@@ -4,7 +4,7 @@ import 'highlight.js/styles/github-dark.css'
 
 import { getAllPosts } from '@/lib/mdx'
 import { genPageMetadata } from 'app/seo'
-import ProjectsLayoutWithTags from '@/layouts/ProjectsLayoutWithTags'
+import ProjectsClient from '@/components/ProjectsClient'
 
 const PROJECTS_PER_PAGE = 6
 
@@ -15,12 +15,12 @@ export default async function Projects() {
   // Contentlayer와 같은 구조로 변환 및 날짜 순으로 정렬
   const projects = allProjects
     .sort((a, b) => (a.date < b.date ? 1 : -1))
-    .map(project => ({
+    .map((project) => ({
       ...project,
       path: `/projects/${project.slug}`,
-      url: `/projects/${project.slug}`
+      url: `/projects/${project.slug}`,
     }))
-  
+
   const pageNumber = 1
   const totalPages = Math.ceil(projects.length / PROJECTS_PER_PAGE)
   const initialDisplayProjects = projects.slice(0, PROJECTS_PER_PAGE * pageNumber)
@@ -30,7 +30,7 @@ export default async function Projects() {
   }
 
   return (
-    <ProjectsLayoutWithTags
+    <ProjectsClient
       projects={projects}
       initialDisplayProjects={initialDisplayProjects}
       pagination={pagination}

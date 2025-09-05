@@ -33,73 +33,93 @@ export default function PostLayout({ content, next, prev, children }: LayoutProp
       {/* Background Elements */}
       <section className="relative w-full overflow-hidden">
         <AnimatedBackground />
-        
+
         {/* Content Container */}
         <div className="relative z-10 w-full">
           <SectionContainer>
             <ScrollTopAndComment />
             <article>
-        <div>
-          <header>
-            <div className="space-y-1 border-b border-gray-800 pb-10 text-center">
-              <dl>
-                <div>
-                  <dt className="sr-only">Published on</dt>
-                  <dd className="text-base leading-6 font-medium text-gray-400">
-                    <time dateTime={date}>{formatDate(date, siteMetadata.locale)}</time>
-                  </dd>
-                </div>
-              </dl>
               <div>
-                <PageTitle>{title}</PageTitle>
-              </div>
-            </div>
-          </header>
-          <div className="grid-rows-[auto_1fr] divide-y divide-gray-800 pb-8 xl:divide-y-0">
-            <div className="divide-y divide-gray-800 xl:col-span-3 xl:row-span-2 xl:pb-0">
-              <div className="prose dark:prose-invert max-w-none pt-10 pb-8">{children}</div>
-            </div>
-            {siteMetadata.comments && (
-              <div className="pt-6 pb-6 text-center text-gray-300" id="comment">
-                <Comments slug={slug} />
-              </div>
-            )}
-            <footer>
-              <div className="flex flex-col gap-4 sm:flex-row sm:justify-between">
-                {prev && prev.path && (
-                  <div className="pt-4 xl:pt-8">
-                    <Link
-                      href={`/${prev.path}`}
-                      className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600/20 to-primary-600/20 border border-blue-500/30 rounded-lg text-blue-300 hover:from-blue-600/30 hover:to-primary-600/30 hover:text-blue-200 hover:border-blue-400/50 transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20 font-medium text-sm"
-                      aria-label={`Previous post: ${prev.title}`}
-                    >
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                      </svg>
-                      {prev.title}
-                    </Link>
+                <header>
+                  <div className="space-y-1 border-b border-gray-800 pb-10 text-center">
+                    <dl>
+                      <div>
+                        <dt className="sr-only">Published on</dt>
+                        <dd className="text-base leading-6 font-medium text-gray-400">
+                          <time dateTime={date}>{formatDate(date, siteMetadata.locale)}</time>
+                        </dd>
+                      </div>
+                    </dl>
+                    <div>
+                      <PageTitle>{title}</PageTitle>
+                    </div>
                   </div>
-                )}
-                {next && next.path && (
-                  <div className="pt-4 xl:pt-8">
-                    <Link
-                      href={`/${next.path}`}
-                      className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600/20 to-primary-600/20 border border-blue-500/30 rounded-lg text-blue-300 hover:from-blue-600/30 hover:to-primary-600/30 hover:text-blue-200 hover:border-blue-400/50 transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20 font-medium text-sm"
-                      aria-label={`Next post: ${next.title}`}
-                    >
-                      {next.title}
-                      <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </Link>
+                </header>
+                <div className="grid-rows-[auto_1fr] divide-y divide-gray-800 pb-8 xl:divide-y-0">
+                  <div className="divide-y divide-gray-800 xl:col-span-3 xl:row-span-2 xl:pb-0">
+                    <div className="prose dark:prose-invert max-w-none pt-10 pb-8">{children}</div>
                   </div>
-                )}
+                  {siteMetadata.comments && (
+                    <div className="pt-6 pb-6 text-center text-gray-300" id="comment">
+                      <Comments slug={slug} />
+                    </div>
+                  )}
+                  <footer>
+                    <div className="flex flex-col gap-4 sm:flex-row sm:justify-between">
+                      {prev && prev.path && (
+                        <div className="pt-4 xl:pt-8">
+                          <Link
+                            href={`/${prev.path}`}
+                            className="to-primary-600/20 hover:to-primary-600/30 inline-flex transform items-center rounded-lg border border-blue-500/30 bg-gradient-to-r from-blue-600/20 px-4 py-2 text-sm font-medium text-blue-300 transition-all duration-300 hover:scale-105 hover:border-blue-400/50 hover:from-blue-600/30 hover:text-blue-200 hover:shadow-lg hover:shadow-blue-500/20"
+                            aria-label={`Previous post: ${prev.title}`}
+                          >
+                            <svg
+                              className="mr-2 h-4 w-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M15 19l-7-7 7-7"
+                              />
+                            </svg>
+                            {prev.title}
+                          </Link>
+                        </div>
+                      )}
+                      {next && next.path && (
+                        <div className="pt-4 xl:pt-8">
+                          <Link
+                            href={`/${next.path}`}
+                            className="to-primary-600/20 hover:to-primary-600/30 inline-flex transform items-center rounded-lg border border-blue-500/30 bg-gradient-to-r from-blue-600/20 px-4 py-2 text-sm font-medium text-blue-300 transition-all duration-300 hover:scale-105 hover:border-blue-400/50 hover:from-blue-600/30 hover:text-blue-200 hover:shadow-lg hover:shadow-blue-500/20"
+                            aria-label={`Next post: ${next.title}`}
+                          >
+                            {next.title}
+                            <svg
+                              className="ml-2 h-4 w-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M9 5l7 7-7 7"
+                              />
+                            </svg>
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  </footer>
+                </div>
               </div>
-            </footer>
-          </div>
-        </div>
-      </article>
-      </SectionContainer>
+            </article>
+          </SectionContainer>
         </div>
       </section>
     </div>

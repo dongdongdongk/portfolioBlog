@@ -3,7 +3,7 @@ import Main from './Main'
 
 export default async function Page() {
   const allPosts = getAllPosts()
-  const posts = allPosts.map(post => ({
+  const posts = allPosts.map((post) => ({
     slug: post.slug,
     path: `/blog/${post.slug}`,
     date: post.date,

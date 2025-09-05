@@ -153,7 +153,7 @@ export default function InteractiveHero({
 
       {/* Interactive Components Container */}
       <div
-        className={`absolute left-1/2 flex -translate-x-1/2 transform items-start justify-center gap-16 transition-all delay-1200 duration-1000 sm:gap-20 md:gap-28 lg:gap-36 xl:gap-48 ${
+        className={`absolute left-1/2 flex -translate-x-1/2 transform items-start justify-center gap-16 transition-all delay-1200 duration-1000 sm:gap-28 md:gap-36 lg:gap-48 xl:gap-56 ${
           isVisible ? 'opacity-100' : 'opacity-0'
         } top-[45%] sm:top-[42%] md:top-[40%] lg:top-[38%] xl:top-[36%]`}
       >
@@ -236,9 +236,8 @@ export default function InteractiveHero({
                       : 'text-white/70'
                 }`}
               >
-                음악과 소리로 감동을 전달하며,
+                기술과 창의성을 결합해 인터랙티브한 오디오 경험을 만들어냅니다.
                 <br />
-                창의적인 오디오 경험을 만듭니다
               </p>
 
               {isHovered && isLeft && (
@@ -330,9 +329,8 @@ export default function InteractiveHero({
                       : 'text-white/70'
                 }`}
               >
-                코드로 문제를 해결하며,
+                코드를 통해 실용적이고 창의적인 방식으로 문제를 해결합니다.
                 <br />
-                혁신적인 디지털 솔루션을 구현합니다
               </p>
 
               {isHovered && !isLeft && (

@@ -7,19 +7,13 @@ export async function POST(request: NextRequest) {
 
     // 입력 검증
     if (!name || !email || !subject || !message) {
-      return NextResponse.json(
-        { error: '모든 필드를 입력해주세요.' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: '모든 필드를 입력해주세요.' }, { status: 400 })
     }
 
     // 이메일 형식 검증
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { error: '올바른 이메일 형식을 입력해주세요.' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: '올바른 이메일 형식을 입력해주세요.' }, { status: 400 })
     }
 
     // Gmail SMTP 설정
@@ -131,20 +125,11 @@ export async function POST(request: NextRequest) {
     }
 
     // 메일 발송
-    await Promise.all([
-      transporter.sendMail(mailOptions),
-      transporter.sendMail(autoReplyOptions)
-    ])
+    await Promise.all([transporter.sendMail(mailOptions), transporter.sendMail(autoReplyOptions)])
 
-    return NextResponse.json(
-      { message: '메시지가 성공적으로 전송되었습니다.' },
-      { status: 200 }
-    )
+    return NextResponse.json({ message: '메시지가 성공적으로 전송되었습니다.' }, { status: 200 })
   } catch (error) {
     console.error('Contact form error:', error)
-    return NextResponse.json(
-      { error: '메시지 전송 중 오류가 발생했습니다.' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: '메시지 전송 중 오류가 발생했습니다.' }, { status: 500 })
   }
 }

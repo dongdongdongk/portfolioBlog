@@ -22,16 +22,24 @@ export async function generateMetadata(props: {
 }): Promise<Metadata | undefined> {
   const params = await props.params
   const slug = decodeURI(params.slug.join('/'))
-  
+
   try {
     const post = getPostBySlug('blog', slug)
     if (!post) {
       return
     }
 
-    const publishedAt = new Date(post.date).toISOString()
-    const modifiedAt = new Date(post.lastmod || post.date).toISOString()
-    
+    const publishedAt = new Date(
+      post.date && typeof post.date === 'string' ? post.date : Date.now()
+    ).toISOString()
+    const modifiedAt = new Date(
+      post.lastmod && typeof post.lastmod === 'string'
+        ? post.lastmod
+        : post.date && typeof post.date === 'string'
+          ? post.date
+          : Date.now()
+    ).toISOString()
+
     return {
       title: post.title,
       description: post.summary,
@@ -64,7 +72,7 @@ export const generateStaticParams = async () => {
 export default async function Page(props: { params: Promise<{ slug: string[] }> }) {
   const params = await props.params
   const slug = decodeURI(params.slug.join('/'))
-  
+
   try {
     const post = getPostBySlug('blog', slug)
     if (!post) {
@@ -78,8 +86,11 @@ export default async function Page(props: { params: Promise<{ slug: string[] }> 
 
     // HTML로 변환된 마크다운 콘텐츠
     const htmlContent = getPostHtml('blog', slug)
-    
-    const Layout = layouts[post.layout || defaultLayout]
+
+    const Layout =
+      layouts[
+        typeof post.layout === 'string' && post.layout in layouts ? post.layout : defaultLayout
+      ]
 
     // 간단한 content 객체 생성 (기존 레이아웃 호환용)
     const mainContent = {
@@ -89,18 +100,18 @@ export default async function Page(props: { params: Promise<{ slug: string[] }> 
       tags: post.tags,
       slug: post.slug,
       path: `/blog/${post.slug}`,
-      filePath: `data/blog/${post.slug}.md`
+      filePath: `data/blog/${post.slug}.md`,
     }
 
     return (
       <Layout content={mainContent} authorDetails={[]} next={next} prev={prev}>
-        <div 
+        <div
           className="blog-content"
-          style={{ 
-            textAlign: 'left', 
+          style={{
+            textAlign: 'left',
             maxWidth: 'none',
             fontSize: '1.125rem',
-            lineHeight: '1.75'
+            lineHeight: '1.75',
           }}
           dangerouslySetInnerHTML={{ __html: htmlContent }}
         />

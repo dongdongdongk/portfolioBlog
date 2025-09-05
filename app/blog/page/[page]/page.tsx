@@ -17,12 +17,12 @@ export default async function Page(props: { params: Promise<{ page: string }> })
   const allPosts = getAllPosts('blog')
   const posts = allPosts
     .sort((a, b) => (a.date < b.date ? 1 : -1))
-    .map(post => ({
+    .map((post) => ({
       ...post,
       path: `/blog/${post.slug}`,
-      url: `/blog/${post.slug}`
+      url: `/blog/${post.slug}`,
     }))
-    
+
   const pageNumber = parseInt(params.page as string)
   const totalPages = Math.ceil(posts.length / POSTS_PER_PAGE)
 

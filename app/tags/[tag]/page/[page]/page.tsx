@@ -23,17 +23,17 @@ export default async function TagPage(props: { params: Promise<{ tag: string; pa
   const tag = decodeURI(params.tag)
   const title = tag[0].toUpperCase() + tag.split(' ').join('-').slice(1)
   const pageNumber = parseInt(params.page)
-  
+
   const allPosts = getAllPosts('blog')
   const filteredPosts = allPosts
     .filter((post) => post.tags && post.tags.map((t) => slug(t)).includes(tag))
     .sort((a, b) => (a.date < b.date ? 1 : -1))
-    .map(post => ({
+    .map((post) => ({
       ...post,
       path: `/blog/${post.slug}`,
-      url: `/blog/${post.slug}`
+      url: `/blog/${post.slug}`,
     }))
-    
+
   const totalPages = Math.ceil(filteredPosts.length / POSTS_PER_PAGE)
 
   // Return 404 for invalid page numbers or empty pages
