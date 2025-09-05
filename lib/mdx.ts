@@ -13,8 +13,8 @@ const projectsDirectory = path.join(process.cwd(), 'data/projects')
 const renderer = new marked.Renderer()
 
 // 헤딩에 대한 커스텀 렌더러 (한글 지원)
-renderer.heading = function({ text, depth }) {
-  const cleanText = typeof text === 'string' ? text : text.toString()
+renderer.heading = function ({ text, depth }: { text: string; depth: number }) {
+  const cleanText = typeof text === 'string' ? text : String(text)
   const id = slugger(cleanText)
   return `<h${depth} id="${id}" class="content-header"><a href="#${id}" class="content-header-link">#</a>${cleanText}</h${depth}>`
 }
@@ -23,19 +23,7 @@ renderer.heading = function({ text, depth }) {
 marked.setOptions({
   gfm: true,
   breaks: true,
-  headerIds: false, // 커스텀 렌더러 사용
-  mangle: false,
   renderer: renderer,
-  highlight: function(code, lang) {
-    if (lang && hljs.getLanguage(lang)) {
-      try {
-        return hljs.highlight(code, { language: lang }).value
-      } catch (err) {
-        console.error('Highlight.js error:', err)
-      }
-    }
-    return hljs.highlightAuto(code).value
-  }
 })
 
 export interface BlogPost {
@@ -46,7 +34,7 @@ export interface BlogPost {
   tags?: string[]
   draft?: boolean
   summary?: string
-  [key: string]: any
+  [key: string]: unknown
 }
 
 export interface AboutPage {
@@ -55,26 +43,26 @@ export interface AboutPage {
   title: string
   category: string
   description?: string
-  [key: string]: any
+  [key: string]: unknown
 }
 
 export function getAllPosts(type: 'blog' | 'projects' = 'blog'): BlogPost[] {
   const directory = type === 'blog' ? postsDirectory : projectsDirectory
-  
+
   if (!fs.existsSync(directory)) {
     return []
   }
 
   function getAllFilesRecursively(dir: string): string[] {
     const files: string[] = []
-    
+
     function scanDirectory(currentDir: string, relativePath = '') {
       const entries = fs.readdirSync(currentDir, { withFileTypes: true })
-      
+
       for (const entry of entries) {
         const fullPath = path.join(currentDir, entry.name)
         const relativeFilePath = relativePath ? path.join(relativePath, entry.name) : entry.name
-        
+
         if (entry.isDirectory()) {
           scanDirectory(fullPath, relativeFilePath)
         } else if (entry.name.endsWith('.mdx') || entry.name.endsWith('.md')) {
@@ -82,7 +70,7 @@ export function getAllPosts(type: 'blog' | 'projects' = 'blog'): BlogPost[] {
         }
       }
     }
-    
+
     scanDirectory(dir)
     return files
   }
@@ -98,10 +86,12 @@ export function getAllPosts(type: 'blog' | 'projects' = 'blog'): BlogPost[] {
       return {
         slug,
         content,
+        title: data.title || '',
+        date: data.date || '',
         ...data,
-      }
+      } as BlogPost
     })
-    .filter(post => !post.draft) // draft가 true인 포스트 제외
+    .filter((post) => !post.draft) // draft가 true인 포스트 제외
     .sort((a, b) => (a.date < b.date ? 1 : -1))
 
   return allPostsData
@@ -109,7 +99,7 @@ export function getAllPosts(type: 'blog' | 'projects' = 'blog'): BlogPost[] {
 
 export function getPostBySlug(type: 'blog' | 'projects', slug: string): BlogPost | null {
   const directory = type === 'blog' ? postsDirectory : projectsDirectory
-  
+
   try {
     let fullPath = path.join(directory, `${slug}.mdx`)
     if (!fs.existsSync(fullPath)) {
@@ -118,15 +108,17 @@ export function getPostBySlug(type: 'blog' | 'projects', slug: string): BlogPost
         return null
       }
     }
-    
+
     const fileContents = fs.readFileSync(fullPath, 'utf8')
     const { data, content } = matter(fileContents)
 
     return {
       slug,
       content,
+      title: data.title || '',
+      date: data.date || '',
       ...data,
-    }
+    } as BlogPost
   } catch (error) {
     return null
   }
@@ -137,7 +129,8 @@ export function getPostHtml(type: 'blog' | 'projects', slug: string): string {
   if (!post) {
     return '<p>게시물을 찾을 수 없습니다.</p>'
   }
-  return marked(post.content)
+  const result = marked(post.content)
+  return typeof result === 'string' ? result : String(result)
 }
 
 // About 페이지 관련 함수들
@@ -145,10 +138,10 @@ export function getAllAboutPages(): AboutPage[] {
   if (!fs.existsSync(aboutDirectory)) {
     return []
   }
-  
+
   const fileNames = fs.readdirSync(aboutDirectory)
   const allAboutData = fileNames
-    .filter(name => name.endsWith('.mdx') || name.endsWith('.md'))
+    .filter((name) => name.endsWith('.mdx') || name.endsWith('.md'))
     .map((fileName): AboutPage => {
       const slug = fileName.replace(/\.(mdx|md)$/, '')
       const fullPath = path.join(aboutDirectory, fileName)
@@ -158,8 +151,10 @@ export function getAllAboutPages(): AboutPage[] {
       return {
         slug,
         content,
+        title: data.title || '',
+        category: data.category || '',
         ...data,
-      }
+      } as AboutPage
     })
 
   return allAboutData
@@ -174,15 +169,17 @@ export function getAboutByCategory(category: string): AboutPage | null {
         return null
       }
     }
-    
+
     const fileContents = fs.readFileSync(fullPath, 'utf8')
     const { data, content } = matter(fileContents)
 
     return {
       slug: category,
       content,
+      title: data.title || '',
+      category: data.category || category,
       ...data,
-    }
+    } as AboutPage
   } catch (error) {
     return null
   }
@@ -193,5 +190,6 @@ export function getAboutHtml(category: string): string {
   if (!page) {
     return '<p>페이지를 찾을 수 없습니다.</p>'
   }
-  return marked(page.content)
+  const result = marked(page.content)
+  return typeof result === 'string' ? result : String(result)
 }
