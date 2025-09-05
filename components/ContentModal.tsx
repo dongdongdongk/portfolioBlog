@@ -519,368 +519,387 @@ function DeveloperContent() {
 function SoundDesignerContent() {
   return (
     <>
-      <ScrollReveal className="mb-20 text-center">
-        <div className="mb-8 inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-400 to-violet-500">
-          <svg
-            className="h-10 w-10 text-white"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
+      {/* Header Section with Profile */}
+      <div className="relative">
+        <div className="mb-12 flex flex-col items-center gap-8 lg:flex-row lg:items-start">
+          {/* Profile Image & Basic Info */}
+          <div className="flex-shrink-0 text-center lg:text-left">
+            <div className="mx-auto mb-6 flex h-32 w-32 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-400 to-violet-500 shadow-2xl shadow-purple-500/20 lg:mx-0 lg:h-40 lg:w-40">
+              <svg
+                className="h-16 w-16 text-white lg:h-20 lg:w-20"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
+                />
+              </svg>
+            </div>
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold text-white lg:text-4xl">김동현</h1>
+              <p className="text-xl font-medium text-purple-300">Sound Designer & Audio Engineer</p>
+              <div className="flex flex-wrap justify-center gap-2 lg:justify-start">
+                <span className="rounded-full bg-purple-500/20 px-3 py-1 text-sm text-purple-300">
+                  Game Audio
+                </span>
+                <span className="rounded-full bg-violet-500/20 px-3 py-1 text-sm text-violet-300">
+                  Music Production
+                </span>
+                <span className="rounded-full bg-purple-500/20 px-3 py-1 text-sm text-purple-300">
+                  Voice Recording
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Professional Summary */}
+          <div className="flex-1">
+            <h2 className="mb-4 text-2xl font-bold text-purple-200 lg:text-3xl">About Me</h2>
+            <div className="space-y-4 leading-relaxed text-gray-300">
+              <p>
+                <strong className="text-purple-300">작곡 전공 출신</strong>으로서 학창시절 게임과
+                영상 음악 작업을 시작하여 자연스럽게 사운드 디자인 업무를 접하게 되었습니다.
+              </p>
+              <p>
+                넷마블F&C, 토이푸딩, 스톰프 뮤직에서
+                <strong className="text-violet-300">애니메이션, 앱, 게임 등 규모있는 콘텐츠</strong>
+                를 제작하며 창의적 마인드와 팀 협업 능력을 키워왔습니다.
+              </p>
+              <p>
+                <strong className="text-purple-300">Wwise, FMOD, 언리얼/유니티</strong> 등 게임
+                엔진과 미들웨어를 심도있게 학습하여 게임 제작 전반에 대한 이해도를 갖추고 있습니다.
+              </p>
+            </div>
+
+            {/* Skills & Tools */}
+            <div className="mt-6 rounded-xl border border-slate-700 bg-slate-800/50 p-4">
+              <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
+                <div className="flex items-center space-x-2">
+                  <svg
+                    className="h-4 w-4 text-purple-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
+                    />
+                  </svg>
+                  <span className="text-gray-300">DAW & Plugin 전문</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <svg
+                    className="h-4 w-4 text-violet-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                    />
+                  </svg>
+                  <span className="text-gray-300">RX9 보이스 에디팅</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <svg
+                    className="h-4 w-4 text-purple-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 18.5l-7.5-7.5 1.5-1.5L12 15.5l6-6 1.5 1.5L12 18.5z"
+                    />
+                  </svg>
+                  <span className="text-gray-300">Wwise & FMOD 통합</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <svg
+                    className="h-4 w-4 text-violet-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                    />
+                  </svg>
+                  <span className="text-gray-300">팀 리더십 & 디렉팅</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Core Competencies */}
+      <ScrollReveal delay={200} className="mb-12">
+        <h2 className="mb-6 flex items-center text-2xl font-bold text-purple-200">
+          <svg className="mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
+              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
-        </div>
-        <h2 className="mb-6 bg-gradient-to-r from-purple-300 to-violet-400 bg-clip-text text-4xl font-bold text-transparent md:text-5xl">
-          Sound Designer 김동현
+          Core Competencies
         </h2>
-        <p className="mx-auto max-w-4xl text-lg leading-relaxed text-gray-300 md:text-xl">
-          넷마블, 토이푸딩, 스톰프 뮤직에서 쌓아온 풍부한 오디오 경험을 바탕으로 게임 사운드
-          엔지니어링부터 음악 프로덕션까지 다양한 영역을 아우르는 사운드 전문가입니다.
-        </p>
-      </ScrollReveal>
-
-      {/* Audio Expertise Overview */}
-      <ScrollReveal delay={200} className="mb-16">
-        <div className="mb-12 text-center">
-          <h3 className="mb-4 text-3xl font-bold text-purple-200">오디오 전문 분야</h3>
-          <p className="text-lg text-gray-400">다양한 환경에서 축적한 오디오 기술과 경험</p>
-        </div>
-        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-          <ScrollReveal delay={400}>
-            <div className="rounded-2xl border border-purple-500/30 bg-purple-900/20 p-6 backdrop-blur-lg transition-all duration-300 hover:bg-purple-900/30">
-              <div className="mb-4 flex items-center">
-                <div className="mr-3 h-3 w-3 rounded-full bg-purple-400"></div>
-                <h4 className="text-2xl font-bold text-purple-300">게임 오디오</h4>
-              </div>
-              <ul className="space-y-3 text-gray-300">
-                <li className="flex items-center">
-                  <span className="mr-3 h-2 w-2 rounded-full bg-purple-500"></span>
-                  언리얼 엔진 사운드 시스템
-                </li>
-                <li className="flex items-center">
-                  <span className="mr-3 h-2 w-2 rounded-full bg-purple-500"></span>
-                  인게임 사운드 이펙트 디자인
-                </li>
-                <li className="flex items-center">
-                  <span className="mr-3 h-2 w-2 rounded-full bg-purple-500"></span>
-                  오디오 최적화 & 성능 튜닝
-                </li>
-                <li className="flex items-center">
-                  <span className="mr-3 h-2 w-2 rounded-full bg-purple-500"></span>
-                  Wwise & FMOD 통합
-                </li>
-              </ul>
+        <div className="grid gap-6 md:grid-cols-3">
+          <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-5">
+            <h3 className="mb-4 text-lg font-semibold text-purple-300">문서화 & 효율적 관리</h3>
+            <div className="space-y-2 text-sm text-gray-300">
+              <p>• 작업 소스 목록 엑셀 문서화</p>
+              <p>• 우선순위 등급 시스템 구축</p>
+              <p>• 지속적 소통 및 혼선 방지</p>
+              <p>• 프로젝트 마감 기한 준수</p>
             </div>
-          </ScrollReveal>
+          </div>
 
-          <ScrollReveal delay={600}>
-            <div className="rounded-2xl border border-purple-500/30 bg-purple-900/20 p-6 backdrop-blur-lg transition-all duration-300 hover:bg-purple-900/30">
-              <div className="mb-4 flex items-center">
-                <div className="mr-3 h-3 w-3 rounded-full bg-violet-400"></div>
-                <h4 className="text-2xl font-bold text-violet-300">음악 프로덕션</h4>
-              </div>
-              <ul className="space-y-3 text-gray-300">
-                <li className="flex items-center">
-                  <span className="mr-3 h-2 w-2 rounded-full bg-violet-500"></span>
-                  작곡 & 편곡
-                </li>
-                <li className="flex items-center">
-                  <span className="mr-3 h-2 w-2 rounded-full bg-violet-500"></span>
-                  믹싱 & 마스터링
-                </li>
-                <li className="flex items-center">
-                  <span className="mr-3 h-2 w-2 rounded-full bg-violet-500"></span>
-                  스튜디오 레코딩
-                </li>
-                <li className="flex items-center">
-                  <span className="mr-3 h-2 w-2 rounded-full bg-violet-500"></span>
-                  오디오 포스트 프로덕션
-                </li>
-              </ul>
+          <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-5">
+            <h3 className="mb-4 text-lg font-semibold text-violet-300">창의적 사운드 제작</h3>
+            <div className="space-y-2 text-sm text-gray-300">
+              <p>• DAW & 다양한 Plugin 활용</p>
+              <p>• 일상 소리 기반 몬스터 보이스</p>
+              <p>• 창의적 사운드 디자인 기법</p>
+              <p>• 특색있는 오디오 결과물</p>
             </div>
-          </ScrollReveal>
+          </div>
 
-          <ScrollReveal delay={800}>
-            <div className="rounded-2xl border border-purple-500/30 bg-purple-900/20 p-6 backdrop-blur-lg transition-all duration-300 hover:bg-purple-900/30 md:col-span-2 lg:col-span-1">
-              <div className="mb-4 flex items-center">
-                <div className="mr-3 h-3 w-3 rounded-full bg-purple-400"></div>
-                <h4 className="text-2xl font-bold text-purple-300">팀 리더십 & 관리</h4>
-              </div>
-              <ul className="space-y-3 text-gray-300">
-                <li className="flex items-center">
-                  <span className="mr-3 h-2 w-2 rounded-full bg-purple-500"></span>
-                  사운드팀 리더십
-                </li>
-                <li className="flex items-center">
-                  <span className="mr-3 h-2 w-2 rounded-full bg-purple-500"></span>
-                  외주 업체 관리
-                </li>
-                <li className="flex items-center">
-                  <span className="mr-3 h-2 w-2 rounded-full bg-purple-500"></span>
-                  프로젝트 일정 관리
-                </li>
-                <li className="flex items-center">
-                  <span className="mr-3 h-2 w-2 rounded-full bg-purple-500"></span>
-                  품질 관리 & 표준화
-                </li>
-              </ul>
+          <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-5">
+            <h3 className="mb-4 text-lg font-semibold text-purple-300">보이스 레코딩 & 디렉팅</h3>
+            <div className="space-y-2 text-sm text-gray-300">
+              <p>• 퀄리티 높은 보이스 샘플 제작</p>
+              <p>• RX9 활용 보이스 에디팅</p>
+              <p>• 성우 디렉팅 및 역량 극대화</p>
+              <p>• 250만 조회수 콘텐츠 제작</p>
             </div>
-          </ScrollReveal>
+          </div>
         </div>
       </ScrollReveal>
 
       {/* Work Experience */}
-      <ScrollReveal delay={1000} className="mb-20">
-        <div className="mb-12 text-center">
-          <h3 className="mb-4 text-3xl font-bold text-purple-200">오디오 경력</h3>
-          <p className="text-lg text-gray-400">다양한 분야에서 쌓아온 오디오 전문 경험</p>
-        </div>
-        <div className="space-y-12">
-          {/* 넷마블 */}
-          <ScrollReveal delay={1200}>
-            <div className="rounded-3xl border border-purple-500/20 bg-purple-900/10 p-8 backdrop-blur-lg transition-all duration-500 hover:bg-purple-900/20">
-              <div className="mb-5 flex items-center">
-                <div className="mr-4 h-4 w-4 animate-pulse rounded-full bg-purple-400"></div>
-                <div>
-                  <h3 className="text-3xl font-bold text-purple-300">넷마블</h3>
-                  <p className="text-purple-200">사운드 개발팀 사원</p>
-                </div>
+      <ScrollReveal delay={300} className="mb-12">
+        <h2 className="mb-6 flex items-center text-2xl font-bold text-purple-200">
+          <svg className="mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0V6a2 2 0 012 2v6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m-8 0v10a2 2 0 002 2h4a2 2 0 002-2V6"
+            />
+          </svg>
+          Work Experience
+        </h2>
+        <div className="space-y-8">
+          {/* 넷마블F&C */}
+          <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-6">
+            <div className="mb-4 flex flex-col md:flex-row md:items-center md:justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-purple-300">넷마블F&C</h3>
+                <p className="font-medium text-purple-200">사운드디자인, 믹싱</p>
               </div>
-              <div className="mb-5 border-l-4 border-purple-400 pl-6">
-                <p className="leading-relaxed text-gray-300">
-                  대규모 게임 개발 환경에서 사운드 디자인과 게임 사운드 엔지니어링을 담당하며,
-                  언리얼 엔진의 오디오 시스템을 활용한 고품질 게임 사운드 구현 경험을 쌓았습니다.
-                </p>
-              </div>
-
-              <div className="mb-5 grid gap-6 md:grid-cols-2">
-                <div className="rounded-2xl bg-purple-900/30 p-6">
-                  <h4 className="mb-3 flex items-center text-xl font-semibold text-purple-300">
-                    <span className="mr-2 h-2 w-2 rounded-full bg-purple-400"></span>
-                    게임 사운드 엔지니어링
-                  </h4>
-                  <ul className="space-y-2 text-sm text-gray-300">
-                    <li>• 언리얼 엔진 기반 게임 사운드 시스템 구축</li>
-                    <li>• 인게임 사운드 이펙트 디자인 및 구현</li>
-                    <li>• 대규모 프로젝트 오디오 최적화</li>
-                    <li>• 실시간 오디오 처리 및 성능 튜닝</li>
-                  </ul>
-                </div>
-
-                <div className="rounded-2xl bg-purple-900/30 p-6">
-                  <h4 className="mb-3 flex items-center text-xl font-semibold text-purple-300">
-                    <span className="mr-2 h-2 w-2 rounded-full bg-purple-400"></span>
-                    기술 스택 & 도구
-                  </h4>
-                  <div className="mb-4 flex flex-wrap gap-2">
-                    <span className="rounded bg-purple-500/20 px-2 py-1 text-xs text-purple-200">
-                      Unreal Engine
-                    </span>
-                    <span className="rounded bg-purple-500/20 px-2 py-1 text-xs text-purple-200">
-                      Wwise
-                    </span>
-                    <span className="rounded bg-purple-500/20 px-2 py-1 text-xs text-purple-200">
-                      Pro Tools
-                    </span>
-                    <span className="rounded bg-purple-500/20 px-2 py-1 text-xs text-purple-200">
-                      C++
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-300">
-                    대형 게임 개발 환경에서 고품질 오디오 시스템 구현 경험
-                  </p>
-                </div>
-              </div>
+              <div className="mt-2 text-sm text-gray-400 md:mt-0">2022 - 2023</div>
             </div>
-          </ScrollReveal>
+            <div className="mb-4">
+              <h4 className="mb-2 font-semibold text-gray-300">
+                주요 프로젝트: 아스달 연대기, 블레이드 & 소울 레볼루션
+              </h4>
+              <ul className="ml-4 space-y-1 text-gray-400">
+                <li>• 언리얼 엔진 오디오 시스템을 활용한 게임 사운드 적용</li>
+                <li>• 캐릭터 및 NPC 대사 녹음 및 편집</li>
+                <li>• 몬스터 공격, 이동, 피격 사운드 효과 제작</li>
+                <li>• 시네마틱 컷신 사운드 디자인 및 믹싱</li>
+              </ul>
+            </div>
+            <p className="border-l-3 border-purple-400 pl-3 text-sm text-gray-300">
+              대형 게임 개발사에서 AAA급 타이틀의 사운드 디자인을 담당하며 대규모 프로젝트 경험을
+              쌓았습니다.
+            </p>
+          </div>
 
           {/* 토이푸딩 */}
-          <ScrollReveal delay={1400}>
-            <div className="rounded-3xl border border-violet-500/20 bg-violet-900/10 p-8 backdrop-blur-lg transition-all duration-500 hover:bg-violet-900/20">
-              <div className="mb-6 flex items-center">
-                <div className="mr-4 h-4 w-4 animate-pulse rounded-full bg-violet-400"></div>
-                <div>
-                  <h3 className="text-3xl font-bold text-violet-300">토이푸딩</h3>
-                  <p className="text-violet-200">사운드팀 팀장 (콘텐츠 개발팀)</p>
-                </div>
+          <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-6">
+            <div className="mb-4 flex flex-col md:flex-row md:items-center md:justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-violet-300">토이푸딩</h3>
+                <p className="font-medium text-violet-200">사운드디자인, 믹싱, 작곡, 편곡</p>
               </div>
-
-              <div className="mb-6 grid gap-6 md:grid-cols-2">
-                <div className="rounded-2xl bg-violet-900/30 p-6">
-                  <h4 className="mb-3 flex items-center text-xl font-semibold text-violet-300">
-                    <span className="mr-2 h-2 w-2 rounded-full bg-violet-400"></span>팀 리더십 &
-                    프로젝트 관리
-                  </h4>
-                  <ul className="space-y-2 text-sm text-gray-300">
-                    <li>• 사운드팀 인력 관리 및 업무 조율</li>
-                    <li>• 외주 업체 관리 및 품질 관리</li>
-                    <li>• 프로젝트 일정 및 워크플로우 최적화</li>
-                    <li>• 팀원 역량 개발 및 기술 지원</li>
-                  </ul>
-                </div>
-
-                <div className="rounded-2xl bg-violet-900/30 p-6">
-                  <h4 className="mb-3 flex items-center text-xl font-semibold text-violet-300">
-                    <span className="mr-2 h-2 w-2 rounded-full bg-violet-400"></span>
-                    오디오 프로덕션
-                  </h4>
-                  <ul className="space-y-2 text-sm text-gray-300">
-                    <li>• 사운드 디자인 및 음향 효과 제작</li>
-                    <li>• 믹싱, 작곡, 편곡 업무</li>
-                    <li>• 레코딩 세션 진행 및 관리</li>
-                    <li>• 다양한 미디어 콘텐츠 오디오 담당</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="border-l-4 border-violet-400 pl-6">
-                <p className="leading-relaxed text-gray-300">
-                  콘텐츠 개발팀에서 사운드팀을 이끌며 다양한 미디어 프로젝트의 오디오 전반을
-                  담당했습니다. 팀 관리와 기술적 실무를 동시에 수행하며 리더십과 전문성을 모두
-                  발휘했습니다.
-                </p>
-              </div>
+              <div className="mt-2 text-sm text-gray-400 md:mt-0">2020 - 2022</div>
             </div>
-          </ScrollReveal>
-
-          {/* 스톰프 뮤직 */}
-          <ScrollReveal delay={1600}>
-            <div className="rounded-3xl border border-purple-500/20 bg-purple-900/10 p-8 backdrop-blur-lg transition-all duration-500 hover:bg-purple-900/20">
-              <div className="mb-6 flex items-center">
-                <div className="mr-4 h-4 w-4 animate-pulse rounded-full bg-purple-400"></div>
-                <div>
-                  <h3 className="text-3xl font-bold text-purple-300">스톰프 뮤직</h3>
-                  <p className="text-purple-200">콘텐츠팀 사원</p>
-                </div>
-              </div>
-
-              <div className="mb-6 grid gap-6 md:grid-cols-2">
-                <div className="rounded-2xl bg-purple-900/30 p-6">
-                  <h4 className="mb-3 flex items-center text-xl font-semibold text-purple-300">
-                    <span className="mr-2 h-2 w-2 rounded-full bg-purple-400"></span>
-                    음악 프로덕션
-                  </h4>
-                  <ul className="space-y-2 text-sm text-gray-300">
-                    <li>• 믹싱 및 마스터링 전문 업무</li>
-                    <li>• 편곡 및 작곡 프로젝트</li>
-                    <li>• 전문 스튜디오 레코딩</li>
-                    <li>• 다양한 장르 음악 제작 경험</li>
-                  </ul>
-                </div>
-
-                <div className="rounded-2xl bg-purple-900/30 p-6">
-                  <h4 className="mb-3 flex items-center text-xl font-semibold text-purple-300">
-                    <span className="mr-2 h-2 w-2 rounded-full bg-purple-400"></span>
-                    프로젝트 관리 & 기술
-                  </h4>
-                  <div className="mb-4 flex flex-wrap gap-2">
-                    <span className="rounded bg-purple-500/20 px-2 py-1 text-xs text-purple-200">
-                      Logic Pro X
-                    </span>
-                    <span className="rounded bg-purple-500/20 px-2 py-1 text-xs text-purple-200">
-                      Cubase
-                    </span>
-                    <span className="rounded bg-purple-500/20 px-2 py-1 text-xs text-purple-200">
-                      Pro Tools
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-300">
-                    외주 프로젝트 관리 및 고품질 음악 프로덕션
-                  </p>
-                </div>
-              </div>
-
-              <div className="border-l-4 border-purple-400 pl-6">
-                <p className="leading-relaxed text-gray-300">
-                  음악 프로덕션 전문 회사에서 다양한 오디오 제작 업무를 경험하며, 믹싱/마스터링부터
-                  작곡/편곡까지 음악 제작의 전 과정에 대한 깊은 이해를 갖추었습니다.
-                </p>
-              </div>
+            <div className="mb-4">
+              <h4 className="mb-2 font-semibold text-gray-300">
+                주요 성과: Baby Doli 애니메이션 2717만 조회수 달성
+              </h4>
+              <ul className="ml-4 space-y-1 text-gray-400">
+                <li>• 유아 대상 캐주얼 게임 사운드디자인 & BGM 제작</li>
+                <li>• 3D 애니메이션 30화 사운드디자인, 레코딩, 작곡 담당</li>
+                <li>• 숏폼 SNS 앱 UI 사운드디자인 (누적 50만 다운로드)</li>
+                <li>• 서울산업진흥원 애니메이션 제작지원사업 본선 진출</li>
+              </ul>
             </div>
-          </ScrollReveal>
+            <p className="border-l-3 border-violet-400 pl-3 text-sm text-gray-300">
+              다양한 미디어 콘텐츠의 오디오 전반을 담당하며 창작자로서의 역량을 발휘했습니다.
+            </p>
+          </div>
+
+          {/* 스톰프뮤직 */}
+          <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-6">
+            <div className="mb-4 flex flex-col md:flex-row md:items-center md:justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-purple-300">스톰프뮤직</h3>
+                <p className="font-medium text-purple-200">작곡, 편곡 외주검수 & 관리, 레코딩</p>
+              </div>
+              <div className="mt-2 text-sm text-gray-400 md:mt-0">2019 - 2020</div>
+            </div>
+            <div className="mb-4">
+              <h4 className="mb-2 font-semibold text-gray-300">주요 업무: 음악 프로덕션 전문</h4>
+              <ul className="ml-4 space-y-1 text-gray-400">
+                <li>• 외주 작곡/편곡 프로젝트 검수 및 관리</li>
+                <li>• 전문 스튜디오 레코딩 세션 진행</li>
+                <li>• 다양한 장르 음악 제작 및 프로덕션</li>
+                <li>• 클라이언트 요구사항 분석 및 품질 관리</li>
+              </ul>
+            </div>
+            <p className="border-l-3 border-purple-400 pl-3 text-sm text-gray-300">
+              음악 프로덕션 전문 회사에서 프로젝트 관리와 음악 제작 전반에 대한 전문성을 갖췄습니다.
+            </p>
+          </div>
         </div>
       </ScrollReveal>
 
-      {/* Audio Technologies & Tools */}
-      <ScrollReveal delay={1800} className="mb-16">
-        <div className="mb-12 text-center">
-          <h3 className="mb-4 text-3xl font-bold text-purple-200">오디오 기술 스택</h3>
-          <p className="text-lg text-gray-400">전문적인 오디오 제작을 위한 도구와 기술</p>
-        </div>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          <ScrollReveal delay={2000}>
-            <div className="rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-900/20 to-violet-900/20 p-6 text-center backdrop-blur-lg transition-all duration-300 hover:scale-105">
-              <div className="mb-3 text-3xl">🎵</div>
-              <h4 className="mb-2 text-lg font-bold text-purple-300">DAW & 편집</h4>
-              <div className="space-y-1 text-sm text-gray-400">
-                <p>Pro Tools, Logic Pro X</p>
-                <p>Cubase, Ableton Live</p>
-              </div>
+      {/* Major Projects */}
+      <ScrollReveal delay={400} className="mb-12">
+        <h2 className="mb-6 flex items-center text-2xl font-bold text-purple-200">
+          <svg className="mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+            />
+          </svg>
+          Major Projects
+        </h2>
+        <div className="grid gap-6 md:grid-cols-2">
+          <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-5">
+            <h3 className="mb-3 text-lg font-semibold text-purple-300">Baby Doli Fantastic Home</h3>
+            <p className="mb-3 text-sm text-gray-400">
+              유아 대상 캐주얼 게임 - 누적 다운로드 10만 회, 중국 수출
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <span className="rounded bg-purple-500/20 px-2 py-1 text-xs text-purple-200">
+                사운드디자인
+              </span>
+              <span className="rounded bg-violet-500/20 px-2 py-1 text-xs text-violet-200">
+                BGM 제작
+              </span>
+              <span className="rounded bg-purple-500/20 px-2 py-1 text-xs text-purple-200">
+                보이스 레코딩
+              </span>
             </div>
-          </ScrollReveal>
-
-          <ScrollReveal delay={2200}>
-            <div className="rounded-2xl border border-purple-500/30 bg-gradient-to-br from-violet-900/20 to-purple-900/20 p-6 text-center backdrop-blur-lg transition-all duration-300 hover:scale-105">
-              <div className="mb-3 text-3xl">🎮</div>
-              <h4 className="mb-2 text-lg font-bold text-violet-300">게임 오디오</h4>
-              <div className="space-y-1 text-sm text-gray-400">
-                <p>Unreal Engine Audio</p>
-                <p>Wwise, FMOD, Unity</p>
-              </div>
+          </div>
+          <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-5">
+            <h3 className="mb-3 text-lg font-semibold text-purple-300">아스달 연대기</h3>
+            <p className="mb-3 text-sm text-gray-400">넷마블 대형 RPG 게임 - G-STAR 2023 출품</p>
+            <div className="flex flex-wrap gap-2">
+              <span className="rounded bg-purple-500/20 px-2 py-1 text-xs text-purple-200">
+                언리얼 엔진
+              </span>
+              <span className="rounded bg-violet-500/20 px-2 py-1 text-xs text-violet-200">
+                사운드 시스템
+              </span>
+              <span className="rounded bg-purple-500/20 px-2 py-1 text-xs text-purple-200">
+                몬스터 사운드
+              </span>
             </div>
-          </ScrollReveal>
-
-          <ScrollReveal delay={2400}>
-            <div className="rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-900/20 to-violet-900/20 p-6 text-center backdrop-blur-lg transition-all duration-300 hover:scale-105">
-              <div className="mb-3 text-3xl">🔊</div>
-              <h4 className="mb-2 text-lg font-bold text-purple-300">사운드 디자인</h4>
-              <div className="space-y-1 text-sm text-gray-400">
-                <p>Audio Mixing</p>
-                <p>Sound Effects, Foley</p>
-              </div>
+          </div>
+          <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-5">
+            <h3 className="mb-3 text-lg font-semibold text-purple-300">Baby Doli Nursery Rhymes</h3>
+            <p className="mb-3 text-sm text-gray-400">
+              3D 애니메이션 30화 - 누적 2717만 조회수, 다국가 수출
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <span className="rounded bg-purple-500/20 px-2 py-1 text-xs text-purple-200">
+                사운드디자인
+              </span>
+              <span className="rounded bg-violet-500/20 px-2 py-1 text-xs text-violet-200">
+                보이스 레코딩
+              </span>
+              <span className="rounded bg-purple-500/20 px-2 py-1 text-xs text-purple-200">
+                BGM 작곡
+              </span>
             </div>
-          </ScrollReveal>
-
-          <ScrollReveal delay={2600}>
-            <div className="rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-900/20 to-violet-900/20 p-6 text-center backdrop-blur-lg transition-all duration-300 hover:scale-105">
-              <div className="mb-3 text-3xl">👥</div>
-              <h4 className="mb-2 text-lg font-bold text-purple-300">팀 리더십</h4>
-              <div className="space-y-1 text-sm text-gray-400">
-                <p>Project Management</p>
-                <p>Quality Control</p>
-              </div>
+          </div>
+          <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-5">
+            <h3 className="mb-3 text-lg font-semibold text-purple-300">CJ CGV PACONNIE</h3>
+            <p className="mb-3 text-sm text-gray-400">CGV 대표 캐릭터 3D 애니메이션 프로젝트</p>
+            <div className="flex flex-wrap gap-2">
+              <span className="rounded bg-purple-500/20 px-2 py-1 text-xs text-purple-200">
+                캐릭터 보이스
+              </span>
+              <span className="rounded bg-violet-500/20 px-2 py-1 text-xs text-violet-200">
+                사운드디자인
+              </span>
+              <span className="rounded bg-purple-500/20 px-2 py-1 text-xs text-purple-200">
+                믹싱&마스터링
+              </span>
             </div>
-          </ScrollReveal>
+          </div>
         </div>
       </ScrollReveal>
 
-      {/* Creative Philosophy */}
-      <ScrollReveal delay={2800} className="mb-16">
-        <div className="rounded-2xl border border-purple-500/10 bg-gradient-to-r from-purple-900/20 to-violet-900/20 p-8 text-center backdrop-blur-sm">
-          <h3 className="mb-6 text-3xl font-bold text-purple-100">오디오 철학</h3>
-          <p className="mx-auto mb-8 max-w-4xl text-lg leading-relaxed text-purple-200/90">
-            소리는 단순한 청각적 요소를 넘어 감정과 이야기를 전달하는 강력한 매체입니다. 기술적
-            완성도와 창의적 표현의 균형을 추구하며, 각 프로젝트의 고유한 정체성을 살리는 맞춤형
-            오디오 솔루션을 제공합니다.
-          </p>
-          <div className="flex flex-wrap justify-center gap-4">
-            <span className="rounded-full border border-purple-500/30 bg-gradient-to-r from-purple-500/20 to-violet-500/20 px-4 py-2 text-purple-200">
-              감정 전달
-            </span>
-            <span className="rounded-full border border-purple-500/30 bg-gradient-to-r from-purple-500/20 to-violet-500/20 px-4 py-2 text-purple-200">
-              기술적 완성도
-            </span>
-            <span className="rounded-full border border-purple-500/30 bg-gradient-to-r from-purple-500/20 to-violet-500/20 px-4 py-2 text-purple-200">
-              창의적 혁신
-            </span>
-            <span className="rounded-full border border-purple-500/30 bg-gradient-to-r from-purple-500/20 to-violet-500/20 px-4 py-2 text-purple-200">
-              협업과 소통
-            </span>
+      {/* Technical Skills */}
+      <ScrollReveal delay={500} className="mb-8">
+        <h2 className="mb-6 flex items-center text-2xl font-bold text-purple-200">
+          <svg className="mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+            />
+          </svg>
+          Technical Stack
+        </h2>
+        <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-5">
+          <div className="grid gap-4 md:grid-cols-4">
+            <div className="text-center">
+              <div className="mb-2 text-2xl">🎵</div>
+              <h3 className="mb-1 font-semibold text-purple-300">DAW & Synth</h3>
+              <p className="text-sm text-gray-400">Pro Tools, Logic, Cubase</p>
+            </div>
+            <div className="text-center">
+              <div className="mb-2 text-2xl">🎮</div>
+              <h3 className="mb-1 font-semibold text-violet-300">Game Audio</h3>
+              <p className="text-sm text-gray-400">Unreal, Unity, Wwise, FMOD</p>
+            </div>
+            <div className="text-center">
+              <div className="mb-2 text-2xl">🎙️</div>
+              <h3 className="mb-1 font-semibold text-purple-300">Voice Editing</h3>
+              <p className="text-sm text-gray-400">RX9, 레코딩 & 디렉팅</p>
+            </div>
+            <div className="text-center">
+              <div className="mb-2 text-2xl">🎼</div>
+              <h3 className="mb-1 font-semibold text-violet-300">Music Production</h3>
+              <p className="text-sm text-gray-400">오케스트레이션, 편곡</p>
+            </div>
           </div>
         </div>
       </ScrollReveal>

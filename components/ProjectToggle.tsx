@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 
 interface ProjectToggleProps {
   onRoleChange: (role: 'Developer' | 'Sound Designer') => void
@@ -16,6 +17,8 @@ export default function ProjectToggle({
   const [activeRole, setActiveRole] = useState<'Developer' | 'Sound Designer'>(
     initialRole || defaultRole
   )
+  const router = useRouter()
+  const pathname = usePathname()
 
   useEffect(() => {
     // 초기 역할 설정
@@ -27,6 +30,16 @@ export default function ProjectToggle({
   const handleRoleChange = (role: 'Developer' | 'Sound Designer') => {
     setActiveRole(role)
     onRoleChange(role)
+
+    // 역할이 바뀔 때 페이지네이션이 있는 페이지에서는 첫 번째 페이지로 이동
+    if (pathname.includes('/projects/page/')) {
+      const roleParam = role === 'Sound Designer' ? '?role=sound-designer' : '?role=developer'
+      router.push(`/projects${roleParam}`)
+    } else if (pathname === '/projects') {
+      // 메인 프로젝트 페이지에서는 URL 파라미터만 업데이트
+      const roleParam = role === 'Sound Designer' ? '?role=sound-designer' : '?role=developer'
+      router.push(`/projects${roleParam}`)
+    }
   }
 
   return (

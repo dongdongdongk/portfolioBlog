@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import Link from '@/components/Link'
 import Image from 'next/image'
 import AnimatedBackground from '@/components/AnimatedBackground'
@@ -11,6 +11,7 @@ import type { BlogPost } from '@/lib/mdx'
 interface PaginationProps {
   totalPages: number
   currentPage: number
+  currentRole?: 'Developer' | 'Sound Designer'
 }
 
 interface ProjectsLayoutProps {
@@ -23,6 +24,7 @@ interface ProjectsLayoutProps {
 
 function Pagination({ totalPages, currentPage }: PaginationProps) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const segments = pathname.split('/')
   const lastSegment = segments[segments.length - 1]
   const basePath = pathname
@@ -32,12 +34,20 @@ function Pagination({ totalPages, currentPage }: PaginationProps) {
   const prevPage = currentPage - 1 > 0
   const nextPage = currentPage + 1 <= totalPages
 
+  // 현재 URL 파라미터를 유지
+  const currentSearchParams = searchParams.toString()
+  const searchQuery = currentSearchParams ? `?${currentSearchParams}` : ''
+
   return (
     <div className="flex items-center justify-center gap-2">
       {/* Previous Button */}
       {prevPage ? (
         <Link
-          href={currentPage - 1 === 1 ? `/${basePath}/` : `/${basePath}/page/${currentPage - 1}`}
+          href={
+            currentPage - 1 === 1
+              ? `/${basePath}/${searchQuery}`
+              : `/${basePath}/page/${currentPage - 1}${searchQuery}`
+          }
           rel="prev"
           className="flex items-center px-3 py-2 text-sm text-gray-400 transition-colors duration-200 hover:text-gray-200"
         >
@@ -82,7 +92,11 @@ function Pagination({ totalPages, currentPage }: PaginationProps) {
           return (
             <Link
               key={pageNum}
-              href={pageNum === 1 ? `/${basePath}/` : `/${basePath}/page/${pageNum}`}
+              href={
+                pageNum === 1
+                  ? `/${basePath}/${searchQuery}`
+                  : `/${basePath}/page/${pageNum}${searchQuery}`
+              }
               className={`flex h-8 w-8 items-center justify-center rounded-lg text-sm font-medium transition-colors duration-200 ${
                 pageNum === currentPage
                   ? 'bg-blue-500 text-white'
@@ -98,7 +112,7 @@ function Pagination({ totalPages, currentPage }: PaginationProps) {
       {/* Next Button */}
       {nextPage ? (
         <Link
-          href={`/${basePath}/page/${currentPage + 1}`}
+          href={`/${basePath}/page/${currentPage + 1}${searchQuery}`}
           rel="next"
           className="flex items-center px-3 py-2 text-sm text-gray-400 transition-colors duration-200 hover:text-gray-200"
         >
@@ -133,10 +147,14 @@ export default function ProjectsLayoutWithTags({
   const [searchValue, setSearchValue] = useState('')
   const [selectedTag, setSelectedTag] = useState('')
   const [selectedRole, setSelectedRole] = useState<'Developer' | 'Sound Designer'>(initialRole)
-  const [filteredProjects, setFilteredProjects] = useState(displayProjects)
+  const [filteredProjects, setFilteredProjects] = useState<BlogPost[]>([])
+  const [displayedProjects, setDisplayedProjects] = useState<BlogPost[]>([])
   const [showAllTags, setShowAllTags] = useState(false)
   const [sortedTags, setSortedTags] = useState<string[]>([])
   const [tagCounts, setTagCounts] = useState<Record<string, number>>({})
+  const [itemsToShow, setItemsToShow] = useState(8) // 초기 표시 개수
+  const [isLoading, setIsLoading] = useState(false)
+  const [showScrollTop, setShowScrollTop] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
   const projectRefs = useRef<(HTMLElement | null)[]>([])
   const observerRef = useRef<IntersectionObserver | null>(null)
@@ -164,12 +182,13 @@ export default function ProjectsLayoutWithTags({
 
   // Search, tag, and role filter functionality
   useEffect(() => {
-    // 검색이나 필터링이 있을 때는 전체 프로젝트에서 필터링
-    const sourceProjects = searchValue || selectedTag ? projects : displayProjects
+    // 항상 전체 프로젝트에서 필터링
+    const sourceProjects = projects
 
     const filtered = sourceProjects.filter((project) => {
       // Role filter - role이 일치하는지 확인
-      const matchesRole = (project as BlogPost & { role?: string }).role === selectedRole
+      const projectRole = (project as BlogPost & { role?: string }).role
+      const matchesRole = projectRole === selectedRole
 
       // Search filter - 검색어가 빈 문자열이면 모든 프로젝트 통과
       let matchesSearch = true
@@ -194,21 +213,59 @@ export default function ProjectsLayoutWithTags({
     })
 
     setFilteredProjects(filtered)
-    // 모든 경우에 프로젝트를 즉시 표시
-    setVisibleProjects(new Array(filtered.length).fill(true))
-  }, [searchValue, selectedTag, selectedRole, displayProjects, projects])
+    // 필터가 변경될 때마다 표시 개수 리셋
+    setItemsToShow(8)
+  }, [searchValue, selectedTag, selectedRole, projects])
+
+  // 표시할 프로젝트 업데이트
+  useEffect(() => {
+    const displayed = filteredProjects.slice(0, itemsToShow)
+    setDisplayedProjects(displayed)
+    setVisibleProjects(new Array(displayed.length).fill(true))
+  }, [filteredProjects, itemsToShow])
 
   // Initial page load animation
   useEffect(() => {
     setIsVisible(true)
   }, [])
 
-  // Update visible projects when filtered projects change - 모든 프로젝트 즉시 표시
-  useEffect(() => {
-    setVisibleProjects(new Array(filteredProjects.length).fill(true))
-  }, [filteredProjects.length])
+  // 더 많은 프로젝트 로드 함수
+  const loadMoreProjects = () => {
+    if (isLoading || itemsToShow >= filteredProjects.length) return
 
-  // Intersection Observer 제거 - 모든 프로젝트를 즉시 표시
+    setIsLoading(true)
+    // 실제 로딩 효과를 위한 약간의 지연
+    setTimeout(() => {
+      setItemsToShow((prev) => prev + 8)
+      setIsLoading(false)
+    }, 500)
+  }
+
+  // 스크롤 이벤트로 자동 로드 및 스크롤 투 톱 버튼 표시
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollY = window.scrollY || document.documentElement.scrollTop
+
+      // 무한스크롤 로직
+      if (window.innerHeight + scrollY >= document.documentElement.offsetHeight - 1000) {
+        loadMoreProjects()
+      }
+
+      // 스크롤 투 톱 버튼 표시/숨김 (300px 이상 스크롤 시 표시)
+      setShowScrollTop(scrollY > 300)
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [isLoading, itemsToShow, filteredProjects.length])
+
+  // 최상단으로 스크롤하는 함수
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    })
+  }
 
   return (
     <>
@@ -433,13 +490,13 @@ export default function ProjectsLayoutWithTags({
               )}
 
               {/* Projects List */}
-              {filteredProjects.length > 0 && (
+              {displayedProjects.length > 0 && (
                 <div
-                  className={`mb-20 space-y-8 transition-all delay-600 duration-1000 ${
+                  className={`mb-20 grid gap-6 transition-all delay-600 duration-1000 sm:grid-cols-1 lg:grid-cols-2 ${
                     isVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'
                   }`}
                 >
-                  {filteredProjects.map((project, index) => {
+                  {displayedProjects.map((project, index) => {
                     const isProjectVisible = visibleProjects[index]
                     return (
                       <article
@@ -457,13 +514,13 @@ export default function ProjectsLayoutWithTags({
                         {/* Animated Border Glow */}
                         <div className="via-primary-500/20 absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 opacity-0 blur-sm transition-opacity duration-700 group-hover:opacity-100"></div>
 
-                        <div className="relative flex flex-col lg:flex-row">
+                        <div className="relative flex h-full">
                           {/* Left: Project Image/Icon */}
-                          <div className="relative flex items-center justify-center overflow-hidden bg-gradient-to-br from-slate-800 to-slate-900 p-8 lg:w-80">
+                          <div className="relative w-40 flex-shrink-0">
                             <Link
                               href={`/projects/${project.slug}`}
                               aria-label={`${project.title}로 이동`}
-                              className="block flex h-48 w-full items-center justify-center overflow-hidden rounded-xl border border-slate-700/50 bg-slate-800/50 transition-colors duration-500 group-hover:border-blue-500/30 lg:h-64"
+                              className="block h-full w-full overflow-hidden bg-white transition-colors duration-500 group-hover:opacity-90"
                             >
                               {project.images?.[0] ? (
                                 <Image
@@ -471,16 +528,16 @@ export default function ProjectsLayoutWithTags({
                                   src={project.images[0]}
                                   className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
                                   width={400}
-                                  height={256}
-                                  sizes="(max-width: 768px) 100vw, 320px"
+                                  height={400}
+                                  sizes="(max-width: 768px) 100vw, 400px"
                                   onError={(e) => {
                                     e.currentTarget.style.display = 'none'
                                   }}
                                 />
                               ) : (
-                                <div className="flex flex-col items-center justify-center p-8 text-gray-400">
+                                <div className="flex h-full w-full flex-col items-center justify-center bg-white text-gray-400">
                                   <svg
-                                    className="mb-4 h-16 w-16 text-blue-400/60"
+                                    className="mb-2 h-12 w-12 text-blue-400/60"
                                     fill="none"
                                     stroke="currentColor"
                                     viewBox="0 0 24 24"
@@ -492,7 +549,7 @@ export default function ProjectsLayoutWithTags({
                                       d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
                                     />
                                   </svg>
-                                  <span className="text-lg font-medium text-gray-500">
+                                  <span className="line-clamp-3 px-2 text-center text-xs font-medium text-gray-600">
                                     {project.title}
                                   </span>
                                 </div>
@@ -501,89 +558,10 @@ export default function ProjectsLayoutWithTags({
                           </div>
 
                           {/* Right: Content */}
-                          <div className="flex flex-1 flex-col justify-between p-8 lg:p-12">
-                            {/* Header Section */}
-                            <div className="mb-6">
-                              {/* Project Index & Date */}
-                              <div className="mb-6 flex items-center justify-between">
-                                <div className="flex items-center space-x-4">
-                                  <span className="text-6xl leading-none font-black text-blue-500/20">
-                                    {String(index + 1).padStart(2, '0')}
-                                  </span>
-                                  <div className="border-l border-slate-600/50 pl-4">
-                                    <time className="flex items-center text-sm text-gray-400">
-                                      <svg
-                                        className="mr-2 h-4 w-4"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                                        />
-                                      </svg>
-                                      {new Date(project.date).toLocaleDateString('ko-KR', {
-                                        year: 'numeric',
-                                        month: 'long',
-                                      })}
-                                    </time>
-                                  </div>
-                                </div>
-
-                                {/* External Links */}
-                                <div className="flex gap-2">
-                                  {typeof project.githubUrl === 'string' && project.githubUrl && (
-                                    <a
-                                      href={project.githubUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="rounded-lg border border-slate-700 bg-slate-800/50 p-2 text-gray-400 transition-all duration-300 hover:scale-110 hover:border-blue-500/50 hover:text-blue-400"
-                                      aria-label="GitHub 저장소"
-                                    >
-                                      <svg
-                                        className="h-4 w-4"
-                                        fill="currentColor"
-                                        viewBox="0 0 24 24"
-                                      >
-                                        <path
-                                          fillRule="evenodd"
-                                          d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
-                                          clipRule="evenodd"
-                                        />
-                                      </svg>
-                                    </a>
-                                  )}
-                                  {typeof project.liveUrl === 'string' && project.liveUrl && (
-                                    <a
-                                      href={project.liveUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="rounded-lg border border-slate-700 bg-slate-800/50 p-2 text-gray-400 transition-all duration-300 hover:scale-110 hover:border-blue-500/50 hover:text-blue-400"
-                                      aria-label="라이브 데모"
-                                    >
-                                      <svg
-                                        className="h-4 w-4"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                                        />
-                                      </svg>
-                                    </a>
-                                  )}
-                                </div>
-                              </div>
-
+                          <div className="flex flex-1 flex-col justify-between p-4">
+                            <div className="space-y-3">
                               {/* Title */}
-                              <h2 className="mb-4 text-3xl leading-tight font-bold lg:text-4xl">
+                              <h2 className="line-clamp-2 text-lg leading-tight font-bold">
                                 <Link
                                   href={`/projects/${project.slug}`}
                                   className="text-gray-100 transition-colors duration-300 group-hover:text-blue-300 hover:text-blue-400"
@@ -592,21 +570,13 @@ export default function ProjectsLayoutWithTags({
                                 </Link>
                               </h2>
 
-                              {/* Description */}
-                              <p className="mb-6 line-clamp-3 text-lg leading-relaxed text-gray-300">
-                                {project.summary}
-                              </p>
-                            </div>
-
-                            {/* Footer Section */}
-                            <div className="space-y-6">
                               {/* Tags */}
                               {project.tags && project.tags.length > 0 && (
-                                <div className="flex flex-wrap gap-2">
-                                  {project.tags.slice(0, 6).map((tag, tagIndex) => (
+                                <div className="flex flex-wrap gap-1">
+                                  {project.tags.slice(0, 4).map((tag, tagIndex) => (
                                     <button
                                       key={tag}
-                                      className={`inline-flex cursor-pointer items-center rounded-lg border border-slate-600/40 bg-slate-800/60 px-3 py-1.5 text-sm font-medium text-gray-300 transition-all duration-300 hover:border-blue-500/50 hover:bg-blue-500/20 hover:text-blue-300 ${
+                                      className={`inline-flex cursor-pointer items-center rounded-md border border-slate-600/40 bg-slate-800/60 px-2 py-1 text-xs font-medium text-gray-300 transition-all duration-300 hover:border-blue-500/50 hover:bg-blue-500/20 hover:text-blue-300 ${
                                         isProjectVisible
                                           ? 'translate-y-0 opacity-100'
                                           : 'translate-y-2 opacity-0'
@@ -625,10 +595,17 @@ export default function ProjectsLayoutWithTags({
                                 </div>
                               )}
 
-                              {/* CTA Button */}
+                              {/* Description */}
+                              <p className="line-clamp-2 text-sm leading-relaxed text-gray-300">
+                                {project.summary}
+                              </p>
+                            </div>
+
+                            {/* CTA Button */}
+                            <div className="pt-3">
                               <Link
                                 href={`/projects/${project.slug}`}
-                                className={`to-primary-600/20 hover:to-primary-600/30 inline-flex transform items-center rounded-xl border border-blue-500/30 bg-gradient-to-r from-blue-600/20 px-8 py-4 font-medium text-blue-300 transition-all duration-300 hover:scale-105 hover:border-blue-400/50 hover:from-blue-600/30 hover:text-blue-200 hover:shadow-lg hover:shadow-blue-500/20 ${
+                                className={`inline-flex transform items-center rounded-lg border border-blue-500/30 bg-gradient-to-r from-blue-600/20 to-blue-600/10 px-3 py-2 text-sm font-medium text-blue-300 transition-all duration-300 hover:scale-105 hover:border-blue-400/50 hover:from-blue-600/30 hover:text-blue-200 hover:shadow-lg hover:shadow-blue-500/20 ${
                                   isProjectVisible
                                     ? 'translate-y-0 opacity-100'
                                     : 'translate-y-2 opacity-0'
@@ -639,9 +616,9 @@ export default function ProjectsLayoutWithTags({
                                     : `${600 + index * 150 + 400}ms`,
                                 }}
                               >
-                                <span>프로젝트 상세보기</span>
+                                <span>상세보기</span>
                                 <svg
-                                  className="ml-2 h-5 w-5 transform transition-transform duration-300 group-hover:translate-x-1"
+                                  className="ml-1 h-3 w-3 transform transition-transform duration-300 group-hover:translate-x-1"
                                   fill="none"
                                   stroke="currentColor"
                                   viewBox="0 0 24 24"
@@ -663,23 +640,85 @@ export default function ProjectsLayoutWithTags({
                 </div>
               )}
 
-              {/* Pagination - Integrated */}
-              {pagination && pagination.totalPages > 1 && (
+              {/* Load More Button */}
+              {itemsToShow < filteredProjects.length && (
                 <div
                   className={`flex justify-center transition-all delay-800 duration-1000 ${
                     isVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'
                   }`}
                 >
-                  <Pagination
-                    currentPage={pagination.currentPage}
-                    totalPages={pagination.totalPages}
-                  />
+                  <button
+                    onClick={loadMoreProjects}
+                    disabled={isLoading}
+                    className={`inline-flex transform items-center rounded-xl px-8 py-4 text-lg font-semibold transition-all duration-300 hover:scale-105 ${
+                      isLoading
+                        ? 'cursor-not-allowed bg-gray-600 text-gray-300'
+                        : 'border border-blue-500/30 bg-gradient-to-r from-blue-600/30 to-purple-600/30 text-blue-300 hover:border-blue-400/50 hover:from-blue-600/40 hover:to-purple-600/40 hover:text-blue-200 hover:shadow-lg hover:shadow-blue-500/20'
+                    }`}
+                  >
+                    {isLoading ? (
+                      <>
+                        <svg
+                          className="mr-3 -ml-1 h-5 w-5 animate-spin"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        로딩 중...
+                      </>
+                    ) : (
+                      <>
+                        더 많은 프로젝트 보기
+                        <span className="ml-2 rounded-full bg-blue-500/20 px-2 py-1 text-sm">
+                          {filteredProjects.length - itemsToShow}
+                        </span>
+                      </>
+                    )}
+                  </button>
                 </div>
               )}
             </div>
           </div>
         </section>
       </div>
+
+      {/* Scroll to Top Button */}
+      {showScrollTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed right-8 bottom-8 z-[9999] flex h-12 w-12 items-center justify-center rounded-full border border-blue-500/30 bg-slate-900/80 text-blue-400 backdrop-blur-md transition-all duration-300 hover:scale-110 hover:border-blue-400/50 hover:bg-slate-800/90 hover:text-blue-300 hover:shadow-lg hover:shadow-blue-500/20"
+          aria-label="맨 위로 이동"
+        >
+          <svg
+            className="h-6 w-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M5 10l7-7m0 0l7 7m-7-7v18"
+            />
+          </svg>
+        </button>
+      )}
     </>
   )
 }

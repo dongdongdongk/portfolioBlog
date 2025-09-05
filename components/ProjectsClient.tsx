@@ -8,7 +8,7 @@ import { BlogPost } from '@/lib/mdx'
 interface ProjectsClientProps {
   projects: BlogPost[]
   initialDisplayProjects: BlogPost[]
-  pagination: {
+  pagination?: {
     currentPage: number
     totalPages: number
   }

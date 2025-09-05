@@ -21,19 +21,10 @@ export default async function Projects() {
       url: `/projects/${project.slug}`,
     }))
 
-  const pageNumber = 1
-  const totalPages = Math.ceil(projects.length / PROJECTS_PER_PAGE)
-  const initialDisplayProjects = projects.slice(0, PROJECTS_PER_PAGE * pageNumber)
-  const pagination = {
-    currentPage: pageNumber,
-    totalPages: totalPages,
-  }
-
   return (
     <ProjectsClient
       projects={projects}
-      initialDisplayProjects={initialDisplayProjects}
-      pagination={pagination}
+      initialDisplayProjects={[]} // 무한스크롤에서는 사용하지 않음
       title="All Projects"
     />
   )

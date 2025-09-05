@@ -117,7 +117,7 @@ export default function InteractiveHero({
       </div>
 
       {/* Content Container - Flex layout to prevent overlap */}
-      <div className="relative z-10 flex flex-1 flex-col items-center justify-center space-y-4 px-4 sm:space-y-6 sm:px-6 md:space-y-8 md:px-8 lg:space-y-4">
+      <div className="relative z-10 flex flex-1 flex-col items-center justify-center space-y-2 px-4 sm:space-y-3 sm:px-6 md:space-y-4 md:px-8 lg:space-y-2">
         {/* Top Title - Made responsive */}
         <div className="w-full max-w-xs text-center sm:max-w-2xl md:max-w-4xl">
           <h1
@@ -148,7 +148,7 @@ export default function InteractiveHero({
 
         {/* Center Divider Line */}
         <div
-          className={`h-16 w-px bg-gradient-to-b from-transparent via-white/10 to-transparent transition-all delay-400 duration-1000 sm:h-20 md:h-24 lg:h-32 ${
+          className={`h-8 w-px bg-gradient-to-b from-transparent via-white/10 to-transparent transition-all delay-400 duration-1000 sm:h-10 md:h-12 lg:h-16 ${
             isVisible ? 'scale-y-100 opacity-100' : 'scale-y-0 opacity-0'
           }`}
         />
