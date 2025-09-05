@@ -12,9 +12,9 @@ import ScrollTopAndComment from '@/components/ScrollTopAndComment'
 import SectionContainer from '@/components/SectionContainer'
 
 interface PageProps {
-  params: Promise<{
+  params: {
     slug: string[]
-  }>
+  }
 }
 
 export async function generateStaticParams() {
@@ -25,8 +25,7 @@ export async function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }: PageProps) {
-  const resolvedParams = await params
-  const slug = resolvedParams.slug?.join('/') || ''
+  const slug = params.slug?.join('/') || ''
   const post = getPostBySlug('projects', slug)
 
   if (!post) {
@@ -40,8 +39,7 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 export default async function Page({ params }: PageProps) {
-  const resolvedParams = await params
-  const slug = resolvedParams.slug?.join('/') || ''
+  const slug = params.slug?.join('/') || ''
   const post = getPostBySlug('projects', slug)
 
   if (!post) {
