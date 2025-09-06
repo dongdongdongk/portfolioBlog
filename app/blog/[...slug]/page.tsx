@@ -6,6 +6,7 @@ import { getAllPosts, getPostBySlug, getPostHtml } from '@/lib/mdx'
 import PostSimple from '@/layouts/PostSimple'
 import PostLayout from '@/layouts/PostLayout'
 import PostBanner from '@/layouts/PostBanner'
+import CodeHighlight from '@/components/CodeHighlight'
 import { Metadata } from 'next'
 import siteMetadata from '@/data/siteMetadata'
 import { notFound } from 'next/navigation'
@@ -115,6 +116,7 @@ export default async function Page(props: { params: Promise<{ slug: string[] }> 
           }}
           dangerouslySetInnerHTML={{ __html: htmlContent }}
         />
+        <CodeHighlight />
       </Layout>
     )
   } catch (error) {

@@ -24,7 +24,50 @@ marked.setOptions({
   gfm: true,
   breaks: true,
   renderer: renderer,
+  highlight: function (code, lang, callback) {
+    // 서버사이드에서는 하이라이팅 없이 반환
+    // 클라이언트사이드에서 처리하도록 함
+    return code
+  },
 })
+
+// 언어명 정규화 함수
+function normalizeLanguage(lang: string): string {
+  const langMap: { [key: string]: string } = {
+    javascript: 'js',
+    typescript: 'ts',
+    jsx: 'jsx',
+    tsx: 'tsx',
+    python: 'python',
+    java: 'java',
+    'c++': 'cpp',
+    'c#': 'csharp',
+    html: 'html',
+    css: 'css',
+    scss: 'scss',
+    sass: 'sass',
+    json: 'json',
+    xml: 'xml',
+    yaml: 'yaml',
+    yml: 'yaml',
+    markdown: 'markdown',
+    md: 'markdown',
+    shell: 'bash',
+    sh: 'bash',
+    bash: 'bash',
+    powershell: 'powershell',
+    sql: 'sql',
+    php: 'php',
+    ruby: 'ruby',
+    go: 'go',
+    rust: 'rust',
+    swift: 'swift',
+    kotlin: 'kotlin',
+  }
+
+  const normalized = lang.toLowerCase().trim()
+  return langMap[normalized] || normalized
+}
 
 export interface BlogPost {
   slug: string

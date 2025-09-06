@@ -53,12 +53,12 @@ const Header = () => {
           </nav>
 
           {/* Action Buttons */}
-          <div className="flex items-center space-x-3">
+          {/* <div className="flex items-center space-x-3">
             <div className="hidden sm:block">
               <SearchButton />
             </div>
             <MobileNav />
-          </div>
+          </div> */}
         </div>
       </div>
     </header>

@@ -94,7 +94,7 @@ export default function PostLayout({ content, authorDetails, next, prev, childre
                   )}
 
                   {/* Main Content */}
-                  <div className="py-8">{children}</div>
+                  <div className="blog-content py-8">{children}</div>
 
                   {/* Navigation */}
                   {(next || prev) && (
@@ -178,13 +178,6 @@ export default function PostLayout({ content, authorDetails, next, prev, childre
                       블로그로 돌아가기
                     </Link>
                   </div>
-
-                  {/* Comments */}
-                  {siteMetadata.comments && (
-                    <div className="border-t border-gray-800 pt-8" id="comment">
-                      <Comments slug={slug} />
-                    </div>
-                  )}
                 </div>
               </div>
             </article>

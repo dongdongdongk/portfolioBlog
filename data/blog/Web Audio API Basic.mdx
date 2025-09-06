@@ -1,0 +1,1192 @@
+---
+title: 'Web Audio API 기초 완벽 가이드'
+date: '2025-09-06'
+tags: ['Web Audio API', 'JavaScript', 'DSP', 'AudioContext', 'AudioNode', 'BiquadFilter']
+draft: false
+summary: '초보자를 위한 Web Audio API 상세 가이드: AudioContext, AudioNode, connect(), BiquadFilterNode를 실제 예제와 함께 완전 정복해보세요.'
+---
+
+import Image from 'next/image'
+
+# Web Audio API 기초 완벽 가이드
+
+## 목차
+
+1. [Web Audio API란?](#web-audio-api란)
+2. [AudioContext 개념](#audiocontext-개념)
+3. [AudioNode 개념](#audionode-개념)
+4. [connect() 메소드로 노드 연결하기](#connect-메소드로-노드-연결하기)
+5. [BiquadFilterNode 사용법](#biquadfilternode-사용법)
+6. [실전 예제](#실전-예제)
+7. [자주 하는 실수들](#자주-하는-실수들)
+
+---
+
+## Web Audio API란?
+
+**Web Audio API**는 웹에서 오디오를 다루기 위한 강력한 JavaScript API입니다. 마치 전자음악 스튜디오의 장비들을 코드로 조작하는 것과 같습니다.
+
+### 🎛️ 실제 스튜디오와 비교
+
+```
+실제 스튜디오:     [신디사이저] → [이펙터] → [믹서] → [스피커]
+Web Audio API:    [AudioNode] → [AudioNode] → [AudioNode] → [destination]
+```
+
+### 특징
+
+- **실시간 오디오 처리**: 지연 없이 즉시 소리 조작
+- **모듈러 시스템**: 레고 블록처럼 조립 가능
+- **고성능**: 네이티브 앱 수준의 성능
+- **크로스 플랫폼**: 모든 모던 브라우저에서 동작
+
+> **주의**: Web Audio API는 HTTPS 환경에서만 완전히 작동합니다. 로컬 개발 시에는 `localhost`를 사용하세요.
+
+---
+
+## AudioContext 개념
+
+**AudioContext**는 Web Audio API의 **중앙 관제실**입니다. 모든 오디오 처리의 시작점이자 관리자 역할을 합니다.
+
+### 🏭 공장에 비유하면
+
+```
+AudioContext = 공장 관리자
+- 전체 생산 라인 관리
+- 품질 관리 (샘플 레이트)
+- 시간 관리 (currentTime)
+- 자원 관리 (메모리, CPU)
+```
+
+### 기본 생성법
+
+```javascript
+// AudioContext 생성 (가장 기본)
+const audioContext = new AudioContext()
+
+// 또는 브라우저 호환성을 위해
+const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+
+// 완전한 에러 처리와 함께
+async function createAudioContext() {
+  try {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+
+    // 브라우저 정책으로 인한 일시정지 상태 체크
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume()
+    }
+
+    return audioContext
+  } catch (error) {
+    console.error('AudioContext 생성 실패:', error)
+    throw new Error('오디오 초기화에 실패했습니다.')
+  }
+}
+```
+
+## (추가 개념) 샘플레이트(Sample Rate)
+
+**샘플레이트**는 소리를 디지털로 표현할 때, **1초 동안 소리를 몇 번 나누어 기록하는가**를 의미합니다.  
+즉, 오디오의 해상도 같은 개념이에요.
+
+- 단위: **Hz(헤르츠)**
+- 예: `44100 Hz` → 1초에 **44,100번** 샘플링
+
+---
+
+### 📷 사진에 비유하면
+
+- **소리 = 영화 속 연속적인 장면**
+- **샘플레이트 = 초당 몇 장을 찍는가(FPS와 유사)**
+
+👉 FPS가 높을수록 부드럽게 보이듯, 샘플레이트가 높을수록 원래 소리에 더 가깝게 들립니다.
+
+---
+
+### 🎶 대표적인 샘플레이트 값
+
+| 샘플레이트      | 용도 / 예시                 |
+| --------------- | --------------------------- |
+| **8 kHz**       | 전화 음성 (음질 낮음)       |
+| **22.05 kHz**   | 오래된 MP3, 인터넷 스트리밍 |
+| **44.1 kHz**    | CD 음질 (표준 음악 음질)    |
+| **48 kHz**      | 영화, 영상, DAW 기본        |
+| **96 kHz 이상** | 스튜디오 녹음, 고음질 음원  |
+
+### 주요 속성들
+
+```javascript
+// 샘플 레이트 (초당 샘플 수)
+console.log(audioContext.sampleRate) // 보통 44100 또는 48000
+
+// 현재 시간 (초 단위, 매우 정확)
+console.log(audioContext.currentTime) // 예: 1.23456789
+
+// 오디오 컨텍스트 상태
+console.log(audioContext.state) // 'running', 'suspended', 'closed'
+
+// 최종 출력 (스피커)
+console.log(audioContext.destination) // 항상 존재하는 특별한 노드
+```
+
+### AudioContext 생명주기
+
+```javascript
+// 1. 생성
+const ctx = new AudioContext()
+
+// 2. 사용
+// ... 오디오 처리 작업들 ...
+
+// 3. 일시정지 (메모리는 유지)
+await ctx.suspend()
+
+// 4. 재개
+await ctx.resume()
+
+// 5. 완전 종료 (메모리 해제)
+await ctx.close()
+```
+
+### ⚠️ 중요한 브라우저 정책
+
+현대 브라우저는 사용자 상호작용 없이는 오디오 재생을 차단합니다.
+
+```javascript
+// ❌ 잘못된 방법 (페이지 로드 시 즉시 실행)
+window.addEventListener('load', () => {
+  const ctx = new AudioContext()
+  // 브라우저가 suspended 상태로 만들어버림!
+})
+
+// ✅ 올바른 방법 (사용자 상호작용 후)
+button.addEventListener('click', async () => {
+  const ctx = new AudioContext()
+
+  // 브라우저가 자동으로 suspended 상태로 만들 수 있음
+  if (ctx.state === 'suspended') {
+    await ctx.resume() // 반드시 재개 필요
+  }
+
+  // 이제 오디오 처리 가능
+})
+```
+
+---
+
+## AudioNode 개념
+
+**AudioNode**는 오디오 처리의 **기본 단위**입니다. 마치 전자회로의 부품이나 스튜디오 장비 하나하나와 같습니다.
+
+### 🔌 전자회로에 비유
+
+```
+전자회로:        [저항] → [콘덴서] → [트랜지스터] → [스피커]
+Web Audio API:   [Gain] → [Filter] → [Oscillator] → [destination]
+```
+
+### AudioNode의 공통 특징
+
+#### 1. 입력과 출력
+
+```javascript
+// 모든 AudioNode는 입력과 출력을 가짐
+const gainNode = audioContext.createGain()
+console.log(gainNode.numberOfInputs) // 1 (소리 입력)
+console.log(gainNode.numberOfOutputs) // 1 (소리 출력)
+
+// 예시
+const oscillator = audioContext.createOscillator()
+console.log(oscillator.numberOfInputs) // 0 (소스 노드)
+console.log(oscillator.numberOfOutputs) // 1
+```
+
+#### 2. 파라미터 (AudioParam)
+
+```javascript
+// 대부분의 노드는 조절 가능한 파라미터를 가짐
+const gainNode = audioContext.createGain()
+
+// gain은 AudioParam 객체
+console.log(gainNode.gain.value) // 현재 값
+gainNode.gain.value = 0.5 // 즉시 변경
+
+// 부드러운 변화 (자동화)
+gainNode.gain.linearRampToValueAtTime(0.8, audioContext.currentTime + 1)
+```
+
+### 주요 AudioNode 종류들
+
+#### 1. 소스 노드들 (Source Nodes)
+
+소리를 만들어내는 노드들 (입력 없음, 출력만 있음)
+
+```javascript
+// 1) 오실레이터 (신디사이저처럼 파형 생성)
+const oscillator = audioContext.createOscillator()
+oscillator.type = 'sine' // 사인파
+oscillator.frequency.value = 440 // 440Hz (라 음)
+
+// 다양한 파형
+oscillator.type = 'sine' // 사인파 (부드러운 소리)
+oscillator.type = 'square' // 사각파 (날카로운 소리)
+oscillator.type = 'sawtooth' // 톱니파 (밝은 소리)
+oscillator.type = 'triangle' // 삼각파 (부드러우면서 밝음)
+
+// 2) 오디오 버퍼 (녹음된 소리 재생)
+const bufferSource = audioContext.createBufferSource()
+// bufferSource.buffer = 어떤오디오버퍼;
+
+// 3) 미디어 엘리먼트 (HTML <audio> 태그 연결)
+const audio = document.querySelector('audio')
+const mediaSource = audioContext.createMediaElementSource(audio)
+```
+
+#### 2. 이펙트 노드들 (Effect Nodes)
+
+소리를 변형하는 노드들 (입력과 출력 모두 있음)
+
+```javascript
+// 1) 게인 (볼륨 조절)
+const gainNode = audioContext.createGain()
+gainNode.gain.value = 0.5 // 50% 볼륨
+
+// 2) 필터 (주파수 조절)
+const filterNode = audioContext.createBiquadFilter()
+filterNode.type = 'lowpass'
+filterNode.frequency.value = 1000
+
+// 3) 딜레이 (에코 효과)
+const delayNode = audioContext.createDelay()
+delayNode.delayTime.value = 0.3 // 0.3초 딜레이
+
+// 4) 컨볼루션 (리버브 효과)
+const convolverNode = audioContext.createConvolver()
+// convolverNode.buffer = 리버브임펄스응답;
+```
+
+#### 3. 목적지 노드 (Destination Node)
+
+```javascript
+// 최종 출력 (스피커) - 항상 존재
+const destination = audioContext.destination
+console.log(destination.maxChannelCount) // 보통 2 (스테레오)
+```
+
+#### 4. 분석 노드들 (Analysis Nodes)
+
+```javascript
+// 애널라이저 (주파수 분석)
+const analyser = audioContext.createAnalyser()
+analyser.fftSize = 256
+
+// 주파수 데이터 가져오기
+const bufferLength = analyser.frequencyBinCount
+const dataArray = new Uint8Array(bufferLength)
+analyser.getByteFrequencyData(dataArray)
+```
+
+---
+
+## connect() 메소드로 노드 연결하기
+
+**connect()**는 AudioNode들을 연결하는 **전선** 역할을 합니다. 신호의 흐름을 만들어줍니다.
+
+### 🔌 기본 연결 방법
+
+#### 1. 단순 연결
+
+```javascript
+// 기본 문법: source.connect(destination)
+const oscillator = audioContext.createOscillator()
+const gainNode = audioContext.createGain()
+
+// 연결: 오실레이터 → 게인 노드
+oscillator.connect(gainNode)
+
+// 최종 출력에 연결: 게인 노드 → 스피커
+gainNode.connect(audioContext.destination)
+```
+
+#### 2. 체인 연결 (여러 이펙트)
+
+```javascript
+// 신호 흐름: 오실레이터 → 필터 → 게인 → 딜레이 → 스피커
+const oscillator = audioContext.createOscillator()
+const filter = audioContext.createBiquadFilter()
+const gain = audioContext.createGain()
+const delay = audioContext.createDelay()
+
+// 순서대로 연결
+oscillator.connect(filter)
+filter.connect(gain)
+gain.connect(delay)
+delay.connect(audioContext.destination)
+
+// 설정
+oscillator.type = 'sawtooth'
+oscillator.frequency.value = 220
+filter.type = 'lowpass'
+filter.frequency.value = 1500
+gain.gain.value = 0.4
+delay.delayTime.value = 0.25
+
+// 시작
+oscillator.start()
+```
+
+### 🔄 고급 연결 패턴
+
+#### 1. 분기 (Split) - 하나의 소스를 여러 곳으로
+
+```javascript
+const oscillator = audioContext.createOscillator()
+const gain1 = audioContext.createGain()
+const gain2 = audioContext.createGain()
+
+// 하나의 오실레이터를 두 개의 게인 노드로 분기
+oscillator.connect(gain1)
+oscillator.connect(gain2) // 같은 소스에서 여러 연결 가능
+
+// 각각 다른 볼륨으로 최종 출력
+gain1.gain.value = 0.3
+gain2.gain.value = 0.7
+gain1.connect(audioContext.destination)
+gain2.connect(audioContext.destination)
+```
+
+#### 2. 믹싱 (Mix) - 여러 소스를 하나로 합치기
+
+```javascript
+const osc1 = audioContext.createOscillator()
+const osc2 = audioContext.createOscillator()
+const mixer = audioContext.createGain() // 믹서 역할
+
+// 두 오실레이터를 하나의 믹서로
+osc1.connect(mixer)
+osc2.connect(mixer)
+
+// 믹서에서 최종 출력으로
+mixer.connect(audioContext.destination)
+```
+
+#### 3. 병렬 처리 (Parallel) - 같은 소스에 다른 이펙트들
+
+```javascript
+const source = audioContext.createOscillator()
+
+// 원본 신호
+const dryGain = audioContext.createGain()
+source.connect(dryGain)
+
+// 딜레이 효과
+const delay = audioContext.createDelay()
+const wetGain = audioContext.createGain()
+source.connect(delay)
+delay.connect(wetGain)
+
+// 두 신호를 믹싱
+const output = audioContext.createGain()
+dryGain.connect(output)
+wetGain.connect(output)
+output.connect(audioContext.destination)
+
+// 드라이/웻 밸런스 조절
+dryGain.gain.value = 0.7 // 원본 70%
+wetGain.gain.value = 0.3 // 이펙트 30%
+```
+
+### 🔌 연결 관리
+
+#### 연결 해제
+
+```javascript
+// 특정 연결 해제
+oscillator.disconnect(gainNode)
+
+// 모든 연결 해제
+oscillator.disconnect()
+
+// 다시 연결
+oscillator.connect(gainNode)
+```
+
+---
+
+## BiquadFilterNode 사용법
+
+**BiquadFilterNode**는 디지털 오디오의 **마법 도구**입니다. 특정 주파수를 강조하거나 제거할 수 있습니다.
+
+### 🎛️ 아날로그 이퀄라이저와 비교
+
+```
+아날로그 EQ:     [Bass] [Mid] [Treble] 노브들
+BiquadFilter:    frequency, Q, gain 파라미터로 정밀 제어
+```
+
+### 기본 생성 및 설정
+
+```javascript
+// 필터 생성
+const filter = audioContext.createBiquadFilter()
+
+// 기본 파라미터들
+filter.type = 'lowpass' // 필터 타입
+filter.frequency.value = 1000 // 컷오프/중심 주파수 (Hz)
+filter.Q.value = 1 // 공명 (품질 계수)
+filter.gain.value = 0 // 게인 (dB) - 일부 타입에서만 사용
+```
+
+### 🎚️ 필터 타입들 (type 속성)
+
+#### 1. 로우패스 (lowpass) - 고음 제거
+
+```javascript
+filter.type = 'lowpass'
+filter.frequency.value = 2000 // 2000Hz 이상 주파수 제거
+
+// 사용 예: 따뜻한 느낌, 멀리서 들리는 효과
+// 실생활 예: 라디오를 멀리서 듣는 소리, 벽 너머 소리
+```
+
+#### 2. 하이패스 (highpass) - 저음 제거
+
+```javascript
+filter.type = 'highpass'
+filter.frequency.value = 200 // 200Hz 이하 주파수 제거
+
+// 사용 예: 선명한 느낌, 전화기 소리
+// 실생활 예: 얇은 스피커, 전화 통화음
+```
+
+#### 3. 밴드패스 (bandpass) - 특정 범위만 통과
+
+```javascript
+filter.type = 'bandpass'
+filter.frequency.value = 1000 // 1000Hz 근처만 통과
+filter.Q.value = 10 // Q값이 클수록 좁은 범위
+
+// 사용 예: 특정 악기만 강조, 보컬 분리
+// 실생활 예: 워키토키, 라디오 튜닝
+```
+
+#### 4. 밴드스톱/노치 (bandstop/notch) - 특정 범위 제거
+
+```javascript
+filter.type = 'notch'
+filter.frequency.value = 60 // 60Hz 제거 (전원 험음 제거)
+filter.Q.value = 20 // 매우 좁은 범위만 제거
+
+// 사용 예: 특정 노이즈 제거, 하울링 제거
+// 실생활 예: 에어컨 소음 제거, 마이크 피드백 방지
+```
+
+#### 5. 로우셸프 (lowshelf) - 저음 전체 조절
+
+```javascript
+filter.type = 'lowshelf'
+filter.frequency.value = 320 // 320Hz 이하 전체 조절
+filter.gain.value = -6 // -6dB 감소 (또는 +6dB 증가 가능)
+
+// 사용 예: 베이스 조절, 전체적인 톤 조정
+// 실생활 예: 오디오 시스템의 베이스 조절
+```
+
+#### 6. 하이셸프 (highshelf) - 고음 전체 조절
+
+```javascript
+filter.type = 'highshelf'
+filter.frequency.value = 3200 // 3200Hz 이상 전체 조절
+filter.gain.value = 3 // +3dB 증가
+
+// 사용 예: 고음 선명도 조절, 에어리한 느낌
+// 실생활 예: 오디오 시스템의 트레블 조절
+```
+
+#### 7. 피킹 (peaking) - 특정 주파수 강조/감소
+
+```javascript
+filter.type = 'peaking'
+filter.frequency.value = 2500 // 2500Hz 조절
+filter.Q.value = 2 // 조절 범위의 폭
+filter.gain.value = 8 // +8dB 부스트
+
+// 사용 예: 보컬 존재감, 악기 특성 강조
+// 실생활 예: 믹싱에서 가장 많이 사용하는 EQ
+```
+
+### 🎯 Q값 (품질 계수) 이해하기
+
+Q값은 필터의 **날카로움**을 결정합니다.
+
+```javascript
+// Q값에 따른 효과
+filter.Q.value = 0.5 // 매우 부드러운 필터 (자연스러움)
+filter.Q.value = 1 // 기본값 (일반적)
+filter.Q.value = 5 // 날카로운 필터 (특별한 효과)
+filter.Q.value = 20 // 매우 날카로운 필터 (노치 필터처럼)
+
+// Q값이 너무 높으면 자기 발진(self-oscillation) 발생 가능
+// 공명음이 들릴 수 있음
+```
+
+### 📊 실시간 파라미터 조절
+
+#### 1. 즉시 변경
+
+```javascript
+// 값 즉시 변경 (클릭음 발생 가능)
+filter.frequency.value = 2000
+filter.Q.value = 5
+```
+
+#### 2. 부드러운 변경 (권장)
+
+```javascript
+// 선형 변화 (Linear Ramp)
+filter.frequency.linearRampToValueAtTime(
+  2000, // 목표값
+  audioContext.currentTime + 1 // 1초 후 도달
+)
+
+// 지수적 변화 (Exponential Ramp) - 주파수에 더 자연스러움
+filter.frequency.exponentialRampToValueAtTime(
+  2000, // 목표값 (0이면 안됨!)
+  audioContext.currentTime + 0.5 // 0.5초 후 도달
+)
+
+// 특정 시점에 정확한 값 설정
+filter.frequency.setValueAtTime(
+  1000, // 값
+  audioContext.currentTime // 지금 즉시
+)
+```
+
+### 🎚️ 실용적인 프리셋들
+
+```javascript
+// 자주 사용하는 필터 설정들
+
+// 1. 부드러운 로우패스 (따뜻한 소리)
+function setupWarmLowpass(filter) {
+  filter.type = 'lowpass'
+  filter.frequency.value = 2000
+  filter.Q.value = 0.7
+}
+
+// 2. 전화기 소리
+function setupTelephoneFilter(filter) {
+  filter.type = 'bandpass'
+  filter.frequency.value = 1000
+  filter.Q.value = 8
+}
+
+// 3. 럼블(저음 노이즈) 제거
+function setupRumbleFilter(filter) {
+  filter.type = 'highpass'
+  filter.frequency.value = 80
+  filter.Q.value = 0.5
+}
+
+// 4. 보컬 존재감 향상
+function setupVocalPresence(filter) {
+  filter.type = 'peaking'
+  filter.frequency.value = 2500
+  filter.Q.value = 1.5
+  filter.gain.value = 4
+}
+
+// 5. 하울링 제거 (예: 500Hz)
+function setupNotchFilter(filter, frequency) {
+  filter.type = 'notch'
+  filter.frequency.value = frequency
+  filter.Q.value = 15
+}
+```
+
+---
+
+### 📻 간단한 라디오 시뮬레이터
+
+```javascript
+class SimpleRadio {
+  constructor() {
+    this.audioContext = null
+    this.oscillator = null
+    this.filter = null
+    this.gain = null
+    this.isPlaying = false
+  }
+
+  async init() {
+    // AudioContext 생성
+    this.audioContext = new (window.AudioContext || window.webkitAudioContext)()
+
+    // 브라우저 정책 대응
+    if (this.audioContext.state === 'suspended') {
+      await this.audioContext.resume()
+    }
+
+    // 노드들 생성
+    this.oscillator = this.audioContext.createOscillator()
+    this.filter = this.audioContext.createBiquadFilter()
+    this.gain = this.audioContext.createGain()
+
+    // 기본 설정
+    this.oscillator.type = 'sawtooth' // 톱니파 (풍부한 하모닉)
+    this.oscillator.frequency.value = 220 // 낮은 A음
+
+    this.filter.type = 'lowpass'
+    this.filter.frequency.value = 1000
+    this.filter.Q.value = 1
+
+    this.gain.gain.value = 0.3
+
+    // 오디오 그래프 연결
+    this.oscillator.connect(this.filter)
+    this.filter.connect(this.gain)
+    this.gain.connect(this.audioContext.destination)
+
+    console.log('라디오 초기화 완료')
+  }
+
+  start() {
+    if (!this.isPlaying) {
+      this.oscillator.start()
+      this.isPlaying = true
+      console.log('라디오 방송 시작')
+    }
+  }
+
+  stop() {
+    if (this.isPlaying) {
+      this.oscillator.stop()
+      this.isPlaying = false
+      console.log('라디오 방송 정지')
+    }
+  }
+
+  // 주파수 튜닝 (라디오 채널 변경)
+  tuneFrequency(frequency) {
+    if (this.oscillator && this.isPlaying) {
+      this.oscillator.frequency.exponentialRampToValueAtTime(
+        frequency,
+        this.audioContext.currentTime + 0.1
+      )
+      console.log(`주파수 변경: ${frequency}Hz`)
+    }
+  }
+
+  // 필터 조절 (음질 조절)
+  adjustTone(cutoff, resonance = 1) {
+    if (this.filter) {
+      this.filter.frequency.exponentialRampToValueAtTime(
+        cutoff,
+        this.audioContext.currentTime + 0.1
+      )
+      this.filter.Q.setValueAtTime(resonance, this.audioContext.currentTime)
+      console.log(`톤 조절: ${cutoff}Hz, Q=${resonance}`)
+    }
+  }
+
+  // 볼륨 조절
+  setVolume(volume) {
+    if (this.gain) {
+      this.gain.gain.linearRampToValueAtTime(volume, this.audioContext.currentTime + 0.1)
+      console.log(`볼륨: ${Math.round(volume * 100)}%`)
+    }
+  }
+}
+
+// 사용 예제
+const radio = new SimpleRadio()
+
+// 초기화
+document.getElementById('initRadio').addEventListener('click', async () => {
+  await radio.init()
+})
+
+// 시작/정지
+document.getElementById('startRadio').addEventListener('click', () => {
+  radio.start()
+})
+
+document.getElementById('stopRadio').addEventListener('click', () => {
+  radio.stop()
+})
+
+// 실시간 조절
+document.getElementById('frequencySlider').addEventListener('input', (e) => {
+  radio.tuneFrequency(parseFloat(e.target.value))
+})
+
+document.getElementById('toneSlider').addEventListener('input', (e) => {
+  radio.adjustTone(parseFloat(e.target.value))
+})
+
+document.getElementById('volumeSlider').addEventListener('input', (e) => {
+  radio.setVolume(parseFloat(e.target.value))
+})
+```
+
+### 🎸 기타 이펙터 체인
+
+```javascript
+class GuitarEffects {
+  constructor() {
+    this.audioContext = null
+    this.nodes = {}
+    this.isActive = false
+  }
+
+  async init() {
+    // AudioContext 및 마이크 입력 설정
+    this.audioContext = new (window.AudioContext || window.webkitAudioContext)()
+
+    if (this.audioContext.state === 'suspended') {
+      await this.audioContext.resume()
+    }
+
+    // 마이크 입력
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      this.nodes.input = this.audioContext.createMediaStreamSource(stream)
+    } catch (error) {
+      console.error('마이크 접근 실패:', error)
+      return
+    }
+
+    // 이펙트 체인 구성
+    this.createEffectChain()
+    this.connectNodes()
+
+    this.isActive = true
+    console.log('기타 이펙터 준비 완료')
+  }
+
+  createEffectChain() {
+    // 입력 게인
+    this.nodes.inputGain = this.audioContext.createGain()
+    this.nodes.inputGain.gain.value = 2.0 // 입력 증폭
+
+    // 하이패스 필터 (럼블 제거)
+    this.nodes.highpass = this.audioContext.createBiquadFilter()
+    this.nodes.highpass.type = 'highpass'
+    this.nodes.highpass.frequency.value = 80
+    this.nodes.highpass.Q.value = 0.5
+
+    // 오버드라이브 (웨이브셰이퍼)
+    this.nodes.overdrive = this.audioContext.createWaveShaper()
+    this.setupOverdrive(5) // 중간 정도 오버드라이브
+
+    // 톤 컨트롤 (로우패스)
+    this.nodes.toneControl = this.audioContext.createBiquadFilter()
+    this.nodes.toneControl.type = 'lowpass'
+    this.nodes.toneControl.frequency.value = 3000
+    this.nodes.toneControl.Q.value = 1
+
+    // 딜레이 이펙트
+    this.nodes.delay = this.audioContext.createDelay(1.0)
+    this.nodes.delay.delayTime.value = 0.25
+
+    this.nodes.delayFeedback = this.audioContext.createGain()
+    this.nodes.delayFeedback.gain.value = 0.3
+
+    this.nodes.delayMix = this.audioContext.createGain()
+    this.nodes.delayMix.gain.value = 0.3
+
+    // 최종 출력 게인
+    this.nodes.outputGain = this.audioContext.createGain()
+    this.nodes.outputGain.gain.value = 0.5
+  }
+
+  setupOverdrive(amount) {
+    const samples = 44100
+    const curve = new Float32Array(samples)
+    const deg = Math.PI / 180
+
+    for (let i = 0; i < samples; i++) {
+      const x = (i * 2) / samples - 1
+      curve[i] = ((3 + amount) * x * 20 * deg) / (Math.PI + amount * Math.abs(x))
+    }
+
+    this.nodes.overdrive.curve = curve
+    this.nodes.overdrive.oversample = '4x'
+  }
+
+  connectNodes() {
+    // 메인 신호 체인
+    this.nodes.input.connect(this.nodes.inputGain)
+    this.nodes.inputGain.connect(this.nodes.highpass)
+    this.nodes.highpass.connect(this.nodes.overdrive)
+    this.nodes.overdrive.connect(this.nodes.toneControl)
+
+    // 딜레이 체인 (병렬 처리)
+    this.nodes.toneControl.connect(this.nodes.delay)
+    this.nodes.delay.connect(this.nodes.delayFeedback)
+    this.nodes.delayFeedback.connect(this.nodes.delay) // 피드백 루프
+    this.nodes.delay.connect(this.nodes.delayMix)
+
+    // 믹싱: 드라이 + 웻 신호
+    this.nodes.toneControl.connect(this.nodes.outputGain) // 드라이 신호
+    this.nodes.delayMix.connect(this.nodes.outputGain) // 웻 신호
+
+    // 최종 출력
+    this.nodes.outputGain.connect(this.audioContext.destination)
+  }
+
+  // 컨트롤 메소드들
+  setInputGain(value) {
+    if (this.nodes.inputGain) {
+      this.nodes.inputGain.gain.setValueAtTime(value, this.audioContext.currentTime)
+    }
+  }
+
+  setOverdrive(amount) {
+    this.setupOverdrive(amount)
+  }
+
+  setTone(frequency) {
+    if (this.nodes.toneControl) {
+      this.nodes.toneControl.frequency.exponentialRampToValueAtTime(
+        frequency,
+        this.audioContext.currentTime + 0.1
+      )
+    }
+  }
+
+  setDelay(time, feedback, mix) {
+    if (this.nodes.delay) {
+      this.nodes.delay.delayTime.setValueAtTime(time, this.audioContext.currentTime)
+    }
+    if (this.nodes.delayFeedback) {
+      this.nodes.delayFeedback.gain.setValueAtTime(feedback, this.audioContext.currentTime)
+    }
+    if (this.nodes.delayMix) {
+      this.nodes.delayMix.gain.setValueAtTime(mix, this.audioContext.currentTime)
+    }
+  }
+
+  setVolume(volume) {
+    if (this.nodes.outputGain) {
+      this.nodes.outputGain.gain.linearRampToValueAtTime(
+        volume,
+        this.audioContext.currentTime + 0.1
+      )
+    }
+  }
+}
+
+// 사용 예제
+const guitar = new GuitarEffects()
+
+// HTML 컨트롤들과 연결
+document.getElementById('initGuitar').addEventListener('click', async () => {
+  await guitar.init()
+})
+
+document.getElementById('gainSlider').addEventListener('input', (e) => {
+  guitar.setInputGain(parseFloat(e.target.value))
+})
+
+document.getElementById('overdriveSlider').addEventListener('input', (e) => {
+  guitar.setOverdrive(parseFloat(e.target.value))
+})
+
+document.getElementById('toneSlider').addEventListener('input', (e) => {
+  guitar.setTone(parseFloat(e.target.value))
+})
+
+document.getElementById('delayTimeSlider').addEventListener('input', (e) => {
+  const time = parseFloat(e.target.value)
+  const feedback = parseFloat(document.getElementById('delayFeedbackSlider').value)
+  const mix = parseFloat(document.getElementById('delayMixSlider').value)
+  guitar.setDelay(time, feedback, mix)
+})
+```
+
+### 🎵 고급 예제: 실시간 스펙트럼 애널라이저
+
+```javascript
+class SpectrumAnalyzer {
+  constructor(canvasId) {
+    this.canvas = document.getElementById(canvasId)
+    this.ctx = this.canvas.getContext('2d')
+    this.audioContext = null
+    this.analyser = null
+    this.source = null
+    this.animationId = null
+
+    // 캔버스 설정
+    this.canvas.width = 800
+    this.canvas.height = 400
+  }
+
+  async init() {
+    // AudioContext 생성
+    this.audioContext = new (window.AudioContext || window.webkitAudioContext)()
+
+    if (this.audioContext.state === 'suspended') {
+      await this.audioContext.resume()
+    }
+
+    // 애널라이저 노드 생성
+    this.analyser = this.audioContext.createAnalyser()
+    this.analyser.fftSize = 256
+    this.analyser.smoothingTimeConstant = 0.8
+
+    // 마이크 입력 연결
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      this.source = this.audioContext.createMediaStreamSource(stream)
+      this.source.connect(this.analyser)
+      // 노트: 스피커 출력은 연결하지 않음 (피드백 방지)
+
+      console.log('스펙트럼 애널라이저 준비 완료')
+      this.startVisualization()
+    } catch (error) {
+      console.error('마이크 접근 실패:', error)
+    }
+  }
+
+  startVisualization() {
+    const bufferLength = this.analyser.frequencyBinCount
+    const dataArray = new Uint8Array(bufferLength)
+
+    const draw = () => {
+      this.animationId = requestAnimationFrame(draw)
+
+      // 주파수 데이터 가져오기
+      this.analyser.getByteFrequencyData(dataArray)
+
+      // 캔버스 초기화
+      this.ctx.fillStyle = 'rgb(20, 20, 20)'
+      this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
+
+      // 주파수 바 그리기
+      const barWidth = (this.canvas.width / bufferLength) * 2.5
+      let barHeight
+      let x = 0
+
+      for (let i = 0; i < bufferLength; i++) {
+        barHeight = (dataArray[i] / 255) * this.canvas.height
+
+        // 주파수에 따른 색상 변화
+        const hue = (i / bufferLength) * 360
+        this.ctx.fillStyle = `hsl(${hue}, 70%, 50%)`
+
+        this.ctx.fillRect(x, this.canvas.height - barHeight, barWidth, barHeight)
+
+        x += barWidth + 1
+      }
+
+      // 주파수 레이블 그리기
+      this.drawFrequencyLabels(bufferLength)
+    }
+
+    draw()
+  }
+
+  drawFrequencyLabels(bufferLength) {
+    const sampleRate = this.audioContext.sampleRate
+    const nyquist = sampleRate / 2
+
+    this.ctx.fillStyle = 'white'
+    this.ctx.font = '12px Arial'
+    this.ctx.textAlign = 'center'
+
+    // 주요 주파수 마킹
+    const frequencies = [100, 1000, 5000, 10000]
+
+    frequencies.forEach((freq) => {
+      if (freq <= nyquist) {
+        const x = (freq / nyquist) * (this.canvas.width / 2.5)
+        this.ctx.fillText(`${freq}Hz`, x, this.canvas.height - 10)
+
+        // 수직선 그리기
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'
+        this.ctx.beginPath()
+        this.ctx.moveTo(x, 0)
+        this.ctx.lineTo(x, this.canvas.height - 30)
+        this.ctx.stroke()
+      }
+    })
+  }
+
+  stop() {
+    if (this.animationId) {
+      cancelAnimationFrame(this.animationId)
+    }
+    if (this.audioContext) {
+      this.audioContext.close()
+    }
+  }
+}
+
+// 사용 예제
+const analyzer = new SpectrumAnalyzer('spectrumCanvas')
+
+document.getElementById('startAnalyzer').addEventListener('click', async () => {
+  await analyzer.init()
+})
+
+document.getElementById('stopAnalyzer').addEventListener('click', () => {
+  analyzer.stop()
+})
+```
+
+---
+
+## 자주 하는 실수들
+
+### ❌ 실수 1: AudioContext 상태 무시
+
+```javascript
+// 잘못된 코드
+const audioContext = new AudioContext()
+const oscillator = audioContext.createOscillator()
+oscillator.connect(audioContext.destination)
+oscillator.start() // 브라우저 정책으로 실행되지 않을 수 있음
+```
+
+```javascript
+// 올바른 코드
+button.addEventListener('click', async () => {
+  const audioContext = new AudioContext()
+
+  if (audioContext.state === 'suspended') {
+    await audioContext.resume()
+  }
+
+  const oscillator = audioContext.createOscillator()
+  oscillator.connect(audioContext.destination)
+  oscillator.start()
+})
+```
+
+### ❌ 실수 2: 오실레이터 재사용 시도
+
+```javascript
+// 잘못된 코드
+const oscillator = audioContext.createOscillator()
+oscillator.start()
+oscillator.stop()
+oscillator.start() // 에러! 오실레이터는 일회용
+```
+
+```javascript
+// 올바른 코드
+function createAndStartOscillator() {
+  const oscillator = audioContext.createOscillator()
+  oscillator.connect(audioContext.destination)
+  oscillator.start()
+  return oscillator
+}
+
+// 매번 새로운 오실레이터 생성
+const osc1 = createAndStartOscillator()
+const osc2 = createAndStartOscillator()
+```
+
+### ❌ 실수 3: 메모리 누수
+
+```javascript
+// 잘못된 코드 - 연결 해제하지 않음
+function playSound() {
+  const oscillator = audioContext.createOscillator()
+  oscillator.connect(audioContext.destination)
+  oscillator.start()
+  oscillator.stop(audioContext.currentTime + 1)
+  // disconnect()를 호출하지 않아서 메모리 누수 발생
+}
+```
+
+```javascript
+// 올바른 코드
+function playSound() {
+  const oscillator = audioContext.createOscillator()
+  oscillator.connect(audioContext.destination)
+  oscillator.start()
+
+  oscillator.addEventListener('ended', () => {
+    oscillator.disconnect() // 메모리 해제
+  })
+
+  oscillator.stop(audioContext.currentTime + 1)
+}
+```
+
+### ❌ 실수 4: 파라미터 즉시 변경으로 인한 클릭음
+
+```javascript
+// 잘못된 코드 - 클릭음 발생
+gainNode.gain.value = 0 // 급격한 변화로 클릭음 발생
+```
+
+```javascript
+// 올바른 코드 - 부드러운 변화
+gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.1)
+```
+
+### ❌ 실수 5: 잘못된 주파수 범위
+
+```javascript
+// 잘못된 코드
+filter.frequency.exponentialRampToValueAtTime(0, audioContext.currentTime + 1)
+// exponentialRamp는 0에 도달할 수 없음!
+```
+
+```javascript
+// 올바른 코드
+filter.frequency.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1)
+// 또는 linearRamp 사용
+filter.frequency.linearRampToValueAtTime(0, audioContext.currentTime + 1)
+```
+
+### ❌ 실수 6: 부적절한 볼륨 레벨
+
+```javascript
+// 잘못된 코드 - 너무 큰 볼륨
+gainNode.gain.value = 10 // 왜곡과 클리핑 발생 가능
+```
+
+```javascript
+// 올바른 코드 - 적절한 볼륨 관리
+gainNode.gain.value = 0.3 // 일반적으로 0.0 ~ 1.0 범위 사용
+
+// 또는 dB 단위로 계산
+function dbToLinear(db) {
+  return Math.pow(10, db / 20)
+}
+
+gainNode.gain.value = dbToLinear(-6) // -6dB
+```
+
+---
+
+## 마무리
+
+이 가이드를 통해 Web Audio API의 핵심 개념들을 완전히 이해했습니다:
+
+### 🎯 학습한 핵심 개념들
+
+- **AudioContext**: 오디오 처리의 중앙 관리자
+- **AudioNode**: 모듈러 오디오 처리 단위
+- **connect()**: 노드 간 신호 흐름 연결
+- **BiquadFilterNode**: 강력한 주파수 조작 도구
+
+### 🚀 다음 단계 추천
+
+1. **AudioWorklet** 학습 - 커스텀 오디오 프로세서 개발
+2. **3D Audio** - 공간 오디오 및 바이노럴 처리
+3. **실시간 분석** - FFT와 고급 신호 분석
+4. **오디오 시각화** - Canvas/WebGL을 이용한 실시간 시각화
+5. **MIDI 연동** - Web MIDI API와의 조합
+
+### 💡 실전 적용 팁
+
+- 항상 사용자 상호작용 후에 AudioContext 생성
+- 메모리 관리를 위해 사용 후 disconnect() 호출
+- 부드러운 파라미터 변화로 클릭음 방지
+- 적절한 볼륨 레벨 유지로 왜곡 방지

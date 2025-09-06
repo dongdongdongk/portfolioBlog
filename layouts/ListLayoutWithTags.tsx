@@ -156,6 +156,7 @@ export default function ListLayoutWithTags({
   const [searchValue, setSearchValue] = useState('')
   const [selectedTag, setSelectedTag] = useState('')
   const [filteredPosts, setFilteredPosts] = useState(displayPosts)
+  const [showAllTags, setShowAllTags] = useState(false)
   const observerRef = useRef<IntersectionObserver | null>(null)
 
   // Search and tag filter functionality
@@ -312,7 +313,7 @@ export default function ListLayoutWithTags({
                       </span>
                     </button>
 
-                    {sortedTags.slice(0, 8).map((tag, tagIndex) => {
+                    {(showAllTags ? sortedTags : sortedTags.slice(0, 8)).map((tag, tagIndex) => {
                       const isActive = selectedTag === tag
                       return (
                         <button
@@ -331,6 +332,49 @@ export default function ListLayoutWithTags({
                         </button>
                       )
                     })}
+
+                    {sortedTags.length > 8 && (
+                      <button
+                        onClick={() => setShowAllTags(!showAllTags)}
+                        className="inline-flex transform items-center rounded-xl border border-slate-600 bg-slate-700/50 px-4 py-2 text-gray-300 transition-all duration-300 hover:scale-105 hover:bg-slate-600/50 hover:text-gray-200"
+                      >
+                        {showAllTags ? (
+                          <>
+                            <span className="font-medium">접기</span>
+                            <svg
+                              className="ml-2 h-4 w-4 transition-transform duration-300"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 9l-7 7-7-7"
+                              />
+                            </svg>
+                          </>
+                        ) : (
+                          <>
+                            <span className="font-medium">+{sortedTags.length - 8}개 더 보기</span>
+                            <svg
+                              className="ml-2 h-4 w-4 transition-transform duration-300"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M9 5l7 7-7 7"
+                              />
+                            </svg>
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
