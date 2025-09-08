@@ -1,0 +1,1870 @@
+---
+title: '섹션 6: Laser Defender 2'
+date: '2025-09-07'
+category: 'Developer/Unity/2D 게임 개발'
+tags:
+  [
+    'Unity',
+    'C#',
+    '2D 게임',
+    '레이저 디펜더',
+    '충돌 시스템',
+    '슈팅',
+    '폭발 효과',
+    '카메라 흔들림',
+    '시차 스크롤',
+    '게임 개발',
+    '초보자',
+  ]
+draft: false
+summary: 'Unity에서 플레이어와 적군 충돌 처리, 데미지 시스템, 발사체 설정, 슈팅 기능, 적군 발사, 폭발 효과, 카메라 흔들림, 시차 스크롤 배경 등을 구현하는 가이드입니다.'
+---
+
+# Laser Defender - 2
+
+Unity 2D 슈팅 게임의 고급 기능들을 구현하는 가이드입니다. 충돌 시스템, 폭발 효과, 카메라 흔들림 등을 학습합니다.
+
+## 📋 목차
+
+1. [플레이어와 적군 충돌 및 데미지 시스템](#플레이어와-적군-충돌-및-데미지-시스템-구현)
+2. [슈팅 시스템 구현](#슈팅-시스템-구현)
+3. [적군 발사 시스템](#적군-발사-시스템)
+4. [폭발 효과 시스템](#폭발-효과-시스템)
+5. [카메라 흔들림 효과](#카메라-흔들림-효과)
+6. [시차 스크롤 배경](#시차-스크롤-배경)
+7. [게임 완성](#게임-완성)
+
+---
+
+# { 플레이어와 적군 충돌 및 데미지 시스템 구현 }
+
+```csharp
+이 강의에서는 Unity 2D 게임에서 플레이어와 적군이 충돌했을 때 데미지를 입히고,
+
+이를 기반으로 피하기 게임처럼 동작하도록 설정하는 과정을 다룹니다.
+```
+
+## 1. 목표
+
+```csharp
+적군과 플레이어가 충돌하면 데미지를 입히는 시스템 구현
+
+물리적 충돌 대신 코드로 제어하는 방식 사용
+
+Health와 DamageDealer 스크립트를 통해 재사용 가능한 데미지 시스템 구축
+
+결과적으로 피하기 게임처럼 플레이어가 적군과 충돌 시 데미지를 입고, 체력이 0이 되면 오브젝트가 파괴됨
+```
+
+## 2. 설정 단계
+
+### (1) Rigidbody 2D 추가
+
+```csharp
+대상: Enemy와 Player 프리팹
+
+설정:
+
+		1. Unity의 [Prefabs] 폴더에서 Enemy와 Player 선택
+
+		2. Inspector에서 Add Component → Rigidbody 2D 추가
+
+		3. Body Type을 Dynamic에서 Kinematic으로 변경
+
+개념: Dynamic은 물리 엔진이 오브젝트를 제어, Kinematic은 코드로 제어. 우리는 코드로 움직임을 제어하므로 Kinematic 사용.
+
+왜?: 물리적 충돌 대신 스크립트로 충돌과 이동을 처리하기 위해.
+```
+
+### Kinematic
+
+```csharp
+Rigidbody 컴포넌트에서 사용하는 Body Type 중 하나로,
+
+물리 엔진의 영향을 받지 않고 코드로 직접 오브젝트의 움직임을 제어할 때 사용됩니다.
+
+물리적 충돌: 물리 엔진에 의한 중력, 마찰, 튕김 등이 적용되지 않음.
+
+이동 제어: 스크립트를 통해 Transform이나 Rigidbody의 속도를 직접 설정.
+
+트리거 충돌: Collider와 함께 사용 시 충돌 감지(OnTriggerEnter 등)는 가능.
+
+용도: 플레이어, 적군, 발사체 등 물리적 반응 없이 코드로 동작을 제어해야 할 때 적합.
+```
+
+### (2) Circle Collider 2D 추가
+
+```csharp
+대상: Enemy와 Player
+
+설정:
+
+1. Add Component → Circle Collider 2D 추가
+
+		개념: Collider는 오브젝트의 충돌 영역을 정의. Circle Collider는 원형 스프라이트에 적합.
+
+		다른 옵션: Box Collider나 Capsule Collider도 가능, 스프라이트 형태에 따라 선택.
+
+2. Edit Collider로 충돌 영역 크기 조정
+
+		Enemy: 충돌 영역을 약간 작게 조정해 플레이어가 날개 끝에 스치면 데미지 없도록.
+
+		Player: 동일하게 충돌 영역 조정, 약간의 여유를 줘 공정성 유지.
+
+3. Is Trigger 체크
+
+		개념: Is Trigger를 활성화하면 물리적 충돌(튕김) 대신 트리거 이벤트(통과하면서 이벤트 발생)로 처리.
+
+
+왜?: 오브젝트가 서로 튕기지 않고, 충돌 시 이벤트(데미지 처리)를 발생시키기 위해.
+```
+
+### (3) Health 스크립트 생성 및 추가
+
+```csharp
+목적: 오브젝트의 체력(Health)을 관리.
+
+설정:
+
+		1. [Assets]에서 우클릭 → Create → C# Script → 이름: Health
+
+		2. Enemy와 Player 프리팹에 Health 컴포넌트 추가
+```
+
+```csharp
+using UnityEngine;
+
+public class Health : MonoBehaviour
+{
+    [SerializeField] int health = 50; // 기본 체력 50
+
+    void OnTriggerEnter2D(Collider2D collision)
+    {
+        DamageDealer damageDealer = collision.GetComponent<DamageDealer>();
+        if (damageDealer != null)
+        {
+            TakeDamage(damageDealer.GetDamage()); // 데미지 적용
+            damageDealer.Hit(); // 충돌 후 데미지 딜러 파괴
+        }
+    }
+
+    void TakeDamage(int damage)
+    {
+        health -= damage; // 체력 감소
+        if (health <= 0)
+        {
+            Destroy(gameObject); // 체력 0 이하 시 오브젝트 파괴
+        }
+    }
+}
+```
+
+```csharp
+개념:
+
+		[SerializeField]: Unity Inspector에서 값을 수정 가능하도록 설정.
+
+		OnTriggerEnter2D: 트리거 콜라이더가 다른 콜라이더와 접촉 시 호출.
+
+		GetComponent<DamageDealer>: 충돌한 오브젝트가 DamageDealer 컴포넌트를 가졌는지 확인.
+
+		TakeDamage: 체력을 감소시키고, 체력이 0 이하일 때 오브젝트 파괴.
+```
+
+### (4) DamageDealer 스크립트 생성 및 추가
+
+```csharp
+목적: 데미지를 입히는 오브젝트(적군 등)를 관리.
+
+설정:
+
+		1. [Assets]에서 우클릭 → Create → C# Script → 이름: DamageDealer
+
+		2. Enemy 프리팹에 DamageDealer 컴포넌트 추가
+
+테스트를 위해 Health의 기본 체력을 50에서 25로 변경 (2번 충돌 시 파괴).
+```
+
+```csharp
+using UnityEngine;
+
+public class DamageDealer : MonoBehaviour
+{
+    [SerializeField] int damage = 10; // 기본 데미지 10
+
+    public int GetDamage()
+    {
+        return damage; // 데미지 값 반환
+    }
+
+    public void Hit()
+    {
+        Destroy(gameObject); // 충돌 시 자신 파괴
+    }
+}
+```
+
+```csharp
+개념:
+
+		DamageDealer는 데미지 값을 저장하고, 다른 오브젝트에 전달.
+
+		Hit(): 충돌 후 오브젝트(적군 등)를 파괴해 재사용 방지.
+
+		재사용성: 이 스크립트는 나중에 발사체 등에도 적용 가능.
+```
+
+<Image src="/images/blog/game/image 498.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+# { 발사체(Projectile) 설정 }
+
+```csharp
+Unity 2D 게임에서 플레이어와 적군의 발사체를 설정하고,
+
+충돌 및 레이어 관리로 원하는 동작을 구현하는 과정을 설명합니다.
+
+발사체가 서로 다른 오브젝트(플레이어, 적군)에 적절히 반응하도록 설정하며, 입력 시스템도 조정합니다.
+```
+
+## 1. 발사체 오브젝트 생성
+
+```csharp
+1. 새 게임 오브젝트 생성
+
+		Hierarchy에서 우측 클릭 → "Create Empty" → 이름: projectile
+
+		Transform 초기화: Position (0, 0, 0)으로 리셋 (오브젝트의 기본 위치를 원점으로 설정).
+
+		개념: Transform은 오브젝트의 위치, 회전, 크기를 정의. 초기화는 기준점을 명확히 하기 위함.
+
+2. 스프라이트 추가
+
+		[Assets Packs] → [PNG] → [laser] 폴더에서 LaserBlue07 선택.
+
+		projectile 오브젝트 아래로 드래그하여 자식 오브젝트로 추가.
+
+		스프라이트 크기 조정: Transform의 Scale을 (X: 2, Y: 2, Z: 2)로 설정.
+
+		개념: 스프라이트는 2D 게임의 시각적 요소. Scale로 크기를 조정해 게임 내에서 적절한 크기로 표시.
+```
+
+## 2. 컴포넌트 추가
+
+```csharp
+1. Rigidbody2D 추가
+
+		projectile에 Rigidbody2D 컴포넌트 추가.
+
+		설정: Body Type을 Kinematic으로 변경.
+
+		개념: Rigidbody2D는 물리적 동작(충돌, 이동)을 제어. Kinematic은 스크립트로 직접 제어할 때 사용.
+
+2. Collider 설정
+
+		Capsule Collider 2D 추가 (발사체의 길쭉한 모양에 적합).
+
+		Collider 크기 조정: 핸들로 스프라이트 모양에 맞춤 (Alt 키로 양쪽 대칭 조정 가능).
+
+		Is Trigger 체크: 충돌 시 물리적 반응 대신 트리거 이벤트 발생.
+
+		개념: Collider는 오브젝트의 충돌 범위 정의. Trigger는 충돌 시 스크립트로 이벤트(예: 데미지 처리)를 처리하도록 설정.
+
+3. DamageDealer 컴포넌트 추가
+
+		사용자 정의 스크립트 DamageDealer 추가.
+
+		기본 데미지 값: 10으로 설정.
+
+		개념: DamageDealer는 발사체가 대상(플레이어 또는 적군)에 데미지 주기 위해 사용되는 커스텀 스크립트.
+```
+
+## 3. 프리팹 생성 및 복제
+
+```csharp
+1. 플레이어 발사체 프리팹
+
+		projectile을 [Prefabs] 폴더로 드래그하여 프리팹 생성.
+
+		이름: projectile_player.
+
+		개념: 프리팹은 재사용 가능한 오브젝트 템플릿. 런타임에서 인스턴스화(생성) 가능.
+
+2. 적군 발사체 생성
+
+		projectile_player 프리팹 복제 (Ctrl+D).
+
+		이름: projectile_enemy.
+
+		스프라이트 변경: LaserBlue07 → LaserRed07 (동일 폴더에서).
+
+		Scale 조정: (X: 2, Y: 2, Z: 2).
+
+		Is Trigger 체크: projectile_enemy와 projectile_player의 Collider에 모두 적용.
+
+		개념: 프리팹 복제를 통해 비슷한 오브젝트를 빠르게 생성. 스프라이트만 변경해 시각적 구분.
+```
+
+## 4. 레이어 설정 및 충돌 관리
+
+```csharp
+1. 문제점 확인
+
+		현재 설정: 발사체가 모든 오브젝트(플레이어, 적군)에 반응 → 원치 않은 충돌(예: 플레이어 발사체가 플레이어에 데미지) 발생.
+
+		목표: 플레이어 발사체는 적군에만, 적군 발사체는 플레이어에만 반응.
+
+2. 레이어 생성
+
+		Inspector → Layer 드롭다운 → "Add Layer".
+
+		새 레이어 추가: Player, Enemy.
+
+		개념: 레이어는 오브젝트를 그룹화해 충돌 규칙을 정의하는 데 사용.
+
+
+3. 오브젝트에 레이어 지정
+
+		projectile_player와 Player 오브젝트 → Layer: Player.
+
+		projectile_enemy와 Enemy 오브젝트 → Layer: Enemy.
+
+		자식 오브젝트 포함하여 레이어 변경 (경고 메시지에서 "Change Children" 선택).
+
+		개념: 자식 오브젝트도 동일한 레이어를 상속받아 일관된 충돌 동작 보장.
+
+4. Layer Collision Matrix 설정
+
+		Edit → Project Settings → Physics 2D → Layer Collision Matrix.
+
+		설정:
+
+				Player 레이어: Enemy와만 충돌.
+
+				Enemy 레이어: Player와만 충돌.
+
+				Player vs Player, Enemy vs Enemy 충돌 비활성화.
+
+		개념: Collision Matrix는 레이어 간 충돌 여부를 제어. 이를 통해 불필요한 충돌(예: 적군끼리 충돌) 방지.
+```
+
+<Image src="/images/blog/game/image 499.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+## 5. 렌더링 순서 조정
+
+```csharp
+1. 문제점: 발사체가 플레이어/적군 위에 렌더링되어 부자연스럽게 보임.
+
+2. 해결
+
+		projectile_player와 projectile_enemy의 스프라이트 → Order in Layer: 0.
+
+		Player와 Enemy의 스프라이트 → Order in Layer: 1.
+
+		개념: Order in Layer는 2D 렌더링 순서를 결정. 낮은 값이 뒤에, 높은 값이 앞에 렌더링.
+```
+
+## 6. 입력 시스템 조정
+
+```csharp
+1. Input Actions 설정
+
+		[InputSystem] → InputActions 열기 → Fire 액션 선택.
+
+		기존: 마우스 왼쪽 버튼 (Left Button [Mouse]).
+
+		추가: + 버튼 → Add Binding → Path: Keyboard/Space.
+
+		Action Type 변경: Button → Value.
+
+		개념: Value 타입은 키 입력/해제 상태를 모두 감지해 발사 동작 제어에 유리.
+
+2. 저장
+
+		Save Asset 클릭 (Auto-Save 꺼져 있을 경우 필수).
+
+		개념: Input System은 플레이어 입력(키보드, 마우스 등)을 관리. 변경 후 저장 필수.
+```
+
+<Image src="/images/blog/game/image 500.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+<Image src="/images/blog/game/image 501.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+<Image src="/images/blog/game/image 502.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+# { 플레이어 슈팅 기능 구현 가이드 }
+
+```csharp
+이 강의에서는 Unity에서 플레이어의 슈팅 기능을 구현하는 방법을 배웁니다.
+
+플레이어가 발사 키를 눌렀을 때 발사체(projectile)를 생성하고,
+
+이를 적절히 제어하는 과정을 다룹니다. 주요 스크립트는 Player와 Shooter로 나뉘며, 코루틴을 활용해 연속 발사를 구현합니다.
+```
+
+## 1. 목표 이해
+
+```csharp
+목표: 플레이어가 발사 키를 눌렀을 때 발사체를 생성하고, 적군도 나중에 반격할 수 있도록 Player와 Shooter 스크립트를 분리.
+
+왜 분리?: Player 스크립트는 이동과 입력 처리에 집중하고, Shooter 스크립트는 발사 로직을 처리해 코드의 재사용성과 유지보수성을 높임.
+
+핵심 개념:
+
+Input System: Unity의 새로운 입력 시스템으로, OnMove나 OnFire 같은 이벤트를 통해 사용자 입력을 처리.
+
+코루틴(Coroutine): Unity에서 비동기적으로 작업을 처리하는 방법. 예를 들어, 일정 시간 간격으로 반복 작업(발사)을 수행할 때 유용.
+```
+
+## 2. Player 스크립트 설정
+
+```csharp
+Player 스크립트는 플레이어의 이동과 입력 처리를 담당하며, 발사 입력(OnFire)도 여기서 받습니다.
+```
+
+### Shooter 컴포넌트 참조
+
+```csharp
+Player 스크립트에서 Shooter 스크립트를 참조하기 위해 변수를 추가.
+```
+
+```csharp
+Shooter shooter;
+void Awake()
+{
+    shooter = GetComponent<Shooter>();
+}
+```
+
+```csharp
+개념: Awake는 게임 오브젝트가 초기화될 때 호출. GetComponent로 동일한 오브젝트의 다른 컴포넌트를 가져옴.
+```
+
+### OnFire 입력 처리
+
+```csharp
+OnFire 메소드를 추가해 발사 입력을 처리. 입력이 눌리면 Shooter의 isFiring 변수를 설정.
+```
+
+```csharp
+void OnFire(InputValue value)
+{
+    if (shooter != null)
+    {
+        shooter.isFiring = value.isPressed;
+    }
+}
+```
+
+```csharp
+개념: InputValue는 Unity Input System의 입력 값. isPressed는 키가 눌렸는지 여부를 반환.
+```
+
+## 3. Shooter 스크립트 생성 및 설정
+
+```csharp
+Shooter 스크립트는 발사체 생성과 발사 로직을 담당합니다. 새로운 컴포넌트로 추가하고 아래를 설정합니다.
+```
+
+### 변수 설정
+
+```csharp
+발사체 프리팹, 속도, 수명, 발사 간격을 인스펙터에서 조정 가능하도록 설정.
+```
+
+```csharp
+// 인스펙터에서 설정할 발사체 프리팹
+[SerializeField] GameObject projectilePrefab;
+// 발사체의 이동 속도, 기본값 10
+[SerializeField] float projectileSpeed = 10f;
+// 발사체가 사라지기까지의 시간(초), 기본값 5초
+[SerializeField] float projectileLifetime = 5f;
+// 발사 간격(초), 기본값 0.2초
+[SerializeField] float firingRate = 0.2f;
+// 발사 상태를 나타내는 플래그, 다른 스크립트에서 접근 가능
+public bool isFiring = false;
+// 연속 발사를 관리하는 코루틴 참조
+Coroutine firingCoroutine;
+```
+
+```csharp
+개념: [SerializeField]는 private 변수를 Unity 인스펙터에 노출. public bool isFiring은 다른 스크립트(Player)에서 접근 가능.
+```
+
+### Fire 메소드 구현
+
+```csharp
+매 프레임마다 호출되는 Update에서 Fire를 호출해 발사 상태를 확인.
+
+isFiring이 true면 코루틴 시작, false면 코루틴 종료.
+```
+
+```csharp
+void Update()
+{
+    Fire();
+}
+
+void Fire()
+{
+    if (isFiring && firingCoroutine == null)
+    {
+        firingCoroutine = StartCoroutine(FireContinuously());
+    }
+    else if (!isFiring && firingCoroutine != null)
+    {
+        StopCoroutine(firingCoroutine);
+        firingCoroutine = null;
+    }
+}
+```
+
+```csharp
+개념: StartCoroutine으로 코루틴 시작, StopCoroutine으로 특정 코루틴 종료. firingCoroutine 변수를 통해 코루틴을 추적.
+```
+
+### 코루틴으로 연속 발사 구현:
+
+```csharp
+FireContinuously 코루틴은 무한 루프를 돌며 발사체를 생성하고, 속도를 설정하며, 일정 시간 후 파괴.
+```
+
+```csharp
+IEnumerator FireContinuously()
+{
+    // 무한 루프로 연속 발사 실행
+    while (true)
+    {
+        // 발사체 프리팹을 플레이어 위치에 생성, 회전은 기본값(Quaternion.identity)
+        GameObject instance = Instantiate(projectilePrefab, transform.position, Quaternion.identity);
+        // 발사체의 Rigidbody2D 컴포넌트 가져오기
+        Rigidbody2D rb = instance.GetComponent<Rigidbody2D>();
+        // Rigidbody2D가 존재하면
+        if (rb != null)
+        {
+            // 발사체를 위쪽 방향(transform.up)으로 지정된 속도로 이동
+            rb.velocity = transform.up * projectileSpeed;
+        }
+        // 발사체를 지정된 수명(projectileLifetime) 후 파괴
+        Destroy(instance, projectileLifetime);
+        // 다음 발사까지 지정된 시간(firingRate) 대기
+        yield return new WaitForSeconds(firingRate);
+    }
+}
+```
+
+```csharp
+Instantiate: 오브젝트를 동적으로 생성.
+
+Rigidbody2D: 발사체의 물리적 움직임을 제어.
+
+transform.up: 오브젝트의 위 방향(초록색 축)을 기준으로 이동.
+
+Destroy(instance, projectileLifetime): 오브젝트를 지정 시간 후 파괴.
+
+yield return new WaitForSeconds(firingRate): 지정 시간 동안 대기.
+
+Instantiate 인자 설
+
+projectilePrefab (GameObject): 복사할 발사체 프리팹. 인스펙터에서 설정한 원본 오브젝트.
+
+transform.position (Vector3): 발사체가 생성될 위치. 플레이어의 현재 위치.
+
+Quaternion.identity (Quaternion): 발사체의 초기 회전. 회전 없음(기본 방향). Quaternion.identity는 "회전 없음"을 의미하며,
+
+기본 방향(0도 회전)을 유지합니다. 즉, 발사체가 특별한 회전 없이 기본 방향으로 생성됩니다.
+```
+
+## 4. 문제 해결: Null Reference Exception
+
+```csharp
+문제: 게임 시작 시 firingCoroutine이 null인데 StopCoroutine을 호출해 오류 발생.
+
+해결:
+
+		Fire 메소드에서 조건을 강화해 firingCoroutine이 null이 아닌 경우에만 종료.
+
+
+개념: null 체크로 예외 방지. 코루틴이 이미 실행 중인지 확인해 중복 실행 방지.
+```
+
+```csharp
+void Fire()
+{
+    // 발사 중이고 코루틴이 실행 중이 아닌 경우
+    if (isFiring && firingCoroutine == null)
+    {
+        // 연속 발사를 위한 코루틴 시작, firingCoroutine에 저장
+        firingCoroutine = StartCoroutine(FireContinuously());
+    }
+    // 발사 중이 아니고 코루틴이 실행 중인 경우
+    else if (!isFiring && firingCoroutine != null)
+    {
+        // 실행 중인 코루틴을 멈춤
+        StopCoroutine(firingCoroutine);
+        // 코루틴 참조를 null로 초기화
+        firingCoroutine = null;
+    }
+}
+```
+
+## 5. 유니티 설정
+
+```csharp
+Player 프리팹:
+
+		Player 오브젝트에 Shooter 컴포넌트 추가.
+
+		Shooter 컴포넌트의 projectilePrefab에 Projectile_player 프리팹 연결.
+
+테스트:
+
+		플레이 모드에서 발사 키(예: 스페이스바)를 눌렀을 때 발사체가 생성되고, 적군을 맞추면 파괴 확인.
+
+		발사체가 transform.up 방향으로 이동하며, projectileLifetime 후 사라짐.
+```
+
+<Image src="/images/blog/game/image 503.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+<Image src="/images/blog/game/image 504.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+# { 적군의 발사 기능 구현 및 최적화 }
+
+## 1. 프로젝트 정리
+
+```csharp
+목표: 프로젝트 구조를 정리하고 적군의 발사 기능을 구현하기 위해 준비.
+
+수행 작업:
+
+		[assets] 폴더에서 Shooter 스크립트를 [scripts] 폴더로 이동.
+
+		[prefabs] 폴더에서 Enemy 프리팹에 Shooter 컴포넌트를 추가.
+
+		Shooter 컴포넌트에 projectile_enemy 프리팹을 설정 (적군용 발사체).
+
+		다른 설정(속도, 발사 속도 등)은 기본값으로 유지하고 테스트 후 수정 예정.
+
+개념 설명:
+
+		프리팹(Prefab): Unity에서 재사용 가능한 게임 오브젝트 템플릿.
+
+		Enemy나 projectile_enemy 같은 프리팹은 미리 설정된 오브젝트를 쉽게 생성/관리할 수 있도록 도와줌.
+
+
+		컴포넌트(Component): 게임 오브젝트에 추가되는 기능 블록. Shooter 스크립트는 발사 로직을 담당하는 컴포넌트임.
+```
+
+## 2. Shooter 스크립트 수정: 적군의 자동 발사
+
+```csharp
+목표: 적군이 자동으로 발사체를 발사하도록 설정.
+
+수행 작업:
+
+		Shooter 스크립트에 새로운 변수 [SerializeField] bool useAI 추가.
+
+		useAI: AI(적군)와 플레이어를 구분하는 플래그. true면 AI가 자동 발사, false면 플레이어 입력으로 발사.
+
+		Start 메서드에서 useAI가 true일 경우 isFiring을 true로 설정
+```
+
+```csharp
+void Start()
+{
+    if (useAI)
+    {
+        isFiring = true; // AI will always fire
+    }
+}
+```
+
+```csharp
+테스트:
+
+		Enemy 프리팹의 Shooter 컴포넌트에서 Use AI를 체크.
+
+		플레이 모드에서 적군이 발사하는지 확인 → 발사됨, 하지만 문제점 발견:
+
+				발사 속도가 너무 빠름.
+
+				발사체 방향이 잘못됨 (위쪽 대신 이상한 방향으로 발사).
+
+개념 설명:
+
+		[SerializeField]: private 변수를 Unity 인스펙터에서 수정 가능하게 만드는 속성. 코드에서는 접근 제한을 유지하면서 편집 가능.
+
+		isFiring: 발사 여부를 결정하는 bool 변수. AI는 항상 발사하도록 설정.
+```
+
+## 3. 문제 해결: 발사 속도와 방향 수정
+
+```csharp
+문제 1: 발사 속도 조정
+
+		Enemy 프리팹의 Shooter 컴포넌트에서 baseFiringRate를 0.2에서 1로 변경.
+
+		효과: 발사 간격이 길어져 덜 빠르게 발사됨.
+
+문제 2: 발사체 방향 수정
+
+		원인: 적군 스프라이트(enemyred05)가 화면 아래를 향하고 있어 발사체가 위쪽 벡터를 따라 잘못된 방향으로 이동.
+
+		해결 방법:
+
+				1. 스프라이트 회전:
+
+						enemyred05 스프라이트의 Rotation Z를 180도로 설정 → 스프라이트가 아래를 향하도록 조정.
+
+						하지만 Enemy 오브젝트 전체의 방향은 여전히 위쪽을 향함.
+
+
+				2. EnemySpawner에서 생성 시 회전:
+
+						EnemySpawner 스크립트의 Instantiate 호출에서 Quaternion.identity를 Quaternion.Euler(0, 0, 180)으로 변경.
+
+
+
+
+	효과: 적군이 생성될 때 180도 회전하여 화면 아래를 향함.
+```
+
+```csharp
+Instantiate(currentWave.GetEnemyPrefab(i), currentWave.GetStartingWaypoint().position, Quaternion.Euler(0, 0, 180), transform);
+```
+
+```csharp
+Quaternion: Unity에서 회전을 표현하는 수학적 구조. Quaternion.identity는 회전 없음을 의미하고, Quaternion.Euler(x, y, z)는 지정된 각도로 회전.
+
+Instantiate: 오브젝트를 동적으로 생성하는 메서드. 위치, 회전, 부모 오브젝트를 지정 가능.
+```
+
+<Image src="/images/blog/game/image 505.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+```csharp
+enemyred05 스프라이트의 Rotation Z를 180도로 설정 → 스프라이트가 아래를 향하도록 조정.
+```
+
+<Image src="/images/blog/game/image 506.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+```csharp
+EnemySpawner 스크립트의 Instantiate 호출에서 Quaternion.identity를 Quaternion.Euler(0, 0, 180)으로 변경.
+```
+
+## 4. 발사 간격 무작위화
+
+```csharp
+목표: 적군 발사 간격을 고정된 값이 아닌 무작위로 만들어 게임을 덜 단조롭게.
+
+수행 작업:
+
+		Shooter 스크립트에 새 변수 추가:
+```
+
+```csharp
+[SerializeField] float firingRateVariance = 0f; // 발사 간격의 변동성
+[SerializeField] float minimumFiringRate = 0.1f; // 최소 발사 간격
+```
+
+```csharp
+FireContinuously 코루Tin 수정:
+
+		baseFiringRate를 고정값으로 사용하지 않고, 무작위 간격 계산.
+
+		Random.Range로 baseFiringRate - firingRateVariance와 baseFiringRate + firingRateVariance 사이의 값을 생성.
+
+		Mathf.Clamp로 최소값(minimumFiringRate)과 최대값(float.MaxValue) 제한.
+```
+
+```csharp
+float timeToNextProjectile = Random.Range(baseFiringRate - firingRateVariance, baseFiringRate + firingRateVariance);
+timeToNextProjectile = Mathf.Clamp(timeToNextProjectile, minimumFiringRate, float.MaxValue);
+yield return new WaitForSeconds(timeToNextProjectile);
+```
+
+```csharp
+테스트:
+
+		Enemy 프리팹의 Shooter 컴포넌트에서:
+
+		Base Firing Rate: 1초.
+
+		Firing Rate Variance: 0.5초 → 발사 간격은 0.5~1.5초 사이 무작위.
+
+		플레이 테스트 → 적군이 무작위 간격으로 발사하며 게임이 더 역동적임.
+
+개념 설명:
+
+		코루틴(Coroutine): Unity에서 비동기적으로 실행되는 함수. yield return new WaitForSeconds()는 지정된 시간 동안 대기.
+
+		Random.Range: 두 값 사이에서 무작위 값을 반환. Mathf.Clamp는 값을 지정된 범위로 제한.
+```
+
+## 5. Shooter 스크립트 정리: 인스펙터 최적화
+
+```csharp
+목표: Shooter 컴포넌트의 인스펙터를 깔끔하게 정리.
+
+수행 작업:
+
+변수 그룹화:
+
+		[Header("General Settings")] 아래에 projectilePrefab, projectileSpeed, projectileLifetime, baseFiringRate 배치.
+
+		[Header("AI Settings")] 아래에 useAI, firingRateVariance, minimumFiringRate 배치.
+
+isFiring 변수 숨기기:
+
+		[HideInInspector] 속성 추가 → 인스펙터에서 isFiring 항목 제거.
+```
+
+```csharp
+[HideInInspector] public bool isFiring = false;
+```
+
+```csharp
+효과: 인스펙터에서 변수가 General과 AI로 구분되어 관리 용이, 불필요한 isFiring 노출 제거.
+
+개념 설명:
+
+		[Header]: 인스펙터에서 변수를 그룹화하여 보기 좋게 정리하는 속성.
+
+		[HideInInspector]: public 변수를 코드에서는 접근 가능하지만 인스펙터에서는 숨김.
+```
+
+<Image src="/images/blog/game/image 507.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+# { 입자 시스템을 활용한 폭발 효과 구현 }
+
+```csharp
+이 강의는 유니티(Unity)에서 입자 시스템(Particle System)을 사용해 비행선이 파괴될 때 폭발 효과를 추가하는 방법을 다룹니다.
+```
+
+## 1. 입자 시스템 추가
+
+```csharp
+단계: Hierarchy에서 우클릭 → Effects → Particle System 추가.
+
+결과: 기본 입자 시스템이 생성되지만, 기본 설정은 솜털 같은 입자를 뿜어내는 상태로, 폭발 효과와는 거리가 멀다.
+
+개념: Particle System은 유니티에서 연기, 불, 폭발 같은 시각적 효과를 만드는 도구입니다. 다양한 설정을 조정해 원하는 효과를 구현할 수 있습니다.
+```
+
+## 2. 스프라이트 시트와 머티리얼 설정
+
+```csharp
+단계:
+
+		1. Assets 폴더에서 우클릭 → Create → Material → 이름: m_explosion.
+
+		2. Inspector에서 Shader를 Standard에서 Particles/Standard Unlit로 변경.
+
+		3. Rendering Mode를 Opaque에서 Additive로 설정 (입자가 자연스럽게 겹치며 빛나는 효과).
+
+		4. 스프라이트 시트를 Albedo 슬롯에 추가 (예: Explosion-stuff 스프라이트 시트).
+
+결과: 입자 시스템이 스프라이트 시트를 사용해 폭발 이미지를 표시.
+
+개념:
+
+		Material: 오브젝트의 색상, 텍스처, 렌더링 방식을 정의.
+
+		Shader: 렌더링 방식(빛, 그림자 등)을 결정. Standard Unlit은 입자에 적합한 비조명 셰이더.
+
+		Additive Rendering: 밝은 색상이 겹칠수록 더 밝아져 폭발이나 불꽃 효과에 적합.
+```
+
+<Image src="/images/blog/game/image 508.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+```csharp
+스프라이트 시트를 Albedo 슬롯에 추가
+```
+
+## 3. 입자 시스템 설정 조정
+
+```csharp
+입자 시스템의 설정을 조정해 폭발 효과를 자연스럽게 만듭니다.
+
+(1) Texture Sheet Animation
+
+		설정:
+
+				Texture Sheet Animation 활성화, Mode: Grid.
+
+				Tiles: X=3, Y=1 (스프라이트 시트 구조에 맞춤).
+
+				Cycles: 2 (스프라이트 시트를 두 번 반복).
+
+				Start Frame: Random Between Two Constants (0, 2)로 설정해 시작 프레임을 무작위로 지정.
+
+		결과: 스프라이트 시트의 이미지가 순차적으로 애니메이션처럼 재생.
+
+		개념: Texture Sheet Animation은 스프라이트 시트를 여러 프레임으로 나누어 애니메이션처럼 보여주는 기능.
+
+(2) 색상 조정 (Color over Lifetime)
+
+		설정:
+
+				Color over Lifetime 활성화.
+
+				색상 전환: 샛노랑 → 주황 → 붉은 회색 (연기 효과) → 투명 (Alpha 감소).
+
+		결과: 폭발이 불꽃에서 연기로 자연스럽게 전환.
+
+		개념: Color over Lifetime은 입자의 생애 동안 색상을 점진적으로 변경해 사실적인 효과를 만듦.
+
+(3) 모양 조정
+
+		설정:
+
+				Shape: Cone → Circle (폭발이 사방으로 퍼지도록).
+
+				Particle System의 Rotation과 Transform을 (0, 0, 0)으로 설정.
+
+				Radius: 0.5로 줄여 폭발 범위 제한.
+
+		결과: 폭발이 동그랗게 퍼지며 자연스러운 모양으로 변경.
+
+		개념: Shape는 입자가 방출되는 형태를 정의. Circle은 2D 게임에서 폭발 효과에 적합.
+
+(4) 입자 지속 시간 (Start Lifetime)
+
+		설정:
+
+				Start Lifetime: Random Between Two Constants (0.1, 0.5).
+
+		결과: 입자가 빠르게 사라져 폭발이 짧고 강렬해짐.
+
+		개념: Start Lifetime은 입자가 화면에 머무르는 시간을 조정.
+
+(5) 입자 회전
+
+		설정:
+
+				Start Rotation: Random Between Two Constants (0, 359).
+
+				Rotation over Lifetime: Angular Velocity = 180도.
+
+		결과: 입자가 무작위 방향으로 회전하며 동적 느낌 추가.
+
+		개념: Rotation은 입자의 방향과 회전을 조정해 역동성을 부여.
+
+(6) 입자 수와 밀도 (Emission)
+
+		설정:
+
+				Emission → Rate over Time: 100으로 증가.
+
+		결과: 입자 수가 많아져 폭발이 더 풍성해짐.
+
+		개념: Emission은 초당 생성되는 입자 수를 정의.
+
+(7) 크기 변화 (Size over Lifetime)
+
+		설정:
+
+				Size over Lifetime 활성화, 곡선(Curve)을 뒤집어 입자가 크기 시작 → 작아지며 소멸.
+
+		결과: 폭발 중심은 크고, 가장자리는 가느다란 연기 효과로 표현.
+
+		개념: Size over Lifetime은 입자의 크기를 생애 동안 동적으로 조정.
+
+(8) 입자 속도 (Start Speed)
+
+		설정:
+
+				Start Speed: Random Between Two Constants (0, 2).
+
+				Curve 설정: 2에 가까운 속도의 입자가 더 많이 생성되도록 경사 설정.
+
+		결과: 입자가 빠르게 퍼지며 자연스러운 폭발 느낌 강화.
+
+		개념: Start Speed는 입자의 초기 속도를 조정. 곡선 설정으로 속도 분포를 세밀히 제어 가능.
+
+(9) 전체 지속 시간
+
+		설정:
+
+				Looping 비활성화.
+
+				Duration: 2초로 설정.
+
+		결과: 폭발이 짧고 강렬해지며 반복되지 않음.
+
+		개념: Duration은 입자 시스템 전체의 재생 시간을 정의.
+```
+
+## 4. 프리팹 생성
+
+```csharp
+단계:
+
+		1. 입자 시스템 이름을 Explosion Effect로 변경.
+
+		2. Assets 폴더로 드래그해 프리팹(Prefab)으로 저장.
+
+		3. Hierarchy에서 입자 시스템 삭제.
+
+결과: 재사용 가능한 폭발 효과 프리팹 완성.
+
+개념: Prefab은 재사용 가능한 게임 오브젝트 템플릿으로, 동일한 설정을 여러 오브젝트에 쉽게 적용 가능.
+```
+
+## 5. Health 스크립트에 폭발 효과 연결
+
+```csharp
+단계:
+
+		1. Health 스크립트에 [SerializeField] ParticleSystem hitEffect; 추가.
+
+		2. PlayHitEffect 메서드 추가:
+
+		3. OnTriggerEnter2D에서 TakeDamage 호출 후 PlayHitEffect 호출.
+```
+
+```csharp
+void PlayHitEffect()
+{
+    if (hitEffect != null)
+    {
+        ParticleSystem instance = Instantiate(hitEffect, transform.position, Quaternion.identity);
+        Destroy(instance.gameObject, instance.main.duration + instance.main.startLifetime.constantMax);
+    }
+}
+```
+
+```csharp
+결과: 비행선이 데미지를 입거나 파괴될 때 폭발 효과가 나타남.
+
+개념:
+
+		SerializeField: Inspector에서 변수를 설정 가능하게 함.
+
+		Instantiate: 오브젝트를 동적으로 생성.
+
+		Destroy: 지정된 시간 후 오브젝트를 제거.
+```
+
+## 6. 렌더링 순서 문제 해결
+
+```csharp
+문제: 폭발 효과가 비행선 뒤에 나타남.
+
+해결:
+
+		Explosion Effect의 Renderer → Sorting Layer를 2로 설정 (비행선: Layer 1, 발사체: Layer 0).
+
+결과: 폭발이 비행선 앞에 올바르게 표시.
+
+개념: Sorting Layer는 2D 게임에서 오브젝트의 렌더링 순서를 결정.
+```
+
+## 7. 최종 테스트
+
+```csharp
+단계:
+
+		1. Player와 Enemy 오브젝트의 Health 스크립트에 Explosion Effect 프리팹 연결.
+
+		2. 게임 실행 → 비행선 파괴 시 폭발 효과 확인.
+
+결과: 짧고 강렬한 폭발 효과가 비행선 파괴 시 자연스럽게 나타남.
+```
+
+<Image src="/images/blog/game/image 509.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+<Image src="/images/blog/game/image 510.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+<Image src="/images/blog/game/image 511.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+<Image src="/images/blog/game/image 512.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+<Image src="/images/blog/game/image 513.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+<Image src="/images/blog/game/image 514.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+<Image src="/images/blog/game/image 515.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+<Image src="/images/blog/game/image 516.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+<Image src="/images/blog/game/image 517.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+# { 카메라 흔들림 효과(Camera Shake) 구현 }
+
+```csharp
+이 강의는 Unity에서 카메라 흔들림 효과를 구현하여 플레이어가 충돌 시 충격을 느낄 수 있도록 만드는 과정을 설명합니다.
+```
+
+## 1. 목표
+
+```csharp
+카메라 흔들림 효과를 구현하여 플레이어가 충돌 시 시각적 피드백을 받도록 함.
+
+메인 카메라에 CameraShake 스크립트를 적용해 카메라를 무작위로 움직임.
+
+Health 스크립트와 연동하여 플레이어가 공격받을 때만 효과가 발생하도록 제한.
+```
+
+## 2. 기본 개념 정리
+
+```csharp
+카메라 흔들림 효과(Camera Shake): 카메라의 위치를 빠르게 무작위로 이동시켜 충격이나 흔들리는 느낌을 주는 시각적 효과.
+
+코루틴(Coroutine): Unity에서 비동기적으로 실행되는 함수로,
+
+프레임 단위로 작업을 분할하여 부드럽게 처리. 여기서는 카메라를 매 프레임마다 이동시키는 데 사용.
+
+Random.insideUnitCircle: 반지름 1인 원 안에서 무작위 2D 벡터를 반환. 카메라의 무작위 이동을 구현하는 데 사용.
+
+Vector2 vs Vector3: Random.insideUnitCircle은 2D 벡터(Vector2)를 반환하지만,
+
+카메라 위치는 3D(Vector3)로 처리. 이를 위해 Vector2를 Vector3로 변환.
+```
+
+## 3. 구현 단계
+
+### (1) CameraShake 스크립트 생성
+
+```csharp
+1. 스크립트 생성:
+
+		[Scripts] 폴더에서 새 C# 스크립트를 만들고 이름을 CameraShake로 지정.
+
+		메인 카메라에 이 스크립트를 추가.
+
+2. 변수 설정:
+
+		shakeDuration: 흔들림 효과가 지속되는 시간 (기본값: 0.5초).
+
+		shakeMagnitude: 카메라 이동 거리 (기본값: 0.1).
+
+		initialPosition: 카메라의 초기 위치를 저장해 효과 종료 후 원래 위치로 복귀.
+```
+
+```csharp
+[SerializeField] float shakeDuration = 0.5f;
+[SerializeField] float shakeMagnitude = 0.1f;
+Vector3 initialPosition;
+```
+
+```csharp
+3. 초기 위치 저장:
+
+		Start 메서드에서 카메라의 초기 위치를 저장.
+```
+
+```csharp
+void Start()
+{
+    initialPosition = transform.position;
+}
+```
+
+```csharp
+4. 흔들림 효과 구현 (코루틴):
+
+		Shake 코루틴: 카메라를 무작위로 이동.
+
+		매 프레임마다 카메라 위치를 initialPosition + (Vector3)Random.insideUnitCircle * shakeMagnitude로 설정.
+
+		elapsedTime을 사용해 shakeDuration 동안 루프를 실행.
+
+		프레임 끝을 기다리기 위해 yield return new WaitForEndOfFrame() 사용.
+
+		효과 종료 후 카메라를 초기 위치로 복귀.
+```
+
+```csharp
+using System.Collections;
+using UnityEngine;
+
+public class CameraShake : MonoBehaviour
+{
+    [SerializeField] float shakeDuration = 0.5f; // 흔들림 효과가 지속되는 시간 (초 단위)
+    [SerializeField] float shakeMagnitude = 0.1f; // 흔들림의 강도 (카메라 이동 거리)
+    Vector3 initialPosition; // 카메라의 초기 위치를 저장하는 변수
+
+    void Start()
+    {
+        initialPosition = transform.position; // 시작 시 카메라의 초기 위치 저장
+    }
+
+    public void Play()
+    {
+        StartCoroutine(Shake()); // 외부에서 호출 가능한 메서드로 Shake 코루틴 실행
+    }
+
+    // 카메라를 무작위로 흔들어 충격 효과를 만드는 코루틴
+    IEnumerator Shake()
+    {
+        // 경과 시간을 추적하는 변수, 0부터 시작
+        float elapsedTime = 0f;
+
+        // 경과 시간이 shakeDuration보다 작을 동안 반복
+        while (elapsedTime < shakeDuration)
+        {
+            // 카메라 위치를 초기 위치에 무작위 오프셋을 더해 설정
+            // Random.insideUnitCircle: 반지름 1인 원 안의 무작위 2D 벡터 반환
+            // (Vector3)로 변환하여 Z축은 0으로 유지 (2D 게임용)
+            // shakeMagnitude를 곱해 흔들림 강도 조절
+            transform.position = initialPosition + (Vector3)Random.insideUnitCircle * shakeMagnitude;
+
+            // 경과 시간에 프레임 간 시간(Time.deltaTime)을 더해 시간 추적
+            elapsedTime += Time.deltaTime;
+
+            // 현재 프레임이 끝날 때까지 대기하여 부드러운 애니메이션 구현
+            yield return new WaitForEndOfFrame();
+        }
+
+        // 흔들림 효과가 끝난 후 카메라를 초기 위치로 복귀
+        transform.position = initialPosition;
+    }
+}
+```
+
+```csharp
+5. 효과 실행 메서드
+
+		Play 메서드를 통해 외부 스크립트에서 흔들림 효과를 호출.
+```
+
+```csharp
+public void Play()
+{
+    StartCoroutine(Shake());
+}
+```
+
+### (2) Health 스크립트 수정
+
+```csharp
+1. 변수 추가:
+
+		CameraShake 참조와 효과 적용 여부를 결정하는 applyCameraShake 변수 추가.
+```
+
+```csharp
+[SerializeField] bool applyCameraShake = false;
+CameraShake cameraShake;
+```
+
+```csharp
+2. 카메라 참조 설정:
+
+		Awake 메서드에서 메인 카메라의 CameraShake 컴포넌트를 가져옴.
+```
+
+```csharp
+void Awake()
+{
+    cameraShake = Camera.main.GetComponent<CameraShake>();
+}
+```
+
+```csharp
+3. 충돌 시 흔들림 호출:
+
+		OnTriggerEnter2D에서 충돌이 발생하면 ShakeCamera 호출.
+
+		applyCameraShake가 true이고 cameraShake가 null이 아닌 경우에만 실행.
+```
+
+```csharp
+void ShakeCamera()
+{
+    if (cameraShake != null && applyCameraShake)
+    {
+        cameraShake.Play();
+    }
+}
+```
+
+### (3) Unity 설정
+
+```csharp
+1. 카메라 설정:
+
+		메인 카메라에 CameraShake 스크립트를 추가.
+
+		Shake Duration과 Shake Magnitude를 조정 (예: 0.5초, 0.1).
+
+2. 프리팹 설정:
+
+		Enemy 프리팹의 Health 스크립트에서 Apply Camera Shake를 false로 설정.
+
+		Player 프리팹의 Health 스크립트에서 Apply Camera Shake를 true로 설정.
+
+3. 테스트:
+
+		게임을 실행하여 플레이어가 적과 충돌 시 카메라 흔들림 효과 확인.
+
+		효과가 너무 강하면 Shake Duration과 Shake Magnitude를 조정.
+```
+
+## 4. 코드 최종 정리
+
+### CameraShake.cs
+
+```csharp
+using System.Collections;
+using UnityEngine;
+
+public class CameraShake : MonoBehaviour
+{
+    [SerializeField] float shakeDuration = 0.5f;
+    [SerializeField] float shakeMagnitude = 0.1f;
+    Vector3 initialPosition;
+
+    void Start()
+    {
+        initialPosition = transform.position;
+    }
+
+    public void Play()
+    {
+        StartCoroutine(Shake());
+    }
+
+    IEnumerator Shake()
+    {
+        float elapsedTime = 0f;
+        while (elapsedTime < shakeDuration)
+        {
+            transform.position = initialPosition + (Vector3)Random.insideUnitCircle * shakeMagnitude;
+            elapsedTime += Time.deltaTime;
+            yield return new WaitForEndOfFrame();
+        }
+        transform.position = initialPosition;
+    }
+}
+```
+
+### Health.cs (관련 부분만)
+
+```csharp
+using System.Collections;
+using UnityEngine;
+
+public class Health : MonoBehaviour
+{
+    [SerializeField] int health = 50;
+    [SerializeField] ParticleSystem hitEffect;
+    [SerializeField] bool applyCameraShake = false;
+    CameraShake cameraShake;
+
+    void Awake()
+    {
+        cameraShake = Camera.main.GetComponent<CameraShake>();
+    }
+
+    void OnTriggerEnter2D(Collider2D collision)
+    {
+        DamageDealer damageDealer = collision.gameObject.GetComponent<DamageDealer>();
+        if (damageDealer != null)
+        {
+            TakeDamage(damageDealer.GetDamage());
+            PlayHitEffect();
+            ShakeCamera();
+            damageDealer.Hit();
+        }
+    }
+
+    void ShakeCamera()
+    {
+        if (cameraShake != null && applyCameraShake)
+        {
+            cameraShake.Play();
+        }
+    }
+    // 나머지 메서드 (TakeDamage, PlayHitEffect 등)는 기존과 동일
+}
+```
+
+# { 시차 스크롤 배경 효과 구현 }
+
+## 1. 시차 스크롤 배경이란? (Parallax Scrolling)
+
+```csharp
+개념:
+
+		시차 스크롤은 2D 게임에서 배경의 여러 레이어가 서로 다른 속도로 이동하여 깊이감과 입체감을 주는
+
+		그래픽 기법입니다. 이는 실제 세계에서 가까운 물체는 빠르게, 먼 물체는 느리게 보이는 시각적 원리를 모방합니다.
+
+예시:
+
+		슈퍼 마리오 게임에서 멀리 있는 산은 느리게, 가까운 나무는 빠르게 움직이는 효과.
+
+효과:
+
+		플레이어가 우주를 비행하거나 공간을 이동하는 듯한 몰입감을 제공.
+
+핵심 원리:
+
+		배경은 여러 레이어로 구성되며, 각 레이어는 독립적으로 움직입니다.
+
+		상위 레이어는 투명도를 가져야 하며, 하위 레이어가 보이도록 설정해야 효과가 살아납니다.
+
+		일반적으로 2~4개의 레이어를 사용해 깊이감을 만듭니다.
+```
+
+## 2. 구현 준비 단계
+
+```csharp
+(1) 필요한 리소스 준비
+
+		배경 이미지: 두 개의 텍스처(stars_0, stars_1)를 사용.
+
+				stars_0: 멀리 있는 배경 (느리게 스크롤).
+
+				stars_1: 가까운 배경 (빠르게 스크롤).
+
+
+		이미지 설정 (Import Settings):
+
+				Texture Type:
+
+						Sprite (2D and UI)로 설정. 2D 게임에서 스프라이트로 사용하기 위함.
+
+				Alpha Is Transparency:
+
+						활성화하여 투명 영역(알파 채널)이 제대로 렌더링되도록 설정.
+
+						이 설정을 누락하면 투명 부분이 검정색으로 나타날 수 있음.
+
+				Wrap Mode:
+
+						Clamp (기본값):
+
+								텍스처가 끝나는 지점에서 픽셀을 늘려서 표시. 스크롤 시 텍스처가 늘어나는 부자연스러운 효과 발생.
+
+						Repeat:
+
+								텍스처가 끝나면 처음부터 반복. 스크롤 배경에 적합.
+
+								설정 방법: Project 창에서 이미지 선택 → Inspector → Wrap Mode를 Repeat로 변경.
+
+				왜 중요한가?:
+
+						Wrap Mode가 Clamp로 설정되면 텍스처가 늘어나 스크롤 효과가 망가짐. Repeat로 설정해야 끊김 없는 스크롤 구현 가능.
+
+(2) Hierarchy 설정
+
+		기존 배경 제거:
+
+				단일 배경 이미지(starfield)를 삭제. 이제 두 개의 레이어로 대체.
+
+
+		새 배경 추가:
+
+				Project 창에서 stars_0와 stars_1을 Hierarchy로 드래그하여 background 오브젝트 아래에 배치.
+
+				계층 구조: stars_0 (뒷 배경), stars_1 (앞 배경) 순서로 배치.
+
+
+		레이어 순서 설정:
+
+				Sorting Layer vs. Order in Layer:
+
+						Sorting Layer: 오브젝트를 특정 렌더링 그룹에 배치. 예: 배경, 전경, UI 등.
+
+						Order in Layer: 동일 Sorting Layer 내에서 렌더링 순서를 결정 (낮은 값이 뒤에, 높은 값이 앞에).
+
+						이 강의에서는 Sorting Layer를 기본값으로 두고, Order in Layer만 조정.
+
+		설정:
+
+				stars_0: Order in Layer = -2 (가장 뒤).
+
+				stars_1: Order in Layer = -1 (그 다음).
+
+				다른 오브젝트(예: 플레이어 = 1, 발사체 = 0, 폭발 = 2)는 더 높은 값으로 설정해 배경 위에 표시.
+
+
+				왜 중요한가?:
+
+						잘못된 레이어 순서는 오브젝트가 겹쳐 보이지 않거나 배경이 전경을 덮는 문제를 일으킴.
+
+(3) Material 생성 및 적용
+
+		Material이란?
+
+				Material(재질)은 Unity에서 객체의 표면이 어떻게 보일지를 결정하는 중요한 자산입니다.
+
+				쉽게 말해, Material은 객체에 색상, 질감(텍스처), 빛 반사 등을 어떻게 표현할지 정의하는 "설명서" 같은 역할을 합니다.
+
+				Material은 두 가지 주요 요소로 구성됩니다:
+
+				Shader(셰이더):
+
+						객체의 렌더링(화면에 그리는) 방식을 결정하는 프로그램. 예를 들어, 빛을 반사하게 할지, 투명하게 할지 등을 정합니다.
+
+				Texture(텍스처):
+
+						객체에 입히는 이미지(예: 나무 질감, 금속 질감 등).
+
+
+				Material은 Unity에서 2D와 3D 객체 모두에 적용되며,
+
+				특히 2D 게임에서는 배경이나 캐릭터 스프라이트의 외관을 조정할 때 많이 사용됩니다.
+
+
+		새 Material 생성:
+
+				[Assets] 폴더에서 우클릭 → Create → Material → 이름: m_background.
+
+
+Shader 설정
+
+		Shader는 Material이 어떻게 렌더링될지를 결정하는 핵심 설정입니다.
+
+		Unity는 다양한 Shader를 제공하며, 프로젝트의 목적에 따라 적합한 Shader를 선택해야 합니다.
+
+		1. 기본 Shader: Standard:
+
+				새로 만든 Material은 기본적으로 Standard Shader를 사용합니다.
+
+				Standard Shader는 3D 객체에 적합한 Shader로, 조명, 그림자, 반사 등 복잡한 효과를 처리합니다.
+
+				예를 들어, 3D 캐릭터나 건물에 빛이 반사되는 모습을 구현할 때 유용합니다.
+
+				하지만 2D 게임에서는 조명 효과가 필요 없는 경우가 많아 Standard Shader는 너무 무겁고 복잡할 수 있습니다.
+
+				2D 배경처럼 단순한 렌더링이 필요한 경우에는 더 가벼운 Shader를 사용하는 게 좋습니다.
+
+
+		2. Unlit/Transparent로 변경:
+
+				Unlit/Transparent Shader는 조명 계산을 하지 않고 텍스처를 화면에 그대로 표시하며, **투명도(알파 값)**를 지원하는 Shader입니다.
+
+
+				설정 방법:
+
+						m_background Material을 클릭하여 Inspector 창에서 확인합니다.
+
+						Inspector 창 상단의 Shader 드롭다운 메뉴를 클릭합니다.
+
+						메뉴에서 Unlit → Transparent를 선택합니다.
+
+
+				이 Shader는 2D 게임의 배경이나 스프라이트에 자주 사용됩니다.
+
+				왜냐하면 조명 효과 없이 텍스처를 빠르게 렌더링하며, 투명한 부분(예: PNG 이미지의 투명 배경)을 제대로 보여줍니다.
+
+
+		3. 왜 Unlit/Transparent를 선택했나?:
+
+				조명 불필요: 배경은 빛의 반사나 그림자 같은 조명 효과가 필요 없습니다.
+
+				예를 들어, 별이 반짝이는 배경은 빛 계산 없이 단순히 이미지 그대로 보여주면 됩니다.
+
+
+				투명도 지원: 배경에 투명한 부분(예: 별 사이의 투명한 공간)이 있다면,
+
+				아래 레이어(예: 다른 배경이나 객체)가 보이도록 해야 합니다. Unlit/Transparent Shader는 이런 투명 효과를 자연스럽게 처리합니다.
+
+
+				성능 최적화: 2D 게임은 보통 가벼운 성능이 중요합니다.
+
+				Unlit Shader는 조명 계산을 생략해 게임이 더 빠르게 실행됩니다.
+
+
+		Material 적용: stars_0와 stars_1의 SpriteRenderer 컴포넌트에 m_background Material을 드래그하여 지정.
+```
+
+### 알파 채널이란?
+
+```csharp
+PNG는 알파 채널을 통해 투명한 배경이나 부분을 지원합니다.
+
+게임에서 이런 PNG 이미지를 사용할 때,
+
+투명한 부분이 자연스럽게 보이도록 Unlit/Transparent Shader 같은 투명도를 지원하는 Shader를 사용해야 합니다.
+
+별이 그려진 배경처럼, 투명한 부분이 있으면 그 아래 레이어가 보이게 되어 더 자연스럽고 입체적인 배경 효과를 만들 수 있습니다.
+```
+
+<Image src="/images/blog/game/image 518.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+<Image src="/images/blog/game/image 519.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+## 3. 스크롤 구현 (SpriteScroller 스크립트)
+
+### (1) 스크립트 생성
+
+```csharp
+[Scripts] 폴더에서 우클릭 → Create → C# Script → 이름: SpriteScroller.
+
+stars_0와 stars_1 GameObject에 이 스크립트를 컴포넌트로 추가.
+```
+
+### (2) 스크립트 코드 작성
+
+```csharp
+// Unity의 기본 기능을 사용하기 위해 UnityEngine 라이브러리를 가져옴 (예: Vector2, Time 등)
+using UnityEngine;
+
+// SpriteScroller라는 클래스를 정의. MonoBehaviour를 상속받아 Unity 게임 객체에 붙일 수 있는 스크립트로 만듦
+public class SpriteScroller : MonoBehaviour
+{
+    // [SerializeField]를 붙여 Unity 에디터의 Inspector 창에서 이 변수를 수정할 수 있게 함
+    // Vector2는 X, Y 두 개의 값을 가지는 2D 좌표. 여기서는 스크롤 속도(방향과 크기)를 저장
+    // 예: X=0.1, Y=0이면 오른쪽으로 초당 0.1만큼 이동
+    [SerializeField] Vector2 moveSpeed; // 스크롤 속도 (X, Y 방향)
+
+    // 매 프레임마다 텍스처가 얼마나 이동할지를 계산해 저장할 변수
+    // Vector2 타입으로 X, Y 방향의 이동량을 나타냄
+    Vector2 offset; // 매 프레임 이동량 계산
+
+    // 스프라이트의 Material을 저장할 변수. Material은 텍스처와 렌더링 방식을 제어
+    // 이걸 이용해 텍스처를 이동시켜 스크롤 효과를 만듦
+    Material material; // 텍스처 제어를 위한 Material 참조
+
+    // Awake는 게임이 시작될 때 한 번 호출되는 함수. 초기 설정을 위해 사용
+    void Awake()
+    {
+        // 이 스크립트가 붙은 게임 객체에서 SpriteRenderer 컴포넌트를 가져옴
+        // SpriteRenderer는 2D 스프라이트(이미지)를 화면에 그리는 역할
+        // 그 SpriteRenderer의 Material을 가져와 material 변수에 저장
+        material = GetComponent<SpriteRenderer>().material; // SpriteRenderer에서 Material 가져오기
+    }
+
+    // Update는 매 프레임마다 호출되는 함수 (예: 초당 60번)
+    // 스크롤 효과를 만들기 위해 매 프레임마다 텍스처 위치를 업데이트
+    void Update()
+    {
+        // 이동량(offset)을 계산: moveSpeed(속도) * Time.deltaTime(한 프레임의 시간)
+        // Time.deltaTime은 프레임 간 시간(초 단위, 예: 0.0167초)을 곱해 부드러운 이동을 보장
+        // 예: moveSpeed가 (0.1, 0)이고 Time.deltaTime이 0.0167라면, offset은 (0.00167, 0)
+        offset = moveSpeed * Time.deltaTime; // 오프셋 계산: 이동 속도 * 프레임 시간
+
+        // Material의 mainTextureOffset은 텍스처의 시작 위치를 나타냄
+        // offset만큼 텍스처 위치를 이동시켜 스크롤 효과를 만듦
+        // +=는 현재 위치에 offset을 더해 계속 이동하도록 함
+        material.mainTextureOffset += offset; // Material의 텍스처 오프셋 업데이트
+    }
+}
+```
+
+### (3) 코드 상세 설명
+
+```csharp
+변수:
+
+		[SerializeField] Vector2 moveSpeed: Inspector에서 조정 가능한 스크롤 속도. X, Y 방향을 각각 설정 가능.
+
+				SerializeField: private 변수지만 Inspector에서 편집 가능하도록 함.
+
+				Vector2: 2D 벡터로, X와 Y 방향의 이동 속도를 정의.
+
+		Vector2 offset: 매 프레임마다 계산된 이동량을 저장.
+
+		Material material: SpriteRenderer의 Material을 참조하여 텍스처 ( 이미지 ) 를 제어.
+
+Awake():
+
+		스크립트 초기화 시 호출. GetComponent<SpriteRenderer>().material로 Material을 가져옴.
+
+		왜 Awake?: Start보다 먼저 실행되어 초기화에 적합.
+
+Update():
+
+		매 프레임 호출.
+
+		offset = moveSpeed * Time.deltaTime: 프레임 독립적인 이동량 계산.
+
+				Time.deltaTime: 프레임 간 시간 차이. 프레임 속도에 상관없이 일정한 속도 유지.
+
+		material.mainTextureOffset += offset: Material의 텍스처 오프셋을 업데이트하여 텍스처를 이동.
+
+				mainTextureOffset: 텍스처의 UV 좌표를 이동시켜 스크롤 효과 구현.
+```
+
+### Material과 mainTextureOffset
+
+```csharp
+1. Material과 mainTextureOffset이란?
+
+		Material은 Unity에서 객체의 외관(색상, 텍스처, 투명도 등)을 정의하는 자산입니다.
+
+		여기에는 텍스처(이미지)와 셰이더(렌더링 방식)가 포함됩니다.
+
+		**mainTextureOffset**은 Material에 적용된 텍스처의 UV 좌표를 조정하는 속성입니다.
+
+		UV 좌표는 텍스처가 객체에 어떻게 매핑되는지를 결정합니다.
+
+				mainTextureOffset을 변경하면 텍스처가 객체 위에서 이동하는 것처럼 보입니다.
+
+				예를 들어, Y 방향으로 오프셋을 증가시키면 텍스처가 위로 스크롤하는 효과가 나타납니다.
+
+2. 왜 Material의 mainTextureOffset을 사용하나?
+
+		Material의 mainTextureOffset을 사용해 텍스처를 이동시키는 이유는 다음과 같습니다:
+
+		(1) 효율성
+
+				물리적 이동 없이 렌더링만 조정: 텍스처를 스크롤하려면 실제로 GameObject를 이동시킬 수도 있지만,
+
+				이는 물리 계산이나 Transform 업데이트를 필요로 해 성능에 부담을 줄 수 있습니다.
+
+				반면, mainTextureOffset은 텍스처의 UV 좌표만 변경하므로 GPU에서 빠르게 처리됩니다. 특히 배경처럼 큰 이미지를 다룰 때 매우 효율적입니다.
+
+				프레임 독립적 이동: 코드에서 moveSpeed * Time.deltaTime을 사용해 프레임 속도에 상관없이 일정한 스크롤 속도를 유지합니다.
+
+				이는 mainTextureOffset을 통해 부드럽게 구현됩니다.
+
+
+		(2) Wrap Mode: Repeat와의 조화
+
+				질문에서 언급된 것처럼, 텍스처의 Wrap Mode를 Repeat로 설정하면 텍스처가 끝나면 처음부터 반복됩니다.
+
+				이 설정과 mainTextureOffset을 조합하면 텍스처가 끊김 없이 계속 스크롤되는 효과를 만들 수 있습니다.
+
+				예: stars_0와 stars_1 텍스처가 Repeat로 설정되어 있고,
+
+				mainTextureOffset을 Y 방향으로 증가시키면 별들이 위로 스크롤하며 끝없이 이어지는 배경 효과를 구현할 수 있습니다.
+
+
+		(3) 다양한 스크롤 속도 구현
+
+				moveSpeed (Vector2)를 사용해 X, Y 방향의 스크롤 속도를 각각 설정할 수 있습니다.
+
+				예를 들어, stars_0은 느리게,
+
+				stars_1은 빠르게 스크롤하도록 설정하면 시차 스크롤(Parallax Scrolling) 효과를 만들 수 있습니다. 이는 깊이감을 주는 데 매우 효과적입니다.
+
+				mainTextureOffset은 Material 단위로 적용되므로,
+
+				각 배경 레이어(stars_0, stars_1)에 서로 다른 Material과 스크롤 속도를 적용해 독립적으로 제어할 수 있습니다.
+
+		(4) 2D 게임에 최적화
+
+				질문에서 사용된 Unlit/Transparent Shader는 조명 계산 없이 텍스처를 그대로 렌더링하므로 2D 게임에 적합합니다.
+
+				mainTextureOffset을 조정하면 조명이나 복잡한 계산 없이도 부드러운 스크롤 효과를 구현할 수 있습니다.
+
+				투명도를 지원하는 PNG 이미지를 사용할 때,
+
+				mainTextureOffset으로 텍스처를 이동시키면 투명한 부분도 자연스럽게 처리됩니다.
+```
+
+### UV 좌표란?
+
+```csharp
+U는 텍스처의 **가로 방향(수평)**을 나타내고, V는 **세로 방향(수직)**을 나타냅니다.
+
+UV 좌표는 보통 0에서 1 사이의 값을 가집니다:
+
+		U = 0: 텍스처의 왼쪽 끝.
+
+		U = 1: 텍스처의 오른쪽 끝.
+
+		V = 0: 텍스처의 아래쪽 끝.
+
+		V = 1: 텍스처의 위쪽 끝.
+
+이 좌표를 사용해 텍스처의 특정 부분을 객체의 표면에 매핑합니다.
+```
+
+<Image src="/images/blog/game/image 520.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+```csharp
+material.mainTextureOffset += offset: Material의 텍스처 오프셋을 업데이트하여 텍스처를 이동.
+```
+
+## 4. 스크롤 속도 조정
+
+```csharp
+Inspector에서 설정:
+
+		stars_0:
+
+				SpriteScroller 컴포넌트의 moveSpeed → Y: 0.1 (느린 스크롤, 멀리 있는 배경).
+
+				X: 0 (Y 방향만 스크롤).
+
+
+		stars_1:
+
+				moveSpeed → Y: 0.2 (빠른 스크롤, 가까운 배경).
+
+				X: 0 (Y 방향만 스크롤).
+
+시차 효과: stars_1이 stars_0보다 두 배 빠르게 이동하여 깊이감 생성.
+
+확장 가능성:
+
+		X 방향 스크롤 추가 가능 (예: 대각선 스크롤).
+
+		추가 레이어를 통해 더 복잡한 시차 효과 구현 가능.
+```
+
+## 5. 흔히 발생하는 문제와 해결
+
+```csharp
+(1) 텍스처 늘어짐
+
+		증상: 스크롤 시 텍스처가 늘어나 부자연스럽게 보임.
+
+		원인: Texture의 Wrap Mode가 Clamp로 설정됨.
+
+		해결: Project 창 → 이미지 선택 → Wrap Mode를 Repeat로 변경.
+
+		왜 발생?: Clamp는 텍스처 경계를 늘려 표시. Repeat는 경계를 넘어갈 때 텍스처를 반복.
+
+
+(2) 레이어가 안 보이거나 겹침
+
+		증상: 배경이 다른 오브젝트를 덮거나, 하위 레이어가 안 보임.
+
+		원인: Order in Layer 설정 오류.
+
+		해결:
+
+				stars_0: -2, stars_1: -1로 설정.
+
+				다른 오브젝트(플레이어, 발사체 등)는 0 이상으로 설정.
+
+		팁: Sorting Layer를 추가로 설정하면 더 복잡한 게임에서도 충돌 방지 가능.
+
+(3) 투명도 문제
+
+		증상: 투명 영역이 검정색으로 표시됨.
+
+		원인: Alpha Is Transparency 설정 누락.
+
+		해결: 이미지의 Import Settings에서 Alpha Is Transparency 활성화.
+
+(4) Material 문제
+
+		증상: 스크롤이 작동하지 않거나 텍스처가 이상하게 렌더링됨.
+
+		원인: Material의 Shader가 Unlit/Transparent가 아님.
+
+		해결: Material의 Shader를 확인하고 Unlit/Transparent로 설정.
+```
+
+## 6. 학습 포인트
+
+```csharp
+시차 스크롤의 핵심: 레이어 간 속도 차이로 깊이감 구현.
+
+Unity 개념:
+
+		SpriteRenderer: 2D 스프라이트 렌더링.
+
+		Material & Shader: 텍스처 렌더링 방식 정의. Unlit/Transparent는 2D 투명 배경에 적합.
+
+		Wrap Mode: 텍스처 반복 설정 (Repeat vs. Clamp).
+
+		Order in Layer: 렌더링 순서 관리.
+
+		Time.deltaTime: 프레임 독립적인 이동 구현.
+
+스크립트 활용: mainTextureOffset으로 텍스처 동적 제어.
+
+디버깅: 이미지 설정, Material, 레이어 순서 등에서 발생하는 문제 해결 방법 학습.
+```
+
+```csharp
+메테리얼 추가
+```

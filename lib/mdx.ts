@@ -31,6 +31,7 @@ export interface BlogPost {
   content: string
   title: string
   date: string
+  category?: string
   tags?: string[]
   draft?: boolean
   summary?: string

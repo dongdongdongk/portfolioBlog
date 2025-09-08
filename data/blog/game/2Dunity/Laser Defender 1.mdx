@@ -1,0 +1,1781 @@
+---
+title: '섹션 6: Laser Defender 1'
+date: '2025-09-07'
+category: 'Developer/Unity/2D 게임 개발'
+tags:
+  [
+    'Unity',
+    'C#',
+    '2D 게임',
+    '유니티 허브',
+    'Visual Studio Code',
+    '게임 개발',
+    'Laser Defender',
+    '초보자',
+  ]
+draft: false
+summary: 'Unity에서 2D 게임 "Laser Defender"를 만들기 위한 기본 설정, 프로젝트 전환, 입력 시스템, 플레이어 이동, 적군 시스템, 웨이브 및 경로 설정 방법을 다룹니다.'
+---
+
+# Laser Defender - 1
+
+Unity 2D 슈팅 게임 "Laser Defender" 개발 가이드입니다. 프로젝트 설정부터 플레이어 이동, 적 시스템까지 단계별로 학습합니다.
+
+## 📋 목차
+
+1. [프로젝트 설정 및 2D 변환](#실수로-3d로-만든-프로젝트-2d로-수정하기--프로젝트-기본-셋팅)
+2. [플레이어 설정](#플레이어-설정)
+3. [입력 시스템 구현](#입력-시스템-구현)
+4. [플레이어 이동](#플레이어-이동)
+5. [적군 시스템](#적군-시스템)
+6. [웨이브 시스템](#웨이브-시스템)
+7. [발사 시스템](#발사-시스템)
+
+---
+
+# 실수로 3D로 만든 프로젝트 2D로 수정하기 + 프로젝트 기본 셋팅
+
+## 1. Unity 프로젝트가 잘못 3D로 생성된 경우 대처 방법
+
+```csharp
+❗ 문제 발생
+
+		강좌에서는 실수로 Unity 프로젝트를 3D로 생성.
+
+		그러나 우리는 2D 게임을 개발해야 함.
+
+🛠 해결 방법
+
+		3D 프로젝트를 2D처럼 설정하는 법을 배움.
+
+		그러나 빠른 해결을 원한다면, 새 프로젝트 생성 + 2D 옵션 체크가 더 나을 수 있음.
+```
+
+## 2. 3D에서 2D처럼 보이도록 Unity 씬 설정하기
+
+```csharp
+① 불필요한 오브젝트 제거
+
+		Hierarchy에 기본적으로 있는 Directional Light는 2D 게임에서는 필요 없음.
+
+		→ 그냥 삭제!
+
+② 메인 카메라 설정
+
+		카메라 Projection을 Perspective에서 Orthographic으로 변경
+
+		→ 원근감을 없애고 평면적인 2D 느낌 구현.
+
+
+		Skybox 제거
+
+				Camera의 Clear Flags를 Skybox에서 Solid Color로 변경.
+
+				화면 상단의 아이콘 (렌더링 관련 토글들)에서 Skybox, Fog, Flare 등 끄기.
+
+		2D 버튼 클릭: Scene 뷰를 2D로 전환해 평면적으로 보이게 함.
+```
+
+## 3. 2D용 기능이 보이지 않을 때: 패키지 설치
+
+### Unity Registry에서 2D 관련 패키지 설치
+
+```csharp
+1. 상단 메뉴 → Window → Package Manager 열기.
+
+2. 상단 드롭다운에서 Unity Registry 선택.
+
+3. 필수 패키지:
+
+		2D Sprite (가장 기본)
+
+		2D Tilemap Editor, 2D Tilemap Extras 등 필요시
+
+4. 설치 후에는 Hierarchy에서 2D Object 메뉴가 생기고, 스프라이트 추가 가능!
+```
+
+## 4. 새 입력 시스템(Input System) 설치
+
+```csharp
+New Input System
+
+		Input System 패키지를 설치함으로써, 기존의 레거시 입력 시스템 대신 새 시스템을 사용.
+
+		설치 후 Unity 재시작이 필요하며, 경고창이 뜨면 그냥 "Yes" 클릭.
+```
+
+## 5. 에디터 레이아웃 커스터마이징
+
+### 창 구성 최적화
+
+```csharp
+Hierarchy, Scene, Game, Inspector 등을 드래그하여 사용자 맞춤 배치.
+
+Layout 저장:
+
+		우측 상단 Layout → Save Layout → 이름 지정 (예: "Laser Defender Layout")
+
+필요 시 Default로 원복 가능.
+```
+
+## 6. Game 창의 종횡비 설정
+
+### 2D 모바일 게임 최적화
+
+```csharp
+대부분의 우주 슈팅 게임은 세로 방향(9:16) 에 최적화됨.
+
+
+		Game 탭 → 종횡비 설정 → 직접 추가:
+
+		Name: 9:16
+
+		Type: Aspect Ratio
+
+		Width: 9, Height: 16
+
+```
+
+<Image src="/images/blog/game/image 472.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+<Image src="/images/blog/game/image 473.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+<Image src="/images/blog/game/image 474.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+## 7. 어셋 다운로드 및 임포트
+
+```csharp
+Kenney 어셋 사용
+
+		무료로 고품질의 어셋 제공하는 사이트.
+
+		여기서는 Space Shooter Redux 어셋을 사용.
+
+		.zip 파일 다운로드 후, 압축 해제하고 Unity 프로젝트의 Asset Packs 폴더에 넣음.
+```
+
+<Image src="/images/blog/game/image 475.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+## 8. 스프라이트 설정 (중요한 개념)
+
+### 3D 프로젝트에서 이미지가 `Default`로 인식되는 문제
+
+```csharp
+2D 스프라이트로 사용하려면:
+
+		스프라이트 선택 → Inspector에서
+
+				Texture Type을 Sprite (2D and UI)로 변경
+
+				Apply 클릭
+
+		여러 개 이미지 선택 후 한 번에 적용도 가능!
+```
+
+## 9. Player 및 Enemy 프리팹 만들기
+
+```csharp
+👾 플레이어 생성
+
+		Hierarchy → 우클릭 → Create Empty → 이름: Player
+
+		Transform 초기화 (Position/Rotation/Scale 모두 0 또는 1로 Reset)
+
+		스프라이트 (파란 비행선) 선택 → Player 오브젝트 아래에 드래그
+
+👾 적군 생성
+
+		Hierarchy → Create Empty → 이름: Enemy 0 (프로그래밍에서는 0부터 시작)
+
+		Transform 초기화
+
+		빨간 적 스프라이트 추가
+
+		둘 다 Prefabs 폴더 만들어 드래그하여 프리팹화
+```
+
+## 10. 카메라 사이즈 조정
+
+```csharp
+오브젝트가 너무 커 보일 때
+
+Main Camera 선택 → Size 조정 (Orthographic인 경우)
+
+예: Size = 9 정도면 적당함
+```
+
+## 11. 배경 설정
+
+```csharp
+배경 오브젝트 추가
+
+1. Hierarchy → Create Empty → 이름: Background
+
+2. Transform 초기화
+
+3. Kenney 어셋 중 starfield 이미지 추가
+
+4. 스프라이트의 Order in Layer를 -1로 설정 → 다른 오브젝트 뒤에 오도록
+```
+
+<Image src="/images/blog/game/image 476.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+# { Input System ( 입력 시스템 ) }
+
+## 1. Unity Input System 설치 확인
+
+```csharp
+설치 확인:
+
+		강의는 이전에 Package Manager를 통해 Unity의 새로운 Input System 패키지를 설치한 것을 전제로 시작합니다.
+
+				Package Manager에서 Input System 패키지가 제대로 설치되었는지, 최신 버전인지 확인하세요.
+
+				확인 후 Package Manager 창을 닫습니다.
+
+개념 설명
+
+		Unity의 Input System은 전통적인 Input Manager를 대체하는 강력한 입력 처리 시스템입니다. 키보드, 마우스,
+
+		게임패드 등 다양한 입력 장치를 유연하게 지원하며,
+
+		입력과 게임 동작을 분리하여 관리할 수 있습니다. 설치된 패키지는 프로젝트 설정에 자동으로 반영되며,
+
+		이를 사용하려면 게임 오브젝트에 컴포넌트를 추가해야 합니다.
+```
+
+<Image src="/images/blog/game/image 477.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+## 2. Player 오브젝트에 Input System 컴포넌트 추가
+
+```csharp
+단계:
+
+		1. 프로젝트의 Assets > Prefabs > Player 오브젝트를 선택합니다.
+
+		2. Add Component 버튼을 눌러 컴포넌트를 추가합니다.
+
+		3. 검색창에서 "Player Input" 또는 **"Input"**을 검색하여 PlayerInput 컴포넌트를 추가합니다.
+
+설정:
+
+		PlayerInput 컴포넌트를 추가하면 설정 창이 나타납니다.
+
+		중요한 설정은 "Create Actions" 버튼을 눌러 새로운 Input Action Asset을 만드는 것입니다.
+
+		Input Action Asset의 이름을 **"InputActions"**로 지정하고 저장합니다.
+
+		Assets 폴더에서 새로 생성된 InputActions 파일을 확인할 수 있습니다.
+
+		경고 메시지가 나타날 수 있지만, 이는 나중에 필요할 때 처리하므로 지금은 무시합니다.
+
+개념 설명:
+
+		PlayerInput 컴포넌트: 이 컴포넌트는 Input System과 게임 오브젝트를 연결하는 역할을 합니다.
+
+		입력 신호를 받아 특정 동작(액션)으로 변환합니다.
+
+		Input Action Asset: 입력과 게임 동작을 매핑하는 설정 파일입니다.
+
+		예를 들어, 키보드의 W 키를 "이동" 동작에 연결할 수 있습니다.
+
+		이 파일은 재사용 가능하며, 여러 게임 오브젝트에서 공통적으로 사용할 수 있습니다.
+```
+
+<Image src="/images/blog/game/image 478.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+## 3. Input Action Asset 설정
+
+```csharp
+Input Action Asset 열기:
+
+		Assets 폴더에서 InputActions 파일을 더블클릭하여 엽니다.
+
+		이 창은 Action Maps, Actions, Properties 세 부분으로 구성됩니다.
+
+Action Maps:
+
+		기본적으로 Player와 UI라는 두 개의 Action Map이 제공됩니다.
+
+		Action Map은 관련된 입력 동작의 그룹입니다. 예를 들어:
+
+				Player Action Map: 이동, 보기, 쏘기 등 플레이어 관련 동작.
+
+				UI Action Map: UI 탐색, 클릭, 제출, 취소 등 UI 관련 동작.
+
+		필요에 따라 새로운 Action Map을 생성할 수 있습니다. 예를 들어, 운전이나 비행 동작을 위한 별도의 Action Map을 만들 수 있습니다.
+
+Actions:
+
+		각 Action Map 안에 여러 Action이 포함됩니다.
+
+		Action은 특정 입력(예: 키보드 키, 게임패드 버튼)을 게임 동작(예: 이동, 점프)에 연결합니다.
+
+		예: Move 액션은 WASD 키나 게임패드 조이스틱 입력을 처리합니다.
+
+Properties:
+
+		특정 Action의 세부 설정을 정의합니다.
+
+		예: Move 액션의 WASD는 2D Vector 타입의 입력으로 설정되어 있으며,
+
+		W(위), S(아래), A(왼쪽), D(오른쪽) 키에 각각 매핑됩니다.
+
+		키 바인딩은 자유롭게 변경 가능하며, Listen 버튼을 눌러 다른 입력 장치(예: 게임패드)를 연결할 수도 있습니다.
+
+저장 설정:
+
+		Input Action Asset 창에서 변경 사항은 자동 저장되지 않습니다.
+
+		Save Asset 버튼을 눌러 수동으로 저장하거나, Auto-save 옵션을 활성화하여 자동 저장되도록 설정할 수 있습니다.
+
+		강의에서는 Auto-save를 비활성화하고, 필요할 때 수동 저장을 진행합니다.
+
+개념 설명:
+
+		Action Map: 서로 관련된 동작들을 묶는 컨테이너입니다. 게임의 맥락(플레이어 제어, UI 제어 등)에 따라 분리하여 관리합니다.
+
+		Action: 입력과 게임 동작 간의 매핑입니다. 입력 장치에 구애받지 않도록 설계되어 있어, 키보드와 게임패드를 동시에 지원할 수 있습니다.
+
+		2D Vector: 이동 같은 2D 입력(예: x, y축)을 처리하기 위한 입력 타입입니다. WASD 키는 각각 x, y 방향의 값을 설정합니다.
+```
+
+<Image src="/images/blog/game/image 479.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+## 4. PlayerInput 컴포넌트 설정
+
+```csharp
+Input Action Asset 연결:
+
+		Player 오브젝트의 PlayerInput 컴포넌트에서 Actions 필드에 InputActions 파일을 드래그하여 연결합니다.
+
+		연결하면 다양한 옵션이 나타나며, 툴팁을 통해 각 옵션의 기능을 확인할 수 있습니다.
+
+Behavior 설정:
+
+		Behavior 옵션은 Input System이 입력을 처리하는 방식을 결정합니다.
+
+		기본값은 Send Messages로 설정되어 있으며, 강의에서는 이를 그대로 사용합니다.
+
+		Send Messages:
+
+				입력이 발생하면 지정된 메시지(예: OnMove)를 게임 오브젝트의 컴포넌트로 보냅니다. 간단하지만 유연성이 제한적입니다.
+
+
+		Invoke Unity Events:
+
+				더 복잡하지만 유연한 방식으로, 이벤트 기반으로 입력을 처리합니다. 강의에서는 초보자를 위해 Send Messages를 사용합니다.
+
+개념 설명:
+
+		Send Messages: 입력이 발생하면 해당 메시지(예: OnMove)를 게임 오브젝트의 스크립트로 브로드캐스트합니다.
+
+		스크립트에 동일한 이름의 메서드가 있어야 이를 처리할 수 있습니다.
+
+		Invoke Unity Events: 입력을 Unity의 이벤트 시스템에 연결하여 더 유연한 처리가 가능하지만, 설정이 복잡합니다.
+```
+
+## 5. Input System 설정 생성
+
+```csharp
+Input System 설정:
+
+		PlayerInput 컴포넌트에서 Open Input Settings를 클릭하여 Input System Package 메뉴를 엽니다.
+
+		Create Settings Asset을 클릭하여 프로젝트에 Input System 설정 파일을 생성합니다.
+
+		생성된 설정 파일은 Assets 폴더에 저장되며, 기본 설정으로 충분하므로 추가 설정은 필요 없습니다.
+
+개념 설명:
+
+		Input System Settings: Input System의 전반적인 동작을 제어하는 설정 파일입니다.
+
+		입력 처리 방식, 디바이스 지원 등을 정의합니다.
+
+		이 설정 파일은 프로젝트 전역에 적용되며, 필요에 따라 세부 조정이 가능합니다.
+```
+
+<Image src="/images/blog/game/image 480.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+<Image src="/images/blog/game/image 481.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+## 6. 스크립트 작성: 입력 처리
+
+```csharp
+Player 오브젝트에 새로운 스크립트를 추가합니다. 스크립트 이름은 Player로 지정합니다.
+
+스크립트를 열어 기본 메서드(Start, 주석 등)를 제거합니다.
+```
+
+```csharp
+// 필요한 라이브러리를 가져오는 부분입니다. 이를 '네임스페이스'라고 부릅니다.
+// 네임스페이스는 Unity와 Input System 기능을 사용하기 위해 필요합니다.
+using System.Collections; // Unity에서 리스트나 배열 같은 컬렉션을 다룰 때 사용
+using System.Collections.Generic; // 추가적인 컬렉션 기능 제공
+using UnityEngine; // Unity의 핵심 기능(게임 오브젝트, 위치 등)을 사용하기 위한 네임스페이스
+using UnityEngine.InputSystem; // Unity의 새로운 Input System 기능을 사용하기 위한 네임스페이스
+
+// 'Player'라는 이름의 클래스를 정의합니다. 클래스는 스크립트의 설계도 같은 역할을 합니다.
+// MonoBehaviour를 상속받아 Unity에서 게임 오브젝트에 붙일 수 있는 스크립트로 만듭니다.
+public class Player : MonoBehaviour
+{
+    // [SerializeField]는 private 변수지만 Unity Inspector 창에서 수정할 수 있게 합니다.
+    // moveSpeed는 플레이어의 이동 속도를 결정하는 변수입니다.
+    // 기본값을 5f로 설정했으며, 'f'는 float형(소수점 숫자)임을 나타냅니다.
+    [SerializeField] float moveSpeed = 5f; // 이동 속도, Inspector에서 조정 가능
+
+    // rawInput은 플레이어의 입력(예: WASD 키)을 저장하는 변수입니다.
+    // Vector2는 2D 좌표(x, y)를 나타내며, 여기서는 이동 방향을 저장합니다.
+    // 예: W 키를 누르면 (0, 1), A 키를 누르면 (-1, 0) 같은 값이 저장됩니다.
+    Vector2 rawInput; // 입력 값을 저장하는 변수
+
+    // Update 메서드는 Unity에서 매 프레임(화면이 갱신될 때마다) 호출됩니다.
+    // 게임이 60프레임으로 실행되면 초당 60번 호출됩니다.
+    void Update()
+    {
+        // Move 메서드를 호출하여 플레이어를 매 프레임마다 이동시킵니다.
+        Move(); // 매 프레임마다 이동 처리
+    }
+
+    // Move 메서드는 플레이어의 실제 이동 로직을 처리합니다.
+    // 입력값(rawInput)을 사용하여 오브젝트의 위치를 업데이트합니다.
+    void Move()
+    {
+        // Vector3 delta는 플레이어가 이동할 거리를 계산합니다.
+        // rawInput(입력 방향) * moveSpeed(이동 속도) * Time.deltaTime(프레임 간 시간)을 곱합니다.
+        // - rawInput: WASD 키 입력에 따라 방향과 크기를 제공 (예: (1, 0) = 오른쪽).
+        // - moveSpeed: 이동 속도를 조절하여 빠르거나 느리게 만듦.
+        // - Time.deltaTime: 프레임 간 경과 시간(초 단위)을 곱하여 이동 속도를 프레임 속도와 독립적으로 만듦.
+        //   예: 높은 프레임 속도에서는 작은 이동량, 낮은 프레임 속도에서는 큰 이동량을 적용해 일관된 속도를 유지.
+        Vector3 delta = rawInput * moveSpeed * Time.deltaTime; // 이동 벡터 계산
+
+        // transform.position은 게임 오브젝트의 현재 위치입니다.
+        // delta를 현재 위치에 더해 플레이어를 이동시킵니다.
+        // Vector3는 3D 좌표(x, y, z)를 나타내지만, 여기서는 z=0으로 2D 이동만 처리합니다.
+        transform.position += delta; // 오브젝트 위치 업데이트
+    }
+
+    // OnMove 메서드는 Unity Input System이 입력을 감지할 때 호출됩니다.
+    // InputValue 타입의 value 매개변수는 입력 장치(키보드, 게임패드 등)에서 받은 데이터를 포함합니다.
+    // 이 메서드 이름(OnMove)은 Input Action Asset에서 설정한 'Move' 액션과 일치해야 합니다.
+    void OnMove(InputValue value)
+    {
+        // value.Get<Vector2>()는 입력 값을 2D 벡터(x, y)로 변환합니다.
+        // 예: W 키를 누르면 (0, 1), D 키를 누르면 (1, 0) 같은 값이 반환됩니다.
+        // 이 값을 rawInput 변수에 저장하여 Move 메서드에서 사용합니다.
+        rawInput = value.Get<Vector2>(); // 입력 값을 Vector2로 가져옴
+
+        // Debug.Log는 Unity 콘솔에 메시지를 출력하여 디버깅에 사용됩니다.
+        // 여기서는 rawInput 값을 출력하여 입력이 제대로 들어오는지 확인합니다.
+        // 예: D 키를 누르면 "rawInput: (1.0, 0.0)" 같은 메시지가 콘솔에 표시됩니다.
+        Debug.Log("rawInput: " + rawInput); // 디버그 로그 출력
+    }
+}
+```
+
+### 2D 게임인데 왜 Vector3?
+
+```csharp
+이 코드는 2D 게임을 만드는 것처럼 보이지만, Unity는 내부적으로 모든 오브젝트를 3D로 처리합니다.
+
+2D 게임에서는 z축(깊이)을 보통 0으로 고정해서 사용합니다. 그래서 Vector3를 사용하더라도 z값은 0으로 유지되며, 실질적으로 x와 y만 바뀝니다.
+
+예: 플레이어가 오른쪽으로 이동하면 transform.position이 (1, 0, 0)에서 (2, 0, 0)으로 바뀌는 식입니다.
+
+Vector3는 지도 위의 좌표라고 생각하세요. 지도에서 위치를 나타낼 때 (x, y)만 있으면 되지만,
+
+Unity는 항상 (x, y, z)를 사용합니다. 2D 게임에서는 z를 0으로 두고 x, y만 조작한다고 보면 됩니다.
+
+이동은 발걸음 같은 거예요. 플레이어가 키보드로 방향(WASD)을 입력하면,
+
+그 방향(rawInput)과 속도(moveSpeed)를 곱해서 한 발짝 움직일 거리(delta)를 계산합니다.
+
+이 거리를 현재 위치(transform.position)에 더해서 플레이어를 이동시키는 거죠.
+
+Unity에서는 이 계산을 Vector3로 해야 위치가 제대로 업데이트됩니다.
+```
+
+### 코드 설명:
+
+```csharp
+using UnityEngine.InputSystem: Input System 기능을 사용하기 위한 네임스페이스입니다.
+
+moveSpeed: Inspector에서 조정 가능한 이동 속도 변수입니다. 기본값은 5f.
+
+rawInput: 입력 값을 저장하는 Vector2 변수로, WASD 또는 기타 입력 장치의 2D 벡터 값을 저장합니다.
+
+OnMove(InputValue value): PlayerInput 컴포넌트가 Send Messages 방식으로 호출하는 메서드입니다. 입력 값을 받아 rawInput에 저장합니다.
+
+Move(): 매 프레임(Update)마다 호출되어 입력 값을 기반으로 플레이어 오브젝트를 이동시킵니다.
+
+Time.deltaTime: 프레임 간 시간 차이를 곱하여 이동 속도를 프레임 독립적으로 만듭니다. 이를 통해 시스템 성능에 따라 이동 속도가 달라지지 않도록 합니다.
+```
+
+### 개념 설명:
+
+```csharp
+InputValue: Input System에서 입력 값을 전달하는 객체입니다. **Get<vector2>()**를 호출하여 2D 벡터 값을 얻습니다.</vector2>
+
+Time.deltaTime: Unity에서 프레임 간 경과 시간을 반환합니다. 이를 사용하면 이동이 프레임 속도에 독립적이 되어 일관된 속도를 유지합니다.
+
+Send Messages 방식: OnMove 메서드는 PlayerInput 컴포넌트가 입력을 감지할 때 자동 호출됩니다.
+
+메서드 이름(OnMove)은 Input Action Asset에서 정의한 액션 이름과 일치해야 합니다.
+```
+
+### Extract Method: Visual Studio
+
+```csharp
+이 기능을 사용해서 업데이트 내부의 로직을 메서드로 빼내서 정리하면 훨씬 보기 좋아진다 ctrl + . 에서 찾아서 사용
+
+그리고 F12 로 메서드 이름을 바꿔주기
+```
+
+# { 플레이어 화면 경계 설정 }
+
+```csharp
+이 강의에서는 Unity 게임에서 플레이어가 화면 밖으로 벗어나지 않도록 경계를 설정하는 방법을 배웁니다.
+```
+
+## 1. 뷰포트와 월드 스페이스 개념
+
+### 뷰포트 스페이스 (Viewport Space)
+
+```csharp
+카메라가 보는 화면의 표준화된 좌표를 의미.
+
+좌표 범위:
+
+		(0, 0): 화면의 왼쪽 아래 코너.
+
+		(1, 0): 오른쪽 아래.
+
+		(0, 1): 왼쪽 위.
+
+		(1, 1): 오른쪽 위.
+
+카메라에 따라 화면의 크기와 상관없이 0~1로 표준화.
+```
+
+<Image src="/images/blog/game/image 482.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+### 월드 스페이스 (World Space):
+
+```csharp
+게임 오브젝트가 존재하는 3D/2D 공간의 실제 좌표.
+
+Unity의 Hierarchy에서 오브젝트의 위치(transform.position)는 월드 스페이스를 기준으로 함.
+```
+
+### ViewportToWorldPoint:
+
+```csharp
+뷰포트 좌표를 월드 스페이스 좌표로 변환하는 Unity의 메소드.
+
+예: Camera.main.ViewportToWorldPoint(new Vector2(0, 0)) → 화면 왼쪽 아래의 월드 좌표를 반환.
+```
+
+### 왜 필요한가?
+
+```csharp
+플레이어가 화면 밖으로 나가지 않도록 경계를 설정하려면,
+
+카메라가 보는 화면의 경계를 월드 좌표로 알아야 함.
+```
+
+## 2. 플레이어 스크립트 수정
+
+```csharp
+Player 스크립트를 열어 화면 경계를 설정하는 코드를 추가합니다.
+```
+
+### 3.1. 변수 선언
+
+```csharp
+[SerializeField] float moveSpeed = 5f; // 플레이어 이동 속도
+Vector2 rawInput; // 입력값 저장
+[SerializeField] float paddingLeft; // 화면 왼쪽 패딩
+[SerializeField] float paddingRight; // 화면 오른쪽 패딩
+[SerializeField] float paddingTop; // 화면 위쪽 패딩
+[SerializeField] float paddingBottom; // 화면 아래쪽 패딩
+Vector2 minBounds; // 화면 왼쪽 아래 경계 (뷰포트 0,0)
+Vector2 maxBounds; // 화면 오른쪽 위 경계 (뷰포트 1,1)
+```
+
+```csharp
+패딩(Padding):
+
+플레이어 스프라이트가 화면 경계에 딱 붙지 않고 약간의 여백을 두기 위해 사용.
+
+스프라이트의 피봇 포인트(중심점) 때문에 경계에 닿을 때 일부가 화면 밖으로 나갈 수 있음. 패딩은 이를 방지.
+```
+
+### 3.2. 화면 경계 초기화 (InitBounds 메소드)
+
+```csharp
+Start 메소드에서 InitBounds를 호출해 화면 경계를 초기화.
+
+메인 카메라를 참조해 뷰포트 좌표를 월드 좌표로 변환.
+```
+
+```csharp
+void Start()
+{
+    InitBounds();
+}
+
+void InitBounds()
+{
+    Camera mainCamera = Camera.main;
+    minBounds = mainCamera.ViewportToWorldPoint(new Vector2(0, 0)); // 왼쪽 아래
+    maxBounds = mainCamera.ViewportToWorldPoint(new Vector2(1, 1)); // 오른쪽 위
+}
+```
+
+```csharp
+Camera.main: Hierarchy에서 "MainCamera" 태그가 붙은 카메라를 참조.
+
+ViewportToWorldPoint: 뷰포트 좌표(0~1)를 월드 좌표로 변환해 minBounds와 maxBounds에 저장.
+
+Z 좌표는 2D 게임에서 필요 없으므로 Vector2 사용.
+```
+
+### 3.3. 플레이어 이동 제한 (Move 메소드)
+
+```csharp
+플레이어의 이동을 화면 경계 내로 제한하기 위해 Mathf.Clamp 사용.
+
+새로운 위치(newPos)를 계산하고, 패딩을 적용해 경계를 조정.
+```
+
+```csharp
+void Move()
+    {
+        // 입력 방향(rawInput)에 이동 속도와 프레임 시간을 곱해 이동량 계산
+        // Time.deltaTime: 프레임 간 시간 차이로 이동을 부드럽게 만듦
+        Vector2 delta = rawInput * moveSpeed * Time.deltaTime;
+
+        // 새로운 위치를 저장할 Vector2 변수 생성
+        Vector2 newPos = new Vector2();
+
+        // X축 이동: 현재 위치에 이동량을 더하고, 경계 안으로 제한
+        // minBounds.x + paddingLeft: 왼쪽 경계를 오른쪽으로 밀어 여백 확보
+        // maxBounds.x - paddingRight: 오른쪽 경계를 왼쪽으로 당겨 여백 확보
+        newPos.x = Mathf.Clamp(transform.position.x + delta.x, minBounds.x + paddingLeft, maxBounds.x - paddingRight);
+
+        // Y축 이동: 현재 위치에 이동량을 더하고, 경계 안으로 제한
+        // minBounds.y + paddingBottom: 아래 경계를 위로 올려 여백 확보
+        // maxBounds.y - paddingTop: 위 경계를 아래로 내려 여백 확보
+        newPos.y = Mathf.Clamp(transform.position.y + delta.y, minBounds.y + paddingBottom, maxBounds.y - paddingTop);
+
+        // 계산된 새 위치를 플레이어의 실제 위치(transform.position)에 적용
+        // transform.position은 Vector3지만, Vector2로 설정하면 Z는 0으로 유지
+        transform.position = newPos;
+    }
+```
+
+```csharp
+Mathf.Clamp(value, min, max): value를 min과 max 사이로 제한.
+
+		예: newPos.x는 minBounds.x와 maxBounds.x - paddingRight 사이로 제한됨.
+
+패딩 적용:
+
+		paddingLeft, paddingRight, paddingTop, paddingBottom을 경계에 추가/제거해 플레이어가 화면 밖으로 나가지 않도록 조정.
+
+Time.deltaTime: 프레임 간 시간 차이를 곱해 이동 속도를 일정하게 유지.
+```
+
+### 패딩 값(0.5, 1)은 어디서 오는가?
+
+```csharp
+패딩 값의 기준:
+
+패딩은 플레이어 스프라이트의 크기(스케일)와 화면 내 여백을 고려해 설정.
+
+예: 플레이어 스프라이트의 스케일이 (1, 1, 1)이라면, 스프라이트의 너비와 높이가 약 1 유닛(월드 좌표 기준)이라고 가정.
+
+스프라이트의 피봇 포인트(기본적으로 중심점)에서 위치가 계산되므로,
+
+스프라이트의 절반(예: 0.5)만큼 경계를 조정해 화면 밖으로 나가는 걸 방지.
+
+강의에서 예시로 paddingLeft = 0.5, paddingRight = 0.5를 설정한 이유:
+
+		스프라이트 너비의 절반(0.5)만큼 여백을 두어 스프라이트가 화면 끝에 닿지 않도록 함.
+
+		paddingTop = 5, paddingBottom = 2는 UI나 게임 디자인(예: 화면 상단/하단 여백)을 고려한 추가적인 여백.
+
+예시:
+
+플레이어 스프라이트의 너비가 1 유닛이라면, 왼쪽 경계에서 0.5를 더해 스프라이트의 왼쪽 끝이 화면 밖으로 나가지 않도록 조정.
+
+paddingTop = 5는 화면 상단에 더 큰 여백을 두어 플레이어가 너무 위로 올라가지 않도록 제한(디자인 선택).
+```
+
+### 3.4. 입력 처리 (OnMove 메소드)
+
+```csharp
+Unity의 새로운 Input System을 사용해 플레이어 입력을 처리.
+```
+
+```csharp
+void OnMove(InputValue value)
+{
+    rawInput = value.Get<Vector2>(); // 입력값을 rawInput에 저장
+    Debug.Log("rawInput: " + rawInput);
+}
+```
+
+```csharp
+InputValue: Unity의 Input System에서 입력 데이터를 처리.
+
+rawInput: 플레이어가 입력한 방향(예: WASD, 조이스틱)을 Vector2로 저장.
+
+Debug.Log: 디버깅용으로 입력값을 콘솔에 출력.
+```
+
+## **4. Unity에서 테스트 및 패딩 설정**
+
+```csharp
+스크립트를 저장한 후, Unity에서 플레이어 프리팹([Assets] → [Prefabs] → [Player])을 열어 패딩 값을 설정.
+
+예시 값:
+
+		paddingLeft: 0.5 (스프라이트의 절반 크기).
+
+		paddingRight: 0.5.
+
+		paddingTop: 5 (화면 위쪽에 여유 공간 확보).
+
+		paddingBottom: 2 (UI를 위한 여유 공간).
+
+플레이 모드로 테스트해 플레이어가 화면 경계 내에서 움직이는지 확인.
+
+문제와 해결:
+
+		문제: 플레이어 스프라이트의 피봇 포인트(중심점) 때문에 경계에 닿을 때 일부가 화면 밖으로 나감.
+
+		해결: 패딩 값을 추가해 경계를 조정, 스프라이트가 화면 안에 완전히 보이도록 설정.
+
+개념 설명:
+
+		피봇 포인트: 스프라이트의 위치를 결정하는 기준점(기본적으로 중심).
+
+		패딩은 스프라이트의 크기와 UI 배치를 고려해 설정해야 함.
+```
+
+<Image src="/images/blog/game/image 483.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+# { 적군 시스템 설계 및 Unity 스크립트 구조 }
+
+```csharp
+이 강의는 Unity 게임에서 적군(enemy) 시스템을 구현하는 초기 설계를 다루며,
+
+적군의 동작 방식과 필요한 스크립트를 체계적으로 정리합니다.
+```
+
+## 1. 적군 시스템의 목표
+
+```csharp
+적군 시스템은 플레이어와 상호작용하며 게임의 도전 요소를 제공합니다. 주요 요구사항은 다음과 같습니다:
+
+		데미지: 적군은 플레이어에게 충돌 또는 발사체(총알 등)를 통해 데미지를 줄 수 있어야 함.
+
+		다양성: 적군은 공격 속도(빠른/느린 발사), 발사체 종류 등 다양한 행동 패턴을 가짐.
+
+		점수 시스템: 적군이 파괴되면 점수 증가, 도망치면 점수 감소.
+
+		Wave 시스템: 적군은 'Wave'(일정 시간 동안 특정 패턴으로 등장하는 적군 그룹) 단위로 생성되며, 정해진 경로(path)를 따라 이동.
+```
+
+### 개념: Wave란?
+
+```csharp
+Wave는 게임에서 적군이 일정 패턴으로 등장하는 단위를 의미합니다. 예를 들어,
+
+한 Wave는 특정 시간 동안 일정 수의 적군이 특정 경로를 따라 이동하도록 설정됩니다.
+
+Wave가 끝나면(적군이 모두 파괴되거나 경로 끝에 도달) 다음 Wave가 시작되며, 적군 종류나 경로가 달라질 수 있습니다.
+```
+
+## 2. 필요한 스크립트와 역할
+
+```csharp
+적군 시스템을 구현하려면 여러 스크립트가 필요합니다. 각 스크립트의 역할은 다음과 같습니다:
+```
+
+```csharp
+1. WaveConfigSO (ScriptableObject):
+
+		역할: Wave의 설정 데이터를 저장. 어떤 적군이 생성되는지,
+
+				  어떤 경로를 따라가는지, 이동 속도, 생성 간격 등을 정의.
+
+
+		왜 ScriptableObject인가?:
+
+				ScriptableObject는 MonoBehaviour와 달리 게임 오브젝트에 붙지 않고,
+
+				데이터를 독립적으로 저장합니다. 여러 Wave 설정을 쉽게 만들고 관리할 수 있어 유용합니다.
+
+2. EnemySpawner:
+
+		역할: WaveConfigSO의 데이터를 읽어 적군을 생성(spawn). Wave 순서와 생성 간격을 관리하며, 적군을 경로 시작점에 배치.
+
+		예상 기능: 여러 Wave를 순차적으로 실행하고, Wave 간 대기 시간을 조절.
+
+3. EnemyPathing:
+
+		역할: 적군이 경로(path)를 따라 이동하도록 제어. Waypoint(경로의 특정 지점)를 따라 적군을 이동시킴.
+
+		핵심: 적군이 다음 Waypoint로 부드럽게 이동하도록 로직을 구성.
+```
+
+## 3. 경로(Path) 설정 방법
+
+```csharp
+적군이 따라갈 경로를 Unity에서 설정하는 방법입니다.
+```
+
+```csharp
+절차:
+
+1. Hierarchy에서 경로 생성:
+
+		빈 게임 오브젝트를 생성하고 이름을 Path 0로 지정.
+
+		Path 0 아래에 자식 오브젝트로 Waypoint (0), Waypoint (1) 등을 추가.
+
+		Waypoint는 빈 오브젝트로, 적군이 이동할 경로의 특정 지점을 나타냄.
+
+2. Waypoint 시각화:
+
+		Waypoint는 기본적으로 Scene 뷰에서 보이지 않으므로,
+
+		Inspector에서 큐브 아이콘을 클릭해 노란 다이아몬드 같은 시각적 마커를 추가.
+
+		Game 뷰에서는 보이지 않도록 설정해 게임 플레이에 영향을 주지 않음.
+
+3.  Waypoint 배치:
+
+		Waypoint를 원하는 경로에 따라 배치(예: 커브 모양).
+
+		시작점과 끝점은 화면 밖에 배치해 적군이 자연스럽게 등장/사라지도록 설계.
+
+4. 프리팹화:
+
+		설정한 Path 0을 프리팹으로 저장.
+
+		새 폴더 Waves and Paths에 저장해 관리.
+
+개념: Waypoint란?
+
+		Waypoint는 경로 상의 특정 지점으로, 적군이 이동할 때 기준점 역할을 합니다. 예를 들어,
+
+		적군은 Waypoint (0)에서 Waypoint (1)로, 그다음 Waypoint (2)로 이동하며 경로를 완성합니다.
+```
+
+<Image src="/images/blog/game/image 484.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+<Image src="/images/blog/game/image 485.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+<Image src="/images/blog/game/image 486.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+## 4. WaveConfigSO 스크립트 작성
+
+```csharp
+WaveConfigSO는 ScriptableObject로, Wave 데이터를 저장합니다. 아래는 주요 코드와 설명입니다.
+```
+
+```csharp
+using System.Collections.Generic;
+using UnityEngine;
+
+[CreateAssetMenu(menuName = "Wave Config", fileName = "New Wave Config")]
+public class WaveConfigSO : ScriptableObject
+{
+    [SerializeField] Transform pathPrefab; // 경로 프리팹
+    [SerializeField] float moveSpeed = 5f; // 적군 이동 속도
+
+    // 시작 Waypoint 반환
+    public Transform GetStartingWaypoint()
+    {
+        return pathPrefab.GetChild(0);
+    }
+
+    // 모든 Waypoint 목록 반환
+    public List<Transform> GetWaypoints()
+    {
+        List<Transform> waypoints = new List<Transform>();
+        foreach (Transform child in pathPrefab)
+        {
+            waypoints.Add(child);
+        }
+        return waypoints;
+    }
+
+    // 이동 속도 반환
+    public float GetMoveSpeed()
+    {
+        return moveSpeed;
+    }
+}
+```
+
+```csharp
+[CreateAssetMenu]:
+
+		Unity 에디터에서 새로운 Wave Config를 쉽게 생성하도록 메뉴를 추가.
+
+		menuName: 에디터에서 보일 이름, fileName: 기본 파일 이름.
+
+변수:
+
+		pathPrefab: 경로 프리팹을 저장. 모든 Waypoint가 포함됨.
+
+		moveSpeed: 적군의 이동 속도. 기본값은 5f.
+
+메서드:
+
+		GetStartingWaypoint(): 경로의 첫 번째 Waypoint를 반환.
+
+		GetWaypoints(): 모든 Waypoint를 리스트로 반환. foreach 루프를 사용해 pathPrefab의 자식 오브젝트를 순회.
+
+		GetMoveSpeed(): 이동 속도를 반환.
+
+개념: foreach vs for 루프
+
+		for 루프: 인덱스를 기반으로 반복. 예: for (int i = 0; i < parent.childCount; i++).
+
+		foreach 루프: 컬렉션의 각 요소를 직접 순회. 코드가 간결하고 읽기 쉬움. 예: foreach (Transform child in pathPrefab).
+```
+
+# { 웨이포인트(Waypoint) 생성 이동시키기}
+
+## 1. 목표
+
+```csharp
+목적: 적군 오브젝트가 지정된 웨이포인트(Waypoint)를 따라 이동하도록 스크립트를 작성.
+
+동작 방식:
+
+		적군은 WaveConfigSO 스크립터블 오브젝트에서 제공된 웨이포인트 목록을 따라 이동.
+
+		시작 시 첫 번째 웨이포인트로 이동.
+
+		매 프레임마다 다음 웨이포인트로 부드럽게 이동.
+
+		마지막 웨이포인트에 도달하면 적군 오브젝트를 파괴.
+```
+
+## 2. 사전 준비
+
+```csharp
+유니티 설정:
+
+		[Prefabs] 폴더에서 적군 프리팹에 Pathfinder 스크립트를 추가.
+
+		[Waves and Paths] 폴더에 WaveConfigSO 스크립터블 오브젝트 생성.
+
+		WaveConfigSO에는 웨이포인트 목록과 이동 속도(MoveSpeed)가 포함됨.
+
+개념 설명:
+
+		스크립터블 오브젝트(Scriptable Object): 유니티에서 재사용 가능한 데이터를 저장하는 객체.
+
+		여기서는 웨이포인트와 이동 속도를 저장.
+
+		웨이포인트(Waypoint): 적군이 따라갈 경로의 특정 위치(Transform).
+
+		프리팹(Prefab): 재사용 가능한 게임 오브젝트 템플릿.
+```
+
+## 3. 스크립트 작성: Pathfinder.cs
+
+### 3.1. 초기 설정
+
+```csharp
+스크립트 생성:
+
+		유니티에서 [Assets] → [Create] → [C# Script]를 선택해 Pathfinder 스크립트 생성.
+
+		적군 프리팹에 Pathfinder 컴포넌트를 추가.
+```
+
+```csharp
+필요한 변수 선언
+```
+
+```csharp
+[SerializeField] WaveConfigSO waveConfig; // 웨이포인트와 속도 정보를 가진 스크립터블 오브젝트
+List<Transform> waypoints; // 웨이포인트 목록
+int waypointIndex = 0; // 현재 목표 웨이포인트의 인덱스
+```
+
+```csharp
+[SerializeField]: 유니티 인스펙터에서 변수를 설정 가능하게 함.
+
+WaveConfigSO: 웨이포인트 목록과 이동 속도를 제공.
+
+waypoints: 적군이 따라갈 웨이포인트 목록을 저장.
+
+waypointIndex: 현재 목표 웨이포인트의 위치를 추적.
+
+개념 설명:
+
+		List<transform></transform>: 동적 배열로, 웨이포인트의 Transform(위치 정보)을 저장.
+
+		Transform: 게임 오브젝트의 위치, 회전, 크기 정보를 담음.
+```
+
+### 3.2. Start 메서드
+
+```csharp
+void Start()
+{
+    waypoints = waveConfig.GetWaypoints(); // WaveConfigSO에서 웨이포인트 목록 가져오기
+    transform.position = waypoints[waypointIndex].position; // 적군을 첫 번째 웨이포인트로 이동
+}
+```
+
+```csharp
+동작:
+
+		게임 시작 시 WaveConfigSO에서 웨이포인트 목록을 가져옴.
+
+		적군의 위치(transform.position)를 첫 번째 웨이포인트 위치로 설정.
+
+개념 설명:
+
+		Start(): 유니티에서 오브젝트가 생성될 때 한 번 호출되는 메서드.
+
+		transform.position: 오브젝트의 3D 공간상 위치(Vector3).
+```
+
+### 3.3. Update 메서드
+
+```csharp
+void Update()
+{
+    FollowPath(); // 매 프레임마다 경로 이동 로직 실행
+}
+```
+
+```csharp
+동작: 매 프레임마다 FollowPath 메서드를 호출해 적군을 이동시킴.
+
+개념 설명:
+
+		Update(): 유니티에서 매 프레임 호출되는 메서드.
+
+		프레임(Frame): 게임 화면이 갱신되는 단위.
+```
+
+### 3.4. FollowPath 메서드
+
+```csharp
+void FollowPath()
+{
+    if (waypointIndex < waypoints.Count) // 아직 이동할 웨이포인트가 남아있는 경우
+    {
+        Vector3 targetPosition = waypoints[waypointIndex].position; // 목표 웨이포인트 위치
+        float delta = waveConfig.GetMoveSpeed() * Time.deltaTime; // 프레임 독립적 이동 거리
+        transform.position = Vector3.MoveTowards(transform.position, targetPosition, delta); // 목표 위치로 이동
+        if (transform.position == targetPosition) // 목표 위치에 도달
+        {
+            waypointIndex++; // 다음 웨이포인트로 이동
+        }
+    }
+    else // 더 이상 웨이포인트가 없으면
+    {
+        Destroy(gameObject); // 적군 오브젝트 파괴
+    }
+}
+```
+
+```csharp
+동작:
+
+		조건 확인: waypointIndex가 웨이포인트 목록의 길이보다 작으면(아직 이동할 웨이포인트가 있으면) 이동 로직 실행.
+
+		목표 위치 설정: 현재 웨이포인트의 위치(targetPosition)를 가져옴.
+
+		이동 거리 계산: WaveConfigSO에서 이동 속도(GetMoveSpeed)를 가져와 Time.deltaTime을 곱해 프레임 독립적으로 이동 거리(delta) 계산.
+
+		이동: Vector3.MoveTowards를 사용해 현재 위치에서 목표 위치로 부드럽게 이동.
+
+		도달 확인: 현재 위치가 목표 위치와 같으면 waypointIndex를 증가시켜 다음 웨이포인트로 전환.
+
+		종료 처리: 모든 웨이포인트를 지나면 Destroy(gameObject)로 적군 제거.
+
+개념 설명:
+
+		Vector3.MoveTowards: 현재 위치에서 목표 위치로 지정된 거리만큼 이동. 초과 이동 방지.
+
+		Time.deltaTime: 프레임 간 시간 간격. 프레임 속도에 상관없이 일정한 속도 보장.
+
+		Destroy(gameObject): 오브젝트를 게임에서 제거.
+```
+
+### Vector3.MoveTowards 인자
+
+```csharp
+current: transform.position (적군의 현재 위치, 예: (0, 0, 0))
+
+target: targetPosition (목표 웨이포인트의 위치, 예: (5, 0, 0))
+
+maxDistanceDelta: delta (이동 속도 * Time.deltaTime, 예: 5 * 0.016 = 0.08초당 유닛)
+
+결과: 적군이 매 프레임마다 목표 웨이포인트 방향으로 delta만큼 이동. 목표에 도달하면 정확히 그 위치에 멈춤.
+```
+
+### 3.5. 오류 수정
+
+```csharp
+문제: Vector2.MoveTowards를 사용했으나 transform.position은 Vector3이므로 컴파일 오류 발생.
+```
+
+```csharp
+transform.position = Vector3.MoveTowards(transform.position, targetPosition, delta);
+```
+
+## 4. 유니티 설정
+
+```csharp
+1. WaveConfigSO 생성:
+
+		[Waves and Paths] 폴더에서 [Create] → [Wave Config]로 WaveConfigSO 생성.
+
+		이름: Wave 0.
+
+		설정: 웨이포인트 프리팹 추가, MoveSpeed를 5로 설정.
+
+2. 적군 프리팹 설정:
+
+		적군 프리팹에 WaveConfigSO를 인스펙터에서 연결.
+
+3. 테스트:
+
+		플레이 버튼을 눌러 적군이 웨이포인트를 따라 이동하고, 마지막 웨이포인트에서 파괴되는지 확인.
+```
+
+<Image src="/images/blog/game/image 487.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+```csharp
+ WaveConfigSO 생성 ( 이름은 Wave0 )
+```
+
+<Image src="/images/blog/game/image 488.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+```csharp
+Wave0 에 전 강의에서 만든 Path0 ( 만들어둔 적 이동 경로 ) 를 넣어준다
+```
+
+<Image src="/images/blog/game/image 489.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+```csharp
+적의 Pathfinder 스크립트에 Wave Config ( 방금 만든 Path0 를 넣은 ) Wave0 를 넣어준다
+```
+
+<Image src="/images/blog/game/image 490.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+```csharp
+이동 경로를 반전시킨 enemy1 도 만들어서 똑같이 Path1 을 만들어서 똑같은 순서대로 적용
+```
+
+# { 적군 생성 및 런타임 인스턴스화 }
+
+```csharp
+이 강의에서는 유니티(Unity)에서 적군(enemy)을 런타임에 동적으로 생성(instantiate)하고,
+
+이를 웨이브(wave)와 경로(path)를 따라 움직이도록 설정하는 방법을 배웁니다.
+
+이를 위해 WaveConfigSO와 Pathfinder 스크립트를 수정하고, 새로운 EnemySpawner 스크립트를 작성합니다.
+```
+
+## 1. 목표
+
+```csharp
+적군 동적 생성: 적군을 게임 시작 시 미리 배치하지 않고, 런타임에 생성.
+
+웨이브 시스템: WaveConfigSO를 통해 적군 프리팹 목록과 경로 정보를 관리.
+
+적군 스폰 관리: EnemySpawner 스크립트를 통해 적군을 생성하고, 생성된 적군을 EnemySpawner 오브젝트 아래로 정리.
+
+문제점 예고: 현재는 적군이 동시에 생성되어 겹치는 문제 발생. 다음 강의에서 시간차 생성을 다룰 예정.
+```
+
+## 2. 개념 설명: 주요 용어
+
+```csharp
+인스턴스화(Instantiate):
+
+		유니티에서 프리팹(prefab)을 게임 실행 중에 동적으로 생성하는 기능. 예: 적군 프리팹을 원하는 위치에 생성.
+
+ScriptableObject (WaveConfigSO):
+
+		유니티에서 데이터만 저장하는 특별한 클래스. WaveConfigSO는 웨이브별 적군 프리팹과 경로 정보를 저장.
+
+SerializeField:
+
+		유니티 인스펙터에서 private 변수를 노출해 설정 가능하도록 함.
+
+Quaternion.identity:
+
+		회전(rotation)이 없는 기본 상태. 오브젝트를 회전 없이 생성할 때 사용.
+
+Transform:
+
+		오브젝트의 위치, 회전, 크기를 관리하는 유니티 컴포넌트.
+```
+
+## 3. 단계별 작업
+
+### 3.1. WaveConfigSO 스크립트 수정
+
+```csharp
+WaveConfigSO는 웨이브 데이터를 관리하는 ScriptableObject입니다.
+
+적군 프리팹 목록을 추가하고,
+
+이를 외부에서 접근할 수 있도록 게터(getter) 메서드를 작성합니다.
+```
+
+### 적군 프리팹 목록 추가:
+
+```csharp
+List<GameObject> enemyPrefabs 변수를 추가해 적군 프리팹을 저장.
+
+[SerializeField]를 사용해 인스펙터에서 프리팹을 설정 가능하도록 함.
+```
+
+```csharp
+[SerializeField] List<GameObject> enemyPrefabs;
+```
+
+### 게터 메서드 작성:
+
+```csharp
+GetEnemyCount(): 적군 프리팹 목록의 개수를 반환.
+
+GetEnemyPrefab(int index): 지정된 인덱스의 적군 프리팹을 반환.
+```
+
+```csharp
+public int GetEnemyCount()
+{
+    return enemyPrefabs.Count;
+}
+
+public GameObject GetEnemyPrefab(int index)
+{
+    return enemyPrefabs[index];
+}
+```
+
+```csharp
+개념: List<T>는 여러 개의 데이터를 순서대로 저장하는 C# 컬렉션입니다.
+
+여기서는 GameObject 타입의 적군 프리팹을 저장하며,
+
+Count 속성으로 개수를 확인하고, 인덱스로 특정 프리팹을 가져옵니다.
+```
+
+## 3.2. EnemySpawner 스크립트 생성
+
+```csharp
+새로운 스크립트 EnemySpawner를 만들어 적군을 런타임에 생성합니다.
+```
+
+### 스크립트 설정:
+
+```csharp
+[SerializeField] WaveConfigSO currentWave: 현재 웨이브 데이터를 참조.
+
+Start()에서 SpawnEnemies()를 호출해 적군 생성 시작.
+```
+
+```csharp
+[SerializeField] WaveConfigSO currentWave;
+
+void Start()
+{
+    SpawnEnemies();
+}
+```
+
+### 적군 생성 (SpawnEnemies):
+
+```csharp
+for 루프를 사용해 WaveConfigSO의 적군 프리팹 목록을 순회.
+
+Instantiate로 적군을 생성하며, 시작 위치는 currentWave.GetStartingWaypoint().position에서 가져옴.
+
+Quaternion.identity로 회전 없이 생성.
+
+transform을 부모로 설정해 생성된 적군을 EnemySpawner 오브젝트 아래로 정리.
+```
+
+```csharp
+void SpawnEnemies()
+{
+    for (int i = 0; i < currentWave.GetEnemyCount(); i++)
+    {
+        Instantiate(currentWave.GetEnemyPrefab(i),
+                    currentWave.GetStartingWaypoint().position,
+                    Quaternion.identity,
+                    transform);
+    }
+}
+```
+
+### 게터 추가:
+
+```csharp
+GetCurrentWave(): EnemySpawner가 사용하는 WaveConfigSO를 Pathfinder와 공유.
+```
+
+```csharp
+public WaveConfigSO GetCurrentWave()
+{
+    return currentWave;
+}
+```
+
+```csharp
+개념: Instantiate는 프리팹을 복사해 게임에 추가합니다.
+
+여기서는 부모(transform)를 지정해 생성된 적군이 계층 구조에서 EnemySpawner 아래로 정리되도록 함.
+
+for 루프는 인덱스를 추적하며 목록을 순회하는 데 유용.
+```
+
+### 3.3. Pathfinder 스크립트 수정
+
+```csharp
+Pathfinder는 적군이 경로를 따라 움직이도록 제어합니다.
+
+WaveConfigSO를 EnemySpawner에서 가져오도록 수정합니다.
+```
+
+### 변수 수정:
+
+```csharp
+[SerializeField] WaveConfigSO waveConfig를 제거하고, EnemySpawner에서 WaveConfigSO를 가져옴.
+
+EnemySpawner 변수를 추가해 참조.
+```
+
+```csharp
+EnemySpawner enemySpawner;
+WaveConfigSO waveConfig;
+```
+
+### 초기화:
+
+```csharp
+Awake()에서 EnemySpawner를 FindAnyObjectByType<EnemySpawner>()로 찾음.
+
+Start()에서 enemySpawner.GetCurrentWave()로 waveConfig를 설정.
+```
+
+```csharp
+void Awake()
+{
+    enemySpawner = FindAnyObjectByType<EnemySpawner>();
+}
+
+void Start()
+{
+    waveConfig = enemySpawner.GetCurrentWave();
+    waypoints = waveConfig.GetWaypoints();
+    transform.position = waypoints[waypointIndex].position;
+}
+```
+
+```csharp
+개념: FindAnyObjectByType<T>()는 장면에서 특정 컴포넌트를 가진 오브젝트를 찾습니다.
+
+이를 통해 EnemySpawner와 Pathfinder가 동일한 WaveConfigSO를 공유하도록 연결.
+```
+
+## 3.4. 유니티 설정
+
+```csharp
+EnemySpawner 오브젝트 생성:
+
+		계층 구조에서 빈 게임 오브젝트를 생성하고 이름은 EnemySpawner.
+
+		EnemySpawner 컴포넌트를 추가.
+
+		인스펙터에서 WaveConfigSO를 Wave 0로 설정.
+
+WaveConfigSO 설정:
+
+		WaveConfigSO의 enemyPrefabs 목록에 적군 프리팹(예: 3개)을 추가.
+
+		시작 웨이포인트(GetStartingWaypoint)가 경로의 첫 번째 지점으로 설정되어 있는지 확인.
+
+기존 적군 제거:
+
+		테스트를 위해 계층 구조에 미리 배치된 적군 오브젝트를 삭제.
+
+		런타임에 EnemySpawner가 적군을 생성하도록 설정.
+```
+
+<Image src="/images/blog/game/image 491.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+<Image src="/images/blog/game/image 492.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+<Image src="/images/blog/game/image 493.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+<Image src="/images/blog/game/image 494.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+## 4. 테스트 및 결과
+
+```csharp
+플레이 시: EnemySpawner가 WaveConfigSO의 적군 프리팹을 루핑하며, 시작 웨이포인트에서 적군을 생성.
+
+계층 구조: 생성된 적군은 EnemySpawner 아래로 정리됨(클론으로 표시).
+
+문제점: 모든 적군이 동시에 생성되어 서로 겹침. 시간차 생성은 다음 강의에서 해결.
+
+개념: 런타임 생성은 게임 시작 후 동적으로 오브젝트를 추가하는 방식으로,
+
+메모리 효율성과 유연성을 높입니다. 하지만 동시 생성은 겹침 문제를 유발하므로,
+
+코루틴(coroutine)이나 타이머로 시간차를 둘 필요가 있음.
+```
+
+# { 적군 웨이브 시스템 구현 }
+
+## **1. 목표: 적군 웨이브 시스템 구현**
+
+```csharp
+목표: 적군이 일정 시간 간격으로 랜덤하게 생성되고, 여러 웨이브로 나뉘어 순차적으로 등장하도록 설정.
+
+핵심 구성 요소:
+
+WaveConfigSO: 웨이브 설정(적군 프리팹, 이동 경로, 생성 간격 등)을 저장하는 스크립터블 오브젝트.
+
+EnemySpawner: 웨이브를 순회하며 적군을 생성하는 스크립트.
+```
+
+## 2. WaveConfigSO 스크립트 설정
+
+```csharp
+WaveConfigSO는 각 웨이브의 설정을 정의하는 스크립터블 오브젝트입니다.
+```
+
+### 2.1. 주요 변수 추가
+
+```csharp
+timeBetweenEnemySpawns: 적군 생성 간격 (기본값: 1초).
+
+		[SerializeField] float timeBetweenEnemySpawns = 1f;
+
+		설명: 적군이 생성되는 기본 시간 간격을 설정.
+
+spawnTimeVariance: 생성 간격의 랜덤 변동 값 (기본값: 0.5초).
+
+		[SerializeField] float spawnTimeVariance = 0f;
+
+		설명: 적군 생성 간격에 무작위성을 추가하여 자연스러운 느낌을 줌.
+
+minimumSpawnTime: 생성 간격의 최소값 (기본값: 0.2초).
+
+		[SerializeField] float minimumSpawnTime = 0.2f;
+
+		설명: 생성 간격이 음수로 떨어지지 않도록 제한.
+```
+
+### 2.2. 랜덤 생성 시간 계산
+
+```csharp
+메서드: GetRandomSpawnTime()
+```
+
+```csharp
+public float GetRandomSpawnTime()
+{
+    float spawnTime = Random.Range(timeBetweenSpawns - spawnTimeVariance, timeBetweenSpawns + spawnTimeVariance);
+    return Mathf.Clamp(spawnTime, minimumSpawnTime, float.MaxValue);
+}
+```
+
+```csharp
+설명:
+
+Random.Range(min, max):
+
+		최소값(timeBetweenSpawns - spawnTimeVariance)과 최대값(timeBetweenSpawns + spawnTimeVariance) 사이의 랜덤 값을 생성.
+
+Mathf.Clamp(value, min, max):
+
+		생성된 값을 최소값(minimumSpawnTime)과 최대값(float.MaxValue) 사이로 제한.
+
+용도: 적군 생성 간격에 무작위성을 추가하되, 너무 짧거나 음수가 되지 않도록 제어.
+```
+
+## 3. EnemySpawner 스크립트 설정
+
+```csharp
+EnemySpawner는 웨이브를 순회하며 적군을 생성하는 역할을 합니다.
+```
+
+### 3.1. 주요 변수
+
+```csharp
+waveConfigs: 웨이브 설정 목록.
+
+		[SerializeField] List<WaveConfigSO> waveConfigs;
+
+		설명: 여러 웨이브를 저장하여 순차적으로 실행.
+
+timeBetweenWaves: 웨이브 간 대기 시간 (기본값: 0초).
+
+		[SerializeField] float timeBetweenWaves = 0f;
+
+		설명: 한 웨이브의 모든 적군 생성 후 다음 웨이브까지의 대기 시간.
+
+currentWave: 현재 실행 중인 웨이브.
+
+		WaveConfigSO currentWave;
+```
+
+### 3.2. 코루틴을 사용한 적군 생성
+
+```csharp
+코루틴(Coroutine):
+
+		개념: 유니티에서 비동기적으로 실행되는 메서드로, 특정 작업(예: 대기)을 처리할 때 유용.
+
+		특징: IEnumerator를 반환하며, yield return으로 실행을 일시 중지 가능.
+```
+
+### 메서드: SpawnEnemyWaves()
+
+```csharp
+// 적군 웨이브를 생성하는 코루틴
+IEnumerator SpawnEnemyWaves()
+{
+    // waveConfigs 목록에 있는 모든 웨이브를 순회
+    // foreach 루프를 사용하여 각 웨이브를 하나씩 처리
+    foreach (WaveConfigSO wave in waveConfigs)
+    {
+        // 현재 웨이브를 설정 (Pathfinder 등 다른 시스템에서 참조)
+        currentWave = wave;
+
+        // 현재 웨이브에 포함된 적군 수만큼 반복
+        // GetEnemyCount()는 WaveConfigSO에서 적군 프리팹 리스트의 길이를 반환
+        for (int i = 0; i < currentWave.GetEnemyCount(); i++)
+        {
+            // 적군 생성: Instantiate(프리팹, 위치, 회전, 부모 오브젝트)
+            // - GetEnemyPrefab(i): 현재 웨이브의 i번째 적군 프리팹
+            // - GetStartingWaypoint().position: 웨이브 경로의 시작 위치
+            // - Quaternion.identity: 회전 없음 (기본 방향)
+            // - transform: EnemySpawner 오브젝트를 부모로 설정하여 계층 구조 정리
+            Instantiate(currentWave.GetEnemyPrefab(i),
+                        currentWave.GetStartingWaypoint().position,
+                        Quaternion.identity,
+                        transform);
+
+            // 적군 생성 후 대기: GetRandomSpawnTime()으로 랜덤한 생성 간격 반환
+            // yield return을 사용하여 코루틴이 지정된 시간(초) 동안 일시 중지
+            // 이는 다음 적군 생성 전 자연스러운 간격을 만듦
+            yield return new WaitForSeconds(currentWave.GetRandomSpawnTime());
+        }
+
+        // 한 웨이브의 모든 적군 생성 후, 다음 웨이브로 넘어가기 전 대기
+        // timeBetweenWaves는 Inspector에서 설정한 웨이브 간 대기 시간
+        // 예: 2초로 설정 시, 한 웨이브 종료 후 2초 후 다음 웨이브 시작
+        yield return new WaitForSeconds(timeBetweenWaves);
+    }
+}
+```
+
+```csharp
+외부 루프 (foreach): waveConfigs 목록의 각 웨이브를 순회.
+
+내부 루프 (for): 현재 웨이브의 모든 적군을 생성.
+
+Instantiate: 적군 프리팹을 시작 위치에 생성.
+
+yield return new WaitForSeconds: 적군 생성 간격(GetRandomSpawnTime) 또는 웨이브 간 대기 시간(timeBetweenWaves)만큼 대기.
+```
+
+### 3.3. 코루틴 시작
+
+```csharp
+void Start()
+{
+    StartCoroutine(SpawnEnemyWaves());
+}
+```
+
+```csharp
+설명: 게임 시작 시 SpawnEnemyWaves 코루틴을 실행.
+```
+
+## 4. 유니티 에디터 설정
+
+```csharp
+WaveConfigSO 설정:
+
+		Waves and Paths 폴더에서 Wave 0, Wave 1 등의 웨이브 파일 생성.
+
+		각 웨이브에 적군 프리팹, 이동 경로, 생성 간격 등을 설정.
+
+		예: timeBetweenEnemySpawns = 1f, spawnTimeVariance = 0.5f, minimumSpawnTime = 0.2f.
+
+EnemySpawner 설정:
+
+		EnemySpawner 오브젝트에 Wave Configs 목록 추가.
+
+		Inspector에서 Wave 0, Wave 1 등을 드래그하여 목록 채우기.
+
+		timeBetweenWaves를 예: 2초로 설정.
+```
+
+<Image src="/images/blog/game/image 495.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+<Image src="/images/blog/game/image 496.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+<Image src="/images/blog/game/image 497.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
+
+## 5. 동작 확인
+
+```csharp
+플레이 테스트:
+
+		첫 번째 웨이브: 적군이 0.5~1.5초 간격으로 랜덤 생성.
+
+		웨이브 간 대기: 2초 후 다음 웨이브 시작.
+
+		timeBetweenWaves = 0 설정 시 웨이브가 즉시 전환.
+
+결과: 적군이 랜덤 간격으로 생성되고, 웨이브가 순차적으로 실행됨.
+```
+
+## 주요 개념 정리
+
+```csharp
+스크립터블 오브젝트(ScriptableObject):
+
+		데이터를 저장하는 유니티의 특수 클래스.
+
+		WaveConfigSO는 웨이브별 설정(적군, 경로, 시간 등)을 저장.
+
+코루틴(Coroutine):
+
+		비동기 작업을 처리하며, yield return으로 대기 가능.
+
+		예: WaitForSeconds로 시간 간격 제어.
+
+랜덤화:
+
+		Random.Range와 Mathf.Clamp로 적군 생성 간격에 무작위성을 추가.
+
+		인스턴스화(Instantiate):
+
+		프리팹을 동적으로 생성하여 게임 오브젝트를 추가.
+```
+
+# { 무한 웨이브를 위한 루프 구현 }
+
+```csharp
+이 강의에서는 유니티(Unity)에서 EnemySpawner 스크립트를 통해 적 웨이브(Wave)를 무한히 생성하기 위해
+
+새로운 루프(while 및 do-while)를 사용하는 방법을 배웁니다.
+
+기존의 for 및 foreach 루프와 비교하며, 새로운 루프를 활용해 무한 웨이브를 구현하는 과정을 설명합니다
+```
+
+## 1. 루프(Loop)의 개념
+
+```csharp
+루프는 코드 블록을 반복적으로 실행하는 프로그래밍 구조입니다. 이 강의에서는 네 가지 루프를 다룹니다:
+
+		For Loop: 정해진 횟수만큼 반복. 예: for (int i = 0; i < 5; i++) { ... }
+
+		Foreach Loop: 리스트나 배열 같은 컬렉션의 각 요소를 순회. 예: foreach (var item in list) { ... }
+
+		While Loop: 조건이 참일 때 반복. 예: while (condition) { ... }
+
+		Do-While Loop: 최소 한 번 실행 후 조건이 참이면 반복. 예: do { ... } while (condition);
+
+개념 설명:
+
+		For와 Foreach는 반복 횟수가 명확할 때 사용됩니다.
+
+		While과 Do-While은 반복 횟수가 불확실하거나 조건에 따라 반복을 제어할 때 유용합니다.
+
+		주의: While과 Do-While은 무한 루프(끝없이 반복)에 빠질 위험이 있으므로,
+
+		조건이 거짓이 될 수 있는 방법을 반드시 마련해야 합니다.
+```
+
+## 2. 강의 목표
+
+```csharp
+EnemySpawner 스크립트에서 WaveConfigSO 리스트를 활용해 적 웨이브를 무한히 생성하는 기능을 구현합니다. 이를 위해:
+
+		새로운 bool 변수 isLooping을 추가해 루프를 제어.
+
+		do-while 루프를 사용해 웨이브를 무한히 반복.
+
+		foreach 루프를 내부에 중첩해 각 웨이브를 순회.
+```
+
+## 3. 구현 단계
+
+```csharp
+1) 변수 추가
+
+		스크립트 상단에 isLooping 변수를 추가해 루프를 켜고 끌 수 있도록 설정합니다:
+
+				[SerializeField] bool isLooping = false;
+
+				SerializeField를 사용해 유니티 인스펙터에서 이 변수를 조정 가능.
+
+개념 설명:
+
+		SerializeField는 private 변수를 유니티 인스펙터에 노출시켜 편집 가능하게 만듭니다.
+
+		isLooping은 do-while 루프의 조건으로 사용됩니다.
+
+2) SpawnEnemyWaves 코루틴 수정
+
+		SpawnEnemyWaves 코루틴을 수정해 do-while 루프를 추가합니다:
+
+				기존 코드를 do { ... } while (isLooping); 구조로 감쌉니다.
+
+				내부에 foreach 루프를 사용해 waveConfigs 리스트의 각 웨이브를 처리.
+
+				각 웨이브에서 적을 생성하고, 웨이브 간 대기 시간(timeBetweenWaves)을 적용.
+```
+
+```csharp
+IEnumerator SpawnEnemyWaves()
+{
+    do
+    {
+        foreach (WaveConfigSO wave in waveConfigs)
+        {
+            currentWave = wave;
+            for (int i = 0; i < currentWave.GetEnemyCount(); i++)
+            {
+                Instantiate(currentWave.GetEnemyPrefab(i),
+                            currentWave.GetStartingWaypoint().position,
+                            Quaternion.identity,
+                            transform);
+                yield return new WaitForSeconds(currentWave.GetRandomSpawnTime());
+            }
+        }
+        yield return new WaitForSeconds(timeBetweenWaves);
+    }
+    while (isLooping);
+}
+```
+
+<Image src="/images/blog/game/image 498.webp" alt="Unity 게임 스크린샷" width={800} height={450} />
