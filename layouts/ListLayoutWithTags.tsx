@@ -870,9 +870,9 @@ export default function ListLayoutWithTags({
               {/* 모든 포스트 로드 완료 */}
               {!hasMore && displayedPosts.length > 0 && (
                 <div className="flex justify-center py-8">
-                  <div className="flex items-center gap-3 rounded-xl border border-green-700/30 bg-green-900/20 px-6 py-3 text-green-300 transition-all duration-300 hover:border-green-600/50 hover:bg-green-800/30">
+                  <div className="flex items-center gap-3 rounded-xl border border-blue-700/30 bg-blue-900/20 px-6 py-3 text-blue-300 transition-all duration-300 hover:border-blue-600/50 hover:bg-blue-800/30">
                     <svg
-                      className="h-5 w-5 text-green-400"
+                      className="h-5 w-5 text-blue-400"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -885,7 +885,7 @@ export default function ListLayoutWithTags({
                       />
                     </svg>
                     <span className="text-sm font-medium">모든 포스트를 불러왔습니다</span>
-                    <span className="text-xs text-green-400/70">({filteredPosts.length}개)</span>
+                    <span className="text-xs text-blue-400/70">({filteredPosts.length}개)</span>
                   </div>
                 </div>
               )}

@@ -13,7 +13,7 @@ interface UseInfiniteScrollReturn<T> {
   isLoading: boolean
   loadMore: () => void
   reset: () => void
-  observerRef: React.RefObject<HTMLDivElement>
+  observerRef: React.RefObject<HTMLDivElement | null>
 }
 
 export function useInfiniteScroll<T>({
