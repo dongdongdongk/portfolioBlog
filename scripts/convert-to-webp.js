@@ -4,7 +4,7 @@ const path = require('path')
 const sharp = require('sharp')
 
 // 변환할 폴더 경로 (명령줄 인수로 받거나 기본값 사용)
-const folderPath = process.argv[2] || './public/images/blog/game'
+const folderPath = process.argv[2] || './public/images/blog/game/3dUnity'
 const quality = parseInt(process.argv[3]) || 70 // WebP 품질 (1-100)
 
 console.log(`📁 변환 대상 폴더: ${path.resolve(folderPath)}`)
