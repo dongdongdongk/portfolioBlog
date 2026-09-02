@@ -38,7 +38,7 @@ export default function FallingSymbols() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const itemsRef = useRef<Item[]>([])
   const colHeightsRef = useRef<number[]>([])
-  const rafRef = useRef<number>()
+  const rafRef = useRef<number>(0)
   const lastSpawnRef = useRef(0)
 
   useEffect(() => {
