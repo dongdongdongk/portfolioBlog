@@ -50,6 +50,15 @@ const soundDesignItems: PortfolioItem[] = [
       'https://player.vimeo.com/video/731735440?badge=0&autopause=0&player_id=0&app_id=58479',
     tags: ['Sound Design', 'Composition', 'Casual', 'SFX'],
   },
+  {
+    title: 'FORSPOKEN — Sound Design',
+    description: 'FORSPOKEN을 소재로 한 스킬 사운드 디자인 포트폴리오 영상.',
+    type: 'vimeo',
+    embedId: '731215776',
+    embedSrc:
+      'https://player.vimeo.com/video/731215776?badge=0&autopause=0&player_id=0&app_id=58479',
+    tags: ['Sound Design', 'SFX'],
+  },
 ]
 
 const systemItems: PortfolioItem[] = [
