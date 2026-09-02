@@ -1,5 +1,5 @@
 import 'css/blog.css'
-import 'highlight.js/styles/github-dark.css'
+import 'highlight.js/styles/github.css'
 
 import PageTitle from '@/components/PageTitle'
 import { getAllPosts, getPostBySlug, getPostHtml } from '@/lib/mdx'

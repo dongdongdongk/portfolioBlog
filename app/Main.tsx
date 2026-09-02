@@ -1,288 +1,181 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from '@/components/Link'
-import Tag from '@/components/Tag'
-import siteMetadata from '@/data/siteMetadata'
-import { formatDate } from 'pliny/utils/formatDate'
-import InteractiveHero from '@/components/InteractiveHero'
-import ContentModal from '@/components/ContentModal'
-import { slug } from 'github-slugger'
+import Image from 'next/image'
 
-const MAX_DISPLAY = 5
+const DEV_SKILLS = [
+  'Unreal Engine',
+  'Unity',
+  'C#',
+  'C++',
+  'Java',
+  'Spring',
+  'React',
+  'Next.js',
+  'TypeScript',
+  'Node.js',
+  'Linux',
+]
+const SOUND_SKILLS = [
+  'Reaper',
+  'Cubase',
+  'Wwise',
+  'FMOD',
+  'iZotope RX',
+  'Orchestration',
+  'Composition & Arrangement',
+  'Sound Design',
+]
 
-export default function Home({ posts }) {
-  const router = useRouter()
-  const [modalOpen, setModalOpen] = useState(false)
-  const [modalType, setModalType] = useState<'developer' | 'sound-designer'>('developer')
-  const [isVisible, setIsVisible] = useState(false)
-  const [visiblePosts, setVisiblePosts] = useState<boolean[]>([])
-  const observerRef = useRef<IntersectionObserver | null>(null)
-
-  const navigateToProjects = (role: 'developer' | 'sound-designer') => {
-    const roleParam = role === 'developer' ? 'developer' : 'sound-designer'
-    router.push(`/projects?role=${roleParam}`)
-  }
-
-  const openModal = (type: 'developer' | 'sound-designer') => {
-    setModalType(type)
-    setModalOpen(true)
-  }
-
-  const closeModal = () => {
-    setModalOpen(false)
-  }
-
-  // Initial page load animation
-  useEffect(() => {
-    setIsVisible(true)
-    setVisiblePosts(new Array(Math.min(posts.length, MAX_DISPLAY)).fill(false))
-  }, [posts.length])
-
-  // Intersection Observer for scroll animations
-  useEffect(() => {
-    if (observerRef.current) {
-      observerRef.current.disconnect()
-    }
-
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const index = parseInt(entry.target.getAttribute('data-index') || '0')
-            setVisiblePosts((prev) => {
-              const updated = [...prev]
-              updated[index] = true
-              return updated
-            })
-          }
-        })
-      },
-      {
-        threshold: 0.1,
-        rootMargin: '0px 0px -50px 0px',
-      }
-    )
-
-    return () => {
-      if (observerRef.current) {
-        observerRef.current.disconnect()
-      }
-    }
-  }, [posts.length])
-
+export default function Home({ postCount }: { postCount: number }) {
   return (
-    <div className="min-h-screen">
-      {/* Full Screen Landing Hero */}
-      <InteractiveHero
-        onDeveloperClick={() => openModal('developer')}
-        onSoundDesignerClick={() => openModal('sound-designer')}
-      />
+    <div className="min-h-screen bg-white">
+      {/* ── Hero ── */}
+      <section className="mx-auto max-w-5xl px-6 py-16 sm:px-8 lg:px-12">
+        <div className="flex flex-col gap-12 lg:flex-row lg:items-center">
+          {/* Left: Text */}
+          <div className="flex-1">
+            <div className="mb-8 space-y-1">
+              <p className="text-4xl leading-snug text-slate-900 sm:text-5xl">안녕하세요,</p>
+              <p className="text-4xl leading-snug text-slate-900 sm:text-5xl">
+                <span className="inline-block border-2 border-slate-900 px-2 font-light">
+                  Technical
+                </span>{' '}
+                <span className="font-extrabold">Sound Designer</span>
+              </p>
+              <p className="text-4xl leading-snug font-extrabold text-slate-900 sm:text-5xl">
+                김동현입니다.
+              </p>
+            </div>
 
-      {/* Content Modal */}
-      <ContentModal
-        isOpen={modalOpen}
-        onClose={closeModal}
-        type={modalType}
-        onNavigateToProjects={navigateToProjects}
-      />
-
-      {/* Content Sections - Only Blog Posts */}
-      <div
-        className={`min-h-screen bg-gradient-to-br from-slate-950 via-gray-900 to-slate-950 pt-20 transition-all delay-1600 duration-1000 ${
-          isVisible ? 'translate-y-0 opacity-100' : 'translate-y-12 opacity-0'
-        }`}
-      >
-        {/* Latest Posts Section */}
-        <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
-          <div className="mb-16 text-center">
-            <h2
-              className={`mb-4 text-4xl font-bold text-gray-100 transition-all delay-200 duration-1000 md:text-5xl ${
-                isVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'
-              }`}
-            >
-              최신 포스트
-            </h2>
-            <div
-              className={`from-primary-500 mx-auto mb-6 h-1 w-16 rounded-full bg-gradient-to-r to-blue-500 transition-all delay-400 duration-800 ${
-                isVisible ? 'scale-x-100 opacity-100' : 'scale-x-0 opacity-0'
-              }`}
-            ></div>
-            <p
-              className={`text-xl text-gray-400 transition-all delay-600 duration-1000 ${
-                isVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
-              }`}
-            >
-              사운드 디자인과 개발 지식을 기록하고 공유합니다.
+            <p className="mb-8 max-w-md text-sm leading-relaxed text-slate-500">
+              넷마블, 토이푸딩 등에서 근무하며 「아스달 연대기」, 「블레이드 앤 소울」 등 AAA 규모
+              게임을 비롯해 다양한 인디 게임, 애니메이션, 광고, 영화의 사운드 제작에 참여했습니다.
+              개발자로서는 금융감독원과 LG U+ 관련 시스템의 개발·운영을 담당했으며, 1인 개발
+              공포게임 「OverTime」을 제작했습니다. 사운드 디자인, 인터랙티브 오디오, Audio DSP,
+              오케스트레이션부터 풀스택 웹, Unity·Unreal 개발까지 폭넓은 실무 경험을 바탕으로,
+              오디오와 개발을 함께 이해하고 설계·구현할 수 있는 역량을 보유하고 있습니다.
             </p>
-          </div>
 
-          <div className="grid gap-8">
-            {!posts.length && (
-              <div className="py-20 text-center">
-                <p className="text-lg text-gray-400">아직 포스트가 없습니다.</p>
-              </div>
-            )}
-
-            {posts.slice(0, MAX_DISPLAY).map((post, index) => {
-              const { slug: postSlug, date, title, summary, tags } = post
-              const isPostVisible = visiblePosts[index]
-              return (
-                <article
-                  key={postSlug}
-                  data-index={index}
-                  ref={(el) => {
-                    if (el && observerRef.current) {
-                      observerRef.current.observe(el)
-                    }
-                  }}
-                  className={`group hover:shadow-primary-500/10 relative transform rounded-2xl border border-gray-800 bg-gray-900/30 p-8 backdrop-blur-lg transition-all duration-700 hover:-translate-y-1 hover:border-gray-700 hover:shadow-2xl ${
-                    isPostVisible ? 'translate-y-0 opacity-100' : 'translate-y-12 opacity-0'
-                  }`}
-                  style={{
-                    transitionDelay: isPostVisible ? '0ms' : `${800 + index * 150}ms`,
-                  }}
-                >
-                  {/* Decorative gradient */}
-                  <div className="from-primary-500/5 absolute inset-0 rounded-2xl bg-gradient-to-r to-blue-500/5 opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
-
-                  <div className="relative">
-                    {/* Date */}
-                    <div
-                      className={`mb-4 flex items-center text-sm text-gray-400 transition-all duration-500 ${
-                        isPostVisible ? 'translate-x-0 opacity-100' : '-translate-x-4 opacity-0'
-                      }`}
-                      style={{
-                        transitionDelay: isPostVisible ? '100ms' : `${800 + index * 150 + 100}ms`,
-                      }}
-                    >
-                      <svg
-                        className="mr-2 h-4 w-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                        />
-                      </svg>
-                      <time dateTime={date}>{formatDate(date, siteMetadata.locale)}</time>
-                    </div>
-
-                    {/* Title */}
-                    <h3
-                      className={`mb-4 text-2xl leading-tight font-bold transition-all duration-700 lg:text-3xl ${
-                        isPostVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
-                      }`}
-                      style={{
-                        transitionDelay: isPostVisible ? '150ms' : `${800 + index * 150 + 150}ms`,
-                      }}
-                    >
-                      <Link
-                        href={`/blog/${postSlug}`}
-                        className="hover:text-primary-400 group-hover:text-primary-300 text-gray-100 transition-colors duration-200"
-                      >
-                        {title}
-                      </Link>
-                    </h3>
-
-                    {/* Summary */}
-                    <p
-                      className={`mb-6 line-clamp-3 text-lg leading-relaxed text-gray-300 transition-all duration-600 ${
-                        isPostVisible ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-0'
-                      }`}
-                      style={{
-                        transitionDelay: isPostVisible ? '200ms' : `${800 + index * 150 + 200}ms`,
-                      }}
-                    >
-                      {summary}
-                    </p>
-
-                    {/* Tags */}
-                    <div className="mb-6 flex flex-wrap gap-2">
-                      {tags?.slice(0, 4).map((tag, tagIndex) => (
-                        <Link
-                          key={tag}
-                          href={`/tags/${slug(tag)}`}
-                          className={`hover:border-primary-500/50 hover:text-primary-400 inline-flex items-center rounded-full border border-gray-700 bg-gray-800/50 px-3 py-1.5 text-sm font-medium text-gray-300 transition-all duration-300 ${
-                            isPostVisible ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
-                          }`}
-                          style={{
-                            transitionDelay: isPostVisible
-                              ? `${250 + tagIndex * 50}ms`
-                              : `${800 + index * 150 + 250 + tagIndex * 50}ms`,
-                          }}
-                        >
-                          {tag}
-                        </Link>
-                      ))}
-                    </div>
-
-                    {/* Read More */}
-                    <Link
-                      href={`/blog/${postSlug}`}
-                      className={`text-primary-400 hover:text-primary-300 group inline-flex items-center font-medium transition-all duration-300 ${
-                        isPostVisible ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
-                      }`}
-                      style={{
-                        transitionDelay: isPostVisible ? '450ms' : `${800 + index * 150 + 450}ms`,
-                      }}
-                    >
-                      자세히 읽기
-                      <svg
-                        className="ml-2 h-4 w-4 transform transition-transform duration-200 group-hover:translate-x-1"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M17 8l4 4m0 0l-4 4m4-4H3"
-                        />
-                      </svg>
-                    </Link>
-                  </div>
-                </article>
-              )
-            })}
-          </div>
-
-          {/* View All Posts */}
-          {posts.length > MAX_DISPLAY && (
-            <div
-              className={`mt-16 text-center transition-all delay-1000 duration-1000 ${
-                isVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'
-              }`}
-            >
-              <Link
-                href="/blog"
-                className="group inline-flex transform items-center rounded-2xl border border-gray-700 bg-gray-800/50 px-8 py-4 text-lg font-semibold text-gray-200 transition-all duration-300 hover:scale-105 hover:border-gray-600 hover:text-gray-100"
+            {/* Buttons */}
+            <div className="flex flex-wrap items-center gap-2">
+              <a
+                href="mailto:dhk9309@gmail.com"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-white transition-colors hover:bg-slate-700"
+                aria-label="이메일"
               >
-                모든 포스트 보기
-                <svg
-                  className="ml-2 h-5 w-5 transform transition-transform duration-200 group-hover:translate-x-1"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M17 8l4 4m0 0l-4 4m4-4H3"
+                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
                   />
                 </svg>
+              </a>
+              <a
+                href="https://github.com/dongdongdongk"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-slate-900 text-slate-900 transition-colors hover:bg-slate-900 hover:text-white"
+                aria-label="GitHub"
+              >
+                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 0C5.373 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.562 21.8 24 17.302 24 12 24 5.373 18.627 0 12 0z" />
+                </svg>
+              </a>
+              <Link
+                href="/about"
+                className="flex h-10 items-center rounded-full border-2 border-slate-900 px-5 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-900 hover:text-white"
+              >
+                About →
               </Link>
             </div>
-          )}
+          </div>
+
+          {/* Right: Interactive dot grid */}
+          <div className="relative hidden lg:block lg:h-96 lg:w-96 xl:h-[480px] xl:w-[480px]">
+            <Image
+              src="/mainright4.png"
+              alt="Technical Sound Designer illustration"
+              fill
+              className="object-contain"
+              priority
+            />
+          </div>
         </div>
-      </div>
+      </section>
+
+      {/* ── Skills ── */}
+      <section className="border-t border-gray-100">
+        <div className="mx-auto max-w-5xl px-6 py-16 sm:px-8 lg:px-12">
+          <h2 className="mb-12 text-center text-2xl text-slate-900">
+            My <strong>Skills</strong>
+          </h2>
+
+          <div className="mb-10">
+            <p className="mb-4 text-xs font-semibold tracking-widest text-slate-400 uppercase">
+              Sound Designer
+            </p>
+            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+              {SOUND_SKILLS.map((skill, i) => (
+                <div
+                  key={skill}
+                  className="flex items-center justify-center rounded-xl border border-gray-200 px-2 py-5 text-center text-xs font-semibold text-slate-700 transition-all duration-150 hover:border-slate-900 hover:bg-slate-900 hover:text-white"
+                >
+                  {skill}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-4 text-xs font-semibold tracking-widest text-slate-400 uppercase">
+              Developer
+            </p>
+            <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
+              {DEV_SKILLS.map((skill, i) => (
+                <div
+                  key={skill}
+                  className="flex items-center justify-center rounded-xl border border-gray-200 px-2 py-5 text-center text-xs font-semibold text-slate-700 transition-all duration-150 hover:border-slate-900 hover:bg-slate-900 hover:text-white"
+                >
+                  {skill}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Links ── */}
+      <section className="border-t border-gray-100">
+        <div className="mx-auto max-w-5xl px-6 py-12 sm:px-8 lg:px-12">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { href: '/portfolio', title: 'Portfolio', desc: '개발 및 사운드 작업물' },
+              { href: '/blog', title: 'Blog', desc: `포스트 ${postCount}개` },
+              { href: '/projects', title: 'Projects', desc: '사이드 프로젝트' },
+              { href: '/about', title: 'About', desc: '더 알아보기' },
+            ].map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="group flex items-center justify-between rounded-xl border border-gray-200 px-5 py-4 transition-colors hover:border-gray-400"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-slate-900 group-hover:text-blue-700">
+                    {item.title}
+                  </p>
+                  <p className="mt-0.5 text-xs text-slate-400">{item.desc}</p>
+                </div>
+                <span className="text-slate-300 transition-all group-hover:translate-x-0.5 group-hover:text-blue-500">
+                  →
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
     </div>
   )
 }

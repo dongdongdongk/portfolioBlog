@@ -5,7 +5,7 @@ const siteMetadata = {
   headerTitle: 'Dongk Blog',
   description: 'Web Audio API, JavaScript 개발 및 오디오 프로그래밍 전문 블로그',
   language: 'ko-kr',
-  theme: 'dark', // system, dark or light
+  theme: 'light', // system, dark or light
   siteUrl: 'http://localhost:3000',
   baseUrl: 'http://localhost:3000',
   siteRepo: 'https://github.com/timlrx/tailwind-nextjs-starter-blog',
