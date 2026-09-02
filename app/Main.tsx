@@ -90,6 +90,12 @@ export default function Home({ postCount }: { postCount: number }) {
               >
                 About →
               </Link>
+              <Link
+                href="/portfolio"
+                className="flex h-10 items-center rounded-full border-2 border-slate-900 px-5 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-900 hover:text-white"
+              >
+                Portfolio →
+              </Link>
             </div>
           </div>
 
@@ -143,6 +149,28 @@ export default function Home({ postCount }: { postCount: number }) {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Contact ── */}
+      <section className="border-t border-gray-100">
+        <div className="mx-auto max-w-5xl px-6 py-16 sm:px-8 lg:px-12">
+          <div className="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-center">
+            <div>
+              <h2 className="text-2xl text-slate-900">
+                협업 · <strong>외주 문의</strong>
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                협업 제안이나 프로젝트 문의가 있으시면 편하게 연락해주세요.
+              </p>
+            </div>
+            <Link
+              href="/contact"
+              className="flex h-10 items-center rounded-full border-2 border-slate-900 px-6 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-900 hover:text-white"
+            >
+              Contact →
+            </Link>
           </div>
         </div>
       </section>
