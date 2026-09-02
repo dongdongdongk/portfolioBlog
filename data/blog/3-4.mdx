@@ -1,0 +1,821 @@
+---
+title: '섹션 3 : 로켓 부스트 4'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+# { 🎥 후처리(Post-processing)와 Depth of Field 적용하기 }
+
+## 📋 목차
+
+1. [후처리(Post-processing) 개념 이해하기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%ED%9B%84%EC%B2%98%EB%A6%ACpost-processing-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Global Volume 설정하기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#global-volume-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+3. [카메라와 Post-processing 활성화 확인하기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EC%B9%B4%EB%A9%94%EB%9D%BC%EC%99%80-post-processing-%ED%99%9C%EC%84%B1%ED%99%94-%ED%99%95%EC%9D%B8%ED%95%98%EA%B8%B0)
+4. [기본 제공 후처리 효과들](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EA%B8%B0%EB%B3%B8-%EC%A0%9C%EA%B3%B5-%ED%9B%84%EC%B2%98%EB%A6%AC-%ED%9A%A8%EA%B3%BC%EB%93%A4)
+   - Tonemapping
+   - Bloom
+   - Vignette
+5. [새로운 Override 추가하기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EC%83%88%EB%A1%9C%EC%9A%B4-override-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+   - Depth Of Field
+   - Channel Mixer (실험 후 제거)
+   - Film Grain
+6. [후처리와 조명의 관계](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%ED%9B%84%EC%B2%98%EB%A6%AC%EC%99%80-%EC%A1%B0%EB%AA%85%EC%9D%98-%EA%B4%80%EA%B3%84)
+7. [정리](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EC%A0%95%EB%A6%AC)
+
+---
+
+## 1. 후처리(Post-processing) 개념 이해하기
+
+- **후처리(Post-processing)** :
+  3D 장면을 렌더링한 뒤, 최종 화면에 **추가적인 시각 효과**를 적용하는 과정.
+  예: 색 보정, 흐림 효과, 빛 번짐 효과 등.
+- 장점: **적은 노력으로도 게임의 비주얼을 크게 개선**할 수 있음.
+- 후처리 효과들은 Unity에서 `Volume` 시스템을 통해 관리함.
+
+---
+
+## 2. Global Volume 설정하기
+
+- **Volume**: 후처리 효과가 적용될 공간(영역)을 정의하는 컨테이너.
+- **Global Volume**: 게임 전체에 효과를 적용.
+  - 현재 프로젝트 템플릿에는 이미 Global Volume이 존재함.
+- **Local Volume**:
+  - 특정 공간(콜라이더) 안에서만 효과 적용.
+  - 예: 플레이어가 동굴 안에 들어가면 어두워지고, 나오면 밝아짐.
+- 이번 강의에서는 **Global Volume**만 사용 → 게임 전체에 효과 적용.
+- 💡 팁: Global Volume을 **Prefabs 폴더에 저장**해 두면 다른 레벨에서도 재사용 가능.
+  ![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380416/notion-blog/_/3D_/3D_/_3_4/image.png)
+
+---
+
+## 3. 카메라와 Post-processing 활성화 확인하기
+
+- **메인 카메라**에서 확인할 것:
+  - `Rendering` → `Post Processing` 체크박스가 켜져 있어야 효과 적용 가능.
+- 체크박스를 켜고 끄면서 → 후처리 효과 적용 여부를 바로 확인할 수 있음.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380415/notion-blog/_/3D_/3D_/_3_4/image_1.png)
+
+---
+
+## 4. 기본 제공 후처리 효과들
+
+템플릿에는 이미 몇 가지 효과가 켜져 있음.
+
+### 4.1 Tonemapping
+
+- 색상을 디스플레이 출력에 맞게 조정.
+- 실제 카메라/영화 같은 느낌을 줄 수 있음.
+- 강의에서는 깊게 다루지 않고 “물음표 아이콘”을 눌러 Unity 문서를 참고하라고 언급.
+
+---
+
+### 4.2 Bloom
+
+- 밝은 부분이 번져서 빛나는 듯한 효과.
+- 발광하는 오브젝트(네온, 불빛, 폭발 등)와 어울림.
+
+---
+
+### 4.3 Vignette
+
+- 화면 가장자리를 어둡게/부드럽게 처리하는 효과.
+- 옵션:
+  - **Intensity** : 효과 강도.
+    → 강도를 높이면 화면 외곽이 많이 어두워짐.
+  - **Smoothness** : 가장자리가 흐려지는 정도.
+    → 낮추면 경계가 뚜렷하고, 높이면 부드럽게 흐려짐.
+- 켜고 끄며 비교하면 차이가 미묘하지만 확실히 존재.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380415/notion-blog/_/3D_/3D_/_3_4/image_2.png)
+
+---
+
+## 5. 새로운 Override 추가하기
+
+**[Add Override] → [Post-processing]** 메뉴에서 원하는 효과를 추가할 수 있음.
+
+---
+
+### 5.1 Depth Of Field (심도 효과)
+
+- **개념**: 카메라가 초점을 맞춘 대상은 선명하고, 앞뒤 배경은 흐릿하게 보이게 하는 효과.
+- 설정 방법:
+  1. `Depth Of Field` 추가.
+  2. **Mode** → `Gaussian` 선택.
+     - 켜지 않으면 불편. Gaussian을 켜면 바로 화면 전체가 흐려짐.
+  3. **Start** 값 조정:
+     - 초점이 시작되는 거리.
+     - Rocket이 선명하게 보일 때까지 값을 조절.
+  4. **End** 값은 끔 (무한으로 설정).
+     - 배경은 전부 흐릿하게 유지.
+- 결과: 로켓은 선명, 배경은 흐릿 → 원근감과 집중도 증가.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380415/notion-blog/_/3D_/3D_/_3_4/image_3.png)
+
+---
+
+### 5.2 Channel Mixer (실험 후 제거)
+
+- 각 색상 채널(R/G/B)을 섞어 새로운 톤을 만들어내는 효과.
+- 하지만 강의에서는 “마음에 들지 않는다”며 제거.
+
+---
+
+### 5.3 Film Grain (필름 그레인)
+
+- 화면에 카메라 필름 같은 노이즈 효과 추가.
+- 옵션:
+  - **Type**: Thin 1, Medium 1 등 다양한 질감 선택 가능.
+  - **Intensity**: 강도 조절.
+    → 값이 높을수록 거칠고, 낮을수록 부드러움.
+- 카메라로 찍은 듯한 느낌을 줄 수 있음.
+
+---
+
+## 6. 후처리와 조명의 관계
+
+- 후처리와 조명은 **서로 밀접하게 연관**됨.
+- 예: Bloom 효과는 조명이 없으면 잘 드러나지 않음.
+- 따라서 후처리 효과를 시험할 때 → **조명 환경도 함께 고려**해야 함.
+- 강의에서는 “조명을 추가해서 어둡게 하고, Bloom으로 발광 효과를 더해볼 수 있다”고 설명.
+
+---
+
+## 7. 정리
+
+- \*후처리(Post-processing)\*\*는 게임의 비주얼을 향상시키는 핵심 도구.
+- **Volume 시스템**을 통해 전역(Global) 또는 특정 공간(Local)에 효과를 적용 가능.
+- 기본 제공 효과: Tonemapping, Bloom, Vignette.
+- 새로운 Override 추가 가능: Depth Of Field, Film Grain 등.
+- Depth Of Field로 **로켓에만 초점을 맞추고 배경은 흐리게 처리**하여 집중도를 높임.
+- 후처리와 조명은 반드시 함께 고려해야 좋은 결과를 얻을 수 있음.
+
+---
+
+# { 💡 Unity에서 조명 시스템 이해하고 적용하기 }
+
+## 📋 목차
+
+1. [Unity 조명의 기본 개념](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#unity-%EC%A1%B0%EB%AA%85%EC%9D%98-%EA%B8%B0%EB%B3%B8-%EA%B0%9C%EB%85%90)
+2. [Directional Light (태양광) 조정하기](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#directional-light-%ED%83%9C%EC%96%91%EA%B4%91-%EC%A1%B0%EC%A0%95%ED%95%98%EA%B8%B0)
+3. [환경광(Environment Lighting) 활용하기](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#%ED%99%98%EA%B2%BD%EA%B4%91environment-lighting-%ED%99%9C%EC%9A%A9%ED%95%98%EA%B8%B0)
+4. [조명 모드와 베이크(Baked) 개념](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#%EC%A1%B0%EB%AA%85-%EB%AA%A8%EB%93%9C%EC%99%80-%EB%B2%A0%EC%9D%B4%ED%81%ACbaked-%EA%B0%9C%EB%85%90)
+5. [포인트 라이트(Point Light) 추가하기](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#%ED%8F%AC%EC%9D%B8%ED%8A%B8-%EB%9D%BC%EC%9D%B4%ED%8A%B8point-light-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+6. [스포트라이트(Spot Light) 활용하기](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#%EC%8A%A4%ED%8F%AC%ED%8A%B8%EB%9D%BC%EC%9D%B4%ED%8A%B8spot-light-%ED%99%9C%EC%9A%A9%ED%95%98%EA%B8%B0)
+7. [게임 오브젝트(Launch Pad, Landing Pad)에 조명 추가](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#%EA%B2%8C%EC%9E%84-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8launch-pad-landing-pad%EC%97%90-%EC%A1%B0%EB%AA%85-%EC%B6%94%EA%B0%80)
+8. [로켓에 조명 도전 과제](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#%EB%A1%9C%EC%BC%93%EC%97%90-%EC%A1%B0%EB%AA%85-%EB%8F%84%EC%A0%84-%EA%B3%BC%EC%A0%9C)
+9. [발광 재질(Emission Material)과 블룸 효과](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#%EB%B0%9C%EA%B4%91-%EC%9E%AC%EC%A7%88emission-material%EA%B3%BC-%EB%B8%94%EB%A3%B8-%ED%9A%A8%EA%B3%BC)
+10. [조명 배치 전략과 활용 팁](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#%EC%A1%B0%EB%AA%85-%EB%B0%B0%EC%B9%98-%EC%A0%84%EB%9E%B5%EA%B3%BC-%ED%99%9C%EC%9A%A9-%ED%8C%81)
+
+---
+
+## 1. Unity 조명의 기본 개념
+
+- Unity에서 **조명(Light)** 은 단순히 화면을 밝히는 역할뿐만 아니라, **그림자, 분위기, 색감**까지 결정하는 중요한 요소.
+- 조명의 종류:
+  - **Directional Light** : 태양/달처럼 무한히 멀리 있는 광원. (전체 장면에 같은 방향으로 빛)
+  - **Point Light** : 전구처럼 특정 지점에서 모든 방향으로 퍼짐.
+  - **Spot Light** : 무대 조명처럼 원뿔 모양으로 빛을 쏨.
+  - **Ambient Light (환경광)** : 전체적인 기본 빛, 그림자가 드리워지지 않는 부드러운 조명.
+
+---
+
+## 2. Directional Light (태양광) 조정하기
+
+- **태양 같은 역할**을 하는 기본 광원.
+- `E` 키 → 회전 툴로 방향을 바꾸면 **그림자의 각도**가 달라짐.
+- 예시:
+  - 정면에서 빛 → 극장 무대처럼 깊이감 있는 그림자.
+- **Intensity (강도)** :
+  - 기본값은 1.0, 줄이면 어두워짐.
+  - 강의에서는 **0.2 정도**로 설정 → 부드럽고 따뜻한 느낌.
+- **Color Temperature (온도)**:
+  - 차갑게(달빛) → 푸른빛.
+  - 따뜻하게(화성, 석양) → 붉은빛.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380415/notion-blog/_/3D_/3D_/_3_4/image_4.png)
+
+---
+
+## 3. 환경광(Environment Lighting) 활용하기
+
+- Unity 메뉴 → `Window > Rendering > Lighting`
+- **Environment** 탭:
+  - **Source = Skybox** (기본) → 하늘과 반사광이 장면에 영향.
+  - **Source = Color** → 단색 빛으로 전체 장면 톤 변경 가능 (예: 푸른색, 주황색).
+- **환경광 강도(Intensity Multiplier)** 를 조절하면:
+  - 낮출수록 어두운 세계.
+  - 올리면 전체가 밝아짐.
+
+👉 **Tip**: Directional Light 강도를 0으로 낮춰도, 환경광이 있으면 완전히 어둡지 않음.
+
+👉 따라서, 두 광원을 균형 있게 설정해야 함.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380416/notion-blog/_/3D_/3D_/_3_4/image_5.png)
+
+---
+
+## 4. 조명 모드와 베이크(Baked) 개념
+
+- **Baked Lighting** : 조명이 **고정된 오브젝트**에 미리 계산되어 저장됨. (실시간이 아님)
+- 장점: 성능 최적화 (특히 큰 환경에서).
+- 단점: 실시간 변화 없음.
+- 실시간 그림자가 필요 없는 건물, 바위 등에 사용.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380416/notion-blog/_/3D_/3D_/_3_4/image_6.png)
+
+---
+
+## 5. 포인트 라이트(Point Light) 추가하기
+
+- 추가 방법: `Hierarchy → 우클릭 → Light → Point Light`.
+- 특징: **전구처럼 빛을 사방으로 방출**.
+- 주요 속성:
+  - **Range (범위)** : 빛이 닿는 거리.
+  - **Intensity (강도)** : 빛의 밝기.
+  - **Color (색상)** : 빛의 색깔.
+- 사용 예시:
+  - 플레이어가 충돌할 위험이 있는 물체 주변에 배치 → “여기 주의하세요!”라는 시각적 힌트.
+- 관리 팁:
+  - `Lights`라는 빈 오브젝트를 만들어 모든 라이트를 그 아래 정리.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380416/notion-blog/_/3D_/3D_/_3_4/image_7.png)
+
+---
+
+## 6. 스포트라이트(Spot Light) 활용하기
+
+- **Type 변경**: Point Light → Spot으로 전환 가능.
+- 원뿔 모양으로 빛을 쏘는 조명.
+- 주요 속성:
+  - **Inner Angle / Outer Angle** : 빛이 퍼지는 각도.
+    - 두 값이 가까우면 경계가 뚜렷.
+    - Inner 값이 작으면 더 부드럽게 번짐.
+  - **Range** : 빛이 닿는 거리.
+- 활용 예시:
+  - 무대 조명, 특정 오브젝트 강조, 손전등 효과.
+
+---
+
+## 7. 게임 오브젝트(Launch Pad, Landing Pad)에 조명 추가
+
+- **Launch Pad** 프리팹에 Point Light 배치.
+  - Transform Reset 후 중앙 배치.
+  - 범위를 패드 위쪽으로 설정.
+  - 강도를 올려서 패드가 눈에 띄게 만듦.
+  - 색상: 흰색(파란색 패드와 대비).
+- 변경 후 → **Overrides → Apply All** 적용 → 모든 프리팹에 반영.
+
+---
+
+## 8. 로켓에 조명 도전 과제
+
+- 목표: 로켓이 화면에서 잘 보이도록 조명 추가.
+- 방법:
+  1. **Point Light** → 로켓 중심/앞부분에 추가.
+
+     → 로켓 자체를 밝게 보여줌.
+
+  2. **Spot Light** → 로켓 앞쪽에 추가.
+     - `x축 -90°` 회전 → 앞으로 쏘게 됨.
+     - Range 조절 → 경로를 살짝 비추도록.
+     - Intensity 올려서 “전조등” 같은 효과.
+
+---
+
+## 9. 발광 재질(Emission Material)과 블룸 효과
+
+- 단순 라이트만 있으면 “가짜”처럼 보임 → Glow(발광 재질) 추가.
+- 방법:
+  1. `Assets → Materials → Create Material → Glow`.
+  2. **Emission(방출)** 색상 활성화 → HDR 색상 선택.
+  3. 오브젝트(Cube)에 적용.
+- Post Processing → **Bloom 효과** 추가:
+  - 발광 재질이 실제로 빛나는 듯 보임.
+- 포인트 라이트와 결합 → 더욱 사실적인 광원 연출.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380416/notion-blog/_/3D_/3D_/_3_4/image_8.png)
+
+---
+
+## 10. 조명 배치 전략과 활용 팁
+
+- **경고/안내 역할** : 충돌 위험 구역, 피해야 할 오브젝트 근처에 조명.
+- **분위기 연출** : 환경광 + 색상으로 세계관 분위기 설정.
+- **시선 유도** : 플레이어가 집중해야 하는 곳(착륙장, 발사대)에 밝은 빛 배치.
+- **장식/디자인** : Glow 박스 같은 소품으로 장면에 포인트 주기.
+- **성능 고려** :
+  - Point Light / Spot Light는 너무 많이 쓰면 성능 저하.
+  - 중요한 곳에만 사용하고, 나머지는 Baked Light 활용.
+
+---
+
+✅ 요약하면, 이번 강의는 단순히 장면을 “밝게” 만드는 게 아니라,
+
+👉 **조명을 이용해 플레이어의 시선을 유도하고, 게임의 분위기를 연출하는 법**을 배우는 내용이에요.
+
+---
+
+## \* 추가 **Baked Light**
+
+Unity에서 말하는 **Baked Light**는 움직이지 않는 정적인 오브젝트에 빛의 영향을 미리 계산해 저장하는 방식이에요. 이렇게 하면 런타임에서 조명을 실시간으로 계산하지 않아도 되어서 성능이 훨씬 좋아집니다.
+
+아래 단계로 만들 수 있어요:
+
+---
+
+## 1. 라이트 모드 설정하기
+
+1. **Directional Light**, **Point Light**, **Spot Light** 등 원하는 라이트를 선택합니다.
+2. Inspector → **Mode** 항목에서 `Baked`를 선택합니다.
+   - `Realtime` → 항상 실시간으로 계산
+   - `Mixed` → 정적은 굽고, 동적 오브젝트는 그림자만 실시간 반영
+   - `Baked` → 정적 오브젝트에 대해서만 굽기
+
+---
+
+## 2. Static 오브젝트 설정하기
+
+- 조명 계산을 미리 굽기 위해서는 오브젝트가 **Static**이어야 해요.
+- 계층(Inspector) 상단에 체크박스가 있어요:
+  - `Static` 전체 체크 or `Lightmap Static`만 체크
+
+---
+
+## 3. Lighting 설정하기
+
+1. 메뉴 → **Window > Rendering > Lighting** 열기
+2. **Scene 탭**에서 Lightmap 세팅을 합니다.
+   - **Lightmapper**:
+     - Progressive CPU (CPU 기반, 정확하지만 느림)
+     - Progressive GPU (빠름, GPU 필요)
+   - **Lightmap Resolution**: 굽는 해상도 조절 (숫자가 클수록 디테일 ↑, 베이크 시간도 ↑)
+   - **Ambient Light**, **Environment Lighting** 등도 조정 가능
+
+---
+
+## 4. Bake 실행하기
+
+- Lighting 창에서 **Generate Lighting** 버튼 클릭
+- Unity가 씬에 있는 모든 정적 오브젝트와 라이트의 상호작용을 계산해서 Lightmap(Texture)으로 저장합니다.
+
+---
+
+## 5. 결과 확인
+
+- 씬 뷰에서 **Shaded → Baked Lightmap** 모드로 전환해서 Lightmap이 적용된 걸 볼 수 있어요.
+- Inspector에서 Mesh Renderer → **Lightmap Settings** 항목에 굽힌 Lightmap 정보가 표시됩니다.
+
+---
+
+✨ 정리하면:
+
+1. 라이트 → Mode를 `Baked`로 설정
+2. 오브젝트 → Static 체크
+3. Lighting 창에서 세팅 후 Bake 실행
+
+---
+
+# { 🧩 프리팹(Prefabs)과 장면 정리하기 }
+
+## 📋 목차
+
+1. [프리팹 개념 이해하기](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#%ED%94%84%EB%A6%AC%ED%8C%B9-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [프리팹으로 만들면 좋은 것들](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#%ED%94%84%EB%A6%AC%ED%8C%B9%EC%9C%BC%EB%A1%9C-%EB%A7%8C%EB%93%A4%EB%A9%B4-%EC%A2%8B%EC%9D%80-%EA%B2%83%EB%93%A4)
+3. [재질(Material)과 프리팹의 차이점](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#%EC%9E%AC%EC%A7%88material%EA%B3%BC-%ED%94%84%EB%A6%AC%ED%8C%B9%EC%9D%98-%EC%B0%A8%EC%9D%B4%EC%A0%90)
+4. [환경(Environment) 프리팹화하기](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#%ED%99%98%EA%B2%BDenvironment-%ED%94%84%EB%A6%AC%ED%8C%B9%ED%99%94%ED%95%98%EA%B8%B0)
+5. [다른 장면(Scene)에서 프리팹 활용하기](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#%EB%8B%A4%EB%A5%B8-%EC%9E%A5%EB%A9%B4scene%EC%97%90%EC%84%9C-%ED%94%84%EB%A6%AC%ED%8C%B9-%ED%99%9C%EC%9A%A9%ED%95%98%EA%B8%B0)
+6. [조명과 환경 설정 공유하기](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#%EC%A1%B0%EB%AA%85%EA%B3%BC-%ED%99%98%EA%B2%BD-%EC%84%A4%EC%A0%95-%EA%B3%B5%EC%9C%A0%ED%95%98%EA%B8%B0)
+7. [마무리 정리](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#%EB%A7%88%EB%AC%B4%EB%A6%AC-%EC%A0%95%EB%A6%AC)
+
+---
+
+## 1. 프리팹 개념 이해하기
+
+- **프리팹(Prefab)** : 게임 오브젝트(GameObject)를 **재사용 가능한 템플릿**으로 저장한 것.
+- 장점:
+  - 여러 장면(Scene)에서 같은 오브젝트를 재사용할 수 있음.
+  - 한 번 수정하면 연결된 모든 프리팹 인스턴스에 적용됨 → 유지 보수 용이.
+- 규칙:
+  - "필요할지도 모른다"는 이유로 무조건 프리팹을 만들 필요는 없음.
+  - 하지만 일반적인 **좋은 습관은 대부분 프리팹화하는 것**. (카메라, 조명, 주요 환경, 플레이어, 오브젝트 등)
+
+---
+
+## 2. 프리팹으로 만들면 좋은 것들
+
+강의에서 예시로 다룬 것들:
+
+1. **메인 카메라(Main Camera)**
+   - 장면마다 달라질 수 있음 → 프리팹화하면 통일된 시점 유지 가능.
+2. **시네머신 카메라(Cinemachine Camera)**
+   - 플레이어를 따라가는 기능 필요 → 프리팹으로 만들어 재활용.
+3. **방향성 광원(Directional Light)**
+   - 태양 역할. 장면마다 빛의 톤을 맞출 수 있음 → 프리팹화하면 조명 관리 용이.
+4. **글로벌 볼륨(Global Volume)**
+   - 후처리 효과(Post Processing) 설정을 포함 → 프리팹화하면 효과 일관성 유지.
+5. **라이트 박스(Light Box)**
+   - 예: 주황색/녹색 발광 재질(Material)이 적용된 상자.
+   - 프리팹화하면 나중에 밝기, 색상 변경이 쉽고 모든 인스턴스에 반영됨.
+6. **발사대(Launch Pad), 착륙대(Landing Pad)**
+   - 게임의 목표 지점이므로 프리팹화 필요.
+
+---
+
+## 3. 재질(Material)과 프리팹의 차이점
+
+- **프리팹** : 게임 오브젝트 전체를 저장. 위치, 회전, 구성 요소까지 포함.
+- **재질(Material)** : 색상, 발광(Emission), 질감(Texture) 등 시각적 속성을 제어.
+
+### 강의에서 다룬 예시
+
+- 기본 주황색 발광(Material)이 있었음.
+- 색상이 너무 흐리다고 생각하면 → Inspector에서 Emission 색상 클릭 → 더 진한 주황색 선택.
+- 파란색은 의미 없어서 흰색으로 유지.
+- 복제해서 녹색 Material을 만든 후 → 녹색 라이트 박스에 적용.
+
+👉 **재질을 수정하면 연결된 모든 오브젝트에 적용됨**.
+
+👉 따라서 색상별로 새로운 재질을 만들고 프리팹에 적용하는 방식이 효율적.
+
+---
+
+## 4. 환경(Environment) 프리팹화하기
+
+- 전체 월드(환경)를 **하나의 빈 게임 오브젝트** 아래에 그룹화 → 프리팹화.
+- 이유:
+  - 다른 장면에서 그대로 불러와 재사용 가능.
+  - 위치를 `(0,0,0)` 으로 리셋하면 항상 올바른 자리에 놓임.
+
+---
+
+## 5. 다른 장면(Scene)에서 프리팹 활용하기
+
+1. 장면에 있는 기존 카메라, 조명, 글로벌 볼륨 삭제.
+2. **Assets → Prefabs** 폴더에서 필요한 프리팹들을 끌어다 놓음:
+   - Main Camera
+   - Cinemachine Camera (플레이어 Rocket을 추적 대상으로 다시 연결 필요)
+   - Directional Light
+   - Global Volume
+3. 환경(Environment) 프리팹도 드래그 → 월드의 기본 구조 복원.
+4. Launch Pad / Landing Pad 도 Prefab에서 가져다 씀.
+
+👉 이렇게 하면 장면마다 같은 품질과 설정 유지 가능.
+
+---
+
+## 6. 조명과 환경 설정 공유하기
+
+- Unity의 환경 설정은 장면(Scene)별로 다를 수 있음.
+- Ambient Light(주변광) 색상, Intensity(강도) 등을 프리셋(Swatch)으로 저장 → 다른 장면에서도 불러와 적용.
+
+### 강의에서 사용한 설정:
+
+- Ambient Color : 약간 푸르스름한 색조.
+- Intensity Multiplier : `0.17`.
+
+👉 이 값들을 여러 장면에 동일하게 적용하면 시각적으로 일관된 게임 분위기 유지 가능.
+
+---
+
+## 7. 마무리 정리
+
+- 프리팹은 **재사용성과 유지보수성** 때문에 필수적.
+- "아무것도 프리팹으로 안 만들었으면 후회할 상황"을 피하기 위해 **처음부터 프리팹화하는 습관**이 중요.
+- 단, 모든 걸 무조건 프리팹화할 필요는 없음 → 자주 쓰이거나 수정 가능성이 높은 오브젝트만 프리팹화.
+- 장면 간 환경, 조명, 카메라, 주요 오브젝트를 프리팹화하면 → 새로운 레벨을 빠르게 제작 가능.
+
+---
+
+👉 요약하면 이번 강의는 **“장면을 일관되게 유지하기 위해 프리팹을 적극적으로 활용하는 방법”**을 실제로 보여주고,
+
+**재질과 프리팹의 차이**, **환경 프리팹화**, **조명/후처리 공유 방법**까지 다룬 거예요.
+
+---
+
+# { 🎛 오실레이터 스크립트와 오브젝트 왕복 이동 }
+
+## 📋 목차
+
+1. [오실레이터 개념 이해하기](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#%EC%98%A4%EC%8B%A4%EB%A0%88%EC%9D%B4%ED%84%B0-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [필요한 요소 정리하기](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#%ED%95%84%EC%9A%94%ED%95%9C-%EC%9A%94%EC%86%8C-%EC%A0%95%EB%A6%AC%ED%95%98%EA%B8%B0)
+3. [Mathf.PingPong 개념](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#mathfpingpong-%EA%B0%9C%EB%85%90)
+4. [Vector3.Lerp 개념](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#vector3lerp-%EA%B0%9C%EB%85%90)
+5. [스크립트 작성 단계](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%9E%91%EC%84%B1-%EB%8B%A8%EA%B3%84)
+6. [Unity에서 적용하기](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#unity%EC%97%90%EC%84%9C-%EC%A0%81%EC%9A%A9%ED%95%98%EA%B8%B0)
+7. [추가 활용 아이디어](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#%EC%B6%94%EA%B0%80-%ED%99%9C%EC%9A%A9-%EC%95%84%EC%9D%B4%EB%94%94%EC%96%B4)
+
+---
+
+## 1. 오실레이터 개념 이해하기
+
+- **오실레이터(Oscillator)** : 한 지점에서 다른 지점까지 이동했다가, 다시 돌아오는 반복적인 움직임을 의미.
+- 게임 내에서 활용:
+  - **장애물** : 플레이어가 피해야 하는 움직이는 함정 (예: 피스톤, 움직이는 벽).
+  - **플랫폼** : 플레이어가 올라타야 하는 이동 발판.
+  - **배경 요소** : 씬에 생동감을 주는 단순한 장식 (예: 움직이는 로봇, 장비).
+
+👉 핵심은 **"시작 위치 ↔ 끝 위치 사이를 반복해서 이동"** 한다는 점입니다.
+
+---
+
+## 2. 필요한 요소 정리하기
+
+오브젝트를 왕복 이동시키려면 다음 변수가 필요합니다:
+
+1. **시작 위치 (startPosition)**
+   - 오브젝트가 게임 시작 시 있는 위치.
+   - `transform.position`을 통해 자동으로 가져옴.
+2. **이동 벡터 (movementVector)**
+   - 어느 방향으로, 얼마나 멀리 이동할지 결정하는 값.
+   - 예: `(10, 0, 0)` → x축으로 10만큼 이동.
+3. **끝 위치 (endPosition)**
+   - `startPosition + movementVector`
+   - 즉, 시작 위치에 이동 벡터를 더해서 계산.
+4. **이동 계수 (movementFactor)**
+   - 현재 이동이 **0~1 범위**에서 얼마나 진행됐는지를 나타내는 값.
+   - `0` → 시작 위치, `1` → 끝 위치.
+   - 중간값(예: `0.5`) → 이동 거리의 절반.
+5. **속도 (speed)**
+   - 오브젝트가 왕복하는 속도.
+   - float 값으로 직렬화해 Unity Inspector에서 조정 가능.
+
+---
+
+## 3. Mathf.PingPong 개념
+
+- **PingPong**: 숫자를 일정 구간에서 앞뒤로 반복시킴.
+- 사용법:
+
+  ```csharp
+  Mathf.PingPong(float t, float length)
+  ```
+
+  - `t`: 시간에 따라 증가하는 값 (`Time.time * speed`).
+  - `length`: 범위 (여기서는 `1`).
+
+- 예시:
+  - `Mathf.PingPong(Time.time, 1)` → `0 → 1 → 0 → 1` 반복.
+  - 이 결과가 **movementFactor**가 됨.
+
+---
+
+## 4. Vector3.Lerp 개념
+
+- **Lerp(Linear Interpolation, 선형 보간)**
+  → 두 점 사이에서 "현재 위치"를 계산하는 함수.
+
+```csharp
+Vector3.Lerp(Vector3 a, Vector3 b, float t)
+```
+
+- `a`: 시작 위치.
+- `b`: 끝 위치.
+- `t`: 0~1 사이 값 → 보간 정도.
+
+👉 `t = 0.5` → a와 b의 중간 지점.
+
+👉 `t = movementFactor`를 넣으면, 오브젝트가 앞뒤로 왕복.
+
+---
+
+## 5. 스크립트 작성 단계
+
+```csharp
+using UnityEngine;
+
+public class Oscillator : MonoBehaviour
+{
+    [SerializeField] Vector3 movementVector; // 얼마나, 어느 방향으로 이동할지
+    [SerializeField] float speed;            // 왕복 속도
+    Vector3 startPosiotion;                  // 시작 위치
+    Vector3 endPosition;                     // 끝 위치
+    float movementFactor;                    // 0~1 사이 진행률
+
+    void Start()
+    {
+        // 시작 위치 저장
+        startPosiotion = transform.position;
+        // 끝 위치 = 시작 위치 + 이동 벡터
+        endPosition = startPosiotion + movementVector;
+    }
+
+    void Update()
+    {
+        // PingPong으로 movementFactor 계산 (0~1 반복)
+        movementFactor = Mathf.PingPong(Time.time * speed, 1f);
+
+        // Lerp로 오브젝트 위치 갱신
+        transform.position = Vector3.Lerp(startPosiotion, endPosition, movementFactor);
+    }
+}
+```
+
+---
+
+## 6. Unity에서 적용하기
+
+1. **오브젝트 배치**
+   - 피스톤, 벽, 발판, 배경 장치 등 원하는 오브젝트 배치.
+2. **스크립트 추가**
+   - `Oscillator.cs`를 오브젝트에 붙임.
+3. **Inspector 설정**
+   - **Movement Vector**: 이동할 방향과 거리 입력.
+     - 예: `(0, 8, 0)` → Y축으로 8만큼 위아래 이동.
+   - **Speed**: 왕복 속도 입력 (예: `0.5`).
+4. **실행 결과**
+   - 오브젝트가 시작 위치와 끝 위치 사이를 반복해서 움직임.
+
+## ⚙️ 쉽게 원리
+
+1. **시작 위치(startPosition)**
+
+   게임 시작할 때 물체가 있는 원래 자리예요.
+
+2. **끝 위치(endPosition)**
+
+   시작 위치에서 `movementVector`만큼 떨어진 지점이에요.
+
+   예를 들어 `movementVector = (6,0,0)`이면 → start에서 오른쪽으로 6만큼 간 위치가 끝점.
+
+3. **시간(Time.time)**
+
+   Unity에서 흐르는 시간을 계속 가져와서, 이걸 이용해 "얼마만큼 이동했는지" 계산해요.
+
+4. **PingPong**
+
+   `Mathf.PingPong`은 시간을 입력하면, **0에서 1까지 갔다가 다시 0으로 돌아오는 값**을 무한히 반복해줘요.
+   - 예: `0 → 0.5 → 1 → 0.5 → 0 → 0.5 …`
+   - 마치 진자처럼 오르락내리락하는 값!
+
+5. **Lerp**
+
+   `Vector3.Lerp(start, end, t)`는 `t`가 0일 때 `start`, 1일 때 `end`, 중간 값일 때는 두 점 사이에 위치를 반환해요.
+   - 예: `t=0.5` → start와 end의 정확히 중간 지점
+
+6. **결합**
+
+   `Lerp(startPosition, endPosition, PingPong(...))`
+
+   → PingPong이 0→1→0 반복하니까
+
+   → 물체가 start ↔ end를 반복 이동!
+
+---
+
+## 7. 추가 활용 아이디어
+
+- **장애물**: 피스톤을 복제해 벽처럼 배치 → 플레이어가 피해야 하는 구간 생성.
+- **배경 장식**: 로버(차량)를 옆으로 움직여서 배경에 생동감 추가.
+- **플랫폼**: 오브젝트 위에 플레이어가 올라설 수 있게 해서 이동 발판 제작.
+- **속도 조절**: Inspector에서 값만 바꿔도 빠른/느린 움직임 연출 가능.
+
+---
+
+✅ **핵심 요약**
+
+- 시작 위치 + 이동 벡터 = 끝 위치.
+- `Mathf.PingPong()` → 0~1 사이 왕복 값 계산.
+- `Vector3.Lerp()` → 시작 ↔ 끝 위치 사이에서 현재 위치 계산.
+- Inspector에서 Movement Vector와 Speed를 조절해 다양한 왕복 오브젝트 구현 가능.
+
+---
+
+# { 🚀 로켓 추진기와 파티클 시스템 제어하기 — **빌드(Build)와 공유 과정 상세 정리 }**
+
+## 📋 목차
+
+1. [에디터에서의 실행 vs 빌드 개념](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#%EC%97%90%EB%94%94%ED%84%B0%EC%97%90%EC%84%9C%EC%9D%98-%EC%8B%A4%ED%96%89-vs-%EB%B9%8C%EB%93%9C-%EA%B0%9C%EB%85%90)
+2. [빌드(Build)란 무엇인가](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#%EB%B9%8C%EB%93%9Cbuild%EB%9E%80-%EB%AC%B4%EC%97%87%EC%9D%B8%EA%B0%80)
+3. [빌드 설정(Build Settings) 살펴보기](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#%EB%B9%8C%EB%93%9C-%EC%84%A4%EC%A0%95build-settings-%EC%82%B4%ED%8E%B4%EB%B3%B4%EA%B8%B0)
+4. [Windows용 빌드 과정](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#windows%EC%9A%A9-%EB%B9%8C%EB%93%9C-%EA%B3%BC%EC%A0%95)
+5. [WebGL(웹) 빌드 과정](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#webgl%EC%9B%B9-%EB%B9%8C%EB%93%9C-%EA%B3%BC%EC%A0%95)
+6. [빌드 결과물 확인 및 공유하기](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#%EB%B9%8C%EB%93%9C-%EA%B2%B0%EA%B3%BC%EB%AC%BC-%ED%99%95%EC%9D%B8-%EB%B0%8F-%EA%B3%B5%EC%9C%A0%ED%95%98%EA%B8%B0)
+7. [공유 시 주의사항 및 팁](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#%EA%B3%B5%EC%9C%A0-%EC%8B%9C-%EC%A3%BC%EC%9D%98%EC%82%AC%ED%95%AD-%EB%B0%8F-%ED%8C%81)
+8. [게임 개발 여정에서 빌드 공유의 의미](https://www.notion.so/3-4-273e683f737e8093a683fba47ebd86f1#%EA%B2%8C%EC%9E%84-%EA%B0%9C%EB%B0%9C-%EC%97%AC%EC%A0%95%EC%97%90%EC%84%9C-%EB%B9%8C%EB%93%9C-%EA%B3%B5%EC%9C%A0%EC%9D%98-%EC%9D%98%EB%AF%B8)
+
+---
+
+## 1. 에디터에서의 실행 vs 빌드 개념
+
+- **Unity 에디터 내 '재생(Play)' 버튼**
+  - 개발 중 게임을 빠르게 테스트할 수 있음.
+  - '정지(Stop)' 버튼을 클릭하면 게임 실행이 멈춤.
+  - 하지만 이 상태에서는 **편집기(Editor) 전용 환경**이므로 다른 사람과 공유할 수 없음.
+- 에디터의 UI, 디버그 정보, 개발용 콘솔 등이 포함되어 있어 **실제 배포 환경과 다름**.
+
+---
+
+## 2. 빌드(Build)란 무엇인가
+
+- **빌드(Build)** :
+  - 게임을 **플랫폼에서 독립적으로 실행**할 수 있도록 만들어주는 **파일/파일 세트**.
+  - 배포 가능한 실행 파일(exe) 또는 웹용 파일 등을 생성.
+  - \*다른 플랫폼(Windows, Mac, WebGL 등)\*\*에 맞춰 패키징할 수 있음.
+- **이유**:
+  - 에디터 없이도 **친구나 커뮤니티**에 배포 가능.
+  - 그래픽 성능이 에디터에서보다 더 깔끔하고 부드럽게 동작.
+
+---
+
+## 3. 빌드 설정(Build Settings) 살펴보기
+
+- 접근 방법: **File → Build Settings**.
+- **장면(Scene) 목록 확인**:
+  - 레벨 로딩 시 사용할 **Scenes In Build** 목록을 설정해야 함.
+- **플랫폼 선택**:
+  - Windows, Mac, Android, iOS, WebGL 등 다양한 플랫폼을 선택 가능.
+  - 사용 중인 플랫폼과 다른 플랫폼으로 변경하려면 **Switch Platform(플랫폼 전환)** 클릭.
+- **Unity Hub 설치 확인**:
+  - 만약 선택한 플랫폼이 보이지 않는다면, Unity Hub에서 해당 플랫폼 빌드 지원 패키지를 설치해야 함.
+
+---
+
+## 4. Windows용 빌드 과정
+
+1. **플랫폼 선택**: Windows 클릭 → _Switch Platform_ 필요 시 실행.
+2. **빌드 실행**:
+   - `Build` 또는 `Build And Run` 버튼 선택 가능.
+   - **Build**: 빌드만 수행 후 수동으로 실행.
+   - **Build And Run**: 빌드 완료 후 자동 실행.
+3. **저장 위치 지정**:
+   - 예: `builds`라는 새 폴더 생성 → 그 안에 `windows` 폴더 생성 → 선택.
+4. **빌드 완료 후 실행**:
+   - 빌드 폴더로 이동 → `.exe` 실행 파일 더블 클릭 → 게임 실행.
+5. **차이점**:
+   - 빌드된 게임은 **그래픽 품질과 성능이 에디터 실행보다 깔끔하고 부드럽게 보임**.
+   - 실행 파일을 친구에게 전달하면, 에디터 없이 바로 플레이 가능.
+6. **실행 중 테스트**:
+   - 카메라 위치, 해상도, 입력(Esc 키로 종료 등) 확인 가능.
+
+---
+
+## 5. WebGL(웹) 빌드 과정
+
+1. **플랫폼 전환**:
+   - Build Settings에서 **WebGL** 클릭 → _Switch Platform_.
+   - 전환 중 경고 메시지: _"플레이어를 빌드할 수 없습니다"_ 등 → 빌드 중 에디터에서 실행 불가.
+2. **빌드 실행**:
+   - `Build` 또는 `Build And Run` 선택.
+   - 새 폴더(예: `web`) 생성 후 저장.
+3. **빌드 완료 후 확인**:
+   - 브라우저에서 자동 실행되거나, 로컬에서 열어 테스트 가능.
+   - 전체 화면 버튼 지원, Esc 키로 종료.
+4. **업로드**:
+   - itch.io, ShareMyGame.com 등 웹 빌드를 업로드할 수 있는 플랫폼에 **폴더 전체** 업로드 필요.
+   - 인덱스 파일과 리소스가 포함된 폴더 단위로 관리됨.
+
+---
+
+## 6. 빌드 결과물 확인 및 공유하기
+
+- **Windows 빌드**: 실행 파일 `.exe` + 필요한 데이터 폴더 → 통째로 전달.
+- **WebGL 빌드**: 빌드 폴더 전체 업로드 → 제공된 링크 공유.
+- **공유 방법 예시**:
+  - "내 게임이 여기 있어! 이 링크로 확인해봐!"
+  - 게임 커뮤니티(디스코드, 포럼 등)에 링크 게시.
+  - 게임 잼(Game Jam) 플랫폼에 업로드.
+
+---
+
+## 7. 공유 시 주의사항 및 팁
+
+- **실행 파일 신뢰 문제**:
+  - 일부 사람들은 exe 실행 파일을 열기 꺼려할 수 있음(보안 우려).
+  - 웹 빌드(WebGL)가 더 선호되는 경우가 많음.
+- **커뮤니티 에티켓**:
+  - 공유 시 “나의 게임만 플레이해줘!”가 아니라 **다른 사람의 게임에도 피드백 제공** → 좋은 카르마 쌓기.
+  - 피드백: 그래픽, 조작감, 재미 요소 등 구체적으로.
+- **업로드 플랫폼 주의**:
+  - 리소스 섹션(Game Dev TV 추천) 확인 → 플랫폼 이름이나 경로가 업데이트될 수 있음.
+  - 현재 추천: **Share My Game.com** (향후 변경될 가능성 있음).
+
+---
+
+## 8. 게임 개발 여정에서 빌드 공유의 의미
+
+- **빌드 공유는 게임 개발의 핵심 단계**:
+  - 친구나 커뮤니티와 테스트 → 개선점 파악.
+  - 자신을 개발자로 드러내고 자신감 쌓기.
+- **좋은 게임을 만들기 위한 과정**:
+  - “좋은 게임을 만들기 전에 나쁜 게임부터 만들어야 한다”는 철학 강조.
+  - 이 강의에서 만든 로켓 게임이 세상을 놀라게 하지 않아도 괜찮음.
+  - 중요한 것은 **경험**과 **공유**를 통해 배우는 것.
+- **마무리 조언**:
+  - 로켓 게임을 조금 더 다듬어 빌드 후 배포.
+  - 게임 플레이 영상이나 스크린샷 공유 → 피드백 수집.
+  - 게임 개발자로서의 첫 발자국을 기념할 것.
+
+---
+
+✅ **정리 포인트**:
+
+- 에디터 실행은 개발용, 빌드는 배포용.
+- Windows 빌드: 실행 파일 `.exe`를 포함한 폴더 생성 → 친구와 공유 가능.
+- WebGL 빌드: 웹 업로드 → 링크 공유가 간편하며 보안 걱정을 줄임.
+- 공유 시 상호 피드백 제공 중요.
+- 빌드는 게임 개발 여정에서 자신감과 기술 향상에 큰 역할.

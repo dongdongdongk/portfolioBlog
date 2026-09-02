@@ -1,0 +1,1027 @@
+---
+title: '섹션 3: Dino Game Clone - 1 -'
+date: '2026-09-02'
+category: '게임 개발/Game Development in JS TS - The Complete Guide (w_'
+tags: ['게임 개발', 'Game Development in JS TS - The Complete Guide (w_']
+draft: false
+summary: ''
+---
+
+# { Phaser 프로젝트의 기본 설정 }
+
+## 1. **Phaser 프로젝트의 기본 설정**
+
+```jsx
+Phaser 게임을 만들기 위해 설정 파일인 index.ts를 작성해야 합니다.
+
+이 파일은 게임의 전체적인 구조와 설정을 담당합니다.
+```
+
+```jsx
+import Phaser from "phaser";
+import PreloadScene from "./scenes/PreloadScene";
+import PlayScene from "./scenes/PlayScene";
+
+const config: Phaser.Types.Core.GameConfig = {
+  type: Phaser.AUTO,  // 렌더링 방식 설정
+  width: 800,  // 게임 화면 너비 (픽셀 단위)
+  height: 600,  // 게임 화면 높이 (픽셀 단위)
+  physics: {  // 물리 엔진 설정
+    default: 'arcade',  // Phaser의 기본 물리 엔진 사용
+  },
+  scene: [PreloadScene, PlayScene]  // 사용할 씬 등록
+};
+
+new Phaser.Game(config);  // 게임 인스턴스 생성
+
+```
+
+## 2. **Phaser의 주요 개념**
+
+```jsx
+(1) Renderer (렌더러)
+
+렌더러는 화면에 그래픽을 그리는 방식입니다.
+
+		Phaser에서는 WebGL, Canvas, 또는 Headless 방식을 사용할 수 있습니다.
+
+				WebGL: 대부분의 최신 브라우저에서 지원하는 고성능 그래픽 기술.
+
+				Canvas: 간단한 그래픽을 그릴 때 사용하는 방식.
+
+				Headless: 화면 없이 게임의 로직만 실행하는 모드.
+
+		**Phaser.AUTO**를 설정하면 Phaser가 자동으로 최적의 방식을 선택합니다.
+
+(2) Scene (씬)
+
+		씬은 게임에서 특정 상태나 화면을 나타냅니다.
+
+		예: 로딩 화면, 게임 플레이 화면, 게임 종료 화면 등이 각각 씬으로 나뉠 수 있습니다.
+
+(3) Physics (물리 엔진)
+
+		Phaser는 물리적인 동작(중력, 충돌, 속도 등)을 처리하는 엔진을 제공합니다.
+
+		기본값은 Arcade 물리 엔진으로, 간단하고 빠르게 동작합니다.
+
+```
+
+## 3. **씬 분리하기**
+
+```jsx
+(1) PreloadScene (로딩 씬)
+
+		PreloadScene은 게임에 필요한 자산(이미지, 사운드 등)을 로드하는 역할을 합니다.
+
+		여기서는 ground.png라는 이미지를 로드합니다.
+```
+
+```jsx
+import Phaser from 'phaser'
+
+class PreloadScene extends Phaser.Scene {
+  constructor() {
+    super('PreloadScene') // 씬의 고유 이름 설정
+  }
+
+  preload() {
+    // 이미지 로드
+    this.load.image('ground', 'assets/ground.png')
+  }
+
+  create() {
+    // 로딩 완료 후 PlayScene으로 이동
+    this.scene.start('PlayScene')
+  }
+}
+
+export default PreloadScene
+```
+
+```jsx
+(2) PlayScene (플레이 씬)
+
+		PlayScene은 실제로 게임이 진행되는 화면을 담당합니다.
+
+		여기서는 간단히 알림창을 띄워서 씬이 로드되었음을 확인합니다.
+```
+
+```jsx
+import Phaser from 'phaser'
+
+class PlayScene extends Phaser.Scene {
+  constructor() {
+    super('PlayScene') // 씬의 고유 이름 설정
+  }
+
+  create() {
+    alert('PlayScene has been loaded!') // 알림창 띄우기
+  }
+}
+
+export default PlayScene
+```
+
+### `Phaser.Scene`은 무엇인가요?
+
+```jsx
+Phaser.Scene은 Phaser에서 제공하는 기본 클래스입니다.
+
+"게임 씬"이라는 개념을 구현하기 위해 필요한 여러 기능이 들어 있습니다.
+
+		예를 들어:
+
+				씬을 초기화하는 기능
+
+				화면에 게임 오브젝트를 추가하는 기능
+
+				자산(이미지, 사운드 등)을 로드하는 기능
+
+				화면을 지속적으로 업데이트하는 기능
+```
+
+```jsx
+import Phaser from 'phaser'
+
+class MyScene extends Phaser.Scene {
+  constructor() {
+    super('MyScene') // 부모 클래스의 초기화 메서드 호출 (씬 이름 설정)
+  }
+
+  preload() {
+    console.log('Loading assets...')
+    // 여기서 이미지, 사운드 같은 자산을 로드합니다.
+  }
+
+  create() {
+    console.log('Creating objects...')
+    // 여기서 화면에 표시할 오브젝트를 추가합니다.
+  }
+
+  update() {
+    console.log('Updating...')
+    // 게임 화면을 매 프레임마다 업데이트합니다.
+  }
+}
+
+export default MyScene
+```
+
+## 4. **씬 등록 및 순서**
+
+```jsx
+Phaser에서 씬은 순서대로 실행됩니다.
+
+index.ts 파일에서 PreloadScene을 먼저 등록한 후 PlayScene을 등록하면,
+
+로딩이 끝난 뒤 플레이 화면으로 넘어갑니다.
+```
+
+```jsx
+scene: [PreloadScene, PlayScene]
+```
+
+# { **Ground(땅 이미지)** 로드 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380498/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_3_Dino_Game_Clone_-_1_-/image.png)
+
+```jsx
+이번 강의에서는 Phaser를 이용해 러너 게임의 기본적인 화면 구성을 설정하고
+
+**Ground(땅 이미지)**를 로드하고 화면에 표시하는 방법을 배웠습니다.
+```
+
+## 1. **게임 화면 크기 설정**
+
+```jsx
+러너 게임이므로 **가로(width)**는 좀 더 길게 설정.
+
+		1000px로 설정.
+
+**세로(height)**는 비교적 작게 설정.
+
+		340px로 설정.
+
+
+투명한 배경 설정: 배경색 없이 투명으로 표시되도록 설정.
+```
+
+```jsx
+const config = {
+  type: Phaser.AUTO,
+  width: 1000,
+  height: 340,
+  transparent: true, //
+}
+```
+
+### transparent ?
+
+```jsx
+Phaser의 transparent 옵션은 배경 색상을 결정하는 설정입니다.
+
+기본적으로 Phaser는 canvas라는 HTML 요소를 사용해 게임을 렌더링하며,
+
+배경색이 설정되지 않으면 기본 배경이 검정색(또는 설정한 색상)으로 표시됩니다.
+
+**transparent: true**로 설정하면, Phaser는 배경을 렌더링하지 않고, 투명한 배경을 유지합니다.
+
+사용 이유
+
+웹 페이지와 자연스럽게 통합:
+
+투명 배경을 사용하면 게임 배경 없이 웹 페이지의 기본 스타일(예: 배경 이미지, 그라데이션 등)을 그대로 보여줄 수 있습니다.
+
+레이어 기능 활용:
+
+투명한 배경을 통해 다른 콘텐츠(예: 다른 HTML 요소나 이미지를 Phaser 게임 화면 뒤에 배치)를 함께 표시할 수 있습니다.
+
+디자인 유연성 제공:
+
+게임 외부의 배경을 별도로 꾸밀 수 있어, Phaser 게임을 특정 프레임이나 배경 레이아웃 안에 배치하는 데 유리합니다.
+```
+
+## 2. **Ground 이미지 로드**
+
+```jsx
+PreloadScene에서 Ground 이미지를 로드:
+
+		ground.png 파일을 preload 메서드에서 로드.
+```
+
+```jsx
+preload() {
+    this.load.image('ground', './assets/ground.png');
+}
+```
+
+## 3. **Ground 이미지 표시**
+
+```jsx
+Ground 이미지를 PlayScene에서 화면에 표시.
+
+		tileSprite를 사용하여 땅 이미지를 배치.
+```
+
+```jsx
+create() {
+    this.add
+        .tileSprite(0, 340, 1000, 26, 'ground')
+        .setOrigin(0, 1);
+}
+```
+
+```jsx
+tileSprite 매개변수 설명:
+
+		x: 이미지를 배치할 가로 위치. (여기선 0)
+
+		y: 이미지를 배치할 세로 위치. (여기선 화면의 맨 아래 340)
+
+		가로 크기: 1000px로 설정. (화면 전체 너비)
+
+		세로 크기: 26px로 설정. (이미지 높이)
+
+		이미지 키: 'ground' (사전에 로드한 이미지)
+```
+
+### **`tileSprite`** 란?
+
+```jsx
+tileSprite는 단순히 하나의 이미지를 사용하는 것이 아니라,
+
+그 이미지를 반복해서 붙여넣어 하나의 큰 배경 또는 영역을 만듭니다.
+
+예를 들어, 아래와 같이 잔디 이미지가 있다고 가정합니다:
+
+잔디의 가로 크기는 100px, 세로 크기는 20px.
+
+그런데 게임에서는 1000px 길이의 잔디가 필요할 수 있습니다.
+
+이런 경우, tileSprite를 사용하면 100px 잔디 이미지를 여러 번 복사해서 큰 잔디 영역을 쉽게 만들 수 있습니다.
+
+tileSprite의 기본 개념
+
+		Tile(타일): 하나의 작은 이미지 또는 텍스처.
+
+		Sprite(스프라이트): 화면에 표시되는 게임 객체.
+
+		tileSprite는 타일을 복제하고 반복하여 하나의 큰 영역을 채우는 역할을 합니다.
+
+
+tileSprite vs sprite
+
+		sprite: 단일 이미지를 화면에 표시.
+
+		tileSprite: 이미지를 반복해서 표시. 주로 배경이나 땅처럼 넓은 영역에 사용.
+```
+
+```jsx
+// 잔디 예시 코드
+const game = new Phaser.Game(config)
+
+let grassTileSprite // tileSprite 변수
+
+function preload() {
+  // 잔디 이미지 로드
+  this.load.image('grass', 'path/to/grass.png') // grass.png를 실제 파일 경로로 교체
+}
+
+function create() {
+  // tileSprite 생성
+  grassTileSprite = this.add.tileSprite(
+    500, // x 좌표 (중심)
+    300, // y 좌표 (중심)
+    1000, // tileSprite의 너비
+    20, // tileSprite의 높이
+    'grass' // 사용 이미지의 키
+  )
+}
+```
+
+```jsx
+1. this.add.tileSprite
+
+		tileSprite를 화면에 추가하는 명령어입니다.
+
+		이걸로 "작은 이미지(타일)를 반복해서 큰 영역을 만들겠다"는 뜻이에요.
+
+2. 500 (x 좌표)
+
+		tileSprite의 중심이 화면에서 가로로 위치할 좌표입니다.
+
+		게임 화면이 가로로 1000px이라면, 500은 화면의 딱 가운데입니다.
+
+3. 300 (y 좌표)
+
+		tileSprite의 중심이 화면에서 세로로 위치할 좌표입니다.
+
+		게임 화면이 세로로 600px이라면, 300은 화면의 세로 중간입니다.
+
+4. 1000 (너비)
+
+		타일을 반복해서 만든 결과물의 가로 길이입니다.
+
+		즉, 화면에서 가로로 1000px만큼 잔디 이미지가 반복된다는 뜻입니다.
+
+5. 20 (높이)
+
+		타일을 반복해서 만든 결과물의 세로 길이입니다.
+
+		잔디 이미지가 높이 20px만큼 반복되도록 설정됩니다.
+```
+
+## 4. **화면에서 이미지 배치 위치 조정**
+
+```jsx
+Phaser의 좌표계에서:
+
+		좌상단이 (0, 0).
+
+		x값: 가로 위치.
+
+		y값: 세로 위치.
+
+
+이미지 원점(origin):
+
+		.setOrigin(0, 1)로 설정하여 이미지의 원점이 좌측 하단에 위치하도록 조정.
+
+```
+
+## 7. **기타**
+
+```jsx
+Canvas 테두리 설정:
+
+		Canvas의 크기를 확인하기 위해 테두리를 추가.
+```
+
+```jsx
+canvas {
+    border: 2px solid black;
+}
+```
+
+# { TypeScript와 Phaser를 활용한 게임 화면의 크기 조정 및 개선 }
+
+```jsx
+1. 문제 설명
+
+		현재 PlayScene에서 배경 타일(tileSprite)의 위치를 화면의 하단에 배치하고 있음.
+
+		배치 위치가 고정된 숫자(340)로 하드코딩되어 있어서,
+
+		게임 화면의 높이를 변경하면 타일의 위치가 잘못 표시되는 문제가 발생.
+
+2. 목표
+
+		화면 높이가 변경되더라도 타일이 항상 화면 하단에 위치하도록 설정.
+
+		Phaser 게임 설정에서 화면 높이 정보를 가져와 활용.
+
+		TypeScript의 타입 시스템과 getter를 사용해 코드를 간결하게 개선.
+```
+
+## 세부 설명
+
+```jsx
+2.1 Phaser의 게임 설정에서 높이 가져오기
+
+		this.game.config.height를 사용하여 Phaser의 게임 설정에서 높이를 가져올 수 있음.
+
+		문제는 this.game.config.height가 string | number 타입으로 설정되어 있어,
+
+		숫자만 허용하는 곳에서 에러를 유발할 수 있음.
+
+		이를 해결하려면 해당 값을 숫자로 명시적으로 변환해야 함.
+
+2.2 타입 시스템(TypeScript) 이해
+
+		TypeScript는 변수나 함수의 매개변수에 타입을 지정해 잘못된 값을 사용하는 것을 방지.
+
+		예를 들어, 다음과 같은 함수는 매개변수에 string과 number를 요구:
+
+
+		function welcomePerson(name: string, age: number): void {
+		    console.log(`Welcome ${name}, age: ${age}`);
+		}
+
+
+2.3 as 키워드를 활용한 타입 변환
+
+		as 키워드는 명시적으로 타입을 변환할 때 사용.
+
+		this.game.config.height as number로 타입을 number로 변환하여
+
+		Phaser의 게임 높이를 안전하게 가져올 수 있음.
+
+
+3. 코드 개선: getter 사용
+
+		동일한 작업(게임 높이 가져오기)을 여러 번 사용할 경우,
+
+		 이를 함수로 분리하거나 getter로 정의.
+
+		getter는 클래스 내의 속성처럼 사용할 수 있는 함수:
+
+		이제 this.gameHeight로 간단히 호출 가능
+
+		get gameHeight(): number {
+		    return this.game.config.height as number;
+		}
+```
+
+## 최종 코드
+
+```jsx
+import Phaser from "phaser";
+
+class PlayScene extends Phaser.Scene {
+    constructor() {
+        super("PlayScene");
+    }
+
+    // Getter를 사용해 게임 높이를 반환
+    get gameHeight(): number {
+        return this.game.config.height as number;
+    }
+
+    create() {
+        // 화면 하단에 배경 타일을 추가
+        this.add
+            .tileSprite(0, this.gameHeight, 88, 26, 'ground')
+            .setOrigin(0, 1);
+    }
+}
+
+export default PlayScene;
+
+```
+
+```jsx
+1. 화면 높이 변경 효과:
+
+		index.ts에서 화면 높이를 400으로 변경하면 타일은 자동으로
+
+		새 높이에 맞게 조정되어 화면 하단에 유지.
+
+		다시 340으로 변경해도 문제없이 작동.
+
+2. 코드 유지보수성 향상:
+
+		하드코딩된 숫자를 제거하고 게임 설정에서 높이를 동적으로 가져옴.
+
+		getter를 사용해 코드가 간결하고 재사용 가능해짐.
+```
+
+# { 다이노사우르스를 게임에 추가하기 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380497/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_3_Dino_Game_Clone_-_1_-/image_1.png)
+
+## PreloadScene - 이미지 로드
+
+```jsx
+preload() 메서드에서 this.load.image()를 사용하여 게임에서 사용할 이미지를 로드합니다.
+
+여기서는 ground와 dino-idle이라는 이름으로 각각 ground.png와 dino-idle-2.png 이미지를 로드합니다.
+
+이미지가 모두 로드되면 this.scene.start('PlayScene')을 호출하여 PlayScene으로 이동합니다.
+```
+
+```jsx
+    preload() {
+        // 다이노사우르스 이미지 로드
+        this.load.image('ground', 'assets/ground.png');
+        this.load.image('dino-idle', 'assets/dino-idle-2.png');
+    }
+
+    create() {
+        // 이미지가 모두 로드되면 PlayScene으로 이동
+        this.scene.start('PlayScene');
+    }
+```
+
+## PlayScene - 게임 환경과 플레이어 생성
+
+```jsx
+ 	 create() {
+        // 환경과 플레이어를 생성하는 함수 호출
+        this.createEnvironment();
+        this.createPlayer();
+    }
+
+    // 게임 환경을 생성하는 함수
+    createEnvironment() {
+        // 타일 스프라이트를 추가하여 배경을 설정
+        this.add.tileSprite(0, this.gameHeight, 88, 26, "ground").setOrigin(0, 1);
+    }
+
+    // 플레이어(다이노사우르스)를 생성하는 함수
+    createPlayer() {
+        // 물리 엔진에 스프라이트를 추가하여 다이노사우르스를 생성
+        this.physics.add.sprite(0, this.gameHeight, "dino-idle").setOrigin(0, 1);
+    }
+```
+
+```jsx
+1) createEnvironment():
+
+		this.add.tileSprite()는 게임의 배경을 설정합니다.
+
+		ground 이미지를 타일 스프라이트로 화면에 표시하고, setOrigin(0, 1)을 사용하여
+
+		배경의 원점을 왼쪽 하단으로 설정합니다. 이 설정으로 배경이 화면 아래쪽에 맞춰져 표시됩니다.
+
+2) createPlayer():
+
+		this.physics.add.sprite()는 물리 엔진을 사용하는 스프라이트를 생성합니다.
+
+		다이노사우르스 이미지를 dino-idle이라는 이름으로 불러와 화면의 왼쪽 하단에 배치합니다.
+
+		setOrigin(0, 1)을 사용하여 원점을 왼쪽 하단으로 설정합니다.
+
+		이로 인해 다이노사우르스가 화면의 왼쪽 하단에 정확하게 위치합니다.
+```
+
+# { **타입스크립트(TypeScript)**의 타입과 모듈 }
+
+## 1. **타입스크립트의 기본 타입**
+
+```jsx
+타입스크립트는 정적 타입을 지원합니다. 기본 타입은 아래와 같습니다.
+
+		string: 문자열 타입
+
+		number: 숫자 타입
+
+		boolean: 참/거짓 타입
+```
+
+```jsx
+let myString: string = "Hello";
+let myNumber: number = 123;
+let myBoolean: boolean = true;
+```
+
+## 2. **사용자 정의 타입(Custom Type)**
+
+```jsx
+타입스크립트는 기본 타입 외에 사용자 정의 타입을 만들 수 있습니다.
+```
+
+```jsx
+// 타입 정의
+type Person = {
+  name: string; // 이름은 문자열
+  age: number;  // 나이는 숫자
+  displayAge: () => void; // 나이를 출력하는 함수
+  getName: () => string;  // 이름을 반환하는 함수
+  welcome: (greeting: string) => string; // 인사말과 이름을 결합해 반환하는 함수
+};
+
+// 데이터 생성 및 사용
+const person: Person = {
+  name: "Philip",
+  age: 30,
+  displayAge: function () {
+    console.log(this.age);
+  },
+  getName: function () {
+    return this.name;
+  },
+  welcome: function (greeting: string) {
+    return `${greeting}, ${this.name}`;
+  },
+};
+
+// 사용 예
+person.displayAge(); // 콘솔에 "30" 출력
+console.log(person.getName()); // "Philip" 출력
+console.log(person.welcome("Hello")); // "Hello, Philip" 출력
+
+```
+
+## 3. **클래스 내에서 타입 사용**
+
+```jsx
+클래스에서도 타입을 사용할 수 있습니다.
+```
+
+```jsx
+class PersonClass {
+  person: Person;
+
+  constructor() {
+    this.person = {
+      name: "Philip",
+      age: 30,
+      displayAge: () => console.log(this.person.age),
+      getName: () => this.person.name,
+      welcome: (greeting: string) => `${greeting}, ${this.person.name}`,
+    };
+  }
+}
+
+const personInstance = new PersonClass();
+personInstance.person.displayAge(); // "30" 출력
+console.log(personInstance.person.getName()); // "Philip" 출력
+console.log(personInstance.person.welcome("Hi")); // "Hi, Philip" 출력
+
+```
+
+## 4. **모듈과 네임스페이스**
+
+```jsx
+타입스크립트에서 모듈과 네임스페이스는 코드를 더 체계적으로 구성하도록 돕습니다.
+
+네임스페이스: 파일 내 코드를 그룹화하고 이름 충돌을 방지.
+```
+
+```jsx
+// 네임스페이스 정의
+namespace DinoGame {
+  export namespace Rendering {
+    export type ObjectType = {
+      a: string; // 문자열 타입
+      b: number; // 숫자 타입
+    };
+  }
+}
+
+// 네임스페이스 사용
+const gameObject: DinoGame.Rendering.ObjectType = {
+  a: "Player",
+  b: 100,
+};
+
+console.log(gameObject); // { a: "Player", b: 100 }
+
+```
+
+```jsx
+namespace Library {
+  export type Book = {
+    title: string;
+    author: string;
+    pages: number;
+  };
+
+  export type Member = {
+    name: string;
+    memberId: number;
+  };
+}
+
+// 네임스페이스 사용
+const book: Library.Book = {
+  title: "타입스크립트 배우기",
+  author: "홍길동",
+  pages: 300,
+};
+
+const member: Library.Member = {
+  name: "철수",
+  memberId: 1234,
+};
+
+console.log(book.title); // "타입스크립트 배우기"
+console.log(member.name); // "철수"
+```
+
+## 5. **타입 별칭 (Alias)**
+
+```jsx
+긴 타입 정의를 간단히 줄이고 싶다면 **별칭(Alias)**을 사용할 수 있습니다.
+
+타입 별칭은 기존에 자주 사용하는 타입에 대해 **새로운 이름(별칭)**을 만들어 주는 기능입니다.
+
+긴 타입 이름을 간단히 바꾸거나, 반복되는 타입 정의를 줄일 때 유용합니다.
+```
+
+```jsx
+// 별칭 정의
+type Age = number;
+
+// 사용
+const myAge: Age = 25;
+
+type GameType = DinoGame.Rendering.ObjectType;
+const gameData: GameType = { a: "Enemy", b: 200 };
+```
+
+```jsx
+// 긴 타입 정의
+type LongType = {
+  name: string;
+  age: number;
+  isStudent: boolean;
+};
+
+// 별칭 만들기
+type Person = LongType;
+
+// 사용
+const student: Person = {
+  name: "철수",
+  age: 20,
+  isStudent: true,
+};
+
+console.log(student.name); // "철수"
+
+```
+
+# { 점프 기능 구현과 네임스페이스 활용 }
+
+```jsx
+이번 강의에서는 게임의 플레이 화면에서 공룡이 점프할 수 있는 기능을 구현하며,
+
+타입스크립트의 고급 기능(모듈, 네임스페이스, 타입 확장 등)을 활용하는 방법을 설명합니다
+```
+
+## 3. **점프 기능 구현**
+
+```jsx
+3.1. 공룡 스프라이트 추가
+
+		공룡 스프라이트를 게임 화면에 추가합니다. 이 스프라이트는 아래의 코드로 생성합니다.
+
+
+		this.physics.add.sprite: 새로운 스프라이트를 생성하고 물리적 특성을 추가합니다.
+
+
+		setOrigin(0, 1): 스프라이트의 기준점을 설정합니다. (왼쪽 하단)
+```
+
+```jsx
+createPlayer() {
+    this.player = this.physics.add.sprite(0, this.gameHeight, "dino-idle").setOrigin(0, 1);
+}
+```
+
+## 3.2. 점프 동작 구현
+
+```jsx
+공룡이 점프하려면 y축 속도를 감소시키는 코드를 작성합니다.
+
+속도 설정은 setVelocityY() 메서드를 사용합니다.
+
+spaceBar.on('down'): 키보드의 스페이스바가 눌릴 때 이벤트를 감지합니다.
+
+setVelocityY(-1600): 공룡이 위로 점프하도록 y축 속도를 음수로 설정합니다.
+```
+
+```jsx
+spaceBar.on('down', () => {
+  this.player.setVelocityY(-1600)
+})
+```
+
+## 4. **타입스크립트 활용**
+
+```jsx
+4.1. 타입 정의
+
+Phaser가 제공하는 타입(SpriteWithDynamicBody)을 사용하여 player 변수의 타입을 명시합니다.
+
+이를 통해 코드의 안정성을 높이고 자동 완성 기능을 활용할 수 있습니다.
+```
+
+```jsx
+player: SpriteWithDynamicBody
+```
+
+### Phaser의 SpriteWithDynamicBody 타입이란?
+
+```jsx
+Phaser의 Arcade Physics 시스템에서 사용되는 스프라이트 객체 타입입니다.
+
+이 타입을 사용하면 플레이어 캐릭터 같은 객체가 화면에 표시되면서 물리 법칙(중력, 충돌, 속도)을 따르는 객체로 동작할 수 있습니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380497/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_3_Dino_Game_Clone_-_1_-/image_2.png)
+
+```jsx
+4.2. 타입 별칭(Alias)
+
+복잡한 타입을 더 간단히 사용할 수 있도록 타입 별칭을 정의합니다.
+
+이제 **SpriteWithDynamicBody**를 사용하면 긴 타입 이름을 대신할 수 있습니다.
+```
+
+```jsx
+// types.ts
+export type SpriteWithDynamicBody = Phaser.Types.Physics.Arcade.SpriteWithDynamicBody;
+
+// PlayScene.ts
+import { SpriteWithDynamicBody } from "../types";
+```
+
+```jsx
+sprite 위에 마우스를 올려보면 아래와 같은 타입을 반환 한다는걸 알 수 있다
+
+그러나 player : Phaser.Types.Physics.Arcade.SpriteWithDynamicBody; 를 해서 사용하면
+
+너무 길고 복잡하니 파일에서 별칭으로 아래와 같이 만들어 줘서 짤게 SpriteWithDynamicBody  로 사용한다
+
+export type SpriteWithDynamicBody = Phaser.Types.Physics.Arcade.SpriteWithDynamicBody;
+
+player: SpriteWithDynamicBody;
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380497/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_3_Dino_Game_Clone_-_1_-/image_3.png)
+
+## 5. **전역 네임스페이스 선언**
+
+```jsx
+Phaser에서는 전역 네임스페이스를 활용할 수 있습니다.
+
+ 아래와 같은 선언 파일(.d.ts)을 작성하면
+
+ 다른 파일에서 별도의 import 없이 해당 타입을 참조할 수 있습니다.
+
+ 이후, 다른 파일에서 Whatever.Person을 자유롭게 사용할 수 있습니다.
+```
+
+```jsx
+// hello.d.ts
+declare namespace Whatever {
+    type Person = { name: string };
+}
+```
+
+## 최종 코드 구조
+
+### PlayScene.ts
+
+```jsx
+import Phaser from "phaser";
+import { SpriteWithDynamicBody } from "../types";
+
+class PlayScene extends Phaser.Scene {
+    player: SpriteWithDynamicBody;
+
+    constructor() {
+        super("PlayScene");
+    }
+
+    create() {
+        this.createEnvironment();
+        this.createPlayer();
+        this.registerPlayerControl();
+    }
+
+    createPlayer() {
+        this.player = this.physics.add.sprite(0, this.game.config.height as number, "dino-idle").setOrigin(0, 1);
+    }
+
+    createEnvironment() {
+        this.add.tileSprite(0, this.game.config.height as number, 88, 26, "ground").setOrigin(0, 1);
+    }
+
+    registerPlayerControl() {
+        const spaceBar = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+
+        spaceBar.on("down", () => {
+            this.player.setVelocityY(-1600);
+        });
+    }
+}
+
+export default PlayScene;
+
+```
+
+### types.ts
+
+```jsx
+export type SpriteWithDynamicBody = Phaser.Types.Physics.Arcade.SpriteWithDynamicBody;
+
+```
+
+# { 플레이어 중력 설정 & 화면 밖으로 나가지 않게 하기 }
+
+```jsx
+공룡이 중력에 의해 떨어지고, 화면 밖으로 나가지 않으며, 스페이스바로 점프할 수 있습니다.
+
+충돌 영역을 조정해 게임의 난이도를 적절히 설정할 수 있습니다.
+```
+
+## 공룡에게 중력을 적용하여 점프 후 떨어지게 하기
+
+```jsx
+플레이어(공룡)에게 중력을 설정합니다.
+
+setGravityY(5000) 메서드를 사용하여 공룡이 위로 올라간 후 다시 아래로 떨어지도록 설정합니다.
+
+중력값을 작게 설정하면 천천히 떨어지고, 크게 설정하면 빠르게 떨어집니다.
+
+예: setGravityY(5) → 천천히, setGravityY(5000) → 빠르게.
+```
+
+```jsx
+this.player.setGravityY(5000)
+```
+
+## 공룡이 화면 밖으로 나가지 않도록 설정하기
+
+```jsx
+setCollideWorldBounds(true)를 사용해 공룡이 월드 바운더리(화면 경계)와 충돌하도록 설정합니다.
+```
+
+```jsx
+this.player.setCollideWorldBounds(true)
+```
+
+## 점프 기능 추가
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380497/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_3_Dino_Game_Clone_-_1_-/image_4.png)
+
+```jsx
+스페이스바를 눌렀을 때 공룡이 점프하도록 설정합니다
+
+여기서 setVelocityY(-1600)은 공룡을 위로 점프시키는 역할을 합니다.
+```
+
+```jsx
+const spaceBar = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE)
+spaceBar.on('down', () => {
+  this.player.setVelocityY(-1600) // 위로 이동하는 속도 설정
+})
+```
+
+## 점프 시 공룡의 이미지와 지면 이미지가 같이 움직이는 문제
+
+```jsx
+공룡 이미지 파일에 지면이 포함되어 있어 발생한 문제입니다.
+
+추후에 공룡과 지면을 별도로 처리하여 수정할 예정입니다.
+```
+
+## 체인 메서드 사용하기
+
+```jsx
+여러 메서드를 한 번에 연결해서 간단히 설정할 수 있습니다
+
+이렇게 작성하면 더 간결하고 읽기 쉽습니다.
+```
+
+```jsx
+this.player.setGravityY(5000).setCollideWorldBounds(true).setBodySize(44, 92) // 충돌 영역 크기 설정
+```
+
+## 충돌 영역 크기 조정
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380497/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_3_Dino_Game_Clone_-_1_-/image_5.png)
+
+```jsx
+공룡의 이미지보다 충돌 영역이 너무 크면 게임이 너무 어렵습니다.
+
+setBodySize(width, height)를 사용해 충돌 영역을 조정합니다
+```
+
+```jsx
+this.player.setBodySize(44, 92) // 충돌 영역을 이미지 크기와 비슷하게 조정
+```

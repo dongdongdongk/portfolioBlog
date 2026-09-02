@@ -1,0 +1,1304 @@
+---
+title: '섹션 5: Create a player - 1 -'
+date: '2026-09-02'
+category: '게임 개발/Game Development in JS TS - The Complete Guide (w_'
+tags: ['게임 개발', 'Game Development in JS TS - The Complete Guide (w_']
+draft: false
+summary: ''
+---
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380507/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_5_Create_a_player_-_1_-/image.png)
+
+# { Phaser에서 플레이어 이동 구현하기 }
+
+```jsx
+이번 강의에서는 Phaser를 사용하여 플레이어의 좌우 이동을 구현하는 방법을 배웁니다.
+
+강의에서는 키보드 입력을 감지하고,
+
+해당 입력에 따라 플레이어의 속도를 설정하는 방식으로 이동을 처리합니다.
+
+이를 이해하기 위해, Phaser의 입력 처리(Input Handling), 물리 엔진(Physics), 속도(Velocity) 개념을 자세히 정리해보겠습니다.
+```
+
+## 1. **Phaser에서 키보드 입력 감지하기**
+
+```jsx
+게임에서 플레이어가 키보드를 눌렀을 때, 이를 감지하여 움직이게 해야 합니다.
+
+Phaser에서는 this.input.keyboard.createCursorKeys()를 사용하여
+
+기본적인 화살표 키(Arrow Keys) 입력을 감지할 수 있습니다.
+```
+
+### 📌 **키 입력 설정**
+
+```jsx
+this.cursors = this.input.keyboard.createCursorKeys()
+```
+
+```jsx
+위 코드를 실행하면 this.cursors 객체가 생성되며, 이 안에는 left, right, up, down 등의 키가 자동으로 포함됩니다.
+```
+
+```jsx
+const { left, right, up, down } = this.cursors
+```
+
+```jsx
+이제 left.isDown 또는 right.isDown을 사용하면 해당 키가 눌렸는지 여부를 알 수 있습니다.
+```
+
+## 2. **Phaser의 `update()` 함수와 프레임 별 실행**
+
+```jsx
+게임의 동작은 초당 60번(60fps) 실행되는 update() 함수에서 처리됩니다.
+
+즉, update() 함수에서 매 프레임마다 키 입력을 확인하고 플레이어의 속도를 변경하면,
+
+자연스럽게 움직이는 효과를 만들 수 있습니다.
+```
+
+### 📌 **`update()`에서 키 입력 처리**
+
+```jsx
+update() {
+    const { left, right } = this.cursors;
+
+    if(left.isDown) {
+        this.player.setVelocityX(-this.playerSpeed);  // 왼쪽 이동 (속도를 음수로 설정)
+    } else if (right.isDown) {
+        this.player.setVelocityX(this.playerSpeed);   // 오른쪽 이동 (속도를 양수로 설정)
+    } else {
+        this.player.setVelocityX(0);  // 키를 떼면 멈춤
+    }
+}
+```
+
+```jsx
+이 코드는 왼쪽 화살표를 누르면 왼쪽(-방향)으로 이동하고,
+
+오른쪽 화살표를 누르면 오른쪽(+방향)으로 이동하도록 만듭니다.
+
+키를 떼면 속도가 0이 되어 플레이어가 멈추게 됩니다.
+```
+
+## 3. **플레이어 속도 변수 설정**
+
+```jsx
+속도를 일정하게 유지하기 위해, this.playerSpeed 변수를 만들어 속도를 지정합니다.
+```
+
+```jsx
+this.playerSpeed = 200
+```
+
+```jsx
+이렇게 하면 playerSpeed 값을 변경하여 쉽게 이동 속도를 조절할 수 있습니다.
+```
+
+# { Phaser에서 플레이어 이동 리팩토링 }
+
+```jsx
+ Phaser를 사용하여 플레이어의 움직임을 관리하는 방법과
+
+ 이를 더 효율적으로 만들기 위한 리팩토링 방법을 소개
+```
+
+## 1. 기존 방식: 플레이어 생성 방법
+
+```jsx
+기존에는 이렇게 플레이어를 생성했습니다:
+```
+
+```jsx
+this.physics.add.sprite(100, 250, 'player')
+```
+
+```jsx
+this.physics.add.sprite: 물리 엔진(Physics Engine)을 적용한 스프라이트를 생성하는 Phaser의 기본 방법입니다.
+
+(100, 250): 플레이어의 초기 위치 (x=100, y=250)
+
+"player": 미리 로드된 플레이어 이미지의 키(Key)입니다.
+
+이 방식은 간단하지만, 플레이어의 움직임, 중력 설정, 충돌 처리 같은
+
+로직을 따로따로 관리해야 해서 코드가 지저분해질 수 있습니다.
+```
+
+## 2. 리팩토링: 플레이어 클래스로 코드 개선
+
+```jsx
+강의에서는 플레이어만을 위한 전용 클래스를 만들어서 모든 관련 기능을 한 곳에 모았습니다.
+```
+
+### 2-1. **플레이어 클래스 생성하기 (`Player.js`)**
+
+```jsx
+import Phaser from 'phaser'
+
+class Player extends Phaser.Physics.Arcade.Sprite {
+  constructor(scene, x, y) {
+    super(scene, x, y, 'player') // 부모 클래스인 Sprite 초기화
+
+    scene.add.existing(this) // 스프라이트를 씬에 추가
+    scene.physics.add.existing(this) // 물리 엔진 적용
+  }
+}
+
+export default Player
+```
+
+```jsx
+1. 클래스 상속 (extends)
+
+		class Player extends Phaser.Physics.Arcade.Sprite
+
+		→ Player 클래스가 Phaser의 Sprite 기능을 물려받습니다.
+
+		→ 이렇게 하면 스프라이트의 모든 기능을 그대로 사용할 수 있습니다.
+
+2. 생성자 (constructor)
+
+		constructor(scene, x, y)
+
+		→ 플레이어를 생성할 때 필요한 값(씬, x좌표, y좌표)을 받습니다.
+
+3. super()
+
+		super(scene, x, y, "player");
+
+		→ 부모 클래스(Sprite)의 생성자를 호출합니다.
+
+		→ scene, x, y, "player"(이미지 키)를 전달하여 초기화합니다.
+
+4. 씬에 추가 (add.existing)
+
+		scene.add.existing(this)
+
+		→ 만든 플레이어 객체를 Phaser의 씬에 추가합니다.
+
+5. 물리 엔진 적용 (physics.add.existing)
+
+		scene.physics.add.existing(this)
+
+		→ 플레이어가 중력, 충돌 등 물리 효과를 가질 수 있도록 설정합니다.
+```
+
+## 3. `Play` 씬에서 플레이어 사용하기
+
+### 3-1. 플레이어 불러오기
+
+```jsx
+import Player from '../entities/Player'
+```
+
+```jsx
+Player 클래스를 불러와서 사용할 준비를 합니다.
+```
+
+### 3-2. 플레이어 생성
+
+```jsx
+createPlayer() {
+    const player = new Player(this, 100, 250);
+    player.body.setGravityY(500);          // 중력 적용
+    player.setCollideWorldBounds(true);    // 화면 밖으로 나가지 않도록 제한
+    return player;
+}
+```
+
+```jsx
+✅ 핵심 개념 설명
+
+1. new Player(this, 100, 250)
+
+		Player 클래스를 인스턴스로 생성합니다.
+
+		this는 현재 씬(Play 씬)을 의미합니다.
+
+2. 중력 적용 (setGravityY)
+
+		player.body.setGravityY(500)
+
+		→ 플레이어가 아래로 떨어지는 중력 효과를 적용합니다.
+
+3. 화면 경계 충돌 처리 (setCollideWorldBounds)
+
+		player.setCollideWorldBounds(true)
+
+		→ 플레이어가 화면 경계를 벗어나지 않도록 합니다.
+```
+
+## 4. 플레이어 움직이기 (좌우 키 입력 처리)
+
+```jsx
+update() {
+    const { left, right } = this.cursors;
+
+    if (left.isDown) {
+        this.player.setVelocityX(-this.playerSpeed);  // 왼쪽으로 이동
+    } else if (right.isDown) {
+        this.player.setVelocityX(this.playerSpeed);   // 오른쪽으로 이동
+    } else {
+        this.player.setVelocityX(0);                  // 키를 떼면 멈춤
+    }
+}
+```
+
+```jsx
+✅ 핵심 개념 설명
+
+1. 키보드 입력 받기 (createCursorKeys)
+
+		this.cursors = this.input.keyboard.createCursorKeys();
+
+		→ 화살표 키(←, →) 입력을 감지할 수 있습니다.
+
+2. 움직임 처리 (setVelocityX)
+
+		setVelocityX(-this.playerSpeed) → 왼쪽으로 이동 (속도를 음수로 설정)
+
+		setVelocityX(this.playerSpeed) → 오른쪽으로 이동 (속도를 양수로 설정)
+
+		setVelocityX(0) → 멈춤 (속도를 0으로 설정)
+
+```
+
+## 5. 문제 해결 과정
+
+```jsx
+강의 중 오류 메시지가 발생했습니다:
+
+이유: 물리 엔진이 스프라이트에 적용되지 않았기 때문입니다.
+```
+
+### ✅ **해결 방법**:
+
+```jsx
+scene.add.existing(this)
+scene.physics.add.existing(this)
+```
+
+```jsx
+add.existing: 스프라이트를 씬에 추가
+
+physics.add.existing: 물리 엔진을 스프라이트에 적용
+
+둘 다 반드시 호출해야 합니다.
+```
+
+## ✅ 최종 요약
+
+```jsx
+기존 방식: this.physics.add.sprite()로 직접 플레이어 생성
+
+리팩토링 후: Player 클래스를 만들어 객체지향적으로 관리
+
+장점:
+
+		코드가 더 깔끔해짐
+
+		플레이어 관련 기능을 한 곳에서 관리 가능
+
+		유지보수 및 확장성 향상
+```
+
+# { Phaser에서 플레이어 이동 리팩토링 2 }
+
+```jsx
+이번 강의에서는 플레이어(Player) 클래스의 기능을 확장하고 코드 구조를 개선하는 작업을 진행했습니다.
+
+핵심적으로는 Play 씬(게임 화면)의 코드에서 플레이어 관련 로직을
+
+Player 클래스 안으로 옮기는 리팩토링을 했습니다.
+```
+
+## 1. Player 클래스 구조 이해하기
+
+### 📦 **Player 클래스란?**
+
+```jsx
+Player 클래스는 플레이어 캐릭터를 정의하는 부분입니다.
+
+이 클래스는 Phaser.Physics.Arcade.Sprite를 상속받아, 물리 엔진의 기능을 활용합니다.
+```
+
+```jsx
+import Phaser from 'phaser'
+
+class Player extends Phaser.Physics.Arcade.Sprite {
+  constructor(scene, x, y) {
+    super(scene, x, y, 'player')
+
+    scene.add.existing(this) // existing 이미 생성된 게임 객체(예: 스프라이트, 텍스트 등)를 현재 씬(Scene)에 추가할 때 사용하는 메서드입니다.
+    scene.physics.add.existing(this)
+
+    this.init()
+  }
+}
+```
+
+### 🔑 **중요한 개념**
+
+```jsx
+상속 (Extending):
+
+		Player가 Phaser.Physics.Arcade.Sprite를 상속했기 때문에
+
+		스프라이트의 모든 기능을 사용할 수 있습니다.
+
+super():
+
+		부모 클래스(여기서는 Arcade.Sprite)의 생성자(constructor)를 호출하여 초기화합니다.
+
+		scene: 플레이어가 속한 씬(게임 화면)
+
+		x, y: 플레이어의 초기 위치
+
+		"player": 사용할 이미지 키(스프라이트 시트)
+
+
+
+씬에 추가하기:
+
+		scene.add.existing(this);       // 씬에 플레이어 추가
+		scene.physics.add.existing(this); // 물리 엔진에 플레이어 추가
+```
+
+## 2. `init()` 함수로 초기화하기
+
+```jsx
+플레이어의 기본 설정(중력, 속도 등)을 init() 함수에서 초기화합니다.
+```
+
+```jsx
+init() {
+    this.gravity = 500;
+    this.playerSpeed = 200;
+
+    this.body.setGravityY(500);               // Y축으로 중력 설정
+    this.setCollideWorldBounds(true);         // 화면 경계와 충돌 설정
+    this.cursors = this.scene.input.keyboard.createCursorKeys(); // 키보드 입력 받기
+}
+```
+
+### ✨ **중요한 개념**
+
+```jsx
+중력 설정:
+
+		this.body.setGravityY(500) → 플레이어가 아래로 떨어지게 만듭니다.
+
+화면 경계 충돌:
+
+		this.setCollideWorldBounds(true) → 캐릭터가 화면 밖으로 나가지 않도록 합니다.
+
+키보드 입력 처리:
+
+		this.cursors = this.scene.input.keyboard.createCursorKeys()
+
+		→ 방향키(←, →, ↑, ↓) 입력을 감지합니다.
+```
+
+# { `preUpdate()` 란? }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380506/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_5_Create_a_player_-_1_-/image_1.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380506/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_5_Create_a_player_-_1_-/image_2.png)
+
+## `preUpdate()`로 움직임 처리하기
+
+```jsx
+이제 플레이어의 움직임을 처리하는 부분입니다.
+```
+
+### 언제 어떤 걸 써야 할까?
+
+```jsx
+플레이어, 적 등 "개별 오브젝트"의 움직임 로직 → preUpdate() 사용
+
+게임 전반적인 상태 관리(점수, 스테이지 관리 등) → update() 사용
+
+애니메이션이 안 되거나 물리 처리가 이상하면 → super.preUpdate() 확인하기
+```
+
+```jsx
+preUpdate() {
+    const { left, right } = this.cursors;
+
+    if (left.isDown) {
+        this.setVelocityX(-this.playerSpeed);  // 왼쪽으로 이동
+    } else if (right.isDown) {
+        this.setVelocityX(this.playerSpeed);   // 오른쪽으로 이동
+    } else {
+        this.setVelocityX(0);                  // 멈추기
+    }
+}
+```
+
+```jsx
+preUpdate()란?
+
+		preUpdate()는 매 프레임마다(초당 60번) 자동으로 호출되는 함수입니다.
+
+		여기서 플레이어의 움직임을 처리합니다.
+
+속도 설정 (setVelocityX())
+
+		this.setVelocityX(속도) → X축으로 움직임을 설정합니다.
+
+		-this.playerSpeed → 왼쪽으로 이동
+
+		this.playerSpeed → 오른쪽으로 이동
+
+		0 → 정지
+
+중요한 주의점:
+
+		preUpdate()를 사용할 때는 항상 super.preUpdate(time, delta)를 호출해야 합니다.
+
+		그래야 애니메이션이 정상적으로 작동합니다.
+```
+
+## 예제: 움직임 처리 비교
+
+### (1) `update()` 사용 시 (씬 단위)
+
+```jsx
+class PlayScene extends Phaser.Scene {
+  create() {
+    this.player = new Player(this, 100, 100)
+  }
+
+  update() {
+    this.player.move() // 씬의 update에서 플레이어 이동 처리
+  }
+}
+```
+
+```jsx
+장점: 모든 게임 로직을 한 곳에서 관리하기 쉬움
+
+단점: 플레이어 클래스가 아닌 씬에 로직이 집중됨 → 코드 분산 어려움
+```
+
+### (2) `preUpdate()` 사용 시 (플레이어 클래스 단위)
+
+```jsx
+class Player extends Phaser.Physics.Arcade.Sprite {
+  preUpdate(time, delta) {
+    super.preUpdate(time, delta) // ⭐ 필수
+    this.move() // 자체적으로 움직임 처리
+  }
+}
+```
+
+```jsx
+장점: 플레이어 관련 로직이 Player 클래스에 집중 → 더 깔끔한 구조
+
+단점: 여러 개의 객체가 있을 경우 preUpdate()가 여러 번 호출되어 성능 이슈 가능성 (극단적인 경우)
+```
+
+### `super.preUpdate()`를 반드시 호출해야 하는 이유
+
+```jsx
+Phaser.Physics.Arcade.Sprite는 내부적으로 애니메이션, 물리 계산 등을 preUpdate()에서 처리합니다.
+
+super.preUpdate()를 호출하지 않으면:
+
+		애니메이션이 작동하지 않음
+
+		충돌 처리 이상
+
+		기타 Phaser의 내부 기능들이 비정상 작동
+```
+
+## 4. Play 씬과의 연결
+
+```jsx
+플레이어를 Play 씬에서 생성하고 관리합니다.
+```
+
+```jsx
+import Phaser from 'phaser'
+import Player from '../entities/Player'
+
+class Play extends Phaser.Scene {
+  constructor() {
+    super('PlayScene')
+  }
+
+  create() {
+    const map = this.createMap()
+    const layers = this.createLayers(map)
+    this.player = this.createPlayer()
+
+    this.physics.add.collider(this.player, layers.platformsColliders)
+  }
+
+  createMap() {
+    const map = this.make.tilemap({ key: 'map' })
+    map.addTilesetImage('main_lev_build_1', 'tiles-1')
+    return map
+  }
+
+  createLayers(map) {
+    const tileset = map.getTileset('main_lev_build_1')
+    const platformsColliders = map.createStaticLayer('platforms_colliders', tileset)
+    platformsColliders.setCollisionByExclusion(-1, true)
+    return { platformsColliders }
+  }
+
+  createPlayer() {
+    return new Player(this, 100, 250) // 플레이어 생성
+  }
+}
+
+export default Play
+```
+
+```jsx
+플레이어 생성:
+
+		this.player = this.createPlayer();
+
+
+충돌 처리:
+
+		this.physics.add.collider(this.player, layers.platformsColliders);
+
+		→ 플레이어가 맵의 플랫폼과 충돌하도록 설정합니다.
+```
+
+```jsx
+업데이트 함수 비우기:
+
+update()는 더 이상 필요 없으므로 비워둡니다.
+
+플레이어의 움직임은 Player 클래스의 preUpdate()에서 처리합니다.
+```
+
+## 버그 해결 과정
+
+```jsx
+에러: Cannot read property 'keyboard' of null
+
+문제 원인:
+
+		this.input.keyboard.createCursorKeys()에서 this.input이 null입니다.
+
+해결 방법:
+
+		this.input은 씬에서만 유효하므로 Player 클래스에서는 this.scene.input으로 접근해야 합니다.
+```
+
+```jsx
+this.cursors = this.scene.input.keyboard.createCursorKeys()
+```
+
+## 요약
+
+```jsx
+Player 클래스: 플레이어 캐릭터의 움직임과 속성을 정의
+
+init() 함수: 중력, 속도, 키보드 입력 초기화
+
+preUpdate() 함수: 매 프레임마다 움직임 처리 (반드시 super.preUpdate() 호출)
+
+Play 씬: 플레이어 생성 및 충돌 관리
+
+버그 해결: this.scene.input으로 씬의 입력 시스템에 접근
+```
+
+# { Phaser에서 플레이어 이동 리팩토링 3 }
+
+## 1️⃣ **기존 구조와 문제점**
+
+```jsx
+기존에는 preUpdate() 함수를 사용하고 있었어.
+
+preUpdate()는 스프라이트의 애니메이션을 업데이트할 때 주로 사용돼.
+
+하지만 지금은 애니메이션이 없어서 이 함수를 사용하는 게 불필요했어.
+
+그래서 애니메이션과 관련 없는 로직을 preUpdate()에 넣는 건 좋은 방법이 아니야.
+```
+
+## 2️⃣ **새로운 구조로 변경하기**
+
+```jsx
+preUpdate() 대신 직접 update() 함수를 만들어서 사용할 거야.
+
+이렇게 하면 코드가 더 깔끔해지고, 나중에 애니메이션을 추가할 때 더 관리하기 쉬워져.
+```
+
+## 3️⃣ **핵심 개념: `initEvents()` 함수**
+
+```jsx
+initEvents()는 이벤트를 등록하는 역할을 해.
+
+Phaser에서는 게임 루프가 돌아갈 때마다 update 이벤트를 발생시켜.
+
+이 update 이벤트에 Player 클래스가 반응하도록 연결해주는 거야.
+```
+
+```jsx
+initEvents() {
+    this.scene.events.on(Phaser.Scenes.Events.UPDATE, this.update, this);
+}
+```
+
+```jsx
+this.scene.events.on(...): 이걸로 이벤트 리스너를 등록해.
+
+Phaser.Scenes.Events.UPDATE: 이건 Phaser에서 제공하는 기본 update 이벤트야.
+
+this.update: 이벤트가 발생하면 Player 클래스의 update() 함수가 호출돼.
+
+this: 마지막 인자는 이벤트가 발생했을 때 참조할 컨텍스트야. 여기서는 Player 객체를 참조하도록 했어.
+```
+
+## 4️⃣ **`update()` 함수의 역할**
+
+```jsx
+update() {
+    const { left, right } = this.cursors;
+    if (left.isDown) {
+        this.setVelocityX(-this.playerSpeed);
+    } else if (right.isDown) {
+        this.setVelocityX(this.playerSpeed);
+    } else {
+        this.setVelocityX(0);
+    }
+}
+```
+
+```jsx
+역할:
+
+		매 프레임마다 호출돼서 플레이어의 움직임을 처리해.
+
+키보드 입력 감지:
+
+		left.isDown: 왼쪽 화살표 키가 눌렸을 때.
+
+		right.isDown: 오른쪽 화살표 키가 눌렸을 때.
+
+속도 조절:
+
+		왼쪽으로 이동: -this.playerSpeed
+
+		오른쪽으로 이동: +this.playerSpeed
+
+		아무 키도 안 눌렀을 땐 0으로 설정해서 멈춤.
+```
+
+## 5️⃣ **놓친 부분: `initEvents()` 호출하기**
+
+```jsx
+처음에는 initEvents()를 호출하지 않아서 이벤트가 등록되지 않았어.
+
+그래서 플레이어가 움직이지 않았던 거야.
+
+해결 방법: constructor에서 initEvents()를 호출하면 돼.
+```
+
+```jsx
+constructor(scene, x, y) {
+    super(scene, x, y, "player");
+
+    scene.add.existing(this);
+    scene.physics.add.existing(this);
+
+    this.init();
+    this.initEvents();  // 이 부분이 필수!
+}
+```
+
+```jsx
+이제 게임 루프가 돌 때마다 update()가 호출돼서 캐릭터가 잘 움직이게 됐어.
+```
+
+## ✅ **정리**
+
+```jsx
+preUpdate() 대신 update() 함수를 직접 만들어 사용함.
+
+initEvents()로 update 이벤트를 등록함.
+
+update() 함수에서는 매 프레임마다 키 입력을 감지해서 캐릭터를 움직임.
+
+initEvents()를 호출하지 않으면 이벤트가 등록되지 않아서 캐릭터가 움직이지 않음
+```
+
+# { 플레이어 캐릭터의 스프라이트와 애니메이션 }
+
+```jsx
+이 강의에서는 Phaser로 플레이어 캐릭터의
+
+스프라이트와 애니메이션을 다루는 방법에 대해 설명하고 있습니다.
+```
+
+## 1. **Player 클래스 생성 및 초기화**
+
+```jsx
+Player 클래스는 Phaser.Physics.Arcade.Sprite를 상속받아,
+
+게임 씬에서 물리학과 애니메이션을 가진 캐릭터를 생성합니다.
+```
+
+```jsx
+init() 메소드에서는 물리 엔진에 캐릭터를 추가하고, 속도와 중력을 설정합니다.
+
+		this.gravity = 500;: 플레이어의 중력 설정.
+
+		this.playerSpeed = 200;: 플레이어의 이동 속도 설정.
+
+		this.body.setGravityY(500);: 중력을 Y축으로 설정.
+
+		this.setCollideWorldBounds(true);: 화면 밖으로 나가지 않도록 설정.
+
+		this.cursors = this.scene.input.keyboard.createCursorKeys();: 방향키 입력을 받기 위한 설정.
+```
+
+## 2. **애니메이션 생성**
+
+```jsx
+플레이어의 애니메이션을 설정하는 부분입니다.
+
+scene.anims.create를 사용하여 애니메이션을 만듭니다.
+
+		key: 애니메이션 이름 ('run').
+
+		frames: generateFrameNumbers 메소드를 통해 스프라이트
+
+						시트에서 애니메이션을 위한 프레임 범위를 지정합니다.
+
+		frameRate: 애니메이션의 속도(초당 프레임 수).
+
+		repeat: 애니메이션 반복 여부 (-1은 무한 반복).
+```
+
+```jsx
+this.scene.anims.create({
+  key: 'run',
+  frames: this.scene.anims.generateFrameNumbers('player', {
+    start: 11,
+    end: 16,
+    frameRate: 10,
+    repeat: -1,
+  }),
+})
+```
+
+## 3. **스프라이트 시트 로딩 (Preload)**
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380506/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_5_Create_a_player_-_1_-/image_3.png)
+
+```jsx
+preload 단계에서 스프라이트 시트를 로드해야 합니다.
+
+이는 player라는 키를 가진 스프라이트 시트로,
+
+각 프레임의 너비는 64픽셀, 높이는 38픽셀로 설정됩니다.
+
+또한, 각 프레임 사이에 빈 공간이 있기 때문에
+
+frameWidth와 frameHeight 외에도 spacing을 설정하여 빈 공간을 무시하도록 합니다.
+```
+
+```jsx
+this.load.spritesheet('player', 'assets/player/move_sprite_1.png', {
+  frameWidth: 64,
+  frameHeight: 38,
+  spacing: 32,
+})
+```
+
+### spacing: 설명
+
+```jsx
+예를 들어, frameWidth: 32와 frameHeight: 38로 각 프레임의 크기를 지정했지만,
+
+각 프레임 사이에 32픽셀의 여백(간격)이 있다고 가정한 거예요.
+
+즉, 각 프레임이 32픽셀씩 떨어져 있고,
+
+spacing: 32는 이 여백을 고려하여 각 프레임을 제대로 분리해서 로드할 수 있게 도와줍니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380506/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_5_Create_a_player_-_1_-/image_4.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380507/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_5_Create_a_player_-_1_-/image_5.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380507/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_5_Create_a_player_-_1_-/image_6.png)
+
+## 4. **애니메이션 세부 조정**
+
+```jsx
+각 애니메이션을 정확하게 설정하려면 스프라이트 시트를 분석하여
+
+각 애니메이션이 사용해야 할 프레임을 결정합니다.
+
+예를 들어, run 애니메이션은 9번 프레임부터 16번 프레임까지 사용됩니다.
+
+이 범위를 기반으로 애니메이션을 설정하고,
+
+애니메이션이 이미 실행 중이면 다시 실행되지 않도록 설정합니다.
+
+ignoreIfPlaying: true를 설정하여 이미 실행 중인 애니메이션을 무시하게 합니다.
+```
+
+## 5. **애니메이션 재생**
+
+```jsx
+this.play('run', true, { ignoreIfPlaying: true });를 사용하여 애니메이션을 실행합니다.
+
+이때 true는 애니메이션이 이미 재생 중일 때 무시하도록 설정합니다.
+
+애니메이션의 속도는 frameRate 값을 조정하여 결정합니다.
+
+예를 들어, frameRate: 10으로 설정하면 초당 10번의 프레임이 재생됩니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380507/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_5_Create_a_player_-_1_-/image_7.png)
+
+```jsx
+this.play('run', true)에서 true는 애니메이션을 반복하게 설정하는 옵션입니다.
+
+이 true는 애니메이션이 한 번 끝나면 다시 시작되도록 하는 기능을 제공합니다.
+
+하지만 애니메이션을 이미 실행 중인 상태에서 중복 실행을 방지하려면 ignoreIfPlaying: true가 필요합니다.
+```
+
+```jsx
+this.play('run', true, { ignoreIfPlaying: true })
+```
+
+# { 플레이어 애니메이션 리팩토링 & idle 추가 }
+
+```jsx
+이 강의에서는 플레이어의 애니메이션을 설정하고,
+
+이를 별도의 파일로 분리하여 관리하는 방법을 배웠습니다.
+
+또한, 플레이어의 상태에 따라 적절한 애니메이션을 실행하는 방식을 설명했습니다.
+```
+
+## 1. 애니메이션 개념과 설정 방식
+
+### 1) 애니메이션이란?
+
+```jsx
+게임에서 캐릭터가 움직이거나 특정 행동을 할 때
+
+여러 개의 프레임(이미지)을 연속적으로 재생하여 자연스러운 동작을 표현하는 기법입니다.
+
+예를 들어, **플레이어가 서 있는 경우(idle)와 뛰는 경우(run)**의 애니메이션이 필요합니다.
+```
+
+## 2. 플레이어 애니메이션 설정
+
+### 1) 애니메이션을 정의하는 코드
+
+```jsx
+Phaser에서 애니메이션을 설정하는 방법:
+```
+
+```jsx
+export default (anims) => {
+  anims.create({
+    key: 'idle', // 애니메이션의 이름
+    frames: anims.generateFrameNumbers('player', { start: 0, end: 8 }), // 프레임 설정
+    frameRate: 10, // 초당 프레임 수
+    repeat: -1, // 무한 반복
+  })
+
+  anims.create({
+    key: 'run',
+    frames: anims.generateFrameNumbers('player', { start: 11, end: 16 }),
+    frameRate: 10,
+    repeat: -1,
+  })
+}
+```
+
+```jsx
+generateFrameNumbers('player', { start: X, end: Y }):
+
+		→ player라는 스프라이트에서 X번 프레임부터 Y번 프레임까지 애니메이션으로 사용합니다.
+
+frameRate: 10:
+
+		→ 애니메이션의 속도를 결정하며, 값이 클수록 빠르게 재생됩니다.
+
+repeat: -1:
+
+		→ 애니메이션을 무한 반복합니다.
+```
+
+## 3. 애니메이션을 플레이어에 적용
+
+### 1) 플레이어 클래스 생성
+
+```jsx
+Phaser에서 Player 클래스를 만들고 애니메이션을 적용합니다.
+```
+
+```jsx
+import Phaser from 'phaser'
+import initAnimations from './PlayerAnims'
+
+class Player extends Phaser.Physics.Arcade.Sprite {
+  constructor(scene, x, y) {
+    super(scene, x, y, 'player')
+
+    scene.add.existing(this)
+    scene.physics.add.existing(this)
+
+    this.init()
+    this.initEvents()
+  }
+
+  init() {
+    this.gravity = 500
+    this.playerSpeed = 200
+
+    this.body.setGravityY(500)
+    this.setCollideWorldBounds(true)
+    this.cursors = this.scene.input.keyboard.createCursorKeys()
+
+    // 애니메이션 초기화
+    initAnimations(this.scene.anims)
+  }
+
+  initEvents() {
+    this.scene.events.on(Phaser.Scenes.Events.UPDATE, this.update, this)
+  }
+
+  update() {
+    const { left, right } = this.cursors
+
+    if (left.isDown) {
+      this.setVelocityX(-this.playerSpeed)
+      this.play('run', true) // 왼쪽 이동 시 run 애니메이션 실행
+    } else if (right.isDown) {
+      this.setVelocityX(this.playerSpeed)
+      this.play('run', true) // 오른쪽 이동 시 run 애니메이션 실행
+    } else {
+      this.setVelocityX(0)
+      this.play('idle', true) // 아무 키도 안 누르면 idle 애니메이션 실행
+    }
+  }
+}
+
+export default Player
+```
+
+```jsx
+this.setVelocityX(-this.playerSpeed):
+
+		→ 왼쪽으로 이동
+
+this.setVelocityX(this.playerSpeed):
+
+		→ 오른쪽으로 이동
+
+this.play('run', true):
+
+		→ 뛰는 애니메이션 실행
+
+this.play('idle', true):
+
+		→ 서 있는 애니메이션 실행
+```
+
+## 4. 애니메이션을 별도 파일로 분리
+
+```jsx
+애니메이션 관련 코드를 PlayerAnims.js라는 별도의 파일로 분리하여 관리하면 유지보수가 쉬워집니다.
+```
+
+```jsx
+export default (anims) => {
+  anims.create({
+    key: 'idle',
+    frames: anims.generateFrameNumbers('player', { start: 0, end: 8 }),
+    frameRate: 10,
+    repeat: -1,
+  })
+
+  anims.create({
+    key: 'run',
+    frames: anims.generateFrameNumbers('player', { start: 11, end: 16 }),
+    frameRate: 10,
+    repeat: -1,
+  })
+}
+```
+
+# { 애니메이션 전환 }
+
+```jsx
+플레이어가 오른쪽으로 이동하면 달리는(run) 애니메이션을 실행합니다.
+
+플레이어가 왼쪽으로 이동하면 달리는(run) 애니메이션을 좌우 반전하여 실행합니다.
+
+플레이어가 멈춰 있을 때는 대기(idle) 애니메이션을 실행합니다.
+```
+
+## 2. **애니메이션 적용 코드**
+
+```jsx
+if (left.isDown) {
+  this.setVelocityX(-this.playerSpeed)
+  this.play('run', true)
+  this.setFlipX(true) // 왼쪽 이동 시 좌우 반전
+} else if (right.isDown) {
+  this.setVelocityX(this.playerSpeed)
+  this.play('run', true)
+  this.setFlipX(false) // 오른쪽 이동 시 정상 방향 유지
+} else {
+  this.setVelocityX(0)
+  this.play('idle', true)
+}
+```
+
+```jsx
+setFlipX(true/false)를 사용해 왼쪽 이동 시 캐릭터를 좌우 반전시킵니다.
+```
+
+# { 점프 기능 추가 정리 }
+
+## 1. **점프 동작 구현 개요**
+
+```jsx
+기존 코드에서는 달리기(run) 와 정지(idle) 애니메이션 전환만 처리됨.
+
+이번 강의에서는 점프(jump) 기능을 추가하여 플랫폼 위로 올라갈 수 있도록 함.
+```
+
+## 2. **점프 키 설정**
+
+```jsx
+점프는 스페이스바(Space key) 또는 위쪽 화살표(Up key) 를 누를 때 실행됨.
+
+cursors 객체에서 space와 up 키를 가져와 감지.
+```
+
+```jsx
+const { left, right, space, up } = this.cursors
+```
+
+## 3. **점프 로직**
+
+```jsx
+점프 동작을 위해 setVelocityY() 메서드를 사용.
+
+this.setVelocityY(this.jumpSpeed); 로 Y축 방향의 속도를 변경하여 점프 효과 적용.
+```
+
+```jsx
+if ((space.isDown || up.isDown) && onFloor) {
+  this.setVelocityY(this.jumpSpeed)
+  this.play('jump', true)
+}
+```
+
+```jsx
+문제점: 키를 여러 번 누르면 점프 속도가 계속 쌓여서 플레이어가 계속 상승하는 버그 발생.
+```
+
+## 4. **점프 조건 추가 (바닥 충돌 감지)**
+
+```jsx
+onFloor 변수를 사용해 플레이어가 바닥과 닿아있을 때만 점프 가능하도록 제한.
+
+this.body.onFloor() 메서드를 이용하여 바닥과 닿아있는지 확인.
+```
+
+```jsx
+const onFloor = this.body.onFloor()
+
+if ((space.isDown || up.isDown) && onFloor) {
+  this.setVelocityY(this.jumpSpeed)
+  this.play('jump', true)
+}
+```
+
+## 5. **점프 속도 조정**
+
+```jsx
+점프 속도를 jumpSpeed = -350 로 설정하여 적절한 점프 높이 조정.
+
+		중력 값을 gravity = 500 으로 설정하여 현실적인 점프 느낌을 줌.
+
+점프 높이를 조정할 경우:
+
+		중력을 낮추면 (예: 100) → 점프가 부드러워짐 (하지만 둔한 느낌).
+
+		중력을 높이면 (예: 700) → 점프가 빠르게 끝남.
+
+		jumpSpeed 값을 조정하여 적절한 점프 높이 설정 가능.
+```
+
+```jsx
+this.gravity = 500
+this.playerSpeed = 200
+this.jumpSpeed = -350
+```
+
+## 6. **점프 강도 조정**
+
+```jsx
+jumpSpeed를 playerSpeed * 1.5 등으로 조정하여 더 높은 점프 가능.
+
+playerSpeed * 2 는 너무 강하기 때문에 적절한 값(예: *1.3 ~ 1.5)을 찾아 적용.
+```
+
+```jsx
+this.jumpSpeed = -this.playerSpeed * 1.5
+```
+
+# { Phaser 3에서 더블 점프 구현하기 }
+
+```jsx
+이번 강의에서는 플레이어가 한 번만 점프하는 것이 아니라
+
+공중에서 추가 점프(더블 점프)를 할 수 있도록 구현합니다.
+```
+
+## 1. 점프 관련 변수 설정
+
+```jsx
+점프를 구현하기 위해 먼저 몇 가지 변수를 설정합니다.
+```
+
+```jsx
+this.jumpCount = 0 // 현재 점프 횟수
+this.consecutiveJumps = 1 // 최대 연속 점프 가능 횟수
+this.jumpSpeed = -250 // 점프 속도 (위로 올라가는 힘)
+```
+
+```jsx
+jumpCount: 현재 몇 번 점프했는지를 저장하는 변수로, 기본값은 0입니다.
+
+consecutiveJumps: 최대 연속 점프 가능 횟수로, 기본적으로 1로 설정하여 한 번 더 점프할 수 있도록 합니다.
+
+jumpSpeed: 위로 이동하는 속도로, 음수 값이어야 위쪽으로 이동합니다.
+```
+
+## 2. 점프 로직 구현
+
+```jsx
+플레이어가 점프할 때 조건을 설정해 점프할 수 있는 상황을 결정합니다.
+```
+
+```jsx
+if (isSpaceJustDown && (onFloor || this.jumpCount < this.consecutiveJumps)) {
+  this.setVelocityY(this.jumpSpeed)
+  this.jumpCount++
+  this.play('jump', true)
+}
+```
+
+```jsx
+isSpaceJustDown: 스페이스 키가 눌렸을 때 한 번만 true를 반환하도록 함.
+
+onFloor: 플레이어가 바닥에 있는지를 확인.
+
+this.jumpCount < this.consecutiveJumps: 현재 점프 횟수가 연속 점프 가능 횟수보다 작은 경우 점프 가능.
+
+점프 실행:
+
+		setVelocityY(this.jumpSpeed)를 호출하여 플레이어가 위쪽으로 이동하도록 함.
+
+		this.jumpCount++로 점프 횟수를 증가시킴.
+
+		this.play('jump', true)를 호출하여 점프 애니메이션 실행.
+```
+
+## 3. 점프 횟수 초기화
+
+```jsx
+플레이어가 바닥에 닿으면 점프 횟수를 다시 0으로 초기화해야 다음 점프가 정상적으로 동작합니다.
+```
+
+```jsx
+if (onFloor) {
+  this.jumpCount = 0
+}
+```
+
+```jsx
+이렇게 하면 바닥에 닿을 때마다 jumpCount가 0으로 초기화되어 다시 두 번 점프할 수 있습니다.
+```
+
+## 4. `JustDown()`을 이용한 키 입력 처리
+
+### 문제점
+
+```jsx
+강의에서는 단순히 space.isDown을 사용하면 점프가 여러 번 발생하는 문제를 설명합니다.
+```
+
+```jsx
+const isSpaceJustDown = Phaser.Input.Keyboard.JustDown(space)
+```
+
+```jsx
+space.isDown의 문제점:
+
+		space.isDown을 사용하면 키를 누르는 동안 계속 true가 반환되어 점프가 여러 번 발생함.
+
+		즉, 한 번만 눌러도 update()가 실행될 때마다 여러 번 호출될 가능성이 있음.
+
+JustDown()의 해결책:
+
+		JustDown(space)는 키를 처음 눌렀을 때 딱 한 번만 true를 반환.
+
+		이후 계속 누르고 있어도 false를 반환하여 점프가 한 번만 실행됨.
+```
+
+## 5. 최종 코드 정리
+
+```jsx
+update() {
+    const { left, right, space } = this.cursors;
+    const isSpaceJustDown = Phaser.Input.Keyboard.JustDown(space);
+    const onFloor = this.body.onFloor();
+
+    if (left.isDown) {
+        this.setVelocityX(-this.playerSpeed);
+        this.play('run', true);
+        this.setFlipX(true);
+    } else if (right.isDown) {
+        this.setVelocityX(this.playerSpeed);
+        this.play('run', true);
+        this.setFlipX(false);
+    } else {
+        this.setVelocityX(0);
+        this.play('idle', true);
+    }
+
+    if ((isSpaceJustDown) && (onFloor || this.jumpCount < this.consecutiveJumps)) {
+        this.setVelocityY(this.jumpSpeed);
+        this.jumpCount++;
+        this.play('jump', true);
+    }
+
+    if (onFloor) {
+        this.jumpCount = 0;
+    }
+}
+```
+
+```jsx
+✅ isSpaceJustDown을 사용해 한 번만 점프하도록 수정
+
+✅ 점프 횟수 제한 (consecutiveJumps)을 추가하여 더블 점프 가능
+
+✅ 바닥에 닿으면 (onFloor) jumpCount를 초기화
+```

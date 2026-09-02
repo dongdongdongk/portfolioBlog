@@ -1,0 +1,524 @@
+---
+title: 'Passport와 jwt 이용해서 로그인 구현'
+date: '2026-09-02'
+category: '백엔드/Node js'
+tags: ['백엔드', 'Node js']
+draft: false
+summary: ''
+---
+
+# **JWT란?**
+
+```jsx
+JWT(JSON Web Token)은 클라이언트와 서버 혹은 서비스간의 통신시 정보를 JSON객체를 통해 안전하게 전송하고 권한(Authorization)을 위해 사용하는 토큰이다.
+```
+
+# JWT를 언제 사용해야 할까?
+
+```jsx
+Authorization:
+
+JWT를 사용하는 주요 이유이다. 사용자가 로그인 하게되면 서버는 사용자에게 JWT를 발급해주고
+
+사용자는 이 JWT를 사용해 해당 토큰으로 허용되는 서버의 서비스에 접근할 수 있다.
+
+정보 교환:
+
+JWT는 정보를 주고 받는데도 유용하게 사용할 수 있다. 예를 들어 공개키,
+
+캐인키 쌍을 사용해 JWT에 서명할 수 있으므로 발신자가 자신이 말하는 사람인지 확인할 수 있다.
+
+또한 Header와 Payload를 사용해 서명이 계산되므로 정보가 변조되지 않았는지도 확인할 수 있다. (Header와 Payload에 관한 내용은 바로 다음에 설명함)
+```
+
+# **공개키(Public Key)와 개인키(Private Key)**
+
+```jsx
+공개키와 개인키는 대칭키 암호화의 한 형태인 비대칭키 암호화에서 사용되는 키 쌍이다.
+
+이 키 쌍은 서로 연결되어 있으며, 데이터를 암호화한 키로만 복호화할 수 있는 특성을 가지고 있다.
+```
+
+## **공개키**
+
+```jsx
+공개키는 누구나 알 수 있는 키로, 데이터를 암호화할 때 사용된다.
+
+다른 사용자들이 데이터를 공유할 때 사용자는 공개키를 이용하여 데이터를 암호화한 후 전송한다.
+```
+
+## **개인키**
+
+```jsx
+개인키는 암호화된 데이터를 복호화할 수 있는 비밀 키로, 오직 키를 가진 사용자만이 알 수 있다.
+
+받은 데이터를 개인키로 복호화하여 원본 데이터를 얻을 수 있다.
+```
+
+## **원리**
+
+```jsx
+사용자 A는 공개키와 개인키를 생성합니다. 이때 공개키는 다른 사용자들에게 공유되고, 개인키는 안전한 곳에 저장된다.
+
+사용자 A가 다른 사용자 B에게 데이터를 보낼 때, 사용자 A는 B의 공개키를 사용하여 데이터를 암호화한다.
+
+사용자 B는 자신의 개인키를 사용하여 암호화된 데이터를 복호화하여 원본 데이터를 얻는다.
+```
+
+## 결론
+
+```jsx
+이러한 방식으로 데이터를 안전하게 전송할 수 있다.
+
+공개키는 공개되어 있어도 데이터를 암호화하는 데 사용되며,
+
+개인키는 안전한 곳에 저장되어 데이터를 복호화하는 데 사용된다.
+
+이 과정에서 중요한 점은 공개키로 암호화된 데이터는 해당 공개키의 짝인 개인키로만 복호화될 수 있다는 것이다.
+```
+
+# **JWT의 구조**
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381049/notion-blog/_/Node_js/Passport_jwt_/Untitled.png)
+
+```jsx
+JWT는 다음과 같이 3개의 부분으로 나누어져 있고 각 부분은 점(.)으로 구분되어 있다.
+
+Header:
+
+토큰 유형과 토큰을 검증하는데 필요한 서명 알고리즘으로 구성되어 있다.
+
+Payload:
+
+토큰에 저장할 데이터들로 구성되어 있다. 위의 예시는 id와 name, 그리고 권한을 확인하기 위한 auth로 구성했다.
+
+Signature:
+
+Header와 Payload를 서명한 값으로 구성되어 있다.
+
+서명할 때 헤더에 정의한 알고리즘과 사용자가의 비밀키를 이용해 서명하는데 만약 특정 공격자가
+
+토큰을 탈취해 내용을 위변조 하더라도 서명한 값과 비교하기 때문에 데이터가 변조되었는지 확인할 수 있다.
+```
+
+# **passport.js란?**
+
+```jsx
+passport는 여권이라는 이름과 같이 서버에서 사용자를 인증하기 위해 사용하는 Node.js용 미들웨어이다.
+
+passport는 다양한 인증 메커니즘(session, jwt 등)을 각 모듈로 패키지화 해 제공하고 있으며 편리하게 인증을 구현할 수 있다.
+```
+
+# **설치**
+
+```jsx
+express는 이미 설치되어있다는 가정하에 진행했다. 일단 passport와 jwt에 필요한 모듈을 설치한다.
+```
+
+```jsx
+npm i passport passport-local passport-jwt jsonwebtoken
+```
+
+```jsx
+각 모듈은 다음과 같은 역할을 한다.
+
+passport: passport의 핵심 기능을 포함한다.
+
+passport-local: passport의 인증 기능을 직접 구현할 때 사용
+
+passport-jwt: jwt를 사용한 passport 인증
+
+jwt: jwt를 생성하는데 사용 (복호화도 가능)
+```
+
+```jsx
+모든 모듈을 설치했으면 이제 본격적으로 express에서 passport와 jwt를 사용한 인증 과정을 구현해보려고 한다.
+
+구현하면서 DB는 sequelize를 사용해 접근하는데 해당 내용은 다루지 않고 유저 데이터를 검증하고 JWT를 인증하는데 초점을 맞췄다.
+```
+
+# **로그인 기능 구현**
+
+## **src/passport/index.js**
+
+```jsx
+로그인 기능을 구현하기 위해 우선 passport에 구현할 인증 기능을 설정 후 등록해줘야 한다.
+```
+
+```jsx
+const passport = require('passport')
+const { Strategy: LocalStrategy } = require('passport-local')
+const bcrypt = require('bcrypt')
+
+const User = require('../models/user') // sequelize의 user 모델
+```
+
+```jsx
+다음과 같이 사용할 모듈들을 불러온다.
+
+passport미들웨어를 등록하기 위한 passport모듈과 사용자 인증을 구현할 Strategy(나중에 JWT의 Strategy와 이름이 겹쳐서 다른이름 선언),
+
+그리고 해쉬된 비밀번호를 비교하기 위한 bcrypt모듈을 불러왔다. 추가로 sequelize로 정의한 User모델을 불러와 User의 데이터를 조회할 수 있도록 했다.
+```
+
+```jsx
+// {"userId": "chanyeong", "password": "password"}
+const passportConfig = { usernameField: 'userId', passwordField: 'password' }
+```
+
+```jsx
+다음과 같이 passport의 옵션을 설정한다.
+
+usernameField는 passport가 읽을 사용자의 아이디를 확인하는 옵션이고 passwordField는 사용자의 비밀번호를 확인하는 옵션이다.
+
+즉 클라이언트가 서버로 사용자의 아이디와 비밀번호가 담긴 Form 데이터를 보내면 passport에서는 등록된 프로퍼티 이름으로 아이디와 비밀번호를 인식한다.
+```
+
+```jsx
+const passportVerify = async (userId, password, done) => {
+  try {
+    // 유저 아이디로 일치하는 유저 데이터 검색
+    const user = await User.findOne({ where: { user_id: userId } })
+    // 검색된 유저 데이터가 없다면 에러 표시
+    if (!user) {
+      done(null, false, { reason: '존재하지 않는 사용자 입니다.' })
+      return
+    }
+    // 검색된 유저 데이터가 있다면 유저 해쉬된 비밀번호 비교
+    const compareResult = await bcrypt.compare(password, user.password)
+
+    // 해쉬된 비밀번호가 같다면 유저 데이터 객체 전송
+    if (compareResult) {
+      done(null, user)
+      return
+    }
+    // 비밀번호가 다를경우 에러 표시
+    done(null, false, { reason: '올바르지 않은 비밀번호 입니다.' })
+  } catch (error) {
+    console.error(error)
+    done(error)
+  }
+}
+```
+
+```jsx
+그리고 사용자의 인증정보를 확인하는 함수를 구현했다.
+
+이 함수는 매개변수로 3개를 받는데 사용자의 아이디, 비밀번호, 그리고 인증의 결과를 호출할 done이라는 함수를 받는다.
+
+done은 인자를 3개까지 받는데 첫 번째 인자는 서버에서 발생한 에러를 넣고 두 번째 인자는 성공했을 때 반환할 값을 넣어준다.
+
+그리고 마지막 세 번째 인자는 사용자가 임의로 인증 실패를 만들고 싶을 때 사용하며 인증 실패한 이유를 함께 넣어줄 수 있다.
+
+그러니 다음 코드는 처음에 유저 아이디로 일치하는 유저 데이터를 검색한 후 검색된 유저 데이터가 없다면 임의로 인증을 실패하도록 설정했고
+
+검색된 유저 데이터가 있다면 받아온 비밀번호와 DB에 저장된 유저의 해쉬된 비밀번호를 비교해 같을 경우에만 done함수의 두 번째 인자로 유저 데이터를 넣어줘서 인증에 성속시켰다.
+```
+
+```jsx
+module.exports = () => {
+  passport.use('local', new LocalStrategy(passportConfig, passportVerify))
+}
+```
+
+```jsx
+마지막으로 LocalStrategy에 방금 생성한 passportConfig와 passportVerify를 인자로 넣어 생성에 passport에 local이란 이름으로 등록해줬다.
+```
+
+## **src/passport/index.js**
+
+```jsx
+const passport = require('passport')
+const { Strategy: LocalStrategy } = require('passport-local')
+const bcrypt = require('bcrypt')
+
+const User = require('../models/user')
+
+const passportConfig = { usernameField: 'userId', passwordField: 'password' }
+
+const passportVerify = async (userId, password, done) => {
+  try {
+    const user = await User.findOne({ where: { user_id: userId } })
+    if (!user) {
+      done(null, false, { message: '존재하지 않는 사용자 입니다.' })
+      return
+    }
+
+    const compareResult = await bcrypt.compare(password, user.password)
+
+    if (compareResult) {
+      done(null, user)
+      return
+    }
+
+    done(null, false, { reason: '올바르지 않은 비밀번호 입니다.' })
+  } catch (error) {
+    console.error(error)
+    done(error)
+  }
+}
+
+module.exports = () => {
+  passport.use('local', new LocalStrategy(passportConfig, passportVerify))
+}
+```
+
+```jsx
+지금까지 작성한 전체 코드를 보면 다음과 같다. 그러면 이제 passport를 express의 미들웨어에 등록해주고 설정을 초기화시켜줘야 한다.
+```
+
+```jsx
+...
+const passport = require('passport');
+const passportConfig = require('./passport');
+
+...
+
+app.use(passport.initialize());
+passportConfig();
+```
+
+```jsx
+다음과 같이 express미들웨어로 passport를 등록해주고 방금 만든 설정을 실행시켜주면 된다.
+```
+
+# **유저 인증 확인**
+
+```jsx
+이제 유저가 직접 로그인 API에 요청을 보내 정상적으로 인증이 이루어 지도록 API를 구현해야 한다.
+```
+
+## **/src/routes/user.js**
+
+```jsx
+const express = require('express')
+const passport = require('passport')
+const jwt = require('jsonwebtoken')
+
+const router = express.Router()
+
+router.post('/signin', async (req, res, next) => {
+  try {
+    // 아까 local로 등록한 인증과정 실행
+    passport.authenticate('local', (passportError, user, info) => {
+      // 인증이 실패했거나 유저 데이터가 없다면 에러 발생
+      if (passportError || !user) {
+        res.status(400).json({ message: info.reason })
+        return
+      }
+      // user데이터를 통해 로그인 진행
+      req.login(user, { session: false }, (loginError) => {
+        if (loginError) {
+          res.send(loginError)
+          return
+        }
+        // 클라이언트에게 JWT생성 후 반환
+        const token = jwt.sign({ id: user.id, name: user.name, auth: user.auth }, 'jwt-secret-key')
+        res.json({ token })
+      })
+    })(req, res)
+  } catch (error) {
+    console.error(error)
+    next(error)
+  }
+})
+
+module.exports = router
+```
+
+```jsx
+다음과 같이 로그인 API에 passport local을 실행하면 좀 전에 구현한 local 함수에서 유저 데이터를 반환해준다.
+
+(인증에 성공했을 경우) 만약 인증이 실패했거나 유저 데이터가 없을 경우 인증에 실패한 것이므로
+
+클라이언트에게 에러를 보내주지만 인증이 성공한 경우에는 유저 데이터에서 필요한 데이터를 JWT에 담아 클라이언트에게 보내주는 기능을 구현한다.
+```
+
+```jsx
+// {"userId": "chanyeong", "password": "password"}
+{
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NSwiaWF0IjoxNjAxNDA0MDkyfQ.W4wotZKzsZGnxOIwd58GNeY2EsBbr_1JhWIaCk8wD5k"
+}
+```
+
+```jsx
+구현한 API에 아이디와 비밀번호값을 담아 요청을 해보니 정상적으로 토큰을 반환해 주는 것을 확인할 수 있다.
+```
+
+# **JWT 검증**
+
+```jsx
+이제 클라이언트는 받은 JWT를 통해 서버에게 인증이 필요한 API 요청을 할 수 있어야 한다.
+
+그런데 아직 서버에서는 발급해준 JWT를 검증하는 기능을 구현하지 않았으므로 이제 passport가 JWT를 복호화한 후 인증정보를 확인할 수 있도록 설정해줘야 한다.
+```
+
+## **src/passport/index.js**
+
+```jsx
+const { ExtractJwt, Strategy: JWTStrategy } = require('passport-jwt')
+```
+
+```jsx
+JWT를 사용하기 위해 아까 작성한 passport파일에 다음 모듈을 추가한다.
+```
+
+```jsx
+const JWTConfig = {
+  jwtFromRequest: ExtractJwt.fromHeader('authorization'),
+  secretOrKey: 'jwt-secret-key',
+}
+```
+
+```jsx
+그리고 JWT토큰을 읽기 위해 다음 설정을 추가한다.
+
+jwtFromRequest는 request에서 JWT를 위치를 설정하는 명령인데
+
+ExtractJwt의 fromHeader명령어를 통해 header의 authorization에서 JWT를 가져올 수 있도록 설정했다.
+
+그리고 secretOrKey에 JWT를 복호화하기 위한 암호 키를 입력했다. (jwt-secret-key는 JWT를 생성할 때 사용한 키와 동일한 키여야 한다.)
+```
+
+```jsx
+const JWTVerify = async (jwtPayload, done) => {
+  try {
+    // payload의 id값으로 유저의 데이터 조회
+    const user = await User.findOne({ where: { id: jwtPayload.id } })
+    // 유저 데이터가 있다면 유저 데이터 객체 전송
+    if (user) {
+      done(null, user)
+      return
+    }
+    // 유저 데이터가 없을 경우 에러 표시
+    done(null, false, { reason: '올바르지 않은 인증정보 입니다.' })
+  } catch (error) {
+    console.error(error)
+    done(error)
+  }
+}
+```
+
+```jsx
+이제 복호화된 JWT에서 Payload(토큰의 데이터 부분)를 받아 유저의 정보를 확인하는 함수를 구현했다.
+
+Payload에서 가져온 유저의 id로 유저의 데이터를 조회한 후 유저 데이터가 있다면 done함수를 통해 인증을 완료했고 유저 데이터가 없다면 인증을 실패하도록 구현했다.
+```
+
+```jsx
+module.exports = () => {
+  ...
+  passport.use('jwt', new JWTStrategy(JWTConfig, JWTVerify));
+};
+```
+
+```jsx
+그리고 아까 local을 등록할 때와 마찬가지로 jwt라는 이름으로 passport의 미들웨어에 등록해준다
+```
+
+## **src/passport/index.js**
+
+```jsx
+const passport = require('passport')
+const { Strategy: LocalStrategy } = require('passport-local')
+const { ExtractJwt, Strategy: JWTStrategy } = require('passport-jwt')
+const bcrypt = require('bcrypt')
+
+const User = require('../models/user')
+
+const passportConfig = { usernameField: 'userId', passwordField: 'password' }
+
+const passportVerify = async (userId, password, done) => {
+  try {
+    const user = await User.findOne({ where: { user_id: userId } })
+    if (!user) {
+      done(null, false, { message: '존재하지 않는 사용자 입니다.' })
+      return
+    }
+
+    const compareResult = await bcrypt.compare(password, user.password)
+
+    if (compareResult) {
+      done(null, user)
+      return
+    }
+
+    done(null, false, { reason: '올바르지 않은 비밀번호 입니다.' })
+  } catch (error) {
+    console.error(error)
+    done(error)
+  }
+}
+
+const JWTConfig = {
+  jwtFromRequest: ExtractJwt.fromHeader('authorization'),
+  secretOrKey: 'jwt-secret-key',
+}
+
+const JWTVerify = async (jwtPayload, done) => {
+  try {
+    // payload의 id값으로 유저의 데이터 조회
+    const user = await User.findOne({ where: { id: jwtPayload.id } })
+    // 유저 데이터가 있다면 유저 데이터 객체 전송
+    if (user) {
+      done(null, user)
+      return
+    }
+    // 유저 데이터가 없을 경우 에러 표시
+    done(null, false, { reason: '올바르지 않은 인증정보 입니다.' })
+  } catch (error) {
+    console.error(error)
+    done(error)
+  }
+}
+
+module.exports = () => {
+  passport.use('local', new LocalStrategy(passportConfig, passportVerify))
+  passport.use('jwt', new JWTStrategy(JWTConfig, JWTVerify))
+}
+```
+
+```jsx
+지금까지 작성한 코드를 보면 다음과 같다. 이제 passport에서 JWT를 사용하기 위한 준비가 모두 끝났다!
+```
+
+# **토큰으로 인증 받기**
+
+```jsx
+이제 클라이언트에서 발급받은 토큰을 통해 권한이 필요한 API에 접근해서 토큰으로 정상적으로 접근이 되는지 확인해보려고 한다.
+```
+
+```jsx
+const express = require('express')
+const passport = require('passport')
+
+const router = express.Router()
+
+router.post('/auth', passport.authenticate('jwt', { session: false }), async (req, res, next) => {
+  try {
+    res.json({ result: true })
+  } catch (error) {
+    console.error(error)
+    next(error)
+  }
+})
+
+module.exports = router
+```
+
+```jsx
+다음과 같이 임시로 권환을 확인하는 API를 만들어 봤다
+
+passport.authenticate메서드를 통해 JWT를 복호화 후 권한이 있는지 확인하며 권한이 있다면 true를 반환해주는 API이다.
+```
+
+```jsx
+// header의 Authorization에 토큰 설정
+{
+    "result": true
+}
+```
+
+```jsx
+요청을 하니 정상적으로 result가 반환되었다. 혹시나 해서 일부로 토큰을 변조해서 잘못된 토큰값을 넣어줘서 확인해 봤는데 다행히 인증이 실패했다고 메시지가 나왔다.
+```

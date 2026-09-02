@@ -1,0 +1,763 @@
+---
+title: '섹션 2: 장애물 피하기 3'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+# { 🚧 태그와 충돌 처리로 점수 시스템 만들기 }
+
+## 📋 목차
+
+1. [태그(Tag) 개념 이해하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%ED%83%9C%EA%B7%B8tag-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [플레이어(Player) 태그 지정하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%ED%94%8C%EB%A0%88%EC%9D%B4%EC%96%B4player-%ED%83%9C%EA%B7%B8-%EC%A7%80%EC%A0%95%ED%95%98%EA%B8%B0)
+3. [충돌 이벤트(OnCollisionEnter) 이해하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%EC%B6%A9%EB%8F%8C-%EC%9D%B4%EB%B2%A4%ED%8A%B8oncollisionenter-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+4. [if 문을 활용한 조건 처리](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#if-%EB%AC%B8%EC%9D%84-%ED%99%9C%EC%9A%A9%ED%95%9C-%EC%A1%B0%EA%B1%B4-%EC%B2%98%EB%A6%AC)
+5. [ObjectHit 스크립트로 색상 변경하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#objecthit-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8%EB%A1%9C-%EC%83%89%EC%83%81-%EB%B3%80%EA%B2%BD%ED%95%98%EA%B8%B0)
+6. [Hit 태그 활용해 중복 점수 방지하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#hit-%ED%83%9C%EA%B7%B8-%ED%99%9C%EC%9A%A9%ED%95%B4-%EC%A4%91%EB%B3%B5-%EC%A0%90%EC%88%98-%EB%B0%A9%EC%A7%80%ED%95%98%EA%B8%B0)
+7. [Score 스크립트에서 점수 증가 로직 구현하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#score-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8%EC%97%90%EC%84%9C-%EC%A0%90%EC%88%98-%EC%A6%9D%EA%B0%80-%EB%A1%9C%EC%A7%81-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. 태그(Tag) 개념 이해하기
+
+- **태그(Tag)** : 게임 오브젝트를 분류하거나 식별하기 위한 문자열.
+- 예: "Player", "Respawn", "Finish" 등.
+- 태그는 코드에서 특정 오브젝트를 판별할 때 유용하다.
+- 대부분의 경우 태그는 필요하지 않지만, **오브젝트 간의 구분**이 필요할 때 필수적이다.
+
+---
+
+## 2. 플레이어(Player) 태그 지정하기
+
+- `Player` 오브젝트를 선택 → Inspector 상단 → Tag 설정 → "Player" 선택.
+- 이제 코드에서 `collision.gameObject.tag == "Player"` 조건을 통해 **플레이어와의 충돌 여부**를 쉽게 확인할 수 있다.
+
+---
+
+## 3. 충돌 이벤트(OnCollisionEnter) 이해하기
+
+- Unity에서 두 오브젝트가 충돌하면 **OnCollisionEnter** 이벤트가 발생한다.
+- 메소드 시그니처:
+  ```csharp
+  void OnCollisionEnter(Collision collision)
+  ```
+- `collision` 매개변수를 통해 충돌한 **상대 오브젝트 정보**를 가져올 수 있다.
+- 예: `collision.gameObject` → 충돌한 게임 오브젝트 참조.
+
+---
+
+## 4. if 문을 활용한 조건 처리
+
+- `if (조건)` → 조건이 참일 경우 코드 실행.
+- `==` : 두 값이 같은지 비교.
+- `!=` : 두 값이 다른지 비교.
+
+예제:
+
+```csharp
+if (collision.gameObject.tag == "Player") {
+    // 플레이어와 부딪혔을 때 실행할 코드
+}
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380411/notion-blog/_/3D_/3D_/_2_3/image.png)
+
+```jsx
+플레이어로 태그 변경
+```
+
+---
+
+## 5. ObjectHit 스크립트로 색상 변경하기
+
+- 충돌 대상이 플레이어일 때만 색상을 변경하도록 설정.
+- 코드 예시:
+  ```csharp
+  if (collision.gameObject.tag == "Player") {
+      GetComponent<MeshRenderer>().material.color = Color.red;
+      gameObject.tag = "Hit"; // 이후에는 'Hit' 태그로 바꿔 중복 처리 방지
+  }
+  ```
+- **개념**: 오브젝트가 플레이어와 처음 부딪히면 색상이 바뀌고, 동시에 태그를 `"Hit"`로 변경해 상태를 기록.
+  ![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380411/notion-blog/_/3D_/3D_/_2_3/image_1.png)
+  ```jsx
+  태그 추가
+  ```
+
+---
+
+## 6. Hit 태그 활용해 중복 점수 방지하기
+
+- 문제: 같은 오브젝트와 여러 번 부딪히면 점수가 계속 올라간다.
+- 해결: 처음 부딪힐 때 오브젝트 태그를 `"Hit"`로 바꿔 **이미 처리된 상태임**을 표시.
+- 이후에는 `"Hit"` 태그를 가진 오브젝트는 점수 증가에서 제외.
+
+---
+
+## 7. Score 스크립트에서 점수 증가 로직 구현하기
+
+- `Score` 스크립트가 플레이어에 붙어있음.
+- OnCollisionEnter에서 충돌한 오브젝트를 확인 후, `"Hit"`가 아니라면 점수를 1 올림.
+
+```csharp
+void OnCollisionEnter(Collision collision) {
+    if (collision.gameObject.tag != "Hit") {
+        hits++;
+        Debug.Log("당신은 " + hits + "번 충돌하였습니다.");
+    }
+}
+```
+
+- 실행 결과:
+  - 새로운 오브젝트에 부딪힐 때만 점수가 1 증가.
+  - 같은 오브젝트에 여러 번 부딪혀도 점수는 더 이상 오르지 않음.
+
+---
+
+✅ **핵심 정리**
+
+- **Tag**는 오브젝트 식별을 위한 문자열.
+- **OnCollisionEnter**는 충돌 이벤트로, `collision.gameObject`를 통해 상대 오브젝트에 접근 가능.
+- **if 문**과 **Tag 비교**로 조건부 충돌 처리 가능.
+- **Hit 태그**를 이용해 "이미 충돌한 오브젝트"를 표시 → 중복 점수 방지.
+- 결과적으로, 오브젝트당 한 번만 점수가 올라가는 시스템 완성.
+
+# { 🎡 회전 스크립트로 오브젝트 움직이기 }
+
+## 📋 목차
+
+1. [새로운 오브젝트 만들기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%EC%83%88%EB%A1%9C%EC%9A%B4-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+2. [오브젝트 크기와 위치 조정하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%ED%81%AC%EA%B8%B0%EC%99%80-%EC%9C%84%EC%B9%98-%EC%A1%B0%EC%A0%95%ED%95%98%EA%B8%B0)
+3. [Material로 색상 적용하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#material%EB%A1%9C-%EC%83%89%EC%83%81-%EC%A0%81%EC%9A%A9%ED%95%98%EA%B8%B0)
+4. [환경(Environment) 그룹으로 정리하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%ED%99%98%EA%B2%BDenvironment-%EA%B7%B8%EB%A3%B9%EC%9C%BC%EB%A1%9C-%EC%A0%95%EB%A6%AC%ED%95%98%EA%B8%B0)
+5. [회전 스크립트(Spinner) 생성하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%ED%9A%8C%EC%A0%84-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8spinner-%EC%83%9D%EC%84%B1%ED%95%98%EA%B8%B0)
+6. [Rotate() 메서드 이해하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#rotate-%EB%A9%94%EC%84%9C%EB%93%9C-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+7. [변수를 이용한 회전 속도 제어하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%EB%B3%80%EC%88%98%EB%A5%BC-%EC%9D%B4%EC%9A%A9%ED%95%9C-%ED%9A%8C%EC%A0%84-%EC%86%8D%EB%8F%84-%EC%A0%9C%EC%96%B4%ED%95%98%EA%B8%B0)
+8. [샌드박스 도구 상자 만들기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%EC%83%8C%EB%93%9C%EB%B0%95%EC%8A%A4-%EB%8F%84%EA%B5%AC-%EC%83%81%EC%9E%90-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+
+---
+
+## 1. 새로운 오브젝트 만들기
+
+- 계층 구조(Hierarchy)에서 → **3D Object → Cube** 추가
+- 중앙 근처에 배치 후 **F 키**로 보기 확대
+- 앞으로 회전 기능을 적용할 기본 장애물이 됨
+
+---
+
+## 2. 오브젝트 크기와 위치 조정하기
+
+- **R 키**로 스케일(크기) 조정 → 원하는 크기로 확대/축소
+- **E 키**로 회전 테스트 → 예상되는 움직임을 미리 확인 가능
+- 바닥에 살짝 내려놓고, 위협적으로 보이도록 약간 키울 수 있음
+
+---
+
+## 3. Material로 색상 적용하기
+
+- **Project 창 → Create → Material** 생성 (예: `SpinnerColor`)
+- 오브젝트에 드래그하여 적용
+- 밝은 테마(흰색) vs 어두운 테마(푸른색) → 원하는 분위기에 맞게 선택
+- 프로토타입 단계에서는 단순한 색상만 적용해도 충분
+
+---
+
+## 4. 환경(Environment) 그룹으로 정리하기
+
+- 새 오브젝트 이름을 `Spinning Thing` 으로 변경
+- **Environment 오브젝트 하위**에 배치 → 관리와 정리가 쉬움
+
+---
+
+## 5. 회전 스크립트(Spinner) 생성하기
+
+- `Scripts` 폴더에 **C# Script → Spinner** 생성
+- Cube(또는 Spinning Thing)에 드래그하여 부착
+
+---
+
+## 6. Rotate() 메서드 이해하기
+
+- `transform.Rotate(x, y, z)` → 오브젝트를 **x, y, z 축 방향으로 회전**시킴
+- `(1, 1, 1)` → 세 축 모두 회전 (예상치 못한 결과)
+- `(0, 1, 0)` → y축만 회전 (원하는 효과)
+
+```csharp
+void Update()
+{
+    transform.Rotate(0, 1, 0); // y축 기준 회전
+}
+```
+
+---
+
+## 7. 변수를 이용한 회전 속도 제어하기
+
+- 문제점: 숫자를 직접 코드에 넣으면(매직 넘버) → 다른 오브젝트에 재사용 불편
+- 해결책: **SerializeField 변수**를 만들어 Inspector에서 값 조정
+
+```csharp
+[SerializeField] float xAngle = 0f;
+[SerializeField] float yAngle = 1f;
+[SerializeField] float zAngle = 0f;
+
+void Update()
+{
+    transform.Rotate(xAngle, yAngle, zAngle);
+}
+```
+
+- Inspector 창에서 `xAngle`, `yAngle`, `zAngle` 조정 → 회전 방향/속도 쉽게 변경 가능
+- 값 예시:
+  - `yAngle = 0.5` → 부드럽게 회전
+  - `xAngle = 2` → 빠르게 옆으로 회전
+
+---
+
+## 8. 샌드박스 도구 상자 만들기
+
+- Spinner 스크립트는 다른 오브젝트에도 적용 가능
+- 장애물 코스 제작 시 다양하게 활용 →
+  - 어떤 건 x축 회전
+  - 어떤 건 y축 회전
+  - 어떤 건 빠르게, 어떤 건 느리게
+- 이렇게 하면 **플레이어가 피하면서 즐길 수 있는 코스**를 만들 수 있음
+
+---
+
+👉 이번 강의 핵심은 **“직렬화된 변수로 회전을 유연하게 제어하는 방법”**입니다.
+
+즉, 한 번 만든 스크립트를 다양한 오브젝트에 재활용할 수 있도록 설계하는 것이 목표예요.
+
+# { 🚀 발사체를 플레이어에게 날아가게 만들기 }
+
+## 📋 목차
+
+1. [발사체 오브젝트 만들기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%EB%B0%9C%EC%82%AC%EC%B2%B4-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+2. [Vector3 개념 이해하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#vector3-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+3. [MoveTowards() 메소드 이해하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#movetowards-%EB%A9%94%EC%86%8C%EB%93%9C-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+4. [FlyAtPlayer 스크립트 작성하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#flyatplayer-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%9E%91%EC%84%B1%ED%95%98%EA%B8%B0)
+5. [플레이어 참조(Reference) 연결하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%ED%94%8C%EB%A0%88%EC%9D%B4%EC%96%B4-%EC%B0%B8%EC%A1%B0reference-%EC%97%B0%EA%B2%B0%ED%95%98%EA%B8%B0)
+6. [프레임 속도와 독립적인 이동](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%ED%94%84%EB%A0%88%EC%9E%84-%EC%86%8D%EB%8F%84%EC%99%80-%EB%8F%85%EB%A6%BD%EC%A0%81%EC%9D%B8-%EC%9D%B4%EB%8F%99)
+7. [속도(speed) 값 조정하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%EC%86%8D%EB%8F%84speed-%EA%B0%92-%EC%A1%B0%EC%A0%95%ED%95%98%EA%B8%B0)
+8. [응용: 여러 발사체 적용하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%EC%9D%91%EC%9A%A9-%EC%97%AC%EB%9F%AC-%EB%B0%9C%EC%82%AC%EC%B2%B4-%EC%A0%81%EC%9A%A9%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. 발사체 오브젝트 만들기
+
+- **Hierarchy → 3D Object → Sphere** 로 구체 생성.
+- 이름은 `Projectile` (발사체).
+- 위치를 플레이어 옆/위에 배치하여 궤적을 확인 가능하게 함.
+
+---
+
+## 2. Vector3 개념 이해하기
+
+- **Vector3** = 3차원 공간의 좌표(x, y, z).
+- 한 변수에 세 가지 값을 담을 수 있음.
+- 위치, 방향, 이동 등에 활용됨.
+- 예: `Vector3 position = new Vector3(1, 2, 3);`
+
+---
+
+## 3. MoveTowards() 메소드 이해하기
+
+- 객체를 특정 지점으로 이동시키는 **Unity 제공 메소드**.
+- 구조:
+  ```csharp
+  Vector3.MoveTowards(현재위치, 목표위치, 최대이동거리);
+  ```
+- 매 프레임마다 조금씩 목표 지점으로 다가가도록 할 수 있음.
+- 즉시 이동이 아닌 **점진적 이동**을 구현 가능.
+
+---
+
+## 4. FlyAtPlayer 스크립트 작성하기
+
+```csharp
+using UnityEngine;
+
+public class FlyAtPlayer : MonoBehaviour
+{
+    [SerializeField] Transform player;   // 플레이어 참조
+    [SerializeField] float speed = 1.0f; // 이동 속도
+    Vector3 playerPosition;
+
+    void Start()
+    {
+        // 시작 시 플레이어 위치 저장
+        playerPosition = player.transform.position;
+    }
+
+    void Update()
+    {
+        // 발사체를 플레이어 위치로 점진적으로 이동
+        transform.position = Vector3.MoveTowards(
+            transform.position,
+            playerPosition,
+            Time.deltaTime * speed
+        );
+    }
+}
+```
+
+---
+
+## 5. 플레이어 참조(Reference) 연결하기
+
+- `FlyAtPlayer` 스크립트를 **Projectile 오브젝트**에 추가.
+- 인스펙터에서 `Player` 필드에 **플레이어 오브젝트**를 드래그 앤 드롭하여 연결.
+- 이렇게 하면 발사체가 **플레이어의 위치**를 알 수 있게 됨.
+
+---
+
+## 6. 프레임 속도와 독립적인 이동
+
+- `Time.deltaTime` 을 곱해줘야 **FPS(프레임 수)에 상관없이 일정한 속도**로 움직임.
+- 예: 고성능 PC, 저성능 모바일에서 같은 속도 유지 가능.
+
+---
+
+## 7. 속도(speed) 값 조정하기
+
+- `[SerializeField] float speed` 로 공개 변수 지정 → 인스펙터에서 실시간 수정 가능.
+- 플레이 모드 중 값 변경으로 **즉시 테스트** 가능.
+- 예:
+  - `speed = 1` → 매우 느림.
+  - `speed = 10` → 빠르게 날아감.
+
+---
+
+## 8. 응용: 여러 발사체 적용하기
+
+- 같은 스크립트를 다른 오브젝트에도 붙이면 **동시에 여러 발사체**를 플레이어로 이동시킬 수 있음.
+- 각각의 `speed` 값을 다르게 주면 다양한 속도의 발사체 생성 가능.
+
+---
+
+✅ 이번 강의의 핵심은 **Vector3, MoveTowards, Time.deltaTime, Inspector 참조 연결**을 이해하고 활용하는 것!
+
+# { 💥 게임 오브젝트 파괴하기 }
+
+## 📋 목차
+
+1. [게임 오브젝트 파괴가 필요한 이유](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%EA%B2%8C%EC%9E%84-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%ED%8C%8C%EA%B4%B4%EA%B0%80-%ED%95%84%EC%9A%94%ED%95%9C-%EC%9D%B4%EC%9C%A0)
+2. [Destroy() 메소드 이해하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#destroy-%EB%A9%94%EC%86%8C%EB%93%9C-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+3. [목적지 도달 여부 확인하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%EB%AA%A9%EC%A0%81%EC%A7%80-%EB%8F%84%EB%8B%AC-%EC%97%AC%EB%B6%80-%ED%99%95%EC%9D%B8%ED%95%98%EA%B8%B0)
+4. [메소드 분리와 코드 정리하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%EB%A9%94%EC%86%8C%EB%93%9C-%EB%B6%84%EB%A6%AC%EC%99%80-%EC%BD%94%EB%93%9C-%EC%A0%95%EB%A6%AC%ED%95%98%EA%B8%B0)
+5. [Vector3.MoveTowards()로 이동 구현](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#vector3movetowards%EB%A1%9C-%EC%9D%B4%EB%8F%99-%EA%B5%AC%ED%98%84)
+6. [플레이어 위치 저장하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%ED%94%8C%EB%A0%88%EC%9D%B4%EC%96%B4-%EC%9C%84%EC%B9%98-%EC%A0%80%EC%9E%A5%ED%95%98%EA%B8%B0)
+7. [효율적인 게임 실행을 위한 오브젝트 관리](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%ED%9A%A8%EC%9C%A8%EC%A0%81%EC%9D%B8-%EA%B2%8C%EC%9E%84-%EC%8B%A4%ED%96%89%EC%9D%84-%EC%9C%84%ED%95%9C-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%EA%B4%80%EB%A6%AC)
+
+---
+
+## 1. 게임 오브젝트 파괴가 필요한 이유
+
+- 게임에서는 **총알, 발사체, 이펙트** 같은 일회성 오브젝트가 많이 등장합니다.
+- 이들을 계속 남겨두면 **Hierarchy**가 복잡해지고, **메모리와 성능에 부담**이 생깁니다.
+- 따라서 목적(예: 플레이어 도달, 충돌, 일정 시간 경과)이 끝나면 파괴해야 합니다.
+
+---
+
+## 2. Destroy() 메소드 이해하기
+
+- Unity에서 오브젝트를 제거하는 기본 메소드 → `Destroy(GameObject);`
+- `gameObject`는 **현재 스크립트가 붙은 오브젝트 자신**을 의미합니다.
+- 다른 오브젝트도 참조 변수로 넘겨서 파괴할 수 있습니다.
+
+---
+
+## 3. 목적지 도달 여부 확인하기
+
+- 발사체가 플레이어에게 도달했는지 확인해야 합니다.
+- 조건문 활용:
+  ```csharp
+  if (transform.position == playerPosition)
+  {
+      Destroy(gameObject);
+  }
+  ```
+- 단, `==` 비교는 **부동소수점 오차 문제** 때문에 권장되지 않고, 실제로는 `Vector3.Distance()` 같은 함수를 사용하는 게 안전합니다.
+
+---
+
+## 4. 메소드 분리와 코드 정리하기
+
+- 모든 코드를 `Update()` 안에 쓰면 **복잡**해집니다.
+- 기능별로 메소드를 나누면 가독성과 유지보수성이 좋아집니다.
+  - `MoveToPlayer()` → 이동 처리
+  - `DestroyWhenReached()` → 목적지 도달 시 파괴
+
+---
+
+## 5. Vector3.MoveTowards()로 이동 구현
+
+- 오브젝트를 부드럽게 목적지로 이동시키는 함수.
+  ```csharp
+  transform.position = Vector3.MoveTowards(
+      transform.position,
+      playerPosition,
+      Time.deltaTime * speed
+  );
+  ```
+- `Time.deltaTime`을 곱해서 **프레임 속도와 관계없이 일정한 속도**로 움직이게 합니다.
+
+---
+
+## 6. 플레이어 위치 저장하기
+
+- 시작 시 `Start()`에서 플레이어의 위치를 저장:
+  ```csharp
+  playerPosition = player.transform.position;
+  ```
+- 이렇게 하면 발사체는 발사 순간의 위치를 목표로 삼습니다.
+- 즉, 플레이어가 도망가더라도 발사체는 **발사 순간 좌표**로 날아갑니다.
+
+---
+
+## 7. 효율적인 게임 실행을 위한 오브젝트 관리
+
+- 오브젝트를 사용하지 않을 때 `Destroy()`로 제거하면:
+  - 메모리 낭비 방지
+  - Hierarchy 정리
+  - 성능 최적화
+- 특히 **총알, 발사체, 이펙트, 일시적 아이템** 등에 필수적으로 적용됩니다.
+
+---
+
+✅ 이번 강의 핵심 개념:
+
+- **불필요해진 오브젝트는 반드시 제거하라.**
+- **Update + 조건문**으로 파괴 시점을 제어한다.
+- **메소드 분리**를 통해 깔끔하고 재사용 가능한 코드를 작성한다.
+
+# { 🚀 트리거 볼륨과 발사체 활성화 이해하기 }
+
+## 📋 목차
+
+1. [Trigger Volume 개념 이해하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#trigger-volume-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Trigger Volume 만들기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#trigger-volume-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+3. [Mesh Renderer 제거하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#mesh-renderer-%EC%A0%9C%EA%B1%B0%ED%95%98%EA%B8%B0)
+4. [Collider와 Is Trigger 옵션](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#collider%EC%99%80-is-trigger-%EC%98%B5%EC%85%98)
+5. [OnTriggerEnter 메서드 이해하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#ontriggerenter-%EB%A9%94%EC%84%9C%EB%93%9C-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+6. [SerializeField와 Inspector 연결](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#serializefield%EC%99%80-inspector-%EC%97%B0%EA%B2%B0)
+7. [발사체 활성화(SetActive)](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%EB%B0%9C%EC%82%AC%EC%B2%B4-%ED%99%9C%EC%84%B1%ED%99%94setactive)
+8. [여러 발사체 관리하기 (List 활용)](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%EC%97%AC%EB%9F%AC-%EB%B0%9C%EC%82%AC%EC%B2%B4-%EA%B4%80%EB%A6%AC%ED%95%98%EA%B8%B0-list-%ED%99%9C%EC%9A%A9)
+
+---
+
+## 1. Trigger Volume 개념 이해하기
+
+- **Trigger Volume**은 플레이어가 특정 영역을 통과했을 때 이벤트를 발생시키는 보이지 않는 영역.
+- 충돌(Collision)과 다르게 **물리적 반응은 없고** 단순히 "플레이어가 들어왔다/나갔다"를 감지.
+- Unity에서는 Collider의 **Is Trigger** 옵션을 켜면 만들 수 있음.
+
+---
+
+## 2. Trigger Volume 만들기
+
+- `Hierarchy` → `3D Object` → `Cube` 생성.
+- 플레이어 앞에 배치하여 "지나가는 구역" 역할을 하도록 설정.
+- 크기를 `R`(Scale 툴)로 조정해서 플레이어가 확실히 통과할 수 있도록 함.
+
+---
+
+## 3. Mesh Renderer 제거하기
+
+- Trigger Volume은 **게임에서 보이지 않아야 자연스럽다**.
+- Cube의 `Mesh Renderer` 컴포넌트를 꺼서 보이지 않게 하거나 완전히 제거.
+- 남는 건 `Box Collider`만 → 플레이어가 인식할 "투명한 구역"이 됨.
+
+---
+
+## 4. Collider와 Is Trigger 옵션
+
+- `Box Collider`의 **Is Trigger** 체크.
+- 체크하지 않으면 "충돌"로 작동 → 플레이어가 부딪혀 멈춰버림.
+- 체크하면 물리 충돌 없이 통과 가능, 대신 `OnTriggerEnter` 이벤트 발생.
+
+---
+
+## 5. OnTriggerEnter 메서드 이해하기
+
+```csharp
+void OnTriggerEnter(Collider other)
+{
+    if (other.gameObject.CompareTag("Player"))
+    {
+        // 플레이어가 트리거에 들어왔을 때 실행할 코드
+    }
+}
+```
+
+- `OnTriggerEnter(Collider other)` : **플레이어가 트리거 안에 들어왔을 때 호출됨**.
+- `CompareTag("Player")` : 태그가 `"Player"`인 경우만 반응하도록 조건 설정.
+
+---
+
+## 6. SerializeField와 Inspector 연결
+
+```csharp
+[SerializeField] GameObject projectile;
+```
+
+- `SerializeField` : private 변수라도 **Inspector에서 연결 가능**.
+- Inspector에서 Trigger Volume에 붙인 스크립트에 Projectile을 드래그&드롭으로 연결.
+- 이 방식으로 **특정 발사체를 코드와 연결**해 제어할 수 있음.
+
+---
+
+## 7. 발사체 활성화(SetActive)
+
+```csharp
+projectile.SetActive(true);
+```
+
+- `SetActive(true)` : 비활성화된 오브젝트를 활성화.
+- 비활성화 상태에서는 보이지 않고, 스크립트나 Collider도 동작하지 않음.
+- 플레이어가 트리거를 통과하면 발사체가 깨어나 작동 시작.
+
+---
+
+## 8. 여러 발사체 관리하기 (List 활용)
+
+```csharp
+[SerializeField] List<GameObject> projectiles;
+
+void OnTriggerEnter(Collider other)
+{
+    if (other.gameObject.CompareTag("Player"))
+    {
+        foreach (GameObject proj in projectiles)
+        {
+            proj.SetActive(true);
+        }
+    }
+}
+```
+
+- **List<GameObject>** 사용 → 발사체 여러 개를 Inspector에서 한 번에 관리 가능.
+- `foreach`문으로 리스트에 있는 모든 발사체를 순회하며 활성화.
+- → 깔끔하고 확장성 있는 방식.
+
+---
+
+✅ **핵심 정리**
+
+- Trigger Volume은 **플레이어의 진입 이벤트를 감지하는 투명한 영역**.
+- `OnTriggerEnter`를 활용해 **조건부 이벤트 실행** 가능.
+- `SerializeField`로 Inspector에서 오브젝트를 연결해 제어.
+- `SetActive(true)`로 발사체를 깨어나게 함.
+- 여러 발사체는 `List<GameObject>`로 관리하면 효율적.
+
+# { 🧩 프리팹(Prefab) 만들기와 활용하기 }
+
+## 📋 목차
+
+1. [프리팹(Prefab) 개념 이해하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%ED%94%84%EB%A6%AC%ED%8C%B9prefab-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [프리팹과 인스턴스 차이](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%ED%94%84%EB%A6%AC%ED%8C%B9%EA%B3%BC-%EC%9D%B8%EC%8A%A4%ED%84%B4%EC%8A%A4-%EC%B0%A8%EC%9D%B4)
+3. [프리팹 생성하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%ED%94%84%EB%A6%AC%ED%8C%B9-%EC%83%9D%EC%84%B1%ED%95%98%EA%B8%B0)
+4. [프리팹 수정과 적용(Overrides)](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%ED%94%84%EB%A6%AC%ED%8C%B9-%EC%88%98%EC%A0%95%EA%B3%BC-%EC%A0%81%EC%9A%A9overrides)
+5. [프리팹 관리와 폴더 구조](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%ED%94%84%EB%A6%AC%ED%8C%B9-%EA%B4%80%EB%A6%AC%EC%99%80-%ED%8F%B4%EB%8D%94-%EA%B5%AC%EC%A1%B0)
+6. [프리팹의 장점](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%ED%94%84%EB%A6%AC%ED%8C%B9%EC%9D%98-%EC%9E%A5%EC%A0%90)
+7. [프리팹 사용 시 주의할 점](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%ED%94%84%EB%A6%AC%ED%8C%B9-%EC%82%AC%EC%9A%A9-%EC%8B%9C-%EC%A3%BC%EC%9D%98%ED%95%A0-%EC%A0%90)
+
+---
+
+## 1. 프리팹(Prefab) 개념 이해하기
+
+- **Prefab(프리팹)**:
+  - 게임 오브젝트(GameObject) 또는 오브젝트들의 집합을 **재사용 가능한 자산**으로 만든 것.
+  - 하드 드라이브에 `.prefab` 파일로 저장됨.
+- 한 번 만들어두면 **여러 장면(Scene)에서 재활용** 가능.
+- Unity Asset Store의 많은 에셋도 사실상 프리팹 모음임.
+
+---
+
+## 2. 프리팹과 인스턴스 차이
+
+- **Prefab**: 원본 템플릿(청사진).
+- **Instance(인스턴스)**: 장면(Scene)에 배치된 프리팹의 복사본.
+- 인스턴스를 삭제해도, **Prefab 파일은 남아 있음** → 다시 드래그해서 사용 가능.
+
+---
+
+## 3. 프리팹 생성하기
+
+1. \*프로젝트 창(Project Window)\*\*에서 `Prefabs`라는 새 폴더 생성.
+2. **Hierarchy**에서 원하는 오브젝트(예: Projectile, Player 등)를 `Prefabs` 폴더로 드래그.
+3. 이제 해당 오브젝트는 `.prefab` 파일로 변환됨.
+4. Scene에 넣고 싶을 때는 → Prefab을 다시 드래그하여 배치하면 됨.
+
+---
+
+## 4. 프리팹 수정과 적용(Overrides)
+
+- 인스턴스에서 값을 바꾸면 → **Override**(재정의) 상태가 됨.
+- Inspector 상단에서:
+  - **Apply All** → 변경 사항을 Prefab 원본에 적용 → 모든 인스턴스에 반영.
+  - **Revert All** → 변경 사항을 취소 → Prefab 원본 상태로 되돌림.
+
+💡 **예시**:
+
+- Projectile 프리팹의 **Scale = 1.5** → 모든 인스턴스 크기 변경.
+- 하지만 특정 인스턴스의 색상만 다르게 바꾸면? → 그 인스턴스만 유지됨.
+  (재질 색상처럼 일부 컴포넌트는 개별 유지 가능)
+
+---
+
+## 5. 프리팹 관리와 폴더 구조
+
+- Prefab은 어디에 둬도 되지만, **전용 Prefabs 폴더**를 만들어 정리하는 것이 권장됨.
+- 플레이어, 발사체, 벽, 트리거 볼륨 등 자주 사용하는 오브젝트는 Prefab으로 관리.
+- 카메라, Directional Light 같은 환경 기본 요소는 굳이 프리팹으로 만들 필요 없음.
+
+---
+
+## 6. 프리팹의 장점
+
+✅ **일관성 유지**: 원본만 수정하면 모든 인스턴스가 자동 반영됨.
+
+✅ **재사용성**: 여러 Scene에서 같은 프리팹을 불러와 사용 가능.
+
+✅ **안전성**: 실수로 Scene 오브젝트를 삭제해도, Prefab이 있으면 다시 배치 가능.
+
+✅ **유연성**: 일부 인스턴스만 다르게 커스터마이징 가능 (색상, 위치 등).
+
+---
+
+## 7. 프리팹 사용 시 주의할 점
+
+- Prefab으로 만들 때 **스크립트 참조(예: Player 변수)**가 끊길 수 있음 → 다시 연결 필요.
+- Console 에러 확인 필수 (특히 `UnassignedReferenceException` 같은 참조 누락 오류).
+- Prefab 수정 시 **인스턴스 Override와 원본의 차이**를 항상 구분해야 함.
+
+---
+
+👉 요약:
+
+프리팹은 Unity에서 **반복 작업을 줄이고, 일관성을 유지하며, 안전하게 프로젝트를 관리**하는 핵심 개념입니다.
+
+이번 강의에서는 Projectile, Player, Trigger Volume, Wall 같은 주요 오브젝트를 프리팹으로 만들어 관리하는 방법을 익혔습니다.
+
+# { 🚀 게임 오브젝트 문제 해결과 실행 순서 이해하기 }
+
+## 📋 목차
+
+1. [게임 오브젝트 활성/비활성 문제](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%EA%B2%8C%EC%9E%84-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%ED%99%9C%EC%84%B1%EB%B9%84%ED%99%9C%EC%84%B1-%EB%AC%B8%EC%A0%9C)
+2. [오류 발생 원인 분석하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%EC%98%A4%EB%A5%98-%EB%B0%9C%EC%83%9D-%EC%9B%90%EC%9D%B8-%EB%B6%84%EC%84%9D%ED%95%98%EA%B8%B0)
+3. [게임 오브젝트 비활성화 도전 과제](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%EA%B2%8C%EC%9E%84-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%EB%B9%84%ED%99%9C%EC%84%B1%ED%99%94-%EB%8F%84%EC%A0%84-%EA%B3%BC%EC%A0%9C)
+4. [Unity 실행 순서 이해하기](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#unity-%EC%8B%A4%ED%96%89-%EC%88%9C%EC%84%9C-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+5. [Awake와 Start의 차이](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#awake%EC%99%80-start%EC%9D%98-%EC%B0%A8%EC%9D%B4)
+6. [실습 코드와 개선](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%EC%8B%A4%EC%8A%B5-%EC%BD%94%EB%93%9C%EC%99%80-%EA%B0%9C%EC%84%A0)
+7. [핵심 정리](https://www.notion.so/2-1-3-26ce683f737e800ab060e048492d60de#%ED%95%B5%EC%8B%AC-%EC%A0%95%EB%A6%AC)
+
+---
+
+## 1. 게임 오브젝트 활성/비활성 문제
+
+- 발사체(Projectile)를 **플레이어 방향으로 이동**시키고 싶을 때, 기본적으로 비활성화된 상태에서 필요할 때만 활성화해야 함.
+- 문제: 활성화/비활성화를 수동으로 관리하지 않으면 **파괴된 오브젝트에 접근**하는 오류 발생.
+
+---
+
+## 2. 오류 발생 원인 분석하기
+
+- `TriggerProjectile` 스크립트는 **플레이어가 트리거에 닿으면 발사체를 활성화**함.
+- `FlyAtPlayer` 스크립트는 **플레이어 위치에 도달하면 자기 자신을 파괴**함.
+- 충돌 시점에 이미 발사체가 파괴되었는데, 다시 `SetActive(true)`를 시도 → **Null 참조 에러 발생**.
+
+---
+
+## 3. 게임 오브젝트 비활성화 도전 과제
+
+- **도전 과제:** 게임 시작 시 발사체가 **비활성화 상태**로 시작하도록 설정.
+- 해결 방법: `SetActive(false)`를 코드에서 직접 실행.
+- "누가 책임질 것인가?" → 발사체 움직임을 담당하는 **FlyAtPlayer 스크립트**가 관리하는 것이 적절함.
+
+---
+
+## 4. Unity 실행 순서 이해하기
+
+Unity에는 다양한 **이벤트 함수 실행 순서**가 존재:
+
+1. **Awake()** : 게임 오브젝트가 생성되자마자, 가장 먼저 호출됨.
+2. **OnEnable()** : 오브젝트가 활성화될 때 호출됨.
+3. **Start()** : 첫 Update 전에 한 번 호출됨.
+4. **Update()** : 매 프레임마다 호출됨.
+5. **FixedUpdate()** : 물리 루프에서 실행 (Update보다 다른 주기로 동작).
+6. **OnTriggerEnter / OnCollisionEnter** : 충돌 시점에서 실행됨.
+
+👉 즉, Awake → OnEnable → Start → Update 순서로 실행된다는 점이 중요함.
+
+---
+
+## 5. Awake와 Start의 차이
+
+- **Start()** : 게임이 시작될 때 한 번 실행 → 보통 초기화 작업에 사용.
+- **Awake()** : Start보다 먼저 실행 → 주로 오브젝트의 **기본 상태 설정**에 사용.
+- 이번 경우:
+  - `Awake()` → 발사체를 비활성화(`SetActive(false)`)
+  - `Start()` → 플레이어의 **초기 위치 기록**
+
+이렇게 분리해야 버그 없이 원하는 동작을 얻을 수 있음.
+
+---
+
+## 6. 실습 코드와 개선
+
+```csharp
+using UnityEngine;
+
+public class FlyAtPlayer : MonoBehaviour
+{
+    [SerializeField] Transform player;
+    [SerializeField] float speed = 1.0f;
+    Vector3 playerPosition;
+
+    void Awake()
+    {
+        // 게임 시작 시 발사체는 비활성화 상태
+        gameObject.SetActive(false);
+    }
+
+    void Start()
+    {
+        // 플레이어 초기 위치 저장
+        playerPosition = player.transform.position;
+    }
+
+    void Update()
+    {
+        DestroyWhenReached();
+        MoveToPlayer();
+    }
+
+    void MoveToPlayer()
+    {
+        transform.position = Vector3.MoveTowards(transform.position, playerPosition, Time.deltaTime * speed);
+    }
+
+    void DestroyWhenReached()
+    {
+        if (transform.position == playerPosition)
+        {
+            Destroy(gameObject);
+        }
+    }
+}
+
+```
+
+---
+
+## 7. 핵심 정리
+
+- 게임 시작 시 발사체는 **Awake에서 비활성화**해야 오류를 방지할 수 있음.
+- **Awake는 Start보다 먼저 실행**되므로, 초기 상태 관리에 적합함.
+- Unity 이벤트 함수에는 **명확한 실행 순서**가 있으며, 이를 이해하면 버그 해결에 큰 도움이 됨.
+- 이번 강의에서는 `Awake`와 `Start`의 차이를 실습을 통해 학습함.

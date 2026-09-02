@@ -1,0 +1,312 @@
+---
+title: 'BCh05 03 p248 Eager/Lazy로딩 이해'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381223/notion-blog/_/_/_/_/BCh05_03_p248_Eager_Lazy_/Untitled.png)
+
+```java
+게시물 로딩 테스트를 실시한다
+```
+
+# 게시물 로딩 테스트
+
+```java
+@Test
+    public void testRead1() {
+        Optional<Board> result = boardRepository.findById(100L); // 데이터베이스에 존재하는 번호
+
+        Board board = result.get();
+
+        System.out.println(board);
+        System.out.println(board.getWriter());
+    }
+```
+
+```java
+Hibernate:
+    select
+        board0_.bno as bno1_0_0_,
+        board0_.moddate as moddate2_0_0_,
+        board0_.regdate as regdate3_0_0_,
+        board0_.content as content4_0_0_,
+        board0_.title as title5_0_0_,
+        board0_.writer_email as writer_e6_0_0_,
+        member1_.email as email1_1_1_,
+        member1_.moddate as moddate2_1_1_,
+        member1_.regdate as regdate3_1_1_,
+        member1_.name as name4_1_1_,
+        member1_.password as password5_1_1_
+    from
+        board board0_
+    left outer join
+        member member1_
+            on board0_.writer_email=member1_.email
+    where
+        board0_.bno=?
+Board(bno=100, title=Title...100, content=Content...100)
+Member(email=user100@aaa.com, password=123456, name=USER100)
+```
+
+```java
+결과를 보면 Board 와 Member 모두를 가져오고
+
+leftJoin 을 사용하였다
+```
+
+# 댓글 로딩 테스트
+
+```java
+@Test
+    public void readReply1() {
+
+        Optional<Reply> result = replyRepository.findById(1L);
+
+        Reply reply = result.get();
+
+        System.out.println(reply);
+
+        System.out.println(reply.getBoard());
+
+    }
+```
+
+```java
+Hibernate:
+    select
+        reply0_.rno as rno1_2_0_,
+        reply0_.moddate as moddate2_2_0_,
+        reply0_.regdate as regdate3_2_0_,
+        reply0_.board_bno as board_bn6_2_0_,
+        reply0_.replyer as replyer4_2_0_,
+        reply0_.text as text5_2_0_,
+        board1_.bno as bno1_0_1_,
+        board1_.moddate as moddate2_0_1_,
+        board1_.regdate as regdate3_0_1_,
+        board1_.content as content4_0_1_,
+        board1_.title as title5_0_1_,
+        board1_.writer_email as writer_e6_0_1_,
+        member2_.email as email1_1_2_,
+        member2_.moddate as moddate2_1_2_,
+        member2_.regdate as regdate3_1_2_,
+        member2_.name as name4_1_2_,
+        member2_.password as password5_1_2_
+    from
+        reply reply0_
+    left outer join
+        board board1_
+            on reply0_.board_bno=board1_.bno
+    left outer join
+        member member2_
+            on board1_.writer_email=member2_.email
+    where
+        reply0_.rno=?
+Reply(rno=1, text=Reply.....1, replyer=guest)
+Board(bno=13, title=Title...13, content=Content...13)
+```
+
+```java
+댓글 로딩 테스트를 진행하면
+
+댓글을 하나 가져오려고 Board 에 Member 까지 모두 가져와 버린다
+
+이러면 메모리를 낭비하게 된다
+```
+
+## 원인
+
+```java
+이 원인은 댓글은
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381221/notion-blog/_/_/_/_/BCh05_03_p248_Eager_Lazy_/Untitled_1.png)
+
+```java
+@ManyToOne 에 의해서 Board 를 가져오게 된다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381222/notion-blog/_/_/_/_/BCh05_03_p248_Eager_Lazy_/Untitled_2.png)
+
+```java
+그리고 Board 는 Member 을 또 가져오게 된다
+```
+
+# **Eager/Lazy 로딩**
+
+## **fetch(가져오는 방식)는 항상 Lazy로딩을**
+
+```java
+@ManyToOne 과 같은 연관관계를 지정하는 경우에는 fetch라는 속성을 지정 가능 (지정하지 않으면 기본 설정 값)
+
+@ManyToOne의 경우 기본이 Eager 방식
+
+가능하면 필요하지 않은 데이터를 가져오지 않도록 Lazy 로딩을 기본으로 지정
+```
+
+## Lazy로딩
+
+```java
+레이지 로딩은 내가 필요하지 않으면 조회하지 않는다  ( 필요하지 않는 데이터는 가능하면 로딩을 미루는 방식이 지연(lazy) 로딩 )
+
+예를 들어 내가 이 테이블만 뒤지면 되고 다른 테이블은 뒤질 필요가 없을 때는 가만있다가
+
+다른 테이블이 필요할 때 그때 다시 조회를 하는방법
+
+( 내가 필요한 순간까지 데이터 조회를 막는것 )
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381222/notion-blog/_/_/_/_/BCh05_03_p248_Eager_Lazy_/Untitled_3.png)
+
+```java
+예를 들어 Board 엔티티를 가져올 떄 회원 엔티티까지 가져오게 (eager) 로 설정 되어있다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381222/notion-blog/_/_/_/_/BCh05_03_p248_Eager_Lazy_/Untitled_4.png)
+
+```java
+여기에 위와 같이
+
+@ManyToOne(fetch = FetchType.LAZY) 이렇게 사용
+```
+
+## no Session 오류
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381222/notion-blog/_/_/_/_/BCh05_03_p248_Eager_Lazy_/Untitled_5.png)
+
+```java
+이후 Reply 엔티티도 fetch = FetchType.LAZY 를 추가해주면
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381222/notion-blog/_/_/_/_/BCh05_03_p248_Eager_Lazy_/Untitled_6.png)
+
+```java
+위와 같은 오류가 발생한다
+```
+
+```java
+세션 이라는 말은 커넥션 이라는 말과 동의어 이다
+
+그래서 지금 상황을 설명하자면 일단 board 테스트를 실행한다
+```
+
+```java
+Hibernate:
+    select
+        board0_.bno as bno1_0_0_,
+        board0_.moddate as moddate2_0_0_,
+        board0_.regdate as regdate3_0_0_,
+        board0_.content as content4_0_0_,
+        board0_.title as title5_0_0_,
+        board0_.writer_email as writer_e6_0_0_
+    from
+        board board0_
+    where
+        board0_.bno=?
+Board(bno=100, title=Title...100, content=Content...100)
+```
+
+```java
+아까보다 심플해진 결과를 볼 수 있다
+
+문제가 발생하는 부분은 아래의 board.getWriter 부분이다
+
+이 부분에서는 처음에 Board 쪽만 조회를 해서 가져왔기 때문에 Member 쪽을 조회하려면 다시 sql Select 를 날려줘야 하는데 그걸 못해줘서 생기는 문제이다
+
+( 결과적으로 no Session 은 다시 DB 연결을 해야하는데 못해서 나오는 오류 )
+
+이런 문제를 해결하기 위해서는 아래의 @Transactional 을 사용한다
+```
+
+```java
+@Test
+    public void testRead1() {
+        Optional<Board> result = boardRepository.findById(100L); // 데이터베이스에 존재하는 번호
+
+        Board board = result.get();
+
+        System.out.println(board);
+        System.out.println(board.getWriter());
+    }
+```
+
+# @Transactional
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381223/notion-blog/_/_/_/_/BCh05_03_p248_Eager_Lazy_/Untitled_7.png)
+
+```java
+새로운 연결이 (DB 랑 ) 필요할 때
+
+이 작업을 하나의 트랜잭션으로 묶어서 처리해준다면
+
+연결이 가능해진다
+
+@Transactional 을 붙이면 해결
+
+( @Transactional 애노테이션을 적용하면 필요한 순간 다시 데이터베이스 연결 )
+```
+
+## 재실행
+
+```java
+Hibernate:
+    select
+        board0_.bno as bno1_0_0_,
+        board0_.moddate as moddate2_0_0_,
+        board0_.regdate as regdate3_0_0_,
+        board0_.content as content4_0_0_,
+        board0_.title as title5_0_0_,
+        board0_.writer_email as writer_e6_0_0_
+    from
+        board board0_
+    where
+        board0_.bno=?
+Board(bno=100, title=Title...100, content=Content...100)
+Hibernate:
+    select
+        member0_.email as email1_1_0_,
+        member0_.moddate as moddate2_1_0_,
+        member0_.regdate as regdate3_1_0_,
+        member0_.name as name4_1_0_,
+        member0_.password as password5_1_0_
+    from
+        member member0_
+    where
+        member0_.email=?
+Member(email=user100@aaa.com, password=123456, name=USER100)
+```
+
+```java
+@Transactional 을 붙이고 다시 테스트를 실행하면
+
+System.out.println(board.getWriter()); 를 실행할 때 다시 DB를 호출한다
+
+( Hibernate: 가 두개 )
+
+한마디로 사용하지 않을 때는 호출하지 말고 (  System.out.println(board); 까지 )
+
+필요할 때는 ( Member 가 필요할 때 ) ( System.out.println(board.getWriter()); ) 다시 호출을 한다
+```
+
+## 오류 없이 사용하는 팁
+
+```java
+1. 연관 관계를 잡을 때 @ManyToOne 을 사용하면
+
+2. Lazy 로딩을 걸어주고
+
+3. 그 변수를 ToString 에 exclude 를 사용해서 제외 시켜준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381223/notion-blog/_/_/_/_/BCh05_03_p248_Eager_Lazy_/Untitled_8.png)
+
+### **주의해야 하는 toString()**
+
+```java
+* toString( )시에 연관된 엔티티를 출력하는 경우에 다시 연결이 필요한 경우가 발생
+
+* 연관관계를 지정하는 경우에는 항상 toString( )에서 제외하도록 주의
+```

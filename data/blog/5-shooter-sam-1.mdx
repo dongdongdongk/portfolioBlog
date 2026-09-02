@@ -1,0 +1,3218 @@
+---
+title: '섹션 5: Shooter Sam - 1'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 언리얼 엔진 게임 에셋 임포트 가이드 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380641/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_1/image.png)
+
+이 강의는 언리얼 엔진에 게임 에셋을 가져오는 방법을 설명합니다.
+
+## 주요 작업 내용
+
+### 1단계: Fab Store에서 캐릭터 에셋 가져오기
+
+1. Fab Store 웹사이트 접속 (에픽게임즈 계정 로그인 필요)
+2. "파라곤 레이스(Paragon Wraith)" 검색
+3. 내 라이브러리에 추가
+4. 에픽게임즈 런처 → 라이브러리 → 팹 라이브러리에서 프로젝트에 추가
+
+### 2단계: 추가 에셋 마이그레이션하기
+
+1. 강의 리소스에서 "어썸 에셋" 프로젝트 다운로드
+2. 다운받은 프로젝트를 열어서 필요한 에셋 선택
+3. 마우스 우클릭 → "마이그레이션" 선택 (이주)
+4. 작업 중인 프로젝트의 콘텐츠 폴더 선택하여 복사
+
+## 가져온 에셋들
+
+### 파라곤 레이스 팩
+
+- 스켈레탈 메시 (뼈대가 있어 애니메이션 가능한 캐릭터 모델)
+- 내부에 애니메이션용 본(뼈대) 구조 포함
+
+### 슈팅 게임 팩
+
+- 무기 메시 (소총, 런처 등)
+- 음향 효과
+- 시각 효과 (파티클)
+- 보이스오버
+
+## 핵심 용어
+
+- **스태틱 메시**: 움직이지 않는 고정된 3D 모델 (건물, 소품 등)
+- **스켈레탈 메시**: 뼈대 구조가 있어 애니메이션이 가능한 3D 모델 (캐릭터)
+- **마이그레이션**: 한 프로젝트의 에셋을 다른 프로젝트로 복사하는 기능
+
+## 주의사항
+
+마이그레이션 과정에서 간혹 일부 폴더나 파일이 복사되지 않을 수 있습니다.
+이런 경우 원본 프로젝트로 돌아가서 해당 파일/폴더를 개별적으로 마이그레이션하면 됩니다.
+
+---
+
+**요약**: 게임 제작에 필요한 캐릭터, 무기, 효과음 등을 프로젝트에 추가하는 과정입니다.
+
+# { 언리얼 엔진 3인칭 템플릿 구조 정리 }
+
+## 1. 주요 폴더 구조
+
+### Character 폴더
+
+- **Mannequin 폴더**
+  - 기본 캐릭터의 모든 에셋 포함
+  - 스켈레탈 메시, 스켈레톤
+  - 애니메이션 (달리기, 점프, 착지 등)
+  - 애니메이션 블루프린트, 블렌드 스페이스
+- **참고**: 이 프로젝트에서는 Paragon Wraith로 교체 예정
+
+### Input 폴더
+
+- 매핑 컨텍스트 (Mapping Context)
+- 입력 액션 (Input Action)
+- 모바일/터치 입력 관련 에셋
+
+### LevelPrototyping 폴더
+
+- 프로토타입 레벨용 메시 (큐브, 원통 등)
+- 머티리얼, 텍스처
+- 상호작용 오브젝트 (문, 점프 패드, 타겟 등)
+
+### ThirdPerson 폴더 ⭐ (가장 중요)
+
+- **기본 맵**: 프로젝트 시작 레벨
+- **머티리얼**: 맵에서 사용되는 머티리얼
+- **블루프린트**
+  - `BP_ThirdPersonCharacter`: 플레이어 캐릭터
+  - `GameMode`: 게임 규칙 관리
+  - `PlayerController`: 캐릭터 제어
+
+### 변형 폴더
+
+- **CombatPlatform**: 격투 게임용 기능
+- **SideScroller**: 횡스크롤 게임용 기능
+
+---
+
+## 2. BP_ThirdPersonCharacter 구조
+
+### 컴포넌트 계층
+
+```
+Capsule Component (루트)
+├── Arrow Component (방향 표시)
+├── Skeletal Mesh Component
+└── Spring Arm
+    └── Camera
+
+Character Movement Component (독립)
+```
+
+### 주요 특징
+
+- **Capsule**: 충돌 및 루트 역할
+- **Skeletal Mesh**: 현재 Mannequin 사용 (변경 가능)
+- **Spring Arm + Camera**: 3인칭 시점 구현
+- **Character Movement**: 이동 로직 처리
+
+---
+
+## 3. C++ 코드 구조
+
+### GameMode 클래스
+
+- 기본적으로 빈 클래스
+- 향후 게임 규칙 구현에 사용 예정
+
+### PlayerController 클래스
+
+**주요 역할**: 입력 매핑 컨텍스트 설정
+
+```cpp
+// 헤더 파일
+TArray<UInputMappingContext*> DefaultMappingContexts;
+```
+
+**기능**
+
+- `BeginPlay()`: 모바일 입력 설정
+- `SetupInputComponent()`: 매핑 컨텍스트 추가
+  - for 루프로 배열의 모든 컨텍스트 추가
+  - 기본적으로 1개의 매핑 컨텍스트 사용
+
+### Character 클래스
+
+**상속 구조**
+
+- `ACharacter` 클래스 상속
+- 기본 컴포넌트 자동 포함 (Capsule, Mesh, Movement)
+
+**생성자에서 수행하는 작업**
+
+```cpp
+// 컴포넌트 생성
+- Spring Arm 생성 및 루트에 부착
+- Camera 생성 및 Spring Arm에 부착
+
+// 설정 커스터마이징
+- 회전 관련 설정
+- Character Movement 설정
+- Capsule 크기 설정
+```
+
+**입력 바인딩 (SetupPlayerInputComponent)**
+
+| 액션        | 키 입력                             | 바인딩 함수                   |
+| ----------- | ----------------------------------- | ----------------------------- |
+| 점프 (시작) | 스페이스바                          | `Jump()` (부모 클래스)        |
+| 점프 (종료) | 스페이스바 해제                     | `StopJumping()` (부모 클래스) |
+| 이동        | WASD, 화살표 키, 게임패드 왼쪽 스틱 | `Move()`                      |
+| 시점        | 마우스, 게임패드 오른쪽 스틱        | `Look()`                      |
+
+---
+
+## 4. 입력 시스템 구조
+
+### 매핑 컨텍스트 구성
+
+**Default Mapping Context**
+
+- 이동: WASD, 화살표 키, 게임패드 왼쪽 스틱
+- 점프: 스페이스바, 게임패드 버튼
+- 시점: 게임패드 오른쪽 스틱
+
+**별도 매핑 컨텍스트**
+
+- 마우스 시점용으로 분리
+
+### 입력 처리 흐름
+
+1. PlayerController가 매핑 컨텍스트 설정
+2. Character 클래스에서 입력 액션에 함수 바인딩
+3. 게임패드 자동 지원
+
+---
+
+## 5. 헤더 파일의 특징
+
+### 인라인 함수 생성
+
+```cpp
+// CPP 파일이 아닌 헤더에서 직접 함수 구현
+FORCEINLINE class USpringArmComponent* GetSpringArm() const { return SpringArm; }
+```
+
+- 매우 짧은 함수에 사용
+- 도우미 함수 (Camera, Spring Arm 반환 등)
+
+### 부모 클래스의 헬퍼 함수 활용
+
+```cpp
+GetCharacterMovement() // Character Movement Component 반환
+GetCapsuleComponent()  // Capsule Component 반환
+```
+
+---
+
+## 6. 커스터마이징 방법
+
+### C++ vs 블루프린트
+
+**C++에서 가능**
+
+- 생성자에서 기본값 설정
+- 컴포넌트 설정 하드코딩
+
+**블루프린트 권장** ⭐
+
+- 변수 조정이 더 직관적
+- 컴파일 없이 즉시 테스트 가능
+- Character Movement 설정 등
+
+### 캐릭터 교체 예시
+
+1. Skeletal Mesh 변경
+2. 해당 스켈레톤에 맞는 애니메이션 블루프린트 생성 필요
+3. Animation Class 속성에서 변경
+
+---
+
+## 7. 향후 수정 예정 사항
+
+### 회전 시스템
+
+- 현재: 기본 3인칭 회전
+- 변경 예정: 슈팅 게임에 맞는 회전 로직
+
+### 게임 모드
+
+- 게임 규칙 구현 예정
+
+---
+
+## 8. 핵심 정리
+
+### 템플릿의 장점
+
+✅ 완성된 3인칭 캐릭터 시스템 제공
+
+✅ 입력 시스템 구현 완료
+
+✅ 게임패드 자동 지원
+
+✅ C++와 블루프린트 혼합 사용 가능
+
+### 학습 포인트
+
+- 템플릿 구조를 이해한 후 커스터마이징
+- 블루프린트에서 설정 변경이 더 편리
+- 각 클래스의 역할 명확히 구분
+  - GameMode: 게임 규칙
+  - PlayerController: 입력 설정
+  - Character: 캐릭터 로직
+
+### 강의 목적
+
+템플릿을 그대로 사용하지 않고, 구조를 완전히 이해한 후 프로젝트에 맞게 수정하기 위함
+
+# { 🎮 3인칭 템플릿의 이동 시스템 완전 분석 }
+
+이번 강의는 언리얼 엔진의 3인칭 템플릿에서 캐릭터 이동이 어떻게 구현되어 있는지를 단계별로 분석합니다. 입력 시스템부터 실제 캐릭터 이동까지의 전 과정을 다룹니다.
+
+---
+
+## 📋 목차
+
+1. [입력 액션 바인딩 이해하기](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#1-%EC%9E%85%EB%A0%A5-%EC%95%A1%EC%85%98-%EB%B0%94%EC%9D%B8%EB%94%A9-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [FVector2D 타입 이해하기](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#2-fvector2d-%ED%83%80%EC%9E%85-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+3. [입력 액션 에셋 설정 분석](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#3-%EC%9E%85%EB%A0%A5-%EC%95%A1%EC%85%98-%EC%97%90%EC%85%8B-%EC%84%A4%EC%A0%95-%EB%B6%84%EC%84%9D)
+4. [매핑 컨텍스트에서 4방향 입력 구현](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#4-%EB%A7%A4%ED%95%91-%EC%BB%A8%ED%85%8D%EC%8A%A4%ED%8A%B8%EC%97%90%EC%84%9C-4%EB%B0%A9%ED%96%A5-%EC%9E%85%EB%A0%A5-%EA%B5%AC%ED%98%84)
+5. [입력 값 로그 출력하기](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#5-%EC%9E%85%EB%A0%A5-%EA%B0%92-%EB%A1%9C%EA%B7%B8-%EC%B6%9C%EB%A0%A5%ED%95%98%EA%B8%B0)
+6. [게임패드와 키보드의 차이점](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#6-%EA%B2%8C%EC%9E%84%ED%8C%A8%EB%93%9C%EC%99%80-%ED%82%A4%EB%B3%B4%EB%93%9C%EC%9D%98-%EC%B0%A8%EC%9D%B4%EC%A0%90)
+7. [DoMove 함수 분석](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#7-domove-%ED%95%A8%EC%88%98-%EB%B6%84%EC%84%9D)
+8. [회전 행렬로 방향 벡터 계산하기](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#8-%ED%9A%8C%EC%A0%84-%ED%96%89%EB%A0%AC%EB%A1%9C-%EB%B0%A9%ED%96%A5-%EB%B2%A1%ED%84%B0-%EA%B3%84%EC%82%B0%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. 입력 액션 바인딩 이해하기
+
+### 플레이어 입력 컴포넌트 설정 위치
+
+3인칭 캐릭터 클래스의 코드를 보면 **플레이어 입력 컴포넌트 설정** 섹션이 있습니다. 여기서 입력과 함수를 연결합니다.
+
+### 이동 액션 바인딩 방식
+
+```cpp
+// 이동 액션이 트리거될 때마다 Move 함수를 호출
+PlayerInputComponent->BindAction("MoveAction", ETriggerEvent::Triggered, this, &AThirdPersonCharacter::Move);
+```
+
+**바인딩의 의미:**
+
+- **"MoveAction"** : 입력 액션의 이름
+- **ETriggerEvent::Triggered** : 이 이벤트 타입은 "액션이 활성화되어 있는 동안 계속 호출"을 의미
+- **Move 함수** : 입력 값을 받아서 처리할 함수
+
+**기존 Bool/Float 방식과의 차이:**
+
+- 이전에는 True/False 값을 받는 Bool 타입이나 단일 숫자를 받는 Float 타입을 사용했습니다.
+- 이동의 경우 **앞뒤 + 좌우** 2가지 방향 정보가 필요하므로 새로운 타입이 필요합니다.
+
+---
+
+## 2. FVector2D 타입 이해하기
+
+### FVector2D란?
+
+```cpp
+void AThirdPersonCharacter::Move(const FInputActionValue& Value)
+{
+    // Value에서 FVector2D 타입으로 값을 가져옴
+    FVector2D MovementVector = Value.Get<FVector2D>();
+
+    // MovementVector.X → 좌우 입력 값 (-1 ~ 1)
+    // MovementVector.Y → 앞뒤 입력 값 (-1 ~ 1)
+}
+```
+
+**FVector2D 구조:**
+
+```
+FVector2D
+├── X (float) : 수평(좌우) 값
+└── Y (float) : 수직(앞뒤) 값
+```
+
+**값 접근 방법:**
+
+```cpp
+float HorizontalInput = MovementVector.X;  // 점(.) 연산자로 X 값 가져오기
+float VerticalInput = MovementVector.Y;    // 점(.) 연산자로 Y 값 가져오기
+```
+
+**FVector와의 차이점:**
+
+- **FVector** : X, Y, Z 세 개의 float 값 (3D 공간용)
+- **FVector2D** : X, Y 두 개의 float 값 (2D 입력용)
+
+---
+
+## 3. 입력 액션 에셋 설정 분석
+
+### 입력 액션 에셋 확인하기
+
+언리얼 엔진 에디터에서 이동 입력 액션 에셋을 열어봅니다.
+
+**Value Type 설정:**
+
+- **Axis2D (Vector 2D)** 로 설정되어 있음
+- 이는 2개의 float 값을 담을 수 있는 타입입니다.
+
+**다른 Value Type 옵션들:**
+
+- **Digital (Bool)** : True/False 값만 필요할 때 (예: 점프)
+- **Axis1D (Float)** : 단일 숫자 값이 필요할 때 (예: 줌)
+- **Axis2D (Vector 2D)** : 두 방향 입력이 필요할 때 (예: 이동)
+- **Axis3D (Vector)** : 세 방향 입력이 필요할 때 (예: 비행)
+
+### 매핑 컨텍스트의 역할
+
+입력 액션 에셋 자체는 "어떤 타입의 값을 받을지"만 정의합니다. 실제로 "어떤 키를 누르면 어떤 값이 들어가는지"는 **매핑 컨텍스트(Mapping Context)** 에서 설정합니다.
+
+---
+
+## 4. 매핑 컨텍스트에서 4방향 입력 구현
+
+### 매핑 컨텍스트 구조 살펴보기
+
+매핑 컨텍스트를 열고 Move 입력 액션을 펼쳐보면 여러 키가 바인딩되어 있습니다:
+
+```
+MoveAction
+├── A 키 (왼쪽)
+├── D 키 (오른쪽)
+├── W 키 (앞)
+├── S 키 (뒤)
+├── 방향키 상하좌우
+└── 게임패드 왼쪽 스틱
+```
+
+이 강의에서는 **A, D, W, S 키**에 집중합니다.
+
+---
+
+### A와 D 키 설정 (좌우 이동)
+
+### D 키 설정
+
+```
+D 키
+├── 기본 값: 1.0 (양수)
+├── 수정자(Modifiers): 없음
+└── 결과: MovementVector.X = 1.0 (오른쪽)
+```
+
+**작동 방식:**
+
+- D 키를 누르면 기본적으로 **양수(+1.0)** 값이 생성됩니다.
+- 수정자가 없으므로 그대로 Vector2D의 **X 속성**에 들어갑니다.
+- X가 양수이므로 **오른쪽** 방향을 의미합니다.
+
+### A 키 설정
+
+```
+A 키
+├── 기본 값: 1.0 (양수)
+├── 수정자: Negate (부정 수정자)
+└── 결과: MovementVector.X = -1.0 (왼쪽)
+```
+
+**Negate 수정자의 역할:**
+
+- **Negate** : 값을 음수로 바꾸는 수정자
+- 원래 값 1.0에 Negate를 적용하면 → **1.0**
+- A 키를 누르면 X = -1.0이 되어 **왼쪽** 방향을 의미합니다.
+
+**Float 입력과의 유사성:**
+
+- 단일 Float 값을 사용할 때도 이런 방식으로 작동합니다.
+- 한 키는 양수, 반대 키는 Negate로 음수를 만듭니다.
+- 하지만 지금은 Vector2D이므로 X와 Y 두 개의 값이 있습니다.
+
+---
+
+### W와 S 키 설정 (앞뒤 이동)
+
+### 기본 동작의 한계
+
+**문제 상황:**
+
+- A, D 키가 이미 X 속성을 사용하고 있습니다.
+- W, S 키도 같은 방식으로 설정하면 X 속성에 값이 들어갑니다.
+- **하나의 Float는 한 번에 하나의 값만** 담을 수 있습니다.
+
+**해결책:**
+
+- W, S 키는 **Y 속성**에 값을 넣어야 합니다.
+- 이를 위해 **Swizzle Input Axis Values** 수정자를 사용합니다.
+
+---
+
+### Swizzle 수정자 이해하기
+
+**W 키 설정:**
+
+```
+W 키
+├── 기본 값: 1.0
+├── 수정자 1: Swizzle Input Axis Values
+│   └── Order: YXZ
+└── 결과: MovementVector.Y = 1.0 (앞)
+```
+
+**Swizzle의 의미:**
+
+- **Swizzle** : 벡터의 속성 위치를 바꾸는 것
+- **Order: YXZ** : 원래 순서(XYZ)를 YXZ로 재배치
+  - 원래 X에 들어갈 값 → Y로 이동
+  - 원래 Y에 들어갈 값 → X로 이동
+  - Z는 이 경우 사용 안 함 (Vector2D는 Z가 없음)
+
+**작동 과정:**
+
+```
+1. W 키 누름 → 기본 값 1.0 생성
+2. 기본적으로 X 속성에 들어가려고 함
+3. Swizzle 수정자 적용 → Y 속성으로 이동
+4. 최종 결과: MovementVector.Y = 1.0
+```
+
+---
+
+**S 키 설정:**
+
+```
+S 키
+├── 기본 값: 1.0
+├── 수정자 1: Negate (부정 수정자)
+├── 수정자 2: Swizzle Input Axis Values
+│   └── Order: YXZ
+└── 결과: MovementVector.Y = -1.0 (뒤)
+```
+
+**수정자 적용 순서:**
+
+```
+1. S 키 누름 → 기본 값 1.0 생성
+2. Negate 적용 → -1.0으로 변경
+3. Swizzle 적용 → X에서 Y로 이동
+4. 최종 결과: MovementVector.Y = -1.0
+```
+
+**중요한 점:**
+
+- Negate가 **Swizzle보다 위에** 있어야 합니다 (수정자는 위에서 아래로 적용됨)
+- A, D 키에는 Swizzle이 없으므로 여전히 X 속성을 사용합니다.
+
+---
+
+### 최종 결과 정리
+
+**각 키를 눌렀을 때:**
+
+| 키 누름 | MovementVector.X | MovementVector.Y | 의미   |
+| ------- | ---------------- | ---------------- | ------ |
+| D 키    | 1.0              | 0.0              | 오른쪽 |
+| A 키    | -1.0             | 0.0              | 왼쪽   |
+| W 키    | 0.0              | 1.0              | 앞     |
+| S 키    | 0.0              | -1.0             | 뒤     |
+
+**대각선 이동:**
+
+| 키 조합 | MovementVector.X | MovementVector.Y | 의미      |
+| ------- | ---------------- | ---------------- | --------- |
+| D + W   | 1.0              | 1.0              | 오른쪽 앞 |
+| A + W   | -1.0             | 1.0              | 왼쪽 앞   |
+| D + S   | 1.0              | -1.0             | 오른쪽 뒤 |
+| A + S   | -1.0             | -1.0             | 왼쪽 뒤   |
+
+---
+
+## 5. 입력 값 로그 출력하기
+
+### 도전 과제
+
+Move 함수 내부에서 받은 X, Y 값을 로그로 출력하여 예상한 값과 일치하는지 확인합니다.
+
+### 코드 작성
+
+```cpp
+void AThirdPersonCharacter::Move(const FInputActionValue& Value)
+{
+    // 입력 액션 값을 FVector2D로 변환
+    FVector2D MovementVector = Value.Get<FVector2D>();
+
+    // 로그 출력
+    // FString::Printf는 C의 printf처럼 포맷팅된 문자열을 만듦
+    // %s는 문자열 자리 표시자
+    // *MovementVector.ToString()은 Vector를 문자열로 변환
+    UE_LOG(LogTemp, Warning, TEXT("MovementVector: %s"), *MovementVector.ToString());
+
+    // 실제 이동 처리 (아래에서 설명)
+    if (Controller != nullptr)
+    {
+        // ... 이동 코드 ...
+    }
+}
+```
+
+**코드 설명:**
+
+1. **MovementVector.ToString()** : Vector2D를 "(X=1.0, Y=0.5)" 같은 문자열로 변환
+2. **별표(\*)** : FString을 C 스타일 문자열로 변환 (UE_LOG가 요구하는 형식)
+3. **TEXT() 매크로** : 문자열을 유니코드로 변환 (언리얼 엔진 표준)
+4. **%s** : 문자열을 삽입할 위치 표시자
+
+---
+
+### 로그 확인하기
+
+게임을 실행하고 Output Log 창을 확인합니다.
+
+**왼쪽(A) 이동 시:**
+
+```
+MovementVector: X=-1.000 Y=0.000
+```
+
+**오른쪽(D) 이동 시:**
+
+```
+MovementVector: X=1.000 Y=0.000
+```
+
+**앞(W) 이동 시:**
+
+```
+MovementVector: X=0.000 Y=1.000
+```
+
+**뒤(S) 이동 시:**
+
+```
+MovementVector: X=0.000 Y=-1.000
+```
+
+**대각선(D + W) 이동 시:**
+
+```
+MovementVector: X=1.000 Y=1.000
+```
+
+---
+
+## 6. 게임패드와 키보드의 차이점
+
+### 키보드의 특징
+
+**디지털 입력:**
+
+- 키보드 키는 **눌림** 또는 **안 눌림** 두 가지 상태만 있습니다.
+- 값: **1.0, 0.0, 1.0** 만 가능
+- 중간 값이 없음
+
+**이동 방향:**
+
+```
+키보드로 가능한 8방향:
+  ↖  ↑  ↗
+  ←  ●  →
+  ↙  ↓  ↘
+```
+
+**로그 예시:**
+
+```
+D 키 누름: X=1.000 Y=0.000
+A 키 누름: X=-1.000 Y=0.000
+정확히 -1, 0, 1만 나타남
+```
+
+---
+
+### 게임패드의 특징
+
+**아날로그 입력:**
+
+- 게임패드 스틱은 **기울인 정도**를 감지합니다.
+- 값: **1.0 ~ 1.0 사이의 모든 소수점 값** 가능
+- 부드러운 속도 조절 가능
+
+**이동 방향:**
+
+```
+게임패드로 가능한 방향:
+    무한대 (360도 모든 방향)
+
+      ↑
+    ↖ ↗
+  ← ● →
+    ↙ ↓
+```
+
+**로그 예시:**
+
+```
+스틱을 살짝만 기울임:
+MovementVector: X=0.234 Y=0.157
+
+스틱을 절반 정도 기울임:
+MovementVector: X=0.567 Y=0.423
+
+스틱을 완전히 기울임:
+MovementVector: X=1.000 Y=0.000
+```
+
+---
+
+### 속도 제어의 차이
+
+**키보드:**
+
+```cpp
+// 캐릭터 이동 컴포넌트의 최대 속도가 500이라면
+MaxWalkSpeed = 500.0f;
+
+// W 키를 누르면
+MovementVector.Y = 1.0
+실제 속도 = 500 * 1.0 = 500 (최대 속도)
+
+// 중간 속도 불가능
+```
+
+**게임패드:**
+
+```cpp
+// 캐릭터 이동 컴포넌트의 최대 속도가 500이라면
+MaxWalkSpeed = 500.0f;
+
+// 스틱을 살짝만 기울이면
+MovementVector.Y = 0.3
+실제 속도 = 500 * 0.3 = 150 (천천히 걷기)
+
+// 스틱을 절반 기울이면
+MovementVector.Y = 0.6
+실제 속도 = 500 * 0.6 = 300 (중간 속도)
+
+// 스틱을 완전히 기울이면
+MovementVector.Y = 1.0
+실제 속도 = 500 * 1.0 = 500 (최대 속도)
+```
+
+**실용적 차이:**
+
+- **키보드** : 빠르게 달리기 / 완전히 멈춤 (2가지 상태)
+- **게임패드** : 살금살금 걷기부터 전력 질주까지 부드럽게 조절 가능
+
+---
+
+## 7. DoMove 함수 분석
+
+### 함수 호출 부분
+
+```cpp
+void AThirdPersonCharacter::Move(const FInputActionValue& Value)
+{
+    FVector2D MovementVector = Value.Get<FVector2D>();
+
+    // 컨트롤러가 유효한지 확인 (플레이어가 캐릭터를 조종 중인지)
+    if (Controller != nullptr)
+    {
+        // DoMove 함수 호출
+        // 첫 번째 인수(MovementVector.X): 좌우 입력
+        // 두 번째 인수(MovementVector.Y): 앞뒤 입력
+        DoMove(MovementVector.X, MovementVector.Y);
+    }
+}
+```
+
+**Controller 체크의 이유:**
+
+- **Controller** : 플레이어나 AI가 캐릭터를 조종하는 객체
+- Controller가 nullptr이면 아무도 조종하지 않는 상태
+- 조종자가 없으면 이동 명령을 처리할 필요가 없음
+
+---
+
+### DoMove 함수 정의
+
+```cpp
+void AThirdPersonCharacter::DoMove(float Right, float Forward)
+{
+    // Right: 좌우 입력 값 (-1.0 ~ 1.0)
+    //        양수(+) = 오른쪽, 음수(-) = 왼쪽
+    // Forward: 앞뒤 입력 값 (-1.0 ~ 1.0)
+    //          양수(+) = 앞, 음수(-) = 뒤
+
+    if (Controller != nullptr)
+    {
+        // 1단계: 컨트롤러의 회전 정보 가져오기
+        // ... (다음 섹션에서 설명)
+
+        // 2단계: 앞/오른쪽 방향 벡터 계산
+        // ... (다음 섹션에서 설명)
+
+        // 3단계: 실제 이동 입력 추가
+        // ... (다음 섹션에서 설명)
+    }
+}
+```
+
+**인수 이름의 의미:**
+
+| 인수 이름 | 원본 값 | 의미 | 음수일 때 | 양수일 때 |
+| --------- | ------- | ---- | --------- | --------- |
+| Right     | X       | 좌우 | 왼쪽      | 오른쪽    |
+| Forward   | Y       | 앞뒤 | 뒤        | 앞        |
+
+**왜 "Right"와 "Forward"인가:**
+
+- X는 수평축이므로 좌우 이동 → "Right"로 명명 (음수면 왼쪽도 가능)
+- Y는 전후축이므로 앞뒤 이동 → "Forward"로 명명 (음수면 뒤로도 가능)
+
+---
+
+## 8. 회전 행렬로 방향 벡터 계산하기
+
+### 전체 코드 구조
+
+```cpp
+void AThirdPersonCharacter::DoMove(float Right, float Forward)
+{
+    if (Controller != nullptr)
+    {
+        // === 1단계: 요(Yaw) 회전 추출 ===
+        const FRotator Rotation = Controller->GetControlRotation();
+        const FRotator YawRotation(0, Rotation.Yaw, 0);
+
+        // === 2단계: 방향 벡터 계산 ===
+        const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+        const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+
+        // === 3단계: 이동 입력 추가 ===
+        AddMovementInput(ForwardDirection, Forward);
+        AddMovementInput(RightDirection, Right);
+    }
+}
+```
+
+이제 각 단계를 자세히 살펴보겠습니다.
+
+---
+
+### 1단계: 요(Yaw) 회전 추출
+
+### 컨트롤러 회전 가져오기
+
+```cpp
+// 컨트롤러의 현재 회전 정보를 가져옴
+const FRotator Rotation = Controller->GetControlRotation();
+```
+
+**FRotator란?**
+
+- 3D 공간에서 회전을 나타내는 구조체
+- 세 가지 축의 회전 값을 가짐:
+  ```
+  FRotator├── Pitch (float) : X축 회전 (위아래 보기)├── Yaw (float)   : Z축 회전 (좌우 회전)└── Roll (float)  : Y축 회전 (기울이기)
+  ```
+
+**Controller->GetControlRotation()의 의미:**
+
+- 플레이어가 카메라를 어느 방향으로 보고 있는지 반환
+- 예: 카메라를 위로 30도, 오른쪽으로 45도 돌렸다면
+  ```
+  Rotation.Pitch = 30.0Rotation.Yaw = 45.0Rotation.Roll = 0.0
+  ```
+
+---
+
+### Yaw(요) 회전이란?
+
+**Yaw 회전 시각화 (게임 내):**
+
+```
+위에서 본 모습:
+        앞(북쪽)
+          ↑
+          |
+왼쪽 ← 캐릭터 → 오른쪽
+          |
+          ↓
+        뒤(남쪽)
+
+Yaw = 0°   : 북쪽을 바라봄
+Yaw = 90°  : 동쪽을 바라봄
+Yaw = 180° : 남쪽을 바라봄
+Yaw = 270° : 서쪽을 바라봄
+```
+
+**Z축 중심 회전:**
+
+```
+   Z축 (위쪽)
+    ↑
+    |
+    ●────→ (캐릭터)
+
+이 Z축을 중심으로 빙글빙글 도는 것이 Yaw 회전
+```
+
+---
+
+### Yaw만 추출하기
+
+```cpp
+// Pitch와 Roll은 0으로 설정하고 Yaw만 유지
+const FRotator YawRotation(0, Rotation.Yaw, 0);
+```
+
+**FRotator 생성자 형식:**
+
+```cpp
+FRotator(Pitch, Yaw, Roll)
+```
+
+**왜 Yaw만 필요한가?**
+
+- **이동 방향 계산에는 "플레이어가 좌우 어디를 보고 있는지"만 필요**
+- Pitch(위아래)는 이동과 무관
+  - 위를 보면서도 앞으로 이동
+  - 아래를 보면서도 앞으로 이동
+- Roll(기울임)도 이동과 무관
+
+**예시:**
+
+```cpp
+// 플레이어가 카메라를 위로 30도, 오른쪽으로 45도 돌린 상태
+Rotation.Pitch = 30.0
+Rotation.Yaw = 45.0
+Rotation.Roll = 0.0
+
+// Yaw만 추출
+YawRotation = FRotator(0, 45.0, 0)
+// → 좌우 방향(45도)만 남김
+```
+
+---
+
+### 2단계: 방향 벡터 계산
+
+### 회전 행렬(Rotation Matrix) 이해하기
+
+**회전 행렬이란?**
+
+- 회전 정보를 수학적 행렬로 변환한 것
+- 이를 통해 "어떤 방향"을 벡터로 계산 가능
+
+**간단한 개념:**
+
+```
+캐릭터가 북쪽(0도)을 보고 있을 때:
+- 앞 방향 = (1, 0, 0)  // X축 양의 방향
+- 오른쪽 방향 = (0, 1, 0)  // Y축 양의 방향
+
+캐릭터가 동쪽(90도)을 보고 있을 때:
+- 앞 방향 = (0, 1, 0)  // 회전되어 Y축 방향이 앞이 됨
+- 오른쪽 방향 = (-1, 0, 0)  // 회전되어 -X축 방향이 오른쪽
+
+→ 회전 행렬은 이런 변환을 자동으로 계산해줌
+```
+
+---
+
+### Forward(앞) 방향 벡터 계산
+
+```cpp
+// YawRotation 정보로 회전 행렬을 만들고
+// X축의 단위 벡터를 가져옴 (앞 방향)
+const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+```
+
+**코드 분해:**
+
+1. **FRotationMatrix(YawRotation)** :
+   - YawRotation을 회전 행렬로 변환
+   - 수학적 계산을 가능하게 함
+2. **GetUnitAxis(EAxis::X)** :
+   - 회전된 X축의 방향을 가져옴
+   - "단위 벡터"이므로 길이가 1인 벡터 (방향만 나타냄)
+3. **EAxis::X** :
+   - X축을 의미하는 열거형 값
+   - 언리얼 엔진에서 X축 = 앞 방향
+
+**결과:**
+
+```
+ForwardDirection = (X, Y, Z) 벡터
+- 이 벡터는 캐릭터가 보고 있는 "앞쪽" 방향을 가리킴
+- 길이가 1인 단위 벡터 (방향만 표현)
+
+```
+
+**예시:**
+
+```cpp
+// 캐릭터가 북쪽(0도)을 보고 있으면
+ForwardDirection = (1, 0, 0)  // X축 양의 방향
+
+// 캐릭터가 동쪽(90도)을 보고 있으면
+ForwardDirection = (0, 1, 0)  // Y축 양의 방향
+
+// 캐릭터가 북동쪽(45도)을 보고 있으면
+ForwardDirection = (0.707, 0.707, 0)  // 대각선 방향
+```
+
+---
+
+### Right(오른쪽) 방향 벡터 계산
+
+```cpp
+// YawRotation 정보로 회전 행렬을 만들고
+// Y축의 단위 벡터를 가져옴 (오른쪽 방향)
+const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+```
+
+**코드 분해:**
+
+1. **GetUnitAxis(EAxis::Y)** :
+   - 회전된 Y축의 방향을 가져옴
+   - 언리얼 엔진에서 Y축 = 오른쪽 방향
+
+**결과:**
+
+```
+RightDirection = (X, Y, Z) 벡터
+- 이 벡터는 캐릭터의 "오른쪽" 방향을 가리킴
+- ForwardDirection과 항상 수직
+```
+
+**예시:**
+
+```cpp
+// 캐릭터가 북쪽(0도)을 보고 있으면
+ForwardDirection = (1, 0, 0)   // 앞 = 북쪽
+RightDirection = (0, 1, 0)     // 오른쪽 = 동쪽
+
+// 캐릭터가 동쪽(90도)을 보고 있으면
+ForwardDirection = (0, 1, 0)   // 앞 = 동쪽
+RightDirection = (0, 0, 1)     // 오른쪽 = 남쪽
+```
+
+---
+
+### 3단계: 이동 입력 추가
+
+### AddMovementInput 함수 이해하기
+
+```cpp
+// 앞뒤 이동 추가
+AddMovementInput(ForwardDirection, Forward);
+
+// 좌우 이동 추가
+AddMovementInput(RightDirection, Right);
+```
+
+**AddMovementInput 함수 형식:**
+
+```cpp
+void AddMovementInput(FVector WorldDirection, float ScaleValue)
+```
+
+**매개변수:**
+
+1. **WorldDirection** : 월드 공간에서의 이동 방향 벡터
+2. **ScaleValue** : 해당 방향으로 이동할 강도 (-1.0 ~ 1.0)
+
+---
+
+### 첫 번째 호출: 앞뒤 이동
+
+```cpp
+AddMovementInput(ForwardDirection, Forward);
+```
+
+**작동 과정:**
+
+```cpp
+// Forward 값에 따른 동작
+
+// W 키 눌림: Forward = 1.0
+AddMovementInput(ForwardDirection, 1.0)
+→ ForwardDirection 방향으로 최대 속도로 이동
+
+// S 키 눌림: Forward = -1.0
+AddMovementInput(ForwardDirection, -1.0)
+→ ForwardDirection의 반대 방향(뒤)으로 최대 속도로 이동
+
+// 아무것도 안 누름: Forward = 0.0
+AddMovementInput(ForwardDirection, 0.0)
+→ 앞뒤로 이동하지 않음
+
+// 게임패드 스틱을 절반만: Forward = 0.5
+AddMovementInput(ForwardDirection, 0.5)
+→ ForwardDirection 방향으로 절반 속도로 이동
+```
+
+---
+
+### 두 번째 호출: 좌우 이동
+
+```cpp
+AddMovementInput(RightDirection, Right);
+```
+
+**작동 과정:**
+
+```cpp
+// Right 값에 따른 동작
+
+// D 키 눌림: Right = 1.0
+AddMovementInput(RightDirection, 1.0)
+→ RightDirection 방향으로 최대 속도로 이동
+
+// A 키 눌림: Right = -1.0
+AddMovementInput(RightDirection, -1.0)
+→ RightDirection의 반대 방향(왼쪽)으로 최대 속도로 이동
+
+// 아무것도 안 누름: Right = 0.0
+AddMovementInput(RightDirection, 0.0)
+→ 좌우로 이동하지 않음
+```
+
+---
+
+### 대각선 이동의 원리
+
+**W + D 키를 동시에 누르면:**
+
+```cpp
+// 1. Move 함수가 호출됨
+MovementVector.X = 1.0  // D 키 (오른쪽)
+MovementVector.Y = 1.0  // W 키 (앞)
+
+// 2. DoMove 함수 호출
+DoMove(1.0, 1.0)
+// Right = 1.0, Forward = 1.0
+
+// 3. AddMovementInput 두 번 호출
+AddMovementInput(ForwardDirection, 1.0)  // 앞으로 이동 추가
+AddMovementInput(RightDirection, 1.0)    // 오른쪽으로 이동 추가
+
+// 4. 두 벡터가 합쳐져서 대각선 방향으로 이동
+최종 이동 방향 = ForwardDirection + RightDirection
+→ 오른쪽 앞 대각선 방향
+```
+
+**시각화:**
+
+```
+    앞(ForwardDirection)
+        ↑
+        |
+        |
+        ●────→ 오른쪽(RightDirection)
+       /
+      /
+     ↗  ← 실제 이동 방향 (두 벡터의 합)
+```
+
+---
+
+### 속도 스케일링 동작
+
+### 캐릭터 이동 컴포넌트 설정
+
+```cpp
+// 캐릭터 블루프린트나 생성자에서 설정
+MaxWalkSpeed = 500.0f;  // 초당 500cm
+```
+
+### ScaleValue에 따른 실제 속도
+
+**키보드 사용 시:**
+
+```cpp
+// W 키만 누름
+Forward = 1.0, Right = 0.0
+AddMovementInput(ForwardDirection, 1.0)
+→ 실제 속도 = 500 * 1.0 = 500 cm/s (전력 질주)
+
+// D 키만 누름
+Forward = 0.0, Right = 1.0
+AddMovementInput(RightDirection, 1.0)
+→ 실제 속도 = 500 * 1.0 = 500 cm/s (오른쪽으로 전력 질주)
+
+// W + D 키 동시
+Forward = 1.0, Right = 1.0
+AddMovementInput(ForwardDirection, 1.0)  // 앞 방향 500
+AddMovementInput(RightDirection, 1.0)    // 오른쪽 방향 500
+→ 대각선으로 약 707 cm/s (√(500² + 500²))
+```
+
+**게임패드 사용 시:**
+
+```cpp
+// 스틱을 살짝만 기울임
+Forward = 0.3, Right = 0.0
+AddMovementInput(ForwardDirection, 0.3)
+→ 실제 속도 = 500 * 0.3 = 150 cm/s (천천히 걷기)
+
+// 스틱을 절반 기울임
+Forward = 0.6, Right = 0.0
+AddMovementInput(ForwardDirection, 0.6)
+→ 실제 속도 = 500 * 0.6 = 300 cm/s (보통 걷기)
+
+// 스틱을 완전히 기울임
+Forward = 1.0, Right = 0.0
+AddMovementInput(ForwardDirection, 1.0)
+→ 실제 속도 = 500 * 1.0 = 500 cm/s (전력 질주)
+```
+
+---
+
+### 전체 흐름 정리
+
+**입력부터 이동까지의 전체 과정:**
+
+```
+1. 플레이어가 W 키 누름
+   ↓
+2. 입력 시스템이 감지
+   └─ MoveAction 트리거
+      └─ Value = (X:0, Y:1)
+         ↓
+3. Move 함수 호출
+   └─ MovementVector.Get<FVector2D>()
+      └─ MovementVector = (0, 1)
+         ↓
+4. DoMove(0, 1) 호출
+   └─ Right = 0, Forward = 1
+      ↓
+5. 컨트롤러 회전 가져오기
+   └─ Rotation = (Pitch:30, Yaw:45, Roll:0)
+      └─ YawRotation = (0, 45, 0)
+         ↓
+6. 방향 벡터 계산
+   └─ ForwardDirection = (0.707, 0.707, 0)  // 45도 방향
+   └─ RightDirection = (-0.707, 0.707, 0)
+      ↓
+7. 이동 입력 추가
+   └─ AddMovementInput(ForwardDirection, 1)
+      └─ 45도 방향(북동쪽)으로 최대 속도로 이동
+```
+
+---
+
+## 💡 핵심 요약
+
+### 입력 시스템
+
+- **FVector2D** : X(좌우), Y(앞뒤) 두 개의 float 값을 담는 구조체
+- **매핑 컨텍스트** : A/D는 X에, W/S는 Swizzle로 Y에 값을 할당
+- **Negate 수정자** : 값을 음수로 바꿔 반대 방향 구현
+
+### 방향 계산
+
+- **Yaw 회전** : Z축 중심의 좌우 회전만 추출 (Pitch, Roll 제거)
+- **회전 행렬** : Yaw를 사용해 현재 바라보는 방향 계산
+- **ForwardDirection** : X축 → 캐릭터의 앞 방향
+- **RightDirection** : Y축 → 캐릭터의 오른쪽 방향
+
+### 이동 실행
+
+- **AddMovementInput** : 방향 벡터 + 강도로 이동 추가
+- **ScaleValue** : -1.0 ~ 1.0 사이 값으로 속도 조절
+- **키보드** : -1, 0, 1만 가능 (디지털)
+- **게임패드** : -1.0 ~ 1.0 모든 값 가능 (아날로그)
+
+이것으로 3인칭 템플릿의 이동 시스템을 완전히 이해했습니다!
+
+# { 🎥 마우스로 카메라 회전 시스템 완전 분석 }
+
+이번 강의는 언리얼 엔진의 3인칭 템플릿에서 마우스 입력을 통해 카메라를 회전시키는 시스템을 다룹니다. 입력 설정부터 실제 회전까지의 전 과정을 배웁니다.
+
+---
+
+## 📋 목차
+
+1. [Look 액션 바인딩 이해하기](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#1-look-%EC%95%A1%EC%85%98-%EB%B0%94%EC%9D%B8%EB%94%A9-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [입력 액션 에셋 설정](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#2-%EC%9E%85%EB%A0%A5-%EC%95%A1%EC%85%98-%EC%97%90%EC%85%8B-%EC%84%A4%EC%A0%95)
+3. [매핑 컨텍스트 - 마우스 입력 처리](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#3-%EB%A7%A4%ED%95%91-%EC%BB%A8%ED%85%8D%EC%8A%A4%ED%8A%B8---%EB%A7%88%EC%9A%B0%EC%8A%A4-%EC%9E%85%EB%A0%A5-%EC%B2%98%EB%A6%AC)
+4. [Negate 수정자의 역할](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#4-negate-%EC%88%98%EC%A0%95%EC%9E%90%EC%9D%98-%EC%97%AD%ED%95%A0)
+5. [마우스 입력 값 로그 출력하기](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#5-%EB%A7%88%EC%9A%B0%EC%8A%A4-%EC%9E%85%EB%A0%A5-%EA%B0%92-%EB%A1%9C%EA%B7%B8-%EC%B6%9C%EB%A0%A5%ED%95%98%EA%B8%B0)
+6. [마우스 속도에 따른 값 변화](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#6-%EB%A7%88%EC%9A%B0%EC%8A%A4-%EC%86%8D%EB%8F%84%EC%97%90-%EB%94%B0%EB%A5%B8-%EA%B0%92-%EB%B3%80%ED%99%94)
+7. [DoLook 함수와 Yaw/Pitch 회전](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#7-dolook-%ED%95%A8%EC%88%98%EC%99%80-yawpitch-%ED%9A%8C%EC%A0%84)
+
+---
+
+## 1. Look 액션 바인딩 이해하기
+
+### Look과 MouseLook의 차이
+
+3인칭 템플릿에는 두 가지 Look 액션이 있습니다:
+
+```
+Look 액션 종류:
+├── Look : 게임패드용 (아날로그 스틱)
+└── MouseLook : 마우스용 (마우스 이동)
+```
+
+**이번 강의에서는 MouseLook에 집중합니다.**
+
+---
+
+### 코드에서의 바인딩
+
+```cpp
+// 플레이어 입력 컴포넌트 설정 부분
+void AThirdPersonCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+    // MouseLook 액션을 Look 함수에 바인딩
+    PlayerInputComponent->BindAction("MouseLook", ETriggerEvent::Triggered, this, &AThirdPersonCharacter::Look);
+}
+```
+
+**바인딩 설명:**
+
+- **"MouseLook"** : 마우스 입력 액션의 이름
+- **ETriggerEvent::Triggered** : 마우스를 움직이는 동안 계속 호출
+- **Look 함수** : 마우스 입력 값을 받아서 처리할 함수
+
+---
+
+### Look 함수 구조
+
+```cpp
+void AThirdPersonCharacter::Look(const FInputActionValue& Value)
+{
+    // 입력 값을 FVector2D로 가져옴
+    FVector2D LookAxisVector = Value.Get<FVector2D>();
+
+    // DoLook 함수에 전달
+    // LookAxisVector.X → 좌우 마우스 이동
+    // LookAxisVector.Y → 상하 마우스 이동
+    DoLook(LookAxisVector.X, LookAxisVector.Y);
+}
+```
+
+**이동(Move) 함수와의 유사성:**
+
+- 둘 다 **FVector2D** 타입 사용
+- X와 Y 두 개의 float 값 포함
+- X: 수평 입력, Y: 수직 입력
+
+**차이점:**
+
+- Move: 캐릭터의 위치 이동
+- Look: 카메라의 방향 회전
+
+---
+
+## 2. 입력 액션 에셋 설정
+
+### MouseLook 액션 에셋 확인
+
+언리얼 엔진 에디터에서 MouseLook 입력 액션 에셋을 엽니다.
+
+**Value Type:**
+
+```
+Value Type: Axis2D (Vector 2D)
+```
+
+**의미:**
+
+- 마우스의 X 이동과 Y 이동 두 가지 값을 담을 수 있음
+- Move 액션과 동일한 타입 사용
+
+**Vector2D 구조:**
+
+```
+FVector2D
+├── X : 마우스 좌우 이동 (-∞ ~ +∞)
+└── Y : 마우스 상하 이동 (-∞ ~ +∞)
+```
+
+---
+
+## 3. 매핑 컨텍스트 - 마우스 입력 처리
+
+### 다른 매핑 컨텍스트 사용
+
+**중요한 차이점:**
+
+- Move 액션: 기본 매핑 컨텍스트 사용
+- **MouseLook 액션: 별도의 매핑 컨텍스트 사용**
+
+매핑 컨텍스트를 열고 MouseLook을 확인합니다.
+
+---
+
+### 마우스 바인딩 구조
+
+```
+MouseLook 액션
+├── Mouse X : 마우스 좌우 이동
+└── Mouse Y : 마우스 상하 이동
+    └── 수정자: Negate (부정 수정자)
+```
+
+---
+
+### 기본 마우스 동작 원리
+
+**마우스 커서의 이해:**
+
+```
+화면 상의 마우스 커서
+├── 게임 중에는 보이지 않음 (뷰포트 클릭 시)
+├── 하지만 위치는 계속 추적됨
+└── 이동량이 입력 값으로 전환됨
+```
+
+**마우스 이동과 입력 값:**
+
+```
+입력 값 구조:
+FVector2D
+├── X : 수평 이동량
+└── Y : 수직 이동량
+```
+
+---
+
+### 기본 마우스 입력 변환
+
+**수평 이동 (Mouse X):**
+
+```
+마우스를 왼쪽으로 이동 → X = 음수 값
+마우스를 오른쪽으로 이동 → X = 양수 값
+```
+
+**작동 방식:**
+
+```cpp
+// 마우스를 왼쪽으로 빠르게 움직임
+X = -5.4  // 음수, 크기는 속도에 비례
+
+// 마우스를 오른쪽으로 천천히 움직임
+X = 0.8   // 양수, 작은 값
+```
+
+---
+
+**수직 이동 (Mouse Y) - 기본 동작:**
+
+```
+마우스를 위로 이동 → Y = 양수 값
+마우스를 아래로 이동 → Y = 음수 값
+```
+
+**이것이 기본(자동) 동작입니다.**
+
+---
+
+## 4. Negate 수정자의 역할
+
+### 왜 Y축에만 Negate가 필요한가?
+
+**문제 상황:**
+
+기본 마우스 동작으로는 카메라 움직임이 부자연스럽습니다:
+
+```
+마우스를 위로 움직임
+→ Y = 양수
+→ 카메라가 아래를 봄 (반대!)
+
+마우스를 아래로 움직임
+→ Y = 음수
+→ 카메라가 위를 봄 (반대!)
+```
+
+**이는 마치 카메라가 거꾸로 작동하는 것처럼 느껴집니다.**
+
+---
+
+### Negate 수정자 적용
+
+```
+Mouse Y
+└── 수정자: Negate
+    └── Order: Y축에만 적용
+```
+
+**Negate의 효과:**
+
+```cpp
+// 원래 값
+마우스 위로 → Y = 1.0 (양수)
+마우스 아래로 → Y = -1.0 (음수)
+
+// Negate 적용 후
+마우스 위로 → Y = -1.0 (음수로 반전)
+마우스 아래로 → Y = 1.0 (양수로 반전)
+```
+
+---
+
+### 최종 결과 (Negate 적용 후)
+
+**수평 이동 (X축) - 변화 없음:**
+
+| 마우스 동작 | X 값 | 카메라 동작 |
+| ----------- | ---- | ----------- |
+| 왼쪽 이동   | 음수 | 왼쪽 회전   |
+| 오른쪽 이동 | 양수 | 오른쪽 회전 |
+
+**수직 이동 (Y축) - Negate 적용됨:**
+
+| 마우스 동작 | 기본 Y 값 | Negate 후 | 카메라 동작 |
+| ----------- | --------- | --------- | ----------- |
+| 위로 이동   | 양수      | **음수**  | 위를 봄     |
+| 아래로 이동 | 음수      | **양수**  | 아래를 봄   |
+
+---
+
+### Negate 없이 플레이하면?
+
+**실험: Negate 수정자 제거**
+
+```
+매핑 컨텍스트에서 Negate 제거
+↓
+게임 실행
+↓
+마우스 위로 → 카메라 아래를 봄 (반대!)
+마우스 아래로 → 카메라 위를 봄 (반대!)
+```
+
+**결과:**
+
+- 조작감이 매우 어색함
+- "역방향 조작" 느낌
+- 대부분의 게임에서 사용하지 않는 방식
+
+**그래서 Negate 수정자가 필수입니다.**
+
+---
+
+## 5. 마우스 입력 값 로그 출력하기
+
+### 도전 과제
+
+Look 함수에서 받은 마우스 입력 값을 로그로 출력하여 어떤 값이 들어오는지 확인합니다.
+
+### 코드 작성
+
+```cpp
+void AThirdPersonCharacter::Look(const FInputActionValue& Value)
+{
+    // 입력 값을 FVector2D로 변환
+    FVector2D LookAxisVector = Value.Get<FVector2D>();
+
+    // 로그 출력
+    // 마우스 입력 값을 확인하기 위한 디버그 출력
+    UE_LOG(LogTemp, Warning, TEXT("LookValue: %s"), *LookAxisVector.ToString());
+
+    // 실제 카메라 회전 처리
+    DoLook(LookAxisVector.X, LookAxisVector.Y);
+}
+```
+
+**코드 설명:**
+
+1. **LookAxisVector.ToString()** : Vector2D를 "(X=0.5, Y=-0.3)" 형식의 문자열로 변환
+2. **별표(\*)** : FString을 C 스타일 문자열로 변환
+3. **TEXT() 매크로** : 문자열을 언리얼 엔진이 요구하는 유니코드 형식으로 변환
+
+---
+
+### 로그 확인 - 천천히 움직일 때
+
+게임을 실행하고 마우스를 **천천히** 움직입니다.
+
+**오른쪽으로 천천히:**
+
+```
+LookValue: X=0.067 Y=0.000
+LookValue: X=0.073 Y=0.000
+LookValue: X=0.065 Y=0.000
+```
+
+**왼쪽으로 천천히:**
+
+```
+LookValue: X=-0.071 Y=0.000
+LookValue: X=-0.068 Y=0.000
+LookValue: X=-0.069 Y=0.000
+```
+
+**위로 천천히 (Negate 적용됨):**
+
+```
+LookValue: X=0.000 Y=-0.074
+LookValue: X=0.000 Y=-0.072
+LookValue: X=0.000 Y=-0.070
+```
+
+**아래로 천천히 (Negate 적용됨):**
+
+```
+LookValue: X=0.000 Y=0.076
+LookValue: X=0.000 Y=0.073
+LookValue: X=0.000 Y=0.075
+```
+
+**특징:**
+
+- 값이 매우 작음 (0.06~0.08 범위)
+- 키보드의 1 또는 -1과 완전히 다름
+
+---
+
+## 6. 마우스 속도에 따른 값 변화
+
+### 왜 이렇게 작은 값일까?
+
+**이유: 마우스 이동 속도를 반영하기 때문**
+
+```
+마우스 입력 = 이동 거리 ÷ 시간
+→ 속도 개념
+```
+
+---
+
+### 빠르게 움직일 때
+
+마우스를 **매우 빠르게** 움직입니다.
+
+**빠른 오른쪽 이동:**
+
+```
+LookValue: X=14.235 Y=0.000
+LookValue: X=12.874 Y=0.000
+LookValue: X=11.523 Y=0.000
+```
+
+**빠른 왼쪽 이동:**
+
+```
+LookValue: X=-15.342 Y=0.000
+LookValue: X=-13.891 Y=0.000
+```
+
+**빠른 위 이동:**
+
+```
+LookValue: X=0.000 Y=-16.127
+LookValue: X=0.000 Y=-14.663
+```
+
+**특징:**
+
+- 값이 매우 큼 (10~16 범위)
+- 천천히 움직일 때보다 100배 이상 차이
+
+---
+
+### 속도 감지의 목적
+
+**게임 플레이 경험 개선:**
+
+```
+천천히 마우스 움직임:
+└── 작은 값 (0.07)
+    └── 카메라 조금만 회전
+        └── 정밀한 조준 가능
+
+빠르게 마우스 움직임:
+└── 큰 값 (14.0)
+    └── 카메라 많이 회전
+        └── 빠른 주변 확인 가능
+```
+
+**실용적 예시:**
+
+```cpp
+// 저격수가 정밀 조준할 때
+마우스 천천히 이동 → 값 = 0.05
+→ 카메라가 아주 조금만 회전 (정밀 조준)
+
+// 적 발견 시 빠르게 돌아볼 때
+마우스 빠르게 이동 → 값 = 15.0
+→ 카메라가 크게 회전 (빠른 반응)
+```
+
+---
+
+### 키보드 입력과의 차이점 정리
+
+**키보드 (이동 입력):**
+
+```
+W 키 누름 → 값 = 1.0 (항상 고정)
+A 키 누름 → 값 = -1.0 (항상 고정)
+
+특징:
+- 고정된 값 (-1, 0, 1)
+- 속도 조절 불가 (키보드)
+- 디지털 입력
+```
+
+**마우스 (카메라 입력):**
+
+```
+천천히 이동 → 값 = 0.07 (작은 값)
+빠르게 이동 → 값 = 14.0 (큰 값)
+
+특징:
+- 가변적인 값 (무한대 범위)
+- 속도에 비례
+- 아날로그 입력
+```
+
+---
+
+## 7. DoLook 함수와 Yaw/Pitch 회전
+
+### DoLook 함수 정의
+
+```cpp
+void AThirdPersonCharacter::DoLook(float Yaw, float Pitch)
+{
+    // Yaw: 좌우 회전 값 (X축 마우스 이동)
+    // Pitch: 상하 회전 값 (Y축 마우스 이동)
+
+    // 컨트롤러에 Yaw 입력 추가 (좌우 회전)
+    AddControllerYawInput(Yaw);
+
+    // 컨트롤러에 Pitch 입력 추가 (상하 회전)
+    AddControllerPitchInput(Pitch);
+}
+```
+
+**매개변수 이름의 의미:**
+
+| 매개변수 | 원본 값 | 의미      | 제어하는 회전 |
+| -------- | ------- | --------- | ------------- |
+| Yaw      | X       | 좌우 이동 | Z축 회전      |
+| Pitch    | Y       | 상하 이동 | Y축 회전      |
+
+---
+
+### Yaw 회전 이해하기
+
+**Yaw란?**
+
+Z축(수직축)을 중심으로 한 회전입니다.
+
+```
+위에서 본 플레이어:
+
+        앞
+        ↑
+        |
+왼쪽 ← 플레이어 → 오른쪽
+        |
+        ↓
+        뒤
+
+Yaw 회전 = 이 평면에서 좌우로 돌아보기
+```
+
+**시각화:**
+
+```
+     Z축 (위쪽)
+      ↑
+      |
+      ●────→ 플레이어가 보는 방향
+
+이 Z축을 중심으로 회전
+→ 좌우로 고개 돌리기
+```
+
+---
+
+**AddControllerYawInput 함수:**
+
+```cpp
+AddControllerYawInput(Yaw);
+```
+
+**작동 과정:**
+
+```cpp
+// 마우스를 오른쪽으로 천천히
+Yaw = 0.07
+AddControllerYawInput(0.07)
+→ 컨트롤러가 Z축 중심으로 0.07도 회전
+→ 카메라가 오른쪽으로 조금 회전
+
+// 마우스를 왼쪽으로 빠르게
+Yaw = -12.5
+AddControllerYawInput(-12.5)
+→ 컨트롤러가 Z축 중심으로 -12.5도 회전
+→ 카메라가 왼쪽으로 크게 회전
+```
+
+---
+
+### Pitch 회전 이해하기
+
+**Pitch란?**
+
+Y축(좌우축)을 중심으로 한 회전입니다.
+
+```
+옆에서 본 플레이어:
+
+       위
+       ↑
+       |
+       ●────→ 플레이어가 보는 방향
+       |
+       ↓
+       아래
+
+Pitch 회전 = 위아래로 고개 들고 숙이기
+```
+
+**시각화:**
+
+```
+    플레이어 옆모습:
+
+    ●───→  수평으로 봄 (Pitch = 0)
+
+    ●
+     ╲
+      ↘  위를 봄 (Pitch < 0)
+
+      ↗
+     ╱
+    ●    아래를 봄 (Pitch > 0)
+```
+
+---
+
+**AddControllerPitchInput 함수:**
+
+```cpp
+AddControllerPitchInput(Pitch);
+```
+
+**작동 과정:**
+
+```cpp
+// 마우스를 위로 천천히 (Negate 적용됨)
+Pitch = -0.07
+AddControllerPitchInput(-0.07)
+→ 컨트롤러가 Y축 중심으로 -0.07도 회전
+→ 카메라가 위를 조금 봄
+
+// 마우스를 아래로 빠르게 (Negate 적용됨)
+Pitch = 11.3
+AddControllerPitchInput(11.3)
+→ 컨트롤러가 Y축 중심으로 11.3도 회전
+→ 카메라가 아래를 많이 봄
+```
+
+---
+
+### Yaw와 Pitch 동시 적용
+
+**대각선 마우스 이동:**
+
+```cpp
+// 마우스를 오른쪽 위로 대각선 이동
+Yaw = 5.2 (오른쪽)
+Pitch = -4.8 (위)
+
+AddControllerYawInput(5.2)    // 오른쪽 회전
+AddControllerPitchInput(-4.8) // 위를 봄
+
+→ 카메라가 오른쪽 위 대각선 방향을 봄
+```
+
+---
+
+### 회전 제한 (Pitch Clamp)
+
+**Pitch에는 제한이 있습니다:**
+
+```
+일반적인 Pitch 제한:
+├── 최소: -89° (거의 수직 위)
+└── 최대: +89° (거의 수직 아래)
+
+→ 완전히 뒤집어지는 것 방지
+```
+
+**왜 제한이 필요한가:**
+
+```
+제한 없으면:
+마우스를 계속 위로 → Pitch -180°
+→ 카메라가 뒤집어짐 (짐벌 락 현상)
+
+제한 있으면:
+마우스를 계속 위로 → Pitch -89°에서 멈춤
+→ 자연스러운 시야 유지
+```
+
+---
+
+### 전체 흐름 정리
+
+**마우스 입력부터 카메라 회전까지:**
+
+```
+1. 플레이어가 마우스를 오른쪽 위로 빠르게 이동
+   ↓
+2. 마우스 시스템이 이동량 감지
+   └─ 수평 이동: 빠름 → 큰 값
+   └─ 수직 이동: 빠름 → 큰 값
+      ↓
+3. 입력 시스템 처리
+   └─ Mouse X → X = 12.5 (양수, 큰 값)
+   └─ Mouse Y → Y = 10.3 (양수)
+      └─ Negate 적용 → Y = -10.3 (음수)
+         ↓
+4. Look 함수 호출
+   └─ LookAxisVector = (12.5, -10.3)
+      ↓
+5. DoLook(12.5, -10.3) 호출
+   └─ Yaw = 12.5, Pitch = -10.3
+      ↓
+6. 회전 입력 추가
+   └─ AddControllerYawInput(12.5)
+      └─ Z축 중심으로 12.5도 오른쪽 회전
+   └─ AddControllerPitchInput(-10.3)
+      └─ Y축 중심으로 -10.3도 위를 봄
+         ↓
+7. 최종 결과
+   └─ 카메라가 오른쪽 위 대각선 방향으로 크게 회전
+```
+
+---
+
+## 💡 핵심 요약
+
+### 입력 시스템
+
+- **MouseLook 액션** : 별도의 매핑 컨텍스트 사용
+- **FVector2D** : X(좌우), Y(상하) 마우스 이동량
+- **Mouse X** : 자동으로 Vector2D.X에 할당
+- **Mouse Y** : 자동으로 Vector2D.Y에 할당 + **Negate 적용**
+
+### Negate 수정자
+
+- **목적** : Y축 입력을 반전시켜 자연스러운 카메라 조작감 제공
+- **효과** : 마우스 위 → 카메라 위, 마우스 아래 → 카메라 아래
+- **적용** : Y축에만 적용, X축은 그대로 유지
+
+### 마우스 입력 특성
+
+- **속도 감지** : 마우스 이동 속도에 비례하는 값 생성
+- **천천히** : 0.05~0.1 범위의 작은 값 → 정밀한 조작
+- **빠르게** : 10~20 범위의 큰 값 → 빠른 회전
+- **키보드와 차이** : 키보드는 고정값(-1, 0, 1), 마우스는 가변값
+
+### 회전 처리
+
+- **Yaw** : Z축 중심 좌우 회전 (고개 돌리기)
+- **Pitch** : Y축 중심 상하 회전 (고개 들고 숙이기)
+- **AddControllerYawInput** : 좌우 회전 추가
+- **AddControllerPitchInput** : 상하 회전 추가 (제한 있음)
+
+### 전체 구조
+
+```
+마우스 이동 → 속도 감지 → Vector2D 생성
+→ Negate(Y만) → Look 함수 → DoLook 함수
+→ Yaw/Pitch 입력 → 카메라 회전
+```
+
+**축하합니다! 3인칭 템플릿의 모든 핵심 시스템을 이해했습니다!** 🎉
+
+이제 언리얼 엔진이 제공한 코드를 완전히 이해했으므로, 이를 기반으로 자신만의 게임 기능을 추가할 수 있습니다.
+
+# { 🎬 3인칭 슈팅 게임용 카메라 설정하기 }
+
+이번 강의는 3인칭 슈팅 게임에 적합한 카메라 위치를 설정하고, 캐릭터가 항상 카메라 방향을 바라보도록 회전 설정을 변경하는 방법을 다룹니다.
+
+---
+
+## 📋 목차
+
+1. [프로젝트 블루프린트 구조 만들기](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#1-%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8-%EB%B8%94%EB%A3%A8%ED%94%84%EB%A6%B0%ED%8A%B8-%EA%B5%AC%EC%A1%B0-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+2. [게임 모드와 플레이어 컨트롤러 설정](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#2-%EA%B2%8C%EC%9E%84-%EB%AA%A8%EB%93%9C%EC%99%80-%ED%94%8C%EB%A0%88%EC%9D%B4%EC%96%B4-%EC%BB%A8%ED%8A%B8%EB%A1%A4%EB%9F%AC-%EC%84%A4%EC%A0%95)
+3. [캐릭터 회전 방식 변경하기](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#3-%EC%BA%90%EB%A6%AD%ED%84%B0-%ED%9A%8C%EC%A0%84-%EB%B0%A9%EC%8B%9D-%EB%B3%80%EA%B2%BD%ED%95%98%EA%B8%B0)
+4. [스켈레탈 메시와 애니메이션 이해하기](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#4-%EC%8A%A4%EC%BC%88%EB%A0%88%ED%83%88-%EB%A9%94%EC%8B%9C%EC%99%80-%EC%95%A0%EB%8B%88%EB%A9%94%EC%9D%B4%EC%85%98-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+5. [카메라 위치 조정하기](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#5-%EC%B9%B4%EB%A9%94%EB%9D%BC-%EC%9C%84%EC%B9%98-%EC%A1%B0%EC%A0%95%ED%95%98%EA%B8%B0)
+6. [스프링 암의 Pawn Control Rotation](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#6-%EC%8A%A4%ED%94%84%EB%A7%81-%EC%95%94%EC%9D%98-pawn-control-rotation)
+
+---
+
+## 1. 프로젝트 블루프린트 구조 만들기
+
+### 왜 자체 블루프린트가 필요한가?
+
+**문제 상황:**
+
+```
+3인칭 템플릿의 기본 블루프린트:
+├── BP_ThirdPersonCharacter
+├── BP_ThirdPersonGameMode
+└── ThirdPersonPlayerController
+
+→ 이것들을 직접 수정하면 나중에 원본이 필요할 때 문제 발생
+```
+
+**해결책: 자손 블루프린트 생성**
+
+---
+
+### 자손 블루프린트 클래스 만들기
+
+**자손(Child) 블루프린트란?**
+
+부모 블루프린트의 모든 기능을 상속받는 새로운 블루프린트입니다.
+
+```
+부모-자식 관계:
+부모 (원본)
+  ↓ 상속
+자식 (복사본)
+
+특징:
+- 부모 변경 → 자식에 자동 반영 ✓
+- 자식 변경 → 부모에 영향 없음 ✓
+```
+
+---
+
+### 캐릭터 자손 블루프린트 생성
+
+**단계별 과정:**
+
+```
+1. 콘텐츠 브라우저에서 3인칭 폴더 열기
+   ↓
+2. BP_ThirdPersonCharacter 찾기
+   ↓
+3. 마우스 우클릭
+   ↓
+4. "Create Child Blueprint Class" 선택
+   ↓
+5. 이름 입력: BP_ShooterCharacter
+```
+
+**코드로 표현하면:**
+
+```cpp
+// 부모 클래스 (원본, 수정 안 함)
+class BP_ThirdPersonCharacter : public ACharacter
+{
+    // 템플릿의 모든 기본 기능
+};
+
+// 자식 클래스 (우리가 수정할 버전)
+class BP_ShooterCharacter : public BP_ThirdPersonCharacter
+{
+    // 부모의 모든 기능 상속 + 우리가 추가할 기능
+};
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380640/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_1/image_1.png)
+
+---
+
+### 폴더 구조 정리하기
+
+**새 폴더 생성:**
+
+```
+프로젝트 구조:
+Content/
+├── ThirdPerson/         (템플릿 원본, 건드리지 않음)
+│   └── Blueprints/
+│       └── BP_ThirdPersonCharacter
+└── MyContent/           (우리 작업 폴더)
+    └── Blueprints/      (새로 생성)
+        └── BP_ShooterCharacter (이동)
+```
+
+**파일 이동 방법:**
+
+```
+1. MyContent 폴더에서 우클릭
+   ↓
+2. "New Folder" 선택 → "Blueprints" 입력
+   ↓
+3. BP_ShooterCharacter를 왼쪽 클릭으로 드래그
+   ↓
+4. Blueprints 폴더에 드롭
+   ↓
+5. "Move Here" 선택 (복사가 아닌 이동)
+```
+
+---
+
+## 2. 게임 모드와 플레이어 컨트롤러 설정
+
+### 게임 모드 블루프린트 생성
+
+**게임 모드(Game Mode)란?**
+
+게임의 규칙과 기본 설정을 관리하는 클래스입니다.
+
+```
+게임 모드가 결정하는 것들:
+├── 어떤 캐릭터를 사용할 것인가 (Default Pawn)
+├── 어떤 플레이어 컨트롤러를 사용할 것인가
+├── 게임 규칙 (점수, 승패 조건 등)
+└── HUD 설정
+```
+
+---
+
+### 게임 모드 C++ 클래스에서 블루프린트 생성
+
+**왜 자손이 아닌 새로 만드나?**
+
+```
+3인칭 템플릿의 게임 모드:
+└── 내부에 우리가 원하는 설정 없음
+    └── 자손으로 만들 필요 없음
+
+우리 프로젝트의 C++ 게임 모드:
+└── ShooterGameMode (비어있음, 템플릿 생성 시 자동 생성)
+    └── 이것을 부모로 블루프린트 생성
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380640/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_1/image_2.png)
+
+---
+
+**생성 과정:**
+
+```
+1. MyContent/Blueprints 폴더에서 우클릭
+   ↓
+2. "Blueprint Class" 선택
+   ↓
+3. "All Classes" 펼치기
+   ↓
+4. "ShooterGameMode" 검색 (우리 C++ 클래스)
+   ↓
+5. 선택 후 이름 입력: BP_ShooterGameMode
+```
+
+**C++ 부모 클래스:**
+
+```cpp
+// ShooterGameMode.h (C++에 이미 있음)
+class SHOOTER_API AShooterGameMode : public AGameModeBase
+{
+    GENERATED_BODY()
+
+    // 현재 비어있음, 나중에 채울 예정
+};
+```
+
+**블루프린트:**
+
+```
+BP_ShooterGameMode (블루프린트)
+  ↓ 상속
+ShooterGameMode (C++ 클래스)
+  ↓ 상속
+GameModeBase (언리얼 엔진 기본)
+```
+
+---
+
+### 기본 게임 모드로 설정
+
+**프로젝트 설정:**
+
+```
+1. 메뉴: Edit → Project Settings
+   ↓
+2. 왼쪽 패널: Maps & Modes 선택
+   ↓
+3. Default GameMode 찾기
+   ↓
+4. BP_ShooterGameMode 선택
+```
+
+**이제 모든 레벨에서 우리 게임 모드가 기본으로 사용됩니다.**
+
+---
+
+### 기본 Pawn 설정
+
+**게임 모드 블루프린트 열기:**
+
+```
+BP_ShooterGameMode 더블클릭
+  ↓
+Details 패널
+  ↓
+Classes 섹션
+  ↓
+Default Pawn Class 찾기
+  ↓
+BP_ShooterCharacter 선택
+```
+
+**설정 의미:**
+
+```cpp
+// BP_ShooterGameMode 내부
+DefaultPawnClass = BP_ShooterCharacter;
+
+// 게임 시작 시
+플레이어가 조종할 캐릭터 = BP_ShooterCharacter 스폰
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380640/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_1/image_3.png)
+
+---
+
+### 플레이어 컨트롤러 블루프린트 생성
+
+**플레이어 컨트롤러란?**
+
+플레이어의 입력을 받아서 Pawn에 전달하는 중간 관리자입니다.
+
+```
+입력 흐름:
+키보드/마우스 입력
+  ↓
+Player Controller (입력 처리, 매핑 컨텍스트 설정)
+  ↓
+Pawn/Character (실제 동작 수행)
+```
+
+---
+
+**생성 과정:**
+
+```
+1. MyContent/Blueprints에서 우클릭
+   ↓
+2. "Blueprint Class" 선택
+   ↓
+3. "All Classes" 펼치기
+   ↓
+4. "ShooterPlayerController" 검색 (C++ 클래스)
+   ↓
+5. 선택 후 이름: BP_ShooterPlayerController
+```
+
+---
+
+### 플레이어 컨트롤러 입력 설정
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380641/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_1/image_4.png)
+
+**왜 매핑 컨텍스트 설정이 필요한가?**
+
+```
+C++ 코드에서는 매핑 컨텍스트를 자동 설정
+  ↓
+하지만 블루프린트에서 만들면
+  ↓
+수동으로 매핑 컨텍스트를 지정해야 함
+```
+
+---
+
+**BP_ShooterPlayerController 열기:**
+
+```
+1. 블루프린트 더블클릭
+   ↓
+2. Details 패널에서 아래로 스크롤
+   ↓
+3. "Input" 섹션 찾기
+   ↓
+4. "Default Mapping Contexts" 배열 펼치기
+```
+
+**매핑 컨텍스트 추가:**
+
+```
+Default Mapping Contexts:
+├── [0] 요소 추가 → IMC_Default 선택
+└── [1] 요소 추가 → IMC_MouseLook 선택
+```
+
+**각 매핑 컨텍스트의 역할:**
+
+| 매핑 컨텍스트 | 포함된 입력   | 용도             |
+| ------------- | ------------- | ---------------- |
+| IMC_Default   | WASD, 점프 등 | 기본 캐릭터 조작 |
+| IMC_MouseLook | 마우스 이동   | 카메라 회전      |
+
+---
+
+**코드로 표현하면:**
+
+```cpp
+// 3인칭 템플릿의 C++에서는 자동으로 했던 것
+void AThirdPersonPlayerController::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // 매핑 컨텍스트 자동 추가
+    EnhancedInputLocalPlayerSubsystem->AddMappingContext(IMC_Default, 0);
+    EnhancedInputLocalPlayerSubsystem->AddMappingContext(IMC_MouseLook, 0);
+}
+
+// 블루프린트에서는 Details 패널에서 수동 설정
+```
+
+**컴파일 & 저장**
+
+---
+
+### 게임 모드에 플레이어 컨트롤러 설정
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380641/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_1/image_5.png)
+
+**도전 과제:**
+
+BP_ShooterGameMode를 열고 기본 플레이어 컨트롤러를 설정하세요.
+
+**해답:**
+
+```
+1. BP_ShooterGameMode 열기
+   ↓
+2. Details 패널
+   ↓
+3. Classes 섹션
+   ↓
+4. Player Controller Class 찾기
+   ↓
+5. BP_ShooterPlayerController 선택
+```
+
+---
+
+### 설정 확인하기
+
+**게임 실행 후 Outliner 확인:**
+
+```
+World Outliner:
+├── PlayerStart
+├── BP_ShooterCharacter (스폰된 캐릭터) ✓
+└── BP_ShooterPlayerController ✓
+
+→ 우리가 만든 블루프린트들이 사용되고 있음
+```
+
+---
+
+## 3. 캐릭터 회전 방식 변경하기
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380641/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_1/image_6.png)
+
+### 현재 문제점 파악
+
+**기본 3인칭 템플릿 동작:**
+
+```
+A 키 누름 → 캐릭터가 왼쪽 회전 + 왼쪽 이동
+D 키 누름 → 캐릭터가 오른쪽 회전 + 오른쪽 이동
+S 키 누름 → 캐릭터가 뒤로 회전 + 뒤로 이동
+
+문제:
+- 캐릭터가 항상 이동 방향을 바라봄
+- 뒤로 가면 카메라 쪽을 바라봄
+```
+
+**슈팅 게임에서 원하는 동작:**
+
+```
+A 키 누름 → 캐릭터는 정면 보면서 왼쪽 스트레이프
+D 키 누름 → 캐릭터는 정면 보면서 오른쪽 스트레이프
+S 키 누름 → 캐릭터는 정면 보면서 뒤로 이동
+
+목표:
+- 캐릭터가 항상 카메라(조준) 방향을 바라봄
+- 총을 들고 있을 때 자연스러운 움직임
+```
+
+---
+
+### Orient Rotation to Movement 옵션
+
+**BP_ShooterCharacter 열기:**
+
+```
+1. BP_ShooterCharacter 더블클릭
+   ↓
+2. Components 패널에서 "CharacterMovement" 선택
+   ↓
+3. Details 패널에서 아래로 스크롤
+   ↓
+4. "Character Movement (Rotation Settings)" 섹션 찾기
+```
+
+---
+
+**Orient Rotation to Movement란?**
+
+```cpp
+// 이 옵션이 체크되어 있으면
+OrientRotationToMovement = true;
+
+// 캐릭터의 회전 방향 = 이동 방향
+if (moving_left) {
+    character_rotation = left;  // 왼쪽을 바라봄
+}
+if (moving_right) {
+    character_rotation = right; // 오른쪽을 바라봄
+}
+```
+
+**비활성화:**
+
+```
+Orient Rotation to Movement 체크 해제
+  ↓
+컴파일 & 저장
+  ↓
+플레이 테스트
+```
+
+---
+
+**결과:**
+
+```
+A 키 누름:
+- 이전: 캐릭터가 왼쪽으로 회전
+- 현재: 캐릭터가 같은 방향 보면서 왼쪽 스트레이프 ✓
+
+S 키 누름:
+- 이전: 캐릭터가 뒤를 돌아봄 (카메라 쪽)
+- 현재: 캐릭터가 앞을 보면서 뒤로 이동 ✓
+```
+
+**주의:**
+
+```
+현재 애니메이션:
+- 걷기 전진 애니메이션만 사용
+- 옆/뒤로 이동 시 부자연스러워 보임
+
+나중에:
+- Paragon 애니메이션으로 교체
+- 모든 방향 이동 애니메이션 포함
+- 자연스러운 움직임
+```
+
+---
+
+### Use Controller Desired Rotation 옵션
+
+**두 번째 문제:**
+
+```
+현재 상태:
+마우스로 카메라 회전
+  ↓
+캐릭터는 가만히 서 있음
+  ↓
+조준선과 캐릭터가 다른 방향
+
+슈팅 게임 문제:
+- 총을 쏘려면 캐릭터가 카메라 방향을 바라봐야 함
+- 조준과 발사 방향이 일치해야 함
+```
+
+---
+
+**Use Controller Desired Rotation 활성화:**
+
+```
+Character Movement (Rotation Settings):
+  ↓
+"Use Controller Desired Rotation" 체크 ✓
+  ↓
+컴파일 & 저장
+```
+
+**옵션 의미:**
+
+```cpp
+UseControllerDesiredRotation = true;
+
+// 캐릭터 회전 = 컨트롤러(카메라) 회전
+character_yaw = controller_yaw;
+
+// 마우스로 카메라 회전하면
+// 캐릭터도 같은 방향으로 회전
+```
+
+---
+
+**결과:**
+
+```
+마우스 오른쪽 이동:
+- 카메라 오른쪽 회전
+- 캐릭터도 오른쪽 회전 ✓
+
+마우스 왼쪽 이동:
+- 카메라 왼쪽 회전
+- 캐릭터도 왼쪽 회전 ✓
+
+최종 동작:
+- 항상 카메라가 바라보는 방향을 캐릭터도 바라봄
+- 조준과 발사 방향 일치
+```
+
+---
+
+### 최종 회전 설정 정리
+
+**Character Movement 설정:**
+
+| 옵션                            | 상태     | 효과                     |
+| ------------------------------- | -------- | ------------------------ |
+| Orient Rotation to Movement     | ☐ 비활성 | 이동 방향으로 회전 안 함 |
+| Use Controller Desired Rotation | ☑ 활성  | 카메라 방향으로 회전     |
+
+**종합 동작:**
+
+```
+WASD 이동:
+- 캐릭터 방향 유지
+- 모든 방향 스트레이프 가능
+
+마우스 회전:
+- 카메라와 캐릭터 동시 회전
+- 조준 방향 = 캐릭터 정면
+```
+
+---
+
+## 4. 스켈레탈 메시와 애니메이션 이해하기
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380641/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_1/image_7.png)
+
+### 카메라 조정의 문제점
+
+**현재 상황:**
+
+```
+사용 중인 메시: 마네킹 (Mannequin)
+목표 메시: 레이스 (Wraith)
+
+문제:
+- 마네킹 크기로 카메라 조정
+  ↓
+- 나중에 레이스로 교체
+  ↓
+- 크기 차이로 카메라 위치 이상해짐
+```
+
+**해결책: 미리 레이스 메시로 교체**
+
+---
+
+### 스켈레탈 메시 구조 이해
+
+**스켈레탈 메시 시스템:**
+
+```
+스켈레탈 메시 시스템 구성요소:
+
+1. Skeleton (뼈대)
+   - 뼈(Bone)들의 구조와 관계
+   - 조인트와 계층 구조
+
+2. Skeletal Mesh (살과 피부)
+   - 3D 모델의 외형
+   - Skeleton에 연결됨
+
+3. Animation (동작)
+   - 시간에 따른 뼈의 움직임
+   - 특정 Skeleton 전용
+```
+
+---
+
+**중요한 규칙:**
+
+```cpp
+// 호환성 규칙
+if (Mesh.Skeleton == Animation.Skeleton) {
+    // 작동 ✓
+    // 같은 Skeleton을 사용하면 호환됨
+}
+else {
+    // 작동 안 함 ✗
+    // 다른 Skeleton이면 호환 안 됨
+}
+```
+
+---
+
+### 메시 교체 실험
+
+**BP_ShooterCharacter에서 Mesh 컴포넌트 선택:**
+
+```
+Components 패널:
+├── CapsuleComponent
+├── ArrowComponent
+├── Mesh ← 선택
+├── SpringArm
+└── Camera
+```
+
+**Details 패널:**
+
+```
+Mesh 섹션:
+  ↓
+Skeletal Mesh Asset
+  ↓
+현재: SKM_Manny_Simple (마네킹)
+```
+
+---
+
+**레이스로 교체 시도 1 - 실패:**
+
+```
+1. Skeletal Mesh Asset 클릭
+   ↓
+2. "Wraith" 검색
+   ↓
+3. SKM_Wraith 선택
+   ↓
+결과: 완전히 변형됨! ✗
+```
+
+**왜 실패했나:**
+
+```
+마네킹 Skeleton:
+└── SK_Mannequin
+
+레이스 Skeleton:
+└── SK_Wraith (다른 뼈 구조)
+
+애니메이션 블루프린트:
+└── SK_Mannequin용으로 설정됨
+    ↓
+    SK_Wraith와 호환 안 됨
+    ↓
+    변형 발생
+```
+
+---
+
+**다시 마네킹으로 복구**
+
+---
+
+### 같은 Skeleton의 다른 메시 시도
+
+**템플릿에 포함된 다른 메시들:**
+
+```
+같은 SK_Mannequin Skeleton 사용:
+├── SKM_Manny_Simple (현재 사용 중)
+├── SKM_Manny (더 복잡한 버전)
+├── SKM_Quinn_Simple
+└── SKM_Quinn
+```
+
+**SKM_Manny_Simple 선택:**
+
+```
+결과: 정상 작동 ✓
+
+이유:
+- 같은 SK_Mannequin Skeleton 사용
+- 애니메이션 블루프린트와 호환
+```
+
+---
+
+**다른 Skeleton 메시 시도:**
+
+```
+SKM_Manny_Tutorials 선택
+  ↓
+결과: 변형됨 ✗
+
+이유:
+- 다른 Skeleton 사용
+- 애니메이션 호환 안 됨
+```
+
+---
+
+### 애니메이션 모드 전환
+
+**Animation Mode란?**
+
+```
+Animation Mode 종류:
+
+1. Use Animation Blueprint
+   - 복잡한 애니메이션 로직 사용
+   - 걷기, 뛰기, 점프 등 자동 전환
+   - Idle → Walk → Run 블렌딩
+
+2. Use Animation Asset
+   - 단일 애니메이션만 재생
+   - 테스트나 단순한 경우에 사용
+```
+
+---
+
+**레이스 메시로 교체 (올바른 방법):**
+
+```
+1. Mesh 컴포넌트 선택
+   ↓
+2. Details → Animation 섹션
+   ↓
+3. Animation Mode 드롭다운
+   ↓
+4. "Use Animation Asset" 선택
+```
+
+**중요한 변화:**
+
+```
+Animation Blueprint 제거됨
+  ↓
+Skeleton 의존성 사라짐
+  ↓
+이제 다른 Skeleton의 메시 사용 가능
+```
+
+---
+
+**메시 교체:**
+
+```
+1. Skeletal Mesh Asset
+   ↓
+2. "Wraith" 검색
+   ↓
+3. SKM_Wraith 선택
+   ↓
+결과: 정상적으로 표시됨 ✓
+```
+
+---
+
+### 애니메이션 에셋 선택
+
+**현재 상태:**
+
+```
+레이스 메시 표시됨
+  ↓
+하지만 T-포즈 (기본 자세)
+  ↓
+애니메이션 선택 필요
+```
+
+**애니메이션 선택:**
+
+```
+1. Animation 섹션
+   ↓
+2. Anim to Play (재생할 애니메이션)
+   ↓
+3. 드롭다운 클릭
+   ↓
+4. "Walk" 검색
+   ↓
+5. Walk_Fwd (앞으로 걷기) 선택
+```
+
+**결과:**
+
+```
+레이스가 걷는 애니메이션으로 표시
+  ↓
+실제 캐릭터 크기 확인 가능
+  ↓
+카메라 조정 준비 완료
+```
+
+---
+
+### 애니메이션 시스템 요약
+
+**정리:**
+
+```
+스켈레탈 메시 교체 방법:
+
+방법 1: 같은 Skeleton 메시
+- Animation Blueprint 모드 유지
+- 그냥 메시만 교체 가능
+- 예: Manny → Quinn
+
+방법 2: 다른 Skeleton 메시
+- Animation Mode를 Asset으로 변경
+- 메시 교체
+- 단일 애니메이션 선택
+- 예: Mannequin → Wraith
+```
+
+---
+
+## 5. 카메라 위치 조정하기
+
+### 슈팅 게임 카메라의 목표
+
+**현재 카메라:**
+
+```
+위치: 캐릭터 정중앙 뒤
+거리: 너무 멀리
+각도: 중앙
+
+문제:
+- 조준선이 화면 중앙
+- 캐릭터가 화면을 너무 많이 가림
+```
+
+**목표 카메라:**
+
+```
+위치: 오른쪽 어깨 너머 (over-the-shoulder)
+거리: 더 가까이
+각도: 총신 너머를 볼 수 있도록
+
+장점:
+- 오른손 무기 위치와 일치
+- 조준과 발사 방향 명확
+- 전방 시야 확보
+```
+
+---
+
+### 스프링 암 컴포넌트 이해
+
+**Spring Arm이란?**
+
+카메라를 캐릭터에서 일정 거리 떨어뜨려주는 막대기 같은 컴포넌트입니다.
+
+```
+구조:
+캐릭터 ●────────────● 카메라
+       └ Spring Arm ┘
+
+기능:
+- 카메라를 멀리 배치
+- 벽과 충돌 시 자동으로 가까워짐
+- 부드러운 카메라 움직임
+```
+
+---
+
+### 도전 과제
+
+카메라를 오른쪽 어깨 위치로 조정하세요.
+
+---
+
+### 카메라 위치 조정 - 해답
+
+**1단계: Spring Arm 높이 조정**
+
+```
+Components 패널:
+  ↓
+SpringArm 선택
+  ↓
+Details → Transform
+  ↓
+Location 섹션
+```
+
+**Z축 (높이) 올리기:**
+
+```
+Location:
+├── X: 0.0 (전후)
+├── Y: 0.0 (좌우)
+└── Z: 70.0 (위로 70cm) ← 변경
+
+효과:
+- 스프링 암의 시작점이 캐릭터 어깨 높이로
+- 카메라도 함께 올라감
+```
+
+---
+
+**2단계: 오른쪽으로 이동**
+
+```
+Location:
+├── X: 0.0
+├── Y: 60.0 (오른쪽으로 60cm) ← 추가 변경
+└── Z: 70.0
+
+효과:
+- 카메라가 오른쪽 어깨 위치로
+```
+
+---
+
+**3단계: 카메라 거리 조정**
+
+```
+Details 패널:
+  ↓
+Camera Settings 섹션
+  ↓
+Target Arm Length
+```
+
+**거리 줄이기:**
+
+```
+Target Arm Length: 250.0 (기본 300에서 감소)
+
+효과:
+- 카메라가 캐릭터에 더 가까워짐
+- 3인칭 슈팅 게임 느낌
+```
+
+**시각화:**
+
+```
+기본 설정 (300):
+캐릭터 ●──────────────────● 카메라 (너무 멀리)
+
+조정 후 (250):
+캐릭터 ●────────────● 카메라 (적당한 거리)
+```
+
+---
+
+**4단계: Socket Offset 사용**
+
+```
+Details 패널:
+  ↓
+Camera Settings
+  ↓
+Socket Offset (소켓 오프셋)
+```
+
+**Y축 오프셋 추가:**
+
+```
+Socket Offset:
+├── X: 0.0
+├── Y: 20.0 (오른쪽으로 20 추가) ← 설정
+└── Z: 0.0
+
+효과:
+- 카메라가 조금 더 오른쪽으로
+- 미세 조정 가능
+```
+
+---
+
+### Location vs Socket Offset 차이
+
+**Location (위치):**
+
+```
+Spring Arm의 시작점 이동
+- 캐릭터 기준 절대 위치
+- X, Y, Z 모두 자유롭게 설정
+```
+
+**Socket Offset (소켓 오프셋):**
+
+```
+Spring Arm의 끝점(카메라 부착점) 오프셋
+- Spring Arm 끝에서의 상대 위치
+- 미세 조정용
+```
+
+**시각화:**
+
+```
+Location으로 조정:
+캐릭터 ●
+         ╲
+          ╲ (Spring Arm 시작점 이동)
+           ●────────────● 카메라
+
+Socket Offset으로 조정:
+캐릭터 ●──────────────● (원래 카메라 위치)
+                        ↓
+                        ● (오프셋 적용 위치)
+```
+
+---
+
+### 최종 Spring Arm 설정
+
+```
+Transform → Location:
+├── X: 0.0
+├── Y: 60.0 (오른쪽 어깨)
+└── Z: 70.0 (어깨 높이)
+
+Camera Settings:
+├── Target Arm Length: 250.0 (거리)
+└── Socket Offset:
+    ├── X: 0.0
+    ├── Y: 20.0 (미세 조정)
+    └── Z: 0.0
+```
+
+**게임 플레이 테스트:**
+
+```
+결과:
+- 캐릭터가 화면 왼쪽에 배치
+- 오른쪽 시야 확보
+- 전방 시야 넓음
+- 3인칭 슈팅 게임 카메라 완성 ✓
+```
+
+---
+
+## 6. 스프링 암의 Pawn Control Rotation
+
+### 회전 설정 시도와 문제
+
+**직접 회전 시도:**
+
+```
+Spring Arm 선택
+  ↓
+Transform → Rotation
+  ↓
+Y축 회전 시도 (예: 10도)
+  ↓
+결과: 아무 변화 없음 ✗
+```
+
+**왜 회전이 안 되나?**
+
+---
+
+### Use Pawn Control Rotation 옵션
+
+**Spring Arm의 특별한 옵션:**
+
+```
+Details 패널:
+  ↓
+Camera Settings
+  ↓
+Use Pawn Control Rotation ← 체크됨
+```
+
+**이 옵션의 의미:**
+
+```cpp
+UsePawnControlRotation = true;
+
+// Spring Arm의 회전 = Pawn의 컨트롤 회전
+SpringArmRotation = ControllerRotation;
+
+// 직접 설정한 Rotation 값은 무시됨
+// 대신 플레이어의 마우스 입력이 회전을 제어
+```
+
+---
+
+### 옵션 비활성화 실험
+
+**체크 해제하면:**
+
+```
+Use Pawn Control Rotation: ☐ 비활성
+
+결과:
+- Transform → Rotation 값 적용됨
+- 수동으로 회전 설정 가능
+```
+
+**하지만 문제 발생:**
+
+```
+마우스로 카메라 회전 시도
+  ↓
+카메라가 움직이지 않음
+  ↓
+이유: 컨트롤 회전과 연결 끊어짐
+```
+
+---
+
+### 왜 Use Pawn Control Rotation을 사용하나?
+
+**장점:**
+
+```
+1. 마우스 입력과 자동 연동
+   - AddControllerYawInput
+   - AddControllerPitchInput
+   ↓
+   자동으로 Spring Arm 회전
+
+2. 캐릭터 회전과 동기화
+   - Use Controller Desired Rotation
+   - 캐릭터와 카메라가 같은 방향
+
+3. 부드러운 카메라 움직임
+```
+
+---
+
+### Location vs Rotation 사용 규칙
+
+**Spring Arm 설정 시:**
+
+```
+Use Pawn Control Rotation = true (기본값, 유지)
+  ↓
+위치 조정:
+- Location 사용 ✓
+- Socket Offset 사용 ✓
+
+회전 조정:
+- Transform → Rotation 사용 ✗ (무시됨)
+- Socket Offset으로 미세 조정만 가능
+```
+
+---
+
+### 완전한 카메라 시스템 이해
+
+**전체 흐름:**
+
+```
+1. 마우스 입력
+   ↓
+2. PlayerController에서 처리
+   ↓
+3. AddControllerYawInput/PitchInput
+   ↓
+4. Controller Rotation 업데이트
+   ↓
+5. Spring Arm이 Controller Rotation 따라감
+   (Use Pawn Control Rotation = true)
+   ↓
+6. Camera가 Spring Arm 끝에 부착
+   (Location + Socket Offset 적용)
+   ↓
+7. Character도 Controller Rotation 따라감
+   (Use Controller Desired Rotation = true)
+```
+
+---
+
+### 최종 컴포넌트 계층 구조
+
+```
+BP_ShooterCharacter:
+├── CapsuleComponent (루트)
+│   └── ArrowComponent
+│   └── Mesh (SKM_Wraith)
+│   └── SpringArm
+│       ├── Location: (0, 60, 70)
+│       ├── Target Arm Length: 250
+│       ├── Socket Offset: (0, 20, 0)
+│       ├── Use Pawn Control Rotation: ✓
+│       └── Camera
+```
+
+**각 설정의 역할:**
+
+| 설정                      | 값   | 효과             |
+| ------------------------- | ---- | ---------------- |
+| Location Y                | 60   | 오른쪽으로       |
+| Location Z                | 70   | 위로             |
+| Target Arm Length         | 250  | 카메라 거리      |
+| Socket Offset Y           | 20   | 미세 조정        |
+| Use Pawn Control Rotation | true | 마우스 회전 연동 |
+
+---
+
+## 💡 핵심 요약
+
+### 프로젝트 구조
+
+- **자손 블루프린트** : 원본 보존하면서 수정 가능
+- **게임 모드** : Default Pawn과 Player Controller 설정
+- **폴더 정리** : 템플릿과 작업 파일 분리
+
+### 캐릭터 회전
+
+- **Orient Rotation to Movement = false** : 이동 방향으로 회전 안 함
+- **Use Controller Desired Rotation = true** : 카메라 방향 바라봄
+- **슈팅 게임 필수 설정** : 조준과 발사 방향 일치
+
+### 스켈레탈 메시
+
+- **Skeleton** : 뼈대 구조 (호환성 핵심)
+- **같은 Skeleton** : 메시와 애니메이션 호환 가능
+- **다른 Skeleton** : Animation Asset 모드로 전환 필요
+
+### 카메라 설정
+
+- **Spring Arm Location** : 시작점 위치 (어깨 높이)
+- **Target Arm Length** : 카메라 거리
+- **Socket Offset** : 미세 조정
+- **Use Pawn Control Rotation** : 마우스 입력과 연동
+
+### 전체 시스템 흐름
+
+```
+마우스 입력 → Controller Rotation
+→ Spring Arm 회전 (Use Pawn Control Rotation)
+→ Character 회전 (Use Controller Desired Rotation)
+→ 카메라와 캐릭터가 같은 방향
+```
+
+**축하합니다! 3인칭 슈팅 게임의 기본 카메라 시스템을 완성했습니다!** 🎮

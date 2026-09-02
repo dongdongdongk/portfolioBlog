@@ -1,0 +1,371 @@
+---
+title: '쓰레드란 무엇인가?'
+date: '2026-09-02'
+category: '백엔드/JAVA'
+tags: ['백엔드', 'JAVA']
+draft: false
+summary: ''
+---
+
+# 1. 쓰레드란 무엇인가?
+
+```jsx
+컴퓨터 프로그램은 기본적으로 하나의 메인 쓰레드에서 실행됩니다.
+
+이 메인 쓰레드에서는 한 번에 한 가지 작업만 처리합니다.
+
+그러나 쓰레드를 추가로 만들면 여러 작업을 동시에 진행할 수 있습니다. 예를 들어,
+
+웹 브라우저가 동영상을 재생하면서 동시에 웹 페이지를 로드할 수 있는 이유가 쓰레드 덕분입니다.
+```
+
+# 2. 자바에서 쓰레드 사용 방법
+
+```jsx
+자바에서는 쓰레드를 사용하는 방법이 여러 가지 있습니다.
+
+주로 Thread 클래스 상속 또는 Runnable 인터페이스 구현 두 가지 방법을 사용합니다.
+
+각각의 방법에 대해 예제를 들어 설명드리겠습니다.
+```
+
+# 3. Thread 클래스 상속하여 쓰레드 만들기
+
+```jsx
+Thread 클래스를 상속하면 새로운 쓰레드 클래스를 정의할 수 있습니다.
+
+run() 메서드를 오버라이딩하여 쓰레드가 실행할 작업을 정의합니다.
+```
+
+```jsx
+// Thread 클래스를 상속한 새로운 쓰레드 정의
+class MyThread extends Thread {
+    @Override
+    public void run() {
+        // 쓰레드가 수행할 작업
+        for (int i = 1; i <= 5; i++) {
+            System.out.println("MyThread: " + i);
+            try {
+                Thread.sleep(1000);  // 1초 대기
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+
+// 메인 클래스에서 쓰레드 실행
+public class Main {
+    public static void main(String[] args) {
+        MyThread thread = new MyThread(); // 새로운 쓰레드 생성
+        thread.start(); // 쓰레드 시작
+    }
+}
+
+```
+
+```jsx
+위 예제에서 MyThread는 Thread 클래스를 상속받아 만든 새로운 쓰레드입니다.
+
+start() 메서드를 호출하면 run() 메서드가 실행되며,
+
+MyThread 쓰레드는 메인 프로그램과 독립적으로 1초마다 숫자를 출력합니다.
+```
+
+# 4. Runnable 인터페이스 구현하여 쓰레드 만들기
+
+```jsx
+Runnable 인터페이스를 구현하는 방식도 있습니다.
+
+이 방법은 특히 이미 다른 클래스를 상속 중인 클래스에서도 쓰레드를 추가할 때 유용합니다.
+```
+
+```jsx
+// Runnable 인터페이스 구현
+class MyRunnable implements Runnable {
+    @Override
+    public void run() {
+        for (int i = 1; i <= 5; i++) {
+            System.out.println("MyRunnable: " + i);
+            try {
+                Thread.sleep(1000);  // 1초 대기
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+
+// 메인 클래스에서 쓰레드 실행
+public class Main {
+    public static void main(String[] args) {
+        Thread thread = new Thread(new MyRunnable()); // 새로운 쓰레드 생성
+        thread.start(); // 쓰레드 시작
+    }
+}
+
+```
+
+```jsx
+위 예제에서 MyRunnable 클래스는 Runnable 인터페이스를 구현하여 쓰레드로 사용할 수 있는 형태입니다.
+
+Thread 생성자에 MyRunnable 객체를 넣고 start()를 호출하면 run() 메서드가 실행됩니다.
+```
+
+# 5. 쓰레드 동작 방식
+
+```jsx
+생성: Thread thread = new Thread(...);로 쓰레드 객체를 생성합니다.
+
+시작: thread.start();로 쓰레드를 시작합니다. 이때 run() 메서드가 호출됩니다.
+
+일시정지: Thread.sleep(milliseconds);로 쓰레드를 잠시 멈춥니다.
+
+종료: run() 메서드의 작업이 모두 끝나면 쓰레드는 자동으로 종료됩니다.
+```
+
+# 6. 쓰레드의 동기화 (Synchronization)
+
+```jsx
+동시에 여러 쓰레드가 공유 자원에 접근하면 충돌이 발생할 수 있습니다.
+
+이럴 때 동기화를 사용하여 문제를 방지할 수 있습니다.
+
+자바에서는 synchronized 키워드를 사용하여 특정 메서드나 블록을 동기화할 수 있습니다.
+```
+
+```jsx
+class Counter {
+    private int count = 0;
+
+    public synchronized void increment() {
+        count++;
+    }
+
+    public int getCount() {
+        return count;
+    }
+}
+
+public class Main {
+    public static void main(String[] args) throws InterruptedException {
+        Counter counter = new Counter();
+
+        // 두 개의 쓰레드가 동시에 count를 증가시킵니다.
+        Thread t1 = new Thread(() -> {
+            for (int i = 0; i < 1000; i++) {
+                counter.increment();
+            }
+        });
+
+        Thread t2 = new Thread(() -> {
+            for (int i = 0; i < 1000; i++) {
+                counter.increment();
+            }
+        });
+
+        t1.start();
+        t2.start();
+
+        t1.join(); // t1이 끝날 때까지 기다립니다.
+        t2.join(); // t2가 끝날 때까지 기다립니다.
+
+        System.out.println("Final Count: " + counter.getCount());
+    }
+}
+
+```
+
+```jsx
+이 예제에서 increment() 메서드는 synchronized로 동기화되어,
+
+두 쓰레드가 동시에 count 값을 수정하지 못하게 합니다. 따라서 충돌 없이 올바른 값이 유지됩니다.
+```
+
+# 7. 쓰레드의 장점과 주의사항
+
+```jsx
+장점:
+
+동시에 여러 작업을 처리할 수 있어 프로그램 속도가 빨라질 수 있습니다.
+
+백그라운드에서 작업을 처리하기에 사용자 인터페이스(UI)가 부드럽게 작동할 수 있습니다.
+
+주의사항:
+
+너무 많은 쓰레드를 생성하면 오히려 성능이 저하될 수 있습니다.
+
+동기화 문제로 인한 데드락(Deadlock)이나 레이스 컨디션(Race Condition) 발생 가능성이 있습니다.
+
+* 쓰레드를 적절히 사용하면 효율적인 프로그램을 작성할 수 있지만,
+
+	무작정 많은 쓰레드를 사용하는 것은 피해야 합니다. 쓰레드를 사용할 때는 항상 동기화 문제와 성능을 고려하는 것이 중요합니다.
+```
+
+# 예제 ( APIM 개발 )
+
+```jsx
+이 코드는 대량의 데이터를 한꺼번에 처리하려 할 때,
+
+데이터를 일정한 크기(여기서는 10,000개)로 나눠 여러 쓰레드에서 동시에 보내도록 설계된 것입니다.
+
+이렇게 하면 데이터 전송 시간이 단축되고, 시스템이 특정 작업으로 인해 과부하가 걸리는 것을 방지할 수 있습니다.
+```
+
+## `Runnable` 인터페이스와 `Thread`의 개념
+
+```jsx
+Runnable:
+
+		Runnable 인터페이스는 자바에서 병렬 작업을 수행하는 방법 중 하나입니다.
+
+		Runnable을 구현한 클래스에는 run이라는 메서드가 있어, 이 메서드 안에 실행할 코드를 작성합니다.
+
+		이렇게 만든 Runnable 객체를 Thread 클래스에 전달하여 쓰레드로 실행할 수 있습니다.
+
+Thread:
+
+		Thread 클래스는 Runnable을 받아서 동시에 실행할 수 있는 새로운 "실행 흐름"을 만듭니다.
+
+		이렇게 여러 흐름을 만들면 하나의 작업이 끝날 때까지 기다릴 필요 없이 동시에 여러 작업을 진행할 수 있습니다.
+```
+
+## `DataSenderRunnable` 클래스 (데이터 전송을 담당하는 쓰레드)
+
+```jsx
+이 클래스는 데이터 전송 작업을 수행하는 Runnable 구현체입니다.
+
+DataSenderRunnable 클래스는 Runnable을 상속받아, run() 메서드에 전송할 데이터를 APIM으로 보내는 로직을 작성합니다.
+
+주요 필드:
+
+		dataList: 전송할 데이터 목록입니다.
+
+		apimService: 데이터를 APIM으로 보내는 메서드를 가진 서비스 객체입니다.
+
+주요 메서드:
+
+		run():
+
+				Thread가 시작될 때 자동으로 실행되는 메서드입니다.
+
+				여기에서는 apimService.sendDataListToApim(dataList);를 호출해 dataList를 APIM으로 전송합니다.
+
+				만약 전송 중 오류가 발생하면, 로그에 에러 메시지를 기록합니다.
+```
+
+```java
+// 데이터 전송을 위한 쓰레드 클래스, 제네릭 타입 T로 다양한 데이터 타입을 지원
+public class DataSenderRunnable<T> implements Runnable {
+    // 로그 메시지를 기록하기 위한 Logger 인스턴스 (CommonCode.LOGGER_NAME_TRANS는 설정된 로거 이름)
+    protected final static Logger logger = LogManager.getLogger(CommonCode.LOGGER_NAME_TRANS);
+
+    // APIM 서버로 보낼 데이터 리스트 (제네릭 타입 T로 다양한 데이터 타입을 지원)
+    private List<T> dataList;
+    // APIM 서버와의 통신을 담당하는 서비스 클래스
+    private ApimService apimService;
+
+    // 생성자: 전달받은 dataList와 apimService를 초기화
+    public DataSenderRunnable(List<T> dataList, ApimService apimService) {
+        this.dataList = dataList;
+        this.apimService = apimService;
+    }
+
+    // Runnable 인터페이스의 run 메서드를 구현하여, 쓰레드가 시작되면 실행되는 작업을 정의
+    @Override
+    public void run() {
+        try {
+            // APIM 서버로 dataList 데이터를 전송
+            apimService.sendDataListToApim(dataList);
+            // 데이터 전송 성공 시, 전송된 아이템 개수와 함께 로그를 기록
+            logger.info("Data successfully sent to APIM for " + dataList.size() + " items.");
+        } catch (Exception e) {
+            // 데이터 전송 중 예외 발생 시, 에러 로그 기록
+            logger.error("Error sending data to APIM: ", e);
+        }
+    }
+}
+
+```
+
+## `processDataInChunks` 메서드 (데이터를 나누어 전송)
+
+```java
+이 메서드는 dataList를 10,000개씩 잘라 여러 쓰레드에서 동시에 전송하게 합니다.
+
+동작 과정:
+
+		데이터 나누기:
+
+				for 루프를 통해 dataList를 10,000개씩 잘라 부분 리스트(chunk)를 만듭니다.
+
+		쓰레드 생성:
+
+				각 chunk마다 DataSenderRunnable 객체를 생성하고 이를 Thread에 넣어 실행합니다.
+
+				이 쓰레드가 생성되면, run() 메서드가 자동으로 호출되어 각 부분 데이터를 APIM으로 전송하게 됩니다.
+
+
+		쓰레드 시작:
+
+				thread.start()는 새로 생성된 쓰레드를 실행합니다.
+
+				이 시점에서 run() 메서드의 코드가 실제로 실행되며, 각 chunk 데이터가 APIM으로 전송됩니다.
+```
+
+```java
+public <T> void processDataInChunks(String tableNm, List<T> dataList) throws Exception {
+    // 10,000개씩 나누어 쓰레드로 APIM 전송
+    int chunkSize = 10000;
+    for (int i = 0; i < dataList.size(); i += chunkSize) {
+        int end = Math.min(i + chunkSize, dataList.size());
+        List<T> chunk = dataList.subList(i, end);
+
+        // 쓰레드를 실행
+        Thread thread = new Thread(new DataSenderRunnable<>(chunk, apimService));
+        thread.start();
+    }
+}
+
+```
+
+```java
+
+int end = Math.min(i + chunkSize, dataList.size());
+
+		end는 각 chunk의 끝 인덱스를 정의하는 값입니다. i가 시작 인덱스라면, end는 i + chunkSize가 됩니다.
+
+		Math.min(i + chunkSize, dataList.size())를 사용해, end가 dataList.size()를 초과하지 않도록 합니다.
+
+		예를 들어, dataList.size()가 25,000인데 chunkSize가 10,000일 경우,
+
+		마지막 chunk는 5,000개만 포함해야 하므로 end 값이 dataList.size()를 넘어가지 않게 해줍니다.
+
+
+		ex) 첫 번째 반복: i = 0일 때 end = 10,000으로 첫 10,000개를 가져옴.
+
+		두 번째 반복: i = 10,000일 때 end = 20,000으로 두 번째 10,000개를 가져옴.
+
+		세 번째 반복: i = 20,000일 때 end = 25,000이 되면서, 남은 5,000개를 가져옴.
+
+		즉, Math.min(i + chunkSize, dataList.size())로 마지막 청크가 10,000개 미만일 때
+
+		남은 데이터만큼 가져오는 방식을 사용하고 있어서, 데이터가 모두 전송됩
+
+
+
+List<T> chunk = dataList.subList(i, end);
+
+		dataList.subList(i, end)는 dataList의 i부터 end 전까지 데이터를 포함하는 부분 리스트를 생성합니다.
+
+		이 chunk는 dataList의 일부를 참조할 뿐, 실제 데이터를 복사하지 않습니다.
+
+		즉, dataList의 원본 데이터를 공유하면서 나누어진 부분 리스트를 나타내는 효율적인 방식입니다.
+
+
+		ex) 첫 번째 반복: i = 0, end = 10,000 → dataList의 0부터 9,999까지 부분을 chunk로 만듭니다.
+
+		두 번째 반복: i = 10,000, end = 20,000 → dataList의 10,000부터 19,999까지 부분을 chunk로 만듭니다.
+
+		세 번째 반복: i = 20,000, end = 25,000 → dataList의 20,000부터 24,999까지 부분을 chunk로 만듭니다.
+```

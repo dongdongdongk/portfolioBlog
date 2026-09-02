@@ -14,6 +14,7 @@ interface CategoryTreeProps {
   tree: CategoryTreeType[]
   onCategorySelect?: (category: string) => void
   selectedCategory?: string
+  currentCategory?: string
 }
 
 interface CategoryNodeProps {
@@ -21,10 +22,19 @@ interface CategoryNodeProps {
   level: number
   onCategorySelect?: (category: string) => void
   selectedCategory?: string
+  currentCategory?: string
 }
 
-function CategoryNode({ node, level, onCategorySelect, selectedCategory }: CategoryNodeProps) {
-  const [isExpanded, setIsExpanded] = useState(true)
+function CategoryNode({
+  node,
+  level,
+  onCategorySelect,
+  selectedCategory,
+  currentCategory,
+}: CategoryNodeProps) {
+  // 현재 글의 카테고리 경로에 포함된 폴더는 기본으로 열기
+  const isInCurrentPath = currentCategory ? currentCategory.startsWith(node.path) : false
+  const [isExpanded, setIsExpanded] = useState(isInCurrentPath)
   const hasChildren = node.children.length > 0
   const hasPosts = node.posts.length > 0
   const isSelected = selectedCategory === node.path
@@ -60,20 +70,22 @@ function CategoryNode({ node, level, onCategorySelect, selectedCategory }: Categ
       >
         {hasContent ? (
           isExpanded ? (
-            <ChevronDownIcon className="h-4 w-4 text-gray-400" />
+            <ChevronDownIcon className="h-4 w-4 shrink-0 text-gray-400" />
           ) : (
-            <ChevronRightIcon className="h-4 w-4 text-gray-400" />
+            <ChevronRightIcon className="h-4 w-4 shrink-0 text-gray-400" />
           )
         ) : (
-          <div className="w-4" />
+          <div className="w-4 shrink-0" />
         )}
 
-        <FolderIcon className="h-4 w-4 text-orange-500" />
+        <FolderIcon className="h-4 w-4 shrink-0 text-orange-500" />
 
-        <span className="text-sm font-medium">{node.name}</span>
+        <span className="truncate text-sm font-medium" title={node.name}>
+          {node.name}
+        </span>
 
         {totalPostCount > 0 && (
-          <span className="ml-auto rounded bg-gray-200 px-1.5 py-0.5 text-xs text-gray-500 dark:bg-gray-700">
+          <span className="ml-auto shrink-0 rounded bg-gray-200 px-1.5 py-0.5 text-xs text-gray-500 dark:bg-gray-700">
             {totalPostCount}
           </span>
         )}
@@ -90,8 +102,10 @@ function CategoryNode({ node, level, onCategorySelect, selectedCategory }: Categ
                 href={`/blog/${post.slug}`}
                 className="flex items-center gap-2 rounded px-2 py-1 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
               >
-                <DocumentTextIcon className="h-4 w-4 text-gray-400" />
-                <span className="truncate text-sm">{post.title}</span>
+                <DocumentTextIcon className="h-4 w-4 shrink-0 text-gray-400" />
+                <span className="truncate text-sm" title={post.title}>
+                  {post.title}
+                </span>
               </Link>
             ))}
         </div>
@@ -107,6 +121,7 @@ function CategoryNode({ node, level, onCategorySelect, selectedCategory }: Categ
               level={level + 1}
               onCategorySelect={onCategorySelect}
               selectedCategory={selectedCategory}
+              currentCategory={currentCategory}
             />
           ))}
         </div>
@@ -119,6 +134,7 @@ export default function CategoryTree({
   tree,
   onCategorySelect,
   selectedCategory,
+  currentCategory,
 }: CategoryTreeProps) {
   return (
     <div className="space-y-1">
@@ -137,6 +153,7 @@ export default function CategoryTree({
             level={0}
             onCategorySelect={onCategorySelect}
             selectedCategory={selectedCategory}
+            currentCategory={currentCategory}
           />
         ))
       )}

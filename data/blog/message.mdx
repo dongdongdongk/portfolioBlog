@@ -1,0 +1,154 @@
+---
+title: 'Message(다국어)'
+date: '2026-09-02'
+category: '기타, 사용 적음/국비'
+tags: ['기타, 사용 적음', '국비']
+draft: false
+summary: ''
+---
+
+```bash
+다국어 페이지 설정
+
+- 한글은 ko
+- 영어는 en
+- 일어는 jp
+```
+
+## 1. 다국어 Message 파일 작성
+
+```bash
+1. /src/main/resources/ 하위에 폴더를 생성
+	 /src/main/resources/messages 폴더 생성
+
+2. message를 저장할 파일 생성
+	 - 형식이 있음
+	 - 기본파일은 ****.properties(ex: message.properties)
+	 - 한국어 파일은 기본파일명과 동일한 이름뒤에 국가코드 작성
+		 (ex: message_ko.properties)
+	 - 다른 언어도 동일
+		 (ex: message_en.properties)
+
+```
+
+## 2. [application.properties](http://application.properties) 설정
+
+```bash
+1. application.properties
+	1) message.properties의 위치와 파일명 설정
+		 ## message 파일의 위치와 이름 -> 폴더명/파일명
+		 ## messages/message로 시작하는 모든 파일
+		 spring.messages.basename=messages/message
+
+	2) Encoding
+		 spring.messages.encoding=UTF-8
+
+	3) message(key)가 없는 경우
+		 spring.messages.use-code-as-default-message=true
+		 ### true  : 예외를 발생 시키지 않고 key를 출력
+		 ### false : 예외를 발생
+
+	4) message 파일 내용의 변경을 감지하는 간격(초단위)
+		 spring.messages.cache-duration=600
+```
+
+## 3. Java 적용
+
+```bash
+- 언어를 구분하는 방법은 Cookie나 Session을 사용
+- Interceptor를 사용하여 언어별 message를 사용
+
+1. java class 선언
+2. WebMvcConfigure Interface 구현
+3. 클래스 선언부에 @Configuration 선언
+
+-------------------------------------------------------
+
+@Configuration
+public class MessageConfig implements WebMvcConfigurer {
+
+	1. Cookie또는 Session 사용 결정
+
+	@Bean
+	public LocaleResolver locale() {
+		//1. session
+		SessionLocaleResolver resolver = new SessionLocaleResolver();
+		resolver.setDefaultLocale(Locale.KOREAN);
+
+
+		//2. Cookie
+		CookieLocaleResolver cResolver = new CookieLocaleResolver();
+		cResolver.setDefaultLocale(Locale.KOREAN);
+		cResolver.setCookieName("lang");
+
+		return cResolver;
+	}
+
+-------------------------------------------------------
+
+	2. Message Interceptor 객체 생성
+	//Interceptor 객체
+	@Bean
+	public LocaleChangeInterceptor changeInterceptor() {
+		LocaleChangeInterceptor changeInterceptor = new LocaleChangeInterceptor();
+		changeInterceptor.setParamName("lang");
+		//parameter를 받아서 언어 구분
+		//url?lang=en
+		return changeInterceptor;
+	}
+}
+
+3. Interceptor 등록
+public class InterceptorConfig implements WebMvcConfigurer {
+	@Autowired //IOC(Inversion Of Control)
+	private TestInterceptor testInterceptor;
+	@Autowired
+	private StudyInterceptor studyInterceptor;
+	@Autowired
+	private LocaleChangeInterceptor localeChangeInterceptor;
+
+	@Override
+	public void addInterceptors(InterceptorRegistry registry) {
+		//method 체이닝
+		//적용할 Interceptor 등록
+		registry.addInterceptor(testInterceptor)
+		//Interceptor를 적용할 URL 등록
+				.addPathPatterns("/qna/**")
+				.addPathPatterns("/notice/**")
+		//제외할 URL등록
+				.excludePathPatterns("/qna/detail")
+				.excludePathPatterns("/qna/write");
+
+		//추가 Interceptor등록
+		registry.addInterceptor(studyInterceptor)
+				.addPathPatterns("/qna/**");
+
+		-------------------------------------------------------
+		//message Interceptor 등록
+		registry.addInterceptor(localeChangeInterceptor)
+				.addPathPatterns("/**");
+	}
+
+}
+```
+
+## 4. JSP 사용
+
+```bash
+1. jsp에 spring message를 사용할 수 있도록 tag lib 선언
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
+
+2. message 기본 문법
+<spring:message code="properites의 key" text="code가 없을 때 기본 메세지"
+	arguments="${}" argumentSeperator="구분자" var="변수명"/>
+
+a. message를 변수에 저장하고 다른 곳에서 출력
+	<spring:message code="hi" var="m" text="기본메세지"/>
+	<h3>${m}</h3>
+b. message에서 여러개를 구분해서 출력
+	a) message.properties
+		 welcome=회원님의 ID는 {0} 이고 Name은 {1} 입니다
+	b) jsp
+	<spring:message code="welcome"
+		arguments="${member.id},${member.name}" argumentSeperator="," />
+```

@@ -1,0 +1,433 @@
+---
+title: 'BCh4 09 p201 방명록조회/수정/삭제처리'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# 방명록의 조회 처리
+
+```java
+* @id 에 해당하는 번호를 이용해서 처리
+
+* 컨트롤러에서는 Model 을 이용해서 처리 결과를 반환
+
+* 화면에서 목록 페이지로 가는 링크가 필요하므로 PageRequestDTO를 그대로 화면에 전송해서 목록으로 가는 링크를 처리
+```
+
+## 등록 페이지 링크와 조회 페이지 링크 처리
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381241/notion-blog/_/_/_/_/BCh4_09_p201_/Untitled.png)
+
+```java
+리스트 페이지 제목 옆에 등록 버튼을 작성해 준다 (이미지에는 html 이 붙어있는데 빼야한다)
+```
+
+```java
+   		<h1>GuestBook List Page
+            <span>
+                <a th:href="@{/guestbook/register}">
+                    <button type="button" class="btn btn-outline-primary">REGISTER</button>
+                </a>
+            </span>
+        </h1>
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381238/notion-blog/_/_/_/_/BCh4_09_p201_/Untitled_1.png)
+
+```java
+<th scope="row"><a th:href="@{/guestbook/read(gno = ${dto.gno}, page = ${result.page})}">[[${dto.gno}]]</a></th>
+
+리스트 페이지에서 글 번호를 클릭하면 상세 조회 페이지로 이동하도록 ( 타임리프는 키 = 값 형태로 작성 가능해서 훨씬 가독성이 좋다 (ex  gno = ${dto.gno}))
+
+글 번호와 페이지 값을 보내준다 ( 현재 페이지 번호르 보내주는 이유는 list 를 누르고 돌아왔을 때 원래 페이지로 돌아오기 위해서다)
+```
+
+## 서비스 부분에 메서드 추가
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381240/notion-blog/_/_/_/_/BCh4_09_p201_/Untitled_2.png)
+
+```java
+서비스 인터페이스에 gno 를 받는 조회 메서드를 작성하고
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381240/notion-blog/_/_/_/_/BCh4_09_p201_/Untitled_3.png)
+
+```java
+  	@Override
+    public GuestbookDTO read(Long gno) {
+        Optional<Guestbook> result  = repository.findById(gno);
+
+        return result.isPresent() ? entityToDto(result.get()) : null;
+    }
+```
+
+```java
+구현 클래스에서 오버라이드로 구현을 해준다
+
+findById 를 활용해서 GuestBook Repository 에서 엔티티 객체를 가지고 왔다면
+
+entityToDto 를 활용해서 객체를 DTO 로 변환해서 반환한다 (.isPresent() 는 객체가 존재하면 true 없으면 false 를 반환한다
+
+(삼항 연산자를 이용해서 거짓이면 null 을 반환하게 하였다)
+
+```
+
+## 컨트롤러 작성
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381240/notion-blog/_/_/_/_/BCh4_09_p201_/Untitled_4.png)
+
+```java
+  	public void read(Long gno , @ModelAttribute("requestDTO") PageRequestDTO pageRequestDTO, Model model) {
+        log.info("gno" + gno);
+        GuestbookDTO dto = service.read(gno);
+
+        model.addAttribute("dto", dto);
+    }
+```
+
+```java
+컨트롤러를 작성한다 특이한 점은 없고
+
+@ModelAttribute 를 사용해서 PageRequestDTO 를 requestDTO 로 다시 명시해줬다(공부 위해서)
+
+Long gno 는 GuestbookDTO dto = service.read(gno); 에 사용하기 위해서 받고
+
+model 은 상세 페이지로 gno 로 조회한 정보(dto) 를 보내주기 위해서고
+
+pageRequestDTO 는 page 를 받아서 저장하기 위해서다(list 를 누르면 원래 list page 로 돌아가기 위해서)
+```
+
+## 조회 페이지 작성
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381240/notion-blog/_/_/_/_/BCh4_09_p201_/Untitled_5.png)
+
+```java
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
+<th:block th:replace="~{/layout/basic :: setContent(~{this::content} )}">
+
+  <th:block th:fragment="content">
+2
+    <h1 class="mt-4">GuestBook Read Page</h1>
+
+    <div class="form-group">
+      <label >Gno</label>
+      <input type="text" class="form-control" name="gno" th:value="${dto.gno}" readonly >
+    </div>
+
+    <div class="form-group">
+      <label >Title</label>>
+      <input type="text" class="form-control" name="title" th:value="${dto.title}" readonly >
+    </div>
+    <div class="form-group">
+      <label >Content</label>
+      <textarea class="form-control" rows="5" name="content" readonly>[[${dto.content}]]</textarea>
+    </div>
+    <div class="form-group">
+      <label >Writer</label>
+      <input type="text" class="form-control" name="writer" th:value="${dto.writer}" readonly>
+    </div>
+    <div class="form-group">
+      <label >RegDate</label>
+      <input type="text" class="form-control" name="regDate" th:value="${#temporals.format(dto.regDate, 'yyyy/MM/dd HH:mm:ss')}" readonly>
+    </div>
+    <div class="form-group">
+      <label >ModDate</label>
+      <input type="text" class="form-control" name="modDate" th:value="${#temporals.format(dto.modDate, 'yyyy/MM/dd HH:mm:ss')}" readonly>
+    </div>
+
+    <!--        <a th:href="@{/guestbook/modify(gno = ${dto.gno}, page=${requestDTO.page})}"><button type="button" class="btn btn-primary">Modify</button></a>-->
+
+    <!--        <a th:href="@{/guestbook/list(page=${requestDTO.page})}"><button type="button" class="btn btn-info">List</button></a>-->
+
+    <a th:href="@{/guestbook/modify(gno = ${dto.gno}, page=${requestDTO.page})}">
+      <button type="button" class="btn btn-primary">Modify</button>
+    </a>
+
+    <a th:href="@{/guestbook/list(page=${requestDTO.page})}">
+      <button type="button" class="btn btn-info">List</button>
+    </a>
+
+  </th:block>
+
+</th:block>
+```
+
+```java
+새로운 read 라는 조회 페이지를 작성해준다
+```
+
+### 리스트 페이지로 돌아갔을 때 페이지 유지하기
+
+```java
+    <a th:href="@{/guestbook/list(page=${requestDTO.page})}">
+      <button type="button" class="btn btn-info">List</button>
+    </a>
+
+아래에 리스트로 돌아가는 버튼을 보면
+
+read 로 넘어갈 때 받아온  page 를 사용해서 리스트로 돌아갈 때 주소에 넣어준다
+```
+
+# 방명록의 수정/삭제 처리
+
+```java
+Guestbook 의 Modify 와 Remove ( 수정, 삭제 ) 기능을 만든다
+```
+
+## 컨트롤러 수정
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381240/notion-blog/_/_/_/_/BCh4_09_p201_/Untitled_6.png)
+
+```java
+수정과 삭제는 상세 페이지로 이동한 상태에서 작업이 진행되므로
+
+컨트롤러에서 엔드 포인트에 read 와 modify 를 추가해준다
+```
+
+## 수정 페이지 추가 (modify)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381241/notion-blog/_/_/_/_/BCh4_09_p201_/Untitled_7.png)
+
+```java
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
+<th:block th:replace="~{/layout/basic :: setContent(~{this::content} )}">
+
+  <th:block th:fragment="content">
+
+    <h1 class="mt-4">GuestBook Modify Page</h1>
+    <form action="/guestbook/modify" method="post">
+      <input type="hidden" name="page" th:value="${requestDTO.page}">
+
+      <div class="form-group">
+        <label >Gno</label>
+        <input type="text" class="form-control" name="gno" th:value="${dto.gno}" readonly >
+      </div>
+
+      <div class="form-group">
+        <label >Title</label>>
+        <input type="text" class="form-control" name="title" th:value="${dto.title}">
+      </div>
+      <div class="form-group">
+        <label >Content</label>
+        <textarea class="form-control" rows="5" name="content">[[${dto.content}]]</textarea>
+      </div>
+      <div class="form-group">
+        <label >Writer</label>
+        <input type="text" class="form-control" name="writer" th:value="${dto.writer}" readonly>
+      </div>
+      <div class="form-group">
+        <label >RegDate</label>
+        <input type="text" class="form-control" name="regDate" th:value="${#temporals.format(dto.regDate, 'yyyy/MM/dd HH:mm:ss')}" readonly>
+      </div>
+      <div class="form-group">
+        <label >ModDate</label>
+        <input type="text" class="form-control" name="modDate" th:value="${#temporals.format(dto.modDate, 'yyyy/MM/dd HH:mm:ss')}" readonly>
+      </div>
+    </form>
+
+    <button type="button" class="btn btn-primary modifyBtn">Modify</button>
+    <button type="button" class="btn btn-info listBtn">List</button>
+    <button type="button" class="btn btn-danger removeBtn">Remove</button>
+
+    <script th:inline="javascript">
+      const removeBtn = document.querySelector(".removeBtn")
+      const actionForm = document.querySelector("form");
+      const modifyBtn = document.querySelector(".modifyBtn")
+
+      removeBtn.addEventListener('click', function (){
+        actionForm.setAttribute("action","/guestbook/remove")
+        actionForm.method = "post";
+        actionForm.submit();
+      });
+
+      modifyBtn.addEventListener('click', function (){
+        if(!confirm("수정하시겠습니까?")){
+          return;
+        }
+        actionForm.setAttribute("action", "/guestbook/modify")
+      });
+
+    </script>
+
+  </th:block>
+
+</th:block>
+```
+
+```java
+* 기본적인 폼은 상세 조회랑 거의 똑같다
+
+* 수정을 위해서 form 으로 input 창을 감싸주고 수정 가능한 컬럼은 readonly 를 지워준다 ( 폼 주소는 <form action="/guestbook/modify" method="post"> )
+
+* 삭제 수정 버튼은 javascript 를 사용해서 작동시킨다
+```
+
+### 삭제 버튼 자바스크립트
+
+```java
+   	<script th:inline="javascript">
+      const removeBtn = document.querySelector(".removeBtn")
+      const actionForm = document.querySelector("form");
+
+		  removeBtn.addEventListener('click', function (){
+        actionForm.setAttribute("action","/guestbook/remove")
+        actionForm.method = "post";
+        actionForm.submit();
+      });
+
+    </script>
+```
+
+## 서비스 계층
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381241/notion-blog/_/_/_/_/BCh4_09_p201_/Untitled_8.png)
+
+```java
+게시글 수정과 삭제를 서비스 클래스에 추가 해준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381241/notion-blog/_/_/_/_/BCh4_09_p201_/Untitled_9.png)
+
+```java
+  	// 게시글 삭제
+    @Override
+    public void remove(Long gno) {
+        repository.deleteById(gno);
+    }
+    // 게시글 수정
+    @Override
+    public void modify(GuestbookDTO dto) {
+        // 업데이트 항목 제목, 내용
+        Optional<Guestbook> result = repository.findById(dto.getGno());
+        if(result.isPresent()) {
+            // result.get()은 Optional 객체 안에 실제로 값이 존재한다면 그 값을 반환,
+            // 값이 없는 경우에는 NoSuchElementException을 발생
+            Guestbook entity = result.get();
+
+            entity.changeTitle(dto.getTitle());
+            entity.changeContent(dto.getContent());
+
+            repository.save(entity);
+        }
+    }
+```
+
+```java
+서비스 구현 클래스에 내용을 작성해준다 ( 삭제는 javaScript 를 이용해서 form 의 주소등 속성을 변경해서 사용한다 )
+```
+
+## 수정 처리
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381238/notion-blog/_/_/_/_/BCh4_09_p201_/Untitled_10.png)
+
+```java
+현재 수정 페이지에는 /guestbook/read 로 이동할 떄 페이지 번호가 파라미터로 같이 이동하고 수정페이지로 이동할때도 같이 전달된다
+
+이를 이용해서 수정 후에도 다시 동일한 페이지로 돌아갈 수 있도록 page 값 역시 form 태그에 추가해서 전달한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381238/notion-blog/_/_/_/_/BCh4_09_p201_/Untitled_11.png)
+
+```java
+hidden 으로 숨겨둔 input 창에 page 값을 보낼 수 있도록 추가해준다
+```
+
+## 수정 컨트롤러 추가
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381238/notion-blog/_/_/_/_/BCh4_09_p201_/Untitled_12.png)
+
+```java
+// 게시글 수정
+    @PostMapping("/modify")
+    public String modify(GuestbookDTO dto, @ModelAttribute("requestDTO") PageRequestDTO requestDTO, RedirectAttributes redirectAttributes) {
+        log.info("post modify");
+        log.info("dto:" + dto);
+
+        service.modify(dto);
+
+        redirectAttributes.addAttribute("page",redirectAttributes);
+        redirectAttributes.addAttribute("gno", dto.getGno());
+        return "redirect:/guestbook/read";
+    }
+```
+
+```java
+3가지 파라미터가 사용된다
+
+수정해야 하는 글의 정보를 가지는 GuestbookDTO
+
+기존의 페이지 정보를 유지하기 위한 PageRequestDTO
+
+리다이렉트로 객체를 넣어 이동하기 위한 RedirectAttributes
+
+```
+
+## 수정 버튼 자바스크립트
+
+```java
+수정 버튼의 자바 스크립트 코드를 작성해 준다
+```
+
+```java
+      modifyBtn.addEventListener('click', function (){
+        if(!confirm("수정하시겠습니까?")){
+          return;
+        }
+        actionForm.setAttribute("action", "/guestbook/modify")
+      });
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381238/notion-blog/_/_/_/_/BCh4_09_p201_/Untitled_13.png)
+
+```java
+주의할점 : 수정 form 에서 modDate 와 regDate 부분의 naem 을 지워줘야 한다
+
+이는 자동으로 값이 수정될것인데 name 이 있으면 form 이 수정하려고 해서 오류가 난다
+```
+
+## 수정 화면에서 다시 리스트로
+
+```java
+수정 페이지에서 리스트 페이지에 자바 스크립트를 사용해서 리스트 페이지( 선택한 글이 있는 페이지 ) 로 돌아간다
+```
+
+```jsx
+ 	<script th:inline="javascript">
+      const removeBtn = document.querySelector(".removeBtn");
+      const actionForm = document.querySelector("form");
+      const modifyBtn = document.querySelector(".modifyBtn");
+      const pageInfo = document.querySelector("input[name='page']");  // 숨겨둔 페이지 값 선택
+      const listBtn = document.querySelector(".listBtn");
+
+			  removeBtn.addEventListener('click', function (){
+        actionForm.setAttribute("action","/guestbook/remove")
+        actionForm.method = "post";
+        actionForm.submit();
+      });
+
+      modifyBtn.addEventListener('click', function (){
+        if(!confirm("수정하시겠습니까?")){
+          return;
+        }
+        actionForm.setAttribute("action", "/guestbook/modify")
+        actionForm.method = "post"
+        actionForm.submit();
+      });
+
+      listBtn.addEventListener("click", function (){
+        actionForm.innerHTML=""; //form 태그의 내용 삭제
+        actionForm.append(pageInfo); // 목록에 필요한 페이지 값 추가
+        actionForm.setAttribute("action", "/guestbook/list") // 폼에 다시 값 추가
+        actionForm.method = "get"; // 메서드 get
+        actionForm.submit();
+      });
+
+    </script>
+```

@@ -1,0 +1,3144 @@
+---
+title: '섹션 4: Battle Blaster - 2'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { Game Mode 설정 초보자용 완벽 가이드 }
+
+## 📌 이번 강의의 목표
+
+1. **Game Mode C++ 클래스 생성**
+2. **Game Mode 블루프린트 만들기**
+3. **BP_Tank를 기본 Pawn으로 설정**
+4. **Player Start 방식으로 전환**
+
+---
+
+## 🎯 왜 Game Mode가 필요한가?
+
+### 현재 방식 vs 새로운 방식
+
+| 방식                            | 장점                | 단점           |
+| ------------------------------- | ------------------- | -------------- |
+| **Auto Possess** (현재)         | 간단함              | 확장성 없음    |
+| **Game Mode + Player Start** ✅ | 게임 규칙 관리 가능 | 설정 단계 많음 |
+
+### Game Mode란?
+
+```
+Game Mode = 게임의 규칙을 정하는 관리자 👔
+
+역할:
+├─ 어떤 Pawn을 사용할지 결정
+├─ 게임 승리/패배 조건 관리
+├─ 점수/타이머 관리
+└─ UI 표시 제어
+```
+
+**비유**: 축구 경기의 심판 + 규칙집
+
+---
+
+## 🏗️ 1단계: Game Mode C++ 클래스 생성
+
+### 작업 순서
+
+```
+Tools → New C++ Class
+    ↓
+All Classes → "game mode" 검색
+    ↓
+⚠️ 선택 주의!
+```
+
+### Game Mode vs Game Mode Base
+
+| 클래스                | 용도                   | 선택 |
+| --------------------- | ---------------------- | ---- |
+| **Game Mode**         | 멀티플레이어 매치 게임 | ❌   |
+| **Game Mode Base** ✅ | 일반적인 모든 게임     | ✅   |
+
+**왜 Base를 선택하나요?**
+
+- 더 많은 기본 기능 제공
+- 커스터마이징 용이
+- 싱글플레이어 게임에 적합
+
+### 클래스 이름
+
+```cpp
+BattleBlasterGameMode
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380634/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_2/image.png)
+
+---
+
+## 📁 2단계: 생성된 파일 확인
+
+### BattleBlasterGameMode.h
+
+```cpp
+#pragma once
+#include "CoreMinimal.h"
+#include "GameFramework/GameModeBase.h"
+#include "BattleBlasterGameMode.generated.h"
+
+UCLASS()
+class BATTLEBLASTER_API ABattleBlasterGameMode : public AGameModeBase
+{
+    GENERATED_BODY()
+
+    // 현재는 비어있음
+    // 다음 강의에서 기능 추가 예정
+};
+```
+
+### 나중에 추가될 기능 (예고)
+
+```cpp
+// 앞으로 구현할 기능들:
+- 남은 적 추적
+- 게임 종료 조건 체크
+- 승리/패배 UI 표시
+- 타이머 관리
+```
+
+---
+
+## 🎨 3단계: Game Mode 블루프린트 생성
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380631/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_2/image_1.png)
+
+### 왜 블루프린트를 또 만드나요?
+
+```
+C++ (구조)     →    Blueprint (설정)
+└─ 게임 규칙 로직   └─ Default Pawn 설정
+                    └─ 기타 게임 설정
+```
+
+### 생성 방법
+
+```
+Blueprints 폴더
+    ↓
+우클릭 → Blueprint Class
+    ↓
+BattleBlasterGameMode 검색 → 선택
+    ↓
+이름: BP_BattleBlasterGameMode
+```
+
+---
+
+## ⚙️ 4단계: Default Pawn 설정
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380632/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_2/image_2.png)
+
+### BP_BattleBlasterGameMode 열기
+
+```
+1. BP_BattleBlasterGameMode 더블클릭
+   ↓
+2. Details 패널에서 "Classes" 섹션 찾기
+   ↓
+3. Default Pawn Class 드롭다운 클릭
+   ↓
+4. "BP_Tank" 선택
+```
+
+### 설정 의미
+
+```
+Default Pawn Class = BP_Tank
+
+의미:
+게임 시작 시 플레이어가 조종할 캐릭터 = 탱크
+```
+
+**Compile & Save!**
+
+---
+
+## 🌍 5단계: 프로젝트 기본 Game Mode 설정
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380633/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_2/image_3.png)
+
+### Project Settings 이동
+
+```
+Edit → Project Settings
+    ↓
+Maps & Modes
+    ↓
+Default GameMode
+    ↓
+BP_BattleBlasterGameMode 선택
+```
+
+### 설정 구조도
+
+```
+프로젝트 전체 설정
+    ↓
+Default GameMode: BP_BattleBlasterGameMode
+    ↓
+이 게임 모드가 사용하는 Pawn: BP_Tank
+```
+
+---
+
+## 🗺️ 6단계: 레벨 정리 및 Player Start 사용
+
+### 현재 상황
+
+```
+레벨에 배치된 BP_Tank
+├─ Auto Possess: Player 0 ← 이제 필요 없음!
+└─ 삭제 예정
+```
+
+### 작업 순서
+
+```
+1. 레벨의 BP_Tank 선택 → Delete
+   ↓
+2. Player Start 확인 (이미 있어야 함)
+   ↓
+3. Play 버튼 클릭
+   ↓
+결과: Player Start 위치에 BP_Tank가 자동 생성됨! ✨
+```
+
+### Auto Possess vs Game Mode 비교
+
+**Auto Possess 방식 (이전):**
+
+```
+레벨에 BP_Tank 직접 배치
+    ↓
+Auto Possess: Player 0 설정
+    ↓
+게임 시작 시 그 탱크 조종
+```
+
+**Game Mode 방식 (현재):**
+
+```
+Game Mode에 Default Pawn 설정
+    ↓
+Player Start 배치
+    ↓
+게임 시작 시 그 위치에 Pawn 생성
+```
+
+---
+
+## 📐 7단계: Player Start 높이 조정
+
+### 문제 발견
+
+```
+게임 플레이 → Eject (F8)
+    ↓
+탱크 위치 확인
+    ↓
+문제: 바닥에 정확히 안 닿음
+```
+
+### 왜 바닥에서 떠있어야 하나요?
+
+```
+❌ 바닥에 딱 붙으면:
+   CapsuleComp가 바닥과 충돌
+   → 움직임 불가능!
+
+✅ 살짝 떠있으면:
+   충돌 없이 자유롭게 움직임
+```
+
+### 권장 설정값
+
+```
+Player Start 선택
+    ↓
+Location
+    └─ Z: 82
+```
+
+### 시각적 설명
+
+```
+높이 0:              높이 82:
+  🚗                   🚗
+━━━━━━━             ━━━━━━━
+(바닥에 박힘)        (살짝 떠있음) ✅
+```
+
+---
+
+## 🌐 추가: World Override 설정
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380633/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_2/image_4.png)
+
+### World Settings에서 확인
+
+```
+Window → World Settings
+    ↓
+Game Mode
+    └─ GameMode Override
+```
+
+### Override 옵션 설명
+
+| 설정              | 의미                  | 우선순위 |
+| ----------------- | --------------------- | -------- |
+| **None** (기본)   | Project Settings 사용 | 낮음     |
+| **특정 GameMode** | 이 레벨만 다른 모드   | **높음** |
+
+### 우선순위 순서
+
+```
+1순위: World Override (레벨별 설정)
+   ↓ (없으면)
+2순위: Project Settings (프로젝트 전체 설정)
+```
+
+### 예시 시나리오
+
+```
+시나리오: 튜토리얼 레벨과 전투 레벨
+
+전투 레벨:
+└─ World Override: None
+    → BP_BattleBlasterGameMode 사용
+
+튜토리얼 레벨:
+└─ World Override: BP_TutorialGameMode
+    → 다른 게임 모드 사용!
+```
+
+**이 프로젝트는 World Override 사용 안 함!**
+
+---
+
+## 📊 전체 흐름도
+
+### 게임 시작 과정
+
+```
+1. 게임 시작
+    ↓
+2. Project Settings 확인
+    ↓
+3. BP_BattleBlasterGameMode 로드
+    ↓
+4. Default Pawn Class 확인 (BP_Tank)
+    ↓
+5. Player Start 위치 찾기
+    ↓
+6. 그 위치에 BP_Tank 생성
+    ↓
+7. Player 0가 그 탱크 조종
+    ↓
+8. 게임 플레이! 🎮
+```
+
+---
+
+## 🔄 Auto Possess → Game Mode 전환 비교
+
+### 변경 전 (Auto Possess)
+
+```
+장점:
+✅ 설정 간단
+✅ 빠른 프로토타입
+
+단점:
+❌ 게임 규칙 관리 불가
+❌ 확장성 부족
+❌ 여러 레벨 관리 어려움
+```
+
+### 변경 후 (Game Mode)
+
+```
+장점:
+✅ 게임 규칙 중앙 관리
+✅ 확장성 좋음
+✅ 전문적인 구조
+✅ 여러 레벨 쉽게 관리
+
+단점:
+❌ 초기 설정 복잡
+```
+
+---
+
+## 🎯 Game Mode가 관리할 내용 (예고)
+
+### 앞으로 구현할 기능들
+
+```cpp
+// BattleBlasterGameMode.cpp에 추가될 내용
+
+1. 적 추적
+   - 레벨에 몇 개의 타워가 있는지
+   - 몇 개를 파괴했는지
+
+2. 승리 조건
+   - 모든 타워 파괴 → 승리!
+   - 탱크 파괴 → 패배!
+
+3. UI 관리
+   - 승리/패배 메시지 표시
+   - 타이머 표시
+
+4. 게임 종료
+   - 조건 충족 시 게임 종료
+   - 재시작 옵션 제공
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Game Mode의 역할
+
+```
+Game Mode = 게임의 두뇌 🧠
+
+담당 업무:
+├─ 캐릭터 관리 (어떤 Pawn 사용?)
+├─ 규칙 관리 (승리/패배 조건)
+├─ 점수 관리 (파괴한 적 수)
+└─ UI 관리 (메시지 표시)
+```
+
+### 파일 구조
+
+```
+C++:
+├─ BattleBlasterGameMode.h
+└─ BattleBlasterGameMode.cpp
+    ↓ (상속받음)
+Blueprint:
+└─ BP_BattleBlasterGameMode
+    └─ Default Pawn: BP_Tank
+```
+
+---
+
+## ❓ 자주 하는 질문
+
+**Q: Player Start가 없으면 어떻게 되나요?**
+
+```
+경고 메시지 뜸 → 0,0,0 위치에서 시작
+→ 항상 Player Start 배치하기!
+```
+
+**Q: Auto Possess를 그대로 두면?**
+
+```
+Game Mode와 충돌!
+→ 예상치 못한 동작 발생
+→ 꼭 삭제하거나 "Disabled"로 설정
+```
+
+**Q: 여러 Player Start가 있으면?**
+
+```
+그중 하나가 랜덤으로 선택됨
+→ 멀티플레이어 게임에 유용
+```
+
+**Q: Game Mode Base 대신 Game Mode를 선택하면?**
+
+```
+더 복잡한 매치 기반 기능 포함
+→ 이 프로젝트엔 과함
+→ Base가 더 적합
+```
+
+# { 언리얼 엔진 Enhanced Input System 설정 가이드 }
+
+이 코드는 언리얼 엔진에서 새로운 입력 시스템(Enhanced Input)을 설정하는 과정입니다. 단계별로 쉽게 설명드리겠습니다.
+
+## 1. 기본 개념 이해
+
+**Input Mapping Context(IMC)란?**
+
+- 키보드/마우스 입력을 게임 내 행동으로 연결하는 설정 파일
+- 예: "W키 = 앞으로 이동", "Space = 점프"
+
+**왜 Tank 클래스에서 설정하나?**
+
+- Tank는 플레이어가 조종하는 캐릭터
+- 적(Enemy)은 플레이어 입력이 필요 없음
+- 따라서 Tank에만 입력 시스템을 넣어야 효율적
+
+## 2. 코드 분석
+
+### BeginPlay 함수의 역할
+
+```cpp
+void ATank::BeginPlay()
+{
+    Super::BeginPlay();  // 부모 클래스의 초기화 먼저 실행
+
+    // 1단계: 플레이어 컨트롤러 가져오기
+    APlayerController* PlayerController = Cast<APlayerController>(GetController());
+```
+
+**플레이어 컨트롤러란?**
+
+- 게임에서 플레이어를 대표하는 객체
+- 입력을 받아 캐릭터(Pawn)를 조종함
+
+```cpp
+    if (PlayerController)  // 컨트롤러가 제대로 있는지 확인
+    {
+        // 2단계: 로컬 플레이어 가져오기
+        ULocalPlayer* LocalPlayer = PlayerController->GetLocalPlayer();
+```
+
+**로컬 플레이어란?**
+
+- 이 컴퓨터에서 직접 플레이하는 플레이어
+- 온라인 멀티플레이와 구분하기 위한 개념
+
+```cpp
+        if (LocalPlayer)  // 로컬 플레이어가 있는지 확인
+        {
+            // 3단계: Enhanced Input 서브시스템 가져오기
+            UEnhancedInputLocalPlayerSubsystem* Subsystem =
+            ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(LocalPlayer);
+
+```
+
+**서브시스템이란?**
+
+- 언리얼 엔진의 특정 기능을 담당하는 관리자
+- Enhanced Input 서브시스템 = 새 입력 시스템을 관리
+
+```cpp
+            if (Subsystem)  // 서브시스템이 제대로 있는지 확인
+            {
+                // 4단계: 우리가 만든 입력 매핑을 등록
+                Subsystem->AddMappingContext(DefaultMappingContext, 0);
+                //                           ↑우리가 만든 IMC    ↑우선순위(0=기본)
+            }
+        }
+    }
+}
+```
+
+## 3. 전체 흐름 요약
+
+```
+게임 시작
+    ↓
+Tank가 생성됨 (생성자 실행)
+    ↓
+BeginPlay 실행
+    ↓
+플레이어 컨트롤러 찾기
+    ↓
+로컬 플레이어 찾기
+    ↓
+Enhanced Input 서브시스템 찾기
+    ↓
+우리가 만든 IMC(Input Mapping Context) 등록
+    ↓
+이제 입력이 작동할 준비 완료!
+```
+
+## 4. if문을 여러 번 사용하는 이유
+
+각 단계에서 객체가 제대로 존재하는지 확인해야 안전합니다:
+
+```cpp
+if (PlayerController)      // 1. 컨트롤러가 있나?
+    if (LocalPlayer)       // 2. 로컬 플레이어가 있나?
+        if (Subsystem)     // 3. 서브시스템이 있나?
+            // 모두 있을 때만 실행
+```
+
+만약 확인 없이 사용하면 프로그램이 죽을(크래시) 수 있습니다.
+
+## 5. 나머지 코드 설명
+
+### 생성자 (Constructor)
+
+```cpp
+ATank::ATank()
+{
+    // 카메라 암(팔) 만들기
+    SpringArmComp = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArmComp"));
+    SpringArmComp->SetupAttachment(CapsuleComp);  // 캡슐에 붙이기
+
+    // 카메라 만들기
+    CameraComp = CreateDefaultSubobject<UCameraComponent>(TEXT("CameraComp"));
+    CameraComp->SetupAttachment(SpringArmComp);  // 카메라 암에 붙이기
+}
+```
+
+**SpringArm이 필요한 이유**
+
+- 카메라가 벽을 뚫지 않도록 자동으로 조정
+- 캐릭터와 카메라 사이의 거리 유지
+
+### Tick 함수
+
+```cpp
+void ATank::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+    // 매 프레임마다 실행되는 함수 (현재는 비어있음)
+}
+```
+
+### SetupPlayerInputComponent
+
+```cpp
+void ATank::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+    Super::SetupPlayerInputComponent(PlayerInputComponent);
+    // 입력 바인딩을 여기서 설정 (다음 강의에서 작성 예정)
+}
+
+```
+
+## 6. 핵심 요약
+
+1. **Enhanced Input System**: 언리얼의 새로운 입력 처리 방식
+2. **Input Mapping Context**: 키 입력과 게임 행동을 연결하는 설정
+3. **BeginPlay**: 게임 시작 시 IMC를 등록하는 곳
+4. **여러 단계의 확인**: 안전한 코드를 위해 각 객체를 확인
+5. **다음 단계**: Input Action을 만들어 실제 키 입력을 처리
+
+이 코드는 "상용구(boilerplate)" 코드로, 대부분의 프로젝트에서 거의 동일하게 사용됩니다. 외울 필요 없이 필요할 때 복사해서 사용하면 됩니다!
+
+# { 언리얼 엔진 Enhanced Input System 설정 가이드 }
+
+이 강의는 언리얼 엔진에서 새로운 입력 시스템(Enhanced Input System)을 설정하는 방법을 다룹니다.
+
+## 1단계: Input Mapping Context 생성
+
+**에디터 작업:**
+
+- Content 폴더에 "Input"이라는 새 폴더 생성
+- 우클릭 → Input → Input Mapping Context 선택
+- 이름을 "IMC_Default"로 지정
+
+**역할:** Input Mapping Context는 어떤 키보드/마우스 입력이 어떤 게임 액션과 연결되는지 정의하는 설정 파일입니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380633/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_2/image_5.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380633/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_2/image_6.png)
+
+## 2단계: 프로젝트에 Enhanced Input 모듈 추가
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380633/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_2/image_7.png)
+
+**Build.cs 파일 수정:**
+
+```csharp
+// BattleBlaster.Build.cs 파일에서
+PublicDependencyModuleNames.AddRange(new string[] {
+    "Core",
+    "CoreUObject",
+    "Engine",
+    "InputCore",
+    "EnhancedInput"  // 이 줄 추가
+});
+```
+
+**중요:**
+
+- 저장 후 Visual Studio 종료
+- 프로젝트 폴더에서 .uproject 파일 우클릭 → "Generate Visual Studio project files"
+- 완료 후 .sln 파일을 다시 열기
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380634/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_2/image_8.png)
+
+## 3단계: Tank 클래스에 코드 작성
+
+### 필요한 헤더 파일 포함
+
+```cpp
+#include "InputMappingContext.h"
+#include "EnhancedInputSubsystems.h"
+```
+
+**팁:** 어떤 헤더를 포함해야 할지 모를 때는 언리얼 공식 문서에서 해당 클래스를 검색하면 헤더 파일 경로를 찾을 수 있습니다.
+
+### Tank.h에 변수 선언
+
+```cpp
+UPROPERTY(EditAnywhere, Category = "Input")
+UInputMappingContext* DefaultMappingContext;
+```
+
+**설명:**
+
+- `EditAnywhere`: 에디터에서 값을 설정할 수 있게 함
+- `Category = "Input"`: 디테일 패널에서 Input 섹션에 표시됨
+
+### BeginPlay()에 설정 코드 작성
+
+코드를 단계별로 이해해보겠습니다:
+
+```cpp
+void ATank::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // 1단계: PlayerController 가져오기
+    APlayerController* PlayerController = Cast<APlayerController>(GetController());
+    if (PlayerController)
+    {
+        // 2단계: LocalPlayer 가져오기
+        ULocalPlayer* LocalPlayer = PlayerController->GetLocalPlayer();
+        if (LocalPlayer)
+        {
+            // 3단계: Enhanced Input Subsystem 가져오기
+            UEnhancedInputLocalPlayerSubsystem* Subsystem =
+                ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(LocalPlayer);
+            if (Subsystem)
+            {
+                // 4단계: Mapping Context 추가
+                Subsystem->AddMappingContext(DefaultMappingContext, 0);
+            }
+        }
+    }
+}
+```
+
+**각 단계 설명:**
+
+1. **PlayerController**: 게임 월드에서 플레이어를 대표하는 클래스
+2. **LocalPlayer**: 로컬 플레이어 정보를 담는 객체
+3. **Subsystem**: Enhanced Input 시스템을 관리하는 하위 시스템
+4. **AddMappingContext**: 우리가 만든 Input Mapping Context를 게임에 등록 (우선순위 0)
+
+## 4단계: 블루프린트에서 설정
+
+1. BP_Tank 블루프린트 열기
+2. Details 패널에서 "Input" 검색
+3. Default Mapping Context에 "IMC_Default" 에셋 할당
+4. 컴파일 및 저장
+
+## 왜 Tank 클래스에서 설정하나요?
+
+- Tank는 플레이어가 조종하는 캐릭터
+- 적(Enemy)은 AI가 조종하므로 입력이 필요 없음
+- BasePawn(부모 클래스)에 설정하면 Enemy도 불필요하게 입력 시스템을 상속받게 됨
+
+## 핵심 포인트
+
+**이 코드는 "상용구(boilerplate)" 코드입니다:**
+
+- 대부분의 언리얼 프로젝트에서 거의 동일하게 사용
+- 처음에 한 번 이해하면, 이후에는 복사해서 사용 가능
+- 세부 원리를 완벽히 이해하지 못해도 괜찮음
+
+**현재 상태:**
+
+- Input Mapping Context는 게임에 추가되었지만 아직 아무 동작도 하지 않음
+- 실제 동작을 위해서는 Input Action(입력 액션)을 만들어야 함
+- 다음 강의에서 Input Action 생성 예정
+
+---
+
+이 과정을 완료하면 언리얼의 최신 입력 시스템을 사용할 준비가 완료됩니다!
+
+# { C++ if문 조건 내 변수 선언 }
+
+## 핵심 개념
+
+**기존 방식:**
+
+```cpp
+APlayerController* PlayerController = Cast<APlayerController>(GetController());
+if (PlayerController)
+{
+    // 코드
+}
+```
+
+**개선된 방식:**
+
+```cpp
+if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+{
+    // 코드
+}
+```
+
+## 작동 원리
+
+1. 변수 선언 및 값 할당
+2. 그 값을 조건으로 평가
+3. true면 if문 실행, false면 무시
+
+## 중요: 변수 수명 규칙
+
+**코드 블록 `{}` 내에서 선언된 변수는 그 블록 내에서만 접근 가능**
+
+```cpp
+if (int A = 10)
+{
+    // A 사용 가능
+}
+// A 사용 불가 - 오류 발생!
+```
+
+## 적용된 코드
+
+```cpp
+void ATank::BeginPlay()
+{
+    Super::BeginPlay();
+
+    if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+    {
+        if (ULocalPlayer* LocalPlayer = PlayerController->GetLocalPlayer())
+        {
+            if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
+                ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(LocalPlayer))
+            {
+                Subsystem->AddMappingContext(DefaultMappingContext, 0);
+            }
+        }
+    }
+}
+```
+
+**장점:** 코드가 더 간결하고, 변수가 필요한 범위에만 존재
+
+# { C++ Forward Declaration (전방 선언) }
+
+## 핵심 개념
+
+**전방 선언이란?**
+헤더 파일을 `#include`하지 않고도 클래스 타입을 사용할 수 있게 하는 기법
+
+## 두 가지 방법
+
+### 방법 1: 변수 선언 앞에 직접 작성
+
+```cpp
+UPROPERTY(VisibleAnywhere)
+class UCameraComponent* CameraComp;
+```
+
+### 방법 2: 클래스 외부에 별도로 작성
+
+```cpp
+// 클래스 정의 위에
+class UCameraComponent;
+class UInputMappingContext;
+
+UCLASS()
+class ATank : public ABasePawn
+{
+    UPROPERTY(VisibleAnywhere)
+    UCameraComponent* CameraComp;
+};
+```
+
+## 사용 규칙
+
+**헤더 파일 (.h):**
+
+```cpp
+// #include "Camera/CameraComponent.h" ❌ 제거
+class UCameraComponent;  // ✅ 전방 선언만
+```
+
+**소스 파일 (.cpp):**
+
+```cpp
+#include "Camera/CameraComponent.h"  // ✅ 여기에 포함
+```
+
+## 왜 사용하나?
+
+**성능 향상**
+
+- 헤더 파일의 컴파일 속도 개선
+- 불필요한 의존성 감소
+- 언리얼 엔진의 표준 관행
+
+## 적용된 코드
+
+**Tank.h:**
+
+```cpp
+#pragma once
+#include "CoreMinimal.h"
+#include "BasePawn.h"
+// 전방 선언으로 변경
+class UCameraComponent;
+class USpringArmComponent;
+class UInputMappingContext;
+
+UCLASS()
+class ATank : public ABasePawn
+{
+    UPROPERTY(EditAnywhere, Category = "Input")
+    UInputMappingContext* DefaultMappingContext;
+
+    UPROPERTY(VisibleAnywhere)
+    USpringArmComponent* SpringArmComp;
+
+    UPROPERTY(VisibleAnywhere)
+    UCameraComponent* CameraComp;
+};
+```
+
+**Tank.cpp:**
+
+```cpp
+#include "Tank.h"
+#include "Camera/CameraComponent.h"
+#include "InputMappingContext.h"
+#include "GameFramework/SpringArmComponent.h"
+#include "EnhancedInputSubsystems.h"
+```
+
+**주의:** 포인터 변수로만 선언할 때 사용 가능. 실제로 클래스의 함수나 멤버를 사용하려면 cpp 파일에 헤더를 포함해야 함!
+
+# { 언리얼 입력 시스템 }
+
+## 🎮 우리가 만들 것
+
+**W키를 누르면 → 탱크가 앞으로 이동**
+
+**S키를 누르면 → 탱크가 뒤로 이동**
+
+지금은 키를 누르면 화면에 메시지만 뜨게 만들 거예요!
+
+---
+
+## 📋 전체 과정 (큰 그림)
+
+```
+1. "이동"이라는 액션 만들기 (IA_Move)
+2. W키와 S키를 "이동" 액션에 연결
+3. "이동" 액션이 발생하면 실행할 함수 만들기
+4. 연결 완료!
+```
+
+---
+
+## 🔨 단계별 따라하기
+
+### STEP 1: 이동 액션 만들기 (에디터)
+
+**언리얼 에디터에서:**
+
+```
+Input 폴더 우클릭
+→ Input 메뉴
+→ Input Action 선택
+→ 이름: IA_Move
+→ 저장
+```
+
+**비유:** "이동"이라는 이름표를 만든 것
+
+---
+
+### STEP 2: 키보드 키 연결하기 (에디터)
+
+**IMC_Default 파일 열기:**
+
+1. **+** 버튼 클릭 (새 매핑 추가)
+2. 방금 만든 **IA_Move** 선택
+3. 펼치기 **▼**
+4. 키 추가 버튼 클릭 → **W키** 누르기
+5. 키 추가 버튼 다시 클릭 → **S키** 누르기
+6. 저장
+
+**결과:**
+
+```
+W키 ─┐
+     ├─→ IA_Move (이동 액션)
+S키 ─┘
+```
+
+**비유:** W키와 S키에 "이동"이라는 이름표를 붙인 것
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380634/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_2/image_9.png)
+
+---
+
+### STEP 3: C++ 코드 작성
+
+### 📄 Tank.h (헤더 파일)
+
+**맨 위에 추가:**
+
+```cpp
+#include "InputAction.h"
+#include "InputActionValue.h"
+#include "EnhancedInputComponent.h"
+```
+
+**클래스 안에 추가:**
+
+```cpp
+// 이동 액션 (에디터에서 설정할 변수)
+UPROPERTY(EditAnywhere, Category = "Input")
+UInputAction* MoveAction;
+
+// 이동 입력이 들어오면 실행될 함수
+void MoveInput();
+```
+
+---
+
+### 📄 Tank.cpp (구현 파일)
+
+**1) 입력 받을 함수 만들기:**
+
+```cpp
+void ATank::MoveInput()
+{
+    // 화면에 메시지 출력 (테스트용)
+    UE_LOG(LogTemp, Warning, TEXT("이동 키 눌림!"));
+}
+```
+
+**간단 설명:**
+
+W나 S를 누르면 이 함수가 실행되면서 "이동 키 눌림!"이라는 메시지가 뜰 거예요.
+
+---
+
+**2) 키와 함수 연결하기:**
+
+```cpp
+void ATank::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+    Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+    // Enhanced Input Component로 변환
+    UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent);
+
+    if (EIC)
+    {
+        // 연결: MoveAction이 발생하면 → MoveInput 함수 실행
+        EIC->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ATank::MoveInput);
+    }
+}
+```
+
+**한 줄씩 이해하기:**
+
+```cpp
+EIC->BindAction(
+    MoveAction,              // 1. 어떤 액션? → IA_Move
+    ETriggerEvent::Triggered, // 2. 언제? → 키 누르는 동안 계속
+    this,                     // 3. 누구의? → 이 탱크의
+    &ATank::MoveInput         // 4. 어떤 함수? → MoveInput 함수
+);
+
+```
+
+---
+
+### 🎯 ETriggerEvent 쉽게 이해하기
+
+```cpp
+Started   // 키를 "딱" 누르는 순간 1번만
+         // 예: 점프 (한 번만 점프)
+
+Triggered // 키를 누르고 있는 동안 계속계속
+         // 예: 이동 (계속 앞으로 가기)
+
+Completed // 키에서 손을 "딱" 떼는 순간 1번만
+         // 예: 총 발사 멈춤
+```
+
+**우리는 `Triggered` 사용** → W를 누르고 있으면 계속 앞으로!
+
+---
+
+### STEP 4: 블루프린트 설정 ⚠️ 중요!
+
+**BP_Tank 열기:**
+
+1. Details 패널에서 **"Input"** 검색
+2. **Move Action** 찾기
+3. 드롭다운에서 **IA_Move** 선택 ← **이거 꼭 해야 함!**
+4. 컴파일 & 저장
+
+**이거 안 하면 아무것도 안 돼요!**
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380631/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_2/image_10.png)
+
+---
+
+## ✅ 테스트하기
+
+**게임 실행:**
+
+1. 플레이 버튼 클릭
+2. **W키** 눌러보기
+3. 화면 왼쪽 위에 노란색으로 **"이동 키 눌림!"** 메시지가 계속 뜨면 성공! 🎉
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380631/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_2/image_11.png)
+
+---
+
+## 🤔 자주 하는 질문
+
+### Q1: "왜 이렇게 복잡해요?"
+
+**A:** 단계가 많아 보이지만, 나중에 똑같은 방식으로 계속 반복해요:
+
+```
+1. Input Action 만들기
+2. 키 연결
+3. 함수 만들기
+4. BindAction으로 묶기
+```
+
+한 번 익히면 계속 써먹을 수 있어요!
+
+---
+
+### Q2: "`this`가 뭐예요?"
+
+**A:** "이 탱크 자신"을 말해요.
+
+```cpp
+// 게임에 탱크가 3대 있다면:
+탱크1의 MoveInput()
+탱크2의 MoveInput()
+탱크3의 MoveInput()
+
+// this = 지금 플레이어가 조종하는 탱크
+```
+
+---
+
+### Q3: "블루프린트에서 설정을 왜 해요?"
+
+**A:** C++에서는 "변수 상자"만 만들고, 실제 "내용물"은 에디터에서 넣어요.
+
+```cpp
+// C++ 코드
+UInputAction* MoveAction;  // 빈 상자 준비
+
+// 블루프린트
+MoveAction = IA_Move       // 상자에 실제 액션 넣기
+```
+
+---
+
+## 🎯 핵심 정리
+
+### 입력 시스템 흐름
+
+```
+키보드 W키
+    ↓
+IMC_Default (매핑 테이블)
+    ↓
+IA_Move (이동 액션)
+    ↓
+BindAction (연결선)
+    ↓
+MoveInput() 함수 실행
+    ↓
+"이동 키 눌림!" 메시지
+```
+
+### 꼭 기억할 것
+
+1. ✅ Input Action 만들기
+2. ✅ IMC에 키 추가 (W, S)
+3. ✅ C++ 함수 만들기
+4. ✅ BindAction으로 연결
+5. ✅ **블루프린트에서 할당** ← 깜빡하기 쉬움!
+
+---
+
+# { 입력 액션 값 전달하기 - 앞/뒤 구분하기 }
+
+## 🎯 목표
+
+**현재 문제:**
+
+- W키와 S키 둘 다 같은 함수를 호출함
+- 어떤 키를 눌렀는지 구분할 수 없음
+
+**해결 방법:**
+
+- W키 → 값 +1 (앞으로)
+- S키 → 값 -1 (뒤로)
+
+---
+
+## 📋 전체 과정
+
+```
+1. Input Action의 값 타입을 Float로 변경
+2. S키에 Negate(음수) 수정자 추가
+3. C++ 함수에서 값 받기
+4. 값을 추출해서 사용하기
+```
+
+---
+
+## STEP 1: Input Action 값 타입 변경
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380632/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_2/image_12.png)
+
+**IA_Move 열기:**
+
+1. **Value Type** 찾기
+2. 기본값: `Boolean (Digital)` ❌
+3. 변경: `Float (Axis1D)` ✅
+
+### Value Type 종류
+
+```
+Boolean (Digital)  → 참/거짓만 (눌림/안눌림)
+Float (Axis1D)     → 실수 하나 (-1 ~ +1)
+Vector2D           → 실수 2개 (X, Y 방향)
+Vector             → 실수 3개 (X, Y, Z 방향)
+```
+
+**우리는 Float 사용** → 앞/뒤 한 방향만 필요하니까!
+
+---
+
+## STEP 2: S키에 음수 수정자 추가
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380632/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_2/image_13.png)
+
+**IMC_Default 열기:**
+
+```
+IA_Move 매핑에서:
+├─ W키 (그대로)
+└─ S키
+   └─ Modifiers 줄에서 + 클릭
+      └─ Negate 선택
+```
+
+### Negate란?
+
+**값에 -1을 곱하는 수정자**
+
+```
+W키 누름 → 값: 1
+S키 누름 → 값: 1 × (-1) = -1
+```
+
+---
+
+## STEP 3: C++ 함수 수정
+
+### 📄 Tank.h
+
+```cpp
+// 기존
+void MoveInput();
+
+// 변경 후
+void MoveInput(const FInputActionValue& Value);
+```
+
+**추가된 부분:**
+
+- `const FInputActionValue& Value` → 입력 값을 받는 매개변수
+
+---
+
+### 📄 Tank.cpp
+
+```cpp
+void ATank::MoveInput(const FInputActionValue& Value)
+{
+    // 1. Float 값 추출
+    float InputValue = Value.Get<float>();
+
+    // 2. 값 출력 (테스트)
+    UE_LOG(LogTemp, Warning, TEXT("InputValue: %f"), InputValue);
+}
+```
+
+### 코드 한 줄씩 이해하기
+
+```cpp
+// 1단계: 값 추출
+float InputValue = Value.Get<float>();
+//     ↑변수      ↑받은값   ↑Float 타입으로 꺼내기
+
+// 2단계: 값 확인
+UE_LOG(LogTemp, Warning, TEXT("InputValue: %f"), InputValue);
+//     ↑로그    ↑경고    ↑메시지        ↑출력할 값
+```
+
+### Get<타입>() 이해하기
+
+```cpp
+Value.Get<float>();    // Float 값 꺼내기
+Value.Get<FVector2D>(); // Vector2D 값 꺼내기
+Value.Get<FVector>();   // Vector 값 꺼내기
+```
+
+**우리는 Float로 설정했으니 `Get<float>()` 사용!**
+
+---
+
+## ✅ 테스트
+
+**게임 실행:**
+
+1. W키 누르기 → 화면에 `InputValue: 1.000000`
+2. S키 누르기 → 화면에 `InputValue: -1.000000`
+
+**성공!** 이제 앞/뒤를 구분할 수 있어요! 🎉
+
+---
+
+## 🔍 값의 의미
+
+```cpp
+InputValue ==  1.0  → W키 (앞으로)
+InputValue == -1.0  → S키 (뒤로)
+InputValue ==  0.0  → 아무 키도 안 누름
+```
+
+**나중에 이동 계산에 사용:**
+
+```cpp
+앞으로 이동 거리 = 속도 × InputValue × DeltaTime
+// InputValue가 1이면 → 앞으로
+// InputValue가 -1이면 → 뒤로
+```
+
+---
+
+## 🤔 자주 하는 질문
+
+### Q1: "`const`랑 `&`는 뭔가요?"
+
+```cpp
+const FInputActionValue& Value
+  ↑                    ↑
+  |                    |
+  |                    참조(원본 사용, 복사 안 함)
+  |
+  상수(변경 불가, 읽기만)
+```
+
+**쉽게 말하면:**
+
+- `&` → "복사하지 말고 원본 그대로 봐"
+- `const` → "보기만 하고 바꾸지는 마"
+
+---
+
+### Q2: "왜 `Get<float>()`를 써요?"
+
+**A:** `FInputActionValue`는 "포장 상자"같은 거예요.
+
+```
+FInputActionValue (상자)
+    └─ float 값 (내용물)
+
+Get<float>() → 상자를 열어서 내용물 꺼내기
+```
+
+---
+
+### Q3: "Boolean 타입은 언제 써요?"
+
+**A:**
+
+```cpp
+Boolean → 점프처럼 "누름/안누름"만 필요할 때
+Float   → 이동처럼 "방향과 세기"가 필요할 때
+Vector2D → 좌우+앞뒤 동시에 필요할 때
+```
+
+---
+
+## 📊 전체 흐름도
+
+```
+W키 누름
+    ↓
+IMC_Default
+    ↓
+IA_Move (Float 타입)
+    ↓
+값: 1.0
+    ↓
+MoveInput(Value)
+    ↓
+Value.Get<float>() → 1.0
+    ↓
+앞으로 이동!
+
+─────────────────
+
+S키 누름
+    ↓
+IMC_Default
+    ↓
+Negate 수정자 적용
+    ↓
+값: -1.0
+    ↓
+MoveInput(Value)
+    ↓
+Value.Get<float>() → -1.0
+    ↓
+뒤로 이동!
+```
+
+---
+
+## 💡 핵심 정리
+
+### 설정 체크리스트
+
+1. ✅ IA_Move의 Value Type → **Float**
+2. ✅ S키에 **Negate** 수정자 추가
+3. ✅ 함수에 `const FInputActionValue& Value` 매개변수 추가
+4. ✅ `Value.Get<float>()` 로 값 추출
+
+### 결과
+
+```cpp
+W키 → InputValue =  1.0  // 앞으로
+S키 → InputValue = -1.0  // 뒤로
+```
+
+---
+
+## 🚀 다음 단계
+
+**현재 상태:**
+
+- 값은 받았지만 실제로 움직이지는 않음
+- 화면에 숫자만 출력됨
+
+**다음 강의:**
+
+- 이 값을 사용해서 실제로 탱크 이동시키기
+- 속도와 DeltaTime 적용하기
+
+# { 탱크 움직이기 }
+
+## 🎯 최종 목표
+
+**W키 누르면 → 탱크가 앞으로 슝~**
+
+**S키 누르면 → 탱크가 뒤로 슝~**
+
+---
+
+## 🤔 왜 Local Space를 써야 하나?
+
+### 상황 1: World Space를 쓴다면? ❌
+
+```
+탱크가 북쪽을 보고 있을 때:
+앞으로 = Y축 증가
+
+탱크가 동쪽으로 90도 회전:
+앞으로 = X축 증가???
+
+탱크가 남쪽으로 180도 회전:
+앞으로 = Y축 감소???
+
+→ 탱크가 어디를 보는지 계산해야 함 😵
+```
+
+### 상황 2: Local Space를 쓴다면? ✅
+
+```
+탱크가 어디를 보든:
+앞으로 = X축 양수 (끝!)
+
+북쪽을 보든, 동쪽을 보든, 남쪽을 보든
+항상 X축 양수 = 앞!
+
+→ 계산 필요 없음! 😊
+```
+
+**비유로 이해하기:**
+
+```
+World Space = 나침반
+"북쪽으로 가" → 내가 어디를 보든 북쪽으로
+
+Local Space = 자동차
+"앞으로 가" → 차가 어디를 보든 앞으로
+```
+
+우리는 탱크니까 **자동차 방식(Local Space)**이 편해요!
+
+---
+
+## 🎮 탱크의 방향 이해하기
+
+**탱크를 위에서 본 모습:**
+
+```
+        앞 (X축 양수)
+          ↑
+          |
+    ┌─────┼─────┐
+왼쪽 │     |     │ 오른쪽
+(Y음)│  탱크 중심  │ (Y양)
+    └─────┼─────┘
+          |
+          ↓
+        뒤 (X축 음수)
+```
+
+**우리가 할 일:**
+
+- W키 → X축에 **양수** 더하기 → 앞으로
+- S키 → X축에 **음수** 더하기 → 뒤로
+
+---
+
+## 📦 FVector 이해하기
+
+### FVector란?
+
+**3D 공간의 한 점 또는 방향을 나타내는 상자**
+
+```cpp
+FVector 위치 = FVector(X, Y, Z);
+//                    ↑  ↑  ↑
+//                 앞뒤 좌우 위아래
+```
+
+### 예시로 이해하기
+
+```cpp
+FVector(100, 0, 0)   → 앞으로 100cm
+FVector(-50, 0, 0)   → 뒤로 50cm
+FVector(0, 30, 0)    → 오른쪽으로 30cm
+FVector(0, -30, 0)   → 왼쪽으로 30cm
+FVector(0, 0, 20)    → 위로 20cm
+```
+
+**우리의 경우:**
+
+```cpp
+FVector DeltaLocation = FVector(0, 0, 0);  // 일단 가만히
+DeltaLocation.X = 10;                       // X만 10으로 바꾸기
+// 결과: FVector(10, 0, 0) → 앞으로 10cm
+```
+
+---
+
+## ⏱️ DeltaTime 완전 정복
+
+### DeltaTime이 뭔가요?
+
+**"지난 프레임부터 지금까지 걸린 시간"**
+
+```
+게임 = 연속된 사진(프레임)의 빠른 재생
+
+프레임1 → (0.016초) → 프레임2 → (0.016초) → 프레임3
+         ↑ 이게 DeltaTime!
+```
+
+### 왜 필요한가요?
+
+**문제 상황: DeltaTime 없이 코드를 짠다면?**
+
+```cpp
+// 나쁜 예
+void MoveInput() {
+    DeltaLocation.X = 10;  // 매 프레임마다 10cm씩 이동
+}
+```
+
+**결과:**
+
+```
+좋은 컴퓨터 (60fps):
+1초 = 60프레임 = 10cm × 60 = 600cm 이동
+
+나쁜 컴퓨터 (30fps):
+1초 = 30프레임 = 10cm × 30 = 300cm 이동
+
+→ 컴퓨터 성능에 따라 속도가 다름! ❌
+```
+
+**해결: DeltaTime 사용**
+
+```cpp
+// 좋은 예
+void MoveInput() {
+    DeltaLocation.X = 600 * DeltaTime;
+}
+```
+
+**결과:**
+
+```
+좋은 컴퓨터 (60fps, DeltaTime = 0.016초):
+1초 = 60프레임
+한 프레임당: 600 × 0.016 = 9.6cm
+1초 동안: 9.6 × 60 = 576cm ≈ 600cm
+
+나쁜 컴퓨터 (30fps, DeltaTime = 0.033초):
+1초 = 30프레임
+한 프레임당: 600 × 0.033 = 19.8cm
+1초 동안: 19.8 × 30 = 594cm ≈ 600cm
+
+→ 모든 컴퓨터에서 비슷한 속도! ✅
+```
+
+---
+
+## 🔧 DeltaTime 얻는 방법
+
+### Tick 함수 안에서는 쉬워요
+
+```cpp
+void ATank::Tick(float DeltaTime) {
+    // DeltaTime이 이미 여기 있음!
+    float move = 10 * DeltaTime;
+}
+```
+
+### 문제: 우리는 Tick이 아니라 MoveInput에서 쓰는데?
+
+```cpp
+void ATank::MoveInput(const FInputActionValue& Value) {
+    // 여기엔 DeltaTime이 없어요! 😢
+}
+```
+
+### 해결책: 직접 가져오기
+
+```cpp
+UGameplayStatics::GetWorldDeltaSeconds(GetWorld())
+```
+
+**하나씩 뜯어보기:**
+
+```cpp
+UGameplayStatics
+↑ "게임플레이 관련 유용한 함수들" 클래스
+
+::GetWorldDeltaSeconds
+↑ 그 중에서 "월드의 델타 초 가져오기" 함수
+
+(GetWorld())
+↑ 이 탱크가 존재하는 게임 월드
+```
+
+**왜 이렇게 복잡한가?**
+
+```
+Tick은 언리얼이 자동으로 호출 → DeltaTime을 자동으로 줌
+
+MoveInput은 우리가 만든 함수 → DeltaTime을 직접 가져와야 함
+```
+
+**비유:**
+
+```
+Tick = 택배가 문 앞까지 배달
+MoveInput = 직접 우체국 가서 받아오기
+```
+
+---
+
+## 💻 전체 코드 완전 분해
+
+### 1단계: 입력 값 받기
+
+```cpp
+float InputValue = Value.Get<float>();
+```
+
+**무슨 일이 일어나나?**
+
+```
+W키 누름 → InputValue = 1.0
+S키 누름 → InputValue = -1.0
+아무것도 안 누름 → 이 함수가 호출 안 됨
+```
+
+---
+
+### 2단계: 빈 이동 벡터 만들기
+
+```cpp
+FVector DeltaLocation = FVector(0.0f, 0.0f, 0.0f);
+```
+
+**왜 0으로 시작하나?**
+
+```
+아직 얼마나 움직일지 모르니까!
+일단 "움직임 없음" 상태로 시작
+```
+
+**시각화:**
+
+```
+DeltaLocation
+┌────────┬────────┬────────┐
+│ X: 0.0 │ Y: 0.0 │ Z: 0.0 │
+└────────┴────────┴────────┘
+  앞뒤    좌우     위아래
+```
+
+---
+
+### 3단계: X값 계산하기 (핵심!)
+
+```cpp
+DeltaLocation.X = Speed * InputValue * UGameplayStatics::GetWorldDeltaSeconds(GetWorld());
+```
+
+**단계별로 계산해보기:**
+
+```
+설정값:
+- Speed = 600 (초당 600cm)
+- InputValue = 1.0 (W키)
+- DeltaTime = 0.016초 (60fps 기준)
+
+계산:
+600 × 1.0 × 0.016 = 9.6
+
+의미:
+"이번 프레임에는 9.6cm 앞으로 이동하자!"
+```
+
+**각 부분의 역할:**
+
+```cpp
+Speed (600)
+↓
+"초당 이동하고 싶은 거리"
+
+× InputValue (1.0 또는 -1.0)
+↓
+"앞으로? 뒤로?"
+
+× DeltaTime (0.016)
+↓
+"이번 프레임 동안만"
+```
+
+**다양한 상황:**
+
+```
+W키 + 60fps:
+600 × 1.0 × 0.016 = 9.6cm 앞으로
+
+S키 + 60fps:
+600 × (-1.0) × 0.016 = -9.6cm (뒤로)
+
+W키 + 30fps (느린 컴퓨터):
+600 × 1.0 × 0.033 = 19.8cm 앞으로
+(한 프레임당 더 많이 이동하지만, 프레임이 적어서 결과는 비슷)
+```
+
+---
+
+### 4단계: 실제로 움직이기
+
+```cpp
+AddActorLocalOffset(DeltaLocation, true);
+```
+
+**함수 이름 분해:**
+
+```
+Add → "더하기"
+Actor → "이 탱크"
+Local → "로컬 공간에서"
+Offset → "위치 변화"
+
+→ "이 탱크의 로컬 위치에 변화를 더해줘"
+```
+
+**두 번째 파라미터 `true`의 의미:**
+
+```cpp
+true (bSweep = true)
+→ "이동하다가 벽 만나면 멈춰!"
+
+false (bSweep = false)
+→ "벽이고 뭐고 무시하고 이동!"
+```
+
+**시각화:**
+
+```
+true인 경우:
+탱크 ──→ ██ (벽)
+       멈춤!
+
+false인 경우:
+탱크 ────→ (벽 통과)
+```
+
+---
+
+## 📝 Tank.h 설정
+
+```cpp
+UPROPERTY(EditAnywhere, Category = "Movement")
+float Speed = 300.0f;
+```
+
+**각 부분 설명:**
+
+```cpp
+UPROPERTY
+→ "이건 언리얼 에디터에서 볼 수 있는 속성이야"
+
+EditAnywhere
+→ "어디서든 수정 가능해"
+
+Category = "Movement"
+→ "Movement 섹션에 표시해줘"
+
+float Speed = 300.0f
+→ "Speed라는 실수, 기본값 300"
+```
+
+---
+
+## 🛠️ 필요한 헤더 파일
+
+```cpp
+#include "Kismet/GameplayStatics.h"
+```
+
+**왜 필요한가?**
+
+```
+UGameplayStatics 클래스를 사용하려면
+그 클래스가 어디 있는지 알려줘야 함
+
+#include = "이 파일 여기 있어요!" 라고 알려주기
+```
+
+**헤더 파일 찾는 방법:**
+
+1. 언리얼 문서 사이트 가기
+2. "GetWorldDeltaSeconds" 검색
+3. 함수 페이지에서 "Header" 부분 찾기
+4. 거기 적힌 경로 복사
+
+---
+
+## 🎮 블루프린트 설정
+
+**BP_Tank 열기:**
+
+1. Details 패널에서 "Speed" 검색
+2. Movement 섹션에서 찾기
+3. 값 변경:
+   - 300 → 느림
+   - 600 → 적당 (추천)
+   - 1000 → 빠름
+
+**컴파일 & 저장!**
+
+---
+
+## 🐛 자주 발생하는 문제
+
+### 문제 1: "탱크가 안 움직여요!"
+
+**원인 1: 바닥에 박혀있음**
+
+```
+해결:
+1. BP_Tank 선택
+2. Z 위치를 +20 정도 올리기
+3. 플레이 버튼 → 바퀴 위치 확인
+```
+
+**원인 2: 충돌 문제**
+
+```cpp
+// 임시 테스트
+AddActorLocalOffset(DeltaLocation, false);
+//                                 ↑ false로 변경
+
+// 이제 움직이면? → 충돌이 문제였음
+// 탱크 위치를 조정하고 다시 true로
+```
+
+---
+
+### 문제 2: "너무 빨라요/느려요!"
+
+```
+너무 느림:
+BP_Tank → Speed를 600, 800, 1000으로 올리기
+
+너무 빠름:
+BP_Tank → Speed를 200, 100으로 낮추기
+```
+
+---
+
+### 문제 3: "컴파일 에러가 나요!"
+
+**에러: "GameplayStatics를 찾을 수 없습니다"**
+
+```cpp
+// Tank.cpp 맨 위에 추가했는지 확인
+#include "Kismet/GameplayStatics.h"
+```
+
+**에러: "Speed를 찾을 수 없습니다"**
+
+```cpp
+// Tank.h에 선언했는지 확인
+float Speed = 300.0f;
+```
+
+---
+
+## 🎯 핵심 요약
+
+### 왜 이렇게 하는가?
+
+```
+Local Space 사용
+→ 탱크 방향 신경 안 써도 됨
+
+DeltaTime 곱하기
+→ 모든 컴퓨터에서 같은 속도
+
+Speed × InputValue × DeltaTime
+→ 속도 × 방향 × 시간 = 이동거리
+```
+
+### 공식 외우기
+
+```
+초당 이동 거리 = Speed
+프레임당 이동 거리 = Speed × DeltaTime
+실제 이동 거리 = Speed × InputValue × DeltaTime
+```
+
+---
+
+## ✅ 최종 체크리스트
+
+**헤더 파일 (Tank.h):**
+
+- ☐ `float Speed` 변수 선언
+
+**소스 파일 (Tank.cpp):**
+
+- ☐ `#include "Kismet/GameplayStatics.h"` 추가
+- ☐ `FVector DeltaLocation` 생성
+- ☐ `DeltaLocation.X` 계산
+- ☐ `AddActorLocalOffset` 호출
+
+**블루프린트 (BP_Tank):**
+
+- ☐ Speed 값 설정 (600 추천)
+- ☐ 탱크 위치 확인 (바닥에 안 박혔는지)
+
+**테스트:**
+
+- ☐ W키로 앞으로 이동
+- ☐ S키로 뒤로 이동
+- ☐ 속도가 적당한지 확인
+
+---
+
+## 🚀 다음 단계
+
+**현재 완성:** W/S로 앞뒤 이동 ✅
+
+**다음 목표:** A/D로 좌우 회전 만들기!
+
+# { 탱크 회전하기 (A/D 키) }
+
+## 🎯 목표
+
+**A키 누르면 → 탱크가 왼쪽으로 회전**
+
+**D키 누르면 → 탱크가 오른쪽으로 회전**
+
+---
+
+## 🔄 회전 이해하기
+
+### 3D 공간의 회전 3가지
+
+```
+        ↑ Z축 (위)
+        |
+        |
+    ────┼────→ X축 (앞)
+        |
+       / Y축 (오른쪽)
+      /
+
+Pitch (피치) = X축 중심 회전 (고개 끄덕이기)
+Yaw (요)     = Z축 중심 회전 (고개 좌우 돌리기) ← 우리가 쓸 것!
+Roll (롤)    = Y축 중심 회전 (비행기 기울이기)
+```
+
+**우리가 원하는 것:**
+
+```
+A키 → 왼쪽으로 돌기 → Yaw를 음수로
+D키 → 오른쪽으로 돌기 → Yaw를 양수로
+```
+
+**비유:**
+
+- 피치 = 고개 끄덕이기 "응"
+- 요 = 고개 저으기 "아니야" ← 이거!
+- 롤 = 체조 선수 옆구르기
+
+---
+
+## 📋 전체 과정 (이동과 거의 같아요!)
+
+```
+1. Input Action 만들기 (IA_Turn)
+2. A/D 키 연결하기
+3. C++ 함수 만들기 (TurnInput)
+4. 회전 계산하기
+5. 카메라 부드럽게 만들기 (보너스!)
+```
+
+---
+
+## STEP 1: Input Action 생성
+
+**Input 폴더에서:**
+
+1. 우클릭 → Input → Input Action
+2. 이름: **IA_Turn**
+3. 열기 → Value Type: **Float (Axis1D)** 선택
+4. 저장
+
+**이동과 똑같아요!** 방향만 다를 뿐
+
+---
+
+## STEP 2: 키 바인딩
+
+**IMC_Default 열기:**
+
+```
+새 매핑 추가 (+버튼)
+├─ Input Action: IA_Turn
+├─ A키 추가
+│  └─ Modifiers에서 + 클릭
+│     └─ Negate 선택 (음수로!)
+└─ D키 추가
+   └─ 수정자 없음 (양수 그대로)
+```
+
+**결과:**
+
+```
+A키 누름 → 값: -1.0 (왼쪽)
+D키 누름 → 값: +1.0 (오른쪽)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380632/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_2/image_14.png)
+
+---
+
+## STEP 3: C++ 코드 작성
+
+### 📄 Tank.h
+
+```cpp
+// 회전 입력 액션
+UPROPERTY(EditAnywhere, Category = "Input")
+UInputAction* TurnAction;
+
+// 회전 속도
+UPROPERTY(EditAnywhere, Category = "Movement")
+float TurnRate = 50.0f;
+
+// 회전 처리 함수
+void TurnInput(const FInputActionValue& Value);
+
+```
+
+---
+
+### 📄 Tank.cpp
+
+### 1) 입력 바인딩 추가
+
+```cpp
+void ATank::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+    Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+    if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+    {
+        // 이동 바인딩 (기존)
+        EIC->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ATank::MoveInput);
+
+        // 회전 바인딩 (새로 추가!)
+        EIC->BindAction(TurnAction, ETriggerEvent::Triggered, this, &ATank::TurnInput);
+    }
+}
+```
+
+---
+
+### 2) 회전 함수 구현
+
+```cpp
+void ATank::TurnInput(const FInputActionValue& Value)
+{
+    // 1. 입력 값 가져오기
+    float InputValue = Value.Get<float>();
+
+    // 2. 회전량 계산
+    FRotator DeltaRotation = FRotator(0.0f, 0.0f, 0.0f);
+    DeltaRotation.Yaw = TurnRate * InputValue * GetWorld()->GetDeltaSeconds();
+
+    // 3. 실제로 회전하기
+    AddActorLocalRotation(DeltaRotation, true);
+}
+```
+
+---
+
+## 🔍 코드 완전 분해
+
+### FRotator란?
+
+**3D 회전을 나타내는 상자**
+
+```cpp
+FRotator 회전 = FRotator(Pitch, Yaw, Roll);
+//                      ↑      ↑    ↑
+//                   X축회전 Z축회전 Y축회전
+```
+
+### 왜 0으로 시작하나?
+
+```cpp
+FRotator DeltaRotation = FRotator(0.0f, 0.0f, 0.0f);
+```
+
+**초기 상태:**
+
+```
+Pitch: 0 → 위아래 회전 안 함
+Yaw:   0 → 좌우 회전 안 함 (아직!)
+Roll:  0 → 기울기 없음
+```
+
+**시각화:**
+
+```
+DeltaRotation
+┌─────────┬─────────┬─────────┐
+│ Pitch:0 │ Yaw:0   │ Roll:0  │
+└─────────┴─────────┴─────────┘
+  고개끄덕   고개젓기   비행기기울기
+```
+
+---
+
+### Yaw 값 계산하기
+
+```cpp
+DeltaRotation.Yaw = TurnRate * InputValue * GetWorld()->GetDeltaSeconds();
+```
+
+**단계별 계산:**
+
+```
+설정:
+- TurnRate = 100 (초당 100도 회전)
+- InputValue = 1.0 (D키)
+- DeltaTime = 0.016초 (60fps)
+
+계산:
+100 × 1.0 × 0.016 = 1.6도
+
+의미:
+"이번 프레임에는 1.6도 오른쪽으로 회전!"
+```
+
+**각 부분의 역할:**
+
+```cpp
+TurnRate (100)
+↓
+"초당 회전하고 싶은 각도"
+
+× InputValue (1.0 또는 -1.0)
+↓
+"왼쪽? 오른쪽?"
+
+× DeltaTime (0.016)
+↓
+"이번 프레임 동안만"
+```
+
+---
+
+### DeltaTime 얻는 다른 방법
+
+**방법 1: GameplayStatics 사용 (이동에서 씀)**
+
+```cpp
+UGameplayStatics::GetWorldDeltaSeconds(GetWorld())
+```
+
+**방법 2: World 직접 사용 (회전에서 씀)**
+
+```cpp
+GetWorld()->GetDeltaSeconds()
+```
+
+**둘 다 똑같아요!** 취향 차이일 뿐
+
+**비유:**
+
+```
+방법1 = 편의점 가서 물 사기
+방법2 = 집 냉장고에서 물 꺼내기
+→ 물은 똑같음!
+```
+
+---
+
+### AddActorLocalRotation
+
+```cpp
+AddActorLocalRotation(DeltaRotation, true);
+```
+
+**함수 이름 분해:**
+
+```
+Add → "더하기"
+Actor → "이 탱크"
+Local → "로컬 공간에서"
+Rotation → "회전"
+
+→ "이 탱크를 로컬 회전 더해서 돌려!"
+```
+
+**두 번째 파라미터 `true`:**
+
+```cpp
+true  → 벽에 부딪히면 회전 멈춤
+false → 벽 무시하고 회전
+```
+
+---
+
+## 🎬 전체 과정 시뮬레이션
+
+### D키를 1초 동안 누른다면:
+
+```
+TurnRate = 100도/초
+60fps 기준
+
+프레임 1 (0.000초):
+1.6도 오른쪽 → 총 회전: 1.6도
+
+프레임 2 (0.016초):
+1.6도 오른쪽 → 총 회전: 3.2도
+
+프레임 3 (0.032초):
+1.6도 오른쪽 → 총 회전: 4.8도
+
+...
+
+프레임 60 (1.000초):
+→ 총 회전: 약 100도 (거의 직각!)
+```
+
+### A키를 누른다면:
+
+```
+같은 계산이지만 음수!
+
+프레임당: -1.6도
+1초 후: 약 -100도 (왼쪽으로 직각)
+```
+
+---
+
+## ⚙️ 블루프린트 설정
+
+**BP_Tank 열기:**
+
+1. **Turn Action** 찾기
+   - IA_Turn 할당 ⚠️ **필수!**
+2. **Turn Rate** 조정
+   - 50 → 느림
+   - 100 → 적당 (추천)
+   - 200 → 빠름
+3. 컴파일 & 저장
+
+---
+
+## 🎥 보너스: 카메라 부드럽게 만들기
+
+### 문제: 카메라가 너무 딱딱해요
+
+```
+현재: 탱크 회전 = 카메라 회전 (1:1)
+→ 로봇 같은 느낌
+
+원하는: 탱크 먼저 회전 → 카메라 천천히 따라감
+→ 자연스러운 느낌
+```
+
+---
+
+### 해결: Spring Arm의 Lag 기능
+
+**BP_Tank에서 Spring Arm 선택:**
+
+1. **Details에서 "Lag" 검색**
+2. **Camera Lag 체크박스 ✅**
+   - 이동할 때 카메라가 부드럽게 따라옴
+3. **Camera Rotation Lag 체크박스 ✅**
+   - 회전할 때 카메라가 부드럽게 따라옴
+
+**조정 가능한 값들:**
+
+```cpp
+Camera Lag Speed (기본 10)
+→ 이동할 때 따라오는 속도
+→ 낮을수록 더 천천히 (더 많은 지연)
+
+Camera Rotation Lag Speed (기본 10 → 6 추천)
+→ 회전할 때 따라오는 속도
+→ 낮을수록 더 천천히
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380632/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_2/image_15.png)
+
+---
+
+### Lag Speed 이해하기
+
+```
+값이 높음 (10, 15, 20):
+탱크 회전 → 카메라가 빠르게 따라옴
+→ 지연이 적음
+
+값이 낮음 (3, 5, 6):
+탱크 회전 → 카메라가 천천히 따라옴
+→ 지연이 많음
+
+값이 0:
+카메라 안 따라옴 (고정)
+```
+
+**비유:**
+
+```
+Lag Speed 10 = 빠른 꼬마
+Lag Speed 6  = 느긋한 할아버지
+Lag Speed 0  = 동상
+```
+
+---
+
+### 추천 설정
+
+```
+Camera Lag: ✅
+Camera Lag Speed: 10 (기본값 OK)
+
+Camera Rotation Lag: ✅
+Camera Rotation Lag Speed: 6 (조금 느리게)
+```
+
+**왜 회전은 더 느리게?**
+
+- 위치 변화는 빠르게 따라가도 자연스러움
+- 회전은 천천히 따라가야 현실적
+
+---
+
+## 🎮 테스트
+
+**게임 실행:**
+
+1. **A키** 누르기 → 왼쪽 회전
+2. **D키** 누르기 → 오른쪽 회전
+3. **W + D** 동시 → 앞으로 가면서 오른쪽 회전
+4. 카메라가 부드럽게 따라오는지 확인
+
+---
+
+## 🐛 문제 해결
+
+### 문제 1: "회전이 안 돼요!"
+
+**체크리스트:**
+
+```
+☐ BP_Tank에서 TurnAction 할당했나?
+☐ IMC_Default에 A/D키 추가했나?
+☐ A키에 Negate 수정자 있나?
+☐ 코드 컴파일 성공했나?
+
+```
+
+---
+
+### 문제 2: "회전이 너무 느려요/빨라요"
+
+```
+너무 느림:
+BP_Tank → TurnRate를 100, 150, 200으로
+
+너무 빠름:
+BP_Tank → TurnRate를 50, 30으로
+
+```
+
+---
+
+### 문제 3: "A키와 D키 방향이 반대예요!"
+
+**원인:** A키 Negate 수정자 문제
+
+**해결:**
+
+```
+케이스 1: A에만 Negate 있어야 함
+- A: Negate ✅
+- D: 수정자 없음 ✅
+
+케이스 2: 반대로 되어있다면
+- A: Negate 제거
+- D: Negate 추가
+```
+
+---
+
+### 문제 4: "카메라가 여전히 딱딱해요"
+
+**체크:**
+
+```
+☐ Camera Rotation Lag 체크했나?
+☐ Lag Speed가 0이 아닌가? (0은 안 움직임)
+☐ Lag Speed를 더 낮춰보기 (6 → 3)
+```
+
+---
+
+## 📊 이동 vs 회전 비교
+
+### 공통점
+
+```
+1. Float 타입 Input Action
+2. 입력 값 × 속도 × DeltaTime
+3. Local Space 사용
+4. Triggered 이벤트 사용
+```
+
+### 차이점
+
+| 항목        | 이동 (Move)         | 회전 (Turn)           |
+| ----------- | ------------------- | --------------------- |
+| 사용 함수   | AddActorLocalOffset | AddActorLocalRotation |
+| 데이터 타입 | FVector             | FRotator              |
+| 변경 축     | X (앞뒤)            | Yaw (좌우)            |
+| 키          | W/S                 | A/D                   |
+
+---
+
+## 💡 핵심 정리
+
+### 회전의 핵심 공식
+
+```cpp
+회전 각도 = TurnRate × InputValue × DeltaTime
+
+D키: 100 × (1.0) × 0.016 = 1.6도 (오른쪽)
+A키: 100 × (-1.0) × 0.016 = -1.6도 (왼쪽)
+```
+
+### FRotator의 3요소
+
+```
+Pitch = X축 회전 (위아래 보기)
+Yaw   = Z축 회전 (좌우 돌기) ← 탱크 회전!
+Roll  = Y축 회전 (옆으로 기울기)
+```
+
+### Lag의 효과
+
+```
+Lag 없음 → 로봇 같은 움직임
+Lag 있음 → 자연스러운 움직임
+```
+
+---
+
+# { 마우스 커서 위치 감지하기 }
+
+## 🎯 목표
+
+**포탑(터렛)이 마우스 커서를 따라 회전하게 만들기!**
+
+```
+마우스가 여기 → 포탑이 이쪽으로 회전
+마우스가 저기 → 포탑이 저쪽으로 회전
+```
+
+---
+
+## 🤔 어떻게 작동하나?
+
+### 전체 과정
+
+```
+1. 마우스 커서 위치 찾기
+   ↓
+2. 화면에서 게임 월드로 선(Line Trace) 쏘기
+   ↓
+3. 선이 닿는 지점 찾기 (Impact Point)
+   ↓
+4. 포탑을 그 지점으로 회전 (다음 강의)
+```
+
+**비유:**
+
+```
+마우스 = 레이저 포인터
+Line Trace = 레이저 빔
+Impact Point = 레이저가 닿는 지점
+```
+
+---
+
+## 📐 Line Trace란?
+
+### 시각적 이해
+
+```
+카메라 (플레이어 시점)
+    |
+    | 마우스 커서
+    ↓
+   ═══════════════> (보이지 않는 선)
+              |
+              ↓
+           바닥에 닿음!
+           (Impact Point)
+```
+
+**실제 게임에서:**
+
+```
+마우스가 바닥 위 → 선이 바닥에 닿음
+마우스가 벽 위 → 선이 벽에 닿음
+마우스가 적 위 → 선이 적에 닿음
+```
+
+---
+
+## 💻 코드 구현
+
+### 왜 Tick 함수에서?
+
+```cpp
+void ATank::Tick(float DeltaTime)
+{
+    // 매 프레임마다 실행되는 함수
+}
+```
+
+**이유:**
+
+```
+마우스는 계속 움직임
+→ 매 프레임마다 마우스 위치 확인 필요
+→ Tick 함수가 완벽!
+```
+
+**비유:**
+
+```
+Tick = 심장 박동
+매 프레임(박동)마다 마우스 위치 체크
+```
+
+---
+
+### 1단계: PlayerController 얻기
+
+```cpp
+APlayerController* PlayerController = Cast<APlayerController>(GetController());
+if (PlayerController)
+{
+    // 여기서 마우스 작업
+}
+```
+
+**왜 필요한가?**
+
+```
+마우스 = 플레이어의 입력 장치
+PlayerController = 플레이어 입력을 관리하는 클래스
+→ 마우스 정보는 PlayerController에 있음!
+```
+
+**Controller vs PlayerController:**
+
+```
+Controller (부모 클래스)
+└─ PlayerController (자식 클래스)
+   └─ 마우스 관련 함수들 여기 있음!
+```
+
+---
+
+### 2단계: 마우스 커서 아래 Line Trace
+
+```cpp
+FHitResult HitResult;
+PlayerController->GetHitResultUnderCursor(ECC_Visibility, false, HitResult);
+```
+
+**함수 이름 분해:**
+
+```
+Get → "가져와"
+HitResult → "충돌 결과를"
+Under → "~아래의"
+Cursor → "커서"
+
+→ "커서 아래의 충돌 결과를 가져와!"
+```
+
+---
+
+### 3단계: 함수 파라미터 이해하기
+
+```cpp
+GetHitResultUnderCursor(
+    ECC_Visibility,  // 1. 충돌 채널
+    false,           // 2. 복잡한 충돌 사용?
+    HitResult        // 3. 결과 저장할 곳
+)
+```
+
+### 파라미터 1: ECC_Visibility (충돌 채널)
+
+**충돌 채널이란?**
+
+```
+게임 오브젝트들이 어떻게 반응할지 결정
+
+ECC_Visibility (가시성 채널):
+- 대부분의 오브젝트가 막음 ✅
+- 기본적으로 "볼 수 있으면 막힘"
+```
+
+**다른 채널들:**
+
+```
+ECC_Visibility  → 보이는 것들
+ECC_Camera      → 카메라용
+ECC_WorldStatic → 움직이지 않는 것들
+ECC_Pawn        → 캐릭터들
+```
+
+**우리는 Visibility 사용** → 가장 범용적!
+
+---
+
+### 파라미터 2: false (복잡한 충돌)
+
+```cpp
+false → 단순한 충돌 체크 (빠름)
+true  → 복잡한 충돌 체크 (정밀하지만 느림)
+```
+
+**차이점:**
+
+```
+false: 큰 박스로 충돌 체크 (우리가 쓸 것)
+┌─────────┐
+│  오브젝트 │ → 대략적
+└─────────┘
+
+true: 실제 모양으로 충돌 체크
+    ╱╲
+   ╱  ╲  → 정밀
+  ╱____╲
+```
+
+**우리는 false 사용** → 포탑 조준에는 대략적으로도 충분!
+
+---
+
+### 파라미터 3: HitResult (충돌 결과)
+
+**FHitResult란?**
+
+```
+충돌 정보를 담는 상자
+
+담기는 정보:
+- 어디에 닿았나? (ImpactPoint)
+- 뭐에 닿았나? (Actor)
+- 법선 벡터는? (Normal)
+- 등등...
+```
+
+**Out Parameter (출력 매개변수):**
+
+```cpp
+FHitResult HitResult;  // 빈 상자 준비
+GetHitResultUnderCursor(..., HitResult);  // 함수가 상자 채워줌
+// 이제 HitResult에 충돌 정보가 가득!
+```
+
+**비유:**
+
+```
+빈 그릇 준비 (FHitResult)
+→ 함수에게 그릇 건네기
+→ 함수가 음식(정보) 담아줌
+→ 가득 찬 그릇 돌려받기
+```
+
+---
+
+### 4단계: Impact Point 사용하기
+
+```cpp
+HitResult.ImpactPoint;
+```
+
+**ImpactPoint란?**
+
+```
+선이 닿은 정확한 3D 좌표
+
+타입: FVector
+값: (X, Y, Z)
+
+예시: (1200.0, -350.0, 50.0)
+```
+
+**시각화:**
+
+```
+게임 월드
+
+바닥 ▓▓▓▓▓▓▓▓▓▓
+        ↑
+     여기가 ImpactPoint!
+     좌표: (500, 200, 0)
+```
+
+---
+
+## 🔍 디버그 구체로 시각화하기
+
+### DrawDebugSphere 이해하기
+
+```cpp
+DrawDebugSphere(
+    GetWorld(),              // 1. 어느 월드에?
+    HitResult.ImpactPoint,   // 2. 어디에 그릴까?
+    25.0f,                   // 3. 크기는?
+    12,                      // 4. 얼마나 둥글게?
+    FColor::Red              // 5. 무슨 색?
+);
+```
+
+**각 파라미터 설명:**
+
+```cpp
+1. GetWorld()
+→ 이 탱크가 있는 게임 월드
+
+2. HitResult.ImpactPoint
+→ 마우스 커서가 가리키는 지점
+
+3. 25.0f
+→ 반지름 25cm (작은 공)
+
+4. 12
+→ 12개 선분 (12각형 같은 느낌)
+   숫자 클수록 더 둥글음
+
+5. FColor::Red
+→ 빨간색
+   (Green, Blue, Yellow 등도 가능)
+```
+
+---
+
+### 왜 디버그 구체를 그리나?
+
+```
+문제: Impact Point는 눈에 안 보임
+해결: 빨간 공을 그려서 시각화!
+
+결과:
+마우스 움직임 → 빨간 공도 따라 움직임
+→ "아, Line Trace가 제대로 작동하는구나!" ✅
+```
+
+---
+
+## 🐛 문제 상황: 하늘을 보면?
+
+### 문제
+
+```
+마우스를 하늘로 가져가면:
+→ Line Trace가 아무것도 안 닿음
+→ HitResult가 비어있음
+→ 디버그 구체 사라짐
+→ 포탑이 이상하게 회전 (버그!)
+```
+
+**시각화:**
+
+```
+카메라
+  |
+  | 마우스(하늘)
+  ↓
+ ═══════════> 선이 계속 날아감...
+             아무것도 안 닿음! ❌
+```
+
+---
+
+### 해결책: Blocking Volume
+
+**Blocking Volume이란?**
+
+```
+보이지 않는 투명한 벽
+
+역할:
+- 눈에 안 보임 (투명)
+- Line Trace는 막음 ✅
+- 배경 역할
+```
+
+---
+
+## 🛠️ Blocking Volume 만들기
+
+### 1단계: 볼륨 생성
+
+**에디터에서:**
+
+```
+Place Actors 패널
+→ "Blocking" 검색
+→ Blocking Volume 드래그
+```
+
+---
+
+### 2단계: 위치 설정
+
+```
+Transform:
+Location: (0, 0, 0)  // 레벨 중심
+
+Scale:
+X: 200 (20,000cm = 200m)
+Y: 200 (20,000cm = 200m)
+Z: 1 (그대로)
+
+→ 엄청 큰 평평한 판!
+```
+
+**시각화:**
+
+```
+위에서 본 모습:
+
+┌─────────────────────┐
+│                     │
+│   Blocking Volume   │  (하늘 덮음)
+│   (투명, 엄청 큼)    │
+│                     │
+└─────────────────────
+```
+
+---
+
+### 3단계: 충돌 설정
+
+**Details 패널:**
+
+1. **Collision 섹션 찾기**
+2. **Collision Presets → Custom**
+3. **모든 채널 Ignore로 설정**
+4. **Visibility만 Block으로 변경**
+
+```
+충돌 설정:
+┌──────────────┬──────────┐
+│ WorldStatic  │ Ignore   │
+│ WorldDynamic │ Ignore   │
+│ Pawn         │ Ignore   │
+│ Visibility   │ Block ✅ │ ← 이것만!
+│ Camera       │ Ignore   │
+└──────────────┴──────────┘
+```
+
+**왜 이렇게?**
+
+```
+다른 것들(Pawn, Camera 등):
+→ Ignore (통과)
+→ 게임플레이에 영향 없음
+
+Visibility만:
+→ Block (막음)
+→ Line Trace는 걸림 ✅
+```
+
+---
+
+### 4단계: 위치 조정 (선택사항)
+
+**문제: 바닥 위의 Line Trace도 막힘**
+
+```
+해결:
+Z 위치를 조금 내리기
+
+Before: Z = 0
+After:  Z = -100
+
+결과:
+가장자리에서만 작동
+중앙(바닥)에서는 안 걸림
+```
+
+---
+
+## 🎮 테스트
+
+### 동작 확인
+
+1. **게임 실행**
+2. **마우스를 바닥 위로**
+   - 빨간 구체가 따라다님 ✅
+3. **마우스를 오브젝트 위로**
+   - 구체가 오브젝트에 붙음 ✅
+4. **마우스를 하늘로**
+   - Blocking Volume이 있으면:
+     - 구체가 사라지지 않음 ✅
+   - Blocking Volume이 없으면:
+     - 구체가 사라짐 ❌
+
+---
+
+## 🔍 코드 전체 흐름
+
+```cpp
+void ATank::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    // 1. PlayerController 얻기
+    APlayerController* PlayerController = Cast<APlayerController>(GetController());
+
+    if (PlayerController)
+    {
+        // 2. 충돌 결과 저장할 상자 준비
+        FHitResult HitResult;
+
+        // 3. 마우스 커서 아래 Line Trace
+        PlayerController->GetHitResultUnderCursor(
+            ECC_Visibility,  // 가시성 채널
+            false,           // 단순 충돌
+            HitResult        // 결과 여기에
+        );
+
+        // 4. 충돌 지점 시각화 (빨간 구체)
+        DrawDebugSphere(
+            GetWorld(),              // 게임 월드
+            HitResult.ImpactPoint,   // 충돌 지점
+            25.0f,                   // 크기
+            12,                      // 세그먼트
+            FColor::Red              // 빨간색
+        );
+
+        // 다음 강의: 이 ImpactPoint로 포탑 회전!
+    }
+}
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Line Trace 3단계
+
+```
+1. 시작: 카메라 (플레이어 시점)
+2. 방향: 마우스 커서 방향
+3. 충돌: 첫 번째로 닿는 오브젝트
+
+결과 → ImpactPoint (3D 좌표)
+```
+
+---
+
+### FHitResult 주요 정보
+
+```cpp
+HitResult.ImpactPoint   // 충돌 위치 (우리가 쓸 것!)
+HitResult.Actor         // 충돌한 액터
+HitResult.Normal        // 표면 법선 벡터
+HitResult.bBlockingHit  // 막히는 충돌인가?
+```
+
+---
+
+### Tick vs BeginPlay
+
+```
+BeginPlay:
+- 게임 시작 시 1번만
+- 초기 설정용
+
+Tick:
+- 매 프레임마다
+- 계속 업데이트가 필요한 것
+- 마우스 추적 ← 여기!
+```
+
+---
+
+## 🐛 문제 해결
+
+### 문제 1: "빨간 구체가 안 보여요!"
+
+**체크리스트:**
+
+```
+☐ 코드 컴파일 성공?
+☐ Tick 함수에 코드 있나?
+☐ DrawDebugSphere 호출하나?
+☐ 게임 뷰에서 확인하나? (에디터 뷰 아님)
+```
+
+---
+
+### 문제 2: "하늘 보면 구체 사라져요"
+
+```
+해결: Blocking Volume 추가
+
+체크:
+☐ Blocking Volume 생성?
+☐ 크기 충분히 큼? (200 x 200)
+☐ Visibility를 Block으로?
+☐ 다른 채널은 Ignore?
+```
+
+---
+
+### 문제 3: "구체가 이상한 곳에 있어요"
+
+```
+원인: Line Trace가 예상 못한 것에 닿음
+
+해결:
+1. 어디에 닿는지 확인
+2. Blocking Volume 위치 조정
+3. 필요없는 오브젝트 Ignore 설정
+```
+
+---
+
+### 문제 4: "컴파일 에러: 'DrawDebugSphere'"
+
+```cpp
+// Tank.cpp 맨 위에 추가
+#include "DrawDebugHelpers.h"
+```
+
+---
+
+## 📊 다음 단계 미리보기
+
+**현재 완성:**
+
+```
+✅ 마우스 위치 감지
+✅ Line Trace로 충돌 지점 찾기
+✅ ImpactPoint 시각화
+```
+
+**다음 강의:**
+
+```
+1. ImpactPoint 사용해서
+2. 포탑을 그 방향으로 회전
+3. LookAt 또는 회전 계산
+```
+
+**최종 목표:**
+
+```
+마우스 움직임
+    ↓
+포탑이 따라 회전
+    ↓
+포탄 발사 방향 결정
+```
+
+---

@@ -1,0 +1,309 @@
+---
+title: 'M:N(다대다) 관계의 설계와 구현'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+```jsx
+JPA 를 이용해서 M:N 관계를 어떻게 구현해야 하는지 살펴본다
+
+이번장은 "영화"와 "회원"을 사용하고 회원이 영화에 대한 감상평을 남기는 시나리오를 가진다
+
+	* 한 편의 영화는 여러 회원의 평가가 행해질 수 있다
+
+	* 한 명의 회원은 여러 영화에 대해서 평점을 줄 수 있다
+```
+
+# M:N(다대다) 관계의 특징
+
+## 다대다 관계의 논리적 설계와 실제 설계
+
+```jsx
+다대다 관계는 논리적인 설계와 실제 테이블 설계가 다르게 된다
+
+왜냐하면 테이블은 고정된 수의 칼럼을 가지고 있기 때문이다
+
+예를들어 학생과 수업이라면
+```
+
+![Untitled](<M%20N(%EB%8B%A4%EB%8C%80%EB%8B%A4)%20%EA%B4%80%EA%B3%84%EC%9D%98%20%EC%84%A4%EA%B3%84%EC%99%80%20%EA%B5%AC%ED%98%84/Untitled.png>)
+
+```jsx
+예를들어 학생과 수업이라면
+
+두 테이블의 PK 가 없어져 버리고 테이블이 과하게 늘어나게 된다
+```
+
+## 다대다 관계의 특징
+
+![Untitled](<M%20N(%EB%8B%A4%EB%8C%80%EB%8B%A4)%20%EA%B4%80%EA%B3%84%EC%9D%98%20%EC%84%A4%EA%B3%84%EC%99%80%20%EA%B5%AC%ED%98%84/Untitled%201.png>)
+
+```jsx
+1. 영화와 회원은 모두 독립적인 엔티티로 설계 가능하다 ( 이러한 엔티티 들은 대부분 명사인 경우가 많다 )
+
+2. 회원 입장에서 여러편의 영화를 평가하기 때문에 2번째 그림의 형태가 가능하다
+
+3. 한 편의 영화는 여러 회원이 존재한다 관계 성립으로 양쪽 다대다가 성립한다
+```
+
+## 다른 다대다 관계
+
+```jsx
+* 학생과 수업 : 한명의 학생은 여러 수업 참가 가능 수업에는 여러 학생이 존재
+
+* 상품과 상품 카테고리 : 하나의 상품은 여러 카테고리에 속하고 카테고리는 여러 상품을 가지고 있다
+
+* 상품과 회원 관계 : 하나의 상품은 여러 회원이 구매 가느아고 한명의 회원은 여러 상품을 구매 가능
+```
+
+# 매핑 테이블
+
+![Untitled](<M%20N(%EB%8B%A4%EB%8C%80%EB%8B%A4)%20%EA%B4%80%EA%B3%84%EC%9D%98%20%EC%84%A4%EA%B3%84%EC%99%80%20%EA%B5%AC%ED%98%84/Untitled%202.png>)
+
+```jsx
+다대다 관계의 문제를 해결하기 위해서는
+
+테이블 설계에서 매핑(Mapping) 테이블을 사용하게 된다
+
+흔히 연결 테이블이라 불리고
+
+두 테이블의 사이에서 필요한 정보를 양쪽에서 끌어다 쓰는 구조이다
+```
+
+## 매핑 테이블의 특징
+
+```jsx
+* 매핑 테이블이 작성되기 이전에 다른 테이블이 먼저 존재해야한다
+
+* 매핑 테이블은 주로 명사가 아닌동사나 히스토리에 대한 데이터를 보관하는 용도
+
+* 매핑 테이블은 중간에서 양쪽의 PK 를 참조하는 형태로 사용 ( FK 가 두개 )
+```
+
+# JPA 에서 M:N( 다대다 ) 처리
+
+```jsx
+JPA 에서 M:N 을 처리하는 방식은 크게 두가지가 있다
+
+1. @ManyToMany 를 이용하는 방식
+
+2. 별도의 엔티티를 설계하고 @ManyToOne 을 이용해서 처리하는 방식
+```
+
+## @ManyToMany 는 사용하기 어려워 추천하지 않는다
+
+```java
+JPA 에서는 @ManyToMany 어노테이션을 이용해서 각 엔티티의 매핑 테이블이 자동으로 생성되는 방식으로 처리 가능
+
+다만 @ManyToMany 의 경우 작성하려는 예제에서 적용하기 어려운 점이 있다
+
+( 영화의 평점 정보는 리뷰 테이블에 있어야 하는데 @ManyToMany 에서는 이 구조를 만들 수 없다 )
+
+@ManyToMany 의 경우에는 주로 양방향 참조를 이용하는데 양방향 참조를 이용하면 상당한 주의가 필요한데
+
+ JPA 실행에서 가장 중요한 것이 현재 메모리상 ( 정확히는 콘텍스트 ) 의 엔티티 객체들의 상태와 데이터 베이스의
+
+상태를 동기화(일치) 시키는것이라는 것을 생각해보면 하나의 객체를 수정할 시 다른 객체의 상태도 매번 변경하는것이 매우 어렵다
+
+실무에서도 가능하면 단방향 참조를 유지하는것이 이러한 연관된 객체가 많을 경우 상태를 정확히 유지하는 것이 어렵기 때문
+```
+
+## 그래서 우리는 어떻게 사용하는가
+
+```java
+예제 프로젝트에서는 중간에 직접 매핑 테이블을 설계하고
+
+직접 매핑 관계를 연결시키는 방식으로 설계를 진행한다
+
+연관 관계를 이용해서 조회해야 하는 데이터의 경우는 JPQL 을 이용해서 leftJoin 등을 이용해서 원하는 테이블을 추출한다
+```
+
+# 설계 시작
+
+## 기본 세팅을 진행한다
+
+```java
+예전에 했던 그대로 세팅
+```
+
+기본 세팅
+
+## 엔티티 클래스 설계
+
+```java
+기본적으로 예전에 사용했던 BaseEntity 를 추가해준다
+```
+
+![Untitled](<M%20N(%EB%8B%A4%EB%8C%80%EB%8B%A4)%20%EA%B4%80%EA%B3%84%EC%9D%98%20%EC%84%A4%EA%B3%84%EC%99%80%20%EA%B5%AC%ED%98%84/Untitled%203.png>)
+
+![Untitled](<M%20N(%EB%8B%A4%EB%8C%80%EB%8B%A4)%20%EA%B4%80%EA%B3%84%EC%9D%98%20%EC%84%A4%EA%B3%84%EC%99%80%20%EA%B5%AC%ED%98%84/Untitled%204.png>)
+
+## Movie 엔티티 클래스 설계
+
+```java
+M:N 관계를 처리할 때는 반드시 매팅 테이블의 설계는 마지막 단계에 처리하고
+
+"명사" 에 해당하는 클래스를 먼저 설계한다
+
+예제에서는 "영화(Movie)" 와 "회원(Member)" 의 존재가 명사에 해당하므로 이들을 먼저 엔티티 클래스로 설계한다
+```
+
+```java
+Movie 엔티티 클래스를 추가한다
+
+title 만 가지는 아주 단순한 구조이다
+```
+
+![Untitled](<M%20N(%EB%8B%A4%EB%8C%80%EB%8B%A4)%20%EA%B4%80%EA%B3%84%EC%9D%98%20%EC%84%A4%EA%B3%84%EC%99%80%20%EA%B5%AC%ED%98%84/Untitled%205.png>)
+
+```java
+@Entity
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@Getter
+@ToString
+public class Movie extends BaseEntity{
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long mno;
+
+    private  String title;
+}
+```
+
+## MovieImage 클래스 설계
+
+```java
+예전 댓글 클래스와 비슷하다
+
+단방향 참조로 처리하고 @Query 로 left join 등을 사용하게 된다
+
+이러한 작업을 할 때는 JPQL 엔티티 클래스인 경우에 사용이 자유롭다
+```
+
+![Untitled](<M%20N(%EB%8B%A4%EB%8C%80%EB%8B%A4)%20%EA%B4%80%EA%B3%84%EC%9D%98%20%EC%84%A4%EA%B3%84%EC%99%80%20%EA%B5%AC%ED%98%84/Untitled%206.png>)
+
+```java
+@Entity
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@Getter
+@ToString(exclude = "movie") // 연관 관계 주의
+public class MovieImage extends BaseEntity{
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long inum;
+
+    private String uuid;
+
+    private String imgName;
+
+    private String path;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    private Movie movie;
+}
+```
+
+```jsx
+java.util.UUID 를 이용해서 고유한 번호를 생성해서 사용할것이다
+
+path 이미지의 저장경로는 년/월/일 폴더구조를 의미하게 된다
+```
+
+### @ElementCollection , @Embeddable
+
+```jsx
+ @ElementCollection나 @Embeddable 같은 엔티티가 아닌 값 객체 ( ValueObject )  를 이용하는 방법도 있다
+
+ 다만 예제의 경우 페이지 처리나 조인 처리가 많으므로 엔티티 타입으로 사용하도록 한다
+```
+
+## Member 클래스 설계
+
+```jsx
+회원 로그인에 대한 처리는 다음 파트의 스프링 시큐리티로 작성하고
+
+기본적인 회원의 정보로 작성하도록 한다
+```
+
+![Untitled](<M%20N(%EB%8B%A4%EB%8C%80%EB%8B%A4)%20%EA%B4%80%EA%B3%84%EC%9D%98%20%EC%84%A4%EA%B3%84%EC%99%80%20%EA%B5%AC%ED%98%84/Untitled%207.png>)
+
+```java
+@Entity
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@Getter
+@ToString
+@Table(name = "m_member")
+public class Member extends BaseEntity{
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long mid;
+
+    private String email;
+
+    private String pw;
+
+    private String nickname;
+}
+```
+
+## 매핑 테이블을 위한 Review 클래스 설계
+
+```java
+매핑 테이블은 주로 "동사"나 "히스토리"를 의미하는 테이블 이다
+
+ex) "회원이 영화에 대해서 평점을 준다" 에서 "평점을 준다" 가 매핑테이블이 필요한 부분이다 (회원이라는 주어, 영화라는 목적어)
+
+* 이 부분이 @ManyToMany 를 이용하는 방식과의 차이다 @ManyToMany 는 관계를 설정할수는 있지만 추가적인 데이터를 기록할수는 없다
+```
+
+![Untitled](<M%20N(%EB%8B%A4%EB%8C%80%EB%8B%A4)%20%EA%B4%80%EA%B3%84%EC%9D%98%20%EC%84%A4%EA%B3%84%EC%99%80%20%EA%B5%AC%ED%98%84/Untitled%208.png>)
+
+```java
+매핑 테이블은 두 테이블 사이에서 양쪽의 PK 를 참조하는 형태로 구성된다
+
+@ManyToOne 을 이용해서 양쪽을 참조하는 구조가 된다
+
+( 단반향 참조의 경우 기본은 항상 외래키(FK) 를 가지고 있는 테이블을 기준으로 설계한다 )
+```
+
+![Untitled](<M%20N(%EB%8B%A4%EB%8C%80%EB%8B%A4)%20%EA%B4%80%EA%B3%84%EC%9D%98%20%EC%84%A4%EA%B3%84%EC%99%80%20%EA%B5%AC%ED%98%84/Untitled%209.png>)
+
+```java
+@Entity
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@Getter
+@ToString(exclude = {"movie","member"})
+public class Review extends BaseEntity{
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long reviewnum;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    private Movie movie;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    private Member member;
+
+    private int grade;
+
+    private String text;
+
+}
+```
+
+![Untitled](<M%20N(%EB%8B%A4%EB%8C%80%EB%8B%A4)%20%EA%B4%80%EA%B3%84%EC%9D%98%20%EC%84%A4%EA%B3%84%EC%99%80%20%EA%B5%AC%ED%98%84/Untitled%2010.png>)
+
+```java
+자동으로 완성된 테이블 관계도
+```

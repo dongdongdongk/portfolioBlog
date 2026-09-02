@@ -1,0 +1,1596 @@
+---
+title: '2023-04-27,28(Spring Security)'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# Spring Security
+
+```java
+보안, 인터셉터, 권한 등을 한곳에서 관리하게 하는 스프링의 프레임워크
+```
+
+# 1. 기본 용어
+
+```jsx
+1. Authentication (로그인 관련)
+	 - 인증
+	 - 로그인
+	 - 유저 식별
+
+2. Authorize (관리자냐 매니저냐)
+	 - 인가
+	 - 접근 권한
+	 - 인증된 유저의 권한
+
+3. Principal  (로그인 한 사람이 누군가, 얼마나 권한이 있는가)
+	 - 접근주체(객체)
+	 - Spring Security에서 사용하는 인증, 인가 정보가 있는 객체
+
+4. Credentials (패스워드 관련)
+	 - 리소스에 접근하는 대상의 비밀번호
+```
+
+# 2. Security 설정
+
+```jsx
+1. Spring Security API POM.XML 추가
+
+	두가지 방법 존재
+
+	1) 프로젝트 생성시 Security API 선택 (프로젝트 생성시 시큐리티 api를 선택해서 넣던가 )
+
+	2) 기존 프로젝트에 추가( 라이브러리 추가) (만들어진 프로젝트에 라이브러리를 추가하던가)
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+```
+
+## 실습내역(시큐리티 설정 추가하기)
+
+![<1. 프로젝트 생성시 Security API 선택>](<2023-04-27,28(Spring%20Security)/Untitled.png>)
+
+<1. 프로젝트 생성시 Security API 선택>
+
+```markdown
+1. Spring Security API POM.XML 추가
+   1. 프로젝트 생성시 Security API 선택
+
+\*홈에 들어가면 기본적으로 로그인을 요구하는데 log에 보면 비번이 자동으로 생성되어있고
+
+아이디는 user 가 기본설정이다.
+
+localhost/login & localhost/logout 이 기본으로 설정되어있다.
+```
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%201.png>)
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%202.png>)
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%203.png>)
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%204.png>)
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%205.png>)
+
+---
+
+---
+
+![<2) 기존 프로젝트에 추가(라이브러리 추가)>](<2023-04-27,28(Spring%20Security)/Untitled%206.png>)
+
+<2) 기존 프로젝트에 추가(라이브러리 추가)>
+
+```markdown
+1. Spring Security API POM.XML 추가 2) 기존 프로젝트에 추가( 라이브러리 추가)
+```
+
+![<Run as ⇒ Run Configuration⇒Spring Boot App 재구성>](<2023-04-27,28(Spring%20Security)/Untitled%207.png>)
+
+<Run as ⇒ Run Configuration⇒Spring Boot App 재구성>
+
+![<maven clean → maven update → 실행>](<2023-04-27,28(Spring%20Security)/Untitled%208.png>)
+
+<maven clean → maven update → 실행>
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%209.png>)
+
+# 3. DB 구성
+
+```jsx
+Member
+ROLE
+- role의 이름 구성 전부 대문자
+- ROLE_***
+
+MEMBER_ROLE
+```
+
+# 4. Security Config
+
+```jsx
+Spring Security 5.7.0-M2 부터 WebSecurityConfigureAdapter는 Deprecated 됨
+대신 SecurityFilterChain 을 Bean으로 등록하는 방식을 권장
+
+**1. WebSecurity 설정 클래스 생성**
+
+@Configuration //설정과 관련된 어노테이션
+@EnableWebSecurity // 시큐리티 적용 어노테이션 추가
+public class SecurityConfig  {
+
+	@Bean            // @Component 와 비슷한 어노테이션 객체를 만들
+	//public 을 선언하면 default로 바꾸라는 메세지 출력 (public WebSecurityCustromizer)
+	WebSecurityCustomizer webSecurityConfig() {
+		**//Security에서 무시해야하는 URL 패턴 등록 (이미지 css 등 시큐리티가 필요없는 부분)**
+		return web -> web //-> :람다함수
+			   .ignoring() //"."으로 연결: 메서드 체이닝 //ignoring():무시하겠다
+			   .antMatchers("/images/**")
+			   .antMatchers("/css/**")
+			   .antMatchers("/js/**")
+			   .antMatchers("/favicon/**")  //웹브라우저에 들어가는 이미지
+			   .antMatchers("/resources/**");
+	}
+
+// 메서드 체이닝 예시) person.setName("John").setAge(30).setAddress("New York");
+// 여러 개의 메서드 호출을 한 줄로 연결하여 사용하는 것
+
+@Bean          //public 을 사용하지 않고 매개변수로 http Security 를 받는다
+	SecurityFilterChain fiterChain(HttpSecurity httpSecurity)throws Exception{
+		httpSecurity
+					.cors()   //cors
+					.and()    // 와
+					.csrf()   // csrf 를
+					.disable() // 활성화 하지 않겠다.
+				.authorizeRequests()          // 권한 과 관련된 메서드
+					.antMatchers("/").permitAll() //루트 밑에 시작하는걸 모두 허용하겠다(permitAll) 이후 아래에서 제한을 시작
+					.antMatchers("/admin").hasRole("ADMIN") // /adimn 을 가진 주소는 role ADMIN 만 허용
+					.antMatchers("/manager").hasAnyRole("ADMIN","MANAGER") //ADMIN 을 가지거나 MANAGER를 가진 사람만 허용 => 회원 한명당 하나의 ROLE를 가질때
+					.anyRequest().authenticated() //그외 나머지는 로그인 해야 볼수 있어요 (authenticated = 로그인 해야 )
+					.and()
+				.formLogin()      // 로그인 포폼은
+					.permitAll()    // 모두 허용
+					.and()
+				.logout()         // 로그아웃도
+					.permitAll();   // 모두 허용
+
+		return httpSecurity.build(); //빌드해서 만들어 준다
+
+	}
+
+}
+
+```
+
+```markdown
+위에서 아래로 실행되기에 "순서" 중요
+이제 대부분의 인터셉터는 Security에서 한다
+```
+
+## 실습내역(Securit url 권한 설정)
+
+![<**1. WebSecurity 설정 클래스 생성**>](<2023-04-27,28(Spring%20Security)/Untitled%2010.png>)
+
+<**1. WebSecurity 설정 클래스 생성**>
+
+```markdown
+.inoring() 이후 .andMachers("url주소") 는 login하지 않아도 들어갈 수 있다. (보안에 걸리지 않음)
+```
+
+![<**1. WebSecurity 설정 클래스 생성**>](<2023-04-27,28(Spring%20Security)/Untitled%2011.png>)
+
+<**1. WebSecurity 설정 클래스 생성**>
+
+```java
+밑에 "authorizeRequests()" 개념 참고
+```
+
+![< formLogin() >](<2023-04-27,28(Spring%20Security)/Untitled%2012.png>)
+
+< formLogin() >
+
+```java
+밑에 "formLogin()" 토글에 개념 참고
+```
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%2013.png>)
+
+```markdown
+Access Denied = 권한이 없습니다
+(못 들어가게 설정해놓았을 때)
+```
+
+## authorizeRequests()
+
+```jsx
+요청 URL과 그에 관한 권한 설정 하는 곳
+
+요청 URL 정보
+antMatchers("요청 URL")
+antMatchers("요청 URL", "요청 URL", ...)
+
+해당URL의 권한 설정
+- DB에는 Role명이 ROLE_NAME
+
+- hasRole(ROLE_를제외한 나머지이름)
+hasRole("권한이름")
+hasAnyRole("권한이름1", "권한이름2",...) : 여러개의 권한 중 하나만 있어도 통과
+
+- access("hasRole('ROLE_포함 전체이름')")
+access("hasRole('ROLE_ADMIN')")
+access("hasRole('ROLE_ADMIN') or hasRole('ROLE_MANAGER')")
+
+permitAll() : 누구나 허용
+denyAll()   : 누구나 차단
+anonymous() : 익명사용자 허용
+
+hasAuthority("권한이름")
+hasAnyAuthority("권한이름", "권한이름2",...)
+
+authenticated() : 인증된 사용자 허용
+
+```
+
+## formLogin()
+
+### 1. Security Config
+
+```jsx
+//httpSecurity.formLogin()
+				.formLogin()       //로그인 폼 인증 설정
+					.loginPage("/member/login") //내장된 로그인폼을 사용하지 않고 개발자가 만든 폼요청 URL
+					//.loginProcessingUrl("login")   //로그인을 진행 요청할 form 태그의 action의 주소 지정
+					.passwordParameter("pw")    //패스워드 파라미터는 password이지만, **개발자가 다른 파라미터 이름을 사용할 때**
+					.usernameParameter("id")    //id 파라미터는 username이지만, **개발자가 다른 파라미터 이름을 사용할 때**
+					.defaultSuccessUrl("/")     //인증에 성공할 경우 요청할 URL
+					.failureUrl("/member/login")//인증에 실패했을 경우 요청할 URL
+					.permitAll()
+					.and()
+```
+
+```markdown
+security 적용하면 평문 패스워드로 사용 불가능
+=> 암호화 된 패스워드 사용
+
+**Controller로 url 요청했을 때 ViewName으로 redirect 또는 jsp로 보내는 메서드 필요가 없어진다
+Securiy 에서 Controller 대신해서 사용 가능**
+```
+
+### 2. LoginSuccess
+
+```jsx
+1. defaultSuccessUrl("URL")
+	 - 로그인 성공 했을 때 요청할 URL
+
+2. SuccessHandler
+	 - 로그인이 성공하고 추가작업을 하고 싶을 때
+	 - Handler class 선언하고 AuthenticationSuccessHandler 구현하고
+	 - onAuthenticationSuccess 오버라이딩
+
+----------------------- Security Config ----------------
+.formLogin()       //로그인 폼 인증 설정
+					.loginPage("/member/login") //내장된 로그인폼을 사용하지 않고 개발자가 만든 폼요청 URL
+					//.loginProcessingUrl("login")   //로그인을 진행 요청할 form 태그의 action의 주소 지정
+					.passwordParameter("pw")    //패스워드 파라미터는 password이지만, 개발자가 다른 파라미터 이름을 사용할 때
+					.usernameParameter("id")    //id 파라미터는 username이지만, 개발자가 다른 파라미터 이름을 사용할 때
+					//.defaultSuccessUrl("/")     //인증에 성공할 경우 요청할 URL
+					.successHandler(loginSuccess)
+					.failureUrl("/member/login?error=true&message=LoginFail")//인증에 실패했을 경우 요청할 URL
+					.permitAll()
+					.and()
+
+----------------------- Success Handler ----------------
+
+@Component
+@Slf4j
+public class LoginSuccess implements AuthenticationSuccessHandler {
+
+	@Override
+	public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
+			Authentication authentication) throws IOException, ServletException {
+		// TODO Auto-generated method stub
+
+		response.sendRedirect("URL");
+	}
+```
+
+## 실습내역
+
+```java
+Handler: 요청을 처리하는 기능을 가진 객체
+
+* AuthenticationSuccessHandler
+- 스프링 시큐리티(Spring Security)에서 로그인 인증 성공 시 처리하는 핸들러(handler)
+- 일반적으로 로그인 성공 시 세션(Session)을 생성하거나 쿠키(Cookie)를 생성하는 등의 작업을 처리
+```
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%2014.png>)
+
+![<login.jsp>](<2023-04-27,28(Spring%20Security)/Untitled%2015.png>)
+
+<login.jsp>
+
+```java
+ID기억할 수 있는 체크박스를 만들고, 이름은 remember로 한다
+그리고 만약 id를 기억하게 되면 userName input태그에는 value가 쿠키값이 오게 한다
+```
+
+![<UserSuccessHandler.java>](<2023-04-27,28(Spring%20Security)/Untitled%2016.png>)
+
+<UserSuccessHandler.java>
+
+![<SecurityConfig.java>](<2023-04-27,28(Spring%20Security)/Untitled%2017.png>)
+
+<SecurityConfig.java>
+
+```java
+**WebSecurity** 설정에서 로그인 성공시에(.successHandler) UserSucessHandler 객체를 생성한다
+```
+
+![<id기억하기 체크>](<2023-04-27,28(Spring%20Security)/Untitled%2018.png>)
+
+<id기억하기 체크>
+
+![< 로그아웃 후 userName에 찍힘 >](<2023-04-27,28(Spring%20Security)/Untitled%2019.png>)
+
+< 로그아웃 후 userName에 찍힘 >
+
+### 3. LoginFail
+
+## 실습내역
+
+![<SecurityConfig.java>](<2023-04-27,28(Spring%20Security)/Untitled%2020.png>)
+
+<SecurityConfig.java>
+
+![<UserLoginFailHandler.java>](<2023-04-27,28(Spring%20Security)/Untitled%2021.png>)
+
+<UserLoginFailHandler.java>
+
+![<login.jsp>](<2023-04-27,28(Spring%20Security)/Untitled%2022.png>)
+
+<login.jsp>
+
+![<MemberVO.java>](<2023-04-27,28(Spring%20Security)/Untitled%2023.png>)
+
+<MemberVO.java>
+
+```java
+enabled 변수 선언 해줌으로서 setter 메소드 사용 가능해짐 (getter는 이미 override 되었으므로)
+mapper에서 login 하는 쿼리에 enabled도 select 한다
+```
+
+![<MemberMapper>](<2023-04-27,28(Spring%20Security)/Untitled%2024.png>)
+
+<MemberMapper>
+
+---
+
+---
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%2025.png>)
+
+```java
+파라미터로 오는게 꼴보기 싫다!
+```
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%2026.png>)
+
+```java
+해당 jsp 의 <script></script>로 "history.replaceState({}, null, location.pathname)"
+```
+
+### 4. Logout
+
+```jsx
+
+1. Config에서 설정
+.logout()
+		.logoutUrl("/member/logout")      : Controller 메서드 만들지 않음
+		.logoutSuccessUrl("/")
+		.invalidateHttpSession(true)  //로그아웃 시 HttpSession을 무효화할지 여부를 지정
+		.deleteCookies("JSESSIONID")  //로그아웃 시 삭제할 쿠키 이름을 지정
+		.permitAll();
+
+1. logoutSuccessUrl("URL")   // 성공했을시 이동할 url
+
+2. addLogoutHandler     : 로그아웃시 해야할 일을 구성
+
+3. logoutSuccessHandler : 로그아웃 성공 후 해야할 일을 구성
+
+2, 3번은 동시에 구현 가능
+- 2번을 실행 후 3번이 실행
+```
+
+## 실습내역(로그인 화면 재 출력 방지)
+
+![<UserLogoutSucessHandler.java>](<2023-04-27,28(Spring%20Security)/Untitled%2027.png>)
+
+<UserLogoutSucessHandler.java>
+
+```java
+class 위에 Component 줘야 스프링이 알아서 객체 만들어주기 때문에
+AutoWired도 마찬가지로 Component를 해야 memberDAO도 객체 생성이 가능하다
+
+따라서 SecurityConfig에도 UserLogoutSuccessHandler도 AutoWired로 객체생성을 해줘야 한다
+```
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%2028.png>)
+
+![<SecurityConfig.java>](<2023-04-27,28(Spring%20Security)/Untitled%2029.png>)
+
+<SecurityConfig.java>
+
+```java
+.logoutSuccessHandler(logoutSucessHandler)//UserLogoutSucessHandler 객체 생성 (로그아웃 성공시)
+```
+
+![<MemberController.java>](<2023-04-27,28(Spring%20Security)/Untitled%2030.png>)
+
+<MemberController.java>
+
+```java
+로그인 후 뒤로가기 했을때, 다시 로그인 화면 나타나는 것을 방지하기 위해 사용
+```
+
+### 1. addLogoutHandler
+
+```jsx
+- 클래스 선언, LogoutHandler 구현
+@Component
+@Slf4j
+public class LogoutCustom implements LogoutHandler {
+
+	@Override
+	public void logout(HttpServletRequest request, HttpServletResponse response, Authentication authentication) {
+		// TODO Auto-generated method stub
+		request.getSession().invalidate();
+		log.info("========== LogoutHandler ===========");
+
+	}
+
+}
+```
+
+### 2. logoutSuccessHandler
+
+```jsx
+- 클래스 선언, LogoutSuccessHandler 구현
+```
+
+## 평문 password랑 DB에 저장된 암호화된 password 비교
+
+## 실습예제
+
+![<MemberController.java>](<2023-04-27,28(Spring%20Security)/Untitled%2031.png>)
+
+<MemberController.java>
+
+```java
+평문으로 온 패스워드랑
+DB에 암호화되어 저장된 패스워드가 비교
+=> PasswordEncoder의 **matches** 가 암호화 시켜줌
+```
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%2032.png>)
+
+```java
+평문패스워드를 암호화 시킨 값과 DB의 저장된 암호화된 패스워드를 비교하면 false 뜸
+해싱이 다르게 된다! (서로 다른 해싱 알고리즘)
+```
+
+# 5. VO - UserDetails
+
+```jsx
+Spring Security에서 제공하는 VO개념, Interface (2가지 방법이 있음)(1번이 더 편하니 1번쓰자)
+
+1. 새로운 VO를 만들고 UserDetail 구현
+	 public class MemberVO Implements UserDetails
+   // MemberVO 에 UserDetails 인터페이스를 구현하면 UserDetails 타입이 됨
+
+2. MemberVO를 새로운 VO에 멤버변수로 활용
+	 public class User implements UserDetails{
+		 private MemberVO memberVo
+	}
+
+	// User 클래스를 만들고 UserDetails 를 구현한뒤 멤버 변수로  MemverVO 선언(1번이 더 좋음)
+```
+
+```java
+userName => username
+passWord => password
+로 변경한다
+(mapper와 VO에)
+"UserDetails" 인터페이스 내장된 Override의 setter getter가 username과 password로 세팅
+```
+
+## 실습내역(MemberVO에 UserDetails 구현하기)
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%2033.png>)
+
+![<MemberVO.java>](<2023-04-27,28(Spring%20Security)/Untitled%2034.png>)
+
+<MemberVO.java>
+
+```java
+package com.iu.base.member;
+
+import java.sql.Date;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+
+import javax.validation.constraints.Email;
+import javax.validation.constraints.Future;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.Past;
+
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.oauth2.core.user.OAuth2User;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@Setter
+@Getter
+public class MemberVO implements UserDetails, OAuth2User{
+
+	@NotBlank
+	private String username;
+
+	@NotBlank
+	private String password;
+
+	private String passwordCheck;
+
+	@NotBlank
+	private String name;
+
+	@Email
+	private String email;
+	@Future
+	private Date birth;
+
+	private boolean enabled;
+
+	private List<RoleVO> roleVOs;
+
+	//OAuth2User, token 정보 저장
+	private Map<String, Object> attributes;
+
+	@Override      //
+	public Collection<? extends GrantedAuthority> getAuthorities() {
+		// TODO Auto-generated method stub
+		// GrantedAuthority" 개체를 보유할 "authorities"라는 새 목록을 만.
+		List<GrantedAuthority> authorities = new ArrayList<>();
+
+		// "roleVOs"라는 컬렉션의 각 "RoleVO" 객체를 반복하는 "for"
+		for(RoleVO roleVO:roleVOs) {
+			authorities.add(new SimpleGrantedAuthority(roleVO.getRoleName()));
+			//SimpleGrantedAuthority" 개체를 만들고 "authorities" 목록에 추가
+		}
+
+		return authorities;
+	}
+
+// 이 코드는 Java 애플리케이션에서 사용자의
+// "GrantedAuthority" 객체 리스트를 생성하는 메서드. 메서드는 "RoleVO" 객체 컬렉션을
+// 반복하며, 사용자 역할에 따른 권한을 나타내는 "SimpleGrantedAuthority" 객체를 생성하고
+// "authorities" 리스트에 추가. 마지막으로 메서드는 "authorities" 리스트를 반환.
+//  이 권한 리스트는 사용자의 역할에 따른 기능 및 데이터에 대한 접근 제어에 사용.
+
+//	@Override
+//	public String getUsername() {
+//		// TODO Auto-generated method stub
+//		username(id) 반환
+//		return null;
+//	}
+//	@Override
+//	public String getPassword() {
+//		// TODO Auto-generated method stub
+//		password 반환
+//		return null;
+//	}
+
+
+	// 아래 4개중 하나라도 false 이면 로그인 x
+	@Override
+	public boolean isAccountNonExpired() {
+		// TODO Auto-generated method stub
+		// 계정의 만료 여부
+		// true : 만료 안됨
+		// false : 만료 됨, 로그인 안됨
+		return true;
+	}
+	@Override
+	public boolean isAccountNonLocked() {
+		// TODO Auto-generated method stub
+		// 계정 잠김 여부
+		// true : 잠기지 않음
+		// false : 잠김, 로그인 안됨
+		return true;
+	}
+	@Override
+	public boolean isCredentialsNonExpired() {
+		// TODO Auto-generated method stub
+		// password 만료 여부
+		// true : 만료 안됨
+		// false : 만료 됨, 로그인 안됨
+		return true;
+	}
+	@Override
+	public boolean isEnabled() {
+		// TODO Auto-generated method stub
+		// 계정 사용 여부
+		// true : 계정 활성화
+		// false : 계정 비활성화, 로그인 안됨
+		return this.enabled;
+	}
+
+
+
+
+}
+```
+
+# 6. Service - UserDetailsService
+
+```java
+1. UserDetailsService 구현
+public class MemberService implements UserDetailsService
+```
+
+## 실습내역(UserDetailsService 구현)
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%2035.png>)
+
+![<MemberService.java>](<2023-04-27,28(Spring%20Security)/Untitled%2036.png>)
+
+<MemberService.java>
+
+![<MemberMapper ⇒ Login>](<2023-04-27,28(Spring%20Security)/Untitled%2037.png>)
+
+<MemberMapper ⇒ Login>
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%2038.png>)
+
+```java
+일반적으로 Spring Security를 사용하여 비밀번호를 인코딩하려면,
+PasswordEncoder 인터페이스를 구현하는 구현체를 생성하고,
+해당 구현체를 WebSecurityConfigurerAdapter 클래스를 상속한 클래스에서 구성해야 함
+```
+
+![<SecurityConfig.java>](<2023-04-27,28(Spring%20Security)/Untitled%2039.png>)
+
+<SecurityConfig.java>
+
+```java
+package com.iu.base.member;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
+import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.validation.BindingResult;
+
+import lombok.extern.slf4j.Slf4j;
+
+@Service
+@Slf4j
+@Transactional(rollbackFor = Exception.class)
+public class MemberService implements UserDetailsService {
+
+	@Autowired
+	private MemberDAO memberDAO;
+
+	@Autowired
+	private PasswordEncoder passwordEncoder;  // 패스워드 인코딩 기능을 사용하기 위한필드
+	// 사용자가 입력한 패스워드와 저장된 패스워드를 비교할 때도 이 필드를 이용하여
+	// 암호화된 패스워드를 비교.
+
+	// UserDetailsService 로 구현한 메소드
+	// 위 코드는 Spring Security의 인증과 관련된 메소드로, 주어진 username을 이용하여
+	// 사용자 정보를 조회하고, 해당 사용자 정보를 UserDetails 객체로 반환
+	@Override
+	public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+		// TODO Auto-generated method stub
+		log.error("=========== Spring Security Login ==============");
+		log.error("=========== {} ======== ", username );
+		MemberVO memberVO = new MemberVO();
+		memberVO.setUsername(username);
+		try {
+			memberVO = memberDAO.getLogin(memberVO); // memberDAO 객체의 getLogin() 메소드를 호출하여, 전달된 username 값을 이용하여 데이터베이스에서 사용자 정보를 조회하고, MemberVO 객체에 할당
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return memberVO;
+	}
+
+	public int setLastTimeUpdate(MemberVO memberVO)throws Exception{
+		return memberDAO.setLastTimeUpdate(memberVO);
+	};
+
+	//패스워드가 일치하는지 검즈하는 메서드
+	public boolean memberCheck(MemberVO memberVO, BindingResult bindingResult)throws Exception{
+		boolean result=false;
+		//false : error가 없음 , 검증성공
+		//true  : error가 실패 , 검증 실패
+
+		//1. annotation 검증 결과
+		result= bindingResult.hasErrors();
+
+		//2. password 일치 검증
+		if(!memberVO.getPassword().equals(memberVO.getPasswordCheck())) {
+			result=true;
+			bindingResult.rejectValue("passwordCheck", "member.password.notEqual");
+		}
+
+		//3. ID중복 검사
+		 MemberVO checkMember = memberDAO.idDuplicateCheck(memberVO);
+		 if(checkMember != null) {
+			 result=true;
+			 bindingResult.rejectValue("username", "member.id.duplicate");
+		 }
+
+		return result;
+	}
+
+	public int setJoin(MemberVO memberVO)throws Exception{
+		//memberVO.setEnabled(true);
+		memberVO.setPassword(passwordEncoder.encode(memberVO.getPassword())); //멤버 vo 에 패스워드를 설정하는데 패스워드 인코더를 이용하여 memberVO 를 인코딩한다.
+		int result = memberDAO.setJoin(memberVO);
+		Map<String, Object> map = new HashMap<>();
+		map.put("username", memberVO.getUsername());
+		map.put("num", 3);
+		result = memberDAO.setMemberRole(map);
+
+		return result;
+	}
+
+	public MemberVO idDuplicateCheck(MemberVO memberVO)throws Exception{
+		return memberDAO.idDuplicateCheck(memberVO);
+	}
+
+
+	public MemberVO getLogin(MemberVO memberVO)throws Exception{
+		return memberDAO.getLogin(memberVO);
+	}
+}
+```
+
+```java
+<**SecurityConfig.java>**
+
+package com.iu.base.config;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+
+import com.iu.base.member.MemberService;
+import com.iu.base.member.MemberSocialService;
+import com.iu.base.security.UserLoginFailHandler;
+import com.iu.base.security.UserLogoutSuccessHandler;
+import com.iu.base.security.UserSuccessHandler;
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+	@Autowired
+	private UserLogoutSuccessHandler logoutSuccessHandler;
+
+	@Autowired
+	private MemberSocialService memberSocialService;
+
+	@Bean
+	//public 을 선언하면 default로 바꾸라는 메세지 출력
+	WebSecurityCustomizer webSecurityConfig() {
+		//Security에서 무시해야하는 URL 패턴 등록
+		return web -> web
+				.ignoring()
+				.antMatchers("/images/**")
+				.antMatchers("/js/**")
+				.antMatchers("/css/**")
+				.antMatchers("/favicon/**")
+
+				;
+	}
+
+	@Bean
+	SecurityFilterChain fiterChain(HttpSecurity httpSecurity)throws Exception{
+		httpSecurity
+				.cors()
+				.and()
+				.csrf()
+				.disable()
+			.authorizeRequests()
+				//URL과 권한 매칭
+				.antMatchers("/").permitAll()
+				.antMatchers("/member/join").permitAll()
+				.antMatchers("/notice/add").hasRole("MEMBER")
+				.antMatchers("/notice/update").hasRole("ADMIN")
+				.antMatchers("/notice/delete").hasRole("ADMIN")
+				.antMatchers("/notice/*").permitAll()
+				.antMatchers("/admin/**").hasRole("ADMIN")
+				.antMatchers("/qna/add").hasAnyRole("ADMIN", "MANAGER", "MEMBER")
+				//.anyRequest().authenticated()
+				.anyRequest().permitAll()
+				.and()
+			.formLogin()
+				.loginPage("/member/login")
+				//.defaultSuccessUrl("/")
+				.successHandler(new UserSuccessHandler())
+				//.failureUrl("/member/login")
+				.failureHandler(new UserLoginFailHandler())
+				.permitAll()
+				.and()
+			.logout()
+				.logoutUrl("/member/logout")
+				//.logoutSuccessUrl("/")
+				.logoutSuccessHandler(logoutSuccessHandler)
+				.invalidateHttpSession(true)
+				.deleteCookies("JSESSIONID")
+				.permitAll()
+				.and()
+			.oauth2Login()
+				.userInfoEndpoint()
+				.userService(memberSocialService)
+
+				;
+//			.sessionManagement()
+//				.maximumSessions(1) //최대 허용 가능한 session 수, -1 : 무제한
+//
+//				.maxSessionsPreventsLogin(false) //false : 이전사용자 세션만료, true: 새로운 사용자 인증 실패
+//
+//				.expiredUrl("/")
+//				.and()
+//			.invalidSessionUrl("/")
+//			.sessionFixation()
+//				.newSession()
+//				;
+
+		return httpSecurity.build();
+	}
+
+	@Bean
+	public PasswordEncoder getPasswordEncoder() {  //패스워드 인코더 패스워드를 암호화
+		return new BCryptPasswordEncoder();
+	}
+
+
+}
+```
+
+# 6-1. Controller
+
+## 실습내역
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%2040.png>)
+
+## 추가예제) 비밀번호 재발급 받기 ⇒ 이메일 ⇒ DB에선 암호화
+
+```java
+*예제*
+id email 입력창 확인한다.
+id email 있으면 해당 email로 임시 비밀번호 발급
+=> 비밀번호 랜덤하게(비밀번호 6글자 숫자 영어 조합)
+DB로 암호화해서 업데이트
+```
+
+# 7. Flow
+
+```jsx
+1. ID, PW 입력
+2. /member/login , POST, ID(username), PW(password)
+3. Security Filter에서 로그인 처리
+	 - UserDetailsService를 찾아서 loadUserByUsername메서드 호출
+	 - DB에서 ID(username)으로 조회
+	 - UserDetails 리턴
+4. Security Filter에서 리턴 받은 UserDetails에서 PASSWORD를 꺼내서 검증
+```
+
+# 8. JSP Security Tag
+
+## 1. API 추가
+
+```jsx
+<dependency>
+  <groupId>org.springframework.security</groupId>
+  <artifactId>spring-security-taglibs</artifactId>
+</dependency>
+```
+
+## 2. JSP 에 Taglib 선언
+
+```jsx
+<%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
+```
+
+## 3. 로그인 유무 판단과 권한
+
+```jsx
+1. 로그인 유무
+<sec:authorize access="isAuthenticated()"></sec:authorize>  : 로그인 되었을 때
+<sec:authorize access="!isAuthenticated()"></sec:authorize> : 로그인 되어 있지 않을 때
+
+2. 권한
+<sec:authorize access="hasRole('권한이름')"></sec:authorize> : 해당 권한만 사용 가능
+<sec:authorize access="hasAnyRole('권한이름1', '권한이름2')"></sec:authorize> : 해당 권한만 사용 가능
+
+3. ALL
+<sec:authorize access="permitAll"></sec:authorize> : 누구나 사용 가능
+<sec:authorize access="denyAll"></sec:authorize>   : 누구도 사용 불가능
+
+4. URL
+- URL 경로가 Security Config 설정에서 특정권한을 가진 URL로 등록 되어 있는 경우
+<sec:authorize url="/admin/"></sec:authorize>      : admin 권한 있는 경우 가능
+```
+
+## 실습내역
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%2041.png>)
+
+![<header.jsp>](<2023-04-27,28(Spring%20Security)/Untitled%2042.png>)
+
+<header.jsp>
+
+```java
+header에 login / logout 시에 로그인 유무 태그 붙여준다
+```
+
+## 4. 사용자 정보 출력
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%2043.png>)
+
+```jsx
+1. Principal(MemberVO정보 )을 Spring Session에서 꺼내와서 변수에 대입해서 사용
+<sec:authentication property="Principal" var="user"/>
+<h3>ID : ${user.id} </h3>
+
+2. 바로 출력
+<sec:authentication property="Principal.name"/>
+
+3. ID를 바로출력
+<sec:authentication property="name"/>
+
+4. 주의 사항
+- authentication은 로그인이 되어야 생성, jsp에서 사용시 단독 사용하면 exception 발생
+<sec:authorize access="isAuthenticated()">
+	<sec:authentication property="name"/>
+</sec:authorize>
+```
+
+- 예제
+
+  ```java
+  <%@ page language="java" contentType="text/html; charset=UTF-8"
+           pageEncoding="UTF-8"%>
+  <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
+  <%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
+  <!DOCTYPE html>
+  <html lang="zxx">
+
+  <head>
+      <meta charset="UTF-8">
+      <meta name="description" content="Sona Template">
+      <meta name="keywords" content="Sona, unica, creative, html">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta http-equiv="X-UA-Compatible" content="ie=edge">
+
+      <!--css-->
+      <c:import url="../temp/style.jsp"></c:import>
+      <!--css-->
+  </head>
+
+  <body>
+
+  <!-- Header Section Begin -->
+  <c:import url="../temp/header.jsp"></c:import>
+  <!-- Header End -->
+
+  <!-- Contact Section Begin -->
+  <section class="contact-section spad">
+      <div class="container">
+          <div class="row">
+              <div class="col-lg-4">
+                  <div class="contact-text">
+                      <h2>MyPage</h2>
+                      <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut
+                          labore et dolore magna aliqua.</p>
+
+                      <table>
+                          <tbody>
+                          <tr>
+                              <td class="c-o">name:</td>
+                              <td><sec:authentication property="principal.name" /></td>
+                          </tr>
+                          <tr>
+                              <td class="c-o">id:</td>
+                              <td><sec:authentication property="principal.id"/></td>
+                          </tr>
+                          <tr>
+                              <td class="c-o">Phone:</td>
+                              <td><sec:authentication property="principal.phoneNumber" /></td>
+                          </tr>
+                          <tr>
+                              <td class="c-o">Email:</td>
+                              <td><sec:authentication property="principal.email" /></td>
+                          </tr>
+                          </tbody>
+                      </table>
+                  </div>
+              </div>
+              <div class="col-lg-7 offset-lg-1">
+                  <form action="#" class="contact-form">
+                      <div class="row">
+                          <div class="col-lg-6">
+                              <input type="text" placeholder="Your Name">
+                          </div>
+                          <div class="col-lg-6">
+                              <input type="text" placeholder="Your Email">
+                          </div>
+                          <div class="col-lg-12">
+                              <textarea placeholder="Your Message"></textarea>
+                              <button type="submit">Submit Now</button>
+                          </div>
+                      </div>
+                  </form>
+              </div>
+          </div>
+
+          <div id="map" style="width:500px;height:400px;"></div>
+
+  <%--        <div class="map">--%>
+  <%--            <iframe--%>
+  <%--                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3022.0606825994123!2d-72.8735845851828!3d40.760690042573295!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x89e85b24c9274c91%3A0xf310d41b791bcb71!2sWilliam%20Floyd%20Pkwy%2C%20Mastic%20Beach%2C%20NY%2C%20USA!5e0!3m2!1sen!2sbd!4v1578582744646!5m2!1sen!2sbd"--%>
+  <%--                    height="470" style="border:0;" allowfullscreen=""></iframe>--%>
+  <%--        </div>--%>
+      </div>
+  </section>
+
+  <!-- Contact Section End -->
+
+  <div class="custom-section">
+      <div class="custom-section-content">
+          <!-- 새로운 <div> 태그를 추가하고 패딩과 배경색을 적용합니다 -->
+          <div class="custom-padding" style="background-color: white; padding: 50px;">
+              <!-- 여기에 내용을 추가하거나 원하는 디자인을 구성할 수 있습니다 -->
+          </div>
+      </div>
+  </div>
+  <!-- Hero Section End -->
+
+  <!-- Footer Section Begin -->
+  <c:import url="../temp/footer.jsp"></c:import>
+  <!-- Footer Section End -->
+
+  <!-- Search model Begin -->
+  <div class="search-model">
+      <div class="h-100 d-flex align-items-center justify-content-center">
+          <div class="search-close-switch"><i class="icon_close"></i></div>
+          <form class="search-model-form">
+              <input type="text" id="search-input" placeholder="Search here.....">
+          </form>
+      </div>
+  </div>
+  <!-- Search model end -->
+  <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=41d534ae5dc3fb8670ff2f84bd5cf770"></script>
+  <script>
+      const container = document.getElementById('map'); //지도를 담을 영역의 DOM 레퍼런스
+      let options = { //지도를 생성할 때 필요한 기본 옵션
+          center: new kakao.maps.LatLng(33.450701, 126.570667), //지도의 중심좌표.
+          level: 3 //지도의 레벨(확대, 축소 정도)
+      };
+      let map = new kakao.maps.Map(container, options); //지도 생성 및 객체 리턴
+
+  </script>
+  <!-- Js Plugins -->
+  <c:import url="../temp/js.jsp"></c:import>
+  </body>
+
+  </html>
+  ```
+
+# 9. Remember-Me
+
+```jsx
+- **다음 접속시 로그인 없이 바로 인증**
+
+1. JSP에 checkbox 추가
+<input type="checkbox" name="rememberMe" class="form-check-input" id="exampleCheck2">
+
+2. Security Config
+.rememberMe()  //RememberMe 설정
+	.rememberMeParameter("rememberMe") //파라미터명
+	.tokenValiditySeconds(300)         //로그인유지 유지시간, 초단위
+	.key("rememberMe")  // 인증받은 사용자의 정보로 Token 생성시 필요, 필수값
+	.userDetailsService(memberSecurityService) //인증 절차를 실행할 UserDetailService, 필수
+	.authenticationSuccessHandler(loginSuccess) //Login 성공 Handler
+
+3. 확인
+	a. login 시 RememberMe 체크
+	b. WebBrowser의 개발자모드 -> applocation -> Cookies -> RememberMe 확인
+	c. JSSESSIONID 삭제
+	d. 새로고침 후 로그인 유지 되는지 확인
+
+4. RememberMe 해제
+	a. 지정한 Tocken 만료 되었을 때
+	b. 사용자가 Logout시
+
+```
+
+# 10. CORS
+
+## 1. Security CORS 사용 (사용자의 데이터를 보호하고 악의적인 공격을 방지하는 데 도움이 되는 보안 기능)
+
+```jsx
+//@Bean
+	CorsConfigurationSource corsConfigurationSource() {
+		CorsConfiguration configuration = new CorsConfiguration();
+		configuration.setAllowedOrigins(Arrays.asList("http://127.0.0.1:5500", "http://192.168.1.20:5500", "http://192.168.1.2:5500", "*"));//List<Integer>
+		configuration.setAllowedMethods(Arrays.asList("GET", "POST"));
+
+		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+		source.registerCorsConfiguration("/**", configuration);
+
+
+		return source;
+	}
+
+.cors()
+	.configurationSource(this.corsConfigurationSource())
+	//허용
+```
+
+# 2. Security 사용하지 않고 허용
+
+### 1. Controller에서 전역 설정
+
+```jsx
+@CrossOrigin(origins="허용 할 상대방의 IP or http://example.com")
+@Controller
+public class CosController {
+
+}
+```
+
+### 2. Controller의 메서드 별로 설정
+
+```jsx
+@Controller
+public class CosController {
+
+	@CrossOrigin(origins="허용 할 상대방의 IP or http://example.com")
+	@GetMapping("URL")
+	public void test(){}
+
+}
+```
+
+### 3. Spring 전역 설정
+
+```jsx
+public class WebConfig implements WebMvcConfig{
+	@Override
+	public void addCorsMapping(CorsRegistry registry){
+			registry.addMapping("/**")
+						  .allowedOrigins("http://example.com")
+							.allowedMethods("*")
+							.allowCredentials(false)
+							.maxAge(3000);
+	}
+
+}
+```
+
+# 11. CSRF
+
+```jsx
+=> CSRF는 Cross-Site Request Forgery의 약자로, 한국어로는 사이트간 요청 위조라고 번역
+로그인한 사용자가 다른 계좌로 이체
+	/bank/transfer?account=받을계좌&amount=금액
+
+	1. 사용자가 은행에 로그인 됨
+	2. 해커가 사용자에게 이메일전송
+	3. <img src="/bank/transfer?account=해커의계좌&amount=1000만원">
+	4. 이미지를 클릭하거나 하는 순간 송금이 됨
+
+- 해결방안
+1. **GET 메서드는 제외하고  POST 요청**
+2. **서버에서 CSRF 토큰을 발행**하고 **사용자는 서버 요청시 CSRF 토큰을 같이 보냄**
+3. Tocken은 계속 바뀜
+4. 위 예제에서는 CSRF 토큰이 없기 때문에 Reject
+```
+
+```jsx
+1. **Security Config에서 CSRF 활성화**
+	 **.csrf().disable() 삭제**
+
+2. **CSRF Token 적용**
+	 1)
+		<form >
+			**<input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">**
+		</form>
+//서버에서 발행한 csrf 의 token
+	2) **sec**
+	<form>
+			**<sec:csrfInput/>**
+	</form>
+```
+
+## 실습예제
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%2044.png>)
+
+```java
+html로 notice에 insert 하는 href 적으면 페이지가 로그인 되어있다면 직원등록 클릭시 notice 테이블에 add되버린다.
+```
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%2045.png>)
+
+= > 해결방법 < =
+
+![<SecurityConfig.java>](<2023-04-27,28(Spring%20Security)/Untitled%2046.png>)
+
+<SecurityConfig.java>
+
+![<login.jsp>](<2023-04-27,28(Spring%20Security)/Untitled%2047.png>)
+
+<login.jsp>
+
+```java
+1. **Security Config에서 CSRF 활성화**
+2. **CSRF Token 적용**
+=> 로그인한 사용자가 href 눌러도 insert되지 않는다
+```
+
+### Logout 시 문제 발생
+
+```jsx
+Logout 경로를 Get으로 보냈지만 내부적으로 POST로 처리 함
+CSRF 기능을 사용하면 Logout도 Token을 보내야 하기 때문에 Post 형식 으로 처리
+```
+
+# 12. 동시접속
+
+```java
+하나의 계정으로 여러곳에서 접속할 경우 동시세션
+
+1. 이전 사용자 세션 만료
+
+2. 현재 접속하려는 사용자 인증 실패
+
+Security Config
+```
+
+# 13. Social Login
+
+## 1. API 추가
+
+```jsx
+<!-- Social Login -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-oauth2-client</artifactId>
+		</dependency>
+```
+
+## 2. Security Config 추가
+
+```jsx
+.oauth2Login() //Social Login 설정
+					.userInfoEndpoint()
+					.userService(memberSocialService)
+```
+
+## 3. properties 내용 추가
+
+```jsx
+# Rest Api key
+spring.security.oauth2.client.registration.kakao.client-id=RestAPI key
+
+# Secret Key
+spring.security.oauth2.client.registration.kakao.client-secret=Secret Key(Admin key)
+//admin 키는 노출되면 X
+
+# Redirect URL
+spring.security.oauth2.client.registration.kakao.redirect-uri={baseUrl}/{action}/oauth2/code/{registrationId}
+//redirect는 Controller에서 하는게 아니라 properties에서 작성함
+  또는
+spring.security.oauth2.client.registration.kakao.redirect-uri = http://localhost/login/oauth2/code/kakao
+
+# 고정값
+spring.security.oauth2.client.registration.kakao.authorization-grant-type=authorization_code
+
+# 회원가입시 추가로 가져 오는 유저 정보 항목
+spring.security.oauth2.client.registration.kakao.scope=profile,account_email
+
+# Social Login 업체 명
+spring.security.oauth2.client.registration.kakao.client-name=Kakao
+
+# 인증 요청시 메서드 형식
+spring.security.oauth2.client.registration.kakao.client-authentication-method=POST
+
+## Provider (제공자) => 카카오개발자 센터에서 주소 가져옴
+spring.security.oauth2.client.provider.kakao.authorization-uri=https://kauth.kakao.com/oauth/authorize
+spring.security.oauth2.client.provider.kakao.token-uri= https://kauth.kakao.com/oauth/token
+spring.security.oauth2.client.provider.kakao.user-info-uri=https://kapi.kakao.com/v2/user/me
+spring.security.oauth2.client.provider.kakao.user-name-attribute=id
+```
+
+## Kakao 설정
+
+```jsx
+1. Kakao 개발자 센터 로그인
+2. 내어플리케이션 -> 어플리케이션 추가하기 -> 정보 입력
+3. 카카오 로그인 항목 클릭
+4. 활성화 설정 에서 상태를 ON으로 변경
+5. Redirect URI 설정(입력)  : properties의 redirect-uri와 동일한 경로
+6. 동의 항목 설정
+```
+
+## SocialService
+
+```jsx
+DefaultOAuth2UserService를 상속받고 loadUser 메서드를 오버라이딩
+
+@Override
+	public OAuth2User loadUser(OAuth2UserRequest userRequest)...
+
+userRequest.getClientRegistration()
+ClientRegistration
+	{
+		registrationId='kakao',
+		clientId='properties의 Client ID',
+		clientSecret='properteies의 Secret Key',
+			clientAuthenticationMethod=org.springframework.security.oauth2.core.ClientAuthenticationMethod@2590a0,
+		authorizationGrantType=org.springframework.security.oauth2.core.AuthorizationGrantType@5da5e9f3,
+		redirectUri='{baseUrl}/{action}/oauth2/code/{registrationId}',
+		scopes=[profile_nickname, profile_image, account_email, birthday],
+		providerDetails=org.springframework.security.oauth2.client.registration.ClientRegistration$ProviderDetails@99d5462,
+		clientName='Kakao'
+}
+
+OAuth2User auth2User= super.loadUser(userRequest);
+{
+	id=2515410804,  //사용자의 ID값(중복 X)
+	connected_at=2022-11-07T08:07:04Z,
+	properties=
+		{
+			nickname=김대기,
+			profile_image=http://k.kakaocdn.net/dn/ll0N9/btrNqbmDgRl/ENeC2eOSqh3KOGWbmfXu1K/img_640x640.jpg,
+				thumbnail_image=http://k.kakaocdn.net/dn/ll0N9/btrNqbmDgRl/ENeC2eOSqh3KOGWbmfXu1K/img_110x110.jpg
+//	**=> properties**
+	},
+	kakao_account=
+	{
+		profile_nickname_needs_agreement=false,
+		profile_image_needs_agreement=false,
+		profile=
+			{
+				nickname=김대기,
+				thumbnail_image_url=http://k.kakaocdn.net/dn/ll0N9/btrNqbmDgRl/ENeC2eOSqh3KOGWbmfXu1K/img_110x110.jpg,
+				profile_image_url=http://k.kakaocdn.net/dn/ll0N9/btrNqbmDgRl/ENeC2eOSqh3KOGWbmfXu1K/img_640x640.jpg,
+				is_default_image=false
+			},
+		has_email=true,
+		email_needs_agreement=false,
+		is_email_valid=true,
+		is_email_verified=true,
+		email=kimdaeki@gmail.com,
+		has_birthday=true,
+		birthday_needs_agreement=false,
+		birthday=0109,
+		birthday_type=SOLAR
+	}
+}
+
+```
+
+### UserVO
+
+```jsx
+SecurityContext의 Authentication내에 저장 할 수 있는 객체 타입은
+UserDetails타입과 OAuth2User 타입으로 정해져 있음
+
+**일반 로그인**의 경우 **UserDetails 타입** 사용
+**Social 로그인**의 경우 **OAuth2User 타입** 사용
+
+JSP에서 두개의 타입을 판별 하는 번거로움을 방지 하기 위해
+
+하나의 VO에 UserDetails, OAuth2User 둘다 구현.
+
+@Data
+public class MemberVO implements UserDetails, **OAuth2User**{
+
+	@NotBlank(message = "ID는 꼭 필요해!!!")
+	private String id;
+	@NotBlank
+	private String pw;
+	private String pwCheck;
+	@NotBlank
+	private String name;
+	@Email
+	@NotBlank
+	private String email;
+
+	@Range(max = 150, min = 0)
+	private int age;
+
+	@Past
+	private Date birth;
+	private boolean enabled;
+
+	private List<RoleVO> roleVOs;
+
+	**//OAuth2User, Token등 정보 저장
+	private Map<String, Object> attributes;**
+
+
+
+
+	@Override
+	public Collection<? extends GrantedAuthority> getAuthorities() {
+
+		List<GrantedAuthority> authorities = new ArrayList<>();
+		for(RoleVO roleVO : roleVOs) {
+			authorities.add(new SimpleGrantedAuthority(roleVO.getRoleName()));
+
+		}
+
+		return authorities;
+	}
+
+	@Override
+	public String getPassword() {
+		// PW 반환
+		return this.getPw();
+	}
+
+	@Override
+	public String getUsername() {
+		// ID 반환
+		return this.id;
+	}
+
+	@Override
+	public boolean isAccountNonExpired() {
+		// TODO Auto-generated method stub
+		//계정의 만료 여부
+		//true : 만료 안됨
+		//false: 만료 됨, 로그인 불가
+		return true;
+	}
+
+	@Override
+	public boolean isAccountNonLocked() {
+		// 계정 잠김 여부
+		// true : 계정이 잠기지 않음
+		// false : 계점이 잠김, 로그인 불가
+		return true;
+	}
+
+	@Override
+	public boolean isCredentialsNonExpired() {
+		// 비밀번호 만료 여부
+		// true : 만료 안됨
+		// false : 만료 됨, 로그인 안됨
+		return true;
+	}
+
+	//isEnabled
+	// 계정 사용 여부
+	// true : 계정 활성화(계정 사용 가능)
+	// false : 계정 비활성화(계정 사용 불가, 로그인 불가)
+	public boolean isEnabled() {
+		return true;
+	}
+
+	@Override
+	public Map<String, Object> getAttributes() {
+		// TODO Auto-generated method stub
+		**return this.attributes;**
+	}
+}
+
+```
+
+## 4. Logout
+
+```java
+로그아웃은 크게 2가지 종류
+1) 단순 로그아웃 (다시 로그인하면 남아있어 자동 로그인 됨)
+2) 카카오계정과 함께 로그아웃
+
+단순 로그아웃은 토큰을 만료 시키지만, 사용자 정보가 웹브라우저에 남아 있어서
+다시 로그인 할 때 ID, PW를 입력 없이 바로 로그인 됨
+
+로그아웃시, 카카오계정과 함계 로그아웃해야 함
+```
+
+```java
+security는 sercurityContext를 추가하는 형태였다
+=> 근데 sociallogin이 늘어났다
+- 실제로 로그인서비스를 요청하는 건 카카오
+- 쿠키를 발급하더라도 서버에 저장하지 못함
+- 세션에다가 저장하지 못한다
+-> 그렇다면 로그인 정보는 어디에 저장하냐? => (2)"TOCKEN" => 해싱된 문자 => 암호를 푸는 디코딩 과정 => 세션이 필요X => 서버에서는 토큰 생성
+(1)기존 세션을 생성하는데 문제점 => 로드 밸런싱
+
+* 해결방법
+(1) 세션 ID를 저장하는 서버를 따로 생성 (EX) 서버:레디스(Redis))
+(2) 토큰을 이용하는 방식 (세션 사용X) (EX) JWT)
+- 암호화 해서 보냄
+
+최종적으로 우린 카카오 로그인 시 토큰방법 이용 (과정 그림으로 표현된 거 캡처할꺼면 9시 30분 영상 다시보기(05/02))
+```
+
+## 카카오 디벨로퍼-Kakao 설정-STS
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%2048.png>)
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%2049.png>)
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%2050.png>)
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%2051.png>)
+
+![<http://localhost>](<2023-04-27,28(Spring%20Security)/Untitled%2052.png>)
+
+<http://localhost>
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%2053.png>)
+
+![<application.properties>](<2023-04-27,28(Spring%20Security)/Untitled%2054.png>)
+
+<application.properties>
+
+![<application.properties>](<2023-04-27,28(Spring%20Security)/Untitled%2055.png>)
+
+<application.properties>
+
+![<login.jsp>](<2023-04-27,28(Spring%20Security)/Untitled%2056.png>)
+
+<login.jsp>
+
+![<MemberSocialService.java>](<2023-04-27,28(Spring%20Security)/Untitled%2057.png>)
+
+<MemberSocialService.java>
+
+![Untitled](<2023-04-27,28(Spring%20Security)/Untitled%2058.png>)
+
+![<SecurityConfig.java>](<2023-04-27,28(Spring%20Security)/Untitled%2059.png>)
+
+<SecurityConfig.java>
+
+![<MemberVO.java>](<2023-04-27,28(Spring%20Security)/Untitled%2060.png>)
+
+<MemberVO.java>
+
+![<MemberSocialService>](<2023-04-27,28(Spring%20Security)/Untitled%2061.png>)
+
+<MemberSocialService>

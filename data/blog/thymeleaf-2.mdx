@@ -1,0 +1,1022 @@
+---
+title: 'Thymeleaf 실무 가이드'
+date: '2026-09-02'
+category: '프론트/Old'
+tags: ['프론트', 'Old']
+draft: false
+summary: ''
+---
+
+# Thymeleaf 실무 가이드
+
+> Spring Boot 환경에서 바로 적용 가능한 Thymeleaf 핵심 레퍼런스
+
+---
+
+## 목차
+
+1. [Thymeleaf란?](https://claude.ai/chat/5cb3db47-9d44-4b0a-92c8-17850cf63ac5#1-thymeleaf%EB%9E%80)
+2. [Spring Boot 세팅](https://claude.ai/chat/5cb3db47-9d44-4b0a-92c8-17850cf63ac5#2-spring-boot-%EC%84%B8%ED%8C%85)
+3. [기본 문법 구조](https://claude.ai/chat/5cb3db47-9d44-4b0a-92c8-17850cf63ac5#3-%EA%B8%B0%EB%B3%B8-%EB%AC%B8%EB%B2%95-%EA%B5%AC%EC%A1%B0)
+4. [변수 출력 (th:text / th:utext)](https://claude.ai/chat/5cb3db47-9d44-4b0a-92c8-17850cf63ac5#4-%EB%B3%80%EC%88%98-%EC%B6%9C%EB%A0%A5-thtext--thutext)
+5. [URL 처리 (th:href / th:src / th:action)](https://claude.ai/chat/5cb3db47-9d44-4b0a-92c8-17850cf63ac5#5-url-%EC%B2%98%EB%A6%AC-thhref--thsrc--thaction)
+6. [조건문 (th:if / th:unless / th:switch)](https://claude.ai/chat/5cb3db47-9d44-4b0a-92c8-17850cf63ac5#6-%EC%A1%B0%EA%B1%B4%EB%AC%B8-thif--thunless--thswitch)
+7. [반복문 (th:each)](https://claude.ai/chat/5cb3db47-9d44-4b0a-92c8-17850cf63ac5#7-%EB%B0%98%EB%B3%B5%EB%AC%B8-theach)
+8. [폼 처리 (th:object / th:field)](https://claude.ai/chat/5cb3db47-9d44-4b0a-92c8-17850cf63ac5#8-%ED%8F%BC-%EC%B2%98%EB%A6%AC-thobject--thfield)
+9. [속성 조작](https://claude.ai/chat/5cb3db47-9d44-4b0a-92c8-17850cf63ac5#9-%EC%86%8D%EC%84%B1-%EC%A1%B0%EC%9E%91)
+10. [레이아웃 & 조각 (th:fragment / th:replace / th:insert)](https://claude.ai/chat/5cb3db47-9d44-4b0a-92c8-17850cf63ac5#10-%EB%A0%88%EC%9D%B4%EC%95%84%EC%9B%83--%EC%A1%B0%EA%B0%81-thfragment--threplace--thinsert)
+11. [인라인 표현식](https://claude.ai/chat/5cb3db47-9d44-4b0a-92c8-17850cf63ac5#11-%EC%9D%B8%EB%9D%BC%EC%9D%B8-%ED%91%9C%ED%98%84%EC%8B%9D)
+12. [유틸리티 객체](https://claude.ai/chat/5cb3db47-9d44-4b0a-92c8-17850cf63ac5#12-%EC%9C%A0%ED%8B%B8%EB%A6%AC%ED%8B%B0-%EA%B0%9D%EC%B2%B4)
+13. [Spring Security 연동](https://claude.ai/chat/5cb3db47-9d44-4b0a-92c8-17850cf63ac5#13-spring-security-%EC%97%B0%EB%8F%99)
+14. [실무 예제 모음](https://claude.ai/chat/5cb3db47-9d44-4b0a-92c8-17850cf63ac5#14-%EC%8B%A4%EB%AC%B4-%EC%98%88%EC%A0%9C-%EB%AA%A8%EC%9D%8C)
+
+---
+
+## 1. Thymeleaf란?
+
+Thymeleaf는 Java/Spring 환경에서 사용하는 **서버사이드 템플릿 엔진**입니다.
+
+HTML 파일 안에 `th:` 속성을 추가하는 방식으로 동작하기 때문에, 브라우저에서 그냥 열어도 깨지지 않는 **Natural Template** 이 가장 큰 특징입니다.
+
+| JSP                                            | Thymeleaf                              |
+| ---------------------------------------------- | -------------------------------------- |
+| `<% ... %>` 태그 — 브라우저에서 직접 열기 불가 | `th:` 속성 — 일반 HTML로도 동작        |
+| WAS 없이 확인 불가                             | 디자이너가 브라우저에서 바로 확인 가능 |
+| Spring Boot 기본 지원 X                        | Spring Boot 공식 권장 템플릿           |
+
+---
+
+## 2. Spring Boot 세팅
+
+### build.gradle
+
+```groovy
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+}
+```
+
+### pom.xml
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-thymeleaf</artifactId>
+</dependency>
+```
+
+### application.properties
+
+```
+# 기본값이라 없어도 되지만, 개발 중에는 캐시 끄기 필수
+spring.thymeleaf.cache=false
+spring.thymeleaf.prefix=classpath:/templates/
+spring.thymeleaf.suffix=.html
+spring.thymeleaf.encoding=UTF-8
+```
+
+### 파일 위치
+
+```
+src/
+└── main/
+    ├── java/
+    └── resources/
+        ├── templates/        ← Thymeleaf HTML 파일
+        │   ├── index.html
+        │   └── user/
+        │       └── list.html
+        └── static/           ← CSS, JS, 이미지 (정적 파일)
+```
+
+### 컨트롤러 기본 패턴
+
+```java
+@Controller
+public class UserController {
+
+    @GetMapping("/users")
+    public String list(Model model) {
+        List<User> users = userService.findAll();
+        model.addAttribute("users", users);       // 모델에 데이터 넣기
+        model.addAttribute("title", "회원 목록");
+        return "user/list";   // templates/user/list.html 렌더링
+    }
+}
+```
+
+---
+
+## 3. 기본 문법 구조
+
+### HTML 네임스페이스 선언 (필수)
+
+```html
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <title th:text="${title}">기본 제목</title>
+  </head>
+  <body>
+    <p th:text="${message}">기본 메시지</p>
+  </body>
+</html>
+```
+
+### 표현식 종류 요약
+
+| 표현식      | 형태     | 설명                           |
+| ----------- | -------- | ------------------------------ | --- | ------------------ |
+| 변수        | `${...}` | Model에 담긴 값                |
+| 선택 변수   | `*{...}` | th:object로 선택된 객체의 필드 |
+| 메시지      | `#{...}` | messages.properties 다국어     |
+| URL         | `@{...}` | URL 링크 생성                  |
+| 조각        | `~{...}` | fragment 참조                  |
+| 리터럴 치환 | `        | ...                            | `   | 문자열 + 변수 혼합 |
+
+---
+
+## 4. 변수 출력 (th:text / th:utext)
+
+### 기본 출력
+
+```html
+<!-- 컨트롤러: model.addAttribute("name", "홍길동"); -->
+
+<p th:text="${name}">기본값</p>
+<!-- 결과: <p>홍길동</p> -->
+
+<p th:text="'안녕하세요, ' + ${name} + '님'">안녕하세요</p>
+<!-- 결과: <p>안녕하세요, 홍길동님</p> -->
+
+<!-- 리터럴 치환 방식 (더 깔끔) -->
+<p th:text="|안녕하세요, ${name}님|">안녕하세요</p>
+```
+
+### HTML 태그 포함 출력
+
+```html
+<!-- model.addAttribute("content", "<b>굵은 글씨</b>"); -->
+
+<p th:text="${content}">내용</p>
+<!-- 결과: &lt;b&gt;굵은 글씨&lt;/b&gt; (태그 이스케이프됨) -->
+
+<p th:utext="${content}">내용</p>
+<!-- 결과: <b>굵은 글씨</b> (HTML 그대로 렌더링) -->
+```
+
+### 객체 필드 접근
+
+```java
+// User.java
+public class User {
+    private String name;
+    private int age;
+    private Address address; // address.city
+}
+```
+
+```html
+<!-- model.addAttribute("user", user); -->
+
+<p th:text="${user.name}">이름</p>
+<p th:text="${user.age}">나이</p>
+<p th:text="${user.address.city}">도시</p>
+
+<!-- Map 접근 -->
+<!-- model.addAttribute("map", Map.of("key", "value")); -->
+<p th:text="${map['key']}">값</p>
+<p th:text="${map.key}">값</p>
+```
+
+### Elvis 연산자 (null 처리)
+
+```html
+<!-- null이면 '이름 없음' 출력 -->
+<p th:text="${user.name} ?: '이름 없음'">이름</p>
+
+<!-- No-Operation (_): null이면 th: 속성 무시 (기본 HTML 유지) -->
+<p th:text="${user.name} ?: _">기본 텍스트</p>
+```
+
+---
+
+## 5. URL 처리 (th:href / th:src / th:action)
+
+### 기본 링크
+
+```html
+<!-- 정적 URL -->
+<a th:href="@{/users}">회원 목록</a>
+<!-- 결과: <a href="/users">회원 목록</a> -->
+
+<!-- 컨텍스트 경로 자동 포함 -->
+<a th:href="@{/css/style.css}">스타일</a>
+```
+
+### 경로 변수 (Path Variable)
+
+```html
+<!-- /users/1, /users/2 ... -->
+<a th:href="@{/users/{id}(id=${user.id})}">상세보기</a>
+
+<!-- 여러 경로 변수 -->
+<a
+  th:href="@{/boards/{boardId}/comments/{commentId}(boardId=${board.id}, commentId=${comment.id})}"
+>
+  댓글 보기
+</a>
+```
+
+### 쿼리 파라미터
+
+```html
+<!-- /users?page=1&size=10 -->
+<a th:href="@{/users(page=1, size=10)}">1페이지</a>
+
+<!-- 변수 사용 -->
+<a th:href="@{/users(page=${currentPage + 1})}">다음 페이지</a>
+
+<!-- 경로변수 + 쿼리파라미터 혼합 -->
+<a th:href="@{/users/{id}/posts(id=${user.id}, page=1)}">게시물</a>
+```
+
+### 이미지 / 스크립트
+
+```html
+<img th:src="@{/images/logo.png}" alt="로고" />
+<script th:src="@{/js/app.js}"></script>
+<link th:href="@{/css/main.css}" rel="stylesheet" />
+
+<!-- 동적 이미지 경로 -->
+<img th:src="${user.profileImage}" alt="프로필" />
+```
+
+---
+
+## 6. 조건문 (th:if / th:unless / th:switch)
+
+### th:if / th:unless
+
+```html
+<!-- true일 때 보이기 -->
+<p th:if="${user.admin}">관리자입니다.</p>
+
+<!-- false일 때 보이기 (unless = if not) -->
+<p th:unless="${user.admin}">일반 회원입니다.</p>
+
+<!-- null 체크 -->
+<div th:if="${user != null}">
+  <p th:text="${user.name}">이름</p>
+</div>
+
+<!-- 문자열 비교 -->
+<p th:if="${user.status == 'ACTIVE'}">활성 회원</p>
+
+<!-- 컬렉션이 비어있는지 -->
+<p th:if="${#lists.isEmpty(users)}">데이터가 없습니다.</p>
+<div th:if="${not #lists.isEmpty(users)}">
+  <!-- 목록 표시 -->
+</div>
+```
+
+> ⚠️ `th:if`가 false이면 해당 태그 자체가 HTML에서 **제거**됩니다.
+
+### th:switch / th:case
+
+```html
+<div th:switch="${user.role}">
+  <p th:case="'ADMIN'">관리자</p>
+  <p th:case="'MANAGER'">매니저</p>
+  <p th:case="'USER'">일반 사용자</p>
+  <p th:case="*">알 수 없음</p>
+  <!-- default -->
+</div>
+```
+
+---
+
+## 7. 반복문 (th:each)
+
+### 기본 반복
+
+```html
+<!-- List<String> items -->
+<ul>
+  <li th:each="item : ${items}" th:text="${item}">항목</li>
+</ul>
+```
+
+### 상태 변수 (iterStat)
+
+```html
+<tr th:each="user, stat : ${users}">
+  <td th:text="${stat.index}">0</td>
+  <!-- 0부터 인덱스 -->
+  <td th:text="${stat.count}">1</td>
+  <!-- 1부터 카운트 -->
+  <td th:text="${stat.size}">전체수</td>
+  <td th:text="${user.name}">이름</td>
+  <td th:text="${user.email}">이메일</td>
+</tr>
+```
+
+| 상태 변수    | 설명                   |
+| ------------ | ---------------------- |
+| `stat.index` | 0부터 시작하는 인덱스  |
+| `stat.count` | 1부터 시작하는 순번    |
+| `stat.size`  | 전체 개수              |
+| `stat.first` | 첫 번째 여부 (boolean) |
+| `stat.last`  | 마지막 여부 (boolean)  |
+| `stat.even`  | 짝수 번째 여부         |
+| `stat.odd`   | 홀수 번째 여부         |
+
+### 실전 예제: 테이블 출력
+
+```html
+<table>
+  <thead>
+    <tr>
+      <th>번호</th>
+      <th>이름</th>
+      <th>이메일</th>
+      <th>관리</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr th:if="${#lists.isEmpty(users)}">
+      <td colspan="4">데이터가 없습니다.</td>
+    </tr>
+    <tr th:each="user, stat : ${users}" th:classappend="${stat.odd} ? 'odd-row'">
+      <td th:text="${stat.count}">1</td>
+      <td th:text="${user.name}">홍길동</td>
+      <td th:text="${user.email}">test@test.com</td>
+      <td>
+        <a th:href="@{/users/{id}(id=${user.id})}">상세</a>
+        <a th:href="@{/users/{id}/edit(id=${user.id})}">수정</a>
+      </td>
+    </tr>
+  </tbody>
+</table>
+```
+
+### Map 반복
+
+```html
+<!-- Map<String, String> -->
+<ul>
+  <li th:each="entry : ${map}">
+    <span th:text="${entry.key}">키</span> :
+    <span th:text="${entry.value}">값</span>
+  </li>
+</ul>
+```
+
+---
+
+## 8. 폼 처리 (th:object / th:field)
+
+### 컨트롤러
+
+```java
+// GET — 폼 표시
+@GetMapping("/users/new")
+public String newForm(Model model) {
+    model.addAttribute("userForm", new UserForm()); // 빈 객체 전달
+    return "user/form";
+}
+
+// POST — 폼 제출
+@PostMapping("/users")
+public String create(@ModelAttribute UserForm form, BindingResult result) {
+    if (result.hasErrors()) {
+        return "user/form"; // 에러 시 폼으로 돌아가기
+    }
+    userService.save(form);
+    return "redirect:/users";
+}
+```
+
+### 폼 HTML
+
+```html
+<form th:action="@{/users}" th:object="${userForm}" method="post">
+  <div>
+    <label>이름</label>
+    <!-- *{name} = ${userForm.name} 과 동일 -->
+    <input type="text" th:field="*{name}" placeholder="이름 입력" />
+    <!-- th:field는 id, name, value 속성을 자동 생성 -->
+    <!-- <input type="text" id="name" name="name" value=""> -->
+
+    <!-- 유효성 에러 표시 -->
+    <span th:if="${#fields.hasErrors('name')}" th:errors="*{name}" class="error">이름 오류</span>
+  </div>
+
+  <div>
+    <label>이메일</label>
+    <input type="email" th:field="*{email}" />
+    <span th:if="${#fields.hasErrors('email')}" th:errors="*{email}" class="error"></span>
+  </div>
+
+  <div>
+    <label>나이</label>
+    <input type="number" th:field="*{age}" />
+  </div>
+
+  <button type="submit">저장</button>
+</form>
+```
+
+### select / checkbox / radio
+
+```html
+<!-- Select -->
+<select th:field="*{region}">
+  <option value="">선택하세요</option>
+  <option th:each="r : ${regions}" th:value="${r.code}" th:text="${r.name}">지역</option>
+</select>
+
+<!-- Checkbox (단일) -->
+<input type="checkbox" th:field="*{agree}" />
+
+<!-- Checkbox (다중) -->
+<div th:each="hobby : ${allHobbies}">
+  <input type="checkbox" th:field="*{hobbies}" th:value="${hobby}" />
+  <label th:text="${hobby}">취미</label>
+</div>
+
+<!-- Radio -->
+<div th:each="gender : ${genders}">
+  <input type="radio" th:field="*{gender}" th:value="${gender.code}" />
+  <label th:text="${gender.label}">성별</label>
+</div>
+```
+
+---
+
+## 9. 속성 조작
+
+### th:attr — 속성 직접 지정
+
+```html
+<input th:attr="placeholder=${placeholder}, maxlength=${maxLen}" />
+```
+
+### 개별 속성 설정 (더 권장)
+
+```html
+<input th:placeholder="${placeholder}" th:value="${user.name}" th:disabled="${user.inactive}" />
+
+<a th:href="@{/users}" th:title="${linkTitle}">목록</a>
+<img th:src="${imgUrl}" th:alt="${imgAlt}" />
+```
+
+### 클래스 동적 처리
+
+```html
+<!-- th:class: 전체 교체 -->
+<div th:class="${isActive} ? 'box active' : 'box'">내용</div>
+
+<!-- th:classappend: 기존 클래스에 추가 -->
+<div class="box" th:classappend="${isActive} ? 'active'">내용</div>
+
+<!-- 여러 조건 클래스 -->
+<li
+  class="item"
+  th:classappend="${item.selected} ? 'selected'"
+  th:classappend="${item.disabled} ? 'disabled'"
+>
+  항목
+</li>
+```
+
+### th:style
+
+```html
+<div th:style="|color: ${textColor}; font-size: ${fontSize}px|">텍스트</div>
+```
+
+### th:id / th:name
+
+```html
+<input th:id="|input-${user.id}|" th:name="|field_${user.id}|" />
+```
+
+---
+
+## 10. 레이아웃 & 조각 (th:fragment / th:replace / th:insert)
+
+공통 헤더, 푸터, 사이드바를 별도 파일로 관리할 때 사용합니다.
+
+### 조각 파일 정의: fragments/layout.html
+
+```html
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+  <body>
+    <!-- 헤더 조각 -->
+    <header th:fragment="header">
+      <nav>
+        <a th:href="@{/}">홈</a>
+        <a th:href="@{/users}">회원</a>
+        <a th:href="@{/boards}">게시판</a>
+      </nav>
+    </header>
+
+    <!-- 푸터 조각 -->
+    <footer th:fragment="footer">
+      <p>© 2025 My Company. All rights reserved.</p>
+    </footer>
+
+    <!-- 파라미터를 받는 조각 -->
+    <div th:fragment="alert(type, message)">
+      <div th:class="|alert alert-${type}|" th:text="${message}">알림 메시지</div>
+    </div>
+  </body>
+</html>
+```
+
+### 조각 사용하기
+
+```html
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <title>페이지 제목</title>
+  </head>
+  <body>
+    <!-- th:replace: 태그 자체를 조각으로 교체 (권장) -->
+    <div th:replace="~{fragments/layout :: header}"></div>
+
+    <!-- th:insert: 태그 안에 조각을 삽입 -->
+    <div th:insert="~{fragments/layout :: footer}"></div>
+
+    <!-- 파라미터 전달 -->
+    <div th:replace="~{fragments/layout :: alert('success', '저장되었습니다.')}"></div>
+
+    <main>
+      <h1>페이지 내용</h1>
+    </main>
+  </body>
+</html>
+```
+
+### 레이아웃 템플릿 패턴 (Thymeleaf Layout Dialect)
+
+### build.gradle
+
+```groovy
+implementation 'nz.net.ultraq.thymeleaf:thymeleaf-layout-dialect'
+```
+
+### templates/layouts/default.html
+
+```html
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+  <head>
+    <meta charset="UTF-8" />
+    <title layout:title-pattern="$CONTENT_TITLE - My Site">My Site</title>
+    <link th:href="@{/css/main.css}" rel="stylesheet" />
+  </head>
+  <body>
+    <div th:replace="~{fragments/layout :: header}"></div>
+
+    <main layout:fragment="content">
+      <!-- 각 페이지 내용이 여기에 삽입됨 -->
+    </main>
+
+    <div th:replace="~{fragments/layout :: footer}"></div>
+    <script th:src="@{/js/app.js}"></script>
+  </body>
+</html>
+```
+
+### 개별 페이지 (layouts/default.html을 상속)
+
+```html
+<!DOCTYPE html>
+<html
+  xmlns:th="http://www.thymeleaf.org"
+  xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+  layout:decorate="~{layouts/default}"
+>
+  <head>
+    <title>회원 목록</title>
+  </head>
+  <body>
+    <main layout:fragment="content">
+      <h1>회원 목록</h1>
+      <table>
+        ...
+      </table>
+    </main>
+  </body>
+</html>
+```
+
+---
+
+## 11. 인라인 표현식
+
+JavaScript나 텍스트 안에서 Thymeleaf 표현식을 사용할 때 씁니다.
+
+### th:inline="javascript"
+
+```html
+<script th:inline="javascript">
+  // [[...]] 로 서버 데이터를 JS 변수에 주입
+  var userId = [[${user.id}]];
+  var userName = [[${user.name}]];
+  var userList = [[${users}]];  // List → JS 배열로 자동 변환
+
+  // 객체도 자동으로 JSON으로 변환됨
+  var userObj = [[${user}]];
+  console.log(userObj.name);
+
+  // 주석 방식 (브라우저에서 열 때도 유효한 JS 유지)
+  /*[[ ${contextPath} ]]*/;
+</script>
+```
+
+### th:inline="text" (텍스트 블록)
+
+```html
+<p th:inline="text">
+  안녕하세요, [[${user.name}]]님! 현재 [[${items.size()}]]개의 항목이 있습니다.
+</p>
+```
+
+---
+
+## 12. 유틸리티 객체
+
+`#` 으로 시작하는 내장 유틸리티 객체들입니다.
+
+### #strings — 문자열
+
+```html
+<p th:text="${#strings.toUpperCase(name)}">이름</p>
+<p th:text="${#strings.toLowerCase(name)}">이름</p>
+<p th:text="${#strings.trim(name)}">이름</p>
+<p th:text="${#strings.length(name)}">길이</p>
+<p th:if="${#strings.isEmpty(name)}">이름 없음</p>
+<p th:if="${#strings.contains(name, '홍')}">홍씨</p>
+<p th:text="${#strings.substring(name, 0, 2)}">앞 2글자</p>
+<p th:text="${#strings.replace(name, '홍', '김')}">치환</p>
+```
+
+### #numbers — 숫자
+
+```html
+<!-- 천 단위 콤마 -->
+<p th:text="${#numbers.formatInteger(price, 3, 'COMMA')}">1,000</p>
+
+<!-- 소수점 2자리 -->
+<p th:text="${#numbers.formatDecimal(rate, 1, 2)}">3.14</p>
+
+<!-- 통화 형식 -->
+<p th:text="${#numbers.formatCurrency(price)}">₩10,000</p>
+```
+
+### #dates — 날짜 (java.util.Date)
+
+```html
+<p th:text="${#dates.format(createDate, 'yyyy-MM-dd')}">날짜</p>
+<p th:text="${#dates.format(createDate, 'yyyy년 MM월 dd일')}">날짜</p>
+<p th:text="${#dates.year(createDate)}">연도</p>
+```
+
+### #temporals — 날짜 (Java 8 LocalDate/LocalDateTime)
+
+```html
+<p th:text="${#temporals.format(createDate, 'yyyy-MM-dd')}">날짜</p>
+<p th:text="${#temporals.format(createDateTime, 'yyyy-MM-dd HH:mm:ss')}">날짜시간</p>
+```
+
+### #lists — 컬렉션
+
+```html
+<p th:text="${#lists.size(items)}">개수</p>
+<p th:if="${#lists.isEmpty(items)}">비어있음</p>
+<p th:if="${#lists.contains(items, 'apple')}">사과 포함</p>
+```
+
+### #maps
+
+```html
+<p th:text="${#maps.size(myMap)}">맵 크기</p>
+<p th:if="${#maps.containsKey(myMap, 'name')}">name 키 있음</p>
+```
+
+### #request / #session (웹 컨텍스트)
+
+```html
+<!-- HttpServletRequest -->
+<p th:text="${#request.getParameter('page')}">페이지</p>
+<p th:text="${#request.contextPath}">컨텍스트 경로</p>
+
+<!-- HttpSession -->
+<p th:text="${#session.getAttribute('loginUser')}">로그인 사용자</p>
+
+<!-- 더 간단한 방법 -->
+<p th:text="${param.page}">파라미터</p>
+<p th:text="${session.loginUser}">세션값</p>
+```
+
+---
+
+## 13. Spring Security 연동
+
+### build.gradle
+
+```groovy
+implementation 'org.thymeleaf.extras:thymeleaf-extras-springsecurity6'
+```
+
+### HTML 네임스페이스 추가
+
+```html
+<html
+  xmlns:th="http://www.thymeleaf.org"
+  xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+></html>
+```
+
+### 인증 여부에 따른 분기
+
+```html
+<!-- 로그인한 사용자에게만 표시 -->
+<div sec:authorize="isAuthenticated()">
+  <p>환영합니다, <span sec:authentication="name">사용자</span>님!</p>
+  <a th:href="@{/logout}">로그아웃</a>
+</div>
+
+<!-- 비로그인 사용자에게만 표시 -->
+<div sec:authorize="isAnonymous()">
+  <a th:href="@{/login}">로그인</a>
+  <a th:href="@{/join}">회원가입</a>
+</div>
+
+<!-- 특정 권한 체크 -->
+<div sec:authorize="hasRole('ADMIN')">
+  <a th:href="@{/admin}">관리자 메뉴</a>
+</div>
+
+<div sec:authorize="hasAnyRole('ADMIN', 'MANAGER')">
+  <p>관리자 또는 매니저만 보임</p>
+</div>
+```
+
+### 현재 사용자 정보
+
+```html
+<!-- 사용자 이름 -->
+<span sec:authentication="name">이름</span>
+
+<!-- 사용자 권한 목록 -->
+<span sec:authentication="principal.authorities">권한</span>
+
+<!-- principal 객체의 필드 (UserDetails 구현체) -->
+<span sec:authentication="principal.email">이메일</span>
+```
+
+---
+
+## 14. 실무 예제 모음
+
+### 예제 1: 페이지네이션
+
+```java
+// 컨트롤러
+@GetMapping("/boards")
+public String list(@RequestParam(defaultValue = "1") int page, Model model) {
+    Page<Board> boardPage = boardService.findAll(PageRequest.of(page - 1, 10));
+    model.addAttribute("boards", boardPage.getContent());
+    model.addAttribute("currentPage", page);
+    model.addAttribute("totalPages", boardPage.getTotalPages());
+    return "board/list";
+}
+```
+
+```html
+<!-- 게시물 목록 -->
+<table>
+  <tr th:each="board : ${boards}">
+    <td th:text="${board.id}">1</td>
+    <td><a th:href="@{/boards/{id}(id=${board.id})}" th:text="${board.title}">제목</a></td>
+    <td th:text="${board.writer}">작성자</td>
+    <td th:text="${#temporals.format(board.createdAt, 'yyyy-MM-dd')}">날짜</td>
+  </tr>
+</table>
+
+<!-- 페이지네이션 -->
+<nav>
+  <a th:href="@{/boards(page=${currentPage - 1})}" th:if="${currentPage > 1}">이전</a>
+
+  <span th:each="i : ${#numbers.sequence(1, totalPages)}">
+    <a
+      th:href="@{/boards(page=${i})}"
+      th:text="${i}"
+      th:classappend="${i == currentPage} ? 'active'"
+      >1</a
+    >
+  </span>
+
+  <a th:href="@{/boards(page=${currentPage + 1})}" th:if="${currentPage < totalPages}">다음</a>
+</nav>
+```
+
+---
+
+### 예제 2: 검색 + 목록
+
+```java
+@GetMapping("/users")
+public String list(@RequestParam(required = false) String keyword,
+                   @RequestParam(defaultValue = "1") int page,
+                   Model model) {
+    model.addAttribute("users", userService.search(keyword, page));
+    model.addAttribute("keyword", keyword);
+    model.addAttribute("currentPage", page);
+    return "user/list";
+}
+```
+
+```html
+<!-- 검색 폼 — 검색어 유지 -->
+<form th:action="@{/users}" method="get">
+  <input type="text" name="keyword" th:value="${keyword}" placeholder="이름 또는 이메일 검색" />
+  <button type="submit">검색</button>
+  <a th:href="@{/users}" th:if="${keyword != null}">초기화</a>
+</form>
+
+<!-- 검색 결과 메시지 -->
+<p th:if="${keyword != null}" th:text="|'${keyword}' 검색 결과: ${users.size()}건|">검색 결과</p>
+
+<!-- 결과 없음 처리 -->
+<div th:if="${#lists.isEmpty(users)}">
+  <p>검색 결과가 없습니다.</p>
+</div>
+
+<table th:unless="${#lists.isEmpty(users)}">
+  <tr th:each="user : ${users}">
+    <td th:text="${user.name}">이름</td>
+    <td th:text="${user.email}">이메일</td>
+  </tr>
+</table>
+```
+
+---
+
+### 예제 3: 플래시 메시지 (리다이렉트 후 알림)
+
+```java
+// 컨트롤러
+@PostMapping("/users")
+public String create(@ModelAttribute UserForm form,
+                     RedirectAttributes redirectAttributes) {
+    userService.save(form);
+    redirectAttributes.addFlashAttribute("message", "회원이 등록되었습니다.");
+    redirectAttributes.addFlashAttribute("messageType", "success");
+    return "redirect:/users";
+}
+```
+
+```html
+<!-- fragments/alert.html -->
+<div th:fragment="flashMessage">
+  <div th:if="${message}" th:class="|alert alert-${messageType}|" th:text="${message}">
+    알림 메시지
+  </div>
+</div>
+
+<!-- 목록 페이지에서 사용 -->
+<div th:replace="~{fragments/alert :: flashMessage}"></div>
+```
+
+---
+
+### 예제 4: 수정 폼 (기존 값 채우기)
+
+```java
+@GetMapping("/users/{id}/edit")
+public String editForm(@PathVariable Long id, Model model) {
+    User user = userService.findById(id);
+    model.addAttribute("userForm", UserForm.from(user)); // 기존 값 채움
+    model.addAttribute("userId", id);
+    return "user/edit";
+}
+
+@PostMapping("/users/{id}")
+public String update(@PathVariable Long id,
+                     @ModelAttribute UserForm form,
+                     BindingResult result,
+                     RedirectAttributes ra) {
+    if (result.hasErrors()) return "user/edit";
+    userService.update(id, form);
+    ra.addFlashAttribute("message", "수정되었습니다.");
+    return "redirect:/users/" + id;
+}
+```
+
+```html
+<form th:action="@{/users/{id}(id=${userId})}" th:object="${userForm}" method="post">
+  <!-- PUT/DELETE는 hidden으로 처리 -->
+  <input type="hidden" name="_method" value="put" />
+
+  <div>
+    <label>이름</label>
+    <input type="text" th:field="*{name}" />
+    <span th:if="${#fields.hasErrors('name')}" th:errors="*{name}" class="error"></span>
+  </div>
+
+  <div>
+    <label>상태</label>
+    <select th:field="*{status}">
+      <option
+        th:each="s : ${T(com.example.UserStatus).values()}"
+        th:value="${s}"
+        th:text="${s.label}"
+      >
+        상태
+      </option>
+    </select>
+  </div>
+
+  <button type="submit">수정 완료</button>
+  <a th:href="@{/users/{id}(id=${userId})}">취소</a>
+</form>
+```
+
+---
+
+### 예제 5: 네비게이션 활성화
+
+```java
+// 컨트롤러마다 activePage 설정
+@GetMapping("/users")
+public String list(Model model) {
+    model.addAttribute("activePage", "users");
+    return "user/list";
+}
+```
+
+```html
+<!-- fragments/nav.html -->
+<nav th:fragment="nav(activePage)">
+  <ul>
+    <li th:classappend="${activePage == 'home'} ? 'active'">
+      <a th:href="@{/}">홈</a>
+    </li>
+    <li th:classappend="${activePage == 'users'} ? 'active'">
+      <a th:href="@{/users}">회원</a>
+    </li>
+    <li th:classappend="${activePage == 'boards'} ? 'active'">
+      <a th:href="@{/boards}">게시판</a>
+    </li>
+  </ul>
+</nav>
+
+<!-- 사용하는 페이지에서 -->
+<div th:replace="~{fragments/nav :: nav(${activePage})}"></div>
+```
+
+---
+
+## 빠른 참조 치트시트
+
+| 작업            | 코드                                          |
+| --------------- | --------------------------------------------- |
+| 변수 출력       | `th:text="${변수}"`                           |
+| HTML 출력       | `th:utext="${변수}"`                          |
+| URL 링크        | `th:href="@{/경로}"`                          |
+| 경로 변수       | `th:href="@{/경로/{id}(id=${변수})}"`         |
+| 조건 표시       | `th:if="${조건}"`                             |
+| 조건 숨기기     | `th:unless="${조건}"`                         |
+| 반복            | `th:each="item : ${list}"`                    |
+| 반복 + 상태     | `th:each="item, stat : ${list}"`              |
+| 클래스 추가     | `th:classappend="${조건} ? '클래스명'"`       |
+| 폼 객체         | `th:object="${객체}"`                         |
+| 폼 필드         | `th:field="*{필드명}"`                        |
+| 에러 표시       | `th:errors="*{필드명}"`                       |
+| 조각 삽입       | `th:replace="~{파일 :: 조각명}"`              |
+| null 처리       | `th:text="${값} ?: '기본값'"`                 |
+| 인라인 JS       | `th:inline="javascript"` + `[[${변수}]]`      |
+| 날짜 포맷       | `${#temporals.format(날짜, 'yyyy-MM-dd')}`    |
+| 숫자 포맷       | `${#numbers.formatInteger(숫자, 3, 'COMMA')}` |
+| 리스트 크기     | `${#lists.size(리스트)}`                      |
+| 리스트 비었는지 | `${#lists.isEmpty(리스트)}`                   |
+| 로그인 여부     | `sec:authorize="isAuthenticated()"`           |
+| 권한 체크       | `sec:authorize="hasRole('ADMIN')"`            |
+
+---
+
+> 📌 **실무 팁**
+>
+> - `th:replace`는 태그까지 교체, `th:insert`는 태그 안에 삽입 — 레이아웃엔 `th:replace` 권장
+> - 개발 중에는 반드시 `spring.thymeleaf.cache=false` 설정
+> - 폼에서 `th:field`를 쓰면 id, name, value가 자동 생성되므로 따로 쓰지 않아도 됨
+> - `#temporals`는 Java 8+ LocalDate/LocalDateTime 전용, `java.util.Date`는 `#dates` 사용
+> - 동적 URL은 항상 `@{...}` 을 사용해야 컨텍스트 경로가 자동으로 붙음

@@ -1,0 +1,3550 @@
+---
+title: '섹션 4: Actions & UI - 3'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380472/notion-blog/_/3D_/_/_4_Actions_UI_-_3/image.png)
+
+# { 🎯 제네릭 TakeAction 메서드로 리팩토링하기 }
+
+이번 강의는 각 액션마다 개별 메서드를 만드는 대신, 모든 액션이 공통으로 사용할 수 있는 제네릭 TakeAction 메서드를 구현하여 코드를 더 간결하고 확장 가능하게 만드는 내용입니다.
+
+---
+
+## 📋 목차
+
+1. [제네릭 TakeAction 메서드의 필요성](https://claude.ai/chat/52859402-4acf-4d86-926e-f111c14e078d#1-%EC%A0%9C%EB%84%A4%EB%A6%AD-takeaction-%EB%A9%94%EC%84%9C%EB%93%9C%EC%9D%98-%ED%95%84%EC%9A%94%EC%84%B1)
+2. [BaseAction에 추상 메서드 정의하기](https://claude.ai/chat/52859402-4acf-4d86-926e-f111c14e078d#2-baseaction%EC%97%90-%EC%B6%94%EC%83%81-%EB%A9%94%EC%84%9C%EB%93%9C-%EC%A0%95%EC%9D%98%ED%95%98%EA%B8%B0)
+3. [MoveAction과 SpinAction 리팩토링](https://claude.ai/chat/52859402-4acf-4d86-926e-f111c14e078d#3-moveaction%EA%B3%BC-spinaction-%EB%A6%AC%ED%8C%A9%ED%86%A0%EB%A7%81)
+4. [UnitActionsSystem의 Switch문 제거](https://claude.ai/chat/52859402-4acf-4d86-926e-f111c14e078d#4-unitactionssystem%EC%9D%98-switch%EB%AC%B8-%EC%A0%9C%EA%B1%B0)
+5. [검증 시스템 통합하기](https://claude.ai/chat/52859402-4acf-4d86-926e-f111c14e078d#5-%EA%B2%80%EC%A6%9D-%EC%8B%9C%EC%8A%A4%ED%85%9C-%ED%86%B5%ED%95%A9%ED%95%98%EA%B8%B0)
+6. [BaseAction에 검증 메서드 추가](https://claude.ai/chat/52859402-4acf-4d86-926e-f111c14e078d#6-baseaction%EC%97%90-%EA%B2%80%EC%A6%9D-%EB%A9%94%EC%84%9C%EB%93%9C-%EC%B6%94%EA%B0%80)
+7. [SpinAction의 유효 위치 구현](https://claude.ai/chat/52859402-4acf-4d86-926e-f111c14e078d#7-spinaction%EC%9D%98-%EC%9C%A0%ED%9A%A8-%EC%9C%84%EC%B9%98-%EA%B5%AC%ED%98%84)
+8. [UI 버튼 클릭 방지 처리](https://claude.ai/chat/52859402-4acf-4d86-926e-f111c14e078d#8-ui-%EB%B2%84%ED%8A%BC-%ED%81%B4%EB%A6%AD-%EB%B0%A9%EC%A7%80-%EC%B2%98%EB%A6%AC)
+9. [GridSystemVisual 업데이트](https://claude.ai/chat/52859402-4acf-4d86-926e-f111c14e078d#9-gridsystemvisual-%EC%97%85%EB%8D%B0%EC%9D%B4%ED%8A%B8)
+10. [이미 선택된 유닛 재선택 방지](https://claude.ai/chat/52859402-4acf-4d86-926e-f111c14e078d#10-%EC%9D%B4%EB%AF%B8-%EC%84%A0%ED%83%9D%EB%90%9C-%EC%9C%A0%EB%8B%9B-%EC%9E%AC%EC%84%A0%ED%83%9D-%EB%B0%A9%EC%A7%80)
+
+---
+
+## 1. 제네릭 TakeAction 메서드의 필요성
+
+### 문제점
+
+- 현재 각 액션(MoveAction, SpinAction)마다 고유한 메서드 이름을 사용:
+  - `MoveAction()` - 이동 액션용
+  - `Spin()` - 회전 액션용
+- 새 액션을 추가할 때마다 UnitActionsSystem에서 Switch문을 계속 확장해야 함
+- 코드 유지보수가 어렵고 확장성이 떨어짐
+
+### 해결 방법
+
+- **제네릭 메서드**: 모든 액션이 동일한 이름의 메서드(`TakeAction`)를 구현
+- **다형성(Polymorphism)** 활용: 부모 클래스 타입으로 자식 클래스의 메서드 호출
+- Switch문 없이 `selectedAction.TakeAction()` 한 줄로 모든 액션 처리 가능
+
+---
+
+## 2. BaseAction에 추상 메서드 정의하기
+
+### 구현 과정
+
+```csharp
+public abstract class BaseAction : MonoBehaviour
+{
+    // 기존 변수들...
+
+    // 🎯 새로운 추상 메서드 추가
+    // - abstract: 모든 자식 클래스가 반드시 구현해야 함
+    // - void: 반환값 없음
+    // - GridPosition: 어디에서 액션을 실행할지 좌표 정보
+    // - Action onActionComplete: 액션이 완료되면 호출할 콜백 함수
+    public abstract void TakeAction(GridPosition gridPosition, Action onActionComplete);
+}
+
+```
+
+### 개념 설명
+
+**추상 메서드(Abstract Method)**
+
+- `abstract` 키워드로 선언된 메서드
+- 구현부({} 중괄호 내용)가 없고 선언만 존재
+- 모든 자식 클래스가 **반드시** 이 메서드를 구현해야 컴파일 가능
+- "이런 기능이 있어야 한다"는 계약(Contract) 역할
+
+**파라미터 설계**
+
+- `GridPosition gridPosition`: 거의 모든 액션이 "어디에서" 실행할지 위치 정보 필요
+- `Action onActionComplete`: 액션 완료 후 처리할 작업(예: isBusy를 false로 변경)
+
+---
+
+## 3. MoveAction과 SpinAction 리팩토링
+
+### MoveAction 수정
+
+```csharp
+public class MoveAction : BaseAction
+{
+    // 🔄 기존 메서드 이름만 변경
+    // MoveAction() → TakeAction()
+    // override: 부모의 추상 메서드를 구현한다는 표시
+    public override void TakeAction(GridPosition gridPosition, Action onActionComplete)
+    {
+        // 완료 콜백 저장
+        this.onActionComplete = onActionComplete;
+
+        // 그리드 좌표를 월드 좌표로 변환
+        this.targetPosition = LevelGrid.Instance.GetWorldPosition(gridPosition);
+
+        // 이동 시작
+        isActive = true;
+    }
+
+    // 나머지 코드는 동일...
+}
+```
+
+### SpinAction 수정
+
+```csharp
+public class SpinAction : BaseAction
+{
+    // 🔄 Spin() 메서드 → TakeAction()으로 변경
+    public override void TakeAction(GridPosition gridPosition, Action onActionComplete)
+    {
+        // ⚠️ gridPosition 파라미터를 사용하지 않음
+        // - SpinAction은 현재 위치에서 제자리 회전만 함
+        // - 하지만 부모 클래스의 메서드 시그니처를 맞추기 위해 필요
+
+        this.onActionComplete = onActionComplete;
+        isActive = true;
+        totalSpinAmount = 0f;
+    }
+
+    // Update()는 동일...
+}
+```
+
+### 사용하지 않는 파라미터 문제
+
+**현재 상황**
+
+- SpinAction의 `gridPosition` 파라미터는 실제로 사용되지 않음
+- 단지 부모 클래스의 메서드 시그니처를 맞추기 위해 존재
+
+**대안 방법 (강의에서 언급)**
+
+```csharp
+// 🎓 고급 패턴: Base Parameters 클래스 사용
+// 1. 베이스 파라미터 클래스 정의
+public class BaseParameters { }
+
+// 2. 각 액션별 파라미터 클래스 생성
+public class SpinParameters : BaseParameters
+{
+    // Spin 액션에 필요한 특별한 데이터
+}
+
+public class MoveParameters : BaseParameters
+{
+    public GridPosition targetPosition;
+}
+
+// 3. TakeAction 시그니처 변경
+public abstract void TakeAction(BaseParameters parameters, Action onActionComplete);
+
+// 4. 각 액션에서 형변환하여 사용
+public override void TakeAction(BaseParameters parameters, Action onActionComplete)
+{
+    SpinParameters spinParams = (SpinParameters)parameters;
+    // spinParams 사용...
+}
+
+```
+
+**강의자의 선택**
+
+- 이 방법은 액션이 매우 많고 각각 다른 파라미터가 필요할 때 유용
+- 하지만 코드를 복잡하게 만들 수 있음
+- **현재는 단순하게**: 모든 액션이 GridPosition을 받되, 사용하지 않으면 무시
+
+---
+
+## 4. UnitActionsSystem의 Switch문 제거
+
+### 리팩토링 전 코드
+
+```csharp
+private void HandleSelectedAction()
+{
+    if (Input.GetMouseButtonDown(0))
+    {
+        GridPosition mouseGridPosition = LevelGrid.Instance.GetGridPosition(MouseWorld.GetPosition());
+
+        // ❌ 액션 타입마다 다른 메서드 호출
+        switch (selectedAction)
+        {
+            case MoveAction moveAction:
+                moveAction.MoveAction(mouseGridPosition, ClearBusy);
+                break;
+            case SpinAction spinAction:
+                spinAction.Spin(ClearBusy);
+                break;
+        }
+    }
+}
+```
+
+### 리팩토링 후 코드
+
+```csharp
+private void HandleSelectedAction()
+{
+    if (Input.GetMouseButtonDown(0))
+    {
+        GridPosition mouseGridPosition = LevelGrid.Instance.GetGridPosition(MouseWorld.GetPosition());
+
+        // ✅ 다형성을 활용한 단일 메서드 호출
+        // selectedAction의 실제 타입(MoveAction/SpinAction)에 따라
+        // 자동으로 올바른 구현이 실행됨
+        selectedAction.TakeAction(mouseGridPosition, ClearBusy);
+    }
+}
+
+```
+
+### 다형성 동작 원리
+
+```csharp
+// selectedAction은 BaseAction 타입
+BaseAction selectedAction;
+
+// 실제로는 MoveAction 인스턴스를 가리킴
+selectedAction = unit.GetMoveAction();
+
+// TakeAction 호출 시:
+// 1. 컴파일러: "BaseAction에 TakeAction이 있네? OK"
+// 2. 런타임: "실제 객체는 MoveAction이니까 MoveAction의 TakeAction 실행!"
+selectedAction.TakeAction(gridPosition, callback);
+
+```
+
+---
+
+## 5. 검증 시스템 통합하기
+
+### 문제 발견
+
+리팩토링 후 테스트 시 발견된 문제:
+
+- **MoveAction**: 이동 전에 `IsValidActionGridPosition()` 검증 필요
+- **SpinAction**: 검증 없이 바로 실행됨
+
+```csharp
+// ❌ 문제: SpinAction도 검증 없이 실행됨
+selectedAction.TakeAction(mouseGridPosition, ClearBusy);
+```
+
+### 해결 방법
+
+모든 액션에 통일된 검증 시스템 적용:
+
+```csharp
+private void HandleSelectedAction()
+{
+    if (Input.GetMouseButtonDown(0))
+    {
+        GridPosition mouseGridPosition = LevelGrid.Instance.GetGridPosition(MouseWorld.GetPosition());
+
+        // ✅ 검증 추가: 유효한 위치인지 먼저 확인
+        if (selectedAction.IsValidActionGridPosition(mouseGridPosition))
+        {
+            SetBusy();
+            selectedAction.TakeAction(mouseGridPosition, ClearBusy);
+        }
+        // 유효하지 않으면 아무 일도 일어나지 않음
+    }
+}
+```
+
+---
+
+## 6. BaseAction에 검증 메서드 추가
+
+### 검증 메서드를 BaseAction으로 이동
+
+**이전**: MoveAction에만 존재했던 검증 메서드
+**이후**: 모든 액션이 사용할 수 있도록 BaseAction으로 이동
+
+```csharp
+public abstract class BaseAction : MonoBehaviour
+{
+    // ... 기존 코드 ...
+
+    // 🎯 추상 메서드: 각 액션이 유효한 위치 목록을 반환해야 함
+    // - 어떤 그리드 위치들이 이 액션을 실행할 수 있는지 정의
+    public abstract List<GridPosition> GetValidActionGridPositionList();
+
+    // ✅ 가상 메서드: 기본 구현 제공, 필요시 오버라이드 가능
+    // - virtual: 자식 클래스에서 재정의할 수 있음
+    // - 기본 동작: 유효 위치 목록에 포함되어 있는지 확인
+    public virtual bool IsValidActionGridPosition(GridPosition gridPosition)
+    {
+        // 1. 이 액션의 유효한 위치 목록 가져오기
+        List<GridPosition> validGridPositionList = GetValidActionGridPositionList();
+
+        // 2. 입력받은 위치가 목록에 포함되어 있는지 확인
+        return validGridPositionList.Contains(gridPosition);
+    }
+}
+
+```
+
+### 개념 설명
+
+**Abstract vs Virtual**
+
+```csharp
+// Abstract (추상)
+// - 구현이 없음, 선언만 존재
+// - 자식 클래스가 **반드시** 구현해야 함
+// - "이 기능은 꼭 있어야 해!"
+public abstract List<GridPosition> GetValidActionGridPositionList();
+
+// Virtual (가상)
+// - 기본 구현 제공
+// - 자식 클래스가 **선택적으로** 재정의 가능
+// - "이렇게 동작하는데, 필요하면 바꿔도 돼"
+public virtual bool IsValidActionGridPosition(GridPosition gridPosition)
+{
+    // 기본 구현...
+}
+```
+
+**왜 IsValidActionGridPosition을 Virtual로?**
+
+- 대부분의 액션: "유효 목록에 포함되어 있는가?" 확인 → 기본 구현 사용
+- 특별한 액션: 더 복잡한 검증 로직 필요 → 오버라이드해서 사용
+
+---
+
+## 7. SpinAction의 유효 위치 구현
+
+### MoveAction 수정
+
+```csharp
+public class MoveAction : BaseAction
+{
+    // ❌ 삭제: IsValidActionGridPosition()는 BaseAction에서 상속받음
+
+    // ✅ 추상 메서드 구현: override 키워드 추가
+    public override List<GridPosition> GetValidActionGridPositionList()
+    {
+        List<GridPosition> validGridPositionList = new List<GridPosition>();
+
+        GridPosition unitGridPosition = unit.GetGridPosition();
+
+        // 유닛 주변 maxMoveDistance 범위 내의 모든 위치 검사
+        for (int x = -maxMoveDistance; x <= maxMoveDistance; x++)
+        {
+            for (int z = -maxMoveDistance; z <= maxMoveDistance; z++)
+            {
+                GridPosition offsetGridPosition = new GridPosition(x, z);
+                GridPosition testGridPosition = unitGridPosition + offsetGridPosition;
+
+                // 유효하지 않은 그리드 위치
+                if (!LevelGrid.Instance.IsValidGridPosition(testGridPosition))
+                {
+                    continue;
+                }
+
+                // 현재 위치와 동일
+                if (unitGridPosition == testGridPosition)
+                {
+                    continue;
+                }
+
+                // 이미 다른 유닛이 있는 위치
+                if (LevelGrid.Instance.HasAnyUnitOnGridPosition(testGridPosition))
+                {
+                    continue;
+                }
+
+                validGridPositionList.Add(testGridPosition);
+            }
+        }
+
+        return validGridPositionList;
+    }
+}
+
+```
+
+### SpinAction 구현
+
+```csharp
+public class SpinAction : BaseAction
+{
+    // ... 기존 코드 ...
+
+    // 🎯 SpinAction의 유효 위치 정의
+    // - 회전 액션은 유닛이 현재 서 있는 위치에서만 실행 가능
+    public override List<GridPosition> GetValidActionGridPositionList()
+    {
+        // 1. 유닛의 현재 위치 가져오기
+        GridPosition unitGridPosition = unit.GetGridPosition();
+
+        // 2. 현재 위치만 포함된 리스트 반환
+        // - 컬렉션 초기화 구문 사용: new List<Type> { 요소1, 요소2, ... }
+        return new List<GridPosition>
+        {
+            unitGridPosition
+        };
+    }
+}
+
+```
+
+### 동작 방식
+
+```csharp
+// SpinAction 선택 시:
+// 1. GetValidActionGridPositionList() 호출
+//    → [유닛의 현재 위치] 반환
+
+// 2. 유저가 유닛 위치 클릭
+//    → IsValidActionGridPosition() 호출
+//    → 유효 목록에 포함? Yes! → 액션 실행
+
+// 3. 유저가 다른 위치 클릭
+//    → IsValidActionGridPosition() 호출
+//    → 유효 목록에 포함? No! → 아무 일도 안 일어남
+
+```
+
+---
+
+## 8. UI 버튼 클릭 방지 처리
+
+### 문제 상황
+
+```
+[Move 버튼]  [Spin 버튼]
+     ↓
+   [게임 화면]
+
+유저가 버튼을 클릭했는데:
+1. 버튼 클릭 이벤트 발생 (버튼 기능 실행)
+2. 버튼 아래 게임 화면도 클릭된 것으로 인식
+3. 의도하지 않은 액션이 실행됨!
+
+```
+
+### 해결 방법: EventSystem 사용
+
+```csharp
+using UnityEngine.EventSystems; // ← 네임스페이스 추가 필요
+
+private void Update()
+{
+    // 액션 실행 중이면 입력 무시
+    if (isBusy)
+    {
+        return;
+    }
+
+    // 🛡️ UI 요소 위에 마우스가 있는지 확인
+    // - EventSystem.current: 현재 활성 이벤트 시스템 (씬에 하나만 존재)
+    // - IsPointerOverGameObject(): 마우스가 UI 요소 위에 있으면 true 반환
+    if (EventSystem.current.IsPointerOverGameObject())
+    {
+        // UI 위에 있으면 게임 입력 처리 중단
+        return;
+    }
+
+    // 유닛 선택 처리
+    if (TryHandleUnitSelection())
+    {
+        return;
+    }
+
+    // 액션 실행 처리
+    HandleSelectedAction();
+}
+
+```
+
+### EventSystem 개념
+
+**EventSystem이란?**
+
+- Unity UI 시스템의 핵심 컴포넌트
+- 모든 UI 이벤트(클릭, 드래그, 스크롤 등)를 관리
+- 씬에 Canvas가 있으면 자동으로 생성됨
+
+**IsPointerOverGameObject() 동작 원리**
+
+```csharp
+// 마우스 포인터가 다음과 같은 UI 요소 위에 있으면 true:
+// - Button
+// - Image
+// - Panel
+// - Text
+// - 그 외 모든 UI 요소
+
+// 게임 오브젝트 위에 있으면 false
+```
+
+**적용 결과**
+
+```
+이전: [버튼 클릭] → 버튼 동작 + 게임 액션 실행 ❌
+이후: [버튼 클릭] → 버튼 동작만 실행 ✅
+```
+
+---
+
+## 9. GridSystemVisual 업데이트
+
+### 문제점
+
+```csharp
+// ❌ 이전 코드: MoveAction만 하드코딩
+public void UpdateGridVisual()
+{
+    HideAllGridPosition();
+
+    // 항상 MoveAction의 유효 위치만 표시
+    MoveAction moveAction = UnitActionsSystem.Instance
+                                            .GetSelectedUnit()
+                                            .GetMoveAction();
+
+    ShowGridPositionList(moveAction.GetValidActionGridPositionList());
+}
+```
+
+**문제**:
+
+- SpinAction을 선택해도 MoveAction의 유효 위치가 표시됨
+- 새로운 액션을 추가할 때마다 코드 수정 필요
+
+### UnitActionsSystem에 GetSelectedAction() 추가
+
+```csharp
+public class UnitActionsSystem : MonoBehaviour
+{
+    private BaseAction selectedAction;
+
+    // ... 기존 코드 ...
+
+    // 🎯 현재 선택된 액션을 반환하는 public 메서드
+    // - 외부에서 selectedAction에 접근할 수 있게 함
+    public BaseAction GetSelectedAction()
+    {
+        return selectedAction;
+    }
+}
+```
+
+### GridSystemVisual 리팩토링
+
+```csharp
+public class GridSystemVisual : MonoBehaviour
+{
+    public void UpdateGridVisual()
+    {
+        // 1. 모든 그리드 비주얼 숨기기
+        HideAllGridPosition();
+
+        // 2. ✅ 현재 선택된 액션 가져오기 (어떤 액션이든 상관없음)
+        BaseAction selectedAction = UnitActionsSystem.Instance.GetSelectedAction();
+
+        // 3. ✅ 해당 액션의 유효 위치 표시
+        // - selectedAction이 MoveAction이면 MoveAction의 GetValidActionGridPositionList() 호출
+        // - selectedAction이 SpinAction이면 SpinAction의 GetValidActionGridPositionList() 호출
+        // - 다형성 덕분에 자동으로 올바른 메서드가 실행됨!
+        ShowGridPositionList(selectedAction.GetValidActionGridPositionList());
+    }
+}
+```
+
+### 다형성의 힘
+
+```csharp
+// MoveAction 선택 시:
+BaseAction selectedAction = moveAction;
+selectedAction.GetValidActionGridPositionList();
+// → MoveAction.GetValidActionGridPositionList() 실행
+// → 유닛 주변 이동 가능한 모든 위치 반환
+
+// SpinAction 선택 시:
+BaseAction selectedAction = spinAction;
+selectedAction.GetValidActionGridPositionList();
+// → SpinAction.GetValidActionGridPositionList() 실행
+// → 유닛의 현재 위치만 반환
+
+// ShootAction 추가 시 (미래):
+// → 코드 수정 없이 자동으로 동작!
+```
+
+---
+
+## 10. 이미 선택된 유닛 재선택 방지
+
+### 문제 상황
+
+```
+상황:
+1. 유저가 유닛 선택
+2. SpinAction 선택 (유효 위치 = 유닛의 현재 위치)
+3. 유닛을 클릭하여 SpinAction 실행하려 함
+
+발생하는 일:
+- 유닛 클릭 → 유닛 재선택
+- SpinAction 실행 안 됨 ❌
+
+원하는 동작:
+- 유닛 클릭 → SpinAction 실행 ✅
+```
+
+### 해결 방법
+
+```csharp
+private bool TryHandleUnitSelection()
+{
+    // 마우스 왼쪽 버튼 클릭 확인
+    if (Input.GetMouseButtonDown(0))
+    {
+        // 레이캐스트로 유닛 찾기
+        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+        if (Physics.Raycast(ray, out RaycastHit raycastHit, float.MaxValue, unitLayerMask))
+        {
+            if (raycastHit.transform.TryGetComponent<Unit>(out Unit unit))
+            {
+                // 🛡️ 이미 선택된 유닛인지 확인
+                if (unit == selectedUnit)
+                {
+                    // 이미 선택된 유닛이면 "선택하지 않음" 처리
+                    // return false → HandleSelectedAction()이 실행됨
+                    return false;
+                }
+
+                // 새로운 유닛이면 선택
+                SetSelectedUnit(unit);
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+```
+
+### 실행 흐름
+
+```csharp
+private void Update()
+{
+    if (isBusy) return;
+    if (EventSystem.current.IsPointerOverGameObject()) return;
+
+    // 🔄 실행 흐름
+    if (TryHandleUnitSelection())
+    {
+        // TryHandleUnitSelection이 true 반환:
+        // - 새로운 유닛 선택됨
+        // - HandleSelectedAction() 실행 안 함 (return으로 중단)
+        return;
+    }
+
+    // TryHandleUnitSelection이 false 반환:
+    // - 유닛이 없거나 이미 선택된 유닛 클릭
+    // - HandleSelectedAction() 실행 (액션 수행)
+    HandleSelectedAction();
+}
+```
+
+### 동작 시나리오
+
+**시나리오 1: 새 유닛 선택**
+
+```
+1. 유저가 다른 유닛 클릭
+2. unit == selectedUnit? → false
+3. SetSelectedUnit(unit) 실행
+4. return true
+5. HandleSelectedAction() 실행 안 됨
+```
+
+**시나리오 2: 이미 선택된 유닛으로 액션 실행**
+
+```
+1. 유저가 현재 선택된 유닛 클릭
+2. unit == selectedUnit? → true
+3. return false (선택 처리 안 함)
+4. TryHandleUnitSelection() 전체가 false 반환
+5. HandleSelectedAction() 실행됨
+6. SpinAction 실행! ✅
+```
+
+**시나리오 3: 빈 공간 클릭**
+
+```
+1. 유저가 유닛 없는 곳 클릭
+2. Raycast가 유닛 감지 못함
+3. return false
+4. HandleSelectedAction() 실행됨
+5. MoveAction 실행 (유효 위치라면)
+```
+
+---
+
+## 🎓 전체 구조 정리
+
+### 리팩토링의 핵심 이점
+
+**1. 코드 간소화**
+
+```csharp
+// ❌ 이전: 액션마다 Switch문 필요
+switch (selectedAction)
+{
+    case MoveAction: ... break;
+    case SpinAction: ... break;
+    case ShootAction: ... break; // 새 액션마다 추가
+}
+
+// ✅ 이후: 한 줄로 모든 액션 처리
+selectedAction.TakeAction(gridPosition, callback);
+
+```
+
+**2. 확장성**
+
+- 새 액션 추가 시:
+  - BaseAction 상속
+  - 추상 메서드 구현
+  - UnitActionsSystem 수정 불필요!
+
+**3. 유지보수성**
+
+- 모든 액션이 동일한 인터페이스 사용
+- 공통 로직은 BaseAction에서 관리
+- 버그 수정 시 한 곳만 수정하면 모든 액션에 적용
+
+### 클래스 구조
+
+```
+BaseAction (추상 클래스)
+├── abstract TakeAction()           - 각 액션이 구현
+├── abstract GetValidActionGridPositionList() - 각 액션이 구현
+└── virtual IsValidActionGridPosition()       - 기본 구현 제공
+
+MoveAction : BaseAction
+├── override TakeAction()           - 이동 로직
+└── override GetValidActionGridPositionList() - 이동 가능 범위
+
+SpinAction : BaseAction
+├── override TakeAction()           - 회전 로직
+└── override GetValidActionGridPositionList() - 현재 위치만
+
+```
+
+### 실행 흐름
+
+```
+유저 입력
+  ↓
+Update()
+  ↓
+UI 위인가? → Yes → return
+  ↓ No
+유닛 선택? → Yes (새 유닛) → return
+  ↓ No/Already Selected
+HandleSelectedAction()
+  ↓
+유효한 위치? → No → return
+  ↓ Yes
+selectedAction.TakeAction()
+  ↓
+실제 타입에 맞는 구현 실행
+(MoveAction/SpinAction)
+```
+
+---
+
+## 💡 다음 강의 예고
+
+현재 남은 문제:
+
+- UI 버튼에 **현재 선택된 액션이 무엇인지** 시각적 표시 없음
+- 유저가 어떤 액션이 활성화되었는지 알 수 없음
+
+다음 강의에서:
+
+- 선택된 액션을 UI에 표시하는 시각적 피드백 구현
+- 버튼 하이라이트 또는 색상 변경 등
+
+# { 🎯 Unity 턴제 전략 게임 - 선택된 액션 버튼 시각적 표시하기 }
+
+이번 강의는 UI 버튼에서 현재 선택된 액션을 시각적으로 표시하는 시스템을 구현하는 내용입니다. 사용자가 어떤 액션(이동, 공격 등)을 선택했는지 명확하게 알 수 있도록 녹색 테두리를 추가하고, 이벤트 시스템을 활용해 효율적으로 업데이트합니다.
+
+---
+
+## 📋 목차
+
+1. [문제 인식: 현재 선택된 액션을 알 수 없다](https://claude.ai/chat/462881de-d2e9-40cc-ad9d-793ccdb952e4#1-%EB%AC%B8%EC%A0%9C-%EC%9D%B8%EC%8B%9D-%ED%98%84%EC%9E%AC-%EC%84%A0%ED%83%9D%EB%90%9C-%EC%95%A1%EC%85%98%EC%9D%84-%EC%95%8C-%EC%88%98-%EC%97%86%EB%8B%A4)
+2. [Selected 시각 요소 만들기](https://claude.ai/chat/462881de-d2e9-40cc-ad9d-793ccdb952e4#2-selected-%EC%8B%9C%EA%B0%81-%EC%9A%94%EC%86%8C-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+3. [2D Sprite Package 설치하기](https://claude.ai/chat/462881de-d2e9-40cc-ad9d-793ccdb952e4#3-2d-sprite-package-%EC%84%A4%EC%B9%98%ED%95%98%EA%B8%B0)
+4. [Border 이미지 Import와 Sprite Editor 설정](https://claude.ai/chat/462881de-d2e9-40cc-ad9d-793ccdb952e4#4-border-%EC%9D%B4%EB%AF%B8%EC%A7%80-import%EC%99%80-sprite-editor-%EC%84%A4%EC%A0%95)
+5. [Sliced Image Type으로 테두리 표현하기](https://claude.ai/chat/462881de-d2e9-40cc-ad9d-793ccdb952e4#5-sliced-image-type%EC%9C%BC%EB%A1%9C-%ED%85%8C%EB%91%90%EB%A6%AC-%ED%91%9C%ED%98%84%ED%95%98%EA%B8%B0)
+6. [ActionButtonUI에 UpdateSelectedVisual 함수 만들기](https://claude.ai/chat/462881de-d2e9-40cc-ad9d-793ccdb952e4#6-actionbuttonui%EC%97%90-updateselectedvisual-%ED%95%A8%EC%88%98-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+7. [UnitActionSystemUI에서 버튼 리스트 관리하기](https://claude.ai/chat/462881de-d2e9-40cc-ad9d-793ccdb952e4#7-unitactionsystemui%EC%97%90%EC%84%9C-%EB%B2%84%ED%8A%BC-%EB%A6%AC%EC%8A%A4%ED%8A%B8-%EA%B4%80%EB%A6%AC%ED%95%98%EA%B8%B0)
+8. [이벤트 기반 업데이트 시스템 구축하기](https://claude.ai/chat/462881de-d2e9-40cc-ad9d-793ccdb952e4#8-%EC%9D%B4%EB%B2%A4%ED%8A%B8-%EA%B8%B0%EB%B0%98-%EC%97%85%EB%8D%B0%EC%9D%B4%ED%8A%B8-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B5%AC%EC%B6%95%ED%95%98%EA%B8%B0)
+9. [테스트 및 최종 확인](https://claude.ai/chat/462881de-d2e9-40cc-ad9d-793ccdb952e4#9-%ED%85%8C%EC%8A%A4%ED%8A%B8-%EB%B0%8F-%EC%B5%9C%EC%A2%85-%ED%99%95%EC%9D%B8)
+
+---
+
+## 1. 문제 인식: 현재 선택된 액션을 알 수 없다
+
+### 현재 상황
+
+- 이전 강의에서 여러 개의 액션 버튼(Move, Spin 등)을 만들었습니다.
+- 각 버튼을 클릭하면 해당 액션이 선택되는 기능은 작동합니다.
+- **하지만 문제점**: 현재 어떤 액션이 선택되어 있는지 시각적으로 알 수 없습니다.
+
+### 해결 방법
+
+- 선택된 버튼에만 **녹색 테두리(border)**를 표시합니다.
+- 선택되지 않은 버튼들은 테두리를 숨깁니다.
+- 이를 통해 사용자가 현재 활성화된 액션을 명확하게 인식할 수 있습니다.
+
+---
+
+## 2. Selected 시각 요소 만들기
+
+### Prefab 열기
+
+- **Action Button UI Prefab**을 더블클릭해서 Prefab 편집 모드로 진입합니다.
+- Prefab 안에서 작업하면 모든 버튼 인스턴스에 자동으로 적용됩니다.
+
+### Selected 게임 오브젝트 생성
+
+1. **UI → Image**로 새로운 이미지 오브젝트를 생성합니다.
+2. 이름을 **"Selected"**로 변경합니다.
+3. **Rect Transform**을 부모(Action Button)에 맞춰 **Stretch**로 설정합니다:
+   - Anchor Presets 메뉴에서 **Alt + Shift**를 누른 채 **stretch-stretch(맨 오른쪽 아래)** 옵션 선택
+   - 이렇게 하면 부모의 크기에 맞춰 자동으로 늘어납니다.
+
+### Stretch 설정의 의미
+
+- **Anchor(앵커)**: UI 요소가 부모 기준으로 어느 위치에 배치될지 결정하는 기준점
+- **Stretch**: 앵커를 사방으로 늘려서 부모의 전체 영역을 차지하도록 만드는 설정
+- 결과: 부모 버튼의 크기가 변해도 테두리가 자동으로 따라갑니다.
+
+---
+
+## 3. 2D Sprite Package 설치하기
+
+### 왜 필요한가?
+
+- Border 이미지를 올바르게 편집하려면 **Sprite Editor**가 필요합니다.
+- Sprite Editor는 **2D Sprite Package**에 포함되어 있습니다.
+- 이 도구로 이미지의 **9-Slice(나인 슬라이스)** 영역을 설정할 수 있습니다.
+
+### 설치 방법
+
+1. **Window → Package Manager** 메뉴를 엽니다.
+2. 검색창에서 **"2D Sprite"**를 검색합니다.
+3. **2D Sprite** 패키지를 찾아서 **Install** 버튼을 클릭합니다.
+
+### 패키지 설치 후
+
+- 이제 텍스처를 선택했을 때 Inspector에 **Sprite Editor** 버튼이 나타납니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380470/notion-blog/_/3D_/_/_4_Actions_UI_-_3/image_1.png)
+
+---
+
+## 4. Border 이미지 Import와 Sprite Editor 설정
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380470/notion-blog/_/3D_/_/_4_Actions_UI_-_3/image_2.png)
+
+### Border 이미지 다운로드
+
+- 강의 자료에서 제공되는 **border 이미지**를 다운로드합니다.
+- Unity 프로젝트의 **Textures** 폴더에 Import 합니다.
+- Import 시 **반드시 포함해야 할 것**: border 이미지 파일
+
+### Sprite Editor 열기
+
+1. Textures 폴더에서 방금 Import한 **Border** 텍스처를 선택합니다.
+2. Inspector에서 **Sprite Editor** 버튼을 클릭합니다.
+
+### 9-Slice Border 개념
+
+- **9-Slice(나인 슬라이스)**: 이미지를 9개의 영역으로 나누는 기법
+- 구조:
+
+  ```
+  [모서리1] [상단 가운데] [모서리2][좌측 가운데] [중앙] [우측 가운데][모서리3] [하단 가운데] [모서리4]
+
+  ```
+
+- **4개 모서리**: 크기 고정 (늘어나지 않음)
+- **4개 가운데 부분**: 필요에 따라 늘어남
+- **1개 중앙**: 늘어나거나 비워둠
+
+### Border 설정값
+
+- Sprite Editor 안에서 **초록색 선**으로 경계선이 표시됩니다.
+- 강의 자료에서 제공한 이미지는 **이미 설정이 완료된 상태**입니다.
+- 직접 다운로드한 경우: 4개의 초록색 선을 드래그해서 테두리 영역을 지정해야 합니다.
+
+### 설정 완료 후
+
+- Sprite Editor 창을 닫습니다.
+- 이제 이 이미지를 UI에서 사용할 준비가 완료되었습니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380471/notion-blog/_/3D_/_/_4_Actions_UI_-_3/image_3.png)
+
+---
+
+## 5. Sliced Image Type으로 테두리 표현하기
+
+### Border Sprite 적용하기
+
+1. Prefab 편집 모드에서 **Selected** 게임 오브젝트를 선택합니다.
+2. **Image 컴포넌트**의 **Source Image** 필드에 **Border** 스프라이트를 드래그합니다.
+3. 이제 테두리 이미지가 버튼에 나타납니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380471/notion-blog/_/3D_/_/_4_Actions_UI_-_3/image_4.png)
+
+### Image Type을 Sliced로 변경
+
+- **Image Type**: 이미지가 크기에 맞춰 어떻게 늘어날지 결정하는 옵션
+- 기본값은 **Simple** (이미지가 그냥 늘어남 → 왜곡됨)
+- **Sliced**로 변경: 9-Slice 정보를 활용해서 모서리는 유지하고 가운데만 늘어남
+
+### Sliced의 장점
+
+- 버튼 크기가 바뀌어도 테두리 모서리가 왜곡되지 않습니다.
+- 항상 깔끔한 테두리 모양을 유지할 수 있습니다.
+
+### Pixels Per Unit Multiplier 조정
+
+- **Pixels Per Unit Multiplier**: 테두리의 두께를 조절하는 값
+- 기본값에서는 테두리가 너무 두꺼울 수 있습니다.
+- 강의에서는 **2.5** 정도로 설정했습니다.
+- 너무 두껍지 않으면서 색상이 잘 보이는 적절한 두께를 찾습니다.
+
+### Transform Scale 조정
+
+- 테두리가 버튼과 시각적으로 잘 어울리도록 **Scale** 값을 조정합니다.
+- 다른 UI 요소들과 자연스럽게 매치되도록 미세 조정합니다.
+
+### 색상 설정
+
+- **Image 컴포넌트**의 **Color** 속성을 **녹색(Green)**으로 변경합니다.
+- 녹색은 "선택됨", "활성화됨"을 나타내는 직관적인 색상입니다.
+
+### Prefab 저장
+
+- 모든 설정이 끝나면 **Prefab을 저장**합니다.
+- 이제 모든 액션 버튼 인스턴스에 Selected 이미지가 포함됩니다.
+
+---
+
+## 6. ActionButtonUI에 UpdateSelectedVisual 함수 만들기
+
+### 필요한 변수 추가
+
+```csharp
+[SerializeField] private GameObject selectedGameObject;
+```
+
+- **selectedGameObject**: Inspector에서 "Selected" 게임 오브젝트를 연결할 변수
+- `[SerializeField]`: private 변수지만 Inspector에 노출시키는 Unity 속성
+
+### Inspector에서 연결하기
+
+1. Prefab 편집 모드에서 **Action Button UI** 게임 오브젝트를 선택합니다.
+2. **ActionButtonUI 스크립트** 컴포넌트를 찾습니다.
+3. **Selected Game Object** 필드에 **Selected** 자식 오브젝트를 드래그해서 연결합니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380471/notion-blog/_/3D_/_/_4_Actions_UI_-_3/image_5.png)
+
+### BaseAction 변수 추가
+
+```csharp
+private BaseAction baseAction;
+```
+
+- **baseAction**: 이 버튼이 나타내는 액션(Move, Spin 등)을 저장하는 변수
+- 나중에 "현재 선택된 액션과 이 버튼의 액션이 같은지" 비교할 때 사용합니다.
+
+### SetBaseAction에서 저장하기
+
+```csharp
+public void SetBaseAction(BaseAction baseAction)
+{
+    this.baseAction = baseAction;  // 이 줄 추가: 액션 정보를 저장
+    textMeshPro.text = baseAction.GetActionName().ToUpper();
+
+    button.onClick.AddListener(() =>
+    {
+        UnitActionsSystem.Instance.SetSelectedAction(baseAction);
+    });
+}
+
+```
+
+- `this.baseAction = baseAction;`: 전달받은 액션을 멤버 변수에 저장
+- 이제 이 버튼이 어떤 액션을 담당하는지 기억할 수 있습니다.
+
+### UpdateSelectedVisual 함수 구현
+
+```csharp
+public void UpdateSelectedVisual()
+{
+    // 1. 현재 시스템에서 선택된 액션이 무엇인지 가져오기
+    BaseAction selectedAction = UnitActionsSystem.Instance.GetSelectedAction();
+
+    // 2. 선택된 액션과 이 버튼의 액션이 같으면 true, 다르면 false
+    // 3. 그 결과에 따라 Selected 게임 오브젝트를 켜거나 끄기
+    selectedGameObject.SetActive(selectedAction == baseAction);
+}
+
+```
+
+### 코드 설명
+
+- **UnitActionsSystem.Instance.GetSelectedAction()**:
+  - Singleton 패턴으로 UnitActionsSystem에 접근
+  - 현재 시스템에서 선택된 액션을 반환받음
+- **selectedAction == baseAction**:
+  - `==` 연산자는 두 객체의 참조가 같은지 비교
+  - 같으면 `true`, 다르면 `false` 반환
+- **SetActive(bool value)**:
+  - Unity의 GameObject 메서드
+  - `true`를 전달하면 게임 오브젝트 활성화 (화면에 보임)
+  - `false`를 전달하면 게임 오브젝트 비활성화 (화면에서 사라짐)
+
+### 결과
+
+- 이제 각 버튼은 스스로 "내가 선택된 버튼인가?"를 판단할 수 있습니다.
+- 선택된 버튼만 녹색 테두리를 표시하고, 나머지는 숨깁니다.
+
+---
+
+## 7. UnitActionSystemUI에서 버튼 리스트 관리하기
+
+### 왜 리스트가 필요한가?
+
+- 현재는 버튼을 만들기만 하고 저장하지 않습니다.
+- 나중에 "모든 버튼의 시각 요소를 업데이트하라"고 명령하려면 버튼들을 추적해야 합니다.
+- **List를 사용하면 동적으로 생성된 모든 버튼을 관리**할 수 있습니다.
+
+### List 변수 선언
+
+```csharp
+private List<ActionButtonUI> actionButtonUIList;
+```
+
+- **List<T>**: C#의 동적 배열 (크기가 자동으로 늘어남)
+- **ActionButtonUI**: 리스트에 저장할 요소의 타입
+- 이 리스트에는 생성된 모든 액션 버튼 UI 스크립트가 저장됩니다.
+
+### Awake에서 리스트 초기화
+
+```csharp
+void Awake()
+{
+    actionButtonUIList = new List<ActionButtonUI>();
+}
+
+```
+
+- **Awake()**: Unity의 생명주기 함수, Start()보다 먼저 실행됨
+- **new List<ActionButtonUI>()**: 빈 리스트를 생성
+- 초기화하지 않으면 null 참조 에러가 발생합니다.
+
+### CreateUnitActionButtons 수정
+
+```csharp
+private void CreateUnitActionButtons()
+{
+    // 1. 기존 버튼들 제거 (이전과 동일)
+    foreach (Transform buttonTransform in actionButtonContainerTransform)
+    {
+        Destroy(buttonTransform.gameObject);
+    }
+
+    // 2. 리스트도 비워주기 (새로 추가)
+    actionButtonUIList.Clear();
+
+    Unit selectedUnit = UnitActionsSystem.Instance.GetSelectedUnit();
+
+    foreach (BaseAction baseAction in selectedUnit.GetBaseActionArray())
+    {
+        Transform actionButtonTransform = Instantiate(actionButtonPrefab, actionButtonContainerTransform);
+
+        ActionButtonUI actionButtonUI = actionButtonTransform.GetComponent<ActionButtonUI>();
+        actionButtonUI.SetBaseAction(baseAction);
+
+        // 3. 생성한 버튼을 리스트에 추가 (새로 추가)
+        actionButtonUIList.Add(actionButtonUI);
+    }
+}
+
+```
+
+### 추가된 코드 설명
+
+- **actionButtonUIList.Clear()**:
+  - 리스트의 모든 요소를 제거
+  - 이전 유닛의 버튼 정보를 삭제하고 새로 시작
+  - 메모리 누수 방지
+- **actionButtonUIList.Add(actionButtonUI)**:
+  - 방금 생성한 버튼을 리스트에 추가
+  - 나중에 순회(iteration)할 수 있도록 저장
+
+### 리스트 활용의 장점
+
+- 생성된 모든 버튼에 접근 가능
+- foreach 문으로 모든 버튼을 순회하며 명령 가능
+- 동적으로 버튼 개수가 바뀌어도 대응 가능
+
+---
+
+## 8. 이벤트 기반 업데이트 시스템 구축하기
+
+### 비효율적인 방법: Update()에서 매 프레임 확인
+
+```csharp
+// ❌ 나쁜 예시 (강의에서 설명한 비효율적인 방법)
+void Update()
+{
+    UpdateSelectedVisual(); // 매 프레임마다 호출
+}
+
+```
+
+### 왜 비효율적인가?
+
+- \*Update()\*\*는 초당 60번 이상 호출됩니다.
+- 선택된 액션은 사용자가 클릭할 때만 바뀝니다.
+- 변화가 없는데도 계속 확인하는 것은 **자원 낭비**입니다.
+
+### 효율적인 방법: 이벤트 시스템 사용
+
+- **필요할 때만** UpdateSelectedVisual을 호출합니다.
+- 선택이 바뀔 때만 반응하는 것이 훨씬 효율적입니다.
+
+### UnitActionsSystem에 이벤트 추가
+
+```csharp
+public event EventHandler OnSelectedActionChanged;
+```
+
+- **event**: C#의 이벤트 키워드 (발행-구독 패턴)
+- **EventHandler**: 매개변수로 (object sender, EventArgs e)를 받는 델리게이트 타입
+- 이 이벤트는 "선택된 액션이 바뀌었다"는 신호를 보냅니다.
+
+### SetSelectedAction에서 이벤트 발생
+
+```csharp
+public void SetSelectedAction(BaseAction baseAction)
+{
+    selectedAction = baseAction;
+
+    // 이벤트 발생: "액션이 바뀌었어요!"
+    OnSelectedActionChanged?.Invoke(this, EventArgs.Empty);
+}
+
+```
+
+### 이벤트 발생 코드 설명
+
+- **OnSelectedActionChanged?.Invoke()**:
+  - `?` (null 조건 연산자): 이벤트에 구독자가 있을 때만 실행
+  - 구독자가 없으면 null이므로 에러 방지
+- **this**: 이벤트를 발생시킨 객체 (UnitActionsSystem)
+- **EventArgs.Empty**: 추가 데이터가 없음을 나타냄
+
+### UnitActionSystemUI에서 이벤트 구독
+
+```csharp
+void Start()
+{
+    // 이미 있던 코드: 유닛이 바뀔 때 구독
+    UnitActionsSystem.Instance.OnSelectedUnitChanged += UnitActionsSystem_OnSelectedUnitChanged;
+
+    // 새로 추가: 액션이 바뀔 때 구독
+    UnitActionsSystem.Instance.OnSelectedActionChanged += UnitActionsSystem_OnSelectedActionChanged;
+
+    CreateUnitActionButtons();
+    UpdateSelectedVisual();
+}
+
+```
+
+### 이벤트 핸들러 함수 추가
+
+```csharp
+private void UnitActionsSystem_OnSelectedActionChanged(object sender, EventArgs e)
+{
+    UpdateSelectedVisual();
+}
+
+```
+
+- 이벤트가 발생하면 이 함수가 자동으로 호출됩니다.
+- 그러면 UpdateSelectedVisual()이 실행되어 버튼 시각 요소가 업데이트됩니다.
+
+### UpdateSelectedVisual 함수 구현
+
+```csharp
+private void UpdateSelectedVisual()
+{
+    // 리스트에 있는 모든 버튼을 순회
+    foreach (ActionButtonUI actionButtonUI in actionButtonUIList)
+    {
+        // 각 버튼에게 "너의 시각 요소를 업데이트해"라고 명령
+        actionButtonUI.UpdateSelectedVisual();
+    }
+}
+
+```
+
+### foreach 문 설명
+
+- **foreach (타입 변수명 in 컬렉션)**:
+  - 리스트의 모든 요소를 하나씩 꺼내서 처리
+  - 자동으로 처음부터 끝까지 순회
+- 각 버튼이 스스로 업데이트를 담당하므로 코드가 깔끔합니다.
+
+### 호출 흐름 정리
+
+1. 사용자가 버튼을 클릭
+2. `SetSelectedAction()` 호출
+3. `OnSelectedActionChanged` 이벤트 발생
+4. `UnitActionsSystem_OnSelectedActionChanged()` 자동 실행
+5. `UpdateSelectedVisual()` 호출
+6. 모든 버튼의 `UpdateSelectedVisual()` 호출
+7. 각 버튼이 자신의 Selected 게임 오브젝트를 켜거나 끔
+
+### 두 가지 업데이트 케이스
+
+```csharp
+private void UnitActionsSystem_OnSelectedUnitChanged(object sender, EventArgs e)
+{
+    CreateUnitActionButtons();  // 유닛이 바뀌면 버튼을 새로 만들고
+    UpdateSelectedVisual();     // 시각 요소 업데이트
+}
+
+private void UnitActionsSystem_OnSelectedActionChanged(object sender, EventArgs e)
+{
+    UpdateSelectedVisual();     // 같은 유닛에서 액션만 바뀌면 시각 요소만 업데이트
+}
+
+```
+
+### 케이스별 설명
+
+- **유닛이 바뀔 때**:
+  - 다른 유닛은 다른 액션들을 가짐
+  - 버튼을 완전히 새로 만들어야 함
+  - 그 후 시각 요소도 업데이트
+- **액션만 바뀔 때**:
+  - 같은 버튼들 중에서 선택만 바뀜
+  - 버튼을 다시 만들 필요 없음
+  - 시각 요소만 업데이트하면 충분
+
+---
+
+## 9. 테스트 및 최종 확인
+
+### 초기 상태 확인
+
+- 게임을 시작하면 **Move 액션**이 기본으로 선택됩니다.
+- Move 버튼에만 녹색 테두리가 표시되어야 합니다.
+
+### 액션 변경 테스트
+
+1. **Spin 버튼**을 클릭합니다.
+2. Move 버튼의 녹색 테두리가 사라집니다.
+3. Spin 버튼에 녹색 테두리가 나타납니다.
+4. Spin 액션을 실행할 수 있습니다.
+
+### 유닛 변경 테스트
+
+1. 다른 유닛을 클릭해서 선택합니다.
+2. 버튼들이 새로 생성됩니다.
+3. 새 유닛의 기본 액션(Move)에 녹색 테두리가 표시됩니다.
+
+### 복합 테스트
+
+1. 유닛 A 선택 → Spin 액션 선택 → 녹색 테두리 확인
+2. 유닛 B 선택 → Move가 기본이므로 녹색 테두리 이동 확인
+3. 다시 유닛 A 선택 → Spin이 여전히 선택되어 있음 (시스템이 기억)
+
+### 시각적 피드백의 중요성
+
+- 사용자는 **현재 어떤 액션이 활성화되어 있는지** 명확하게 알 수 있습니다.
+- 실수로 잘못된 액션을 실행하는 것을 방지합니다.
+- UI/UX 품질이 크게 향상됩니다.
+
+---
+
+## 📚 핵심 개념 정리
+
+### 1. UI Stretch (늘리기)
+
+- Anchor를 사방으로 확장해서 부모 크기에 맞춤
+- 반응형 UI를 만들 때 유용
+
+### 2. 9-Slice (나인 슬라이스)
+
+- 이미지를 9개 영역으로 나누어 크기 조절
+- 모서리는 고정, 가운데는 늘어남
+- 테두리나 패널 같은 UI에 적합
+
+### 3. Sliced Image Type
+
+- Unity의 Image 컴포넌트에서 9-Slice 정보 활용
+- 왜곡 없이 이미지 크기 조절 가능
+
+### 4. 이벤트 기반 프로그래밍
+
+- **발행자(Publisher)**: 이벤트를 발생시키는 쪽 (UnitActionsSystem)
+- **구독자(Subscriber)**: 이벤트를 듣는 쪽 (UnitActionSystemUI)
+- 변화가 있을 때만 반응 → 효율적
+
+### 5. Singleton 패턴
+
+- `Instance`: 클래스의 유일한 인스턴스에 전역 접근
+- 게임 전체에서 단 하나만 존재해야 하는 시스템에 사용
+
+### 6. List<T>
+
+- 동적 배열 (크기 자동 조절)
+- Add(), Clear(), foreach로 쉽게 관리
+
+### 7. SetActive()
+
+- 게임 오브젝트를 켜거나 끄는 Unity 메서드
+- 화면에 보이기/숨기기를 제어
+
+---
+
+## 💡 다음 강의 예고
+
+다음 강의에서는 **액션 사용 후 버튼 비활성화** 기능을 추가합니다:
+
+- 이미 로직상으로는 액션을 한 번 쓰면 다른 액션을 못 쓰게 되어 있습니다.
+- 하지만 UI에는 아무런 표시가 없습니다.
+- **Action Blocker**를 추가해서 사용할 수 없는 액션을 시각적으로 표현할 예정입니다.
+
+# { 🎮 Unity UI - Action Busy 시스템 만들기 }
+
+이번 강의는 유닛이 행동 중일 때 버튼을 막고 "BUSY" 표시를 보여주는 UI 시스템을 구현하는 내용입니다. 이벤트 시스템과 제네릭을 활용하여 깔끔하게 구현합니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380471/notion-blog/_/3D_/_/_4_Actions_UI_-_3/image_6.png)
+
+---
+
+## 📋 목차
+
+1. [현재 문제점 파악하기](https://claude.ai/chat/b67ddbcc-b1c5-43ac-afae-38c342a9afd0#1-%ED%98%84%EC%9E%AC-%EB%AC%B8%EC%A0%9C%EC%A0%90-%ED%8C%8C%EC%95%85%ED%95%98%EA%B8%B0)
+2. [Action Busy UI 게임 오브젝트 설정하기](https://claude.ai/chat/b67ddbcc-b1c5-43ac-afae-38c342a9afd0#2-action-busy-ui-%EA%B2%8C%EC%9E%84-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+3. [UI 렌더링 순서 이해하기](https://claude.ai/chat/b67ddbcc-b1c5-43ac-afae-38c342a9afd0#3-ui-%EB%A0%8C%EB%8D%94%EB%A7%81-%EC%88%9C%EC%84%9C-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+4. [Busy 텍스트와 배경 이미지 만들기](https://claude.ai/chat/b67ddbcc-b1c5-43ac-afae-38c342a9afd0#4-busy-%ED%85%8D%EC%8A%A4%ED%8A%B8%EC%99%80-%EB%B0%B0%EA%B2%BD-%EC%9D%B4%EB%AF%B8%EC%A7%80-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+5. [씬 뷰에서 UI 가시성 관리하기](https://claude.ai/chat/b67ddbcc-b1c5-43ac-afae-38c342a9afd0#5-%EC%94%AC-%EB%B7%B0%EC%97%90%EC%84%9C-ui-%EA%B0%80%EC%8B%9C%EC%84%B1-%EA%B4%80%EB%A6%AC%ED%95%98%EA%B8%B0)
+6. [ActionBusyUI 스크립트 작성하기](https://claude.ai/chat/b67ddbcc-b1c5-43ac-afae-38c342a9afd0#6-actionbusyui-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%9E%91%EC%84%B1%ED%95%98%EA%B8%B0)
+7. [제네릭을 사용한 이벤트 시스템 개선하기](https://claude.ai/chat/b67ddbcc-b1c5-43ac-afae-38c342a9afd0#7-%EC%A0%9C%EB%84%A4%EB%A6%AD%EC%9D%84-%EC%82%AC%EC%9A%A9%ED%95%9C-%EC%9D%B4%EB%B2%A4%ED%8A%B8-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B0%9C%EC%84%A0%ED%95%98%EA%B8%B0)
+8. [UnitActionsSystem에 OnBusyChanged 이벤트 추가하기](https://claude.ai/chat/b67ddbcc-b1c5-43ac-afae-38c342a9afd0#8-unitactionssystem%EC%97%90-onbusychanged-%EC%9D%B4%EB%B2%A4%ED%8A%B8-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+9. [ActionBusyUI 스크립트 완성하기](https://claude.ai/chat/b67ddbcc-b1c5-43ac-afae-38c342a9afd0#9-actionbusyui-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%99%84%EC%84%B1%ED%95%98%EA%B8%B0)
+10. [테스트 및 동작 확인하기](https://claude.ai/chat/b67ddbcc-b1c5-43ac-afae-38c342a9afd0#10-%ED%85%8C%EC%8A%A4%ED%8A%B8-%EB%B0%8F-%EB%8F%99%EC%9E%91-%ED%99%95%EC%9D%B8%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. 현재 문제점 파악하기
+
+### 문제 상황
+
+- 현재 게임에서 유닛을 클릭하면 이동하고, 행동이 진행 중일 때 다른 버튼을 눌러도 작동하지 않음
+- 이미 코드로는 행동 중복 실행을 막아놨지만, **시각적 피드백이 없음**
+- 예를 들어:
+  - 멀리 이동 명령을 내린 후
+  - 즉시 "Spin" 버튼을 눌러도 아무 반응이 없음
+  - 사용자는 왜 버튼이 안 눌리는지 알 수 없음
+
+### 해결 방법
+
+- 행동이 진행 중일 때 버튼 위에 시각적 표시(Visual)를 추가
+- "BUSY" 라는 텍스트와 반투명 검은 배경으로 버튼들을 덮어서 표시
+
+---
+
+## 2. Action Busy UI 게임 오브젝트 설정하기
+
+### Canvas에 새 게임 오브젝트 추가
+
+1. **Hierarchy**에서 Canvas 선택
+2. 마우스 우클릭 → **Create Empty** 선택
+3. 이름을 **"ActionBusyUI"**로 변경
+
+### 위치와 앵커 설정
+
+- **Anchor Preset(앵커 프리셋)** 설정:
+  - Inspector 창에서 Rect Transform 컴포넌트 찾기
+  - 좌측 상단의 앵커 아이콘 클릭
+  - **Bottom(하단)** 앵커 선택
+  - 이렇게 하면 UI가 화면 하단에 고정됨
+- **위치 조정**:
+  - 버튼들 바로 위에 위치하도록 Y 좌표를 조정
+  - 버튼들을 완전히 덮을 수 있는 위치에 배치
+
+**앵커(Anchor) 개념**:
+
+- UI 요소가 화면 크기가 변해도 특정 위치를 유지하게 하는 기준점
+- Bottom 앵커는 화면 하단을 기준으로 위치를 고정시킴
+
+---
+
+## 3. UI 렌더링 순서 이해하기
+
+### Hierarchy 순서와 렌더링 순서의 관계
+
+Unity UI Canvas에서는 **Hierarchy의 순서가 곧 렌더링 순서**입니다.
+
+- **위에 있는 오브젝트가 먼저 렌더링됨** (뒤에 그려짐)
+- **아래에 있는 오브젝트가 나중에 렌더링됨** (위에 그려짐)
+
+### 올바른 순서 설정
+
+우리가 원하는 것:
+
+- Action 버튼들이 먼저 그려지고
+- 그 위에 Busy UI가 그려져서 버튼을 덮어야 함
+
+따라서 Hierarchy 순서:
+
+```
+Canvas
+├── UnitActionButtons (먼저 렌더링 - 뒤쪽)
+└── ActionBusyUI (나중에 렌더링 - 앞쪽)
+```
+
+**ActionBusyUI가 UnitActionButtons 아래에 위치**해야 버튼들 위에 표시됩니다.
+
+---
+
+## 4. Busy 텍스트와 배경 이미지 만들기
+
+### 배경 이미지 만들기
+
+1. ActionBusyUI 오브젝트 선택
+2. 마우스 우클릭 → **UI → Image** 선택
+3. 이름은 기본값 그대로 사용
+
+### 이미지 Transform 설정 (Stretch to Fill)
+
+- **Anchor Preset** 클릭
+- **Alt 키를 누른 채로** Stretch(늘리기) 옵션 선택
+  - 좌측 상단의 십자가 모양 아이콘
+  - Alt를 누르면 Position도 함께 설정됨
+- **결과**:
+  - Left, Top, Right, Bottom 모두 **0**으로 설정됨
+  - 이미지가 부모(ActionBusyUI)의 전체 영역을 꽉 채움
+
+**Stretch 설정 개념**:
+
+- 자식 UI 요소를 부모의 크기에 맞춰 자동으로 늘림
+- Left/Top/Right/Bottom = 0 → 부모와 정확히 같은 크기
+
+### 배경 색상 설정
+
+- Image 컴포넌트의 **Color** 속성 변경
+- 검은색(Black)을 선택하되 **투명도(Alpha)를 낮춰서** 반투명하게 만듦
+- 이렇게 하면 버튼들이 살짝 보이면서도 덮여있는 느낌을 줌
+
+---
+
+### Busy 텍스트 만들기
+
+1. Image 오브젝트 선택
+2. 마우스 우클릭 → **UI → Text** 선택
+3. Text 오브젝트가 Image의 자식으로 생성됨
+
+### 텍스트 내용 설정
+
+- Text 컴포넌트에서:
+  - 내용을 **"BUSY"**로 변경
+
+### 텍스트 Transform 설정
+
+- 배경 이미지와 동일하게 **Stretch** 설정:
+  - Alt + Stretch Preset 선택
+  - Left, Top, Right, Bottom 모두 **0**
+  - 텍스트가 이미지 전체를 차지함
+
+### 부모 크기 조정
+
+- 다시 ActionBusyUI (최상위 부모) 선택
+- Rect Transform의 크기를 조정하여:
+  - 모든 버튼들을 완전히 덮을 수 있을 만큼 크게 설정
+  - 예: Width와 Height를 적절히 늘림
+
+### 텍스트 스타일 설정
+
+**Font 설정**:
+
+- Font Style: **Bold** (굵게)
+
+**Alignment(정렬)**:
+
+- Horizontal: **Center** (가로 가운데)
+- Vertical: **Middle** (세로 가운데)
+
+**Color(색상)**:
+
+- 주황색(Orange) 계열로 설정
+- 눈에 잘 띄는 밝은 색상 사용
+
+이렇게 하면 검은 반투명 배경 위에 주황색 굵은 "BUSY" 텍스트가 중앙에 표시됩니다.
+
+---
+
+## 5. 씬 뷰에서 UI 가시성 관리하기
+
+### Hierarchy의 가시성 버튼
+
+Hierarchy 창의 각 오브젝트 왼쪽에는 두 개의 버튼이 있습니다:
+
+### 🔒 Lock 버튼 (왼쪽 버튼)
+
+- **기능**: 오브젝트 선택을 잠금
+- **사용법**: 버튼을 클릭하면 자물쇠 아이콘으로 변함
+- **효과**:
+  - Scene View나 Hierarchy에서 오브젝트를 클릭해도 선택되지 않음
+  - 실수로 선택하거나 이동하는 것을 방지
+  - 예: Busy UI를 잠그면 Scene View에서 클릭해도 선택 안 됨
+
+### 👁️ Visibility 버튼 (오른쪽 버튼)
+
+- **기능**: Scene View에서만 오브젝트를 숨김
+- **사용법**: 눈 아이콘을 클릭하면 회색으로 변하며 비활성화됨
+- **효과**:
+  - **Scene View에서만** 안 보임
+  - **Game View에서는 여전히 보임**
+  - 게임 오브젝트는 여전히 활성화 상태
+
+### SetActive vs Scene View 가시성의 차이
+
+**중요한 차이점**:
+
+1. **GameObject.SetActive(false)**:
+   - 게임 오브젝트를 완전히 비활성화
+   - Game View와 Scene View 모두에서 안 보임
+   - 컴포넌트들도 작동하지 않음
+2. **Scene View Visibility 끄기**:
+   - Scene View에서만 안 보임
+   - Game View에서는 여전히 보임
+   - 게임 오브젝트는 완전히 활성화 상태
+   - 모든 컴포넌트가 정상 작동
+
+### 실용적인 활용
+
+UI 요소가 많아지면 Scene View가 복잡해집니다:
+
+- 작업하지 않는 UI는 Scene View에서 숨김
+- 필요한 UI만 보이게 하여 작업 효율 향상
+- Game View에서는 모두 정상적으로 보임
+
+---
+
+## 6. ActionBusyUI 스크립트 작성하기
+
+### 스크립트 생성
+
+1. **Project** 창에서 Scripts 폴더 선택
+2. 마우스 우클릭 → **Create → C# Script**
+3. 이름을 **"ActionBusyUI"**로 설정
+
+### 스크립트 연결
+
+1. Hierarchy에서 ActionBusyUI 게임 오브젝트 선택
+2. 방금 만든 ActionBusyUI 스크립트를 드래그하여 Inspector에 드롭
+3. 또는 **Add Component** 버튼으로 추가
+
+### 기본 구조 작성
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class ActionBusyUI : MonoBehaviour
+{
+    // Show 함수: UI를 표시하는 함수
+    private void Show()
+    {
+        gameObject.SetActive(true);  // 이 게임 오브젝트를 활성화
+    }
+
+    // Hide 함수: UI를 숨기는 함수
+    private void Hide()
+    {
+        gameObject.SetActive(false);  // 이 게임 오브젝트를 비활성화
+    }
+}
+```
+
+**GameObject.SetActive() 개념**:
+
+- `gameObject`는 이 스크립트가 붙어있는 게임 오브젝트를 가리킴
+- `SetActive(true)`: 오브젝트를 활성화 → 화면에 보임
+- `SetActive(false)`: 오브젝트를 비활성화 → 화면에서 사라짐
+
+### 학습 도전 과제
+
+강의에서 제시한 도전 과제:
+
+1. **목표**: Busy 상태에 따라 UI를 보여주거나 숨기는 로직 추가
+2. **힌트1**: `GameObject.SetActive()`를 사용하여 UI 표시/숨김 처리
+3. **힌트2**: UnitActionsSystem에 이벤트를 만들어서 Busy 상태 변화를 감지
+
+---
+
+## 7. 제네릭을 사용한 이벤트 시스템 개선하기
+
+### 기존 이벤트 방식의 한계
+
+지금까지 사용한 이벤트 방식:
+
+```csharp
+public event EventHandler OnSomeEvent;
+
+// 발생시킬 때
+OnSomeEvent?.Invoke(this, EventArgs.Empty);
+
+// 구독할 때
+void HandleEvent(object sender, EventArgs e)
+{
+    // 추가 데이터가 필요하면 별도 함수를 호출해야 함
+    bool busyState = GetBusyState();
+}
+```
+
+**문제점**:
+
+- 이벤트를 받은 후 추가 정보가 필요하면 별도 함수를 호출해야 함
+- 비효율적이고 코드가 복잡해짐
+
+---
+
+### 제네릭 EventHandler란?
+
+C#의 EventHandler는 **제네릭 버전**을 제공합니다:
+
+```csharp
+EventHandler<TEventArgs>
+```
+
+**제네릭(Generics)이란?**:
+
+- 타입을 나중에 지정할 수 있게 해주는 기능
+- `<T>` 안에 원하는 타입을 넣을 수 있음
+- 여러 타입에 대해 같은 코드를 재사용 가능
+
+**EventHandler<T>의 함수 시그니처**:
+
+```csharp
+// 일반 EventHandler
+void Handler(object sender, EventArgs e)
+
+// 제네릭 EventHandler<bool>
+void Handler(object sender, bool e)  // 두 번째 매개변수가 bool 타입!
+```
+
+---
+
+### 제네릭 EventHandler 사용 예시
+
+```csharp
+// bool 값을 전달하는 이벤트 선언
+// 이벤트를 발생시킬 때 bool 값을 "보내는" 것
+public event EventHandler<bool> OnBusyChanged;
+
+// 이벤트 발생 (busy 상태를 직접 전달)
+OnBusyChanged?.Invoke(this, true);  // busy 상태가 true로 변경됨
+
+// 이벤트 구독
+void HandleBusyChanged(object sender, bool isBusy)
+{
+    // isBusy 매개변수로 바로 상태를 받음!
+    if (isBusy)
+    {
+        // Busy 상태일 때 처리
+    }
+}
+```
+
+**장점**:
+
+- 이벤트 발생 시 필요한 데이터를 **직접 전달**
+- 구독자는 별도 함수 호출 없이 **바로 데이터 사용** 가능
+- 코드가 간결하고 효율적
+
+---
+
+### Custom EventArgs 클래스 방식 (대안)
+
+또 다른 방법으로는 EventArgs를 상속받은 커스텀 클래스를 만들 수 있습니다:
+
+```csharp
+// EventArgs를 상속받은 커스텀 클래스
+public class BusyChangedEventArgs : EventArgs
+{
+    public bool IsBusy { get; set; }
+}
+
+// 이 클래스를 사용하는 이벤트
+public event EventHandler<BusyChangedEventArgs> OnBusyChanged;
+
+// 발생시킬 때
+OnBusyChanged?.Invoke(this, new BusyChangedEventArgs { IsBusy = true });
+
+```
+
+**이 방식의 특징**:
+
+- 더 명확한 타입 정의
+- 여러 개의 데이터를 한번에 전달 가능
+- 하지만 추가 클래스를 정의해야 함
+
+**이번 강의의 선택**:
+
+- 단순히 `bool` 값 하나만 전달하면 되므로
+- `EventHandler<bool>`을 직접 사용
+- 추가 클래스 정의 없이 간단하게 구현
+
+---
+
+## 8. UnitActionsSystem에 OnBusyChanged 이벤트 추가하기
+
+### OnBusyChanged 이벤트 선언
+
+UnitActionsSystem 스크립트를 열어서 다른 이벤트들과 함께 추가:
+
+```csharp
+public class UnitActionsSystem : MonoBehaviour
+{
+    public static UnitActionsSystem Instance { get; private set; }
+
+    // 기존 이벤트들
+    public event EventHandler OnSelectedUnitChanged;
+    public event EventHandler OnSelectedActionChanged;
+
+    // 새로 추가하는 이벤트: bool 타입을 전달하는 제네릭 EventHandler
+    public event EventHandler<bool> OnBusyChanged;
+
+    // ... 나머지 코드
+}
+
+```
+
+**코드 설명**:
+
+- `EventHandler<bool>`: bool 타입의 데이터를 전달할 수 있는 이벤트 핸들러
+- `OnBusyChanged`: Busy 상태가 변경될 때마다 발생하는 이벤트
+- `public`: 다른 스크립트에서 이 이벤트를 구독할 수 있도록 공개
+
+---
+
+### SetBusy() 함수에 이벤트 발생 추가
+
+```csharp
+private void SetBusy()
+{
+    isBusy = true;  // busy 상태를 true로 설정
+
+    // 이벤트 발생: busy 상태(true)를 전달
+    OnBusyChanged?.Invoke(this, isBusy);
+}
+
+```
+
+**코드 설명**:
+
+- `OnBusyChanged?.Invoke(this, isBusy)`:
+  - `OnBusyChanged?`: 이벤트가 null이 아니면 (구독자가 있으면)
+  - `Invoke(this, isBusy)`: 이벤트를 발생시키고 현재 busy 상태(true)를 전달
+  - `this`: 이벤트를 발생시킨 객체 (UnitActionsSystem 자신)
+  - `isBusy`: 현재 busy 상태값 (true)
+
+---
+
+### ClearBusy() 함수에 이벤트 발생 추가
+
+```csharp
+private void ClearBusy()
+{
+    isBusy = false;  // busy 상태를 false로 설정
+
+    // 이벤트 발생: busy 상태(false)를 전달
+    OnBusyChanged?.Invoke(this, isBusy);
+}
+
+```
+
+**코드 설명**:
+
+- 동일한 방식으로 이벤트 발생
+- 이번에는 `isBusy`가 `false`이므로 false 값이 전달됨
+
+---
+
+### 이벤트가 발생하는 시점 정리
+
+1. **행동 시작** → `SetBusy()` 호출 → `isBusy = true` → `OnBusyChanged(true)` 발생
+2. **행동 완료** → `ClearBusy()` 호출 → `isBusy = false` → `OnBusyChanged(false)` 발생
+
+이렇게 하면 Busy 상태가 변경될 때마다 자동으로 이벤트가 발생하여 구독자들에게 알려줍니다.
+
+---
+
+## 9. ActionBusyUI 스크립트 완성하기
+
+### Start 함수 추가
+
+```csharp
+public class ActionBusyUI : MonoBehaviour
+{
+    private void Start()
+    {
+        // UnitActionsSystem의 OnBusyChanged 이벤트 구독
+        UnitActionsSystem.Instance.OnBusyChanged += UnitActionsSystem_OnBusyChanged;
+
+        // 시작할 때는 UI를 숨김 (기본적으로 busy 상태가 아니므로)
+        Hide();
+    }
+
+    // ... Show(), Hide() 함수들
+}
+
+```
+
+**Start() 사용 이유**:
+
+- `Awake()`가 아닌 `Start()`를 사용하는 이유:
+  - `UnitActionsSystem.Instance`라는 **외부 참조**에 접근하기 때문
+  - `Instance`가 `Awake()`에서 설정되므로
+  - `Start()`에서 접근해야 안전하게 가져올 수 있음
+
+**구독 문법 설명**:
+
+```csharp
+UnitActionsSystem.Instance.OnBusyChanged += UnitActionsSystem_OnBusyChanged;
+```
+
+- `+=`: 이벤트에 함수를 구독(등록)하는 연산자
+- `UnitActionsSystem_OnBusyChanged`: 이벤트가 발생하면 호출될 함수 이름
+- 이 함수는 아래에서 정의할 예정
+
+**Hide() 호출 이유**:
+
+- 게임 시작 시 어떤 행동도 진행 중이 아니므로
+- UI는 숨겨진 상태로 시작해야 함
+
+---
+
+### 이벤트 핸들러 함수 작성
+
+```csharp
+// OnBusyChanged 이벤트가 발생했을 때 호출되는 함수
+private void UnitActionsSystem_OnBusyChanged(object sender, bool isBusy)
+{
+    // isBusy 매개변수로 현재 busy 상태를 바로 받음
+
+    if (isBusy)  // busy 상태가 true면
+    {
+        Show();  // UI를 표시
+    }
+    else  // busy 상태가 false면
+    {
+        Hide();  // UI를 숨김
+    }
+}
+```
+
+**함수 시그니처 설명**:
+
+- `private void`: 이 스크립트 내부에서만 사용하는 함수
+- `UnitActionsSystem_OnBusyChanged`: 함수 이름 (명명 규칙: 이벤트소스\_이벤트이름)
+- `object sender`: 이벤트를 발생시킨 객체 (여기서는 UnitActionsSystem)
+- `bool isBusy`: **제네릭으로 전달받는 bool 값** - busy 상태
+
+**로직 설명**:
+
+- `isBusy`가 true → 행동 진행 중 → UI 표시
+- `isBusy`가 false → 행동 완료 → UI 숨김
+
+---
+
+### 완성된 전체 코드
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class ActionBusyUI : MonoBehaviour
+{
+    // Start: 초기화 함수
+    private void Start()
+    {
+        // UnitActionsSystem의 OnBusyChanged 이벤트 구독
+        UnitActionsSystem.Instance.OnBusyChanged += UnitActionsSystem_OnBusyChanged;
+
+        // 시작할 때는 UI를 숨긴 상태로 시작
+        Hide();
+    }
+
+    // Show: UI를 표시하는 함수
+    private void Show()
+    {
+        gameObject.SetActive(true);  // 이 게임 오브젝트 활성화
+    }
+
+    // Hide: UI를 숨기는 함수
+    private void Hide()
+    {
+        gameObject.SetActive(false);  // 이 게임 오브젝트 비활성화
+    }
+
+    // 이벤트 핸들러: Busy 상태가 변경될 때 호출됨
+    private void UnitActionsSystem_OnBusyChanged(object sender, bool isBusy)
+    {
+        if (isBusy)  // busy 상태면
+        {
+            Show();  // UI 표시
+        }
+        else  // busy 상태가 아니면
+        {
+            Hide();  // UI 숨김
+        }
+    }
+}
+
+```
+
+**코드의 흐름**:
+
+1. 게임 시작 → `Start()` 실행 → 이벤트 구독 + UI 숨김
+2. 행동 시작 → `SetBusy()` → `OnBusyChanged(true)` → `Show()` → UI 표시
+3. 행동 완료 → `ClearBusy()` → `OnBusyChanged(false)` → `Hide()` → UI 숨김
+
+---
+
+## 10. 테스트 및 동작 확인하기
+
+### Play 모드로 테스트
+
+1. Unity 에디터에서 **Play 버튼** 클릭
+2. 게임 시작 시:
+   - Busy UI가 보이지 않음 ✓
+   - 버튼들이 정상적으로 보임 ✓
+
+### 이동 명령 테스트
+
+1. 유닛 선택 후 멀리 클릭하여 이동 명령
+2. **즉시 "BUSY" UI가 나타남** ✓
+   - 주황색 "BUSY" 텍스트 표시
+   - 반투명 검은 배경으로 버튼 덮음
+3. 이동 완료되면:
+   - **자동으로 "BUSY" UI가 사라짐** ✓
+   - 버튼들이 다시 사용 가능해짐
+
+### Spin 행동 테스트
+
+1. "Spin" 버튼 클릭
+2. **즉시 "BUSY" UI가 나타남** ✓
+3. Spin 애니메이션 완료되면:
+   - **자동으로 "BUSY" UI가 사라짐** ✓
+
+### 버튼 차단 확인
+
+1. 행동 진행 중 (BUSY 표시 중)
+2. 다른 버튼 클릭 시도
+3. **클릭이 차단됨** ✓
+   - UI가 버튼 위를 덮고 있어 클릭이 전달되지 않음
+   - 시각적으로 왜 버튼이 안 눌리는지 명확함
+
+---
+
+## 📚 핵심 개념 정리
+
+### 1. UI 렌더링 순서
+
+- Hierarchy 순서 = 렌더링 순서
+- 아래에 있는 오브젝트가 위에 그려짐
+
+### 2. Stretch 레이아웃
+
+- Alt + Anchor Preset으로 빠른 설정
+- 부모 크기에 맞춰 자동으로 늘어남
+
+### 3. Scene View 가시성
+
+- Lock: 선택 방지
+- Visibility: Scene View에서만 숨김
+- SetActive와는 다름
+
+### 4. 제네릭 EventHandler
+
+- `EventHandler<T>`: 타입을 지정할 수 있는 이벤트 핸들러
+- 이벤트 발생 시 데이터를 직접 전달 가능
+- 별도 함수 호출 없이 효율적
+
+### 5. 이벤트 기반 UI 업데이트
+
+- 상태 변경 → 이벤트 발생 → UI 자동 업데이트
+- 코드 결합도를 낮추는 깔끔한 구조
+
+---
+
+## 🎯 다음 강의 예고
+
+현재는 행동을 무제한으로 할 수 있는 문제가 있습니다:
+
+- Spin을 무한정 반복 가능
+- 이동을 계속할 수 있음
+
+**다음 강의에서는**:
+
+- **Action Point(행동 포인트) 시스템** 추가
+- 각 행동마다 코스트(비용) 설정
+- 포인트를 소모하여 행동 제한하기
+
+# { 🎮 액션 포인트(Action Points) 시스템 구현하기 }
+
+이번 강의는 유닛의 행동에 제한을 두기 위해 **액션 포인트 시스템**을 구현하여, 각 유닛이 턴당 제한된 행동만 할 수 있도록 만드는 내용입니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380471/notion-blog/_/3D_/_/_4_Actions_UI_-_3/image_7.png)
+
+---
+
+## 📋 목차
+
+1. [액션 포인트 시스템 개념 이해하기](https://claude.ai/chat/0a5bc5c4-5e90-4d11-bb13-64a2d8f96165#1-%EC%95%A1%EC%85%98-%ED%8F%AC%EC%9D%B8%ED%8A%B8-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Unit 클래스에 액션 포인트 추가하기](https://claude.ai/chat/0a5bc5c4-5e90-4d11-bb13-64a2d8f96165#2-unit-%ED%81%B4%EB%9E%98%EC%8A%A4%EC%97%90-%EC%95%A1%EC%85%98-%ED%8F%AC%EC%9D%B8%ED%8A%B8-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+3. [BaseAction에 액션 비용 정의하기](https://claude.ai/chat/0a5bc5c4-5e90-4d11-bb13-64a2d8f96165#3-baseaction%EC%97%90-%EC%95%A1%EC%85%98-%EB%B9%84%EC%9A%A9-%EC%A0%95%EC%9D%98%ED%95%98%EA%B8%B0)
+4. [액션 포인트 소비 로직 구현하기](https://claude.ai/chat/0a5bc5c4-5e90-4d11-bb13-64a2d8f96165#4-%EC%95%A1%EC%85%98-%ED%8F%AC%EC%9D%B8%ED%8A%B8-%EC%86%8C%EB%B9%84-%EB%A1%9C%EC%A7%81-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+5. [UnitActionSystem에 액션 포인트 검증 추가하기](https://claude.ai/chat/0a5bc5c4-5e90-4d11-bb13-64a2d8f96165#5-unitactionsystem%EC%97%90-%EC%95%A1%EC%85%98-%ED%8F%AC%EC%9D%B8%ED%8A%B8-%EA%B2%80%EC%A6%9D-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+6. [액션 포인트 UI 표시하기](https://claude.ai/chat/0a5bc5c4-5e90-4d11-bb13-64a2d8f96165#6-%EC%95%A1%EC%85%98-%ED%8F%AC%EC%9D%B8%ED%8A%B8-ui-%ED%91%9C%EC%8B%9C%ED%95%98%EA%B8%B0)
+7. [액션 포인트 UI 업데이트 로직 구현하기](https://claude.ai/chat/0a5bc5c4-5e90-4d11-bb13-64a2d8f96165#7-%EC%95%A1%EC%85%98-%ED%8F%AC%EC%9D%B8%ED%8A%B8-ui-%EC%97%85%EB%8D%B0%EC%9D%B4%ED%8A%B8-%EB%A1%9C%EC%A7%81-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. 액션 포인트 시스템 개념 이해하기
+
+### 현재 문제점
+
+- 현재 게임에서는 유닛이 **무제한으로 행동**할 수 있음
+- 이동도 무한, 회전도 무한으로 할 수 있어서 게임 밸런스가 없음
+
+### 액션 포인트 시스템의 두 가지 설계 방식
+
+### 방식 1: 전역(Global) 액션 포인트
+
+- **모든 유닛이 액션 포인트를 공유**하는 방식
+- 예: 총 4 액션 포인트가 있다면
+  - 한 유닛이 4번 행동
+  - 또는 유닛 A가 1번, 유닛 B가 3번
+  - 또는 유닛 A가 2번, 유닛 B가 2번
+- **단점**: 한 유닛이 턴당 10번 행동하는 등 밸런스가 깨질 수 있음
+
+### 방식 2: 유닛별(Per-Unit) 액션 포인트 ⭐ (채택)
+
+- **각 유닛이 자신만의 액션 포인트**를 가지는 방식
+- 각 유닛은 독립적으로 행동 제한을 받음
+- **장점**: 밸런스 관리가 훨씬 쉬움
+
+### 액션 비용 설계 방식
+
+### 방식 1: 모든 액션 동일 비용
+
+- 모든 행동이 1 액션 포인트 소비
+- 구현이 단순함
+
+### 방식 2: 액션별 다른 비용 ⭐ (채택)
+
+- 각 액션마다 다른 비용 설정 가능
+- 예: Move = 1 포인트, Spin = 2 포인트
+- 확장성이 좋음 (나중에 새로운 액션 추가 시 비용 조절 가능)
+
+---
+
+## 2. Unit 클래스에 액션 포인트 추가하기
+
+### 액션 포인트 변수 추가
+
+```csharp
+public class Unit : MonoBehaviour
+{
+    private GridPosition gridPosition;
+    private MoveAction moveAction;
+    private SpinAction spinAction;
+    private BaseAction[] baseActionArray;
+
+    // 액션 포인트 변수 추가 (기본값 2)
+    private int actionPoints = 2;  // 각 유닛이 턴당 사용할 수 있는 행동 횟수
+}
+```
+
+**핵심 개념**:
+
+- `private int actionPoints = 2`: 유닛이 가진 액션 포인트 (초기값 2)
+- 이 값이 0이 되면 더 이상 행동할 수 없음
+
+---
+
+## 3. BaseAction에 액션 비용 정의하기
+
+### GetActionPointCost() 함수 추가
+
+```csharp
+public abstract class BaseAction : MonoBehaviour
+{
+    protected Unit unit;
+    protected bool isActive = false;
+    protected Action onActionComplete;
+
+    protected virtual void Awake()
+    {
+        unit = GetComponent<Unit>();
+    }
+
+    // 기존 추상 메서드들...
+    public abstract string GetActionName();
+    public abstract void TakeAction(GridPosition gridPosition, Action onActionComplete);
+    public abstract List<GridPosition> GetValidActionGridPositionList();
+
+    // 새로운 virtual 메서드: 액션 비용 반환
+    public virtual int GetActionPointCost()
+    {
+        return 1;  // 기본 비용은 1 액션 포인트
+    }
+}
+
+```
+
+**핵심 개념**:
+
+- `virtual` 키워드 사용: 자식 클래스에서 **선택적으로** 오버라이드 가능
+- 기본 반환값 `1`: 모든 액션의 기본 비용은 1 포인트
+- `abstract`가 아닌 `virtual`을 선택한 이유:
+  - `abstract`: 모든 자식 클래스가 **반드시** 구현해야 함
+  - `virtual`: 기본값을 제공하되, 필요한 경우에만 오버라이드
+
+### SpinAction에서 비용 오버라이드
+
+```csharp
+public class SpinAction : BaseAction
+{
+    private float totalSpinAmount;
+
+    void Update()
+    {
+        if (!isActive)
+        {
+            return;
+        }
+        float spinAddAmount = 360f * Time.deltaTime;
+        transform.eulerAngles += new Vector3(0, spinAddAmount, 0);
+
+        totalSpinAmount += spinAddAmount;
+        if (totalSpinAmount >= 360f)
+        {
+            isActive = false;
+            onActionComplete();
+        }
+    }
+
+    // 기존 메서드들...
+    public override void TakeAction(GridPosition gridPosition, Action onActionComplete)
+    {
+        this.onActionComplete = onActionComplete;
+        isActive = true;
+        totalSpinAmount = 0f;
+    }
+
+    public override string GetActionName()
+    {
+        return "Spin";
+    }
+
+    public override List<GridPosition> GetValidActionGridPositionList()
+    {
+        GridPosition unitGridPosition = unit.GetGridPosition();
+        return new List<GridPosition> { unitGridPosition };
+    }
+
+    // GetActionPointCost 오버라이드: Spin은 2 포인트 소비
+    public override int GetActionPointCost()
+    {
+        return 2;  // Spin 액션은 2 액션 포인트 필요
+    }
+}
+
+```
+
+**핵심 개념**:
+
+- `override` 키워드: 부모 클래스의 `virtual` 메서드를 재정의
+- SpinAction은 더 비싼 행동이므로 2 포인트 소비
+- MoveAction은 오버라이드하지 않았으므로 기본값 1 포인트 사용
+
+---
+
+## 4. 액션 포인트 소비 로직 구현하기
+
+### CanSpendActionPointsToTakeAction() - 액션 포인트 확인 함수
+
+```csharp
+public class Unit : MonoBehaviour
+{
+    // ... 기존 변수들 ...
+    private int actionPoints = 2;
+
+    // 특정 액션을 수행할 수 있는지 확인하는 함수
+    public bool CanSpendActionPointsToTakeAction(BaseAction baseAction)
+    {
+        // 현재 보유한 액션 포인트가 액션 비용보다 크거나 같은지 확인
+        if (actionPoints >= baseAction.GetActionPointCost())
+        {
+            return true;   // 충분한 포인트 보유 → 액션 가능
+        }
+        else
+        {
+            return false;  // 포인트 부족 → 액션 불가능
+        }
+
+        // 위 코드는 아래처럼 간단히 작성 가능:
+        // return actionPoints >= baseAction.GetActionPointCost();
+    }
+}
+```
+
+**핵심 개념**:
+
+- `actionPoints >= baseAction.GetActionPointCost()`:
+  - 현재 포인트가 액션 비용 이상이면 `true` 반환
+  - 포인트가 부족하면 `false` 반환
+- 이 함수는 **확인만** 하고 실제로 포인트를 소비하지는 않음
+
+### SpendActionPoints() - 액션 포인트 소비 함수
+
+```csharp
+public class Unit : MonoBehaviour
+{
+    // ... 기존 코드 ...
+
+    // 액션 포인트를 실제로 소비하는 private 함수
+    private void SpendActionPoints(int amount)
+    {
+        actionPoints -= amount;  // 현재 포인트에서 amount만큼 차감
+    }
+}
+
+```
+
+**핵심 개념**:
+
+- `private`: 외부에서 직접 호출 불가 (포인트 소비를 제한적으로 관리)
+- `amount` 만큼 `actionPoints`를 감소시킴
+- 음수 체크는 하지 않음 (대신 사용 전에 `CanSpend...`로 항상 확인)
+
+### TrySpendActionPointsToTakeAction() - 통합 함수
+
+```csharp
+public class Unit : MonoBehaviour
+{
+    // ... 기존 코드 ...
+
+    // 액션 포인트 확인 + 소비를 한 번에 처리하는 함수
+    public bool TrySpendActionPointsToTakeAction(BaseAction baseAction)
+    {
+        // 1. 먼저 액션을 수행할 수 있는지 확인
+        if (CanSpendActionPointsToTakeAction(baseAction))
+        {
+            // 2. 가능하다면 포인트를 소비
+            SpendActionPoints(baseAction.GetActionPointCost());
+            return true;   // 성공적으로 소비됨
+        }
+        else
+        {
+            return false;  // 포인트가 부족해서 소비 실패
+        }
+    }
+}
+
+```
+
+**핵심 개념**:
+
+- `Try` 접두사: 시도는 하지만 실패할 수 있다는 의미
+- 반환값 `bool`:
+  - `true`: 포인트 소비 성공
+  - `false`: 포인트 부족으로 소비 실패
+- **두 작업을 원자적으로 처리**:
+  1. 확인 (Can)
+  2. 소비 (Spend)
+- 이렇게 하면 외부에서 하나의 함수로 모든 처리 가능
+
+### GetActionPoints() - 액션 포인트 조회 함수
+
+```csharp
+public class Unit : MonoBehaviour
+{
+    // ... 기존 코드 ...
+
+    // 현재 보유한 액션 포인트를 반환 (UI 표시용)
+    public int GetActionPoints()
+    {
+        return actionPoints;
+    }
+}
+
+```
+
+**핵심 개념**:
+
+- UI에서 현재 액션 포인트를 표시하기 위해 필요
+- `private` 변수를 외부에서 읽을 수 있게 해주는 getter 함수
+
+---
+
+## 5. UnitActionSystem에 액션 포인트 검증 추가하기
+
+### HandleSelectedAction() 함수 수정 - 방법 1 (중첩 if)
+
+```csharp
+public class UnitActionsSystem : MonoBehaviour
+{
+    // ... 기존 변수들 ...
+
+    private void HandleSelectedAction()
+    {
+        if (Input.GetMouseButtonDown(0))  // 마우스 왼쪽 버튼 클릭
+        {
+            // 클릭한 위치의 그리드 좌표 가져오기
+            GridPosition mouseGridPosition = LevelGrid.Instance.GetGridPosition(MouseWorld.GetPosition());
+
+            // 첫 번째 검증: 유효한 액션 위치인가?
+            if (selectedAction.IsValidActionGridPosition(mouseGridPosition))
+            {
+                // 두 번째 검증: 액션 포인트를 소비할 수 있는가?
+                if (selectedUnit.TrySpendActionPointsToTakeAction(selectedAction))
+                {
+                    // 모든 검증 통과 → 액션 실행
+                    SetBusy();  // 시스템을 busy 상태로 설정
+                    selectedAction.TakeAction(mouseGridPosition, ClearBusy);
+
+                    // 액션 시작 이벤트 발생 (UI 업데이트용)
+                    OnActionStarted?.Invoke(this, EventArgs.Empty);
+                }
+            }
+        }
+    }
+}
+
+```
+
+**핵심 개념 (중첩 if 방식)**:
+
+- **이중 검증 구조**:
+  1. 액션 위치가 유효한가?
+  2. 액션 포인트가 충분한가?
+- 두 조건을 모두 만족해야 액션 실행
+- **단점**: if문이 중첩되어 들여쓰기가 깊어짐 (가독성 저하)
+
+### HandleSelectedAction() 함수 수정 - 방법 2 (Early Return) ⭐
+
+```csharp
+public class UnitActionsSystem : MonoBehaviour
+{
+    // ... 기존 변수들 ...
+
+    private void HandleSelectedAction()
+    {
+        if (Input.GetMouseButtonDown(0))  // 마우스 왼쪽 버튼 클릭
+        {
+            // 클릭한 위치의 그리드 좌표 가져오기
+            GridPosition mouseGridPosition = LevelGrid.Instance.GetGridPosition(MouseWorld.GetPosition());
+
+            // 검증 1: 유효하지 않은 위치면 즉시 종료 (Early Return)
+            if (!selectedAction.IsValidActionGridPosition(mouseGridPosition))
+            {
+                return;  // 함수 즉시 종료
+            }
+
+            // 검증 2: 액션 포인트가 부족하면 즉시 종료 (Early Return)
+            if (!selectedUnit.TrySpendActionPointsToTakeAction(selectedAction))
+            {
+                return;  // 함수 즉시 종료
+            }
+
+            // 여기까지 왔다면 모든 검증 통과 → 액션 실행
+            SetBusy();
+            selectedAction.TakeAction(mouseGridPosition, ClearBusy);
+
+            // 액션 시작 이벤트 발생
+            OnActionStarted?.Invoke(this, EventArgs.Empty);
+        }
+    }
+}
+
+```
+
+**핵심 개념 (Early Return 방식)**:
+
+- **Guard Clause 패턴**: 조건이 맞지 않으면 즉시 반환
+- **장점**:
+  - 들여쓰기가 깊어지지 않음 (가독성 향상)
+  - 실패 조건을 먼저 처리하고 성공 로직은 마지막에
+  - "이 조건이 아니면 실행할 필요 없다"는 의도가 명확
+- **두 방식 모두 동일하게 동작**하지만, Early Return이 더 깔끔함
+
+### OnActionStarted 이벤트 추가
+
+```csharp
+public class UnitActionsSystem : MonoBehaviour
+{
+    public static UnitActionsSystem Instance { get; private set; }
+
+    // 기존 이벤트들
+    public event EventHandler OnSelectedUnitChanged;
+    public event EventHandler OnSelectedActionChanged;
+    public event EventHandler<bool> OnBusyChanged;
+
+    // 새로운 이벤트: 액션이 시작될 때 발생
+    public event EventHandler OnActionStarted;
+
+    // ... 나머지 코드 ...
+}
+
+```
+
+**핵심 개념**:
+
+- `OnActionStarted`: 액션이 시작되는 순간 발생하는 이벤트
+- **사용 목적**: UI에서 액션 포인트가 소비되었음을 알리기 위해
+- **이벤트를 사용하는 이유**:
+  - UI가 Unit의 액션 포인트 변화를 직접 감시하지 않아도 됨
+  - UnitActionSystem에서 한 번만 이벤트를 발생시키면 됨
+  - Unit 클래스에 이벤트를 추가하지 않아도 되어 간결함
+
+---
+
+## 6. 액션 포인트 UI 표시하기
+
+### UI 계층 구조 설정
+
+```
+Canvas
+└── UnitActionSystemUI
+    ├── ActionButtonContainer
+    │   └── (ActionButton들이 여기에 생성됨)
+    ├── ActionBusyUI (busy 상태 표시)
+    └── ActionPointsText (새로 추가) ⭐
+
+```
+
+### ActionPointsText 오브젝트 생성 과정
+
+1. **텍스트 오브젝트 생성**
+   - Hierarchy에서 UnitActionSystemUI 선택
+   - 우클릭 → UI → Text - TextMeshPro
+   - 이름: "ActionPointsText"
+2. **위치 설정**
+   - **Anchor Preset**: Bottom Center 선택
+   - 액션 버튼들 바로 아래에 배치
+   - Position 조정하여 적절한 위치에 배치
+3. **크기 설정**
+   - Width: 0 (자동 크기 조정)
+   - Height: 0 (자동 크기 조정)
+   - 텍스트 길이에 따라 자동으로 크기 조정됨
+4. **텍스트 속성 설정**
+
+   ```
+   Text: "Action Points: 2"  (기본 표시 텍스트)
+   Font Style: Bold  (굵은 글씨)
+
+   ```
+
+5. **정렬(Alignment) 설정**
+   - Horizontal: Center
+   - Vertical: Middle
+   - Wrapping: Disabled (줄바꿈 비활성화)
+6. **외곽선(Outline) 추가**
+   - Material Preset: Outline 선택
+   - 텍스트 가독성 향상을 위해 외곽선 추가
+7. **ActionBusyUI와 위치 조정**
+   - ActionBusyUI: busy 상태를 표시하는 UI (평소에는 숨김)
+   - ActionBusyUI가 보일 때 ActionPointsText와 겹치지 않도록 조정
+   - ActionBusyUI의 부모 오브젝트 위치를 약간 위로 이동
+
+**핵심 개념**:
+
+- **TextMeshPro**: Unity의 고급 텍스트 렌더링 시스템
+- **Anchor**: UI 요소의 기준점 (화면 크기가 변해도 상대 위치 유지)
+- **Outline**: 텍스트 외곽선 (배경과 구분되어 가독성 향상)
+
+---
+
+## 7. 액션 포인트 UI 업데이트 로직 구현하기
+
+### UnitActionSystemUI 클래스 수정
+
+### TextMeshPro 참조 추가
+
+```csharp
+using TMPro;  // TextMeshPro 사용을 위한 네임스페이스 추가
+
+public class UnitActionSystemUI : MonoBehaviour
+{
+    [SerializeField] private Transform actionButtonPrefab;
+    [SerializeField] private Transform actionButtonContainerTransform;
+
+    // TextMeshPro 컴포넌트 참조 추가
+    [SerializeField] private TextMeshProUGUI actionPointsText;
+
+    private List<ActionButtonUI> actionButtonUIList;
+
+    // ... 나머지 코드 ...
+}
+
+```
+
+**핵심 개념**:
+
+- `using TMPro`: TextMeshPro 관련 클래스를 사용하기 위한 네임스페이스
+- `TextMeshProUGUI`: UI용 TextMeshPro 컴포넌트 타입
+- `[SerializeField]`: Inspector에서 참조를 할당할 수 있게 함
+
+### UpdateActionPoints() 함수 구현
+
+```csharp
+public class UnitActionSystemUI : MonoBehaviour
+{
+    // ... 기존 변수들 ...
+
+    // 액션 포인트 텍스트를 업데이트하는 함수
+    private void UpdateActionPoints()
+    {
+        // 1. 현재 선택된 유닛 가져오기
+        Unit selectedUnit = UnitActionsSystem.Instance.GetSelectedUnit();
+
+        // 2. 해당 유닛의 현재 액션 포인트 가져오기
+        int currentActionPoints = selectedUnit.GetActionPoints();
+
+        // 3. 텍스트 업데이트
+        actionPointsText.text = "Action Points: " + currentActionPoints;
+    }
+}
+
+```
+
+**핵심 개념**:
+
+- **체인 호출**:
+  1. `UnitActionsSystem.Instance`: 싱글톤 인스턴스 접근
+  2. `.GetSelectedUnit()`: 현재 선택된 유닛 가져오기
+  3. `.GetActionPoints()`: 해당 유닛의 액션 포인트 가져오기
+- **문자열 결합**: `"Action Points: " + currentActionPoints`
+  - 예: currentActionPoints가 2라면 → "Action Points: 2"
+
+### Start() 함수에서 초기화
+
+```csharp
+public class UnitActionSystemUI : MonoBehaviour
+{
+    void Start()
+    {
+        // 1. 이벤트 구독
+        UnitActionsSystem.Instance.OnSelectedUnitChanged += UnitActionsSystem_OnSelectedUnitChanged;
+        UnitActionsSystem.Instance.OnSelectedActionChanged += UnitActionsSystem_OnSelectedUnitChanged;
+        UnitActionsSystem.Instance.OnActionStarted += UnitActionsSystem_OnActionStarted;
+
+        // 2. 초기 액션 포인트 표시 ⭐
+        UpdateActionPoints();
+
+        // 3. 버튼 생성 및 비주얼 업데이트
+        CreateUnitActionButtons();
+        UpdateSelectedVisual();
+    }
+}
+
+```
+
+**핵심 개념**:
+
+- `UpdateActionPoints()` 호출: 게임 시작 시 초기 액션 포인트 표시
+- 호출 순서가 중요: 이벤트 구독 후에 호출해야 함
+
+### OnSelectedUnitChanged 이벤트 핸들러
+
+```csharp
+public class UnitActionSystemUI : MonoBehaviour
+{
+    // 유닛이 변경되었을 때 호출되는 함수
+    private void UnitActionsSystem_OnSelectedUnitChanged(object sender, EventArgs e)
+    {
+        CreateUnitActionButtons();  // 버튼 재생성
+        UpdateSelectedVisual();     // 선택 비주얼 업데이트
+        UpdateActionPoints();       // 액션 포인트 업데이트 ⭐
+    }
+}
+
+```
+
+**핵심 개념**:
+
+- **호출 시점**: 플레이어가 다른 유닛을 선택했을 때
+- **이유**: 각 유닛마다 남은 액션 포인트가 다르므로 업데이트 필요
+- **예시**:
+  - 유닛 A (1 포인트 남음) → 유닛 B (2 포인트 남음)로 변경
+  - UI는 "Action Points: 2"로 업데이트되어야 함
+
+### OnActionStarted 이벤트 핸들러
+
+```csharp
+public class UnitActionSystemUI : MonoBehaviour
+{
+    // 액션이 시작되었을 때 호출되는 함수
+    private void UnitActionsSystem_OnActionStarted(object sender, EventArgs e)
+    {
+        UpdateActionPoints();  // 액션 포인트가 소비되었으므로 UI 업데이트
+    }
+}
+
+```
+
+**핵심 개념**:
+
+- **호출 시점**: 액션이 실행되어 포인트가 소비된 직후
+- **이유**: 유닛의 액션 포인트가 감소했으므로 UI 업데이트 필요
+- **예시**:
+  - Move 실행 전: "Action Points: 2"
+  - Move 실행 후: "Action Points: 1" (1 포인트 소비)
+
+### 이벤트 기반 업데이트의 장점
+
+```
+❌ 방법 1: Unit에 이벤트 추가
+Unit → OnActionPointsChanged 이벤트 발생
+        ↓
+    UI가 구독
+    문제점:
+    - 유닛이 바뀔 때마다 구독 해제/재구독 필요
+    - selectedUnit.OnActionPointsChanged -= ...
+    - newSelectedUnit.OnActionPointsChanged += ...
+
+✅ 방법 2: UnitActionSystem에 이벤트 추가 (채택)
+UnitActionSystem → OnActionStarted 이벤트 발생
+                    ↓
+                 UI가 구독
+    장점:
+    - 한 번만 구독하면 됨
+    - 유닛이 바뀌어도 구독 관리 불필요
+    - 코드가 훨씬 간결함
+
+```
+
+**핵심 개념**:
+
+- **이벤트 중앙화**: UnitActionSystem에서 모든 액션 관련 이벤트 관리
+- **구독 관리 단순화**: UI는 시스템 이벤트만 구독
+- **결합도 감소**: UI가 개별 Unit을 직접 구독하지 않음
+
+---
+
+## 🎯 전체 동작 흐름 정리
+
+### 액션 실행 시 전체 프로세스
+
+```
+1. 플레이어가 마우스 클릭
+   ↓
+2. HandleSelectedAction() 실행
+   ↓
+3. 검증 1: 유효한 위치인가? (IsValidActionGridPosition)
+   ↓
+4. 검증 2: 액션 포인트 충분한가? (TrySpendActionPointsToTakeAction)
+   ├─ CanSpendActionPointsToTakeAction(): 확인
+   └─ SpendActionPoints(): 포인트 소비
+   ↓
+5. 액션 실행 (TakeAction)
+   ↓
+6. OnActionStarted 이벤트 발생
+   ↓
+7. UI 업데이트 (UpdateActionPoints)
+
+```
+
+### 유닛 전환 시 전체 프로세스
+
+```
+1. 플레이어가 다른 유닛 클릭
+   ↓
+2. SetSelectedUnit() 실행
+   ↓
+3. OnSelectedUnitChanged 이벤트 발생
+   ↓
+4. UI 업데이트
+   ├─ CreateUnitActionButtons(): 버튼 재생성
+   ├─ UpdateSelectedVisual(): 선택 표시
+   └─ UpdateActionPoints(): 액션 포인트 표시
+
+```
+
+---
+
+## 💡 핵심 개념 요약
+
+### 1. **액션 포인트 시스템**
+
+- 각 유닛이 턴당 제한된 행동만 할 수 있게 함
+- 게임 밸런스와 전략성 제공
+
+### 2. **Virtual vs Abstract**
+
+- `virtual`: 기본 구현 제공, 선택적 오버라이드
+- `abstract`: 구현 강제, 모든 자식이 반드시 구현
+
+### 3. **Try 패턴**
+
+- `TrySpendActionPoints`: 시도하고 성공/실패 반환
+- 확인과 실행을 원자적으로 처리
+
+### 4. **Early Return (Guard Clause)**
+
+- 실패 조건을 먼저 체크하고 즉시 반환
+- 코드 가독성 향상, 중첩 감소
+
+### 5. **이벤트 기반 UI 업데이트**
+
+- 데이터 변경 시 이벤트 발생
+- UI는 이벤트를 구독하여 자동 업데이트
+- 느슨한 결합(Loose Coupling) 구현
+
+### 6. **싱글톤 패턴**
+
+- `UnitActionsSystem.Instance`: 어디서든 접근 가능
+- 전역 상태 관리에 유용
+
+---
+
+## 🔄 다음 단계 예고
+
+현재까지 구현된 내용:
+
+- ✅ 유닛마다 2 액션 포인트 보유
+- ✅ Move는 1 포인트, Spin은 2 포인트 소비
+- ✅ 포인트가 0이 되면 행동 불가
+- ✅ UI에 남은 포인트 표시
+
+**문제점**: 액션 포인트가 0이 되면 영구적으로 행동 불가
+
+**다음 강의 내용**:
+
+- **턴 시스템(Turn System)** 구현
+- 턴 종료 시 액션 포인트 리셋
+- 플레이어 턴 / 적 턴 교대
+
+# { 🎮 턴 시스템과 액션 포인트 관리하기 }
+
+이번 강의는 턴 기반 전략 게임에서 턴을 종료하고 새로운 턴을 시작하며, 모든 유닛의 액션 포인트를 리셋하는 턴 시스템을 구현합니다.
+
+---
+
+## 📋 목차
+
+1. [턴 시스템의 개념과 필요성](https://claude.ai/chat/f8376cd3-62c1-4dbd-9a83-99cc054d9198#1-%ED%84%B4-%EC%8B%9C%EC%8A%A4%ED%85%9C%EC%9D%98-%EA%B0%9C%EB%85%90%EA%B3%BC-%ED%95%84%EC%9A%94%EC%84%B1)
+2. [TurnSystem 스크립트 생성하기](https://claude.ai/chat/f8376cd3-62c1-4dbd-9a83-99cc054d9198#2-turnsystem-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%83%9D%EC%84%B1%ED%95%98%EA%B8%B0)
+3. [턴 시스템 UI 만들기](https://claude.ai/chat/f8376cd3-62c1-4dbd-9a83-99cc054d9198#3-%ED%84%B4-%EC%8B%9C%EC%8A%A4%ED%85%9C-ui-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+4. [TurnSystemUI 스크립트 구현하기](https://claude.ai/chat/f8376cd3-62c1-4dbd-9a83-99cc054d9198#4-turnsystemui-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+5. [싱글톤 패턴 적용하기](https://claude.ai/chat/f8376cd3-62c1-4dbd-9a83-99cc054d9198#5-%EC%8B%B1%EA%B8%80%ED%86%A4-%ED%8C%A8%ED%84%B4-%EC%A0%81%EC%9A%A9%ED%95%98%EA%B8%B0)
+6. [턴 번호 텍스트 업데이트하기](https://claude.ai/chat/f8376cd3-62c1-4dbd-9a83-99cc054d9198#6-%ED%84%B4-%EB%B2%88%ED%98%B8-%ED%85%8D%EC%8A%A4%ED%8A%B8-%EC%97%85%EB%8D%B0%EC%9D%B4%ED%8A%B8%ED%95%98%EA%B8%B0)
+7. [이벤트 시스템으로 턴 변경 알리기](https://claude.ai/chat/f8376cd3-62c1-4dbd-9a83-99cc054d9198#7-%EC%9D%B4%EB%B2%A4%ED%8A%B8-%EC%8B%9C%EC%8A%A4%ED%85%9C%EC%9C%BC%EB%A1%9C-%ED%84%B4-%EB%B3%80%EA%B2%BD-%EC%95%8C%EB%A6%AC%EA%B8%B0)
+8. [유닛의 액션 포인트 리셋하기](https://claude.ai/chat/f8376cd3-62c1-4dbd-9a83-99cc054d9198#8-%EC%9C%A0%EB%8B%9B%EC%9D%98-%EC%95%A1%EC%85%98-%ED%8F%AC%EC%9D%B8%ED%8A%B8-%EB%A6%AC%EC%85%8B%ED%95%98%EA%B8%B0)
+9. [스크립트 타이밍 문제 해결하기](https://claude.ai/chat/f8376cd3-62c1-4dbd-9a83-99cc054d9198#9-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%ED%83%80%EC%9D%B4%EB%B0%8D-%EB%AC%B8%EC%A0%9C-%ED%95%B4%EA%B2%B0%ED%95%98%EA%B8%B0)
+10. [정적(Static) 이벤트 사용하기](https://claude.ai/chat/f8376cd3-62c1-4dbd-9a83-99cc054d9198#10-%EC%A0%95%EC%A0%81static-%EC%9D%B4%EB%B2%A4%ED%8A%B8-%EC%82%AC%EC%9A%A9%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. 턴 시스템의 개념과 필요성
+
+### 현재 상황
+
+- 유닛들은 이미 액션 포인트를 가지고 있음 (UI에 표시됨)
+- 각 유닛은 2개의 액션 포인트로 시작
+- 이동 액션은 1 액션 포인트를 소비
+- 액션 포인트가 0이 되면 더 이상 행동할 수 없음
+
+### 턴 시스템이 필요한 이유
+
+- **문제**: 현재는 액션 포인트가 소진되면 더 이상 아무것도 할 수 없음
+- **해결**: 턴 시스템을 통해 턴을 종료하고 새로운 턴을 시작하면서 액션 포인트를 다시 채움
+- 턴 기반 전략 게임의 핵심 메커니즘
+
+---
+
+## 2. TurnSystem 스크립트 생성하기
+
+### 게임 오브젝트 설정
+
+1. Scripts 폴더에 새로운 C# 스크립트 생성 → 이름: **TurnSystem**
+2. 씬에 빈 게임 오브젝트 생성 (Create Empty) → 이름: **TurnSystem**
+3. TurnSystem 스크립트를 게임 오브젝트에 추가
+4. Transform 리셋 (위치를 (0,0,0)으로 초기화)
+
+### TurnSystem 스크립트 기본 구조
+
+```csharp
+public class TurnSystem : MonoBehaviour
+{
+    // 현재 턴 번호를 추적하는 변수
+    private int turnNumber = 1;  // 1부터 시작
+
+    // 턴을 종료하고 다음 턴으로 넘어가는 함수
+    public void NextTurn()
+    {
+        turnNumber++;  // 턴 번호 1 증가
+    }
+}
+```
+
+**개념**
+
+- **turnNumber**: 현재 게임이 몇 번째 턴인지 나타냄 (1부터 시작)
+- **NextTurn()**: 턴을 종료하고 다음 턴으로 넘어가는 역할
+
+---
+
+## 3. 턴 시스템 UI 만들기
+
+### UI 계층 구조 설정
+
+**1. TurnSystemUI 부모 오브젝트**
+
+- Canvas 내부에 빈 오브젝트 생성 → 이름: **TurnSystemUI**
+- Rect Transform: 화면 전체를 차지하도록 앵커 확장
+- Position: 모두 0으로 설정
+
+**2. End Turn 버튼 만들기**
+
+- TurnSystemUI 내부에 UI → Button 생성 → 이름: **EndTurnButton**
+- 앵커: 우측 상단 코너에 고정
+- 크기: Width 250 정도로 설정
+- Background 색상: 어두운 회색 (Dark Gray)
+- 텍스트:
+  - 내용: "END TURN"
+  - 색상: 흰색
+  - 스타일: Bold
+
+**3. Turn Number 텍스트 만들기**
+
+- TurnSystemUI 내부에 UI → Text - TextMeshPro 생성 → 이름: **TurnNumberText**
+- 앵커: 화면 상단 중앙에 고정
+- Width와 Height: 0으로 설정 (자동 크기)
+- 텍스트:
+  - 내용: "TURN 1"
+  - 스타일: Bold
+  - 정렬: 중앙 (Horizontal/Vertical Center)
+  - Material: Outline 사용
+
+**최종 UI 구조**
+
+```
+Canvas
+└── TurnSystemUI
+    ├── EndTurnButton
+    │   └── Text
+    └── TurnNumberText
+```
+
+---
+
+## 4. TurnSystemUI 스크립트 구현하기
+
+### 스크립트 생성 및 폴더 정리
+
+**1. 스크립트 생성**
+
+- 이름: **TurnSystemUI**
+- TurnSystemUI 게임 오브젝트에 추가
+
+**2. UI 폴더 정리**
+
+- Scripts 폴더 내에 **UI** 폴더 생성
+- 관련 스크립트들을 UI 폴더로 이동:
+  - ActionBusyUI
+  - ActionButtonUI
+  - TurnSystemUI
+  - UnitActionSystemUI
+
+### TurnSystemUI 스크립트 기본 구조
+
+```csharp
+using UnityEngine;
+using UnityEngine.UI;   // Button 사용을 위해 필요
+using TMPro;             // TextMeshPro 사용을 위해 필요
+
+public class TurnSystemUI : MonoBehaviour
+{
+    // Inspector에서 설정할 UI 요소들
+    [SerializeField] private Button endTurnButton;
+    [SerializeField] private TextMeshProUGUI turnNumberText;
+}
+```
+
+**Inspector 설정**
+
+- TurnSystemUI 오브젝트 선택
+- End Turn Button 필드: EndTurnButton 드래그
+- Turn Number Text 필드: TurnNumberText 드래그
+
+**개념 설명**
+
+- **[SerializeField]**: private 변수를 Inspector에서 볼 수 있게 만듦
+- **Button**: Unity UI의 버튼 컴포넌트
+- **TextMeshProUGUI**: TextMeshPro의 UI용 텍스트 컴포넌트
+
+---
+
+## 5. 싱글톤 패턴 적용하기
+
+### 버튼 클릭 연결 방법 비교
+
+**방법 1: Unity 에디터에서 직접 연결** (사용 안 함)
+
+- Inspector의 On Click() 이벤트 사용
+- Prefab에서는 작동 안 함
+- 일관성 부족
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380472/notion-blog/_/3D_/_/_4_Actions_UI_-_3/image_8.png)
+
+**방법 2: 코드로 연결 (싱글톤 사용)** ✅
+
+- 코드에서 onClick 이벤트에 리스너 추가
+- 싱글톤 패턴으로 TurnSystem에 접근
+- 일관된 접근 방식, 더 유연함
+
+### TurnSystem에 싱글톤 구현
+
+```csharp
+public class TurnSystem : MonoBehaviour
+{
+    // 싱글톤 인스턴스
+    // static: 클래스 자체에 속하는 변수 (모든 인스턴스가 공유)
+    // { get; private set; }: 외부에서는 읽기만 가능
+    public static TurnSystem Instance { get; private set; }
+
+    private int turnNumber = 1;
+
+    // Awake: Start보다 먼저 실행
+    private void Awake()
+    {
+        // 중복 인스턴스 체크
+        if (Instance != null)
+        {
+            Debug.LogError("There is more than one TurnSystem! " + transform + " - " + Instance);
+            Destroy(gameObject);
+            return;
+        }
+
+        // 싱글톤 인스턴스 설정
+        Instance = this;
+    }
+
+    public void NextTurn()
+    {
+        turnNumber++;
+    }
+
+    public int GetTurnNumber()
+    {
+        return turnNumber;
+    }
+}
+```
+
+**싱글톤 패턴 개념**
+
+- 클래스의 인스턴스가 단 하나만 존재하도록 보장
+- 전역적으로 접근 가능 (`TurnSystem.Instance`)
+- 게임 매니저 클래스에 적합
+- 중복 인스턴스 자동 방지
+
+---
+
+## 6. 턴 번호 텍스트 업데이트하기
+
+### TurnSystemUI에서 버튼 클릭 이벤트 연결
+
+```csharp
+public class TurnSystemUI : MonoBehaviour
+{
+    [SerializeField] private Button endTurnButton;
+    [SerializeField] private TextMeshProUGUI turnNumberText;
+
+    // Start: Awake 이후에 실행
+    // 외부 참조 사용 시 Start 사용 (다른 오브젝트의 Awake 완료 보장)
+    private void Start()
+    {
+        // 버튼 클릭 이벤트에 리스너 추가
+        // 람다 표현식(익명 함수) 사용
+        endTurnButton.onClick.AddListener(() =>
+        {
+            TurnSystem.Instance.NextTurn();
+        });
+    }
+}
+
+```
+
+### 턴 번호 텍스트 업데이트 함수
+
+```csharp
+// 턴 번호 텍스트를 업데이트하는 함수
+private void UpdateTurnText()
+{
+    // "TURN " + 현재 턴 번호
+    turnNumberText.text = "TURN " + TurnSystem.Instance.GetTurnNumber();
+}
+
+```
+
+**람다 표현식 (익명 함수)**
+
+```csharp
+() => { 코드 }
+
+```
+
+- 간단한 함수를 짧게 작성하는 방법
+- `()`: 매개변수 목록
+- `=>`: 람다 연산자
+- `{ 코드 }`: 실행할 코드
+
+**Awake vs Start 차이**
+
+- **Awake**: 내부 초기화, 싱글톤 설정에 사용
+- **Start**: 외부 참조 사용, 이벤트 구독에 사용 (다른 오브젝트의 Awake 완료 후 실행)
+
+---
+
+## 7. 이벤트 시스템으로 턴 변경 알리기
+
+### 이벤트 시스템의 필요성
+
+**잘못된 방법: Update에서 매 프레임 체크**
+
+```csharp
+private void Update()
+{
+    UpdateTurnText();  // 초당 60번 이상 실행 (낭비!)
+}
+```
+
+- 문제: 턴이 바뀌지 않아도 계속 업데이트
+- 성능 낭비
+
+**올바른 방법: 이벤트 시스템**
+
+- 턴이 실제로 변경되었을 때만 알림
+- 필요한 시스템들이 이벤트를 구독
+- 효율적
+
+### TurnSystem에 이벤트 추가
+
+```csharp
+public class TurnSystem : MonoBehaviour
+{
+    public static TurnSystem Instance { get; private set; }
+
+    // 턴 변경 이벤트 선언
+    // event: 이벤트 키워드
+    // EventHandler: 표준 이벤트 델리게이트 타입
+    public event EventHandler OnTurnChanged;
+
+    private int turnNumber = 1;
+
+    private void Awake()
+    {
+        if (Instance != null)
+        {
+            Debug.LogError("There is more than one TurnSystem!");
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+    }
+
+    public void NextTurn()
+    {
+        turnNumber++;
+
+        // 이벤트 발생 (구독자들에게 알림)
+        // ?. : null이 아닐 때만 실행
+        // this: 이벤트를 발생시킨 객체
+        // EventArgs.Empty: 추가 데이터 없음
+        OnTurnChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public int GetTurnNumber()
+    {
+        return turnNumber;
+    }
+}
+
+```
+
+### TurnSystemUI에서 이벤트 구독
+
+```csharp
+private void Start()
+{
+    // 버튼 클릭 이벤트 연결
+    endTurnButton.onClick.AddListener(() =>
+    {
+        TurnSystem.Instance.NextTurn();
+    });
+
+    // OnTurnChanged 이벤트 구독
+    // += : 이벤트에 리스너 추가
+    TurnSystem.Instance.OnTurnChanged += TurnSystem_OnTurnChanged;
+
+    // 게임 시작 시 초기 텍스트 업데이트
+    UpdateTurnText();
+}
+
+// 이벤트 핸들러 함수
+// 명명 규칙: 클래스명_이벤트명
+// object sender: 이벤트를 발생시킨 객체
+// System.EventArgs e: 이벤트 데이터
+private void TurnSystem_OnTurnChanged(object sender, System.EventArgs e)
+{
+    UpdateTurnText();  // 턴이 변경될 때만 업데이트
+}
+
+private void UpdateTurnText()
+{
+    turnNumberText.text = "TURN " + TurnSystem.Instance.GetTurnNumber();
+}
+
+```
+
+**이벤트 시스템 흐름**
+
+```
+1. 이벤트 선언 (Publisher)
+   public event EventHandler OnTurnChanged;
+
+2. 이벤트 구독 (Subscriber)
+   TurnSystem.Instance.OnTurnChanged += TurnSystem_OnTurnChanged;
+
+3. 이벤트 발생 (Publisher)
+   OnTurnChanged?.Invoke(this, EventArgs.Empty);
+
+4. 이벤트 처리 (Subscriber)
+   TurnSystem_OnTurnChanged() 실행
+
+```
+
+**이벤트 시스템의 장점**
+
+- 코드 간 의존성 감소 (느슨한 결합)
+- 확장성 좋음 (여러 구독자 추가 가능)
+- 성능 효율적 (필요할 때만 실행)
+
+---
+
+## 8. 유닛의 액션 포인트 리셋하기
+
+### ACTION_POINTS_MAX 상수 정의
+
+```csharp
+public class Unit : MonoBehaviour
+{
+    // const: 컴파일 타임 상수 (값 변경 불가)
+    // 상수는 대문자와 언더스코어 사용
+    private const int ACTION_POINTS_MAX = 2;
+
+    // 시작 시 최대값으로 초기화
+    private int actionPoints = ACTION_POINTS_MAX;
+}
+
+```
+
+**const vs [SerializeField]**
+
+```csharp
+// const (고정된 디자인)
+private const int ACTION_POINTS_MAX = 2;
+// - 컴파일 시 고정
+// - 런타임에 변경 불가
+// - 메모리 효율적
+
+// SerializeField (유연한 디자인)
+[SerializeField] private int actionPointsMax = 2;
+// - Inspector에서 조정 가능
+// - 유닛마다 다른 값 설정 가능
+// - 런타임에 변경 가능
+
+```
+
+### Unit에서 턴 변경 이벤트 구독
+
+```csharp
+private void Start()
+{
+    // LevelGrid 관련 초기화
+    gridPosition = LevelGrid.Instance.GetGridPosition(transform.position);
+    LevelGrid.Instance.AddUnitAtGridPosition(gridPosition, this);
+
+    // TurnSystem의 OnTurnChanged 이벤트 구독
+    TurnSystem.Instance.OnTurnChanged += TurnSystem_OnTurnChanged;
+}
+
+// 턴 변경 이벤트 핸들러
+// using System 추가 필요 (EventArgs)
+private void TurnSystem_OnTurnChanged(object sender, System.EventArgs e)
+{
+    // 액션 포인트를 최대값으로 리셋
+    actionPoints = ACTION_POINTS_MAX;
+}
+
+```
+
+**왜 하드코딩하지 않는가?**
+
+```csharp
+// 나쁜 예
+actionPoints = 2;  // 직접 숫자 입력
+
+// 좋은 예
+actionPoints = ACTION_POINTS_MAX;  // 상수 사용
+```
+
+- 상수 사용 시 한 곳만 수정하면 모든 곳에 반영
+- 코드의 의도가 명확함
+- 유지보수 용이
+
+---
+
+## 9. 스크립트 타이밍 문제 해결하기
+
+### UnitActionSystemUI에서 액션 포인트 업데이트
+
+```csharp
+public class UnitActionSystemUI : MonoBehaviour
+{
+    [SerializeField] private TextMeshProUGUI actionPointsText;
+
+    void Start()
+    {
+        // 다른 이벤트 구독들...
+        UnitActionsSystem.Instance.OnActionStarted += UnitActionsSystem_OnActionStarted;
+
+        // 턴이 변경될 때도 액션 포인트 업데이트
+        TurnSystem.Instance.OnTurnChanged += TurnSystem_OnTurnChanged;
+
+        UpdateActionPoints();
+    }
+
+    private void TurnSystem_OnTurnChanged(object sender, EventArgs e)
+    {
+        UpdateActionPoints();
+    }
+
+    private void UpdateActionPoints()
+    {
+        Unit selectedUnit = UnitActionsSystem.Instance.GetSelectedUnit();
+        actionPointsText.text = "Action Points: " + selectedUnit.GetActionPoints();
+    }
+}
+
+```
+
+### 스크립트 타이밍 문제 발생
+
+**문제 상황**
+
+- Unity는 Start() 함수들의 실행 순서를 보장하지 않음
+- 이벤트 구독 순서가 실행 순서를 결정함
+
+**버그 시나리오**
+
+```
+1. UnitActionSystemUI.Start()가 먼저 실행
+   → OnTurnChanged 이벤트를 먼저 구독
+
+2. Unit.Start()가 나중에 실행
+   → OnTurnChanged 이벤트를 나중에 구독
+
+3. End Turn 버튼 클릭
+   → OnTurnChanged 이벤트 발생
+
+4. 먼저 UnitActionSystemUI_OnTurnChanged 실행
+   → selectedUnit.GetActionPoints() 호출
+   → 아직 Unit이 액션 포인트를 리셋하지 않음
+   → 텍스트가 0으로 표시
+
+5. 나중에 Unit_OnTurnChanged 실행
+   → actionPoints = 2 (리셋)
+   → 하지만 UI는 이미 0으로 업데이트됨
+
+결과: UI는 0을 표시하지만 실제로는 2개의 액션 포인트
+
+```
+
+**문제의 핵심**
+
+- 실행 순서가 랜덤 (PC마다 다를 수 있음)
+- 버그 재현이 어려움
+- 디버깅이 매우 어려움
+
+### 해결 방법 비교
+
+**방법 1: Script Execution Order** (사용 안 함)
+
+```
+Edit → Project Settings → Script Execution Order
+```
+
+- UnitActionSystemUI를 늦게 실행하도록 설정
+- 단점: 수동 설정, 관리 번거로움
+
+**방법 2: 정적 이벤트 사용** ✅
+
+- OnTurnChanged는 "턴이 바뀌었다"만 알림
+- 진짜 필요한 것: "액션 포인트가 변경되었다" 알림
+- 액션 포인트 변경 후에 발생하는 새로운 이벤트 생성
+
+---
+
+## 10. 정적(Static) 이벤트 사용하기
+
+### 정적 이벤트 개념
+
+**일반 이벤트 vs 정적 이벤트**
+
+```csharp
+// 일반(Instance) 이벤트
+public event EventHandler OnTurnChanged;
+// - 특정 객체(인스턴스)에 속함
+// - 각 Unit 객체가 자신만의 이벤트를 가짐
+
+// 정적(Static) 이벤트
+public static event EventHandler OnAnyActionPointsChanged;
+// - 클래스 자체에 속함 (모든 인스턴스가 공유)
+// - 단 하나만 존재
+// - 어떤 유닛이든 액션 포인트가 변경되면 발생
+
+```
+
+### Unit에 정적 이벤트 추가
+
+```csharp
+public class Unit : MonoBehaviour
+{
+    private const int ACTION_POINTS_MAX = 2;
+
+    // 정적 이벤트: 어떤 유닛이든 액션 포인트가 변경되면 발생
+    // OnAny: 정적 이벤트임을 나타내는 명명 규칙
+    public static event EventHandler OnAnyActionPointsChanged;
+
+    private int actionPoints = ACTION_POINTS_MAX;
+
+    // 액션 포인트 소비 시
+    private void SpendActionPoints(int amount)
+    {
+        actionPoints -= amount;
+
+        // 액션 포인트가 변경되었으므로 이벤트 발생
+        OnAnyActionPointsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    // 턴 변경 시
+    private void TurnSystem_OnTurnChanged(object sender, System.EventArgs e)
+    {
+        actionPoints = ACTION_POINTS_MAX;
+
+        // 액션 포인트가 변경되었으므로 이벤트 발생
+        OnAnyActionPointsChanged?.Invoke(this, EventArgs.Empty);
+    }
+}
+
+```
+
+**정적 이벤트 명명 규칙**
+
+```csharp
+// 일반 이벤트
+public event EventHandler OnDamaged;     // 이 유닛이 데미지 받음
+
+// 정적 이벤트 (OnAny 접두사)
+public static event EventHandler OnAnyUnitDamaged;  // 어떤 유닛이든 데미지 받음
+
+```
+
+### UnitActionSystemUI에서 정적 이벤트 구독
+
+```csharp
+void Start()
+{
+    // 다른 이벤트 구독들...
+    UnitActionsSystem.Instance.OnSelectedUnitChanged += UnitActionsSystem_OnSelectedUnitChanged;
+    UnitActionsSystem.Instance.OnActionStarted += UnitActionsSystem_OnActionStarted;
+
+    // 턴 변경 이벤트 제거 (더 이상 필요 없음)
+    // TurnSystem.Instance.OnTurnChanged += TurnSystem_OnTurnChanged;
+
+    // 액션 포인트 변경 이벤트 구독
+    // static 이벤트는 클래스 이름으로 직접 접근 (Instance 불필요)
+    Unit.OnAnyActionPointsChanged += Unit_OnAnyActionPointsChanged;
+
+    UpdateActionPoints();
+}
+
+// 어떤 유닛의 액션 포인트가 변경되든 호출됨
+private void Unit_OnAnyActionPointsChanged(object sender, EventArgs e)
+{
+    UpdateActionPoints();
+}
+
+```
+
+**정적 이벤트 접근 방법**
+
+```csharp
+// 일반 이벤트
+TurnSystem.Instance.OnTurnChanged += Handler;  // Instance 필요
+
+// 정적 이벤트
+Unit.OnAnyActionPointsChanged += Handler;  // 클래스 이름으로 직접 접근
+
+```
+
+### 왜 타이밍 문제가 해결되는가?
+
+**기존 방법 (문제)**
+
+```
+End Turn 클릭
+  ↓
+OnTurnChanged 발생 (턴이 바뀌었다는 신호)
+  ↓
+모두가 동시에 반응 → 순서 문제 발생
+  ├─ UnitActionSystemUI: GetActionPoints() → 0 (아직 리셋 안 됨)
+  └─ Unit: actionPoints = 2 (리셋)
+
+```
+
+**새로운 방법 (해결)**
+
+```
+End Turn 클릭
+  ↓
+OnTurnChanged 발생
+  ↓
+Unit_OnTurnChanged 실행
+  → actionPoints = 2 (리셋)
+  → OnAnyActionPointsChanged 발생 ← 리셋 완료 후!
+     ↓
+     UnitActionSystemUI_OnAnyActionPointsChanged 실행
+     → GetActionPoints() → 2 (이미 리셋됨)
+
+```
+
+**핵심**
+
+- 액션 포인트 변경이 **완료된 후**에 이벤트가 발생
+- 실행 순서에 관계없이 항상 정확함
+
+---
+
+## 🎓 전체 시스템 흐름
+
+```
+게임 시작
+  ↓
+[초기화]
+- TurnSystem: turnNumber = 1, 싱글톤 설정
+- Unit: actionPoints = 2, OnTurnChanged 구독
+- TurnSystemUI: 버튼 이벤트 연결, OnTurnChanged 구독
+- UnitActionSystemUI: OnAnyActionPointsChanged 구독
+  ↓
+[플레이어 행동]
+유닛 선택 → 액션 선택 → 실행
+  ↓
+actionPoints 감소
+  ↓
+OnAnyActionPointsChanged 발생 → UI 업데이트
+  ↓
+[End Turn 버튼 클릭]
+NextTurn() 호출
+  ↓
+turnNumber++
+  ↓
+OnTurnChanged 발생
+  ├─ TurnSystemUI: 턴 번호 텍스트 업데이트
+  └─ 각 Unit: actionPoints = 2 (리셋)
+      ↓
+      OnAnyActionPointsChanged 발생
+        ↓
+        UnitActionSystemUI: 액션 포인트 텍스트 업데이트
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### 1. 싱글톤 패턴
+
+- 클래스의 인스턴스를 하나만 생성
+- 전역 접근: `TurnSystem.Instance`
+
+### 2. 이벤트 시스템
+
+- 관찰자 패턴 구현
+- 느슨한 결합, 효율적 업데이트
+
+### 3. 정적 이벤트
+
+- 클래스 레벨 이벤트
+- 모든 인스턴스가 공유
+
+### 4. 명명 규칙
+
+- 일반 이벤트: `OnTurnChanged`
+- 정적 이벤트: `OnAnyActionPointsChanged`
+- 핸들러: `TurnSystem_OnTurnChanged`
+
+### 5. Awake vs Start
+
+- Awake: 내부 초기화, 싱글톤 설정
+- Start: 외부 참조, 이벤트 구독
+
+다음 강의에서는 적(Enemy) 유닛을 추가합니다!

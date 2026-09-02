@@ -105,7 +105,7 @@ export default function AnimatedBackground({ className = '' }: AnimatedBackgroun
         ></div>
 
         {/* Mesh gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-800/30 to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-50/20 to-transparent"></div>
 
         {/* Floating Particles with smooth movement */}
         {particles.map((particle) => (

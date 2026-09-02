@@ -1,0 +1,376 @@
+---
+title: '실시간 청소부 청소 상태'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381059/notion-blog/_/_/Spring_/_/Untitled.png)
+
+```
+실시간으로 청소부 상태를 변경하는 기능을 만든다
+
+청소 시작을 누르면 청소중 상태가 뜨고 청소가 완료되면 사라진다
+```
+
+## 1.Mapper 생성
+
+```
+오늘 청소를 하는 청소부 번호, 방번호, 방상태 를 가져오는 getRequestClean 를 작성해줬다.
+
+
+```
+
+### Mapper
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381059/notion-blog/_/_/Spring_/_/Untitled_1.png)
+
+```java
+<select id="getRequestClean" parameterType="ReservedVO" resultMap="getRequestCleanResult">
+   SELECT DISTINCT C.SCHEDULENUMBER, R.ROOMNUMBER, ROOMSTATUS                                      // CALENDER' 테이블에서 'SCHEDULENUMBER', 'RESERVED' 테이블에서 'ROOMNUMBER', 두 테이블 중 하나에서 'ROOMSTATUS'를 선택
+   FROM RESERVED R                                                                                 // 테이블이 조인되는 방식을 지정
+   JOIN CALENDER C ON R.ROOMSTATUS = '청소요청' OR ROOMSTATUS = '청소중'                             // 조인 조건은 테이블의 'ROOMSTATUS'가 '청소 요청' 또는 '청소 진행 중'일 때 조인을 수행 (on 은 조인의 조건을 지정하는것)
+	 WHERE CURRENT_DATE() BETWEEN C.SCHEDULESTARTDATE AND C.SCHEDULEENDDATE                          // 현재 날짜(CURRENT_DATE())가 CALENDER 테이블의 SCHEDULESTARTDATE 및 SCHEDULEENDDATE 열 사이에 있는지 확인
+</select>
+```
+
+### resultMap
+
+```java
+조인을 사용해서 두개의 VO 를 합쳐서 사용하기 위해서 만들어 준다
+```
+
+```java
+<resultMap type="CalenderVO" id="getRequestCleanResult">
+        <id column="scheduleNumber" property="scheduleNumber"/>                                       // id 는 pk (이는 관행일 뿐이고 꼭 지켜야 하는건 아니다 꼭  scheduleNumber 가 되야하는건 아님)
+        <result column="scheduleEnddate" property="scheduleEnddate"/>
+        <result column="scheduleStartdate" property="scheduleStartdate"/>
+
+        <collection property="reservedVOS" javaType="List" ofType="ReservedVO">                      // CalenderVO" 개체에서 "reservedVOS"라는 컬렉션 속성을 정의(CalenderVO 내부에 private List<ReservedVO> reservedVOS; 를 만들어 줘야함)  (collection 은 1:N 관계일때 사용) ( "CalenderVO" 에 "ReservedVO" 개체 모음이 포함되어 있음을 나타냄)
+            <id column="reservationNum" property="reservationNum"/>
+            <result column="reservationDate" property="reservationDate"/>
+            <result column="roomNumber" property="roomNumber"/>
+            <result column="roomType" property="roomType"/>
+            <result column="roomStatus" property="roomStatus"/>
+        </collection>
+    </resultMap>
+```
+
+### CalenderVO
+
+```java
+CalenderVO 에 private List<ReservedVO> reservedVOS 를 추가해줘 CalenderVO 에서 ReservedVO 를 사용 가능하게 해준다
+```
+
+```java
+@Getter
+@Setter
+public class CalenderVO {
+    private Date scheduleStartdate;
+    private Date scheduleEnddate;
+    private Long scheduleNumber;
+
+    private List<ReservedVO> reservedVOS;
+}
+```
+
+### DAO
+
+```java
+public List<ReservedVO>getRequestClean(CalenderVO calenderVO) throws Exception;
+```
+
+### Service
+
+```java
+public List<ReservedVO> getRequestClean(CalenderVO calenderVO) throws Exception{
+        return cleanDAO.getRequestClean(calenderVO);
+    }
+```
+
+### Controller
+
+```java
+Ajax 를 활용해서 따로 jsp 를 만들어 교체 해주는 방식으로 사용하여 실시간으로 ui가 변하게 해준다. (cleanCheckList 를 만들어서 교체)
+```
+
+```java
+@GetMapping("cleanCheckList")
+    @ResponseBody
+    public ModelAndView cleanUpdate(CalenderVO calenderVO) throws Exception {
+        ModelAndView mv = new ModelAndView();
+            List<CalenderVO>calenderVOList=cleanService.getCleanList(calenderVO);
+            List<ReservedVO>RequestClean =cleanService.getRequestClean(calenderVO);
+            mv.addObject("events",calenderVOList);
+            mv.addObject("request",RequestClean);
+        mv.setViewName("clean/cleanCheckList");
+        return mv;
+    }
+```
+
+## 2.교체될 jsp 생성
+
+```java
+메인 jsp 에 빈 div 를 만들고 그 부분에 넣어줄 jsp 를 생성해 준다 현재 콜렉션을 사용하였기 때문에 2개의 c:forEach 반복문이 사용되게 된다<%@ page language="java" contentType="text/html; charset=UTF-8"
+         pageEncoding="UTF-8" %>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
+
+<div class="card-body">
+    <c:forEach var="request" items="${request}">
+        <c:forEach var="request2" items="${request.reservedVOS}">
+            <c:if test="${request2.roomStatus eq '청소요청'}">
+                <div class="d-flex align-items-center justify-content-between mb-4">
+                    <div class="d-flex align-items-center flex-shrink-0 me-3">
+                        <div class="avatar avatar-xl me-3 bg-gray-200"><img
+                                class="avatar-img img-fluid"
+                                src="/assets/img/illustrations/profiles/profile-1.png" alt=""/>
+                        </div>
+                        <div class="d-flex flex-column fw-bold">
+                            <div class="text-dark line-height-normal mb-1" href="#!">청소${request.scheduleNumber}팀 : 청소요청</div>
+                            <div class="small text-muted line-height-normal">방번호 : ${request2.roomNumber} 호</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-dark" onclick="CleaningInProgress('${request2.roomNumber}')">청소시작</button>                 // onclick 을 사용하면 클릭시 javascript 에서 원하는 함수를 호출해서 사용할 수 있다. "CleaningInProgress('${request2.roomNumber}')" 이렇게 사용하면 매개변수로 값을 보낼 수 있다.
+                </div>
+            </c:if>
+        </c:forEach>
+        <c:forEach var="request2" items="${request.reservedVOS}">
+            <c:if test="${request2.roomStatus eq '청소중'}">
+                <div class="d-flex align-items-center justify-content-between mb-4">
+                    <div class="d-flex align-items-center flex-shrink-0 me-3">
+                        <div class="avatar avatar-xl me-3 bg-gray-200"><img
+                                class="avatar-img img-fluid"
+                                src="/assets/img/illustrations/profiles/profile-1.png" alt=""/>
+                        </div>
+                        <div class="d-flex flex-column fw-bold">
+                            <span class="text-dark line-height-normal mb-1" href="#!">청소${request.scheduleNumber}팀 : 청소요청</span><div class="cleaning">청소중</div>
+                            <div class="small text-muted line-height-normal">방번호 : ${request2.roomNumber} 호</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-dark" onclick="CleaningComplete('${request2.roomNumber}')">청소완료</button>
+                </div>
+            </c:if>
+        </c:forEach>
+    </c:forEach>
+</div>
+```
+
+## 3.자바스크립트 작성
+
+```java
+onclick 을 사용할 함수를 작성해주고 Ajax 사용 + 몇초마다  새로고침(실시간을 위해서)
+```
+
+```java
+$(document).ready(function() {
+    // #insertSchedule 폼의 버튼 눌렀을 때 이벤트
+    updateCardContainer();
+});
+
+function updateCardContainer() {                                                    //메인 jsp 에 분리해놓은 위의 jsp 를 넣어주기 위한 Ajax
+    $.ajax({
+        url: '/clean/cleanCheckList',
+        method: 'GET',
+        success: function (checkList) {
+
+            $('#checkList').html(checkList);                                       // id 속성 "checkList"가 있는 요소의 HTML 콘텐츠를 업데이트, html() 함수는 요소의 내용을 checkList 변수의 값으로 가짐
+        },
+        error: function (error) {
+            console.error('Error:', error);
+        }
+    });
+}
+
+setInterval(updateCardContainer, 3000);                                            // 3초마다 리셋 해주는 함수
+
+function CleaningInProgress(roomNumber) {
+
+    $.ajax({
+        url:'/clean/updateCleaningInProgress',
+        method: 'POST',
+        data: {
+            roomNumber: roomNumber,
+        },
+        success: function(response) {
+            // Handle the success response
+            console.log('Cleaning request sent');
+        },
+        error: function(error) {
+            // Handle the error
+            console.error('');
+            alert("청소를 시작합니다.")
+        }
+    });
+}
+
+function CleaningComplete(roomNumber) {
+    $.ajax({
+        url: '/clean/cleaningComplete',
+        method: 'POST',
+        data: {
+            roomNumber: roomNumber,
+        },
+        success: function(response) {
+            // Handle the success response
+            console.log('변경완료(재실)');
+            alert("청소를 완료합니다.")
+        },
+        error: function(error) {
+            // Handle the error
+            console.error('An error occurred while marking the cleaning as complete');
+            alert("청소를 완료합니다.")
+        }
+    });
+}
+```
+
+## 4.메인 jsp 에 div 생성
+
+```java
+										<div class="col-xxl-4">
+                        <div class="row">
+                            <div class="col-xl-6 col-xxl-12">
+                                <!-- Team members / people dashboard card example-->
+                                <div class="card mb-4">
+                                    <div class="card-header">체크 리스트</div>
+                                    <div class="card-header" >
+                                        <div id="checkList">                                 // 빈 div 체크리스트
+
+                                        </div>
+
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-xl-6 col-xxl-12">
+                                <!-- Project tracker card example-->
+                                <button class="btn btn-dark" type="button" data-bs-toggle="modal"
+                                        data-bs-target="#exampleModalLg">스케줄 등록
+                                </button>
+                                <button class="btn btn-dark" type="button" data-bs-toggle="modal" data-bs-target="#exampleModal">
+                                    청소보고
+                                </button>
+
+                            </div>
+                        </div>
+                        <!-- Illustration dashboard card example-->
+
+                    </div>
+```
+
+# 청소부 상태 청소 중 변경하기
+
+## 1.청소부 상태 변경 할 Mapper 만들기
+
+```java
+DB의 청소요청 을 청소중 으로 변경하여 jsp 에서 if 를 써서 다른 ui 로 출력되게 할 예정이다
+```
+
+### Mapper
+
+```java
+		<update id="updateCleaningInProgress" parameterType="ReservedVO">
+        UPDATE RESERVED
+        SET ROOMSTATUS = '청소중'
+        WHERE ROOMNUMBER = #{roomNumber}
+        AND ROOMSTATUS = '청소요청'
+    </update>
+```
+
+### DAO
+
+```java
+public int updateCleaningInProgress(ReservedVO reservedVO) throws Exception;
+```
+
+### Service
+
+```java
+		public int updateCleaningInProgress(ReservedVO reservedVO) throws Exception{
+        return cleanDAO.updateCleaningInProgress(reservedVO);
+    }
+```
+
+### Controller
+
+```java
+		@ResponseBody
+    @PostMapping ("/updateCleaningInProgress")
+    public ModelAndView updateCleaningInProgress(ReservedVO reservedVO) throws Exception{
+        ModelAndView mv = new ModelAndView();
+        int result = cleanService.updateCleaningInProgress(reservedVO);
+        return mv;
+    }
+```
+
+## 2.javascript 만들기
+
+```java
+버튼을 클릭 하였을 떄 Ajax 로 Controller 을 호출해 DB를 변경해준다.
+```
+
+```java
+function CleaningInProgress(roomNumber) {
+
+    $.ajax({
+        url:'/clean/updateCleaningInProgress',
+        method: 'POST',
+        data: {
+            roomNumber: roomNumber,
+        },
+        success: function(response) {
+            // Handle the success response
+            console.log('Cleaning request sent');
+        },
+        error: function(error) {
+            // Handle the error
+            console.error('');
+            alert("청소를 시작합니다.")
+        }
+    });
+}
+```
+
+## 3.이벤트 시작 버튼 만들기
+
+```java
+<div class="card-body">
+    <c:forEach var="request" items="${request}">
+        <c:forEach var="request2" items="${request.reservedVOS}">
+            <c:if test="${request2.roomStatus eq '청소요청'}">
+                <div class="d-flex align-items-center justify-content-between mb-4">
+                    <div class="d-flex align-items-center flex-shrink-0 me-3">
+                        <div class="avatar avatar-xl me-3 bg-gray-200"><img
+                                class="avatar-img img-fluid"
+                                src="/assets/img/illustrations/profiles/profile-1.png" alt=""/>
+                        </div>
+                        <div class="d-flex flex-column fw-bold">
+                            <div class="text-dark line-height-normal mb-1" href="#!">청소${request.scheduleNumber}팀 : 청소요청</div>
+                            <div class="small text-muted line-height-normal">방번호 : ${request2.roomNumber} 호</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-dark" onclick="CleaningInProgress('${request2.roomNumber}')">청소시작</button>                // 청소 시작 버튼 onclick 을 사용
+                </div>
+            </c:if>
+        </c:forEach>
+        <c:forEach var="request2" items="${request.reservedVOS}">
+            <c:if test="${request2.roomStatus eq '청소중'}">
+                <div class="d-flex align-items-center justify-content-between mb-4">
+                    <div class="d-flex align-items-center flex-shrink-0 me-3">
+                        <div class="avatar avatar-xl me-3 bg-gray-200"><img
+                                class="avatar-img img-fluid"
+                                src="/assets/img/illustrations/profiles/profile-1.png" alt=""/>
+                        </div>
+                        <div class="d-flex flex-column fw-bold">
+                            <span class="text-dark line-height-normal mb-1" href="#!">청소${request.scheduleNumber}팀 : 청소요청</span><div class="cleaning">청소중</div>
+                            <div class="small text-muted line-height-normal">방번호 : ${request2.roomNumber} 호</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-dark" onclick="CleaningComplete('${request2.roomNumber}')">청소완료</button>
+                </div>
+            </c:if>
+        </c:forEach>
+    </c:forEach>
+</div>
+```

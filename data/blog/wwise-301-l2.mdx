@@ -1,0 +1,994 @@
+---
+title: 'Wwise 301 L2'
+date: '2026-09-02'
+category: '게임 개발/WWISE'
+tags: ['게임 개발', 'WWISE']
+draft: false
+summary: ''
+---
+
+# { 🌳 환경음 (Ambient Sound) }
+
+빛나는 검을 손에 쥐고 여러분은 **Woodlands** 쪽으로 향해 **Evil Spit Plant**와 싸우게 됩니다.
+
+다리 쪽으로 걸어가니, 다리 아래에서 **잔잔히 흐르는 강물 소리**가 들려옵니다.
+
+이때, 이런 **River**의 사운드를 게임에 구현하려면 어떻게 해야 할까요?
+
+---
+
+## 🎧 AkEvent를 사용할 경우
+
+가장 먼저 떠오르는 방법은 **`River` 게임 오브젝트에 `AkEvent` 컴포넌트를 추가하는 것**입니다.
+
+하지만 이렇게 하면 **소리가 오브젝트의 한 지점(중심점)** 에서만 재생됩니다.
+
+즉,
+
+- 강 전체가 아닌 **한 점에서만** 물소리가 들리게 되며,
+- 자연스럽게 흐르는 **넓은 강의 느낌을 표현하기 어렵습니다.**
+
+---
+
+## 🌊 AkAmbient 컴포넌트 사용하기
+
+이럴 때는 **`AkAmbient` 컴포넌트**를 사용해야 합니다.
+
+이 컴포넌트는 `AkEvent`와 동일한 기능(사운드 이벤트 재생)을 제공하면서,
+
+추가로 **사운드의 위치(Positioning)** 를 세밀하게 지정할 수 있는 기능을 가집니다.
+
+이를 통해 다음과 같은 효과를 낼 수 있습니다.
+
+- 강 전체를 따라 소리가 들리게 만들기
+- 강의 여러 부분에서 동시에 물이 흐르는 듯한 공간감 표현하기
+- 플레이어가 강 가까이 갈수록 점점 더 크게 들리게 하기
+
+---
+
+## 💡 정리
+
+| 상황                           | 사용할 컴포넌트 | 설명                                                                  |
+| ------------------------------ | --------------- | --------------------------------------------------------------------- |
+| 소리가 한 위치에서만 들리면 됨 | `AkEvent`       | 단순한 사운드 재생 (예: 버튼 클릭, 폭발음 등)                         |
+| 소리가 공간 전체에 퍼져야 함   | `AkAmbient`     | 환경음처럼 넓은 범위에서 들리는 소리 (예: 강물, 바람, 숲의 새소리 등) |
+
+---
+
+## 🔎 요약
+
+> AkEvent → 점(Point) 사운드
+>
+> `AkAmbient` → **공간(Ambient) 사운드**
+
+---
+
+원하신다면 다음 단계로
+
+**`AkAmbient`의 위치 지정 모드(Position Type)** 종류도
+
+그림 예시와 함께 정리해드릴 수 있습니다. 원하시나요?
+
+# { 🚀 AK Ambient Component와 감쇠(Attenuation) 시각화하기 }
+
+이번 강의는 **Wwise의 AK Ambient Component를 사용해 ‘Windmill Ambience(풍차 환경음)’를 설정하고, 감쇠 범위(Attenuation Distance)를 시각적으로 확인하는 방법**을 배우는 내용입니다.
+
+또한, Wwise와 Unity 간의 연동 과정에서 **SoundBank에 감쇠 정보를 포함시키는 설정 방법**도 다룹니다.
+
+---
+
+## 📋 목차
+
+1. [AK Ambient Component 개념 이해하기](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#1-ak-ambient-component-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [프로젝트 준비하기 (씬과 오브젝트 확인)](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#2-%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8-%EC%A4%80%EB%B9%84%ED%95%98%EA%B8%B0-%EC%94%AC%EA%B3%BC-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%ED%99%95%EC%9D%B8)
+3. [Wwise 설정: 감쇠(Max Attenuation) 포함시키기](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#3-wwise-%EC%84%A4%EC%A0%95-%EA%B0%90%EC%87%A0max-attenuation-%ED%8F%AC%ED%95%A8%EC%8B%9C%ED%82%A4%EA%B8%B0)
+4. [Unity에서 AK Ambient Component 적용하기](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#4-unity%EC%97%90%EC%84%9C-ak-ambient-component-%EC%A0%81%EC%9A%A9%ED%95%98%EA%B8%B0)
+5. [Show Attenuation Sphere로 거리 시각화하기](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#5-show-attenuation-sphere%EB%A1%9C-%EA%B1%B0%EB%A6%AC-%EC%8B%9C%EA%B0%81%ED%99%94%ED%95%98%EA%B8%B0)
+6. [Sphere Collider를 이용한 거리 조정 실습](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#6-sphere-collider%EB%A5%BC-%EC%9D%B4%EC%9A%A9%ED%95%9C-%EA%B1%B0%EB%A6%AC-%EC%A1%B0%EC%A0%95-%EC%8B%A4%EC%8A%B5)
+7. [최종 정리](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#7-%EC%B5%9C%EC%A2%85-%EC%A0%95%EB%A6%AC)
+
+---
+
+## 1. AK Ambient Component 개념 이해하기
+
+### 🎧 AK Ambient Component란?
+
+- Wwise Unity Integration에서 제공하는 **컴포넌트**로,
+  **환경음(Ambient Sound)** 을 자동으로 재생하거나 **특정 위치 기반**으로 배치할 때 사용합니다.
+- **AK Event** 컴포넌트처럼 사운드를 재생할 수 있지만,
+  AK Ambient Component는 추가 기능이 포함되어 있습니다.
+
+---
+
+### ✨ AK Ambient Component의 주요 기능
+
+| 기능                        | 설명                                                                      |
+| --------------------------- | ------------------------------------------------------------------------- |
+| **Event 재생**              | AK Event처럼 특정 사운드를 재생할 수 있음.                                |
+| **Position Type 설정**      | 사운드의 위치 계산 방식을 지정 (예: 2D, 3D, Trigger 기반 등).             |
+| **Show Attenuation Sphere** | 감쇠 거리(사운드가 들리는 최대 거리)를 Unity Scene에서 시각적으로 표시함. |
+| **Auto-Play / Loop 지원**   | 씬이 시작될 때 자동 재생하거나 반복 재생 가능.                            |
+
+---
+
+## 2. 프로젝트 준비하기 (씬과 오브젝트 확인)
+
+- 강의에서는 **Wwise Certification 301 → Lesson 2 → Posting an Ambient Scene** 씬을 사용합니다.
+- Unity의 **Hierarchy 창**에서 다음 구조를 확인합니다:
+
+```
+Device
+ └── Windmill
+```
+
+- `Windmill` 오브젝트는 풍차 소리가 날 **환경음(Ambience)** 을 담당합니다.
+- 이 Windmill에 **AK Ambient Component**를 추가합니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380520/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L2/image.png)
+
+---
+
+## 3. Wwise 설정: 감쇠(Max Attenuation) 포함시키기
+
+### 🎯 목적
+
+Unity에서 감쇠(Attenuation) 시각화를 하려면,
+
+**Wwise SoundBank에 "Max Attenuation Distance" 정보가 포함**되어 있어야 합니다.
+
+- 새로운 Wwise 프로젝트를 만들 때 Attenuation ShareSet의 Max Distance 값은 SoundBank의 메타데이터에 포함되지 않습니다. 반면 WAG에서는 메타데이터에 포함됩니다.
+
+### 설정 방법
+
+1. **Wwise에서 프로젝트 열기**
+2. 상단 메뉴 → **Project → Project Settings** 로 이동
+3. 왼쪽 탭 중 **SoundBanks** 선택
+4. **“Max Attenuation”** 옵션이 켜져 있는지 확인
+   - 이 옵션이 **비활성화되어 있으면 감쇠 정보가 SoundBank에 포함되지 않음**
+5. 저장 후 Wwise 닫기
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380515/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L2/image_1.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380518/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L2/image_2.png)
+
+(추가) AkWwiseProjectInfo.GetData().GetEventMaxAttenuation() 함수를 호출하면 여러분의 사용자 정의 스크립트에서 Max Distance를 가져올 수 있습니다.
+
+---
+
+## 4. Unity에서 AK Ambient Component 적용하기
+
+### 📦 SoundBank 갱신
+
+- Unity로 돌아와 **Wwise Picker 창**을 엽니다.
+- **Generate SoundBanks** 버튼 클릭
+  → 이렇게 하면 **Wwise에서 설정한 감쇠(Max Attenuation) 정보**가 Unity에 반영됩니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380518/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L2/image_3.png)
+
+---
+
+### 🔧 AK Ambient Component 설정 항목
+
+| 항목                        | 설명                                           |
+| --------------------------- | ---------------------------------------------- |
+| **Event Name**              | Windmill Ambience (Wwise에서 만든 이벤트 선택) |
+| **Trigger On Start**        | 씬 시작 시 자동 재생 여부                      |
+| **Show Attenuation Sphere** | 감쇠 범위(Attenuation Range)를 시각적으로 표시 |
+| **Current Event Only**      | 현재 선택된 이벤트의 감쇠 범위만 표시          |
+
+---
+
+## 5. Show Attenuation Sphere로 거리 시각화하기
+
+- **Show Attenuation Sphere** 옵션을 활성화한 후
+  **“Current Event Only”** 버튼을 클릭합니다.
+- Unity Scene에 **빨간색 반투명 구체(Red Transparent Sphere)** 가 나타납니다.
+
+### 🔴 이 구체의 의미
+
+- 이 구체는 Wwise에서 설정한 **Max Attenuation Distance(최대 감쇠 거리)** 를 나타냅니다.
+- 즉, 이 구체의 반지름 안에서는 **Windmill Ambience** 소리가 들리고,
+  구체 밖으로 벗어나면 소리가 들리지 않습니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380519/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L2/image_4.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380519/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L2/image_5.png)
+
+---
+
+## 6. Sphere Collider를 이용한 거리 조정 실습
+
+이제 감쇠 범위가 **플레이어 시작 위치까지 도달하도록** 거리 값을 조정합니다.
+
+---
+
+### ① 현재 감쇠 거리 확인
+
+- Wwise에서 **Windmill Ambience의 Attenuation Distance**를 확인하면
+  기본 값은 **35**로 설정되어 있습니다.
+
+---
+
+### ② Unity에서 Sphere Collider로 비교
+
+- Windmill 오브젝트에 **Sphere Collider**를 추가하고,
+  `Radius = 35` 로 설정합니다.
+- Scene에서 보면:
+  - **초록색 구(Sphere Collider)** 와
+  - **빨간색 구(Attenuation Sphere)** 의 크기가 동일합니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380519/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L2/image_6.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380519/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L2/image_7.png)
+
+```csharp
+이런식으로 미리 확인 가능하지만 ( 초록색 ) 그닥 유용한지 모르겠다
+```
+
+---
+
+### ③ 플레이어 위치까지 범위 확장
+
+- 이제 구체의 반경을 **서서히 늘리며** 플레이어 위치까지 커버되도록 조정합니다.
+- 플레이어가 **Windmill 소리를 들을 수 있는 지점**까지 커버되려면
+  약 `Radius = 50` 정도가 필요합니다.
+- 여기에 약간의 여유(버퍼)를 주기 위해 `55`로 설정합니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380519/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L2/image_8.png)
+
+```csharp
+300까지 엄청 늘렸다
+```
+
+---
+
+### ④ Wwise에서 최종 거리 수정
+
+1. Wwise로 돌아가 **Windmill Ambience Attenuation Distance**를 **55**로 변경
+2. 저장 후 다시 Unity로 돌아와 **Generate SoundBanks** 실행
+3. Unity Scene의 빨간 Attenuation Sphere가 커진 것을 확인
+
+👉 이제 **플레이어 시작 위치가 감쇠 범위 안에 포함**되어
+
+Windmill 소리를 들을 수 있게 됩니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380520/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L2/image_9.png)
+
+---
+
+## 7. 최종 정리
+
+| 단계 | 설명                                                                                  |
+| ---- | ------------------------------------------------------------------------------------- |
+| 1    | AK Ambient Component는 AK Event보다 확장된 기능을 제공함 (감쇠 시각화, 위치 타입 등)  |
+| 2    | 감쇠 시각화를 사용하려면 SoundBank 생성 시 “Max Attenuation” 정보가 포함되어야 함     |
+| 3    | Unity에서 “Show Attenuation Sphere → Current Event Only”로 시각화 가능                |
+| 4    | Sphere Collider를 활용해 감쇠 거리와 플레이어 거리 비교 가능                          |
+| 5    | 최종적으로 Attenuation Distance를 55로 조정하여 사운드가 플레이어에게 도달하도록 설정 |
+
+---
+
+### 💡 핵심 개념 요약
+
+- **Attenuation(감쇠)**: 사운드가 멀어질수록 점점 작아지는 거리 기반 볼륨 조정.
+- **Max Attenuation Distance**: 사운드가 완전히 들리지 않게 되는 최대 거리.
+- **Show Attenuation Sphere**: Unity에서 이 거리 범위를 시각적으로 확인하는 기능.
+- **Sphere Collider 비교법**: 감쇠 범위를 실제 물리 거리와 맞춰보기 위한 간단한 방법.
+
+---
+
+📘 **이 강의의 핵심 포인트**
+
+> “Wwise의 감쇠 시스템을 시각적으로 이해하고,
+>
+> Unity Scene에서 실제 청취 가능한 범위를 정확히 설정하는 방법을 배운다.”
+
+---
+
+# { 🌋 AkAmbient Large Mode로 용암(Lava) 환경음 구현하기 }
+
+이번 강의는 **Wwise와 Unity 통합 환경**에서 **AkAmbient 컴포넌트의 Large Mode**를 활용해
+
+**하나의 사운드 이벤트로 넓은 공간(예: 용암, 물, 바람 등)**을 자연스럽게 재생하는 방법을 배웁니다.
+
+---
+
+## 📋 목차
+
+1. [Large Mode 개념 이해하기](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#1-large-mode-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [문제 상황: 용암 환경음의 한계](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#2-%EB%AC%B8%EC%A0%9C-%EC%83%81%ED%99%A9-%EC%9A%A9%EC%95%94-%ED%99%98%EA%B2%BD%EC%9D%8C%EC%9D%98-%ED%95%9C%EA%B3%84)
+3. [Large Mode 설정 과정](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#3-large-mode-%EC%84%A4%EC%A0%95-%EA%B3%BC%EC%A0%95)
+4. [Position 오브젝트 추가 및 배치](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#4-position-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%EC%B6%94%EA%B0%80-%EB%B0%8F-%EB%B0%B0%EC%B9%98)
+5. [Attenuation Sphere로 사운드 영역 확인하기](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#5-attenuation-sphere%EB%A1%9C-%EC%82%AC%EC%9A%B4%EB%93%9C-%EC%98%81%EC%97%AD-%ED%99%95%EC%9D%B8%ED%95%98%EA%B8%B0)
+6. [테스트 및 조정 단계](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#6-%ED%85%8C%EC%8A%A4%ED%8A%B8-%EB%B0%8F-%EC%A1%B0%EC%A0%95-%EB%8B%A8%EA%B3%84)
+
+---
+
+## 1. Large Mode 개념 이해하기
+
+### 🎧 AkAmbient란?
+
+- **AkAmbient**는 Unity에서 **Wwise Event**를 재생하기 위한 컴포넌트입니다.
+- 이 컴포넌트를 게임 오브젝트에 추가하면,
+  해당 오브젝트의 **3D 공간 좌표**를 기준으로 사운드가 재생됩니다.
+
+### 🎚️ Large Mode란?
+
+- **하나의 Wwise Event**로 **여러 위치(Position)**에서 사운드를 재생할 수 있는 기능입니다.
+- 각 위치는 “점 형태의 이미터(Point Emitter)”로 작동하며,
+  여러 점에서 동시에 소리가 방사되는 것처럼 들리게 합니다.
+
+🔹 **핵심 장점**
+
+| 구분            | 설명                                                        |
+| --------------- | ----------------------------------------------------------- |
+| **효율성**      | 하나의 보이스 인스턴스(voice)만 사용 → 리소스 절약          |
+| **자연스러움**  | 용암, 물, 바람 등 넓은 면적의 사운드를 입체적으로 재현      |
+| **간결한 관리** | 여러 개의 오브젝트 대신 하나의 AkAmbient로 여러 지점을 제어 |
+
+💡 즉, **“볼류메트릭(Volumetric) 사운드”**처럼 공간 전체에서 들리는 음향을 구현하는 기술입니다.
+
+---
+
+## 2. 문제 상황: 용암 환경음의 한계
+
+던전(Dungeon) 지역에는 커다란 조각상이 있고,
+
+그 아래에는 **넓게 퍼진 용암(Lava)**가 흐르고 있습니다.
+
+그런데 현재 용암 사운드는 **Ambient_Lava 오브젝트의 한 지점에서만 재생**되고 있습니다.
+
+즉, **소리가 특정 방향에서만 들리고**,
+
+플레이어가 다리 위를 걸을 때 공간 전체에 울려 퍼지는 느낌이 부족합니다.
+
+🎯 **문제 원인:**
+
+현재 **Position Type**이 `Simple Mode`로 설정되어 있기 때문입니다.
+
+→ 단일 위치에서만 소리가 재생되고 있음.
+
+---
+
+## 3. Large Mode 설정 과정
+
+1. Unity 상단 메뉴에서
+
+   `Audiokinetic > Certification > 301 > Lesson 2` 로 이동합니다.
+
+2. **AkAmbient Position Types** 씬을 엽니다.
+   - 여기서 Dungeon 지역의 환경이 설정되어 있습니다.
+3. 게임을 **Play 모드**로 실행한 뒤
+
+   `ESC → Library` 로 **텔레포트**합니다.
+   - 다리 위를 걸어가며 Lava 소리가 한 방향에서만 들리는 것을 확인합니다.
+
+4. **Play 모드를 종료(ESC → Play 종료)** 한 후,
+
+   **Hierarchy** 창에서 아래 경로로 이동합니다.
+
+   ```
+   L2_3B - Dungeon Environment Scene
+   └── Wwise
+       └── Ambient_Lava
+   ```
+
+5. `Ambient_Lava` 게임 오브젝트를 선택하고,
+
+   **Inspector**에서 `AkAmbient` 컴포넌트를 확인합니다.
+
+6. **Position Type** 항목이 `Simple Mode`로 되어 있다면,
+
+   드롭다운을 클릭하여 `Large Mode`로 변경합니다.
+
+   ```
+   AkAmbient Component
+   ├── Event: Ambient_Lava
+   ├── Position Type: Large Mode
+   └── [ Show Attenuation Spheres ] 옵션 표시됨
+   ```
+
+---
+
+## 4. Position 오브젝트 추가 및 배치
+
+1. Large Mode를 선택하면
+
+   **Show Attenuation Spheres** 아래에 두 개의 버튼이 생깁니다:
+   - `Add Large Mode Position`
+   - `Use Existing Positions`
+
+2. **Add Large Mode Position**을 클릭합니다.
+
+   → 새로운 하위 게임 오브젝트가 자동 생성됩니다.
+
+   ```
+   Ambient_Lava
+   ├── AkAmbient (Component)
+   └── AkAmbientPoint0
+   ```
+
+   💡 자동으로 `AkAmbient Large Mode Positioner` 컴포넌트가 추가됩니다.
+
+   ![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380515/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L2/image_10.png)
+
+3. **Scene 뷰에서 ‘F’ 키**를 눌러
+
+   `Ambient_Lava` 오브젝트에 **포커스**합니다.
+
+   Lava 지형 전체가 보이도록 **화면을 조정**하세요.
+
+   (카메라 시야를 넓히면 배치하기 쉬움)
+
+4. **Hierarchy에서 AkAmbientPoint0**을 선택한 뒤
+
+   **Move 도구(W)**로 **Lava 영역의 한쪽 중앙**으로 이동시킵니다.
+
+5. \*각 사분면(Quadrant)\*\*에 2~3개의 포인트가 생기도록
+
+   `Add Large Mode Position`을 반복 클릭하여 여러 점을 추가합니다.
+
+   예시:
+
+   ```
+   Ambient_Lava
+   ├── AkAmbient
+   ├── AkAmbientPoint0
+   ├── AkAmbientPoint1
+   ├── AkAmbientPoint2
+   ├── AkAmbientPoint3
+   └── AkAmbientPoint4
+   ```
+
+   ![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380515/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L2/image_11.png)
+
+6. 각 점을 용암 위에 고르게 배치하여
+
+   **넓은 범위에서 사운드가 들리도록 구성**합니다.
+
+   🔸 상위 오브젝트(`Ambient_Lava`)를 이동하면
+
+   하위 포인트들이 **상대적 위치 기준으로 함께 이동**하므로,
+
+   개별 점을 옮기려면 반드시 **각 Point 오브젝트를 직접 선택**하세요.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380515/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L2/image_12.png)
+
+---
+
+## 5. Attenuation Sphere로 사운드 영역 확인하기
+
+### 🟣 Show Attenuation Spheres
+
+- Large Mode에서는 각 Position 오브젝트에 **Attenuation Sphere(감쇠 구)**를 표시할 수 있습니다.
+- 이 구체는 사운드가 도달하는 범위를 나타냅니다.
+
+1. **Inspector**에서 `Show Attenuation Spheres` 옵션을
+
+   `Current Event Only` 로 설정합니다.
+
+2. 이제 Scene 뷰에 각 포인트 주변에 **투명한 구체**가 표시됩니다.
+   - 구가 겹칠수록 불투명하게 보이며,
+     그 부분에서는 사운드 강도가 더 높게 들립니다.
+3. 구체들이 잘 이어져 있으면,
+
+   Lava 영역 전체가 고르게 덮여 **자연스러운 볼륨감 있는 환경음**을 얻을 수 있습니다.
+
+💡 **만약 빈 공간이 있다면?**
+
+- **Add Position**으로 새 점을 추가하거나
+- **Wwise Attenuation 설정**에서 반경(Radius)을 늘리면 됩니다.
+
+---
+
+## 6. 테스트 및 조정 단계
+
+1. Play 모드를 다시 시작합니다.
+2. `ESC → Library`로 이동한 후
+
+   **다리 위를 걸으며** 용암 소리가 공간 전체에서 들리는지 확인합니다.
+
+3. 카메라를 Lava 위쪽으로 이동시켜
+
+   사운드 분포를 귀로 테스트합니다.
+
+4. 특정 구역에서 소리가 약하거나 비자연스럽다면,
+
+   그 영역에 **Position 오브젝트를 추가하거나 이동**합니다.
+
+5. 수정 후 Play 모드를 종료하여 변경 사항을 저장합니다.
+
+---
+
+## 🧠 요약 정리
+
+| 항목                   | 설명                                                      |
+| ---------------------- | --------------------------------------------------------- |
+| **문제**               | Lava 소리가 단일 지점에서만 재생되어 비현실적             |
+| **해결책**             | AkAmbient의 Large Mode를 이용해 다중 점 이미터 생성       |
+| **구현 방식**          | Add Large Mode Position으로 여러 점 추가                  |
+| **장점**               | 하나의 Event로 다수의 위치 재생 → 성능 절약 + 공간감 강화 |
+| **Attenuation Sphere** | 각 포인트의 사운드 도달 범위 확인용 시각화 도구           |
+| **결과**               | Lava가 넓은 영역에서 자연스럽게 들리는 환경음 완성        |
+
+---
+
+## 🔍 참고 팁
+
+- **Large Mode 사용 권장 대상**
+  - 물 흐름, 강물, 용암, 폭풍, 바람 등 넓은 환경음
+- **Simple Mode 사용 권장 대상**
+  - 문 여는 소리, 단발 효과음, 근거리 사운드
+- **추가 학습 자료**
+  - Audiokinetic 공식 문서: _3D Positioning & Large Mode Integration_
+  - Wwise Certification 301 (Positioning Types 섹션)
+
+---
+
+## ✅ 최종 결과
+
+- **Event:** `Ambient_Lava`
+- **Mode:** `Large Mode`
+- **Positions:** 4~8개
+- **시각 확인:** `Show Attenuation Spheres = Current Event Only`
+- **결과:**
+  용암이 **바닥 전체를 따라 입체적으로 울려 퍼지는** 현실적인 사운드 환경 완성 🔊
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380515/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L2/image_13.png)
+
+---
+
+# { 🎧 Multi Position 모드 사용하기 }
+
+Unity에서 **Wwise의 AkAmbient 컴포넌트**를 이용해 **중복 보이스를 줄이고 오디오 성능을 최적화**하는 방법을 배우는 강의입니다.
+
+---
+
+## 📋 목차
+
+1. [Multi Position 모드 개념 이해하기](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#multi-position-%EB%AA%A8%EB%93%9C-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Prefab과 AkAmbient 컴포넌트의 관계](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#prefab%EA%B3%BC-akambient-%EC%BB%B4%ED%8F%AC%EB%84%8C%ED%8A%B8%EC%9D%98-%EA%B4%80%EA%B3%84)
+3. [현재 Torch 사운드 구조 살펴보기](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#%ED%98%84%EC%9E%AC-torch-%EC%82%AC%EC%9A%B4%EB%93%9C-%EA%B5%AC%EC%A1%B0-%EC%82%B4%ED%8E%B4%EB%B3%B4%EA%B8%B0)
+4. [Simple 모드에서의 보이스 확인하기](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#simple-%EB%AA%A8%EB%93%9C%EC%97%90%EC%84%9C%EC%9D%98-%EB%B3%B4%EC%9D%B4%EC%8A%A4-%ED%99%95%EC%9D%B8%ED%95%98%EA%B8%B0)
+5. [Multi Position 모드로 변경하기](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#multi-position-%EB%AA%A8%EB%93%9C%EB%A1%9C-%EB%B3%80%EA%B2%BD%ED%95%98%EA%B8%B0)
+6. [Prefab에 변경사항 적용(Apply)](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#prefab%EC%97%90-%EB%B3%80%EA%B2%BD%EC%82%AC%ED%95%AD-%EC%A0%81%EC%9A%A9apply)
+7. [보이스 수 비교 및 최적화 결과 확인하기](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#%EB%B3%B4%EC%9D%B4%EC%8A%A4-%EC%88%98-%EB%B9%84%EA%B5%90-%EB%B0%8F-%EC%B5%9C%EC%A0%81%ED%99%94-%EA%B2%B0%EA%B3%BC-%ED%99%95%EC%9D%B8%ED%95%98%EA%B8%B0)
+8. [Multi Position 모드의 장점과 주의점](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#multi-position-%EB%AA%A8%EB%93%9C%EC%9D%98-%EC%9E%A5%EC%A0%90%EA%B3%BC-%EC%A3%BC%EC%9D%98%EC%A0%90)
+
+---
+
+## 1. Multi Position 모드 개념 이해하기
+
+- **정의:**
+  Multi Position Mode는 **하나의 Wwise Event를 여러 위치에서 재생**할 때,
+  **각 위치별로 별도의 보이스 인스턴스를 생성하지 않고 단 하나의 보이스만 사용**하도록 하는 기능입니다.
+- **기본 아이디어:**
+  예를 들어, 던전에 횃불이 17개 있다고 가정합시다.
+  각 횃불마다 AkAmbient 컴포넌트가 추가되어 있다면,
+  단순히 Event를 재생하는 것만으로 **17개의 보이스 인스턴스가 동시에 발생**합니다.
+  → CPU와 메모리 낭비.
+  하지만 Multi Position 모드를 사용하면
+  **17개의 위치 정보는 유지하면서도 단 하나의 보이스 인스턴스만 재생**됩니다.
+  즉, **공간적 배치 정보(Positioning)는 그대로** 유지하면서
+  **오디오 성능 부하는 1개 인스턴스 수준으로 줄이는 최적화 방법**입니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380516/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L2/image_14.png)
+
+```csharp
+엄청 많은 Torch보이스 검출
+```
+
+---
+
+## 2. Prefab과 AkAmbient 컴포넌트의 관계
+
+- **Prefab이란:**
+  Unity에서 게임 오브젝트를 재사용하기 위해 만든 **템플릿(청사진)**입니다.
+  예를 들어 `301_Torch`라는 Prefab은 Torch의 **위치, 모델, 사운드 설정** 등을 모두 포함하고 있습니다.
+- **Prefab의 특징:**
+  - Scene에 Prefab을 여러 번 배치하면,
+    모든 인스턴스가 **원본 Prefab의 속성을 상속**받습니다.
+  - Prefab의 속성을 변경한 뒤 **Apply**하면
+    → Scene에 배치된 모든 동일한 Prefab 인스턴스가 **자동으로 업데이트**됩니다.
+- **AkAmbient 컴포넌트:**
+  각 Torch Prefab에는 AkAmbient 컴포넌트가 붙어 있으며,
+  이 컴포넌트가 **Wwise Event(예: Ambient_Torch)**를 실제로 재생시킵니다.
+
+---
+
+## 3. 현재 Torch 사운드 구조 살펴보기
+
+1. Unity에서 **Hierarchy 창**을 열고
+
+   `AkAmbient Position Types` 씬을 선택합니다.
+
+   (경로: `Audiokinetic > Certification > 301 > Lesson 2 > AkAmbient Position Types`)
+
+2. Scene 안에는 **Dungeon 환경**이 있으며,
+
+   여러 개의 **Torch 게임 오브젝트**가 배치되어 있습니다.
+   - 이름 예시: `301_Torch_01`, `301_Torch_02`, `301_Torch_03` …
+   - 각각의 Torch에는 **AkAmbient 컴포넌트**가 포함되어 있습니다.
+
+3. 이 컴포넌트들은 모두 **Simple 모드**로 설정되어 있어,
+
+   Torch마다 Event가 **별도로 재생**되고 있습니다.
+
+   즉, **17개의 Torch → 17개의 보이스 인스턴스**가 생성되는 구조입니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380516/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L2/image_15.png)
+
+---
+
+## 4. Simple 모드에서의 보이스 확인하기
+
+### 🔹 연결 단계
+
+1. **Wwise와 Unity를 연결**합니다.
+   - 상단 툴바에서 `Wwise Toolbar → Remote…` 클릭
+   - `Wwise Adventure Game (Editor)` 선택 후 `Connect`
+2. Unity에서 **Play 모드 시작**
+   - `Play` 클릭 → ESC 키로 게임 메뉴 열기
+   - `Dungeon`으로 텔레포트
+3. **Torch 소리 확인**
+   - 복도를 걸어가면 각 횃불을 지날 때마다 **볼륨이 커졌다 작아짐**
+   - 이는 각 Torch의 위치에서 별개의 Event가 재생되고 있음을 의미함.
+
+### 🔹 보이스 모니터링
+
+1. Wwise에서 상단 메뉴 `Layouts → Voice Profiler` 선택
+2. **Ambient_Torch Event**만 필터링
+3. 타임라인을 뒤로 드래그하여 `301_Torch` 오브젝트가 활성화된 시점 확인
+4. **Voice Inspector 왼쪽 패널**을 보면
+   - Ambient_Torch Event가 **10개 이상** 동시에 활성화되어 있음
+   - 각 보이스가 Torch 오브젝트별로 따로 재생 중임을 확인 가능
+
+---
+
+## 5. Multi Position 모드로 변경하기
+
+1. Unity의 **Hierarchy 창**에서 `Torch` 검색
+2. `301_Torch_01` 게임 오브젝트 선택
+   - 이름이 **파란색**으로 표시됨 → Prefab 인스턴스임을 의미
+3. **Inspector 창**에서 AkAmbient 컴포넌트 확인
+4. **Position Type** 속성을 **Simple Mode → Multi Position Mode**로 변경
+   - 이제 이 Torch는 Multi Position 모드를 사용하는 상태가 됩니다.
+
+---
+
+## 6. Prefab에 변경사항 적용(Apply)
+
+1. 변경한 컴포넌트를 Prefab에 반영해야
+
+   → 나머지 모든 Torch 오브젝트에도 같은 설정이 적용됩니다.
+
+2. 방법:
+   - `Inspector` 창의 **AkAmbient 컴포넌트**를 우클릭
+   - `Modified Component > Apply to Prefab '301_Torch'` 선택
+   - 이렇게 하면 `301_Torch` Prefab의 AkAmbient 설정이 업데이트됩니다.
+3. 이제 모든 Torch Prefab 인스턴스(`301_Torch_02`, `301_Torch_03` …)가
+
+   자동으로 **Multi Position 모드**를 상속받게 됩니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380516/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L2/image_16.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380516/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L2/image_17.png)
+
+```csharp
+적용하고 프리팹에 overrides
+```
+
+---
+
+## 7. 보이스 수 비교 및 최적화 결과 확인하기
+
+### 🔹 결과 확인 절차
+
+1. **Wwise Profiler 재연결**
+   - `Reconnect` 클릭
+2. Unity에서 다시 **Play 모드 시작**
+   - 게임 메뉴 → Dungeon으로 텔레포트
+3. Torch 복도를 따라 이동하면서 소리 확인
+   - 여전히 Torch 위치별로 사운드가 들리지만
+     이제는 모든 Torch가 **하나의 Event 인스턴스만 공유**합니다.
+
+### 🔹 Wwise Voice Inspector에서 확인
+
+- Voice Inspector의 **왼쪽 패널**:
+  - Ambient_Torch Event 인스턴스가 이제 **1개만 존재**
+- Voice Inspector의 **오른쪽 패널**:
+  - 각 횃불의 **Distance Attenuation(거리 감쇠)** 정보가 여전히 표시됨
+  - 즉, Torch의 위치 차이에 따라 볼륨 감쇠가 자연스럽게 작동함을 의미함
+
+✅ 결과적으로:
+
+- 이전엔 Torch 17개 → **17개의 보이스 인스턴스**
+- Multi Position 적용 후 → **1개의 보이스 인스턴스만 사용**
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380516/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L2/image_18.png)
+
+```csharp
+2개의 보이스만 사용중
+```
+
+---
+
+## 8. Multi Position 모드의 장점과 주의점
+
+### 🌟 장점
+
+1. **성능 최적화:**
+   - 동일한 Event를 여러 위치에서 사용할 때 **CPU 및 메모리 사용량 대폭 절감**
+2. **공간적 정확도 유지:**
+   - 각 오브젝트의 **3D 위치 정보**는 그대로 유지됨
+   - 플레이어가 Torch에 가까워질수록 사운드가 커지고 멀어질수록 작아짐
+3. **레벨 디자이너 친화적:**
+   - 새 Torch Prefab을 추가해도 자동으로 Multi Position 모드가 적용되어
+     추가 설정 없이 바로 최적화된 사운드가 사용됨
+
+### ⚠️ 주의점
+
+- Multi Position 모드는 **단일 보이스 인스턴스를 공유**하므로
+  각 위치별로 **랜덤화된 소리(Randomizer)**를 적용할 수 없습니다.
+  즉, Torch마다 약간씩 다른 소리를 내는 연출은 불가능합니다.
+- 하지만 **퍼포먼스 효율성**이 매우 높기 때문에
+  **동일한 사운드가 여러 곳에서 동시에 들려야 하는 상황**(예: 횃불, 폭포, 비, 바람 등)에 이상적입니다.
+
+---
+
+✅ **요약**
+
+| 항목               | Simple Mode              | Multi Position Mode             |
+| ------------------ | ------------------------ | ------------------------------- |
+| 보이스 인스턴스 수 | Torch 수만큼 생성 (중복) | 1개만 생성                      |
+| 위치 정보          | 유지됨                   | 유지됨                          |
+| 랜덤화된 사운드    | 가능                     | 불가능                          |
+| 성능 효율          | 낮음                     | 매우 높음                       |
+| 사용 예시          | 개별 사운드              | 반복적 환경음 (불, 비, 바람 등) |
+
+---
+
+💡 **정리 포인트:**
+
+- Multi Position Mode는 **“하나의 Event로 여러 위치를 커버하는 최적화 기법”**이다.
+- Prefab 구조를 활용하면 **한 번의 Apply로 전체 인스턴스에 적용 가능**하다.
+- **성능 향상과 유지보수 효율** 모두 얻을 수 있는 핵심 기술이다.
+
+---
+
+# { 🎧 Event Position Confiner 이해하고 사용하기 }
+
+이번 강의에서는 **Event Position Confiner 스크립트**를 통해
+
+환경 사운드를 “영역(Box Collider)” 안에 한정하고,
+
+플레이어(또는 카메라)가 그 영역 안팎을 이동할 때
+
+소리의 위치와 감쇠(Attenuation)를 자동으로 조정하는 방법을 배웁니다.
+
+---
+
+## 📋 목차
+
+1. [Event Position Confiner 개념 이해하기](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#event-position-confiner-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [씬(Scene) 구성 살펴보기](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#%EC%94%ACscene-%EA%B5%AC%EC%84%B1-%EC%82%B4%ED%8E%B4%EB%B3%B4%EA%B8%B0)
+3. [EventPositionConfiner 스크립트 추가하기](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#eventpositionconfiner-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+4. [프로퍼티 설정하기](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#%ED%94%84%EB%A1%9C%ED%8D%BC%ED%8B%B0-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+5. [씬 뷰 레이아웃 조정하기](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#%EC%94%AC-%EB%B7%B0-%EB%A0%88%EC%9D%B4%EC%95%84%EC%9B%83-%EC%A1%B0%EC%A0%95%ED%95%98%EA%B8%B0)
+6. [실행하며 소리 위치 확인하기](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#%EC%8B%A4%ED%96%89%ED%95%98%EB%A9%B0-%EC%86%8C%EB%A6%AC-%EC%9C%84%EC%B9%98-%ED%99%95%EC%9D%B8%ED%95%98%EA%B8%B0)
+7. [작동 원리 및 믹싱 활용 이해](https://www.notion.so/Wwise-301-L2-01-289e683f737e8032b9c0df5ade3fe62a#%EC%9E%91%EB%8F%99-%EC%9B%90%EB%A6%AC-%EB%B0%8F-%EB%AF%B9%EC%8B%B1-%ED%99%9C%EC%9A%A9-%EC%9D%B4%ED%95%B4)
+
+---
+
+## 1. Event Position Confiner 개념 이해하기
+
+### 🎯 목적
+
+- **환경음(Ambient Sound)** 이 넓은 지역에서 일정하게 들리도록 하기 위해 사용.
+- 단순히 한 지점에서 소리를 내는 것이 아니라,
+  플레이어의 위치에 따라 소리의 “출발점”을 **Collider 안에서 제한**함.
+
+### 🔊 기존 AkAmbient의 한계
+
+Wwise의 **AkAmbient 컴포넌트**에는 여러 모드가 있습니다:
+
+- **Simple Mode** : 한 위치에서 단일 사운드 재생.
+- **Large Mode** : 여러 오브젝트에서 하나의 이벤트를 재생해 넓은 공간 커버.
+- **Multi-Position Mode** : 여러 위치를 지정해 한 번에 동일한 이벤트 재생.
+
+하지만 이런 방식들은 모두 **“소리의 위치(Point)”** 기반입니다.
+
+즉, 소리의 세기나 감쇠는 “그 위치로부터의 거리”에 따라 달라집니다.
+
+➡️ 문제점:
+
+넓은 지역 전체에 고르게 들리는 환경음을 만들기가 어려움.
+
+매번 위치별로 볼륨 밸런스를 다시 조정해야 함.
+
+### 🧩 해결책
+
+**EventPositionConfiner** 스크립트를 사용합니다.
+
+이 스크립트는 다음과 같이 작동합니다:
+
+1. 특정 **Trigger Collider**(예: Box Collider)를 참조.
+2. 플레이어의 **AkAudioListener** 위치를 계속 추적.
+3. 소리의 위치를 Collider 내부 또는 가장 가까운 지점으로 “이동”시켜줌.
+4. 그 결과:
+   - **플레이어가 Collider 내부**일 때:
+     → 소리의 감쇠 거리(Attenuation Distance)가 0 (즉, 바로 옆에서 들림)
+   - **플레이어가 Collider 외부**일 때:
+     → 소리의 위치가 Collider의 가장 가까운 면 쪽으로 이동하며 감쇠 적용
+
+🎧 즉, 이 스크립트는 Collider 영역 전체를 “하나의 볼륨 영역(Volumetric Emitter)”처럼 작동하게 합니다.
+
+---
+
+## 2. 씬(Scene) 구성 살펴보기
+
+- 사용된 씬:
+  `Audiokinetic > Certification > 301 > Lesson 2 > Event Position Confiner`
+- 주요 구성:
+  - **Main Scene** : 플레이어가 움직이는 주 무대
+  - **Village Environment Scene** : 환경 사운드용 서브 씬
+    - 이 안에 `River` 게임 오브젝트가 포함되어 있으며
+      물 흐르는 소리(Ambient_River Event)를 재생할 예정.
+- River 오브젝트에는 이미 **Box Collider**가 부착되어 있음.
+  → 이 Collider 영역이 바로 **소리의 위치가 제한될 공간**이 됩니다.
+
+---
+
+## 3. EventPositionConfiner 스크립트 추가하기
+
+### 🧭 경로
+
+`Hierarchy → L2_4B - Village Environment Scene → Wwise → River`
+
+1. River 오브젝트 선택
+2. **Inspector**에서 **Add Component** 클릭
+3. “EventPositionConfiner” 검색 후 추가
+
+이제 `Event Position Confiner` 컴포넌트가 Inspector에 표시됩니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380518/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L2/image_19.png)
+
+---
+
+## 4. 프로퍼티 설정하기
+
+EventPositionConfiner에는 두 가지 주요 프로퍼티가 있습니다:
+
+| 프로퍼티            | 설명                                     | 권장값          |
+| ------------------- | ---------------------------------------- | --------------- |
+| **Update Interval** | 소리 위치를 갱신하는 시간 간격 (초 단위) | `0.05`          |
+| **Event**           | 재생할 Wwise 이벤트 지정                 | `Ambient_River` |
+
+설정 방법:
+
+1. `Event Name` 필드 클릭
+2. **Ambient_River Event** 선택
+3. Update Interval은 기본값 0.05 유지
+
+💡 **작동 원리**
+
+- Update Interval마다 플레이어 위치를 감지하고
+  소리의 위치를 Collider 내부에서 재조정함.
+- 너무 느리면 소리 이동이 지연되고
+  너무 빠르면 CPU 부하가 증가할 수 있음.
+
+---
+
+## 5. 씬 뷰 레이아웃 조정하기
+
+### 🪟 2 by 3 레이아웃 설정
+
+1. Unity 상단 메뉴 → `Window > Layouts > 2 by 3` 선택
+2. Game 뷰와 Scene 뷰를 나란히 배치
+
+이렇게 하면:
+
+- **Game 뷰** : 실제 플레이 모습 확인
+- **Scene 뷰** : EventPositionConfiner가 생성한 “소리 위치 구(Sphere)” 확인 가능
+
+### 📌 River 오브젝트 포커싱
+
+1. Hierarchy에서 `River` 선택
+2. Scene 뷰 안에서 `F` 키 → Collider 영역 중심으로 포커스
+3. Box Collider의 초록색 테두리가 보이면 OK
+
+이 Collider 안에서 파란색 구가 생성되어 이동하게 됩니다.
+
+---
+
+## 6. 실행하며 소리 위치 확인하기
+
+### 🎮 Play 모드 실행
+
+1. Game 뷰의 “Play Maximized” 옵션을 해제
+
+   → Scene 뷰에서도 동시에 모니터링 가능
+
+2. Play 버튼 클릭
+
+이제 Scene 뷰에서 작은 **파란색 구(Sphere)**를 찾아보세요.
+
+이 구는 EventPositionConfiner 스크립트가 생성한 **소리 위치(Emitter GameObject)**입니다.
+
+- **Collider 밖일 때:**
+  파란 구는 Collider의 가장 가까운 모서리 부근에 위치.
+- **Collider 안으로 들어갈 때:**
+  파란 구가 Main Camera 바로 아래로 이동 (즉, 플레이어 중심).
+
+🎥 이 구는 **Scene 뷰 전용 시각화용 오브젝트**로,
+
+Game 뷰나 빌드된 게임에서는 보이지 않습니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380518/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L2/image_20.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380518/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L2/image_21.png)
+
+---
+
+## 7. 작동 원리 및 믹싱 활용 이해
+
+### ⚙️ 작동 구조 요약
+
+| 단계 | 작동 내용                                                                  |
+| ---- | -------------------------------------------------------------------------- |
+| 1    | 스크립트가 **Event(Ambient_River)** 를 새로운 GameObject에 Post            |
+| 2    | 그 GameObject는 지속적으로 **AkAudioListener(Main Camera)** 의 위치를 추적 |
+| 3    | 위치는 Collider 내부로 제한되어, Collider 밖으로 나가지 않음               |
+| 4    | Update Interval마다 위치가 새로 계산되어 부드럽게 이동                     |
+| 5    | Collider 내부에서는 Attenuation 거리 = 0 (즉, 바로 옆에서 들리는 효과)     |
+| 6    | Collider 밖에서는 Collider의 가장 가까운 지점에서 감쇠 계산 적용           |
+
+---
+
+### 🎚️ 믹싱상의 장점
+
+- **균일한 환경음 볼륨 유지**
+  → 넓은 지역에서도 일정한 사운드 레벨로 재생됨.
+- **자연스러운 감쇠(Attenuation)**
+  → Collider 경계에서 부드럽게 볼륨이 줄어듦.
+- **믹싱 단순화**
+  → 위치별로 개별 볼륨 조정할 필요가 없음.
+
+---
+
+### 💡 개발 팁 (비슷한 스크립트 제작 시)
+
+- **빠른 위치 업데이트 유지:**
+  플레이어(AkAudioListener)의 이동 속도를 따라갈 만큼 짧은 간격으로 업데이트해야 함.
+- **Spread(확산) 추가:**
+  Attenuation ShareSet에서 근거리 스프레드를 살짝 주면
+  소리 위치가 빠르게 움직일 때도 부드럽게 들림.
+- **Mesh Collider 사용 시:**
+  Convex로 설정해야 정상적으로 Collider 안에서 위치 계산 가능.
+
+---
+
+### 🎬 요약
+
+| 항목            | 설명                                                          |
+| --------------- | ------------------------------------------------------------- |
+| **핵심 목적**   | Collider 안에서만 소리의 위치를 제한해 자연스러운 환경음 구현 |
+| **적용 대상**   | 강, 바람, 도시 소음 등 넓게 퍼진 Ambient 사운드               |
+| **이점**        | 감쇠 제어 자동화, 믹싱 일관성 향상, CPU 효율적 사용           |
+| **시각적 확인** | Scene 뷰에서 파란 구로 표시되는 사운드 위치 확인 가능         |
+
+---
+
+✅ **결론:**
+
+**EventPositionConfiner 스크립트**는
+
+“환경음을 공간에 맞게 제한하고 균일하게 유지”하기 위한
+
+**사용자 정의 볼류메트릭 사운드 제어 도구**입니다.
+
+플레이어의 위치에 따라 사운드의 위치를 자동으로 재배치함으로써
+
+넓은 지역의 환경음을 사실적이면서도 관리하기 쉽게 만들어줍니다.
+
+---

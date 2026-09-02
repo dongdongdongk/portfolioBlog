@@ -1,0 +1,2831 @@
+---
+title: '섹션 8: 제트팩 저니 - 제트팩을 이용한 3D 플랫폼 게임 - 5'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { ✈️ 제트팩 비행 메커니즘 구현하기 }
+
+## 🎯 목표
+
+캐릭터 이동 모드를 변경하여 실제 비행 기능 구현 및 비행 중 회전 제어
+
+---
+
+## 🎮 캐릭터 이동 모드 개념
+
+### Movement Mode란?
+
+```
+Character Movement Component의 상태
+  ├─ Walking (걷기) - 기본값
+  ├─ Flying (비행)
+  ├─ Swimming (수영)
+  ├─ Falling (낙하)
+  └─ Custom (커스텀)
+```
+
+**각 모드의 특징**
+
+**Walking**
+
+```
+특징
+  ├─ 중력 적용됨
+  ├─ 바닥에 붙어서 이동
+  ├─ 점프 가능
+  └─ 마찰력 있음
+```
+
+**Flying**
+
+```
+특징
+  ├─ 중력 무시됨 ✅
+  ├─ 공중에 떠 있음
+  ├─ 모든 방향 이동 가능
+  └─ 낮은 마찰력
+```
+
+---
+
+## 🔧 코드 정리: Activate Thruster Visual 함수
+
+### 1. 기존 문제
+
+```
+Event Start Jetpack
+  ├─ Activate (Thruster_Effect_R)
+  └─ Activate (Thruster_Effect_L)
+
+Event Stop Jetpack
+  ├─ Deactivate (Thruster_Effect_R)
+  └─ Deactivate (Thruster_Effect_L)
+
+문제
+  └─ 같은 로직이 두 번 반복됨
+```
+
+### 2. 함수 생성
+
+```
+새 함수: Activate Thruster Visual
+  └─ 입력: Active (Boolean)
+```
+
+**Boolean 입력이란?**
+
+```
+True 전달
+  └─ 추진기 활성화
+
+False 전달
+  └─ 추진기 비활성화
+
+장점
+  └─ 하나의 함수로 켜기/끄기 모두 처리
+```
+
+### 3. 함수 내부 구조
+
+```
+Activate Thruster Visual
+  ↓
+입력: Active (Boolean)
+  ↓
+Branch
+  ├─ True → Activate
+  │   ├─ Thruster_Effect_R
+  │   └─ Thruster_Effect_L
+  │
+  └─ False → Deactivate
+      ├─ Thruster_Effect_R
+      └─ Thruster_Effect_L
+```
+
+**Branch 노드란?**
+
+```
+기능
+  └─ if-else 조건문
+
+입력
+  └─ Condition (Boolean)
+
+출력
+  ├─ True: 조건이 참일 때 실행
+  └─ False: 조건이 거짓일 때 실행
+
+예시
+  └─ Active가 True면 Activate 실행
+  └─ Active가 False면 Deactivate 실행
+```
+
+### 4. 사용 방법
+
+```
+Event Start Jetpack
+  └─ Activate Thruster Visual (Active = True)
+
+Event Stop Jetpack
+  └─ Activate Thruster Visual (Active = False)
+```
+
+---
+
+## 🎮 Movement Component 타입 변경
+
+### 1. 왜 타입 변경이 필요한가?
+
+**현재 상태**
+
+```
+Movement Component 변수
+  └─ 타입: Pawn Movement Component
+
+문제
+  └─ Set Movement Mode 함수가 없음
+
+이유
+  └─ Pawn Movement Component는 기본 클래스
+  └─ 고급 기능 없음
+```
+
+**상속 구조**
+
+```
+Pawn Movement Component (부모 클래스)
+  └─ 기본 이동 기능만
+
+Character Movement Component (자식 클래스)
+  └─ 기본 기능 + 걷기/비행/수영 등 고급 기능 ✅
+```
+
+**비유**
+
+```
+Pawn Movement Component
+  └─ "이동 가능한 물체" (일반)
+
+Character Movement Component
+  └─ "사람처럼 이동하는 캐릭터" (구체적)
+  └─ 걷기, 점프, 비행 등 사람 움직임 특화
+```
+
+### 2. 타입 변경 과정
+
+**Store Essential Variables에서 Cast 추가**
+
+```
+기존
+  Get Movement Component
+    ↓
+  Set (Movement Component)
+
+변경
+  Get Movement Component
+    ↓
+  Cast to Character Movement Component
+    ↓
+  Set (Movement Component)
+```
+
+**Cast to Character Movement Component란?**
+
+```
+기능
+  └─ 타입 변환 + 유효성 검사
+
+입력
+  └─ Pawn Movement Component
+
+출력 (성공)
+  └─ Character Movement Component
+  └─ 고급 기능 사용 가능
+
+출력 (실패)
+  └─ Cast Failed 실행
+  └─ 변환 불가능
+```
+
+**왜 Cast가 필요한가?**
+
+```
+상황
+  └─ 변수는 부모 타입 (Pawn Movement)
+  └─ 실제 오브젝트는 자식 타입 (Character Movement)
+
+해결
+  └─ Cast로 "이건 Character Movement야!"라고 확인
+  └─ 그제야 고급 기능 사용 가능
+```
+
+### 3. 변수 타입 직접 변경
+
+**방법 1: 새 변수 생성 (안전)**
+
+```
+1. 새 변수 생성
+   └─ 타입: Character Movement Component
+
+2. Cast 결과를 새 변수에 저장
+
+3. 기존 변수 삭제
+```
+
+**방법 2: 기존 변수 타입 변경 (빠름)**
+
+```
+1. Movement Component 변수 선택
+
+2. Variable Type → Character Movement Component
+
+3. 경고 메시지
+   "연결이 끊어질 수 있습니다. 계속할까요?"
+
+4. "Change Variable Type" 클릭
+
+5. 끊어진 연결 수동 수정
+```
+
+**경고가 나타나는 이유**
+
+```
+타입 변경 시
+  └─ 기존 연결이 호환 안 될 수 있음
+
+예시
+  └─ Set 노드가 Pawn Movement 받는데
+  └─ Character Movement로 바뀌면 불일치
+
+해결
+  └─ Cast 결과를 Set에 연결
+```
+
+### 4. 수정 작업
+
+```
+기존 연결 끊김
+  Set (Movement Component)
+    ↓
+  입력이 없음
+
+수정
+  Cast to Character Movement Component
+    ↓
+  As Character Movement Component (반환값)
+    ↓
+  Set (Movement Component)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380761/notion-blog/_/_/_5_/_8_-_3D_-_5/image.png)
+
+---
+
+## ✈️ 비행 모드 설정
+
+### 1. Set Movement Mode 노드
+
+```
+Player Controller
+  ↓
+IA_Jetpack Started
+  ↓
+Movement Component (Get, Validated)
+  ↓
+Set Movement Mode
+  └─ New Movement Mode: Flying
+```
+
+**Set Movement Mode란?**
+
+```
+기능
+  └─ 캐릭터의 이동 방식 변경
+
+입력 - Target
+  └─ Character Movement Component
+
+입력 - New Movement Mode
+  ├─ Walking
+  ├─ Flying ✅
+  ├─ Swimming
+  ├─ Falling
+  └─ Custom
+
+효과
+  └─ 즉시 해당 모드로 전환
+```
+
+### 2. 제트팩 시작 시
+
+```
+IA_Jetpack Started
+  ↓
+Set Movement Mode
+  └─ Flying
+
+결과
+  ├─ 중력 무시됨
+  ├─ 공중에 떠 있음
+  └─ 자유롭게 이동 가능
+```
+
+### 3. 제트팩 정지 시
+
+```
+IA_Jetpack Completed
+  ↓
+Set Movement Mode
+  └─ Walking
+
+결과
+  ├─ 중력 다시 적용
+  ├─ 낙하 시작
+  └─ 바닥에 착지
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380757/notion-blog/_/_/_5_/_8_-_3D_-_5/image_1.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380759/notion-blog/_/_/_5_/_8_-_3D_-_5/image_2.png)
+
+---
+
+## ⚙️ 비행 설정 조정
+
+### 1. Braking Deceleration Flying
+
+**BP_Kick → Character Movement Component**
+
+```
+Flying 섹션
+  └─ Braking Deceleration Flying: 2000
+```
+
+**Braking Deceleration이란?**
+
+```
+정의
+  └─ 제동 감속도
+  └─ 입력 멈췄을 때 얼마나 빨리 멈추는지
+
+값이 작으면 (기본값)
+  └─ 천천히 멈춤
+  └─ 미끄러지는 느낌
+
+값이 크면 (2000)
+  └─ 빠르게 멈춤 ✅
+  └─ 정밀한 제어
+```
+
+**왜 늘리나?**
+
+```
+문제
+  └─ W 키 떼면 계속 미끄러짐
+  └─ 멈추는데 시간 오래 걸림
+
+해결
+  └─ 2000으로 증가
+  └─ 몇 초 안에 거의 정지
+
+효과
+  └─ 정밀한 비행 제어 가능
+```
+
+### 2. Max Fly Speed
+
+```
+기본값
+  └─ 600
+
+조정 가능
+  └─ 더 빠르거나 느린 비행
+
+현재
+  └─ 기본값 유지
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380759/notion-blog/_/_/_5_/_8_-_3D_-_5/image_3.png)
+
+---
+
+## 🔄 회전 제어 시스템
+
+### 문제 상황
+
+```
+비행 중
+  ├─ 카메라 돌려도
+  └─ 캐릭터는 이동 방향만 봄
+  └─ 애니메이션 어색함
+```
+
+### 목표
+
+```
+비행 중
+  ├─ 카메라 방향 = 캐릭터 방향
+  └─ 자연스러운 비행 애니메이션 가능
+```
+
+---
+
+## 🎯 Orient Rotation to Movement
+
+### 1. 개념 이해
+
+**Orient Rotation to Movement란?**
+
+```
+정의
+  └─ "이동 방향으로 회전 조정"
+
+True (기본값 - 걷기)
+  ├─ 캐릭터가 이동하는 방향을 봄
+  ├─ W 누르면 앞 보고 이동
+  ├─ A 누르면 왼쪽 보고 이동
+  └─ 카메라와 무관
+
+False (비행)
+  ├─ 이동 방향과 무관
+  ├─ 다른 방식으로 회전 제어
+  └─ Controller Rotation 사용 가능
+```
+
+**비유**
+
+```
+True = 자동차
+  └─ 핸들 돌린 방향으로 차 돌아감
+
+False = 드론
+  └─ 조종기 방향대로 기체 회전
+```
+
+### 2. 비행 시작 시 설정
+
+```
+Set Movement Mode (Flying)
+  ↓
+Set Orient Rotation to Movement
+  └─ False
+```
+
+**왜 False로?**
+
+```
+이유
+  └─ 이동 방향 말고 Controller로 회전 제어
+
+효과
+  └─ 카메라 방향으로 캐릭터 회전 준비
+```
+
+### 3. 비행 종료 시 설정
+
+```
+Set Movement Mode (Walking)
+  ↓
+Set Orient Rotation to Movement
+  └─ True
+```
+
+**왜 True로?**
+
+```
+이유
+  └─ 걷기는 이동 방향 보는게 자연스러움
+
+효과
+  └─ 걷는 방향으로 자동 회전
+```
+
+---
+
+## 🎮 Use Controller Rotation Yaw
+
+### 1. 개념 이해
+
+**Controller란?**
+
+```
+정의
+  └─ 캐릭터를 조종하는 컨트롤러
+  └─ 보통 Player Controller
+
+Controller Rotation
+  └─ 컨트롤러(카메라)가 향하는 방향
+
+Yaw
+  └─ 좌우 회전 (수평 회전)
+
+Pitch
+  └─ 상하 회전 (위아래)
+
+Roll
+  └─ 기울기 회전 (좌우 기울임)
+```
+
+**Use Controller Rotation Yaw란?**
+
+```
+True
+  ├─ 캐릭터 회전 = 카메라 회전
+  ├─ 카메라 돌리면 캐릭터도 돌아감
+  └─ 즉각 반영 (스냅)
+
+False (기본값)
+  ├─ 캐릭터 회전 ≠ 카메라 회전
+  ├─ 카메라 자유롭게 회전 가능
+  └─ 캐릭터는 독립적
+```
+
+### 2. 비행 시작 시 설정
+
+```
+Controlled Character (Get, Validated)
+  ↓
+Set Use Controller Rotation Yaw
+  └─ True
+```
+
+**효과**
+
+```
+카메라 왼쪽 회전
+  └─ 캐릭터도 왼쪽 회전
+
+카메라 오른쪽 회전
+  └─ 캐릭터도 오른쪽 회전
+
+결과
+  └─ 카메라 방향 = 캐릭터 방향
+```
+
+### 3. 비행 종료 시 설정
+
+```
+Set Use Controller Rotation Yaw
+  └─ False
+```
+
+**효과**
+
+```
+카메라 회전
+  └─ 캐릭터는 그대로
+
+이동 방향
+  └─ Orient Rotation to Movement로 제어
+```
+
+---
+
+## 🔄 Use Controller Desired Rotation
+
+### 1. 문제 발견
+
+```
+Use Controller Rotation Yaw = True
+  └─ 즉각 스냅됨
+  └─ 뚝뚝 끊기는 느낌
+  └─ 부자연스러움
+```
+
+### 2. Use Controller Desired Rotation
+
+**개념**
+
+```
+Use Controller Rotation Yaw
+  └─ 즉각 회전 (스냅)
+  └─ 0.1초 만에 180도 회전 가능
+
+Use Controller Desired Rotation
+  └─ 부드럽게 보간 (Interpolation)
+  └─ 서서히 목표 회전으로 이동 ✅
+```
+
+**Interpolation이란?**
+
+```
+정의
+  └─ 두 값 사이를 부드럽게 전환
+
+예시
+  └─ 현재: 0도
+  └─ 목표: 180도
+  └─ 보간: 0 → 45 → 90 → 135 → 180 (부드럽게)
+```
+
+### 3. 설정 변경
+
+```
+비행 시작
+  ├─ Use Controller Rotation Yaw 제거
+  └─ Use Controller Desired Rotation = True
+
+비행 종료
+  └─ Use Controller Desired Rotation = False
+```
+
+### 4. Rotation Rate 조정
+
+**Character Movement Component**
+
+```
+Rotation Rate
+  ├─ 기본값: 720
+  └─ 변경값: 1440
+```
+
+**Rotation Rate란?**
+
+```
+정의
+  └─ 초당 회전 속도 (도/초)
+
+720
+  └─ 1초에 720도 회전 (2바퀴)
+  └─ 0.5초에 1바퀴
+
+1440
+  └─ 1초에 1440도 회전 (4바퀴)
+  └─ 0.25초에 1바퀴
+  └─ 더 빠른 반응 ✅
+```
+
+**왜 늘리나?**
+
+```
+문제
+  └─ 720은 조금 느림
+  └─ 비행 중 반응 느린 느낌
+
+해결
+  └─ 1440으로 증가
+  └─ 빠른 방향 전환
+```
+
+**주의**
+
+```
+카메라 회전 속도에도 영향
+  └─ Rotation Rate 공유
+  └─ 너무 크면 어지러움
+  └─ 1440 정도가 적당
+```
+
+---
+
+## 📊 최종 회전 제어 시스템
+
+### 걷기 모드
+
+```
+Orient Rotation to Movement = True
+  └─ 이동 방향으로 회전
+
+Use Controller Desired Rotation = False
+  └─ 컨트롤러 회전 무시
+
+효과
+  └─ 이동하는 방향을 봄
+  └─ 카메라는 자유롭게 회전
+```
+
+### 비행 모드
+
+```
+Orient Rotation to Movement = False
+  └─ 이동 방향 무시
+
+Use Controller Desired Rotation = True
+  └─ 컨트롤러 방향으로 부드럽게 회전
+
+Rotation Rate = 1440
+  └─ 빠른 회전 속도
+
+효과
+  └─ 카메라 방향 = 캐릭터 방향
+  └─ 부드러운 전환
+  └─ 빠른 반응
+```
+
+---
+
+## 🏗️ 함수로 정리
+
+### Start Movement Mode Flying 함수
+
+```
+함수 내용
+  ├─ Set Movement Mode (Flying)
+  ├─ Set Orient Rotation to Movement (False)
+  └─ Set Use Controller Desired Rotation (True)
+```
+
+**왜 함수로 만드나?**
+
+```
+장점
+  ├─ 관련 설정 한 곳에 모음
+  ├─ 재사용 가능
+  ├─ 수정 시 한 번만
+  └─ Event Graph 깔끔
+```
+
+### Start Movement Mode Walking 함수
+
+```
+함수 내용
+  ├─ Set Movement Mode (Walking)
+  ├─ Set Orient Rotation to Movement (True)
+  └─ Set Use Controller Desired Rotation (False)
+```
+
+### 사용
+
+```
+IA_Jetpack Started
+  └─ Start Movement Mode Flying
+
+IA_Jetpack Completed
+  └─ Start Movement Mode Walking
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Movement Mode
+
+```
+정의
+  └─ 캐릭터의 이동 방식
+
+종류
+  ├─ Walking: 중력 O, 바닥 붙음
+  ├─ Flying: 중력 X, 공중 부유
+  ├─ Swimming: 물속 이동
+  └─ Falling: 낙하 중
+
+전환
+  └─ Set Movement Mode로 즉시 변경
+```
+
+### Rotation Control
+
+```
+Orient Rotation to Movement
+  └─ 이동 방향으로 회전할지
+
+Use Controller Rotation Yaw
+  └─ 컨트롤러 방향 즉시 따를지
+
+Use Controller Desired Rotation
+  └─ 컨트롤러 방향 부드럽게 따를지
+
+Rotation Rate
+  └─ 회전 속도 (도/초)
+```
+
+### Cast
+
+```
+정의
+  └─ 타입 변환
+
+필요성
+  └─ 부모 타입을 자식 타입으로 변환
+  └─ 고급 기능 사용 위해
+
+예시
+  └─ Pawn Movement → Character Movement
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 1. Movement Component 타입
+
+```
+반드시 Character Movement Component
+  └─ Set Movement Mode 있음
+
+Pawn Movement Component
+  └─ 기본 기능만, 모드 변경 불가
+```
+
+### 2. 회전 설정 충돌
+
+```
+동시에 True 금지
+  ├─ Orient Rotation to Movement
+  └─ Use Controller Desired Rotation
+
+이유
+  └─ 두 시스템이 동시 제어하면 충돌
+```
+
+### 3. Rotation Rate
+
+```
+너무 작으면
+  └─ 느린 반응
+
+너무 크면
+  └─ 어지러움
+
+권장
+  └─ 1440 ~ 2000
+```
+
+### 4. Validated Get 필수
+
+```
+Movement Component 사용 전
+  └─ 반드시 Is Valid 체크
+
+이유
+  └─ None일 수 있음
+  └─ 안전한 코드
+```
+
+---
+
+## 🎓 용어 정리
+
+**Movement Mode (이동 모드)**
+
+- 캐릭터가 움직이는 방식
+- Walking, Flying, Swimming 등
+
+**Yaw (요)**
+
+- 좌우 회전 (수평 회전)
+- 나침반처럼 0~360도
+
+**Pitch (피치)**
+
+- 상하 회전 (위아래)
+- 고개 끄덕임
+
+**Roll (롤)**
+
+- 좌우 기울임
+- 비행기 날개 기울이기
+
+**Interpolation (보간)**
+
+- 두 값 사이 부드러운 전환
+- 급격한 변화 방지
+
+**Rotation Rate (회전 속도)**
+
+- 초당 회전하는 각도
+- 단위: 도/초
+
+**Controller (컨트롤러)**
+
+- 캐릭터를 조종하는 객체
+- 보통 Player Controller
+
+**Braking (제동)**
+
+- 멈추는 힘
+- 클수록 빨리 정지
+
+---
+
+## 🎯 다음 단계
+
+현재 상태
+
+```
+✅ 비행 모드 전환
+✅ 부드러운 회전
+✅ 빠른 정지
+❌ 상승/하강 입력 없음
+```
+
+다음 작업
+
+```
+추진기 키 누를 때
+  └─ 위로 상승하는 기능 추가
+  └─ 실제 제트팩처럼 느껴지게
+```
+
+# { 🚀 제트팩 상승 입력 구현하기 }
+
+## 🎯 목표
+
+제트팩 활성화 중 지속적으로 위로 상승하는 입력 추가
+
+---
+
+## 💭 설계 고민
+
+### 요구사항
+
+```
+제트팩 활성화 중
+  └─ 매 프레임 위로 상승
+
+제트팩 비활성화 시
+  └─ 상승 입력 중단
+```
+
+### 해결 방법 비교
+
+**방법 1: Boolean + Event Tick**
+
+```
+1. Boolean 변수 생성
+   └─ Is Jetpack Active
+
+2. 제트팩 시작 시
+   └─ Is Jetpack Active = True
+
+3. 제트팩 정지 시
+   └─ Is Jetpack Active = False
+
+4. Event Tick에서
+   └─ Is Jetpack Active 체크
+   └─ True면 상승 입력 추가
+```
+
+**Event Tick이란?**
+
+```
+정의
+  └─ 매 프레임마다 실행되는 이벤트
+
+주기
+  └─ 60 FPS = 1초에 60번 실행
+  └─ 120 FPS = 1초에 120번 실행
+
+용도
+  └─ 지속적인 업데이트 필요한 로직
+```
+
+**방법 2: Triggered 이벤트 활용 (강의 방법)**
+
+```
+IA_Jetpack
+  └─ Triggered 핀 활용
+
+특징
+  └─ 키를 누르고 있는 동안 매 프레임 실행
+  └─ 별도 Boolean 불필요
+```
+
+**Triggered 핀이란?**
+
+```
+Enhanced Input Action의 상태
+
+Started
+  └─ 키를 누르는 순간 (1회)
+
+Triggered
+  └─ 키를 누르고 있는 동안 (매 프레임) ✅
+  └─ 키를 떼기 전까지 계속 실행
+
+Completed
+  └─ 키를 떼는 순간 (1회)
+```
+
+**비교**
+
+```
+방법 1 (Boolean + Tick)
+  ├─ Event Tick이 항상 실행됨
+  ├─ 매 프레임 Boolean 체크
+  └─ 약간의 오버헤드 (미미함)
+
+방법 2 (Triggered)
+  ├─ 키 누를 때만 실행
+  ├─ Boolean 체크 불필요
+  └─ 조금 더 효율적 ✅
+
+결론
+  └─ 성능 차이 미미
+  └─ 어느 방법이든 OK
+```
+
+---
+
+## 🔧 구현: Apply Thrust Input 함수
+
+### 1. 함수 생성
+
+```
+새 함수: Apply Thrust Input
+  └─ Player Controller에 생성
+  └─ Category: Kick Input
+```
+
+### 2. Controlled Character 가져오기
+
+```
+Controlled Character (Get, Validated)
+  ├─ Is Valid → 계속 진행
+  └─ Is Not Valid → 종료
+```
+
+**왜 Validated Get을 사용하나?**
+
+```
+안전성
+  └─ Controlled Character가 없을 수 있음
+  └─ None 체크 필수
+
+자동 처리
+  └─ Is Valid/Is Not Valid 핀 제공
+  └─ 간편한 분기 처리
+```
+
+### 3. Movement Component 가져오기
+
+```
+Movement Component (Get, Validated)
+  ├─ Is Valid → 계속 진행
+  └─ Is Not Valid → 종료
+```
+
+**이중 검증**
+
+```
+1차: Controlled Character 체크
+  └─ 캐릭터가 있는지
+
+2차: Movement Component 체크
+  └─ 이동 컴포넌트가 있는지
+
+안전한 코드
+  └─ 둘 다 유효할 때만 실행
+```
+
+---
+
+## 📐 Add Input Vector 노드
+
+### 1. 기본 개념
+
+**Add Input Vector란?**
+
+```
+기능
+  └─ Movement Component에 이동 입력 추가
+
+용도
+  └─ 캐릭터를 특정 방향으로 이동시킴
+
+누적
+  └─ 기존 입력에 더해짐 (덮어쓰기 X)
+```
+
+**입력 누적 원리**
+
+```
+WASD 입력
+  └─ 기본 이동 벡터
+
+Add Input Vector
+  └─ 추가 이동 벡터
+
+최종 이동
+  └─ 기본 입력 + 추가 입력
+```
+
+### 2. 노드 파라미터
+
+**Target**
+
+```
+Movement Component
+  └─ 입력을 추가할 대상
+```
+
+**World Vector**
+
+```
+정의
+  └─ 이동할 방향과 크기
+
+타입
+  └─ Vector (X, Y, Z)
+
+단위
+  └─ 월드 좌표계 기준
+```
+
+**Force**
+
+```
+체크 시
+  └─ 다른 제약 무시하고 강제 적용
+
+미체크 (기본)
+  └─ 일반 입력으로 처리 ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380759/notion-blog/_/_/_5_/_8_-_3D_-_5/image_4.png)
+
+---
+
+## 📍 Get Actor Up Vector
+
+### 1. 개념 이해
+
+**Actor Up Vector란?**
+
+```
+정의
+  └─ 액터의 위쪽 방향 벡터
+
+특징
+  ├─ 액터의 로컬 좌표계 기준
+  ├─ 항상 크기 1인 단위 벡터
+  └─ 액터 회전에 따라 변함
+```
+
+**왜 (0, 0, 1)이 아닌가?**
+
+```
+(0, 0, 1)
+  └─ 월드의 절대 위쪽
+  └─ 항상 하늘 방향
+
+Get Actor Up Vector
+  └─ 캐릭터 기준 위쪽
+  └─ 캐릭터가 기울어지면 방향도 변함
+```
+
+**예시**
+
+```
+캐릭터가 똑바로 서있음
+  └─ Up Vector = (0, 0, 1)
+  └─ 월드 위쪽과 동일
+
+캐릭터가 옆으로 누움
+  └─ Up Vector = (1, 0, 0) 또는 (-1, 0, 0)
+  └─ 캐릭터 기준으로는 여전히 "위"
+
+우리 경우 (일반적)
+  └─ 캐릭터는 항상 똑바로 서있음
+  └─ Up Vector = (0, 0, 1)
+  └─ 하지만 안전하게 Get Actor Up Vector 사용
+```
+
+### 2. Vector 곱셈
+
+**벡터 \* 스칼라**
+
+```
+Up Vector: (0, 0, 1)
+  ×
+Scalar: 0.25
+  =
+Result: (0, 0, 0.25)
+```
+
+**의미**
+
+```
+원래 벡터
+  └─ 방향: 위쪽
+  └─ 크기: 1
+
+곱셈 후
+  └─ 방향: 위쪽 (동일)
+  └─ 크기: 0.25 (축소)
+
+효과
+  └─ 같은 방향으로 약하게 이동
+```
+
+---
+
+## 🎛️ Thruster Input Factor 변수
+
+### 1. 변수 생성
+
+```
+변수명: Thruster Input Factor
+  ├─ 타입: Float
+  ├─ 기본값: 0.25
+  └─ Category: Kick Input
+```
+
+**Float 타입이란?**
+
+```
+정의
+  └─ 소수점 있는 숫자
+
+예시
+  └─ 0.25, 1.5, -0.1
+
+용도
+  └─ 세밀한 값 조정
+```
+
+### 2. 값의 의미
+
+**0.25의 의미**
+
+```
+벡터 크기
+  └─ 매 프레임 0.25만큼 위로 이동
+
+프레임 누적
+  └─ 60 FPS 기준
+  └─ 1초 = 0.25 × 60 = 15 유닛 상승
+```
+
+**값 조정**
+
+```
+값을 키우면 (예: 0.5)
+  └─ 더 빠르게 상승
+
+값을 줄이면 (예: 0.1)
+  └─ 더 천천히 상승
+```
+
+### 3. 왜 변수로 만드나?
+
+**하드코딩 vs 변수**
+
+```
+하드코딩 (0.25 직접 입력)
+  ├─ 수정하려면 블루프린트 열어야 함
+  ├─ 컴파일 필요
+  └─ 테스트 불편
+
+변수
+  ├─ Details 패널에서 즉시 수정
+  ├─ 컴파일 불필요
+  └─ 빠른 테스트 ✅
+```
+
+**장점**
+
+```
+실시간 조정
+  └─ 플레이 중 바로 수정 가능
+
+균형 조정
+  └─ 여러 값 시도하며 최적값 찾기
+
+재사용
+  └─ 다른 곳에서도 참조 가능
+```
+
+---
+
+## 🔗 최종 연결
+
+### Apply Thrust Input 함수 구조
+
+```
+Controlled Character (Get, Validated)
+  ↓
+Is Valid?
+  ↓
+Movement Component (Get, Validated)
+  ↓
+Is Valid?
+  ↓
+Get Actor Up Vector
+  ↓
+Vector × Thruster Input Factor
+  ↓
+Add Input Vector
+```
+
+### IA_Jetpack에서 호출
+
+```
+IA_Jetpack
+  ├─ Started → Start Jetpack
+  ├─ Triggered → Apply Thrust Input ✅
+  └─ Completed → Stop Jetpack
+```
+
+**흐름**
+
+```
+Shift 키 누름
+  ↓
+Started 실행
+  └─ Start Jetpack (1회)
+
+Shift 키 계속 누르고 있음
+  ↓
+Triggered 매 프레임 실행
+  └─ Apply Thrust Input (지속)
+
+Shift 키 뗌
+  ↓
+Completed 실행
+  └─ Stop Jetpack (1회)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380760/notion-blog/_/_/_5_/_8_-_3D_-_5/image_5.png)
+
+---
+
+## 🎮 동작 원리
+
+### 매 프레임 처리
+
+```
+프레임 1
+  └─ Up Vector × 0.25 = (0, 0, 0.25)
+  └─ 캐릭터 위치 += (0, 0, 0.25)
+
+프레임 2
+  └─ Up Vector × 0.25 = (0, 0, 0.25)
+  └─ 캐릭터 위치 += (0, 0, 0.25)
+
+...계속 누적...
+
+결과
+  └─ 지속적으로 상승
+```
+
+### 입력 합성
+
+```
+WASD 입력
+  └─ 전후좌우 이동 벡터
+
+Add Input Vector
+  └─ 위쪽 이동 벡터
+
+최종 이동
+  └─ WASD 방향 + 위쪽
+  └─ 대각선 상승 이동 가능 ✅
+```
+
+**예시**
+
+```
+W 키 누름 + 제트팩
+  ├─ W: 앞으로 (1, 0, 0)
+  ├─ Thrust: 위로 (0, 0, 0.25)
+  └─ 결과: 앞-위 대각선 (1, 0, 0.25)
+
+제트팩만 활성화
+  ├─ WASD: 없음
+  ├─ Thrust: 위로 (0, 0, 0.25)
+  └─ 결과: 수직 상승
+```
+
+---
+
+## 🧹 코드 정리
+
+### 함수 축소
+
+```
+기존 노드들
+  ├─ Movement Component Get
+  ├─ Set Movement Mode
+  ├─ Set Orient Rotation...
+  └─ Set Use Controller Desired...
+
+축소 후
+  └─ Start Jetpack 함수 (1개 노드)
+```
+
+**축소된 함수들**
+
+```
+Start Jetpack 함수
+  ├─ Start Movement Mode Flying
+  ├─ Start Thruster Sound
+  └─ Activate Thruster Visual
+
+Stop Jetpack 함수
+  ├─ Start Movement Mode Walking
+  ├─ Stop Thruster Sound
+  └─ Activate Thruster Visual (False)
+```
+
+**Category 설정**
+
+```
+모든 제트팩 관련 함수
+  └─ Category: Kick Input
+
+장점
+  ├─ 함수 목록에서 그룹화
+  ├─ 찾기 쉬움
+  └─ 정리된 느낌
+```
+
+---
+
+## 📊 최종 시스템 구조
+
+### Event Graph (IA_Jetpack)
+
+```
+IA_Jetpack
+  ├─ Started
+  │   └─ Start Jetpack
+  │
+  ├─ Triggered
+  │   └─ Apply Thrust Input
+  │
+  └─ Completed
+      └─ Stop Jetpack
+```
+
+### Start Jetpack 함수
+
+```
+1. Start Movement Mode Flying
+   ├─ Set Movement Mode (Flying)
+   ├─ Set Orient Rotation to Movement (False)
+   └─ Set Use Controller Desired Rotation (True)
+
+2. Start Thruster Sound
+   ├─ Spawn/Play Thruster Start
+   └─ Spawn/Play Thruster Loop
+
+3. Activate Thruster Visual (True)
+   └─ Activate Thruster Effects
+```
+
+### Apply Thrust Input 함수
+
+```
+Controlled Character (Validated)
+  ↓
+Movement Component (Validated)
+  ↓
+Add Input Vector
+  └─ Actor Up Vector × Thruster Input Factor
+```
+
+### Stop Jetpack 함수
+
+```
+1. Start Movement Mode Walking
+   ├─ Set Movement Mode (Walking)
+   ├─ Set Orient Rotation to Movement (True)
+   └─ Set Use Controller Desired Rotation (False)
+
+2. Stop Thruster Sound
+   ├─ Stop Thruster Loop
+   └─ Play Thruster Stop
+
+3. Activate Thruster Visual (False)
+   └─ Deactivate Thruster Effects
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Add Input Vector
+
+```
+정의
+  └─ 이동 입력을 추가로 더함
+
+특징
+  ├─ 기존 입력 유지
+  ├─ 누적 방식
+  └─ 매 프레임 호출 가능
+
+용도
+  └─ 지속적인 힘 적용
+```
+
+### Triggered 이벤트
+
+```
+정의
+  └─ 키를 누르고 있는 동안 매 프레임 실행
+
+차이점
+  ├─ Started: 1회 (누르는 순간)
+  ├─ Triggered: 지속 (누르는 동안)
+  └─ Completed: 1회 (떼는 순간)
+
+활용
+  └─ 지속적 입력 처리에 최적
+```
+
+### Vector 연산
+
+```
+Vector × Scalar
+  └─ 방향 유지, 크기만 변경
+
+예시
+  └─ (0, 0, 1) × 0.25 = (0, 0, 0.25)
+
+의미
+  └─ 같은 방향으로 약하게
+```
+
+### 입력 누적
+
+```
+WASD 입력
+  +
+Add Input Vector
+  =
+합성된 이동 방향
+
+결과
+  └─ 복합적인 움직임 가능
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 1. Triggered 사용 시
+
+```
+매 프레임 실행
+  └─ 무거운 연산 금지
+  └─ 간단한 입력 추가만
+
+우리 경우
+  └─ Add Input Vector만
+  └─ 매우 가벼움 ✅
+```
+
+### 2. Input Factor 값
+
+```
+너무 크면
+  └─ 제어 불가능하게 빠름
+
+너무 작으면
+  └─ 상승력 부족
+
+권장
+  └─ 0.1 ~ 0.5 사이
+  └─ 테스트하며 조정
+```
+
+### 3. Validated Get
+
+```
+반드시 체크
+  ├─ Controlled Character
+  └─ Movement Component
+
+이유
+  └─ None일 수 있음
+  └─ 크래시 방지
+```
+
+### 4. 함수 분리
+
+```
+한 함수에 너무 많은 기능 X
+
+좋은 분리
+  ├─ Start Jetpack: 초기 설정
+  ├─ Apply Thrust: 지속 입력
+  └─ Stop Jetpack: 종료 처리
+
+각자의 역할 명확
+```
+
+---
+
+## 🎓 용어 정리
+
+**Add Input Vector**
+
+- Movement Component에 이동 입력 추가
+- 기존 입력과 누적됨
+
+**Triggered Event**
+
+- 키를 누르고 있는 동안 매 프레임 실행
+- 지속적 입력 처리에 사용
+
+**Up Vector**
+
+- 액터의 위쪽 방향 벡터
+- 크기 1인 단위 벡터
+
+**Scalar (스칼라)**
+
+- 크기만 있는 값 (방향 없음)
+- 벡터 곱셈에 사용
+
+**Frame (프레임)**
+
+- 화면 갱신 단위
+- 60 FPS = 초당 60번 갱신
+
+**Input Factor (입력 계수)**
+
+- 입력 강도 조절 변수
+- 밸런싱에 사용
+
+---
+
+## 🎯 최종 결과
+
+### 기능
+
+```
+✅ 제트팩 시각/사운드 효과
+✅ 비행 모드 전환
+✅ 부드러운 회전 제어
+✅ 지속적인 상승 입력
+✅ WASD와 조합한 자유 비행
+```
+
+### 조작법
+
+```
+Shift 누름
+  └─ 제트팩 시작
+  └─ 비행 모드
+  └─ 지속적 상승
+
+WASD
+  └─ 전후좌우 이동
+
+마우스
+  └─ 방향 제어
+
+Shift 뗌
+  └─ 비행 종료
+  └─ 낙하 시작
+```
+
+### 다음 단계
+
+```
+현재
+  └─ 기본 비행 메커니즘 완성
+
+향후 개선 가능
+  ├─ 비행 애니메이션
+  ├─ 연료 시스템
+  ├─ 속도 제한
+  └─ 특수 효과
+```
+
+# { 🎬 비행 애니메이션 시스템 구축하기 }
+
+## 🎯 목표
+
+2D 블렌드 스페이스로 방향별 비행 애니메이션 구현 및 Movement Mode에 따른 포즈 블렌딩
+
+---
+
+## 🎨 비행 애니메이션 에셋
+
+### 제공된 애니메이션
+
+```
+Assets/Kick/Animations
+  ├─ Fly_Forward (앞으로 비행)
+  ├─ Fly_Idle (제자리 비행)
+  ├─ Fly_Left (왼쪽 비행)
+  ├─ Fly_Right (오른쪽 비행)
+  └─ Fly_Backward (뒤로 비행)
+```
+
+**각 애니메이션 특징**
+
+```
+Fly_Idle
+  └─ 제자리에서 떠 있는 모션
+
+Fly_Forward
+  └─ 몸을 앞으로 기울이며 비행
+
+Fly_Left/Right
+  └─ 좌우로 몸 기울임
+
+Fly_Backward
+  └─ 뒤로 살짝 젖힘
+```
+
+---
+
+## 📊 2D Blend Space 개념
+
+### 1D vs 2D Blend Space
+
+**1D Blend Space (Idle-Walk-Run)**
+
+```
+한 축만 사용
+  └─ 가로축: Speed (0 → 600)
+
+애니메이션 배치
+  ├─ 0: Idle
+  ├─ 300: Walk
+  └─ 600: Run
+
+블렌딩
+  └─ 속도에 따라 선형 블렌딩
+  └─ Speed 150 = Idle 50% + Walk 50%
+```
+
+**2D Blend Space (비행)**
+
+```
+두 축 사용
+  ├─ 가로축 (X): 좌우 입력
+  └─ 세로축 (Y): 전후 입력
+
+평면 공간
+  └─ 2차원 그리드에 애니메이션 배치
+  └─ XY 값에 따라 4개 애니메이션 블렌딩
+```
+
+**왜 2D가 필요한가?**
+
+```
+비행은 방향이 2차원
+  ├─ 좌우 (X축)
+  ├─ 전후 (Y축)
+  └─ 동시 고려 필요
+
+예시
+  └─ 앞-왼쪽 대각선 비행
+  └─ Forward + Left 블렌딩
+```
+
+---
+
+## 🎮 Enhanced Input Action Value 분석
+
+### IA_Move의 Action Value
+
+```
+W 키 (앞)
+  └─ (X: 0, Y: 1)
+
+S 키 (뒤)
+  └─ (X: 0, Y: -1)
+
+A 키 (왼쪽)
+  └─ (X: -1, Y: 0)
+
+D 키 (오른쪽)
+  └─ (X: 1, Y: 0)
+```
+
+**Vector2D 구조**
+
+```
+정의
+  └─ 2개의 float 값
+  └─ (X, Y)
+
+범위
+  ├─ 키보드: -1, 0, 1 (불연속)
+  └─ 조이스틱: -1.0 ~ 1.0 (연속)
+```
+
+**조이스틱의 장점**
+
+```
+키보드
+  └─ -1 → 0 → 1 (갑작스러운 변화)
+
+조이스틱
+  └─ -1.0 → -0.5 → 0 → 0.5 → 1.0
+  └─ 부드러운 전환
+  └─ 세밀한 제어
+```
+
+---
+
+## 🎨 Blend Space 설정
+
+### 1. Blend Space 생성
+
+```
+Content/Blueprints/Kick
+  ↓
+우클릭 → Animation → Blend Space
+  ├─ Skeleton: SK_Kick 선택
+  └─ 이름: BS_Flying
+```
+
+### 2. Axis 설정
+
+**Horizontal Axis (가로축)**
+
+```
+이름: Input_X
+
+Minimum Axis Value: -1.0
+  └─ 왼쪽 최대
+
+Maximum Axis Value: 1.0
+  └─ 오른쪽 최대
+
+Grid Divisions: 4
+  └─ 그리드 세분화
+```
+
+**Vertical Axis (세로축)**
+
+```
+이름: Input_Y
+
+Minimum Axis Value: -1.0
+  └─ 뒤쪽 최대
+
+Maximum Axis Value: 1.0
+  └─ 앞쪽 최대
+
+Grid Divisions: 4
+```
+
+**왜 -1 ~ 1인가?**
+
+```
+Enhanced Input Action Value
+  └─ -1 ~ 1 범위
+
+Blend Space도 동일 범위
+  └─ 직접 매핑 가능
+  └─ 변환 불필요
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380760/notion-blog/_/_/_5_/_8_-_3D_-_5/image_6.png)
+
+### 3. 애니메이션 배치
+
+**중앙 (0, 0)**
+
+```
+Fly_Idle
+  └─ 입력 없을 때
+  └─ 제자리 비행
+```
+
+**오른쪽 (1, 0)**
+
+```
+Fly_Right
+  └─ X = 1 (D 키)
+  └─ 오른쪽 기울임
+```
+
+**왼쪽 (-1, 0)**
+
+```
+Fly_Left
+  └─ X = -1 (A 키)
+  └─ 왼쪽 기울임
+```
+
+**앞 (0, 1)**
+
+```
+Fly_Forward
+  └─ Y = 1 (W 키)
+  └─ 앞으로 기울임
+```
+
+**뒤 (0, -1)**
+
+```
+Fly_Backward
+  └─ Y = -1 (S 키)
+  └─ 뒤로 기울임
+```
+
+**Shift + 드래그**
+
+```
+기능
+  └─ 그리드에 스냅
+
+효과
+  └─ 정확한 위치 배치
+  └─ (1, 0)에 정확히 배치
+```
+
+**Ctrl + 드래그 (미리보기)**
+
+```
+기능
+  └─ 블렌딩 미리보기
+
+사용법
+  └─ Ctrl 누른 채 마우스 이동
+  └─ 실시간 블렌딩 확인
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380760/notion-blog/_/_/_5_/_8_-_3D_-_5/image_7.png)
+
+### 4. 블렌딩 예시
+
+**오른쪽-앞 대각선 (0.7, 0.7)**
+
+```
+블렌딩 계산
+  ├─ Fly_Right (X 영향)
+  ├─ Fly_Forward (Y 영향)
+  ├─ Fly_Idle (중앙 영향)
+  └─ Fly_Right_Forward (없음, 자동 블렌딩)
+
+결과
+  └─ 4개 애니메이션의 가중 평균
+  └─ 오른쪽-앞 대각선 자세
+```
+
+**블렌딩 원리**
+
+```
+2D 공간의 한 점
+  ↓
+주변 4개 샘플의 거리 계산
+  ↓
+거리에 반비례하는 가중치
+  ↓
+가중 평균으로 블렌딩
+```
+
+---
+
+## 🔌 Blueprint Interface로 데이터 전달
+
+### 문제 상황
+
+```
+Animation Blueprint
+  └─ IA_Move의 Action Value 필요
+
+Player Controller
+  └─ IA_Move 구현됨
+  └─ Action Value 있음
+
+어떻게 전달?
+```
+
+### 해결책: Interface 함수
+
+**BPI_Jetpack에 함수 추가**
+
+```
+함수명: Get Move Input
+
+출력
+  ├─ Input Action Value
+  └─ 타입: Vector2D
+```
+
+**Vector2D란?**
+
+```
+정의
+  └─ 2D 벡터 타입
+  └─ (X, Y) 두 float 값
+
+vs Vector
+  └─ Vector는 (X, Y, Z) 세 값
+
+용도
+  └─ 2D 입력 전달에 최적
+```
+
+**⚠️ 주의: Vector2D vs Vector2D Array**
+
+```
+Vector2D ✅
+  └─ 파란색 아이콘
+  └─ 단일 벡터
+
+Vector2D Array ❌
+  └─ 배열 아이콘
+  └─ 벡터들의 리스트
+
+올바른 선택
+  └─ 단일 Vector2D 선택
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380760/notion-blog/_/_/_5_/_8_-_3D_-_5/image_8.png)
+
+---
+
+## 🔧 BP_Kick에서 구현
+
+### Get Move Input 구현
+
+```
+BPI_Jetpack → Get Move Input 더블클릭
+  ↓
+함수 구현 (이벤트 아님)
+```
+
+**왜 이벤트가 아닌 함수?**
+
+```
+Interface 출력 있음
+  └─ Return Node 필요
+  └─ 함수만 Return 가능
+
+이벤트
+  └─ 출력 없음
+  └─ Return 불가
+
+함수
+  └─ 출력 가능 ✅
+  └─ Return Node 있음
+```
+
+### Enhanced Get Action Value 노드
+
+```
+IA_Move
+  ↓
+Enhanced Get Action Value
+  └─ 현재 입력 값 반환
+```
+
+**Pure Node (순수 노드)**
+
+```
+특징
+  └─ 실행 핀 없음
+  └─ 값만 반환
+  └─ 여러 번 호출 가능
+
+vs 일반 노드
+  └─ 실행 핀 있음
+  └─ 한 번만 실행
+
+Enhanced Get Action Value
+  └─ Pure Node ✅
+  └─ 언제든 현재 값 조회
+```
+
+### 구현 코드
+
+```
+Get Move Input (함수)
+  ↓
+Enhanced Get Action Value (IA_Move)
+  ↓
+Return Node
+  └─ Input Action Value 연결
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380760/notion-blog/_/_/_5_/_8_-_3D_-_5/image_9.png)
+
+---
+
+## 📐 Animation Blueprint에서 사용
+
+### Update Animation Variables 함수
+
+**기존 내용**
+
+```
+Store Essential Variables
+  ├─ Character 저장
+  └─ Character Movement 저장
+```
+
+**추가 내용: Get Move Input**
+
+```
+Character (Get)
+  ↓
+Get Move Input (Interface 호출)
+  ↓
+Promote to Variable
+  └─ 이름: IA Move Input Action Value
+```
+
+**Interface 함수 호출 원리**
+
+```
+Character는 BPI_Jetpack 구현함
+  ↓
+Character에서 Get Move Input 호출 가능
+  ↓
+BP_Kick의 구현된 함수 실행
+  ↓
+Vector2D 값 반환
+```
+
+**Sequence 노드 연결**
+
+```
+기존 Sequence
+  ├─ Then 0: 기존 로직
+  └─ Then 1: Get Move Input 추가
+
+순차 실행
+  └─ 매 프레임 업데이트
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380757/notion-blog/_/_/_5_/_8_-_3D_-_5/image_10.png)
+
+### Anim Graph에서 Blend Space 사용
+
+**BS_Flying 배치**
+
+```
+Flying State Machine 생성
+  ↓
+Flying State 더블클릭
+  ↓
+BS_Flying 드래그
+  ↓
+Entry 연결
+```
+
+**입력 연결**
+
+```
+IA Move Input Action Value (Get)
+  ↓
+우클릭 → Split Struct Pin
+  ├─ X → Input_X
+  └─ Y → Input_Y
+```
+
+**Split Struct Pin이란?**
+
+```
+Vector2D 구조체
+  └─ (X, Y) 하나의 핀
+
+Split 후
+  ├─ X 핀
+  └─ Y 핀
+
+개별 연결
+  └─ 각각 다른 곳에 연결 가능
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380757/notion-blog/_/_/_5_/_8_-_3D_-_5/image_11.png)
+
+---
+
+## 🎨 Smoothing Time (부드러운 전환)
+
+### 문제: 키보드 입력의 불연속성
+
+```
+키보드
+  └─ 0 → 1 → 0 (갑작스러움)
+  └─ 애니메이션이 뚝뚝 끊김
+
+조이스틱
+  └─ 0 → 0.5 → 1.0 → 0.5 → 0
+  └─ 부드러운 전환
+```
+
+### Smoothing Time 설정
+
+```
+BS_Flying 열기
+  ↓
+Smoothing Time
+  ├─ Horizontal: 0.2
+  └─ Vertical: 0.2
+```
+
+**Smoothing Time이란?**
+
+```
+정의
+  └─ 목표값까지 도달하는 시간
+
+0.2초 설정
+  └─ 입력 변화 시 0.2초에 걸쳐 전환
+
+효과
+  ├─ 갑작스러운 변화 방지
+  ├─ 부드러운 애니메이션
+  └─ 자연스러운 느낌
+```
+
+**작동 원리**
+
+```
+입력: 0 → 1로 변화
+
+Smoothing 없음
+  └─ 즉시 1
+
+Smoothing 0.2초
+  ├─ 0.05초: 0.25
+  ├─ 0.10초: 0.50
+  ├─ 0.15초: 0.75
+  └─ 0.20초: 1.00
+
+Interpolation (보간)
+  └─ 부드러운 곡선으로 전환
+
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380758/notion-blog/_/_/_5_/_8_-_3D_-_5/image_12.png)
+
+---
+
+## 🔀 Blend Poses by Enum
+
+### Movement Mode Enum
+
+**E_Movement_Mode란?**
+
+```
+Enum (열거형)
+  └─ 여러 가능한 값의 목록
+
+Movement Mode 값들
+  ├─ Walking
+  ├─ Falling
+  ├─ Flying
+  ├─ Swimming
+  └─ Custom
+```
+
+**Enum의 특징**
+
+```
+색상
+  └─ 녹색 핀
+
+선택
+  └─ 드롭다운에서 하나 선택
+
+타입 안전
+  └─ 오타 방지
+  └─ 정해진 값만 사용
+```
+
+### Movement Mode 저장
+
+**Update Animation Variables에 추가**
+
+```
+Character Movement (Get)
+  ↓
+Get Movement Mode
+  ↓
+Promote to Variable
+  └─ 이름: Movement Mode
+```
+
+**Get Movement Mode란?**
+
+```
+기능
+  └─ 현재 이동 모드 반환
+
+반환 타입
+  └─ E_Movement_Mode (Enum)
+
+값 예시
+  ├─ 지상: Walking
+  ├─ 공중 낙하: Falling
+  └─ 제트팩: Flying
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380758/notion-blog/_/_/_5_/_8_-_3D_-_5/image_13.png)
+
+### Blend Poses by Enum 노드
+
+**생성**
+
+```
+Anim Graph
+  ↓
+우클릭 → Blend Poses
+  └─ Blend Poses by E Movement Mode 선택
+```
+
+**노드 구조**
+
+```
+Blend Poses (E Movement Mode)
+
+입력
+  ├─ Active Enum Value (Enum)
+  ├─ Default Pose
+  ├─ Walking Pose (추가)
+  ├─ Falling Pose (추가)
+  └─ Flying Pose (추가)
+
+출력
+  └─ Output Pose
+```
+
+**작동 원리**
+
+```
+Active Enum Value = Walking
+  ↓
+Walking Pose 사용
+
+Active Enum Value = Flying
+  ↓
+Flying Pose 사용
+
+Active Enum Value = 기타
+  ↓
+Default Pose 사용
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380758/notion-blog/_/_/_5_/_8_-_3D_-_5/image_14.png)
+
+### Pose 추가 방법
+
+```
+노드 우클릭
+  ↓
+Add Pin
+  ├─ Walking 선택
+  ├─ Falling 선택
+  └─ Flying 선택
+```
+
+**추가된 핀들**
+
+```
+Walking Pose
+  └─ Locomotion State Machine 연결
+
+Falling Pose
+  └─ Locomotion State Machine 연결
+
+Flying Pose
+  └─ Flying State Machine 연결
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380758/notion-blog/_/_/_5_/_8_-_3D_-_5/image_15.png)
+
+---
+
+## 💾 Cached Pose (포즈 캐싱)
+
+### 문제: 같은 포즈를 여러 곳에 사용
+
+```
+Locomotion State Machine
+  ├─ Walking Pose에 연결
+  └─ Falling Pose에도 연결 필요
+
+문제
+  └─ 핀 하나를 두 곳에 연결 불가
+```
+
+**시도**
+
+```
+Locomotion → Walking 연결
+  ↓
+Locomotion → Falling 연결 시도
+  ↓
+❌ Walking 연결이 Falling으로 이동
+  └─ 동시 연결 불가
+```
+
+### Cached Pose 개념
+
+**정의**
+
+```
+Cached Pose
+  └─ 애니메이션 포즈를 "저장"
+  └─ 변수처럼 여러 곳에서 사용
+```
+
+**비유**
+
+```
+일반 변수
+  └─ 데이터를 저장
+  └─ 여러 곳에서 Get으로 사용
+
+Cached Pose
+  └─ 애니메이션 포즈를 저장
+  └─ 여러 곳에서 Use로 사용
+```
+
+### 생성 및 사용
+
+**Save Cached Pose**
+
+```
+Locomotion State Machine
+  ↓
+드래그 → Cache 입력
+  ↓
+Save Cached Pose 선택
+  └─ 이름: Cached_Locomotion
+```
+
+**Use Cached Pose**
+
+```
+우클릭 → Use Cached Pose
+  └─ Cached_Locomotion 선택
+
+복제
+  └─ Ctrl + D
+
+연결
+  ├─ 첫 번째 → Walking Pose
+  └─ 두 번째 → Falling Pose
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380758/notion-blog/_/_/_5_/_8_-_3D_-_5/image_16.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380759/notion-blog/_/_/_5_/_8_-_3D_-_5/image_17.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380759/notion-blog/_/_/_5_/_8_-_3D_-_5/image_18.png)
+
+**작동 원리**
+
+```
+매 프레임
+  ↓
+Locomotion State Machine 실행
+  ↓
+Save Cached Pose (포즈 저장)
+  ↓
+Use Cached Pose ×2 (저장된 포즈 사용)
+  ├─ Walking Pose
+  └─ Falling Pose
+
+성능
+  └─ State Machine 1회만 실행
+  └─ 결과를 2곳에서 재사용
+```
+
+---
+
+## 🎯 최종 Anim Graph 구조
+
+### 전체 흐름
+
+```
+Locomotion State Machine
+  ↓
+Save Cached Pose (Cached_Locomotion)
+
+Flying State Machine
+
+Blend Poses by E Movement Mode
+  ├─ Movement Mode (Enum)
+  ├─ Walking → Use Cached Pose (Cached_Locomotion)
+  ├─ Falling → Use Cached Pose (Cached_Locomotion)
+  ├─ Flying → Flying State Machine
+  └─ Default → (사용 안 함)
+  ↓
+Output Pose
+```
+
+### 동작 시나리오
+
+**걷기 중**
+
+```
+Movement Mode = Walking
+  ↓
+Blend Poses 노드
+  ↓
+Walking Pose 선택
+  ↓
+Use Cached Pose (Locomotion)
+  ↓
+Idle/Walk/Run 블렌딩
+```
+
+**점프 (낙하 중)**
+
+```
+Movement Mode = Falling
+  ↓
+Blend Poses 노드
+  ↓
+Falling Pose 선택
+  ↓
+Use Cached Pose (Locomotion)
+  ↓
+점프/낙하 애니메이션
+```
+
+**제트팩 비행**
+
+```
+Movement Mode = Flying
+  ↓
+Blend Poses 노드
+  ↓
+Flying Pose 선택
+  ↓
+Flying State Machine
+  ↓
+BS_Flying (2D Blend Space)
+  ↓
+입력에 따른 방향별 비행 애니메이션
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### 2D Blend Space
+
+```
+정의
+  └─ 2개 축으로 애니메이션 블렌딩
+
+용도
+  └─ 방향성 있는 움직임
+  └─ 비행, 스트레이프 등
+
+블렌딩
+  └─ 주변 4개 샘플의 가중 평균
+```
+
+### Enhanced Input Action Value
+
+```
+Vector2D 타입
+  └─ (X, Y) 2D 입력
+
+범위
+  └─ -1.0 ~ 1.0
+
+장치별 차이
+  ├─ 키보드: 불연속 (-1, 0, 1)
+  └─ 조이스틱: 연속 (모든 값)
+```
+
+### Blueprint Interface
+
+```
+데이터 전달
+  └─ 타입 캐스팅 없이
+
+구현
+  ├─ 인터페이스에 함수 정의
+  ├─ 클래스에서 구현
+  └─ 호출자는 타입 몰라도 됨
+```
+
+### Enum (열거형)
+
+```
+정의
+  └─ 정해진 값들의 목록
+
+장점
+  ├─ 타입 안전
+  ├─ 오타 방지
+  └─ 드롭다운 선택
+
+색상
+  └─ 녹색 핀
+```
+
+### Blend Poses by Enum
+
+```
+기능
+  └─ Enum 값에 따라 포즈 선택
+
+용도
+  └─ 상태별 애니메이션
+  └─ Movement Mode별 분기
+
+확장성
+  └─ Pin 추가로 케이스 확장
+```
+
+### Cached Pose
+
+```
+기능
+  └─ 포즈 저장 후 재사용
+
+장점
+  ├─ 중복 계산 방지
+  ├─ 성능 향상
+  └─ 여러 곳에 사용 가능
+
+사용법
+  ├─ Save: 저장
+  └─ Use: 사용 (여러 개 가능)
+```
+
+### Smoothing Time
+
+```
+정의
+  └─ 목표값까지 도달 시간
+
+효과
+  └─ 부드러운 전환
+  └─ 불연속 입력 완화
+
+설정
+  └─ 0.1 ~ 0.3초 권장
+```
+
+---
+
+## 📁 폴더 구조 정리
+
+### 추천 구조
+
+```
+Content/Blueprints/Kick
+  └─ ABP_Kick (Animation Blueprint)
+
+Content/Assets/Kick/Animations
+  ├─ BS_Idle_Walk_Run (Blend Space)
+  ├─ BS_Flying (Blend Space)
+  └─ 애니메이션 파일들
+```
+
+**왜 분리하나?**
+
+```
+Blueprints
+  └─ 로직, 코드 성격
+  └─ ABP는 Blueprint
+
+Assets/Animations
+  └─ 데이터, 에셋 성격
+  └─ Blend Space는 Asset
+
+장점
+  ├─ 명확한 분류
+  ├─ 찾기 쉬움
+  └─ 협업 시 충돌 감소
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 1. Vector2D 타입 선택
+
+```
+❌ Vector2D Array
+  └─ 배열 아이콘
+
+✅ Vector2D
+  └─ 파란색 단일 아이콘
+```
+
+### 2. Blend Space 축 범위
+
+```
+Enhanced Input과 일치
+  └─ -1.0 ~ 1.0
+
+다르면
+  └─ 값 변환 필요
+  └─ 복잡해짐
+```
+
+### 3. Smoothing Time 과다
+
+```
+너무 크면 (1초 이상)
+  └─ 반응 느림
+  └─ 입력 지연 느낌
+
+적절한 값
+  └─ 0.1 ~ 0.3초
+```
+
+### 4. Default Pose
+
+```
+사용 안 하더라도
+  └─ 연결 권장
+
+이유
+  └─ 예상 밖 상황 대비
+  └─ T-Pose 방지
+```
+
+### 5. Interface 함수 vs 이벤트
+
+```
+출력 있으면
+  └─ 함수 ✅
+
+출력 없으면
+  └─ 이벤트 OK
+```
+
+---
+
+## 🎓 용어 정리
+
+**2D Blend Space**
+
+- 2개 축으로 애니메이션 블렌딩
+- 방향성 움직임에 사용
+
+**Vector2D**
+
+- 2차원 벡터 (X, Y)
+- 2D 입력 표현
+
+**Enum (열거형)**
+
+- 정해진 값들의 목록
+- 타입 안전한 선택
+
+**Cached Pose**
+
+- 저장된 애니메이션 포즈
+- 재사용 가능
+
+**Smoothing Time**
+
+- 값 전환 시간
+- 부드러운 애니메이션
+
+**Split Struct Pin**
+
+- 구조체를 개별 핀으로 분리
+- 각각 따로 연결 가능
+
+**Pure Node**
+
+- 실행 핀 없는 노드
+- 값만 반환
+
+**Interpolation (보간)**
+
+- 두 값 사이 부드러운 전환
+- 중간값 자동 계산
+
+---
+
+## 🎯 최종 결과
+
+### 기능
+
+```
+✅ 걷기/달리기 애니메이션
+✅ 점프/낙하 애니메이션
+✅ 8방향 비행 애니메이션
+✅ 부드러운 전환
+✅ Movement Mode 자동 전환
+```
+
+### 조작감
+
+```
+키보드
+  └─ Smoothing으로 부드러움
+
+조이스틱
+  └─ 매우 자연스러운 블렌딩
+
+카메라 회전
+  └─ Use Controller Desired Rotation
+  └─ 부드러운 방향 전환
+```
+
+### 다음 단계
+
+```
+현재
+  └─ 완전한 비행 시스템
+
+향후 개선
+  ├─ 특수 모션 (급강하, 급상승)
+  ├─ 속도별 애니메이션
+  └─ 파티클 효과 강화
+```

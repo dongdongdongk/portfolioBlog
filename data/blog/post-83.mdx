@@ -1,0 +1,306 @@
+---
+title: '이미지 캡쳐 (오버레이) 만들기'
+date: '2026-09-02'
+category: '풀스택/Electron'
+tags: ['풀스택', 'Electron']
+draft: false
+summary: ''
+---
+
+![image.png](<%EC%9D%B4%EB%AF%B8%EC%A7%80%20%EC%BA%A1%EC%B3%90%20(%EC%98%A4%EB%B2%84%EB%A0%88%EC%9D%B4)%20%EB%A7%8C%EB%93%A4%EA%B8%B0/image.png>)
+
+```jsx
+이 코드의 목적은 사용자가 특정 화면 영역을 선택하면 그 부분을 캡처하도록 하는 오버레이(Overlay) UI를 구현하는 것입니다
+```
+
+## 1. 오버레이 UI 개념
+
+```jsx
+오버레이(Overlay)란 기존 화면 위에 덧씌워지는 인터페이스 요소를 의미합니다.
+
+이 코드에서 canvas 요소를 활용해 전체 화면을 덮는 오버레이를 만들고,
+
+사용자가 드래그한 부분만 투명하게 만들어 선택할 수 있도록 합니다.
+```
+
+### 오버레이의 역할
+
+```jsx
+1. 기존 화면을 어둡게 처리하여 사용자가 선택할 영역을 명확하게 인식하도록 함
+
+2. 사용자가 마우스로 드래그하여 원하는 영역을 선택할 수 있도록 인터랙션 제공
+
+3. 선택한 영역 정보를 Electron을 통해 전달하여 캡처 실행
+```
+
+## 2. HTML 구조
+
+```jsx
+<canvas id="overlayCanvas"></canvas>
+```
+
+```jsx
+canvas 요소는 HTML5의 그래픽 요소로, 2D 또는 3D 그래픽을 그릴 수 있습니다.
+
+화면 전체를 덮도록 설정하여 마우스 이벤트를 감지하고, 원하는 영역을 시각적으로 표시합니다.
+```
+
+## 캔버스 ?
+
+```jsx
+<canvas>는 HTML 요소 중 하나입니다. 쉽게 말해서, 웹 페이지에 그릴 수 있는 "그림판"을 제공하는 요소라고 할 수 있습니다.
+
+HTML 요소 중 하나지만, 직접적으로 화면에 텍스트나 이미지가 보이지 않아요.
+
+대신, JavaScript를 사용하여 그 안에 다양한 그래픽을 그릴 수 있습니다.
+```
+
+### 캔버스의 동작 원리
+
+```jsx
+캔버스는 그림을 그리기 위한 도화지와 비슷합니다. HTML에서 <canvas> 요소를 사용해서 화면에 "그림판"을 만들어 놓고,
+
+JavaScript로 그 안에 그림이나 텍스트, 애니메이션 등을 그릴 수 있어요.
+
+하지만 <canvas> 자체는 보여지는 콘텐츠가 아니에요.
+
+대신, JavaScript에서 getContext('2d')를 호출해서 2D 그래픽을 그릴 수 있는 도구를 받게 됩니다.
+```
+
+## 3. CSS 스타일
+
+```jsx
+body {
+    margin: 0;
+    overflow: hidden;
+}
+#overlayCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    cursor: crosshair;
+}
+```
+
+```jsx
+margin: 0; → 브라우저 기본 마진 제거
+
+overflow: hidden; → 스크롤 방지 (전체 화면을 덮기 위해 필요)
+
+position: absolute; top: 0; left: 0; → 화면 좌측 상단부터 전체를 덮도록 설정
+
+width: 100vw; height: 100vh; → 전체 화면 크기
+
+cursor: crosshair; → 마우스를 십자선 커서로 변경하여 드래그할 수 있음을 명확히 표시
+```
+
+## 4. JavaScript 동작 흐름
+
+### 1) 캔버스 초기 설정
+
+```jsx
+const canvas = document.getElementById('overlayCanvas')
+const ctx = canvas.getContext('2d')
+
+canvas.width = window.innerWidth
+canvas.height = window.innerHeight
+```
+
+```jsx
+getContext("2d") → 2D 그래픽을 그릴 수 있도록 설정
+
+canvas.width 및 canvas.height를 window.innerWidth와
+
+window.innerHeight로 설정하여 전체 화면을 덮음
+```
+
+### 2) 오버레이를 그리는 함수
+
+```jsx
+function drawOverlay() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+  // 전체 화면을 반투명한 검정색으로 채움
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+  if (startX && startY && endX && endY) {
+    // 선택 영역 계산
+    const x = Math.min(startX, endX)
+    const y = Math.min(startY, endY)
+    const width = Math.abs(endX - startX)
+    const height = Math.abs(endY - startY)
+
+    // 선택 영역을 투명하게 처리
+    ctx.globalCompositeOperation = 'destination-out'
+    ctx.fillStyle = 'rgba(0, 0, 0, 3)' // 강한 투명 효과
+    ctx.fillRect(x, y, width, height)
+    ctx.globalCompositeOperation = 'source-over'
+  }
+}
+```
+
+```jsx
+1. ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+		캔버스를 초기화하여 이전 프레임이 남지 않도록 함.
+
+2. ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+
+		캔버스 전체를 반투명한 검정색으로 채워 오버레이 효과 생성.
+
+3. 선택 영역을 투명하게 만드는 부분
+
+		사용자가 드래그한 사각형을 destination-out 모드로 설정하면
+
+		해당 부분이 지워지면서 투명하게 됨.
+```
+
+### 왜 `globalCompositeOperation = 'destination-out'`를 사용하는가?
+
+```jsx
+destination-out을 설정하면 기존의 픽셀 값에서 해당 부분을 지워버립니다.
+
+이렇게 하면 선택한 영역이 원래 화면처럼 보이게 되는 효과가 나옵니다.
+```
+
+```jsx
+ctx.globalCompositeOperation = 'destination-out';
+→ 새로 그려지는 내용이 기존의 내용을 지우는 방식으로 설정합니다.
+
+  이 경우, 검은색 사각형을 그리면 그 영역이 투명해집니다.
+
+ctx.fillStyle = 'rgba(0, 0, 0, 3)';
+→ 그려지는 사각형의 색을 불투명한 검은색으로 설정합니다. ( 최대값이 1 인데 지금 실수해서 3이다 이러면 의미가 없어짐 )
+
+ctx.fillRect(x, y, width, height);
+→ x, y 위치에 불투명한 검은색 사각형을 그려서 그 영역을 지우는 효과를 냅니다.
+
+ctx.globalCompositeOperation = 'source-over';
+→ 이후부터는 기본적인 그리기 모드로 돌아가서 새로운 그림을 그리게 됩니다.
+```
+
+```jsx
+1. ctx.globalCompositeOperation
+
+		먼저, globalCompositeOperation은 그림을 그릴 때,
+
+		기존에 그려진 것과 새로 그려지는 것을 어떻게 결합할지 정하는 설정입니다.
+
+		기본값은 'source-over'인데, 이 값은 새로 그려지는 내용이 기존 내용 위에 그려진다는 뜻입니다.
+
+2. 'destination-out' 값
+
+		globalCompositeOperation에 'destination-out'을 설정하면, 새로 그려지는 부분이 기존에 그려진 것과 결합되지 않고,
+
+		그 자리를 '지우는' 효과가 나옵니다. 즉, 투명하게 만드는 효과가 발생합니다.
+
+		예를 들어, 빨간색 사각형 위에 'destination-out'을 설정하면, 그 사각형이 투명해지거나 지워지는 효과를 만들 수 있습니다.
+
+3. ctx.fillStyle
+
+		fillStyle은 캔버스에서 그릴 도형의 색깔이나 그라디언트를 지정하는 속성입니다.
+
+		여기서는 'rgba(0, 0, 0, 3)'을 설정하고 있는데, 이 값을 보면 알 수 없는 부분이 있어요. (투명도는 1이 최대인데 3 )
+
+4. ctx.fillRect(x, y, width, height)
+
+		fillRect()는 직사각형을 그리기 위한 함수입니다. x, y는 직사각형의 시작 좌표,
+
+		width와 height는 직사각형의 크기입니다.
+
+		그래서 이 코드는 특정 위치에 특정 크기의 사각형을 그리는 역할을 합니다.
+
+5. 다시 'source-over'로 설정
+
+		그리고 마지막에 다시 globalCompositeOperation을 'source-over'로 설정하는데,
+
+		이 설정은 기본값으로 되돌리는 것입니다. 이제 새로운 도형을 그릴 때 기존의 내용 위에 겹쳐서 그려지게 됩니다.
+```
+
+## 3) 마우스 이벤트 처리
+
+```jsx
+캔버스에서 마우스를 클릭하고 드래그하는 동작을 감지하여 선택 영역을 설정합니다.
+```
+
+### (1) 마우스 버튼을 누를 때 (드래그 시작점)
+
+```jsx
+canvas.addEventListener('mousedown', (e) => {
+  startX = e.clientX
+  startY = e.clientY
+})
+```
+
+```jsx
+startX, startY에 마우스를 누른 위치를 저장
+```
+
+### (2) 마우스를 움직일 때 (드래그 중)
+
+```jsx
+canvas.addEventListener('mousemove', (e) => {
+  if (!startX || !startY) return
+  endX = e.clientX
+  endY = e.clientY
+  drawOverlay()
+})
+```
+
+```jsx
+마우스 버튼을 누른 상태에서 이동하면 endX, endY를 갱신
+
+drawOverlay();를 호출하여 선택 영역을 업데이트
+```
+
+### (3) 마우스 버튼을 떼었을 때 (드래그 종료)
+
+```jsx
+canvas.addEventListener('mouseup', () => {
+  if (!startX || !startY || !endX || !endY) return
+
+  const bounds = {
+    x: Math.min(startX, endX),
+    y: Math.min(startY, endY),
+    width: Math.abs(endX - startX),
+    height: Math.abs(endY - startY),
+  }
+
+  // 캡처 요청
+  window.electron.captureScreen(bounds)
+
+  // 오버레이 닫기
+  window.electron.closeOverlay()
+})
+```
+
+```jsx
+드래그한 영역의 좌표를 계산하여 bounds 객체 생성
+
+window.electron.captureScreen(bounds);
+
+		→ Electron을 이용해 해당 영역을 캡처하는 명령 전달
+
+window.electron.closeOverlay();
+
+		→ 캡처 후 오버레이를 닫음 (Electron의 렌더러 프로세스에서
+
+			오버레이 창을 닫을 것으로 예상됨)
+```
+
+## 5. 전체적인 흐름
+
+```jsx
+1. canvas를 화면 전체에 배치하여 마우스 이벤트를 감지.
+
+2. 마우스를 클릭하면 시작 좌표(startX, startY)를 저장.
+
+3. 드래그하는 동안 mousemove 이벤트가 발생하여 선택 영역을 실시간으로 업데이트.
+
+4. mouseup 이벤트 발생 시 선택한 영역을 window.electron.captureScreen(bounds);로
+
+	 전달하여 캡처 실행. 오버레이 창을 닫음.
+```

@@ -1,0 +1,2165 @@
+---
+title: '섹션 5: Enemies & Combat - 3'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+# { 🎯 Unity 전술 게임: 체력 시스템 구축하기 }
+
+이번 강의에서는 유닛들이 총알로부터 데미지를 받고 죽을 수 있도록 하는 체력 시스템을 구현합니다. 이벤트 기반 설계를 통해 재사용 가능하고 확장 가능한 시스템을 만듭니다.
+
+---
+
+## 📋 목차
+
+1. [HealthSystem 스크립트 생성 및 기본 구조](https://claude.ai/chat/fb46f20b-2029-4b42-906b-242d0f58ee96#1-healthsystem-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%83%9D%EC%84%B1-%EB%B0%8F-%EA%B8%B0%EB%B3%B8-%EA%B5%AC%EC%A1%B0)
+2. [데미지 처리 로직 구현](https://claude.ai/chat/fb46f20b-2029-4b42-906b-242d0f58ee96#2-%EB%8D%B0%EB%AF%B8%EC%A7%80-%EC%B2%98%EB%A6%AC-%EB%A1%9C%EC%A7%81-%EA%B5%AC%ED%98%84)
+3. [Unit 스크립트와 연결하기](https://claude.ai/chat/fb46f20b-2029-4b42-906b-242d0f58ee96#3-unit-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8%EC%99%80-%EC%97%B0%EA%B2%B0%ED%95%98%EA%B8%B0)
+4. [ShootAction과 연동하기](https://claude.ai/chat/fb46f20b-2029-4b42-906b-242d0f58ee96#4-shootaction%EA%B3%BC-%EC%97%B0%EB%8F%99%ED%95%98%EA%B8%B0)
+5. [죽음 처리와 이벤트 시스템](https://claude.ai/chat/fb46f20b-2029-4b42-906b-242d0f58ee96#5-%EC%A3%BD%EC%9D%8C-%EC%B2%98%EB%A6%AC%EC%99%80-%EC%9D%B4%EB%B2%A4%ED%8A%B8-%EC%8B%9C%EC%8A%A4%ED%85%9C)
+6. [그리드 시스템 정리하기](https://claude.ai/chat/fb46f20b-2029-4b42-906b-242d0f58ee96#6-%EA%B7%B8%EB%A6%AC%EB%93%9C-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EC%A0%95%EB%A6%AC%ED%95%98%EA%B8%B0)
+7. [메모리 누수 방지: 이벤트 구독 해제](https://claude.ai/chat/fb46f20b-2029-4b42-906b-242d0f58ee96#7-%EB%A9%94%EB%AA%A8%EB%A6%AC-%EB%88%84%EC%88%98-%EB%B0%A9%EC%A7%80-%EC%9D%B4%EB%B2%A4%ED%8A%B8-%EA%B5%AC%EB%8F%85-%ED%95%B4%EC%A0%9C)
+
+---
+
+## 1. HealthSystem 스크립트 생성 및 기본 구조
+
+### 스크립트 생성 및 컴포넌트 추가
+
+- 새로운 C# 스크립트 생성: **HealthSystem**
+- Unit Prefab (기본 유닛, 적이 아닌)에 HealthSystem 컴포넌트 추가
+- 프리팹에 추가하면 모든 유닛 인스턴스가 자동으로 이 컴포넌트를 갖게 됨
+
+### 체력 필드 정의
+
+```csharp
+[SerializeField] private int health = 100;
+```
+
+**개념 설명:**
+
+- **데이터 타입 선택**: `int` vs `float`
+  - `int`: 정수 (100, 99, 98...) - 정확한 숫자, 소수점 없음
+  - `float`: 실수 (100.5, 99.3...) - 소수점 포함 가능
+  - 강의에서는 `int` 선택 → 체력을 깔끔한 정수로 표현하기 위함
+- **[SerializeField]**:
+  - private 필드를 Unity Inspector에서 편집 가능하게 만듦
+  - 외부에서는 접근 불가하지만, 개발자가 Unity 에디터에서 쉽게 값 조정 가능
+- **초기값 100**: 기본 체력을 100으로 설정
+
+---
+
+## 2. 데미지 처리 로직 구현
+
+### TakeDamage 함수 (초기 버전)
+
+```csharp
+public void TakeDamage(int damageAmount)
+{
+    // 받은 데미지만큼 체력 감소
+    health -= damageAmount;
+
+    // 체력이 음수가 되는 것을 방지
+    if (health < 0)
+    {
+        health = 0;
+    }
+}
+```
+
+**개념 설명:**
+
+- **public void**: 다른 클래스에서 호출 가능한 함수, 반환값 없음
+- **매개변수 `int damageAmount`**: 받을 데미지 양을 외부에서 전달받음
+- **`health -= damageAmount`**: 현재 체력에서 데미지를 뺌 (health = health - damageAmount와 동일)
+- **체력 하한선 체크**:
+  - 체력이 음수가 되면 0으로 고정
+  - 예: 체력 10인데 20 데미지 받으면 -10이 아니라 0으로 설정
+
+### 함수명 변경: Damage로 단순화
+
+```csharp
+public void Damage(int damageAmount)
+{
+    health -= damageAmount;
+
+    if (health < 0)
+    {
+        health = 0;
+    }
+
+    // 테스트용 디버그 로그
+    Debug.Log(health);
+}
+```
+
+**개념 설명:**
+
+- `TakeDamage` → `Damage`로 이름 단순화
+- `Debug.Log(health)`: Unity 콘솔에 현재 체력 출력 → 테스트용
+
+---
+
+## 3. Unit 스크립트와 연결하기
+
+### HealthSystem 컴포넌트 참조 저장
+
+```csharp
+public class Unit : MonoBehaviour
+{
+    private HealthSystem healthSystem;  // HealthSystem 컴포넌트 참조
+
+    private void Awake()
+    {
+        // 같은 GameObject에 붙어있는 HealthSystem 컴포넌트 가져오기
+        healthSystem = GetComponent<HealthSystem>();
+        // 다른 컴포넌트들도 가져오기...
+    }
+}
+```
+
+**개념 설명:**
+
+- **GetComponent<HealthSystem>()**:
+  - 같은 GameObject에 붙어있는 HealthSystem 컴포넌트를 찾아서 반환
+  - Unity의 컴포넌트 기반 아키텍처 활용
+- **private 필드로 저장**:
+  - 한 번만 찾아서 저장해두면 성능 효율적
+  - 매번 GetComponent 호출하는 것보다 빠름
+
+### Unit의 Damage 함수 구현
+
+```csharp
+public void Damage(int damageAmount)
+{
+    // HealthSystem의 Damage 함수를 호출하며 데미지 전달
+    healthSystem.Damage(damageAmount);
+}
+```
+
+**개념 설명:**
+
+- **중개 함수 (Wrapper Function)**:
+  - Unit 클래스가 데미지를 직접 받고, 내부적으로 HealthSystem에 전달
+  - 외부에서는 Unit에게만 데미지를 주면 됨 → HealthSystem 존재를 몰라도 됨
+- **매개변수로 데미지 전달**:
+  - 받은 `damageAmount`를 그대로 HealthSystem에 전달
+  - 유연성: 다양한 데미지 양 처리 가능
+
+---
+
+## 4. ShootAction과 연동하기
+
+### ShootAction에서 Damage 호출 수정
+
+```csharp
+// ShootAction.cs의 Shoot 함수 내부
+targetUnit.Damage(40);  // 40 데미지 전달
+```
+
+**개념 설명:**
+
+- **고정 데미지 값**:
+  - 현재는 간단하게 40으로 설정
+  - 3번 맞으면 죽음 (100 체력 ÷ 40 ≈ 2.5회)
+- **향후 확장 가능성**:
+  - 무기 종류에 따라 다른 데미지 (예: 권총 40, 샷건 80)
+  - 무기 시스템 추가 시 유연하게 대응 가능
+
+### 테스트 결과
+
+1. **첫 번째 사격**: 체력 100 → 60 (40 데미지)
+2. **두 번째 사격**: 체력 60 → 20 (40 데미지)
+3. **세 번째 사격**: 체력 20 → 0 (40 데미지, 하한선 적용)
+
+**문제점 발견**:
+
+- 체력이 0이 되어도 유닛이 죽지 않음
+- 화면에 그대로 남아있고 아무 일도 일어나지 않음
+
+---
+
+## 5. 죽음 처리와 이벤트 시스템
+
+### Die 함수 추가 (초기 버전)
+
+```csharp
+public void Damage(int damageAmount)
+{
+    health -= damageAmount;
+
+    if (health < 0)
+    {
+        health = 0;
+    }
+
+    // 체력이 0이면 죽음 처리
+    if (health == 0)
+    {
+        Die();
+    }
+
+    Debug.Log(health);
+}
+
+private void Die()
+{
+    // 이 GameObject 파괴
+    Destroy(gameObject);
+}
+```
+
+**개념 설명:**
+
+- **Die() 함수**: 유닛이 죽을 때 실행되는 로직
+- **Destroy(gameObject)**:
+  - 현재 GameObject를 씬에서 제거
+  - 메모리에서도 해제됨
+
+### 문제점: 하드코딩된 동작
+
+**하드코딩이란?**
+
+- 특정 동작이 코드에 직접 작성되어 있어 변경이 어려운 상태
+- 예: `Destroy(gameObject)`가 Die 함수에 직접 들어있음
+
+**문제점:**
+
+- HealthSystem을 다른 용도로 재사용하기 어려움
+- 예시:
+  - 상자: 죽으면 아이템 드롭
+  - 벽: 죽으면 폭발 이펙트
+  - 보스: 죽으면 컷신 재생
+- 모든 경우에 `Destroy(gameObject)`만 실행되면 안 됨
+
+### 이벤트 시스템으로 해결
+
+```csharp
+using System;  // EventHandler 사용을 위해 필요
+
+public class HealthSystem : MonoBehaviour
+{
+    // 죽음 이벤트 선언
+    public event EventHandler OnDead;
+
+    [SerializeField] private int health = 100;
+
+    public void Damage(int damageAmount)
+    {
+        health -= damageAmount;
+
+        if (health < 0)
+        {
+            health = 0;
+        }
+
+        if (health == 0)
+        {
+            Die();
+        }
+
+        Debug.Log(health);
+    }
+
+    private void Die()
+    {
+        // 이벤트 발생 (구독자들에게 알림)
+        OnDead?.Invoke(this, EventArgs.Empty);
+    }
+}
+```
+
+**개념 설명:**
+
+**이벤트 (Event)란?**
+
+- 특정 상황이 발생했을 때 다른 코드들에게 알려주는 시스템
+- 구독 (Subscribe): 이벤트가 발생하면 내 함수를 실행해달라고 등록
+- 발행 (Invoke): 이벤트를 실제로 발생시켜 구독자들에게 알림
+
+**EventHandler:**
+
+- C#에서 제공하는 표준 이벤트 타입
+- `(object sender, EventArgs e)` 형식의 매개변수를 가진 함수들을 연결 가능
+
+**OnDead?.Invoke():**
+
+- `?.`: Null 조건 연산자
+  - 구독자가 있으면 Invoke 실행
+  - 구독자가 없으면 아무것도 안 함 (오류 방지)
+- `Invoke(this, EventArgs.Empty)`:
+  - `this`: 이벤트를 발생시킨 객체 (HealthSystem 자신)
+  - `EventArgs.Empty`: 추가 정보 없음
+
+### Unit에서 이벤트 구독하기
+
+```csharp
+public class Unit : MonoBehaviour
+{
+    private HealthSystem healthSystem;
+
+    private void Awake()
+    {
+        healthSystem = GetComponent<HealthSystem>();
+    }
+
+    private void Start()
+    {
+        // ... 기존 코드들 ...
+
+        // HealthSystem의 OnDead 이벤트 구독
+        healthSystem.OnDead += HealthSystem_OnDead;
+    }
+
+    // 이벤트 핸들러 함수
+    private void HealthSystem_OnDead(object sender, EventArgs e)
+    {
+        // 유닛이 죽었을 때 실행될 로직
+        Destroy(gameObject);
+    }
+}
+```
+
+**개념 설명:**
+
+**이벤트 구독 (`+=`):**
+
+- `healthSystem.OnDead += HealthSystem_OnDead`
+- "OnDead 이벤트가 발생하면 HealthSystem_OnDead 함수를 실행해줘"라는 의미
+- 여러 함수를 구독할 수 있음 (모두 실행됨)
+
+**명명 규칙:**
+
+- `HealthSystem_OnDead`:
+  - 어떤 객체의 어떤 이벤트를 처리하는지 명확히 표현
+  - `클래스명_이벤트명` 형식
+
+**Start() vs Awake():**
+
+- Awake(): 컴포넌트 참조 가져오기
+- Start(): 이벤트 구독, 초기화
+- Start()에서 구독하는 이유: 다른 객체들이 모두 준비된 후 연결
+
+### 이벤트 시스템의 장점
+
+**재사용성:**
+
+- HealthSystem은 죽음만 알림
+- 실제 동작은 각 객체가 자유롭게 정의
+- 예시:
+
+  ```csharp
+    // 상자의 경우
+    private void HealthSystem_OnDead(object sender, EventArgs e)
+    {
+        DropLoot();        // 아이템 드롭
+        PlayBreakSound();  // 부서지는 소리
+        Destroy(gameObject);
+    }
+
+    // 보스의 경우
+    private void HealthSystem_OnDead(object sender, EventArgs e)
+    {
+        StartCutscene();   // 컷신 시작
+        UnlockAchievement();
+        SpawnLoot();
+    }
+  ```
+
+**유지보수성:**
+
+- HealthSystem 수정 없이 죽음 동작 변경 가능
+- 새로운 기능 추가가 쉬움
+
+---
+
+## 6. 그리드 시스템 정리하기
+
+### 문제 상황
+
+유닛이 죽으면 GameObject는 파괴되지만, LevelGrid 시스템에는 여전히 참조가 남아있음:
+
+- 디버그 객체에 `null` 참조 에러 발생
+- 그리드 시스템의 데이터 불일치
+
+### 그리드에서 유닛 제거
+
+```csharp
+private void HealthSystem_OnDead(object sender, EventArgs e)
+{
+    // 1. 그리드 시스템에서 이 유닛 제거
+    LevelGrid.Instance.RemoveUnitAtGridPosition(gridPosition, this);
+
+    // 2. GameObject 파괴
+    Destroy(gameObject);
+}
+```
+
+**개념 설명:**
+
+**RemoveUnitAtGridPosition:**
+
+- 그리드 시스템에 "이 위치에서 이 유닛을 제거해줘"라고 요청
+- 매개변수:
+  - `gridPosition`: 유닛이 있던 그리드 좌표
+  - `this`: 제거할 유닛 객체 (자기 자신)
+
+**순서의 중요성:**
+
+1. **먼저** 그리드에서 제거
+2. **그 다음** GameObject 파괴
+
+- 반대로 하면: GameObject가 먼저 파괴되어 `this`가 무효화됨
+
+---
+
+## 7. 메모리 누수 방지: 이벤트 구독 해제
+
+### 문제 발견
+
+유닛이 죽은 후 다른 유닛을 선택하면 에러 발생:
+
+- **에러 위치**: UnitSelectedVisual 스크립트
+- **에러 내용**: MeshRenderer가 null
+- **원인**: GameObject는 파괴되었지만 이벤트 구독은 여전히 살아있음
+
+### 문제 상황 분석
+
+```
+[유닛 A 생성]
+  ↓
+[UnitSelectedVisual이 이벤트 구독]
+  UnitActionsSystem.OnSelectedUnitChanged += UpdateVisual
+  ↓
+[유닛 A 죽음]
+  GameObject 파괴 → MeshRenderer 파괴
+  하지만 이벤트 구독은 여전히 활성화!
+  ↓
+[다른 유닛 B 선택]
+  OnSelectedUnitChanged 이벤트 발생
+  → 죽은 유닛 A의 UpdateVisual도 호출됨
+  → meshRenderer는 이미 파괴됨
+  → NULL 참조 에러!
+```
+
+**메모리 누수 (Memory Leak):**
+
+- 더 이상 사용하지 않는 객체가 메모리에 남아있는 현상
+- 이벤트 구독은 객체가 파괴되어도 자동으로 해제되지 않음
+- 시간이 지나면 메모리 낭비 및 예상치 못한 버그 발생
+
+### OnDestroy 함수로 해결
+
+```csharp
+public class UnitSelectedVisual : MonoBehaviour
+{
+    [SerializeField] private Unit unit;
+    private MeshRenderer meshRenderer;
+
+    private void Start()
+    {
+        // 이벤트 구독
+        UnitActionsSystem.Instance.OnSelectedUnitChanged += UnitActionsSystem_OnSelectedUnitChanged;
+        UpdateVisual();
+    }
+
+    private void UnitActionsSystem_OnSelectedUnitChanged(object sender, EventArgs empty)
+    {
+        UpdateVisual();
+    }
+
+    private void UpdateVisual()
+    {
+        if (UnitActionsSystem.Instance.GetSelectedUnit() == unit)
+        {
+            meshRenderer.enabled = true;
+        }
+        else
+        {
+            meshRenderer.enabled = false;
+        }
+    }
+
+    // GameObject가 파괴될 때 자동 호출되는 함수
+    private void OnDestroy()
+    {
+        // 이벤트 구독 해제
+        UnitActionsSystem.Instance.OnSelectedUnitChanged -= UnitActionsSystem_OnSelectedUnitChanged;
+    }
+}
+```
+
+**개념 설명:**
+
+**OnDestroy():**
+
+- Unity의 생명주기 함수 (MonoBehaviour에 내장)
+- GameObject가 파괴될 때 자동으로 호출됨
+- 정리(cleanup) 작업에 사용
+
+**이벤트 구독 해제 (`-=`):**
+
+- `+=`로 구독했던 함수를 제거
+- "더 이상 이 이벤트에 대해 알려주지 않아도 돼"라는 의미
+- 구독할 때와 정확히 같은 함수 이름 사용
+
+**동작 흐름:**
+
+```
+[유닛 A 생성]
+  Start(): 이벤트 구독 (+= 연산자)
+  ↓
+[유닛 A 죽음]
+  Destroy(gameObject) 호출
+  → Unity가 자동으로 OnDestroy() 호출
+  → 이벤트 구독 해제 (-= 연산자)
+  ↓
+[다른 유닛 B 선택]
+  OnSelectedUnitChanged 이벤트 발생
+  → 유닛 A의 함수는 더 이상 호출되지 않음
+  → 에러 없음!
+```
+
+### 이벤트 구독/해제 패턴
+
+**올바른 패턴:**
+
+```csharp
+// 구독
+private void Start()
+{
+    EventSource.OnEvent += EventHandler;
+}
+
+// 해제
+private void OnDestroy()
+{
+    EventSource.OnEvent -= EventHandler;
+}
+```
+
+**주의사항:**
+
+- 구독과 해제는 항상 **쌍**으로!
+- 구독만 하고 해제 안 하면 메모리 누수
+- 같은 함수 이름으로 구독/해제
+
+### 최종 테스트
+
+1. **적 사격**: 유닛이 죽고 화면에서 사라짐
+2. **다른 유닛 선택**: 정상적으로 선택 표시 나타남
+3. **에러 없음**: 콘솔에 아무 에러도 표시되지 않음
+4. **이동 가능**: 남은 유닛들이 정상 작동
+
+---
+
+## 🎓 핵심 개념 정리
+
+### 1. HealthSystem의 설계 철학
+
+**재사용 가능한 컴포넌트:**
+
+- 유닛뿐만 아니라 상자, 벽, 차량 등 모든 것에 적용 가능
+- 특정 동작을 하드코딩하지 않음
+- 이벤트로 알림만 하고, 구체적인 동작은 각 객체가 결정
+
+**단일 책임 원칙:**
+
+- HealthSystem: 체력 관리와 죽음 감지만 담당
+- Unit: 게임 로직과 상호작용 처리
+- UnitSelectedVisual: 시각적 표현만 담당
+
+### 2. 이벤트 시스템의 이해
+
+**이벤트의 3요소:**
+
+1. **발행자 (Publisher)**: 이벤트를 발생시키는 객체 (HealthSystem)
+2. **이벤트 (Event)**: 특정 상황 발생을 알림 (OnDead)
+3. **구독자 (Subscriber)**: 이벤트에 반응하는 객체 (Unit, UnitSelectedVisual)
+
+**이벤트의 장점:**
+
+- 느슨한 결합 (Loose Coupling): 객체들이 서로를 직접 참조하지 않음
+- 확장성: 새로운 구독자 추가가 쉬움
+- 재사용성: 같은 이벤트를 다양한 상황에서 활용
+
+### 3. 메모리 관리
+
+**구독/해제 패턴:**
+
+- 구독: `+=` 연산자 사용, Start()에서 실행
+- 해제: `=` 연산자 사용, OnDestroy()에서 실행
+- 항상 쌍으로 관리하여 메모리 누수 방지
+
+**Unity 생명주기:**
+
+```
+Awake() → 컴포넌트 참조 가져오기
+  ↓
+Start() → 이벤트 구독, 초기화
+  ↓
+Update() → 매 프레임 로직
+  ↓
+OnDestroy() → 정리 작업, 이벤트 구독 해제
+```
+
+### 4. 데미지 전달 체인
+
+```
+ShootAction.Damage(40)
+  ↓
+Unit.Damage(40)
+  ↓
+HealthSystem.Damage(40)
+  ↓
+health -= 40
+  ↓
+if (health == 0) → Die()
+  ↓
+OnDead?.Invoke()
+  ↓
+Unit.HealthSystem_OnDead()
+  ↓
+LevelGrid.RemoveUnit() + Destroy(gameObject)
+```
+
+---
+
+## 🔧 현재 시스템의 한계와 개선점
+
+**현재 시스템:**
+
+- 유닛이 죽으면 단순히 사라짐
+- 시각적으로 만족스럽지 않음
+
+**다음 강의 예고:**
+
+- 래그돌 (Ragdoll) 시스템 추가
+- 유닛이 죽을 때 물리 기반 애니메이션 적용
+- 더 만족스러운 죽음 연출
+
+---
+
+# { 🎮 Unity 래그돌(Ragdoll) 시스템 만들기 }
+
+이번 강의는 유닛이 죽을 때 자연스럽게 쓰러지는 래그돌 효과를 만들고, 물리 기반 폭발 효과를 추가하는 전체 과정을 다룹니다.
+
+---
+
+## 📋 목차
+
+1. [래그돌(Ragdoll) 개념 이해하기](https://claude.ai/chat/f8ef06b4-2c9b-4369-8676-ad271aab2582#1-%EB%9E%98%EA%B7%B8%EB%8F%8Cragdoll-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Unit Ragdoll 프리팹 준비하기](https://claude.ai/chat/f8ef06b4-2c9b-4369-8676-ad271aab2582#2-unit-ragdoll-%ED%94%84%EB%A6%AC%ED%8C%B9-%EC%A4%80%EB%B9%84%ED%95%98%EA%B8%B0)
+3. [Unity Ragdoll Wizard 사용하기](https://claude.ai/chat/f8ef06b4-2c9b-4369-8676-ad271aab2582#3-unity-ragdoll-wizard-%EC%82%AC%EC%9A%A9%ED%95%98%EA%B8%B0)
+4. [래그돌 테스트 및 문제 해결하기](https://claude.ai/chat/f8ef06b4-2c9b-4369-8676-ad271aab2582#4-%EB%9E%98%EA%B7%B8%EB%8F%8C-%ED%85%8C%EC%8A%A4%ED%8A%B8-%EB%B0%8F-%EB%AC%B8%EC%A0%9C-%ED%95%B4%EA%B2%B0%ED%95%98%EA%B8%B0)
+5. [UnitRagdollSpawner 스크립트 만들기](https://claude.ai/chat/f8ef06b4-2c9b-4369-8676-ad271aab2582#5-unitragdollspawner-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+6. [적 유닛용 래그돌 Variant 만들기](https://claude.ai/chat/f8ef06b4-2c9b-4369-8676-ad271aab2582#6-%EC%A0%81-%EC%9C%A0%EB%8B%9B%EC%9A%A9-%EB%9E%98%EA%B7%B8%EB%8F%8C-variant-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+7. [래그돌 포즈 매칭 시스템 구현하기](https://claude.ai/chat/f8ef06b4-2c9b-4369-8676-ad271aab2582#7-%EB%9E%98%EA%B7%B8%EB%8F%8C-%ED%8F%AC%EC%A6%88-%EB%A7%A4%EC%B9%AD-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+8. [물리 폭발 효과 추가하기](https://claude.ai/chat/f8ef06b4-2c9b-4369-8676-ad271aab2582#8-%EB%AC%BC%EB%A6%AC-%ED%8F%AD%EB%B0%9C-%ED%9A%A8%EA%B3%BC-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. 래그돌(Ragdoll) 개념 이해하기
+
+### 래그돌이란?
+
+- **Ragdoll(래그돌)**: 캐릭터가 죽거나 쓰러질 때 물리 엔진을 활용해 자연스럽게 넘어지는 효과
+- 기존 문제점: 유닛이 죽으면 게임 오브젝트가 그냥 사라짐 (Destroy됨)
+- 개선 목표: 죽을 때 물리 법칙에 따라 자연스럽게 쓰러지도록 만들기
+
+### 래그돌의 구성 요소
+
+1. **Colliders(충돌체)**: 각 신체 부위마다 물리적 충돌을 감지하는 콜라이더
+2. **Rigidbody(강체)**: 중력과 물리력을 받는 물리 컴포넌트
+3. **Character Joints(캐릭터 조인트)**: 뼈대들을 연결하고 관절의 움직임을 제한하는 컴포넌트
+
+---
+
+## 2. Unit Ragdoll 프리팹 준비하기
+
+### 기존 Unit 프리팹 복제하기
+
+**단계:**
+
+1. Unit 베이스 프리팹 선택
+2. **Ctrl + D** 누르거나 **Edit > Duplicate** 선택
+3. 이름을 **"Unit Ragdoll"** 로 변경
+
+### 불필요한 컴포넌트 제거하기
+
+래그돌은 순수 비주얼만 필요하므로 로직 컴포넌트들을 모두 제거:
+
+**제거할 컴포넌트들:**
+
+- **Unit 스크립트**: 게임 로직 담당
+- **Pathfinder**: 경로 찾기 시스템
+- **모든 Action 스크립트들**: 유닛의 행동 제어
+- **Animator**: 애니메이션 컨트롤러
+- **Health System**: 체력 관리 시스템
+- **Select Visual 게임 오브젝트**: 선택 표시 비주얼 (게임 오브젝트 자체를 삭제)
+
+### 무기(Weapon) 처리하기
+
+- 무기 게임 오브젝트를 **삭제하지 말고 비활성화(Disable)**만 하기
+- 이유: 나중에 래그돌 생성 후 다시 활성화할 예정
+
+**결과:**
+
+- 순수한 비주얼만 남은 유닛 프리팹 완성
+- Animator가 제거되어 애니메이션 없이 T-Pose 상태
+
+---
+
+## 3. Unity Ragdoll Wizard 사용하기
+
+### Ragdoll Wizard 열기
+
+**경로:**
+
+- **GameObject > 3D Object > Ragdoll**
+
+### Ragdoll Wizard 인터페이스
+
+- 각 필드는 캐릭터의 특정 뼈(Bone)를 지정하는 곳
+- 모든 필드를 채워야 올바른 래그돌이 생성됨
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380475/notion-blog/_/3D_/_/_5_Enemies_Combat_-_3/image.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380473/notion-blog/_/3D_/_/_5_Enemies_Combat_-_3/image_1.png)
+
+### 뼈대(Bone) 할당하기
+
+**중요:** 캐릭터의 뼈 이름이 Wizard의 필드명과 정확히 일치하지 않을 수 있으므로 적절히 매칭 필요
+
+### 핵심 뼈대 할당 목록:
+
+**1. Pelvis (골반)**
+
+- 캐릭터에서 찾을 이름: **Hips**
+
+**2. Left Hip (왼쪽 엉덩이)**
+
+- 캐릭터에서 찾을 이름: **Upper Leg Left**
+
+**3. Right Hip (오른쪽 엉덩이)**
+
+- 캐릭터에서 찾을 이름: **Upper Leg Right**
+
+**4. Left Knee (왼쪽 무릎)**
+
+- Upper Leg Left 안으로 들어가서 찾기
+- 캐릭터에서 찾을 이름: **Lower Leg Left**
+
+**5. Left Foot (왼쪽 발)**
+
+- 캐릭터에서 찾을 이름: **Ankle Left**
+
+**6. Right Knee (오른쪽 무릎)**
+
+- 캐릭터에서 찾을 이름: **Lower Leg Right**
+
+**7. Right Foot (오른쪽 발)**
+
+- 캐릭터에서 찾을 이름: **Ankle Right**
+
+**8. Left Arm (왼쪽 팔)**
+
+- Spine 안으로 들어가서 Left Clavicle 찾기
+- 캐릭터에서 찾을 이름: **Shoulder Left** (팔 윗부분)
+
+**9. Left Elbow (왼쪽 팔꿈치)**
+
+- 캐릭터에서 찾을 이름: **Left Elbow**
+- 시각적으로 확인 가능: 정확히 팔꿈치 위치에 뼈가 있음
+
+**10. Right Arm (오른쪽 팔)**
+
+- Right Clavicle 안에서 찾기
+- 캐릭터에서 찾을 이름: **Shoulder Right**
+
+**11. Right Elbow (오른쪽 팔꿈치)**
+
+- 캐릭터에서 찾을 이름: **Right Elbow**
+
+**12. Middle Spine (중간 척추)**
+
+- 여러 Spine이 있는 경우 **Spine 2** 선택
+
+**13. Head (머리)**
+
+- Neck 안으로 들어가서 찾기
+- 캐릭터에서 찾을 이름: **Head**
+
+### 래그돌 생성 전 중요 작업
+
+**⚠️ 무기(Weapon)를 반드시 비활성화한 상태에서 Create 버튼 클릭**
+
+**이유:**
+
+- 무기가 활성화된 상태로 래그돌을 생성하면
+- Wizard가 무기까지 포함한 큰 콜라이더를 만들어버림
+- 결과적으로 부정확한 물리 충돌 발생
+
+### 래그돌 생성하기
+
+1. 모든 뼈대 할당 완료
+2. 무기 비활성화 확인
+3. **Create** 버튼 클릭
+
+**생성 결과:**
+
+- 모든 뼈대에 자동으로 **Collider**와 **Character Joint** 추가됨
+- 부모 오브젝트를 선택하면 전체 구조를 한눈에 볼 수 있음
+
+### 무기 다시 활성화하기
+
+래그돌 생성 완료 후:
+
+1. Unit Ragdoll 프리팹 안으로 들어가기
+2. Weapon 게임 오브젝트 찾기
+3. **다시 활성화(Enable)**
+
+---
+
+## 4. 래그돌 테스트 및 문제 해결하기
+
+### 기본 테스트
+
+1. Scene View에서 나가기
+2. Unit Ragdoll Prefab 저장
+3. 씬에 Unit Ragdoll 프리팹을 드래그해서 배치
+4. **Play** 버튼 클릭
+
+**예상 결과:**
+
+- 래그돌이 바닥으로 자연스럽게 쓰러짐
+
+### 일반적인 문제와 해결 방법
+
+### 문제 1: 다리가 이상한 방향으로 굽어짐
+
+**해결 방법:**
+
+- Unit Ragdoll 프리팹 열기
+- 해당 다리 뼈의 Character Joint 컴포넌트 찾기
+- Joint Limits(관절 제한) 값들을 조정
+
+### 문제 2: 머리가 이상하게 움직임
+
+**원인:**
+
+- Neck의 Sphere Collider 크기가 너무 작음
+- Wizard가 기본적으로 매우 작은 반지름으로 생성
+
+**해결 방법:**
+
+1. Unit Ragdoll 프리팹 열기
+2. **Neck 게임 오브젝트** 선택
+3. **Sphere Collider** 컴포넌트 찾기
+4. **Radius(반지름)** 값을 크게 증가시키기
+   - 목표: 시각적 머리 크기와 비슷하게 맞추기
+5. 프리팹 저장하고 다시 테스트
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380473/notion-blog/_/3D_/_/_5_Enemies_Combat_-_3/image_2.png)
+
+**테스트 방법:**
+
+1. Unit Ragdoll을 수동으로 위로 올리기
+2. Play하면서 떨어지는 모습 관찰
+3. 머리가 자연스럽게 떨어지는지 확인
+
+### 추가 조정 가능한 요소들
+
+**Collider 조정:**
+
+- **Radius(반지름)**: 콜라이더의 크기
+- **Height(높이)**: Capsule Collider의 길이
+
+**Character Joint 조정:**
+
+- **Limits**: 관절이 움직일 수 있는 각도 범위
+- **Swing Axis**: 관절의 회전 축
+
+**일반 원칙:**
+
+- Humanoid(인간형) 캐릭터의 경우 대부분 자동으로 잘 작동함
+- 문제 발생 시 해당 부위의 콜라이더나 조인트만 미세 조정
+
+---
+
+## 5. UnitRagdollSpawner 스크립트 만들기
+
+### 스크립트 생성 및 연결
+
+**스크립트 생성:**
+
+1. 새 C# 스크립트 생성
+2. 이름: **UnitRagdollSpawner**
+
+**스크립트 연결:**
+
+- **Unit 프리팹**(기본 유닛)에 UnitRagdollSpawner 컴포넌트 추가
+- 적 프리팹이 아닌 기본 Unit 프리팹에 추가
+
+### 코드 구조 이해하기
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using System; // EventArgs 사용을 위해 필요
+
+public class UnitRagdollSpawner : MonoBehaviour
+{
+    // 래그돌 프리팹을 저장할 변수
+    [SerializeField] private Transform ragdollPrefab;
+
+    // 원본 캐릭터의 루트 뼈를 저장할 변수
+    // (나중에 포즈 매칭에 사용)
+    [SerializeField] private Transform originalRootBone;
+
+    // 체력 시스템 컴포넌트 참조
+    private HealthSystem healthSystem;
+
+    private void Awake()
+    {
+        // 같은 게임 오브젝트에 있는 HealthSystem 컴포넌트 가져오기
+        healthSystem = GetComponent<HealthSystem>();
+
+        // 유닛이 죽을 때 실행될 함수를 이벤트에 등록
+        healthSystem.OnDead += HealthSystem_OnDead;
+    }
+
+    // 유닛이 죽었을 때 호출되는 이벤트 핸들러
+    private void HealthSystem_OnDead(object sender, EventArgs e)
+    {
+        // 래그돌 생성:
+        // - 현재 유닛과 같은 위치(transform.position)
+        // - 현재 유닛과 같은 회전(transform.rotation)
+        Transform ragdollTransform = Instantiate(
+            ragdollPrefab,
+            transform.position,
+            transform.rotation
+        );
+
+        // 생성된 래그돌의 UnitRagdoll 컴포넌트 가져오기
+        UnitRagdoll unitRagdoll = ragdollTransform.GetComponent<UnitRagdoll>();
+
+        // 래그돌 설정 함수 호출
+        // (포즈 매칭을 위해 원본 루트 뼈 전달)
+        unitRagdoll.Setup(originalRootBone);
+    }
+}
+
+```
+
+### Inspector에서 설정하기
+
+**Unit 프리팹 열기:**
+
+1. Unit 프리팹 더블클릭
+2. UnitRagdollSpawner 스크립트 찾기
+
+**필드 할당:**
+
+1. **Ragdoll Prefab**: Unit Ragdoll 프리팹 드래그
+2. **Original Root Bone**: Unit의 Root 뼈 드래그
+   - 보통 계층 구조에서 "Root" 또는 최상위 뼈
+
+### 첫 테스트
+
+**테스트 전 준비:**
+
+- 씬에 있던 테스트용 Unit Ragdoll 제거
+
+**테스트:**
+
+1. Play 모드 진입
+2. Shoot Action 선택
+3. 적 유닛 클릭해서 사격
+4. 적이 죽으면 래그돌 생성되는지 확인
+
+**예상 결과:**
+
+- 적이 사라지지 않고 래그돌로 바뀌며 쓰러짐
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380473/notion-blog/_/3D_/_/_5_Enemies_Combat_-_3/image_3.png)
+
+---
+
+## 6. 적 유닛용 래그돌 Variant 만들기
+
+### 문제 상황
+
+- 적 유닛은 빨간색 재질(Material)을 사용
+- 하지만 래그돌은 플레이어용 파란색 재질로 생성됨
+- 결과: 적이 죽으면 색상이 갑자기 바뀌는 문제 발생
+
+### Prefab Variant 만들기
+
+**Prefab Variant란?**
+
+- 기존 프리팹을 기반으로 일부만 변경한 변형 프리팹
+- 원본 프리팹의 변경사항을 자동으로 상속받음
+
+**생성 방법:**
+
+1. Unit Ragdoll 프리팹 우클릭
+2. **Create > Prefab Variant** 선택
+3. 이름: **Unit Ragdoll Enemy**
+
+### 적 재질 적용하기
+
+**단계:**
+
+1. Unit Ragdoll Enemy 프리팹 열기
+2. **Character** 게임 오브젝트 찾기
+3. **Skinned Mesh Renderer** 컴포넌트 선택
+4. **Materials** 섹션에서:
+   - Element 0을 적의 빨간색 재질로 변경
+   - 예: "texture_04" (빨간색 재질)
+
+### Unit Enemy 프리팹에 적용하기
+
+**Unit Enemy 프리팹 수정:**
+
+1. Unit Enemy 프리팹 열기
+   - Unit Enemy는 Unit 프리팹을 기반으로 만들어짐
+   - 따라서 UnitRagdollSpawner가 이미 있음
+2. UnitRagdollSpawner 컴포넌트 찾기
+3. **Ragdoll Prefab** 필드를:
+   - 기본 Unit Ragdoll → **Unit Ragdoll Enemy**로 변경
+
+### 테스트
+
+**확인 사항:**
+
+1. Play 모드 진입
+2. 적 사격
+3. 래그돌이 **빨간색**으로 생성되는지 확인
+
+---
+
+## 7. 래그돌 포즈 매칭 시스템 구현하기
+
+### 문제 상황
+
+- 래그돌이 T-Pose(팔을 벌린 기본 자세)로 생성됨
+- 실제 유닛이 죽기 직전의 포즈와 일치하지 않음
+- 부자연스러운 전환 효과
+
+### 해결 방법
+
+- 유닛의 모든 뼈(Bone)를 순회
+- 각 뼈의 위치(Position)와 회전(Rotation)을 래그돌의 뼈에 복사
+
+### UnitRagdoll 스크립트 만들기
+
+**스크립트 생성:**
+
+1. 새 C# 스크립트 생성
+2. 이름: **UnitRagdoll**
+
+**스크립트 연결:**
+
+- Unit Ragdoll 프리팹(기본)에 UnitRagdoll 컴포넌트 추가
+
+### Inspector 설정
+
+**Unit Ragdoll 프리팹 열기:**
+
+1. UnitRagdoll 스크립트 찾기
+2. **Ragdoll Root Bone** 필드에:
+   - 래그돌의 Root 뼈 드래그 (보통 "Root" 또는 최상위 뼈)
+
+### Setup 함수 이해하기
+
+```csharp
+public class UnitRagdoll : MonoBehaviour
+{
+    // 래그돌의 루트 뼈
+    [SerializeField] private Transform ragdollRootBone;
+
+    // UnitRagdollSpawner에서 호출하는 초기 설정 함수
+    public void Setup(Transform originalRootBone)
+    {
+        // 1단계: 모든 뼈의 포즈를 원본에서 래그돌로 복사
+        MatchAllChildTransforms(originalRootBone, ragdollRootBone);
+
+        // 2단계: 폭발 효과 적용 (나중에 구현)
+        ApplyExplosionToRagdoll(ragdollRootBone, 300f, transform.position, 10f);
+    }
+}
+
+```
+
+### 재귀 함수(Recursive Function) 개념
+
+**재귀 함수란?**
+
+- 자기 자신을 호출하는 함수
+- 복잡한 계층 구조를 처리할 때 유용
+
+**왜 재귀가 필요한가?**
+
+- 캐릭터의 뼈 구조는 여러 단계(레벨)의 자식들로 구성됨
+- 예시 계층:
+  ```
+    Root
+    ├─ Hips
+    │  ├─ Spine
+    │  │  ├─ Spine1
+    │  │  │  ├─ Spine2
+    │  │  │  │  ├─ Neck
+    │  │  │  │  │  └─ Head
+    │  ├─ Upper Leg Left
+    │  │  ├─ Lower Leg Left
+    │  │  │  └─ Ankle Left
+  ```
+- 단순 반복문으로는 한 단계만 처리 가능
+- 재귀 함수를 사용하면 모든 단계를 자동으로 처리
+
+### MatchAllChildTransforms 함수 상세 분석
+
+```csharp
+// root: 원본 유닛의 뼈
+// clone: 래그돌의 뼈
+private void MatchAllChildTransforms(Transform root, Transform clone)
+{
+    // root의 직접적인 자식들을 모두 순회
+    foreach (Transform child in root)
+    {
+        // clone에서 같은 이름의 자식을 찾기
+        // Find()는 자식들 중에서 이름이 일치하는 Transform을 반환
+        Transform cloneChild = clone.Find(child.name);
+
+        // 일치하는 자식을 찾았다면
+        if (cloneChild != null)
+        {
+            // 원본 뼈의 위치를 래그돌 뼈에 복사
+            cloneChild.position = child.position;
+
+            // 원본 뼈의 회전을 래그돌 뼈에 복사
+            cloneChild.rotation = child.rotation;
+
+            // ⭐ 재귀 호출: 이 자식의 자식들도 처리하기
+            // - child가 새로운 root가 됨
+            // - cloneChild가 새로운 clone이 됨
+            // - 이 과정이 자식이 없을 때까지 반복됨
+            MatchAllChildTransforms(child, cloneChild);
+        }
+    }
+}
+
+```
+
+### 재귀 함수 실행 흐름 예시
+
+**예시 구조:**
+
+```
+Root
+├─ Hips (1단계)
+│  └─ Spine (2단계)
+│     └─ Neck (3단계)
+
+```
+
+**실행 과정:**
+
+1. **첫 번째 호출**: `MatchAllChildTransforms(Root, RagdollRoot)`
+   - Hips를 찾아서 위치/회전 복사
+   - `MatchAllChildTransforms(Hips, RagdollHips)` 호출
+2. **두 번째 호출**: `MatchAllChildTransforms(Hips, RagdollHips)`
+   - Spine을 찾아서 위치/회전 복사
+   - `MatchAllChildTransforms(Spine, RagdollSpine)` 호출
+3. **세 번째 호출**: `MatchAllChildTransforms(Spine, RagdollSpine)`
+   - Neck을 찾아서 위치/회전 복사
+   - `MatchAllChildTransforms(Neck, RagdollNeck)` 호출
+4. **네 번째 호출**: `MatchAllChildTransforms(Neck, RagdollNeck)`
+   - Neck에는 자식이 없음 (또는 Head만 있음)
+   - foreach 종료
+   - 함수 종료
+
+**결과:**
+
+- 모든 레벨의 모든 뼈가 자동으로 처리됨
+- 복잡한 계층 구조를 간단한 코드로 처리 가능
+
+### 테스트
+
+1. Play 모드 진입
+2. 적 사격
+3. 래그돌이 **유닛이 죽기 직전 포즈 그대로** 생성되는지 확인
+
+**예상 결과:**
+
+- T-Pose가 아닌 자연스러운 포즈로 쓰러짐
+
+---
+
+## 8. 물리 폭발 효과 추가하기
+
+### 현재 문제점
+
+- 래그돌이 포즈는 정확하지만 바로 주저앉음
+- 현실감 부족: 총에 맞으면 뒤로 튕겨나가야 함
+
+### 목표
+
+- 래그돌의 모든 신체 부위에 폭발력(Explosion Force) 적용
+- 살짝 위로 튀어 오르고 뒤로 날아가는 효과
+
+### Unity의 AddExplosionForce 함수
+
+**기능:**
+
+- Rigidbody에 폭발 중심점에서 바깥쪽으로 힘을 가함
+- 게임에서 폭발, 충격 효과를 구현할 때 사용
+
+**파라미터:**
+
+1. **explosionForce**: 폭발의 힘 (float)
+2. **explosionPosition**: 폭발 중심 위치 (Vector3)
+3. **explosionRadius**: 영향 범위 (float)
+
+### ApplyExplosionToRagdoll 함수 구현
+
+```csharp
+// root: 현재 처리 중인 뼈
+// explosionForce: 폭발의 세기
+// explosionPosition: 폭발이 일어나는 위치
+// explosionRange: 폭발의 영향 범위
+private void ApplyExplosionToRagdoll(
+    Transform root,
+    float explosionForce,
+    Vector3 explosionPosition,
+    float explosionRange
+)
+{
+    // root의 모든 직접 자식들을 순회
+    foreach (Transform child in root)
+    {
+        // 이 자식이 Rigidbody 컴포넌트를 가지고 있는지 확인
+        // TryGetComponent는 컴포넌트가 있으면 true를 반환하고
+        // out 파라미터로 컴포넌트를 가져옴
+        if (child.TryGetComponent<Rigidbody>(out Rigidbody childRigidbody))
+        {
+            // Rigidbody에 폭발력 적용
+            childRigidbody.AddExplosionForce(
+                explosionForce,      // 힘의 세기
+                explosionPosition,   // 폭발 중심점
+                explosionRange       // 영향 범위
+            );
+        }
+
+        // ⭐ 재귀 호출: 이 자식의 자식들도 처리
+        // - 모든 신체 부위의 Rigidbody에 폭발력이 적용됨
+        // - 자식이 없을 때까지 계속 반복
+        ApplyExplosionToRagdoll(
+            child,              // 새로운 root
+            explosionForce,     // 같은 폭발 세기
+            explosionPosition,  // 같은 폭발 위치
+            explosionRange      // 같은 폭발 범위
+        );
+    }
+}
+
+```
+
+### Setup 함수에서 호출하기
+
+```csharp
+public void Setup(Transform originalRootBone)
+{
+    // 1단계: 포즈 매칭
+    MatchAllChildTransforms(originalRootBone, ragdollRootBone);
+
+    // 2단계: 폭발 효과 적용
+    ApplyExplosionToRagdoll(
+        ragdollRootBone,          // 래그돌의 루트 뼈
+        300f,                     // 폭발 세기 (조정 가능)
+        transform.position,       // 폭발 위치: 래그돌 발 아래
+        10f                       // 폭발 범위 (조정 가능)
+    );
+}
+
+```
+
+### 폭발 위치 선택
+
+**`transform.position` 사용 이유:**
+
+- 래그돌의 발 위치 (또는 중심 위치)
+- 간단하고 효과적인 방법
+
+**대안 방법 (더 복잡):**
+
+- 실제 총알이 맞은 위치 추적
+- 총알의 방향 벡터 활용
+- 더 정교한 물리 반응 구현
+
+**강의에서는 단순성을 위해 `transform.position` 사용**
+
+### 파라미터 값 조정하기
+
+**추천 시작 값:**
+
+- **explosionForce**: 300f
+- **explosionRange**: 10f
+
+**테스트:**
+
+1. 기본 값으로 테스트
+2. Play 모드에서 적 사격
+3. 래그돌이 살짝 튀어 오르며 쓰러지는지 확인
+
+**값을 크게 했을 때 (예: 2000f):**
+
+- 래그돌이 맵 밖으로 날아감
+- 과장된 효과
+
+**값을 작게 했을 때:**
+
+- 거의 움직임 없이 주저앉음
+- 지루한 효과
+
+**최종 추천:** 300f~500f 정도가 현실적
+
+### 완성된 전체 UnitRagdoll 코드
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class UnitRagdoll : MonoBehaviour
+{
+    // 래그돌의 루트 뼈 (Inspector에서 할당)
+    [SerializeField] private Transform ragdollRootBone;
+
+    // UnitRagdollSpawner에서 호출하는 초기화 함수
+    public void Setup(Transform originalRootBone)
+    {
+        // 1. 원본 유닛의 포즈를 래그돌에 복사
+        MatchAllChildTransforms(originalRootBone, ragdollRootBone);
+
+        // 2. 래그돌에 폭발 효과 적용
+        ApplyExplosionToRagdoll(ragdollRootBone, 300f, transform.position, 10f);
+    }
+
+    // 재귀적으로 모든 자식 Transform의 위치와 회전을 복사하는 함수
+    private void MatchAllChildTransforms(Transform root, Transform clone)
+    {
+        // root의 모든 직접 자식들을 순회
+        foreach (Transform child in root)
+        {
+            // clone에서 같은 이름의 자식 찾기
+            Transform cloneChild = clone.Find(child.name);
+
+            // 일치하는 자식이 있으면
+            if (cloneChild != null)
+            {
+                // 위치와 회전 복사
+                cloneChild.position = child.position;
+                cloneChild.rotation = child.rotation;
+
+                // 재귀 호출: 이 자식의 자식들도 처리
+                MatchAllChildTransforms(child, cloneChild);
+            }
+        }
+    }
+
+    // 재귀적으로 모든 Rigidbody에 폭발력을 적용하는 함수
+    private void ApplyExplosionToRagdoll(
+        Transform root,
+        float explosionForce,
+        Vector3 explosionPosition,
+        float explosionRange
+    )
+    {
+        // root의 모든 직접 자식들을 순회
+        foreach (Transform child in root)
+        {
+            // 자식이 Rigidbody를 가지고 있는지 확인
+            if (child.TryGetComponent<Rigidbody>(out Rigidbody childRigidbody))
+            {
+                // Rigidbody에 폭발력 추가
+                childRigidbody.AddExplosionForce(
+                    explosionForce,
+                    explosionPosition,
+                    explosionRange
+                );
+            }
+
+            // 재귀 호출: 이 자식의 자식들도 처리
+            ApplyExplosionToRagdoll(
+                child,
+                explosionForce,
+                explosionPosition,
+                explosionRange
+            );
+        }
+    }
+}
+
+```
+
+---
+
+## 🎯 최종 정리
+
+### 구현한 시스템 전체 흐름
+
+1. **유닛이 죽음** → HealthSystem의 OnDead 이벤트 발생
+2. **UnitRagdollSpawner**가 이벤트를 감지
+   - 유닛과 같은 위치/회전으로 래그돌 생성
+   - 원본 루트 뼈 정보를 Setup 함수에 전달
+3. **UnitRagdoll.Setup()** 실행
+   - **MatchAllChildTransforms()**: 모든 뼈의 포즈 복사
+   - **ApplyExplosionToRagdoll()**: 모든 신체 부위에 폭발력 적용
+4. **물리 시뮬레이션 시작**
+   - 중력 + 폭발력이 합쳐져 자연스럽게 쓰러짐
+
+### 핵심 개념 정리
+
+**1. 래그돌(Ragdoll)**
+
+- 캐릭터를 물리 시뮬레이션 기반으로 쓰러뜨리는 시스템
+- Collider + Rigidbody + Character Joint로 구성
+
+**2. Unity Ragdoll Wizard**
+
+- 자동으로 모든 신체 부위에 물리 컴포넌트 추가
+- 뼈대 구조에 맞게 관절 제한 설정
+
+**3. Prefab Variant**
+
+- 원본 프리팹을 상속받아 일부만 변경
+- 적/아군 같은 변형 제작에 유용
+
+**4. 재귀 함수(Recursive Function)**
+
+- 계층 구조를 가진 데이터 처리에 필수
+- 캐릭터의 복잡한 뼈 구조를 간단히 처리
+
+**5. AddExplosionForce()**
+
+- Unity의 내장 물리 함수
+- 자연스러운 충격 효과 구현
+
+### 추가 개선 가능 사항
+
+강의에서는 다루지 않았지만 더 발전시킬 수 있는 부분:
+
+1. **총알 방향 기반 폭발**
+   - 현재: 아래에서 위로 폭발
+   - 개선: 총알이 날아온 방향 반대로 날아가기
+2. **신체 부위별 다른 효과**
+   - 머리 맞으면 더 큰 충격
+   - 다리 맞으면 넘어지는 방향 다르게
+3. **래그돌 자동 제거**
+   - 일정 시간 후 자동 삭제
+   - 메모리 관리
+4. **사운드 효과**
+   - 쓰러지는 소리
+   - 바닥 충돌 소리
+
+---
+
+## ⚠️ 주의사항
+
+1. **무기 비활성화**: Ragdoll Wizard 실행 전 반드시 확인
+2. **콜라이더 크기**: 특히 머리 부분은 거의 항상 조정 필요
+3. **폭발 세기**: 너무 크면 맵 밖으로 날아감
+4. **프리팹 저장**: 변경 후 항상 저장 확인
+
+# { 🎮 유닛 체력바와 행동 포인트 UI 만들기 }
+
+이번 강의에서는 각 유닛 위에 월드 스페이스 캔버스를 사용해서 체력바와 행동 포인트를 표시하는 UI 시스템을 구축합니다.
+
+---
+
+## 📋 목차
+
+1. [월드 스페이스 캔버스 개념](https://claude.ai/chat/8ce402ef-2af9-4980-a059-a04978cb17de#1-%EC%9B%94%EB%93%9C-%EC%8A%A4%ED%8E%98%EC%9D%B4%EC%8A%A4-%EC%BA%94%EB%B2%84%EC%8A%A4-%EA%B0%9C%EB%85%90)
+2. [행동 포인트 텍스트 UI 만들기](https://claude.ai/chat/8ce402ef-2af9-4980-a059-a04978cb17de#2-%ED%96%89%EB%8F%99-%ED%8F%AC%EC%9D%B8%ED%8A%B8-%ED%85%8D%EC%8A%A4%ED%8A%B8-ui-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+3. [UnitWorldUI 스크립트 작성](https://claude.ai/chat/8ce402ef-2af9-4980-a059-a04978cb17de#3-unitworldui-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%9E%91%EC%84%B1)
+4. [카메라를 바라보는 LookAtCamera 스크립트](https://claude.ai/chat/8ce402ef-2af9-4980-a059-a04978cb17de#4-%EC%B9%B4%EB%A9%94%EB%9D%BC%EB%A5%BC-%EB%B0%94%EB%9D%BC%EB%B3%B4%EB%8A%94-lookatcamera-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8)
+5. [체력바 UI 만들기](https://claude.ai/chat/8ce402ef-2af9-4980-a059-a04978cb17de#5-%EC%B2%B4%EB%A0%A5%EB%B0%94-ui-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+6. [HealthSystem 스크립트 수정](https://claude.ai/chat/8ce402ef-2af9-4980-a059-a04978cb17de#6-healthsystem-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%88%98%EC%A0%95)
+7. [체력바 업데이트 연결](https://claude.ai/chat/8ce402ef-2af9-4980-a059-a04978cb17de#7-%EC%B2%B4%EB%A0%A5%EB%B0%94-%EC%97%85%EB%8D%B0%EC%9D%B4%ED%8A%B8-%EC%97%B0%EA%B2%B0)
+
+---
+
+## 1. 월드 스페이스 캔버스 개념
+
+### 캔버스의 두 가지 타입
+
+유니티에서 UI를 만들 때 사용하는 Canvas에는 크게 두 가지 렌더 모드가 있습니다:
+
+1. **Screen Space Overlay (스크린 스페이스 오버레이)**
+   - 기본 설정 모드
+   - 화면 전체에 걸쳐 표시되는 일반적인 UI
+   - 항상 화면 최상단에 렌더링됨
+   - 예: 메인 메뉴, HUD, 버튼 등
+2. **World Space (월드 스페이스)**
+   - 3D 공간 안에 존재하는 캔버스
+   - 게임 오브젝트처럼 위치, 회전, 크기 조정 가능
+   - 카메라와의 거리에 따라 크기가 변함
+   - 예: 캐릭터 체력바, 이름표, 상호작용 UI 등
+
+### 월드 스페이스 캔버스의 장점
+
+- UI 요소(Image, Text, Button 등)를 3D 공간에서 사용 가능
+- 게임 오브젝트에 직접 부착해서 따라다니게 할 수 있음
+- 각 유닛마다 독립적인 UI를 표시하기 완벽함
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380473/notion-blog/_/3D_/_/_5_Enemies_Combat_-_3/image_4.png)
+
+---
+
+## 2. 행동 포인트 텍스트 UI 만들기
+
+### 캔버스 생성 및 설정
+
+1. **Unit 프리팹 안에 캔버스 추가**
+   - Unit 프리팹을 엽니다
+   - UI → Canvas 생성
+   - 이름: `UnitWorldUI`
+2. **캔버스를 월드 스페이스로 변경**
+   - Canvas 컴포넌트의 **Render Mode**를 찾습니다
+   - 기본값인 "Screen Space - Overlay"를 **"World Space"**로 변경
+   - 이제 Transform 값을 조정할 수 있게 됩니다
+3. **캔버스 위치 조정**
+   - Position을 (0, 0, 0)으로 리셋
+   - Y축을 올려서 캐릭터 머리 위에 배치 (예: Y = 2.5)
+
+### 행동 포인트 텍스트 오브젝트 생성
+
+1. **TextMeshPro 텍스트 추가**
+   - UnitWorldUI 캔버스 안에 생성
+   - UI → Text - TextMeshPro
+   - 이름: `ActionPointsText`
+2. **텍스트 내용 및 스타일 설정**
+   - Text 필드에 숫자 입력 (예: "7")
+   - Font Style을 **Bold**로 변경 → 가독성 향상
+   - Font Size를 매우 작게 조정 (예: 0.5)
+     - 이유: 월드 스페이스 UI는 기본 크기가 매우 크기 때문
+3. **Transform 및 정렬 설정**
+   - Position을 (0, 0, 0)으로 리셋
+   - Rect Transform의 앵커를 중앙 하단으로 설정
+   - Text Wrapping 비활성화 (자동 줄바꿈 방지)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380474/notion-blog/_/3D_/_/_5_Enemies_Combat_-_3/image_5.png)
+
+---
+
+## 3. UnitWorldUI 스크립트 작성
+
+### 스크립트 생성 및 기본 구조
+
+```csharp
+using UnityEngine;
+using TMPro; // TextMeshPro를 사용하기 위한 네임스페이스
+
+public class UnitWorldUI : MonoBehaviour
+{
+    // UI 요소 참조
+    [SerializeField] private TextMeshProUGUI actionPointsText; // 행동 포인트를 표시할 텍스트
+    [SerializeField] private Unit unit; // 이 UI가 표시할 유닛
+
+    // Start는 게임 시작 시 한 번 실행
+    private void Start()
+    {
+        // 정적 이벤트 구독: 모든 유닛의 행동 포인트 변경을 감지
+        Unit.OnAnyActionPointsChanged += Unit_OnAnyActionPointsChanged;
+
+        // 초기 텍스트 업데이트
+        UpdateActionPointsText();
+    }
+
+    // 행동 포인트 텍스트를 업데이트하는 함수
+    private void UpdateActionPointsText()
+    {
+        // unit에서 현재 행동 포인트를 가져와서 문자열로 변환 후 텍스트에 표시
+        actionPointsText.text = unit.GetActionPoints().ToString();
+    }
+
+    // 이벤트 핸들러: 행동 포인트가 변경되었을 때 호출됨
+    private void Unit_OnAnyActionPointsChanged(object sender, EventArgs e)
+    {
+        UpdateActionPointsText(); // 텍스트 업데이트 함수 호출
+    }
+}
+```
+
+### 코드 상세 설명
+
+**1. using 선언부**
+
+```csharp
+using TMPro; // TextMeshPro 사용을 위한 네임스페이스
+```
+
+- TextMeshProUGUI 타입을 사용하려면 필수
+- TextMeshPro는 Unity의 기본 Text보다 성능과 품질이 우수
+
+**2. 필드 선언**
+
+```csharp
+[SerializeField] private TextMeshProUGUI actionPointsText;
+```
+
+- `[SerializeField]`: private 필드를 인스펙터에 노출
+- `TextMeshProUGUI`: UI Canvas에서 사용하는 TextMeshPro 컴포넌트 타입
+- 인스펙터에서 직접 연결 필요
+
+```csharp
+[SerializeField] private Unit unit;
+```
+
+- 이 UI가 표시할 대상 유닛
+- 행동 포인트 정보를 가져오기 위해 필요
+
+**3. 이벤트 구독**
+
+```csharp
+Unit.OnAnyActionPointsChanged += Unit_OnAnyActionPointsChanged;
+```
+
+- `Unit.OnAnyActionPointsChanged`: Unit 클래스의 정적(static) 이벤트
+- 정적 이벤트의 특징:
+  - 모든 유닛이 공유하는 이벤트
+  - 어떤 유닛이든 행동 포인트가 변경되면 모든 구독자에게 알림
+- `+=`: 이벤트 구독 연산자
+- `Unit_OnAnyActionPointsChanged`: 이벤트 발생 시 호출될 메서드
+
+**4. 정적 이벤트 사용의 장단점**
+
+장점:
+
+- 코드가 간단함
+- 이벤트 관리가 한 곳에서 이루어짐
+
+단점:
+
+- 모든 유닛의 UI가 업데이트됨 (약간의 성능 낭비)
+- 하지만 이 프로젝트에서는:
+  - 유닛 수가 적음 (수십 개 이하)
+  - 행동 포인트 변경이 자주 발생하지 않음
+  - 따라서 성능 문제 없음
+
+**5. ToString() 메서드**
+
+```csharp
+unit.GetActionPoints().ToString()
+```
+
+- `GetActionPoints()`: int 타입 반환
+- `.ToString()`: int를 string으로 변환
+- Text 컴포넌트는 string만 받으므로 변환 필수
+
+### 에디터에서 참조 연결
+
+1. Unit 프리팹의 UnitWorldUI 오브젝트 선택
+2. UnitWorldUI 스크립트 컴포넌트에서:
+   - **Action Points Text**: ActionPointsText 오브젝트 드래그
+   - **Unit**: 부모의 Unit 컴포넌트 드래그
+3. 프리팹 저장
+
+### 테스트 결과
+
+- 게임 시작 시 모든 유닛에 행동 포인트(예: 2) 표시됨
+- 유닛이 이동하면 행동 포인트 감소 (2 → 1 → 0)
+- 사격 등 다른 행동도 행동 포인트 차감
+
+---
+
+## 4. 카메라를 바라보는 LookAtCamera 스크립트
+
+### 문제점 인식
+
+현재 상태에서 UI 텍스트는 고정된 방향을 바라봅니다:
+
+- 카메라가 특정 각도에 있으면 텍스트가 읽기 어려움
+- 텍스트가 뒤집혀 보이거나 옆으로 보일 수 있음
+- 월드 스페이스 UI의 일반적인 문제점
+
+### 해결 방법: Billboard 효과
+
+Billboard 효과란 오브젝트가 항상 카메라를 향하도록 회전시키는 것:
+
+- 나무의 2D 스프라이트가 항상 카메라를 향하게 함
+- UI 요소가 항상 정면으로 보이게 함
+
+### LookAtCamera 스크립트 생성
+
+```csharp
+using UnityEngine;
+
+public class LookAtCamera : MonoBehaviour
+{
+    [SerializeField] private bool invert; // 반전 옵션
+    private Transform cameraTransform; // 카메라의 Transform 참조
+
+    // 초기화
+    private void Awake()
+    {
+        // Camera.main: 메인 카메라 찾기 (MainCamera 태그가 있는 카메라)
+        // .transform: Transform 컴포넌트 가져오기
+        cameraTransform = Camera.main.transform;
+    }
+
+    // LateUpdate: 모든 Update 이후 실행
+    private void LateUpdate()
+    {
+        if (invert)
+        {
+            // 반전 모드: 카메라 반대 방향을 바라봄
+
+            // 카메라까지의 방향 벡터 계산
+            Vector3 dirToCamera = (cameraTransform.position - transform.position).normalized;
+
+            // normalized: 방향만 유지하고 길이를 1로 만듦
+            // 예: (3, 0, 4) → (0.6, 0, 0.8)
+
+            // 현재 위치 + (카메라 방향의 반대) = 카메라 반대편을 바라봄
+            transform.LookAt(transform.position + dirToCamera * -1);
+
+        } else {
+            // 일반 모드: 카메라를 직접 바라봄
+            transform.LookAt(cameraTransform);
+        }
+    }
+}
+```
+
+### 코드 상세 설명
+
+**1. 카메라 Transform 캐싱**
+
+```csharp
+private Transform cameraTransform;
+cameraTransform = Camera.main.transform;
+```
+
+- `Camera.main`: Unity가 자동으로 찾는 메인 카메라
+  - "MainCamera" 태그가 있는 카메라를 반환
+- `.transform`: GameObject의 위치/회전/크기 정보
+- **캐싱하는 이유**:
+  - `Camera.main`은 매번 호출 시 카메라를 찾는 연산 수행
+  - Awake에서 한 번만 찾아서 저장하면 성능 향상
+  - LateUpdate는 매 프레임 실행되므로 최적화 중요
+
+**2. LateUpdate 사용 이유**
+
+```csharp
+private void LateUpdate()
+```
+
+- Unity의 실행 순서:
+  1. `Update()`: 모든 스크립트의 Update 실행
+  2. `LateUpdate()`: 모든 Update 이후 실행
+- 장점:
+  - 카메라가 Update에서 이동해도 문제없음
+  - 항상 카메라의 최종 위치를 기준으로 회전
+  - 실행 순서 문제 방지
+
+**3. transform.LookAt() 메서드**
+
+```csharp
+transform.LookAt(cameraTransform);
+```
+
+- Unity의 내장 메서드
+- 지정한 Transform을 향하도록 회전
+- Forward(Z축)가 타겟을 향하게 됨
+
+**4. 반전 로직의 필요성**
+
+처음 테스트 시 문제 발견:
+
+- 텍스트가 거꾸로 보임
+- LookAt이 Z축 방향을 타겟으로 향하게 하는데, UI는 반대편이 앞면
+
+해결 방법 - 반전 옵션:
+
+```csharp
+if (invert)
+{
+    // 카메라까지의 방향 계산
+    Vector3 dirToCamera = (cameraTransform.position - transform.position).normalized;
+
+    // 방향을 반대로 해서 LookAt
+    transform.LookAt(transform.position + dirToCamera * -1);
+}
+```
+
+**벡터 계산 설명**:
+
+```csharp
+Vector3 dirToCamera = (cameraTransform.position - transform.position).normalized;
+```
+
+- `cameraTransform.position`: 카메라 위치 (예: (10, 5, 10))
+- `transform.position`: 현재 오브젝트 위치 (예: (0, 2, 0))
+- 빼기 연산: (10, 5, 10) - (0, 2, 0) = (10, 3, 10)
+- `.normalized`: 방향만 유지, 길이 1로 정규화
+  - (10, 3, 10) → (0.74, 0.22, 0.74)
+
+```csharp
+transform.LookAt(transform.position + dirToCamera * -1);
+```
+
+- `dirToCamera * -1`: 방향 반대로 (카메라의 정반대)
+- `transform.position + (반대 방향)`: 카메라 반대편 지점
+- 그 지점을 바라봄 = 결과적으로 카메라를 향함 (UI 특성상)
+
+### 에디터 설정
+
+1. UnitWorldUI 오브젝트에 LookAtCamera 스크립트 추가
+2. **Invert 체크박스 활성화**
+   - 체크: 카메라 반대 방향 (UI가 제대로 보임)
+   - 체크 해제: 카메라를 직접 바라봄 (텍스트 반대로 보임)
+3. 프리팹 저장
+
+### 테스트 결과
+
+- 카메라를 어느 각도로 회전해도 텍스트가 항상 정면으로 보임
+- 유닛을 여러 각도에서 봐도 행동 포인트가 읽기 쉬움
+- Invert 체크/해제로 즉시 차이 확인 가능
+
+---
+
+## 5. 체력바 UI 만들기
+
+### 기본 구조 생성
+
+1. **Empty GameObject 생성**
+   - UnitWorldUI 안에 생성
+   - 이름: `HealthBar`
+   - 역할: 체력바 요소들의 컨테이너
+2. **크기 조정**
+   - Width: 1
+   - Height: 0.2
+   - 이유: 월드 스페이스에서 100 단위는 너무 큼
+
+### 배경(Background) 이미지 만들기
+
+1. **UI Image 추가**
+   - HealthBar 안에 생성
+   - 이름: `Background`
+2. **Rect Transform 설정**
+   - Anchor Presets: Stretch (모든 방향으로 늘어남)
+   - Left, Top, Right, Bottom 모두 0
+   - 결과: 부모를 꽉 채움
+3. **색상 및 외곽선 설정**
+   - Color: 어두운 회색 (예: RGB 50, 50, 50)
+   - Component → UI → Effects → **Outline** 추가
+     - Effect Distance: 0.05 (외곽선 두께)
+     - Alpha: 최대값 (완전 불투명)
+     - 결과: 체력바에 테두리 생김
+
+### 실제 체력바(Bar) 이미지 만들기
+
+1. **UI Image 추가**
+   - Background 안에 생성 (Background의 자식)
+   - 이름: `Bar`
+2. **Rect Transform 설정**
+   - Anchor Presets: Stretch
+   - Left, Top, Right, Bottom 모두 0
+3. **색상 설정**
+   - Color: 빨간색 (체력을 나타냄)
+
+### Image Component의 Filled 기능
+
+**문제점**: 일반 Image는 크기를 조절하면 늘어나거나 줄어듦
+
+**해결책**: Image의 **Filled** 기능 사용
+
+1. **소스 이미지 설정**
+   - Source Image에 스프라이트 할당 필요
+   - Unity 내장 스프라이트 사용: "UI/Skin/Knob" 또는 검색해서 "white" 찾기
+   - **white**: 1x1 픽셀 흰색 텍스처
+     - 흰색인 이유: Color Tint(색상 곱하기)와 완벽히 작동
+     - 빨간색으로 Tint하면 빨간색 바 생성
+2. **Image Type 변경**
+   - Simple → **Filled**로 변경
+   - 새로운 옵션들이 나타남
+3. **Fill Method 설정**
+   - Fill Method: **Horizontal** (가로로 채워짐)
+   - Fill Origin: **Left** (왼쪽에서 시작)
+4. **Fill Amount로 체력 표현**
+   - Fill Amount: 0.0 ~ 1.0 (정규화된 값)
+   - 0.0: 완전히 비어있음 (체력 0%)
+   - 0.5: 절반 채워짐 (체력 50%)
+   - 1.0: 완전히 채워짐 (체력 100%)
+   - 슬라이더로 실시간 테스트 가능
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380474/notion-blog/_/3D_/_/_5_Enemies_Combat_-_3/image_6.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380474/notion-blog/_/3D_/_/_5_Enemies_Combat_-_3/image_7.png)
+
+### 위치 조정
+
+- ActionPointsText를 오른쪽으로 이동
+- HealthBar를 왼쪽으로 이동
+- 결과: 체력바(좌) - 행동 포인트(우) 배치
+
+---
+
+## 6. HealthSystem 스크립트 수정
+
+### 필드 추가 및 초기화
+
+```csharp
+public class HealthSystem : MonoBehaviour
+{
+    public event EventHandler OnDead; // 사망 이벤트
+    public event EventHandler OnDamaged; // 데미지 받음 이벤트 (새로 추가)
+
+    [SerializeField] private int health = 100; // 현재 체력
+    private int healthMax; // 최대 체력 (새로 추가)
+
+    private void Awake()
+    {
+        // 게임 시작 시 현재 체력을 최대 체력으로 설정
+        healthMax = health;
+    }
+```
+
+**healthMax 필드의 필요성**:
+
+- 정규화된 값 계산에 필요
+- 예: 체력 60, 최대 체력 100 → 정규화 값 0.6 (60%)
+- 체력이 변해도 최대값은 유지되어야 함
+
+### 데미지 이벤트 추가
+
+```csharp
+public void Damage(int damageAmout)
+{
+    health -= damageAmout; // 체력 감소
+
+    if (health < 0)
+    {
+        health = 0; // 음수 방지
+    }
+
+    // 데미지를 받았음을 알림 (새로 추가)
+    OnDamaged?.Invoke(this, EventArgs.Empty);
+
+    if (health == 0)
+    {
+        Die(); // 체력이 0이면 사망
+    }
+
+    Debug.Log(health); // 디버깅용 로그
+}
+```
+
+**OnDamaged 이벤트의 역할**:
+
+- 체력이 변할 때마다 UI에 알림
+- `?.`(null 조건부 연산자): 구독자가 있을 때만 실행
+- UI가 이 이벤트를 구독해서 체력바 업데이트
+
+### GetHealthNormalized 함수 추가
+
+```csharp
+public float GetHealthNormalized()
+{
+    // 현재 체력을 최대 체력으로 나누어 0~1 사이 값 반환
+    return (float)health / healthMax;
+}
+```
+
+**중요한 형변환(Cast) 문제**:
+
+문제 상황:
+
+```csharp
+// 만약 health와 healthMax가 둘 다 int라면
+int health = 10;
+int healthMax = 100;
+return health / healthMax; // 결과는 0! (0.1이 아님)
+```
+
+원인:
+
+- int ÷ int = int (정수 나눗셈)
+- 10 ÷ 100 = 0.1이지만 int는 소수점 이하 버림
+- 0.1 → 0으로 변환됨
+
+해결책:
+
+```csharp
+return (float)health / healthMax;
+```
+
+- `(float)health`: health를 float으로 변환
+- float ÷ int = float (소수점 있는 나눗셈)
+- 10.0 ÷ 100 = 0.1 (정확한 결과)
+
+**정규화(Normalization)의 의미**:
+
+- 값을 0과 1 사이로 변환
+- UI의 Fill Amount가 0~1 사이 값을 요구하므로 필수
+- 예시:
+  - 체력 100/100 → 1.0 (꽉 참)
+  - 체력 50/100 → 0.5 (반)
+  - 체력 0/100 → 0.0 (빔)
+
+---
+
+## 7. 체력바 업데이트 연결
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380474/notion-blog/_/3D_/_/_5_Enemies_Combat_-_3/image_8.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380474/notion-blog/_/3D_/_/_5_Enemies_Combat_-_3/image_9.png)
+
+### UnitWorldUI 스크립트 확장
+
+```csharp
+using UnityEngine;
+using TMPro;
+using UnityEngine.UI; // Image 사용을 위해 추가
+
+public class UnitWorldUI : MonoBehaviour
+{
+    [SerializeField] private TextMeshProUGUI actionPointsText;
+    [SerializeField] private Unit unit;
+    [SerializeField] private Image healthBarImage; // 체력바 이미지 (새로 추가)
+    [SerializeField] private HealthSystem healthSystem; // HealthSystem 참조 (새로 추가)
+
+    private void Start()
+    {
+        // 행동 포인트 이벤트 구독
+        Unit.OnAnyActionPointsChanged += Unit_OnAnyActionPointsChanged;
+
+        // 데미지 이벤트 구독 (새로 추가)
+        healthSystem.OnDamaged += HealthSystem_OnDamaged;
+
+        // 초기 업데이트
+        UpdateActionPointsText();
+        UpdateHealthBar(); // 체력바 초기화 (새로 추가)
+    }
+
+    private void UpdateActionPointsText()
+    {
+        actionPointsText.text = unit.GetActionPoints().ToString();
+    }
+
+    private void Unit_OnAnyActionPointsChanged(object sender, EventArgs e)
+    {
+        UpdateActionPointsText();
+    }
+
+    // 체력바를 업데이트하는 함수 (새로 추가)
+    private void UpdateHealthBar()
+    {
+        // healthSystem에서 정규화된 체력 값(0~1)을 가져와서
+        // Image의 fillAmount에 할당
+        healthBarImage.fillAmount = healthSystem.GetHealthNormalized();
+    }
+
+    // 데미지 이벤트 핸들러 (새로 추가)
+    private void HealthSystem_OnDamaged(object sender, EventArgs e)
+    {
+        UpdateHealthBar(); // 데미지를 받을 때마다 체력바 업데이트
+    }
+}
+```
+
+### 코드 상세 설명
+
+**1. UnityEngine.UI 네임스페이스**
+
+```csharp
+using UnityEngine.UI;
+```
+
+- Image 컴포넌트 사용에 필요
+- Unity의 기본 UI 시스템
+
+**2. 체력바 이미지 참조**
+
+```csharp
+[SerializeField] private Image healthBarImage;
+```
+
+- Bar 오브젝트의 Image 컴포넌트
+- fillAmount 속성을 조작하기 위해 필요
+
+**3. HealthSystem 참조**
+
+```csharp
+[SerializeField] private HealthSystem healthSystem;
+```
+
+- Unit의 HealthSystem 컴포넌트
+- 체력 정보를 가져오고 이벤트를 구독하기 위해 필요
+
+**4. 이벤트 구독**
+
+```csharp
+healthSystem.OnDamaged += HealthSystem_OnDamaged;
+```
+
+- HealthSystem의 OnDamaged 이벤트 구독
+- 유닛이 데미지를 받을 때마다 호출됨
+- 체력이 변할 때 UI도 즉시 업데이트
+
+**5. fillAmount 속성**
+
+```csharp
+healthBarImage.fillAmount = healthSystem.GetHealthNormalized();
+```
+
+- `fillAmount`: Image의 채워진 정도 (0.0 ~ 1.0)
+- `GetHealthNormalized()`: 0~1 사이 값 반환
+- 직접 대입하면 체력바가 즉시 변화
+
+**6. 초기화의 중요성**
+
+```csharp
+UpdateHealthBar(); // Start()에서 호출
+```
+
+- 게임 시작 시 체력바가 제대로 채워지도록 함
+- 없으면 첫 데미지 전까지 체력바가 비어있을 수 있음
+
+### 에디터에서 참조 연결
+
+1. Unit 프리팹의 UnitWorldUI 스크립트에서:
+   - **Health Bar Image**: HealthBar/Bar 오브젝트의 Image 컴포넌트 드래그
+   - **Health System**: Unit의 HealthSystem 컴포넌트 드래그
+2. 프리팹 저장
+
+### Enemy 설정 복구
+
+테스트를 위해 이전에 Enemy의 체력을 10으로 낮췄다면:
+
+1. Enemy 프리팹 선택
+2. HealthSystem의 Health 값을 **100**으로 복구
+3. 이제 한 방에 죽지 않고 여러 번 쏴야 죽음
+
+### 최종 테스트 결과
+
+1. **게임 시작 시**:
+   - 모든 유닛의 체력바가 꽉 차있음
+   - 행동 포인트 표시됨
+2. **적 유닛 사격 시**:
+   - 데미지 40이라면 체력바가 60%로 줄어듦
+   - 한 번 더 쏘면 20%로
+   - 세 번째 사격으로 사망 (체력바 비어짐)
+3. **카메라 회전**:
+   - 어느 각도에서도 UI가 정면으로 보임
+   - 체력바와 행동 포인트 모두 읽기 쉬움
+4. **유닛 이동**:
+   - 행동 포인트가 실시간으로 감소
+   - 체력바는 데미지를 받지 않으면 그대로 유지

@@ -1,0 +1,2560 @@
+---
+title: '섹션 3: Dungeon Escape - 5'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { C++에서 컴포넌트 생성하기 - Lock 액터 만들기 }
+
+## 📚 강의 개요
+
+이 강의에서는 C++로 Lock(자물쇠) 액터 클래스를 만들고, 블루프린트가 아닌 **코드에서 직접 컴포넌트를 생성**하는 방법을 배웁니다.
+
+---
+
+## 🎯 왜 C++에서 컴포넌트를 만들까요?
+
+### 블루프린트 vs C++
+
+- **블루프린트에서 컴포넌트 생성**: 편집기에서 쉽게 추가 가능
+- **C++에서 컴포넌트 생성**: 코드 내에서 직접 접근 및 제어 가능
+
+**중요한 차이점**: 블루프린트에서 만든 컴포넌트는 C++ 코드에서 직접 제어하기 어렵습니다. 더 많은 통제권을 원한다면 C++에서 생성해야 합니다!
+
+---
+
+## 🔧 구현 과정
+
+### 1단계: 액터 태그 설정
+
+```cpp
+Tags.Add("Lock");
+```
+
+**왜 필요한가요?**
+
+- 나중에 이 액터가 자물쇠인지 확인할 때 사용
+- 상호작용 시스템에서 객체 타입을 빠르게 판별 가능
+
+---
+
+### 2단계: 필요한 헤더 파일 포함하기
+
+```cpp
+#include "Components/TriggerComponent.h"
+#include "Components/StaticMeshComponent.h"
+// SceneComponent는 기본 포함되어 있어서 별도로 include 불필요
+```
+
+**각 헤더의 역할**:
+
+- `TriggerComponent.h` → 트리거(충돌 감지) 컴포넌트 사용
+- `StaticMeshComponent.h` → 3D 메시 표시 컴포넌트 사용
+
+---
+
+### 3단계: 헤더 파일에서 컴포넌트 선언
+
+```cpp
+UPROPERTY(VisibleAnywhere)
+USceneComponent* RootComp;
+
+UPROPERTY(VisibleAnywhere)
+UTriggerComponent* TriggerComp;
+
+UPROPERTY(VisibleAnywhere)
+UStaticMeshComponent* KeyItemMesh;
+```
+
+**코드 분석**:
+
+- `UPROPERTY(VisibleAnywhere)`: 에디터의 Details 패널에서 볼 수 있게 만듦
+- (포인터): 컴포넌트는 항상 포인터로 선언
+- 각 변수명은 컴포넌트의 역할을 명확히 표현
+
+**세 가지 컴포넌트의 역할**:
+
+1. **RootComp** (Scene Component): 다른 컴포넌트들을 붙일 뿌리
+2. **TriggerComp** (Trigger Component): 플레이어가 가까이 왔을 때 감지
+3. **KeyItemMesh** (Static Mesh Component): 열쇠 아이템의 3D 모델 표시
+
+---
+
+### 4단계: 생성자에서 컴포넌트 생성하기
+
+### 📌 CreateDefaultSubobject 함수 이해하기
+
+```cpp
+CreateDefaultSubobject<컴포넌트타입>(TEXT("컴포넌트 이름"))
+```
+
+이 함수는:
+
+- 새로운 컴포넌트 객체를 **생성**
+- 해당 컴포넌트의 **포인터를 반환**
+- 블루프린트에서 보이는 이름을 지정
+
+---
+
+### ① Root Component 생성
+
+```cpp
+RootComp = CreateDefaultSubobject<USceneComponent>(TEXT("Root Comp"));
+SetRootComponent(RootComp);
+```
+
+**단계별 설명**:
+
+1. `USceneComponent` 타입의 컴포넌트 생성
+2. 블루프린트에서 "Root Comp"라는 이름으로 표시
+3. `SetRootComponent()`로 이 컴포넌트를 **루트로 지정**
+
+**루트 컴포넌트란?**
+
+- 액터의 최상위 컴포넌트
+- 다른 모든 컴포넌트가 여기에 붙음
+- 액터의 위치/회전/크기 기준점
+
+---
+
+### ② Trigger Component 생성 및 연결
+
+```cpp
+TriggerComp = CreateDefaultSubobject<UTriggerComponent>(TEXT("Trigger Comp"));
+TriggerComp->SetupAttachment(RootComp);
+```
+
+**단계별 설명**:
+
+1. `UTriggerComponent` 타입 생성
+2. `SetupAttachment()`로 RootComp에 **부착**
+
+**SetupAttachment의 의미**:
+
+- 블루프린트에서 컴포넌트를 드래그해서 다른 컴포넌트 아래에 넣는 것과 동일
+- 부모-자식 관계 형성
+- 부모가 움직이면 자식도 함께 움직임
+
+---
+
+### ③ Static Mesh Component 생성 및 연결
+
+```cpp
+KeyItemMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Key Item Mesh"));
+KeyItemMesh->SetupAttachment(RootComp);
+```
+
+**이 메시의 용도**:
+
+- 처음에는 **보이지 않음** (숨김 상태)
+- 플레이어가 열쇠를 자물쇠에 놓으면 **나타남**
+- 시각적 피드백 제공
+
+---
+
+## 🎨 컴포넌트 계층 구조
+
+생성한 컴포넌트들의 관계를 트리로 표현하면:
+
+```
+RootComp (SceneComponent) ← 루트
+├── TriggerComp (TriggerComponent)
+└── KeyItemMesh (StaticMeshComponent)
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### CreateDefaultSubobject의 3단계
+
+1. **선언**: 헤더 파일에서 포인터 변수 선언
+2. **생성**: 생성자에서 `CreateDefaultSubobject<>()` 호출
+3. **연결**: `SetupAttachment()` 또는 `SetRootComponent()` 사용
+
+### 포인터를 사용하는 이유
+
+```cpp
+USceneComponent* RootComp;  // 포인터 (*)
+```
+
+- `CreateDefaultSubobject()`가 **메모리 주소를 반환**하기 때문
+- 언리얼의 모든 컴포넌트는 동적으로 생성되므로 포인터 필요
+
+### UPROPERTY의 의미
+
+```cpp
+UPROPERTY(VisibleAnywhere)
+```
+
+- 언리얼 에디터와 C++ 코드를 연결하는 매크로
+- `VisibleAnywhere`: 모든 곳에서 볼 수 있지만 편집은 불가
+- 블루프린트 Details 패널에 표시됨
+
+---
+
+## ✅ 완성된 코드 전체 흐름
+
+```cpp
+// 1. 헤더 파일에서 선언
+UPROPERTY(VisibleAnywhere)
+USceneComponent* RootComp;
+
+UPROPERTY(VisibleAnywhere)
+UTriggerComponent* TriggerComp;
+
+UPROPERTY(VisibleAnywhere)
+UStaticMeshComponent* KeyItemMesh;
+
+// 2. 생성자에서 생성 및 연결
+ALock::ALock()
+{
+    // Root 생성 및 설정
+    RootComp = CreateDefaultSubobject<USceneComponent>(TEXT("Root Comp"));
+    SetRootComponent(RootComp);
+
+    // Trigger 생성 및 Root에 부착
+    TriggerComp = CreateDefaultSubobject<UTriggerComponent>(TEXT("Trigger Comp"));
+    TriggerComp->SetupAttachment(RootComp);
+
+    // Mesh 생성 및 Root에 부착
+    KeyItemMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Key Item Mesh"));
+    KeyItemMesh->SetupAttachment(RootComp);
+
+    // 태그 추가
+    Tags.Add("Lock");
+}
+```
+
+---
+
+## 🎓 다음 단계
+
+강의에서는 이 C++ 클래스를 기반으로 **블루프린트를 생성**하는 방법을 배울 예정입니다. C++로 기본 구조를 만들고, 블루프린트에서 세부 설정(메시 선택, 트리거 크기 등)을 조정하는 **하이브리드 방식**을 사용합니다.
+
+---
+
+## 🔑 기억해야 할 핵심
+
+1. **C++에서 컴포넌트를 만들면** → 코드에서 직접 제어 가능
+2. **CreateDefaultSubobject** → 컴포넌트 생성의 핵심 함수
+3. **SetRootComponent** → 루트 설정
+4. **SetupAttachment** → 부모에 부착
+5. **포인터 사용 필수** → 컴포넌트는 항상 포인터로 다룸
+
+# { Lock 액터 블루프린트 생성 및 레벨 배치하기 }
+
+## 📚 강의 개요
+
+이전 강의에서 C++로 만든 Lock 클래스를 기반으로 **블루프린트를 생성**하고, 레벨에 실제로 배치하는 방법을 배웁니다.
+
+---
+
+## 🎯 C++와 블루프린트의 관계 이해하기
+
+### C++ 클래스 → 블루프린트 생성 과정
+
+```
+C++ Lock 클래스 (기본 구조)
+    ↓
+Blueprint 생성 (BP_TestDoorLock)
+    ↓
+레벨에 배치 및 시각적 설정
+```
+
+**왜 이런 방식을 사용할까요?**
+
+- **C++**: 기능과 로직 구현 (코드에서 제어 가능)
+- **블루프린트**: 시각적 요소 설정 (메시, 크기, 위치 등)
+- **하이브리드 방식**의 장점을 모두 활용!
+
+---
+
+## 🔧 블루프린트 생성하기
+
+### 1단계: 새 블루프린트 만들기
+
+1. **콘텐츠 브라우저**에서 우클릭
+2. **Blueprint Class** 선택
+3. **부모 클래스**: `Lock` 선택 (우리가 만든 C++ 클래스)
+4. 이름: `BP_TestDoorLock` 또는 `BP_TestLevelLock`
+
+---
+
+### 2단계: 블루프린트 내부 확인하기
+
+블루프린트를 열면 **C++에서 만든 컴포넌트**들이 자동으로 보입니다:
+
+```
+컴포넌트 계층 구조:
+├── RootComp (SceneComponent) ← 루트
+    ├── TriggerComp (TriggerComponent)
+    └── KeyItemMesh (StaticMeshComponent)
+```
+
+**중요한 차이점 확인**:
+
+- ✅ C++에서 만든 컴포넌트 → 코드에서 접근 가능
+- ❌ 블루프린트 Add 버튼으로 만든 컴포넌트 → 코드에서 접근 불가능
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380627/notion-blog/_/_/_5_C_/_3_Dungeon_Escape_-_5/image.png)
+
+---
+
+## 🎨 Lock 액터 시각적 설정하기
+
+### 3단계: 테이블(받침대) 추가
+
+**목적**: 동상이 놓일 플랫폼 역할
+
+### 작업 순서:
+
+1. **Static Mesh Component 추가**
+2. 메시 선택: `Content/StarterContent/Props/SM_TableRound` (테이블 메시)
+3. **위치 조정**: 바닥에 딱 맞게 배치
+4. **크기 조정**:
+
+   ```
+   Z축 (높이): 약간 더 크게X, Y축 (폭): 작게 만들어서 플랫폼처럼 보이게
+   ```
+
+**스케일 모드 사용법**:
+
+- **R 키**: 스케일 모드 전환
+- 축 별로 드래그해서 크기 조정
+
+---
+
+### 4단계: 열쇠 아이템(유리 동상) 설정
+
+**KeyItemMesh 컴포넌트 설정하기**:
+
+1. 컴포넌트 목록에서 **KeyItemMesh** 클릭
+2. Details 패널에서 **Static Mesh** 항목 찾기
+3. 메시 선택: `SM_Statue` (유리 동상)
+4. **위치 조정**: 테이블 위에 올리기
+
+**이 메시의 동작 원리**:
+
+```
+게임 시작 시: KeyItemMesh → 보이지 않음 (Hidden)
+     ↓
+플레이어가 아이템을 Lock에 배치
+     ↓
+KeyItemMesh → 보이게 설정 (Visible)
+```
+
+이것은 **시각적 피드백**을 제공하는 역할입니다!
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380625/notion-blog/_/_/_5_C_/_3_Dungeon_Escape_-_5/image_1.png)
+
+---
+
+### 5단계: 트리거 컴포넌트 조정
+
+**TriggerComp 크기 및 위치 설정**:
+
+1. 컴포넌트 목록에서 **TriggerComp** 선택
+2. **위치**: 유리 동상을 대략적으로 덮을 수 있도록 위로 올리기
+3. **크기**: 동상 주변 영역을 감지할 수 있을 만큼 충분히 크게
+
+**트리거의 역할**:
+
+- 플레이어가 가까이 왔을 때 **충돌 감지**
+- 상호작용 가능 여부 판단
+- "E키를 눌러 배치하세요" 같은 UI 표시 시점 결정
+
+---
+
+## 🏷️ 태그 확인하기
+
+### C++에서 추가한 태그 검증
+
+블루프린트의 **Details 패널**에서:
+
+1. **Tags** 섹션 찾기
+2. `Lock` 태그가 자동으로 추가되어 있는지 확인
+
+```cpp
+// C++에서 추가했던 코드
+Tags.Add("Lock");
+```
+
+**태그의 용도**:
+
+- 런타임에 "이 액터가 자물쇠인가?" 빠르게 판별
+- 다른 액터와의 상호작용 로직에서 사용
+
+---
+
+## 🌍 레벨에 배치하기
+
+### 6단계: 레벨에 Lock 액터 배치
+
+**배치 방법**:
+
+1. 콘텐츠 브라우저에서 **BP_TestDoorLock** 선택
+2. **왼쪽 클릭 & 드래그**로 레벨에 배치
+3. 원하는 위치에 **드롭**
+
+**초기 상태**:
+
+- 동상 메시는 **보이지 않음** (게임 시작 시)
+- 플레이어가 아이템을 배치하면 **나타남**
+
+---
+
+### 7단계: 최종 조정
+
+### 크기가 너무 큰 경우:
+
+1. 블루프린트로 돌아가기
+2. **KeyItemMesh** 선택
+3. \*Scale 도구 (R)\*\*로 적절한 크기로 조정
+4. **TriggerComp**도 함께 조정
+
+### 위치 미세 조정:
+
+- **W 키**: 이동 모드
+- **E 키**: 회전 모드
+- **R 키**: 스케일 모드
+
+---
+
+## 💡 핵심 개념 정리
+
+### C++에서 컴포넌트를 만드는 이유 (복습)
+
+```
+블루프린트에서 Add 버튼으로 컴포넌트 추가:
+❌ C++ 코드에서 접근 불가능
+❌ 런타임에 제어하기 어려움
+
+C++에서 CreateDefaultSubobject로 생성:
+✅ C++ 코드에서 직접 접근 가능
+✅ TriggerComp->SetActive() 같은 함수 호출 가능
+✅ 런타임에 동적 제어 용이
+```
+
+---
+
+### 블루프린트 vs C++ 역할 분담
+
+| 구분            | C++                      | 블루프린트           |
+| --------------- | ------------------------ | -------------------- |
+| **구조 정의**   | 컴포넌트 생성, 변수 선언 | -                    |
+| **로직 구현**   | 함수, 이벤트 처리        | 간단한 로직          |
+| **시각적 설정** | -                        | 메시, 머티리얼, 크기 |
+| **레벨 배치**   | -                        | 위치, 회전 설정      |
+
+---
+
+## 🎮 게임 실행 시 예상 동작
+
+### 현재까지 구현된 상태:
+
+```
+1. 게임 시작
+   → Lock 액터는 레벨에 배치되어 있음
+   → KeyItemMesh는 보이지 않음 (숨김 상태)
+
+2. 플레이어가 아이템 획득
+   → (다음 강의에서 구현 예정)
+
+3. 플레이어가 Lock에 가까이 다가감
+   → TriggerComp가 감지
+   → UI 표시: "E키를 눌러 배치하세요"
+
+4. E키 입력
+   → 아이템이 Lock에 배치됨
+   → KeyItemMesh가 보이게 변경
+   → 시각적 피드백 제공
+```
+
+---
+
+## 🔑 실습 요약
+
+### 완성된 Lock 액터의 구성:
+
+```
+BP_TestDoorLock
+├── RootComp (Scene Component)
+    ├── TableMesh (새로 추가) ← 받침대
+    ├── TriggerComp ← 플레이어 감지
+    └── KeyItemMesh ← 유리 동상 (초기 숨김)
+```
+
+### 설정한 주요 속성:
+
+- **TableMesh**: SM_TableRound, 크기 조정
+- **KeyItemMesh**: SM_Statue, 초기 Hidden
+- **TriggerComp**: 동상을 감싸는 크기
+- **Tags**: "Lock" (자동 추가됨)
+
+---
+
+## 📝 다음 단계 예고
+
+강의에서는 앞으로:
+
+1. **메인 레벨**에 여러 개의 Lock 액터 배치
+2. 각 Lock마다 **다른 모양**의 동상 사용
+3. **상호작용 로직** 구현 (아이템 배치 기능)
+4. **시각적 피드백** 완성 (Hidden → Visible 전환)
+
+---
+
+## ✅ 체크리스트
+
+이 강의를 완료했다면:
+
+- [ ] C++ 클래스 기반 블루프린트 생성 완료
+- [ ] 컴포넌트 계층 구조 이해
+- [ ] 시각적 요소(메시, 트리거) 설정 완료
+- [ ] 태그 확인 완료
+- [ ] 레벨에 배치 완료
+- [ ] 크기 및 위치 조정 완료
+
+---
+
+## 💭 초보자를 위한 팁
+
+**Q: 왜 동상을 처음에 숨기나요?**
+A: 게임 디자인상 "플레이어가 아이템을 배치했을 때" 시각적 변화를 주기 위해서입니다. 이런 피드백이 없으면 플레이어는 자신의 행동이 효과가 있었는지 알 수 없습니다.
+
+**Q: 트리거 크기가 왜 중요한가요?**
+A: 너무 작으면 플레이어가 정확히 위치해야 하고, 너무 크면 멀리서도 반응해서 부자연스럽습니다. 적절한 크기가 좋은 게임 경험을 만듭니다!
+
+**Q: 태그는 꼭 필요한가요?**
+A: 네! 런타임에 "충돌한 액터가 자물쇠인지" 확인할 때 `ActorHasTag("Lock")`처럼 간단히 체크할 수 있어서 매우 유용합니다.
+
+# { 언리얼 엔진 콜리전 시스템 정리 }
+
+## 📌 콜리전(Collision)이란?
+
+언리얼 엔진에서 **두 액터(Actor)가 서로 접촉할 때 발생하는 상호작용**을 의미합니다.
+
+- 멈출 것인가?
+- 겹쳐서 통과할 것인가?
+- 완전히 무시할 것인가?
+
+---
+
+## 🔧 콜리전 설정 방법
+
+### 1. 기본 접근 경로
+
+```
+액터 선택 → Static Mesh Component 클릭 → Details 패널 → Collision 섹션
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380626/notion-blog/_/_/_5_C_/_3_Dungeon_Escape_-_5/image_2.png)
+
+### 2. Collision Presets (콜리전 프리셋)
+
+언리얼에서 제공하는 **미리 만들어진 콜리전 설정**
+
+**주요 프리셋:**
+
+- **Default**: 기본 설정 (모든 것을 차단)
+- **Pawn**: 플레이어가 제어하는 액터용
+- **PhysicsActor**: 물리 시뮬레이션하는 액터용
+- **BlockAll**: 모든 것을 차단
+- **Custom**: 사용자 정의 설정
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380626/notion-blog/_/_/_5_C_/_3_Dungeon_Escape_-_5/image_3.png)
+
+---
+
+## ⚙️ 콜리전 활성화 옵션 (Collision Enabled)
+
+| 옵션                  | 설명                 | 물리 | 쿼리 (오버랩/레이캐스트) |
+| --------------------- | -------------------- | ---- | ------------------------ |
+| **No Collision**      | 충돌 없음            | ✗    | ✗                        |
+| **Query Only**        | 쿼리만 가능          | ✗    | ✓                        |
+| **Physics Only**      | 물리만 가능          | ✓    | ✗                        |
+| **Collision Enabled** | 모두 활성화 (기본값) | ✓    | ✓                        |
+
+---
+
+## 🎯 Object Type (오브젝트 타입)
+
+**물리 엔진에서 이 오브젝트가 어떤 종류인지 정의**
+
+### 주요 타입:
+
+- **WorldStatic**: 움직이지 않는 오브젝트 (건물, 지형 등)
+- **WorldDynamic**: 코드로 움직이는 오브젝트 (문, 승강기 등)
+- **Pawn**: 플레이어가 제어하는 캐릭터
+- **PhysicsBody**: 물리 시뮬레이션이 있는 오브젝트
+- **Vehicle**: 차량
+- **Destructible**: 파괴 가능한 오브젝트
+
+---
+
+## 🔀 콜리전 반응 (Collision Response)
+
+### 3가지 반응 타입:
+
+| 반응        | 설명 | 게임 내 동작                |
+| ----------- | ---- | --------------------------- |
+| **Ignore**  | 무시 | 통과함 (이벤트 없음)        |
+| **Overlap** | 겹침 | 통과함 (오버랩 이벤트 발생) |
+| **Block**   | 차단 | 막힘 (충돌 발생)            |
+
+### 💡 중요한 원칙:
+
+> 두 오브젝트의 콜리전 반응이 다를 때는 "덜 차단하는 쪽"이 우선됩니다!
+
+### 우선순위 규칙:
+
+```
+Ignore > Overlap > Block
+```
+
+### 예시:
+
+- 오브젝트 A: Block으로 설정
+- 오브젝트 B: Overlap으로 설정
+- **결과**: Overlap 적용 (서로 겹침)
+
+---
+
+## 📊 콜리전 반응 조합표
+
+| Object A | Object B | 결과               |
+| -------- | -------- | ------------------ |
+| Block    | Block    | **Block** (차단)   |
+| Block    | Overlap  | **Overlap** (겹침) |
+| Block    | Ignore   | **Ignore** (무시)  |
+| Overlap  | Overlap  | **Overlap** (겹침) |
+| Overlap  | Ignore   | **Ignore** (무시)  |
+| Ignore   | Ignore   | **Ignore** (무시)  |
+
+---
+
+## 🎓 실습 예제: 플레이어가 통과할 수 있는 오브젝트 만들기
+
+### 목표:
+
+핵심 아이템(유리 조각상)을 플레이어가 통과할 수 있게 만들기
+
+### 단계:
+
+1. **Blueprint 열기**
+
+   ```
+   BP_TestDoorLock 블루프린트 열기
+   ```
+
+2. **Key Item Mesh 선택**
+
+   ```
+   Components 패널에서 Key Item Mesh 선택
+   ```
+
+3. **Collision 설정 변경**
+
+   ```
+   Details → Collision 섹션
+   Collision Presets → Custom 선택
+   ```
+
+4. **Pawn 반응 변경**
+
+   ```
+   Collision Responses → Pawn → Overlap 또는 Ignore 선택
+   ```
+
+### 왜 Pawn을 선택했을까?
+
+플레이어 캐릭터의 Capsule Component가 **Pawn** 타입이기 때문!
+
+```
+플레이어 Blueprint → Capsule Component 확인
+→ Object Type: Pawn
+→ Collision Preset: Pawn
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380626/notion-blog/_/_/_5_C_/_3_Dungeon_Escape_-_5/image_4.png)
+
+---
+
+## 💡 핵심 팁
+
+### 1. 프리셋 확인하기
+
+대부분의 설정에 **마우스를 올리면 도움말**이 표시됩니다.
+
+### 2. Custom vs Preset
+
+- **빠른 설정**: 프리셋 사용
+- **세밀한 제어**: Custom 사용
+
+### 3. 물리 시뮬레이션 테스트
+
+```
+Static Mesh Component → Physics 섹션
+→ Simulate Physics 체크
+→ Collision Preset이 자동으로 PhysicsActor로 변경됨
+```
+
+---
+
+## 🔍 디버깅 체크리스트
+
+충돌이 예상대로 작동하지 않을 때:
+
+- [ ] 두 오브젝트 모두 Collision Enabled가 켜져 있는가?
+- [ ] Object Type이 올바르게 설정되어 있는가?
+- [ ] Collision Response가 의도한 대로 설정되어 있는가?
+- [ ] 양쪽 오브젝트의 설정을 모두 확인했는가?
+- [ ] "덜 차단하는" 규칙을 고려했는가?
+
+---
+
+## 📝 요약
+
+1. **콜리전 시스템**은 두 액터의 상호작용을 제어합니다
+2. **Collision Presets**로 빠르게 설정하거나 **Custom**으로 세밀하게 제어할 수 있습니다
+3. **Object Type**은 오브젝트의 종류를 정의합니다
+4. **Collision Response**는 Ignore, Overlap, Block 중 하나입니다
+5. **두 오브젝트의 반응이 다르면 "덜 차단하는" 쪽이 우선**됩니다
+
+---
+
+이 내용을 이해하면 문, 아이템, 트리거, 물리 오브젝트 등 다양한 게임 메커니즘을 구현할 수 있습니다! 🎮
+
+# { Lock 액터 완성하기 - 가시성 제어와 Getter/Setter 구현 }
+
+## 📚 강의 개요
+
+Lock 액터의 핵심 기능을 완성합니다. **메시의 가시성을 제어**하고, **Getter/Setter 패턴**을 사용하여 안전하게 상태를 관리하는 방법을 배웁니다.
+
+---
+
+## 🎯 Lock 시스템 전체 흐름 이해하기
+
+### 게임 플레이 시나리오
+
+```
+1. 플레이어가 수집 가능한 아이템 발견
+   ↓
+2. 좌클릭으로 아이템 획득 → 인벤토리에 저장
+   ↓
+3. Lock 액터 발견
+   ↓
+4. Lock을 좌클릭하여 아이템 배치 시도
+   ↓
+5. 아이템 이름 검증
+   - 맞는 아이템 → Lock 해제, 문 열림
+   - 틀린 아이템 → 배치 실패
+```
+
+**핵심 아이디어**: 각 Lock마다 **특정 아이템만** 받아들입니다!
+
+---
+
+## 🔑 Key Item Name 시스템
+
+### 개념 이해하기
+
+**Lock 액터의 KeyItemName**:
+
+```cpp
+// Lock이 원하는 아이템의 이름
+UPROPERTY(EditAnywhere)
+FString KeyItemName;  // 예: "Glass Statue"
+```
+
+**Collectable Item의 ItemName**:
+
+```cpp
+// 수집 가능한 아이템의 실제 이름
+UPROPERTY(EditAnywhere)
+FString ItemName;  // 예: "Glass Statue"
+```
+
+### 검증 로직
+
+```cpp
+// 나중에 구현될 검증 코드
+if (CollectableItem->ItemName == Lock->KeyItemName)
+{
+    // 올바른 아이템! Lock 해제
+    Lock->SetIsKeyPlaced(true);
+}
+else
+{
+    // 틀린 아이템! 배치 실패
+    // "이 자물쇠에는 맞지 않습니다" 메시지
+}
+```
+
+---
+
+## 🎨 변수 설계하기
+
+### 필요한 멤버 변수 2개
+
+### 1. KeyItemName (FString)
+
+```cpp
+UPROPERTY(EditAnywhere)
+FString KeyItemName;
+```
+
+**용도**: 이 Lock이 요구하는 아이템의 이름
+**설정 방법**: 에디터에서 각 Lock 인스턴스마다 다르게 설정
+**예시**:
+
+- Lock A: KeyItemName = "Glass Statue"
+- Lock B: KeyItemName = "Golden Key"
+- Lock C: KeyItemName = "Ancient Scroll"
+
+---
+
+### 2. IsKeyPlaced (bool)
+
+```cpp
+UPROPERTY(VisibleAnywhere)
+bool IsKeyPlaced = false;
+```
+
+**용도**: 현재 올바른 아이템이 배치되었는지 여부
+**초기값**: `false` (아직 아이템 없음)
+**변경 시점**:
+
+- 플레이어가 올바른 아이템 배치 → `true`
+- 아이템 회수 → `false` (선택적 기능)
+
+---
+
+## 🔒 Getter/Setter 패턴 이해하기
+
+### 왜 Private 변수를 사용할까요?
+
+**문제 상황**:
+
+```cpp
+// 만약 IsKeyPlaced가 public이라면?
+Lock->IsKeyPlaced = true;  // 직접 변경
+
+// 문제점:
+// 1. KeyItemMesh의 가시성이 업데이트 안 됨
+// 2. TriggerComp가 활성화되지 않음
+// 3. 데이터 일관성 깨짐!
+```
+
+**해결책: Setter 함수 사용**:
+
+```cpp
+// 올바른 방법
+Lock->SetIsKeyPlaced(true);
+
+// 장점:
+// 1. KeyItemMesh 가시성 자동 업데이트
+// 2. TriggerComp 자동 활성화
+// 3. 모든 관련 작업이 한 번에!
+```
+
+---
+
+### Getter와 Setter 구현
+
+### 헤더 파일 (.h)
+
+```cpp
+public:  // 외부에서 호출 가능해야 함!
+    // Setter: 값을 설정하는 함수
+    void SetIsKeyPlaced(bool NewIsKeyPlaced);
+
+    // Getter: 값을 읽는 함수
+    bool GetIsKeyPlaced();
+
+private:  // 직접 접근은 막음
+    UPROPERTY(VisibleAnywhere)
+    bool IsKeyPlaced = false;
+```
+
+**접근 제어자 위치**:
+
+- **public**: Getter/Setter → 누구나 호출 가능
+- **private**: 변수 자체 → 클래스 내부에서만 접근
+
+---
+
+### CPP 파일 구현
+
+**Setter 함수**:
+
+```cpp
+void ALock::SetIsKeyPlaced(bool NewIsKeyPlaced)
+{
+    // 1. 멤버 변수 업데이트
+    IsKeyPlaced = NewIsKeyPlaced;
+
+    // 2. 트리거 컴포넌트 상태 변경
+    TriggerComp->Trigger(NewIsKeyPlaced);
+
+    // 3. 메시 가시성 변경
+    KeyItemMesh->SetVisibility(NewIsKeyPlaced);
+}
+```
+
+**한 줄씩 분석**:
+
+```cpp
+IsKeyPlaced = NewIsKeyPlaced;
+```
+
+- 새로운 값을 멤버 변수에 저장
+
+```cpp
+TriggerComp->Trigger(NewIsKeyPlaced);
+```
+
+- `true`: 트리거 활성화 → 문이 열림
+- `false`: 트리거 비활성화 → 문이 닫힘
+
+```cpp
+KeyItemMesh->SetVisibility(NewIsKeyPlaced);
+```
+
+- `true`: 메시 보이게 (아이템이 배치된 것처럼)
+- `false`: 메시 숨기기 (아이템이 없는 상태)
+
+---
+
+**Getter 함수**:
+
+```cpp
+bool ALock::GetIsKeyPlaced()
+{
+    return IsKeyPlaced;
+}
+```
+
+**사용 예시**:
+
+```cpp
+// 다른 클래스에서 Lock의 상태 확인
+if (Lock->GetIsKeyPlaced())
+{
+    // 이미 아이템이 배치되어 있음
+    ShowMessage("이 자물쇠는 이미 열려있습니다");
+}
+```
+
+---
+
+## 🎬 SetVisibility 함수 이해하기
+
+### C++에서 메시 가시성 제어
+
+```cpp
+StaticMeshComponent->SetVisibility(bool bNewVisibility);
+```
+
+**매개변수**:
+
+- `true`: 메시를 **보이게** 설정
+- `false`: 메시를 **숨기기** 설정
+
+### 실전 활용 예시
+
+```cpp
+// 게임 시작 시: 아이템 숨기기
+KeyItemMesh->SetVisibility(false);
+
+// 플레이어가 아이템 배치 시: 아이템 보이기
+KeyItemMesh->SetVisibility(true);
+
+// 아이템 회수 시: 다시 숨기기
+KeyItemMesh->SetVisibility(false);
+```
+
+---
+
+## 🧪 테스트 과정
+
+### BeginPlay에서 테스트하기
+
+### 테스트 1: false로 설정
+
+```cpp
+void ALock::BeginPlay()
+{
+    Super::BeginPlay();
+    SetIsKeyPlaced(false);  // 초기 상태 테스트
+}
+
+```
+
+**예상 결과**:
+
+- ✅ KeyItemMesh가 **보이지 않음**
+- ✅ TriggerComp가 **비활성화**됨
+- ✅ 문이 **닫혀 있음**
+
+---
+
+### 테스트 2: true로 설정
+
+```cpp
+void ALock::BeginPlay()
+{
+    Super::BeginPlay();
+    SetIsKeyPlaced(true);  // 활성화 상태 테스트
+}
+
+```
+
+**예상 결과**:
+
+- ✅ KeyItemMesh가 **보임**
+- ✅ TriggerComp가 **활성화**됨
+- ✅ 문이 **즉시 열림**
+
+---
+
+## 🔧 Lock과 Mover 연결하기
+
+### 블루프린트에서 설정
+
+**중요한 단계**: TriggerComp를 문(Mover)에 연결해야 합니다!
+
+1. 레벨에서 **Lock 액터 선택**
+2. Details 패널에서 **TriggerComp** 찾기
+3. **Mover 액터 선택** (열리게 할 문)
+4. TriggerComp의 타겟으로 지정
+
+**코드로 이해하기**:
+
+```cpp
+// TriggerComp->Trigger(true) 호출 시
+// → 연결된 Mover가 열림
+
+// TriggerComp->Trigger(false) 호출 시
+// → 연결된 Mover가 닫힘
+```
+
+---
+
+## 📝 KeyItemName 설정하기
+
+### 블루프린트 인스턴스별 설정
+
+**주의**: 블루프린트 자체가 아닌, **레벨에 배치된 인스턴스**에서 설정!
+
+1. 레벨에 배치된 **Lock 액터 선택**
+2. Details 패널에서 **Lock 섹션** 찾기
+3. **KeyItemName** 필드에 이름 입력
+   - 예: "Glass Statue"
+
+**왜 인스턴스에서 설정할까요?**
+
+```
+같은 BP_Lock 블루프린트를 사용하더라도
+각 Lock마다 다른 아이템을 요구할 수 있습니다!
+
+Lock A 인스턴스: KeyItemName = "Glass Statue"
+Lock B 인스턴스: KeyItemName = "Golden Key"
+Lock C 인스턴스: KeyItemName = "Ancient Scroll"
+```
+
+---
+
+## 💡 전체 시스템 동작 흐름
+
+### 최종 완성된 Lock 시스템
+
+```
+초기 상태 (게임 시작):
+├── IsKeyPlaced = false
+├── KeyItemMesh = 숨김 (Visibility: false)
+├── TriggerComp = 비활성화
+└── 문 = 닫힘
+
+플레이어가 올바른 아이템 배치:
+├── SetIsKeyPlaced(true) 호출
+├── IsKeyPlaced = true로 변경
+├── KeyItemMesh = 보임 (Visibility: true)
+├── TriggerComp->Trigger(true) → 활성화
+└── 문 = 열림 ✓
+
+(선택) 아이템 회수:
+├── SetIsKeyPlaced(false) 호출
+├── IsKeyPlaced = false로 변경
+├── KeyItemMesh = 숨김 (Visibility: false)
+├── TriggerComp->Trigger(false) → 비활성화
+└── 문 = 닫힘
+```
+
+---
+
+## 🎯 핵심 개념 정리
+
+### 1. Getter/Setter 패턴의 장점
+
+| 직접 접근                   | Getter/Setter 사용            |
+| --------------------------- | ----------------------------- |
+| `Lock->IsKeyPlaced = true;` | `Lock->SetIsKeyPlaced(true);` |
+| 관련 작업 누락 가능         | 모든 작업 자동 수행           |
+| 데이터 일관성 깨질 수 있음  | 데이터 일관성 보장            |
+| 디버깅 어려움               | 한 곳에서 관리                |
+
+---
+
+### 2. SetVisibility의 활용
+
+```cpp
+// 단순히 보이기/숨기기만이 아님
+KeyItemMesh->SetVisibility(NewIsKeyPlaced);
+
+// NewIsKeyPlaced 값에 따라:
+// true  → 시각적 피드백 (아이템이 배치됨을 표시)
+// false → 초기 상태 (아이템이 없음을 표시)
+```
+
+---
+
+### 3. 변수의 접근 제어
+
+```cpp
+public:
+    void SetIsKeyPlaced(bool);  // 외부에서 호출 가능
+    bool GetIsKeyPlaced();      // 외부에서 호출 가능
+
+private:
+    bool IsKeyPlaced;           // 내부에서만 접근 가능
+```
+
+**이유**:
+
+- 외부에서는 **함수를 통해서만** 변경 가능
+- 변경 시 **항상 일관된 처리** 보장
+
+---
+
+## 🔍 실전 디버깅 팁
+
+### 문제: 압력판이 트리거를 다시 활성화함
+
+**상황**:
+
+```cpp
+SetIsKeyPlaced(false);  // 비활성화했는데
+// 압력판이 있으면 다시 활성화됨!
+```
+
+**해결책**:
+
+```
+레벨에서 압력판(Pressure Plate)을
+뒤로 이동시켜서 영향권 밖으로 빼기
+```
+
+---
+
+### 문제: TriggerComp가 작동하지 않음
+
+**체크리스트**:
+
+- [ ] TriggerComp가 Mover에 연결되었는가?
+- [ ] Mover 액터가 레벨에 존재하는가?
+- [ ] SetIsKeyPlaced(true)가 호출되었는가?
+- [ ] TriggerComp의 크기가 적절한가?
+
+---
+
+## ✅ 완성된 코드 전체 흐름
+
+```cpp
+// 헤더 파일
+class ALock : public AActor
+{
+public:
+    UPROPERTY(EditAnywhere)
+    FString KeyItemName;  // 에디터에서 설정
+
+    void SetIsKeyPlaced(bool NewIsKeyPlaced);
+    bool GetIsKeyPlaced();
+
+private:
+    UPROPERTY(VisibleAnywhere)
+    bool IsKeyPlaced = false;  // 초기값 false
+
+    UPROPERTY(VisibleAnywhere)
+    UStaticMeshComponent* KeyItemMesh;
+
+    UPROPERTY(VisibleAnywhere)
+    UTriggerComponent* TriggerComp;
+};
+
+// CPP 파일
+void ALock::SetIsKeyPlaced(bool NewIsKeyPlaced)
+{
+    IsKeyPlaced = NewIsKeyPlaced;
+    TriggerComp->Trigger(NewIsKeyPlaced);
+    KeyItemMesh->SetVisibility(NewIsKeyPlaced);
+}
+
+bool ALock::GetIsKeyPlaced()
+{
+    return IsKeyPlaced;
+}
+
+void ALock::BeginPlay()
+{
+    Super::BeginPlay();
+    SetIsKeyPlaced(true);  // 테스트용 (나중에 제거)
+}
+```
+
+---
+
+## 📚 다음 단계
+
+강의 이후 구현할 내용:
+
+1. **플레이어 상호작용 시스템**
+   - 좌클릭으로 아이템 배치
+   - KeyItemName 검증 로직
+2. **UI 피드백**
+   - "올바른 아이템입니다"
+   - "이 자물쇠에 맞지 않습니다"
+3. **사운드 효과**
+   - 자물쇠 해제 소리
+   - 문 열리는 소리
+
+---
+
+## 💭 초보자 Q&A
+
+**Q: 왜 BeginPlay에서 true/false를 테스트하나요?**
+A: 실제 상호작용 시스템이 완성되기 전에 Lock의 동작을 확인하기 위해서입니다. 나중에는 이 줄을 제거하고 실제 플레이어 입력으로 제어합니다.
+
+**Q: Getter는 왜 필요한가요? 직접 읽으면 안 되나요?**
+A: Private 변수는 외부에서 직접 읽을 수 없습니다. Getter를 통해 "읽기 전용" 접근을 제공합니다. 이렇게 하면 값은 읽을 수 있지만, 변경은 Setter를 통해서만 가능합니다.
+
+**Q: SetVisibility와 SetActive의 차이는?**
+A:
+
+- `SetVisibility`: 렌더링만 제어 (보이기/숨기기)
+- `SetActive`: 컴포넌트의 전체 기능 제어 (충돌, 물리 등 포함)
+
+**Q: 왜 KeyItemName을 EditAnywhere로 하나요?**
+A: 각 Lock 인스턴스마다 다른 아이템을 요구하도록 만들기 위해서입니다. 코드를 수정하지 않고도 에디터에서 쉽게 변경할 수 있습니다!
+
+# { 언리얼 입력 시스템 - Input Action 만들기 }
+
+## 📚 강의 개요
+
+상호작용 시스템 구현을 위해 **언리얼의 입력 시스템**을 이해하고, **마우스 왼쪽 버튼**과 **E키**로 작동하는 새로운 Input Action을 만듭니다.
+
+---
+
+## 🎯 왜 입력 시스템이 필요한가요?
+
+### 구현하려는 기능
+
+```
+플레이어의 행동:
+1. 수집 가능한 아이템에 마우스 왼쪽 클릭
+   → 아이템 획득
+
+2. Lock 액터에 마우스 왼쪽 클릭
+   → 아이템 배치 시도
+
+이를 위해 필요한 것:
+✓ 마우스 왼쪽 버튼 입력 감지
+✓ 입력에 반응하는 C++ 함수 연결
+```
+
+**입력 시스템의 역할**: 키보드/마우스 입력을 게임 내 행동으로 변환!
+
+---
+
+## 🔑 언리얼 입력 시스템의 구조
+
+### 핵심 개념 2가지
+
+### 1. Input Action (입력 액션)
+
+**정의**: 게임에서 할 수 있는 "행동"을 나타내는 에셋
+
+**예시**:
+
+- `IA_Jump` → 점프하기
+- `IA_Move` → 이동하기
+- `IA_Look` → 둘러보기
+- `IA_Interact` → 상호작용하기 ← **우리가 만들 것!**
+
+**파일 위치**: `Content/Input/Actions/`
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380626/notion-blog/_/_/_5_C_/_3_Dungeon_Escape_-_5/image_5.png)
+
+---
+
+### 2. Input Mapping Context (입력 매핑 컨텍스트)
+
+**정의**: Input Action을 **실제 키/버튼**에 연결하는 설정 파일
+
+**구조**:
+
+```
+Input Mapping Context
+├── IA_Jump
+│   ├── Space Bar
+│   └── Gamepad Face Button Bottom
+│
+├── IA_Move
+│   ├── W, A, S, D 키
+│   ├── 방향키 (↑, ↓, ←, →)
+│   └── Gamepad Left Thumbstick
+│
+└── IA_Interact (새로 만들 것)
+    ├── Left Mouse Button
+    └── E 키
+```
+
+**파일 위치**: `Content/Input/IMC_Default`
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380627/notion-blog/_/_/_5_C_/_3_Dungeon_Escape_-_5/image_6.png)
+
+---
+
+## 🎨 입력 시스템의 흐름도
+
+```
+[플레이어가 마우스 왼쪽 버튼 클릭]
+            ↓
+[Input Mapping Context가 감지]
+"Left Mouse Button → IA_Interact"
+            ↓
+[IA_Interact Input Action 트리거]
+            ↓
+[C++ 코드에서 연결된 함수 호출]
+            ↓
+[실제 게임 로직 실행]
+예: OnInteract() 함수 → 아이템 획득
+```
+
+---
+
+## 📂 기존 입력 시스템 살펴보기
+
+### Input Mapping Context 열어보기
+
+**경로**: `Content/Input/IMC_Default` 더블클릭
+
+**주요 섹션**: **Mappings** (매핑 목록)
+
+```
+Mappings:
+├── IA_Jump
+│   └── Space Bar
+│   └── Gamepad Face Button Bottom
+│
+├── IA_Move
+│   └── W (forward)
+│   └── S (backward)
+│   └── A (left)
+│   └── D (right)
+│   └── Arrow Keys
+│   └── Gamepad Left Thumbstick
+│
+└── IA_Look
+    └── Mouse XY 2D-Axis
+    └── Gamepad Right Thumbstick
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380627/notion-blog/_/_/_5_C_/_3_Dungeon_Escape_-_5/image_7.png)
+
+---
+
+### 매핑의 구조 이해하기
+
+### 각 매핑 항목:
+
+```
+[Input Action] ← 무엇을 할지
+    ↓
+[Key/Button] ← 어떤 키로 할지
+```
+
+**예시: IA_Jump**
+
+- **Input Action**: IA_Jump (점프 행동)
+- **매핑된 키**:
+  - Space Bar (키보드)
+  - Gamepad Face Button Bottom (게임패드)
+
+**의미**:
+
+- Space Bar 누름 → IA_Jump 트리거 → 캐릭터 점프
+- 게임패드 버튼 누름 → IA_Jump 트리거 → 캐릭터 점프
+
+---
+
+## 🔧 새로운 Input Action 만들기
+
+### 1단계: IA_Interact Input Action 생성
+
+**작업 순서**:
+
+1. **Content Browser**에서 `Content/Input/Actions` 폴더로 이동
+2. **우클릭** → **Input** → **Input Action**
+3. 이름: `IA_Interact` 입력
+   - IA = Input Action의 약자
+   - Interact = 상호작용
+
+**파일 저장**: `Ctrl + S`
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380627/notion-blog/_/_/_5_C_/_3_Dungeon_Escape_-_5/image_8.png)
+
+---
+
+### 2단계: Input Mapping Context에 매핑 추가
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380627/notion-blog/_/_/_5_C_/_3_Dungeon_Escape_-_5/image_9.png)
+
+### IMC_Default 열기
+
+1. `Content/Input/IMC_Default` 더블클릭
+2. **Mappings** 섹션 찾기
+
+---
+
+### 첫 번째 매핑: 마우스 왼쪽 버튼
+
+**방법 1: 자동 감지**
+
+1. Mappings 옆의 **+ 아이콘** 클릭
+2. 드롭다운에서 **IA_Interact** 선택
+3. 자동 생성된 매핑 펼치기
+4. 매핑 옆의 **버튼** 클릭
+5. **마우스 왼쪽 버튼** 클릭
+6. 자동으로 "Left Mouse Button"으로 설정됨
+
+**방법 2: 수동 선택**
+
+1. 버튼 클릭 대신 **드롭다운** 클릭
+2. 목록에서 **Mouse** → **Left Mouse Button** 선택
+
+---
+
+### 두 번째 매핑: E 키
+
+**같은 Input Action에 여러 매핑 추가하기**:
+
+1. **IA_Interact** 펼친 상태에서
+2. 하단의 **+ 아이콘** 클릭 (새 매핑 추가)
+3. **버튼** 클릭 → **E 키** 누르기
+   - 또는 드롭다운에서 **Keyboard** → **E** 선택
+
+**완성된 모습**:
+
+```
+IA_Interact
+├── Left Mouse Button
+└── E
+```
+
+**의미**:
+
+- 마우스 왼쪽 버튼 **또는** E키 → 같은 동작 실행!
+
+---
+
+## 💡 핵심 개념 정리
+
+### Input Action vs Input Mapping
+
+| 개념          | Input Action           | Input Mapping         |
+| ------------- | ---------------------- | --------------------- |
+| **역할**      | 게임 내 "행동" 정의    | 행동을 "키"에 연결    |
+| **에셋 타입** | IA_Interact            | IMC_Default           |
+| **내용**      | 추상적 개념 (상호작용) | 구체적 키 (마우스, E) |
+| **개수**      | 하나의 행동            | 여러 키 매핑 가능     |
+
+---
+
+### 하나의 Action에 여러 매핑을 만드는 이유
+
+**유연성 제공**:
+
+```
+IA_Interact에 2개의 매핑:
+├── Left Mouse Button → PC 플레이어용
+└── E 키 → 키보드 선호 플레이어용
+
+플레이어가 선택 가능!
+
+```
+
+**크로스 플랫폼 지원**:
+
+```
+IA_Jump에 다중 매핑:
+├── Space Bar → PC
+├── Gamepad Face Button Bottom → 콘솔
+└── Touch Screen → 모바일 (추가 가능)
+
+```
+
+---
+
+## 🎮 실전 예시
+
+### 기존 매핑 분석: IA_Move
+
+```
+IA_Move (이동 액션)
+├── W → 앞으로
+├── S → 뒤로
+├── A → 왼쪽
+├── D → 오른쪽
+├── Arrow Up → 앞으로
+├── Arrow Down → 뒤로
+├── Arrow Left → 왼쪽
+├── Arrow Right → 오른쪽
+└── Gamepad Left Thumbstick → 아날로그 이동
+
+```
+
+**왜 이렇게 많은 매핑이?**
+
+- WASD 선호 플레이어
+- 방향키 선호 플레이어
+- 게임패드 플레이어
+  → 모두 수용 가능!
+
+---
+
+## 🔍 매핑 컨텍스트 여러 개 사용하기
+
+### 템플릿의 구조
+
+```
+IMC_Default (기본 조작)
+├── IA_Jump
+├── IA_Move
+└── IA_Interact (우리가 추가)
+
+IMC_Default_Look (시점 조작)
+└── IA_Look
+
+```
+
+**왜 분리했을까?**
+
+- 강사도 정확히 모름 😅
+- **필수 아님**: 하나의 매핑 컨텍스트에 모두 넣어도 OK!
+
+**우리의 선택**:
+
+- `IMC_Default`에 IA_Interact 추가
+- 단순하게 유지!
+
+---
+
+## ⚠️ 주의사항
+
+### 엔진에서의 설정만으로는 불충분!
+
+**현재 상태**:
+
+```
+✅ Input Action 생성 완료 (IA_Interact)
+✅ Input Mapping 설정 완료 (마우스, E키)
+❌ C++ 코드 연결 필요 ← 아직 안 함!
+
+```
+
+**필요한 다음 단계**:
+
+```cpp
+// C++에서 해야 할 작업 (다음 강의)
+void APlayerCharacter::SetupPlayerInputComponent(...)
+{
+    // IA_Interact를 C++ 함수에 연결
+    EnhancedInputComponent->BindAction(
+        InteractAction,  // IA_Interact 에셋
+        ETriggerEvent::Triggered,
+        this,
+        &APlayerCharacter::OnInteract  // 호출될 함수
+    );
+}
+
+```
+
+---
+
+## 📝 완성된 설정 요약
+
+### 생성한 에셋
+
+```
+Content/Input/Actions/
+└── IA_Interact (Input Action)
+
+Content/Input/
+└── IMC_Default (Input Mapping Context)
+    └── Mappings:
+        └── IA_Interact
+            ├── Left Mouse Button
+            └── E
+
+```
+
+---
+
+### 전체 흐름 정리
+
+```
+1. 에디터에서 Input Action 생성
+   → IA_Interact 파일 생성
+
+2. Input Mapping Context에 매핑 추가
+   → IA_Interact + Left Mouse Button
+   → IA_Interact + E 키
+
+3. C++에서 함수 연결 (다음 강의)
+   → IA_Interact 트리거 시 OnInteract() 호출
+
+4. 게임 실행
+   → 마우스 클릭 or E키 → OnInteract() 실행
+
+```
+
+---
+
+## 🎓 다음 강의 예고
+
+**다룰 내용**:
+
+1. **C++에서 Input Action 연결**하기
+   - `SetupPlayerInputComponent` 함수
+   - `BindAction` 사용법
+2. **OnInteract 함수 구현**
+   - 레이캐스트로 상호작용 대상 감지
+   - 아이템 획득 로직
+   - Lock에 아이템 배치 로직
+3. **전체 시스템 테스트**
+   - 실제로 마우스 클릭으로 아이템 줍기
+   - E키로도 동작하는지 확인
+
+---
+
+## 💭 초보자 Q&A
+
+**Q: Input Action과 Input Mapping의 차이가 헷갈려요.**
+A: 쉽게 생각하면:
+
+- **Input Action**: "무엇을 할까?" (점프, 상호작용, 공격)
+- **Input Mapping**: "어떤 키로 할까?" (Space, E, 마우스)
+
+**Q: 왜 같은 액션에 여러 키를 매핑하나요?**
+A: 플레이어마다 선호하는 키가 다르기 때문입니다. 어떤 사람은 E키를, 어떤 사람은 마우스를 선호할 수 있죠.
+
+**Q: Mapping Context를 여러 개 만들어야 하나요?**
+A: 필수는 아닙니다. 하나에 모든 매핑을 넣어도 작동합니다. 여러 개로 나누는 것은 조직화를 위한 선택입니다.
+
+**Q: 입력 시스템이 복잡한 이유는?**
+A: 언리얼의 Enhanced Input System은 강력하지만 초보자에겐 복잡합니다. 하지만 한번 익히면:
+
+- 크로스 플랫폼 지원 쉬움
+- 키 변경이 유연함
+- 복잡한 입력 처리 가능
+
+**Q: 왜 템플릿에는 이미 설정되어 있나요?**
+A: 1인칭 템플릿은 기본 이동/점프가 미리 설정되어 바로 테스트 가능하도록 만들어졌습니다. 우리는 여기에 상호작용 기능만 추가하는 것입니다!
+
+---
+
+## ✅ 이번 강의 체크리스트
+
+완료했다면 체크:
+
+- [ ] Input Action 개념 이해
+- [ ] Input Mapping Context 개념 이해
+- [ ] IA_Interact Input Action 생성
+- [ ] IMC_Default에 마우스 왼쪽 버튼 매핑 추가
+- [ ] IMC_Default에 E키 매핑 추가
+- [ ] 에셋 저장 완료
+
+**다음 강의 준비**:
+
+- [ ] C++에서 Input Action 바인딩하는 방법 배우기
+- [ ] 실제 상호작용 로직 구현하기
+
+# { C++에서 Input Action 연결하기 }
+
+## 📚 강의 개요
+
+에디터에서 만든 Input Action을 **C++ 함수와 연결**하여, 마우스 왼쪽 버튼이나 E키를 누르면 실제로 코드가 실행되도록 만듭니다.
+
+---
+
+## 🎯 C++ 입력 시스템의 2단계
+
+### 전체 흐름 이해하기
+
+```
+1단계: 매핑 컨텍스트 등록
+   → 게임에 IMC_Default 추가
+   → 플레이어가 입력을 감지할 수 있게 됨
+
+2단계: Input Action을 C++ 함수에 연결
+   → IA_Interact를 Interact() 함수에 바인딩
+   → 마우스 클릭 시 Interact() 함수 호출됨
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380625/notion-blog/_/_/_5_C_/_3_Dungeon_Escape_-_5/image_10.png)
+
+**중요한 개념**:
+
+```cpp
+// Input Action 자체는 아무것도 하지 않음!
+IA_Interact (에셋)  // 단순히 "상호작용"이라는 개념만 표현
+
+// C++ 함수에 연결되어야 실제 동작함
+IA_Interact → Interact() 함수 → 실제 코드 실행!
+```
+
+---
+
+## 🔧 1단계: 매핑 컨텍스트 등록
+
+### Player Controller에서 처리
+
+**파일**: `DungeonEscapePlayerController.h`
+
+### 헤더 파일의 변수 선언
+
+```cpp
+UPROPERTY(EditAnywhere, Category = "Input")
+TArray<class UInputMappingContext*> DefaultMappingContexts;
+```
+
+**코드 분석**:
+
+- `TArray`: 배열 (여러 개 담을 수 있는 컨테이너)
+- `UInputMappingContext*`: Input Mapping Context 포인터
+- `EditAnywhere`: 에디터에서 편집 가능
+- **목적**: 에디터에서 만든 IMC 에셋을 C++ 코드와 연결
+
+---
+
+### 블루프린트에서 설정 확인
+
+**경로**: `Content/FirstPerson/Blueprints/BP_PlayerController`
+
+**Details 패널**:
+
+```
+Input 섹션
+└── Default Mapping Contexts (배열)
+    ├── [0] IMC_Default
+    └── [1] IMC_Default_Look
+```
+
+**이 설정의 의미**:
+
+```
+C++ 변수 ← 에디터 에셋 연결
+DefaultMappingContexts[0] = IMC_Default
+DefaultMappingContexts[1] = IMC_Default_Look
+```
+
+---
+
+### CPP 파일의 등록 코드
+
+**파일**: `DungeonEscapePlayerController.cpp`
+
+```cpp
+void ADungeonEscapePlayerController::SetupInputComponent()
+{
+    Super::SetupInputComponent();
+
+    // 1. Enhanced Input Subsystem 가져오기
+    UEnhancedInputLocalPlayerSubsystem* Subsystem =
+        ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(
+            GetLocalPlayer()
+        );
+
+    // 2. 모든 매핑 컨텍스트를 게임에 추가
+    for (UInputMappingContext* MappingContext : DefaultMappingContexts)
+    {
+        if (Subsystem && MappingContext)
+        {
+            Subsystem->AddMappingContext(MappingContext, 0);
+        }
+    }
+}
+```
+
+**단계별 이해**:
+
+```
+1. Subsystem 획득
+   → Enhanced Input을 관리하는 시스템 접근
+
+2. For Loop 실행
+   → DefaultMappingContexts 배열의 각 요소 순회
+
+3. 매핑 컨텍스트 추가
+   → 각 IMC를 게임에 등록
+   → 이제 플레이어가 입력 감지 가능!
+```
+
+**초보자용 설명**:
+
+```cpp
+// For Loop의 의미 (아직 배우지 않았지만 대략 이해)
+for (각 매핑 컨텍스트 : DefaultMappingContexts 배열)
+{
+    해당 매핑 컨텍스트를 게임에 추가;
+}
+
+// 예시:
+// IMC_Default를 게임에 추가
+// IMC_Default_Look을 게임에 추가
+```
+
+---
+
+## 🎮 2단계: Input Action을 C++ 함수에 연결
+
+### Character 클래스에서 처리
+
+**파일**: `DungeonEscapeCharacter.h`
+
+### Input Action 변수 선언
+
+```cpp
+// 기존 Input Action들
+UPROPERTY(EditAnywhere, Category = "Input")
+class UInputAction* JumpAction;
+
+UPROPERTY(EditAnywhere, Category = "Input")
+class UInputAction* MoveAction;
+
+UPROPERTY(EditAnywhere, Category = "Input")
+class UInputAction* LookAction;
+
+// 새로 추가할 Input Action
+UPROPERTY(EditAnywhere, Category = "Input")
+class UInputAction* InteractAction;  // 이것을 추가!
+
+```
+
+**변수의 역할**:
+
+```
+C++ 코드 ← → 에디터 에셋 연결
+
+InteractAction 변수 = IA_Interact 에셋
+
+```
+
+---
+
+### 연결될 함수 선언
+
+```cpp
+public:
+    void Interact();  // 새로 만들 함수
+
+```
+
+**함수 정의** (CPP 파일):
+
+```cpp
+void ADungeonEscapeCharacter::Interact()
+{
+    UE_LOG(LogTemp, Warning, TEXT("Interact function called"));
+}
+
+```
+
+**현재는 테스트용**:
+
+- 로그 메시지만 출력
+- 나중에 실제 상호작용 로직 추가 예정
+
+---
+
+### SetupPlayerInputComponent 함수
+
+**이 함수의 역할**: Input Action과 C++ 함수를 연결하는 특수 함수
+
+**파일**: `DungeonEscapeCharacter.cpp`
+
+```cpp
+void ADungeonEscapeCharacter::SetupPlayerInputComponent(
+    UInputComponent* PlayerInputComponent)
+{
+    // Enhanced Input Component 캐스팅
+    if (UEnhancedInputComponent* EnhancedInputComponent =
+        Cast<UEnhancedInputComponent>(PlayerInputComponent))
+    {
+        // 기존 바인딩들...
+
+        // 새로 추가: Interact Action 바인딩
+        EnhancedInputComponent->BindAction(
+            InteractAction,              // 어떤 Input Action?
+            ETriggerEvent::Started,      // 언제 호출?
+            this,                        // 어떤 객체의 함수?
+            &ADungeonEscapeCharacter::Interact  // 어떤 함수?
+        );
+    }
+}
+
+```
+
+---
+
+### BindAction 함수 완전 분석
+
+### 함수 구조
+
+```cpp
+EnhancedInputComponent->BindAction(
+    InputAction,        // 1. 연결할 Input Action
+    TriggerEvent,       // 2. 트리거 이벤트 타입
+    Object,             // 3. 함수를 가진 객체
+    &Class::Function    // 4. 호출할 함수의 주소
+);
+```
+
+---
+
+### 1번 매개변수: Input Action
+
+```cpp
+InteractAction  // 헤더에 선언한 변수
+```
+
+**설정 위치**: `BP_Player` 블루프린트의 Details 패널
+
+- InteractAction = IA_Interact 에셋
+
+---
+
+### 2번 매개변수: Trigger Event Type
+
+**3가지 옵션**:
+
+```cpp
+ETriggerEvent::Started    // 키를 누른 순간 (1회만)
+ETriggerEvent::Triggered  // 키를 누르고 있는 동안 (계속)
+ETriggerEvent::Completed  // 키를 뗀 순간 (1회만)
+```
+
+**시각적 이해**:
+
+```
+키보드 타임라인:
+[키 누름] ──────── [키를 누르고 있음] ──────── [키를 뗌]
+    ↓                      ↓                      ↓
+ Started              Triggered               Completed
+ (1번 호출)           (계속 호출)              (1번 호출)
+```
+
+---
+
+### 각 타입의 실전 활용
+
+**Started (시작 시 1회)**:
+
+```cpp
+// 점프 - 한 번만 점프하면 됨
+EnhancedInputComponent->BindAction(
+    JumpAction,
+    ETriggerEvent::Started,  // Space 누를 때 1번만
+    this,
+    &ADungeonEscapeCharacter::DoJumpStart
+);
+```
+
+**Triggered (누르고 있는 동안 계속)**:
+
+```cpp
+// 이동 - 계속 움직여야 함
+EnhancedInputComponent->BindAction(
+    MoveAction,
+    ETriggerEvent::Triggered,  // W 누르는 동안 계속
+    this,
+    &ADungeonEscapeCharacter::MoveInput
+);
+```
+
+**Completed (뗄 때 1회)**:
+
+```cpp
+// 점프 종료 - 멈추는 순간 1번
+EnhancedInputComponent->BindAction(
+    JumpAction,
+    ETriggerEvent::Completed,  // Space 뗄 때 1번
+    this,
+    &ADungeonEscapeCharacter::DoJumpEnd
+);
+```
+
+---
+
+### 우리의 선택: Started
+
+```cpp
+ETriggerEvent::Started  // 왜?
+```
+
+**이유**:
+
+```
+마우스 클릭 시나리오:
+1. 클릭 순간 → 아이템 획득/배치 (1회만 필요)
+2. 클릭 유지 → 아무것도 안 함
+3. 마우스 뗌 → 아무것도 안 함
+
+결론: Started가 적합!
+```
+
+**만약 Triggered를 사용하면?**:
+
+```cpp
+// 문제 발생!
+[마우스 버튼 누르는 동안]
+Interact() 호출
+Interact() 호출  ← 계속 호출됨!
+Interact() 호출
+Interact() 호출
+...
+
+// 아이템이 여러 번 획득되거나 이상한 동작 발생
+```
+
+---
+
+### 3번, 4번 매개변수: 객체와 함수 주소
+
+```cpp
+this,                                    // 3. 이 객체(캐릭터)의
+&ADungeonEscapeCharacter::Interact       // 4. Interact 함수를 호출
+```
+
+**this의 의미**:
+
+- 현재 캐릭터 객체를 가리킴
+- "이 캐릭터의 함수를 호출해"
+
+**&ADungeonEscapeCharacter::Interact**:
+
+- `&`: 주소 연산자 (함수의 메모리 위치)
+- `ADungeonEscapeCharacter::`: 클래스 이름
+- `Interact`: 함수 이름
+
+---
+
+## 🎨 블루프린트에서 Input Action 설정
+
+### BP_Player 블루프린트 설정
+
+**경로**: `Content/FirstPerson/Blueprints/BP_Player`
+
+**필수 작업**:
+
+1. 블루프린트 열기
+2. Details 패널에서 **Input 섹션** 찾기
+3. **Interact Action** 변수 찾기 (새로 생긴 것)
+4. 드롭다운 클릭 → **IA_Interact** 선택
+5. 컴파일 & 저장
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380625/notion-blog/_/_/_5_C_/_3_Dungeon_Escape_-_5/image_11.png)
+
+**설정 전**:
+
+```
+Interact Action: None  ❌
+```
+
+**설정 후**:
+
+```
+Interact Action: IA_Interact  ✅
+```
+
+---
+
+### 왜 블루프린트에서도 설정해야 하나?
+
+**C++와 블루프린트의 역할**:
+
+```
+C++ 코드:
+├── 변수 선언: UInputAction* InteractAction;
+├── 함수 선언: void Interact();
+└── 바인딩 코드: BindAction(InteractAction, ...)
+
+블루프린트:
+└── 실제 에셋 연결: InteractAction = IA_Interact
+
+게임 실행:
+└── IA_Interact 트리거 → Interact() 함수 호출!
+```
+
+**비유**:
+
+```
+C++: "InteractAction이라는 변수가 있어요"
+블루프린트: "그 변수에 IA_Interact 에셋을 넣을게요"
+게임: "IA_Interact가 트리거되면 Interact() 호출!"
+```
+
+---
+
+## 🧪 테스트하기
+
+### 테스트 1: 설정 전 (실패 사례)
+
+**상황**:
+
+```
+✅ C++ 코드 작성 완료
+✅ 컴파일 성공
+❌ 블루프린트에서 InteractAction 설정 안 함
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380626/notion-blog/_/_/_5_C_/_3_Dungeon_Escape_-_5/image_12.png)
+
+**결과**:
+
+```
+게임 실행
+마우스 왼쪽 버튼 클릭
+→ 아무 일도 일어나지 않음! ❌
+
+로그 출력: (없음)
+```
+
+**이유**:
+
+```cpp
+InteractAction = nullptr  // 아무것도 연결 안 됨
+→ BindAction이 작동하지 않음
+```
+
+---
+
+### 테스트 2: 설정 후 (성공!)
+
+**상황**:
+
+```
+✅ C++ 코드 작성 완료
+✅ 블루프린트에서 InteractAction = IA_Interact 설정
+✅ 컴파일 & 저장
+```
+
+**결과**:
+
+```
+게임 실행
+로그 창 열기 (` 키 또는 Cmd + ~ )
+
+마우스 왼쪽 버튼 클릭
+→ LogTemp: Warning: Interact function called ✅
+
+E 키 누르기
+→ LogTemp: Warning: Interact function called ✅
+```
+
+**성공!** 두 입력 모두 같은 함수 호출!
+
+---
+
+## 💡 전체 시스템 흐름도
+
+### 완성된 입력 시스템
+
+```
+[플레이어 입력]
+├── 마우스 왼쪽 버튼 클릭
+└── E 키 누르기
+        ↓
+[Input Mapping Context] (IMC_Default)
+└── "이 입력은 IA_Interact야!"
+        ↓
+[Input Action] (IA_Interact)
+└── "Started 이벤트 발생!"
+        ↓
+[BindAction 연결]
+└── "InteractAction이 Started면..."
+        ↓
+[C++ 함수 호출]
+└── ADungeonEscapeCharacter::Interact() 실행
+        ↓
+[현재 동작]
+└── UE_LOG 출력: "Interact function called"
+        ↓
+[나중에 구현]
+└── 실제 상호작용 로직 (아이템 획득 등)
+```
+
+---
+
+## 🔑 핵심 개념 정리
+
+### 1. Input Action 자체는 아무것도 안 함!
+
+```cpp
+// 단순히 개념만 표현
+IA_Interact  // "상호작용"이라는 추상적 아이디어
+
+// C++ 함수와 연결되어야 실제 동작
+BindAction → Interact() → 실제 코드 실행!
+```
+
+---
+
+### 2. 2단계 설정 필수
+
+| 단계      | 위치             | 작업                |
+| --------- | ---------------- | ------------------- |
+| **1단계** | PlayerController | 매핑 컨텍스트 등록  |
+| **2단계** | Character        | Input Action 바인딩 |
+
+둘 다 완료되어야 작동!
+
+---
+
+### 3. Trigger Event 타입 선택 기준
+
+```cpp
+Started:    한 번만 발생 (클릭, 점프)
+Triggered:  계속 발생 (이동, 조준)
+Completed:  종료 시점 (점프 멈춤)
+```
+
+---
+
+### 4. C++와 블루프린트의 협업
+
+```
+C++: 구조 정의 (변수, 함수, 바인딩 로직)
+블루프린트: 에셋 연결 (어떤 Input Action 사용할지)
+게임: 두 가지 결합하여 실행!
+```
+
+---
+
+## 📝 완성된 코드 정리
+
+### 헤더 파일 (DungeonEscapeCharacter.h)
+
+```cpp
+public:
+    // Input Action 변수 선언
+    UPROPERTY(EditAnywhere, Category = "Input")
+    class UInputAction* InteractAction;
+
+    // 호출될 함수 선언
+    void Interact();
+```
+
+---
+
+### CPP 파일 (DungeonEscapeCharacter.cpp)
+
+```cpp
+// Input Action 바인딩
+void ADungeonEscapeCharacter::SetupPlayerInputComponent(
+    UInputComponent* PlayerInputComponent)
+{
+    if (UEnhancedInputComponent* EnhancedInputComponent =
+        Cast<UEnhancedInputComponent>(PlayerInputComponent))
+    {
+        // Interact Action 바인딩
+        EnhancedInputComponent->BindAction(
+            InteractAction,
+            ETriggerEvent::Started,  // 누른 순간 1회
+            this,
+            &ADungeonEscapeCharacter::Interact
+        );
+    }
+}
+
+// 실제 호출되는 함수
+void ADungeonEscapeCharacter::Interact()
+{
+    UE_LOG(LogTemp, Warning, TEXT("Interact function called"));
+
+    // TODO: 나중에 실제 상호작용 로직 구현
+    // - 레이캐스트로 앞에 뭐가 있는지 확인
+    // - 아이템이면 획득
+    // - Lock이면 아이템 배치 시도
+}
+```
+
+---
+
+## 🎓 다음 단계
+
+**현재 상태**:
+
+```
+✅ Input Action 생성 (IA_Interact)
+✅ Input Mapping 설정 (마우스, E키)
+✅ C++ 함수 연결 (Interact())
+✅ 테스트 성공 (로그 출력)
+```
+
+**다음 강의에서 구현할 것**:
+
+1. **레이캐스트** (Raycast)
+   - 플레이어 앞에 뭐가 있는지 감지
+2. **상호작용 로직**
+   - Collectable Item 획득
+   - Lock에 아이템 배치
+3. **UI 피드백**
+   - "E키를 눌러 획득하세요"
+   - "올바른 아이템입니다"
+
+---
+
+## 💭 초보자 Q&A
+
+**Q: 왜 PlayerController와 Character 둘 다 설정하나요?**
+A: 역할이 다릅니다:
+
+- **PlayerController**: 매핑 컨텍스트를 게임에 등록 (전체 입력 활성화)
+- **Character**: 각 Input Action을 함수에 연결 (개별 동작 정의)
+
+**Q: this와 & 기호는 왜 사용하나요?**
+A:
+
+- `this`: 현재 객체(캐릭터) 가리킴
+- `&`: 함수의 메모리 주소 전달 (포인터 개념)
+
+지금은 "이렇게 쓴다"만 알아도 OK!
+
+**Q: Started vs Triggered 어떻게 선택하나요?**
+A: 간단한 판단 기준:
+
+- 1번만 실행? → Started
+- 계속 실행? → Triggered
+
+**Q: 블루프린트 설정을 깜빡하면?**
+A: 코드는 에러 없이 컴파일되지만, 게임에서 작동하지 않습니다. 반드시 블루프린트에서 Input Action을 설정해야 합니다!
+
+**Q: 여러 Input Action을 같은 함수에 연결할 수 있나요?**
+A: 아니요, 각 Input Action은 각자의 함수가 필요합니다. 하지만 그 함수들이 내부적으로 같은 함수를 호출할 수는 있습니다!
+
+---
+
+# { 🎮 언리얼 C++ 입력 시스템 — 초보용 정리본 }
+
+## 결론부터 (이 한 줄만 기억해도 됨)
+
+> “입력은 켜는 곳과, 사용하는 곳이 다르다”
+
+- 🔌 **켜는 곳** → PlayerController
+- 🎭 **행동하는 곳** → Character
+
+이게 전부야.
+
+---
+
+## 🤔 왜 이렇게 나눴을까?
+
+언리얼은 이렇게 생각함:
+
+> “입력은 ‘플레이어’의 것
+>
+> 행동은 ‘캐릭터’의 것”
+
+그래서 억지로 둘을 나눠놨음.
+
+(초보자한텐 솔직히 불친절함 😅)
+
+---
+
+## 🧩 전체 구조를 사람 말로 풀면
+
+### 상황
+
+> “플레이어가 E 키를 눌렀을 때
+>
+> 캐릭터가 상호작용 하게 하고 싶다”
+
+언리얼은 이걸 **4단계로 쪼갬**.
+
+---
+
+## ① Input Action (IA_Interact)
+
+### 👉 이건 그냥 **이름표**야
+
+```
+IA_Interact = "상호작용"
+```
+
+❌ 동작 안 함
+
+❌ 코드 없음
+
+⭕ “이건 상호작용이라는 입력이다”라고 이름만 붙임
+
+📌 **아무 일도 안 하는 게 정상**
+
+---
+
+## ② Input Mapping Context (IMC_Default)
+
+### 👉 “어떤 키가 그 이름표냐?”를 정하는 표
+
+```
+E 키 → IA_Interact
+마우스 왼쪽 → IA_Interact
+```
+
+📌 여기까지 해도 **아직 게임은 반응 안 함**
+
+---
+
+## ③ PlayerController — 입력 전원 버튼 🔌
+
+### 👉 “이 입력 설정을 게임에서 쓰겠다”고 선언하는 곳
+
+비유하면:
+
+> IMC는 리모컨
+>
+> PlayerController는 **TV 전원 버튼**
+
+```
+IMC를 등록 안 하면
+→ 버튼 눌러도 TV 안 켜짐
+```
+
+그래서 PlayerController에서:
+
+```cpp
+Subsystem->AddMappingContext(IMC_Default, 0);
+```
+
+📌 의미:
+
+> “이 입력 설정(IMC)을 이제부터 사용하겠다”
+
+---
+
+## ④ Character — 실제 행동 담당 🎭
+
+### 👉 “그래서 눌리면 뭐 할 건데?”
+
+여기서 드디어 **행동**을 정의함.
+
+```cpp
+void Interact()
+{
+    // 상호작용 내용
+}
+```
+
+그리고 연결:
+
+```cpp
+IA_Interact 눌림 → Interact() 실행
+```
+
+📌 **이게 게임 플레이 로직**
+
+---
+
+## 🔗 핵심 연결 한 줄 요약
+
+```
+E 키
+→ IA_Interact (이름표)
+→ IMC (연결표)
+→ PlayerController (입력 켜짐)
+→ Character (행동 실행)
+```
+
+---
+
+## 🧠 진짜 중요한 포인트 3개
+
+### ✅ 1. Input Action은 “기능”이 아니다
+
+> ❌ “IA_Interact가 상호작용을 한다”
+>
+> ⭕ “IA_Interact가 눌렸다는 신호만 준다”
+
+---
+
+### ✅ 2. PlayerController와 Character는 역할이 다르다
+
+| 역할             | 하는 일        |
+| ---------------- | -------------- |
+| PlayerController | 입력 사용 허락 |
+| Character        | 입력으로 행동  |
+
+---
+
+### ✅ 3. 블루프린트 설정은 “배선 연결”
+
+C++에서 이렇게 말해둠:
+
+```cpp
+UInputAction* InteractAction;
+```
+
+블루프린트에서 실제로:
+
+```
+InteractAction = IA_Interact
+```
+
+📌 안 꽂으면 전기 안 옴.
+
+---
+
+## 🤯 왜 하나라도 빠지면 안 될까?
+
+언리얼은 이렇게 생각함:
+
+> “에러는 안 낼게
+>
+> 대신 아무것도 안 할게”
+
+그래서:
+
+- 컴파일 성공
+- 게임 실행
+- 근데 반응 없음 😇
+
+👉 이건 **네가 잘못한 게 아니라 언리얼 방식**
+
+---
+
+## 🧪 최소 테스트 기준 (이것만 확인하면 OK)
+
+✔ PlayerController에 IMC 등록됨
+
+✔ Character에서 BindAction 있음
+
+✔ BP에서 InteractAction에 IA_Interact 연결됨
+
+이 3개만 맞으면 **100% 동작**
+
+---

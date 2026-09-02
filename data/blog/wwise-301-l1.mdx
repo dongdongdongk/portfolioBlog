@@ -1,0 +1,410 @@
+---
+title: 'Wwise 301 L1'
+date: '2026-09-02'
+category: '게임 개발/WWISE'
+tags: ['게임 개발', 'WWISE']
+draft: false
+summary: ''
+---
+
+# { 🚀 SoundBank 로드하기와 Wwise 이벤트 재생하기 }
+
+이번 강의에서는 **Wwise의 SoundBank를 Unity에서 로드하고**,
+
+게임 오브젝트에 **사운드를 연결해 재생하는 방법**을 배웁니다.
+
+즉, 게임에서 사운드가 어떻게 로드되고, 언제 어떤 이벤트가 재생되는지를 이해하고 직접 설정합니다.
+
+---
+
+## 📋 목차
+
+1. [SoundBank와 Event의 개념 이해하기](https://www.notion.so/289e683f737e80bfaa14f5912a0740fe#soundbank%EC%99%80-event%EC%9D%98-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [SoundBank 생성 및 Unity에 추가하기](https://www.notion.so/289e683f737e80bfaa14f5912a0740fe#soundbank-%EC%83%9D%EC%84%B1-%EB%B0%8F-unity%EC%97%90-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+3. [SoundBank 로드 시점 제어하기 (Load On)](https://www.notion.so/289e683f737e80bfaa14f5912a0740fe#soundbank-%EB%A1%9C%EB%93%9C-%EC%8B%9C%EC%A0%90-%EC%A0%9C%EC%96%B4%ED%95%98%EA%B8%B0-load-on)
+4. [이벤트(Event) 추가하고 재생하기](https://www.notion.so/289e683f737e80bfaa14f5912a0740fe#%EC%9D%B4%EB%B2%A4%ED%8A%B8event-%EC%B6%94%EA%B0%80%ED%95%98%EA%B3%A0-%EC%9E%AC%EC%83%9D%ED%95%98%EA%B8%B0)
+5. [사운드의 공간적 위치와 고정 동작 이해하기](https://www.notion.so/289e683f737e80bfaa14f5912a0740fe#%EC%82%AC%EC%9A%B4%EB%93%9C%EC%9D%98-%EA%B3%B5%EA%B0%84%EC%A0%81-%EC%9C%84%EC%B9%98%EC%99%80-%EA%B3%A0%EC%A0%95-%EB%8F%99%EC%9E%91-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. SoundBank와 Event의 개념 이해하기
+
+- **SoundBank(사운드뱅크)**
+  : Wwise에서 만든 모든 사운드 데이터, 이벤트, 설정 등을 **패키징한 파일**입니다.
+  - Unity로 가져오기 전에, **SoundBank가 반드시 생성되어 있어야** 합니다.
+  - 즉, Unity에서는 SoundBank 안에 담긴 사운드나 이벤트만 사용할 수 있습니다.
+- **Event(이벤트)**
+  : 실제로 “사운드를 재생”하거나 “정지”시키는 명령입니다.
+  - 예: `Play_Fire`, `Stop_Explosion`, `Play_Footstep` 등.
+  - 이벤트는 SoundBank에 포함되어야만 Unity에서 호출할 수 있습니다.
+
+> 🎯 정리
+>
+> 게임 안에서 사운드를 재생하기 위해서는
+>
+> `Wwise Event` → `SoundBank` → `Unity GameObject`
+>
+> 순으로 연결되어야 합니다.
+
+---
+
+## 2. SoundBank 생성 및 Unity에 추가하기
+
+### 🔹 Device Picker 열기
+
+- Unity 상단 메뉴에서:
+  ```
+  Window → Audio → Wwise Picker
+  ```
+  로 이동합니다.
+  여기서 **Wwise 프로젝트의 모든 SoundBank와 Event를 Unity에서 접근할 수 있습니다.**
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380514/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L1/image.png)
+
+### 🔹 SoundBank 선택 및 추가하기
+
+- Wwise Picker 창에서
+  `SoundBanks > Default Work Unit > General` 로 이동합니다.
+- `General` SoundBank는 **게임 전체에서 공용으로 사용하는 사운드들을 포함**하는 SoundBank입니다.
+- `General` SoundBank를 **Hierarchy의 “General SoundBanks” 게임 오브젝트**로 **드래그 앤 드롭**합니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380512/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L1/image_1.png)
+
+### 🔹 Unity 내에서의 연결 확인
+
+- 이제 `General SoundBanks` 게임 오브젝트를 선택하면
+  **Inspector 뷰**에 `AkBank` 컴포넌트가 추가된 것을 볼 수 있습니다.
+- 이 `AkBank` 컴포넌트가 **SoundBank를 실제 메모리에 로드하고 관리하는 역할**을 합니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380513/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L1/image_2.png)
+
+---
+
+## 3. SoundBank 로드 시점 제어하기 (Load On)
+
+### 🔹 Start 이전에 SoundBank 로드 필요성
+
+- Wwise 이벤트는 일반적으로 **Start() 함수가 실행될 때** 호출됩니다.
+- 하지만 이벤트를 **Start() 이전에 로드된 SoundBank 안에서만 재생**할 수 있습니다.
+- 즉, **SoundBank가 Start 이전에 로드되어 있어야** 이벤트가 제대로 재생됩니다.
+
+### 🔹 Load On 옵션 조정하기
+
+- `AkBank` 컴포넌트의 **“Load On”** 속성을 확인합니다.
+  기본적으로는 `Start`로 설정되어 있습니다.
+- 이 옵션은 **언제 SoundBank를 메모리에 로드할지를 정하는 옵션**입니다.
+
+| 옵션        | 설명                                           |
+| ----------- | ---------------------------------------------- |
+| **Awake**   | 오브젝트가 생성될 때(게임 실행 시점) 즉시 로드 |
+| **Start**   | Start() 함수가 실행될 때 로드                  |
+| **Trigger** | 특정 이벤트(트리거)가 발생할 때 로드           |
+
+### 🔹 Start → Awake로 변경하기
+
+- **Awake** 옵션을 선택합니다.
+  이렇게 하면 **SoundBank가 Start보다 먼저 로드**되어
+  이후 Start에서 실행되는 Wwise 이벤트들이 정상적으로 작동할 수 있습니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380513/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L1/image_3.png)
+
+### 🔹 Mixed 상태
+
+- Awake를 선택하면 Load On 속성이 `Mixed`로 바뀝니다.
+  이유: Unity에서는 여러 로드 조건을 동시에 선택할 수 있기 때문입니다.
+- 따라서 **Start 옵션을 해제**하고 **Awake만 선택**해둡니다.
+
+### ✅ 결과
+
+- 이제 `General` SoundBank는 **게임 실행 시(오브젝트 생성 시)** 자동으로 로드됩니다.
+- SoundBank 이름(`Bank Name`)은 자동으로 `General`로 지정됩니다.
+
+---
+
+## 4. 이벤트(Event) 추가하고 재생하기
+
+### 🔹 장면 준비하기
+
+- Scene 뷰에서 **Player 오브젝트**를 선택합니다.
+- `Scene View`에서 마우스를 두고 `F` 키를 눌러 **플레이어 위치를 중앙으로 포커싱**합니다.
+
+### 🔹 이벤트를 Scene에 추가하기
+
+1. **Project 창**에서 `Campfire`를 검색합니다.
+2. `3D_Campfire` 프리팹(또는 오브젝트)을 Scene에 드래그해 배치합니다.
+   - 위치: 지면 위로 살짝 띄워줍니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380513/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L1/image_4.png)
+
+### 🔹 Wwise Event 컴포넌트 추가하기
+
+- `Campfire` 오브젝트를 선택하고,
+  **Inspector → Add Component → “Ak Event”** 를 검색해 추가합니다.
+
+### 🔹 AkEvent 속성 살펴보기
+
+| 속성           | 설명                                                         |
+| -------------- | ------------------------------------------------------------ |
+| **Trigger On** | 이벤트가 언제 재생될지 설정 (예: Start, Awake, Collision 등) |
+| **Event Name** | 어떤 Wwise 이벤트를 재생할지 지정                            |
+
+- `Trigger On`은 기본적으로 `Start`로 설정되어 있습니다.
+  즉, 게임이 시작되면 자동으로 해당 사운드가 재생됩니다.
+
+### 🔹 Event 지정하기
+
+- `Event Name` 오른쪽의 선택 버튼을 클릭 →
+  `Events > Ambient > General > Play_Campfire` 를 더블클릭합니다.
+
+> 🎯 이 과정을 통해 Campfire 오브젝트가 게임 시작 시 불타는 소리를 재생하는 역할을 하게 됩니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380513/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L1/image_5.png)
+
+---
+
+## 5. 사운드의 공간적 위치와 고정 동작 이해하기
+
+- Play를 누르면 사운드가 재생됩니다.
+- `Campfire` 오브젝트를 이동해도,
+  사운드는 여전히 **해당 오브젝트의 현재 위치**에서 들립니다.
+
+> 🔊 즉, Wwise 사운드는 **오브젝트에 “고정된 3D 사운드”**로 작동합니다.
+>
+> 오브젝트가 움직이면 소리의 위치도 함께 이동합니다.
+
+- 따라서, 예를 들어 불이 피어나는 오브젝트를 이동시킨다면,
+  불소리도 그와 함께 공간적으로 이동하게 됩니다.
+  (이는 Wwise의 **3D Spatialization** 시스템에 의해 자동으로 처리됩니다.)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380514/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L1/image_6.png)
+
+---
+
+## 🧠 핵심 요약
+
+| 단계 | 내용                                                                  |
+| ---- | --------------------------------------------------------------------- |
+| 1️⃣   | **Wwise에서 SoundBank 생성** (예: General)                            |
+| 2️⃣   | Unity에서 **Wwise Picker**로 SoundBank 드래그하여 GameObject에 추가   |
+| 3️⃣   | `AkBank` 컴포넌트의 **Load On = Awake** 설정                          |
+| 4️⃣   | `AkEvent` 컴포넌트를 추가하고 이벤트 이름 지정 (`Play_Campfire`)      |
+| 5️⃣   | 실행 시 **SoundBank가 먼저 로드되고**, Start에서 **이벤트 자동 재생** |
+
+---
+
+## 🎓 개념 정리
+
+- **SoundBank**: Wwise에서 만든 오디오 데이터의 묶음.
+- **AkBank Component**: Unity 내에서 SoundBank를 로드/언로드하는 역할.
+- **Load On (Awake/Start)**: SoundBank 로드 시점을 제어.
+- **AkEvent Component**: 오디오 이벤트(Play, Stop 등)를 재생.
+- **Trigger On (Start)**: 이벤트 실행 타이밍 제어.
+- **3D Sound Positioning**: 사운드가 오브젝트의 실제 위치를 기준으로 공간적으로 재생됨.
+
+---
+
+# { 🎯 Trigger Conditions — 트리거 조건 정의하기 }
+
+이번 강의에서는 **Wwise를 Unity에 통합했을 때, 특정 상황(Trigger)에 따라 사운드가 재생되도록 제어하는 방법**을 배웁니다.
+
+예시로는 플레이어가 **동전(Coin)** 오브젝트를 획득할 때 사운드를 재생하는 기능을 구현합니다.
+
+---
+
+## 📋 목차
+
+1. [Trigger Conditions 개념 이해하기](https://www.notion.so/Wwise-301-L1-01-289e683f737e80bfaa14f5912a0740fe#trigger-conditions-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [씬 설정 및 오브젝트 배치](https://www.notion.so/Wwise-301-L1-01-289e683f737e80bfaa14f5912a0740fe#%EC%94%AC-%EC%84%A4%EC%A0%95-%EB%B0%8F-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%EB%B0%B0%EC%B9%98)
+3. [E Key Event 컴포넌트 추가 및 설정](https://www.notion.so/Wwise-301-L1-01-289e683f737e80bfaa14f5912a0740fe#e-key-event-%EC%BB%B4%ED%8F%AC%EB%84%8C%ED%8A%B8-%EC%B6%94%EA%B0%80-%EB%B0%8F-%EC%84%A4%EC%A0%95)
+4. [Trigger Enter 이벤트 연결하기](https://www.notion.so/Wwise-301-L1-01-289e683f737e80bfaa14f5912a0740fe#trigger-enter-%EC%9D%B4%EB%B2%A4%ED%8A%B8-%EC%97%B0%EA%B2%B0%ED%95%98%EA%B8%B0)
+5. [문제 원인 분석: 사운드가 자동 재생되는 이유](https://www.notion.so/Wwise-301-L1-01-289e683f737e80bfaa14f5912a0740fe#%EB%AC%B8%EC%A0%9C-%EC%9B%90%EC%9D%B8-%EB%B6%84%EC%84%9D-%EC%82%AC%EC%9A%B4%EB%93%9C%EA%B0%80-%EC%9E%90%EB%8F%99-%EC%9E%AC%EC%83%9D%EB%90%98%EB%8A%94-%EC%9D%B4%EC%9C%A0)
+6. [AK Trigger Enter 컴포넌트로 해결하기](https://www.notion.so/Wwise-301-L1-01-289e683f737e80bfaa14f5912a0740fe#ak-trigger-enter-%EC%BB%B4%ED%8F%AC%EB%84%8C%ED%8A%B8%EB%A1%9C-%ED%95%B4%EA%B2%B0%ED%95%98%EA%B8%B0)
+7. [정상 동작 테스트 및 요약](https://www.notion.so/Wwise-301-L1-01-289e683f737e80bfaa14f5912a0740fe#%EC%A0%95%EC%83%81-%EB%8F%99%EC%9E%91-%ED%85%8C%EC%8A%A4%ED%8A%B8-%EB%B0%8F-%EC%9A%94%EC%95%BD)
+
+---
+
+## 1. Trigger Conditions 개념 이해하기
+
+- **Trigger Condition (트리거 조건)**:
+  게임 내 특정 상황(Trigger)이 발생할 때 사운드를 재생하게 만드는 조건을 의미합니다.
+  예를 들어:
+  - 플레이어가 아이템을 **획득할 때**
+  - 캐릭터가 **충돌할 때**
+  - 문이 **열릴 때**
+    와 같은 이벤트를 트리거로 설정할 수 있습니다.
+- 이번 강의의 목표:
+  플레이어가 **Coin 오브젝트**와 충돌(Trigger Enter)할 때 **“Pickup_Coin” 사운드 이벤트**를 재생하도록 설정합니다.
+
+---
+
+## 2. 씬 설정 및 오브젝트 배치
+
+1. **씬 열기**
+   - Unity 메뉴에서
+     `Audiokinetic → Certification 301 → Lesson 1 → Trigger Conditions`
+     씬을 엽니다.
+2. **Player 선택**
+   - Hierarchy(계층) 뷰에서 **Player** 오브젝트를 선택합니다.
+3. **Coin Prefab 추가**
+   - Project 뷰에서 `301_Coin`을 검색합니다.
+   - Prefab을 **Scene View**로 드래그하여 **플레이어 앞쪽**에 배치합니다.
+4. **Collider 시각화 확인**
+   - 동전 주위에 **녹색 구(Sphere)** 형태의 Collider가 보이지 않는다면:
+     - Inspector에서 **Sphere Collider** 항목을 열어 **Is Trigger**가 활성화되어 있는지 확인합니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380514/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L1/image_7.png)
+
+---
+
+## 3. E Key Event 컴포넌트 추가 및 설정
+
+이제 **Trigger 조건이 발생했을 때 사운드를 재생하는 로직**을 설정합니다.
+
+1. **E Key Event 스크립트 추가**
+   - 동전 오브젝트(`301_Coin`)를 선택하고
+     **Add Component → AK Event**를 추가합니다.
+2. **불필요한 옵션 해제**
+   - AK Event에는 여러 트리거 옵션이 존재하지만,
+     이번에는 **`AK Trigger Enter`** 만 선택합니다.
+   - 이렇게 하면 **다른 Collider가 들어올 때만 이벤트가 발생**하게 됩니다.
+3. **이벤트 설정 (Event Property 지정)**
+   - Inspector에서 **Event** 속성을 클릭합니다.
+   - `Events → Player → General → Pickup_Coin`을 선택한 후 **OK** 클릭.
+
+이제, **플레이어가 Collider에 들어올 때** 동전 획득 사운드가 재생되도록 설정되었습니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380514/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L1/image_8.png)
+
+---
+
+## 4. Trigger Enter 이벤트 연결하기
+
+- **Trigger Enter란?**
+  어떤 오브젝트의 Collider가 **Trigger Collider** 안으로 들어올 때 발생하는 이벤트입니다.
+- 현재 설정한 **AK Trigger Enter** 옵션은 “이 오브젝트(동전)”의 Collider 안으로 **다른 오브젝트가 들어올 때** 실행됩니다.
+- 즉, **플레이어가 동전 Collider 범위로 들어올 때**, “Pickup_Coin” 이벤트가 호출되어 사운드가 재생됩니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380514/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L1/image_9.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380512/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L1/image_10.png)
+
+---
+
+## 5. 문제 원인 분석: 사운드가 자동 재생되는 이유
+
+테스트를 위해 **Play Mode**를 실행하면, 게임을 시작하자마자 **동전 사운드가 자동으로 재생**되는 문제가 발생합니다.
+
+이 현상의 이유는 다음과 같습니다 👇
+
+- **Collider 감지 방식**
+  Unity의 Collider는 **게임이 시작될 때** 주변의 Collider를 즉시 감지합니다.
+  이때, 동전의 Sphere Collider가 **지면(Ground)** 을 “다른 Collider”로 인식하고,
+  “Trigger Enter” 이벤트가 발생하게 됩니다.
+- 결과적으로, **플레이어가 접촉하지 않았는데도** 사운드가 실행되는 것입니다.
+
+---
+
+## 6. AK Trigger Enter 컴포넌트로 해결하기
+
+이 문제를 해결하기 위해 **“AK Trigger Enter” 컴포넌트**를 사용합니다.
+
+1. **AK Trigger Enter 컴포넌트 추가**
+   - 동전 오브젝트를 선택하고
+     **Add Component → AK Trigger Enter**를 추가합니다.
+2. **Trigger Object 설정**
+   - AK Trigger Enter에는 **Trigger Object** 속성이 있습니다.
+   - 이 속성은 **이 이벤트를 유발할 수 있는 오브젝트(한정된 대상)** 을 지정합니다.
+   - Player 오브젝트를 **Trigger Object** 필드로 드래그 앤 드롭합니다.
+3. **동작 원리**
+   - 이제 “AK Trigger Enter”는
+     **Player 오브젝트가 Collider 안으로 들어올 때만** 이벤트를 트리거합니다.
+   - Ground나 다른 Collider는 무시됩니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380512/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L1/image_11.png)
+
+---
+
+## 7. 정상 동작 테스트 및 요약
+
+✅ **테스트 단계**
+
+1. **Play Mode 실행**
+   - 이번에는 게임을 시작할 때 사운드가 자동으로 재생되지 않습니다.
+2. **플레이어 이동**
+   - 플레이어를 동전 쪽으로 이동하면, **충돌 시 사운드가 재생**됩니다.
+
+---
+
+### 🔍 요약 정리
+
+| 단계 | 설명                    | 주요 포인트                                 |
+| ---- | ----------------------- | ------------------------------------------- |
+| 1    | 동전 Prefab 추가        | Collider가 활성화되어 있어야 함             |
+| 2    | AK Event 추가           | AK Trigger Enter만 선택                     |
+| 3    | Pickup_Coin 이벤트 연결 | Event 속성에서 Wwise Event 지정             |
+| 4    | 문제 발생               | Ground Collider도 감지되어 사운드 자동 재생 |
+| 5    | AK Trigger Enter 추가   | Player만 트리거로 지정하여 문제 해결        |
+| 6    | 테스트 완료             | 오직 Player 접촉 시 사운드 재생             |
+
+---
+
+## 💡 핵심 개념 요약
+
+- **AK Trigger Enter**
+  - Trigger Collider에 진입할 때 발생하는 이벤트.
+  - 특정 GameObject(Player 등)만 인식하도록 설정 가능.
+- **AK Event**
+  - 특정 이벤트(Wwise Event)를 트리거와 연결하여 사운드를 재생하는 컴포넌트.
+  - Start, Update, Trigger 등 다양한 실행 시점을 제어 가능.
+- **Trigger Object**
+  - AK Trigger Enter 컴포넌트에서 트리거 조건을 제한하는 필드.
+  - 이 필드에 지정된 오브젝트만 이벤트를 활성화시킴.
+
+---
+
+🎧 **결론:**
+
+이번 강의에서는 “Trigger Condition”을 이용해 **플레이어만 특정 사운드를 재생하도록 제어하는 방법**을 배웠습니다.
+
+이 과정을 통해 Wwise 이벤트 시스템과 Unity Collider의 상호작용 원리를 이해하고,
+
+**불필요한 트리거 감지 문제(자동 재생 문제)** 를 해결하는 방법까지 익혔습니다.
+
+# { 오류 발생 }
+
+```csharp
+Access to Wwise is required to generate the SoundBanks. Please go to Edit > Project Settings... and set the Wwise Application Path found in the Wwise Editor view.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380513/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L1/image_12.png)
+
+```csharp
+WWISE 경로가 확실하지 않으면 오류가 발생한다
+```
+
+## ⚙️ 두 경로가 연결되어야 하는 이유
+
+Unity에서 Wwise 관련 기능(예: SoundBank 생성, 이벤트 미리보기)을 사용할 때는 다음 순서로 동작합니다:
+
+1. Unity가 **Wwise Project Path**를 확인
+
+   → 어떤 `.wproj` 파일을 기반으로 할지 결정
+
+2. Unity가 **Wwise Application Path**를 사용해
+
+   Wwise.exe를 실행
+
+3. 지정된 Wwise 프로젝트 파일을 열어서
+
+   SoundBank를 생성하고 Unity로 전달
+
+👉 따라서 **둘 다 정확하게 설정되어 있어야** SoundBank가 정상적으로 만들어집니다.
+
+---
+
+## 💡 확인 위치
+
+| 항목                       | Unity 내 위치                                                          |
+| -------------------------- | ---------------------------------------------------------------------- |
+| **Wwise Application Path** | `Edit → Project Settings → Wwise`                                      |
+| **Wwise Project Path**     | `Wwise → Project Settings` (또는 `Wwise Picker` 창 상단에서 확인 가능) |

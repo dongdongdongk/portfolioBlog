@@ -1,0 +1,1021 @@
+---
+title: '섹션:5 음식 배달 앱 - 1'
+date: '2026-09-02'
+category: '프론트/React Native'
+tags: ['프론트', 'React Native']
+draft: false
+summary: ''
+---
+
+# { 🍔 음식 배달 앱 — 소개 & 프로젝트 세팅 }
+
+> 부동산 앱과 세팅 과정은 동일 — 새로 나온 것만 정리
+
+섹션:3 영화 앱 - 1
+
+---
+
+## 📋 이번 앱에서 배울 것 (부동산 앱과 차이)
+
+| 기능          | 부동산 앱     | 음식 배달 앱          |
+| ------------- | ------------- | --------------------- |
+| 인증 방식     | 구글 OAuth    | **이메일 + 비밀번호** |
+| 상태 관리     | React Context | **Zustand**           |
+| 에러 모니터링 | ❌            | **Sentry**            |
+| 네비게이션    | 탭만          | **탭 + 스택**         |
+| 장바구니      | ❌            | **카트 + 옵션 로직**  |
+
+---
+
+## 1. 새로 나온 도구들
+
+### Zustand — 글로벌 상태 관리
+
+```
+React Context (부동산 앱):
+  Provider로 감싸기 → useContext로 꺼내기
+  → 설정이 많고 코드가 길다
+
+Zustand (음식 배달 앱):
+  store 하나 만들기 → useStore로 바로 꺼내기
+  → 훨씬 간단하고 코드가 짧다
+```
+
+> 💡 장바구니처럼 여러 화면에서 공유해야 하는 상태(담은 음식 목록, 수량 등)를
+> Zustand로 관리합니다.
+
+### Sentry — 에러 모니터링
+
+```
+개발할 때 에러:
+  터미널/콘솔에서 바로 확인 가능
+
+실제 출시 후 에러:
+  사용자 폰에서 발생 → 개발자는 모름 😱
+  → Sentry가 에러를 자동으로 수집해서 대시보드에 표시
+
+추가 기능: Seer (AI 에이전트)
+  → 수집된 에러를 분석해서 해결 방법까지 자동 제안
+```
+
+---
+
+## 2. 만들 화면 6개
+
+```
+1. 로그인/회원가입  — 이메일 + 비밀번호 인증
+2. 홈              — 실시간 음식 메뉴 + 할인 배너
+3. 검색            — 이름/카테고리 필터
+4. 장바구니        — 담은 음식 + 옵션(사이즈, 토핑 등)
+5. 프로필          — 유저 정보
+6. 주문 상세       — 주문 내역
+```
+
+---
+
+## 3. 기술 스택
+
+| 역할       | 도구                               |
+| ---------- | ---------------------------------- |
+| 프레임워크 | React Native + Expo SDK 52         |
+| 스타일링   | NativeWind (Tailwind CSS)          |
+| 백엔드     | Appwrite (인증 + DB + 이미지 저장) |
+| 상태 관리  | **Zustand** ← 새로 등장            |
+| 에러 추적  | **Sentry** ← 새로 등장             |
+| 언어       | TypeScript                         |
+
+---
+
+## 4. 프로젝트 세팅
+
+부동산 앱과 동일합니다. 아래만 다릅니다.
+
+```json
+// app.json
+{
+  "expo": {
+    "name": "FastFood",
+    "scheme": "fastfood" // ← 딥링크 스킴만 다름
+  }
+}
+```
+
+```bash
+# 프로젝트 생성
+npx create-expo-app@latest ./
+
+# 초기화
+npm run reset-project
+
+# 개발 서버 시작
+npx expo start
+```
+
+> 세팅 상세 내용은 이전에 정리한
+> `restate_project_setup.md`를 참고하세요.
+
+---
+
+## 🔑 핵심 요약
+
+1. **이메일 인증** = 구글 OAuth 대신 이메일 + 비밀번호로 로그인
+2. **Zustand** = Context보다 간단한 글로벌 상태 관리 (장바구니에 활용)
+3. **Sentry** = 출시 후 실제 유저 기기에서 발생하는 에러를 수집/분석
+4. **탭 + 스택 네비게이션** = 탭은 메인 메뉴, 스택은 화면 안에서의 이동(상세 → 뒤로)
+5. **프로젝트 세팅** = 부동산 앱과 동일 (scheme만 `fastfood`로 변경)
+
+# { 🍔 홈 화면 가이드 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381487/notion-blog/_/React_Native/React_Native_-_/_5_-_1/image.png)
+
+> FlatList + 교차 레이아웃 카드 + CartButton 컴포넌트
+
+---
+
+## 📋 이번 강의에서 만드는 것
+
+```
+홈 화면
+├── SafeAreaView
+│   └── FlatList
+│       ├── ListHeaderComponent
+│       │   ├── 배달 위치 (DELIVER TO + 도시명)
+│       │   └── <CartButton /> (장바구니 아이콘 + 뱃지)
+│       └── renderItem: OfferCard (카드들)
+│           ├── 짝수 인덱스: 이미지 왼쪽 + 텍스트 오른쪽
+│           └── 홀수 인덱스: 텍스트 왼쪽 + 이미지 오른쪽
+```
+
+---
+
+## 1. 전체 코드 + 주석
+
+```tsx
+// app/(tabs)/index.tsx
+
+import cn from "clsx";
+import { Fragment } from "react";
+import { FlatList, Image, Pressable, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import CartButton from "@/components/CartButton";
+import { images, offers } from "@/constants";
+
+export default function Index() {
+  return (
+    <SafeAreaView className="flex-1 bg-white">
+      <FlatList
+        data={offers}        // constants에서 가져온 카테고리 목록 배열
+        renderItem={({ item, index }) => {
+          // 교차 레이아웃: 짝수번째는 이미지가 왼쪽, 홀수번째는 이미지가 오른쪽
+          // index % 2 === 0: 나머지가 0이면 짝수 (0, 2, 4...)
+          const isEven = index % 2 === 0;
+
+          return (
+            <View>
+              {/* Pressable: 누를 수 있는 영역 */}
+              {/* cn(): clsx 함수 — 조건에 따라 className 조합 */}
+              <Pressable
+                className={cn(
+                  "offer-card",                              // 항상 적용
+                  isEven ? "flex-row-reverse" : "flex-row"  // 조건부 적용
+                )}
+                style={{ backgroundColor: item.color }}     // 카드마다 다른 배경색
+                android_ripple={{ color: "#ffffff22" }}      // Android 누름 효과
+              >
+                {/* Pressable의 children을 함수로 받으면 pressed 상태 접근 가능 */}
+                {({ pressed }) => (
+                  <Fragment>   {/* 불필요한 View 없이 두 요소를 묶을 때 */}
+
+                    {/* 이미지 영역: 카드 너비의 절반 */}
+                    <View className="h-full w-1/2">
+                      <Image
+                        source={item.image}
+                        className="size-full"
+                        resizeMode="contain"
+                      />
+                    </View>
+
+                    {/* 텍스트 영역: 교차 레이아웃에 따라 패딩 방향 변경 */}
+                    <View className={cn(
+                      "offer-card__info",
+                      isEven ? "pl-10" : "pr-10"  // 짝수면 왼쪽 패딩, 홀수면 오른쪽
+                    )}>
+                      <Text className="h1-bold text-white leading-tight">
+                        {item.title}
+                      </Text>
+                      <Image
+                        source={images.arrowRight}
+                        className="size-10"
+                        resizeMode="contain"
+                        tintColor="#ffffff"  // 흰색 화살표 아이콘
+                      />
+                    </View>
+
+                  </Fragment>
+                )}
+              </Pressable>
+            </View>
+          );
+        }}
+
+        contentContainerClassName="pb-28 px-5"  // 하단 여백 + 좌우 여백
+
+        {/* 리스트 상단 헤더: 위치 + 장바구니 */}
+        ListHeaderComponent={() => (
+          <View className="flex-between flex-row w-full my-5">
+
+            {/* 왼쪽: 배달 위치 */}
+            <View className="flex-start">
+              <Text className="small-bold text-primary">DELIVER TO</Text>
+              <TouchableOpacity className="flex-center flex-row gap-x-1 mt-0.5">
+                <Text className="paragraph-bold text-dark-100">Croatia</Text>
+                <Image source={images.arrowDown} className="size-3" resizeMode="contain" />
+              </TouchableOpacity>
+            </View>
+
+            {/* 오른쪽: 장바구니 버튼 */}
+            <CartButton />
+
+          </View>
+        )}
+      />
+    </SafeAreaView>
+  );
+}
+```
+
+---
+
+## 2. 새로 나온 개념들
+
+### `Pressable` — 더 강력한 버튼
+
+```tsx
+// TouchableOpacity: 누르면 투명도가 낮아짐 (간단한 버튼에 적합)
+<TouchableOpacity onPress={...}>
+  <Text>누르기</Text>
+</TouchableOpacity>
+
+// Pressable: 더 세밀한 제어 가능 (눌린 상태 감지, Android 효과 등)
+<Pressable
+  onPress={...}
+  android_ripple={{ color: "#ffffff22" }}  // Android 전용 물결 효과
+>
+  {({ pressed }) => (
+    // pressed: 현재 눌렸는지 여부 (true/false)
+    // 누른 상태에서 스타일 변경 등에 활용 가능
+    <Text style={{ opacity: pressed ? 0.5 : 1 }}>누르기</Text>
+  )}
+</Pressable>
+```
+
+### `clsx` — 조건부 className 조합
+
+```bash
+npm install clsx
+```
+
+```tsx
+import cn from 'clsx'
+
+// 조건에 따라 className을 동적으로 조합
+cn('기본클래스', 조건 ? '참일때클래스' : '거짓일때클래스')
+
+// 예시
+cn('offer-card', isEven ? 'flex-row-reverse' : 'flex-row')
+// isEven = true  → "offer-card flex-row-reverse"
+// isEven = false → "offer-card flex-row"
+
+// 부동산 앱과 비교: 템플릿 리터럴로 했던 것과 같은 역할
+// 이전: className={`offer-card ${isEven ? 'flex-row-reverse' : 'flex-row'}`}
+// 지금: className={cn("offer-card", isEven ? 'flex-row-reverse' : 'flex-row')}
+// clsx가 더 가독성이 좋고, 조건이 많을 때 특히 유용
+```
+
+### `%` 모듈로 연산자 — 짝수/홀수 판별
+
+```tsx
+// %: 나눗셈의 나머지를 반환
+0 % 2 === 0 // true  → 짝수 (index 0)
+1 % 2 === 0 // false → 홀수 (index 1)
+2 % 2 === 0 // true  → 짝수 (index 2)
+3 % 2 === 0 // false → 홀수 (index 3)
+
+// 교차 레이아웃에 활용
+const isEven = index % 2 === 0
+// isEven = true  → flex-row-reverse (이미지 왼쪽)
+// isEven = false → flex-row         (이미지 오른쪽)
+```
+
+### `Fragment` — 불필요한 View 없이 묶기
+
+```tsx
+// 두 요소를 하나로 묶고 싶은데 불필요한 View는 추가하고 싶지 않을 때
+import { Fragment } from "react";
+
+// Fragment 없이 (잘못된 예)
+return <View /><View />  // ❌ JSX는 하나의 루트 요소만 반환 가능
+
+// View로 묶기
+return <View><View /><View /></View>  // ✅ 하지만 불필요한 View 추가됨
+
+// Fragment로 묶기
+return <Fragment><View /><View /></Fragment>  // ✅ 불필요한 View 없음
+// 단축 문법: <>...</>
+return <><View /><View /></>
+```
+
+### `globals.css` 커스텀 유틸리티 클래스
+
+```css
+/* globals.css */
+/* 자주 쓰는 스타일 조합을 이름 붙여서 재사용 */
+
+@layer components {
+  .offer-card {
+    @apply my-3 h-48 w-full rounded-xl;
+  }
+
+  .offer-card__info {
+    @apply flex-1 justify-center;
+  }
+
+  .h1-bold {
+    @apply text-3xl font-bold;
+  }
+
+  .small-bold {
+    @apply text-sm font-bold;
+  }
+
+  /* ... */
+}
+```
+
+```tsx
+// 사용할 때 → 긴 className 대신 짧은 이름으로
+<View className="offer-card" />        // w-full h-48 my-3 rounded-xl 적용
+<Text className="h1-bold text-white">  // text-3xl font-bold text-white 적용
+```
+
+---
+
+## 3. CartButton 컴포넌트
+
+```tsx
+// components/CartButton.tsx
+
+import { Image, Text, TouchableOpacity, View } from 'react-native'
+import { images } from '@/constants'
+
+const CartButton = () => {
+  const totalItems = 10 // 나중에 Zustand 전역 상태로 교체 예정
+
+  return (
+    <TouchableOpacity className="cart-btn" onPress={() => {}}>
+      {/* 장바구니 가방 아이콘 */}
+      <Image source={images.bag} className="size-5" resizeMode="contain" />
+
+      {/* 아이템이 있을 때만 뱃지 표시 */}
+      {totalItems > 0 && (
+        <View className="cart-badge">
+          <Text className="small-bold text-white">{totalItems}</Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  )
+}
+
+export default CartButton
+```
+
+> 💡 지금은 숫자를 하드코딩(`10`)했지만, 나중에 **Zustand** 전역 상태로 교체합니다.
+> 유저가 어느 화면에서든 음식을 담으면 이 뱃지 숫자가 자동으로 업데이트됩니다.
+
+---
+
+## ⚠️ React Native 초보 실수 1위 — ScrollView 안에 FlatList 절대 금지
+
+```tsx
+// ❌ 절대 이렇게 하면 안 됨!
+<ScrollView>
+  <FlatList ... />  // 성능 최적화 깨짐, 레이아웃 버그 발생
+</ScrollView>
+
+// ✅ 올바른 방법: 헤더를 ListHeaderComponent로
+<FlatList
+  data={...}
+  ListHeaderComponent={() => <View>헤더 UI</View>}  // 헤더도 FlatList의 일부로
+/>
+```
+
+---
+
+## 🔑 핵심 요약
+
+1. **`Pressable`** = `TouchableOpacity`보다 강력한 버튼, `pressed` 상태 감지 + Android 물결 효과
+2. **`clsx`** = 조건부 className 조합 도구 (`cn("기본", 조건 ? "A" : "B")`)
+3. **`index % 2`** = 짝수/홀수 판별로 교차 레이아웃 구현
+4. **`Fragment`** = 불필요한 View 없이 여러 요소를 하나로 묶기
+5. **`globals.css` 커스텀 클래스** = 자주 쓰는 스타일 조합을 이름으로 등록해 재사용
+6. **`CartButton`** = 전역 장바구니 상태를 표시하는 재사용 컴포넌트 (Zustand 연결 예정)
+7. **FlatList 안에 ScrollView 금지** = 헤더는 `ListHeaderComponent`로 처리
+
+# { 🗺️ 음식 배달 앱 — 라우트 구조 }
+
+> 부동산 앱과 거의 동일 — 새로 나온 개념만 정리
+
+---
+
+## 전체 파일 구조
+
+```
+app/
+├── (auth)/                    ← 인증 그룹 (탭 없음)
+│   ├── _layout.tsx
+│   ├── signin.tsx             → /signin
+│   └── signup.tsx             → /signup
+└── (tabs)/                    ← 탭 그룹 (탭 있음)
+    ├── _layout.tsx
+    ├── index.tsx              → /       (홈)
+    ├── cart.tsx               → /cart
+    ├── search.tsx             → /search
+    └── profile.tsx            → /profile
+```
+
+부동산 앱과 다른 점:
+
+- `(root)` 대신 `(auth)` + `(tabs)` 두 그룹으로 나눔
+- `signin` 외에 `signup` 화면 추가
+
+---
+
+## 새로 나온 것 — `Slot` 컴포넌트
+
+부동산 앱에서는 `(root)/_layout.tsx`에서 로그인 체크 후 `<Slot />`을 썼는데, 이번 강의에서 Slot의 역할을 명확히 설명합니다.
+
+```tsx
+// app/(tabs)/_layout.tsx
+
+import { Redirect, Slot } from 'expo-router'
+
+export default function TabsLayout() {
+  const isAuthenticated = false // 나중에 실제 인증 상태로 교체 예정
+
+  // 로그인 안 됨 → 로그인 화면으로 리디렉트
+  if (!isAuthenticated) return <Redirect href="/signin" />
+
+  // 로그인 됨 → 현재 라우트의 화면을 그대로 렌더링
+  return <Slot />
+}
+```
+
+```
+Slot의 역할:
+  _layout.tsx가 "껍데기(레이아웃)"라면
+  Slot은 "내용물이 들어갈 자리"
+
+예: (auth)/_layout.tsx
+  <SafeAreaView>     ← 레이아웃 (공통 UI)
+    <Slot />         ← 여기에 signin.tsx 또는 signup.tsx 내용이 들어감
+  </SafeAreaView>
+```
+
+---
+
+## `router.push` vs `Redirect`
+
+```tsx
+// router.push: 코드에서 직접 이동 (버튼 클릭 등)
+import { router } from 'expo-router'
+;<Button title="Go to Sign Up" onPress={() => router.push('/signup')} />
+
+// Redirect: 조건에 따라 자동 이동 (로그인 체크 등)
+import { Redirect } from 'expo-router'
+if (!isAuthenticated) return <Redirect href="/signin" />
+```
+
+---
+
+## 부록 — Git 커밋 기본 흐름
+
+강의에서 처음으로 GitHub 연동을 다뤘습니다.
+
+```bash
+git init                          # 저장소 초기화
+git add .                         # 모든 변경사항 스테이징
+git commit -m "커밋 메시지"        # 커밋
+git branch -M main                # 브랜치 이름을 main으로
+git remote add origin <URL>       # GitHub 원격 저장소 연결
+git push -u origin main           # 첫 번째 푸시
+```
+
+> 💡 이후에는 `git add .` → `git commit -m "..."` → `git push` 세 줄만 반복하면 됩니다.
+
+# { ⚙️ 음식 배달 앱 — Appwrite 기본 설정 }
+
+> 부동산 앱과 거의 동일 — 차이점만 정리
+
+---
+
+## 부동산 앱과 다른 점
+
+|             | 부동산 앱               | 음식 배달 앱                                              |
+| ----------- | ----------------------- | --------------------------------------------------------- |
+| 패키지      | `react-native-appwrite` | `react-native-appwrite` + **`react-native-url-polyfill`** |
+| 인증        | 구글 OAuth              | **이메일 + 비밀번호** (다음 강의)                         |
+| config 이름 | `config`                | `appwriteConfig`                                          |
+
+---
+
+## 설치
+
+```bash
+npx expo install react-native-appwrite react-native-url-polyfill
+```
+
+> 💡 `react-native-url-polyfill`은 React Native 환경에서
+> URL 관련 기능이 누락되는 문제를 보완하는 패키지입니다.
+
+---
+
+## .env
+
+```bash
+EXPO_PUBLIC_APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
+EXPO_PUBLIC_APPWRITE_PROJECT_ID=여기에_프로젝트_ID
+```
+
+---
+
+## lib/appwrite.ts
+
+```tsx
+import { Client, Account, Databases, Storage } from 'react-native-appwrite'
+
+export const appwriteConfig = {
+  endpoint: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT,
+  platform: 'com.jsm.foodordering', // Appwrite에 등록한 번들 ID
+  projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID,
+}
+
+const client = new Client()
+client
+  .setEndpoint(appwriteConfig.endpoint!)
+  .setProject(appwriteConfig.projectId!)
+  .setPlatform(appwriteConfig.platform!)
+
+export const account = new Account(client)
+export const databases = new Databases(client)
+export const storage = new Storage(client)
+```
+
+> 나머지 설정 상세 내용은 `restate_appwrite_auth.md` 참고
+
+# { 🔐 인증 화면 UI 가이드 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381487/notion-blog/_/React_Native/React_Native_-_/_5_-_1/image_1.png)
+
+> 로그인/회원가입 화면 + CustomInput + CustomButton + types.ts
+
+---
+
+## 📋 이번 강의에서 만드는 것
+
+```
+app/(auth)/
+├── _layout.tsx     ← 공통 헤더 UI (이미지 + 로고)
+├── signin.tsx      ← 이메일 + 비밀번호 입력 폼
+└── signup.tsx      ← 이름 + 이메일 + 비밀번호 입력 폼
+
+components/
+├── CustomInput.tsx  ← 재사용 입력 컴포넌트
+└── CustomButton.tsx ← 재사용 버튼 컴포넌트
+
+types.ts             ← 앱 전체 타입 정의 파일
+```
+
+---
+
+## 1. 인증 레이아웃 — 공통 헤더 UI
+
+```tsx
+// app/(auth)/_layout.tsx
+
+import { KeyboardAvoidingView, ScrollView, View, Image, Dimensions, Platform } from 'react-native'
+import { Slot } from 'expo-router'
+import { images } from '@/constants'
+
+export default function AuthLayout() {
+  return (
+    // KeyboardAvoidingView: 키보드가 올라올 때 입력창이 가려지지 않게 자동으로 올려줌
+    // behavior: iOS는 "padding", Android는 "height" (OS별로 다르게 동작)
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      {/* keyboardShouldPersistTaps="handled": 키보드 밖 터치 시 키보드 자동 닫힘 */}
+      <ScrollView className="h-full bg-white" keyboardShouldPersistTaps="handled">
+        {/* 상단 이미지 영역 — 화면 높이의 절반 정도 */}
+        <View
+          className="relative w-full"
+          style={{ height: Dimensions.get('screen').height / 2.25 }}
+        >
+          {/* 배경 이미지 */}
+          <ImageBackground
+            source={images.loginGraphic}
+            className="size-full"
+            resizeMode="stretch"
+          />
+
+          {/* 로고 — 이미지 아래에 걸쳐서 표시 */}
+          <Image source={images.logo} className="absolute -bottom-16 z-10 size-48 self-center" />
+        </View>
+
+        {/* 각 페이지(signin/signup) 내용이 여기에 들어감 */}
+        <Slot />
+      </ScrollView>
+    </KeyboardAvoidingView>
+  )
+}
+```
+
+### 새로 나온 개념들
+
+**`KeyboardAvoidingView`**
+
+```
+키보드 없을 때:       키보드 올라올 때 (KeyboardAvoidingView 없으면):
+┌──────────────┐      ┌──────────────┐
+│  이미지       │      │  이미지       │
+│  입력창       │  →   │  키보드가     │
+│  버튼         │      │  입력창 가림! │
+└──────────────┘      └──────────────┘
+
+KeyboardAvoidingView 있을 때:
+  iOS: padding을 추가해서 컨텐츠를 위로 밀어올림
+  Android: height를 줄여서 키보드 위에 컨텐츠 표시
+```
+
+**`Platform.OS`**
+
+```tsx
+import { Platform } from 'react-native'
+
+Platform.OS // "ios" 또는 "android"
+
+// OS별로 다른 동작이 필요할 때
+Platform.OS === 'ios' ? 'padding' : 'height'
+```
+
+**`Dimensions.get("screen").height`**
+
+```tsx
+import { Dimensions } from "react-native";
+
+// 기기 화면의 실제 크기를 코드로 가져오기
+const screenHeight = Dimensions.get("screen").height;
+// 예: iPhone 14 → 844
+
+// 화면 높이의 절반 계산
+style={{ height: screenHeight / 2.25 }}
+// 고정 픽셀 대신 비율로 계산 → 모든 기기 크기에서 일관된 비율 유지
+```
+
+**`keyboardShouldPersistTaps="handled"`**
+
+```
+이 prop 없을 때:
+  키보드 밖 아무 곳 탭 → 키보드 닫힘, 탭 이벤트 무시
+  → 버튼 클릭이 안 되는 문제 발생!
+
+"handled" 설정 시:
+  키보드 밖 탭 → 키보드 닫힘 + 탭 이벤트도 처리됨
+  → 버튼 클릭 정상 작동
+```
+
+---
+
+## 2. types.ts — 앱 전체 타입 정의
+
+```tsx
+// types.ts (루트 폴더)
+
+import { Models } from 'react-native-appwrite'
+import { ImageSourcePropType } from 'react-native'
+
+// Appwrite 컬렉션 문서 타입들
+// Models.Document를 extends해서 $id, $createdAt 등 기본 필드도 포함
+export interface MenuItem extends Models.Document {
+  name: string
+  price: number
+  image_url: string
+  description: string
+  calories: number
+  protein: number
+  rating: number
+  type: string
+}
+
+export interface User extends Models.Document {
+  name: string
+  email: string
+  avatar: string
+}
+
+// 장바구니 아이템 타입 (Appwrite와 무관한 클라이언트 전용)
+export interface CartItemType {
+  id: string
+  name: string
+  price: number
+  image_url: string
+  quantity: number
+  customizations?: CartCustomization[] // ? = 선택 사항
+}
+
+// 컴포넌트 Props 타입들
+export interface CustomInputProps {
+  placeholder?: string
+  value?: string
+  onChangeText?: (text: string) => void
+  label: string
+  secureTextEntry?: boolean
+  keyboardType?: 'default' | 'email-address' | 'numeric' | 'phone-pad'
+}
+
+export interface CustomButtonProps {
+  onPress?: () => void
+  title?: string
+  style?: string
+  leftIcon?: React.ReactNode
+  textStyle?: string
+  isLoading?: boolean
+}
+
+// Appwrite 함수 파라미터 타입들
+export interface CreateUserParams {
+  email: string
+  password: string
+  name: string
+}
+
+export interface SignInParams {
+  email: string
+  password: string
+}
+```
+
+### `Models.Document`를 extends하는 이유
+
+```tsx
+// Appwrite가 모든 문서에 자동으로 추가하는 기본 필드
+interface Models.Document {
+  $id: string;          // 고유 ID
+  $createdAt: string;   // 생성 시각
+  $updatedAt: string;   // 수정 시각
+  // ...
+}
+
+// extends: 기본 필드 + 우리가 추가한 필드를 모두 포함
+interface MenuItem extends Models.Document {
+  name: string;   // 우리가 추가한 필드
+  price: number;
+  // ...
+}
+
+// 결과: MenuItem 타입은 $id, $createdAt, name, price 모두 포함
+```
+
+---
+
+## 3. CustomInput 컴포넌트
+
+```tsx
+// components/CustomInput.tsx
+
+import { CustomInputProps } from '@/types'
+import cn from 'clsx'
+import { useState } from 'react'
+import { Text, TextInput, View } from 'react-native'
+
+const CustomInput = ({
+  placeholder = 'Enter text',
+  value,
+  onChangeText,
+  label,
+  secureTextEntry = false,
+  keyboardType = 'default',
+}: CustomInputProps) => {
+  // 포커스 상태 — 입력창이 활성화(클릭)되었는지 여부
+  const [isFocused, setIsFocused] = useState(false)
+
+  return (
+    <View className="w-full">
+      {/* 입력창 위의 라벨 텍스트 */}
+      <Text className="label">{label}</Text>
+
+      <TextInput
+        autoCapitalize="none" // 자동 대문자 변환 끄기 (이메일에 필요)
+        autoCorrect={false} // 자동 수정 끄기
+        value={value}
+        onChangeText={onChangeText}
+        secureTextEntry={secureTextEntry} // true면 비밀번호처럼 * 표시
+        keyboardType={keyboardType}
+        onFocus={() => setIsFocused(true)} // 입력창 클릭 시
+        onBlur={() => setIsFocused(false)} // 입력창 벗어날 시
+        placeholder={placeholder}
+        placeholderTextColor="#888"
+        className={cn(
+          'input',
+          isFocused ? 'border-primary' : 'border-gray-300' // 포커스 시 파란 테두리
+        )}
+      />
+    </View>
+  )
+}
+
+export default CustomInput
+```
+
+### `onFocus` / `onBlur`
+
+```
+onFocus: 입력창을 탭해서 키보드가 올라오는 순간 실행
+onBlur:  다른 곳을 탭해서 입력창에서 벗어나는 순간 실행
+
+활용: isFocused 상태로 활성화/비활성화 스타일 구분
+  활성화 → border-primary (파란 테두리)
+  비활성화 → border-gray-300 (회색 테두리)
+```
+
+---
+
+## 4. CustomButton 컴포넌트
+
+```tsx
+// components/CustomButton.tsx
+
+import { CustomButtonProps } from '@/types'
+import cn from 'clsx'
+import { ActivityIndicator, Text, TouchableOpacity } from 'react-native'
+
+const CustomButton = ({
+  onPress,
+  title = 'Click me',
+  style,
+  leftIcon,
+  textStyle,
+  isLoading = false,
+}: CustomButtonProps) => {
+  return (
+    <TouchableOpacity
+      className={cn('custom-btn', style)} // 기본 버튼 스타일 + 외부에서 추가 스타일
+      onPress={onPress}
+    >
+      {/* 왼쪽 아이콘 (있을 때만 표시) */}
+      {leftIcon}
+
+      <View className="flex-center flex-row">
+        {/* 로딩 중이면 스피너, 아니면 텍스트 */}
+        {isLoading ? (
+          <ActivityIndicator size="small" color="white" />
+        ) : (
+          <Text className={cn('text-white-100 paragraph-semibold', textStyle)}>{title}</Text>
+        )}
+      </View>
+    </TouchableOpacity>
+  )
+}
+
+export default CustomButton
+```
+
+---
+
+## 5. 로그인 화면 폼 로직
+
+```tsx
+// app/(auth)/signin.tsx
+
+import { useState } from 'react'
+import { Alert, View } from 'react-native'
+import { Link, router } from 'expo-router'
+import CustomInput from '@/components/CustomInput'
+import CustomButton from '@/components/CustomButton'
+
+const SignIn = () => {
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // 폼 상태: 이메일 + 비밀번호를 하나의 객체로 관리
+  const [form, setForm] = useState({
+    email: '',
+    password: '',
+  })
+
+  const submit = async () => {
+    // 유효성 검사: 빈 값이면 경고 후 종료
+    if (!form.email || !form.password) {
+      Alert.alert('Error', 'Please enter valid email address and password')
+      return // ← return 필수! 없으면 아래 코드도 실행됨
+    }
+
+    setIsSubmitting(true)
+    try {
+      // appwrite 로그인 함수 호출 (다음 강의에서 구현)
+      // await signIn({ email: form.email, password: form.password });
+
+      Alert.alert('Success', 'User signed in successfully')
+      router.replace('/') // replace: 히스토리에 쌓지 않고 이동 (뒤로가기 시 로그인 화면 안 보임)
+    } catch (error: any) {
+      Alert.alert('Error', error.message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <View className="mt-5 gap-10 rounded-lg bg-white p-5">
+      <CustomInput
+        label="Email"
+        placeholder="Enter your email"
+        value={form.email}
+        keyboardType="email-address"
+        onChangeText={(text) =>
+          // 이전 상태를 스프레드하고 email만 업데이트
+          setForm((prev) => ({ ...prev, email: text }))
+        }
+      />
+
+      <CustomInput
+        label="Password"
+        placeholder="Enter your password"
+        value={form.password}
+        secureTextEntry={true} // 비밀번호 숨김
+        onChangeText={(text) => setForm((prev) => ({ ...prev, password: text }))}
+      />
+
+      <CustomButton
+        title="Sign In"
+        onPress={submit}
+        isLoading={isSubmitting} // 로딩 중이면 스피너 표시
+      />
+
+      {/* 회원가입 페이지로 이동 링크 */}
+      <View className="mt-5 flex flex-row justify-center gap-2">
+        <Text className="base-regular text-gray-500">Don't have an account?</Text>
+        <Link href="/signup" className="base-bold text-primary">
+          Sign Up
+        </Link>
+      </View>
+    </View>
+  )
+}
+```
+
+### 폼 상태 업데이트 패턴
+
+```tsx
+// 여러 필드를 하나의 state로 관리할 때
+const [form, setForm] = useState({ email: '', password: '' })
+
+// 특정 필드만 업데이트하는 방법
+setForm((prev) => ({ ...prev, email: newText }))
+//         ↑         ↑           ↑
+//    이전 상태    스프레드      email만 변경
+//               (나머지 필드 유지)
+
+// 결과: { email: "new@email.com", password: "" }
+//              변경됨 ↑              유지됨 ↑
+```
+
+### `router.replace` vs `router.push`
+
+```
+router.push("/")     → 히스토리에 추가 (뒤로가기 가능)
+router.replace("/")  → 히스토리 교체 (로그인 후 뒤로가기 시 로그인 화면 안 나타남)
+
+로그인 성공 후에는 replace가 적합:
+  로그인 → 홈으로 이동 → 뒤로가기 → 로그인이 다시 나오면 이상함!
+```
+
+---
+
+## ✅ 체크리스트
+
+- [ ] `KeyboardAvoidingView` + `Platform.OS`로 OS별 처리
+- [ ] `Dimensions.get("screen").height`로 화면 크기 기반 레이아웃
+- [ ] `types.ts` 파일에 앱 전체 타입 정의
+- [ ] `CustomInput` 컴포넌트 (포커스 상태 + clsx 조건부 스타일)
+- [ ] `CustomButton` 컴포넌트 (로딩 스피너 + 외부 스타일 주입)
+- [ ] 폼 상태를 객체로 관리 (`{ email, password }`)
+- [ ] 유효성 검사 후 `return`으로 조기 종료
+- [ ] 로그인 성공 시 `router.replace("/")`
+
+---
+
+## 🔑 핵심 요약
+
+1. **`KeyboardAvoidingView`** = 키보드가 입력창을 가리지 않도록 자동 처리
+2. **`Platform.OS`** = "ios" / "android" 구분해서 OS별 다른 동작 적용
+3. **`Dimensions`** = 기기 화면 크기를 코드로 가져와 비율 기반 레이아웃 구현
+4. **`types.ts`** = 앱 전체에서 사용하는 타입을 한 파일에 모아 관리
+5. **`onFocus/onBlur`** = 입력창 활성화/비활성화 상태를 감지해 스타일 변경
+6. **폼 객체 상태** = 여러 입력 필드를 하나의 `useState`로 관리 + `...prev` 스프레드 패턴
+7. **`router.replace`** = 로그인 후 뒤로가기 시 로그인 화면이 다시 나오지 않게 처리

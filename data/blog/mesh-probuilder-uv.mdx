@@ -1,0 +1,346 @@
+---
+title: 'Mesh 구조 이해하기 & ProBuilder로 UV 매핑 편집하기'
+date: '2026-09-02'
+category: '게임 개발/유니티 개인 정리'
+tags: ['게임 개발', '유니티 개인 정리']
+draft: false
+summary: ''
+---
+
+# 🚀 Unity에서 Mesh 구조 이해하기 & ProBuilder로 UV 매핑 편집하기
+
+이번 강의는
+
+**Unity에서 3D Mesh 구조를 눈으로 확인하는 방법**,
+
+**ProBuilder를 이용해 직접 Mesh를 변형하거나 UV를 수정하는 방법**에 대한 내용입니다.
+
+초보자도 이해하기 쉽게 개념에 집중하여 정리했습니다.
+
+---
+
+# 📋 목차
+
+1. 드로우 모드 개념 이해하기
+2. 와이어프레임을 이용해 Mesh 구조 보기
+3. Mesh와 Vertex(정점) 개념 이해하기
+4. ProBuilder 설치하기
+5. ProBuilderize로 Mesh 변환하기
+6. ProBuilder에서 Vertex/Edge/Face 편집
+7. UV 에디터로 UV 좌표 수정하기
+8. 편집된 Mesh Export(내보내기)
+
+---
+
+# 1. 드로우 모드 개념 이해하기
+
+Unity는 **Scene 뷰에서 3D 오브젝트가 어떻게 구성되어 있는지** 다양한 방식(모드)으로 볼 수 있게 해주는 기능이 있다.
+
+이게 바로 **Draw Mode(드로우 모드)**.
+
+- Draw Mode는 오브젝트의 **표면**, **라이팅 적용 여부**, **와이어프레임**, **텍스처 구조** 등을 시각적으로 확인하기 위한 모드이다.
+- 어디서?
+  ⮕ **Scene View 오른쪽 상단의 Overlays(오버레이) → 구체 아이콘(드로우 모드) 클릭**
+
+드로우 모드에는 대표적으로 다음과 같은 모드가 있다.
+
+| 모드                 | 설명                               |
+| -------------------- | ---------------------------------- |
+| **Shaded**           | 일반적인 렌더링 모습               |
+| **Wireframe**        | 메시의 정점/에지 구조를 볼 수 있음 |
+| **Shaded Wireframe** | 텍스처 + 와이어프레임 동시에 보기  |
+| **Albedo**           | 빛을 무시하고 순수한 텍스처만 보기 |
+
+강의에서는 주로 **와이어프레임 모드**를 이용했다.
+
+---
+
+# 2. 와이어프레임을 이용해 Mesh 구조 보기
+
+드로우 모드를 **Wireframe**으로 바꾸면…
+
+- 3D 오브젝트가 버텍스(정점)와 Edge(선)로 구성된 형태로 보여진다.
+- 메쉬가 “얼마나 촘촘하게 subdivide되어 있는지” 확인할 수 있다.
+- 변형 작업(예: 휘기, 늘리기)을 하려면
+  → **얼마나 많은 정점이 있는지 보는 것이 매우 중요**
+
+예)
+
+- 땅(Plane)의 경우 **균일하게 촘촘한 버텍스 구조** → 변형하기 쉬움
+- Water Plane 같은 경우 노이즈를 주어 출렁이게 만들기 좋음
+
+---
+
+# 3. Mesh와 Vertex(정점) 개념 이해하기
+
+Mesh(메쉬)는 3D 모델의 **기본 골격**이다.
+
+구성 요소:
+
+- **Vertex(정점)**: 메쉬의 좌표를 이루는 점
+- **Edge(모서리)**: 정점과 정점을 잇는 선
+- **Face(면)**: Edge 3개 이상으로 이루어진 면(주로 삼각형, 사각형)
+
+메쉬가 촘촘하면:
+
+- 더 자연스럽게 변형 가능
+- 더 복잡한 애니메이션·쉐이더 적용 가능
+
+메쉬가 너무 단순하면:
+
+- 변형 시 단단하게 접히거나 부자연스러움
+
+그래서 UV 수정, 메쉬 변형, 파티클 충돌 등을 작업할 때
+
+**메쉬 구조를 잘 확인하는 것이 중요**하다.
+
+---
+
+# 4. ProBuilder 설치하기
+
+UV를 수정하거나 간단한 수준의 메쉬 편집(모델링)을 하려면
+
+Unity 기본 기능만으로는 어렵다.
+
+그래서 Unity 제공 패키지 **ProBuilder**를 설치한다.
+
+설치 방법:
+
+1. 상단 메뉴 **Window → Package Manager**
+2. 검색창에 **ProBuilder**
+3. 최신 버전 설치 (강의에서는 6.x 버전)
+4. 설치 후 메뉴에 **Tools → ProBuilder** 항목이 생긴다.
+
+---
+
+# 5. ProBuilderize로 Mesh 변환하기
+
+중요 개념:
+
+> ProBuilder는 일반 MeshFilter를 바로 편집할 수 없다.
+> 먼저 ProBuilder 전용 Mesh로 변환해야 한다.
+
+이 과정을 **ProBuilderize**라고 부른다.
+
+단계:
+
+1. 오브젝트 선택
+2. 상단 메뉴 **Tools → ProBuilder → ProBuilderize**
+3. 선택한 오브젝트가 ProBuilder 전용 Mesh로 변경됨
+
+변경되는 것:
+
+- 기존 **Mesh Filter → ProBuilder Mesh Filter**로 교체됨
+- ProBuilder 도구들을 적용할 수 있게 됨
+
+ProBuilderize 이후 ProBuilder 툴박스가 자동으로 뜨기도 한다.
+
+---
+
+# 6. ProBuilder에서 Vertex/Edge/Face 편집
+
+ProBuilder 도구창에는 대표적으로 3가지 선택 모드가 있다.
+
+| 아이콘 | 이름            | 설명                            |
+| ------ | --------------- | ------------------------------- |
+| ●      | **Vertex 모드** | 정점을 하나씩 이동시키거나 변형 |
+| ∕      | **Edge 모드**   | 모서리 단위로 이동/확장         |
+| ▭      | **Face 모드**   | 면 단위로 밀기/당기기/회전      |
+
+이 모드는 **하나의 메쉬를 변형하거나 새로운 형태를 만들 때 필수**다.
+
+예:
+
+- Vertex 모드 → 산 모양 만들기 가능
+- Face 모드 → 면을 extrude(늘리기) 가능
+- Edge 모드 → 경사진 부분 만들기
+
+강의에서는 ProBuilderize 후 바로 Vertex/Face 조작이 가능해진다고 설명.
+
+---
+
+# 7. UV 에디터로 UV 좌표 수정하기
+
+ProBuilder에는 **UV Editor** 기능이 있다.
+
+### UV란?
+
+- 텍스처가 3D 모델 표면에 어떻게 붙을지 결정하는 2D 좌표계
+- (U, V)라고 부르는 2차원 좌표값
+- UV를 조정하면 텍스처를 움직이거나 회전하거나 크기 조절 가능
+
+### UV Editor 여는 방법:
+
+- **Tools → ProBuilder → Open UV Editor**
+
+ProBuilderize된 오브젝트만 UV가 표시됨
+
+→ 일반 MeshFilter는 UV가 안 뜬다.
+
+---
+
+### UV Editor에서 가능한 작업
+
+✔ **텍스처 위치 이동**
+
+→ UV 사각형(면)을 위로 올리면 텍스처가 위로 이동
+
+→ 어떤 부분을 보이게/안 보이게 할 수 있음
+
+✔ **텍스처 회전**
+
+→ UV 좌표를 회전시켜 텍스처 방향 변경
+
+✔ **텍스처 확대/축소**
+
+→ UV 범위를 조정해 텍스처 타일링 효과
+
+✔ **다른 면을 다른 부분과 매핑**
+
+→ 하나의 큐브라도 각 면에 서로 다른 부분의 텍스처 부착 가능
+
+---
+
+강의에서 나온 핵심 예시:
+
+- 어떤 면의 텍스처를 보이지 않게 하고 싶다면 UV를 위로 올려버리면 됨
+- 텍스처는 움직이지 않음 → **움직이는 것은 UV 좌표**
+  → 그 면이 텍스처의 빈 공간을 바라보게 되면 텍스처가 보이지 않는다.
+
+---
+
+# 8. 편집된 Mesh Export(내보내기)
+
+ProBuilder 모델링이 끝났다면 다시 일반 Mesh로 변환해야 한다.
+
+단계:
+
+1. 편집 완료된 오브젝트 선택
+2. 메뉴 **Tools → ProBuilder → Export → Export Asset**
+3. 원하는 이름 입력 후 저장
+
+생성되는 파일 특징:
+
+- **FBX가 아닌 .asset 형태의 Mesh 파일**
+- 순수 Mesh 데이터만 포함
+  - Vertex 위치
+  - Vertex 색
+  - UV 좌표
+  - Triangles 정보
+- 텍스처(material)은 포함되지 않음
+
+이 과정으로:
+
+- 완전히 새로운 3D 모델을 Unity 안에서 생성하는 셈이다.
+
+---
+
+# 📌 전체 흐름 요약
+
+1. **Draw Mode → Wireframe**
+
+   → Mesh 구조(버텍스/에지/면) 확인
+
+2. **Mesh의 정점 구조 이해**
+
+   → 변형이 가능한지 판단
+
+3. **ProBuilder 설치**
+4. **ProBuilderize**
+
+   → 일반 MeshFilter → ProBuilder MeshFilter로 변환
+
+5. **Vertex/Edge/Face 모드로 메쉬 편집**
+6. **UV Editor로 텍스처 위치 조정**
+
+   → 텍스처가 보이는/안 보이는 영역 조절 가능
+
+7. **Export Asset**
+
+   → 최종 Mesh를 새로운 3D 모델로 저장
+
+---
+
+# 🤓 마무리
+
+이 강의의 핵심은 **"Unity에서도 모델링 툴처럼 간단한 Mesh 편집 + UV 조절이 가능하다"**는 점이다.
+
+- 메쉬 구조를 드로우 모드로 보는 방법
+- ProBuilder로 메쉬 변형
+- UV Editor로 텍스처 조정
+- 완성된 메쉬를 export해서 고유 모델로 사용
+
+# { ✅ _정리: Unity ProBuilder로 메시 일부(뚜껑 등)를 분리하는 방법 }_
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380779/notion-blog/_/_/Mesh_ProBuilder_UV_/image.png)
+
+### 🎯 **목표**
+
+하나로 봉합된(mesh combined) 3D 모델에서 일부분(예: 뚜껑)만 따로 선택해서 **별도의 GameObject로 분리(detach)** 하는 방법.
+
+---
+
+## 1. **ProBuilder 설치**
+
+1. 상단 메뉴에서 **Window → Package Manager**
+2. 목록에서 **ProBuilder** 검색
+3. **Install**
+
+---
+
+## 2. **기존 메시를 ProBuilder 객체로 변환**
+
+1. 씬의 메시 오브젝트 선택
+2. 상단 메뉴 **Tools → ProBuilder → ProBuilderize**
+   - 기존 MeshFilter/Renderer를 프로빌더가 다룰 수 있는 형식으로 변환
+
+---
+
+## 3. **ProBuilder 편집모드 활성화**
+
+1. **ProBuilder 창 열기**
+   - Tools → ProBuilder → ProBuilder Window
+2. 상단에서 **Face 모드(면 선택 모드)** 선택
+
+---
+
+## 4. **분리하고 싶은 면 선택하기 (예: 뚜껑 부분)**
+
+ProBuilder에는 여러 선택 기능이 있음:
+
+- **Alt + G → Grow Selection**
+  → 현재 선택된 면을 중심으로 연결된 면이 점점 확장됨
+- **Loop / Ring 선택 기능**
+  → 구조 따라 자동으로 둘러진 면을 선택
+
+이 기능들을 사용해 **뚜껑 부분만 모두 선택**한다.
+
+※ 모든 면이 누락 없이 선택되었는지 꼭 확인!
+
+---
+
+## 5. **선택한 면을 분리하기**
+
+1. ProBuilder Window → **Geometry** 탭으로 이동
+2. **Detach Faces** 클릭
+3. 옵션 표시됨
+   - **"Detach as GameObject" → Yes**
+
+→ 클릭하면 **선택했던 면이 새로운 GameObject로 분리**됨.
+
+---
+
+## 6. **결과**
+
+- 원래 메시: 뚜껑이 사라진 상태
+- 새 GameObject: 뚜껑만 따로 분리된 오브젝트
+  - 위치와 형태 그대로 유지됨
+  - 이제 자유롭게 수정·교체·애니메이션 가능
+
+---
+
+# ✨ 최종 요약
+
+**프로빌더 설치 → ProBuilderize 변환 → 면 선택 → Grow Selection으로 확장 → Detach Faces로 분리 → 새로운 GameObject 생성**
+
+이 순서로 진행하면 열리지 않는 메시라도 필요한 부분만 떼어낼 수 있다.

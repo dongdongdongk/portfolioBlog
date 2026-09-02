@@ -1,0 +1,971 @@
+---
+title: '섹션 4 - 4'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+# { 🖥️ UI 캔버스와 Scoreboard(TextMeshPro) }
+
+이번 강의에서는 **UI 캔버스(Canvas)와 TMP 텍스트 요소를 사용해 점수를 표시하는 방법**을 학습합니다.
+
+UI가 화면 크기와 해상도에 따라 어떻게 고정되고 스케일되는지, 그리고 `Scoreboard` 스크립트와 연결해 실제 점수를 반영하는 방법을 다룹니다.
+
+---
+
+## 📋 목차
+
+1. [UI 캔버스 개념 이해하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#ui-%EC%BA%94%EB%B2%84%EC%8A%A4-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [TextMeshPro(TMP) 요소 생성하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#textmeshprotmp-%EC%9A%94%EC%86%8C-%EC%83%9D%EC%84%B1%ED%95%98%EA%B8%B0)
+3. [RectTransform, 앵커, 피봇 설정하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#recttransform-%EC%95%B5%EC%BB%A4-%ED%94%BC%EB%B4%87-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+4. [Canvas Scaler와 화면 스케일링](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#canvas-scaler%EC%99%80-%ED%99%94%EB%A9%B4-%EC%8A%A4%EC%BC%80%EC%9D%BC%EB%A7%81)
+5. [TMP 텍스트 옵션 조정하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#tmp-%ED%85%8D%EC%8A%A4%ED%8A%B8-%EC%98%B5%EC%85%98-%EC%A1%B0%EC%A0%95%ED%95%98%EA%B8%B0)
+6. [Scoreboard 스크립트 구현하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#scoreboard-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+7. [버그 및 문제 해결 팁](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%EB%B2%84%EA%B7%B8-%EB%B0%8F-%EB%AC%B8%EC%A0%9C-%ED%95%B4%EA%B2%B0-%ED%8C%81)
+8. [실습 체크리스트](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%EC%8B%A4%EC%8A%B5-%EC%B2%B4%ED%81%AC%EB%A6%AC%EC%8A%A4%ED%8A%B8)
+
+---
+
+## 1. UI 캔버스 개념 이해하기
+
+- **캔버스(Canvas)**: UI 요소를 표시하기 위한 컨테이너.
+- **Scene 뷰에서 F 키**: 선택한 UI 요소에 포커스하면, **16:9 비율의 흰 직사각형**이 나타남 → 게임 뷰의 화면 비율을 시각적으로 보여줌.
+- **Screen Space - Overlay 모드**:
+  - UI가 화면 공간에 직접 렌더링됨.
+  - z축 값은 의미가 거의 없음 → 3D 오브젝트처럼 깊이 이동 불필요.
+
+---
+
+## 2. TextMeshPro(TMP) 요소 생성하기
+
+- 계층 구조(Hierarchy)에서 `UI → Text - TextMeshPro` 생성.
+- 프로젝트에서 처음 TMP를 쓸 경우 → **TMP Essentials 리소스** 가져오기 팝업 등장.
+  - Essentials(필수) + Extras(선택, 추가 폰트 제공).
+  - 팝업이 안 뜨면 메뉴 → `Window > TextMeshPro > Import TMP Essential Resources` 선택.
+- 새 TMP 텍스트 생성 후 이름을 `Scoreboard Text`로 변경.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380434/notion-blog/_/3D_/3D_/_4_-_4/image.png)
+
+---
+
+## 3. RectTransform, 앵커, 피봇 설정하기
+
+- UI 요소는 모두 `RectTransform` 컴포넌트를 가짐.
+  → 일반 오브젝트의 `Transform`과 다르게, **UI 전용 좌표계**를 사용함.
+  → 위치, 크기, 회전뿐 아니라 **앵커(Anchor)와 피봇(Pivot)** 개념이 추가됨.
+
+---
+
+### 📌 앵커(Anchor)
+
+- **부모(Canvas나 Panel 등)** 기준으로 **UI가 고정되는 위치**를 의미.
+- 기본값은 중앙에 고정되어 있음 → 화면 크기가 변하면 상대적으로 움직일 수 있음.
+- 예시:
+  - Scoreboard Text의 앵커를 `왼쪽 상단`으로 설정 → 해상도가 변해도 항상 왼쪽 상단에 위치.
+  - 미니맵 아이콘의 앵커를 `오른쪽 하단`으로 설정 → 화면 크기와 상관없이 오른쪽 하단에 붙음.
+
+---
+
+### 📌 피봇(Pivot)
+
+- **UI 요소의 중심점**을 의미 (회전, 스케일, 위치 이동의 기준점).
+- 기본값은 (0.5, 0.5) → 즉, 정가운데.
+- 예시:
+  - 피봇이 (0,0) → 왼쪽 아래 모서리를 기준으로 크기 조절/회전.
+  - 피봇이 (1,1) → 오른쪽 위 모서리를 기준으로 크기 조절/회전.
+
+---
+
+### 📌 단축키
+
+- `Alt` : **앵커 + 위치** 이동 (현재 위치를 기준으로 앵커 설정).
+- `Shift` : **피봇**만 변경.
+- `Shift + Alt` : **피봇 + 위치** 동시에 변경 (가장 많이 쓰임).
+
+---
+
+### 🛠 실습
+
+1. **Scoreboard Text** 오브젝트 선택.
+2. `RectTransform`의 **앵커 프리셋(Anchor Presets)** 버튼 클릭.
+   - (작은 사각형 버튼, 씬 뷰의 "사각형 아이콘")
+3. 프리셋 중 **왼쪽 상단** 선택.
+4. **Shift + Alt** 누른 상태에서 클릭.
+   - → 피봇과 앵커가 동시에 왼쪽 상단으로 고정됨.
+   - → Scoreboard Text는 어떤 해상도에서도 항상 왼쪽 상단에 위치하게 됨.
+
+---
+
+✅ **정리**
+
+- 앵커 = 부모 기준 **고정 위치**.
+- 피봇 = UI 요소 자체의 **중심점**.
+- **Shift + Alt** 조합 → “해상도 변해도 흔들리지 않는 UI”의 핵심!
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380426/notion-blog/_/3D_/3D_/_4_-_4/image_1.png)
+
+---
+
+## 4. Canvas Scaler와 화면 스케일링
+
+- **Canvas Scaler**: UI를 화면 해상도에 맞춰 스케일링.
+- 기본 옵션 덕분에 게임을 빌드하거나 다른 모니터에서 실행해도 UI 크기/위치가 유지됨.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380428/notion-blog/_/3D_/3D_/_4_-_4/image_2.png)
+
+---
+
+## 5. TMP 텍스트 옵션 조정하기
+
+- **Text 입력값**: `00000` (플레이스 홀더 → 자리 확보용)
+  → 나중에는 `0` 하나만 남김 (자리수 변화 시 보기 깔끔).
+- **Font Asset**: Roboto (프로젝트 테마와 어울림).
+- **Font Size**: 약 100.
+- **Wrapping Mode**:
+  - Normal(기본) → 줄바꿈 발생.
+  - No Wrap → 줄바꿈 없음 (또는 RectTransform 크기 늘려 해결).
+- **Vertex Color**: 색상 스포이드로 프로젝트 테마 컬러 매칭.
+- **Underlay(드롭 섀도우)**:
+  - 체크 활성화 → 알파값/오프셋 조절.
+  - 가독성 및 시각적 강조 효과 제공.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380430/notion-blog/_/3D_/3D_/_4_-_4/image_3.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380432/notion-blog/_/3D_/3D_/_4_-_4/image_4.png)
+
+---
+
+## 6. Scoreboard 스크립트 구현하기
+
+```csharp
+using UnityEngine;
+using TMPro;
+
+public class Scoreboard : MonoBehaviour
+{
+    [SerializeField] TMP_Text scoreboardText;
+    int score = 0;
+
+    public void IncreaseScore(int amount)
+    {
+        score = score + amount;
+        scoreboardText.text = score.ToString();
+    }
+}
+```
+
+- **핵심 포인트**:
+  - `TMP_Text` 타입을 사용하려면 `using TMPro;` 필요.
+  - Inspector에서 `Scoreboard Text`를 드래그해 `scoreboardText` 필드에 연결.
+  - `score.ToString()` : `int` → `string` 변환 필수 (`scoreboardText.text`는 문자열만 받음).
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380433/notion-blog/_/3D_/3D_/_4_-_4/image_5.png)
+
+---
+
+## 7. 버그 및 문제 해결 팁
+
+- **TMP SubMeshUI 자식 오브젝트 생성**: 필요 없는 경우 삭제 가능.
+- **NullReferenceException 발생**: `scoreboardText`에 텍스트 컴포넌트가 연결되지 않은 경우.
+- **줄바꿈 문제**: No Wrap 설정 또는 RectTransform 크기 확장으로 해결.
+
+---
+
+## 8. 실습 체크리스트
+
+✅ 캔버스에 TMP 텍스트 생성 (`Scoreboard Text`)
+
+✅ TMP Essentials 가져오기
+
+✅ 앵커 프리셋 → 왼쪽 상단 (Shift+Alt)
+
+✅ Font Size 조정 (~100), Wrapping Mode 조정
+
+✅ Underlay 옵션으로 가독성 개선
+
+✅ Scoreboard 스크립트 작성 & TMP Text 연결
+
+✅ 플레이 모드에서 적 파괴 시 점수 UI 업데이트 확인
+
+---
+
+# { 🎬 타임라인(Control Track)으로 적 웨이브 생성하기 }
+
+이번 강의에서는 **타임라인(Timeline)의 컨트롤 트랙(Control Track)** 기능을 사용하여
+
+적 웨이브(Enemy Waves)를 **프리팹으로 만들어 재사용**하고, 마스터 타임라인에서 관리하는 방법을 다룹니다.
+
+---
+
+## 📋 목차
+
+1. [타임라인과 컨트롤 트랙 개념 이해하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%ED%83%80%EC%9E%84%EB%9D%BC%EC%9D%B8%EA%B3%BC-%EC%BB%A8%ED%8A%B8%EB%A1%A4-%ED%8A%B8%EB%9E%99-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [마스터 타임라인과 서브 타임라인 구성하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%EB%A7%88%EC%8A%A4%ED%84%B0-%ED%83%80%EC%9E%84%EB%9D%BC%EC%9D%B8%EA%B3%BC-%EC%84%9C%EB%B8%8C-%ED%83%80%EC%9E%84%EB%9D%BC%EC%9D%B8-%EA%B5%AC%EC%84%B1%ED%95%98%EA%B8%B0)
+3. [첫 번째 웨이브(Three Butterflies) 만들기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%EC%B2%AB-%EB%B2%88%EC%A7%B8-%EC%9B%A8%EC%9D%B4%EB%B8%8Cthree-butterflies-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+4. [웨이브 애니메이션 녹화하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%EC%9B%A8%EC%9D%B4%EB%B8%8C-%EC%95%A0%EB%8B%88%EB%A9%94%EC%9D%B4%EC%85%98-%EB%85%B9%ED%99%94%ED%95%98%EA%B8%B0)
+5. [마스터 타임라인과 웨이브 연결하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%EB%A7%88%EC%8A%A4%ED%84%B0-%ED%83%80%EC%9E%84%EB%9D%BC%EC%9D%B8%EA%B3%BC-%EC%9B%A8%EC%9D%B4%EB%B8%8C-%EC%97%B0%EA%B2%B0%ED%95%98%EA%B8%B0)
+6. [웨이브 프리팹으로 저장하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%EC%9B%A8%EC%9D%B4%EB%B8%8C-%ED%94%84%EB%A6%AC%ED%8C%B9%EC%9C%BC%EB%A1%9C-%EC%A0%80%EC%9E%A5%ED%95%98%EA%B8%B0)
+7. [여러 개 웨이브 관리하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%EC%97%AC%EB%9F%AC-%EA%B0%9C-%EC%9B%A8%EC%9D%B4%EB%B8%8C-%EA%B4%80%EB%A6%AC%ED%95%98%EA%B8%B0)
+8. [이번 강의 과제](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%EC%9D%B4%EB%B2%88-%EA%B0%95%EC%9D%98-%EA%B3%BC%EC%A0%9C)
+
+---
+
+## 1. 타임라인과 컨트롤 트랙 개념 이해하기
+
+- **Timeline** : 애니메이션, 이벤트, 오브젝트 활성화/비활성화를 시간축 기반으로 제어하는 도구.
+- **Playable Asset (.playable)** : 타임라인 데이터를 담는 파일.
+- **Control Track** : 다른 타임라인이나 오브젝트의 동작을 제어하는 트랙.
+  - 마스터 타임라인이 서브 타임라인을 제어할 수 있음 → “타임라인 인셉션(Timeline Inception)”
+  - 특정 구간에서 오브젝트 활성화/비활성화도 자동 처리 가능.
+
+---
+
+## 2. 마스터 타임라인과 서브 타임라인 구성하기
+
+1. **마스터 타임라인**
+   - 현재 장면(Scene)에 존재하는 최상위 타임라인.
+   - 적 웨이브를 관리하는 중심이 됨.
+2. **서브 타임라인 생성**
+   - 계층 구조에서 **빈 게임 오브젝트(Timeline Holder)** 생성 → 마스터 타임라인 배치.
+   - 또 다른 빈 오브젝트 생성 → 이름을 `Enemy Waves`로 지정 (적 웨이브 관리용).
+3. **기존 적 오브젝트 정리**
+   - 테스트용 적 오브젝트들(`Enemy 1,2,3,4,5`)과 `Enemies` 부모 오브젝트는 삭제 → 계층 구조 정리.
+
+---
+
+## 3. 첫 번째 웨이브(Three Butterflies) 만들기
+
+1. **프리팹 배치**
+   - `Prefabs → Ships` 폴더에서 **Butterfly Ship** 프리팹을 드래그.
+   - 플레이어 앞쪽, 산 주변에서 등장하도록 배치.
+2. **스케일 조정**
+   - 나비가 너무 작으면, **부모 오브젝트**를 직접 스케일 업 → 콜라이더도 함께 확대됨.
+   - 모델 스케일은 `1,1,1` 유지.
+   - 이 상태를 다시 프리팹에 적용하여 모든 나비 크기를 통일.
+3. **웨이브 그룹 생성**
+   - `Enemy Waves` 오브젝트 아래에 빈 오브젝트 생성 → `Three Butterflies`라고 이름 지정.
+   - 나비 프리팹을 `Three Butterflies` 안에 넣고, 3개 복제.
+   - 각각의 나비 위치를 약간 다르게 배치 → 자연스럽게 날아오는 편대 느낌.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380433/notion-blog/_/3D_/3D_/_4_-_4/image_6.png)
+
+---
+
+## 4. 웨이브 애니메이션 녹화하기
+
+1. **새로운 타임라인 생성**
+   - `Assets → Timelines` 폴더에 `Three Butterflies Timeline` 생성.
+   - `Three Butterflies` 오브젝트를 선택한 상태에서 타임라인 열기.
+2. **애니메이션 트랙 추가**
+   - 세 마리 나비를 모두 선택 → 타임라인에 드래그.
+   - 각 나비별 **애니메이션 트랙**이 자동 생성됨.
+3. **키프레임 애니메이션 설정**
+   - 시작 지점 (0초) → 위치 A (언덕 근처).
+   - 종료 지점 (7~8초) → 위치 B (멀리 사라지는 지점).
+   - 중간 지점(3~4초)에 변화를 추가 →
+     - 나비1 : 아래로 이동
+     - 나비2 : 앞쪽으로 이동
+     - 나비3 : 위로 이동
+   - → 유기적이고 자연스러운 웨이브 비행 경로 완성.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380434/notion-blog/_/3D_/3D_/_4_-_4/image_7.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380434/notion-blog/_/3D_/3D_/_4_-_4/image_8.png)
+
+---
+
+## 5. 마스터 타임라인과 웨이브 연결하기
+
+- `Three Butterflies` 웨이브를 **마스터 타임라인의 Control Track**에 드래그.
+- 타임라인 스크럽 시, 해당 구간에서만 웨이브가 **자동 활성화** → 지나가면 자동 비활성화.
+- 위치/타이밍 조정 가능 → 플레이어 리그 움직임에 맞춰 웨이브 위치 수정.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380434/notion-blog/_/3D_/3D_/_4_-_4/image_9.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380426/notion-blog/_/3D_/3D_/_4_-_4/image_10.png)
+
+---
+
+## 6. 웨이브 프리팹으로 저장하기
+
+1. **프리팹 폴더 생성**
+   - `Project → Prefabs → Enemy Waves` 폴더 생성.
+2. **웨이브 프리팹화**
+   - `Three Butterflies` 전체 그룹을 드래그 → 프리팹으로 저장.
+3. **재사용 방법**
+   - 새 장면에 프리팹 드래그 → 다른 각도로 회전시켜도 동일한 애니메이션 유지.
+   - 원하는 곳에서 반복 배치 가능.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380426/notion-blog/_/3D_/3D_/_4_-_4/image_11.png)
+
+---
+
+## 7. 여러 개 웨이브 관리하기
+
+- **추가 웨이브 생성**
+  - `Three Butterflies-1`, `Three Butterflies-2`, `Three Butterflies-3` 식으로 이름 변경 → 구분 용이.
+- **Control Track 정리 방식**
+  - 여러 Control Track에 나누어 배치 → 시각적으로 정리 쉬움.
+  - 또는 하나의 Control Track에 모두 배치 가능 → 단순 관리 가능.
+- **응용**
+  - 이후 "친절한 우주선" 같은 이벤트성 NPC도 Control Track에서 관리 가능.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380426/notion-blog/_/3D_/3D_/_4_-_4/image_12.png)
+
+```csharp
+프리팹에서 가져와 위치를 이동 방향을 이동해서 다시 사용
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380427/notion-blog/_/3D_/3D_/_4_-_4/image_13.png)
+
+```csharp
+마스터 타임라인에서 여러개 넣어서 사용
+```
+
+---
+
+## 8. 이번 강의 과제
+
+- **연습 목표**
+  1. 새로운 적 웨이브를 타임라인으로 생성.
+  2. 해당 웨이브를 프리팹으로 저장.
+  3. 마스터 타임라인에서 **3번 이상 재사용**.
+- **주의할 점**
+  - 타임라인 정확한 타이밍에 너무 집착하지 말 것.
+  - 지금은 다양한 웨이브 생성과 재사용에 익숙해지는 단계.
+  - 테스트 플레이를 통해 위치, 높이, 타이밍은 계속 조정 가능.
+
+---
+
+✅ 정리하면, 이번 강의 핵심은
+
+- **Timeline → Control Track**을 사용해 **재사용 가능한 Enemy Waves**를 만드는 방법을 배우고,
+- 이를 프리팹으로 관리하여 여러 번 활용할 수 있게 하는 것입니다.
+
+---
+
+# { 🎙️ 마스터 타임라인에서 오디오 음성 트랙 활성화하기 }
+
+이번 강의는 **타임라인(Timeline)**을 활용해 제공된 음성 대사(Voice Lines) 오디오 파일을 순서대로 재생하고, 게임 플레이 스토리와 맞게 배치하는 방법을 다룹니다.
+
+## 📋 목차
+
+1. [음성 자산(Voice Lines) 준비하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%EC%9D%8C%EC%84%B1-%EC%9E%90%EC%82%B0voice-lines-%EC%A4%80%EB%B9%84%ED%95%98%EA%B8%B0)
+2. [타임라인에 오디오 클립 추가하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%ED%83%80%EC%9E%84%EB%9D%BC%EC%9D%B8%EC%97%90-%EC%98%A4%EB%94%94%EC%98%A4-%ED%81%B4%EB%A6%BD-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+3. [트랙 그룹 정리하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%ED%8A%B8%EB%9E%99-%EA%B7%B8%EB%A3%B9-%EC%A0%95%EB%A6%AC%ED%95%98%EA%B8%B0)
+4. [스토리 플로우에 음성 대사 배치하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%EC%8A%A4%ED%86%A0%EB%A6%AC-%ED%94%8C%EB%A1%9C%EC%9A%B0%EC%97%90-%EC%9D%8C%EC%84%B1-%EB%8C%80%EC%82%AC-%EB%B0%B0%EC%B9%98%ED%95%98%EA%B8%B0)
+5. [자연스러운 오디오 전환 이해하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%EC%9E%90%EC%97%B0%EC%8A%A4%EB%9F%AC%EC%9A%B4-%EC%98%A4%EB%94%94%EC%98%A4-%EC%A0%84%ED%99%98-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+6. [강의 도전 과제](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%EA%B0%95%EC%9D%98-%EB%8F%84%EC%A0%84-%EA%B3%BC%EC%A0%9C)
+
+---
+
+## 1. 음성 자산(Voice Lines) 준비하기
+
+- 강의 자료의 **리소스 탭에서 Voice Lines 압축 파일**을 다운로드.
+- 압축을 풀고 **Imported GDTV Assets 폴더**에 넣습니다.
+- 폴더 안에는:
+  - 🎧 **8개의 음성 대사 오디오 파일**
+  - 📄 **텍스트 파일** (각 대사의 스크립트 기록)
+- 👉 참고: 텍스트 파일을 **Inspector에서 잠가두면** 대사 확인 시 편리합니다.
+
+---
+
+## 2. 타임라인에 오디오 클립 추가하기
+
+- `Timeline` 창을 열고 **프로젝트 창을 옆으로 배치** → 오디오 파일과 타임라인을 동시에 보기 편함.
+- **음성 파일 하나를 타임라인으로 드래그** → 자동으로 **오디오 트랙(Audio Track)** 생성.
+- ▶️ **재생 버튼을 누르거나 게임 실행 시** 음성이 정상적으로 출력되는지 확인 가능.
+
+---
+
+## 3. 트랙 그룹 정리하기
+
+- **트랙 그룹(Track Group)**: 여러 트랙을 묶어 정리할 수 있는 컨테이너.
+  - 게임 오브젝트의 빈 객체와 비슷한 개념.
+- 이번 강의에서 만든 그룹들:
+  1. **Player** → 플레이어 관련 트랙 정리
+  2. **Enemy Waves** → 적 웨이브 관련 컨트롤 트랙 정리
+  3. **Voice Lines** → 오디오 트랙을 묶어 정리
+- 작업 방법:
+  - `+` 버튼 → **Track Group 추가**
+  - 드래그 앤 드롭으로 하위 트랙을 정리
+  - 필요 없는 트랙(예: 예전 플레이 테스트용 빈 애니메이터)은 **삭제**
+
+---
+
+## 5. 자연스러운 오디오 전환 이해하기
+
+- **오디오 클립이 겹칠 경우** → 자동으로 서로 섞여(fade in/out) 전환됩니다.
+- 강의에서는 "참고만" 하고 실제로는 **겹치지 않고 순차적으로 배치**.
+- 💡 팁: 필요한 경우에는 일부 겹쳐 **자연스러운 대화 느낌** 연출 가능.
+
+---
+
+## 6. 강의 도전 과제
+
+- 제공된 음성 라인을 사용하여 **타임라인 기반 오디오 콘텐츠**를 만들어보기.
+- 조건:
+  - **1분 ~ 3분 분량**
+  - 반드시 8개의 음성 대사 모두 활용할 필요는 없음.
+- 선택 과제:
+  - 직접 음성을 녹음하여 프로젝트에 추가
+  - 커뮤니티에 공유
+
+---
+
+✅ 이번 강의 핵심 정리:
+
+- 오디오 파일을 **Timeline에 직접 드래그 → 자동 오디오 트랙 생성**
+- **Track Group**을 사용하여 Player / Enemy / Voice Lines로 **정리**
+- **8개의 음성 대사**를 배치해 **스토리 흐름과 맞는 오디오 경험** 구성
+- 오디오가 겹칠 때는 자동 믹싱(fade), 필요 시 활용 가능
+
+---
+
+# {💬 타임라인 시그널과 UI 캔버스 하단 텍스트 표시하기}
+
+이번 강의는 **타임라인 시그널을 활용하여 게임 화면 하단에 대화 텍스트(UI)를 표시**하고, 오디오 음성 라인과 정확히 동기화되도록 설정하는 방법에 대해 다룹니다.
+
+---
+
+## 📋 목차
+
+1. [타임라인 시그널 개념 이해하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%ED%83%80%EC%9E%84%EB%9D%BC%EC%9D%B8-%EC%8B%9C%EA%B7%B8%EB%84%90-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [UI 캔버스에 텍스트 배치하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#ui-%EC%BA%94%EB%B2%84%EC%8A%A4%EC%97%90-%ED%85%8D%EC%8A%A4%ED%8A%B8-%EB%B0%B0%EC%B9%98%ED%95%98%EA%B8%B0)
+3. [Dialogue Lines 스크립트 작성하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#dialogue-lines-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%9E%91%EC%84%B1%ED%95%98%EA%B8%B0)
+4. [타임라인 신호와 메서드 연결하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%ED%83%80%EC%9E%84%EB%9D%BC%EC%9D%B8-%EC%8B%A0%ED%98%B8%EC%99%80-%EB%A9%94%EC%84%9C%EB%93%9C-%EC%97%B0%EA%B2%B0%ED%95%98%EA%B8%B0)
+5. [Signal Emitter & Receiver 정리하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#signal-emitter--receiver-%EC%A0%95%EB%A6%AC%ED%95%98%EA%B8%B0)
+6. [실행 및 테스트](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%EC%8B%A4%ED%96%89-%EB%B0%8F-%ED%85%8C%EC%8A%A4%ED%8A%B8)
+
+---
+
+## 1. 타임라인 시그널 개념 이해하기
+
+- **타임라인 신호(Timeline Signal)** : 타임라인에서 특정 지점에 도달했을 때 이벤트를 발생시키는 시스템.
+- 신호를 제대로 활용하려면 세 가지 요소가 필요합니다:
+  1. **Signal Emitter (방출기)**
+     - 신호를 내보내는 역할.
+     - 타임라인 상에서는 **마커(Marker)** 형태로 표현됨.
+     - 특정 위치에 배치하여 “여기서 이벤트 실행!”을 지정.
+  2. **Signal Receiver (수신기)**
+     - 신호를 받아서 **어떤 동작을 실행할지 정의**하는 컴포넌트.
+     - UnityEvent 리스트를 가지고 있어, 여기서 원하는 함수 호출 가능.
+  3. **Signal Asset (에셋)**
+     - 방출기와 수신기를 연결해주는 데이터 자원.
+     - 한 번 만들어두면 여러 타임라인에서 재사용 가능.
+
+---
+
+## 2. UI 캔버스에 텍스트 배치하기
+
+### ✅ TextMeshPro UI 생성
+
+1. Hierarchy → `UI > TextMeshPro` 생성.
+2. 이름을 **Dialogue Text** 로 변경.
+3. 위치: RectTransform에서 `Shift + Alt` 를 누른 채 **하단 정렬 + Stretch** 선택 → 화면 하단 전체에 걸쳐 표시됨.
+
+### ✅ 텍스트 스타일링
+
+- 정렬: **가운데 정렬 (Center Alignment)**.
+- 글꼴(Font): 프로젝트에 이미 사용 중인 **Roboto**로 변경.
+- 크기(Font Size): `48` 정도로 크게 조정.
+- 효과: 기존 그림자(Shadow) 효과 유지.
+- 하단에 약간의 여백(padding) 부여.
+
+### ✅ 임시 자리 표시자
+
+- 첫 번째 음성 라인을 그대로 복사해서 Dialogue Text에 붙여넣어 확인.
+- 게임 뷰에서 잘 보이면 준비 완료.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380427/notion-blog/_/3D_/3D_/_4_-_4/image_14.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380427/notion-blog/_/3D_/3D_/_4_-_4/image_15.png)
+
+```csharp
+위로 올려서 여백 만들어주기
+```
+
+---
+
+## 3. Dialogue Lines 스크립트 작성하기
+
+### ✅ 스크립트 생성 및 구조
+
+- `DialogueLines.cs` 라는 새 MonoBehaviour 스크립트 생성.
+- 빈 오브젝트 **Manager > Dialogue** 에 부착.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380427/notion-blog/_/3D_/3D_/_4_-_4/image_16.png)
+
+### ✅ 핵심 코드
+
+```csharp
+using UnityEngine;
+using TMPro;
+
+public class DialogueLines : MonoBehaviour
+{
+    [SerializeField] TMP_Text dialogueText;   // UI 텍스트 참조
+    [SerializeField] string[] timelineTextLines; // 인스펙터에서 입력할 대화 문자열 배열
+
+    int currentLine = 0; // 현재 표시 중인 대사 인덱스
+
+    // 타임라인 신호에 의해 호출될 함수
+    public void NextDialogueLine()
+    {
+        // 다음 줄로 이동
+        dialogueText.text = timelineTextLines[currentLine];
+        currentLine++;
+    }
+}
+```
+
+### ✅ 인스펙터에서 설정
+
+- `timelineTextLines` 배열에 **8개의 음성 라인 텍스트**를 입력.
+- `dialogueText` 필드에는 UI 캔버스의 Dialogue Text 오브젝트를 드래그 앤 드롭.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380427/notion-blog/_/3D_/3D_/_4_-_4/image_17.png)
+
+---
+
+## 4. 타임라인 신호와 메서드 연결하기
+
+### ✅ Signal Asset 생성
+
+1. Project 창 → Timeline 폴더 → `Create > Signal > Signal Asset`.
+2. 이름: **NextDialogueLine** (스크립트 메서드 이름과 일치).
+
+### ✅ Signal Receiver 추가
+
+- Dialogue 오브젝트 → `Add Component > Signal Receiver`.
+- 신호 발생 시 실행할 **NextDialogueLine() 메서드**를 이벤트 목록에 연결.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380428/notion-blog/_/3D_/3D_/_4_-_4/image_18.png)
+
+---
+
+## 5. Signal Emitter & Receiver 정리하기
+
+### ✅ 두 가지 방식
+
+1. **마커 트랙 상단에 직접 배치 (Marker 방식)**
+   - Timeline 상단에서 Signal Emitter Marker 추가.
+   - Signal Asset 연결 → Receiver 지정 → NextDialogueLine() 실행.
+2. **Signal Track 방식 (추천)**
+   - Voice Lines 그룹 안에 `+` 버튼으로 Signal Track 추가.
+   - 여기에서 Signal Emitter들을 배치.
+   - Dialogue 오브젝트를 드래그하면 자동으로 Signal Receiver 연결 가능.
+
+👉 Signal Track을 쓰면 **정리된 구조**를 유지할 수 있어 실무에 더 적합.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380428/notion-blog/_/3D_/3D_/_4_-_4/image_19.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380428/notion-blog/_/3D_/3D_/_4_-_4/image_20.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380428/notion-blog/_/3D_/3D_/_4_-_4/image_21.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380429/notion-blog/_/3D_/3D_/_4_-_4/image_22.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380429/notion-blog/_/3D_/3D_/_4_-_4/image_23.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380429/notion-blog/_/3D_/3D_/_4_-_4/image_24.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380429/notion-blog/_/3D_/3D_/_4_-_4/image_25.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380429/notion-blog/_/3D_/3D_/_4_-_4/image_26.png)
+
+---
+
+## 6. 실행 및 테스트
+
+- Timeline 재생만으로는 Signal이 작동하지 않음 → 반드시 **Play Mode에서 실행**해야 이벤트가 발생.
+- 오디오 음성 라인과 동일한 타이밍에 텍스트가 업데이트되는지 확인.
+- 모든 대사(8줄)가 올바른 타이밍에 전환되면 성공.
+
+---
+
+# ✅ 최종 정리
+
+- **Signal** = 타임라인에서 이벤트를 발생시키는 시스템.
+- UI 캔버스에 **하단 텍스트 영역**을 배치 → TextMeshPro 활용.
+- **DialogueLines 스크립트**에서 문자열 배열 + public 메서드(`NextDialogueLine`)로 관리.
+- **Signal Asset** + **Signal Receiver** + **Signal Emitter**를 연결해 타임라인에서 호출.
+- Signal Track을 쓰면 구조적으로 더 깔끔.
+- 반드시 Play 모드에서 테스트해야 정상 동작.
+
+# 💡 쉽게 이해하는 원리와 동작 순서
+
+---
+
+## 1️⃣ 오디오(음성)와 텍스트가 따로 있음
+
+- 게임에는 **음성 대사(오디오 파일)** 가 있고,
+- 같은 내용을 **글자로 보여줄 텍스트(UI)** 가 있음.
+
+👉 하지만 Unity는 자동으로 “음성 나오면 텍스트도 바꿔줘!” 라고 해주지 않음.
+
+👉 그래서 **타임라인 신호(Signal)** 를 써서 두 개를 맞춰주는 거예요.
+
+---
+
+## 2️⃣ 신호(Signal)란?
+
+- **타임라인 위에서 “여기!” 하고 알려주는 마커(표식)** 같은 것.
+- 예: 타임라인이 5초 지점에 오면 신호를 발사 → “다음 텍스트 보여줘!”
+
+---
+
+## 3️⃣ 신호의 3가지 요소
+
+1. **방출기 (Emitter)** : 신호를 내보내는 역할.
+
+   → 타임라인에 “이 시점에서 신호 발사!”라고 표시하는 마커.
+
+2. **수신기 (Receiver)** : 신호를 받으면 무언가 실행하는 역할.
+
+   → “신호 받았네? 그럼 텍스트를 다음 줄로 바꿔야지.”
+
+3. **신호 에셋 (Signal Asset)** : 방출기와 수신기를 연결해주는 다리.
+
+👉 쉽게 말해 **벨 누르는 사람(Emitter) → 초인종 소리(Asset) → 문 열어주는 사람(Receiver)** 구조예요.
+
+---
+
+## 4️⃣ DialogueLines 스크립트의 역할
+
+- 신호가 왔을 때 실행할 “문 열기 동작”을 코드로 만든 거예요.
+
+```csharp
+public void NextDialogueLine() {
+   dialogueText.text = timelineTextLines[currentLine];
+   currentLine++;
+}
+```
+
+순서:
+
+1. 배열(`timelineTextLines[]`)에 여러 줄의 대사를 저장해둠.
+   - 예:
+     - 0번: "여기 와 주셔서 감사합니다, 중위님"
+     - 1번: "정말로 도움이 필요합니다"
+     - 2번: "함정입니다" ...
+2. 신호가 오면 → `NextDialogueLine()` 실행.
+3. 배열에서 `현재 줄(currentLine)`을 가져와 텍스트 UI에 넣음.
+4. 줄 번호(`currentLine`)를 1 증가시킴.
+
+   → 다음 신호 때는 다음 줄이 출력됨.
+
+---
+
+## 5️⃣ 실제 동작 흐름 예시
+
+👉 플레이어가 게임을 실행하면…
+
+1. **0초**
+   - 오디오: "여기 와 주셔서 감사합니다, 중위님"
+   - 신호 발생 → 텍스트: "여기 와 주셔서 감사합니다, 중위님"
+2. **5초**
+   - 오디오: "정말로 중위님의 도움이 필요합니다"
+   - 신호 발생 → 텍스트: "정말로 중위님의 도움이 필요합니다"
+3. **10초**
+   - 오디오: "함정입니다"
+   - 신호 발생 → 텍스트: "함정입니다"
+
+👉 이런 식으로 **오디오 타이밍에 맞춰 텍스트가 한 줄씩 바뀌는 것**이에요.
+
+---
+
+# { 🎥 UI 캔버스에 초상화 카메라 표시하기 }
+
+이번 강의는 **별도의 카메라와 렌더 텍스처(Render Texture)를 이용해 캐릭터 초상화를 UI 캔버스에 표시하는 방법**을 다룹니다.
+
+## 📋 목차
+
+1. [초상화 카메라 개념 이해하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%EC%B4%88%EC%83%81%ED%99%94-%EC%B9%B4%EB%A9%94%EB%9D%BC-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [캐릭터 모델과 애니메이션 준비하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%EC%BA%90%EB%A6%AD%ED%84%B0-%EB%AA%A8%EB%8D%B8%EA%B3%BC-%EC%95%A0%EB%8B%88%EB%A9%94%EC%9D%B4%EC%85%98-%EC%A4%80%EB%B9%84%ED%95%98%EA%B8%B0)
+3. [초상화 카메라 만들고 배치하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%EC%B4%88%EC%83%81%ED%99%94-%EC%B9%B4%EB%A9%94%EB%9D%BC-%EB%A7%8C%EB%93%A4%EA%B3%A0-%EB%B0%B0%EC%B9%98%ED%95%98%EA%B8%B0)
+4. [배경(라커 모델)과 조명 세팅하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%EB%B0%B0%EA%B2%BD%EB%9D%BC%EC%BB%A4-%EB%AA%A8%EB%8D%B8%EA%B3%BC-%EC%A1%B0%EB%AA%85-%EC%84%B8%ED%8C%85%ED%95%98%EA%B8%B0)
+5. [렌더 텍스처(Render Texture) 생성 및 연결하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%EB%A0%8C%EB%8D%94-%ED%85%8D%EC%8A%A4%EC%B2%98render-texture-%EC%83%9D%EC%84%B1-%EB%B0%8F-%EC%97%B0%EA%B2%B0%ED%95%98%EA%B8%B0)
+6. [UI 캔버스에서 Raw Image로 표시하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#ui-%EC%BA%94%EB%B2%84%EC%8A%A4%EC%97%90%EC%84%9C-raw-image%EB%A1%9C-%ED%91%9C%EC%8B%9C%ED%95%98%EA%B8%B0)
+7. [타임라인에서 초상화 제어하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%ED%83%80%EC%9E%84%EB%9D%BC%EC%9D%B8%EC%97%90%EC%84%9C-%EC%B4%88%EC%83%81%ED%99%94-%EC%A0%9C%EC%96%B4%ED%95%98%EA%B8%B0)
+8. [해상도와 겹침 문제 해결하기](https://www.notion.so/4-279e683f737e80ca9695e782a70413c9#%ED%95%B4%EC%83%81%EB%8F%84%EC%99%80-%EA%B2%B9%EC%B9%A8-%EB%AC%B8%EC%A0%9C-%ED%95%B4%EA%B2%B0%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. 초상화 카메라 개념 이해하기
+
+- **목적**
+  - 플레이어의 실제 게임 화면은 3인칭/1인칭 시점에서 보여지지만,
+    동시에 캐릭터의 얼굴이나 특정 부분을 **UI(예: 초상화, 미니맵, 장비 화면)**에 따로 보여주고 싶을 때 사용한다.
+  - 예를 들어, RPG 게임에서 **대화창 옆에 캐릭터 얼굴이 표시**되거나,
+    FPS 게임에서 **무기 스코프 화면**이 따로 UI에 표시되는 것도 같은 원리이다.
+
+---
+
+- **방법**
+  1. **별도의 카메라 생성하기**
+     - 게임의 메인 카메라와는 다른 **전용 카메라**를 만든다.
+     - 이 카메라는 **오직 캐릭터의 얼굴(또는 원하는 부분)**만 비춘다.
+     - 카메라 위치를 캐릭터 정면 가까이에 두고, 필요하다면 전용 레이어를 지정해서 **원하는 오브젝트만 보이게 설정**한다.
+  2. **Render Texture 사용하기**
+     - 일반적으로 카메라가 보는 화면은 **모니터(게임 화면)**에 출력되지만,
+       Unity에서는 이 출력 결과를 **파일처럼 저장 가능한 텍스처(Render Texture)**로 받을 수 있다.
+     - **Render Texture란?**
+       - 말 그대로 카메라가 찍은 화면을 **“실시간으로 그려주는 그림(텍스처)”**이다.
+       - 보통 2D 스프라이트나 사진은 **고정된 이미지(Texture2D)**인데,
+         Render Texture는 **카메라 시점이 변하면 그 즉시 갱신되는 영상**을 텍스처처럼 다룰 수 있다.
+       - 즉, **움직이는 영상도 하나의 텍스처로 취급**할 수 있어서 UI나 3D 오브젝트에 붙일 수 있다.
+       - 예시:
+         - 캐릭터 초상화
+         - CCTV 화면
+         - 미니맵 (전용 카메라 + Render Texture)
+         - 스코프 화면
+     - Render Texture의 속성
+       - **해상도**: 초상화가 흐릿하지 않게 적당한 크기(예: 512x512)로 설정.
+       - **포맷**: 색상, 깊이 버퍼 등을 지원. (일반적으로 기본값 사용해도 무방)
+       - **갱신 방식**: 카메라가 Render Texture를 대상으로 렌더링할 때마다 자동으로 업데이트됨.
+  3. **UI에 표시하기 (Raw Image)**
+     - UI 캔버스에 `Raw Image` 컴포넌트를 추가한다.
+     - `Raw Image`는 일반 `Image`와 달리 **실시간 텍스처(Render Texture)** 같은 동적인 그림도 표시 가능하다.
+     - Render Texture를 `Raw Image`의 `Texture` 슬롯에 넣으면,
+       카메라가 비춘 캐릭터 얼굴이 UI에 실시간으로 출력된다.
+
+---
+
+👉 요약하면,
+
+- 메인 카메라 = 플레이어 전체 화면
+- 초상화 카메라 = 캐릭터 얼굴만 전용으로 촬영
+- Render Texture = 촬영된 영상을 텍스처처럼 저장
+- Raw Image = UI에서 그 텍스처를 출력
+
+---
+
+## 2. 캐릭터 모델과 애니메이션 준비하기
+
+- 강의에서 제공된 **GDTV Fleet Characters 패키지** 가져오기.
+  - 위치: `Assets/GDTV Assets/GDTV Fleet Characters/Prefabs`
+- 사용 가능 캐릭터:
+  - **지휘관(Commander)**
+  - **항해사(Navigator)**
+- 각 프리팹에는 **기본 대기(Idle) 애니메이션**이 설정되어 있음.
+- 애니메이션은 블렌더(3D 툴)에서 제작되어 유니티로 가져온 것 → Unity Animator로 루프 재생 가능.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380430/notion-blog/_/3D_/3D_/_4_-_4/image_27.png)
+
+---
+
+## 3. 초상화 카메라 만들고 배치하기
+
+1. **빈 GameObject 생성**
+   - 예: `Fleet Command` (조직용 그룹)
+   - 그 안에 `Lieutenant Nehpets`라는 빈 오브젝트 생성.
+   - 여기에 **Navigator 모델 프리팹** 드래그&드롭.
+2. **초상화 카메라 추가**
+   - `Lieutenant Nehpets`에 **Camera** 생성.
+   - 이름 변경: `Portrait Camera`.
+3. **카메라 세팅**
+   - **Audio Listener 삭제** (메인 카메라와 중복되면 오류 발생).
+   - 캐릭터 얼굴 쪽을 향하도록 `Rotation = (0,180,0)` 근처로 설정.
+   - `Position`을 얼굴 가까이로 조정.
+   - **Field of View (시야각)**: 좁히면 초상화 비율이 안정적으로 보임.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380430/notion-blog/_/3D_/3D_/_4_-_4/image_28.png)
+
+```csharp
+카메라를 아래에 추가 ( 화면에서 어떤 카메라를 사용할지 몰라서 오류가 생김 )
+```
+
+---
+
+## 4. 배경(라커 모델)과 조명 세팅하기
+
+1. **배경 모델 배치**
+   - `Locker` 프리팹(사물함)을 `Lieutenant` 밑에 배치.
+   - 크기 조절 → 단순한 “배경판” 역할.
+2. **조명 설정**
+   - `Lieutenant` 밑에 **Point Light** 생성.
+   - 얼굴이 밝게 보이도록 위치 조정.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380430/notion-blog/_/3D_/3D_/_4_-_4/image_29.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380430/notion-blog/_/3D_/3D_/_4_-_4/image_30.png)
+
+```csharp
+새로운 카메라 위치를 수정하고 라이트를 추가하고 뒤에 사물을 추가해서 배경을 가려줌
+```
+
+---
+
+## 5. 렌더 텍스처(Render Texture) 생성 및 연결하기
+
+1. **Render Texture 생성**
+   - `Assets/Textures` 폴더 → `Create > Render Texture`
+   - 이름: `Nehpets Portrait`.
+2. **카메라 출력 연결**
+   - `Portrait Camera`의 **Target Texture** 필드에 `Nehpets Portrait` 드래그.
+
+---
+
+## 6. UI 캔버스에서 Raw Image로 표시하기
+
+1. **UI 캔버스에 Raw Image 생성**
+   - `Canvas > Create UI > Raw Image`
+   - 이름: `Portrait Window (Nehpets)`.
+2. **위치 & 크기 조정**
+   - `Rect Transform` → **오른쪽 아래 Anchoring** (`Alt + 클릭`).
+   - 크기: 약 `450 x 450`.
+   - 여백: `X = -250`, `Y = 250`.
+3. **텍스처 연결**
+   - Raw Image의 **Texture 필드**에 `Nehpets Portrait` 드래그.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380431/notion-blog/_/3D_/3D_/_4_-_4/image_31.png)
+
+```csharp
+UI 로 출력을 위해 Raw Image 추가
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380431/notion-blog/_/3D_/3D_/_4_-_4/image_32.png)
+
+```csharp
+캔버스에 구조를 만들어주고 ( Raw Image 는 Nehpets 로 이름을 바꿨음 )
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380431/notion-blog/_/3D_/3D_/_4_-_4/image_33.png)
+
+```csharp
+피벗을 이동하여 오른쪽 아래로 붙여준다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380431/notion-blog/_/3D_/3D_/_4_-_4/image_34.png)
+
+```csharp
+portraitWindows 크기를 조절해주고
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380431/notion-blog/_/3D_/3D_/_4_-_4/image_35.png)
+
+```csharp
+하위의 Nehpets 를 최대로 넓혀준다
+
+( 그리고 약간의 여백을 만들어준다 portraitWindows를 직접 이동시켜서
+```
+
+## Render Texture vs Raw Image
+
+### 1. **Render Texture**
+
+- **정의**: 카메라가 찍은 화면을 저장하는 **특수한 텍스처(영상 저장소)**
+- **역할**: **카메라 출력물**을 담는 그릇
+- **특징**:
+  - 스스로는 보이지 않는다 (UI나 게임 화면에 직접 표시되지 않음).
+  - 다른 오브젝트가 이 텍스처를 “참조”해야만 보인다.
+  - 실시간으로 계속 갱신된다 → 움직이는 화면도 저장 가능.
+- **비유**:
+  - 카메라가 찍은 영상을 **USB 메모리**에 기록해 둔 것.
+  - 혼자서는 보이지 않고, TV나 모니터에 연결해야 화면이 나온다.
+
+---
+
+### 2. **Raw Image**
+
+- **정의**: UI에서 텍스처를 그대로 보여주는 **UI 컴포넌트**
+- **역할**: **텍스처 소비자(화면 출력 장치)**
+- **특징**:
+  - `Texture` 슬롯에 넣은 텍스처(Render Texture, 일반 이미지 등)를 UI로 표시한다.
+  - Unity UI(Canvas) 위에 뜨기 때문에 항상 화면에 보인다.
+  - Render Texture 외에도 PNG, JPG 같은 **고정 이미지(Texture2D)**도 넣을 수 있다.
+- **비유**:
+  - USB에 저장된 영상을 TV 화면에 띄워주는 **모니터**.
+  - 스스로 영상을 만들지 않고, 그냥 받은 걸 보여주는 역할.
+
+---
+
+### 3. **정리**
+
+- Render Texture = **카메라 영상 저장소 (Producer)**
+- Raw Image = **저장된 영상을 보여주는 UI 컴포넌트 (Consumer)**
+
+---
+
+👉 그래서 **둘은 세트처럼 움직여요**:
+
+카메라 → Render Texture (저장) → Raw Image (표시)
+
+---
+
+## 7. 타임라인에서 초상화 제어하기
+
+- **초상화 활성/비활성 전환**을 Timeline에서 제어.
+- 방법:
+  1. 계층 구조에서 초상화 GameObject 기본값을 **비활성화**.
+  2. Timeline에서 **Control Track** 추가.
+  3. Raw Image 오브젝트를 드래그 → 특정 대사(Voice Line)와 동기화.
+- 여러 캐릭터(예: `General Kcir`)도 같은 방식으로 **카메라 + Render Texture + Raw Image**를 복제하여 설정 가능.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380432/notion-blog/_/3D_/3D_/_4_-_4/image_36.png)
+
+```csharp
+랜더 텍스처 만들어주기
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380432/notion-blog/_/3D_/3D_/_4_-_4/image_37.png)
+
+```csharp
+카메라로 돌아가서 아웃풋에 방금 만든 랜더텍스처를 넣어준다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380432/notion-blog/_/3D_/3D_/_4_-_4/image_38.png)
+
+```csharp
+아까 만들어둔 Raw Image ( Nehpets ) 에 텍스처에 방금 만든 랜더 텍스처를 넣어준다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380432/notion-blog/_/3D_/3D_/_4_-_4/image_39.png)
+
+```csharp
+복제된 두 인물 모델
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380433/notion-blog/_/3D_/3D_/_4_-_4/image_40.png)
+
+```csharp
+각 포트레이트 윈도우를 트랙을 만들고 ( 컨트롤 트랙 ) 집어넣어준다
+```
+
+---
+
+## 8. 해상도와 겹침 문제 해결하기
+
+1. **텍스트 겹침 문제**
+   - 대화 텍스트를 **Portrait 옆으로 이동**.
+   - 앵커를 오른쪽 정렬.
+   - 글꼴 크기 조정 (`44` 정도).
+2. **저해상도 문제**
+   - Render Texture 기본 크기: `256x256`.
+   - 더 선명하게 하려면: `512x512` 이상으로 변경.
+   - 단, 성능에 영향 있음 → 상황에 맞게 조정.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380433/notion-blog/_/3D_/3D_/_4_-_4/image_41.png)
+
+```csharp
+랜더러 텍스처 크기를 키우면 초상화 화질이 올라간다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380433/notion-blog/_/3D_/3D_/_4_-_4/image_42.png)
+
+```csharp
+약간의 UI 위치 수정
+```
+
+---
+
+✅ **최종 결과**:
+
+- 초상화 카메라가 캐릭터 얼굴을 비추고, Render Texture를 통해 UI Raw Image에 표시됨.
+- Timeline에서 대사 타이밍에 맞추어 초상화를 활성/비활성 전환 가능.
+- 추가 캐릭터도 같은 방식으로 쉽게 복제 가능.
+
+---

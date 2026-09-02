@@ -1,0 +1,301 @@
+---
+title: '주문과 할인 도메인 설계'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# 주문과 할인 도메인 설계
+
+```jsx
+주문과 할인 정책
+
+* 회원은 상품을 주문할 수 있다.
+
+* 회원 등급에 따라 할인 정책을 적용할 수 있다.
+
+* 할인 정책은 모든 VIP는 1000원을 할인해주는 고정 금액 할인을 적용해달라. (나중에 변경 될 수 있다.)
+
+* 할인 정책은 변경 가능성이 높다. 회사의 기본 할인 정책을 아직 정하지 못했고, 오픈 직전까지 고민을 미루고 싶다. 최악의 경우 할인을 적용하지 않을 수 도 있다. (미확정)
+```
+
+## 주문 도메인 협력, 역할, 책임
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381135/notion-blog/_/_/_-_/_/Untitled.png)
+
+- 위 그림은 단순 역할에 대해서만 그린것
+
+```java
+1) 주문 생성: 클라이언트는 주문 서비스에 주문 생성을 요청한다.
+
+- 실무에서는 상품이라는 객체를 만들어서 구현하지만 여기서는 간단하게 구현하기 위해 데이터(회원 id, 상품명, 상품가격)로 보낸다.
+
+2) 회원 조회: 할인을 위해서 회원 등급이 필요하다. 그래서 주문 서비스는 회원 저장소에서 회원을 조회한다. (회원의 등급을 알기 위해서)
+
+3) 할인 적용: 주문 서비스는 회원 등급에 따른 할인 여부를 할인 정책에 위임한다.
+
+4) 주문 결과 반환: 주문 서비스는 할인 결과를 포함한 주문 결과를 반환한다.
+
+(참고) 실제로는 주문 데이터를 DB에 저장하지만 여기서는 단순히 주문 결과를 반환하도록 구현한다.
+```
+
+# 주문 도메인 전체
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381133/notion-blog/_/_/_-_/_/Untitled_1.png)
+
+- 위 그림은 역할과 구현까지 그림으로 표현한 것
+
+```java
+"역할과 구현"을 분리해서 자유롭게 구현 객체를 조립할 수 있도록 설계했다. 덕분에 회원 저장소, 할인 정책도 유연하게 변경할 수 있다.
+```
+
+# **주문 도메인 클래스 다이어그램**
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381134/notion-blog/_/_/_-_/_/Untitled_2.png)
+
+- 실제 클래스 구현을 표현한 그림 (클래스 다이어그램 ( 정적 ))
+
+```java
+* 인터페이스의 구현체가 하나 일때 보통 구현체 이름은 인터페이스명 + Impl
+```
+
+# **주문 도메인 객체 다이어그램**
+
+```java
+실제로 어떤 인터페이스 구현체로 new를 하는지에 따라서 주문 도메인 객체 다이어그램은 2가지로 나타낼 수 있다. 역할들의 협력 관계를 그대로 재사용할 수 있다.
+```
+
+## **객체 다이어그램1**
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381134/notion-blog/_/_/_-_/_/Untitled_3.png)
+
+```java
+회원을 메모리에서 조회하고 정액 할인 정책(고정금액)을 지원해도 주문 서비스를 변경하지 않아도 된다.
+```
+
+## **객체 다이어그램2**
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381134/notion-blog/_/_/_-_/_/Untitled_4.png)
+
+```java
+회원을 DB에서 조회하고 정률 할인 정책(주문 금액 %)을 지원해도 주문 서비스를 변경하지 않아도 된다.
+```
+
+# 할인 도메인 개발
+
+## **패키지 생성**
+
+```java
+src/main/java/Group이름.core 패키지 내에 discount 패키지를 생성한다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381134/notion-blog/_/_/_-_/_/Untitled_5.png)
+
+## **할인 정책**
+
+```java
+할인 정책 인터페이스를 만들고 할인 정책 구현체를 만든다.
+```
+
+### **할인 정책 인터페이스**
+
+```java
+생성한 패키지 내에 할인 정책 인터페이스(DiscountPolicy)를 생성한다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381135/notion-blog/_/_/_-_/_/Untitled_6.png)
+
+```java
+할인 정책 인터페이스에 discount() 추상 메서드를 선언한다. 매개변수는 Member 객체와 상품의 가격을 전달받는다. 리턴값은 할인 금액이다.
+```
+
+### **할인 정책 구현체**
+
+```java
+할인 정책 인터페이스의 구현체인 고정 할인 정책 구현체를 생성한다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381135/notion-blog/_/_/_-_/_/Untitled_7.png)
+
+```java
+할인 정책 인터페이스의 구현체이므로 implements DiscountPolicy를 추가해 주고, 추상 메서드를 구현하는 부분을 만든다.
+
+요구사항에서 고정 할인 정책이라면 1000원을 할인하기로 했으니, 상수로 만들어준다.
+```
+
+```java
+할인 조건이 회원의 등급이 VIP인 경우에만 할인이 적용되므로, if 문을 사용하여 회원의 등급 조건을 확인하고 할인 금액을 리턴한다. VIP가 아닌 경우는 0을 리턴하면 된다
+```
+
+# 주문 **도메인 개발**
+
+### **패키지 생성**
+
+```java
+src/main/java/Group이름.core 패키지 내에 order 패키지를 생성한다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381135/notion-blog/_/_/_-_/_/Untitled_8.png)
+
+### **주문 엔티티**
+
+```java
+order 패키지 내에 주문 엔티티 Order를 생성한다.
+
+회원 id
+상품 이름
+상품 가격
+할인 가격
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381135/notion-blog/_/_/_-_/_/Untitled_9.png)
+
+```java
+package hello.core.order;
+
+public class Order {
+    private Long memberId;
+    private String itemName;
+    private int itemPrice;
+    private int discountPrice;
+
+    public Order(Long memberId, String itemName, int itemPrice, int discountPrice) {
+        this.memberId = memberId;
+        this.itemName = itemName;
+        this.itemPrice = itemPrice;
+        this.discountPrice = discountPrice;
+    }
+
+    public int calculatePrice() {
+        return itemPrice - discountPrice;
+    }
+
+    public Long getMemberId() {
+        return memberId;
+    }
+
+    public void setMemberId(Long memberId) {
+        this.memberId = memberId;
+    }
+
+    public String getItemName() {
+        return itemName;
+    }
+
+    public void setItemName(String itemName) {
+        this.itemName = itemName;
+    }
+
+    public int getItemPrice() {
+        return itemPrice;
+    }
+
+    public void setItemPrice(int itemPrice) {
+        this.itemPrice = itemPrice;
+    }
+
+    public int getDiscountPrice() {
+        return discountPrice;
+    }
+
+    public void setDiscountPrice(int discountPrice) {
+        this.discountPrice = discountPrice;
+    }
+
+    @Override
+    public String toString() {
+        return "Order{" +
+                "memberId=" + memberId +
+                ", itemName='" + itemName + '\'' +
+                ", itemPrice=" + itemPrice +
+                ", discountPrice=" + discountPrice +
+                '}';
+    }
+}
+```
+
+```java
+회원 엔티티와 마찬가지로 생성자를 만들고 Getter/Setter도 만들어준다
+
+할인된 가격을 반환하는 메서드 calculatePrice()도 만들어준다. 이 메서드는 간단하게 상품 가격에서 할인 가격을 뺀 금액을 리턴하면 된다.
+```
+
+```java
+추가적으로 toString() 메서드를 오버라이딩하여 주문 엔티티의 필드들을 쉽게 출력할 수 있도록 한다.
+
+이 부분에 대해서는 뒤에서 설명한다고 한다. 아마 main에서 console 출력으로 비교할 때 보기 좋게 출력되도록 하려고 하시는 것 같다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381133/notion-blog/_/_/_-_/_/Untitled_10.png)
+
+# **주문 서비스**
+
+```java
+주문 서비스 인터페이스를 만든 후 주문 서비스 구현체를 만들어 보겠다.
+```
+
+## **주문 서비스 인터페이스**
+
+```java
+order 패키지에 주문 서비스 인터페이스 OrderService를 생성한다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381133/notion-blog/_/_/_-_/_/Untitled_11.png)
+
+```java
+OrderService에는 주문을 생성하는 createOrder() 메서드 하나만 있으면 된다. 추상 메서드를 선언한다. 매개변수는 회원 id, 상품 이름, 상품 가격을 전달받는다.
+```
+
+## **주문 서비스 구현체**
+
+```java
+주문 서비스 인터페이스를 구현할 주문 서비스 구현체 OrderServiceImpl을 order 패키지에 생성한다.
+
+implements OrderService를 추가하고 추상 메서드를 구현하는 부분을 만든다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381134/notion-blog/_/_/_-_/_/Untitled_12.png)
+
+```java
+주문 서비스 구현체 OrderServiceImpl은 회원 저장소와 할인 정책을 의존하기 때문에 다음과 같이 인터페이스의 인스턴스가 구현체 객체를 참조하도록 한다. (동적 다이어그램을 확인하라)
+```
+
+```java
+createOrder() 메서드에서는 Member 객체를 조회하여 가져오고, 그 Member 객체와 상품의 가격을 할인 정책에 전달해 준다(discountPrice). 리턴값이 할인 가격이므로 int형 변수로 받는다.
+```
+
+```java
+여기서 알 수 있는 것은 설계가 굉장히 잘 되어있다는 것이다. 왜냐하면 주문 서비스에서는 할인에 대해서는 모르기 때문에 할인 정책 구현체가 알아서 처리하고 결과만 던져달라고 하며 회원 객체와 상품 가격만 전달하고 있다. (private final DiscountPolicy discountPolicy = new FixDiscountPolicy();)
+
+할인에 대한 변경이 필요하면, 할인 정책만 수정하면 된다. SRP가 잘 지켜지고 있는 것이다
+
+마지막으로 Order 객체를 생성하여 리턴해주면 완성이다.
+```
+
+# 마무리
+
+```java
+개발을 모두 마쳤으니, 주문과 할인 도메인 설계 때 협력 관계 그림에 나왔던 흐름과 한 번 맞춰보도록 하자.
+```
+
+```java
+1. 주문 생성 : 클라이언트는 주문 서비스에 주문 생성을 요청한다.
+
+2. 회원 조회 : 할인을 위해 회원 등급이 필요하다. 주문 서비스는 회원 저장소에서 회원을 조회한다.
+
+3. 할인 적용 : 주문 서비스는 회원 등급에 따른 할인 여부를 할인 정책에 위임한다.
+
+4. 주문 결과 반환 : 주문 서비스는 할인 결과를 포함한 주문 결과를 반환한다.
+```
+
+```java
+클라이언트가 주문 서비스 OrderService에 주문 생성을 요청한다 → createOrder()
+
+주문 서비스가 회원 저장소에서 회원을 조회한다 → MemberRepository의 findById()
+
+주문 서비스는 할인 여부를 할인 정책에 위임한다 → DiscountPolicy의 discount()
+
+주문 서비스는 할인 결과를 포함한 주문 결과를 반환한다 → return new Order(매개변수들)
+```

@@ -1,0 +1,757 @@
+---
+title: '터렛 오브젝트 풀링 시스템 만들기'
+date: '2026-09-02'
+category: '게임 개발/유니티 개인 정리'
+tags: ['게임 개발', '유니티 개인 정리']
+draft: false
+summary: ''
+---
+
+# 🚀 유니티 오브젝트 풀링 시스템
+
+발사체를 계속 생성/삭제하면 **성능이 떨어집니다**. 오브젝트 풀링으로 **최적화**해봅시다!
+
+---
+
+## 📋 목차
+
+1. [오브젝트 풀링이란?](https://claude.ai/chat/2bd22684-8867-44de-96c9-c06903ce5257#1-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%ED%92%80%EB%A7%81%EC%9D%B4%EB%9E%80)
+2. [인터페이스 만들기](https://claude.ai/chat/2bd22684-8867-44de-96c9-c06903ce5257#2-%EC%9D%B8%ED%84%B0%ED%8E%98%EC%9D%B4%EC%8A%A4-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+3. [오브젝트 풀 시스템 구현](https://claude.ai/chat/2bd22684-8867-44de-96c9-c06903ce5257#3-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%ED%92%80-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B5%AC%ED%98%84)
+4. [발사체를 풀링으로 전환](https://claude.ai/chat/2bd22684-8867-44de-96c9-c06903ce5257#4-%EB%B0%9C%EC%82%AC%EC%B2%B4%EB%A5%BC-%ED%92%80%EB%A7%81%EC%9C%BC%EB%A1%9C-%EC%A0%84%ED%99%98)
+5. [터렛에서 풀링 사용](https://claude.ai/chat/2bd22684-8867-44de-96c9-c06903ce5257#5-%ED%84%B0%EB%A0%9B%EC%97%90%EC%84%9C-%ED%92%80%EB%A7%81-%EC%82%AC%EC%9A%A9)
+6. [설정 및 테스트](https://claude.ai/chat/2bd22684-8867-44de-96c9-c06903ce5257#6-%EC%84%A4%EC%A0%95-%EB%B0%8F-%ED%85%8C%EC%8A%A4%ED%8A%B8)
+
+---
+
+## 1. 오브젝트 풀링이란?
+
+### 기존 방식의 문제점
+
+```csharp
+// 발사할 때마다 생성
+Instantiate(projectile);  // ← 메모리 할당
+
+// 충돌하면 삭제
+Destroy(projectile);      // ← 가비지 컬렉션 발생! (렉 유발)
+```
+
+**문제:**
+
+- 계속 생성/삭제 → 가비지 컬렉션(GC) 발생
+- GC 실행 시 게임이 일시적으로 멈춤 (프레임 드롭)
+- 터렛이 많으면 심각한 렉
+
+### 풀링 방식
+
+```
+[오브젝트 풀]
+┌─────────────────┐
+│ ●●●●●●●●●●      │ ← 미리 생성 (비활성)
+└─────────────────┘
+     ↓ 꺼내기
+    [●] ← 활성화 (게임에 등장)
+     ↓ 사용 완료
+    [●] ← 비활성화
+     ↓ 반환
+[오브젝트 풀]
+┌─────────────────┐
+│ ●●●●●●●●●●      │ ← 다시 풀에 보관
+└─────────────────┘
+
+```
+
+**장점:**
+
+- ✅ GC 최소화 → 프레임 안정
+- ✅ 생성 비용 없음 → 빠른 발사
+- ✅ 여러 터렛 동시 발사 가능
+
+---
+
+## 2. 인터페이스 만들기
+
+### IPooledObject.cs
+
+```csharp
+// 풀에서 꺼낼 때 실행할 함수를 정의하는 "약속"
+public interface IPooledObject
+{
+    void OnObjectSpawn();  // 풀에서 꺼낼 때 호출됨
+}
+```
+
+### 인터페이스란?
+
+- **계약서** 같은 것
+- "이 인터페이스를 사용하는 클래스는 반드시 `OnObjectSpawn()` 함수를 만들어야 한다"는 규칙
+- 풀에서 꺼낼 때 초기화가 필요한 것들을 여기에 작성
+
+**사용 예시:**
+
+```csharp
+public class TurretProjectile : MonoBehaviour, IPooledObject
+{
+    // IPooledObject를 구현하므로 OnObjectSpawn() 필수
+    public void OnObjectSpawn()
+    {
+        // 풀에서 꺼낼 때마다 실행
+        spawnTime = Time.time;
+        SpawnMuzzleEffect();
+    }
+}
+
+```
+
+---
+
+## 3. 오브젝트 풀 시스템 구현
+
+### ObjectPool.cs
+
+```csharp
+using System.Collections.Generic;
+using UnityEngine;
+
+public class ObjectPool : MonoBehaviour
+{
+    // Inspector에서 설정할 풀 정보
+    [System.Serializable]
+    public class Pool
+    {
+        public string tag;           // 풀 이름
+        public GameObject prefab;    // 프리팹
+        public int size;             // 미리 만들 개수
+    }
+
+    [SerializeField] List<Pool> pools;  // 여러 종류의 풀
+
+    // 태그로 풀을 찾기 위한 Dictionary
+    // "TurretProjectile" → Queue<GameObject>
+    private Dictionary<string, Queue<GameObject>> poolDictionary;
+
+    void Awake()
+    {
+        poolDictionary = new Dictionary<string, Queue<GameObject>>();
+
+        // 설정한 모든 풀 생성
+        foreach (Pool pool in pools)
+        {
+            Queue<GameObject> objectPool = new Queue<GameObject>();
+
+            // 풀 크기만큼 오브젝트 미리 생성
+            for (int i = 0; i < pool.size; i++)
+            {
+                GameObject obj = Instantiate(pool.prefab);
+                obj.SetActive(false);              // 비활성화 (숨김)
+                obj.transform.SetParent(transform); // 하이어라키 정리
+                objectPool.Enqueue(obj);           // 큐에 추가
+            }
+
+            // Dictionary에 풀 등록
+            poolDictionary.Add(pool.tag, objectPool);
+        }
+    }
+
+    // 풀에서 오브젝트 꺼내기
+    public GameObject SpawnFromPool(string tag, Vector3 position, Quaternion rotation)
+    {
+        // 태그가 존재하지 않으면
+        if (!poolDictionary.ContainsKey(tag))
+        {
+            Debug.LogWarning($"Pool with tag {tag} doesn't exist.");
+            return null;
+        }
+
+        // 큐에서 오브젝트 꺼내기
+        GameObject objectToSpawn = poolDictionary[tag].Dequeue();
+
+        // 활성화 및 위치/회전 설정
+        objectToSpawn.SetActive(true);
+        objectToSpawn.transform.position = position;
+        objectToSpawn.transform.rotation = rotation;
+
+        // IPooledObject 인터페이스 구현 확인
+        IPooledObject pooledObj = objectToSpawn.GetComponent<IPooledObject>();
+        if (pooledObj != null)
+        {
+            pooledObj.OnObjectSpawn();  // 초기화 함수 호출
+        }
+
+        // 다시 큐에 넣기 (순환 사용)
+        poolDictionary[tag].Enqueue(objectToSpawn);
+
+        return objectToSpawn;
+    }
+
+    // 풀로 반환 (비활성화)
+    public void ReturnToPool(GameObject obj)
+    {
+        obj.SetActive(false);
+    }
+}
+
+```
+
+### 핵심 개념
+
+### **Dictionary<키, 값>**
+
+```csharp
+Dictionary<string, Queue<GameObject>> poolDictionary;
+
+```
+
+- **사전** 자료구조
+- 키(태그)로 값(풀) 빠르게 찾기
+- 예: `poolDictionary["TurretProjectile"]` → 발사체 풀
+
+### **Queue<T>**
+
+```csharp
+Queue<GameObject> objectPool = new Queue<GameObject>();
+
+```
+
+- **큐** 자료구조 (선입선출)
+- `Enqueue(obj)`: 뒤에 추가
+- `Dequeue()`: 앞에서 꺼냄
+
+```
+[큐 동작]
+Enqueue → [●●●●] → Dequeue
+          앞←뒤
+
+```
+
+### **SetActive(bool)**
+
+```csharp
+obj.SetActive(false);  // 비활성화 (보이지 않음, Update 실행 안됨)
+obj.SetActive(true);   // 활성화 (보임, Update 실행)
+
+```
+
+---
+
+## 4. 발사체를 풀링으로 전환
+
+### TurretProjectile.cs (풀링 버전)
+
+```csharp
+using UnityEngine;
+
+public class TurretProjectile : MonoBehaviour, IPooledObject  // ← 인터페이스 추가
+{
+    [Header("Movement")]
+    [SerializeField] float speed = 15f;
+    [SerializeField] float lifetime = 5f;
+
+    [Header("Damage")]
+    [SerializeField] float damage = 10f;
+
+    [Header("Effects")]
+    [SerializeField] GameObject muzzlePrefab;
+    [SerializeField] GameObject hitPrefab;
+
+    private ObjectPool objectPool;  // 풀 참조
+    private float spawnTime;        // 생성 시간
+
+    void Start()
+    {
+        // ObjectPool 찾기 (씬에 1개만 있어야 함)
+        objectPool = FindObjectOfType<ObjectPool>();
+    }
+
+    // IPooledObject 인터페이스 구현
+    // 풀에서 꺼낼 때마다 호출됨
+    public void OnObjectSpawn()
+    {
+        spawnTime = Time.time;        // 생성 시간 기록
+        SpawnMuzzleEffect();          // 총구 이펙트
+    }
+
+    void Update()
+    {
+        // 앞으로 이동
+        transform.position += transform.forward * speed * Time.deltaTime;
+
+        // 수명이 다하면 풀로 반환
+        if (Time.time >= spawnTime + lifetime)
+        {
+            ReturnToPool();
+        }
+    }
+
+    void SpawnMuzzleEffect()
+    {
+        if (muzzlePrefab != null)
+        {
+            var muzzleVFX = Instantiate(muzzlePrefab, transform.position, Quaternion.identity);
+            muzzleVFX.transform.forward = transform.forward;
+
+            var psMuzzle = muzzleVFX.GetComponent<ParticleSystem>();
+            if (psMuzzle != null)
+            {
+                Destroy(muzzleVFX, psMuzzle.main.duration);
+            }
+            else
+            {
+                var psChild = muzzleVFX.transform.GetChild(0).GetComponent<ParticleSystem>();
+                if (psChild != null)
+                {
+                    Destroy(muzzleVFX, psChild.main.duration);
+                }
+            }
+        }
+    }
+
+    void OnCollisionEnter(Collision collision)
+    {
+        SpawnHitEffect(collision);
+        DealDamage(collision.gameObject);
+        ReturnToPool();  // ← Destroy 대신 풀로 반환
+    }
+
+    void SpawnHitEffect(Collision collision)
+    {
+        if (hitPrefab != null)
+        {
+            ContactPoint contact = collision.contacts[0];
+            Quaternion rot = Quaternion.FromToRotation(Vector3.up, contact.normal);
+            Vector3 pos = contact.point;
+
+            var hitVFX = Instantiate(hitPrefab, pos, rot);
+            var psHit = hitVFX.GetComponent<ParticleSystem>();
+
+            if (psHit != null)
+            {
+                Destroy(hitVFX, psHit.main.duration);
+            }
+            else
+            {
+                var psChild = hitVFX.transform.GetChild(0).GetComponent<ParticleSystem>();
+                if (psChild != null)
+                {
+                    Destroy(hitVFX, psChild.main.duration);
+                }
+            }
+        }
+    }
+
+    void DealDamage(GameObject target)
+    {
+        if (target.CompareTag("Player"))
+        {
+            PlayerHealth playerHealth = target.GetComponent<PlayerHealth>();
+            if (playerHealth != null)
+            {
+                playerHealth.TakeDamage(damage);
+            }
+        }
+    }
+
+    // 풀로 반환
+    void ReturnToPool()
+    {
+        if (objectPool != null)
+        {
+            objectPool.ReturnToPool(gameObject);
+        }
+        else
+        {
+            // 풀이 없으면 그냥 비활성화
+            gameObject.SetActive(false);
+        }
+    }
+}
+
+```
+
+### 주요 변경사항
+
+**1. 인터페이스 구현**
+
+```csharp
+public class TurretProjectile : MonoBehaviour, IPooledObject
+
+```
+
+**2. OnObjectSpawn() 추가**
+
+```csharp
+public void OnObjectSpawn()
+{
+    spawnTime = Time.time;  // Start() 대신 여기서 초기화
+    SpawnMuzzleEffect();
+}
+
+```
+
+**3. Destroy → ReturnToPool**
+
+```csharp
+// 기존
+Destroy(gameObject);
+
+// 변경
+ReturnToPool();
+
+```
+
+**4. 수명 관리 변경**
+
+```csharp
+// 기존: Start()에서
+Destroy(gameObject, lifetime);
+
+// 변경: Update()에서 체크
+if (Time.time >= spawnTime + lifetime)
+{
+    ReturnToPool();
+}
+
+```
+
+---
+
+## 5. 터렛에서 풀링 사용
+
+### Turret.cs (풀링 버전)
+
+```csharp
+using UnityEngine;
+
+public class Turret : MonoBehaviour
+{
+    [Header("References")]
+    [SerializeField] Transform turretHead;
+    [SerializeField] Transform playerTargetPoint;
+    [SerializeField] Transform firePoint;
+
+    [Header("Pooling")]
+    [SerializeField] string projectilePoolTag = "TurretProjectile";  // ← 풀 태그
+
+    [Header("Settings")]
+    [SerializeField] float detectionRange = 20f;
+    [SerializeField] float fireRate = 1f;
+    [SerializeField] float rotationSpeed = 5f;
+
+    private float nextFireTime = 0f;
+    private TurretDetection detection;
+    private ObjectPool objectPool;  // ← 풀 참조
+
+    void Start()
+    {
+        detection = GetComponent<TurretDetection>();
+        if (detection == null)
+        {
+            detection = gameObject.AddComponent<TurretDetection>();
+            detection.Initialize(detectionRange);
+        }
+
+        // ObjectPool 찾기
+        objectPool = FindObjectOfType<ObjectPool>();
+        if (objectPool == null)
+        {
+            Debug.LogError("ObjectPool not found in scene!");
+        }
+    }
+
+    void Update()
+    {
+        if (playerTargetPoint != null && detection.IsPlayerInRange())
+        {
+            RotateTurretHead();
+
+            if (Time.time >= nextFireTime)
+            {
+                Shoot();
+                nextFireTime = Time.time + 1f / fireRate;
+            }
+        }
+    }
+
+    void RotateTurretHead()
+    {
+        if (turretHead != null)
+        {
+            Vector3 direction = playerTargetPoint.position - turretHead.position;
+            Quaternion targetRotation = Quaternion.LookRotation(direction);
+            turretHead.rotation = Quaternion.Slerp(
+                turretHead.rotation,
+                targetRotation,
+                Time.deltaTime * rotationSpeed
+            );
+        }
+    }
+
+    void Shoot()
+    {
+        if (firePoint != null && objectPool != null)
+        {
+            // Instantiate 대신 풀에서 꺼내기
+            objectPool.SpawnFromPool(
+                projectilePoolTag,      // 태그
+                firePoint.position,     // 위치
+                firePoint.rotation      // 회전
+            );
+        }
+    }
+
+    void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(transform.position, detectionRange);
+    }
+}
+
+```
+
+### 주요 변경사항
+
+**1. 프리팹 대신 태그 사용**
+
+```csharp
+// 기존
+[SerializeField] GameObject projectilePrefab;
+
+// 변경
+[SerializeField] string projectilePoolTag = "TurretProjectile";
+
+```
+
+**2. ObjectPool 참조 추가**
+
+```csharp
+private ObjectPool objectPool;
+
+void Start()
+{
+    objectPool = FindObjectOfType<ObjectPool>();
+}
+
+```
+
+**3. Instantiate → SpawnFromPool**
+
+```csharp
+// 기존
+Instantiate(projectilePrefab, position, rotation);
+
+// 변경
+objectPool.SpawnFromPool(projectilePoolTag, position, rotation);
+
+```
+
+---
+
+## 6. 설정 및 테스트
+
+### Step 1: ObjectPool 오브젝트 생성
+
+**1. 빈 GameObject 생성**
+
+- 하이어라키 우클릭 → Create Empty
+- 이름: `ObjectPool`
+
+**2. ObjectPool.cs 추가**
+
+- Add Component → ObjectPool
+
+**3. Inspector 설정**
+
+```
+Pools
+  Size: 1
+
+  Element 0
+  ├─ Tag: TurretProjectile
+  ├─ Prefab: [TurretProjectile 프리팹 드래그]
+  └─ Size: 20
+
+```
+
+**Size 계산:**
+
+```
+필요한 크기 = 터렛 개수 × 발사 속도 × 수명
+예: 5개 터렛 × 1발/초 × 5초 = 25개
+여유있게 30~50개 추천
+
+```
+
+### Step 2: 터렛 설정 업데이트
+
+**Turret GameObject 선택**
+
+Inspector에서:
+
+- **Projectile Pool Tag**: `TurretProjectile` (ObjectPool의 태그와 동일)
+- Projectile Prefab 필드는 제거됨
+
+### Step 3: 테스트
+
+**체크리스트:**
+
+✅ **게임 시작 시**
+
+- ObjectPool 하위에 발사체들이 생성됨
+- 모두 비활성화 상태 (회색)
+
+✅ **발사 시**
+
+- 새로운 오브젝트가 생성되지 않음
+- 기존 비활성 오브젝트가 활성화됨
+
+✅ **충돌/수명 다한 후**
+
+- 오브젝트가 사라지지 않고 비활성화됨
+- 다시 풀에서 재사용 가능
+
+✅ **성능**
+
+- 프레임 드롭 없음
+- 여러 터렛 동시 발사해도 부드러움
+
+### 하이어라키 예시
+
+```
+Scene
+├─ ObjectPool
+│  ├─ TurretProjectile (Clone) - Active: false
+│  ├─ TurretProjectile (Clone) - Active: false
+│  ├─ TurretProjectile (Clone) - Active: true  ← 발사 중
+│  ├─ TurretProjectile (Clone) - Active: false
+│  └─ ... (20개)
+│
+├─ Turret
+└─ Player
+
+```
+
+---
+
+## 🎯 성능 비교
+
+### 기존 방식 (Instantiate/Destroy)
+
+```
+발사 → 생성 (메모리 할당) → 충돌 → 삭제 (GC 발생) → 렉!
+
+```
+
+**문제:**
+
+- 발사 시마다 메모리 할당
+- GC 자주 발생 → 프레임 드롭
+- 터렛 10개 × 초당 2발 = 초당 20번 GC 발생 가능
+
+### 풀링 방식
+
+```
+발사 → 활성화 (빠름) → 충돌 → 비활성화 (빠름) → 부드러움!
+
+```
+
+**장점:**
+
+- 메모리 할당 없음
+- GC 거의 발생 안함
+- 프레임 안정적
+
+---
+
+## 📝 핵심 개념 정리
+
+### 1. 오브젝트 풀링 원리
+
+```
+미리 생성 → 활성화/비활성화 반복 → 재사용
+
+```
+
+### 2. 인터페이스
+
+```csharp
+public interface IPooledObject
+{
+    void OnObjectSpawn();  // 약속: 이 함수 반드시 구현
+}
+
+```
+
+### 3. Dictionary
+
+```csharp
+Dictionary<string, Queue<GameObject>> pools;
+pools["TurretProjectile"]  // 태그로 풀 찾기
+
+```
+
+### 4. Queue
+
+```csharp
+Queue<GameObject> pool = new Queue<GameObject>();
+pool.Enqueue(obj);  // 뒤에 추가
+pool.Dequeue();     // 앞에서 꺼냄
+
+```
+
+### 5. SetActive
+
+```csharp
+obj.SetActive(false);  // 비활성화 (삭제 아님!)
+obj.SetActive(true);   // 활성화 (재사용)
+
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 1. 풀 크기 부족
+
+**증상:** 발사체가 갑자기 안 나옴
+
+**해결:** ObjectPool의 Size 늘리기
+
+```
+터렛 많으면: Size 50~100
+터렛 적으면: Size 20~30
+
+```
+
+### 2. 태그 오타
+
+**증상:** 발사 안 됨, 콘솔에 경고
+
+**해결:** Turret과 ObjectPool의 태그가 정확히 일치하는지 확인
+
+```csharp
+// Turret.cs
+projectilePoolTag = "TurretProjectile"
+
+// ObjectPool Inspector
+Tag: TurretProjectile  // 동일해야 함!
+
+```
+
+### 3. ObjectPool 없음
+
+**증상:** 콘솔에 "ObjectPool not found"
+
+**해결:** 씬에 ObjectPool GameObject 추가
+
+---
+
+## ✅ 최종 체크리스트
+
+- [ ] IPooledObject.cs 생성
+- [ ] ObjectPool.cs 생성
+- [ ] ObjectPool GameObject 생성 및 설정
+- [ ] TurretProjectile.cs에 IPooledObject 구현
+- [ ] Turret.cs에서 풀링 사용
+- [ ] 게임 실행 시 풀이 생성되는지 확인
+- [ ] 발사체가 재사용되는지 확인 (하이어라키 관찰)
+- [ ] 프레임이 안정적인지 확인

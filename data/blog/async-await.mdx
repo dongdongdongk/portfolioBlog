@@ -1,0 +1,286 @@
+---
+title: 'async와 await'
+date: '2026-09-02'
+category: '풀스택/JavaScript'
+tags: ['풀스택', 'JavaScript']
+draft: false
+summary: ''
+---
+
+# **async 함수 선언**
+
+```jsx
+async 키워드를 함수 앞에 붙이면 해당 함수는 비동기 함수가 된다.
+```
+
+```jsx
+async function fetchData() {
+  // 비동기 작업을 수행하는 코드
+}
+```
+
+# **await 표현식**
+
+```jsx
+* await 키워드는 비동기 함수 안에서만 사용할 수 있다.
+
+* await 뒤에 오는 표현식은 Promise를 반환하는 비동기 작업이 된다.
+
+* await은 해당 작업이 완료될 때까지 코드의 실행을 일시 정지시킨다.
+```
+
+```jsx
+async function fetchData() {
+  // 비동기 작업이 완료될 때까지 기다림
+  const result = await someAsyncFunction() //
+  console.log(result)
+}
+```
+
+### 예제
+
+```jsx
+async function fetchAndDisplayData() {
+  try {
+    // 데이터를 가져오는 비동기 작업
+    const data = await fetchDataFromServer()
+
+    // 데이터를 화면에 표시
+    displayDataOnScreen(data)
+  } catch (error) {
+    // 오류 처리
+    console.error('데이터를 가져오는 중 오류 발생:', error)
+  }
+}
+
+// fetchAndDisplayData 함수 호출
+fetchAndDisplayData()
+```
+
+## await 뒤에 오는 함수는 비동기 함수여야 하는가?
+
+```jsx
+await는 비동기적으로 완료되는 작업의 결과를 기다리기 위해 사용되는 것이며,
+
+이 작업이 Promise를 반환하는 함수일 필요는 없다. (Promise를 반환하지 않는 함수, 일반 객체, 또는 값도 될 수 있다)
+
+그러나 await를 사용하면서 해당 작업이 완료될 때까지 다음 코드를 실행하지 않도록 하려면( 비동기적으로 처리하려면) ,
+
+await 다음에 오는 표현식은 Promise 객체나 비동기 함수이어야 한다.
+
+( 비동기적인 동작을 가진 함수가 아니라 그냥 값을 반환하는 함수라면, await를 사용해도 동기적으로 작동하게 된다 )
+
+* 대부분의 브라우저나(fetch) node.js 비동기 API 들은 이미 promice 객체를 반환한다 그래서 따로 newPromise 할 필요 없이
+
+  그대로 사용하면 된다
+```
+
+# 예제
+
+## **비동기 함수를 사용하여 데이터 가져오기**
+
+```jsx
+// 비동기 함수를 사용하여 웹에서 데이터를 가져오는 예제
+async function fetchDataFromServer(url) {
+  try {
+    const response = await fetch(url)
+    const data = await response.json()
+    console.log('데이터 가져오기 성공:', data)
+  } catch (error) {
+    console.error('데이터 가져오기 실패:', error)
+  }
+}
+```
+
+## 여러 비동기 작업을 병렬로 처리하기
+
+```jsx
+// 병렬로 여러 비동기 작업을 수행하는 예제
+async function processTasksParallel() {
+  try {
+    const task1 = someAsyncFunction1()
+    const task2 = someAsyncFunction2()
+    const task3 = someAsyncFunction3()
+
+    // Promise.all을 사용하여 모든 작업이 완료될 때까지 기다림
+    const results = await Promise.all([task1, task2, task3])
+
+    console.log('작업 결과:', results)
+  } catch (error) {
+    console.error('작업 처리 중 오류 발생:', error)
+  }
+}
+
+// processTasksParallel 함수 호출
+processTasksParallel()
+```
+
+## **사용자 입력 대기 중 로딩 화면 표시하기**
+
+```jsx
+// 사용자 입력을 기다리는 동안 로딩 화면을 표시하는 예제
+async function waitForUserInput() {
+  try {
+    // 사용자 입력을 기다리는 동안 로딩 화면 표시
+    showLoadingScreen()
+
+    // 사용자 입력을 받는 비동기 함수 호출
+    const userInput = await getUserInput()
+
+    // 사용자 입력에 따라 다른 작업 수행
+    processUserInput(userInput)
+
+    // 로딩 화면 숨기기
+    hideLoadingScreen()
+  } catch (error) {
+    // 오류 처리
+    console.error('사용자 입력 처리 중 오류 발생:', error)
+    // 로딩 화면 숨기기
+    hideLoadingScreen()
+  }
+}
+
+// waitForUserInput 함수 호출
+waitForUserInput()
+```
+
+# fetch ⇒ async 변환 예제
+
+## **기본적인 Fetch**
+
+```jsx
+// 기본적인 Fetch 사용
+fetch('https://api.example.com/data')
+  .then((response) => response.json())
+  .then((data) => console.log('데이터 가져오기 성공:', data))
+  .catch((error) => console.error('데이터 가져오기 실패:', error))
+```
+
+```jsx
+// async/await를 사용한 Fetch
+async function fetchData() {
+  try {
+    const response = await fetch('https://api.example.com/data')
+    const data = await response.json()
+    console.log('데이터 가져오기 성공:', data)
+  } catch (error) {
+    console.error('데이터 가져오기 실패:', error)
+  }
+}
+
+// fetchData 함수 호출
+fetchData()
+```
+
+## **POST 요청**
+
+```jsx
+// 기본적인 POST 요청
+fetch('https://api.example.com/postData', {
+  method: 'POST',
+  body: JSON.stringify({ key: 'value' }),
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+  .then((response) => response.json())
+  .then((data) => console.log('데이터 전송 및 응답 성공:', data))
+  .catch((error) => console.error('데이터 전송 실패:', error))
+```
+
+```jsx
+// async/await를 사용한 POST 요청
+async function postData() {
+  try {
+    const response = await fetch('https://api.example.com/postData', {
+      method: 'POST',
+      body: JSON.stringify({ key: 'value' }),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+    const data = await response.json()
+    console.log('데이터 전송 및 응답 성공:', data)
+  } catch (error) {
+    console.error('데이터 전송 실패:', error)
+  }
+}
+
+// postData 함수 호출
+postData()
+```
+
+## **동시에 여러 개의 요청 수행 (Promise.all 사용)**
+
+```jsx
+// 여러 개의 Fetch 요청을 동시에 수행
+const urls = [
+  'https://api.example.com/data1',
+  'https://api.example.com/data2',
+  'https://api.example.com/data3',
+]
+
+const requests = urls.map((url) => fetch(url))
+
+Promise.all(requests)
+  .then((responses) => Promise.all(responses.map((response) => response.json())))
+  .then((dataArray) => console.log('여러 데이터 가져오기 성공:', dataArray))
+  .catch((error) => console.error('여러 데이터 가져오기 실패:', error))
+```
+
+```jsx
+// async/await 및 Promise.all을 사용한 여러 개의 Fetch 요청
+async function fetchMultipleData(urls) {
+  try {
+    const requests = urls.map((url) => fetch(url))
+    const responses = await Promise.all(requests)
+    const dataArray = await Promise.all(responses.map((response) => response.json()))
+    console.log('여러 데이터 가져오기 성공:', dataArray)
+  } catch (error) {
+    console.error('여러 데이터 가져오기 실패:', error)
+  }
+}
+
+// fetchMultipleData 함수 호출
+fetchMultipleData([
+  'https://api.example.com/data1',
+  'https://api.example.com/data2',
+  'https://api.example.com/data3',
+])
+```
+
+## **헤더에 인증 토큰 추가**
+
+```jsx
+// 헤더에 인증 토큰을 추가한 Fetch 요청
+const token = 'Bearer myAuthToken'
+
+fetch('https://api.example.com/authenticatedData', {
+  headers: {
+    Authorization: token,
+  },
+})
+  .then((response) => response.json())
+  .then((data) => console.log('인증된 데이터 가져오기 성공:', data))
+  .catch((error) => console.error('인증된 데이터 가져오기 실패:', error))
+```
+
+```jsx
+// async/await를 사용하여 헤더에 인증 토큰을 추가한 Fetch 요청
+async function fetchAuthenticatedData(token) {
+  try {
+    const response = await fetch('https://api.example.com/authenticatedData', {
+      headers: {
+        Authorization: token,
+      },
+    })
+    const data = await response.json()
+    console.log('인증된 데이터 가져오기 성공:', data)
+  } catch (error) {
+    console.error('인증된 데이터 가져오기 실패:', error)
+  }
+}
+
+// fetchAuthenticatedData 함수 호출
+fetchAuthenticatedData('Bearer myAuthToken')
+```

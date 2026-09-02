@@ -1,0 +1,480 @@
+---
+title: '서블릿5'
+date: '2026-09-02'
+category: '기타, 사용 적음/국비'
+tags: ['기타, 사용 적음', '국비']
+draft: false
+summary: ''
+---
+
+## Spring MyBatis - 기본 연결
+
+```java
+ Database Framework 중 하나
+- Mybatis   : 배우기 쉬움  , SQL문 기반, 복잡한 쿼리를 사용할 때 많이 사용
+- Hibernate : 배우기 어려움, method 기반, 단순한 쿼리를 사용 할 때 많이 사용
+
+- 공식주소   : https://mybatis.org
+- 참조문서   : https://mybatis.org/mybatis-3/
+
+**1. 개념
+	- SQL문을 Java에서 분리하여 XML에 등록하고 연결해서 사용**
+
+2. Mybatis Library 다운
+	- Spring은 pom.xml에서 라이브러리 관리를 함
+	1) mvnrepository.com 에서 필요한 라이브러리 검색
+	2) 원하는 버전을 클릭하고 maven의 내용을 복사
+	3) pom.xml에 <dependencies>내에 붙여 넣기 후 저장
+	4) 라이브러리 다운이 끝나면 프로젝트 우클릭-> maven -> update project 실행
+	5) 서버를 restart
+
+	a. mybatis
+		- 최신버전
+		<dependency>
+		    <groupId>org.mybatis</groupId>
+		    <artifactId>mybatis</artifactId>
+		    <version>3.5.9</version>
+		</dependency>
+
+	b. mybatis-spring
+		- 최신버전
+		<dependency>
+		    <groupId>org.mybatis</groupId>
+		    <artifactId>mybatis-spring</artifactId>
+		    <version>2.0.7</version>
+		</dependency>
+
+	c. spring-jdbc
+		- 현재 사용중인 Spring Framework 버전과 동일
+		<dependency>
+		    <groupId>org.springframework</groupId>
+		    <artifactId>spring-jdbc</artifactId>
+		    <version>${org.springframework-version}</version>
+		</dependency>
+
+	d. jdbc
+		- DB에 맞는 jdbc
+		<dependency>
+		    <groupId>com.oracle.ojdbc</groupId>
+		    <artifactId>ojdbc8</artifactId>
+		    <version>19.3.0.0</version>
+		</dependency>
+
+*개발 시작 전 환경세팅을 팀원과 같게 해줘야 한다
+```
+
+```java
+스프링에서 객체를 만들떄 사용하는 방법 두가지 Annotation 과 XML (Annotation 은 소스코드를
+
+열 수 있을때 사용한다 MyBatis 를 사용할때는 라이브러리 이기 때문에 소스확인 불가 = XML)
+
+```
+
+## XML 이 객체를 만드는 원리
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380891/notion-blog/_/_/JSP/_5/Untitled.png)
+
+```java
+web.xml 이 위 코드의 경로를 읽고 servlet-context.xml 을 찾아가
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380886/notion-blog/_/_/JSP/_5/Untitled_1.png)
+
+```java
+**<beans:been> 객체를 만들어라**
+
+(컨테이너를 만드는 두가지 톰캣,스프링중 스프링이 객체생성)
+
+**<context:component=scan 아래의 경로로 스캔하라**
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380888/notion-blog/_/_/JSP/_5/Untitled_2.png)
+
+```java
+<context-param 은 dispatcherServlet 만 사용할 수 있는 init-param 과 다르게 모두 사용할 수
+
+있다 (저기 적혀있는 주소 덕분에 스프링이 알아서 객체를 찾아줄 수 있다.
+
+**한마디로 위치를 알려줘야 스프링이 찾아준단것**
+```
+
+## XML db연결을 위한 객체 생성하는 법
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380949/notion-blog/_/Database/Oracle/Java_DB_/Untitled.png)
+
+- 위 과정을 대체한다.
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380890/notion-blog/_/_/JSP/_5/Untitled_3.png)
+
+```java
+1.**새로운 XML 파일을 생성한다.**
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380890/notion-blog/_/_/JSP/_5/Untitled_4.png)
+
+```java
+<bean></bean> : 객체를 만드는 태그
+
+class ="주소" : 어느 패키지에 있는 클래스를 만들건지 정보를 주는곳
+
+id = "이름" : 이들을 구분하기 위한 이름
+
+<property> : Setter 을 호출하기 위한 태그   (의존성이 있는 객체를 주입하기 위해 Setter,생성자)
+
+<constructor-arg> : 생성자를 호출하기 위한 태그
+```
+
+```java
+2.	**-- Database에 로그인 후 연결객체를 관리하는 클래스의 객체 생성
+  -- DBCconection 을 대체**
+
+	<bean class="org.springframework.jdbc.datasource.DriverManagerDataSource" id="dataSource">
+		<property name="username" value="${oracle.username}"></property>
+		<property name="password" value="${oracle.password}"></property>
+		<property name="url" value="${oracle.url}"></property>
+		<property name="driverClassName" value="${oracle.driver}"></property>
+	</bean>
+
+"org.springframework.jdbc.datasource.DriverManagerDataSource" 복붙 권장
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380890/notion-blog/_/_/JSP/_5/Untitled_5.png)
+
+```java
+**3.web.xml 로 들어가 data base context.xml 을 찾을 수 있게 * (하위) 로 경로를 수정해준다.**
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380891/notion-blog/_/_/JSP/_5/Untitled_6.png)
+
+```java
+**4.필요한곳(DAO) 에 DataSource 타입의 멤버 변수를 생성하고 (DriverManager의 상위) Autowired
+
+이후 Connect 전부 삭제가능 (아래에서 이것도 대체됨)**
+```
+
+## Mapper 파일 생성하기 (SQL,prepared 지우기)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380891/notion-blog/_/_/JSP/_5/Untitled_7.png)
+
+```java
+1**.SQL문을 자바에서 분리해서 사용하기 위해서 XML 파일을 만들어준다.(자바외의 나의머지 자원이
+
+들어가는 resources 에 폴더 제작)**
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380891/notion-blog/_/_/JSP/_5/Untitled_8.png)
+
+```java
+2**.Mybatis 홈페이지에서 위의 부분을 복사한뒤**
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380891/notion-blog/_/_/JSP/_5/Untitled_9.png)
+
+```java
+3**.만든 XML 파일에 붙여넣어 준다**
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380886/notion-blog/_/_/JSP/_5/Untitled_10.png)
+
+```java
+**<mapper></mapper>** 사이에 쿼리문 작성
+
+**id 는 메서드명과 동일하게**
+
+**parameterType = "매개변수 받는 데이터타입"
+
+resultType = "결과 값이 있으면 값 보낼 타입"**
+
+(com.iu.product.ProductDTO")config 전까지는 풀주소 (ProductDTO가 어느 패키지 인지 알수 업기때문
+
+ **= #{productNum}**  자바의 쿼리문 ? 대신에 사용한다 **=#{getter 의 이름}**
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380886/notion-blog/_/_/JSP/_5/Untitled_11.png)
+
+```java
+**resultType = "결과물 반환할 타입"** (config 전까지 풀주소로)
+
+*리턴 타입이 ArrayList 여도 ProductDTO로 반환한다 이는 쿼리문의 결과를 Mybatis 에게 알아서
+
+넣으라고 명령하기 때문
+
+결과물이 0개든, 1개든 , N개든 resultType은 DTO
+
+*SQL 결과물이다 메서드의 return 이 아니다
+
+List 여도 DTO에 넣어주는 원리
+
+*SELECT 의 결과물을 resultType의 setter 을 찾아서 넣어주는게 원리
+
+(List 는 setter가 없다.)
+
+값이 여러개 나온다 (List) 한개 나온다 는 아래의
+
+.selectOne
+.selectList 를 통해서 결정된다.(리턴 타입 List 는 모두 부모형으로 ArrayList x)
+```
+
+## SQL문이 있는 XML 파일의 위치 알려주기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380886/notion-blog/_/_/JSP/_5/Untitled_12.png)
+
+```java
+ mapper 파일 위치와 그쪽으로 mapper 에 있는 sql 문을 보내주는 역할
+
+id = "sqlSessionFactoryBean" (자동완성 추천)
+**"org.mybatis.spring.SqlSessionFactoryBean"**  복붙권장
+
+property name="dataSource" ref="dataSource"></property> //Connection 의 위치 알려주기
+
+* ref= 참조변수 dataSorce (Connection id)
+
+<property name="mapperLocations" value="classpath:database/mappers/*Mapper.xml"></property>
+//mapper 위치 알려주기 classes 에 위치한다 이를 classpath 라고 부른다
+//*Mapper.xml  Mapper.xml 로 끝나는 모든것
+```
+
+```java
+<bean class="org.mybatis.spring.SqlSessionTemplate" id="sqlSession">
+		<constructor-arg name="sqlSessionFactory" ref="sqlSessionFactoryBean"></constructor-arg>
+</bean>
+
+// 이클래스는 기본 생성자가 없다 그래서 매개변수가 있는 생성자를 만들어야한다
+// 그때 쓰는게 <constructor-arg
+// 매개변수 명 sqlSessionFactory 참조변수명 sqlSessionFactoryBean
+//결과적으로 sqlSession 을 쓰면 mapper의 위치 db의 위치 모두 알 수 있다
+```
+
+### 사용할 Mapper 선택 (NAMESPACE)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380887/notion-blog/_/_/JSP/_5/Untitled_13.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380887/notion-blog/_/_/JSP/_5/Untitled_14.png)
+
+```java
+**위의** **DataSource 를 대체한다.
+
+sqlSession 을 쓰면 mapper의 위치 db의 위치 모두 알 수 있다
+
+private final String NAMESPACE = "Mapper 의 속성."  : 어느 mapper을 쓸지 선택하는것
+
+*namespace 는 따로 규칙은 없지만 이 namespace를 사용하는 DAO의 풀패키지 명을 써준다.
+
+*속성 끝에 . 을 붙여주는데 이 DAO mapper 의 누구누구 가 된다.
+
+ex) NAMESPACE + getProductDetail  / NAMESPACE + id**
+```
+
+### sqlSession 의 리턴
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380887/notion-blog/_/_/JSP/_5/Untitled_15.png)
+
+```java
+return sqlSession.selectone(NAMESPACE+"getProductDetail", productDTO);
+
+sqlSession 을 통해 NAMESPACE.(쩜)+"gerProductDetail" 실행
+
+getProductDetail 은 pk키 이므로 결과물이 한개 아니면 0개다 이때 사용하는게 **selectOne**
+
+(두개면오류)
+
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380887/notion-blog/_/_/JSP/_5/Untitled_16.png)
+
+```java
+
+=#{productNum} 을 꺼내야 하는데 parameterType에서 꺼낸다
+
+parameterType 이 ProductDTO 에 getProductNum 이니 , productDTO 를 보내준다
+
+(NAMESPACE+"getProductDetail",productDTO)
+
+* getProductList 는 보내라는 매개변수가 없으니 보낼 필요가 없다
+
+*이제 DAO 는 DB에 접속해서 꺼내고 넣는 작업만 진행한다.
+
+*다른 리턴도 참고
+```
+
+## statementType = “PREPARED””STATEMENT”
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380887/notion-blog/_/_/JSP/_5/Untitled_17.png)
+
+```java
+PREPARED : 디폴트값 (생략가능)
+
+STATEMENT : 쿼리문이 주소에 노출될 수 있어 보안에 문제가 있다는...?
+```
+
+## Forwarding , Redirect
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380888/notion-blog/_/_/JSP/_5/Untitled_18.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380888/notion-blog/_/_/JSP/_5/Untitled_19.png)
+
+```html
+Forwarding - request스코프에 담긴값이 유효하다.(request,response가 유지된다.) - 이동된 url이 화면에
+안보인다.(사용자는 이동했는지 알수없음) - 요청이 발생해서 view(jsp)까지 이동하는 방식 Redirect -
+클라이언트가 새로 페이지를 요청한 것과 같은 방식으로 페이지가 이동됨. - request, response가 유지되지
+않는다.(새로 만들어짐.) - 이동된 url이 화면에 보인다. - 요청이 발생해서 응답으로 view(jsp)로
+가는것이 아님 - dispatcher Servlet에서 바로 응답 - 서버에서 응답으로 다시 접속할 URL주소를 Client로
+보냄 --------------------------------------------------------------------------------- Forward는
+재사용성이 강한 방식이고 변화가 없다. 반대로 Redirect는 변화가 강하고 재사용성이 없다. 이 2가지
+방식의 차이점 때문에 웹 애플리케이션을 작성할 때 잘 고려하여 사용해야한다. 보통 포워드방식은
+리스트보기, 검색 등등의 경웨 사용하는것이 바람직하고 리다이렉트방식은 로그인, 회원가입, 글쓰기
+등등의 방식에 적합하다.
+----------------------------------------------------------------------------------- 1. 포워딩
+상담원이 직접 다른 상담원에게 물어보고 고객에게 답을 주는 경우 2. 리다이렉트 상담원이 " 해당
+문의사항은 다른번호로 전화를 걸어야 하는데 다른번호로 전화를 하겠어요? " 라고 답한 후 고객이
+다른번호로 직접 전화걸어서 해결하는 경우
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380888/notion-blog/_/_/JSP/_5/Untitled_20.png)
+
+```java
+문법 :Redirect : 주소를 줄테니 위 주소로 다시치고 접속하라
+	    return "redirect: 다시 접속 할 주소 ";  //URL은 상대경로로 작성
+
+		  Foward
+      jsp의 경로명
+
+```
+
+## Redirect,Foward 다이어그램
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380888/notion-blog/_/_/JSP/_5/Untitled_21.png)
+
+## INSERT 예제
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380889/notion-blog/_/_/JSP/_5/Untitled_22.png)
+
+```java
+Controller 에서 Method 가 GET 과 POST 로 나눠지는데 이유는 redirect 때문이다
+
+Form 까지의 이동은 GET 으로 이동하지만 Form 에서 이동은 Post 를 사용한다.(Post 는 DB로 이동)
+
+*(ModelAndView 는 컨트롤러에서 뷰페이지와 데이터 모델을 함께 반환할때 사용
+
+setViewName 으로 뷰페이지로 이동 또는 리다이렉트)
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380889/notion-blog/_/_/JSP/_5/Untitled_23.png)
+
+```java
+Get 메소드로 주소를 받아 bankBookAdd로 이동한 뒤
+
+bankBook의 form 에서 action 으로 같은위치 add 로 이동하지만 Post 메서드를 이용하여 DB로 이동
+
+(이러한 작업을 하는 이유는 클라이언트로 부터 파라메터 를 입력받고 DB로 이동해야 하기 때문)
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380889/notion-blog/_/_/JSP/_5/Untitled_24.png)
+
+```java
+id 는 메서드명과 동일하게  setAddProduct
+
+resultType이 없는 이유는 insert,delete,update 는 결과가 항상 숫자(int)이기 때문이다.
+
+* 시퀸서는 다른곳에서 받아온다
+
+* 매개변수 ProductDTO productDTO 를 받는 이유는 데이터를 전달받기 위해서
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380889/notion-blog/_/_/JSP/_5/Untitled_25.png)
+
+### DELETE 예제
+
+```java
+DELETE 는 한개의 값을 받고 있기 때문에 (#{productNum} pk키) Long productNum 이 가능하다
+
+그러나 버그가 발생할 수 있기 때문에 하나라도 DTO 타입을 추천한다
+```
+
+```java
+ parameter 처리
+			 - #{}
+			 - DTO type이면 #{getter의 이름}
+			 **- Wrapper type(Primitive Type) 또는 String Type 하나라면 #{DAO에서 넘겨주는 변수명}**
+			 - Getter Method가 없다
+			 - #{}는 Data만 가능, 테이블명이나, 컬럼명 같은 것들은 사용 X
+
+			 - parameter는 한개든 여러개든 DTO에 담아서 전송
+
+			 - Map , List
+					-- Map  : #{key}
+					-- List : #{index번호}
+```
+
+### 시퀸서 받아오기 예제
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380889/notion-blog/_/_/JSP/_5/Untitled_26.png)
+
+```java
+DAO 에 존재하는 시퀸서를 받아오는 코드이다. 아직 MyBatis 를 사용하고 있지 않다.
+
+DB 서버의 정보는 database-context 에 저장되어 있으므로 접속에 문제가 있을시 확인해본다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380890/notion-blog/_/_/JSP/_5/Untitled_27.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380890/notion-blog/_/_/JSP/_5/Untitled_28.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380890/notion-blog/_/_/JSP/_5/Untitled_29.png)
+
+```java
+위와 같은 코드로 간소화 가능하다.
+
+sqlSeesion 에 의해서 Connection 이 해결되고 sql문도 해결되었다.
+
+결과 값은 시퀸서는 하나의 값을 받아오기 때문에 **selectOne** 을 사용해주고
+
+NAMESPACE 의 이름은 메서드와 같은 "getProductNum" 으로 설정해주고 + 를 통해 NAMESPACE 와
+
+붙여준다.
+
+리턴값은 Long 으로 따로 매개변수를 가지지 않는다.
+
+
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380890/notion-blog/_/_/JSP/_5/Untitled_30.png)
+
+```java
+Product Mapper 로 이동하여 쿼리문을 추가해준다.
+
+id 는 메서드 명과 똑같이 설정해주고 resultType 은 원래는 "java.lang.Long" 이지만 configuration
+
+을 이용해 "Long"으로 줄여준다
+
+
+```
+
+## Configuration
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380890/notion-blog/_/_/JSP/_5/Untitled_31.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380890/notion-blog/_/_/JSP/_5/Untitled_32.png)
+
+```java
+<!DOCTYPE configuration
+  PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-config.dtd">   //홉페이지에서 복붙
+
+	<configuration>
+  	<typeAliases>
+			-- 없는 클래스는 선언 하면 에러
+  		<typeAlias type="풀패키지명.클래스명" alias="별칭(클래스명)"/>
+  		<typeAlias type="com.iu.s1.bankbook.BankBookDTO" alias="BankBookDTO"/>
+
+  		<typeAlias type="java.lang.Long" alias="Long"/>
+  	</typeAliases>
+
+  </configuration>
+
+* XML파일을 이용해서 타입명에 별칭을 주는것
+
+*database-context.xml 에서 경로를 알려줘야 한다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380890/notion-blog/_/_/JSP/_5/Untitled_33.png)

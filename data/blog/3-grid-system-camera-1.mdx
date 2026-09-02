@@ -1,0 +1,3144 @@
+---
+title: '섹션 3: Grid System & Camera - 1'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+# { 🧩 그리드 시스템 만들기 & 좌표 변환 구조 이해하기 }
+
+이번 강의는 **색깔 있는 정사각형 칸들로 이루어진 “그리드(Grid) 시스템”을 만들고**
+
+**그리드 좌표를 월드 좌표로 / 월드 좌표를 그리드 좌표로 변환하는 전체 구조**를 이해하는 강의입니다.
+
+## 📋 목차
+
+1. GridSystem 클래스를 일반 C# 클래스로 만드는 이유
+2. 생성자(Constructor) 개념과 사용 이유
+3. 그리드 시각화를 위한 Debug.DrawLine 사용
+4. 월드 좌표 → 그리드 좌표 변환 함수 만들기
+5. GridPosition 구조체(struct) 설계 이유
+6. 테스트 스크립트로 실제 그리드 작동 확인하기
+
+---
+
+---
+
+## 1. **GridSystem 클래스를 일반 C# 클래스로 만드는 이유**
+
+### 🔍 왜 MonoBehaviour를 상속하지 않을까?
+
+Unity에서는 `MonoBehaviour`를 상속하면 **Unity가 객체 생성과 생명 주기를 관리**합니다.
+
+하지만 강의에서는 **우리가 직접 new 로 객체를 생성**해야 했습니다.
+
+✔ **MonoBehaviour는 new 키워드로 생성할 수 없다**
+
+✔ 생성자를 자유롭게 사용할 수 없다
+
+✔ 그래서 GridSystem 을 “완전한 C# 클래스”로 만들었다
+
+즉,
+
+💡 **GridSystem은 Unity 오브젝트가 아니라, 논리적인 그리드 구조를 관리하는 순수한 데이터 클래스**
+
+➡ Unity에 붙지 않고, 우리가 코드에서 직접 new 로 생성
+
+➡ 게임 월드에서 독립적으로 그리드 계산 담당
+
+---
+
+---
+
+## 2. **생성자(Constructor) 개념과 사용 이유**
+
+### ✔ 생성자는 “객체를 만들 때 가장 먼저 실행되는 함수”
+
+형식:
+
+```csharp
+public ClassName(파라미터들) { ... }
+```
+
+특징:
+
+- 리턴 타입 없다 (void 조차 없음)
+- 함수 이름 = 클래스 이름
+- 객체 초기화용
+
+강의에서 생성자를 사용한 이유:
+
+- 그리드의 **width**, **height**, **cellSize** 같은 초기 설정값이 반드시 필요하기 때문
+- 시작하자마자 그리드 전체를 그려야 하기 때문
+
+```csharp
+public GridSystem(int width, int height, float cellSize)
+{
+    this.width = width;
+    this.height = height;
+    this.cellSize = cellSize;
+
+    // 생성하자마자 그리드 시각화 (Debug.DrawLine)
+}
+```
+
+---
+
+---
+
+## 3. **그리드 시각화를 위한 Debug.DrawLine 사용**
+
+그리드 구조를 눈으로 보기 위해 Debug.DrawLine을 사용했다.
+
+```csharp
+Debug.DrawLine(
+    GetWorldPosition(x, z),
+    GetWorldPosition(x, z) + Vector3.right * .2f,
+    Color.white,
+    1000f
+);
+```
+
+이 코드는 “짧은 흰색 대시(—)”를 x,z 위치마다 찍어주는 것.
+
+### 🔍 사용된 옵션 설명
+
+| 옵션                 | 의미                             |
+| -------------------- | -------------------------------- |
+| `start`              | 선 시작 위치 (Vector3)           |
+| `end`                | 선 끝 위치                       |
+| `color`              | 선 색상                          |
+| `duration`           | 유지 시간 (초)                   |
+| `depthTest` (기본값) | 다른 오브젝트 뒤에 가려질지 여부 |
+
+### 강의에서 사용한 표현 목적
+
+- 셀마다 화면에 짧은 선을 찍어 그리드의 전체 모습을 확인
+- Scene/Game View에서 Gizmos를 켜야 보임
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380467/notion-blog/_/3D_/_/_3_Grid_System_Camera_-_1/image.png)
+
+---
+
+---
+
+## 4. **그리드 좌표 → 월드 좌표 변환**
+
+### ✔ GetWorldPosition(int x, int z)
+
+```csharp
+return new Vector3(x, 0, z) * cellSize;
+```
+
+이 수식은 매우 중요함.
+
+- 그리드의 각 칸을 **정확한 월드 위치**로 매핑
+- x와 z는 정수(칸 번호)
+- cellSize 를 곱해서 실제 유니티 월드 좌표로 변환
+  (예: cellSize = 2 → 1칸 = 2유닛)
+
+---
+
+---
+
+## 5. **월드 좌표 → 그리드 좌표 변환**
+
+### ✔ GetGridPosition(Vector3 worldPosition)
+
+```csharp
+return new GridPosition(
+    Mathf.RoundToInt(worldPosition.x / cellSize),
+    Mathf.RoundToInt(worldPosition.z / cellSize)
+);
+```
+
+동작 과정:
+
+1. 월드 좌표를 cellSize 로 나누면 “칸 번호”가 나옴
+2. float → int 변환 위해 `RoundToInt()` 사용
+3. (x, z)를 GridPosition 구조체에 담아 반환
+
+이 기능을 통해:
+
+💡 “마우스가 어느 칸 위에 올라와 있는지”
+
+즉, 전략 게임에서 매우 흔한 기능 구현이 가능해진다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380467/notion-blog/_/3D_/_/_3_Grid_System_Camera_-_1/image_1.png)
+
+## ✅ (추가 설명)**월드 포지션 → 그리드 좌표가 되는 원리**
+
+### 📌 1. **그리드 시스템은 ‘칸 크기(cellSize)’로 구역을 나눈다**
+
+예를 들어, cellSize = 2f 라면,
+
+- (0~2) 범위 = 그리드 X = 0
+- (2~4) 범위 = 그리드 X = 1
+- (4~6) 범위 = 그리드 X = 2
+  이런 식으로 **칸이 2 단위씩** 배치되어 있다고 보면 된다.
+
+즉, **월드 좌표가 어느 칸(셀)에 속하는지 계산**해야 한다.
+
+---
+
+### 📌2. **월드 포지션 / cellSize 를 하면 ‘몇 번째 칸인지’가 계산된다**
+
+예를 들어
+
+`cellSize = 2f`
+
+### ● 월드 포지션 x = 3.5 위치라고 하면?
+
+```
+gridX = 3.5 / 2f = 1.75
+```
+
+→ 이 값은 **1번째 칸과 2번째 칸 사이**에 있다는 뜻
+
+→ RoundToInt(1.75) = **2번 칸**
+
+그래서 gridX = 2가 된다.
+
+---
+
+---
+
+## 6. **GridPosition 구조체(struct) 설계 이유**
+
+### 왜 class가 아닌 struct인가?
+
+구조체는 **값 타입**이며,
+
+Vector3처럼 **복사해서 사용하는 타입**이다.
+
+✔ 값을 그대로 전달하고
+
+✔ 참조 공유로 버그가 생기는 일을 막기 위해
+
+✔ Vector3 처럼 가볍고 빠르다
+
+---
+
+### ToString() 추가 이유
+
+```csharp
+public override string ToString()
+{
+    return "x: " + x + ", z: " + z;
+}
+```
+
+이걸 안 하면 Debug.Log 로 출력될 때
+
+```
+GridPosition
+```
+
+이렇게 타입 이름만 출력된다.
+
+추가한 뒤엔
+
+```
+x: 3, z: 5
+```
+
+정확한 좌표 확인 가능 → 디버깅에 매우 유용.
+
+---
+
+---
+
+## 7. **테스트 스크립트로 실제 그리드 작동 확인하기**
+
+Testing.cs 의 핵심:
+
+### 1) GridSystem 직접 생성
+
+```csharp
+gridSystem = new GridSystem(10, 10, 2f);
+```
+
+### 2) Update()에서 마우스 월드 좌표를 즉시 그리드 좌표로 변환
+
+```csharp
+Debug.Log(gridSystem.GetGridPosition(MouseWorld.GetPosition()));
+```
+
+이걸 Scene/Game View에서 보면:
+
+- 마우스를 움직일 때마다
+
+```
+x: 2, z: 4
+x: 3, z: 4
+x: 3, z: 5
+```
+
+이런 식으로 계속 좌표가 찍힘.
+
+즉,
+
+💡 “마우스가 지금 몇 번째 셀(칸)에 위치하고 있는지”
+
+완벽히 계산됨.
+
+---
+
+---
+
+# 📌 전체 흐름 요약
+
+1. **GridSystem**을 일반 C# 클래스로 만든다
+
+   ➝ Unity 오브젝트가 아니라 우리가 직접 new 로 만들기 위해
+
+2. **생성자**에서 width, height, cellSize 저장하고
+
+   Debug.DrawLine 으로 그리드를 즉석에서 그린다
+
+3. **GetWorldPosition**
+
+   그리드 좌표 → 유니티 좌표로 변환
+
+4. **GetGridPosition**
+
+   유니티 좌표 → 그리드 좌표로 변환
+
+5. **GridPosition struct**
+
+   x, z 저장 용도
+
+   Vector3처럼 값 타입으로 설계
+
+6. **Testing.cs**
+
+   마우스 위치를 실시간으로 그리드 좌표로 출력하며 테스트
+
+---
+
+# 🎉 이 강의에서 배운 핵심
+
+- Unity 게임 설계에서 “순수 C# 클래스”가 필요한 이유
+- 생성자를 사용해 시스템을 초기화하는 방법
+- 그리드 구조를 만드는 가장 기본적인 방식
+- 월드 <-> 그리드 변환 알고리즘
+- struct 를 사용하는 이유
+- Debug.DrawLine 으로 시각적 테스트 하는 법
+
+## Testing.cs
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+// 이 스크립트는 씬에 붙여서 GridSystem을 생성하고,
+// 매 프레임마다 마우스가 위치한 그리드 좌표를 로그로 출력하는 테스트용 스크립트입니다.
+public class Testing : MonoBehaviour
+{
+    // GridSystem을 저장할 필드. 실제 게임 오브젝트가 아니라 우리가 만든 C# 클래스 인스턴스입니다.
+    private GridSystem gridSystem;
+
+    // Start는 MonoBehaviour에서 씬이 시작될 때 한 번 실행되는 함수입니다.
+    // 여기서는 그리드 시스템을 초기화합니다.
+    void Start()
+    {
+       // GridSystem(width, height, cellSize) 생성
+       // width: 가로 칸 수 (여기서는 10)
+       // height: 세로 칸 수 (여기서는 10)
+       // cellSize: 하나의 셀이 월드에서 차지하는 길이 (여기서는 2 유닛)
+       gridSystem = new GridSystem(10, 10, 2f);
+    }
+
+    // Update는 매 프레임 호출됩니다. (보통 1초에 30~60번)
+    // 여기서는 매 프레임 마우스 위치를 그리드 좌표로 변환해 로그로 출력합니다.
+    private void Update()
+    {
+        // MouseWorld.GetPosition()은 마우스의 월드 좌표(Vector3)를 얻어오는 유틸(강의에서 제공된 가정)
+        // gridSystem.GetGridPosition(...)은 그 월드 좌표를 GridPosition으로 변환해 줍니다.
+        Debug.Log(gridSystem.GetGridPosition(MouseWorld.GetPosition()));
+    }
+}
+
+```
+
+## `GridPosition.cs` (struct)
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+// GridPosition은 그리드 상의 한 칸을 나타내는 단순한 데이터 구조체입니다.
+// x,z 두 정수로 칸의 좌표를 표현합니다.
+// struct로 만든 이유: 값 타입(value type)이라서 복사가 빠르고, Vector3처럼 다루기 편합니다.
+public struct GridPosition
+{
+    // 그리드의 X 인덱스 (가로 위치)
+    public int x;
+    // 그리드의 Z 인덱스 (세로 위치 — 강의에서는 Z를 사용)
+    public int z;
+
+    // GridPosition 생성자: new GridPosition(x, z)로 쉽게 만들 수 있게 함
+    public GridPosition(int x, int z)
+    {
+        this.x = x;
+        this.z = z;
+    }
+
+    // ToString을 오버라이드하면 Debug.Log에 더 읽기 쉬운 형태로 찍힙니다.
+    // 기본 ToString()은 타입 이름만 출력하기 때문에 디버깅에 불편합니다.
+    public override string ToString()
+    {
+        // 예시 출력: "x: 3, z: 5"
+        return "x: " + x + ", z: " + z;
+        // 또는 C# 문자열 보간 사용: return $"x: {x}, z: {z}";
+    }
+}
+
+```
+
+---
+
+## `GridSystem.cs`
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+// GridSystem은 그리드의 논리(좌표 변환 등)를 담당하는 순수 C# 클래스입니다.
+// MonoBehaviour를 상속하지 않기 때문에 Unity의 메시 호출(Start/Update 등)을 직접 받지 않습니다.
+// 대신 new GridSystem(...) 으로 생성해서 사용합니다.
+public class GridSystem
+{
+    // 그리드 width(가로 칸 수)
+    private int width;
+    // 그리드 height(세로 칸 수)
+    private int height;
+    // 각 셀의 크기 (월드 단위). 예: 2f면 한 칸이 2유닛 길이
+    private float cellSize;
+
+    // 생성자: 그리드 크기와 셀 크기를 받아 내부 상태를 초기화합니다.
+    // 또한 생성 시 간단한 디버그 시각화를 위해 각 칸에 짧은 선들을 그립니다.
+    public GridSystem(int width, int height, float cellSize)
+    {
+        this.width = width;
+        this.height = height;
+        this.cellSize = cellSize;
+
+        // 그리드의 모든 칸을 순회하여 디버그 선을 그립니다.
+        // Debug.DrawLine은 게임 실행 중 Scene 뷰나 Game 뷰(Gizmos 켜짐)에서만 보입니다.
+        for (int x = 0; x < width; x++)
+        {
+            for (int z = 0; z < height; z++)
+            {
+                // 각 그리드 좌표 위치에서 오른쪽으로 짧은 선을 그려 "대시"처럼 보이게 합니다.
+                // - 시작점: GetWorldPosition(x, z)
+                // - 끝점: 시작점 + (Vector3.right * 0.2f) -> 짧은 길이
+                // - 색: 흰색
+                // - duration: 1000초 (디버그 목적, 오래 보이게 설정)
+                Debug.DrawLine(GetWorldPosition(x, z), GetWorldPosition(x, z) + Vector3.right * .2f, Color.white, 1000f);
+            }
+        }
+    }
+
+    // GetWorldPosition: 그리드 좌표(x,z)를 월드(Vector3) 위치로 변환합니다.
+    // 예: x=1,z=0, cellSize=2 -> 월드 위치 (2, 0, 0)
+    public Vector3 GetWorldPosition(int x, int z)
+    {
+        // Vector3(x, 0, z)를 만든 뒤 cellSize로 스케일(곱셈)하면 됩니다.
+        // Y(높이)는 여기서 0으로 고정되어 있으므로 평면상에 그리드가 깔립니다.
+        return new Vector3(x, 0, z) * cellSize;
+    }
+
+    // GetGridPosition: 월드 좌표(Vector3)를 받아 그 위치에 해당하는 그리드 좌표(GridPosition)를 반환합니다.
+    // 주로 마우스 위치 같은 실수 좌표를 '어느 칸에 속하는지' 판별할 때 사용합니다.
+    public GridPosition GetGridPosition(Vector3 worldPosition)
+    {
+        // worldPosition.x / cellSize -> 몇 번째 칸인지 (float)
+        // Mathf.RoundToInt로 반올림하여 정수 인덱스로 변환
+        // 반올림 대신 Mathf.FloorToInt를 쓰면 항상 내림(왼쪽/아래 방향) 처리가 됩니다.
+        return new GridPosition(
+            Mathf.RoundToInt(worldPosition.x / cellSize),
+            Mathf.RoundToInt(worldPosition.z / cellSize)
+        );
+    }
+}
+
+```
+
+# 📘 **{ 🧱 Grid System & Grid Object 구축하기 }**
+
+이번 강의는 **Grid(격자) 기반 시스템을 만들기 위해`GridSystem`, `GridObject`, `GridPosition` 구조를 설계하고
+각 위치에 디버그용 텍스트 오브젝트를 생성하는 전체 과정**에 관한 내용입니다.
+
+---
+
+# 📋 **목차**
+
+1. Grid 시스템을 만드는 이유
+2. GridPosition 구조체 만들기
+3. GridObject 클래스 만들기
+4. GridSystem 구축하기
+5. 2차원 배열(GridObject[,]) 이해하기
+6. GridObject 생성 및 저장
+7. 디버그용 Grid Label 만들기
+8. Testing 스크립트에서 GridSystem 사용하기
+9. 전체 흐름 요약
+
+---
+
+# 💡 **Grid 시스템을 만드는 이유**
+
+전략 게임, 전술 게임, 건설 시뮬레이션 게임에서는 “지도” 전체가 **칸(Grid)** 으로 나누어져 있고
+
+각 칸마다 “무엇이 놓여 있는지”, “어떤 유닛이 있는지” 등을 관리해야 합니다.
+
+이를 효율적으로 관리하기 위해 다음과 같은 것이 필요합니다:
+
+- 각 칸의 위치(좌표)
+- 칸에 어떤 오브젝트가 있는지
+- 마우스를 월드 좌표 → 그리드 좌표로 변환
+- 디버깅을 위해 각 칸에 정보를 표시
+
+이번 강의는 이 기본 틀을 만드는 과정입니다.
+
+---
+
+## **1. GridPosition 구조체 만들기**
+
+### 📌 역할
+
+그리드에서 하나의 칸(셀)이 가지는 좌표를 저장.
+
+Grid는 X(가로), Z(세로)로 구성됨 → Y는 쓰지않음(평면 Grid)
+
+```csharp
+public struct GridPosition {
+    public int x;
+    public int z;
+
+    public GridPosition(int x, int z) {
+        this.x = x;
+        this.z = z;
+    }
+
+    public override string ToString() {
+        return "x: " + x + ", z: " + z;
+    }
+}
+```
+
+### ✔ 핵심 개념
+
+- **struct**는 “값 타입”
+- 단순한 좌표 정보 저장할 때 효율적
+- `ToString()` 오버라이드 → 디버깅 편함
+
+---
+
+## **2. GridObject 클래스 만들기**
+
+### 📌 역할
+
+Grid의 **한 칸이 가지고 있는 데이터**를 저장하는 객체
+
+나중에 이 칸에 유닛 리스트, 건물 등 다양한 정보를 담을 예정.
+
+```csharp
+public class GridObject {
+    private GridSystem gridSystem;
+    private GridPosition gridPosition;
+
+    public GridObject(GridSystem gridSystem, GridPosition gridPosition) {
+        this.gridSystem = gridSystem;
+        this.gridPosition = gridPosition;
+    }
+}
+```
+
+### ✔ 중요한 내용
+
+- `GridObject`는 **MonoBehaviour를 상속하지 않는다.**
+  → 생성자를 자유롭게 사용하기 위함
+  → 실제 게임 오브젝트가 아니라 “데이터용 객체”
+- 생성자로 GridSystem과 위치 정보 저장
+
+---
+
+## **3. GridSystem 클래스 만들기**
+
+### 📌 Grid 전체를 관리하는 핵심 관리자 클래스
+
+```csharp
+public class GridSystem {
+    private int width;
+    private int height;
+    private float cellSize;
+    private GridObject[,] gridObjectArray;
+```
+
+### 각 필드 의미
+
+| 필드              | 설명                                                              |
+| ----------------- | ----------------------------------------------------------------- |
+| `width`           | 그리드 가로 칸 수                                                 |
+| `height`          | 그리드 세로 칸 수                                                 |
+| `cellSize`        | 각 칸의 실제 월드 공간 크기                                       |
+| `gridObjectArray` | (중요!) 각 칸마다 하나씩 존재하는 GridObject들을 저장하는 2D 배열 |
+
+---
+
+## **4. 2차원 배열(GridObject[,]) 이해하기**
+
+강의에서 강조한 부분.
+
+### ✔ 1차원 배열
+
+```csharp
+int[] arr = new int[5];
+arr[0] = 10;
+```
+
+### ✔ 2차원 배열
+
+```csharp
+GridObject[,] arr = new GridObject[width, height];
+arr[x, z] = ...;
+```
+
+- 인덱스가 두 개
+- `[,]` 문법만 보면 “이건 2D 배열이구나” 즉시 이해할 수 있어야 함
+- 그리드 시스템에서 가장 직관적이고 관리하기 쉬운 방식
+
+---
+
+## **5. GridObject를 생성하고 각 칸에 저장하기**
+
+GridSystem 생성자에서 실행됨:
+
+```csharp
+public GridSystem(int width, int height, float cellSize) {
+    this.width = width;
+    this.height = height;
+    this.cellSize = cellSize;
+
+    gridObjectArray = new GridObject[width, height];
+
+    for (int x = 0; x < width; x++) {
+        for (int z = 0; z < height; z++) {
+
+            GridPosition gridPosition = new GridPosition(x, z);
+
+            gridObjectArray[x, z] = new GridObject(this, gridPosition);
+        }
+    }
+}
+```
+
+### ✔ 여기서 하는 일
+
+1. 2D 배열 생성
+2. 이중 for문 대입
+3. 각 GridPosition 생성
+4. GridObject 생성
+5. 배열에 저장 → **절대 사라지지 않고 저장됨**
+
+---
+
+## **6. 월드 좌표 ↔ 그리드 좌표 변환하기**
+
+### 6-1. **월드 좌표 → 그리드 좌표**
+
+```csharp
+public GridPosition GetGridPosition(Vector3 worldPosition) {
+    return new GridPosition(
+        Mathf.RoundToInt(worldPosition.x / cellSize),
+        Mathf.RoundToInt(worldPosition.z / cellSize)
+    );
+}
+```
+
+✔ 역할
+
+마우스 위치를 읽어서 “이 위치는 그리드의 몇 번째 칸인가?” 계산하는 핵심 함수.
+
+---
+
+### 6-2. **그리드 좌표 → 월드 좌표**
+
+```csharp
+public Vector3 GetWorldPosition(int x, int z) {
+    return new Vector3(x, 0, z) * cellSize;
+}
+```
+
+✔ 역할
+
+디버그 오브젝트를 정확한 Grid 칸 위에 배치하도록 하는 기능.
+
+---
+
+## **7. 그리드 디버그 라벨 오브젝트 생성하기(TextMeshPro)**
+
+### GridSystem 내부 함수
+
+```csharp
+public void CreateDebugObjects(Transform debugPrefab) {
+    for (int x = 0; x < width; x++) {
+        for (int z = 0; z < height; z++) {
+
+            GameObject.Instantiate(
+                debugPrefab,
+                GetWorldPosition(x, z),
+                Quaternion.identity
+            );
+        }
+    }
+}
+```
+
+✔ 여기서 설명한 중요한 개념:
+
+### 💡 Transform vs GameObject 차이
+
+- **Transform을 인스턴스화하면 Transform 반환**
+- **GameObject를 인스턴스화하면 GameObject 반환**
+- Transform으로 받으면 `transform.position` 같은 작업이 편함
+- 그래서 강의에서는 **Transform을 선호**
+
+---
+
+### TextMeshPro 설정 과정
+
+1. GameObject 생성
+2. 그 안에 TextMeshPro 추가
+3. X 회전 90도 → 바닥을 향해 보이도록
+4. Y 위치 0.02f 정도 올려서 바닥과 깜빡임 방지
+5. Alignment 중앙
+6. Wrapping 끄기
+7. Font Size 조절
+8. Prefab으로 저장 후 Testing에서 사용
+
+---
+
+## **8. Testing 스크립트에서 GridSystem 사용하기**
+
+```csharp
+public class Testing : MonoBehaviour {
+    [SerializeField] private Transform gridDebugObjectPrefab;
+
+    private GridSystem gridSystem;
+
+    void Start() {
+        gridSystem = new GridSystem(10, 10, 2f);
+        gridSystem.CreateDebugObjects(gridDebugObjectPrefab);
+    }
+
+    private void Update() {
+        Debug.Log(gridSystem.GetGridPosition(MouseWorld.GetPosition()));
+    }
+}
+```
+
+### ✔ 하는 일
+
+- GridSystem 생성
+- 디버그 오브젝트 생성
+- 매 프레임마다 마우스가 가리키는 그리드 칸 출력
+
+---
+
+## **전체 흐름 요약**
+
+아주 중요한 부분!
+
+### 전체 생성 과정
+
+1️⃣ **Testing.Start()**
+
+→ GridSystem 생성
+
+→ width, height, cellSize 저장
+
+→ GridObject 2D 배열 초기화
+
+→ 모든 칸에 GridObject 생성 및 저장
+
+2️⃣ **Testing.Start()**
+
+→ CreateDebugObjects 호출
+
+→ 모든 Grid Position에 디버그 텍스트 Instantiate
+
+3️⃣ **Update()에서 GetGridPosition() 호출**
+
+→ 마우스 월드 위치를 그리드 좌표로 변환
+
+→ Debug.Log
+
+# { 🧱 Grid Debug Object 만들기 & GridSystem 데이터 시각화 }
+
+이번 강의는 **GridSystem의 각 칸(그리드)의 정보를 화면에 표시하는 시스템을 만드는 과정**을 설명합니다.
+
+(전체 강의 짧은 요약 : _그리드 객체를 만들고, 이를 화면에 텍스트로 표시하는 디버그 시스템 구축_)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380467/notion-blog/_/3D_/_/_3_Grid_System_Camera_-_1/image_2.png)
+
+---
+
+## 📋 목차
+
+1. Grid Debug Object 개념 이해
+2. GridDebugObject 스크립트 만들기
+3. GridObject 만들기 & ToString 재정의
+4. GridSystem에 GetGridObject 추가하기
+5. Debug Prefab 생성 & 연결 과정
+6. TextMeshPro 이용해 그리드 정보 표시하기
+7. 그리드 디버그 시스템 완성 테스트
+
+---
+
+---
+
+## Grid Debug Object 개념 이해
+
+### 🔎 **Grid Debug Object란?**
+
+- 그리드(타일) 하나하나의 정보를 **눈으로 확인하기 위한 디버깅용 오브젝트**.
+- 각 칸에 "0,0", "1,0", "2,3"처럼 **그리드 좌표 텍스트를 표시**.
+- 나중에 유닛, 장애물, 행동 범위 등을 표현할 때 매우 중요한 도구.
+
+### 왜 필요할까?
+
+- 우리가 만든 GridSystem이 정상적으로 생성됐는지 확인하기 위해 **시각적 확인 도구**가 필요하기 때문.
+
+---
+
+# 1. GridDebugObject 스크립트 만들기
+
+### ✔ 강의 진행 순서
+
+1. **prefab 안에 GridDebugObject라는 스크립트 추가**
+2. 스크립트 내부에 “gridObject를 받아 저장할 함수”를 작성
+3. Update()에서 텍스트를 지속적으로 갱신
+
+### 코드 설명
+
+```csharp
+public class GridDebugObject : MonoBehaviour
+{
+    [SerializeField] private TextMeshPro textMeshPro;
+    private GridObject gridObject;
+
+    public void SetGridObject(GridObject gridObject)
+    {
+        this.gridObject = gridObject;  // 외부에서 GridObject 전달받음
+    }
+
+    private void Update()
+    {
+        textMeshPro.text = gridObject.ToString(); // 텍스트를 그리드 정보로 갱신
+    }
+}
+```
+
+### 핵심 개념
+
+- **SetGridObject()** : GridSystem이 각 칸의 정보를 넣어주는 함수
+- **Update()** : 매 프레임마다 gridObject의 정보를 텍스트로 표시
+
+> 나중에 GridObject 내용이 변경될 가능성이 있어 Update에서 계속 갱신함.
+
+---
+
+# 2. GridObject 만들기 & ToString 재정의
+
+### ✔ GridObject의 역할
+
+- **그리드 하나(칸)의 실제 데이터 저장소**
+- 현재는 위치(GridPosition)만 저장하지만 나중에 “unit이 있는지”, “점령됐는지”, “지형 타입” 등을 넣을 수 있음.
+
+### 코드
+
+```csharp
+public class GridObject : MonoBehaviour
+{
+    private GridSystem gridSystem;
+    private GridPosition gridPosition;
+
+    public GridObject(GridSystem gridSystem, GridPosition gridPosition)
+    {
+        this.gridSystem = gridSystem;
+        this.gridPosition = gridPosition;
+    }
+
+    public override string ToString()
+    {
+        return gridPosition.ToString();
+    }
+}
+```
+
+### 핵심 개념
+
+- **ToString() override**
+  → 텍스트 출력시 GridObject가 가진 정보를 문자열로 표시
+  → 지금은 단순히 “(x,z) 좌표”만 표시
+
+이 방식 덕분에 GridDebugObject는 단순히 `gridObject.ToString()`만 호출하면 됨.
+
+---
+
+# 3. GridSystem에 GetGridObject 추가하기
+
+### 이전까지 문제점
+
+- GridSystem 내부의 배열(gridObjectArray)에 접근할 때 **반복되는 코드**가 많음.
+
+### 해결: 전용 함수 만들기
+
+```csharp
+public GridObject GetGridObject(GridPosition gridPosition)
+{
+    return gridObjectArray[gridPosition.x, gridPosition.z];
+}
+```
+
+### 이 함수의 역할
+
+- 외부에서 그리드 좌표를 전달하면 해당 위치의 GridObject를 반환
+- GridDebugObject에 올바른 데이터 연결 가능해짐
+
+---
+
+# 4. Debug Prefab 생성 & 연결 과정
+
+### 강의에서 진행한 과정
+
+1. GridSystem의 CreateDebugObjects() 함수에서
+
+   → 각 그리드 위치마다 디버그 프리팹을 Instantiate
+
+2. Instantiate된 오브젝트에서
+
+   → GridDebugObject 컴포넌트를 가져옴
+
+3. 그 컴포넌트에 GridObject를 전달함 (SetGridObject 호출)
+
+### 코드
+
+```csharp
+public void CreateDebugObjects(Transform debugPrefab)
+{
+    for (int x = 0; x < width; x++)
+    {
+        for (int z = 0; z < height; z++)
+        {
+            GridPosition gridPosition = new GridPosition(x, z);
+
+            Transform debugTransform = GameObject.Instantiate(
+                debugPrefab,
+                GetWorldPosition(gridPosition),
+                Quaternion.identity
+            );
+
+            debugTransform.GetComponent<GridDebugObject>().SetGridObject(
+                gridObjectArray[x, z]
+            );
+        }
+    }
+}
+```
+
+### 핵심 개념
+
+- **Instantiate** : 프리팹을 실제 씬에 생성
+- **GetComponent<GridDebugObject>()** : 스크립트 불러오기
+- **SetGridObject()** : 그리드 데이터 전달
+
+---
+
+# 5. TextMeshPro 이용해 그리드 정보 표시하기
+
+### 수업에서 수행한 과정
+
+1. TextMeshPro를 사용하기 위해
+
+   `using TMPro;` 추가.
+
+2. GridDebugObject 스크립트에 텍스트 필드 추가:
+
+```csharp
+[SerializeField] private TextMeshPro textMeshPro;
+```
+
+1. 프리팹 내부에서 실제 TMP 텍스트 컴포넌트를 연결
+
+   (prefab 수정 또는 override 적용)
+
+2. Update에서 텍스트 갱신
+
+   → `textMeshPro.text = gridObject.ToString();`
+
+---
+
+# 6. 그리드 디버그 시스템 완성 테스트
+
+### 강의에서 설명한 테스트 과정
+
+1. Play 버튼을 눌러 확인
+2. 모든 그리드 칸 위에 “0,0”, “0,1”, “3,2”… 등 좌표가 표시됨
+3. 텍스트 크기가 너무 크면 →
+
+   TMP Component의 Font Size를 5 → 3으로 감소
+
+4. 전체 그리드 시각화 성공
+
+---
+
+# 🎉 최종 결과
+
+- **모든 그리드 칸마다 GridObject 존재**
+- **각 GridObject의 정보를 TMP 텍스트로 표시**
+- **GridSystem의 내부 구조를 화면에서 즉시 확인 가능**
+
+# { 🎮 LevelGrid 클래스로 게임 레벨 그리드 관리하기 }
+
+이번 강의는 **GridSystem을 활용하여 게임 레벨 전체를 관리하는 LevelGrid 클래스를 만들고, 유닛의 위치를 그리드에서 추적하고 업데이트하는 시스템**을 구축하는 내용입니다.
+
+---
+
+## 📋 목차
+
+1. [LevelGrid 클래스 생성 및 기본 설정](https://claude.ai/chat/6907f46e-749a-4d4e-b2c3-6d54d4b6a7ee#1-levelgrid-%ED%81%B4%EB%9E%98%EC%8A%A4-%EC%83%9D%EC%84%B1-%EB%B0%8F-%EA%B8%B0%EB%B3%B8-%EC%84%A4%EC%A0%95)
+2. [GridObject에 Unit 저장 기능 추가](https://claude.ai/chat/6907f46e-749a-4d4e-b2c3-6d54d4b6a7ee#2-gridobject%EC%97%90-unit-%EC%A0%80%EC%9E%A5-%EA%B8%B0%EB%8A%A5-%EC%B6%94%EA%B0%80)
+3. [Singleton 패턴 적용](https://claude.ai/chat/6907f46e-749a-4d4e-b2c3-6d54d4b6a7ee#3-singleton-%ED%8C%A8%ED%84%B4-%EC%A0%81%EC%9A%A9)
+4. [Unit이 시작할 때 그리드에 등록하기](https://claude.ai/chat/6907f46e-749a-4d4e-b2c3-6d54d4b6a7ee#4-unit%EC%9D%B4-%EC%8B%9C%EC%9E%91%ED%95%A0-%EB%95%8C-%EA%B7%B8%EB%A6%AC%EB%93%9C%EC%97%90-%EB%93%B1%EB%A1%9D%ED%95%98%EA%B8%B0)
+5. [GridPosition 비교 연산자 구현](https://claude.ai/chat/6907f46e-749a-4d4e-b2c3-6d54d4b6a7ee#5-gridposition-%EB%B9%84%EA%B5%90-%EC%97%B0%EC%82%B0%EC%9E%90-%EA%B5%AC%ED%98%84)
+6. [Unit 이동 추적 및 그리드 업데이트](https://claude.ai/chat/6907f46e-749a-4d4e-b2c3-6d54d4b6a7ee#6-unit-%EC%9D%B4%EB%8F%99-%EC%B6%94%EC%A0%81-%EB%B0%8F-%EA%B7%B8%EB%A6%AC%EB%93%9C-%EC%97%85%EB%8D%B0%EC%9D%B4%ED%8A%B8)
+7. [다중 유닛 지원으로 리팩토링](https://claude.ai/chat/6907f46e-749a-4d4e-b2c3-6d54d4b6a7ee#7-%EB%8B%A4%EC%A4%91-%EC%9C%A0%EB%8B%9B-%EC%A7%80%EC%9B%90%EC%9C%BC%EB%A1%9C-%EB%A6%AC%ED%8C%A9%ED%86%A0%EB%A7%81)
+
+---
+
+## 1. LevelGrid 클래스 생성 및 기본 설정
+
+### LevelGrid 클래스 생성
+
+- Scripts 폴더에 **LevelGrid.cs** 새 C# 스크립트 생성
+- Hierarchy에서 빈 게임 오브젝트 생성 → 이름: "LevelGrid"
+- LevelGrid 스크립트를 게임 오브젝트에 추가
+- Transform 리셋 (0,0,0)
+
+### Awake 함수에서 GridSystem 초기화
+
+```csharp
+[SerializeField] private Transform gridDebugObjectPrefab; // 디버그 오브젝트 프리팹 참조
+private GridSystem gridSystem; // 내부 그리드 시스템
+
+void Awake()
+{
+    // GridSystem 생성: 10x10 크기, 셀 크기 2f
+    gridSystem = new GridSystem(10, 10, 2f);
+
+    // 디버그 오브젝트 생성하여 그리드 시각화
+    gridSystem.CreateDebugObjects(gridDebugObjectPrefab);
+}
+
+```
+
+### 기본 함수 구조 정의
+
+```csharp
+// 특정 그리드 위치에 유닛 설정
+public void SetUnitAtGridPosition(GridPosition gridPosition, Unit unit)
+{
+    // 구현 필요
+}
+
+// 특정 그리드 위치의 유닛 가져오기
+public Unit GetUnitAtGridPosition(GridPosition gridPosition)
+{
+    // 구현 필요
+}
+
+// 특정 그리드 위치의 유닛 제거
+public void ClearUnitAtGridPosition(GridPosition gridPosition)
+{
+    // 구현 필요
+}
+
+```
+
+---
+
+## 2. GridObject에 Unit 저장 기능 추가
+
+### GridObject에 Unit 필드 추가
+
+```csharp
+public class GridObject
+{
+    private GridSystem gridSystem;
+    private GridPosition gridPosition;
+    private Unit unit; // 유닛 저장 변수 추가
+
+    // 유닛 설정
+    public void SetUnit(Unit unit)
+    {
+        this.unit = unit;
+    }
+
+    // 유닛 가져오기
+    public Unit GetUnit()
+    {
+        return unit;
+    }
+}
+
+```
+
+### ToString() 메서드에 Unit 표시 추가
+
+```csharp
+public override string ToString()
+{
+    // 그리드 위치 출력 + 새 줄 + 유닛 정보 출력
+    return gridPosition.ToString() + "\n" + unit;
+}
+
+```
+
+- 유닛이 있으면 해당 유닛 정보 표시
+- 유닛이 없으면 빈 공간으로 표시
+
+### LevelGrid 함수 구현 완료
+
+```csharp
+public void SetUnitAtGridPosition(GridPosition gridPosition, Unit unit)
+{
+    // 1. 그리드 시스템에서 해당 위치의 GridObject 가져오기
+    GridObject gridObject = gridSystem.GetGridObject(gridPosition);
+
+    // 2. GridObject에 유닛 설정
+    gridObject.SetUnit(unit);
+}
+
+public Unit GetUnitAtGridPosition(GridPosition gridPosition)
+{
+    GridObject gridObject = gridSystem.GetGridObject(gridPosition);
+    return gridObject.GetUnit(); // 저장된 유닛 반환
+}
+
+public void ClearUnitAtGridPosition(GridPosition gridPosition)
+{
+    GridObject gridObject = gridSystem.GetGridObject(gridPosition);
+    gridObject.SetUnit(null); // null로 설정하여 제거
+}
+
+```
+
+---
+
+## 3. Singleton 패턴 적용
+
+### Singleton 패턴이 필요한 이유
+
+- Unit 프리팹은 씬에 미리 배치되지 않아 Inspector에서 LevelGrid를 직접 참조할 수 없음
+- 정적(static) 인스턴스를 통해 어디서든 접근 가능하게 만듦
+
+### Singleton 구현
+
+```csharp
+public class LevelGrid : MonoBehaviour
+{
+    // 정적 인스턴스 - 외부에서 읽기만 가능, 설정은 private
+    public static LevelGrid Instance { get; private set; }
+
+    void Awake()
+    {
+        // 이미 인스턴스가 존재하면 에러 출력 후 파괴
+        if (Instance != null)
+        {
+            Debug.LogError("There is more than one LevelGrid! " + transform + " - " + Instance);
+            Destroy(gameObject);
+            return;
+        }
+
+        // 현재 객체를 정적 인스턴스로 설정
+        Instance = this;
+
+        // GridSystem 초기화
+        gridSystem = new GridSystem(10, 10, 2f);
+        gridSystem.CreateDebugObjects(gridDebugObjectPrefab);
+    }
+}
+
+```
+
+---
+
+## 4. Unit이 시작할 때 그리드에 등록하기
+
+### Pass-through 함수 생성 (추상화 레벨 유지)
+
+**개념**: LevelGrid는 내부 GridSystem을 외부에 직접 노출하지 않고, 필요한 기능만 전달하는 함수 제공
+
+```csharp
+// Lambda Expression 사용 (간결한 표현)
+public GridPosition GetGridPosition(Vector3 worldPosition) =>
+    gridSystem.GetGridPosition(worldPosition);
+
+// 위 코드는 아래와 동일함 (기존 방식)
+public GridPosition GetGridPosition(Vector3 worldPosition)
+{
+    return gridSystem.GetGridPosition(worldPosition);
+}
+
+```
+
+**Lambda Expression 설명**:
+
+- `=>` 기호 사용
+- 중괄호와 return 키워드 생략 가능
+- 단순히 값을 전달하는 pass-through 함수에 적합
+
+### Unit 스크립트에서 Start 함수 구현
+
+```csharp
+private void Start()
+{
+    // 1. 현재 유닛의 월드 위치를 그리드 위치로 변환
+    GridPosition gridPosition = LevelGrid.Instance.GetGridPosition(transform.position);
+
+    // 2. LevelGrid에 이 유닛을 해당 그리드 위치에 등록
+    LevelGrid.Instance.SetUnitAtGridPosition(gridPosition, this);
+}
+
+```
+
+### 테스트 결과
+
+- 씬 실행 시 각 유닛이 자동으로 해당 그리드 위치에 등록됨
+- 디버그 텍스트에서 유닛이 있는 그리드는 유닛 정보 표시, 빈 그리드는 공백 표시
+
+---
+
+## 5. GridPosition 비교 연산자 구현
+
+### 문제 상황
+
+- Unit이 이동했는지 확인하려면 GridPosition 비교 필요
+- 커스텀 struct는 기본적으로 `==`, `!=` 연산자 지원 안 됨
+
+### 비교 연산자 오버로딩
+
+```csharp
+public struct GridPosition : IEquatable<GridPosition>
+{
+    public int x;
+    public int z;
+
+    // == 연산자 오버로드
+    public static bool operator ==(GridPosition a, GridPosition b)
+    {
+        // x와 z 모두 같으면 true
+        return a.x == b.x && a.z == b.z;
+    }
+
+    // != 연산자 오버로드
+    public static bool operator !=(GridPosition a, GridPosition b)
+    {
+        // == 의 반대
+        return !(a == b);
+    }
+}
+
+```
+
+### Equals 메서드 오버라이드
+
+```csharp
+public override bool Equals(object obj)
+{
+    // obj가 GridPosition 타입인지 확인하고, 맞으면 x, z 비교
+    return obj is GridPosition position &&
+           x == position.x &&
+           z == position.z;
+}
+
+public override int GetHashCode()
+{
+    // x와 z를 조합한 해시코드 생성
+    return HashCode.Combine(x, z);
+}
+
+```
+
+### IEquatable 인터페이스 구현
+
+```csharp
+// IEquatable<GridPosition> 인터페이스 구현
+public bool Equals(GridPosition other)
+{
+    // 기존에 오버로드한 == 연산자 활용
+    return this == other;
+}
+
+```
+
+**완벽한 구현 이유**:
+
+- 연산자 오버로딩만으로는 경고 발생
+- Equals, GetHashCode 오버라이드 필요
+- IEquatable 구현으로 성능 최적화 및 타입 안정성 확보
+
+---
+
+## 6. Unit 이동 추적 및 그리드 업데이트
+
+### Update에서 그리드 위치 변화 감지
+
+```csharp
+public class Unit : MonoBehaviour
+{
+    private GridPosition currentGridPosition; // 현재 그리드 위치 저장
+
+    private void Start()
+    {
+        // 시작 시 현재 그리드 위치 저장
+        currentGridPosition = LevelGrid.Instance.GetGridPosition(transform.position);
+        LevelGrid.Instance.SetUnitAtGridPosition(currentGridPosition, this);
+    }
+
+    private void Update()
+    {
+        // 매 프레임 새로운 그리드 위치 계산
+        GridPosition newGridPosition = LevelGrid.Instance.GetGridPosition(transform.position);
+
+        // 그리드 위치가 변경되었는지 확인
+        if (newGridPosition != currentGridPosition)
+        {
+            // 그리드 위치 변경 알림
+            LevelGrid.Instance.UnitMovedGridPosition(
+                this,                  // 이동한 유닛
+                currentGridPosition,   // 이전 위치
+                newGridPosition        // 새 위치
+            );
+
+            // 현재 위치 업데이트
+            currentGridPosition = newGridPosition;
+        }
+    }
+}
+
+```
+
+### LevelGrid에 UnitMovedGridPosition 함수 추가
+
+```csharp
+public void UnitMovedGridPosition(Unit unit, GridPosition fromGridPosition, GridPosition toGridPosition)
+{
+    // 1. 이전 위치에서 유닛 제거
+    RemoveUnitAtGridPosition(fromGridPosition, unit);
+
+    // 2. 새 위치에 유닛 추가
+    AddUnitAtGridPosition(toGridPosition, unit);
+}
+
+```
+
+### 테스트 결과
+
+- 유닛이 이동하면 실시간으로 그리드 업데이트
+- 디버그 텍스트에서 유닛의 현재 위치 정확히 표시
+
+---
+
+## 7. 다중 유닛 지원으로 리팩토링
+
+### 문제 상황
+
+- 현재는 한 그리드에 하나의 유닛만 저장 가능
+- 유닛이 다른 유닛을 지나갈 때 기존 유닛 정보가 덮어씌워짐
+- 게임 설계: 최종적으로는 한 칸에 하나만 배치하지만, **이동 중에는 겹칠 수 있어야 함**
+
+### GridObject를 List로 변경
+
+```csharp
+public class GridObject
+{
+    private List<Unit> unitList; // 단일 Unit → List<Unit>으로 변경
+
+    public GridObject(GridSystem gridSystem, GridPosition gridPosition)
+    {
+        this.gridSystem = gridSystem;
+        this.gridPosition = gridPosition;
+        unitList = new List<Unit>(); // 빈 리스트로 초기화
+    }
+
+    // 유닛 추가
+    public void AddUnit(Unit unit)
+    {
+        unitList.Add(unit);
+    }
+
+    // 유닛 제거
+    public void RemoveUnit(Unit unit)
+    {
+        unitList.Remove(unit);
+    }
+
+    // 유닛 리스트 가져오기
+    public List<Unit> GetUnitList()
+    {
+        return unitList;
+    }
+}
+
+```
+
+### ToString()에서 여러 유닛 표시
+
+```csharp
+public override string ToString()
+{
+    string unitString = "";
+
+    // 리스트의 모든 유닛을 순회하며 문자열 생성
+    foreach (Unit unit in unitList)
+    {
+        unitString += unit + "\n"; // 각 유닛마다 새 줄로 표시
+    }
+
+    return gridPosition.ToString() + "\n" + unitString;
+}
+
+```
+
+### LevelGrid 함수 수정
+
+```csharp
+// SetUnit → AddUnit으로 변경
+public void AddUnitAtGridPosition(GridPosition gridPosition, Unit unit)
+{
+    GridObject gridObject = gridSystem.GetGridObject(gridPosition);
+    gridObject.AddUnit(unit); // 리스트에 추가
+}
+
+// GetUnit → GetUnitList로 변경 (반환 타입도 List로)
+public List<Unit> GetUnitAtGridPosition(GridPosition gridPosition)
+{
+    GridObject gridObject = gridSystem.GetGridObject(gridPosition);
+    return gridObject.GetUnitList(); // 리스트 반환
+}
+
+// Clear 대신 Remove 사용 (Unit 매개변수 필요)
+public void RemoveUnitAtGridPosition(GridPosition gridPosition, Unit unit)
+{
+    GridObject gridObject = gridSystem.GetGridObject(gridPosition);
+    gridObject.RemoveUnit(unit); // 특정 유닛만 제거
+}
+
+// UnitMovedGridPosition 수정
+public void UnitMovedGridPosition(Unit unit, GridPosition fromGridPosition, GridPosition toGridPosition)
+{
+    RemoveUnitAtGridPosition(fromGridPosition, unit); // 이전 위치에서 제거
+    AddUnitAtGridPosition(toGridPosition, unit);       // 새 위치에 추가
+}
+
+```
+
+### Unit 스크립트 수정
+
+```csharp
+private void Start()
+{
+    currentGridPosition = LevelGrid.Instance.GetGridPosition(transform.position);
+    LevelGrid.Instance.AddUnitAtGridPosition(currentGridPosition, this); // SetUnit → AddUnit
+}
+
+```
+
+### 최종 테스트 결과
+
+- 여러 유닛이 같은 그리드를 지나가도 정보 손실 없음
+- 한 그리드에 여러 유닛이 있으면 모두 표시됨
+- 예: 두 유닛이 같은 칸에 있으면 디버그 텍스트에 둘 다 표시
+
+---
+
+## 💡 추가 개념 설명
+
+### 그리드 범위 밖 이동 문제
+
+- 현재: 유닛이 그리드 밖으로 이동하면 에러 발생
+- **두 가지 해결 방법**:
+  1. **광범위한 에러 체크**: 인덱스 존재 여부, GridObject 존재 여부 등 확인
+  2. **입력 검증**: 유닛이 유효한 위치로만 이동하도록 사전 제한
+- **이 프로젝트의 선택**: 입력 검증 방식
+  - 나중에 적절한 이동 로직 구현 예정
+  - 유닛이 클릭한 위치로 무조건 가는 것이 아닌, 유효한 그리드 위치로만 이동
+  - 이동 액션 구현 시 자세히 다룰 예정
+
+---
+
+## 🎯 핵심 정리
+
+1. **LevelGrid**: 게임 레벨의 전체 그리드를 관리하는 싱글톤 클래스
+2. **GridObject**: 각 그리드 셀에 여러 유닛 저장 가능 (List 사용)
+3. **Unit 추적**: Update에서 GridPosition 변화 감지하여 자동 업데이트
+4. **GridPosition 비교**: 커스텀 struct에 연산자 오버로딩 및 Equals 구현
+5. **Lambda Expression**: 간단한 pass-through 함수를 간결하게 표현
+6. **다중 유닛 지원**: 이동 중 유닛이 겹쳐도 문제없도록 설계
+
+# { 그리드 시스템 최종 구조 정리 }
+
+## 🎮 전체 구조 이해하기
+
+이 시스템은 **턴제 전략 게임**(예: XCOM, Fire Emblem)에서 사용하는 그리드 기반 유닛 관리 시스템입니다. 게임 월드를 바둑판처럼 나누어 유닛의 위치를 관리합니다.
+
+### 주요 클래스 역할
+
+- **LevelGrid**: 전체 그리드 시스템의 관리자 (싱글톤)
+- **GridSystem**: 실제 그리드 배열을 관리
+- **GridObject**: 각 그리드 칸 하나를 담당
+- **GridPosition**: 그리드 좌표 (x, z)
+- **Unit**: 움직이는 유닛
+- **UnitActionsSystem**: 유닛 선택/명령 관리
+- **GridDebugObject**: 그리드 정보를 화면에 표시
+
+---
+
+## 📋 1단계: 게임 시작 - 그리드 생성
+
+### 1-1. LevelGrid 초기화
+
+```csharp
+void Awake()
+{
+    Instance = this; // 싱글톤 설정
+    gridSystem = new GridSystem(10, 10, 2f);
+    // 가로 10칸, 세로 10칸, 각 칸의 크기 2m
+}
+```
+
+**이 시점에서 일어나는 일:**
+
+- 게임 월드에 보이지 않는 10x10 그리드가 생성됩니다
+- 각 칸의 실제 크기는 2m x 2m입니다
+
+### 1-2. GridSystem 생성자 실행
+
+```csharp
+public GridSystem(int width, int height, float cellSize)
+{
+    this.width = 10;
+    this.height = 10;
+    this.cellSize = 2f;
+
+    // 100개의 GridObject를 담을 배열 생성
+    gridObjectArray = new GridObject[10, 10];
+
+    // 이중 반복문으로 모든 칸 생성
+    for (int x = 0; x < 10; x++)
+    {
+        for (int z = 0; z < 10; z++)
+        {
+            GridPosition gridPosition = new GridPosition(x, z);
+            gridObjectArray[x, z] = new GridObject(this, gridPosition);
+        }
+    }
+}
+```
+
+**실제 생성되는 구조:**
+
+```
+gridObjectArray[0,0]  [1,0]  [2,0]  ... [9,0]
+               [0,1]  [1,1]  [2,1]  ... [9,1]
+               [0,2]  [1,2]  [2,2]  ... [9,2]
+               ...
+               [0,9]  [1,9]  [2,9]  ... [9,9]
+
+```
+
+각 GridObject는:
+
+- 자신의 그리드 좌표를 알고 있음
+- 자신 위에 있는 유닛 리스트를 가짐 (처음엔 비어있음)
+
+### 1-3. 디버그 오브젝트 생성
+
+```csharp
+gridSystem.CreateDebugObjects(gridDebugObjectPrefab);
+```
+
+**동작 과정:**
+
+1. 모든 그리드 칸을 순회 (100번 반복)
+2. 각 칸의 월드 좌표를 계산
+
+   ```csharp
+   // 예: gridPosition(3, 2) → 월드 좌표 (6, 0, 4)Vector3 worldPos = new Vector3(3, 0, 2) * 2f = (6, 0, 4)
+   ```
+
+3. 해당 위치에 디버그 프리팹 생성
+4. GridDebugObject 컴포넌트에 GridObject 연결
+
+**결과:** 화면에 100개의 텍스트가 표시되어 각 그리드 정보를 보여줌
+
+---
+
+## 🎯 2단계: 유닛 등록
+
+### 2-1. Unit의 Awake
+
+```csharp
+private void Awake()
+{
+    targetPosition = transform.position;
+    // 예: 유닛이 (5.2, 0, 7.8) 위치에 있다면
+}
+```
+
+### 2-2. Unit의 Start
+
+```csharp
+private void Start()
+{
+    // 1. 현재 월드 좌표를 그리드 좌표로 변환
+    gridPosition = LevelGrid.Instance.GetGridPosition(transform.position);
+
+    // 내부에서 일어나는 일:
+    // transform.position = (5.2, 0, 7.8)
+    // GridSystem.GetGridPosition() 호출
+    // x = RoundToInt(5.2 / 2f) = RoundToInt(2.6) = 3
+    // z = RoundToInt(7.8 / 2f) = RoundToInt(3.9) = 4
+    // → gridPosition = (3, 4)
+
+    // 2. 해당 그리드에 자신을 등록
+    LevelGrid.Instance.AddUnitAtGridPosition(gridPosition, this);
+}
+
+```
+
+**AddUnitAtGridPosition의 내부 동작:**
+
+```csharp
+public void AddUnitAtGridPosition(GridPosition gridPosition, Unit unit)
+{
+    // 1. gridPosition(3,4)에 해당하는 GridObject 가져오기
+    GridObject gridObject = gridSystem.GetGridObject(gridPosition);
+    // → gridObjectArray[3, 4] 반환
+
+    // 2. 해당 GridObject의 유닛 리스트에 추가
+    gridObject.AddUnit(unit);
+    // → gridObjectArray[3,4].unitList.Add(unit)
+}
+
+```
+
+**결과:**
+
+- 유닛이 그리드 (3, 4)에 등록됨
+- GridDebugObject가 Update()에서 "x: 3; z: 4\n유닛이름" 표시
+
+---
+
+## 🖱️ 3단계: 유닛 선택 (마우스 클릭)
+
+### 3-1. 클릭 감지
+
+```csharp
+// UnitActionsSystem.Update() - 매 프레임마다 실행
+void Update()
+{
+    if (Input.GetMouseButtonDown(0)) // 마우스 왼쪽 클릭 시
+    {
+        if (TryHandleUnitSelection()) // 유닛 선택 시도
+        {
+            return; // 유닛을 선택했으면 여기서 종료
+        }
+        // 유닛 선택 실패 시 이동 명령
+        selectedUnit.Move(MouseWorld.GetPosition());
+    }
+}
+
+```
+
+### 3-2. 유닛 선택 처리
+
+```csharp
+private bool TryHandleUnitSelection()
+{
+    // 1. 카메라에서 마우스 위치로 광선(Ray) 발사
+    Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+
+    // 2. 광선이 유닛 레이어에 있는 물체와 충돌하는지 확인
+    if (Physics.Raycast(ray, out RaycastHit raycastHit, float.MaxValue, unitLayerMask))
+    {
+        // 3. 충돌한 오브젝트가 Unit 컴포넌트를 가지고 있는지 확인
+        if (raycastHit.transform.TryGetComponent<Unit>(out Unit unit))
+        {
+            SetSelectedUnit(unit); // 유닛 선택
+            return true; // 선택 성공
+        }
+    }
+    return false; // 선택 실패 (빈 곳 클릭)
+}
+
+```
+
+### 3-3. 선택 상태 업데이트
+
+```csharp
+private void SetSelectedUnit(Unit unit)
+{
+    selectedUnit = unit; // 선택된 유닛 저장
+    OnSelectedUnitChanged?.Invoke(this, EventArgs.Empty); // 이벤트 발생
+}
+
+```
+
+**이벤트 발생 후:**
+
+```csharp
+// UnitSelectedVisual.UnitActionsSystem_OnSelectedUnitChanged()
+private void UnitActionsSystem_OnSelectedUnitChanged(object sender, EventArgs empty)
+{
+    UpdateVisual(); // 시각적 표시 업데이트
+}
+
+private void UpdateVisual()
+{
+    // 이 유닛이 선택된 유닛인지 확인
+    if (UnitActionsSystem.Instance.GetSelectedUnit() == unit)
+    {
+        meshRenderer.enabled = true; // 선택 링 표시
+    }
+    else
+    {
+        meshRenderer.enabled = false; // 선택 링 숨김
+    }
+}
+
+```
+
+---
+
+## 🚶 4단계: 유닛 이동 명령
+
+### 4-1. 빈 곳 클릭 시
+
+```csharp
+// UnitActionsSystem.Update()에서
+if (Input.GetMouseButtonDown(0))
+{
+    if (TryHandleUnitSelection()) // 유닛 클릭이 아니면
+    {
+        return;
+    }
+    // 여기 도착: 빈 곳을 클릭함
+    selectedUnit.Move(MouseWorld.GetPosition());
+    // 예: 마우스 월드 좌표 (12.3, 0, 8.7)을 목표로 설정
+}
+
+```
+
+### 4-2. Unit.Move() 실행
+
+```csharp
+public void Move(Vector3 targetPosition)
+{
+    this.targetPosition = targetPosition;
+    // 예: this.targetPosition = (12.3, 0, 8.7)
+    // 유닛은 다음 프레임부터 이 위치로 이동 시작
+}
+
+```
+
+---
+
+## 🏃 5단계: 유닛 이동 처리 (매 프레임)
+
+### 5-1. 물리적 이동
+
+```csharp
+// Unit.Update() - 매 프레임마다 실행
+private void Update()
+{
+    float stoppingDistance = 0.5f;
+
+    // 목표 지점까지의 거리 확인
+    if (Vector3.Distance(transform.position, targetPosition) > stoppingDistance)
+    {
+        // 1. 이동 방향 계산
+        Vector3 moveDirection = (targetPosition - transform.position).normalized;
+        // 예: (12.3, 0, 8.7) - (5.2, 0, 7.8) = (7.1, 0, 0.9)
+        // normalized = (0.99, 0, 0.13)
+
+        // 2. 위치 이동
+        float moveSpeed = 4f;
+        transform.position += moveDirection * Time.deltaTime * moveSpeed;
+        // 매 프레임마다 조금씩 이동 (초당 4m)
+
+        // 3. 회전 처리
+        float rotationSpeed = 10f;
+        transform.forward = Vector3.Lerp(transform.forward, moveDirection,
+                                        Time.deltaTime * rotationSpeed);
+        // 부드럽게 이동 방향으로 회전
+
+        // 4. 애니메이션 시작
+        unitAnimator.SetBool("IsWalking", true);
+    }
+    else
+    {
+        // 목표 지점 도착
+        unitAnimator.SetBool("IsWalking", false);
+    }
+
+```
+
+### 5-2. 그리드 위치 추적 (매 프레임)
+
+```csharp
+    // Update() 메서드 내부 계속...
+
+    // 현재 월드 좌표를 그리드 좌표로 변환
+    GridPosition newGridPosition = LevelGrid.Instance.GetGridPosition(transform.position);
+
+    // 예시 상황:
+    // 프레임 1: transform.position = (5.2, 0, 7.8) → newGridPosition = (3, 4)
+    // 프레임 2: transform.position = (5.6, 0, 7.9) → newGridPosition = (3, 4)
+    // ...
+    // 프레임 50: transform.position = (7.1, 0, 8.2) → newGridPosition = (4, 4)
+
+    // 그리드 칸이 바뀌었는지 확인
+    if (newGridPosition != gridPosition)
+    {
+        // 그리드 칸이 바뀜! 등록 정보 업데이트
+        LevelGrid.Instance.UnitMovedGridPosition(this, gridPosition, newGridPosition);
+        // 이전: (3, 4), 새로운: (4, 4)
+
+        gridPosition = newGridPosition; // 저장된 그리드 위치 업데이트
+    }
+}
+
+```
+
+### 5-3. 그리드 등록 정보 업데이트
+
+```csharp
+// LevelGrid.UnitMovedGridPosition()
+public void UnitMovedGridPosition(Unit unit, GridPosition fromGridPosition,
+                                  GridPosition toGridPosition)
+{
+    // 1. 이전 그리드에서 제거
+    RemoveUnitAtGridPosition(fromGridPosition, unit);
+    // 내부: gridObjectArray[3, 4].unitList.Remove(unit)
+
+    // 2. 새 그리드에 추가
+    AddUnitAtGridPosition(toGridPosition, unit);
+    // 내부: gridObjectArray[4, 4].unitList.Add(unit)
+}
+
+```
+
+**실시간으로 일어나는 일:**
+
+```
+프레임 1-49: 유닛이 그리드 (3,4)에 있음
+  → gridObjectArray[3,4].unitList = [이 유닛]
+  → GridDebugObject가 "x: 3; z: 4\n유닛이름" 표시
+
+프레임 50: 유닛이 그리드 (4,4)로 이동
+  → gridObjectArray[3,4].unitList = [] (비어있음)
+  → gridObjectArray[4,4].unitList = [이 유닛]
+  → GridDebugObject 표시 자동 업데이트
+
+```
+
+---
+
+## 🔄 6단계: 실시간 정보 표시
+
+### GridDebugObject의 Update()
+
+```csharp
+private void Update()
+{
+    // 매 프레임마다 실행
+    textMeshPro.text = gridObject.ToString();
+}
+
+```
+
+### GridObject.ToString()
+
+```csharp
+public override string ToString()
+{
+    string unitString = "";
+
+    // 이 그리드에 있는 모든 유닛 이름 수집
+    foreach (Unit unit in unitList)
+    {
+        unitString += unit + "\n";
+    }
+
+    // 그리드 좌표 + 유닛 목록 반환
+    return gridPosition.ToString() + "\n" + unitString;
+    // 예: "x: 4; z: 4\nUnit_Soldier\n"
+}
+
+```
+
+---
+
+## 📊 전체 흐름 요약
+
+### 게임 시작
+
+```
+1. LevelGrid.Awake()
+   ↓
+2. GridSystem 생성 (10x10 배열)
+   ↓
+3. 100개의 GridObject 생성
+   ↓
+4. 100개의 GridDebugObject 생성 (화면에 표시)
+   ↓
+5. Unit.Start() - 자신을 그리드에 등록
+
+```
+
+### 플레이 중 (매 프레임)
+
+```
+[유닛 클릭]
+마우스 클릭
+   ↓
+Raycast로 유닛 감지
+   ↓
+selectedUnit 설정
+   ↓
+OnSelectedUnitChanged 이벤트
+   ↓
+UnitSelectedVisual 업데이트 (링 표시)
+
+[이동 명령]
+빈 곳 클릭
+   ↓
+selectedUnit.Move(클릭 위치)
+   ↓
+targetPosition 설정
+
+[매 프레임 이동]
+Unit.Update()
+   ↓
+목표 지점으로 조금씩 이동
+   ↓
+현재 그리드 위치 계산
+   ↓
+그리드가 바뀌었나? (Yes)
+   ↓
+이전 그리드에서 제거
+   ↓
+새 그리드에 추가
+   ↓
+GridDebugObject 자동 업데이트
+
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### 좌표 시스템
+
+- **월드 좌표**: 실제 게임 공간의 3D 좌표 (float)
+- **그리드 좌표**: 바둑판 같은 정수 좌표 (int)
+- 변환 공식: `그리드 좌표 = Round(월드 좌표 / 셀 크기)`
+
+### 이벤트 시스템
+
+- `OnSelectedUnitChanged`: 유닛 선택이 바뀔 때마다 발생
+- 여러 시스템이 구독하여 자동으로 반응 (느슨한 결합)
+
+### 싱글톤 패턴
+
+- `LevelGrid.Instance`, `UnitActionsSystem.Instance`
+- 어디서든 쉽게 접근 가능하지만 하나만 존재
+
+이 시스템은 전략 게임의 기초로, 이동 범위 표시, 공격 범위 계산, 장애물 체크 등을 쉽게 구현할 수 있게 해줍니다!
+
+## LevelGrid
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+/// <summary>
+/// 게임의 전체 그리드 시스템을 관리하는 매니저 클래스
+/// 싱글톤 패턴으로 구현되어 게임 내에서 하나만 존재하며, 어디서든 접근 가능
+/// 역할: 유닛과 그리드 시스템 사이의 중개자 (Mediator)
+/// </summary>
+public class LevelGrid : MonoBehaviour
+{
+    // ========== 싱글톤 패턴 ==========
+    // 게임 어디서든 LevelGrid.Instance로 접근 가능
+    // 예: LevelGrid.Instance.GetGridPosition(transform.position);
+    public static LevelGrid Instance { get; private set; }
+
+    // ========== 인스펙터 설정 값 ==========
+    // 그리드 위에 표시될 디버그 텍스트 프리팹
+    // Unity 에디터에서 할당 (TextMeshPro가 포함된 프리팹)
+    [SerializeField] private Transform gridDebugObjectPrefab;
+
+    // ========== 내부 시스템 ==========
+    // 실제 그리드 데이터를 관리하는 시스템
+    // 10x10 배열과 모든 그리드 로직을 담당
+    private GridSystem gridSystem;
+
+    /// <summary>
+    /// Unity 생명주기: 오브젝트가 생성될 때 가장 먼저 실행
+    /// 싱글톤 설정과 그리드 초기화를 담당
+    /// </summary>
+    void Awake()
+    {
+        // ===== 싱글톤 중복 체크 =====
+        // 이미 다른 LevelGrid가 존재하는지 확인
+        if (Instance != null)
+        {
+            // 에러 로그 출력: 어떤 오브젝트가 중복인지 표시
+            Debug.LogError("There is more than one UnitActionsSystem! " + transform + " - " + Instance);
+            // 현재 오브젝트를 파괴하여 하나만 남김
+            Destroy(gameObject);
+            return; // 더 이상 코드 실행 안 함
+        }
+
+        // ===== 싱글톤 등록 =====
+        // 이 인스턴스를 전역으로 접근 가능하게 설정
+        Instance = this;
+
+        // ===== 그리드 시스템 생성 =====
+        // 매개변수: (가로 칸 수, 세로 칸 수, 각 칸의 크기)
+        // 10x10 그리드, 각 칸은 2m x 2m 크기
+        // 결과: 총 20m x 20m 크기의 게임 맵이 생성됨
+        gridSystem = new GridSystem(10, 10, 2f);
+
+        // ===== 디버그 오브젝트 생성 =====
+        // 각 그리드 칸마다 텍스트를 표시하여 정보를 시각화
+        // 개발 중에 그리드 상태를 쉽게 확인할 수 있음
+        gridSystem.CreateDebugObjects(gridDebugObjectPrefab);
+    }
+
+    /// <summary>
+    /// 특정 그리드 위치에 유닛을 추가 (등록)
+    /// 주로 게임 시작 시 또는 유닛이 새로운 칸으로 이동했을 때 호출
+    /// </summary>
+    /// <param name="gridPosition">유닛을 추가할 그리드 좌표 (예: x=3, z=4)</param>
+    /// <param name="unit">추가할 유닛 객체</param>
+    public void AddUnitAtGridPosition(GridPosition gridPosition, Unit unit)
+    {
+        // 1단계: 해당 그리드 좌표의 GridObject 가져오기
+        //        예: gridPosition(3,4) → gridObjectArray[3,4] 반환
+        GridObject gridObject = gridSystem.GetGridObject(gridPosition);
+
+        // 2단계: 해당 GridObject의 유닛 리스트에 유닛 추가
+        //        내부적으로 List<Unit>.Add() 실행
+        //        결과: 이 그리드 칸에 유닛이 "등록"됨
+        gridObject.AddUnit(unit);
+    }
+
+    /// <summary>
+    /// 특정 그리드 위치에 있는 모든 유닛의 리스트를 반환
+    /// 전투 시스템이나 상호작용 시 "이 칸에 누가 있는지" 확인할 때 사용
+    /// </summary>
+    /// <param name="gridPosition">확인할 그리드 좌표</param>
+    /// <returns>해당 위치에 있는 유닛들의 리스트 (비어있을 수도 있음)</returns>
+    public List<Unit> GetUnitAtGridPosition(GridPosition gridPosition)
+    {
+        // 1단계: 해당 그리드 좌표의 GridObject 가져오기
+        GridObject gridObject = gridSystem.GetGridObject(gridPosition);
+
+        // 2단계: 해당 GridObject가 관리하는 유닛 리스트 반환
+        //        예: [Unit_Soldier, Unit_Mage] 또는 빈 리스트 []
+        return gridObject.GetUnitList();
+    }
+
+    /// <summary>
+    /// 특정 그리드 위치에서 유닛을 제거 (등록 해제)
+    /// 주로 유닛이 다른 칸으로 이동하거나 사망할 때 호출
+    /// </summary>
+    /// <param name="gridPosition">유닛을 제거할 그리드 좌표</param>
+    /// <param name="unit">제거할 유닛 객체</param>
+    public void RemoveUnitAtGridPosition(GridPosition gridPosition, Unit unit)
+    {
+        // 1단계: 해당 그리드 좌표의 GridObject 가져오기
+        GridObject gridObject = gridSystem.GetGridObject(gridPosition);
+
+        // 2단계: 해당 GridObject의 유닛 리스트에서 유닛 제거
+        //        내부적으로 List<Unit>.Remove() 실행
+        //        결과: 이 그리드 칸에서 유닛이 "등록 해제"됨
+        gridObject.RemoveUnit(unit);
+    }
+
+    /// <summary>
+    /// 유닛이 한 그리드 칸에서 다른 그리드 칸으로 이동했을 때 호출
+    /// 이전 칸에서는 제거하고, 새 칸에는 추가하는 작업을 한 번에 처리
+    /// Unit.Update()에서 매 프레임 그리드 위치를 체크하여 호출됨
+    /// </summary>
+    /// <param name="unit">이동한 유닛 객체</param>
+    /// <param name="fromGridPosition">이전 그리드 좌표 (예: 3,4)</param>
+    /// <param name="toGridPosition">새로운 그리드 좌표 (예: 4,4)</param>
+    public void UnitMovedGridPosition(Unit unit, GridPosition fromGridPosition, GridPosition toGridPosition)
+    {
+        // 1단계: 이전 그리드 칸에서 유닛 제거
+        //        예: gridObjectArray[3,4].unitList에서 제거
+        RemoveUnitAtGridPosition(fromGridPosition, unit);
+
+        // 2단계: 새로운 그리드 칸에 유닛 추가
+        //        예: gridObjectArray[4,4].unitList에 추가
+        AddUnitAtGridPosition(toGridPosition, unit);
+
+        // 결과: 유닛의 그리드 등록 정보가 실시간으로 업데이트됨
+        //       GridDebugObject가 자동으로 변화를 감지하여 화면에 표시
+    }
+
+    /// <summary>
+    /// 월드 좌표(3D 공간 좌표)를 그리드 좌표로 변환
+    /// Expression-bodied member 문법 사용 (간결한 표현)
+    ///
+    /// 변환 과정:
+    /// 월드 좌표 (5.2, 0, 7.8)
+    ///   ↓ 각 축을 셀 크기(2f)로 나눔
+    /// (2.6, 0, 3.9)
+    ///   ↓ 반올림 (RoundToInt)
+    /// 그리드 좌표 (3, 4)
+    /// </summary>
+    /// <param name="worldPosition">변환할 월드 좌표 (Vector3)</param>
+    /// <returns>변환된 그리드 좌표 (GridPosition)</returns>
+    public GridPosition GetGridPosition(Vector3 worldPosition) =>
+        gridSystem.GetGridPosition(worldPosition);
+
+    // ===== 위 코드와 동일한 기능의 일반 메서드 형태 (주석 처리됨) =====
+    // Expression-bodied member가 더 간결하지만, 초보자는 아래 형태가 이해하기 쉬울 수 있음
+    // public GridPosition GetGridPosition(Vector3 worldPosition)
+    // {
+    //     // gridSystem의 GetGridPosition 메서드를 호출하여
+    //     // 월드 좌표를 그리드 좌표로 변환한 결과를 반환
+    //     return gridSystem.GetGridPosition(worldPosition);
+    // }
+}
+
+/* ========== 전체 흐름 예시 ==========
+
+1. 게임 시작:
+   Awake() 실행
+   → Instance = this (싱글톤 등록)
+   → gridSystem = new GridSystem(10, 10, 2f) (그리드 생성)
+   → 100개의 GridObject 생성 (각각 빈 유닛 리스트 가짐)
+   → 100개의 디버그 텍스트 생성
+
+2. 유닛 생성 (Unit.Start()):
+   transform.position = (5.2, 0, 7.8)
+   → LevelGrid.Instance.GetGridPosition(transform.position)
+   → gridPosition = (3, 4) 계산
+   → LevelGrid.Instance.AddUnitAtGridPosition(gridPosition, this)
+   → gridObjectArray[3,4].unitList에 유닛 추가
+   → 화면에 "x: 3; z: 4\nUnit이름" 표시
+
+3. 유닛 이동 중 (매 프레임 Unit.Update()):
+   transform.position = (7.1, 0, 8.2)로 이동
+   → newGridPosition = (4, 4) 계산
+   → newGridPosition != gridPosition (칸이 바뀜!)
+   → LevelGrid.Instance.UnitMovedGridPosition(this, (3,4), (4,4))
+   → gridObjectArray[3,4]에서 제거, gridObjectArray[4,4]에 추가
+   → 화면 표시 자동 업데이트
+
+4. 전투 시스템에서 활용:
+   공격 대상 확인 시
+   → List<Unit> targets = LevelGrid.Instance.GetUnitAtGridPosition(attackPosition);
+   → 해당 칸에 적이 있는지 확인
+   → 있다면 공격 실행
+
+========================================= */
+```
+
+## GridSystem
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+/// <summary>
+/// 그리드 시스템의 핵심 클래스
+/// 2차원 배열로 그리드를 관리하고, 월드 좌표 ↔ 그리드 좌표 변환을 담당
+/// MonoBehaviour를 상속받지 않는 순수 C# 클래스 (게임 오브젝트에 붙지 않음)
+/// </summary>
+public class GridSystem
+{
+    // ========== 그리드 크기 정보 ==========
+    // 그리드의 가로 칸 수 (예: 10)
+    private int width;
+
+    // 그리드의 세로 칸 수 (예: 10)
+    private int height;
+
+    // 각 그리드 칸의 실제 크기 (단위: 미터)
+    // 예: cellSize = 2f → 한 칸이 2m x 2m
+    private float cellSize;
+
+    // ========== 핵심 데이터 구조 ==========
+    // 2차원 배열로 모든 그리드 칸을 저장
+    // gridObjectArray[x, z] 형태로 접근
+    // 예: gridObjectArray[3, 4]는 3번째 열, 4번째 행의 그리드 칸
+    private GridObject[,] gridObjectArray;
+
+    /// <summary>
+    /// 생성자: GridSystem 객체를 만들 때 자동으로 실행
+    /// LevelGrid.Awake()에서 호출됨
+    ///
+    /// 실행 순서:
+    /// 1. 크기 정보 저장
+    /// 2. 2차원 배열 생성
+    /// 3. 모든 칸에 GridObject 생성 및 초기화
+    /// </summary>
+    /// <param name="width">그리드 가로 칸 수</param>
+    /// <param name="height">그리드 세로 칸 수</param>
+    /// <param name="cellSize">각 칸의 크기 (미터)</param>
+    public GridSystem(int width, int height, float cellSize)
+    {
+        // ===== 1단계: 멤버 변수에 값 저장 =====
+        this.width = width;           // 예: 10
+        this.height = height;         // 예: 10
+        this.cellSize = cellSize;     // 예: 2.0f
+
+        // ===== 2단계: 2차원 배열 메모리 할당 =====
+        // new GridObject[10, 10] → 100개의 GridObject를 담을 공간 생성
+        // 이 시점에는 모두 null 상태
+        gridObjectArray = new GridObject[width, height];
+
+        // ===== 3단계: 모든 그리드 칸 초기화 (이중 반복문) =====
+        // 외부 반복: x축 (가로, 열)
+        for (int x = 0; x < width; x++)  // x = 0, 1, 2, ..., 9
+        {
+            // 내부 반복: z축 (세로, 행)
+            for (int z = 0; z < height; z++)  // z = 0, 1, 2, ..., 9
+            {
+                // 현재 칸의 그리드 좌표 생성
+                // 예: x=3, z=4 → GridPosition(3, 4)
+                GridPosition gridPosition = new GridPosition(x, z);
+
+                // 해당 위치에 새로운 GridObject 생성 및 저장
+                // 매개변수: (이 GridSystem 자신, 그리드 좌표)
+                // GridObject는 자신의 위치와 부모 시스템을 기억함
+                gridObjectArray[x, z] = new GridObject(this, gridPosition);
+            }
+        }
+
+        // 결과: 100개의 GridObject가 생성되고 각각 초기화됨
+        //       각 GridObject는 빈 유닛 리스트를 가짐
+    }
+
+    /// <summary>
+    /// 그리드 좌표 → 월드 좌표 변환
+    /// "이 그리드 칸의 중심이 게임 월드의 어느 위치인가?"
+    ///
+    /// 계산 예시:
+    /// gridPosition = (3, 4), cellSize = 2f
+    /// → (3, 0, 4) * 2f
+    /// → (6, 0, 8) ← 이 그리드 칸의 월드 좌표
+    /// </summary>
+    /// <param name="gridPosition">변환할 그리드 좌표</param>
+    /// <returns>해당 그리드 칸의 중심점 월드 좌표</returns>
+    public Vector3 GetWorldPosition(GridPosition gridPosition)
+    {
+        // gridPosition.x와 gridPosition.z를 Vector3로 만들고
+        // cellSize를 곱하여 실제 월드 크기로 확장
+        // y축은 0 (지면 높이)
+        return new Vector3(gridPosition.x, 0, gridPosition.z) * cellSize;
+    }
+
+    /// <summary>
+    /// 월드 좌표 → 그리드 좌표 변환
+    /// "이 월드 위치는 어느 그리드 칸에 속하는가?"
+    ///
+    /// 계산 예시:
+    /// worldPosition = (7.2, 0, 8.9), cellSize = 2f
+    /// → x: 7.2 / 2f = 3.6 → RoundToInt = 4
+    /// → z: 8.9 / 2f = 4.45 → RoundToInt = 4
+    /// → GridPosition(4, 4)
+    ///
+    /// RoundToInt 사용 이유:
+    /// - 반올림으로 가장 가까운 그리드 칸을 찾음
+    /// - 7.2m는 4번 칸(6-8m)에 가장 가깝다
+    /// </summary>
+    /// <param name="worldPosition">변환할 월드 좌표</param>
+    /// <returns>해당 위치가 속한 그리드 좌표</returns>
+    public GridPosition GetGridPosition(Vector3 worldPosition)
+    {
+        return new GridPosition(
+            // x축 변환: 월드 x좌표를 셀 크기로 나누고 반올림
+            Mathf.RoundToInt(worldPosition.x / cellSize),
+
+            // z축 변환: 월드 z좌표를 셀 크기로 나누고 반올림
+            Mathf.RoundToInt(worldPosition.z / cellSize)
+        );
+    }
+
+    /// <summary>
+    /// 모든 그리드 칸에 디버그 표시용 오브젝트 생성
+    /// 개발 중에 그리드 상태를 시각적으로 확인하기 위한 기능
+    ///
+    /// 생성 과정:
+    /// 1. 모든 그리드 칸을 순회
+    /// 2. 각 칸의 월드 좌표 계산
+    /// 3. 해당 위치에 디버그 프리팹 생성
+    /// 4. GridDebugObject에 해당 칸 정보 연결
+    /// </summary>
+    /// <param name="debugPrefab">생성할 디버그 오브젝트 프리팹 (TextMeshPro 포함)</param>
+    public void CreateDebugObjects(Transform debugPrefab)
+    {
+        // ===== 모든 그리드 칸 순회 (이중 반복문) =====
+        for (int x = 0; x < width; x++)
+        {
+            for (int z = 0; z < height; z++)
+            {
+                // 1단계: 현재 칸의 그리드 좌표 생성
+                GridPosition gridPosition = new GridPosition(x, z);
+
+                // 2단계: 디버그 오브젝트를 월드에 생성
+                // Instantiate(프리팹, 위치, 회전)
+                // - 위치: GetWorldPosition()으로 계산된 월드 좌표
+                //   예: (3,4) 그리드 → (6, 0, 8) 월드 좌표
+                // - 회전: Quaternion.identity (회전 없음, 0도)
+                Transform debugTransform = GameObject.Instantiate(
+                    debugPrefab,
+                    GetWorldPosition(gridPosition),  // 생성 위치
+                    Quaternion.identity              // 회전 없음
+                );
+
+                // 3단계: 생성된 오브젝트에서 GridDebugObject 컴포넌트 가져오기
+                GridDebugObject gridDebugObject = debugTransform.GetComponent<GridDebugObject>();
+
+                // 4단계: GridDebugObject에 해당 그리드 칸 정보 연결
+                // 이제 GridDebugObject는 Update()에서 이 GridObject의 정보를 표시함
+                // 예: "x: 3; z: 4\nUnit_Soldier\n"
+                gridDebugObject.SetGridObject(GetGridObject(gridPosition));
+            }
+        }
+
+        // 결과: 100개의 디버그 텍스트가 화면에 표시됨
+        //       각 텍스트는 해당 그리드의 좌표와 유닛 정보를 실시간 표시
+    }
+
+    /// <summary>
+    /// 특정 그리드 좌표의 GridObject를 반환
+    /// 배열 접근의 편의성을 위한 메서드
+    ///
+    /// 사용 예시:
+    /// GridObject obj = GetGridObject(new GridPosition(3, 4));
+    /// → gridObjectArray[3, 4]를 반환
+    /// </summary>
+    /// <param name="gridPosition">가져올 그리드 좌표</param>
+    /// <returns>해당 좌표의 GridObject</returns>
+    public GridObject GetGridObject(GridPosition gridPosition)
+    {
+        // 2차원 배열에서 해당 좌표의 GridObject 반환
+        // gridPosition.x = 열 인덱스
+        // gridPosition.z = 행 인덱스
+        return gridObjectArray[gridPosition.x, gridPosition.z];
+    }
+}
+
+/* ========== 전체 동작 흐름 예시 ==========
+
+1. GridSystem 생성:
+   new GridSystem(10, 10, 2f)
+   ↓
+   gridObjectArray[10, 10] 메모리 할당
+   ↓
+   이중 반복문으로 100개 GridObject 생성
+   [0,0] [1,0] [2,0] ... [9,0]
+   [0,1] [1,1] [2,1] ... [9,1]
+   ...
+   [0,9] [1,9] [2,9] ... [9,9]
+   ↓
+   각 GridObject는 빈 유닛 리스트 가짐
+
+2. 디버그 오브젝트 생성:
+   CreateDebugObjects(prefab)
+   ↓
+   100번 반복:
+     - GridPosition(x, z) 생성
+     - GetWorldPosition()로 월드 좌표 계산
+     - 해당 위치에 프리팹 생성
+     - GridDebugObject와 GridObject 연결
+   ↓
+   화면에 100개의 텍스트 표시
+
+3. 좌표 변환 사용:
+
+   [월드 → 그리드]
+   유닛 위치 (7.2, 0, 8.9)
+   ↓ GetGridPosition()
+   7.2/2=3.6→4, 8.9/2=4.45→4
+   ↓
+   GridPosition(4, 4)
+
+   [그리드 → 월드]
+   GridPosition(3, 4)
+   ↓ GetWorldPosition()
+   (3, 0, 4) * 2f
+   ↓
+   (6, 0, 8)
+
+4. GridObject 접근:
+   GetGridObject(GridPosition(3, 4))
+   ↓
+   gridObjectArray[3, 4] 반환
+   ↓
+   해당 칸의 유닛 리스트 등 정보 접근 가능
+
+========================================= */
+
+/* ========== 좌표 시스템 시각화 ==========
+
+그리드 좌표 (cellSize = 2f):
+  0   1   2   3   4
+0 ┌───┬───┬───┬───┐
+  │0,0│1,0│2,0│3,0│
+1 ├───┼───┼───┼───┤
+  │0,1│1,1│2,1│3,1│
+2 ├───┼───┼───┼───┤
+  │0,2│1,2│2,2│3,2│
+3 ├───┼───┼───┼───┤
+  │0,3│1,3│2,3│3,3│
+4 └───┴───┴───┴───┘
+
+월드 좌표 (각 칸이 2x2):
+  0   2   4   6   8
+0 ┌───┬───┬───┬───┐
+  │   │   │   │   │
+2 ├───┼───┼───┼───┤
+  │   │   │   │   │
+4 ├───┼───┼───┼───┤
+  │   │   │ X │   │ ← (6, 0, 4) = GridPosition(3, 2)
+6 ├───┼───┼───┼───┤
+  │   │   │   │   │
+8 └───┴───┴───┴───┘
+
+========================================= */
+```
+
+## GridObject
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+/// <summary>
+/// 그리드의 각 칸(셀)을 나타내는 클래스
+/// 하나의 GridObject = 게임 맵의 한 칸
+///
+/// 역할:
+/// 1. 자신의 위치 정보 저장 (어느 그리드 좌표인지)
+/// 2. 이 칸에 있는 유닛들을 관리 (List로 추적)
+/// 3. 부모 GridSystem 참조 유지
+///
+/// 예시: GridObject at (3, 4) → "이 칸에는 Soldier 유닛과 Mage 유닛이 있다"
+/// </summary>
+public class GridObject
+{
+    // ========== 위치 및 시스템 정보 ==========
+    // 이 GridObject가 속한 GridSystem (부모 시스템 참조)
+    // 필요시 전체 그리드 정보에 접근할 수 있도록 저장
+    private GridSystem gridSystem;
+
+    // 이 GridObject의 그리드 좌표
+    // 예: GridPosition(3, 4) → "나는 3열 4행에 있는 칸이다"
+    private GridPosition gridPosition;
+
+    // ========== 유닛 관리 ==========
+    // 이 그리드 칸 위에 현재 존재하는 모든 유닛들의 리스트
+    // 예: [Unit_Soldier, Unit_Mage] 또는 빈 리스트 []
+    // 동적 크기: 유닛이 들어오고 나가면서 자동으로 크기 변경
+    private List<Unit> unitList;
+
+    /// <summary>
+    /// 생성자: GridObject를 만들 때 자동으로 실행
+    /// GridSystem의 생성자 내부에서 100번 호출됨 (10x10 그리드의 경우)
+    ///
+    /// 실행 순서:
+    /// 1. 부모 GridSystem 참조 저장
+    /// 2. 자신의 그리드 좌표 저장
+    /// 3. 빈 유닛 리스트 생성
+    /// </summary>
+    /// <param name="gridSystem">이 GridObject가 속한 GridSystem</param>
+    /// <param name="gridPosition">이 GridObject의 그리드 좌표</param>
+    public GridObject(GridSystem gridSystem, GridPosition gridPosition)
+    {
+        // ===== 멤버 변수 초기화 =====
+        // 부모 GridSystem 저장 (나중에 다른 칸 정보 접근 가능)
+        this.gridSystem = gridSystem;
+
+        // 내 위치 저장 (예: "나는 (3, 4) 칸이다")
+        this.gridPosition = gridPosition;
+
+        // 빈 유닛 리스트 생성 (초기에는 유닛이 없음)
+        // new List<Unit>() → 크기 0의 동적 배열 생성
+        unitList = new List<Unit>();
+
+        // 결과: 이 칸은 이제 유닛을 받을 준비가 됨
+    }
+
+    /// <summary>
+    /// 이 GridObject의 정보를 문자열로 변환
+    /// GridDebugObject가 Update()에서 매 프레임 호출하여 화면에 표시
+    ///
+    /// 출력 형식:
+    /// "x: 3; z: 4
+    ///  Unit_Soldier
+    ///  Unit_Mage
+    /// "
+    ///
+    /// 사용처: 개발 중 디버깅용 (어느 칸에 어떤 유닛이 있는지 한눈에 확인)
+    /// </summary>
+    /// <returns>그리드 좌표 + 유닛 목록을 포함한 문자열</returns>
+    public override string ToString()
+    {
+        // ===== 1단계: 유닛 이름들을 하나의 문자열로 합치기 =====
+        string unitString = "";  // 빈 문자열로 시작
+
+        // 이 칸에 있는 모든 유닛을 순회
+        foreach (Unit unit in unitList)
+        {
+            // 각 유닛의 ToString() 결과를 추가하고 줄바꿈
+            // unit.ToString()은 보통 "Unit_Soldier" 같은 이름 반환
+            unitString += unit + "\n";
+
+            // 반복 예시:
+            // 1회전: unitString = "Unit_Soldier\n"
+            // 2회전: unitString = "Unit_Soldier\nUnit_Mage\n"
+        }
+
+        // ===== 2단계: 최종 문자열 조합 =====
+        // gridPosition.ToString() → "x: 3; z: 4"
+        // + "\n" → 줄바꿈
+        // + unitString → "Unit_Soldier\nUnit_Mage\n"
+        return gridPosition.ToString() + "\n" + unitString;
+
+        // 최종 결과 예시:
+        // "x: 3; z: 4
+        //  Unit_Soldier
+        //  Unit_Mage
+        // "
+    }
+
+    /// <summary>
+    /// 이 그리드 칸에 유닛을 추가 (등록)
+    ///
+    /// 호출 시점:
+    /// 1. 게임 시작 시 유닛 초기 배치 (Unit.Start())
+    /// 2. 유닛이 다른 칸에서 이 칸으로 이동했을 때
+    ///
+    /// 내부 동작:
+    /// List<Unit>의 Add() 메서드로 리스트 끝에 추가
+    /// </summary>
+    /// <param name="unit">추가할 유닛 객체</param>
+    public void AddUnit(Unit unit)
+    {
+        // unitList에 유닛 추가
+        // List는 동적 배열이므로 크기 자동 증가
+        unitList.Add(unit);
+
+        // 실행 전: unitList = [Unit_Soldier]
+        // AddUnit(Unit_Mage) 실행
+        // 실행 후: unitList = [Unit_Soldier, Unit_Mage]
+
+        // 결과: GridDebugObject의 ToString()이 자동으로 업데이트된 정보 표시
+    }
+
+    /// <summary>
+    /// 이 그리드 칸에서 유닛을 제거 (등록 해제)
+    ///
+    /// 호출 시점:
+    /// 1. 유닛이 이 칸에서 다른 칸으로 이동할 때
+    /// 2. 유닛이 사망하거나 게임에서 제거될 때
+    ///
+    /// 내부 동작:
+    /// List<Unit>의 Remove() 메서드로 특정 유닛 제거
+    /// 해당 유닛을 찾아서 리스트에서 삭제
+    /// </summary>
+    /// <param name="unit">제거할 유닛 객체</param>
+    public void RemoveUnit(Unit unit)
+    {
+        // unitList에서 해당 유닛 제거
+        // Remove()는 첫 번째로 일치하는 항목만 제거
+        unitList.Remove(unit);
+
+        // 실행 전: unitList = [Unit_Soldier, Unit_Mage]
+        // RemoveUnit(Unit_Soldier) 실행
+        // 실행 후: unitList = [Unit_Mage]
+
+        // 주의: 리스트에 없는 유닛을 제거하려 해도 에러는 발생하지 않음
+        //       단순히 아무 일도 일어나지 않음
+    }
+
+    /// <summary>
+    /// 이 그리드 칸에 있는 모든 유닛의 리스트를 반환
+    ///
+    /// 사용처:
+    /// 1. 전투 시스템: "이 칸에 적이 있는가?" 확인
+    /// 2. 이동 시스템: "이 칸이 비어있는가?" 확인
+    /// 3. UI 시스템: "이 칸에 몇 명이 있는가?" 표시
+    /// 4. AI 시스템: "근처에 아군이 있는가?" 탐색
+    ///
+    /// 주의: 원본 리스트를 반환하므로 외부에서 수정 가능
+    ///       (더 안전하게 하려면 new List<Unit>(unitList) 반환)
+    /// </summary>
+    /// <returns>이 칸에 있는 유닛들의 리스트 (비어있을 수 있음)</returns>
+    public List<Unit> GetUnitList()
+    {
+        // unitList 참조를 그대로 반환
+        // 빈 리스트일 수도 있음: []
+        // 유닛이 있을 수도 있음: [Unit_Soldier, Unit_Mage]
+        return unitList;
+    }
+}
+```
+
+## GridPosition
+
+```csharp
+using System;
+
+/// <summary>
+/// 그리드 좌표를 나타내는 구조체 (struct)
+/// 2D 그리드의 위치를 정수 (x, z)로 표현
+/// 예: GridPosition(3, 4) → 3열 4행
+///
+/// struct를 사용하는 이유:
+/// - 작은 데이터 (int 2개)는 struct가 성능상 유리
+/// - 값 타입이라 복사될 때 독립적인 값으로 복사됨
+/// </summary>
+/// IEquatable<GridPosition> = "나는 비교 가능한 타입입니다" 라는 표시
+/// → == 연산자를 쓸 수 있게 해줌
+/// → 성능도 더 좋음
+/// ✅ IEquatable 덕분에 ==, != 사용 가능
+/// ✅ if (newPos != oldPos) 이런 코드가 작동함
+
+public struct GridPosition : IEquatable<GridPosition>
+{
+    // ========== 좌표 데이터 ==========
+    public int x;  // 가로 좌표 (열)
+    public int z;  // 세로 좌표 (행) - y가 아닌 z를 사용 (y는 높이)
+
+    /// <summary>
+    /// 생성자: GridPosition을 만들 때 x, z 값을 설정
+    /// 사용 예: GridPosition pos = new GridPosition(3, 4);
+    /// </summary>
+    public GridPosition(int x, int z)
+    {
+        this.x = x;
+        this.z = z;
+    }
+
+    /// <summary>
+    /// object 타입과 비교할 때 사용 (override 필수)
+    /// 두 GridPosition이 같은 좌표인지 확인
+    ///
+    /// 동작 과정:
+    /// 1. obj가 GridPosition 타입인지 확인
+    /// 2. x 좌표가 같은지 확인
+    /// 3. z 좌표가 같은지 확인
+    /// </summary>
+    public override bool Equals(object obj)
+    {
+        // obj가 GridPosition이고 x, z가 모두 같으면 true
+        return obj is GridPosition position &&
+               x == position.x &&
+               z == position.z;
+    }
+
+    /// <summary>
+    /// IEquatable 인터페이스 구현
+    /// GridPosition끼리 직접 비교할 때 사용 (박싱 없이 빠름)
+    /// 내부적으로 == 연산자 사용
+    /// </summary>
+    public bool Equals(GridPosition other)
+    {
+        return this == other;  // 아래에 정의된 == 연산자 호출
+    }
+
+    /// <summary>
+    /// 해시 코드 생성 (Dictionary, HashSet 등에서 사용)
+    /// x, z 값을 조합하여 고유한 정수 값 생성
+    ///
+    /// 사용처:
+    /// Dictionary<GridPosition, GridObject> 같은 컬렉션에서
+    /// 빠른 검색을 위해 필요
+    /// </summary>
+    public override int GetHashCode()
+    {
+        // x와 z를 조합하여 해시 코드 생성
+        // 예: (3, 4) → 고유한 정수 값
+        return HashCode.Combine(x, z);
+    }
+
+    /// <summary>
+    /// GridPosition을 문자열로 변환
+    /// 디버깅이나 UI 표시에 사용
+    ///
+    /// 출력 예: "x: 3; z: 4"
+    /// </summary>
+    public override string ToString()
+    {
+        // 문자열 보간 ($"...") 사용하여 가독성 좋은 형식으로 반환
+        return $"x: {x}; z: {z}";
+    }
+
+    /// <summary>
+    /// == 연산자 오버로딩
+    /// GridPosition끼리 "같다"를 판별
+    ///
+    /// 사용 예: if (posA == posB) { ... }
+    /// </summary>
+    public static bool operator ==(GridPosition a, GridPosition b)
+    {
+        // x 좌표와 z 좌표가 모두 같으면 true
+        return a.x == b.x && a.z == b.z;
+    }
+
+    /// <summary>
+    /// != 연산자 오버로딩
+    /// GridPosition끼리 "다르다"를 판별
+    ///
+    /// 사용 예: if (newPos != oldPos) { 이동했다! }
+    /// </summary>
+    public static bool operator !=(GridPosition a, GridPosition b)
+    {
+        // == 연산자의 반대 결과 반환
+        return !(a == b);
+    }
+}
+
+/* ========== 사용 예시 ==========
+
+1. 생성:
+GridPosition pos1 = new GridPosition(3, 4);
+GridPosition pos2 = new GridPosition(3, 4);
+GridPosition pos3 = new GridPosition(5, 6);
+
+2. 비교:
+if (pos1 == pos2)  // true (같은 좌표)
+if (pos1 != pos3)  // true (다른 좌표)
+
+3. 문자열 변환:
+Debug.Log(pos1.ToString());  // "x: 3; z: 4"
+
+4. Unit.Update()에서 실제 사용:
+GridPosition newPos = LevelGrid.Instance.GetGridPosition(transform.position);
+if (newPos != gridPosition)  // 그리드 칸이 바뀌었나?
+{
+    // 이동 처리
+    LevelGrid.Instance.UnitMovedGridPosition(this, gridPosition, newPos);
+    gridPosition = newPos;
+}
+
+operator == 설명
+📌 한 줄 요약
+== 기호의 동작 방식을 직접 정의하는 것
+
+💡 쉬운 이해
+일반적인 == 연산자
+pint a = 5;
+int b = 5;
+if (a == b)  // C#이 알아서 비교해줌
+우리가 만든 타입은?
+GridPosition pos1 = new GridPosition(3, 4);
+GridPosition pos2 = new GridPosition(3, 4);
+if (pos1 == pos2)  // ← 어떻게 비교할지 모름! (직접 알려줘야 함)
+
+🔧 operator == 의 역할
+public static bool operator ==(GridPosition a, GridPosition b)
+{
+    return a.x == b.x && a.z == b.z;  // "x도 같고 z도 같으면 같다"
+}
+의미:
+
+GridPosition == GridPosition 할 때
+이 코드가 실행됨
+"x와 z가 모두 같으면 같은 좌표"라고 정의
+
+================================= */
+```
+
+## GridDebugObject
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using TMPro;
+using UnityEngine;
+
+/// <summary>
+/// 각 그리드 칸의 정보를 화면에 표시하는 디버그용 클래스
+/// 게임 오브젝트에 붙어서 TextMeshPro로 정보를 실시간 표시
+/// 개발 중에 그리드 상태를 시각적으로 확인하기 위한 용도
+/// </summary>
+public class GridDebugObject : MonoBehaviour
+{
+    // ========== UI 컴포넌트 ==========
+    // 그리드 정보를 표시할 TextMeshPro 컴포넌트
+    // Unity 에디터에서 할당 필요
+    [SerializeField] private TextMeshPro textMeshPro;
+
+    // ========== 연결된 그리드 정보 ==========
+    // 이 디버그 오브젝트가 표시할 GridObject
+    // GridSystem.CreateDebugObjects()에서 설정됨
+    private GridObject gridObject;
+
+    /// <summary>
+    /// 이 디버그 오브젝트에 GridObject를 연결
+    /// GridSystem.CreateDebugObjects()에서 호출됨
+    ///
+    /// 호출 예: gridDebugObject.SetGridObject(gridObjectArray[3, 4]);
+    /// </summary>
+    /// <param name="gridObject">표시할 GridObject</param>
+    public void SetGridObject(GridObject gridObject)
+    {
+        // 멤버 변수에 GridObject 저장
+        // 이제 Update()에서 이 GridObject의 정보를 표시할 수 있음
+        this.gridObject = gridObject;
+    }
+
+    /// <summary>
+    /// 매 프레임마다 실행 (Unity 생명주기)
+    /// GridObject의 현재 상태를 실시간으로 텍스트에 반영
+    ///
+    /// 표시 내용:
+    /// - 그리드 좌표 (예: "x: 3; z: 4")
+    /// - 이 칸에 있는 유닛 목록
+    /// </summary>
+    private void Update()
+    {
+        // gridObject.ToString() 호출하여 정보를 문자열로 가져옴
+        // 예: "x: 3; z: 4\nUnit_Soldier\n"
+        // TextMeshPro에 표시 (화면에 보임)
+        textMeshPro.text = gridObject.ToString();
+
+        // 유닛이 이동하면 gridObject.unitList가 자동으로 업데이트되므로
+        // 이 코드만으로 실시간 정보 표시 가능
+    }
+}
+
+/* ========== 동작 흐름 ==========
+
+1. GridSystem.CreateDebugObjects() 실행:
+   GameObject 생성 at (6, 0, 8)
+   ↓
+   GridDebugObject 컴포넌트 가져오기
+   ↓
+   SetGridObject(gridObjectArray[3,4]) 호출
+   ↓
+   this.gridObject = gridObjectArray[3,4] 저장
+
+2. 매 프레임 Update() 실행:
+   gridObject.ToString() 호출
+   ↓
+   "x: 3; z: 4\n" 반환 (유닛 없을 때)
+   ↓
+   textMeshPro.text에 할당
+   ↓
+   화면에 표시
+
+3. 유닛이 이 칸에 추가되면:
+   gridObject.unitList = [Unit_Soldier]
+   ↓
+   다음 프레임 Update()
+   ↓
+   gridObject.ToString() → "x: 3; z: 4\nUnit_Soldier\n"
+   ↓
+   자동으로 업데이트된 정보 표시
+
+================================= */
+```
+
+## Unit
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+/// <summary>
+/// 게임 내 유닛(캐릭터)을 제어하는 클래스
+/// 이동, 애니메이션, 그리드 위치 추적을 담당
+/// </summary>
+public class Unit : MonoBehaviour
+{
+    // ========== 컴포넌트 ==========
+    // 유닛의 애니메이터 (걷기 애니메이션 등)
+    // Unity 에디터에서 할당
+    [SerializeField] private Animator unitAnimator;
+
+    // ========== 이동 관련 ==========
+    // 유닛이 이동할 목표 위치 (월드 좌표)
+    // Move() 메서드로 설정됨
+    private Vector3 targetPosition;
+
+    // ========== 그리드 추적 ==========
+    // 유닛의 현재 그리드 좌표
+    // 이동하면서 칸이 바뀔 때마다 업데이트됨
+    private GridPosition gridPosition;
+
+    /// <summary>
+    /// Unity 생명주기: 오브젝트 생성 시 가장 먼저 실행
+    /// 초기 목표 위치를 현재 위치로 설정 (제자리)
+    /// </summary>
+    private void Awake()
+    {
+        // 게임 시작 시 현재 위치를 목표로 설정
+        // 즉, 처음엔 움직이지 않음
+        targetPosition = transform.position;
+    }
+
+    /// <summary>
+    /// Unity 생명주기: 첫 프레임 시작 전 실행 (Awake 다음)
+    /// 유닛을 그리드 시스템에 등록
+    /// </summary>
+    private void Start()
+    {
+        // 1단계: 현재 월드 위치를 그리드 좌표로 변환
+        // 예: (5.2, 0, 7.8) → GridPosition(3, 4)
+        gridPosition = LevelGrid.Instance.GetGridPosition(transform.position);
+
+        // 2단계: 해당 그리드 칸에 자신을 등록
+        // gridObjectArray[3,4].unitList에 이 유닛 추가
+        LevelGrid.Instance.AddUnitAtGridPosition(gridPosition, this);
+
+        // 결과: 그리드 시스템이 이 유닛의 위치를 추적 시작
+    }
+
+    /// <summary>
+    /// Unity 생명주기: 매 프레임마다 실행
+    ///
+    /// 담당 작업:
+    /// 1. targetPosition을 향해 이동
+    /// 2. 이동 방향으로 회전
+    /// 3. 걷기 애니메이션 제어
+    /// 4. 그리드 위치 변화 감지 및 업데이트
+    /// </summary>
+    private void Update()
+    {
+        // ===== 이동 처리 =====
+        float stoppingDistance = 0.5f;  // 목표 지점 근처면 도착으로 간주
+
+        // 목표 지점까지의 거리 확인
+        if (Vector3.Distance(transform.position, targetPosition) > stoppingDistance)
+        {
+            // ----- 아직 도착 안 함, 계속 이동 -----
+
+            // 1. 이동 방향 계산 (정규화된 벡터)
+            Vector3 moveDirection = (targetPosition - transform.position).normalized;
+
+            // 2. 위치 이동 (초당 4m 속도)
+            float moveSpeed = 4f;
+            transform.position += moveDirection * Time.deltaTime * moveSpeed;
+            // Time.deltaTime: 이전 프레임과의 시간 차이 (프레임 독립적 이동)
+
+            // 3. 부드러운 회전 (이동 방향을 바라봄)
+            float rotationSpeed = 10f;
+            transform.forward = Vector3.Lerp(
+                transform.forward,      // 현재 방향
+                moveDirection,          // 목표 방향
+                Time.deltaTime * rotationSpeed  // 보간 비율
+            );
+
+            // 4. 걷기 애니메이션 재생
+            unitAnimator.SetBool("IsWalking", true);
+        }
+        else
+        {
+            // ----- 목표 지점 도착, 정지 -----
+            unitAnimator.SetBool("IsWalking", false);
+        }
+
+        // ===== 그리드 위치 추적 =====
+        // 현재 월드 위치를 그리드 좌표로 변환
+        GridPosition newGridPosition = LevelGrid.Instance.GetGridPosition(transform.position);
+
+        // 그리드 칸이 바뀌었는지 확인
+        if (newGridPosition != gridPosition)
+        {
+            // 칸이 바뀜! 그리드 등록 정보 업데이트
+            // 이전 칸에서 제거 + 새 칸에 추가
+            LevelGrid.Instance.UnitMovedGridPosition(this, gridPosition, newGridPosition);
+
+            // 저장된 그리드 위치 업데이트
+            gridPosition = newGridPosition;
+
+            // 결과: GridDebugObject가 자동으로 변경된 정보 표시
+        }
+    }
+
+    /// <summary>
+    /// 유닛에게 이동 명령을 내림
+    /// UnitActionsSystem에서 호출됨 (마우스 클릭 시)
+    ///
+    /// 동작: targetPosition만 설정, 실제 이동은 Update()에서 처리
+    /// </summary>
+    /// <param name="targetPosition">이동할 목표 위치 (월드 좌표)</param>
+    public void Move(Vector3 targetPosition)
+    {
+        // 목표 위치 설정
+        // 다음 프레임부터 Update()가 이 위치로 이동 시작
+        this.targetPosition = targetPosition;
+    }
+}
+
+/* ========== 전체 생명주기 ==========
+
+1. 게임 시작:
+   Awake() → targetPosition = 현재 위치 (제자리)
+   ↓
+   Start() → 그리드 시스템에 등록
+   - gridPosition = (3, 4) 계산
+   - LevelGrid에 AddUnit 호출
+
+2. 플레이어가 클릭 (빈 곳):
+   UnitActionsSystem.Update()
+   ↓
+   selectedUnit.Move((12.3, 0, 8.7)) 호출
+   ↓
+   this.targetPosition = (12.3, 0, 8.7) 설정
+
+3. 이동 중 (매 프레임):
+   Update() 실행
+   ↓
+   목표까지 거리 체크 → 아직 멈
+   ↓
+   moveDirection 계산
+   ↓
+   위치 이동 (조금씩)
+   ↓
+   회전 (부드럽게)
+   ↓
+   애니메이션 ON
+   ↓
+   그리드 위치 체크
+   ↓
+   칸이 바뀌었나? (Yes)
+   ↓
+   UnitMovedGridPosition 호출
+   - 이전 칸 제거
+   - 새 칸 추가
+   - gridPosition 업데이트
+
+4. 목표 도착:
+   거리 < 0.5f
+   ↓
+   애니메이션 OFF
+   ↓
+   정지 (targetPosition 유지)
+
+================================= */
+```
+
+# { 그리드 시스템 핵심 요약 }
+
+## 📦 각 클래스 역할
+
+**LevelGrid** (관리자)
+
+- 싱글톤으로 어디서든 접근 가능
+- GridSystem을 생성하고 유닛 등록/제거 중개
+
+**GridSystem** (데이터 저장소)
+
+- 10x10 배열로 100개 칸 관리
+- 월드 좌표 ↔ 그리드 좌표 변환
+
+**GridObject** (한 칸)
+
+- 각 그리드 칸 하나를 담당
+- 자신 위에 있는 유닛 리스트 관리
+
+**GridPosition** (좌표)
+
+- 그리드 좌표 (x, z)를 표현하는 구조체
+- 비교 연산자(==, !=) 지원
+
+**Unit** (유닛)
+
+- 목표 지점으로 이동
+- 매 프레임 그리드 위치 체크 → 칸 바뀌면 등록 정보 업데이트
+
+**GridDebugObject** (화면 표시)
+
+- 매 프레임 GridObject 정보를 텍스트로 표시
+
+---
+
+## 🔄 동작 흐름
+
+### 게임 시작
+
+```
+1. LevelGrid 생성
+   ↓
+2. GridSystem(10,10,2f) 생성 → 100개 GridObject 배열
+   ↓
+3. 100개 디버그 텍스트 생성
+   ↓
+4. Unit.Start() → 자신의 그리드 등록
+
+```
+
+### 유닛 이동
+
+```
+1. 빈 곳 클릭 → selectedUnit.Move(클릭위치)
+   ↓
+2. Unit.Update() 매 프레임
+   - targetPosition으로 조금씩 이동
+   - 현재 그리드 좌표 계산
+   - 칸이 바뀌었나? (Yes)
+   ↓
+3. 이전 칸에서 제거 + 새 칸에 추가
+   ↓
+4. 화면 자동 업데이트
+
+```
+
+---
+
+## 💡 핵심 개념
+
+**좌표 변환**
+
+- 월드 (7.2, 0, 8.9) → 그리드 (4, 4)
+- 공식: `Round(월드좌표 / 셀크기)`
+
+**실시간 추적**
+
+- Unit.Update()가 매 프레임 그리드 위치 체크
+- 칸이 바뀌면 자동으로 등록 정보 갱신
+
+**연결 구조**
+
+```
+LevelGrid → GridSystem → GridObject[,] → List<Unit>
+                              ↓
+                         GridDebugObject (화면 표시)
+```

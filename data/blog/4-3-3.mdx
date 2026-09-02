@@ -1,0 +1,380 @@
+---
+title: '섹션:4 풀스택 부동산 앱 - 3'
+date: '2026-09-02'
+category: '프론트/React Native'
+tags: ['프론트', 'React Native']
+draft: false
+summary: ''
+---
+
+# { 🔍 Appwrite 검색 인덱스 설정 }
+
+> `Query.search()`를 사용하려면 인덱스를 먼저 만들어야 함
+
+---
+
+## 왜 인덱스가 필요한가?
+
+```
+인덱스 없이 검색할 때:
+  Query.search("name", "house") 호출
+  → Appwrite 서버 에러 발생 ❌
+
+인덱스 생성 후:
+  → 정상 검색 결과 반환 ✅
+```
+
+> 💡 인덱스는 책의 "색인"과 같습니다.
+> 책 전체를 뒤지는 대신 색인 페이지에서 바로 찾는 것처럼,
+> DB도 인덱스가 있어야 텍스트 검색을 빠르게 할 수 있습니다.
+
+---
+
+## 설정 방법
+
+Appwrite 대시보드에서:
+
+```
+Database → properties 컬렉션 → Indexes 탭 → Create Index
+```
+
+아래 3개를 생성합니다:
+
+| 인덱스 키        | 타입      | 속성      | 정렬 |
+| ---------------- | --------- | --------- | ---- |
+| `name_search`    | Full Text | `name`    | ASC  |
+| `address_search` | Full Text | `address` | ASC  |
+| `type_search`    | Full Text | `type`    | ASC  |
+
+---
+
+## 인덱스 생성 후 동작
+
+```tsx
+// 이름, 주소, 유형 중 하나라도 일치하면 결과 반환
+Query.or([
+  Query.search('name', 'house'), // ← 인덱스 필요
+  Query.search('address', 'seoul'), // ← 인덱스 필요
+  Query.search('type', 'villa'), // ← 인덱스 필요
+])
+```
+
+> ⚠️ `Query.equal()`은 인덱스 없이도 동작하지만
+> `Query.search()`는 **반드시 Full Text 인덱스가 있어야** 합니다.
+
+# { 🔭 탐색(Explore) 화면 가이드 }
+
+> 홈 화면에서 코드를 재사용해 더 간단하게 구현
+
+---
+
+## 📋 홈 화면 vs 탐색 화면 비교
+
+|                             | 홈 화면 | 탐색 화면      |
+| --------------------------- | ------- | -------------- |
+| 유저 인사 (Good Morning)    | ✅      | ❌             |
+| Featured 섹션 (가로 스크롤) | ✅      | ❌             |
+| 뒤로가기 버튼               | ❌      | ✅             |
+| 검색바                      | ✅      | ✅             |
+| 필터                        | ✅      | ✅             |
+| 매물 카드 목록              | ✅      | ✅             |
+| 결과 개수 표시              | ❌      | ✅             |
+| 매물 제한                   | 6개     | 20개 (더 많이) |
+
+---
+
+## 1. 전체 코드 + 주석
+
+```tsx
+// app/(root)/(tabs)/explore.tsx
+
+import { ActivityIndicator, FlatList, Image, Text, TouchableOpacity, View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { useEffect } from 'react'
+import { router, useLocalSearchParams } from 'expo-router'
+
+import icons from '@/constants/icons'
+import Search from '@/components/Search'
+import { Card } from '@/components/Cards'
+import Filters from '@/components/Filters'
+import NoResults from '@/components/NoResults'
+import { getProperties } from '@/lib/appwrite'
+import { useAppwrite } from '@/lib/useAppwrite'
+
+const Explore = () => {
+  // URL 파라미터에서 검색어/필터 읽기
+  const params = useLocalSearchParams<{ query?: string; filter?: string }>()
+
+  // 매물 데이터 가져오기 (skip: true → 처음엔 실행 안 함)
+  const {
+    data: properties,
+    refetch,
+    loading,
+  } = useAppwrite({
+    fn: getProperties,
+    params: {
+      filter: params.filter!,
+      query: params.query!,
+      // 홈과 다르게 limit 없음 → 탐색 화면은 더 많이 표시
+    },
+    skip: true,
+  })
+
+  // 검색어/필터가 바뀔 때마다 데이터 다시 가져오기
+  useEffect(() => {
+    refetch({
+      filter: params.filter!,
+      query: params.query!,
+    })
+  }, [params.filter, params.query])
+
+  // 카드 클릭 → 매물 상세 페이지로 이동
+  const handleCardPress = (id: string) => router.push(`/properties/${id}`)
+
+  return (
+    <SafeAreaView className="h-full bg-white">
+      <FlatList
+        data={properties}
+        numColumns={2}
+        renderItem={({ item }) => <Card item={item} onPress={() => handleCardPress(item.$id)} />}
+        keyExtractor={(item) => item.$id}
+        contentContainerClassName="pb-32"
+        columnWrapperClassName="flex gap-5 px-5"
+        showsVerticalScrollIndicator={false}
+        // 데이터 없을 때: 로딩 중이면 스피너, 아니면 NoResults
+        ListEmptyComponent={
+          loading ? (
+            <ActivityIndicator size="large" className="text-primary-300 mt-5" />
+          ) : (
+            <NoResults />
+          )
+        }
+        // 리스트 상단 헤더
+        ListHeaderComponent={() => (
+          <View className="px-5">
+            {/* 상단 바: 뒤로가기 + 제목 + 벨 */}
+            <View className="mt-5 flex flex-row items-center justify-between">
+              {/* 뒤로가기 버튼 */}
+              <TouchableOpacity
+                onPress={() => router.back()}
+                className="bg-primary-200 flex size-11 flex-row items-center justify-center rounded-full"
+              >
+                <Image source={icons.backArrow} className="size-5" />
+              </TouchableOpacity>
+
+              {/* 중앙 제목 */}
+              <Text className="font-rubik-medium text-black-300 mr-2 text-center text-base">
+                Search for Your Ideal Home
+              </Text>
+
+              {/* 알림 벨 */}
+              <Image source={icons.bell} className="h-6 w-6" />
+            </View>
+
+            {/* 검색바 */}
+            <Search />
+
+            <View className="mt-5">
+              {/* 필터 칩 */}
+              <Filters />
+
+              {/* 결과 개수 표시 */}
+              {/* ?. (옵셔널 체이닝): properties가 null일 수 있어서 안전하게 접근 */}
+              <Text className="font-rubik-bold text-black-300 mt-5 text-xl">
+                Found {properties?.length} Properties
+              </Text>
+            </View>
+          </View>
+        )}
+      />
+    </SafeAreaView>
+  )
+}
+
+export default Explore
+```
+
+---
+
+## 2. 새로 나온 것 — `router.back()`
+
+```tsx
+// 이전 화면으로 돌아가기
+<TouchableOpacity onPress={() => router.back()}>
+  <Image source={icons.backArrow} className="size-5" />
+</TouchableOpacity>
+```
+
+```
+router.push("/some-page")   → 새 화면으로 이동 (히스토리에 쌓임)
+router.back()               → 이전 화면으로 돌아가기 (히스토리에서 꺼냄)
+
+홈 → 탐색 (router.push)
+탐색 → 홈 (router.back)
+```
+
+---
+
+## 3. 결과 개수 표시
+
+```tsx
+<Text>Found {properties?.length} Properties</Text>
+
+// properties가 null/undefined일 때:
+// properties?.length → undefined → "Found undefined Properties"
+// 로딩 중엔 잠깐 이렇게 보일 수 있지만, 데이터 로드 후 정상 표시
+
+// properties가 배열일 때:
+// properties?.length → 20 → "Found 20 Properties"
+```
+
+---
+
+## 4. 홈과 탐색의 핵심 차이
+
+```tsx
+// 홈: 최신 매물 5개 + 추천 매물 6개 (두 가지 API 호출)
+const { data: latestProperties } = useAppwrite({ fn: getLatestProperties })
+const { data: properties } = useAppwrite({ fn: getProperties, params: { limit: 6 } })
+
+// 탐색: 매물만, 개수 제한 없음 (한 가지 API 호출)
+const { data: properties } = useAppwrite({ fn: getProperties })
+// limit 없음 → 매칭되는 모든 매물 표시
+```
+
+---
+
+## 🔑 핵심 요약
+
+1. **탐색 화면 = 홈 화면에서 Featured 섹션과 유저 인사 제거 + 뒤로가기 추가**
+2. **`router.back()`** = 이전 화면으로 돌아가기
+3. **결과 개수** = `properties?.length`로 표시 (`?.`로 null 안전하게 접근)
+4. **limit 없음** = 탐색 화면은 더 많은 결과 표시 (홈은 6개 제한)
+5. **컴포넌트 재사용** = `<Search />`, `<Filters />`, `<Card />`, `<NoResults />` 모두 그대로 사용
+
+# { 🧩 공통 컴포넌트 — NoResults & Comment }
+
+---
+
+## 1. NoResults — 결과 없음 화면
+
+검색/필터 결과가 없거나 데이터가 비어있을 때 표시합니다.
+홈 화면과 탐색 화면 양쪽에서 `ListEmptyComponent`로 재사용됩니다.
+
+```tsx
+// components/NoResults.tsx
+
+import { View, Text, Image } from 'react-native'
+import images from '@/constants/images'
+
+const NoResults = () => {
+  return (
+    <View className="my-5 flex items-center">
+      {/* 결과 없음 일러스트 이미지 */}
+      <Image source={images.noResult} className="h-80 w-11/12" resizeMode="contain" />
+      <Text className="font-rubik-bold text-black-300 mt-5 text-2xl">No Result</Text>
+      <Text className="text-black-100 mt-2 text-base">We could not find any result</Text>
+    </View>
+  )
+}
+
+export default NoResults
+```
+
+### 사용 방법
+
+```tsx
+// FlatList의 ListEmptyComponent로 사용
+<FlatList
+  data={properties}
+  ListEmptyComponent={
+    loading ? (
+      <ActivityIndicator size="large" /> // 로딩 중
+    ) : (
+      <NoResults /> // 데이터 없음
+    )
+  }
+/>
+```
+
+---
+
+## 2. Comment — 리뷰 카드
+
+매물 상세 페이지에서 각 리뷰를 표시합니다.
+
+```tsx
+// components/Comment.tsx
+
+import { View, Text, Image } from 'react-native'
+import icons from '@/constants/icons'
+import { Models } from 'react-native-appwrite'
+
+interface Props {
+  item: Models.Document // Appwrite 리뷰 문서
+}
+
+const Comment = ({ item }: Props) => {
+  return (
+    <View className="flex flex-col items-start">
+      {/* 리뷰어 아바타 + 이름 */}
+      <View className="flex flex-row items-center">
+        <Image source={{ uri: item.avatar }} className="size-14 rounded-full" />
+        <Text className="text-black-300 font-rubik-bold ml-3 text-base">{item.name}</Text>
+      </View>
+
+      {/* 리뷰 내용 */}
+      <Text className="text-black-200 font-rubik mt-2 text-base">{item.review}</Text>
+
+      {/* 하단: 좋아요 + 작성 날짜 */}
+      <View className="mt-4 flex w-full flex-row items-center justify-between">
+        {/* 좋아요 아이콘 + 개수 */}
+        <View className="flex flex-row items-center">
+          <Image
+            source={icons.heart}
+            className="size-5"
+            tintColor={'#0061FF'} // tintColor로 하트 아이콘을 파란색으로
+          />
+          <Text className="text-black-300 font-rubik-medium ml-2 text-sm">120</Text>
+        </View>
+
+        {/* 작성 날짜 */}
+        {/* $createdAt: Appwrite가 자동으로 기록하는 문서 생성 시각 */}
+        <Text className="text-black-100 font-rubik text-sm">
+          {new Date(item.$createdAt).toDateString()}
+        </Text>
+      </View>
+    </View>
+  )
+}
+
+export default Comment
+```
+
+### `new Date().toDateString()` 날짜 변환
+
+```tsx
+// Appwrite의 $createdAt은 ISO 8601 형식 문자열
+item.$createdAt // "2024-01-15T09:30:00.000Z"
+
+// Date 객체로 변환 → 읽기 좋은 형식으로 출력
+new Date('2024-01-15T09:30:00.000Z').toDateString()
+// → "Mon Jan 15 2024"
+
+// 변환 없이 그냥 쓰면?
+{
+  item.$createdAt
+} // "2024-01-15T09:30:00.000Z" 그대로 표시 → 사용자가 읽기 어려움
+```
+
+---
+
+## 🔑 핵심 요약
+
+| 컴포넌트    | 역할                | 사용 위치                    |
+| ----------- | ------------------- | ---------------------------- |
+| `NoResults` | 데이터 없을 때 표시 | 홈/탐색 `ListEmptyComponent` |
+| `Comment`   | 리뷰 한 개 표시     | 매물 상세 페이지             |
+
+- **`tintColor`** = PNG 아이콘 색상을 코드로 변경 (하트를 파란색으로)
+- **`new Date().toDateString()`** = ISO 날짜 문자열 → "Mon Jan 15 2024" 형식 변환

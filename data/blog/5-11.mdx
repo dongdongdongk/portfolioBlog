@@ -1,0 +1,63 @@
+---
+title: '섹션 5. 다음 뉴스 웹 크롤링'
+date: '2026-09-02'
+category: '기타, 사용 적음/크롤링 & 파이썬'
+tags: ['기타, 사용 적음', '크롤링 & 파이썬']
+draft: false
+summary: ''
+---
+
+```python
+import requests
+from bs4 import BeautifulSoup
+
+# User-Agent 헤더 설정
+headers = {
+    "User-Agent" : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+}
+
+# 크롤링할 사이트 URL 설정
+url = "https://news.daum.net/"
+
+# requests를 사용하여 사이트에 GET 요청을 보냄
+req = requests.get(url, headers=headers)
+
+# 응답 받은 HTML을 텍스트로 추출
+html = req.text
+
+# BeautifulSoup을 사용하여 HTML을 파싱 ( HTML 코드를 파이썬이 이해할 수 있는 객체로 변환하여 효과적으로 조작할 수 있도록 )
+soup = BeautifulSoup(html, "html.parser")
+
+# 클래스명이 'item_issue'인 요소들을 선택
+item_issue = soup.select(".item_issue")
+
+# 선택된 요소들에 대해 반복문 수행
+for item in item_issue:
+    # 언론사 추출
+    press = item.select_one(".logo_cp > img")["alt"]
+
+    # 카테고리 추출
+    category = item.select_one(".txt_category").text
+
+    # 기사 제목 추출
+    link_txt = item.select_one(".link_txt")
+    link = link_txt['href']
+    txt = link_txt.text.strip()  # 좌우 공백 제거
+
+    # 결과 출력
+    print(f"{press} - {category}")
+    print(f"{txt} : {link}")
+    print("")
+```
+
+# 이상하게 출력 되는 이슈
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380939/notion-blog/_/_/_/_5_/Untitled.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380938/notion-blog/_/_/_/_5_/Untitled_1.png)
+
+```python
+이런식으로 우리 눈에 보이지 않는 긴 공백이 있어서 그렇다 이걸 해결하기 위해
+
+strip() 을 사용해서 없에 주면 깨끗하게 출력할 수 있다.
+```

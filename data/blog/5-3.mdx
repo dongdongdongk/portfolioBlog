@@ -1,0 +1,1362 @@
+---
+title: '섹션 5: 타일바니아 - 3 -'
+date: '2026-09-02'
+category: '게임 개발/2D 게임을 만들기 위한 C# 유니티 학습'
+tags: ['게임 개발', '2D 게임을 만들기 위한 C# 유니티 학습']
+draft: false
+summary: ''
+---
+
+# { 시네머신 팔로우 카메라 설정 }
+
+## 1. **강의 목표**
+
+```csharp
+시네머신(Cinemachine)을 이용해 플레이어를 따라다니는 카메라(Follow Camera) 를 설정함으로써,
+
+플레이어가 사다리 등 모든 영역을 자유롭게 이동할 수 있도록 만드는 것이 이번 강의의 목표입니다.
+```
+
+## 2. 시네머신 설치
+
+```csharp
+패키지 매니저(Package Manager) 를 엽니다.
+
+Cinemachine을 검색하여 설치합니다.
+
+		설치되지 않은 경우 반드시 이 단계를 수행.
+
+설치가 완료되면 [제거] 버튼이 보임 → 설치 완료 상태 확인.
+```
+
+## 3. 시네머신 가상 카메라 생성
+
+```csharp
+계층구조(Hierarchy)에서 우클릭 → Cinemachine → Virtual Camera 생성.
+
+이름은 자유롭게 지정하되, 강의에서는 "Follow Camera" 로 명명.
+```
+
+## 4. Follow Camera 설정 - 바디 옵션
+
+```csharp
+Follow Camera를 선택 후 Body를 Framing Transposer로 설정.
+
+		Framing Transposer는 플레이어를 화면 내에서 일정 위치에 유지하도록 자동 조정하는 기능.
+
+Follow 대상(Follow Target)을 플레이어 오브젝트로 설정.
+
+		작은 [선택] 버튼을 클릭하여 플레이어 지정.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380398/notion-blog/_/2D_C_/_5_-_3_-/image.png)
+
+## 5. 팔로우 동작의 조정
+
+```csharp
+플레이어가 점프 시 카메라가 너무 적극적으로 따라가는 문제 발생.
+
+이를 해결하기 위해 감쇠(Damping)와 데드존(Dead Zone) 을 조정함.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380391/notion-blog/_/2D_C_/_5_-_3_-/image_1.png)
+
+## 6. 데드존(Dead Zone) 설정
+
+```csharp
+데드존 폭을 조정하여 카메라의 반응 범위 설정:
+
+		예시: X=0.1, Y=0.1
+
+데드존: 플레이어가 이 영역 내에 있는 한, 카메라가 움직이지 않음.
+```
+
+## 7. 감쇠(Damping) 설정
+
+```csharp
+카메라의 움직임을 부드럽게 만들기 위해 감쇠 값 조정.
+
+		특히 점프 시 Y 방향 감쇠를 5로 조정 → 카메라가 천천히 따라오게 설정.
+
+		반응이 너무 빠르면 시청자가 불편함을 느낄 수 있기 때문.
+```
+
+## 8. 렌즈(Lens) 설정 - Ortho Size
+
+```csharp
+Framing Transposer 사용 중이므로 카메라 거리를 직접 제어하진 않음.
+
+다만, Orthographic Size 를 통해 줌 인/아웃 효과를 낼 수 있음.
+
+		기본값: 5
+
+		더 멀어지면 더 넓은 영역이 보이고, 더 가까우면 플레이어에 집중 가능.
+
+추후 게임 플레이에 따라 조정할 수 있음.
+```
+
+# { 카메라 이동을 제한 }
+
+```csharp
+플레이어가 게임 월드의 경계 밖으로 나가지 않도록
+
+Cinemachine Confiner와 Polygon Collider 2D를 활용해 카메라 이동을 제한하는 법을 배웁니다.
+```
+
+## 1. 📸 Cinemachine Confiner 개념 정리
+
+```csharp
+Cinemachine Confiner는 가상 카메라의 이동을 지정된 Collider 2D 형태 안으로 제한해주는 컴포넌트입니다.
+
+이 기능을 통해 플레이어가 스크린 바깥으로 나가도 카메라는 해당 경계를 넘어가지 않게 됩니다.
+
+구성 요소:
+
+		Cinemachine Virtual Camera
+
+		Cinemachine Confiner (또는 Confiner 2D)
+
+		Bounding Shape 2D → 카메라가 벗어나지 못할 충돌 지형 (보통 Polygon Collider 2D 사용)
+```
+
+## 2. 🎨 배경 타일맵 세팅
+
+```csharp
+⛏ 타일 팔레트 설정
+
+		1. Tile Palette에서 배경 타일 선택
+
+		2. Tilemap Renderer의 Sorting Layer: "Background"로 설정 (시각적 정렬용)
+
+		3. Tilemap Collider 2D는 사용하지 않음 — 대신 Polygon Collider 2D를 수동 추가
+
+🧱 배경 영역 그리기
+
+		카메라가 따라다닐 전체 영역(레벨)을 배경 타일로 칠함
+
+		가능한 한 직사각형 형태로 그리되, 자유롭게 흥미로운 형태도 가능
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380394/notion-blog/_/2D_C_/_5_-_3_-/image_2.png)
+
+## 3. 🧩 Polygon Collider 2D로 경계 설정
+
+```csharp
+1. Background Tilemap GameObject에 Polygon Collider 2D 컴포넌트 추가
+
+2. 이 Collider는 카메라 경계 (Bounding Shape) 역할
+
+3. Edit Collider 버튼으로 꼭짓점(Point) 조정
+
+		플레이어가 볼 수 있는 경계 안쪽만 포함되도록 설정
+
+		겹치는 부분이나 지나치게 튀어나온 부분은 정리
+
+Why Polygon Collider 2D?
+
+→ 직사각형 외에도 자유로운 모양을 표현할 수 있기 때문입니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380396/notion-blog/_/2D_C_/_5_-_3_-/image_3.png)
+
+## 4. 🎥 Cinemachine Confiner 설정
+
+```csharp
+1. Cinemachine Virtual Camera 선택
+
+2. Inspector 창에서 아래로 내려 Add Component → Cinemachine Confiner 추가
+
+3. Bounding Shape 2D에 아까 만든 Polygon Collider 2D가 있는 Background Tilemap을 드래그
+
+Confiner가 작동하면 카메라가 해당 경계 밖으로 이동하지 않게 됩니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380397/notion-blog/_/2D_C_/_5_-_3_-/image_4.png)
+
+## 5. 🧱 플레이어와 카메라의 충돌 문제 해결
+
+### 문제 상황:
+
+```csharp
+배경에 Collider가 추가되자 플레이어와
+
+카메라가 예상치 못하게 충돌함 → 게임 시작 시 땅속으로 추락하거나 충돌 이상 발생
+```
+
+### 해결 방법: **충돌 레이어 분리**
+
+```csharp
+1. 레이어 생성
+
+		Player 레이어 (Layer 8)
+
+		Background 레이어 (Layer 9)
+
+2. 레이어 지정
+
+		플레이어 GameObject → Player 레이어로
+
+		Background Tilemap → Background 레이어로
+
+3. Physics 2D 충돌 설정
+
+		메뉴: Edit > Project Settings > Physics 2D
+
+		Layer Collision Matrix에서
+
+				Background 레이어가 어떤 것과도 충돌하지 않도록 체크 해제
+
+				즉, Player와 Background의 충돌도 체크 해제
+
+이렇게 하면 플레이어는 Background Collider와 충돌하지 않지만,
+
+카메라의 Confiner는 여전히 작동합니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380397/notion-blog/_/2D_C_/_5_-_3_-/image_5.png)
+
+```csharp
+레이어 지정
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380397/notion-blog/_/2D_C_/_5_-_3_-/image_6.png)
+
+```csharp
+Background 레이어가 어떤 것과도 충돌하지 않도록 체크 해제
+```
+
+# { Unity Cinemachine 상태 기반 카메라 }
+
+## 1. **개요**
+
+```csharp
+이번 강의에서는 캐릭터의 애니메이션 상태에 따라 다양한 카메라를 자동으로 전환하는 시스템을 구축합니다.
+
+이 과정에서 Unity의 Cinemachine의 State-Driven Camera 기능을 사용하며,
+
+Idle(대기), Run(달리기), Climb(등반) 상태별로 카메라를 설정하고 전환합니다.
+```
+
+## 2. 애니메이터의 '상태'란?
+
+```csharp
+상태는 캐릭터의 동작 상태를 의미합니다 (예: Idle, Run, Climb).
+
+애니메이터는 이러한 상태와 상태 간 전환을 제어합니다.
+
+이 상태를 기반으로 카메라도 자동 전환됩니다.
+```
+
+## 3. Cinemachine State-Driven Camera 설치
+
+```csharp
+1. 계층 뷰에서 우클릭 → Cinemachine → State-Driven Camera 추가.
+
+2. 새로 빈 오브젝트(Create Empty) 생성 → 이름을 Camera로 설정.
+
+3. State-Driven Camera, Main Camera, Virtual Cameras를 이 오브젝트의 하위로 정리.
+
+📌 Tip: 하위 오브젝트로 정리하면 관리가 쉬워집니다. ( state-Driven Camera 하위에 카메라들을 넣어줘야 한다 )
+```
+
+## 4. 카메라 구성 및 이름 정리
+
+```csharp
+기존의 vcam1은 삭제.
+
+새로 추가한 Virtual Camera는 Run 상태 전용으로 이름 변경 (Run Camera).
+
+Run Camera를 복제하여 Idle Camera 생성.
+
+각각의 카메라는 특정 애니메이션 상태에 대응하도록 구성.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380397/notion-blog/_/2D_C_/_5_-_3_-/image_7.png)
+
+## 5. 상태-기반 카메라 설정
+
+```csharp
+1. State-Driven Camera 선택 → Animator 연결 확인 (진저 캐릭터).
+
+2. 애니메이션 상태를 Idling, Running 등으로 추가.
+
+3. 각 상태마다 대응하는 카메라를 설정.
+
+
+		예:
+
+		Idling → Idle Camera
+
+		Running → Run Camera
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380398/notion-blog/_/2D_C_/_5_-_3_-/image_8.png)
+
+## 6. 카메라 세부 조정
+
+```csharp
+카메라의 줌 정도는 Lens → Orthographic Size로 조절.
+
+상태별로 보이는 장면의 크기를 다르게 설정.
+
+💡 Solo 버튼: 특정 카메라를 강제로 화면에 띄워 편집할 수 있도록 함.
+
+예:
+
+		Idle Camera → Orthographic Size: 4
+
+		Run Camera → 기본값 또는 7 등
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380398/notion-blog/_/2D_C_/_5_-_3_-/image_9.png)
+
+## 7. 카메라 블렌딩 설정 (전환 부드럽게 만들기)
+
+```csharp
+기본 블렌드 시간은 0.5초, 이를 5초로 변경하여 더 부드럽게 전환되도록 설정.
+
+블렌드 방식은 Ease In Out.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380391/notion-blog/_/2D_C_/_5_-_3_-/image_10.png)
+
+## 8. 사용자 지정 블렌드 추가
+
+```csharp
+Create Asset → 사용자 정의 블렌드 설정 가능.
+
+상태별 블렌딩 시간 설정:
+
+예:
+
+		Run → Idle : 5초 (천천히 줌인)
+
+		Idle → Run : 1초 (빠르게 줌아웃)
+```
+
+## 정지 효과 추가
+
+```csharp
+상태 전환 직후 화면을 멈추기 위해 Transition Duration을 사용하여 대기 시간 설정 (예: 1초).
+
+점프 전이나 다음 상태로 넘어가기 전에 잠시 멈춘 듯한 느낌을 연출.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380391/notion-blog/_/2D_C_/_5_-_3_-/image_11.png)
+
+## ANY CAMERA → 특정 카메라 전환
+
+```csharp
+'ANY CAMERA' 기능으로 모든 카메라에서 특정 상태로 전환 가능.
+
+일일이 From-To 연결할 필요 없음.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380391/notion-blog/_/2D_C_/_5_-_3_-/image_12.png)
+
+## Ladder 상태 카메라 만들기
+
+```csharp
+목표: 사다리(Climb) 상태를 위한 카메라 구현
+
+절차:
+
+1. Idle Camera 복제 → Ladder Camera로 이름 변경
+
+2. Lens 크기 조정: 극적으로 줌아웃 (예: 8)
+
+3. State 추가: Climb 상태 → Ladder Camera 연결
+
+4. Blend 설정:
+
+		ANY CAMERA → Ladder: 0.5초 (빠르게 전환)
+
+		Ladder → ANY CAMERA: 1초 (빠른 복귀)
+
+		Ladder → Idle/Run 등: 필요에 따라 3초 등 부드러운 전환 설정
+
+📌 사다리를 오르면 빠르게 줌아웃, 내려오면 천천히 줌인
+```
+
+# { 물리 머티리얼 사용 }
+
+```csharp
+본 강의의 목적은 픽셀 아트로 만든 버섯을 이용해 통통 튀는 플랫폼을 만들고,
+
+플레이어가 벽에 붙는 문제를 물리 머티리얼로 해결하는 것이다.
+```
+
+## 1. **버섯 추가 및 배치**
+
+```csharp
+버섯 스프라이트를 Assets > Sprites 폴더에 추가.
+
+유니티에서 버섯 이미지를 선택했을 때 위쪽 가장자리에 미리보기가 나타난다.
+
+버섯이 너무 작게 보이는 경우:
+
+Sprite의 Pixels Per Unit 값을 32로 설정 (버섯이 32x32 픽셀이므로).
+
+Sprite Editor에서 Custom Physics Shape 생성:
+
+		충돌 영역을 정의.
+
+		꼭짓점을 드래그하여 다각형 형태로 구성 가능.
+
+		적용 후 X를 눌러 편집 종료.
+```
+
+## 2. **통통 튀는 타일맵 만들기**
+
+### 타일맵 구조 생성
+
+```csharp
+Hierarchy > 마우스 우클릭 → 2D Object → Tilemap → Rectangle
+
+이름: Bouncing Tilemap
+
+필요한 구성 요소 추가:
+
+		Tilemap Collider 2D
+
+		Composite Collider 2D (이전 콜라이더를 통합하여 성능 최적화)
+
+		Rigidbody 2D: Body Type을 Static으로 설정 (지형이 움직이지 않도록)
+```
+
+### 충돌 조정
+
+```csharp
+버섯이 플랫폼 뒤에 가려질 수 있으므로 Tilemap Renderer의 Sorting Order를 조정
+
+정렬 순서(Sorting Order)를 플랫폼과 동일하게 맞춰서 충돌 윤곽선이 잘 보이도록 함
+```
+
+### 충돌 전용 레이어 생성
+
+```csharp
+Bouncing이라는 새로운 Layer 생성
+
+Bouncing Tilemap의 Layer를 이 Layer로 설정
+```
+
+## Physics Material 2D란?
+
+```csharp
+게임 안에서 물체가 미끄러지거나 튕기는 정도를 정해주는 설정이에요.
+
+이걸 어디에 쓰나요?
+
+		캐릭터가 얼음 위에서 미끄러지게 만들고 싶을 때
+
+		공이 튕기게 만들고 싶을 때
+
+		캐릭터가 벽에 붙지 않게 만들고 싶을 때
+
+Friction (마찰력)	미끄러운 정도	숫자가 작을수록 미끄러지고, 크면 잘 안 미끄러져요
+
+Bounciness (탄력)	튕기는 정도	숫자가 클수록 더 많이 튕겨요
+```
+
+## 3. Physics Material 2D로 바운스 구현
+
+```csharp
+새 머티리얼 생성
+
+		Assets > Materials 폴더 생성
+
+		마우스 우클릭 > Create > 2D > Physics Material 2D
+
+		이름: Bouncy bounce
+
+속성 설명
+
+		Friction (마찰): 표면과의 마찰력. 0이면 미끄럽고, 1이면 끈적함
+
+		Bounciness (탄력): 얼마나 튕길 것인가
+
+				0이면 반동 없음
+
+				1이면 같은 높이로 튕김
+
+				1 이상이면 더 높이 튕김 (예: 1.5 → 50% 더 높이 튕김)
+
+적용
+
+		Tilemap Collider 2D → Material 항목에 Bouncy bounce를 드래그하여 적용
+
+		(Rigidbody 2D와 Composite Collider 2D에도 적용할 수 있음)
+
+테스트
+
+		플레이어가 버섯에 닿으면 위로 튕겨야 함
+
+		버섯이 없으면 구멍에서 나올 수 없도록 설계 → 게임 메카닉 추가 성공
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380391/notion-blog/_/2D_C_/_5_-_3_-/image_13.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380393/notion-blog/_/2D_C_/_5_-_3_-/image_14.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380393/notion-blog/_/2D_C_/_5_-_3_-/image_15.png)
+
+## 5. **플레이어가 벽에 달라붙는 현상 해결**
+
+```csharp
+문제 분석
+
+		점프 후 벽에 닿으면 멈춘 채 벽에 달라붙는 현상 발생
+
+		이는 Physics Material 2D의 마찰(Friction) 때문
+
+해결 방법
+
+		Assets > Materials 폴더에서 마우스 우클릭 → Create → 2D → Physics Material 2D
+
+		이름: No friction
+
+		Friction과 Bounciness 값을 모두 0으로 설정
+
+		플레이어 → Collider (예: Capsule Collider 2D) 선택 → Material에 No friction 적용
+
+테스트
+
+		벽을 붙잡지 않고 자연스럽게 미끄러져 내려감
+
+		벽 점프는 여전히 가능 (향후 다른 로직으로 제어 가능)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380393/notion-blog/_/2D_C_/_5_-_3_-/image_16.png)
+
+# { 벽에 붙어서 계속 점프하는 버그 막기 }
+
+## 1. 벽 점프 방지 로직을 위한 추가 콜라이더 (FeetCollider) 만들기
+
+### 개념:
+
+```csharp
+벽을 향해 점프하면 벽에 닿아있는 것으로 판단해서 자꾸 점프할 수 있는 문제가 생김
+
+이를 방지하기 위해 "발바닥 전용 감지 영역" 을 만든다.
+
+즉, 벽이 아니라 "진짜 바닥"에만 닿았을 때만 점프가 가능하도록 체크할 새로운 콜라이더가 필요함
+```
+
+### 구현 방법:
+
+```csharp
+1. 플레이어 오브젝트에 BoxCollider2D를 추가한다.
+
+2. 이 콜라이더를 "Feet" (발바닥) 용도로 사용한다.
+
+3. CapsuleCollider2D는 계속 몸통용으로 사용
+
+4. Feet Collider는 조금 작게 만들어서 몸체 안쪽에 위치시키고, 벽에 닿지 않게 한다.
+
+📌 왜 이렇게?
+
+→ 바닥만 감지하고, 벽과는 접촉하지 않게 하기 위해서!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380393/notion-blog/_/2D_C_/_5_-_3_-/image_17.png)
+
+```csharp
+아이콘 크기 줄이기 아이콘 때문에 Collider 등을 보기 힘들다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380393/notion-blog/_/2D_C_/_5_-_3_-/image_18.png)
+
+```csharp
+발쪽에 Collider 추가
+```
+
+## 2. 새로 만든 FeetCollider를 코드에 연결하기
+
+```csharp
+CapsuleCollider2D myBodyCollider;
+BoxCollider2D myFeetCollider;
+```
+
+```csharp
+void Start() {
+    ...
+    myBodyCollider = GetComponent<CapsuleCollider2D>();
+    myFeetCollider = GetComponent<BoxCollider2D>();  // feet 전용 콜라이더 연결
+}
+```
+
+## 3. 점프 로직에서 FeetCollider 사용하도록 수정
+
+### 개념:
+
+```csharp
+기존에는 몸통 콜라이더(myBodyCollider) 가 땅에 닿아 있는지를 기준으로 점프 판단
+
+이제는 FeetCollider가 "Ground" 레이어에 닿았는지를 기준으로 점프하도록 변경
+```
+
+```csharp
+void OnJump(InputValue value) {
+    if (!myFeetCollider.IsTouchingLayers(LayerMask.GetMask("Ground"))) {
+        return;
+    }
+    if (value.isPressed) {
+        myRigidbody.velocity += new Vector2(0f, jumpSpeed);
+    }
+}
+```
+
+```csharp
+→ 이제 점프는 FeetCollider가 Ground에 정확히 닿았을 때만 실행됨
+→ 벽 점프 방지 완료!
+```
+
+## 4. 사다리 타기도 FeetCollider 기준으로 수정
+
+### 개념:
+
+```csharp
+사다리 역시 발이 닿았을 때만 탈 수 있어야 자연스럽다
+```
+
+```csharp
+void ClimbLadder() {
+    if (!myFeetCollider.IsTouchingLayers(LayerMask.GetMask("Climbing"))) {
+        myRigidbody.gravityScale = gravityScaleAtStart;
+        myAnimator.SetBool("Climbing", false);
+        return;
+    }
+    ...
+}
+```
+
+## 5. 프리팹에 반영하기
+
+### 개념:
+
+```csharp
+오브젝트 수정 후에는 프리팹에 반영해야 다른 씬에서도 동일하게 작동
+```
+
+### 방법:
+
+```csharp
+플레이어 오브젝트에서 우측 상단 [Overrides → Apply All] 혹은 [Apply] 버튼 클릭
+```
+
+# { 적 캐릭터(구버) 추가 }
+
+## 목표
+
+```csharp
+Unity에서 적 캐릭터를 만들고
+
+Sprite 애니메이션을 적용해서
+
+한 자리에 서서 통통 튀는 동작을 구현
+```
+
+## 1. 적 캐릭터 만들기 (구버 만들기)
+
+### 게임 오브젝트 생성
+
+```csharp
+Hierarchy에서 우클릭 → 2D 객체 → 빈 오브젝트 생성
+
+이름을 Goober라고 지정 (강사는 적을 구버라고 부릅니다)
+```
+
+### Transform 초기화 & 위치 조정
+
+```csharp
+Transform → 우클릭 → Reset
+
+		위치, 회전, 스케일이 모두 (0,0,0)으로 초기화됨
+
+위치를 플레이어 근처로 이동시킴
+```
+
+## 2. 구성요소(Component) 추가
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380394/notion-blog/_/2D_C_/_5_-_3_-/image_19.png)
+
+```csharp
+적 ( Goober ) 제작중
+```
+
+### Sprite Renderer
+
+```csharp
+스프라이트 이미지를 보여주는 컴포넌트
+
+Goober에 Sprite Renderer 추가
+
+6개의 적 스프라이트 중 하나를 선택해서 표시함
+```
+
+### Sorting Layer 설정
+
+```csharp
+적과 플레이어가 겹칠 경우 어떤 것이 앞에 보일지 정하는 설정
+
+Sorting Layer에 새 레이어 “Enemy” 추가
+
+Goober의 Sprite Renderer에 이 레이어를 할당
+```
+
+### Rigidbody2D (운동학적)
+
+```csharp
+Rigidbody2D 추가 → Body Type을 Kinematic(운동학적) 으로 설정
+
+왜? 적은 물리에 반응하지 않고, 스크립트로 움직이기 때문
+
+벽에 부딪혀 튕기거나 중력에 끌릴 필요 없음
+
+Dynamic (동적)
+
+		중력, 충돌, 물리 힘 모두에 반응함.	플레이어, 적, 떨어지는 상자
+
+Kinematic (운동학적)
+
+		중력이나 물리 힘엔 반응 안 함. 코드나 애니메이션으로 직접 움직임 제어.	자동으로 움직이는 적, 엘리베이터
+
+Static (정적)
+
+		전혀 움직이지 않음. 충돌만 감지함.	벽, 바닥, 플랫폼
+```
+
+### Capsule Collider 2D
+
+```csharp
+충돌 영역을 설정하기 위한 컴포넌트
+
+Capsule Collider 2D 추가
+
+Edit Collider 버튼 클릭 → 크기를 조절해 스프라이트에 잘 맞도록 설정
+```
+
+## 3. 애니메이션 설정
+
+### Animator 컴포넌트 추가
+
+```csharp
+Animator 컴포넌트는 애니메이션을 실행/제어하는 역할
+
+Animator Controller가 필요함
+```
+
+### Animator Controller 생성
+
+```csharp
+Assets > Animations 폴더에서 우클릭 → Create > Animator Controller
+
+이름: Goober
+
+Goober 오브젝트의 Animator에 이 컨트롤러를 연결
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380394/notion-blog/_/2D_C_/_5_-_3_-/image_20.png)
+
+```csharp
+애니메이터 컨트롤러 넣어주기
+```
+
+### 애니메이션 클립 만들기
+
+```csharp
+스프라이트 시트에서 6개의 애니메이션 프레임을 드래그 선택
+
+우클릭 → Create > Animation 선택
+
+이름: goober_Anim
+
+자동으로 애니메이션 클립이 만들어지고, 컨트롤러에도 연결됨
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380394/notion-blog/_/2D_C_/_5_-_3_-/image_21.png)
+
+```csharp
+goober 애니메이션 만들기
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380394/notion-blog/_/2D_C_/_5_-_3_-/image_22.png)
+
+```csharp
+애니메이션 컨트롤러에 goober Anim 넣어주기
+```
+
+### 애니메이션 루프 설정
+
+```csharp
+goober_Anim 애니메이션 파일 클릭
+
+Inspector에서 Loop Time 체크 → 애니메이션이 반복되도록 설정
+```
+
+## 4. 스프라이트의 기준 위치 조정
+
+```csharp
+문제 발생:
+
+		구버가 통통 튀긴 하지만 공중에 떠 있는 느낌이 남
+
+해결:
+
+		Sprite Editor 열기 → 각 프레임의 Pivot(기준점)을 아래로 맞춤
+
+		파란색 선이 기준선인데, 각 프레임마다 발이 바닥에 닿도록 정렬
+
+		이렇게 하면 구버가 땅 위에서 튀는 느낌으로 자연스럽게 보입니다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380395/notion-blog/_/2D_C_/_5_-_3_-/image_23.png)
+
+```csharp
+스프라이트 에디터로 goober 아래 딱 맞춰주기 ( 공중에 떠있음 )
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380395/notion-blog/_/2D_C_/_5_-_3_-/image_24.png)
+
+```csharp
+완료 ( 땅에 딱 붙음 ) ( 애니메이션 통통 )
+```
+
+# { 적(Enemy) 방향 전환 }
+
+```csharp
+적(Enemy)을 자동으로 좌우로 이동하게 만들고,
+
+벽에 부딪히면 방향을 바꿔서 튕겨나가듯 반대 방향으로 움직이도록 만드는 것이 목표입니다.
+```
+
+## 1. 스크립트 생성과 기본 설정
+
+```csharp
+스크립트 생성
+
+Scripts 폴더에서 우클릭 → [Create] > [C# Script]
+
+이름을 **EnemyMovement**로 지정
+
+💡 (주의: 오타로 EmenyMovement라 되어 있는데, 정확한 이름은 EnemyMovement입니다)
+```
+
+## 2. Rigidbody2D로 움직이기 위한 준비
+
+### Rigidbody2D란?
+
+```csharp
+2D 물리 엔진을 사용하는 객체를 움직일 수 있게 해주는 컴포넌트예요.
+
+Unity에서 객체를 "물리적으로" 움직이려면 꼭 필요합니다.
+```
+
+### Start()에서 컴포넌트 연결
+
+```csharp
+Rigidbody2D myRigidbody;
+
+void Start() {
+    myRigidbody = GetComponent<Rigidbody2D>();
+}
+```
+
+```csharp
+게임이 시작될 때 myRigidbody 변수에 이 오브젝트의 Rigidbody2D 컴포넌트를 넣습니다.
+
+안 해주면 오류 발생 ❗
+```
+
+## 3. 적이 일정한 속도로 계속 이동하게 만들기
+
+### moveSpeed 변수 선언
+
+```csharp
+[SerializeField] float moveSpeed = 1f;
+```
+
+```csharp
+SerializeField: 유니티 에디터에서 값을 조절할 수 있게 해줍니다.
+
+1f 만큼 계속 오른쪽으로 움직이게 설정
+```
+
+### Update()에서 이동 처리
+
+```csharp
+void Update() {
+    myRigidbody.velocity = new Vector2(moveSpeed, 0f);
+}
+```
+
+```csharp
+매 프레임마다 적을 x축(moveSpeed)으로만 움직이게 합니다.
+
+y축은 0f이므로 위아래 이동은 없음
+```
+
+## 4. 벽에 부딪히면 방향 전환
+
+### 트리거 충돌 감지: `OnTriggerExit2D`
+
+```csharp
+void OnTriggerExit2D(Collider2D other) {
+    moveSpeed = -moveSpeed;
+    FlipEnemyFacing();
+}
+```
+
+```csharp
+**OnTriggerExit2D**는 적이 어떤 트리거 콜라이더 영역에서 벗어났을 때 호출됩니다.
+
+moveSpeed를 반대로 바꿔서 방향을 바꾸고, 그에 맞춰 적의 스프라이트도 뒤집어요.
+```
+
+## 5. 적 스프라이트 뒤집기
+
+### 방향 반전 함수
+
+```csharp
+void FlipEnemyFacing() {
+    transform.localScale = new Vector2(-Mathf.Sign(myRigidbody.velocity.x), 1f);
+}
+```
+
+```csharp
+transform.localScale은 오브젝트의 크기 및 방향입니다.
+
+Mathf.Sign()은 속도의 방향(x가 +인지 -인지)에 따라 1 또는 -1을 반환
+
+-Mathf.Sign(...)은 현재 방향의 반대 방향으로 캐릭터를 돌립니다.
+
+y축은 그대로 1f (위아래 반전 X)
+```
+
+## 6. 충돌 감지용 트리거 콜라이더 설치
+
+### 박스 콜라이더 2D 추가
+
+```csharp
+적 오브젝트에 Box Collider 2D를 추가
+
+Is Trigger 체크 ✅
+
+이걸 "역방향 잠망경"처럼 아래로 내리고 작게 만들기
+
+		적이 땅이나 벽과 접촉하다가 벗어날 때 OnTriggerExit2D()가 호출되도록 함
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380395/notion-blog/_/2D_C_/_5_-_3_-/image_25.png)
+
+```csharp
+Box Collider 을 추가해서 지면과 출동하고 있는지 확인 ( 아래로 잠망경 느낌으로 )
+```
+
+## 7. 충돌 매트릭스 설정 (레이어)
+
+### 새로운 레이어 생성
+
+```csharp
+레이어 이름: Enemies
+
+적 오브젝트에 Enemies 레이어 할당
+```
+
+### 프로젝트 설정
+
+```csharp
+[Edit] > [Project Settings] > [Physics 2D]
+
+Collision Matrix에서 Enemies가 무엇과 충돌할지 선택
+
+		Ground, Player만 체크
+
+		다른 건 다 해제해서 원치 않는 충돌 제거
+
+		예: 사다리, 배경, 다른 적 등은 충돌하지 않도록
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380395/notion-blog/_/2D_C_/_5_-_3_-/image_26.png)
+
+```csharp
+적이 땅, 플레이어, 하고만 충돌하도록 설정
+```
+
+# { 죽음 로직 기초 }
+
+## 1. 강의 목표
+
+```csharp
+이번 강의의 목적은 적과 충돌했을 때 플레이어가 죽는 기능을 구현하는 것이다.
+
+아직 애니메이션이나 hit 리액션은 구현하지 않았고, 이후 강의에서 다룰 예정이다.
+
+지금은 죽음의 기본 로직을 구현하는 데 집중한다
+```
+
+## 2. 플레이어의 죽음 처리 구조 설명
+
+```csharp
+적은 나쁜 존재이므로 적과 닿으면 죽는 구조를 만들 것.
+
+플레이어가 더 이상 제어되지 않도록 처리할 예정.
+```
+
+## 3. `isAlive` 불리언 선언
+
+```csharp
+PlayerMovement 스크립트 안에 bool isAlive = true; 선언.
+
+처음에는 true로 설정해서 플레이어가 살아 있는 상태로 시작.
+
+이 값으로 플레이어가 죽었는지 판단할 수 있게 된다.
+```
+
+## 4. 제어 막기: 업데이트와 입력 메서드 수정
+
+```csharp
+Update(), OnMove(), OnJump() 메서드 맨 위에 다음 코드 추가:
+
+플레이어가 살아있지 않다면, 입력이나 움직임 등이 더 이상 작동하지 않게 된다.
+```
+
+```csharp
+if (!isAlive) { return; }
+```
+
+## 5. `Die()` 메서드 생성
+
+```csharp
+void Die() 메서드를 만들어 플레이어가 죽는 로직을 작성.
+
+메서드 내부에서 다음 코드 작성:
+```
+
+```csharp
+if (myBodyCollider.IsTouchingLayers(LayerMask.GetMask("Enemies"))) {
+    isAlive = false;
+}
+```
+
+```csharp
+**Layer 이름이 정확히 "Enemy"**인지 꼭 확인해야 함.
+
+실수로 로 작성하면 작동하지 않음.
+```
+
+### `LayerMask`란?
+
+```csharp
+레이어 마스크는 특정 레이어를 감지하거나 비교할 때 사용하는 필터 역할을 합니다.
+
+예: "Ground", "Climbing", "Enemies" 같은 레이어를 필터링해서 충돌하거나 접촉 중인지 판단할 수 있어요.
+
+LayerMask.GetMask("레이어이름")란?
+
+문자열로 레이어 이름을 넣으면, 그 레이어에 해당하는 숫자 마스크값을 반환해줘요.
+
+즉, "Enemies" 레이어만 체크하겠다는 뜻입니다.
+```
+
+## 6. `Die()` 메서드 호출
+
+```csharp
+Update() 메서드에서 Die(); 호출.
+
+매 프레임마다 적과 충돌했는지 확인하게 됨.
+```
+
+# { 충돌 시 죽음 애니메이션 + 공중 띄우기 }
+
+## 1. **애니메이터 설정: 트리거 파라미터 만들기**
+
+```csharp
+1. 애니메이션 컨트롤러 열기
+
+		Animations 폴더로 이동해서 플레이어 애니메이션 컨트롤러 (Player)를 클릭.
+
+2. 새 트리거 추가
+
+		Animator 창에서 왼쪽 상단의 파라미터(Parameter) 탭 클릭.
+
+		오른쪽 상단에 있는 "+" 버튼 클릭 > Trigger 선택.
+
+		이름을 Dying 으로 설정.
+
+				이 트리거는 일방통행용이므로, 다시 되돌아올 필요가 없음.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380395/notion-blog/_/2D_C_/_5_-_3_-/image_27.png)
+
+```csharp
+새로운 파라미터 Die 추가 ( bool 이 아니라 트리거 )
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380396/notion-blog/_/2D_C_/_5_-_3_-/image_28.png)
+
+```csharp
+Make Transition 을 이용해서 AnyState 에서 Death 로 이어준다
+
+( 이 트리거는 일방통행용이므로, 다시 되돌아올 필요가 없음. )
+```
+
+## 2. **죽음 애니메이션 만들기**
+
+```csharp
+1. 스프라이트에서 프레임 선택
+
+		Sprites 폴더로 이동.
+
+		플레이어가 누워있는 자세의 스프라이트 한 장을 선택.
+
+2. 애니메이션 만들기
+
+		선택한 스프라이트 위에서 마우스 우클릭 → Create > Animation 선택.
+
+		애니메이션 이름은 Death.anim 로 설정.
+
+		Animations 폴더 안에 저장.
+
+3. 반복되지 않도록 설정
+
+		Death 애니메이션은 1프레임만 보여주기 때문에,
+
+		Loop Time 체크 해제 (Inspector 창에서 확인).
+```
+
+## 3. **Animator 상태머신 연결: Any State → Death**
+
+```csharp
+1. 새로운 상태 추가
+
+		Death 애니메이션을 Animator 창에 끌어다 놓아 새 상태로 생성.
+
+2. 전이(Transition) 만들기
+
+		Any State 노드에서 우클릭 → Make Transition 선택.
+
+		방금 만든 Death 상태에 연결.
+
+3. Transition 세부 설정
+
+		전이선 클릭 후 Inspector에서:
+
+		Has Exit Time: 체크 해제
+
+		Transition Duration: 0으로 설정 (즉시 전환되게 하기 위해)
+
+		Conditions: + 버튼 클릭해서
+
+				조건을 Dying 트리거로 설정.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380396/notion-blog/_/2D_C_/_5_-_3_-/image_29.png)
+
+```csharp
+Transition Duratio 를 0으로
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380396/notion-blog/_/2D_C_/_5_-_3_-/image_30.png)
+
+```csharp
+컨디션에 Die true 추가 ( 나중에 코드에 setTrigger 에 여기서 지정한 이름으로 해줘야 한다 )
+```
+
+## 4. **코드 수정: Die() 메서드에서 애니메이션 상태 변경**
+
+### 플레이어가 적과 충돌할 때 처리
+
+```csharp
+void Die() {
+    if (myBodyCollider.IsTouchingLayers(LayerMask.GetMask("Enemy"))) {
+        isAlive = false;
+        myAnimator.SetTrigger("Dying"); // 트리거 설정
+        myRigidbody.velocity = deathKick; // 공중으로 튕겨나가듯 반응
+    }
+}
+```
+
+### 주의할 점
+
+```csharp
+SetTrigger("Dying") 는 트리거 파라미터와 정확히 일치해야 함 (대소문자 포함).
+
+isAlive = false 설정을 통해, 이후에 이동, 점프 등의 입력이 먹히지 않도록 차단.
+```
+
+## 5. **죽을 때 튀어오르게 하기 - deathKick 설정**
+
+### 변수 선언
+
+```csharp
+[SerializeField] Vector2 deathKick = new Vector2(10f, 10f);
+```
+
+### 물리 반응 주기
+
+```csharp
+위에서 본 것처럼 .velocity = deathKick; 로 설정하면
+
+		플레이어가 죽는 순간 오른쪽 위 방향으로 튀어오르게 됨.
+
+이 값을 유니티 인스펙터에서 실시간으로 조정 가능.
+```
+
+# { 스파이크와 같은 위험 요소 추가 }
+
+```csharp
+플레이어가 스파이크와 같은 위험 요소에 닿았을 때 사망 애니메이션이 재생되도록 구현한다.
+```
+
+## 1. Hazard(위험요소) 타일맵 만들기
+
+### 타일맵 생성
+
+```csharp
+Hierarchy 뷰에서 Tilemap Grid에서 우클릭
+
+메뉴: 2D Object > Tilemap > Rectangular 선택
+
+이름을 Hazards Tilemap으로 변경
+```
+
+### 개념
+
+```csharp
+Tilemap은 여러 종류의 타일을 정리하고 배치할 수 있는 시스템이다.
+
+각 기능에 맞는 타일맵을 분리해 사용하면 Layer 충돌이나 렌더링 정리에 유리하다.
+```
+
+## 2. Layer & Sorting Layer 설정
+
+### Physics Layer 설정
+
+```csharp
+Hazards Tilemap 선택 > Inspector > Layer > Add Layer
+
+이름: Hazards 추가 (예: User Layer 12)
+
+다시 타일맵을 선택하고 방금 만든 Hazards 레이어로 설정
+```
+
+### Sorting Layer 설정
+
+```csharp
+Inspector > Tilemap Renderer > Sorting Layer
+
++ 버튼 클릭 후 새 Sorting Layer를 Hazards로 이름 설정
+
+렌더 순서를 고려해 적절한 순서 (예: 5번)로 배치
+```
+
+### 개념
+
+```csharp
+Layer: 물리 충돌을 위한 구분
+
+Sorting Layer: 화면 상의 렌더링 순서를 위한 구분
+```
+
+## 3. 스파이크 타일 설정
+
+### 스프라이트 설정
+
+```csharp
+제공된 스파이크 스프라이트를 찾는다
+
+선택 후 Inspector > Sprite Editor 클릭
+
+좌상단에서 Custom Physics Shape 선택
+
+타일 주위로 루즈하게 4개 점을 찍어 충돌 모양을 지정
+
+Apply 클릭
+```
+
+### 개념
+
+```csharp
+Custom Physics Shape을 설정하면, 해당 Sprite가 충돌할 때 어떤 모양으로 간주할지를 지정할 수 있다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380396/notion-blog/_/2D_C_/_5_-_3_-/image_31.png)
+
+```csharp
+Sprite 에디터에서 피직스 셰이프로 영역 지정
+```
+
+## 4. Tilemap에 Collider 추가
+
+```csharp
+Hazards Tilemap 선택
+
+Inspector > Add Component > Tilemap Collider 2D 추가
+
+이후 isTrigger 설정은 나중에 적용 ( 뒤에 충돌 문제 해결 )
+```
+
+## 5. 발판 만들고 스파이크 배치
+
+```csharp
+Platforms Tilemap 선택
+
+Rule Tile 선택 후 Shift를 누른 채 스파이크를 놓을 자리 제거
+
+적당한 구덩이 형태의 공간을 만든다
+```
+
+## 6. 스파이크 타일로 저장하고 배치
+
+```csharp
+Tile Palette에서 스파이크 스프라이트를 끌어다 놓음
+
+저장 경로: Assets/Tiles/Spikes
+
+Active Tilemap을 Hazards Tilemap으로 설정한 뒤 배치
+```
+
+## 7. 물리 충돌로 플레이어 사망 처리
+
+### Player Movement 스크립트 수정
+
+```csharp
+void Die() {
+    if (myBodyCollider.IsTouchingLayers(LayerMask.GetMask("Enemy", "Hazards"))) {
+        isAlive = false;
+        myAnimator.SetTrigger("Die");
+        myRigidbody.velocity = deathKick;
+    }
+}
+```
+
+### 개념
+
+```csharp
+LayerMask.GetMask(...): 특정 Layer들과 충돌 중인지 감지
+
+SetTrigger("Die"): Animator에서 Die 트리거 실행
+
+deathKick: 죽을 때 플레이어에게 적용할 튕김 힘
+```
+
+## 8. 충돌 문제 해결 – Trigger 설정
+
+### 문제
+
+```csharp
+플레이어의 발(Collider) 이 스파이크 위에 있어도 사망하지 않음
+
+원인: 플레이어 발은 일반 Collider, 스파이크는 Collider → 관통 불가
+```
+
+### 해결 방법
+
+```csharp
+Hazards Tilemap > Tilemap Collider 2D > isTrigger = true 로 설정
+
+(참고로 적에게도 같은 처리를 해줘야 할 수 있음) ( 몬스터 )
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380397/notion-blog/_/2D_C_/_5_-_3_-/image_32.png)

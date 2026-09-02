@@ -1,0 +1,306 @@
+---
+title: '자바 ::더블콜론 이란?'
+date: '2026-09-02'
+category: '백엔드/JAVA'
+tags: ['백엔드', 'JAVA']
+draft: false
+summary: ''
+---
+
+```java
+메소드 레퍼런스라고도 불린다. 자바8 버전에서 소개되었다. 람다식과 똑같은 기능을 한다.
+
+람다식과 차이점이 있다면 인스턴스를 활용하여 메소드를 전달하는데에 있다.
+```
+
+# **1. 더블콜론과 람다**
+
+```java
+더블콜론은 람다의 간결한 버전중 하나이다 아래 예제를 보자
+```
+
+```java
+List<String> list = List.of("Peter", "Thomas", "Edvard", "Gerhard");
+
+    // print using lambda
+    list.forEach(item -> System.out.println(item));
+```
+
+```java
+자바의 더블콜론은 위 람다식을 아래와 같이 더욱 간결하게 해준다
+
+즉 람다식이 이미 존재하는 메소드와 동일한 기능이면 메소드 레퍼런스로 람다식을 대체할 수 있다.
+```
+
+```java
+// print using :: (method reference operator)
+    list.forEach(System.out::println);
+```
+
+# **2. 더블콜론의 사용처**
+
+```java
+* 사용하는 람다식이 기존에 있는 인스턴스의 메소드와 동일하면 메소드 레퍼런스로 대체 가능하다
+
+* 스태틱 메소드, 인스턴스의 메소드의 메소드 레퍼런스로 사용가능하다
+```
+
+# **사용 방법**
+
+```java
+람다식에서 파라미터를 중복해서 사용하고 싶지 않을 때 사용하고,
+
+람다식과 동일한 처리 방법을 갖긴 하지만, 이름으로 기존 메소드를 참조함으로써 더욱 보기 쉽게 사용할 수 있다
+```
+
+```java
+[인스턴스]::[메소드명(or new)]
+
+ex) User::getId
+```
+
+```java
+① 람다 표현식 () -> {} 에서만 사용 가능하고
+
+② static 메소드인 경우 인스턴스 대신 클래스 이름으로 사용할 수도 있다 !
+```
+
+## **예시**
+
+```java
+리스트를 순회하면서 String 을 대문자로 바꿔주고자 할 때
+```
+
+```java
+List<String> testList = Arrays.asList("one", "two", "three", "four");
+testList = testList
+        .stream()
+        .map(a -> a.toUpperCase()) // 람다 표현식
+        .collect(Collectors.toList());
+
+testList = testList
+        .stream()
+        .map(String::toUpperCase) // 이중 콜론 연산자 사용
+        .collect(Collectors.toList());
+```
+
+```java
+a -> a.toUpperCase() 를 이중 콜론 연산자로 표현하려면 String::toUpperCase 로 나타낼 수 있다
+```
+
+```java
+특정 Dto 리스트에서 아이디만 뽑을 때
+```
+
+```java
+@Getter
+@AllArgsConstructor(staticName = "of")
+public class TestDto {
+    private Long id;
+    private String name;
+}
+
+List<TestDto> testDtoList = new ArrayList<>();
+testDtoList.add(TestDto.of(1L, "첫번째"));
+testDtoList.add(TestDto.of(2L, "두번째"));
+
+// 람다 표현식
+testDtoList.stream().map(a->a.getId()).collect(Collectors.toList());
+// 이중 콜론 연산자 사용
+testDtoList.stream().map(TestDto::getId).collect(Collectors.toList());
+```
+
+```java
+static 메소드를 사용할 때
+```
+
+```java
+@Getter
+@AllArgsConstructor(staticName = "of")
+public class NameDto {
+	private String name;
+}
+
+List<String> testList = Arrays.asList("one", "two", "three", "four");
+// 람다 표현식
+testList.stream().map(a->NameDto.of(a)).collect(Collectors.toList())
+// 이중 콜론 연산자 사용
+testList.stream().map(NameDto::of).collect(Collectors.toList())
+```
+
+```java
+람다식이 하나의 메서드만 호출하는 경우, 메서드 참조를 통해 람다식을 간략히 할 수 있다.
+클래스명::메서드명 또는 참조변수::메서드명
+
+// 기존
+Function<String, Integer> f = (String s) -> Integer.parseInt(s);
+
+// 메서드 참조
+Funcation<String, Integer> f = Integer::parseInt;
+```
+
+# 쉬운 설명
+
+## **메서드 참조는 언제, 어떻게 사용할 수 있을까**
+
+```java
+**메서드 참조는 람다식에서 파라미터의 중복을 피하기 위해 사용한다.**
+
+파라미터가 중복되지 않았다면 메서드 참조 표현식은 사용 불가능하다.
+```
+
+## **인스턴스의 메서드를 참조하는 경우**
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        List<Member> memberList = Arrays.asList(new Member("A"), new Member("B"), new Member("C"));
+        String collect = memberList.stream().map(element -> element.getName()).collect(Collectors.joining());
+        System.out.println(collect);
+    }
+
+    public static class Member {
+        private String name;
+
+        public Member(String name) {
+            this.name = name;
+        }
+
+        public String getName() {
+            return name;
+        }
+    }
+}
+```
+
+```java
+위 코드에서 stream 생성 이후 map 메서드에서 람다식을 사용했다.
+
+이때 map에 걸리는 요소들은 Member 인스턴스다. 그리고 map 내부에서 인스턴스의 메서드인 getName()을 호출하고 있다.
+
+
+
+그런데 문제는 요소를 지칭하는 element가 두 번이나 등장한다. Java에서는 이게 보기 싫었던 거다. 이걸 꼭 한 번만 써주고 싶었던 것
+
+위 코드에서 람다식을 메서드 참조 표현식으로 변경해보면 다음과 같다.
+```
+
+```java
+// 일반 람다식
+String collect = memberList.stream().map(element -> element.getName()).collect(Collectors.joining());
+
+// 메서드 참조 표현식
+String collect = memberList.stream().map(Member::getName).collect(Collectors.joining());
+```
+
+```java
+위 코드에서 메서드 참조 표현식의 사용 형태는 다음과 같다.
+```
+
+```java
+// 일반 람다식
+(인스턴스 -> 인스턴스.메서드명) // map(element -> element.getName()
+
+// 메서드 참조 표현식
+(인스턴스의 클래스명::메서드명) // map(Member::getName)
+```
+
+## **인스턴스를 생성하는 경우**
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        List<String> memberNameList = List.of("A", "B", "C");
+        List<Member> memberList = memberNameList.stream().map(name -> new Member(name)).collect(Collectors.toList());
+        memberList.forEach(member -> System.out.println(member.getName()));
+    }
+
+    public static class Member {
+        private String name;
+
+        public Member(String name) {
+            this.name = name;
+        }
+
+        public String getName() {
+            return name;
+        }
+    }
+}
+```
+
+```java
+위 코드에서 memberList를  초기화할 때 stream 생성 이후 map 메서드에서 람다식을 사용했다.
+
+이때 map에 걸리는 요소들은 String 객체지만, Member 클래스의 인스턴스를 만들 때 인자로 들어간다.
+
+이때도 메서드 참조 표현식이 가능하다. 위 코드에서 람다식을 메서드 참조 표현식으로 변경해보면 다음과 같다.
+```
+
+```java
+// 일반 람다식
+List<Member> memberList = memberNameList.stream().map(name -> new Member(name)).collect(Collectors.toList());
+
+// 메서드 참조 표현식
+List<Member> memberList = memberNameList.stream().map(Member::new).collect(Collectors.toList());
+```
+
+```java
+위 코드에서 메서드 참조 표현식의 사용 형태는 다음과 같습니다. 특히, 이렇게 메서드가 아닌 생성자를 참조할 때는 생성자 참조 표현식이라고 부른다.
+```
+
+```java
+// 일반 람다식
+(인자로 들어갈 객체 -> new 클래스명(인자로 들어갈 객체))
+
+// 메서드 참조 표현식
+(클래스명::new)
+```
+
+## :: 를 사용하지 못하는 예제
+
+```java
+List<String> list = Arrays.asList("a","b","c");
+Stream<String> stream = list.stream()
+	.filter(list -> list.contains("a"));  //  .contains 메서드는 List 클래스의 일반 메서드이므로 메서드 레퍼런스(::)로 대체할 수 없습니다
+    // 'a'가 들어간 요소만 선택  [a]
+
+```
+
+```java
+메서드 레퍼런스(::)를 사용할 수 없는 이유
+
+1. 메서드 레퍼런스의 형식:
+
+* 메서드 레퍼런스는 클래스이름::메서드이름 형식을 가져야 합니다. // list -> list.contains("a") list 는 인스턴스의 클래스 이름이 아니다
+
+* 이 형식을 따르지 않으면 올바른 메서드 레퍼런스가 아닙니다.
+
+2. filter 메서드와 Predicate 함수형 인터페이스:
+
+* filter 메서드는 Predicate 함수형 인터페이스를 사용하여 요소를 필터링합니다.
+
+* Predicate 인터페이스는 boolean test(T t) 시그니처를 가지며, 주어진 인수를 받아 boolean 값을 반환합니다.
+
+(메서드 시그니처 = 메서드가 어떤 형식의 정보를 받고 어떤 형식의 정보를 반환하는지를 정의)
+
+3. contains 메서드와 시그니처:
+
+* List 클래스의 contains 메서드는 boolean 값을 반환합니다.
+
+* contains 메서드의 시그니처는 boolean contains(Object o)입니다.
+
+**메서드 레퍼런스(::)를 사용하려면 두 가지 조건을 충족해야 합니다.**
+
+a. 메서드 레퍼런스의 형식이 올바르아야 합니다.
+
+b. 메서드 레퍼런스의 메서드와 함수형 인터페이스의 시그니처가 일치해야 합니다.
+
+List 클래스의 contains 메서드는 filter 메서드에서 사용하는 Predicate 인터페이스와의 시그니처가 다릅니다.
+
+contains 메서드는 Object 타입을 받아서 boolean 값을 반환하는 반면, Predicate 인터페이스는 제네릭 타입 T를 받아서 boolean 값을 반환합니다.
+
+이로 인해 두 메서드 간의 시그니처 일치가 불가능하며, 따라서 ::를 사용한 메서드 레퍼런스로 filter 메서드의 인자로 전달할 수 없습니다.
+
+요약하면, 메서드 레퍼런스는 형식과 시그니처의 일치를 요구하며, contains 메서드와 Predicate 인터페이스의 시그니처가 일치하지 않아서 ::를 사용할 수 없는 것입니다
+```

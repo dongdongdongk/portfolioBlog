@@ -1,0 +1,1635 @@
+---
+title: 'EcommerceProject -3-1'
+date: '2026-09-02'
+category: '풀스택/프로젝트 정리'
+tags: ['풀스택', '프로젝트 정리']
+draft: false
+summary: ''
+---
+
+# 프로텍트 라우터 수정
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381460/notion-blog/_/_/EcommerceProject/EcommerceProject_-3-1/Untitled.png)
+
+```jsx
+프로텍트 라우터의 수정이 조금 필요하다
+```
+
+## ProtectedRoute.js
+
+```jsx
+// React와 라우터에서 필요한 모듈을 가져옵니다.
+import { useSelector } from 'react-redux'
+import { Navigate } from 'react-router-dom'
+
+// 사용자의 로그인 상태를 확인하여 보호된 라우트를 처리하는 컴포넌트를 정의합니다.
+const ProtectedRoute = ({ children }) => {
+  // Redux store에서 사용자 정보 및 로딩 상태를 가져옵니다.
+  const { loading, isAuthenticated } = useSelector((state) => state.user)
+
+  // 로딩 상태가 완료된 경우
+  if (loading === false) {
+    // 사용자가 인증되지 않은 경우 로그인 페이지로 이동합니다.
+    if (!isAuthenticated) {
+      return <Navigate to="/login" replace />
+    }
+    // 사용자가 인증된 경우 자식 컴포넌트(보호된 컨텐츠)를 반환합니다.
+    return children
+  }
+}
+
+// 컴포넌트를 내보냅니다.
+export default ProtectedRoute
+```
+
+## SellerProtectedRoute.js
+
+```jsx
+// React와 라우터에서 필요한 모듈을 가져옵니다.
+import { useSelector } from 'react-redux'
+import { Navigate } from 'react-router-dom'
+import Loader from '../components/Layout/Loader'
+
+// 판매자 전용 보호 라우트를 처리하는 컴포넌트를 정의합니다.
+const SellerProtectedRoute = ({ children }) => {
+  // Redux store에서 판매자 정보와 로딩 상태를 가져옵니다.
+  const { loading, isSeller } = useSelector((state) => state.seller)
+
+  // 로딩 중인 경우 로딩 스피너를 표시합니다.
+  if (loading) {
+    return <Loader />
+  } else {
+    // 판매자로 인증되지 않은 경우 판매자 로그인 페이지로 이동합니다.
+    if (!isSeller) {
+      return <Navigate to={`/shop-login`} replace />
+    }
+    // 판매자로 인증된 경우 자식 컴포넌트(판매자 전용 컨텐츠)를 반환합니다.
+    return children
+  }
+}
+
+// 컴포넌트를 내보냅니다.
+export default SellerProtectedRoute
+```
+
+```jsx
+위와 같이 작업을 하면
+
+                <SellerProtectedRoute isSeller={isSeller}>
+                  <ShopHomePage />
+                </SellerProtectedRoute>
+
+아래와 같이 props 를 전달할 필요가 없고 보호받는 children 라우트에 isSeller 값이 true 인지 확인하여 login 으로 보낸다
+```
+
+# 로더 컴포넌트 생성
+
+```jsx
+// React와 Lottie를 사용하여 로딩 스피너를 렌더링하는 Loader 컴포넌트입니다.
+import React from 'react'
+import Lottie from 'react-lottie'
+import Loading from '../../Lottie/LOADING.json'
+
+const Loader = () => {
+  // Lottie 애니메이션의 기본 옵션을 설정합니다.
+  const defaultOptions = {
+    loop: true, // 애니메이션을 반복 재생합니다.
+    autoplay: true, // 페이지 로딩 시 자동으로 애니메이션을 시작합니다.
+    animationData: Loading, // 사용할 Lottie 애니메이션 데이터입니다.
+    rendererSettings: {
+      preserveAspectRatio: 'xMidYMid slice', // 애니메이션을 중앙에 유지하고 잘라내기 위한 설정입니다.
+    },
+  }
+
+  // 화면 전체를 가득 채우고 가운데에 로딩 스피너를 표시합니다.
+  return (
+    <div className="flex h-screen w-full items-center justify-center">
+      {/* Lottie 컴포넌트에 설정된 옵션을 전달하여 애니메이션을 렌더링합니다. */}
+      <Lottie options={defaultOptions} width={300} height={300} />
+    </div>
+  )
+}
+
+// Loader 컴포넌트를 내보냅니다.
+export default Loader
+```
+
+```jsx
+Lotti 를 사용하였고
+
+loop 오류 이슈가 있었다 이때는 defaultOptions  같은 options 을 추가해줘서 사용해준다
+
+위의 셀러 프로텍트 라우터에 보면 로더를 사용하는데 로딩시에 이 페이지를 출력해준다
+
+  if (loading) {
+    return <Loader />;
+  }
+```
+
+# ShopDashboardPage.jsx 제작
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381460/notion-blog/_/_/EcommerceProject/EcommerceProject_-3-1/Untitled_1.png)
+
+```jsx
+import React from 'react'
+import DashboardHeader from '../../components/Shop/Layout/DashboardHeader'
+import DashboardSideBar from '../../components/Shop/Layout/DashboardSideBar'
+
+// ShopDashboardPage 컴포넌트: 쇼핑몰 대시보드 페이지를 나타냅니다.
+const ShopDashboardPage = () => {
+  return (
+    <div>
+      {/* 대시보드 헤더 컴포넌트를 렌더링합니다. */}
+      <DashboardHeader />
+
+      <div className="flex w-full items-center justify-between">
+        {/* 대시보드 사이드바 컴포넌트를 렌더링합니다.
+            active 속성은 선택된 메뉴를 표시하는 데 사용됩니다. */}
+        <div className="800px:w-[330px] w-[80px]">
+          <DashboardSideBar active={1} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default ShopDashboardPage
+```
+
+```jsx
+ShopDashboardPage 를 작성해준다
+```
+
+## ShopLoginPage.jsx
+
+```jsx
+import React, { useEffect } from 'react'
+import { useSelector } from 'react-redux'
+import { useNavigate } from 'react-router-dom'
+import ShopLogin from '../../components/Shop/ShopLogin'
+
+// ShopLoginPage 컴포넌트: 쇼핑몰 로그인 페이지를 나타냅니다.
+const ShopLoginPage = () => {
+  const navigate = useNavigate()
+  const { isSeller, isLoading } = useSelector((state) => state.seller)
+
+  useEffect(() => {
+    // 로그인 여부와 로딩 상태에 따라 조건부로 페이지 이동을 수행합니다.
+    if (isSeller === true) {
+      // 판매자로 로그인한 경우 대시보드 페이지로 이동합니다.
+      navigate(`/dashboard`)
+    }
+  }, [isLoading, isSeller])
+
+  return (
+    <div>
+      {/* ShopLogin 컴포넌트를 렌더링합니다. */}
+      <ShopLogin />
+    </div>
+  )
+}
+
+export default ShopLoginPage
+```
+
+```jsx
+로그인 페이지에 살짝 수정이 필요하다
+
+  useEffect(() => {
+    // 로그인 여부와 로딩 상태에 따라 조건부로 페이지 이동을 수행합니다.
+    if (isSeller === true) {
+      // 판매자로 로그인한 경우 대시보드 페이지로 이동합니다.
+      navigate(`/dashboard`);
+    }
+  }, [isLoading, isSeller]);
+
+이렇게 수정하여 사용자가 로그인 페이지로 이동했을때 랜더링 되고 ( 사용자가 로그인 상태가 아니라면 )
+
+로그인을 진행하면 상태가 변경되므로 ( isSeller ) 다시 useEffect 가 발생하여 navigate 부분이 실행된다
+```
+
+## DashboardHeader.jsx 만들어 주기
+
+```jsx
+import React from 'react'
+import { AiOutlineGift } from 'react-icons/ai'
+import { MdOutlineLocalOffer } from 'react-icons/md'
+import { FiPackage, FiShoppingBag } from 'react-icons/fi'
+import { useSelector } from 'react-redux'
+import { Link } from 'react-router-dom'
+import { BiMessageSquareDetail } from 'react-icons/bi'
+
+const DashboardHeader = () => {
+  // Redux에서 판매자 정보를 가져옵니다.
+  const { seller } = useSelector((state) => state.seller)
+
+  // 로그 확인을 위해 콘솔에 판매자 정보를 출력합니다.
+  console.log(seller)
+
+  return (
+    // 대시보드 헤더 영역입니다.
+    <div className="sticky top-0 left-0 z-30 flex h-[80px] w-full items-center justify-between bg-white px-4 shadow">
+      {/* 대시보드 로고 */}
+      <div>
+        <Link to="/dashboard">
+          <img src={`http://localhost:5000/images/QuickDealMarketFix.jpg`} alt="" />
+        </Link>
+      </div>
+      {/* 대시보드 메뉴 아이콘 및 판매자 프로필 */}
+      <div className="flex items-center">
+        <div className="mr-4 flex items-center">
+          {/* 쿠폰 페이지로 이동하는 링크 */}
+          <Link to="/dashboard/coupons" className="800px:block hidden">
+            <AiOutlineGift color="#555" size={30} className="mx-5 cursor-pointer" />
+          </Link>
+          {/* 이벤트 페이지로 이동하는 링크 */}
+          <Link to="/dashboard-events" className="800px:block hidden">
+            <MdOutlineLocalOffer color="#555" size={30} className="mx-5 cursor-pointer" />
+          </Link>
+          {/* 상품 관리 페이지로 이동하는 링크 */}
+          <Link to="/dashboard-products" className="800px:block hidden">
+            <FiShoppingBag color="#555" size={30} className="mx-5 cursor-pointer" />
+          </Link>
+          {/* 주문 관리 페이지로 이동하는 링크 */}
+          <Link to="/dashboard-orders" className="800px:block hidden">
+            <FiPackage color="#555" size={30} className="mx-5 cursor-pointer" />
+          </Link>
+          {/* 메시지 페이지로 이동하는 링크 */}
+          <Link to="/dashboard-messages" className="800px:block hidden">
+            <BiMessageSquareDetail color="#555" size={30} className="mx-5 cursor-pointer" />
+          </Link>
+          {/* 판매자 프로필 페이지로 이동하는 링크 */}
+          <Link to={`/shop/${seller._id}`}>
+            <img
+              src={`http://localhost:5000/${seller.avatar}`}
+              alt=""
+              className="h-[50px] w-[50px] rounded-full object-cover"
+            />
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default DashboardHeader
+```
+
+```jsx
+특별한 기능은 없고 link 를 통해서 원하는 페이지로 이동하는 헤더 부분이다
+```
+
+## DashboardSideBar.jsx 작성
+
+```jsx
+import React from 'react'
+import { AiOutlineFolderAdd, AiOutlineGift } from 'react-icons/ai'
+import { FiPackage, FiShoppingBag } from 'react-icons/fi'
+import { MdOutlineLocalOffer } from 'react-icons/md'
+import { RxDashboard } from 'react-icons/rx'
+import { VscNewFile } from 'react-icons/vsc'
+import { CiMoneyBill, CiSettings } from 'react-icons/ci'
+import { Link } from 'react-router-dom'
+import { BiMessageSquareDetail } from 'react-icons/bi'
+import { HiOutlineReceiptRefund } from 'react-icons/hi'
+
+const DashboardSideBar = ({ active }) => {
+  return (
+    // 대시보드의 좌측 사이드바 영역입니다.
+    <div className="sticky top-0 left-0 z-10 h-[90vh] w-full overflow-y-scroll bg-white shadow-sm">
+      {/* 대시보드 메뉴 항목 - Dashboard */}
+      <div className="flex w-full items-center p-4">
+        <Link to="/dashboard" className="flex w-full items-center">
+          <RxDashboard size={30} color={`${active === 1 ? 'crimson' : '#555'}`} />
+          <h5
+            className={`800px:block hidden pl-2 text-[18px] font-[400] ${
+              active === 1 ? 'text-[crimson]' : 'text-[#555]'
+            }`}
+          >
+            Dashboard
+          </h5>
+        </Link>
+      </div>
+
+      {/* 대시보드 메뉴 항목 - All Orders */}
+      <div className="flex w-full items-center p-4">
+        <Link to="/dashboard-orders" className="flex w-full items-center">
+          <FiShoppingBag size={30} color={`${active === 2 ? 'crimson' : '#555'}`} />
+          <h5
+            className={`800px:block hidden pl-2 text-[18px] font-[400] ${
+              active === 2 ? 'text-[crimson]' : 'text-[#555]'
+            }`}
+          >
+            All Orders
+          </h5>
+        </Link>
+      </div>
+
+      {/* 대시보드 메뉴 항목 - All Products */}
+      <div className="flex w-full items-center p-4">
+        <Link to="/dashboard-products" className="flex w-full items-center">
+          <FiPackage size={30} color={`${active === 3 ? 'crimson' : '#555'}`} />
+          <h5
+            className={`800px:block hidden pl-2 text-[18px] font-[400] ${
+              active === 3 ? 'text-[crimson]' : 'text-[#555]'
+            }`}
+          >
+            All Products
+          </h5>
+        </Link>
+      </div>
+
+      {/* 대시보드 메뉴 항목 - Create Product */}
+      <div className="flex w-full items-center p-4">
+        <Link to="/dashboard-create-product" className="flex w-full items-center">
+          <AiOutlineFolderAdd size={30} color={`${active === 4 ? 'crimson' : '#555'}`} />
+          <h5
+            className={`800px:block hidden pl-2 text-[18px] font-[400] ${
+              active === 4 ? 'text-[crimson]' : 'text-[#555]'
+            }`}
+          >
+            Create Product
+          </h5>
+        </Link>
+      </div>
+
+      {/* 대시보드 메뉴 항목 - All Events */}
+      <div className="flex w-full items-center p-4">
+        <Link to="/dashboard-events" className="flex w-full items-center">
+          <MdOutlineLocalOffer size={30} color={`${active === 5 ? 'crimson' : '#555'}`} />
+          <h5
+            className={`800px:block hidden pl-2 text-[18px] font-[400] ${
+              active === 5 ? 'text-[crimson]' : 'text-[#555]'
+            }`}
+          >
+            All Events
+          </h5>
+        </Link>
+      </div>
+
+      {/* 대시보드 메뉴 항목 - Create Event */}
+      <div className="flex w-full items-center p-4">
+        <Link to="/dashboard-create-event" className="flex w-full items-center">
+          <VscNewFile size={30} color={`${active === 6 ? 'crimson' : '#555'}`} />
+          <h5
+            className={`800px:block hidden pl-2 text-[18px] font-[400] ${
+              active === 6 ? 'text-[crimson]' : 'text-[#555]'
+            }`}
+          >
+            Create Event
+          </h5>
+        </Link>
+      </div>
+
+      {/* 대시보드 메뉴 항목 - Withdraw Money */}
+      <div className="flex w-full items-center p-4">
+        <Link to="/dashboard-withdraw-money" className="flex w-full items-center">
+          <CiMoneyBill size={30} color={`${active === 7 ? 'crimson' : '#555'}`} />
+          <h5
+            className={`800px:block hidden pl-2 text-[18px] font-[400] ${
+              active === 7 ? 'text-[crimson]' : 'text-[#555]'
+            }`}
+          >
+            Withdraw Money
+          </h5>
+        </Link>
+      </div>
+
+      {/* 대시보드 메뉴 항목 - Shop Inbox */}
+      <div className="flex w-full items-center p-4">
+        <Link to="/dashboard-messages" className="flex w-full items-center">
+          <BiMessageSquareDetail size={30} color={`${active === 8 ? 'crimson' : '#555'}`} />
+          <h5
+            className={`800px:block hidden pl-2 text-[18px] font-[400] ${
+              active === 8 ? 'text-[crimson]' : 'text-[#555]'
+            }`}
+          >
+            Shop Inbox
+          </h5>
+        </Link>
+      </div>
+
+      {/* 대시보드 메뉴 항목 - Discount Codes */}
+      <div className="flex w-full items-center p-4">
+        <Link to="/dashboard-coupons" className="flex w-full items-center">
+          <AiOutlineGift size={30} color={`${active === 9 ? 'crimson' : '#555'}`} />
+          <h5
+            className={`800px:block hidden pl-2 text-[18px] font-[400] ${
+              active === 9 ? 'text-[crimson]' : 'text-[#555]'
+            }`}
+          >
+            Discount Codes
+          </h5>
+        </Link>
+      </div>
+
+      {/* 대시보드 메뉴 항목 - Refunds */}
+      <div className="flex w-full items-center p-4">
+        <Link to="/dashboard-refunds" className="flex w-full items-center">
+          <HiOutlineReceiptRefund size={30} color={`${active === 10 ? 'crimson' : '#555'}`} />
+          <h5
+            className={`800px:block hidden pl-2 text-[18px] font-[400] ${
+              active === 10 ? 'text-[crimson]' : 'text-[#555]'
+            }`}
+          >
+            Refunds
+          </h5>
+        </Link>
+      </div>
+
+      {/* 대시보드 메뉴 항목 - Settings */}
+      <div className="flex w-full items-center p-4">
+        <Link to="/dashboard-settings" className="flex w-full items-center">
+          <CiSettings size={30} color={`${active === 11 ? 'crimson' : '#555'}`} />
+          <h5
+            className={`800px:block hidden pl-2 text-[18px] font-[400] ${
+              active === 11 ? 'text-[crimson]' : 'text-[#555]'
+            }`}
+          >
+            Settings
+          </h5>
+        </Link>
+      </div>
+    </div>
+  )
+}
+
+export default DashboardSideBar
+```
+
+```jsx
+좌측 사이드바 영역을 제어하는 부분이며 active 값에 따라서 선택한 항목이 표시된다
+```
+
+# shop 홈페이지 제작
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381460/notion-blog/_/_/EcommerceProject/EcommerceProject_-3-1/Untitled_2.png)
+
+## ShopInfo.jsx 컴포넌트를 만들어준다
+
+```jsx
+import axios from 'axios'
+import React, { useEffect, useState } from 'react'
+import { useParams } from 'react-router-dom'
+import styles from '../../styles/styles'
+import Loader from '../Layout/Loader'
+
+const ShopInfo = ({ isOwner }) => {
+  // 로컬 상태 관리를 위한 useState 훅 사용
+  const [data, setData] = useState({})
+  const [isLoading, setIsLoading] = useState(false)
+
+  // React Router의 useParams 훅을 사용하여 URL 파라미터 값 추출
+  const { id } = useParams()
+
+  // useEffect 훅을 사용하여 컴포넌트가 마운트될 때 한 번만 실행되도록 설정
+  useEffect(() => {
+    // 데이터 로딩 상태를 true로 설정하여 로딩 중임을 표시
+    setIsLoading(true)
+
+    // Axios를 사용하여 서버로부터 상점 정보를 가져옴
+    axios
+      .get(`http://localhost:5000/api/v2/shop/get-shop-info/${id}`)
+      .then((res) => {
+        // 서버 응답으로 받은 데이터를 로컬 상태에 저장
+        setData(res.data.shop)
+        // 데이터 로딩이 완료되었으므로 로딩 상태를 false로 업데이트
+        setIsLoading(false)
+      })
+      .catch((error) => {
+        // 에러가 발생하면 콘솔에 에러 로그를 출력하고 로딩 상태를 false로 설정
+        console.log(error)
+        setIsLoading(false)
+      })
+  }, []) // 빈 배열을 전달하여 컴포넌트가 처음 렌더링될 때만 useEffect가 실행되도록 설정
+
+  // 로그아웃 핸들러 함수 정의
+  const logoutHandler = async () => {
+    // Axios를 사용하여 로그아웃 요청을 서버에 전송
+    axios.get(`http://localhost:5000/api/v2/shop/logout`, {
+      withCredentials: true,
+    })
+
+    // 페이지 새로고침을 통해 로그아웃 적용
+    window.location.reload()
+  }
+
+  // JSX로 컴포넌트 렌더링
+  return (
+    <>
+      {/* 데이터 로딩 중인지 확인하고, 로딩 중이라면 로더 컴포넌트를 표시 */}
+      {isLoading ? (
+        <Loader />
+      ) : (
+        <div>
+          {/* 상점 정보를 화면에 출력 */}
+          <div className="w-full py-5">
+            <div className="item-center flex w-full justify-center">
+              {/* 상점 로고 이미지 출력 */}
+              <img
+                src={`http://localhost:5000/${data.avatar}`}
+                alt=""
+                className="h-[150px] w-[150px] rounded-full object-cover"
+              />
+            </div>
+            {/* 상점 이름 출력 */}
+            <h3 className="py-2 text-center text-[20px]">{data.name}</h3>
+            {/* 상점 설명 출력 */}
+            <p className="flex items-center p-[10px] text-[16px] text-[#000000a6]">
+              {data.description}
+            </p>
+          </div>
+
+          {/* 상점 주소 출력 */}
+          <div className="p-3">
+            <h5 className="font-[600]">Address</h5>
+            <h4 className="text-[#000000a6]">{data.address}</h4>
+          </div>
+
+          {/* 상점 전화번호 출력 */}
+          <div className="p-3">
+            <h5 className="font-[600]">Phone Number</h5>
+            <h4 className="text-[#000000a6]">{data.phoneNumber}</h4>
+          </div>
+
+          {/* 전체 상품 수 출력 (임시 값으로 10 설정) */}
+          <div className="p-3">
+            <h5 className="font-[600]">Total Products</h5>
+            <h4 className="text-[#000000a6]">10</h4>
+          </div>
+
+          {/* 상점 평점 출력 (임시 값으로 4/5 설정) */}
+          <div className="p-3">
+            <h5 className="font-[600]">Shop Ratings</h5>
+            <h4 className="text-[#000000b0]">4/5</h4>
+          </div>
+
+          {/* 가입일 출력 */}
+          <div className="p-3">
+            <h5 className="font-[600]">Joined On</h5>
+            <h4 className="text-[#000000b0]">{data?.createdAt?.slice(0, 10)}</h4>
+          </div>
+
+          {/* 소유자 여부에 따라 편집 및 로그아웃 버튼 표시 */}
+          {isOwner && (
+            <div className="px-4 py-3">
+              {/* 상점 편집 버튼 */}
+              <div className={`${styles.button} !h-[42px] !w-full !rounded-[5px]`}>
+                <span className="text-white">Edit Shop</span>
+              </div>
+              {/* 로그아웃 버튼 */}
+              <div
+                className={`${styles.button} !h-[42px] !w-full !rounded-[5px]`}
+                onClick={logoutHandler}
+              >
+                <span className="text-white">Log Out</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  )
+}
+
+export default ShopInfo
+```
+
+```jsx
+Shop의 정보를 표시하는 부분이다 (아바타, 이름 등등 ) isOwner  부분은 아직 redux 작업을 하지 않아서 추후 추가하겠다
+```
+
+## shop.js 컨트롤러에 추가
+
+```jsx
+// 상점 로그아웃 라우트 정의
+router.get(
+  '/logout',
+  catchAsyncErrors(async (req, res, next) => {
+    try {
+      // seller_token 쿠키를 만료시켜 로그아웃 처리
+      res.cookie('seller_token', null, {
+        expires: new Date(Date.now()),
+        httpOnly: true,
+      })
+
+      // 클라이언트에 성공 응답 전송
+      res.status(201).json({
+        success: true,
+        message: 'Log out successful!',
+      })
+    } catch (error) {
+      // 오류 발생 시 에러 핸들러를 통해 오류 응답 처리
+      return next(new ErrorHandler(error.message, 500))
+    }
+  })
+)
+
+// 상점 정보 조회 라우트 정의
+router.get(
+  '/get-shop-info/:id',
+  catchAsyncErrors(async (req, res, next) => {
+    try {
+      // 요청된 id에 해당하는 상점 정보를 데이터베이스에서 조회
+      const shop = await Shop.findById(req.params.id)
+
+      // 조회된 상점 정보를 클라이언트에 응답으로 전송
+      res.status(201).json({
+        success: true,
+        shop,
+      })
+    } catch (error) {
+      // 오류 발생 시 에러 핸들러를 통해 오류 응답 처리
+      return next(new ErrorHandler(error.message, 500))
+    }
+  })
+)
+```
+
+```jsx
+위의 두 라우터를 shop.js 컨트롤러에 추가해준다
+
+로그아웃은 토큰 시간을 만료시키고 null 로 처리해서 없에준다
+```
+
+## ShopProfileData.jsx
+
+```jsx
+import React, { useEffect, useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { Link, useParams } from 'react-router-dom'
+// import { getAllProductsShop } from "../../redux/actions/product";
+import styles from '../../styles/styles'
+import ProductCard from '../Route/ProductCard'
+import { productData } from '../../static/data'
+
+const ShopProfileData = ({ isOwner }) => {
+  //   const {products} = useSelector((state) => state.products);
+  //   const {id} = useParams();
+  //   const dispatch = useDispatch();
+  //   useEffect(() => {
+  //     dispatch(getAllProductsShop(id));
+  //   }, [dispatch])
+
+  const [active, setActive] = useState(1)
+
+  return (
+    <div className="w-full">
+      {/* 섹션 전체 영역 */}
+      <div className="flex w-full items-center justify-between">
+        {/* 섹션 내부 왼쪽 영역 */}
+        <div className="flex w-full">
+          {/* 상점 제품 섹션 버튼 */}
+          <div className="flex items-center" onClick={() => setActive(1)}>
+            <h5
+              className={`text-[20px] font-[600] ${
+                active === 1 ? 'text-red-500' : 'text-[#333]'
+              } cursor-pointer pr-[20px]`}
+            >
+              Shop Products
+            </h5>
+          </div>
+          {/* 진행 중인 이벤트 섹션 버튼 */}
+          <div className="flex items-center" onClick={() => setActive(2)}>
+            <h5
+              className={`text-[20px] font-[600] ${
+                active === 2 ? 'text-red-500' : 'text-[#333]'
+              } cursor-pointer pr-[20px]`}
+            >
+              Running Events
+            </h5>
+          </div>
+          {/* 상점 리뷰 섹션 버튼 */}
+          <div className="flex items-center" onClick={() => setActive(3)}>
+            <h5
+              className={`text-[20px] font-[600] ${
+                active === 3 ? 'text-red-500' : 'text-[#333]'
+              } cursor-pointer pr-[20px]`}
+            >
+              Shop Reviews
+            </h5>
+          </div>
+        </div>
+        {/* 섹션 내부 오른쪽 영역 */}
+        <div>
+          {/* 상점 소유자일 경우에만 대시보드로 이동하는 버튼 */}
+          {isOwner && (
+            <div>
+              <Link to="/dashboard">
+                <div className={`${styles.button} h-[42px] !rounded-[4px]`}>
+                  <span className="text-[#fff]">Go Dashboard</span>
+                </div>
+              </Link>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <br />
+
+      {/* 제품 목록 그리드 영역 */}
+      <div className="mb-12 grid grid-cols-1 gap-[20px] border-0 md:grid-cols-2 md:gap-[25px] lg:grid-cols-3 lg:gap-[25px] xl:grid-cols-4 xl:gap-[20px]">
+        {/* 상점 제품 데이터를 매핑하여 ProductCard 컴포넌트로 렌더링 */}
+        {productData &&
+          productData.map((i, index) => <ProductCard data={i} key={index} isShop={true} />)}
+      </div>
+
+      {/* 제품이 없는 경우 안내 메시지 */}
+      {/* {products && products.length === 0 && (
+        <h5 className="w-full text-center py-5 text-[18px]">
+          No Products have for this shop!
+        </h5>
+      )} */}
+    </div>
+  )
+}
+
+export default ShopProfileData
+```
+
+```jsx
+위쪽 부분의 가게리뷰등 항목으로 이동하는 부분 + 제품 표시부분
+
+현재 제품 표시부분은 더미 DB 를 사용중이여서 주석처리해두었다
+```
+
+## ShopHomePage.jsx 추가
+
+```jsx
+import React from 'react'
+import styles from '../../styles/styles'
+import ShopInfo from '../../components/Shop/ShopInfo'
+import ShopProfileData from '../../components/Shop/ShopProfileData'
+
+const ShopHomePage = () => {
+  return (
+    <div className={`${styles.section} bg-[#f5f5f5]`}>
+      {/* 전체 섹션 스타일과 배경 설정 */}
+      <div className="flex w-full justify-between py-10">
+        {/* 왼쪽 사이드바 영역 */}
+        <div className="sticky top-10 left-0 z-10 h-[90vh] w-[25%] overflow-y-scroll rounded-[4px] bg-[#fff] shadow-sm">
+          {/* 상점 정보 컴포넌트를 포함한 왼쪽 사이드바 */}
+          <ShopInfo isOwner={true} />
+        </div>
+        {/* 오른쪽 메인 콘텐츠 영역 */}
+        <div className="w-[72%] rounded-[4px]">
+          {/* 상점 프로필 데이터 컴포넌트를 포함한 오른쪽 메인 콘텐츠 */}
+          <ShopProfileData isOwner={true} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default ShopHomePage
+```
+
+```jsx
+위에 만든 컴포넌트를 사용할 페이지를 추가한다
+```
+
+# ShopCreate 페이지 만들기 ( 판매자 상품 등록 만들기 )
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381460/notion-blog/_/_/EcommerceProject/EcommerceProject_-3-1/Untitled_3.png)
+
+## CreateProduct.jsx 컴포넌트
+
+```jsx
+상품을 등록하는 페이지다 Redux 로 상품 등록이 관리되고 있으며 그 이유는
+
+다양한 컴포넌트 간 데이터 공유:
+
+전역 상태 관리를 사용하면 여러 컴포넌트 간에 데이터를 쉽게 공유할 수 있다. 특히 상태가 여러 컴포넌트에서 필요하거나 상태 변경이 다양한 부분에 영향을 미칠 때 전역적인 상태 관리는 유용하다.
+```
+
+```jsx
+import React, { useEffect, useState } from 'react'
+import { AiOutlinePlusCircle } from 'react-icons/ai'
+import { useDispatch, useSelector } from 'react-redux'
+import { useNavigate } from 'react-router-dom'
+import { createProduct } from '../../redux/product/productAction'
+import { categoriesData } from '../../static/data'
+import { toast } from 'react-toastify'
+
+const CreateProduct = () => {
+  // Redux에서 판매자 정보 및 상품 생성 성공 여부와 에러를 가져옴
+  const { seller } = useSelector((state) => state.seller)
+  const { success, error } = useSelector((state) => state.product)
+
+  // React Router DOM의 useNavigate 훅을 사용하여 페이지 이동을 담당하는 함수를 가져옴
+  const navigate = useNavigate()
+  const dispatch = useDispatch()
+
+  // 상품 등록에 필요한 상태들을 관리하는 useState 훅을 사용
+  const [images, setImages] = useState([])
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [category, setCategory] = useState('')
+  const [tags, setTags] = useState('')
+  const [originalPrice, setOriginalPrice] = useState()
+  const [discountPrice, setDiscountPrice] = useState()
+  const [stock, setStock] = useState()
+
+  // 상품 생성 성공 및 에러 상태를 모니터링하여 메시지를 토스트로 표시하고 페이지를 리로드함
+  useEffect(() => {
+    if (error) {
+      toast.error(error)
+    }
+    if (success) {
+      toast.success('상품등록 완료!')
+      navigate('/dashboard')
+      window.location.reload()
+    }
+  }, [dispatch, error, success])
+
+  // 이미지를 선택하면 handleImageChange 함수가 호출되어 이미지를 상태에 추가함
+  const handleImageChange = (e) => {
+    e.preventDefault()
+    let files = Array.from(e.target.files)
+    setImages((prevImages) => [...prevImages, ...files])
+  }
+
+  // 폼을 제출하면 Redux 액션을 통해 상품을 생성하는 함수
+  const handleSubmit = (e) => {
+    e.preventDefault()
+
+    // FormData를 사용하여 이미지 및 필드 데이터를 모두 담음
+    const newForm = new FormData()
+
+    images.forEach((image) => {
+      // forEach 메서드를 사용하여 images 배열에 있는 각 이미지 파일을 순회하면서, 각 이미지를 newForm이라는 FormData 객체에 append 메서드를 사용하여 추가
+      newForm.append('images', image)
+    })
+    newForm.append('name', name)
+    newForm.append('description', description)
+    newForm.append('category', category)
+    newForm.append('tags', tags)
+    newForm.append('originalPrice', originalPrice)
+    newForm.append('discountPrice', discountPrice)
+    newForm.append('stock', stock)
+    newForm.append('shopId', seller._id)
+
+    // Redux 액션을 통해 상품 생성
+    dispatch(createProduct(newForm))
+  }
+
+  return (
+    <div className="800px:w-[50%] h-[80vh] w-[90%] overflow-y-scroll rounded-[4px] bg-white p-3 shadow">
+      <h5 className="font-Poppins text-center text-[30px]">상품 등록</h5>
+      {/* 상품 생성 폼 */}
+      <form onSubmit={handleSubmit}>
+        <br />
+        <div>
+          <label className="pb-2">
+            제품명 <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            name="name"
+            value={name}
+            className="mt-2 block h-[35px] w-full appearance-none rounded-[3px] border border-gray-300 px-3 placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500 focus:outline-none sm:text-sm"
+            onChange={(e) => setName(e.target.value)}
+            placeholder="제품명 입력"
+          />
+        </div>
+        <br />
+        <div>
+          <label className="pb-2">
+            제품 설명 <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            cols="30"
+            required
+            rows="8"
+            type="text"
+            name="description"
+            value={description}
+            className="mt-2 block w-full appearance-none rounded-[3px] border border-gray-300 px-3 pt-2 placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500 focus:outline-none sm:text-sm"
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="제품 설명 입력"
+          ></textarea>
+        </div>
+        <br />
+        <div>
+          <label className="pb-2">
+            카테고리 <span className="text-red-500">*</span>
+          </label>
+          <select
+            className="mt-2 h-[35px] w-full rounded-[5px] border"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+          >
+            <option value="Choose a category">카테고리 선택</option>
+            {categoriesData &&
+              categoriesData.map((i) => (
+                <option value={i.title} key={i.title}>
+                  {i.title}
+                </option>
+              ))}
+          </select>
+        </div>
+        <br />
+        <div>
+          <label className="pb-2">태그</label>
+          <input
+            type="text"
+            name="tags"
+            value={tags}
+            className="mt-2 block h-[35px] w-full appearance-none rounded-[3px] border border-gray-300 px-3 placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500 focus:outline-none sm:text-sm"
+            onChange={(e) => setTags(e.target.value)}
+            placeholder="제품 태그 입력"
+          />
+        </div>
+        <br />
+        <div>
+          <label className="pb-2">기본 가격</label>
+          <input
+            type="number"
+            name="price"
+            value={originalPrice}
+            className="mt-2 block h-[35px] w-full appearance-none rounded-[3px] border border-gray-300 px-3 placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500 focus:outline-none sm:text-sm"
+            onChange={(e) => setOriginalPrice(e.target.value)}
+            placeholder="제품 가격 입력"
+          />
+        </div>
+        <br />
+        <div>
+          <label className="pb-2">
+            가격 (할인 적용) <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="number"
+            name="price"
+            value={discountPrice}
+            className="mt-2 block h-[35px] w-full appearance-none rounded-[3px] border border-gray-300 px-3 placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500 focus:outline-none sm:text-sm"
+            onChange={(e) => setDiscountPrice(e.target.value)}
+            placeholder="할인 가격"
+          />
+        </div>
+        <br />
+        <div>
+          <label className="pb-2">
+            제품 재고 <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="number"
+            name="price"
+            value={stock}
+            className="mt-2 block h-[35px] w-full appearance-none rounded-[3px] border border-gray-300 px-3 placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500 focus:outline-none sm:text-sm"
+            onChange={(e) => setStock(e.target.value)}
+            placeholder="제품 재고 입력"
+          />
+        </div>
+        <br />
+        <div>
+          <label className="pb-2">
+            이미지 업로드 <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="file"
+            name=""
+            id="upload"
+            className="hidden"
+            multiple
+            onChange={handleImageChange}
+          />
+          <div className="flex w-full flex-wrap items-center">
+            <label htmlFor="upload">
+              <AiOutlinePlusCircle size={30} className="mt-3" color="#555" />
+            </label>
+            {images &&
+              images.map((i) => (
+                <img
+                  src={URL.createObjectURL(i)}
+                  key={i}
+                  alt=""
+                  className="m-2 h-[120px] w-[120px] object-cover"
+                />
+              ))}
+          </div>
+          <br />
+          <div>
+            <input
+              type="submit"
+              value="제품 등록"
+              className="mt-2 block h-[35px] w-full cursor-pointer appearance-none rounded-[3px] border border-gray-300 px-3 text-center placeholder-gray-400 focus:border-yellow-500 focus:ring-yellow-500 focus:outline-none sm:text-sm"
+            />
+          </div>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+export default CreateProduct
+```
+
+```jsx
+
+// 사용자가 이미지를 선택하면 호출되는 함수(handleImageChange)
+const handleImageChange = (e) => {
+  // 이벤트 기본 동작을 막음(페이지 새로고침 방지)
+  e.preventDefault();
+
+  // e.target.files에서 선택한 파일들을 배열로 변환
+  let files = Array.from(e.target.files);
+
+  // 기존 이미지 배열과 새로 선택한 이미지 배열을 합친 후 상태 업데이트
+  setImages((prevImages) => [...prevImages, ...files]);
+};
+
+let files = Array.from(e.target.files);:
+
+이벤트 객체에서 선택한 파일들을 배열로 가져온다. e.target.files는 파일 입력(input type="file")에서 선택한 파일들을 나타내는 FileList 객체이다.
+
+setImages((prevImages) => [...prevImages, ...files]);:
+
+기존의 이미지 배열(prevImages)과 새로 선택한 이미지 배열(files)을 합쳐서 새로운 이미지 배열을 만들고,
+
+이를 setImages 함수를 사용하여 상태에 업데이트한다. 이로써 사용자가 여러 번 이미지를 선택해도 이미지 배열이 누적되어 유지된다.
+
+--------------------------------------------------------------------------------------------------------------------------
+
+<div>
+  {/* 이미지 업로드 라벨 및 파일 입력 필드 */}
+  <label className="pb-2">
+    이미지 업로드 <span className="text-red-500">*</span>
+  </label>
+  <input
+    type="file"
+    name=""
+    id="upload"
+    className="hidden"
+    multiple
+    onChange={handleImageChange}
+  />
+
+  {/* 이미지 업로드 트리거 버튼 및 이미지 미리보기 */}
+  <div className="w-full flex items-center flex-wrap">
+    {/* 파일 입력 필드 트리거를 위한 라벨 */}
+    <label htmlFor="upload">
+      {/* AiOutlinePlusCircle 아이콘: 이미지 추가 아이콘 */}
+      <AiOutlinePlusCircle size={30} className="mt-3" color="#555" />
+    </label>
+
+<input>: 파일을 선택하는 파일 입력 필드를 나타낸다.
+
+type="file"로 설정되어 있어 파일 선택이 가능하며, multiple 속성으로 여러 파일 선택이 가능하도록 설정되어 있다.
+
+사용자가 파일을 선택하면 onChange 이벤트에 등록된 handleImageChange 함수가 호출된다.
+
+<div>: 이미지 업로드 트리거 버튼과 이미지 미리보기를 포함하는 컨테이너이다.
+
+<label htmlFor="upload">: 파일 입력 필드(#upload # = id)를 트리거하기 위한 라벨이다. 라벨을 클릭하면 파일 입력 필드가 클릭된 효과를 얻게 된다.
+
+<AiOutlinePlusCircle>: React Icons에서 제공하는 AiOutlinePlusCircle 아이콘을 사용하여 이미지 추가 아이콘을 나타낸다.
+
+* <label> 요소의 for 속성(혹은 HTML5에서는 htmlFor 프로퍼티)은 해당 라벨이 어떤 입력 필드를 나타내는지를 지정하는 역할을 한다.
+
+	이를 통해 사용자가 라벨을 클릭하면 연결된 입력 필드가 자동으로 활성화된다 ( <input> 은 className = hidden 으로 숨겨놓았다 출력하면 파일선택 나타남 )
+
+    {/* 이미지 배열을 순회하며 각 이미지에 대한 미리보기 */}
+    {images &&
+      images.map((i) => (
+        <img
+          src={URL.createObjectURL(i)} // 선택한 이미지의 경로 생성
+          key={i} // 이미지 고유 키로 사용
+          alt=""
+          className="h-[120px] w-[120px] object-cover m-2" // 이미지 스타일 지정
+        />
+      ))}
+  </div>
+</div>
+
+이미지 배열 순회: images.map()을 사용하여 이미지 배열을 순회하며 각 이미지에 대한 미리보기를 생성한다.
+
+URL.createObjectURL(i)를 사용하여 선택한 이미지의 경로를 생성하고, 각 이미지는 고유한 키(key={i})와 스타일이 지정된 <img> 태그로 표시된다.
+
+* URL.createObjectURL(i)는 브라우저에 의해 관리되는 임시 URL을 생성
+
+	이 URL은 메모리상에서만 존재하며, 실제로 서버에 저장되어 있는 파일의 경로가 아니라 브라우저가 자체적으로 생성한 식별 가능한 URL
+
+	브라우저 세션 동안 유지되며, 해당 URL을 사용하여 이미지를 표시하거나 다룰 수 있다. 예를 들어, 이 URL을 <img> 태그의 src 속성에 할당하여 이미지를 동적으로 표시할 수 있다.
+
+  이 방법은 파일을 서버로 업로드하기 전에 사용자에게 이미지를 미리보기로 보여주는 등의 상황에서 유용하게 사용될 수 있습니다.
+```
+
+## ShopCreate.jsx 페이지
+
+```jsx
+import React, { useEffect } from 'react'
+import { useSelector } from 'react-redux'
+import { useNavigate } from 'react-router-dom'
+import ShopCreate from '../../components/Shop/ShopCreate'
+
+const ShopCreatePage = () => {
+  const navigate = useNavigate()
+  const { isSeller, seller } = useSelector((state) => state.seller)
+
+  // useEffect를 사용하여 페이지가 로드될 때 한 번만 실행되도록 설정
+  useEffect(() => {
+    // 판매자로 등록된 경우
+    if (isSeller === true) {
+      // 해당 판매자의 상점 페이지로 이동
+      navigate(`/shop/${seller._id}`)
+    }
+  }, []) // 빈 배열을 전달하여 컴포넌트가 처음 렌더링될 때만 실행되도록 함
+
+  return (
+    <div>
+      {/* ShopCreate 컴포넌트 렌더링 */}
+      <ShopCreate />
+    </div>
+  )
+}
+
+export default ShopCreatePage
+```
+
+```jsx
+Redux 를 사용해서 사용자가 로그인 한 상태라면 그 사용자의 페이지로 이동하게 한다
+
+navigate(`/shop/${seller._id}`);
+```
+
+# 상품 모델 생성
+
+## product.js
+
+```jsx
+const mongoose = require('mongoose')
+
+const productSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: [true, '제품명을 입력해주세요!'],
+  },
+  description: {
+    type: String,
+    required: [true, '제품 설명을 입력하세요!'],
+  },
+  category: {
+    type: String,
+    required: [true, '제품 카테고리를 입력하세요!'],
+  },
+  tags: {
+    type: String,
+  },
+  originalPrice: {
+    type: Number,
+  },
+  discountPrice: {
+    type: Number,
+    required: [true, '제품 가격을 입력하세요!'],
+  },
+  stock: {
+    type: Number,
+    required: [true, '제품 재고를 입력하세요!'],
+  },
+  images: [
+    {
+      type: String,
+    },
+  ],
+  shopId: {
+    type: String,
+    required: true,
+  },
+  shop: {
+    type: Object,
+    required: true,
+  },
+  sold_out: {
+    type: Number,
+    default: 0,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now(),
+  },
+})
+
+module.exports = mongoose.model('Product', productSchema)
+```
+
+# product.js 컨트롤러 제작
+
+```jsx
+품 관리 기능을 제공하는 RESTful API를 정의하고 있다. 업로드된 이미지 파일은 multer를 사용하여 처리하고, 비동기 작업에서 발생하는 에러를 처리하는 catchAsyncErrors 미들웨어를 활용하고 있다.
+```
+
+```jsx
+// express 모듈 및 관련 미들웨어, 모델, 유틸리티, 파일 시스템 모듈 등을 불러옵니다.
+const express = require('express')
+const { isSeller } = require('../middleware/auth') // 판매자 권한 체크 미들웨어
+const catchAsyncErrors = require('../middleware/catchAsyncErrors') // 비동기 에러 핸들링 미들웨어
+const router = express.Router()
+const Product = require('../model/product') // 상품 모델
+const Shop = require('../model/shop') // 상점 모델
+const { upload } = require('../multer') // 파일 업로드 관련 미들웨어
+const ErrorHandler = require('../util/ErrorHandler') // 에러 핸들링 유틸리티
+const fs = require('fs') // 파일 시스템 모듈
+
+// 상품 생성 라우트
+router.post(
+  '/create-product',
+  upload.array('images'), // 이미지 업로드 미들웨어
+  catchAsyncErrors(async (req, res, next) => {
+    try {
+      const shopId = req.body.shopId
+      const shop = await Shop.findById(shopId)
+
+      // 상점이 존재하지 않으면 에러 응답
+      if (!shop) {
+        return next(new ErrorHandler('상점이 존재하지 않습니다!', 400))
+      } else {
+        // 업로드된 파일들의 URL을 배열로 변환
+        const files = req.files
+        const imageUrls = files.map((file) => `${file.filename}`) // 이 부분의 목적은 업로드된 이미지 파일들의 URL을 추출하여 imageUrls 배열에 저장하고, 이를 이용하여 상품 객체의 images 속성에 할당
+
+        // 상품 데이터 조합
+        const productData = req.body
+        productData.images = imageUrls
+        productData.shop = shop
+
+        // 상품 생성
+        const product = await Product.create(productData)
+
+        res.status(201).json({
+          success: true,
+          product,
+        })
+      }
+    } catch (error) {
+      return next(new ErrorHandler(error, 400))
+    }
+  })
+)
+
+// 특정 상점의 모든 상품 조회 라우트
+router.get(
+  '/get-all-products-shop/:id',
+  catchAsyncErrors(async (req, res, next) => {
+    try {
+      // 상점 아이디에 해당하는 모든 상품 조회
+      const products = await Product.find({ shopId: req.params.id }) // const products: 검색 결과로 얻은 상품들은 products 변수에 할당된다. 이는 배열 형태로 반환되며, 조건에 맞는 모든 상품을 포함
+
+      res.status(201).json({
+        success: true,
+        products,
+      })
+    } catch (error) {
+      return next(new ErrorHandler(error, 400))
+    }
+  })
+)
+
+// 특정 상점의 상품 삭제 라우트
+router.delete(
+  '/delete-shop-product/:id',
+  isSeller, // 판매자 권한 체크
+  catchAsyncErrors(async (req, res, next) => {
+    try {
+      const productId = req.params.id
+
+      // 상품 아이디에 해당하는 상품 및 이미지 파일 삭제
+      const productData = await Product.findById(productId)
+
+      productData.images.forEach((imageUrl) => {
+        const filename = imageUrl
+        const filePath = `uploads/${filename}`
+
+        fs.unlink(filePath, (err) => {
+          if (err) {
+            console.log(err)
+          }
+        })
+      })
+
+      // 상품 삭제
+      const product = await Product.findByIdAndDelete(productId)
+
+      if (!product) {
+        return next(new ErrorHandler('일치하는 상품과 id 를 찾지 못했습니다!', 500))
+      }
+
+      res.status(201).json({
+        success: true,
+        message: '상품 삭제 성공!',
+      })
+    } catch (error) {
+      return next(new ErrorHandler(error, 400))
+    }
+  })
+)
+
+// 모든 상품 조회 라우트
+router.get(
+  '/get-all-products',
+  catchAsyncErrors(async (req, res, next) => {
+    try {
+      // 모든 상품 조회
+      const products = await Product.find()
+
+      res.status(201).json({
+        success: true,
+        products,
+      })
+    } catch (error) {
+      return next(new ErrorHandler(error, 400))
+    }
+  })
+)
+
+// 라우터를 내보냅니다.
+module.exports = router
+```
+
+```jsx
+// 상품 생성 라우트
+router.post(
+  "/create-product",
+  upload.array("images"), // 이미지 업로드 미들웨어
+  catchAsyncErrors(async (req, res, next) => {
+    try {
+      const shopId = req.body.shopId;
+      const shop = await Shop.findById(shopId);
+
+      // 상점이 존재하지 않으면 에러 응답
+      if (!shop) {
+        return next(new ErrorHandler("상점이 존재하지 않습니다!", 400));
+      } else {
+        // 업로드된 파일들의 URL을 배열로 변환
+        const files = req.files;
+        const imageUrls = files.map((file) => `${file.filename}`); // 이 부분의 목적은 업로드된 이미지 파일들의 URL을 추출하여 imageUrls 배열에 저장하고, 이를 이용하여 상품 객체의 images 속성에 할당
+
+        // 상품 데이터 조합
+        const productData = req.body;
+        productData.images = imageUrls;
+        productData.shop = shop;
+
+        // 상품 생성
+        const product = await Product.create(productData);
+
+        res.status(201).json({
+          success: true,
+          product,
+        });
+      }
+    } catch (error) {
+      return next(new ErrorHandler(error, 400));
+    }
+  })
+);
+
+upload.array("images")는 "images" 필드에 해당하는 여러 파일을 업로드하는 multer 미들웨어를 설정하는 부분이다.
+
+클라이언트에서 이미지 파일을 업로드할 때 해당 필드에 여러 파일을 선택하여 업로드할 수 있도록 한다.
+
+이후에 코드에서는 req.files를 통해 업로드된 파일들의 정보에 접근할 수 있다.
+
+--------------------------------------------------------------------------------------------------------------------------
+
+// 특정 상점의 상품 삭제 라우트
+router.delete(
+  "/delete-shop-product/:id",
+  isSeller, // 판매자 권한 체크
+  catchAsyncErrors(async (req, res, next) => {
+    try {
+      const productId = req.params.id;
+
+      // 상품 아이디에 해당하는 상품 및 이미지 파일 삭제
+      const productData = await Product.findById(productId);
+
+      productData.images.forEach((imageUrl) => {
+        const filename = imageUrl;
+        const filePath = `uploads/${filename}`;
+
+        fs.unlink(filePath, (err) => {
+          if (err) {
+            console.log(err);
+          }
+        });
+      });
+
+      // 상품 삭제
+      const product = await Product.findByIdAndDelete(productId);
+
+      if (!product) {
+        return next(new ErrorHandler("일치하는 상품과 id 를 찾지 못했습니다!", 500));
+      }
+
+      res.status(201).json({
+        success: true,
+        message: "상품 삭제 성공!",
+      });
+    } catch (error) {
+      return next(new ErrorHandler(error, 400));
+    }
+  })
+);
+
+fs.unlink(filePath, (err) => { ... }): fs.unlink 함수는 파일을 삭제하는 함수이다. 첫 번째 매개변수로는 삭제할 파일의 경로(filePath)가 들어가고,
+
+두 번째 매개변수로는 삭제 작업이 완료된 후 호출될 콜백 함수가 들어감
+
+이 부분의 목적은 해당 상품에 연결된 모든 이미지 파일을 서버에서 삭제하는 것
+
+각 이미지 파일의 경로는 uploads 폴더 내에 저장되어 있고, fs.unlink를 통해 해당 경로의 파일을 삭제한다.
+
+삭제 과정에서 오류가 발생하면 콘솔에 오류 메시지를 출력하게 된다.
+
+이렇게 파일 삭제 작업을 수행함으로써 상품 삭제와 함께 연결된 이미지 파일도 서버에서 제거
+
+const filePath = `uploads/${filename}`;
+
+upload.array("images") 미들웨어는 클라이언트가 전송한 이미지 파일들의 정보를 req.files에 저장한다.
+
+이 정보에는 각 파일의 원래 이름, 업로드된 이름, 크기 등이 포함되어 있다. 따라서 filename은 업로드된 이미지 파일의 이름을 나타내게된다
+
+--------------------------------------------------------------------------------------------------------------------------
+
+```
+
+# index.js 에 상품 라우터 추가해주기
+
+```jsx
+// 라우터 부분
+const user = require('./controller/user')
+const shop = require('./controller/shop')
+const product = require('./controller/product')
+
+app.use('/api/v2/user', user)
+app.use('/api/v2/shop', shop)
+app.use('/api/v2/product', product)
+```
+
+# 상품 관련 리덕스 추가
+
+## productAction.js 추가
+
+```jsx
+import { createAsyncThunk } from '@reduxjs/toolkit'
+import axios from 'axios'
+
+// 에러 클리어 액션
+export const clearErrors = createAsyncThunk('product/clearErrors', async () => {
+  return null
+})
+
+// 상품 생성 액션
+export const createProduct = createAsyncThunk('product/createProduct', async (newForm) => {
+  try {
+    // HTTP 요청 헤더 설정
+    const config = { headers: { 'Content-Type': 'multipart/form-data' } }
+
+    // 상품 생성 API 호출
+    const { data } = await axios.post(
+      `http://localhost:5000/api/v2/product/create-product`,
+      newForm,
+      config
+    )
+
+    // 성공적으로 생성된 상품 반환
+    return data.product
+  } catch (error) {
+    // API 호출 중 오류 발생 시 오류 메시지를 던짐
+    throw error.response.data.message
+  }
+})
+
+// 특정 상점의 모든 상품 조회 액션
+export const getAllProductsShop = createAsyncThunk('product/getAllProductsShop', async (id) => {
+  try {
+    // 특정 상점의 모든 상품 조회 API 호출
+    const { data } = await axios.get(
+      `http://localhost:5000/api/v2/product/get-all-products-shop/${id}`
+    )
+
+    // 조회된 상품들 반환
+    return data.products
+  } catch (error) {
+    // API 호출 중 오류 발생 시 오류 메시지를 던짐
+    throw error.response.data.message
+  }
+})
+
+// 상품 삭제 액션
+export const deleteProduct = createAsyncThunk('product/deleteProduct', async (id) => {
+  try {
+    // 상품 삭제 API 호출
+    const { data } = await axios.delete(
+      `http://localhost:5000/api/v2/product/delete-shop-product/${id}`,
+      { withCredentials: true }
+    )
+
+    // 성공적으로 삭제된 메시지 반환
+    return data.message
+  } catch (error) {
+    // API 호출 중 오류 발생 시 오류 메시지를 던짐
+    throw error.response.data.message
+  }
+})
+```
+
+```jsx
+
+const config = { headers: { "Content-Type": "multipart/form-data" } };
+
+이 설정은 현재 요청이 multipart/form-data 형식의 데이터를 포함하고 있다는 것을 나타낸다.
+
+multipart/form-data는 주로 파일 업로드와 함께 사용되는 데이터 전송 형식으로,
+
+이 형식을 사용하면 텍스트 데이터와 파일을 동시에 전송할 수 있다. 이 경우, 주로 폼 데이터에 이미지나 파일이 첨부된 상황에서 사용된다.
+
+따라서, config 객체는 Axios로 HTTP 요청 시 사용되며,
+
+해당 요청의 헤더로 "Content-Type"이 "multipart/form-data"로 설정되어 있다.
+
+이를 통해 서버는 전송된 데이터가 파일 등을 포함하는 복합적인 형식임을 이해하고 처리할 수 있게 된다.
+```
+
+## productReducer.js
+
+```jsx
+// Redux Toolkit에서 createSlice 함수를 import
+import { createSlice } from '@reduxjs/toolkit'
+// productAction에서 사용할 동기 액션들을 import
+import { createProduct, getAllProductsShop, deleteProduct } from './productAction'
+
+// 슬라이스 생성
+const productSlice = createSlice({
+  name: 'product', // 슬라이스의 이름
+  initialState: {
+    isLoading: true, // 초기 상태: 로딩 중인지 여부
+    product: null, // 초기 상태: 단일 제품 정보
+    success: false, // 초기 상태: 성공 여부
+    products: [], // 초기 상태: 제품 목록
+    message: null, // 초기 상태: 메시지
+    allProducts: [], // 초기 상태: 모든 제품 목록
+    error: null, // 초기 상태: 에러 메시지
+  },
+  // 리듀서 및 비동기 액션 핸들링
+  reducers: {
+    clearErrors: (state) => {
+      // clearErrors 액션 핸들러: 에러와 성공 상태 초기화
+      state.error = null
+      state.success = false
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      // createProduct 비동기 액션 핸들링
+      .addCase(createProduct.pending, (state) => {
+        state.isLoading = true // 액션 수행 중 로딩 상태 설정
+        state.success = false // 성공 상태 초기화
+        state.error = null // 에러 초기화
+      })
+      .addCase(createProduct.fulfilled, (state, action) => {
+        state.isLoading = false // 액션 완료 후 로딩 상태 해제
+        state.product = action.payload // 액션에서 받아온 제품 정보 저장
+        state.success = true // 성공 상태 설정
+      })
+      .addCase(createProduct.rejected, (state, action) => {
+        state.isLoading = false // 액션 수행 실패 시 로딩 상태 해제
+        state.error = action.error.message // 액션에서 받아온 에러 메시지 저장
+        state.success = false // 실패한 경우 성공 상태 초기화
+      })
+      // getAllProductsShop 비동기 액션 핸들링
+      .addCase(getAllProductsShop.pending, (state) => {
+        state.isLoading = true // 액션 수행 중 로딩 상태 설정
+        state.error = null // 에러 초기화
+      })
+      .addCase(getAllProductsShop.fulfilled, (state, action) => {
+        state.isLoading = false // 액션 완료 후 로딩 상태 해제
+        state.products = action.payload // 액션에서 받아온 제품 목록 저장
+      })
+      .addCase(getAllProductsShop.rejected, (state, action) => {
+        state.isLoading = false // 액션 수행 실패 시 로딩 상태 해제
+        state.error = action.error.message // 액션에서 받아온 에러 메시지 저장
+      })
+      // deleteProduct 비동기 액션 핸들링
+      .addCase(deleteProduct.pending, (state) => {
+        state.isLoading = true // 액션 수행 중 로딩 상태 설정
+      })
+      .addCase(deleteProduct.fulfilled, (state, action) => {
+        state.isLoading = false // 액션 완료 후 로딩 상태 해제
+        state.error = action.payload // 액션에서 받아온 에러 메시지 저장
+      })
+      .addCase(deleteProduct.rejected, (state, action) => {
+        state.isLoading = false // 액션 수행 실패 시 로딩 상태 해제
+        state.error = action.payload // 액션에서 받아온 에러 메시지 저장
+      })
+  },
+})
+
+// 액션 생성자 내보내기
+export const { clearErrors } = productSlice.actions
+
+// 리듀서 내보내기
+export default productSlice.reducer
+```
+
+```jsx
+Redux Toolkit을 사용하여 Redux 스토어의 상태를 관리하는데 필요한 슬라이스와 리듀서를 생성 비동기 액션들은 extraReducers 부분에서 각각의 상태 변화에 대한 핸들링을 정의
+```

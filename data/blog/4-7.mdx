@@ -1,0 +1,2289 @@
+---
+title: '배드 봇 - 드론 비행 슈팅 게임 - 4'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 파티클 이펙트 생성 & 리팩토링 }
+
+## 🎯 목표
+
+```
+발사 시 파티클 이펙트 추가
+  ├─ Niagara System Spawn
+  ├─ Socket 위치에 생성
+  └─ 코드 리팩토링 (정리)
+```
+
+---
+
+## 💡 포스트 프로세스 볼륨
+
+### 문제: 자동 노출
+
+```
+화면이 계속 밝아졌다 어두워졌다
+  ↓
+눈이 적응하는 효과
+  ↓
+성가심! 😵
+```
+
+---
+
+## 🎨 Post Process Volume 추가
+
+### 배치
+
+### Quick Add 메뉴
+
+```
+화면 좌측 상단 "+"
+  ↓
+Volumes
+  ↓
+Post Process Volume
+  ↓
+레벨에 드래그
+```
+
+### Infinite 설정
+
+### Details 패널
+
+```
+Post Process Volume 선택
+  ↓
+"infinite" 검색
+  ↓
+☑ Infinite Extent (Unbound)
+  ↓
+전체 레벨에 영향!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380695/notion-blog/_/_/_5_/_-_-_4/image.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380692/notion-blog/_/_/_5_/_-_-_4/image_1.png)
+
+---
+
+## ⚙️ 자동 노출 끄기
+
+### Exposure 설정
+
+### 찾기
+
+```
+Details 패널
+  ↓
+"exposure" 검색
+  ↓
+Exposure 섹션
+```
+
+### 값 변경
+
+```
+☑ Min EV 100 (체크해서 Override)
+  └─ 값: 0
+
+☑ Max EV 100 (체크해서 Override)
+  └─ 값: 0
+```
+
+### 효과
+
+```
+Min = Max
+  ↓
+자동 노출 비활성화!
+  ↓
+일정한 밝기 유지 ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380693/notion-blog/_/_/_5_/_-_-_4/image_2.png)
+
+---
+
+## 🧹 레벨 정리
+
+### 불필요한 오브젝트 이동
+
+```
+Post Process Volume
+Volumetric Cloud
+Sky Atmosphere
+Directional Light
+Sky Light
+  ↓
+모두 선택 (Shift + 클릭)
+  ↓
+위로 이동 (카메라 밖으로)
+```
+
+---
+
+## 🚀 Niagara System Spawn
+
+### 현재 코드 분석
+
+### Event BeginPlay
+
+```
+[StoreTargetPawn]
+  ↓
+[Delay 2초]
+  ↓
+[Spawn Actor BP BlasterBeam]
+  ├─ Socket: Rifle_L
+  └─ Socket: Rifle_R
+```
+
+### 목표
+
+```
+빔 생성 시 파티클도 생성!
+  ↓
+Socket 위치에서
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380689/notion-blog/_/_/_5_/_-_-_3/image_15.png)
+
+---
+
+## ✨ Spawn System at Location
+
+### 노드 찾기
+
+```
+우클릭
+  ↓
+"spawn system" 검색
+  ↓
+[Spawn System at Location]
+```
+
+### 다른 옵션들
+
+```
+Spawn System Attached
+  └─ Component에 부착
+
+Spawn System at Location
+  └─ 특정 위치에만 생성 ✅
+  (우리가 원하는 것!)
+```
+
+---
+
+## 🔧 Spawn System 설정
+
+### 입력 파라미터
+
+### System Template
+
+```
+생성할 Niagara System
+  ↓
+드롭다운
+  ↓
+NS_BeamBurst 선택
+```
+
+### Location
+
+```
+어디에 생성?
+  ↓
+Socket 위치
+```
+
+### Rotation
+
+```
+어느 방향으로?
+  ↓
+Socket 회전
+```
+
+### Scale
+
+```
+Vector One (1,1,1) = 기본 크기
+  ↓
+변경 안 함
+```
+
+---
+
+## 🎯 미니 챌린지!
+
+### 과제
+
+```
+Location과 Rotation 입력 연결하기
+  ↓
+Socket Transform 사용
+  ↓
+동영상 일시정지하고 시도!
+```
+
+---
+
+## ✅ 해답
+
+### Get Socket Transform
+
+### 노드 찾기
+
+```
+우클릭
+  ↓
+"get socket transform"
+  ↓
+[Get Socket Transform (BotMesh)]
+```
+
+### Split Struct Pin
+
+```
+Return Value 우클릭
+  ↓
+Split Struct Pin
+  ├─ Return Value Location
+  ├─ Return Value Rotation
+  └─ Return Value Scale
+```
+
+### 연결
+
+```
+[Get Socket Transform]
+  ├─ Socket Name: "Rifle_L"
+  ├─ Location → [Spawn System] Location
+  └─ Rotation → [Spawn System] Rotation
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380693/notion-blog/_/_/_5_/_-_-_4/image_3.png)
+
+---
+
+## 🧪 첫 테스트
+
+### 파티클 시스템 제거
+
+```
+레벨에 배치된 NS_BeamBurst
+  ↓
+Delete
+  (게임 시작 시 자동 생성되므로)
+```
+
+### 실행
+
+```
+▶ 재생
+  ↓
+2초 대기
+  ↓
+왼쪽 소총에서만 폭발! ✅
+```
+
+---
+
+## 📋 오른쪽도 추가
+
+### 노드 복제
+
+```
+3개 노드 선택
+  ├─ Get Socket Transform
+  ├─ Spawn System at Location
+  └─ 연결 와이어
+      ↓
+Ctrl + D (복제)
+  ↓
+Socket Name: "Rifle_R"로 변경
+```
+
+### 테스트
+
+```
+▶ 재생
+  ↓
+양쪽 소총에서 폭발! ✅
+```
+
+---
+
+## 🎨 코드 정리 시작
+
+### 문제점
+
+```
+반복되는 패턴
+  ├─ Rifle_L용 노드들
+  └─ Rifle_R용 노드들
+      ↓
+거의 똑같음!
+      ↓
+함수로 만들자!
+```
+
+---
+
+## 🔧 SpawnBlasterBeam 함수
+
+### 함수 생성
+
+### My Blueprint
+
+```
+Functions → "+"
+  ↓
+이름: SpawnBlasterBeam
+```
+
+### 입력 파라미터 추가
+
+### Details 패널
+
+```
+SpawnBlasterBeam 선택
+  ↓
+Inputs → "+"
+  ├─ 타입: Name
+  └─ 이름: SocketName
+```
+
+### 왜 Name 타입?
+
+```
+Socket 이름 = Name 타입
+  ↓
+"Rifle_L", "Rifle_R" 등
+```
+
+---
+
+## 📝 함수 구현
+
+### 노드 복사
+
+### Event Graph에서
+
+```
+Spawn Actor BP BlasterBeam
+Get Socket Transform
+BotMesh 노드들
+  ↓
+Shift + 클릭으로 모두 선택
+  ↓
+Ctrl + C (복사)
+```
+
+### SpawnBlasterBeam 함수에
+
+```
+Ctrl + V (붙여넣기)
+  ↓
+Entry 노드에 연결
+```
+
+---
+
+## 🔌 입력 연결
+
+### Socket Name 사용
+
+```
+Socket Name: "Rifle_L" 삭제
+  ↓
+[SocketName] 입력 핀
+  ↓
+[Get Socket Transform] In Socket Name
+  ↓
+함수에 전달된 이름 사용!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380693/notion-blog/_/_/_5_/_-_-_4/image_4.png)
+
+---
+
+## 🎯 Event Graph에서 호출
+
+### 기존 노드 삭제
+
+```
+Spawn Actor BP BlasterBeam
+Get Socket Transform
+관련 노드들 모두 삭제
+```
+
+### 함수 호출
+
+### 왼쪽 소총
+
+```
+우클릭
+  ↓
+"SpawnBlasterBeam" 검색
+  ↓
+[SpawnBlasterBeam]
+  └─ SocketName: "Rifle_L"
+```
+
+### 오른쪽 소총
+
+```
+Ctrl + D (복제)
+  ↓
+[SpawnBlasterBeam]
+  └─ SocketName: "Rifle_R"
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380694/notion-blog/_/_/_5_/_-_-_4/image_5.png)
+
+---
+
+## 💾 변수로 승격
+
+### 왜?
+
+```
+"Rifle_L" 하드코딩 ❌
+  ├─ 오타 위험
+  ├─ 변경 어려움
+  └─ 재사용 불편
+      ↓
+변수 사용! ✅
+```
+
+### 왼쪽 소켓
+
+### Promote to Variable
+
+```
+SocketName 핀 우클릭
+  ↓
+"Promote to Variable"
+  ↓
+이름: RifleSocketName_L
+```
+
+### 자동 설정
+
+```
+Compile 클릭
+  ↓
+기본값: "Rifle_L" (자동!)
+  ↓
+변경 필요 없음 ✅
+```
+
+### 오른쪽 소켓
+
+```
+똑같이 반복
+  ↓
+이름: RifleSocketName_R
+  ↓
+기본값: "Rifle_R" (자동)
+```
+
+---
+
+## 📁 변수 카테고리 정리
+
+### 카테고리 만들기
+
+### RifleSocketName_L 선택
+
+```
+Details 패널
+  ↓
+Category: Default
+  ↓
+드롭다운 → "New..."
+  ↓
+새 카테고리: Rifle
+```
+
+### RifleSocketName_R도 같게
+
+```
+Category: Rifle
+  ↓
+같은 카테고리로!
+```
+
+### 결과
+
+```
+Variables 섹션
+  └─ Rifle
+      ├─ RifleSocketName_L
+      └─ RifleSocketName_R
+          ↓
+깔끔하게 정리! ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380694/notion-blog/_/_/_5_/_-_-_4/image_6.png)
+
+---
+
+## 🎯 다른 변수들도 정리
+
+### Combat 카테고리
+
+```
+TargetPawn
+  └─ Category: Combat
+
+RotationInterpSpeed
+  └─ Category: Combat
+```
+
+### 최종 구조
+
+```
+Variables
+  ├─ Combat
+  │   ├─ TargetPawn
+  │   └─ RotationInterpSpeed
+  └─ Rifle
+      ├─ RifleSocketName_L
+      └─ RifleSocketName_R
+```
+
+---
+
+## ✨ 파티클도 함수에 추가
+
+### 목표
+
+```
+SpawnBlasterBeam이
+  ├─ Actor 생성
+  └─ Particle 생성
+      ↓
+한 번에 모두!
+```
+
+### 노드 복사
+
+### Event Graph
+
+```
+Spawn System at Location
+Get Socket Transform
+  ↓
+Ctrl + C (복사)
+```
+
+### SpawnBlasterBeam 함수
+
+```
+Ctrl + V (붙여넣기)
+  ↓
+Spawn Actor 뒤에 연결
+```
+
+---
+
+## 🔗 Socket Name 연결
+
+### 문제
+
+```
+Socket Name 하드코딩되어 있음
+  ↓
+함수 입력 사용해야 함
+```
+
+### 해결 방법 1: 드래그
+
+```
+[SocketName] 입력
+  ↓
+[Get Socket Transform] 연결
+  ↓
+긴 와이어 😰
+```
+
+### 해결 방법 2: Get 노드 (추천!)
+
+### 생성
+
+```
+우클릭
+  ↓
+"SocketName" 검색
+  ↓
+[Get SocketName]
+```
+
+### 사용
+
+```
+[Get SocketName]
+  ↓
+[Get Socket Transform] In Socket Name
+  ↓
+와이어 짧음! ✅
+```
+
+### 복제
+
+```
+Ctrl + D
+  ↓
+다른 Get Socket Transform에도 연결
+```
+
+---
+
+## 🧹 Event Graph 정리
+
+### Spawn System 노드 삭제
+
+```
+이제 함수가 처리함
+  ↓
+Event Graph에서 삭제
+  ↓
+SpawnBlasterBeam만 호출
+```
+
+### 최종 구조
+
+```
+Event BeginPlay
+  ↓
+[StoreTargetPawn]
+  ↓
+[Delay 2초]
+  ↓
+[SpawnBlasterBeam]
+  └─ SocketName: RifleSocketName_L
+      ↓
+[SpawnBlasterBeam]
+  └─ SocketName: RifleSocketName_R
+```
+
+---
+
+## 🧪 최종 테스트
+
+```
+▶ 재생
+  ↓
+2초 대기
+  ↓
+양쪽 소총에서
+  ├─ 빔 발사 ✅
+  └─ 파티클 폭발 ✅
+      ↓
+완벽!
+```
+
+---
+
+## 🎓 핵심 개념
+
+### 리팩토링 (Refactoring)
+
+```
+복잡한 코드를
+  ↓
+깔끔하고 재사용 가능하게
+  ↓
+좋은 프로그래밍 습관!
+```
+
+### 함수 입력 파라미터
+
+```
+함수를 범용적으로
+  ├─ 왼쪽도 쓰고
+  └─ 오른쪽도 쓰고
+      ↓
+입력값만 바꾸면 됨!
+```
+
+### 변수 승격
+
+```
+하드코딩 값을
+  ↓
+변수로 변환
+  ↓
+관리 쉬움!
+```
+
+---
+
+## 💡 프로그래밍 용어
+
+### Refactoring
+
+```
+코드 재구성
+  ├─ 기능은 같음
+  ├─ 구조만 개선
+  └─ 가독성/유지보수성 향상
+```
+
+### Good Programming Practice
+
+```
+좋은 코딩 습관
+  ├─ 함수 사용
+  ├─ 변수 이름 명확히
+  ├─ 카테고리로 정리
+  └─ 반복 제거
+```
+
+### Visual Programming
+
+```
+Blueprint = 비주얼 프로그래밍
+  ↓
+코드 없이 프로그래밍
+  ↓
+같은 원칙 적용!
+```
+
+---
+
+## 📊 Before vs After
+
+### Before (복잡)
+
+```
+Event BeginPlay
+  ├─ [많은 노드들]
+  ├─ [Get Socket Transform] L
+  ├─ [Spawn Actor]
+  ├─ [Spawn System]
+  ├─ [Get Socket Transform] R
+  ├─ [Spawn Actor]
+  └─ [Spawn System]
+      ↓
+와이어 스파게티 🍝
+```
+
+### After (깔끔)
+
+```
+Event BeginPlay
+  ├─ [StoreTargetPawn]
+  ├─ [Delay]
+  ├─ [SpawnBlasterBeam] L
+  └─ [SpawnBlasterBeam] R
+      ↓
+간결! ✅
+```
+
+---
+
+## 🎯 배운 것들
+
+### Post Process Volume
+
+```
+✅ 레벨 전체 시각 효과
+✅ Infinite Extent
+✅ 자동 노출 끄기
+```
+
+### Niagara Spawn
+
+```
+✅ Spawn System at Location
+✅ Socket Transform 사용
+✅ Location + Rotation 전달
+```
+
+### 리팩토링
+
+```
+✅ 함수로 묶기
+✅ 입력 파라미터
+✅ 변수 승격
+✅ 카테고리 정리
+✅ Get 노드 활용
+```
+
+---
+
+## ⚠️ 중요 팁
+
+### 함수 입력으로 Get 노드
+
+```
+함수 내부에서
+  ↓
+우클릭 → 입력 이름 검색
+  ↓
+Get 노드 자동 생성
+  ↓
+와이어 깔끔!
+```
+
+### 변수 카테고리
+
+```
+관련 변수끼리 그룹화
+  ↓
+찾기 쉬움
+  ↓
+유지보수 편함
+```
+
+### 자동 기본값
+
+```
+Promote to Variable
+  ↓
+하드코딩 값이 자동 기본값
+  ↓
+편리!
+```
+
+---
+
+# { 언리얼 엔진 - 사운드 시스템 & 메타사운드 }
+
+## 🎯 학습 목표
+
+드론의 블라스터 빔 발사 시 사운드 재생 구현
+
+- WAV 파일 임포트 및 재생
+- 메타사운드 생성 및 설정
+- 3D 사운드 감쇠(Attenuation) 적용
+- 랜덤 사운드 변화 구현
+
+---
+
+## 📁 사운드 파일 임포트
+
+### 1. 폴더 구조 생성
+
+```
+Content/Assets/
+  └─ Sounds/          (새로 생성)
+      └─ Drone/       (새로 생성)
+```
+
+**작업 순서**
+
+1. Content Browser에서 우클릭
+2. New Folder → "Sounds"
+3. Sounds 폴더 내 New Folder → "Drone"
+
+### 2. WAV 파일 임포트
+
+**방법 1: 드래그 앤 드롭**
+
+```
+탐색기에서 WAV 파일 선택
+  ↓
+Drone 폴더로 드래그
+  ↓
+자동 임포트 완료
+```
+
+**방법 2: Import 버튼**
+
+- Import 클릭 → 파일 선택 → Open
+
+**임포트된 파일**
+
+- Drone_Energy_Rifle_01.wav
+- Drone_Energy_Rifle_02.wav
+- Drone_Energy_Rifle_03.wav
+
+### 3. 사운드 미리듣기
+
+Content Browser에서 WAV 파일 선택 시
+
+- 재생 버튼(▶) 표시
+- 클릭으로 즉시 재생 가능
+
+---
+
+## 🔊 기본 사운드 재생
+
+### Blueprint 노드 구성
+
+**BP_Bot → Spawn Blaster Beam 함수**
+
+```
+Get Socket Transform
+  ↓
+Play Sound at Location
+  ├─ Location: Socket Transform (Return Value → Location)
+  └─ Sound: Drone_Energy_Rifle_01
+```
+
+**노드 설정**
+
+```
+Play Sound at Location
+  ├─ Sound: Drone_Energy_Rifle_01 (하드코딩)
+  └─ Location: 소켓 위치
+```
+
+### 📝 2D vs 3D 사운드
+
+**Play Sound 2D**
+
+- 위치 무관
+- 항상 동일한 볼륨
+- UI 사운드에 적합
+
+**Play Sound at Location**
+
+- 3D 공간 사운드
+- 거리에 따라 볼륨 변화
+- 게임 내 효과음에 적합
+
+### ⚠️ 현재 문제점
+
+```
+문제: 거리와 무관하게 동일한 볼륨
+  ↓
+원인: Attenuation 미설정
+  ↓
+해결: 메타사운드 + Attenuation 적용
+```
+
+---
+
+## 🎵 메타사운드(MetaSound) 생성
+
+### 메타사운드란?
+
+```
+WAV 파일 = 단순 오디오 파일
+  ↓
+MetaSound = 커스터마이징 가능한 사운드 시스템
+  ├─ 모노/스테레오 선택
+  ├─ 랜덤 변화 적용
+  ├─ 피치 조절
+  └─ 감쇠 설정
+```
+
+### 1. 메타사운드 생성
+
+```
+Sounds/Drone 폴더에서 우클릭
+  ↓
+Audio → Meta Sound Source
+  ↓
+이름: SFX_Energy_Rifle
+```
+
+**명명 규칙**
+
+- `SFX_` 접두사: Sound Effect
+- 용도를 명확히 표시
+
+### 2. 메타사운드 에디터 구조
+
+```
+MetaSound Editor
+  ├─ Graph (중앙)
+  ├─ Details Panel (우측)
+  └─ Members Panel (좌측)
+      ├─ Inputs
+      ├─ Outputs
+      └─ Variables
+```
+
+---
+
+## 🔧 스테레오 사운드 설정
+
+### 1. 출력 형식 변경
+
+**현재 상태**
+
+```
+Output Format: Mono
+  └─ Output 노드
+      └─ Mono (입력 핀 1개)
+```
+
+**변경 방법**
+
+```
+MetaSound 노드 클릭
+  ↓
+Details Panel
+  ↓
+Output Format: Mono → Stereo
+```
+
+**변경 후**
+
+```
+Output Format: Stereo
+  └─ Output 노드
+      ├─ Left (L)
+      └─ Right (R)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380694/notion-blog/_/_/_5_/_-_-_4/image_7.png)
+
+### 2. 모노 vs 스테레오 비교
+
+**Mono (모노)**
+
+```
+오디오 채널: 1개
+  ↓
+좌/우 스피커 동일 사운드
+  ↓
+평면적인 느낌
+```
+
+**Stereo (스테레오)**
+
+```
+오디오 채널: 2개
+  ├─ Left: 왼쪽 스피커
+  └─ Right: 오른쪽 스피커
+  ↓
+입체적이고 몰입감 있음
+```
+
+---
+
+## 🎹 Input 설정 (WAV 파일 연결)
+
+### 1. Input 생성
+
+```
+Members Panel → Inputs
+  ↓
++ 버튼 클릭
+  ↓
+Data Type: Wave Asset (드롭다운에서 선택)
+  ↓
+이름: Rifle Input
+```
+
+### 2. 기본값 설정
+
+```
+Rifle Input 선택
+  ↓
+Details Panel → Default
+  ↓
+Drone_Energy_Rifle_01 선택
+```
+
+### 3. Graph에 배치
+
+```
+Rifle Input을 Graph로 드래그
+  ↓
+노드 생성됨
+  └─ 출력 핀: Wave Asset 타입
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380694/notion-blog/_/_/_5_/_-_-_4/image_8.png)
+
+---
+
+## 🎮 Wave Player 노드 구성
+
+### 1. Wave Player 추가
+
+**스테레오용 Wave Player**
+
+```
+Graph에서 우클릭
+  ↓
+검색: Wave Player
+  ↓
+선택: Wave Player 2.0 Stereo
+```
+
+### 2. 노드 연결
+
+```
+Input 노드
+  └─ On Play → Wave Player → Play
+
+Rifle Input
+  └─ (출력) → Wave Player → Wave Asset
+
+Wave Player
+  ├─ Left (L) → Output → Left
+  ├─ Right (R) → Output → Right
+  └─ On Finished → Output → Finished
+```
+
+**완성된 구조**
+
+```
+Input (On Play)
+  ↓
+Wave Player
+  ├─ Wave Asset ← Rifle Input
+  ├─ Left → Output Left
+  ├─ Right → Output Right
+  └─ On Finished → Output Finished
+```
+
+### 3. 테스트
+
+재생 버튼(▶) 클릭
+
+- 우측에 데시벨 레벨 표시
+- 파형 그래프 표시
+- 스테레오 사운드 재생
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380694/notion-blog/_/_/_5_/_-_-_4/image_9.png)
+
+---
+
+## 🎲 랜덤 사운드 시스템
+
+### 1. Input을 배열로 변경
+
+```
+Rifle Input 선택
+  ↓
+Details Panel
+  ↓
+Is Array 체크
+```
+
+### 2. 배열에 WAV 파일 추가
+
+**방법 1: 드롭다운**
+
+```
+Default 섹션
+  ↓
++ 버튼으로 요소 추가
+  ↓
+각 요소에 WAV 파일 선택
+```
+
+**방법 2: 드래그 (권장)**
+
+```
+Content Drawer 열기
+  ↓
+Layout → Dock in Layout
+  ↓
+3개 WAV 파일 모두 선택 (Shift 클릭)
+  ↓
+배열로 드래그
+```
+
+**결과**
+
+```
+Rifle Input (Array)
+  ├─ [0] Drone_Energy_Rifle_01
+  ├─ [1] Drone_Energy_Rifle_02
+  └─ [2] Drone_Energy_Rifle_03
+```
+
+### 3. Random Get 노드 추가
+
+```
+Graph에서 우클릭
+  ↓
+검색: Random Get
+  ↓
+선택: Random Get (Wave Asset Array)
+```
+
+### 4. 노드 재연결
+
+**기존 연결 해제**
+
+```
+Rifle Input → Wave Player 연결 끊기
+```
+
+**새 연결**
+
+```
+Input (On Play)
+  ↓
+Random Get → On Next
+  ↓
+Wave Player → Play
+
+Rifle Input (Array)
+  ↓
+Random Get → In Array
+
+Random Get → Return Value
+  ↓
+Wave Player → Wave Asset
+```
+
+**완성된 흐름**
+
+```
+재생 시작
+  ↓
+Random Get: 배열에서 랜덤 선택
+  ↓
+Wave Player: 선택된 파일 재생
+  ↓
+매번 다른 사운드 재생
+```
+
+---
+
+## 🎚️ 피치 시프트 (Pitch Shift)
+
+### 1. Random Float 노드 추가
+
+```
+우클릭 → Random Float
+  ↓
+노드 생성
+```
+
+### 2. 연결
+
+```
+Random Get → On Next
+  ↓
+Random Float → Next
+  ↓
+Wave Player → Play
+```
+
+**전선 정리 (Reroute Node)**
+
+```
+전선 더블클릭
+  ↓
+Reroute Node 생성
+  ↓
+노드 뒤로 전선이 가지 않도록 정리
+```
+
+### 3. 피치 범위 설정
+
+```
+Random Float
+  ├─ Min: -2
+  └─ Max: 2
+  ↓
+Return Value → Wave Player → Pitch Shift
+```
+
+**효과**
+
+```
+-2 ~ +2 사이 랜덤 피치 변화
+  ↓
+매번 미묘하게 다른 톤
+  ↓
+사운드 다양성 증가
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380692/notion-blog/_/_/_5_/_-_-_4/image_10.png)
+
+---
+
+## ⏱️ 시작 시간 조정
+
+### Start Time 설정
+
+```
+Wave Player 선택
+  ↓
+Details Panel
+  ↓
+Start Time: 0.08
+```
+
+**효과**
+
+```
+사운드 앞부분 0.08초 스킵
+  ↓
+빌드업 제거
+  ↓
+더 즉각적인 사운드
+```
+
+---
+
+## 📉 사운드 감쇠 (Attenuation)
+
+### 감쇠란?
+
+```
+3D 공간에서 거리에 따른 볼륨 변화
+  ↓
+가까울 때: 큰 볼륨
+  ↓
+멀어질수록: 볼륨 감소
+  ↓
+일정 거리 이상: 소리 안 들림
+```
+
+### 1. Attenuation Asset 생성
+
+```
+SFX_Energy_Rifle 열기
+  ↓
+Source 기어 아이콘 클릭
+  ↓
+스크롤 → Attenuation
+  ↓
+드롭다운 → Sound Attenuation (새 에셋)
+```
+
+**저장 위치**
+
+```
+Sounds/Drone/
+  ↓
+이름: Attenuation_Drone
+  ↓
+Save
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380692/notion-blog/_/_/_5_/_-_-_4/image_11.png)
+
+### 2. Attenuation 설정값
+
+**Attenuation_Drone 더블클릭**
+
+```
+Inner Radius: 400
+  ├─ 의미: 최대 볼륨 범위
+  └─ 400 유닛(cm) 이내 = 최대 볼륨
+
+Falloff Distance: 3600
+  ├─ 의미: 총 감쇠 거리
+  └─ 3600 유닛(cm) 초과 = 소리 안 들림
+```
+
+**작동 원리**
+
+```
+거리 0~400: 최대 볼륨 (100%)
+  ↓
+거리 400~3600: 점진적 감소
+  ↓
+거리 3600+: 소리 없음 (0%)
+```
+
+### 3. 테스트
+
+**BP_Bot 수정**
+
+```
+Event Graph
+  ↓
+Delay 값: 8초로 변경
+  ↓
+멀리 이동할 시간 확보
+```
+
+**확인 방법**
+
+```
+재생
+  ↓
+드론에서 멀어지기
+  ↓
+볼륨 감소 확인
+  ↓
+3600 유닛 초과 시 소리 안 들림
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380692/notion-blog/_/_/_5_/_-_-_4/image_12.png)
+
+---
+
+## 🎮 Blueprint에 메타사운드 적용
+
+### BP_Bot 수정
+
+```
+Spawn Blaster Beam 함수
+  ↓
+Play Sound at Location
+  ↓
+Sound: SFX_Energy_Rifle (메타사운드)
+```
+
+**변경 전**
+
+```
+Sound: Drone_Energy_Rifle_01 (WAV 파일)
+```
+
+**변경 후**
+
+```
+Sound: SFX_Energy_Rifle (MetaSound)
+  ↓
+재생 시마다
+  ├─ 3개 중 1개 랜덤 선택
+  ├─ 피치 랜덤 변화
+  ├─ 거리에 따른 볼륨 조절
+  └─ 스테레오 사운드
+```
+
+---
+
+## ✅ 최종 구조 정리
+
+### MetaSound 내부
+
+```
+Input (On Play)
+  ↓
+Random Get
+  ├─ In Array ← Rifle Input (3개 WAV 배열)
+  └─ Return Value → Wave Player (Wave Asset)
+  ↓
+Random Float
+  ├─ Min: -2
+  ├─ Max: 2
+  └─ Return Value → Wave Player (Pitch Shift)
+  ↓
+Wave Player (Stereo)
+  ├─ Start Time: 0.08
+  ├─ Left → Output Left
+  ├─ Right → Output Right
+  └─ On Finished → Output Finished
+```
+
+### Blueprint
+
+```
+Get Socket Transform
+  ↓
+Play Sound at Location
+  ├─ Sound: SFX_Energy_Rifle
+  ├─ Location: Socket Position
+  └─ Attenuation: Attenuation_Drone
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### WAV vs MetaSound
+
+**WAV 파일**
+
+```
+✓ 단순 오디오 재생
+✗ 커스터마이징 불가
+✗ 단조로운 사운드
+```
+
+**MetaSound**
+
+```
+✓ 다양한 변화 가능
+✓ 랜덤 요소 추가
+✓ 피치/볼륨 제어
+✓ 재사용성 높음
+```
+
+### Attenuation의 중요성
+
+```
+Attenuation 없음
+  → 거리 무관 동일 볼륨
+  → 비현실적
+
+Attenuation 적용
+  → 거리 기반 볼륨
+  → 몰입감 증가
+```
+
+### 랜덤화의 효과
+
+```
+동일 사운드 반복
+  → 지루함
+  → 기계적
+
+랜덤 사운드 + 피치
+  → 자연스러움
+  → 다양성
+```
+
+---
+
+## 📊 설정값 요약
+
+### MetaSound
+
+| 속성          | 값     | 효과      |
+| ------------- | ------ | --------- |
+| Output Format | Stereo | 입체감    |
+| Start Time    | 0.08   | 빠른 시작 |
+| Pitch Min     | -2     | 낮은 톤   |
+| Pitch Max     | +2     | 높은 톤   |
+
+### Attenuation
+
+| 속성             | 값   | 의미          |
+| ---------------- | ---- | ------------- |
+| Inner Radius     | 400  | 최대볼륨 범위 |
+| Falloff Distance | 3600 | 총 감쇠 거리  |
+
+---
+
+## ⚠️ 주의사항
+
+### 1. 파일 형식
+
+```
+✓ WAV: 언리얼 지원, 고음질
+✗ MP3: 지원하지만 압축 손실
+```
+
+### 2. 모노 vs 스테레오 선택
+
+```
+모노: UI 사운드, 단순 효과음
+스테레오: 게임 내 3D 사운드
+```
+
+### 3. Attenuation 필수
+
+```
+Play Sound at Location 사용 시
+  → Attenuation 반드시 설정
+  → 설정 안 하면 거리 무관 재생
+```
+
+### 4. 피치 범위
+
+```
+너무 큰 값 (±20)
+  → 부자연스러움
+
+적정 값 (±2~5)
+  → 자연스러운 변화
+```
+
+### 5. Start Time 조절
+
+```
+사운드마다 최적값 다름
+  → 직접 들어보며 조정
+  → 0.05~0.1초 정도 적정
+```
+
+---
+
+# { 언리얼 엔진 - 타이머와 플립플롭으로 연속 발사 구현 }
+
+## 🎯 학습 목표
+
+드론의 연속 발사 시스템 구현
+
+- Delay 노드의 한계 이해
+- Timer 시스템으로 전환
+- FlipFlop 노드로 좌우 교차 발사
+- Niagara 시스템 방향성 조정
+
+---
+
+## ⚠️ Delay 노드의 문제점
+
+### 현재 상황
+
+```
+Begin Play
+  ↓
+Save Target Pawn
+  ↓
+Delay (8초)
+  ↓
+Spawn Blaster Beam (1회만)
+```
+
+### Delay의 한계
+
+```
+✗ 제어 불가능
+  → 시작하면 반드시 완료까지 실행
+  → 중간에 취소/중지 불가
+
+✗ 참조 검증 없음
+  → 지연 중 참조가 무효화되어도
+  → 무효한 참조 사용 시도
+  → 크래시 위험
+
+✗ 원시적 방법
+  → 프로덕션 코드에 부적합
+  → 테스트용으로만 적합
+```
+
+---
+
+## ⏱️ Timer 시스템
+
+### Timer의 장점
+
+```
+✓ 제어 가능
+  → 시작/중지/재시작
+  → 유효성 검사 가능
+
+✓ 정교한 제어
+  → 반복(Loop) 설정
+  → 델리게이트 연결
+  → 타이밍 조절
+```
+
+### Set Timer by Event 노드
+
+```
+Set Timer by Event
+  ├─ Event: 실행할 이벤트 델리게이트
+  ├─ Time: 대기 시간 (초)
+  ├─ Looping: 반복 여부
+  └─ First Delay: 최초 실행 지연
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380693/notion-blog/_/_/_5_/_-_-_4/image_13.png)
+
+---
+
+## 🎮 Custom Event 생성
+
+### 1. Custom Event 추가
+
+```
+Event Graph 우클릭
+  ↓
+Add Custom Event
+  ↓
+이름: Fire Blaster Beam
+```
+
+**Custom Event 특징**
+
+```
+이벤트 = 함수와 유사
+  ├─ 호출 가능
+  ├─ 델리게이트로 사용
+  └─ 실행 핀 연결
+```
+
+### 2. Event Delegate 이해
+
+**Event의 빨간 사각형 출력**
+
+```
+Event Begin Play
+  └─ (빨간 사각형) = Output Delegate
+
+Event Tick
+  └─ (빨간 사각형) = Output Delegate
+
+Custom Event
+  └─ (빨간 사각형) = Output Delegate
+```
+
+**용도**
+
+```
+델리게이트 = 이벤트를 값으로 전달
+  ↓
+Timer에 연결
+  ↓
+지정된 시간 후 이벤트 실행
+```
+
+---
+
+## 🔧 Timer 구현
+
+### 1. 기본 구조
+
+```
+Begin Play
+  ↓
+Save Target Pawn
+  ↓
+Set Timer by Event
+  ├─ Event: Fire Blaster Beam (델리게이트)
+  ├─ Time: 0.2
+  └─ Looping: ✓ (체크)
+```
+
+### 2. 변수로 시간 관리
+
+**Blaster Time 변수 생성**
+
+```
+Time 값 우클릭
+  ↓
+Promote to Variable
+  ↓
+이름: Blaster Time
+  ├─ Type: Float
+  ├─ Default: 0.2
+  └─ Category: Combat
+```
+
+**구조 개선**
+
+```
+Set Timer by Event
+  └─ Time ← Blaster Time (변수)
+
+장점:
+  ├─ 매직 넘버 제거
+  ├─ Details Panel에서 조정
+  └─ 재사용 용이
+```
+
+### 3. Custom Event 연결
+
+```
+Fire Blaster Beam (Event)
+  ↓
+Spawn Blaster Beam (함수)
+  └─ Socket Name: Rifle_L
+```
+
+---
+
+## 🔄 FlipFlop으로 교차 발사
+
+### FlipFlop 노드란?
+
+```
+FlipFlop
+  ├─ 실행될 때마다 기억
+  ├─ A와 B 교대 실행
+  └─ 자동으로 상태 토글
+
+작동 방식:
+  1회 실행 → A 실행
+  2회 실행 → B 실행
+  3회 실행 → A 실행
+  4회 실행 → B 실행
+  ...
+```
+
+### 구현
+
+```
+Fire Blaster Beam (Event)
+  ↓
+FlipFlop
+  ├─ A → Spawn Blaster Beam
+  │       └─ Socket Name: Rifle_L
+  │
+  └─ B → Spawn Blaster Beam (복제)
+          └─ Socket Name: Rifle_R
+
+```
+
+**노드 복제 방법**
+
+```
+Spawn Blaster Beam 선택
+  ↓
+Ctrl + D (복제)
+  ↓
+Socket Name: Rifle_R로 변경
+  ↓
+FlipFlop B에 연결
+
+```
+
+### 결과
+
+```
+0.2초마다 발사
+  ├─ 1회: 왼쪽 소총 (Rifle_L)
+  ├─ 2회: 오른쪽 소총 (Rifle_R)
+  ├─ 3회: 왼쪽 소총
+  └─ 4회: 오른쪽 소총
+  ...
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380693/notion-blog/_/_/_5_/_-_-_4/image_14.png)
+
+---
+
+## ⚡ 즉시 발사 구현
+
+### 문제점
+
+```
+Set Timer by Event 실행
+  ↓
+Time만큼 대기
+  ↓
+첫 발사
+```
+
+**Blaster Time = 2초인 경우**
+
+```
+게임 시작
+  ↓
+2초 대기
+  ↓
+첫 발사 (너무 느림)
+```
+
+### 해결 방법
+
+```
+Begin Play
+  ↓
+Save Target Pawn
+  ↓
+Fire Blaster Beam (즉시 호출)
+  ↓
+Set Timer by Event
+  └─ 이후 반복 실행
+```
+
+**Custom Event 호출**
+
+```
+우클릭 → Fire Blaster Beam 검색
+  ↓
+Call Function으로 표시
+  ↓
+Set Timer 전에 연결
+```
+
+**결과**
+
+```
+게임 시작 → 즉시 첫 발사
+  ↓
+0.2초 후 두 번째 발사
+  ↓
+0.2초마다 계속 반복
+```
+
+---
+
+## 📦 함수 축소 제한사항
+
+### 시도
+
+```
+모든 노드 선택
+  ↓
+우클릭 → Collapse to Function
+  ↓
+❌ 컴파일 에러 발생
+```
+
+### 에러 원인
+
+```
+함수 내부에서 불가능한 작업:
+  ├─ Set Timer by Event
+  ├─ Custom Event 정의
+  └─ 기타 특정 노드들
+
+→ Event Graph에만 가능
+→ 함수로 축소 불가
+```
+
+### 대처 방법
+
+```
+Ctrl + Z (실행 취소)
+  ↓
+노드를 Event Graph에 유지
+  ↓
+주석(Comment)으로 정리
+```
+
+---
+
+## 🎨 Niagara 방향성 조정
+
+### 현재 문제
+
+```
+재생 시 파티클이
+  ├─ 모든 방향으로 분산
+  └─ 방향성 없음
+
+원하는 결과:
+  → 한 방향으로 발사
+```
+
+### NS_Beam_Burst 수정
+
+**경로**
+
+```
+Content/Assets/Effects/
+  └─ NS_Beam_Burst
+```
+
+### 1. Add Velocity from Point
+
+**Omnidirectional Burst 이미터**
+
+```
+Isolate 활성화 (이미터 단독 보기)
+  ↓
+Add Velocity from Point 찾기
+  ↓
+Origin Offset 수정
+  ├─ X: -10
+  ├─ Y: 0
+  └─ Z: 0
+```
+
+**효과**
+
+```
+속도 원점을 -10 오프셋
+  ↓
+양의 X 방향으로 발사
+  ↓
+방향성 생김
+```
+
+### 2. 모든 이미터에 적용
+
+**3개 이미터 모두 수정**
+
+```
+Emitter 1: Omnidirectional Burst
+  └─ Origin Offset X: -10
+
+Emitter 2: Omnidirectional Burst
+  └─ Origin Offset X: -10
+
+Emitter 3: Omnidirectional Burst
+  └─ Origin Offset X: -10
+```
+
+### 3. 색상 조정 (선택사항)
+
+**Initialize Particle**
+
+```
+Color 찾기
+  ↓
+Green 값 낮추기
+  ├─ 기존: 20
+  └─ 변경: 10
+  ↓
+Red 비율 증가
+  ↓
+더 불같은 색상
+```
+
+**조정 가능 항목**
+
+```
+색상 (Color)
+  ├─ Red
+  ├─ Green
+  └─ Blue
+
+크기 (Size)
+속도 (Velocity)
+수명 (Lifetime)
+```
+
+### 4. 테스트
+
+```
+Isolate 비활성화
+  ↓
+전체 이미터 확인
+  ↓
+게임에서 테스트
+  ↓
+원하는 모습까지 조정
+```
+
+---
+
+## 💡 Skylight 조정
+
+### 어두운 그림자 문제
+
+```
+드론이 그늘에 있을 때
+  ↓
+발사 효과 잘 안 보임
+  ↓
+Skylight 강도 증가 필요
+```
+
+### 조정 방법
+
+```
+Outliner에서 Skylight 선택
+  ↓
+Details Panel
+  ↓
+Intensity Scale
+  ├─ 기본값: 1
+  └─ 변경: 3~4
+```
+
+**효과**
+
+```
+그늘 영역도 밝아짐
+  ↓
+발사 효과 가시성 증가
+```
+
+---
+
+## ✅ 최종 구조
+
+### Event Graph
+
+```
+Begin Play
+  ↓
+Save Target Pawn
+  ↓
+Fire Blaster Beam (즉시 실행)
+  ↓
+Set Timer by Event
+  ├─ Event: Fire Blaster Beam
+  ├─ Time: Blaster Time (0.2)
+  └─ Looping: ✓
+
+Fire Blaster Beam (Custom Event)
+  ↓
+FlipFlop
+  ├─ A → Spawn Blaster Beam (Rifle_L)
+  └─ B → Spawn Blaster Beam (Rifle_R)
+```
+
+### 변수
+
+```
+Combat 카테고리
+  └─ Blaster Time (Float)
+      ├─ Default: 0.2
+      └─ 발사 간격 제어
+```
+
+---
+
+## 📊 주요 설정값
+
+### Timer 설정
+
+| 속성         | 값    | 효과      |
+| ------------ | ----- | --------- |
+| Blaster Time | 0.2초 | 발사 간격 |
+| Looping      | True  | 반복 실행 |
+
+### Niagara 조정
+
+| 속성            | 값  | 효과        |
+| --------------- | --- | ----------- |
+| Origin Offset X | -10 | 방향성 부여 |
+| Green           | 10  | 색상 조정   |
+
+### Lighting
+
+| 속성               | 값  | 효과        |
+| ------------------ | --- | ----------- |
+| Skylight Intensity | 3~4 | 가시성 증가 |
+
+---
+
+## ⚠️ 주의사항
+
+### 1. 함수 제한
+
+```
+❌ Timer 설정을 함수에 포함 불가
+❌ Custom Event를 함수에 포함 불가
+✓ Event Graph에서만 사용
+```
+
+### 2. Isolate 기능
+
+```
+Niagara 편집 시:
+  ├─ Isolate로 개별 이미터 작업
+  └─ 완료 후 Isolate 비활성화 필수
+```
+
+### 3. Simulate 모드
+
+```
+테스트 시:
+  ├─ Simulate: 관찰용
+  └─ Play: 실제 플레이 테스트
+```
+
+### 4. Delegate 연결
+
+```
+빨간 사각형 핀끼리 연결
+  ↓
+Event → Timer Event 입력
+```
+
+### 5. 변수 카테고리
+
+```
+관련 변수를 같은 카테고리로
+  → Details Panel에서 찾기 쉬움
+  → 예: Combat 카테고리
+```
+
+---
+
+## 🎯 핵심 개념 정리
+
+### Delay vs Timer
+
+```
+Delay
+  ├─ 간단하지만 제어 불가
+  └─ 테스트용으로만 사용
+
+Timer
+  ├─ 정교한 제어 가능
+  ├─ 프로덕션 코드에 적합
+  └─ Looping, 취소 지원
+```
+
+### FlipFlop 활용
+
+```
+교대 실행이 필요한 경우:
+  ├─ 좌우 교차
+  ├─ On/Off 토글
+  └─ 상태 전환
+
+→ FlipFlop 노드 활용
+```
+
+### Custom Event
+
+```
+이벤트 = 재사용 가능한 실행 흐름
+  ├─ 함수처럼 호출 가능
+  ├─ Timer에 연결 가능
+  └─ 여러 곳에서 호출 가능
+```
+
+### Niagara 방향 제어
+
+```
+Add Velocity from Point
+  └─ Origin Offset으로 방향 조절
+  └─ X축 오프셋 = 전후 방향
+```
+
+---
+
+## 📝 다음 단계
+
+현재까지 구현 완료:
+
+- ✅ 연속 발사 시스템
+- ✅ 좌우 교차 발사
+- ✅ 사운드 효과
+- ✅ 파티클 방향성
+
+**다음 구현 예정:**
+
+- 드론 회전 속도 조정
+- 타겟팅 시스템 개선
+- 충돌 감지
+- 피격 효과
+
+---
+
+## 💡 추가 팁
+
+### Tab 관리
+
+```
+BP_Bot 우클릭
+  ↓
+Close Tabs to the Right
+  ↓
+작업 중인 탭만 유지
+
+```
+
+### 노드 정리
+
+```
+주석 블록 활용
+  ├─ 노드 선택
+  ├─ C 키
+  └─ Comment 작성
+
+색상 구분
+  ├─ 주요 로직: 녹색
+  ├─ 테스트: 노란색
+  └─ 문제 영역: 빨간색
+```
+
+### 파라미터 조정
+
+```
+Niagara, Material 등:
+  ├─ 게임 실행 중 조정
+  ├─ 실시간 확인
+  └─ 최적값 찾기
+```
+
+---
+
+## 🎓 학습 요약
+
+```
+Timer 시스템 구현
+  ├─ Delay → Timer 전환
+  ├─ Custom Event 생성
+  ├─ Looping 설정
+  └─ 변수로 시간 관리
+  ↓
+FlipFlop 활용
+  ├─ 좌우 교차 발사
+  └─ 상태 기반 실행
+  ↓
+Niagara 최적화
+  ├─ 방향성 부여
+  ├─ 색상 조정
+  └─ 시각적 품질 향상
+  ↓
+완성: 정교한 발사 시스템
+```

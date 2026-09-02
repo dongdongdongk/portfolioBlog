@@ -1,0 +1,4744 @@
+---
+title: '섹션 7: 악성 봇 마무리 및 보스전 - 3'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# 🎮 적 봇 스폰 시스템 만들기 (1부) - 준비 및 구조 설정
+
+## 🎯 이번 강의 목표
+
+플레이어가 특정 위치를 지나갈 때 적 봇이 자동으로 생성되는 시스템을 만듭니다.
+
+- 보이지 않는 트리거 박스 설정
+- 적이 나타날 위치 지정
+- 다음 강의에서 실제 스폰 기능 구현 예정
+
+## 📋 전체 시스템 구조
+
+```
+게임 흐름
+  ↓
+플레이어가 입구 통과
+  ↓
+보이지 않는 Box와 충돌 감지
+  ↓
+지정된 위치에 적 봇 스폰
+  ↓
+전투 시작
+```
+
+---
+
+## 🗺️ 1단계: 레벨 시작 설정
+
+### 📝 작업 내용
+
+프로젝트가 올바른 레벨에서 시작하도록 설정합니다.
+
+```
+Settings → Project Settings
+  ↓
+Maps & Modes 섹션
+  ↓
+Editor Startup Map: AsianVillageDemo
+Game Default Map: AsianVillageDemo
+```
+
+### 🔧 상세 과정
+
+**1. 프로젝트 설정 열기**
+
+- Edit → Project Settings 선택
+
+**2. 시작 맵 설정**
+
+```
+Maps & Modes 카테고리
+  ├─ Editor Startup Map
+  │   └─ AsianVillageDemo로 변경
+  │       (에디터를 열 때 이 맵으로 시작)
+  │
+  └─ Game Default Map
+      └─ AsianVillageDemo로 변경
+          (게임 실행 시 이 맵으로 시작)
+```
+
+### ✅ 확인 방법
+
+Play 버튼 눌러서 설정한 레벨에서 시작하는지 확인
+
+---
+
+## 🎯 2단계: 스폰 시스템 계획
+
+### 💡 작동 방식
+
+```
+두 기둥 사이 입구
+  ↓
+보이지 않는 Box Collision (트리거)
+  ↓
+플레이어가 통과하면 감지
+  ↓
+마당 곳곳에 적 봇 생성
+  ↓
+전투 시작
+```
+
+### 📦 필요한 구성요소
+
+```
+BP_BotSpawner (새로 만들 액터)
+  ├─ Box Component
+  │   └─ 충돌 감지 영역 (트리거)
+  │
+  ├─ Target Points (배열)
+  │   └─ 적이 생성될 위치들
+  │
+  └─ Spawn Logic (다음 강의)
+      └─ 실제 스폰 기능
+```
+
+---
+
+## 🔨 3단계: BP_BotSpawner 액터 만들기
+
+### 📝 파일 구조
+
+```
+Content Browser
+  ↓
+Drone 폴더 (BP_Bot이 있는 곳)
+  ↓
+New Blueprint Class
+  ├─ Parent: Actor
+  └─ Name: BP_BotSpawner
+```
+
+**규칙**: 스포너는 스폰할 대상과 같은 폴더에 배치
+
+- 예: BP_SmallSphere와 BP_SphereSpawner는 같은 폴더
+- 예: BP_Bot과 BP_BotSpawner도 같은 폴더
+
+### 🔧 생성 과정
+
+**1. 블루프린트 생성**
+
+```
+Drone 폴더에서 우클릭
+  ↓
+Blueprint Class 선택
+  ↓
+Actor 선택
+  ↓
+이름: BP_BotSpawner
+```
+
+---
+
+## 📦 4단계: Box Component 추가 및 설정
+
+### 🎯 Box Component란?
+
+보이지 않는 박스 형태의 충돌 감지 영역입니다.
+
+- 플레이어가 이 영역에 들어오면 감지
+- 게임에서는 보이지 않음 (편집 모드에서만 표시)
+
+### 🔧 추가 방법
+
+**1. Component 추가**
+
+```
+BP_BotSpawner 열기
+  ↓
+Components 패널
+  ↓
++ Add → Box 검색
+  ↓
+Box Collision 선택
+  ↓
+이름: Box (기본값 사용)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380740/notion-blog/_/_/_5_/_7_-_3/image.png)
+
+### 🎨 시각화 설정 (보기 편하게)
+
+**디테일 패널에서 설정**
+
+```
+Box Component 선택
+  ↓
+Shape 카테고리
+  ↓
+Advanced (▼ 클릭하여 펼치기)
+  ├─ Shape Color: 녹청색 (파란색 계열)
+  └─ Line Thickness: 5
+```
+
+**효과**
+
+- 선택 안 했을 때: 녹청색으로 표시
+- 선택했을 때: 노란색으로 표시
+- 두께가 5라서 잘 보임
+
+### ⚠️ 중요한 주의사항
+
+**크기 조정 방법**
+
+```
+❌ 잘못된 방법
+  └─ Transform의 Scale 변경
+      (나중에 계산이 복잡해짐)
+
+✅ 올바른 방법
+  └─ Box Extent 값 조정
+      (정확한 크기 제어 가능)
+```
+
+**위치 조정 주의**
+
+```
+액터를 움직이고 싶을 때:
+  ├─ ✅ 아웃라이너에서 BP_BotSpawner 자체 선택 후 이동
+  └─ ❌ Box Component 선택 상태로 이동
+      (Box만 움직이고 액터 루트는 그대로)
+```
+
+---
+
+## 🗺️ 5단계: 레벨에 배치 및 크기 조정
+
+### 📍 배치 위치
+
+두 기둥 사이 입구 중앙에 배치합니다.
+
+**배치 과정**
+
+```
+Content Browser에서 BP_BotSpawner 드래그
+  ↓
+두 기둥 사이 입구 중앙에 Drop
+  ↓
+정확한 중앙 위치로 조정
+```
+
+### 📏 크기 조정 (Instance별 설정)
+
+**개별 인스턴스에서 Box 크기 조정 가능**
+
+```
+레벨에 배치된 BP_BotSpawner 선택
+  ↓
+Details 패널
+  ↓
+Box (Instance Editable) 컴포넌트 선택
+  ↓
+Box Extent 조정
+  ├─ X: 입구 너비에 맞게
+  ├─ Y: 입구 깊이에 맞게
+  └─ Z: 플레이어 높이 정도
+```
+
+**조정 예시**
+
+```
+두 기둥 사이를 완전히 커버하도록:
+  ├─ X Extent: 200-300 정도
+  ├─ Y Extent: 100-150 정도
+  └─ Z Extent: 150-200 정도
+      (플레이어가 지나갈 높이)
+```
+
+### 💡 Instance Editable의 장점
+
+같은 BP_BotSpawner를 여러 곳에 배치할 때:
+
+- 각 위치마다 다른 크기 설정 가능
+- 블루프린트 자체는 수정 안 해도 됨
+- 레벨 디자인에 유연하게 대응
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380737/notion-blog/_/_/_5_/_7_-_3/image_1.png)
+
+---
+
+## ⚙️ 6단계: Collision 설정 수정
+
+### 🔍 현재 문제
+
+```
+Box Component의 기본 Collision Preset
+  ↓
+"OverlapAllDynamic"
+  ├─ 대부분: Overlap (통과 가능)
+  └─ Player와 Enemy: Block (막힘!)
+      ⚠️ 입구를 통과할 수 없음
+```
+
+### 🔧 해결 방법
+
+**Project Settings에서 Preset 수정**
+
+```
+Edit → Project Settings
+  ↓
+Engine - Collision 카테고리
+  ↓
+Preset 섹션
+  ↓
+OverlapAllDynamic 찾기
+  ↓
+Edit 클릭
+  ├─ Player Response: Overlap으로 변경
+  └─ Enemy Response: Overlap으로 변경
+```
+
+**OverlapAll 프리셋도 동일하게 수정**
+
+```
+OverlapAll 찾기
+  ↓
+Edit 클릭
+  ├─ Player Response: Overlap
+  └─ Enemy Response: Overlap
+```
+
+### ✅ 수정 후 결과
+
+```
+Before:
+플레이어가 입구에서 막힘
+
+After:
+플레이어가 자유롭게 통과
+  ↓
+Box와 Overlap 이벤트 발생 (다음 강의에서 활용)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380739/notion-blog/_/_/_5_/_7_-_3/image_2.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380739/notion-blog/_/_/_5_/_7_-_3/image_3.png)
+
+---
+
+## 🎯 7단계: Target Point 시스템 설정
+
+### 💡 Target Point란?
+
+```
+Target Point
+  └─ 3D 공간의 특정 위치를 표시하는 액터
+      ├─ Billboard Component만 가짐 (매우 가벼움)
+      ├─ 위치 정보만 필요할 때 사용
+      └─ 스폰 위치, 웨이포인트 등에 활용
+```
+
+### 📦 Target Point 배치
+
+**1. 레벨에 추가**
+
+```
+Place Actors 패널
+  ↓
+All Classes 섹션
+  ↓
+"Target" 검색
+  ↓
+Target Point 드래그하여 마당에 배치
+```
+
+**2. 외형**
+
+```
+선택 안 함: 작은 빌보드 아이콘
+선택함: 강조 표시된 빌보드
+  └─ 게임 실행 시에는 안 보임
+```
+
+**3. 여러 개 배치**
+
+```
+동상 옆에 하나
+  ↓
+Alt + 드래그로 복제
+  ↓
+다른 위치에도 배치
+  (예: 2개 배치)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380739/notion-blog/_/_/_5_/_7_-_3/image_4.png)
+
+---
+
+## 🔗 8단계: BP_BotSpawner에 변수 추가
+
+### 📝 Target Points 배열 변수
+
+**목적**: 여러 Target Point를 저장하여 각 위치에 봇 스폰
+
+**변수 생성**
+
+```
+BP_BotSpawner 열기
+  ↓
+Variables 패널
+  ↓
++ 버튼 (Add Variable)
+  ↓
+이름: TargetPoints
+  ↓
+Variable Type: Target Point (Object Reference)
+  ↓
+Container Type: Array (배열로 변경)
+  ↓
+Instance Editable: ✅ 체크
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380739/notion-blog/_/_/_5_/_7_-_3/image_5.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380740/notion-blog/_/_/_5_/_7_-_3/image_6.png)
+
+### 🔧 상세 설정
+
+**1. 변수 타입 설정**
+
+```
+Default Boolean에서 변경
+  ↓
+Object Reference 카테고리
+  ↓
+Target Point 선택
+```
+
+**2. 배열로 변경**
+
+```
+Variable Type 옆 드롭다운
+  ↓
+Single → Array로 변경
+  └─ 여러 Target Point 저장 가능
+
+```
+
+**3. Instance Editable 체크**
+
+```
+Details 패널
+  ↓
+Instance Editable: ✅
+  └─ 레벨의 각 Spawner마다 다른 Target Points 설정 가능
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380740/notion-blog/_/_/_5_/_7_-_3/image_7.png)
+
+```csharp
+이거 해야지 변수에서 보인다 잘 기억하자 이게 **Instance Editable 다**
+```
+
+---
+
+## 🎨 9단계: Target Points 연결하기
+
+### 🔗 Dropper Tool 사용법
+
+**가장 편한 방법: Dropper Tool**
+
+```
+레벨에서 BP_BotSpawner 선택
+  ↓
+Details 패널
+  ↓
+Target Points 배열
+  ↓
++ 버튼으로 요소 추가
+  ↓
+드롭다운 옆 Dropper 아이콘 (💧) 클릭
+  └─ "Pick Actor from Scene" 표시됨
+  ↓
+커서가 Dropper로 변경
+  ↓
+레벨에서 원하는 Target Point 클릭
+  └─ 자동으로 배열에 추가됨
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380735/notion-blog/_/_/_5_/_7_-_2/image_14.png)
+
+### 📋 여러 Target Point 추가
+
+**반복 과정**
+
+```
+Target Points 배열에서 + 클릭
+  ↓
+Dropper 아이콘 클릭
+  ↓
+두 번째 Target Point 선택
+  ↓
+배열에 추가됨
+
+결과:
+Target Points [0]: TargetPoint_1
+Target Points [1]: TargetPoint_2
+```
+
+### 💡 다른 방법들 (참고)
+
+**드롭다운 방법**
+
+```
+배열 요소의 드롭다운 클릭
+  ↓
+레벨에 있는 모든 Target Point 목록 표시
+  ↓
+원하는 것 선택
+```
+
+**World Outliner에서 드래그**
+
+```
+World Outliner에서 Target Point 선택
+  ↓
+배열로 드래그 & 드롭
+```
+
+---
+
+## 📊 현재까지 완성된 구조
+
+```
+BP_BotSpawner
+  ├─ Box Component
+  │   ├─ 입구에 배치됨
+  │   ├─ 크기: 입구 전체 커버
+  │   ├─ Collision: OverlapAllDynamic
+  │   └─ Player와 Overlap 가능
+  │
+  └─ Target Points (배열 변수)
+      ├─ Instance Editable: ✅
+      ├─ [0]: TargetPoint_1 (동상 옆)
+      └─ [1]: TargetPoint_2 (복제한 위치)
+
+레벨 구성
+  ├─ BP_BotSpawner (입구에 배치)
+  ├─ TargetPoint_1 (마당 내 위치1)
+  └─ TargetPoint_2 (마당 내 위치2)
+```
+
+---
+
+## 🎯 다음 강의 예고
+
+### 📝 구현할 기능
+
+다음 강의에서는 실제 스폰 기능을 프로그래밍합니다:
+
+```
+1. Box Overlap 이벤트 감지
+   ↓
+2. Target Points 배열 순회
+   ↓
+3. 각 Target Point 위치에 BP_Bot 스폰
+   ↓
+4. 적 봇 활성화
+```
+
+### 🔧 사용할 Blueprint 노드
+
+- **Begin Overlap**: Box와 충돌 감지
+- **For Each Loop**: 배열의 모든 Target Point 순회
+- **Spawn Actor**: BP_Bot 생성
+- **Get Actor Location**: Target Point의 위치 가져오기
+
+---
+
+## ✅ 핵심 정리
+
+### 📌 이번 강의에서 배운 것
+
+**1. 레벨 시작 설정**
+
+- Editor Startup Map, Game Default Map 설정
+
+**2. BP_BotSpawner 액터 생성**
+
+- Box Component로 트리거 영역 설정
+- 시각화 옵션으로 편집 편의성 향상
+
+**3. Collision 설정**
+
+- OverlapAllDynamic Preset 수정
+- Player와 Enemy도 Overlap 가능하게 변경
+
+**4. Target Point 시스템**
+
+- 스폰 위치를 표시하는 가벼운 액터
+- 배열 변수로 여러 위치 관리
+
+**5. Instance Editable**
+
+- 레벨의 각 Spawner마다 다른 Target Points 설정 가능
+- 유연한 레벨 디자인
+
+### ⚠️ 주의할 점
+
+```
+Box Component 크기 조정
+  └─ Scale 사용 ❌
+  └─ Box Extent 사용 ✅
+
+액터 위치 이동
+  └─ Box Component 선택 상태로 이동 ❌
+  └─ 액터 자체 선택 후 이동 ✅
+
+Collision Preset
+  └─ Project Settings에서 전역 수정
+  └─ 한 번만 설정하면 모든 곳에 적용
+```
+
+# {🎮 적 봇 스폰 시스템 만들기 (2부) - Blueprint 로직 구현 }
+
+## 🎯 이번 강의 목표
+
+플레이어가 트리거 박스를 지나갈 때 Target Point 위치에 적 봇을 자동으로 생성하는 기능을 완성합니다.
+
+- Overlap 이벤트로 충돌 감지
+- 배열 순회로 여러 봇 스폰
+- 중복 스폰 방지 최적화
+
+## 📋 완성될 시스템 흐름
+
+```
+플레이어가 Box와 충돌
+  ↓
+ActorBeginOverlap 이벤트 발생
+  ↓
+Target Points 배열 순회 (For Each Loop)
+  ↓
+각 Target Point 위치에서 BP_Bot 스폰
+  ↓
+스폰 완료 후 Spawner 제거
+```
+
+---
+
+## 🔨 1단계: Blueprint 준비 작업
+
+### 📝 불필요한 이벤트 정리
+
+**Event Graph 정리**
+
+```
+BP_BotSpawner 열기
+  ↓
+Event Graph
+  ↓
+Event Tick 삭제
+  └─ 매 프레임 호출되는 이벤트 (지금은 불필요)
+
+Event BeginPlay 삭제
+  └─ 게임 시작 시 한 번 호출 (지금은 불필요)
+```
+
+**이유**: 스폰은 플레이어가 지나갈 때만 발생하므로 Overlap 이벤트만 필요
+
+---
+
+## 🎮 2단계: Scene Root 구조 단순화
+
+### 🔧 Root Component 변경
+
+**현재 구조**
+
+```
+DefaultSceneRoot (루트)
+  └─ Box Component (충돌 감지)
+```
+
+**변경 후**
+
+```
+Box Component (루트)
+  └─ (자식 없음)
+```
+
+### 📝 변경 방법
+
+```
+Components 패널
+  ↓
+Box Component를 위로 드래그
+  ↓
+DefaultSceneRoot 위에 놓기
+  └─ Box가 새로운 루트가 됨
+
+```
+
+**장점**
+
+- 구조 단순화
+- Box만 충돌 감지하므로 더 명확함
+- DefaultSceneRoot는 충돌 기능이 없어서 불필요
+
+---
+
+## 🎯 3단계: Overlap 이벤트 추가 (핵심)
+
+### 📌 Event ActorBeginOverlap
+
+**이벤트 추가**
+
+```
+Event Graph에서 우클릭
+  ↓
+"Begin Overlap" 검색
+  ↓
+Event ActorBeginOverlap 선택
+```
+
+### 💡 Event ActorBeginOverlap란?
+
+```
+Event ActorBeginOverlap
+  └─ 다른 액터가 이 액터의 충돌 영역에 들어올 때 발생하는 이벤트
+      ├─ 자동으로 실행됨 (매 프레임 체크하지 않아도 됨)
+      ├─ 충돌한 상대방 정보를 알려줌
+      └─ 한 번만 발생 (계속 겹쳐있어도 들어올 때만)
+```
+
+### 🔌 출력 핀 설명
+
+```
+Event ActorBeginOverlap
+  ├─ 실행 핀 (빨간색 삼각형)
+  │   └─ 이벤트가 발생하면 여기서부터 실행 시작
+  │
+  └─ Other Actor (파란색)
+      └─ 충돌한 상대방 액터의 참조
+          (예: 플레이어, 적, 발사체 등)
+```
+
+---
+
+## 🔄 4단계: For Each Loop로 배열 순회
+
+### 📌 For Each Loop 노드
+
+**노드 추가**
+
+```
+Event ActorBeginOverlap 실행 핀에서 드래그
+  ↓
+"For Each Loop" 검색
+  ↓
+For Each Loop 노드 연결
+```
+
+### 💡 For Each Loop란?
+
+```
+For Each Loop
+  └─ 배열의 모든 요소를 하나씩 꺼내서 처리하는 반복문
+
+예시:
+Target Points 배열 = [위치1, 위치2, 위치3]
+  ↓
+Loop 1회: 위치1에서 봇 스폰
+Loop 2회: 위치2에서 봇 스폰
+Loop 3회: 위치3에서 봇 스폰
+```
+
+### 🔌 핀 설명
+
+```
+For Each Loop
+  ├─ 입력
+  │   ├─ 실행 핀 (좌측 빨간 삼각형)
+  │   │   └─ 루프 시작 신호
+  │   │
+  │   └─ Array (파란색)
+  │       └─ 순회할 배열
+  │           (여기서는 Target Points 배열)
+  │
+  └─ 출력
+      ├─ Loop Body (빨간 삼각형)
+      │   └─ 배열의 각 요소마다 실행
+      │       (요소 개수만큼 반복)
+      │
+      ├─ Array Element (파란색)
+      │   └─ 현재 처리 중인 요소
+      │       (현재 Target Point)
+      │
+      ├─ Array Index (정수)
+      │   └─ 현재 요소의 인덱스
+      │       (0, 1, 2, ...)
+      │
+      └─ Completed (빨간 삼각형)
+          └─ 모든 반복이 끝나면 실행
+              (배열의 마지막까지 다 돌았을 때)
+```
+
+### 📝 배열 연결
+
+```
+Target Points 변수를 드래그
+  ↓
+Get으로 배치 (Getter)
+  ↓
+For Each Loop의 Array 핀에 연결
+```
+
+---
+
+## 📍 5단계: Target Point 위치 가져오기
+
+### 📌 Get Actor Location 노드
+
+**노드 추가**
+
+```
+For Each Loop의 Array Element 핀에서 드래그
+  ↓
+"Get Actor Location" 검색
+  ↓
+Get Actor Location 노드 연결
+```
+
+### 💡 Get Actor Location이란?
+
+```
+Get Actor Location
+  └─ 액터의 3D 공간상의 위치(X, Y, Z)를 가져오는 함수
+
+Target (입력)
+  └─ 위치를 알고 싶은 액터
+      (여기서는 Target Point)
+
+Return Value (출력)
+  └─ Vector 타입 (X, Y, Z 좌표)
+      예: (1200.0, 500.0, 100.0)
+```
+
+### 🔗 연결
+
+```
+For Each Loop의 Array Element
+  ↓
+Get Actor Location의 Target
+  └─ 현재 순회 중인 Target Point의 위치를 가져옴
+```
+
+---
+
+## 🤖 6단계: 봇 스폰하기
+
+### 📌 Spawn Actor from Class 노드
+
+**노드 추가**
+
+```
+For Each Loop의 Loop Body에서 드래그
+  ↓
+"Spawn Actor" 검색
+  ↓
+Spawn Actor from Class 선택
+```
+
+### 💡 Spawn Actor from Class란?
+
+```
+Spawn Actor from Class
+  └─ 게임 중에 새로운 액터를 생성하는 함수
+      ├─ 실행 시점에 동적으로 생성
+      ├─ 레벨에 미리 배치한 것이 아님
+      └─ 원하는 위치, 회전, 크기로 생성 가능
+```
+
+### 🔌 핀 설명
+
+```
+Spawn Actor from Class
+  ├─ 입력
+  │   ├─ 실행 핀 (좌측 빨간 삼각형)
+  │   │   └─ 스폰 명령 실행
+  │   │
+  │   ├─ Class (주황색)
+  │   │   └─ 생성할 액터의 종류
+  │   │       (여기서는 BP_Bot)
+  │   │
+  │   ├─ Spawn Transform (노란색)
+  │   │   └─ 생성 위치, 회전, 크기
+  │   │       ├─ Location: 어디에 생성할지
+  │   │       ├─ Rotation: 어떤 방향을 볼지
+  │   │       └─ Scale: 크기 (보통 1,1,1)
+  │   │
+  │   ├─ Collision Handling Override
+  │   │   └─ 충돌 처리 방식
+  │   │       (기본값: Default 사용)
+  │   │
+  │   └─ Instigator
+  │       └─ 생성을 일으킨 주체
+  │           (보통 비워둠)
+  │
+  └─ 출력
+      ├─ 실행 핀 (우측 빨간 삼각형)
+      │   └─ 스폰 후 다음 실행
+      │
+      └─ Return Value (파란색)
+          └─ 생성된 액터의 참조
+              (생성된 봇을 제어하고 싶을 때 사용)
+```
+
+### 🔧 설정 방법
+
+**1. Class 설정**
+
+```
+Class 드롭다운
+  ↓
+BP_Bot 선택
+  └─ 적 봇을 생성하도록 설정
+```
+
+**2. Spawn Transform 분할**
+
+```
+Spawn Transform 핀에서 우클릭
+  ↓
+Split Struct Pin 선택
+  └─ Transform이 Location, Rotation, Scale로 분리됨
+```
+
+**분할 후 구조**
+
+```
+Spawn Transform
+  ├─ Location (X, Y, Z)
+  ├─ Rotation (Roll, Pitch, Yaw)
+  └─ Scale (X, Y, Z)
+```
+
+**3. Location 연결**
+
+```
+Get Actor Location의 Return Value
+  ↓
+Spawn Transform Location에 연결
+  └─ Target Point의 위치에서 봇 생성
+```
+
+**4. Rotation과 Scale**
+
+```
+Rotation
+  └─ 연결 안 함 (봇이 알아서 플레이어를 향함)
+
+Scale
+  └─ 기본값 (1, 1, 1) 사용
+      (원본 크기 그대로)
+```
+
+---
+
+## 🎨 7단계: 노드 연결 완성
+
+### 📊 전체 Blueprint 구조
+
+```
+Event ActorBeginOverlap
+  ↓ (실행 흐름)
+For Each Loop
+  ├─ Array: Target Points (배열)
+  ↓ Loop Body (각 요소마다 실행)
+Spawn Actor from Class
+  ├─ Class: BP_Bot
+  └─ Location: Get Actor Location
+      └─ Target: Array Element (현재 Target Point)
+```
+
+### 🔗 정확한 연결도
+
+```
+[Event ActorBeginOverlap]
+  │ (실행 핀)
+  ↓
+[For Each Loop]
+  │ Array ← [Get Target Points]
+  │
+  ├─ Loop Body (실행 핀)
+  │   ↓
+  │   [Spawn Actor BP_Bot]
+  │     └─ Location ← [Get Actor Location]
+  │         └─ Target ← Array Element
+  │
+  └─ Completed (나중에 사용)
+```
+
+---
+
+## ✅ 8단계: 첫 번째 테스트
+
+### 🎮 테스트 과정
+
+**1. 컴파일 및 저장**
+
+```
+Blueprint 상단
+  ├─ Compile 클릭 (초록 체크 표시 확인)
+  └─ Save 클릭
+```
+
+**2. 플레이 테스트**
+
+```
+Play 버튼
+  ↓
+입구(두 기둥 사이)로 이동
+  ↓
+Box와 Overlap
+  ↓
+Target Point 2곳에서 봇 생성 확인
+```
+
+### 🎯 예상 결과
+
+```
+입구 통과
+  ↓
+동상 양쪽에 봇 2개 생성
+  ├─ Target Point 1 위치에 봇 1
+  └─ Target Point 2 위치에 봇 2
+  ↓
+봇들이 플레이어를 추격
+```
+
+### ✅ 성공!
+
+- 2개의 봇이 정확한 위치에 스폰됨
+- 즉시 적대적으로 플레이어 추격 시작
+
+---
+
+## ⚠️ 9단계: 문제점 발견
+
+### 🐛 문제 1: 무한 스폰
+
+**현재 상황**
+
+```
+플레이어가 다시 Box를 통과
+  ↓
+ActorBeginOverlap 다시 발생
+  ↓
+또 다시 봇 2개 스폰
+  ↓
+무한 반복 가능...
+```
+
+### 🐛 문제 2: 다른 액터도 트리거
+
+**테스트 시나리오**
+
+```
+봇 2개 스폰됨
+  ↓
+봇들이 플레이어 추격
+  ↓
+봇이 Box를 통과하면서 Overlap 발생
+  ↓
+또 봇 2개 추가 스폰! (총 4개)
+  ↓
+그 봇들도 지나가면...
+  ↓
+또 2개씩 계속 스폰됨 (끝없이 증가)
+```
+
+**실제 테스트 결과**
+
+- 봇이 4개, 6개, 8개... 계속 증가
+- 게임이 망가짐
+
+### 💡 해결 방법 필요
+
+두 가지 접근법:
+
+1. 한 번 스폰하면 더 이상 스폰 안 되게
+2. 오직 플레이어만 트리거하게
+
+---
+
+## 🛡️ 10단계: 중복 스폰 방지 (초급 방법)
+
+### 📝 Boolean 변수로 체크
+
+**변수 생성**
+
+```
+Variables 패널
+  ↓
++ Add Variable
+  ↓
+이름: HasSpawnedBots
+  ↓
+Variable Type: Boolean
+  ├─ Default: Single (배열 아님)
+  └─ Default Value: false (체크 안 함)
+```
+
+### 💡 Boolean이란?
+
+```
+Boolean (부울)
+  └─ 참(true) 또는 거짓(false) 두 가지 값만 가지는 타입
+      ├─ true: 이미 스폰함
+      └─ false: 아직 스폰 안 함
+```
+
+### 🔧 Blueprint 수정
+
+**Branch 노드 추가**
+
+```
+Event ActorBeginOverlap → Branch 노드 → For Each Loop
+
+Branch 노드:
+  ├─ Condition: HasSpawnedBots (Get)
+  ├─ True: 아무것도 안 함 (스폰 X)
+  └─ False: For Each Loop 실행 (스폰 O)
+```
+
+### 📌 Branch 노드란?
+
+```
+Branch
+  └─ if문과 같은 조건 분기
+
+Condition (입력)
+  └─ Boolean 값 (true/false)
+
+True (출력)
+  └─ Condition이 true일 때 실행
+
+False (출력)
+  └─ Condition이 false일 때 실행
+```
+
+### 🔗 연결 구조
+
+```
+[Event ActorBeginOverlap]
+  ↓
+[Branch]
+  ├─ Condition ← [Get HasSpawnedBots]
+  │
+  ├─ False (처음엔 false)
+  │   ↓
+  │   [Set HasSpawnedBots] (true로 변경)
+  │     ↓
+  │   [For Each Loop]
+  │     ↓
+  │   [Spawn Actor BP_Bot]
+  │
+  └─ True (이미 스폰함)
+      └─ (아무것도 안 함)
+```
+
+### ⚠️ 이 방법의 문제점
+
+```
+매번 Overlap 발생
+  ↓
+Branch만 체크하고 끝
+  ↓
+하지만 충돌 감지는 계속 작동 중
+  └─ CPU 리소스 낭비 (최적화 X)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380740/notion-blog/_/_/_5_/_7_-_3/image_8.png)
+
+---
+
+## ⚡ 11단계: 충돌 비활성화 (최적화 방법 1)
+
+### 📌 Set Collision Enabled 노드
+
+**노드 추가**
+
+```
+For Each Loop의 Completed 핀에서 드래그
+  ↓
+"Set Collision Enabled" 검색
+  ↓
+Set Collision Enabled 선택
+```
+
+### 💡 Set Collision Enabled란?
+
+```
+Set Collision Enabled
+  └─ 컴포넌트의 충돌 기능을 켜거나 끄는 함수
+
+Target (입력)
+  └─ 충돌 설정을 바꿀 컴포넌트
+      (여기서는 Box Component)
+
+New Type (입력)
+  └─ 충돌 타입 선택
+      ├─ Query and Physics: 완전 활성화
+      ├─ Query Only (No Physics): 겹침만 감지
+      ├─ Physics Only (No Query): 물리만 작동
+      └─ No Collision: 완전 비활성화
+```
+
+### 🔧 설정 방법
+
+**1. Target 연결**
+
+```
+Components 패널에서 Box 드래그
+  ↓
+Get Box (Getter)
+  ↓
+Set Collision Enabled의 Target에 연결
+```
+
+**2. New Type 설정**
+
+```
+New Type 드롭다운
+  ↓
+No Collision 선택
+  └─ 충돌 완전 비활성화
+```
+
+### 🔗 연결 구조
+
+```
+[For Each Loop]
+  └─ Completed (모든 스폰 완료 후)
+      ↓
+  [Set Collision Enabled]
+      ├─ Target: Box Component
+      └─ New Type: No Collision
+```
+
+### ✅ 효과
+
+```
+Before:
+매번 Overlap 이벤트 발생 → Branch 체크 → CPU 낭비
+
+After:
+Overlap 이벤트 자체가 발생 안 함 → CPU 절약
+```
+
+---
+
+## 🗑️ 12단계: Spawner 제거 (최적화 방법 2)
+
+### 📌 Destroy Actor 노드
+
+**노드 추가**
+
+```
+For Each Loop의 Completed에서 드래그
+  ↓
+"Destroy Actor" 검색
+  ↓
+Destroy Actor 선택
+```
+
+### 💡 Destroy Actor란?
+
+```
+Destroy Actor
+  └─ 액터를 게임에서 완전히 삭제하는 함수
+      ├─ 메모리에서 제거됨
+      ├─ 더 이상 업데이트 안 함
+      └─ 레벨에서 사라짐
+```
+
+### 🔧 사용법
+
+**Target 설정**
+
+```
+Destroy Actor
+  └─ Target: self
+      (노드에서 우클릭 → Get a reference to self)
+      또는 Target 비워두기 (자동으로 self)
+```
+
+### 🔗 연결 구조
+
+```
+[For Each Loop]
+  └─ Completed
+      ↓
+  [Destroy Actor]
+      └─ Target: (비움 = self = BP_BotSpawner 자신)
+```
+
+### ⚖️ 두 방법 비교
+
+```
+Set Collision Enabled (No Collision)
+  ├─ 장점: Spawner는 남아있음 (나중에 재활용 가능)
+  ├─ 단점: 메모리에 계속 존재
+  └─ 사용: 나중에 다시 활성화할 수도 있을 때
+
+Destroy Actor
+  ├─ 장점: 메모리 완전 해제 (최적화)
+  ├─ 단점: 다시 사용 불가
+  └─ 사용: 한 번만 스폰하고 끝낼 때 (지금 상황)
+```
+
+### ✅ 권장: Destroy Actor
+
+이 게임에서는 한 번만 스폰하므로 Destroy Actor 사용
+
+---
+
+## 🎯 13단계: 플레이어만 트리거하도록 설정
+
+### ⚠️ 현재 문제
+
+```
+Box Component
+  └─ Collision Preset: OverlapAllDynamic
+      ├─ 모든 Dynamic 오브젝트와 Overlap
+      ├─ Player ✅
+      ├─ Enemy ✅ (문제!)
+      └─ Projectile 등 다른 것들도 트리거 가능
+```
+
+### 🔧 해결: Overlap Only Pawn Preset 사용
+
+**현재 있는 Preset 활용**
+
+```
+Box Component 선택
+  ↓
+Details 패널
+  ↓
+Collision
+  ↓
+Collision Presets: Pickup 선택
+  └─ Pickup Preset은 Player와만 Overlap하도록 설정됨
+```
+
+### 💡 Pickup Preset이란?
+
+```
+Pickup (기존에 만들었던 Preset)
+  ├─ Collision Enabled: Query Only
+  ├─ Object Type: WorldDynamic
+  └─ Collision Responses:
+      ├─ Default: Ignore (무시)
+      └─ Player: Overlap (겹침)
+          → 오직 플레이어와만 반응
+```
+
+### 🎨 Preset 이름 변경 (선택사항)
+
+**더 명확한 이름으로 변경**
+
+```
+Edit → Project Settings
+  ↓
+Engine - Collision
+  ↓
+Preset 섹션
+  ↓
+Pickup 찾기
+  ↓
+Edit 클릭
+  ├─ Name: OverlapOnlyPawn 또는 OverlapOnlyPlayer
+  ├─ Description: "플레이어와만 겹침을 감지하는 컴포넌트용"
+  └─ Accept
+```
+
+**변경 후**
+
+```
+Box Component의 Collision Preset
+  └─ OverlapOnlyPawn으로 표시됨
+      (기능은 동일, 이름만 명확해짐)
+```
+
+### ✅ 최종 최적화 결과
+
+```
+최적화 조합:
+  ├─ Collision Preset: OverlapOnlyPawn
+  │   └─ 플레이어만 트리거 (적 봇은 트리거 X)
+  │
+  └─ Destroy Actor 사용
+      └─ 스폰 후 Spawner 제거 (재트리거 불가)
+
+결과:
+  ├─ CPU 효율: 최상 (불필요한 충돌 감지 없음)
+  ├─ 메모리: 최상 (사용 후 즉시 해제)
+  └─ 기능: 완벽 (한 번만 정확히 스폰)
+```
+
+---
+
+## 🏗️ 14단계: 두 번째 Spawner 추가
+
+### 📍 다음 구역 설정
+
+**Spawner 배치**
+
+```
+Content Browser에서 BP_BotSpawner 드래그
+  ↓
+두 번째 마당 입구에 배치
+  ↓
+Box Component 선택
+  ↓
+Box Extent 조정
+  ├─ X: 해당 구역 너비만큼
+  ├─ Y: 구역 깊이만큼
+  └─ Z: 플레이어 높이만큼
+```
+
+### 🎯 Target Point 배치
+
+**3개의 Target Point 추가**
+
+```
+Place Actors → Target Point
+  ↓
+두 번째 마당에 3곳 배치
+  ├─ Target Point 1: 왼쪽
+  ├─ Target Point 2: 중앙
+  └─ Target Point 3: 오른쪽
+```
+
+**복제로 빠르게 배치**
+
+```
+첫 번째 Target Point 선택
+  ↓
+Alt + 드래그로 복제
+  ↓
+원하는 위치에 배치
+  ↓
+반복
+```
+
+### 🔗 Spawner에 연결
+
+**Target Points 배열 설정**
+
+```
+BP_BotSpawner (두 번째) 선택
+  ↓
+Details 패널
+  ↓
+Target Points 배열
+  ↓
++ 버튼 3번 클릭 (3개 요소 추가)
+  ↓
+각 요소마다:
+  ├─ Dropper 아이콘 클릭
+  ├─ 레벨의 Target Point 클릭
+  └─ 배열에 추가됨
+
+결과:
+Target Points [0]: TargetPoint_3
+Target Points [1]: TargetPoint_4
+Target Points [2]: TargetPoint_5
+```
+
+---
+
+## 🎮 15단계: 최종 테스트
+
+### 🧪 전체 시스템 테스트
+
+**테스트 시나리오**
+
+```
+1단계: 첫 번째 입구 통과
+  ↓
+봇 2개 스폰 (동상 양쪽)
+  ↓
+봇 제거
+  ↓
+2단계: 두 번째 입구 통과
+  ↓
+봇 3개 스폰 (마당 곳곳)
+  ↓
+봇 제거
+  ↓
+다시 되돌아가기
+  ↓
+봇 추가 스폰 안 됨 ✅ (Spawner가 Destroy됨)
+```
+
+### ✅ 예상 결과
+
+```
+첫 번째 구역
+  ├─ 입구 통과 → 봇 2개 스폰
+  ├─ 전투 → 봇 처치
+  └─ Spawner 사라짐
+
+두 번째 구역
+  ├─ 입구 통과 → 봇 3개 스폰
+  ├─ 전투 → 봇 처치
+  └─ Spawner 사라짐
+
+재방문
+  └─ 어떤 구역도 봇 스폰 안 됨 ✅
+```
+
+### 🎯 성공!
+
+- 각 구역마다 정확한 개수의 봇 스폰
+- 중복 스폰 없음
+- 최적화 완료
+
+---
+
+## 📊 최종 Blueprint 구조 정리
+
+### 🎨 완성된 노드 구조
+
+```
+[Event ActorBeginOverlap]
+  │
+  ↓
+[For Each Loop]
+  │ Array ← [Get Target Points]
+  │
+  ├─ Loop Body
+  │   ↓
+  │   [Spawn Actor from Class]
+  │     ├─ Class: BP_Bot
+  │     └─ Location ← [Get Actor Location]
+  │         └─ Target ← Array Element
+  │
+  └─ Completed
+      ↓
+  [Destroy Actor]
+      └─ Target: self (BP_BotSpawner)
+```
+
+### 🔧 Component 설정
+
+```
+BP_BotSpawner
+  └─ Box Component (Root)
+      ├─ Collision Preset: OverlapOnlyPawn
+      ├─ Shape Color: 녹청색
+      └─ Line Thickness: 5
+```
+
+### 📝 Variables
+
+```
+Target Points (Array)
+  ├─ Type: Target Point (Object Reference)
+  ├─ Container: Array
+  └─ Instance Editable: ✅
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### 📌 주요 Blueprint 노드
+
+**1. Event ActorBeginOverlap**
+
+```
+역할: 다른 액터가 충돌 영역에 들어올 때 자동 실행
+사용: 트리거, 픽업, 문 열기 등
+```
+
+**2. For Each Loop**
+
+```
+역할: 배열의 모든 요소를 순회하며 작업 수행
+사용: 여러 대상에게 동일한 작업 (스폰, 파괴, 이동 등)
+```
+
+**3. Get Actor Location**
+
+```
+역할: 액터의 3D 위치 좌표 가져오기
+사용: 스폰 위치, 거리 계산, 방향 계산 등
+```
+
+**4. Spawn Actor from Class**
+
+```
+역할: 게임 중 새로운 액터 동적 생성
+사용: 적 스폰, 아이템 생성, 효과 생성 등
+```
+
+**5. Branch**
+
+```
+역할: 조건에 따라 실행 흐름 분기
+사용: 모든 조건부 로직 (if문)
+```
+
+**6. Set Collision Enabled**
+
+```
+역할: 컴포넌트의 충돌 기능 제어
+사용: 트리거 비활성화, 임시 무적 등
+```
+
+**7. Destroy Actor**
+
+```
+역할: 액터를 게임에서 완전히 제거
+사용: 적 사망, 아이템 소비, 임시 객체 정리 등
+```
+
+---
+
+## ⚠️ 주의사항 및 팁
+
+### 🔴 흔한 실수
+
+**1. Spawn Transform 분할 안 함**
+
+```
+❌ Transform을 통째로 연결
+✅ Split Struct Pin으로 Location만 연결
+```
+
+**2. Array Element 직접 사용**
+
+```
+❌ Array Element를 직접 Spawn Location에 연결
+✅ Get Actor Location으로 위치 추출 후 연결
+```
+
+**3. Collision Preset 미설정**
+
+```
+❌ OverlapAllDynamic 그대로 사용 (모든 것과 반응)
+✅ OverlapOnlyPawn 사용 (플레이어만)
+```
+
+**4. Spawner 정리 안 함**
+
+```
+❌ 스폰 후 Spawner 그대로 유지 (재트리거 가능)
+✅ Destroy Actor로 제거 (최적화)
+```
+
+### ✅ Best Practices
+
+**최적화 우선순위**
+
+```
+1. 플레이어만 트리거 (Collision Preset)
+2. 한 번만 실행 (Destroy Actor)
+3. Boolean 체크는 최후의 수단
+```
+
+**Target Point 배치 팁**
+
+```
+- 플레이어 시야에서 약간 벗어난 곳
+- 엄폐물 뒤
+- 전술적으로 유리한 위치
+- 너무 가깝지 않게 분산
+```
+
+**Box 크기 조정**
+
+```
+- 입구를 완전히 커버
+- 너무 크면 예상치 못한 곳에서 트리거
+- 너무 작으면 지나쳐도 안 걸림
+- Z축도 충분히 높게 (점프 고려)
+```
+
+---
+
+## 🎯 핵심 정리
+
+### ✅ 완성된 기능
+
+**스폰 시스템**
+
+- ✅ 플레이어가 지나가면 자동 스폰
+- ✅ 원하는 위치에 정확히 배치
+- ✅ 원하는 개수만큼 생성
+- ✅ 중복 스폰 방지
+- ✅ 최적화 완료
+
+**Blueprint 기술**
+
+- ✅ Event 시스템 이해
+- ✅ 배열 순회 (For Each Loop)
+- ✅ 액터 스폰
+- ✅ 위치 데이터 활용
+- ✅ 충돌 최적화
+
+**레벨 디자인**
+
+- ✅ 구역별 전투 설정
+- ✅ 난이도 조절 (봇 개수)
+- ✅ 재사용 가능한 시스템
+
+### 🚀 활용 가능성
+
+```
+이 시스템으로 만들 수 있는 것:
+  ├─ 웨이브 시스템 (단계별 적 출현)
+  ├─ 보스 등장 연출
+  ├─ 아이템 상자 스폰
+  ├─ NPC 등장
+  ├─ 이벤트 트리거
+  └─ 동적 레벨 생성
+```
+
+### 💪 배운 핵심 개념
+
+**1. 이벤트 기반 프로그래밍**
+
+- 특정 조건에서 자동 실행
+- 사용자 입력 없이 동작
+
+**2. 배열과 반복문**
+
+- 여러 데이터를 효율적으로 처리
+- 동일한 작업을 여러 대상에게
+
+**3. 동적 객체 생성**
+
+- 게임 중 필요할 때 생성
+- 메모리 효율적 관리
+
+**4. 최적화 마인드**
+
+- 불필요한 연산 제거
+- 메모리 정리
+
+---
+
+# { 🎮 보스 봇 만들기 - 체력 시스템과 난이도 조절 }
+
+## 🎯 이번 강의 목표
+
+기본 봇에 체력 시스템을 추가하고, 더 크고 강력한 보스 봇을 만듭니다.
+
+- 체력 시스템 구현 (한 방에 죽지 않게)
+- 큰 메시를 가진 보스 봇 생성
+- 난이도 조절 (체력, 속도, 공격력)
+- 봇 스포너에서 다른 봇 클래스 스폰
+
+## 📋 전체 작업 흐름
+
+```
+현재 문제
+  ├─ 봇이 한 방에 죽음
+  └─ 모든 봇이 동일
+
+  ↓
+
+체력 시스템 추가
+  ├─ Health 변수 생성
+  ├─ 데미지로 체력 감소
+  └─ 체력 0이 되면 폭발
+
+  ↓
+
+보스 봇 생성
+  ├─ 더 큰 메시
+  ├─ 더 많은 체력
+  ├─ 느린 이동
+  └─ 빠른 공격
+
+  ↓
+
+봇 스포너 개선
+  └─ 다양한 봇 클래스 스폰 가능
+```
+
+---
+
+## ❤️ 1단계: 체력 시스템 구현
+
+### 🔍 현재 상황 분석
+
+**BP_Bot의 Event Any Damage**
+
+```
+현재:
+Event Any Damage → 즉시 Explode
+  └─ Damage 값을 받지만 사용 안 함
+  └─ 한 방에 무조건 폭발
+
+문제점:
+  ├─ 너무 쉽게 죽음
+  ├─ 난이도 조절 불가
+  └─ 보스 봇을 만들 수 없음
+```
+
+### 📝 Health 변수 생성
+
+**변수 추가**
+
+```
+BP_Bot 열기
+  ↓
+Variables 패널
+  ↓
++ Add Variable
+  ├─ Name: Health
+  ├─ Type: Float
+  ├─ Category: Combat
+  ├─ Default Value: 30.0
+  └─ Instance Editable: ✅ (체크)
+```
+
+### 💡 Float 타입이란?
+
+```
+Float (실수)
+  └─ 소수점이 있는 숫자
+      ├─ 30.0, 25.5, 100.75 등
+      ├─ 정밀한 값 표현 가능
+      └─ 체력, 데미지, 속도 등에 사용
+
+Integer와 비교:
+  ├─ Integer: 정수 (30, 25, 100)
+  └─ Float: 실수 (30.0, 25.5, 100.75)
+```
+
+---
+
+## 🔫 2단계: 데미지 시스템 이해
+
+### 🔍 블래스터 빔 분석
+
+**BP_BlasterBeam → Event Graph**
+
+```
+Handle On Hit (충돌 처리)
+  ↓
+Spawn Niagara System (충격 이펙트)
+  ↓
+Apply Damage (피해 입히기)
+  ├─ Hit Actor에게 전달
+  └─ Damage 변수 값 사용
+```
+
+### 📊 데미지 값 확인
+
+**BP_PlayerBlasterBeam (하위 클래스)**
+
+```
+Variables
+  └─ Damage (Float)
+      ├─ Default Value: 10.0
+      └─ 플레이어 발사체가 입히는 피해량
+
+상속 구조:
+BP_BlasterBeam (부모)
+  └─ Damage 변수 정의
+      ↓
+BP_PlayerBlasterBeam (자식)
+  └─ Damage = 10.0으로 설정
+```
+
+### 💡 계산
+
+```
+현재 설정:
+  ├─ Bot Health: 30.0
+  └─ Player Damage: 10.0
+      ↓
+  결과: 3발로 봇 처치 가능
+```
+
+---
+
+## 🔧 3단계: DecrementHealth 함수 생성
+
+### 📌 함수 만들기
+
+**새 함수 추가**
+
+```
+BP_Bot → Functions 패널
+  ↓
++ 버튼 (Add Function)
+  ↓
+Name: DecrementHealth
+```
+
+### 🔌 입력/출력 파라미터 설정
+
+**Details 패널에서 설정**
+
+```
+Inputs
+  └─ Damage (Float)
+      └─ 받은 피해량
+
+Outputs
+  └─ IsDead (Boolean)
+      └─ 죽었는지 여부 (true/false)
+```
+
+### 💡 함수 파라미터란?
+
+```
+Function Parameters
+  ├─ Inputs (입력)
+  │   └─ 함수가 작동하는데 필요한 정보
+  │       (예: Damage - 얼마나 다쳤는지)
+  │
+  └─ Outputs (출력)
+      └─ 함수가 계산한 결과
+          (예: IsDead - 죽었는지 안 죽었는지)
+
+사용 예:
+DecrementHealth 함수 호출
+  ├─ Input: Damage = 10.0
+  ↓ (체력 30.0 → 20.0으로 감소)
+  └─ Output: IsDead = false (아직 살아있음)
+```
+
+---
+
+## 🎨 4단계: DecrementHealth 로직 구현
+
+### 🔗 노드 구조
+
+```
+[DecrementHealth 함수 시작]
+  │
+  ├─ Input: Damage (받은 피해)
+  │
+  ↓
+[Set Health]
+  ├─ 새 값: Health - Damage
+  │   └─ 현재 체력에서 피해량 빼기
+  │
+  ↓
+[Get Health]
+  ↓
+[<= (작거나 같음)]
+  ├─ A: Health
+  ├─ B: 0.0
+  │
+  ↓
+[Return Node]
+  └─ IsDead: <= 연산 결과 (true/false)
+```
+
+### 📝 상세 노드 설명
+
+**1. Set Health (체력 감소)**
+
+```
+Set Health
+  └─ 변수 값을 변경하는 노드
+
+연결:
+  ├─ 새 값: [Health - Damage] (빼기 노드 결과)
+  └─ 효과: 현재 체력에서 받은 피해만큼 감소
+
+예시:
+Health = 30.0
+Damage = 10.0
+  ↓
+Set Health = 30.0 - 10.0 = 20.0
+```
+
+**2. 빼기 노드 (-)**
+
+```
+Float - Float
+  ├─ A: Health (Get)
+  ├─ B: Damage (Input Parameter)
+  └─ 결과: A - B
+
+예시:
+30.0 - 10.0 = 20.0
+```
+
+**3. <= (Less Than or Equal)**
+
+```
+<= 노드
+  └─ A가 B보다 작거나 같은지 확인
+      ├─ A: Health
+      ├─ B: 0.0
+      └─ 결과: Boolean (true/false)
+
+예시:
+Health = 5.0
+  ├─ 5.0 <= 0.0 → false (아직 살아있음)
+
+Health = 0.0
+  ├─ 0.0 <= 0.0 → true (죽음!)
+
+Health = -5.0
+  └─ -5.0 <= 0.0 → true (죽음!)
+```
+
+**4. Return Node**
+
+```
+Return Node
+  └─ 함수의 출력 값을 반환
+
+IsDead (Output)
+  └─ <= 노드의 결과 연결
+      ├─ true: 체력이 0 이하 (죽음)
+      └─ false: 체력이 0 초과 (생존)
+```
+
+---
+
+## 🔄 5단계: Event Any Damage 수정
+
+### 📝 기존 코드 리팩토링
+
+**변경 전**
+
+```
+Event Any Damage
+  ↓
+Explode (즉시 폭발)
+```
+
+**변경 후**
+
+```
+Event Any Damage
+  ├─ Damage (이벤트에서 받은 값)
+  ↓
+[DecrementHealth 함수 호출]
+  ├─ Input: Damage
+  ↓
+[Branch]
+  ├─ Condition: IsDead (함수 출력)
+  ├─ True → Explode
+  └─ False → (아무것도 안 함)
+```
+
+### 💡 리팩토링이란?
+
+```
+Refactoring (리팩토링)
+  └─ 기능은 그대로 유지하면서 코드를 정리하는 작업
+      ├─ 함수로 묶어서 재사용 가능하게
+      ├─ 읽기 쉽게
+      └─ 유지보수 편하게
+
+장점:
+  ├─ 같은 로직을 여러 곳에서 사용 가능
+  ├─ 수정할 때 한 곳만 고치면 됨
+  └─ 코드가 깔끔해짐
+```
+
+---
+
+## 🏗️ 7단계: 보스 메시 만들기
+
+### ⚠️ Scale 사용 금지 이유
+
+```
+Transform의 Scale 사용 시 문제점:
+  ├─ 이동/회전할 때마다 추가 계산 필요
+  ├─ 성능 저하 (특히 여러 개일 때)
+  └─ 콜리전 계산 복잡해짐
+
+해결책:
+  └─ 실제 메시 크기를 변경한 새 에셋 만들기
+```
+
+### 📦 메시 복제
+
+**Content Browser**
+
+```
+SM_Drone 찾기
+  ↓
+우클릭 → Duplicate (또는 Ctrl+D)
+  ↓
+이름: SM_Drone_Boss
+```
+
+---
+
+## 🎨 8단계: Modeling Mode로 메시 변형
+
+### 🔧 Modeling Mode 진입
+
+**방법 1: 단축키**
+
+```
+SM_Drone_Boss를 레벨에 드래그
+  ↓
+선택한 상태로 Shift+5
+  └─ Modeling Mode로 전환
+```
+
+**방법 2: 드롭다운**
+
+```
+상단 Mode 드롭다운
+  ↓
+Select Mode → Modeling
+```
+
+### 📏 Transform (변형) 작업
+
+**크기 조정**
+
+```
+Modeling Mode
+  ↓
+Xform (Transform) 섹션
+  ↓
+Transform 도구 선택
+  ↓
+Scale 입력: 5.0
+  └─ 모든 축(X, Y, Z)에 5배 적용
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380740/notion-blog/_/_/_5_/_7_-_3/image_9.png)
+
+### 🔥 Bake Transform
+
+**변형 굽기 (고정하기)**
+
+```
+Transform 클릭
+  ↓
+Bake Transform 선택
+  ↓
+경고창: "메시를 수정하려고 합니다"
+  ├─ 복제본을 수정 중이므로 안전
+  └─ Accept 클릭
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380737/notion-blog/_/_/_5_/_7_-_3/image_10.png)
+
+### 💡 Bake Transform이란?
+
+```
+Bake Transform
+  └─ 임시 변형을 영구적으로 메시에 적용
+
+Before Bake:
+  ├─ 원본 메시 크기: 1
+  └─ Transform Scale: 5
+      → 매번 "5배 확대" 계산 필요
+
+After Bake:
+  ├─ 메시 크기 자체가 5배
+  └─ Transform Scale: 1
+      → 추가 계산 불필요 (최적화!)
+```
+
+### 🚪 Modeling Mode 종료
+
+**방법 1: 단축키**
+
+```
+Shift+1
+  └─ Selection Mode로 복귀
+```
+
+**방법 2: 드롭다운**
+
+```
+Mode 드롭다운
+  ↓
+Select Mode 선택
+```
+
+---
+
+## 🔫 9단계: 소켓 위치 조정
+
+### 🔍 문제 확인
+
+```
+메시가 5배 커짐
+  ↓
+하지만 소켓 위치는 그대로
+  ↓
+무기가 이상한 위치에 붙음
+  └─ 소켓 위치 재조정 필요
+```
+
+### 🔧 소켓 이동
+
+**SM_Drone_Boss 열기**
+
+```
+Skeleton Tree
+  ├─ Rifle_R 소켓 선택
+  └─ Rifle_L 소켓 선택
+```
+
+**Left View로 전환**
+
+```
+상단 뷰포트 버튼
+  ↓
+Left (왼쪽 뷰)
+  ↓
+Lighting → Wireframe
+  └─ 내부 구조 보기 편함
+```
+
+**Rifle_R 이동**
+
+```
+Rifle_R 소켓 선택
+  ↓
+Move Tool (W)로 이동
+  ↓
+드론의 중앙 무기 위치에 배치
+  └─ 팔 끝부분
+```
+
+**Rifle_L 이동**
+
+```
+Front View로 전환 (정면 뷰)
+  ↓
+Rifle_L 소켓 선택
+  ↓
+Rifle_R과 대칭 위치로 이동
+```
+
+**확인**
+
+```
+Perspective View로 복귀
+  ↓
+양쪽 소켓이 정확한 위치에 있는지 확인
+```
+
+### 📝 완료
+
+- SM_Drone_Boss 저장
+- 레벨에서 테스트용 메시 삭제 가능
+
+---
+
+## 🎯 10단계: BP_BotBoss 블루프린트 생성
+
+### 📝 자식 Blueprint 만들기
+
+**상속 구조**
+
+```
+BP_Bot (부모)
+  └─ BP_BotBoss (자식)
+      ├─ 부모의 모든 기능 상속
+      └─ 추가로 변경 가능
+```
+
+**생성 방법**
+
+```
+Content Browser → Blueprints/Drone
+  ↓
+BP_Bot 우클릭
+  ↓
+Create Child Blueprint Class
+  ↓
+이름: BP_BotBoss
+```
+
+### 💡 상속(Inheritance)이란?
+
+```
+Inheritance (상속)
+  └─ 부모의 기능을 자식이 물려받는 것
+
+BP_Bot (부모)
+  ├─ Health 시스템
+  ├─ Movement 기능
+  ├─ Shooting 기능
+  └─ AI 로직
+
+BP_BotBoss (자식)
+  ├─ ✅ 위 모든 기능 자동 포함
+  └─ + 추가 변경
+      ├─ 더 큰 메시
+      ├─ 더 많은 체력
+      └─ 다른 속도/공격력
+```
+
+---
+
+## 🎨 11단계: 보스 메시 적용
+
+### 🔧 Static Mesh 변경
+
+**BP_BotBoss 열기**
+
+```
+Components 패널
+  ↓
+BotMesh 선택
+  ↓
+Details 패널
+  ↓
+Static Mesh 드롭다운
+  ├─ 기존: SM_Drone
+  └─ 변경: SM_Drone_Boss
+
+결과:
+  └─ 뷰포트에서 더 큰 봇 확인 가능
+```
+
+### ✅ 현재 상태
+
+```
+BP_BotBoss
+  ├─ 메시만 더 큼
+  ├─ 체력, 속도, 공격력은 부모와 동일
+  └─ 다음 단계: 능력치 조정
+```
+
+---
+
+## 🔄 12단계: Bot Spawner에 변수 추가
+
+### 🎯 목표
+
+```
+현재:
+BP_BotSpawner → 항상 BP_Bot 스폰
+
+변경 후:
+BP_BotSpawner → 원하는 봇 클래스 스폰 가능
+  ├─ BP_Bot (일반 봇)
+  └─ BP_BotBoss (보스 봇)
+```
+
+### 📝 BotClass 변수 생성
+
+**BP_BotSpawner 열기**
+
+```
+Variables 패널
+  ↓
++ Add Variable
+  ├─ Name: BotClass
+  ├─ Type: BP_Bot (Class Reference)
+  ├─ Instance Editable: ✅
+  └─ Default Value: BP_Bot
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380737/notion-blog/_/_/_5_/_7_-_3/image_11.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380737/notion-blog/_/_/_5_/_7_-_3/image_12.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380737/notion-blog/_/_/_5_/_7_-_3/image_13.png)
+
+### 💡 Class Reference란?
+
+```
+Object Reference vs Class Reference
+
+Object Reference (파란색)
+  └─ 이미 생성된 특정 액터의 참조
+      예: 레벨에 배치된 특정 Target Point
+
+Class Reference (보라색)
+  └─ 액터의 '종류(클래스)' 자체를 가리킴
+      예: BP_Bot 클래스, BP_BotBoss 클래스
+      └─ Spawn Actor에서 "어떤 종류를 만들지" 지정할 때 사용
+```
+
+### 🔍 타입 선택 과정
+
+**검색: BP_Bot**
+
+```
+두 가지 옵션 표시:
+  ├─ Object Reference (파란색)
+  │   └─ 특정 인스턴스
+  │
+  └─ Class Reference (보라색) ✅
+      └─ 클래스 자체
+```
+
+**Class Reference 선택**
+
+```
+BP_Bot (Class Reference)
+  ├─ BP_Bot 클래스 저장 가능
+  └─ BP_Bot의 자식 클래스도 저장 가능
+      └─ BP_BotBoss도 저장 가능! (상속)
+```
+
+### 💡 다형성(Polymorphism)
+
+```
+상속의 강력한 기능:
+
+BP_Bot 타입 변수
+  ├─ BP_Bot 저장 가능 ✅
+  └─ BP_Bot의 자식들도 저장 가능 ✅
+      ├─ BP_BotBoss
+      ├─ BP_FlyingBot (만들면)
+      └─ BP_TankBot (만들면)
+
+이유:
+  └─ 자식은 부모이기도 하기 때문
+      "BP_BotBoss는 BP_Bot이다" (참)
+```
+
+---
+
+## 🔗 13단계: Spawn Actor 노드 수정
+
+### 📝 변경 작업
+
+**Event Graph**
+
+```
+Spawn Actor from Class 노드 찾기
+  ↓
+Class 핀에서 BP_Bot 연결 제거
+  ↓
+BotClass 변수 Get
+  ↓
+Class 핀에 연결
+```
+
+### 🔧 연결 구조
+
+```
+[For Each Loop]
+  ↓ Loop Body
+[Spawn Actor from Class]
+  ├─ Class ← [Get BotClass] (변수)
+  └─ Location ← [Get Actor Location]
+
+Before:
+  └─ Class: BP_Bot (고정)
+
+After:
+  └─ Class: BotClass 변수 (변경 가능)
+```
+
+### ✅ 효과
+
+```
+기본값: BotClass = BP_Bot
+  └─ 기존과 동일하게 작동
+
+하지만 이제:
+  └─ 레벨의 각 Spawner마다 다른 클래스 설정 가능
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380738/notion-blog/_/_/_5_/_7_-_3/image_14.png)
+
+---
+
+## 🎮 14단계: 보스 Spawner 배치
+
+### 📍 사원 입구에 배치
+
+**Spawner 드래그**
+
+```
+Content Browser → BP_BotSpawner
+  ↓
+사원 입구 중앙에 드래그
+```
+
+**Box 크기 조정**
+
+```
+BP_BotSpawner 선택
+  ↓
+Details → Box Component
+  ↓
+Box Extent 조정
+  ├─ 입구 전체 커버
+  └─ Line Thickness: 5 (보기 편하게)
+```
+
+### 🎯 Target Point 배치
+
+**사원 중앙에 배치**
+
+```
+Place Actors → Target Point
+  ↓
+사원 내부 중앙에 드래그
+  ↓
+Z축 조정 (바닥에서 약간 위)
+```
+
+### 🔗 Spawner 설정
+
+**Details 패널**
+
+```
+BP_BotSpawner 선택
+  ↓
+Bot Class
+  ├─ 기본: BP_Bot
+  └─ 변경: BP_BotBoss ✅
+
+Target Points
+  ├─ + 버튼
+  ├─ Dropper 아이콘
+  └─ 레벨의 Target Point 클릭
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380737/notion-blog/_/_/_5_/_7_-_3/image_15.png)
+
+---
+
+## 🧪 15단계: Play Here 기능 사용
+
+### 💡 Play Here란?
+
+```
+Play Here
+  └─ 레벨의 특정 위치에서 게임 시작
+
+기본 Play 버튼:
+  └─ Player Start 위치에서 시작
+
+Play Here:
+  └─ 클릭한 위치에서 바로 시작
+      └─ 테스트하려는 구역으로 빠르게 이동
+```
+
+### 🎮 사용 방법
+
+```
+테스트하려는 위치로 카메라 이동
+  ↓
+뷰포트에서 우클릭
+  ↓
+"Play from Here" 선택
+  ↓
+해당 위치에서 게임 시작
+```
+
+### ✅ 테스트 결과
+
+**문제 발견**
+
+```
+보스 봇 스폰 성공 ✅
+  ↓
+하지만 너무 쉽게 죽음 ❌
+  ├─ 일반 봇과 동일한 체력 (30)
+  ├─ 크기만 크고 능력치는 같음
+  └─ 오히려 맞추기 쉬워서 더 약함!
+```
+
+---
+
+## 💪 16단계: 보스 능력치 조정
+
+### 📊 변수 확인하기
+
+**Show Inherited Variables**
+
+```
+BP_BotBoss → Variables 패널
+  ↓
+기본: 변수가 안 보임
+  (상속받은 변수는 숨겨짐)
+  ↓
+Settings 아이콘 (⚙️) 클릭
+  ↓
+"Show Inherited Variables" 체크 ✅
+  ↓
+부모(BP_Bot)의 변수들 표시됨
+```
+
+**또는 간단한 방법**
+
+```
+Components 패널
+  ↓
+BP_BotBoss 자체 선택 (최상위)
+  ↓
+Details 패널
+  └─ 모든 변수 카테고리별로 표시
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380737/notion-blog/_/_/_5_/_7_-_3/image_16.png)
+
+---
+
+## ❤️ 17단계: 체력 증가
+
+### 🔧 설정
+
+**Details 패널**
+
+```
+BP_BotBoss (최상위) 선택
+  ↓
+Combat 카테고리
+  ↓
+Health
+  ├─ 기본값 (부모): 30.0
+  └─ 변경값: 250.0
+```
+
+### 💡 계산
+
+```
+보스 체력: 250.0
+플레이어 데미지: 10.0
+  ↓
+필요한 타격 횟수: 25발!
+  └─ 일반 봇(3발)보다 훨씬 오래 걸림
+```
+
+---
+
+## 🐌 18단계: 이동 속도 감소
+
+### 🔍 Speed 변수 찾기
+
+**BP_Bot에서 확인**
+
+```
+BP_Bot → Functions
+  ↓
+MoveBotForward 함수
+  ↓
+Speed 변수 사용
+  └─ 봇이 전진하는 속도 제어
+```
+
+### 🔧 보스 속도 설정
+
+**BP_BotBoss**
+
+```
+Details 패널
+  ↓
+Combat 카테고리
+  ↓
+Speed
+  ├─ 기본값 (부모): 50.0
+  └─ 변경값: 25.0
+      └─ 더 크고 무거운 느낌
+```
+
+---
+
+## ⚡ 19단계: 공격 속도 증가
+
+### 🔍 공격 시스템 분석
+
+**BP_Bot → Event Graph**
+
+```
+타이머 발견:
+  ↓
+Set Timer by Event
+  ├─ Looping: ✅
+  ├─ Time: BlasterTime (변수)
+  └─ Event: LeftOrRight
+      ↓
+  무기 발사
+```
+
+### 💡 BlasterTime 변수
+
+```
+BlasterTime
+  └─ 발사 간격 (초 단위)
+
+예시:
+  ├─ 2.0 = 2초마다 발사
+  ├─ 1.0 = 1초마다 발사
+  └─ 0.08 = 0.08초(80ms)마다 발사
+```
+
+### 🔧 보스 공격 속도 설정
+
+**BP_BotBoss**
+
+```
+Details 패널
+  ↓
+Combat 카테고리
+  ↓
+Blaster Time
+  ├─ 기본값 (부모): 2.0
+  └─ 변경값: 0.08
+      └─ 엄청 빠르게 발사!
+```
+
+### ⚠️ 실수 주의
+
+```
+첫 시도: 0.8로 입력
+  └─ 결과: 너무 느림 (0.8초 = 800ms)
+
+수정: 0.08로 입력
+  └─ 결과: 매우 빠름 (0.08초 = 80ms)
+      └─ 거의 연사 수준!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380737/notion-blog/_/_/_5_/_7_-_3/image_17.png)
+
+---
+
+## 🔄 20단계: 회전 속도 증가
+
+### 🔍 회전 시스템 찾기
+
+**BP_Bot → Event Graph**
+
+```
+주석: "Interpolate rotation to target pawn"
+  ↓
+RInterpTo 노드
+  ↓
+RotationInterpSpeed 변수 사용
+  └─ 플레이어를 향해 회전하는 속도
+```
+
+### 💡 RInterpTo란?
+
+```
+RInterpTo (Rotation Interpolate To)
+  └─ 부드럽게 회전하는 함수
+
+Current: 현재 회전
+Target: 목표 회전
+DeltaTime: 프레임 시간
+InterpSpeed: 회전 속도
+  ├─ 낮을수록: 천천히 회전
+  └─ 높을수록: 빠르게 회전
+```
+
+### 🔧 보스 회전 속도 조정
+
+**BP_BotBoss**
+
+```
+RotationInterpSpeed
+  ├─ 기본값: 8.0
+  ├─ 테스트 1: 16.0 (2배)
+  │   └─ 결과: 조금 빠름
+  └─ 테스트 2: 32.0 (4배)
+      └─ 결과: 매우 빠름 ✅
+```
+
+---
+
+## 🚀 21단계: 전체 발사체 속도 증가
+
+### 🔍 현재 문제
+
+```
+보스가 빠르게 회전해도:
+  └─ 발사체가 느려서 피하기 쉬움
+      └─ 난이도 상승 효과 미미
+```
+
+### 🔧 BP_BlasterBeam 수정
+
+**모든 발사체에 적용**
+
+```
+BP_BlasterBeam (부모 클래스)
+  ↓
+Components 패널
+  ↓
+ProjectileMovement 선택
+  ↓
+Details 패널
+  ↓
+Initial Speed
+  ├─ 기본값: 1000.0
+  └─ 변경값: 2000.0 (2배)
+```
+
+### 💡 ProjectileMovement Component
+
+```
+ProjectileMovement Component
+  └─ 발사체의 이동을 제어하는 컴포넌트
+
+Initial Speed
+  └─ 발사 시 초기 속도
+      ├─ 1000 = 초당 1000 유닛 이동
+      └─ 2000 = 초당 2000 유닛 이동 (2배 빠름)
+
+효과:
+  ├─ 플레이어 발사체도 빨라짐
+  └─ 적 발사체도 빨라짐
+      → 전체적으로 빠른 전투감
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### 📌 1. 체력 시스템
+
+```
+DecrementHealth 함수
+  ├─ Input: Damage
+  ├─ 처리: Health = Health - Damage
+  ├─ 확인: Health <= 0?
+  └─ Output: IsDead (Boolean)
+
+장점:
+  ├─ 재사용 가능한 함수
+  ├─ 난이도 조절 쉬움
+  └─ 확장 가능 (힐링, 방어력 등)
+```
+
+### 📌 2. 상속 (Inheritance)
+
+```
+BP_Bot (부모)
+  └─ 기본 봇 기능 정의
+      ↓
+BP_BotBoss (자식)
+  ├─ 부모의 모든 기능 상속
+  └─ 특정 값만 변경
+      ├─ 메시
+      ├─ 체력
+      ├─ 속도
+      └─ 공격력
+
+코드 재사용:
+  └─ 같은 코드를 여러 번 작성 안 해도 됨
+```
+
+### 📌 3. Class Reference
+
+```
+Object Reference (파란색)
+  └─ 레벨의 특정 액터 참조
+      예: 배치된 Target Point
+
+Class Reference (보라색)
+  └─ 액터의 종류 자체
+      예: BP_Bot 클래스
+      └─ Spawn Actor에 사용
+```
+
+### 📌 4. 다형성 (Polymorphism)
+
+```
+BotClass 변수 (BP_Bot 타입)
+  ├─ BP_Bot 저장 가능
+  └─ BP_Bot의 자식도 저장 가능
+      └─ BP_BotBoss 가능!
+
+활용:
+  └─ 하나의 Spawner로 다양한 봇 스폰
+```
+
+### 📌 5. Modeling Mode
+
+```
+Bake Transform
+  └─ 임시 변형을 영구적으로 적용
+
+장점:
+  ├─ 성능 최적화
+  ├─ Transform 계산 불필요
+  └─ 콜리전도 정확해짐
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 🔴 흔한 실수
+
+**1. Scale 직접 사용**
+
+```
+❌ Transform의 Scale로 크기 조정
+✅ 새 메시를 Bake Transform으로 생성
+```
+
+**2. 소켓 위치 미조정**
+
+```
+❌ 메시 크기만 바꾸고 소켓 그대로
+✅ 소켓도 비율에 맞게 재배치
+```
+
+**3. Class Reference vs Object Reference 혼동**
+
+```
+❌ Spawn Actor에 Object Reference 연결
+✅ Spawn Actor에 Class Reference 연결
+```
+
+**4. 변수 타입 실수**
+
+```
+BlasterTime 값 입력 시:
+  ❌ 0.8 (800ms - 너무 느림)
+  ✅ 0.08 (80ms - 빠른 공격)
+```
+
+---
+
+## 🎓 배운 핵심 개념
+
+**1. 체력 시스템 설계**
+
+- Float 변수로 체력 관리
+- 함수로 로직 캡슐화
+- Boolean 반환으로 상태 전달
+
+**2. 상속과 다형성**
+
+- 부모-자식 관계
+- 코드 재사용
+- 유연한 타입 시스템
+
+**3. 메시 최적화**
+
+- Modeling Mode 활용
+- Bake Transform
+- 소켓 재조정
+
+**4. 게임 밸런싱**
+
+- 난이도 곡선 설계
+- 능력치 조절
+- 플레이 테스트
+
+**5. 효율적인 개발**
+
+- Play Here로 빠른 테스트
+- Instance Editable로 유연한 설정
+- 상속으로 확장 용이
+
+---
+
+# { 🎯 적 봇 조준 정확도 개선 - 챌린지 }
+
+## 🎯 이번 강의 목표
+
+적 봇이 발사하는 블래스터 빔이 플레이어를 정확히 조준하도록 개선합니다.
+
+- 현재 문제점 파악 (빗나가는 발사)
+- Find Look at Rotation으로 정확한 조준 구현
+- 보스 전용 강력한 발사체 생성
+- 시각적 차별화 (색상 변경)
+
+## 🐛 1단계: 문제 발견
+
+### 🔍 현재 상황
+
+**보스전 테스트**
+
+```
+플레이어가 가만히 서 있으면:
+  ├─ 발사체가 플레이어를 빗나감
+  ├─ 전혀 맞지 않음
+  └─ 너무 쉬움
+```
+
+**원인 분석**
+
+```
+일반 봇:
+  ├─ 크기가 작음
+  ├─ 무기가 중앙에 가까움
+  └─ 우연히 자주 맞춤
+
+보스 봇:
+  ├─ 크기가 큼 (5배)
+  ├─ 무기가 양쪽 끝에 멀리 떨어짐
+  ├─ 발사체가 앞으로만 날아감
+  └─ 플레이어를 정확히 조준 안 함
+```
+
+### 💡 플레이어 발사체는 왜 정확한가?
+
+```
+BP_BotPawn (플레이어)
+  ↓
+Line Trace로 조준점 계산
+  ↓
+발사체 방향 = Line Trace 방향
+  └─ 항상 십자선이 가리키는 곳에 명중
+
+적 봇도 같은 원리 필요:
+  └─ 발사 방향 = 플레이어를 향하는 방향
+```
+
+---
+
+## 🔧 2단계: SpawnBlasterBeam 함수 분석
+
+### 📍 현재 코드 확인
+
+**BP_Bot → Functions → SpawnBlasterBeam**
+
+```
+Get Socket Transform
+  ├─ Socket Name: 입력 파라미터
+  ├─ Return Value: Transform
+  │   ├─ Location (위치)
+  │   ├─ Rotation (회전)
+  │   └─ Scale (크기)
+  │
+  ↓
+Spawn Actor from Class
+  ├─ Class: BP_EnemyBlasterBeam
+  └─ Spawn Transform: Socket Transform (그대로 사용)
+```
+
+### ⚠️ 문제점
+
+```
+Socket Transform의 Rotation
+  └─ 소켓이 향하는 방향
+      ├─ 봇의 앞쪽 방향
+      └─ 플레이어를 향하지 않음
+
+결과:
+  └─ 발사체가 봇의 정면으로만 날아감
+```
+
+---
+
+## 🎯 3단계: Find Look at Rotation 적용
+
+### 📌 Split Struct Pin
+
+**Spawn Transform 분할**
+
+```
+Spawn Actor 노드
+  ↓
+Spawn Transform 핀 우클릭
+  ↓
+Split Struct Pin 선택
+  ↓
+분할 결과:
+  ├─ Location
+  ├─ Rotation
+  └─ Scale
+```
+
+### 💡 Split Struct Pin이란?
+
+```
+Transform = Location + Rotation + Scale
+
+Split 전:
+  └─ Transform (하나의 핀)
+
+Split 후:
+  ├─ Location (위치만)
+  ├─ Rotation (회전만)
+  └─ Scale (크기만)
+
+장점:
+  └─ 각각 따로 제어 가능
+      예: Location은 소켓 위치
+          Rotation은 플레이어 방향
+```
+
+### 🔗 Location 연결
+
+**소켓 위치 사용**
+
+```
+Get Socket Transform → Return Value Location
+  ↓
+Spawn Transform Location
+  └─ 무기 소켓 위치에서 발사
+```
+
+---
+
+## 🎯 4단계: Find Look at Rotation 노드
+
+### 📌 노드 추가
+
+**노드 검색**
+
+```
+우클릭
+  ↓
+"Find Look at Rotation" 검색
+  ↓
+Find Look at Rotation 선택
+```
+
+### 💡 Find Look at Rotation이란?
+
+```
+Find Look at Rotation
+  └─ 시작점에서 목표점을 바라보는 회전값 계산
+
+Input:
+  ├─ Start (시작 위치)
+  │   └─ 어디서 보는가
+  │
+  └─ Target (목표 위치)
+      └─ 어디를 보는가
+
+Output:
+  └─ Return Value (Rotation)
+      └─ Start에서 Target을 정확히 향하는 회전값
+
+예시:
+총구(Start)에서 플레이어(Target)를 향하는 방향
+```
+
+### 🔌 입력 연결
+
+**Start 위치 (발사 시작점)**
+
+```
+Get Socket Transform → Return Value Location
+  ↓
+Find Look at Rotation → Start
+  └─ 무기 소켓 위치
+```
+
+**Target 위치 (플레이어)**
+
+```
+Target Pawn (변수 Get)
+  ↓
+Get Actor Location
+  ↓
+Find Look at Rotation → Target
+  └─ 플레이어의 위치
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380739/notion-blog/_/_/_5_/_7_-_3/image_18.png)
+
+### 🔗 출력 연결
+
+**정확한 조준 방향**
+
+```
+Find Look at Rotation → Return Value
+  ↓
+Spawn Transform Rotation
+  └─ 플레이어를 정확히 향하는 회전값
+```
+
+---
+
+## 📊 5단계: 완성된 노드 구조
+
+### 🎨 전체 Blueprint
+
+```
+[SpawnBlasterBeam 함수]
+  │
+  ├─ Input: SocketName (어느 무기에서 발사?)
+  │
+  ↓
+[Get Socket Transform]
+  ├─ Socket Name: SocketName
+  ├─ Return Value Location → ①
+  └─ (Rotation은 사용 안 함)
+
+  ↓
+[Get Target Pawn]
+  ↓
+[Get Actor Location]
+  └─ Return Value → ②
+
+  ↓
+[Find Look at Rotation]
+  ├─ Start: ① (무기 위치)
+  ├─ Target: ② (플레이어 위치)
+  └─ Return Value → ③
+
+  ↓
+[Spawn Actor BP_EnemyBlasterBeam]
+  ├─ Spawn Transform Location: ①
+  ├─ Spawn Transform Rotation: ③
+  └─ Spawn Transform Scale: (1, 1, 1)
+```
+
+### 💡 작동 원리
+
+```
+매 발사마다:
+  1. 무기 소켓의 현재 위치 가져오기
+  2. 플레이어의 현재 위치 가져오기
+  3. 무기 → 플레이어 방향 계산
+  4. 그 방향으로 발사체 생성
+
+결과:
+  └─ 발사체가 항상 플레이어를 정확히 향함
+```
+
+---
+
+## 🚀 7단계: 보스 전용 발사체 만들기
+
+### 🎯 목표
+
+```
+보스를 더 위협적으로:
+  ├─ 더 빠른 발사체
+  ├─ 더 높은 데미지
+  └─ 다른 색상 (시각적 구분)
+```
+
+### 📝 새 블루프린트 생성
+
+**자식 클래스 만들기**
+
+```
+BP_BlasterBeam 우클릭
+  ↓
+Create Child Blueprint Class
+  ↓
+이름: BP_BossBlasterBeam
+```
+
+### 💡 상속 활용
+
+```
+BP_BlasterBeam (부모)
+  ├─ 기본 발사체 기능
+  └─ Beam Mesh, Collision 등
+      ↓
+BP_EnemyBlasterBeam (자식)
+  ├─ 부모 기능 상속
+  └─ 적 전용 설정
+      ↓
+BP_BossBlasterBeam (손자)
+  ├─ 적 발사체 기능 상속
+  └─ 보스 전용 강화
+```
+
+---
+
+## ⚙️ 8단계: 보스 발사체 설정
+
+### 🔧 필수 설정 확인
+
+**BP_BossBlasterBeam 열기**
+
+**1. Beam Mesh 확인**
+
+```
+Components 패널
+  ↓
+BeamMesh 있는지 확인
+  └─ 부모로부터 상속됨 ✅
+```
+
+**2. Collision Preset 확인**
+
+```
+BeamMesh 선택
+  ↓
+Details → Collision
+  ↓
+Collision Presets: EnemyProjectile
+  └─ 적 발사체용 설정 ✅
+```
+
+### 🚀 속도 증가
+
+**ProjectileMovement Component**
+
+```
+Components 패널
+  ↓
+ProjectileMovement 선택
+  ↓
+Details 패널
+  ↓
+Initial Speed
+  ├─ 부모 (Enemy): 2000
+  └─ 변경값: 4000 (2배 빠름!)
+```
+
+### 💥 데미지 증가
+
+**Variables**
+
+```
+Damage 변수
+  ├─ 부모 (Enemy): 10.0
+  └─ 변경값: 20.0 (2배 데미지!)
+```
+
+### 📊 보스 발사체 최종 스펙
+
+```
+BP_BossBlasterBeam
+  ├─ Speed: 4000 (기본의 2배)
+  ├─ Damage: 20 (기본의 2배)
+  └─ 색상: (다음 단계에서 변경)
+```
+
+---
+
+## 🔄 9단계: 봇이 다른 발사체 사용하도록 설정
+
+### 📝 BlasterBeamClass 변수 생성
+
+**BP_Bot → Variables**
+
+```
++ Add Variable
+  ├─ Name: BlasterBeamClass
+  ├─ Type: BP_BlasterBeam (Class Reference)
+  ├─ Instance Editable: ✅
+  └─ Default Value: BP_EnemyBlasterBeam
+```
+
+### 💡 하드코딩 vs 변수 사용
+
+```
+Before (하드코딩):
+Spawn Actor
+  └─ Class: BP_EnemyBlasterBeam (고정)
+      └─ 모든 봇이 같은 발사체 사용
+
+After (변수 사용):
+Spawn Actor
+  └─ Class: BlasterBeamClass (변수)
+      └─ 봇마다 다른 발사체 사용 가능
+```
+
+### 🔗 SpawnBlasterBeam 함수 수정
+
+**Class 연결 변경**
+
+```
+Spawn Actor from Class
+  ↓
+Class 핀에서 기존 연결 제거
+  ↓
+BlasterBeamClass 변수 Get
+  ↓
+Class 핀에 연결
+```
+
+---
+
+## 🎯 10단계: 보스에 적용
+
+### 🔧 BP_BotBoss 설정
+
+**Details 패널**
+
+```
+BP_BotBoss 선택
+  ↓
+Combat 카테고리
+  ↓
+Blaster Beam Class
+  ├─ 기본값: BP_EnemyBlasterBeam
+  └─ 변경값: BP_BossBlasterBeam ✅
+```
+
+### ✅ 결과
+
+```
+일반 봇:
+  └─ BlasterBeamClass = BP_EnemyBlasterBeam
+      ├─ Speed: 2000
+      └─ Damage: 10
+
+보스 봇:
+  └─ BlasterBeamClass = BP_BossBlasterBeam
+      ├─ Speed: 4000 (2배)
+      └─ Damage: 20 (2배)
+```
+
+---
+
+## 🎨 11단계: 시각적 차별화 - 색상 변경
+
+### 🔍 머티리얼 찾기
+
+**BP_BlasterBeam**
+
+```
+Components 패널
+  ↓
+BeamMesh 선택
+  ↓
+Details → Materials
+  ↓
+Element 0: MI_BlasterBeam
+  └─ Material Instance 확인
+```
+
+### 📝 새 Material Instance 생성
+
+**Content Browser**
+
+```
+MI_BlasterBeam 우클릭
+  ↓
+Create Material Instance
+  ↓
+이름: MI_BossBlasterBeam
+```
+
+### 💡 Material Instance란?
+
+```
+Material (머티리얼)
+  └─ 기본 재질 정의
+      ├─ 색상 파라미터
+      ├─ 빛 반사 설정
+      └─ 텍스처 등
+
+Material Instance (머티리얼 인스턴스)
+  └─ 머티리얼의 복사본
+      ├─ 같은 구조
+      └─ 파라미터만 변경 가능
+          (색상, 밝기 등)
+
+장점:
+  ├─ 가볍고 빠름
+  ├─ 실시간 수정 가능
+  └─ 많이 만들어도 성능 영향 적음
+```
+
+### 🎨 색상 편집
+
+**MI_BossBlasterBeam 열기**
+
+```
+Parameter Groups
+  ↓
+Color (또는 Emissive Color)
+  ├─ 체크박스 활성화 ✅
+  └─ 색상 선택
+      └─ 녹색 계열 선택
+```
+
+**추가 설정**
+
+```
+Glow Amount (또는 Emission)
+  ├─ 체크박스 활성화 ✅
+  ├─ 기본값: 100
+  └─ 변경값: 200
+      └─ 더 밝게 빛남
+```
+
+### 🔧 보스 발사체에 적용
+
+**BP_BossBlasterBeam**
+
+```
+Components 패널
+  ↓
+BeamMesh 선택
+  ↓
+Details → Materials
+  ↓
+Element 0
+  ├─ 기존: MI_BlasterBeam (파란색)
+  └─ 변경: MI_BossBlasterBeam (녹색) ✅
+```
+
+---
+
+## 📊 전체 시스템 비교
+
+### 🎯 조준 시스템
+
+**Before**
+
+```
+Socket Transform 그대로 사용
+  ├─ 소켓이 향하는 방향으로 발사
+  ├─ 플레이어 위치 무시
+  └─ 부정확
+```
+
+**After**
+
+```
+Find Look at Rotation 사용
+  ├─ Start: 무기 소켓 위치
+  ├─ Target: 플레이어 위치
+  ├─ 정확한 방향 계산
+  └─ 항상 명중
+```
+
+### 🚀 발사체 종류
+
+**플레이어 발사체**
+
+```
+BP_PlayerBlasterBeam
+  ├─ 색상: 파란색
+  ├─ Speed: 2000
+  └─ Damage: 10
+```
+
+**일반 적 발사체**
+
+```
+BP_EnemyBlasterBeam
+  ├─ 색상: 파란색
+  ├─ Speed: 2000
+  └─ Damage: 10
+```
+
+**보스 발사체**
+
+```
+BP_BossBlasterBeam
+  ├─ 색상: 녹색 ⚠️
+  ├─ Speed: 4000 ⚡
+  └─ Damage: 20 💥
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### 📌 Find Look at Rotation
+
+```
+용도:
+  └─ 한 지점에서 다른 지점을 바라보는 회전값 계산
+
+활용 예:
+  ├─ 적이 플레이어 조준
+  ├─ 카메라가 대상 추적
+  ├─ 터렛이 목표물 겨냥
+  └─ 캐릭터가 특정 방향 보기
+
+입력:
+  ├─ Start: Vector (시작 위치)
+  └─ Target: Vector (목표 위치)
+
+출력:
+  └─ Rotator (회전값)
+```
+
+### 📌 Split Struct Pin
+
+```
+Transform 같은 구조체를 개별 요소로 분리
+  ├─ Location (X, Y, Z)
+  ├─ Rotation (Roll, Pitch, Yaw)
+  └─ Scale (X, Y, Z)
+
+장점:
+  └─ 각 요소를 독립적으로 제어
+      예: 위치는 A, 회전은 B 사용
+```
+
+### 📌 Class Reference 변수
+
+```
+변수로 클래스를 저장
+  └─ Spawn Actor에서 동적으로 클래스 선택 가능
+
+활용:
+  ├─ 봇마다 다른 발사체
+  ├─ 레벨마다 다른 적
+  └─ 난이도별 다른 무기
+```
+
+### 📌 Material Instance
+
+```
+Material의 경량 복사본
+  ├─ 같은 구조
+  └─ 파라미터만 변경 (색상, 밝기 등)
+
+장점:
+  ├─ 빠른 생성
+  ├─ 실시간 수정
+  └─ 성능 효율적
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 🔴 흔한 실수
+
+**1. Split 안 하고 Rotation 연결**
+
+```
+❌ Transform 전체를 연결하면:
+  └─ Find Look at Rotation 결과가 무시됨
+
+✅ Split Struct Pin으로 분리:
+  └─ Location: 소켓 위치
+  └─ Rotation: Look at Rotation 결과
+```
+
+**2. Start와 Target 순서 바꿈**
+
+```
+❌ Start = Target Pawn
+    Target = Socket Location
+  └─ 반대 방향으로 발사됨
+
+✅ Start = Socket Location (발사 시작점)
+    Target = Target Pawn (조준 대상)
+```
+
+**3. Material vs Material Instance 혼동**
+
+```
+Material 직접 수정:
+  └─ 모든 발사체 색상이 바뀜
+
+Material Instance 사용:
+  └─ 특정 발사체만 색상 변경
+```
+
+### ✅ Best Practices
+
+**발사체 다양화**
+
+```
+상속 구조 활용:
+BP_BlasterBeam
+  ├─ BP_PlayerBlasterBeam
+  ├─ BP_EnemyBlasterBeam
+  └─ BP_BossBlasterBeam
+      └─ 각각 다른 속성
+```
+
+**시각적 피드백**
+
+```
+위험한 발사체:
+  ├─ 다른 색상 (경고색)
+  ├─ 더 밝게 빛남
+  └─ 플레이어가 즉시 인지
+```
+
+**난이도 조절**
+
+```
+속도와 데미지의 균형:
+  ├─ 너무 빠르고 강하면: 불가능
+  ├─ 너무 느리고 약하면: 지루함
+  └─ 테스트로 적절한 값 찾기
+```
+
+---
+
+## 🎯 핵심 정리
+
+### ✅ 구현한 기능
+
+**정확한 조준**
+
+- ✅ Find Look at Rotation 사용
+- ✅ 모든 발사가 플레이어를 정확히 향함
+- ✅ 적절한 난이도 상승
+
+**보스 강화**
+
+- ✅ 2배 빠른 발사체 (4000)
+- ✅ 2배 높은 데미지 (20)
+- ✅ 녹색 색상 (시각적 구분)
+
+**시스템 개선**
+
+- ✅ Class Reference로 유연한 구조
+- ✅ 봇마다 다른 발사체 사용 가능
+- ✅ Material Instance로 시각적 다양성
+
+---
+
+## 🎓 배운 핵심 기술
+
+**1. 방향 계산**
+
+- Find Look at Rotation으로 정확한 조준
+- Vector 위치에서 회전값 도출
+
+**2. 구조체 분해**
+
+- Split Struct Pin 활용
+- 개별 요소 독립 제어
+
+**3. 동적 클래스 선택**
+
+- Class Reference 변수
+- 런타임에 다른 클래스 스폰
+
+**4. 비주얼 커스터마이징**
+
+- Material Instance 생성
+- 파라미터 조정으로 변형
+
+**5. 게임 밸런싱**
+
+- 속도와 데미지 조절
+- 시각적 피드백 추가
+- 플레이 테스트로 검증
+
+---
+
+# { 💥 보스 전용 대형 폭발 이펙트 만들기 - 챌린지 }
+
+## 🎯 이번 강의 목표
+
+보스 봇을 위한 5배 크기의 폭발 나이아가라 시스템을 만듭니다.
+
+- 기존 폭발 시스템 복제
+- 각 이미터 파라미터 조정
+- 메시 크기 변경
+- 봇별로 다른 폭발 이펙트 사용
+
+## 🔍 1단계: 문제 인식
+
+### ⚠️ 현재 상황
+
+**보스 폭발 테스트**
+
+```
+보스를 처치하면:
+  ├─ 작은 폭발 이펙트 발생
+  ├─ 크기가 보스와 어울리지 않음
+  └─ 아쉬운 느낌
+```
+
+### 🎯 목표
+
+```
+보스에 어울리는 폭발:
+  ├─ 5배 큰 크기
+  ├─ 더 많은 파티클
+  ├─ 더 화려한 효과
+  └─ 보스 처치의 성취감
+```
+
+---
+
+## 📦 2단계: 폭발 시스템 찾기
+
+### 🔍 경로 확인
+
+**BP_Bot → Explode 함수**
+
+```
+Functions 패널
+  ↓
+Explode 함수 열기
+  ↓
+Spawn System at Location 노드
+  ↓
+System Template: NS_Fire_Explosion
+  └─ 현재 사용 중인 나이아가라 시스템
+```
+
+### 📁 Content Browser에서 찾기
+
+```
+Content Browser
+  ↓
+검색: "NS_Fire_Explosion"
+  ↓
+나이아가라 시스템 확인
+  └─ 폭발 이펙트의 원본 파일
+```
+
+---
+
+## 📋 3단계: 나이아가라 시스템 복제
+
+### 📝 복제 작업
+
+**안전한 작업을 위한 복제**
+
+```
+NS_Fire_Explosion 우클릭
+  ↓
+Duplicate (또는 Ctrl+D)
+  ↓
+이름: NS_Fire_Explosion_Boss
+```
+
+### ⚠️ 원본 보호
+
+```
+NS_Fire_Explosion 닫기
+  └─ 실수로 원본 수정 방지
+
+작업 중인 탭 정리:
+  ├─ BP_Bot만 열어두기
+  └─ NS_Fire_Explosion_Boss만 열기
+```
+
+---
+
+## 🎨 4단계: 나이아가라 편집 기본 - 이미터 분리
+
+### 💡 나이아가라 시스템 구조
+
+```
+NS_Fire_Explosion
+  ├─ Emitter 1: 폭발 (메시)
+  ├─ Emitter 2: 스파크 (스프라이트)
+  ├─ Emitter 3: 스파크 블랙 (스프라이트)
+  ├─ Emitter 4: 샤인 (빛)
+  └─ Emitter 5: 링 (확장 고리)
+```
+
+### 🔧 이미터 격리 방법
+
+**방법 1: Isolate 아이콘**
+
+```
+이미터 패널
+  ↓
+각 이미터 옆 격리 아이콘 클릭
+  └─ 해당 이미터만 보기
+```
+
+**방법 2: 체크박스**
+
+```
+이미터 체크박스
+  ├─ 체크: 해당 이미터 표시
+  └─ 체크 해제: 숨김
+
+활용:
+  └─ 원하는 이미터만 선택해서 작업
+```
+
+### 💡 왜 격리하는가?
+
+```
+여러 이미터 동시 표시:
+  └─ 복잡해서 개별 효과 파악 어려움
+
+격리해서 작업:
+  ├─ 한 이미터만 보면서 조정
+  ├─ 효과 명확히 확인
+  └─ 정확한 파라미터 조절
+```
+
+---
+
+## 🔨 5단계: Emitter 1 - 폭발 메시 (구체)
+
+### 🔍 구조 파악
+
+**이미터 1 선택 (다른 것 체크 해제)**
+
+```
+Emitter 1
+  ↓
+Rendering 섹션
+  ↓
+Mesh Renderer (메시 렌더러)
+  └─ Sprite Renderer 대신 3D 메시 사용
+```
+
+### 💡 Mesh Renderer vs Sprite Renderer
+
+```
+Sprite Renderer (스프라이트)
+  └─ 2D 이미지 (항상 카메라 향함)
+      ├─ 불, 연기, 빛 등
+      └─ 가볍고 빠름
+
+Mesh Renderer (메시)
+  └─ 3D 모델 (입체적)
+      ├─ 파편, 잔해, 구체 등
+      └─ 더 현실적이지만 무거움
+```
+
+### 📦 현재 사용 중인 메시
+
+**Details 패널**
+
+```
+Mesh Renderer
+  ↓
+Meshes (배열)
+  ↓
+Element 0: Sphere
+  └─ Shared 폴더의 구체 메시
+```
+
+---
+
+## 🎨 6단계: 더 큰 구체 메시 만들기
+
+### 📝 메시 복제
+
+**Content Browser**
+
+```
+Sphere 메시 우클릭
+  ↓
+Duplicate
+  ↓
+이름: Sphere_Boss
+```
+
+### 🔧 Modeling Mode로 크기 변경
+
+**1. 레벨에 배치**
+
+```
+Sphere_Boss를 레벨에 드래그
+```
+
+**2. Modeling Mode 진입**
+
+```
+Shift+5 (단축키)
+또는
+Mode 드롭다운 → Modeling
+```
+
+**3. Transform 적용**
+
+```
+Xform 섹션
+  ↓
+Transform 도구 선택
+  ↓
+Scale: 5.0 입력
+  └─ 모든 축에 5배 적용
+```
+
+**4. Bake Transform**
+
+```
+Transform 클릭
+  ↓
+Bake Transform 선택
+  ↓
+경고창: Accept 클릭
+  └─ 복제본이므로 안전
+```
+
+**5. Modeling Mode 종료**
+
+```
+Shift+1
+또는
+Mode 드롭다운 → Select
+```
+
+### ✅ 결과
+
+```
+Sphere_Boss
+  ├─ 원본의 5배 크기
+  ├─ Bake로 영구 적용
+  └─ 레벨에서 삭제 가능
+```
+
+---
+
+## 🔄 7단계: 나이아가라에 큰 메시 적용
+
+### 🔧 메시 교체
+
+**NS_Fire_Explosion_Boss**
+
+```
+Emitter 1 선택
+  ↓
+Mesh Renderer
+  ↓
+Meshes → Element 0
+  ↓
+드롭다운에서 Sphere_Boss 선택
+또는
+왼쪽 화살표 클릭 (현재 선택된 에셋 사용)
+```
+
+### ✅ 결과 확인
+
+```
+뷰포트에서:
+  └─ 폭발 구체가 5배 커짐
+
+하지만:
+  └─ 다른 이미터들은 여전히 작음
+      → 상대적으로 더 작아 보임
+```
+
+---
+
+## ⚡ 8단계: Emitter 2 - 스파크 조정
+
+### 🔍 이미터 2 격리
+
+**체크박스 설정**
+
+```
+Emitter 1: ✅ (구체 - 크기 비교용)
+Emitter 2: ✅ (스파크 - 조정 대상)
+나머지: ☐ (숨김)
+```
+
+### 📝 조정할 파라미터
+
+**1. Spawn Burst Instantaneous (스폰 개수)**
+
+```
+Emitter Update 섹션
+  ↓
+Spawn Burst Instantaneous
+  ↓
+Spawn Count
+  ├─ 기본값: 50
+  └─ 변경값: 70
+      └─ 더 많은 파티클 생성
+```
+
+### 💡 Spawn Burst Instantaneous란?
+
+```
+Spawn Burst Instantaneous
+  └─ 한 번에 대량으로 파티클 생성
+
+Spawn Count
+  └─ 생성할 파티클 개수
+      ├─ 50 = 스파크 50개
+      └─ 70 = 스파크 70개 (더 풍성)
+```
+
+**2. Particle Spawn - Sprite Size (크기)**
+
+```
+Particle Spawn 섹션
+  ↓
+Initialize Particle
+  ↓
+Sprite Attributes
+  ↓
+Sprite Size Mode: Random Uniform
+  ├─ Sprite Size Min
+  │   ├─ 기본: (1, 1)
+  │   └─ 변경: (3, 3)
+  │
+  └─ Sprite Size Max
+      ├─ 기본: (4, 4)
+      └─ 변경: (8, 8)
+```
+
+### 💡 Sprite Size Mode란?
+
+```
+Random Uniform
+  └─ Min과 Max 사이에서 무작위 크기
+
+예시:
+Min (3, 3) ~ Max (8, 8)
+  ├─ 각 파티클마다 다른 크기
+  ├─ 3에서 8 사이의 값
+  └─ 더 다양하고 자연스러움
+```
+
+**3. Lifetime (수명)**
+
+```
+Initialize Particle
+  ↓
+Lifetime Mode: Random
+  ├─ Lifetime Min
+  │   ├─ 기본: 0.5
+  │   └─ 변경: 0.75
+  │
+  └─ Lifetime Max
+      ├─ 기본: 1.0
+      └─ 변경: 1.25
+```
+
+### 💡 Lifetime이란?
+
+```
+Lifetime (수명)
+  └─ 파티클이 존재하는 시간 (초)
+
+0.75 ~ 1.25:
+  ├─ 각 스파크마다 다른 수명
+  ├─ 짧으면 빨리 사라짐
+  └─ 길면 오래 남음
+      → 적절한 잔상 효과
+```
+
+**4. Shape Location (스폰 위치)**
+
+```
+Initialize Particle
+  ↓
+Shape Location
+  ↓
+Sphere Radius
+  ├─ 기본: 8
+  └─ 변경: 48 (6배)
+```
+
+### 💡 Shape Location이란?
+
+```
+Shape Location - Sphere
+  └─ 구체 영역 내에서 파티클 생성
+
+Sphere Radius
+  └─ 구체의 반지름
+      ├─ 8 = 작은 영역에서 스폰
+      └─ 48 = 큰 영역에서 스폰
+          → 더 넓게 퍼짐
+```
+
+**5. Add Velocity (속도)**
+
+```
+Particle Spawn
+  ↓
+Add Velocity from Point
+  ├─ Velocity Minimum
+  │   ├─ 기본: 200
+  │   └─ 변경: 400
+  │
+  └─ Velocity Maximum
+      ├─ 기본: 800
+      └─ 변경: 1600 (2배)
+```
+
+### 💡 Add Velocity from Point란?
+
+```
+Add Velocity from Point
+  └─ 중심점에서 바깥으로 파티클 발사
+
+Velocity (속도)
+  ├─ 400 ~ 1600
+  ├─ 초당 이동 거리
+  └─ 2배 빠르면 2배 멀리 날아감
+      → 더 역동적인 폭발
+```
+
+---
+
+## 🖤 9단계: Emitter 3 - 스파크 블랙 조정
+
+### 📝 동일한 설정 적용
+
+**Emitter 3은 검은색 스파크**
+
+```
+Emitter 2와 동일한 파라미터:
+  ├─ Spawn Count: 70
+  ├─ Sprite Size: (3, 3) ~ (8, 8)
+  ├─ Lifetime: 0.75 ~ 1.25
+  ├─ Sphere Radius: 48
+  └─ Velocity: 400 ~ 1600
+```
+
+### 💡 왜 똑같이?
+
+```
+스파크 + 스파크 블랙:
+  └─ 함께 작동하는 이펙트
+      ├─ 밝은 스파크 (주효과)
+      └─ 검은 스파크 (디테일)
+          → 균형 맞춰야 자연스러움
+```
+
+---
+
+## ✨ 10단계: Emitter 4 - 샤인 (빛) 조정
+
+### 🔍 Shine 격리
+
+**Isolate 아이콘 사용**
+
+```
+Emitter 4만 격리
+  ↓
+작은 빛 스프라이트 확인
+  └─ Sprite Renderer 사용
+```
+
+### 📝 Sprite Size 증가
+
+**Initialize Particle**
+
+```
+Sprite Size Mode: Random Uniform
+  ├─ Sprite Size Min
+  │   ├─ 기본: (100, 200)
+  │   └─ 시도 1: (200, 300)
+  │   └─ 시도 2: (500, 750)
+  │   └─ 최종: (800, 1200)
+  │
+  └─ Sprite Size Max
+      └─ 동일하게 증가
+```
+
+### 💡 반복 조정 과정
+
+```
+나이아가라 작업의 특징:
+  └─ 한 번에 정답 찾기 어려움
+      ├─ 조금씩 증가
+      ├─ 격리 해제해서 확인
+      ├─ 다른 이미터와 비교
+      └─ 반복 조정
+```
+
+---
+
+## 💍 11단계: Emitter 5 - 링 (고리) 조정
+
+### 🔍 Ring 격리
+
+**마지막 이미터**
+
+```
+Emitter 5 체크
+  ↓
+Isolate
+  ↓
+확장하는 고리 확인
+  └─ 매우 작음
+```
+
+### 📝 크기 증가
+
+**Initialize Particle**
+
+```
+Sprite Size
+  ├─ Min
+  │   ├─ 기본: 75
+  │   ├─ 계산: 75 * 5 = 375
+  │   └─ 입력: "75*5" 또는 "375"
+  │
+  └─ Max
+      ├─ 기본: 100
+      └─ 계산: 100 * 5 = 500
+```
+
+### 💡 계산식 직접 입력 가능
+
+```
+언리얼 엔진의 숫자 입력:
+  └─ 수식 입력 가능
+
+예시:
+  ├─ "75*5" 입력 → 자동으로 375
+  ├─ "100/2" 입력 → 50
+  └─ "200+50" 입력 → 250
+      → 계산기 없이 편리하게 조정
+```
+
+### ✅ 격리 해제 확인
+
+```
+Isolate 해제
+  ↓
+모든 이미터 함께 보기
+  ↓
+전체 폭발 이펙트 확인
+  └─ 보스에 어울리는 크기!
+```
+
+---
+
+## 🔄 12단계: ExplosionSystem 변수 생성
+
+### 🎯 목표
+
+```
+현재:
+모든 봇이 같은 폭발 사용
+
+변경 후:
+봇마다 다른 폭발 가능
+  ├─ 일반 봇 → 작은 폭발
+  └─ 보스 봇 → 큰 폭발
+```
+
+### 📝 변수로 승격
+
+**BP_Bot → Explode 함수**
+
+```
+Spawn System at Location 노드
+  ↓
+System Template 핀 우클릭
+  ↓
+Promote to Variable
+  ↓
+이름: ExplosionSystem
+```
+
+### 💡 Promote to Variable이란?
+
+```
+Promote to Variable
+  └─ 하드코딩된 값을 변수로 변환
+
+Before:
+  └─ NS_Fire_Explosion (고정)
+
+After:
+  └─ ExplosionSystem 변수 (변경 가능)
+      ├─ 기본값: NS_Fire_Explosion
+      └─ 봇마다 다른 값 설정 가능
+```
+
+### 🔌 자동 연결
+
+```
+변수로 승격하면:
+  ├─ 자동으로 변수 생성
+  ├─ 기존 값이 기본값으로 설정
+  └─ 노드에 자동 연결
+      → 기존 기능 유지
+```
+
+---
+
+## 🎯 13단계: 보스에 큰 폭발 적용
+
+### 🔧 BP_BotBoss 설정
+
+**간단한 방법 (Details 패널)**
+
+```
+Content Browser에서 BP_BotBoss 우클릭
+  ↓
+Edit Blueprint 대신:
+  ↓
+Details 패널 직접 확인
+  ↓
+Explosion System 변수 찾기
+  ├─ 기본: NS_Fire_Explosion
+  └─ 변경: NS_Fire_Explosion_Boss ✅
+```
+
+### 💡 전체 에디터 vs Details 패널
+
+```
+간단한 변경:
+  └─ Details 패널에서 직접 수정
+      ├─ 빠름
+      ├─ 가벼움
+      └─ 에디터 열 필요 없음
+
+복잡한 작업:
+  └─ 전체 Blueprint Editor 열기
+      ├─ 노드 편집
+      ├─ 함수 수정
+      └─ 로직 변경
+```
+
+### ✅ 완료
+
+```
+Compile
+  ↓
+Save
+  ↓
+닫기
+  └─ 보스 폭발 설정 완료!
+```
+
+---
+
+## 🎮 14단계: 최종 테스트
+
+### 🧪 테스트 시나리오
+
+**보스전 도전**
+
+```
+Play from Here
+  ↓
+보스와 전투
+  ↓
+보스 처치
+  ↓
+폭발 이펙트 확인
+```
+
+### ✅ 결과
+
+```
+일반 봇:
+  └─ NS_Fire_Explosion
+      └─ 작은 폭발
+
+보스 봇:
+  └─ NS_Fire_Explosion_Boss
+      ├─ 5배 큰 구체
+      ├─ 더 많은 파티클 (70개)
+      ├─ 더 큰 스파크 (3~8)
+      ├─ 더 넓은 범위 (반경 48)
+      ├─ 더 빠른 속도 (400~1600)
+      └─ 훨씬 화려함!
+```
+
+### 🎉 성공!
+
+- 보스에 어울리는 대형 폭발
+- 시각적 만족감 향상
+- 나이아가라 파라미터 학습
+
+---
+
+## 📊 파라미터 변경 요약
+
+### 🎨 Emitter 2 & 3 (스파크)
+
+```
+Spawn Count
+  ├─ Before: 50
+  └─ After: 70 (40% 증가)
+
+Sprite Size
+  ├─ Before: (1, 1) ~ (4, 4)
+  └─ After: (3, 3) ~ (8, 8) (2배)
+
+Lifetime
+  ├─ Before: 0.5 ~ 1.0
+  └─ After: 0.75 ~ 1.25 (50% 증가)
+
+Sphere Radius
+  ├─ Before: 8
+  └─ After: 48 (6배)
+
+Velocity
+  ├─ Before: 200 ~ 800
+  └─ After: 400 ~ 1600 (2배)
+```
+
+### ✨ Emitter 4 (샤인)
+
+```
+Sprite Size
+  ├─ Before: (100, 200)
+  └─ After: (800, 1200) (6~8배)
+```
+
+### 💍 Emitter 5 (링)
+
+```
+Sprite Size
+  ├─ Before: 75 ~ 100
+  └─ After: 375 ~ 500 (5배)
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### 📌 나이아가라 이미터 구조
+
+```
+Niagara System (나이아가라 시스템)
+  └─ 여러 Emitter의 집합
+
+Emitter (이미터)
+  ├─ 파티클 생성 규칙
+  ├─ 렌더링 방식
+  └─ 업데이트 로직
+
+Particle (파티클)
+  └─ 실제 보이는 개별 요소
+```
+
+### 📌 주요 파라미터
+
+**Spawn (생성)**
+
+```
+Spawn Count
+  └─ 파티클 개수
+      ├─ 많으면: 풍성함
+      └─ 적으면: 희소함
+```
+
+**Size (크기)**
+
+```
+Sprite Size
+  └─ 파티클 크기
+      ├─ Random: 다양한 크기
+      └─ Uniform: 같은 크기
+```
+
+**Lifetime (수명)**
+
+```
+Lifetime
+  └─ 지속 시간 (초)
+      ├─ 짧으면: 빠르게 사라짐
+      └─ 길면: 오래 남음
+```
+
+**Position (위치)**
+
+```
+Shape Location
+  └─ 스폰 영역
+      ├─ Sphere: 구체 영역
+      ├─ Box: 상자 영역
+      └─ Cylinder: 원통 영역
+```
+
+**Velocity (속도)**
+
+```
+Add Velocity
+  └─ 이동 속도
+      ├─ From Point: 중심에서 방사
+      ├─ In Cone: 원뿔 방향
+      └─ Directional: 특정 방향
+```
+
+### 📌 Renderer 타입
+
+**Sprite Renderer**
+
+```
+2D 이미지
+  ├─ 항상 카메라 향함
+  ├─ 가벼움
+  └─ 대부분의 이펙트에 사용
+      (불, 연기, 빛, 스파크 등)
+```
+
+**Mesh Renderer**
+
+```
+3D 메시
+  ├─ 입체적
+  ├─ 무거움
+  └─ 현실적인 파편/잔해 등
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 🔴 흔한 실수
+
+**1. 원본 파일 수정**
+
+```
+❌ 복제 안 하고 원본 수정
+  └─ 모든 봇 폭발이 바뀜
+
+✅ 복제본 만들어서 수정
+  └─ 필요한 곳만 사용
+```
+
+**2. 한 번에 모든 이미터 조정**
+
+```
+❌ 여러 이미터 동시 수정
+  └─ 효과 파악 어려움
+
+✅ 격리해서 하나씩 조정
+  └─ 정확한 결과 확인
+```
+
+**3. 너무 큰 값 설정**
+
+```
+파티클 수:
+  ├─ 너무 많으면 성능 저하
+  └─ 적절한 범위 유지
+
+크기:
+  ├─ 너무 크면 부자연스러움
+  └─ 주변 환경과 비교하며 조정
+```
+
+**4. Bake Transform 잊기**
+
+```
+❌ Scale만 조정하고 Bake 안 함
+  └─ 임시 변형 (비효율)
+
+✅ Bake Transform으로 고정
+  └─ 영구 적용 (최적화)
+```
+
+### ✅ Best Practices
+
+**나이아가라 작업 순서**
+
+```
+1. 복제본 만들기
+2. 원본 닫기
+3. 이미터별로 격리
+4. 하나씩 조정
+5. 전체 확인
+6. 반복 조정
+```
+
+**파라미터 조정 팁**
+
+```
+점진적 증가:
+  ├─ 한 번에 2배씩
+  ├─ 너무 크면 절반으로
+  └─ 미세 조정
+```
+
+**성능 고려**
+
+```
+파티클 수:
+  └─ 필요한 만큼만
+      (70개도 충분히 많음)
+
+Lifetime:
+  └─ 너무 길면 누적되어 느려짐
+```
+
+**시각적 일관성**
+
+```
+관련된 이미터:
+  └─ 비슷한 비율로 증가
+      (스파크 + 스파크 블랙)
+```
+
+---
+
+## 🎯 핵심 정리
+
+### ✅ 완성한 것
+
+**대형 폭발 이펙트**
+
+- ✅ 5배 큰 구체 메시
+- ✅ 더 많은 파티클
+- ✅ 더 큰 스파크
+- ✅ 더 넓은 범위
+- ✅ 더 빠른 속도
+
+**시스템 구조**
+
+- ✅ ExplosionSystem 변수
+- ✅ 봇마다 다른 폭발
+- ✅ 재사용 가능한 구조
+
+**나이아가라 스킬**
+
+- ✅ 이미터 격리 방법
+- ✅ 파라미터 조정
+- ✅ 메시 렌더러 사용
+- ✅ 반복 조정 과정
+
+### 🎮 최종 설정
+
+**일반 봇**
+
+```
+ExplosionSystem: NS_Fire_Explosion
+  └─ 표준 크기 폭발
+```
+
+**보스 봇**
+
+```
+ExplosionSystem: NS_Fire_Explosion_Boss
+  ├─ 구체: 5배 크기
+  ├─ 스파크: 70개 (↑40%)
+  ├─ 크기: 3~8 (↑2배)
+  ├─ 범위: 48 (↑6배)
+  ├─ 속도: 400~1600 (↑2배)
+  └─ 시각적 임팩트: 극대화
+```
+
+### 🚀 확장 가능성
+
+```
+다른 적 타입:
+  ├─ 중형 봇 → 3배 폭발
+  ├─ 거대 봇 → 10배 폭발
+  └─ 특수 봇 → 색상 변경
+
+환경 이펙트:
+  ├─ 폭발 배럴
+  ├─ 파괴 가능한 오브젝트
+  └─ 스크립트 이벤트
+```
+
+---
+
+## 🎓 배운 핵심 기술
+
+**1. 나이아가라 시스템 구조 이해**
+
+- 이미터 개념
+- 파티클 생성 원리
+- Renderer 타입
+
+**2. 이미터 격리와 조정**
+
+- Isolate 기능
+- 개별 파라미터 수정
+- 전체 효과 확인
+
+**3. 메시 크기 변경**
+
+- Modeling Mode
+- Bake Transform
+- 나이아가라에 적용
+
+**4. 변수 시스템 활용**
+
+- Promote to Variable
+- 동적 이펙트 선택
+- 재사용 가능한 구조
+
+**5. 반복 조정 프로세스**
+
+- 시도와 확인
+- 점진적 개선
+- 최적값 찾기
+
+---

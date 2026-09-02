@@ -1,0 +1,46 @@
+---
+title: 'BCh04 04 p150 검색조건처리'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# 다중 항목 검색 테스트
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381206/notion-blog/_/_/_/_/BCh04_04_p150_/Untitled.png)
+
+```java
+@Test
+    public void testQuery2() {
+        Pageable pageable = PageRequest.of(0, 10, Sort.by("gno").descending()); // Pageable 객체를 생성 이 객체는 페이징 및 정렬 정보를 설정 0번 페이지부터 10개의 항목을 gno 필드를 기준으로 내림차순으로 정렬하도록 설정
+
+        QGuestbook qGuestbook = QGuestbook.guestbook; // Querydsl을 사용하여 Guestbook 엔터티를 쿼리하기 위한 QGuestbook 객체를 생성. Querydsl은 엔터티의 필드를 Java 코드로 쉽게 쿼리할 수 있도록 도와준다
+
+        BooleanBuilder booleanBuilder = new BooleanBuilder(); // BooleanBuilder 객체를 생성 이 객체는 조건을 조합하는 데 사용
+
+        // title like %1% or content like %1%
+        BooleanExpression expression = qGuestbook.title.contains("1"); // "title" 필드에 "1"이 포함된 경우를 나타내는 BooleanExpression을 생성
+        BooleanExpression exAll = expression.or(qGuestbook.content.contains("1")); // "content" 필드에 "1"이 포함된 경우를 나타내는 BooleanExpression을 expression과 or 연산자를 사용하여 조합
+
+        booleanBuilder.and(exAll); // 이전에 생성한 exAll을 booleanBuilder와 and 연산자를 사용하여 조합
+        booleanBuilder.and(qGuestbook.gno.gt(0L)); // "gno" 필드가 0보다 큰 경우(gt)를 나타내는 BooleanExpression을 booleanBuilder와 and 연산자를 사용하여 조합
+
+        Page<Guestbook> result = guestbookRepository.findAll(booleanBuilder, pageable); // guestbookRepository를 사용하여 booleanBuilder와 pageable 정보를 기반으로 데이터베이스에서 게스트북 데이터를 조회
+
+        result.forEach(guestbook -> {
+            System.out.println(guestbook);
+        });
+    }
+```
+
+## 결과
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381206/notion-blog/_/_/_/_/BCh04_04_p150_/Untitled_1.png)
+
+```java
+위의 exAll 은 두개의 조건을 합쳐서 만들어서 where 에 () 에 묶여서 나온다
+
+그리고 and 는 새로 booleanBuilder 을 추가하여 만들었기 때문에 () 안에 없이 밑에 생겨났다
+```

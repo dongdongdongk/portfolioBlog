@@ -1,0 +1,1190 @@
+---
+title: '섹션 6 : 샤프 슈터 3'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+# { 🔫 무기 시스템 리팩토링과 발사 쿨다운 구현하기 }
+
+이번 강의에서는 기존 권총(Pistol) 코드 구조를 리팩토링하고, **발사 속도(Fire Rate) 쿨다운**을 실제로 적용하는 방법을 다룹니다.
+
+## 📋 목차
+
+1. [현재 구조 문제점 파악하기](https://www.notion.so/280e683f737e8016a90ae0d032763c9a#%ED%98%84%EC%9E%AC-%EA%B5%AC%EC%A1%B0-%EB%AC%B8%EC%A0%9C%EC%A0%90-%ED%8C%8C%EC%95%85%ED%95%98%EA%B8%B0)
+2. [Weapon 클래스와 ActiveWeapon 클래스 분리하기](https://www.notion.so/280e683f737e8016a90ae0d032763c9a#weapon-%ED%81%B4%EB%9E%98%EC%8A%A4%EC%99%80-activeweapon-%ED%81%B4%EB%9E%98%EC%8A%A4-%EB%B6%84%EB%A6%AC%ED%95%98%EA%B8%B0)
+3. [WeaponSO(ScriptableObject) 활용하기](https://www.notion.so/280e683f737e8016a90ae0d032763c9a#weaponso-scriptableobject-%ED%99%9C%EC%9A%A9%ED%95%98%EA%B8%B0)
+4. [ActiveWeapon에서 발사 로직 처리하기](https://www.notion.so/280e683f737e8016a90ae0d032763c9a#activeweapon%EC%97%90%EC%84%9C-%EB%B0%9C%EC%82%AC-%EB%A1%9C%EC%A7%81-%EC%B2%98%EB%A6%AC%ED%95%98%EA%B8%B0)
+5. [쿨다운(Fire Rate) 구현하기](https://www.notion.so/280e683f737e8016a90ae0d032763c9a#%EC%BF%A8%EB%8B%A4%EC%9A%B4fire-rate-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+6. [최종 코드 구조 정리](https://www.notion.so/280e683f737e8016a90ae0d032763c9a#%EC%B5%9C%EC%A2%85-%EC%BD%94%EB%93%9C-%EA%B5%AC%EC%A1%B0-%EC%A0%95%EB%A6%AC)
+
+---
+
+## 1. 현재 구조 문제점 파악하기
+
+- **문제 상황**
+  - 기존에는 `Pistol(권총)` 오브젝트 하나에 **모든 발사 로직**이 들어있음.
+  - 즉, 무기가 늘어나면 (기관총, 저격총, 샷건 등) → 모든 무기 스크립트에 발사 로직을 각각 넣어야 함.
+  - 유지보수와 확장성이 떨어짐.
+- **프로토타입에서는 괜찮았지만, 실제 게임 구조에서는 비효율적.**
+  - 무기 교체 기능을 넣으려면 공통된 발사 로직이 필요.
+  - 따라서 `Weapon`과 `ActiveWeapon`으로 역할을 분리해야 함.
+
+---
+
+## 2. Weapon 클래스와 ActiveWeapon 클래스 분리하기
+
+- **Weapon 클래스 (개별 무기 담당)**
+  - 각 무기 오브젝트에 붙음.
+  - 고유한 파티클(`Muzzle Flash`), 발사 이펙트, 레이캐스트 데미지 처리 담당.
+  - 즉, **무기 자체의 개별 특징 처리**.
+- **ActiveWeapon 클래스 (플레이어 무기 시스템 담당)**
+  - 플레이어가 현재 장착하고 있는 무기를 관리.
+  - 입력(`마우스 클릭`)을 받아서 → 현재 장착된 `Weapon`에게 발사 명령을 내림.
+  - 발사 속도 쿨다운(Fire Rate), 애니메이션 관리, 무기 교체 등의 공통 로직 담당.
+
+이렇게 하면,
+
+- **무기 개별 특징 = Weapon**
+- **무기 공통 관리 = ActiveWeapon**
+
+---
+
+## 3. WeaponSO (ScriptableObject) 활용하기
+
+- **ScriptableObject 장점**
+  - 데이터 중심 구조.
+  - 무기별 데미지, 발사 속도, VFX Prefab 등을 에디터에서 쉽게 변경 가능.
+  - 코드 수정 없이 새로운 무기를 추가할 수 있음.
+- **WeaponSO 구성**
+  ```csharp
+  public class WeaponSO : ScriptableObject
+  {
+      public int Dagage = 1;
+      public float FireRate = 0.5f;
+      public GameObject HitVFXPrefab;
+  }
+  ```
+- 주요 속성:
+  - **Damage** → 총알이 입히는 피해량.
+  - **FireRate** → 발사 속도 (몇 초마다 한 번 발사 가능한지).
+  - **HitVFXPrefab** → 총알이 맞았을 때 나오는 효과 프리팹.
+
+---
+
+## 4. ActiveWeapon에서 발사 로직 처리하기
+
+- **핵심 개념**
+  - ActiveWeapon은 입력(`starterAssetsInputs.shoot`)을 감지.
+  - 일정 시간이 지나야(`FireRate` 조건 충족) → Weapon.Shoot() 호출.
+  - Animator를 통해 발사 애니메이션 실행.
+- **구현 코드 (핵심 부분)**
+
+  ```csharp
+  void HandleShoot()
+  {
+      if (!starterAssetsInputs.shoot) return;
+
+      if (timeSinceLastShot >= weaponSO.FireRate)
+      {
+          currentWeapon.Shoot(weaponSO);   // 무기 발사 실행
+          animator.Play(SHOOT_STRING, 0, 0f);
+          timeSinceLastShot = 0f;          // 쿨다운 초기화
+      }
+
+      starterAssetsInputs.ShootInput(false); // 입력 리셋
+  }
+  ```
+
+---
+
+## 5. 쿨다운(Fire Rate) 구현하기
+
+- **FireRate 사용 방법**
+  - `ActiveWeapon`에서 `timeSinceLastShot` 변수로 시간 누적.
+  - `Update()`에서 매 프레임 `time.deltaTime`만큼 증가.
+  - 무기 발사 시 `FireRate`보다 크면 발사 가능.
+- **쿨다운 동작 과정**
+  1. 플레이어가 발사 버튼 입력.
+  2. `timeSinceLastShot >= weaponSO.FireRate` 조건 검사.
+  3. 조건 충족 → 발사 실행 후 `timeSinceLastShot = 0` 초기화.
+  4. 조건 미충족 → 발사 안 됨 (쿨다운 대기).
+- **장점**
+  - 무기마다 다른 발사 속도 가능.
+  - 예: 권총은 0.5초, 기관총은 0.1초, 저격총은 1.5초.
+
+---
+
+## 6. 최종 코드 구조 정리
+
+### 🔹 ActiveWeapon.cs
+
+- 현재 장착 무기 관리 + 발사 쿨다운 제어
+
+```csharp
+public class ActiveWeapon : MonoBehaviour
+{
+    [SerializeField] WeaponSO weaponSO;
+    Animator animator;
+    StarterAssetsInputs starterAssetsInputs;
+    Weapon currentWeapon;
+    float timeSinceLastShot = 0f;
+    const string SHOOT_STRING = "Shoot";
+
+    void Awake()
+    {
+        starterAssetsInputs = GetComponentInParent<StarterAssetsInputs>();
+        animator = GetComponent<Animator>();
+    }
+
+    void Start()
+    {
+        currentWeapon = GetComponentInChildren<Weapon>();
+    }
+
+    void Update()
+    {
+        timeSinceLastShot += Time.deltaTime;
+        HandleShoot();
+    }
+
+    void HandleShoot()
+    {
+        if (!starterAssetsInputs.shoot) return;
+
+        if (timeSinceLastShot >= weaponSO.FireRate)
+        {
+            currentWeapon.Shoot(weaponSO);
+            animator.Play(SHOOT_STRING, 0, 0f);
+            timeSinceLastShot = 0f;
+        }
+
+        starterAssetsInputs.ShootInput(false);
+    }
+}
+```
+
+---
+
+### 🔹 Weapon.cs
+
+- 개별 무기 로직 (MuzzleFlash, Raycast, 적 피격 처리)
+
+```csharp
+public class Weapon : MonoBehaviour
+{
+    [SerializeField] ParticleSystem muzzleFlash;
+
+    public void Shoot(WeaponSO weaponSO)
+    {
+        muzzleFlash.Play();
+        RaycastHit hit;
+
+        if (Physics.Raycast(Camera.main.transform.position, Camera.main.transform.forward, out hit, Mathf.Infinity))
+        {
+            Instantiate(weaponSO.HitVFXPrefab, hit.point, Quaternion.identity);
+
+            EnemyHealth enemyHealth = hit.collider.GetComponent<EnemyHealth>();
+            enemyHealth?.TakeDamage(weaponSO.Dagage);
+        }
+    }
+}
+```
+
+---
+
+### 🔹 WeaponSO.cs
+
+- 무기별 데이터 정의
+
+```csharp
+[CreateAssetMenu(fileName = "WeaponSO", menuName = "Scriptable Objects/WeaponSO")]
+public class WeaponSO : ScriptableObject
+{
+    public int Dagage = 1;
+    public float FireRate = 0.5f;
+    public GameObject HitVFXPrefab;
+}
+```
+
+---
+
+✅ **최종 정리**
+
+- `Weapon` → 개별 무기 특화 로직 (이펙트, 레이캐스트, 데미지)
+- `ActiveWeapon` → 입력/쿨다운/애니메이션/무기 관리
+- `WeaponSO` → 무기별 데이터 관리
+
+이제 권총뿐만 아니라 기관총, 저격총 등도 **ScriptableObject 교체만으로 손쉽게 확장** 가능!
+
+---
+
+# { 🔫 무기 프리팹과 자동 사격 기능 구현하기 }
+
+이번 강의는 **권총 프리팹을 기반으로 새로운 무기(기관총)를 추가하고, 자동 발사 기능을 구현**하는 방법을 다룹니다.
+
+---
+
+## 📋 목차
+
+1. [무기 프리팹 구조 이해하기](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#%EB%AC%B4%EA%B8%B0-%ED%94%84%EB%A6%AC%ED%8C%B9-%EA%B5%AC%EC%A1%B0-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [권총 프리팹에서 기관총 프리팹 만들기](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#%EA%B6%8C%EC%B4%9D-%ED%94%84%EB%A6%AC%ED%8C%B9%EC%97%90%EC%84%9C-%EA%B8%B0%EA%B4%80%EC%B4%9D-%ED%94%84%EB%A6%AC%ED%8C%B9-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+3. [무기 모델 교체 및 위치 조정하기](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#%EB%AC%B4%EA%B8%B0-%EB%AA%A8%EB%8D%B8-%EA%B5%90%EC%B2%B4-%EB%B0%8F-%EC%9C%84%EC%B9%98-%EC%A1%B0%EC%A0%95%ED%95%98%EA%B8%B0)
+4. [ScriptableObject 속성 확장 (isAutomatic)](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#scriptableobject-%EC%86%8D%EC%84%B1-%ED%99%95%EC%9E%A5-isautomatic)
+5. [자동 사격 로직 구현하기](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#%EC%9E%90%EB%8F%99-%EC%82%AC%EA%B2%A9-%EB%A1%9C%EC%A7%81-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+6. [Input System 상호작용(Interaction) 설정](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#input-system-%EC%83%81%ED%98%B8%EC%9E%91%EC%9A%A9interaction-%EC%84%A4%EC%A0%95)
+7. [테스트 및 조정 과정](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#%ED%85%8C%EC%8A%A4%ED%8A%B8-%EB%B0%8F-%EC%A1%B0%EC%A0%95-%EA%B3%BC%EC%A0%95)
+
+---
+
+## 1. 무기 프리팹 구조 이해하기
+
+- **Prefab** : 재사용 가능한 게임 오브젝트 템플릿. 무기처럼 여러 곳에서 활용되는 오브젝트를 관리하기 좋음.
+- 무기 프리팹의 구성 요소:
+  - **모델(Model)** → 실제 3D 총기 모델 (권총, 기관총 등)
+  - **총구 섬광(Muzzle Flash)** → 발사 시 나오는 파티클 효과
+  - **Weapon Script** → 발사 로직과 무기 동작 처리
+
+📌 아이디어:
+
+플레이어가 새로운 무기를 집으면, **활성 무기(Active Weapon)** 오브젝트의 하위 프리팹을 교체하여 실제로 사용할 수 있도록 만듦.
+
+---
+
+## 2. 권총 프리팹에서 기관총 프리팹 만들기
+
+- 프로젝트의 **Prefabs 폴더** 안에 `Weapons` 폴더를 생성.
+- 플레이어의 기본 무기인 **권총(Pistol)** 을 프리팹으로 변환.
+- 이때 프리팹은 **격리 모드(Isolation Mode)** 로 열어서 전체 오브젝트와 하위 요소(모델, 총구 섬광 등)를 함께 저장.
+- 총구 섬광은 원래 프리팹과 연결된 상태를 유지해야 하므로 완전히 풀어헤치지 않고 프리팹 상태로 유지.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380451/notion-blog/_/3D_/3D_/_6_3/image.png)
+
+```csharp
+자체 모드에서 열어야 프리팹 추가 가능
+```
+
+---
+
+## 3. 무기 모델 교체 및 위치 조정하기
+
+- 권총 프리팹을 **기관총 모델**로 교체:
+  1. `Models > Kinetic Weapons` 폴더에서 기관총 FBX 모델을 가져옴.
+  2. 권총 모델을 삭제하고 기관총 모델을 추가.
+- 모델 배치:
+  - 위치(Position)를 대략적으로 조정해 손에 자연스럽게 잡히도록 맞춤.
+  - 기관총은 권총보다 길이가 길기 때문에 **총구 섬광(Muzzle Flash)** 도 앞으로 이동해야 함.
+  - 이동 좌표를 **Local Space(로컬 좌표계)** 로 전환 후, 총구 끝부분 위치에 섬광을 다시 정렬.
+
+---
+
+## 4. ScriptableObject 속성 확장 (isAutomatic)
+
+무기별 발사 방식을 구분하기 위해 **Weapon ScriptableObject** 에 새로운 속성을 추가.
+
+- 새로운 변수:
+  ```csharp
+  public bool IsAutomatic = false;
+  ```
+- 의미:
+  - **false** → 권총(Pistol), 저격총(Sniper)처럼 한 발씩 클릭해야 발사.
+  - **true** → 기관총(Machine Gun)처럼 버튼을 누르고 있는 동안 자동으로 발사.
+
+---
+
+## 5. 자동 사격 로직 구현하기
+
+`ActiveWeapon.cs` 의 **HandleShoot()** 메소드에서 조건 분기 추가.
+
+```csharp
+void HandleShoot()
+{
+    if (!starterAssetsInputs.shoot) { return; }
+
+    if (timeSinceLastShot >= weaponSO.FireRate)
+    {
+        currentWeapon.Shoot(weaponSO);
+        animator.Play(SHOOT_STRING, 0, 0f);
+        timeSinceLastShot = 0f;
+    }
+
+    // 자동 사격이 아닌 경우(권총, 저격총) → 입력을 한 번만 처리하고 false로 초기화
+    if (!weaponSO.IsAutomatic)
+    {
+        starterAssetsInputs.ShootInput(false);
+    }
+}
+```
+
+📌 동작 개념:
+
+- **자동 무기 (isAutomatic = true)**
+  - 버튼을 누르고 있는 동안 계속 발사.
+- **비자동 무기 (isAutomatic = false)**
+  - 클릭할 때마다 한 번만 발사. 이후 입력을 `false` 로 돌려서 반복 발사 방지.
+
+---
+
+## 6. Input System 상호작용(Interaction) 설정
+
+자동 발사가 **멈추지 않는 버그**가 발생할 수 있음 → 해결책은 **Input Action Map의 상호작용 설정**.
+
+- Unity Input Action Map 열기 → **Shoot Action** 확인.
+- Interaction 옵션:
+  - **Press Only** → 버튼을 누를 때만 이벤트 발생.
+  - **Press and Release** → 버튼을 눌렀을 때와 뗄 때 모두 이벤트 발생.
+
+👉 `Release` 시점에서도 Shoot Input이 false로 전달되도록 설정하면, 마우스를 놓았을 때 자동 발사가 멈춤.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380450/notion-blog/_/3D_/3D_/_6_3/image_1.png)
+
+```csharp
+인풋 시스템 수정
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380450/notion-blog/_/3D_/3D_/_6_3/image_2.png)
+
+```csharp
+**Press and Release** → 버튼을 눌렀을 때와 뗄 때 모두 이벤트 발생.
+```
+
+---
+
+## 7. 테스트 및 조정 과정
+
+1. **Machine Gun ScriptableObject** 에서 `IsAutomatic = true` 로 설정.
+2. 플레이어의 활성 무기를 기관총 프리팹으로 교체.
+3. 게임 실행 후 테스트:
+   - 마우스 왼쪽 버튼을 누르고 있으면 계속 발사됨.
+   - 버튼을 떼면 발사가 멈춤.
+4. 최종 위치 미세 조정:
+   - 무기가 화면 중앙에 너무 치우치면 **살짝 오른쪽/아래/위로 이동**하여 조준선과 자연스럽게 맞춤.
+
+---
+
+✅ 최종 정리
+
+- **무기 프리팹 관리** : 권총 프리팹을 기반으로 기관총 프리팹 제작.
+- **모델 교체 및 총구 위치 조정** : 새 FBX 모델 삽입 후 총구 섬광 위치 수정.
+- **ScriptableObject 확장** : `IsAutomatic` 속성 추가로 무기별 발사 방식 구분.
+- **자동 사격 구현** : `HandleShoot()` 메소드에 조건 분기 추가.
+- **Input Interaction 설정** : "눌렀을 때 / 뗐을 때" 입력 처리로 자동 발사 종료 구현.
+- **테스트 후 위치 조정** : 무기 위치 미세 조정으로 플레이어 시야와 일치.
+
+---
+
+# { 🔫 무기 픽업 시스템과 ScriptableObject 데이터 전송 }
+
+이번 강의는 **씬(Scene) 안에 무기 픽업 오브젝트를 만들고, 플레이어가 해당 픽업을 획득하면 `ScriptableObject` 형태의 무기 데이터를 `ActiveWeapon` 클래스에 전달하여 무기를 교체하는 방법**을 다룹니다.
+
+---
+
+## 📋 목차
+
+1. [ScriptableObject 기반 무기 데이터 준비하기](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#scriptableobject-%EA%B8%B0%EB%B0%98-%EB%AC%B4%EA%B8%B0-%EB%8D%B0%EC%9D%B4%ED%84%B0-%EC%A4%80%EB%B9%84%ED%95%98%EA%B8%B0)
+2. [무기 픽업(Base Pickup) 프리팹 구조 만들기](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#%EB%AC%B4%EA%B8%B0-%ED%94%BD%EC%97%85base-pickup-%ED%94%84%EB%A6%AC%ED%8C%B9-%EA%B5%AC%EC%A1%B0-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+3. [픽업 프리팹 변형(Prefab Variant) 생성하기](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#%ED%94%BD%EC%97%85-%ED%94%84%EB%A6%AC%ED%8C%B9-%EB%B3%80%ED%98%95prefab-variant-%EC%83%9D%EC%84%B1%ED%95%98%EA%B8%B0)
+4. [WeaponPickup 스크립트 작성하기](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#weaponpickup-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%9E%91%EC%84%B1%ED%95%98%EA%B8%B0)
+5. [ActiveWeapon 클래스 수정하기](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#activeweapon-%ED%81%B4%EB%9E%98%EC%8A%A4-%EC%88%98%EC%A0%95%ED%95%98%EA%B8%B0)
+6. [동작 흐름 확인하기](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#%EB%8F%99%EC%9E%91-%ED%9D%90%EB%A6%84-%ED%99%95%EC%9D%B8%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. ScriptableObject 기반 무기 데이터 준비하기
+
+- **ScriptableObject**는 다양한 무기(권총, 기관총 등)의 데이터를 에셋으로 보관하는 역할을 함.
+- 예시 데이터 구조(`WeaponSO`)에는 다음과 같은 정보가 담김:
+  - **무기 이름 (name)**
+  - **연사 속도 (FireRate)**
+  - **자동 발사 여부 (IsAutomatic)**
+- 장점: 코드 변경 없이, 에셋을 바꿔가며 다양한 무기를 손쉽게 추가 가능.
+
+---
+
+## 2. 무기 픽업(Base Pickup) 프리팹 구조 만들기
+
+1. **빈 게임 오브젝트 생성 → "Base Pickup" 이름 지정**
+   - 모든 무기 픽업의 부모 역할을 하는 기본 구조.
+2. **자식 오브젝트 "Model" 생성**
+   - 여기에 무기 모델이나 단순한 시각적 큐브 배치.
+3. **Collider 설정**
+   - `Box Collider` 삭제 후 `Capsule Collider` 추가.
+   - **Is Trigger = ON** (충돌 판정은 하되, 물리적 반응은 없음).
+   - **Radius = 0.7** (적절히 모델을 감싸도록 조정).
+4. **WeaponPickup 스크립트 부착 준비**
+   - "Base Weapon Pickup" 이름으로 관리.
+
+---
+
+## 3. 픽업 프리팹 변형(Prefab Variant) 생성하기
+
+- **Prefabs/Pickups 폴더** 생성 후 Base Pickup을 프리팹화.
+- **프리팹 변형(Prefab Variant)** 활용 → 권총, 기관총 픽업을 생성.
+- 모델 교체 과정:
+  - Model 자식 안의 **Cube 삭제 → 실제 무기 FBX 모델 삽입**.
+  - 크기 및 위치 조정 → 콜라이더가 무기를 적절히 감싸도록 맞춤.
+
+---
+
+## 4. WeaponPickup 스크립트 작성하기
+
+```csharp
+using UnityEngine;
+
+public class WeaponPickup : MonoBehaviour
+{
+    [SerializeField] WeaponSO weaponSO;   // ScriptableObject 데이터 참조
+
+    const string PLAYER_STRING = "Player"; // 태그 비교용 상수
+
+    void OnTriggerEnter(Collider other)
+    {
+        if (other.CompareTag(PLAYER_STRING))
+        {
+            ActiveWeapon activeWeapon = other.GetComponentInChildren<ActiveWeapon>();
+            activeWeapon.SwitchWeapon(weaponSO); // 무기 교체
+            Destroy(gameObject); // 픽업 파괴
+        }
+    }
+}
+```
+
+- **핵심 개념**
+  - `SerializeField WeaponSO weaponSO` → 각 픽업마다 다른 무기 데이터 연결.
+  - `OnTriggerEnter` → 플레이어가 Trigger Collider에 들어올 때 실행.
+  - 태그 검사(`CompareTag("Player")`) → 플레이어만 무기를 획득 가능.
+  - `ActiveWeapon` 컴포넌트에 데이터 전달 → 실제 무기 장착 로직 실행.
+  - `Destroy(gameObject)` → 픽업 오브젝트는 일회성이므로 획득 후 제거.
+  - GetComponentInChildren<ActiveWeapon> `other`(플레이어 오브젝트) **자식 오브젝트들까지 검사해서 ActiveWeapon 컴포넌트를 찾아옴**.
+  - 만약 플레이어의 본체에 붙어있지 않고, **플레이어 하위 오브젝트(예: 무기 슬롯, 무기 모델 오브젝트)** 에 `ActiveWeapon`이 붙어있다면 이 메서드로 접근 가능.
+
+---
+
+## 5. ActiveWeapon 클래스 수정하기
+
+```csharp
+using UnityEngine;
+using StarterAssets;
+
+public class ActiveWeapon : MonoBehaviour
+{
+    [SerializeField] WeaponSO weaponSO;
+    Animator animator;
+    StarterAssetsInputs starterAssetsInputs;
+    Weapon currentWeapon;
+    const string SHOOT_STRING = "Shoot";
+
+    float timeSinceLastShot = 0f;
+
+    void Awake()
+    {
+        starterAssetsInputs = GetComponentInParent<StarterAssetsInputs>();
+        animator = GetComponent<Animator>();
+    }
+
+    void Start()
+    {
+        currentWeapon = GetComponentInChildren<Weapon>();
+    }
+
+    void Update()
+    {
+        timeSinceLastShot += Time.deltaTime;
+        HandleShoot();
+    }
+
+    // 새로 추가된 메소드
+    public void SwitchWeapon(WeaponSO weaponSO)
+    {
+        Debug.Log("Switched Weapon " + weaponSO.name);
+        // 추후: 무기 데이터 교체 및 모델 교체 로직 추가 예정
+    }
+
+    void HandleShoot()
+    {
+        if (!starterAssetsInputs.shoot) { return; }
+
+        if (timeSinceLastShot >= weaponSO.FireRate)
+        {
+            currentWeapon.Shoot(weaponSO);
+            animator.Play(SHOOT_STRING, 0, 0f);
+            timeSinceLastShot = 0f;
+        }
+
+        if (!weaponSO.IsAutomatic)
+        {
+            starterAssetsInputs.ShootInput(false);
+        }
+    }
+}
+
+```
+
+- **추가된 부분**
+  - `public void SwitchWeapon(WeaponSO weaponSO)` → 무기 픽업 시 호출.
+  - Debug.Log 출력: `"Switched Weapon 권총"` / `"Switched Weapon 기관총"` 같은 로그 확인 가능.
+
+---
+
+## 6. 동작 흐름 확인하기
+
+1. 플레이어가 **픽업 오브젝트의 Trigger Collider**에 닿음.
+2. `WeaponPickup.OnTriggerEnter` 실행 → `ActiveWeapon.SwitchWeapon()` 호출.
+3. `SwitchWeapon()` 내부에서 **무기 ScriptableObject 데이터** 전달.
+4. Debug.Log를 통해 무기 교체 확인:
+   - `"Player picked up Pistol"`
+   - `"Player picked up Machine Gun"`
+5. 픽업 오브젝트는 즉시 **Destroy(gameObject)** 로 삭제.
+
+---
+
+✅ **핵심 정리**
+
+- ScriptableObject로 무기 데이터를 관리하면 **유연하고 재사용 가능한 무기 시스템** 구축 가능.
+- 픽업 시스템은 **Collider(Trigger) + ScriptableObject 데이터 전달 + Prefab Variant 구조**로 깔끔하게 구현.
+- 현재는 Debug.Log로 확인만 하지만, 추후에는 실제 무기 프리팹 교체와 애니메이션 전환까지 확장 가능.
+
+---
+
+# { 🔫 무기 교체 시스템 구현하기 }
+
+이번 강의는 플레이어가 **무기를 교체하면서 서로 다른 총을 발사할 수 있도록** 시스템을 구현하는 강의입니다.
+
+---
+
+## 📋 목차
+
+1. [무기 프리팹 준비하기](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#%EB%AC%B4%EA%B8%B0-%ED%94%84%EB%A6%AC%ED%8C%B9-%EC%A4%80%EB%B9%84%ED%95%98%EA%B8%B0)
+2. [무기 SO(Scriptable Object) 확장하기](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#%EB%AC%B4%EA%B8%B0-soscriptable-object-%ED%99%95%EC%9E%A5%ED%95%98%EA%B8%B0)
+3. [ActiveWeapon 클래스 수정하기](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#activeweapon-%ED%81%B4%EB%9E%98%EC%8A%A4-%EC%88%98%EC%A0%95%ED%95%98%EA%B8%B0)
+4. [무기 교체 로직 흐름](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#%EB%AC%B4%EA%B8%B0-%EA%B5%90%EC%B2%B4-%EB%A1%9C%EC%A7%81-%ED%9D%90%EB%A6%84)
+5. [테스트 및 확인하기](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#%ED%85%8C%EC%8A%A4%ED%8A%B8-%EB%B0%8F-%ED%99%95%EC%9D%B8%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. 무기 프리팹 준비하기
+
+### 📌 프리팹(Prefab) 개념
+
+- **프리팹(Prefab)** : 게임 오브젝트를 재사용할 수 있도록 템플릿 형태로 저장한 것.
+- 장점:
+  - 여러 번 복제 및 배치 가능.
+  - Transform(위치, 회전, 크기) 같은 설정을 저장/유지.
+  - 특정 무기를 교체하거나 삭제할 때 쉽게 관리 가능.
+
+### ⚙️ 프리팹 준비 과정
+
+1. **권총(Pistol) 프리팹**은 이미 준비되어 있음.
+2. **기관총(Assault Rifle) 프리팹**을 새로 생성해야 함.
+   - 경로: `[Player] - [PlayerCameraRoot] - [Active Weapon]`
+   - Active Weapon 아래에 붙어있는 기관총 모델을 **프리팹으로 저장**.
+   - 저장 시 유니티가 “프리팹 모드로 열어야 한다”는 경고창을 띄움 → 확인 후 전체 오브젝트를 프리팹으로 저장.
+
+### 🎯 핵심
+
+- 이렇게 하면 **무기를 교체할 때 단순히 기존 무기 삭제 후 새 프리팹 인스턴스화**만 하면 됨.
+- 프리팹은 이미 올바른 위치/회전을 포함하고 있어 추가적인 좌표 계산 필요 없음.
+
+---
+
+## 2. 무기 SO(Scriptable Object) 확장하기
+
+### 📌 Scriptable Object 개념
+
+- **데이터 중심 오브젝트**로, 무기의 정보(데미지, 연사 속도, 프리팹 참조 등)를 저장하는 역할.
+- 장점:
+  - 코드 수정 없이 새로운 무기 데이터 생성 가능.
+  - 다양한 무기 간 공통 속성 관리 가능.
+
+### ⚙️ 수정된 `WeaponSO` 구조
+
+```csharp
+[CreateAssetMenu(fileName = "WeaponSO", menuName = "Scriptable Objects/WeaponSO")]
+public class WeaponSO : ScriptableObject
+{
+    public GameObject weaponPrefab;  // 무기 프리팹 참조 추가
+    public int Dagage = 1;
+    public float FireRate = 0.5f;
+    public GameObject HitVFXPrefab;
+    public bool IsAutomatic = false;
+}
+```
+
+- **weaponPrefab** : 실제로 장착될 무기 오브젝트.
+- Inspector 창에서 **권총 프리팹, 기관총 프리팹**을 각각 지정해야 함.
+
+---
+
+## 3. ActiveWeapon 클래스 수정하기
+
+### 📌 주요 변경 사항
+
+### 1) 기존 Debug.Log 삭제
+
+- 무기 전환 시 단순히 출력만 하던 부분 제거 → 실제 교체 로직 작성.
+
+### 2) 현재 무기 삭제
+
+```csharp
+if (currentWeapon)
+{
+    Destroy(currentWeapon.gameObject);
+}
+```
+
+- null 체크 후 **현재 장착된 무기 제거**.
+
+### 3) 새 무기 생성 (프리팹 인스턴스화)
+
+```csharp
+Weapon newWeapon = Instantiate(weaponSO.weaponPrefab, transform).GetComponent<Weapon>();
+currentWeapon = newWeapon;
+this.weaponSO = weaponSO;
+```
+
+---
+
+- `Weapon newWeapon = Instantiate(weaponSO.weaponPrefab, transform).GetComponent<Weapon>();`
+  - **Instantiate** → "새로운 오브젝트를 게임에 만들어 준다"는 뜻.
+  - `weaponSO.weaponPrefab` → 새로 만들 무기(프리팹). 여기서 권총이나 기관총 같은 실제 모델을 가져옵니다.
+  - `transform` → 방금 만든 무기를 어디에 붙일지 정하는 부분. `ActiveWeapon`이라는 부모 오브젝트 밑에 새 무기를 붙입니다.
+    (여기서 `transform`은 **이 스크립트(ActiveWeapon.cs)** 가 붙어 있는 오브젝트의 `Transform`)
+  - `.GetComponent<Weapon>()` → 만든 무기에서 `Weapon` 스크립트를 꺼내옵니다. 이렇게 하면 나중에 `Shoot()` 같은 무기 기능을 쓸 수 있어요.
+
+---
+
+- `currentWeapon = newWeapon;`
+  - 지금 사용 중인 무기(`currentWeapon`)를 **방금 만든 무기**로 바꿔 줍니다.
+  - 예를 들어 권총을 쓰다가 기관총을 만들면, 이제 `currentWeapon`은 기관총이 됩니다.
+
+---
+
+- `this.weaponSO = weaponSO;`
+  - 현재 무기 데이터(`weaponSO`)를 새 무기의 데이터로 바꿔 줍니다.
+  - 이 데이터 안에는 **데미지, 연사 속도, 자동 발사 여부, 프리팹 정보** 등이 들어 있어서, 발사할 때 어떤 성능으로 쓸지 정해 줍니다.
+
+### 3) 새 무기 생성 (프리팹 인스턴스화) ( 추가 상세 설명 )
+
+- `Weapon newWeapon = Instantiate(weaponSO.weaponPrefab, transform).GetComponent<Weapon>();`
+  - **Instantiate(원본, 부모)** 호출
+    - `weaponSO.weaponPrefab` → 인스턴스화할 **프리팹(GameObject)** 참조입니다.
+    - `transform` → 생성된 인스턴스의 **부모(Parent)** 로 `ActiveWeapon` 컴포넌트가 붙은 게임오브젝트의 `transform`을 넘기고 있습니다. 결과적으로 새 무기는 `ActiveWeapon` 오브젝트의 **자식**이 됩니다.
+    - Unity의 오버로드 동작 요약:
+      - 부모(Transform)를 지정하면, **기본 동작은 원본(프리팹)의 위치/회전 값을 복사해 생성된 객체의 로컬(local) 위치/회전으로 설정**합니다. (버전/오버로드에 따라 `instantiateInWorldSpace` 파라미터로 '월드 위치 유지' 여부를 바꿀 수 있음.)
+      - 만약 부모의 원점(0,0,0)에 맞추고 싶다면 `Instantiate(prefab, transform, false)` 혹은 생성 후 `newGO.transform.localPosition = Vector3.zero; newGO.transform.localRotation = Quaternion.identity;` 처럼 명시적으로 설정하세요.
+    - 반환값은 `GameObject`(혹은 `Object`) 인스턴스이므로 `.GetComponent<Weapon>()`로 **Weapon 스크립트(컴포넌트)** 를 바로 얻습니다.
+    - 주의: `.GetComponent<Weapon>()`는 **프리팹 루트(GameObject)**에 `Weapon` 컴포넌트가 붙어 있어야 값을 얻습니다. `Weapon`이 자식 오브젝트에 붙어 있으면 `GetComponentInChildren<Weapon>()`을 사용하거나 구조를 바꾸세요.
+    - 예외/에러 처리: `weaponSO`나 `weaponSO.weaponPrefab`이 `null`이면 Instantiate가 실패하므로 **null 체크**를 해주는 것이 안전합니다.
+- `currentWeapon = newWeapon;`
+  - `currentWeapon`(타입: `Weapon`)에 **인스턴스화한 Weapon 컴포넌트** 참조를 할당합니다.
+  - 이후 `currentWeapon.Shoot(...)` 등의 호출은 이 컴포넌트의 인스턴스에 대해 실행됩니다.
+  - `currentWeapon`에는 **컴포넌트 레퍼런스**가 저장되므로, 게임오브젝트 전체를 제거하려면 `Destroy(currentWeapon.gameObject)` 처럼 `.gameObject`를 통해 삭제해야 합니다.
+  - 생명주기: 인스턴스화 직후 해당 무기 오브젝트의 `Awake()`가 호출되고, 활성 상태라면 `OnEnable()` / `Start()`도 호출됩니다. 따라서 인스턴스화 직후 필요한 초기화가 프리팹 내부에서 이루어질 수 있습니다.
+- `this.weaponSO = weaponSO;`
+  - `ActiveWeapon` 클래스 수준의 `weaponSO` 레퍼런스를 새로 전달된 `weaponSO`로 **업데이트**합니다.
+  - 이유/의의: `HandleShoot()`에서 `weaponSO.FireRate`, `weaponSO.IsAutomatic`, `weaponSO.Dagage` 등을 참조하기 때문에 **현재 장착된 무기의 데이터(데미지, 연사속도, 자동 여부 등)**가 항상 최신 상태여야 합니다.
+  - 참고: 만약 `currentWeapon`이 자체적으로 `WeaponSO`를 내부에 저장하거나 각 무기 컴포넌트가 그에 따른 동작을 관리한다면, `currentWeapon.Init(weaponSO)` 같은 초기화 호출을 추가하는 편이 더 명확한 구조가 됩니다.
+
+### 🧩 Unity에서 `transform` 이라는 건? ( 추가 설명 )
+
+- **Transform** = 오브젝트의 위치(Position), 회전(Rotation), 크기(Scale) + 부모/자식 관계까지 담고 있는 정보.
+- 게임 오브젝트는 모두 `Transform`을 하나씩 가지고 있어요.
+
+---
+
+### 📌 부모-자식 관계란?
+
+- 유니티에서 **부모-자식 관계**를 맺으면:
+  - 부모를 움직이면 → 자식도 같이 움직입니다.
+  - 자식의 위치는 **부모를 기준으로 한 위치(=Local Position)** 로 저장됩니다.
+
+예시:
+
+- `[Player]` 오브젝트 밑에 `[Gun]` 자식 오브젝트가 있다면,
+  - 플레이어가 앞으로 가면 총도 같이 따라갑니다.
+  - 총의 위치는 "플레이어를 기준으로 0.2m 앞" 같은 식으로 저장됩니다.
+
+---
+
+### 📌 `Instantiate(프리팹, transform)` 이라는 코드
+
+```csharp
+Weapon newWeapon = Instantiate(weaponSO.weaponPrefab, transform).GetComponent<Weapon>();
+```
+
+- `Instantiate(무엇을, 어디에)` 라고 읽으면 돼요.
+- 여기서 \**`transform`*은 `ActiveWeapon`이라는 오브젝트의 `Transform`입니다.
+- 그래서 "무기를 생성하고 → ActiveWeapon 밑에 붙여라"라는 뜻이 됩니다.
+
+즉,
+
+- 부모: `ActiveWeapon`
+- 자식: 방금 만든 무기 프리팹
+
+---
+
+### 🎯 결과적으로
+
+- 무기가 `ActiveWeapon`의 **자식 오브젝트**가 됩니다.
+- 그러면 플레이어가 고개를 돌리거나, 총을 들고 움직일 때 총도 같이 따라다닙니다.
+- 만약 부모를 지정하지 않으면, 총은 **씬(Scene)의 맨 위(root)**에 생겨서, 플레이어와 상관없이 공중에 떠 있을 거예요.
+
+---
+
+## 4. 무기 교체 로직 흐름
+
+1. 플레이어가 무기 교체 입력 → `SwitchWeapon(WeaponSO weaponSO)` 호출.
+2. 현재 무기 존재 여부 확인 후 **삭제**.
+3. 새로운 무기 프리팹 **인스턴스화**.
+4. `currentWeapon` 참조 업데이트.
+5. 무기 데이터(`weaponSO`) 갱신 → 발사 속도, 데미지 등 새 무기의 속성이 반영됨.
+
+---
+
+## 5. 테스트 및 확인하기
+
+### ⚙️ 실행 흐름
+
+1. **시작 무기 = 권총**
+   - 권총 프리팹이 활성 무기에 장착되어 있음.
+2. 무기 교체 입력 → **기관총으로 교체**
+   - 권총 오브젝트 삭제 → 기관총 프리팹 인스턴스화 → 장착 완료.
+3. 다시 무기 교체 입력 → **권총으로 교체**
+   - 기관총 삭제 → 권총 프리팹 생성 → 장착 완료.
+4. 반복 가능 → **무한히 권총 ↔ 기관총 전환 가능**.
+
+### 🎯 최종 확인 포인트
+
+- 프리팹을 Inspector에서 제대로 할당했는지(권총, 기관총 모두).
+- FBX 모델이 아니라 **프리팹**을 할당했는지.
+- FireRate, IsAutomatic, Damage 값이 올바른지.
+
+---
+
+## ✅ 정리
+
+- \*프리팹(Prefab)\*\*을 활용하면 무기 교체가 단순해진다.
+- **Scriptable Object**를 통해 무기 데이터를 관리하면, 코드 수정 없이 새로운 무기를 손쉽게 추가 가능하다.
+- **ActiveWeapon 클래스**는 현재 무기를 삭제하고, 선택한 무기의 프리팹을 인스턴스화하여 교체하는 핵심 로직을 담당한다.
+- 최종적으로 플레이어는 **권총과 기관총을 자유롭게 전환하며 발사 가능**하다.
+
+---
+
+# { 🎯 스나이퍼 라이플(Sniper Rifle) 무기 추가 & 줌(Zoom) 기능 구현하기 }
+
+이번 강의에서는 **새로운 무기(저격총, Sniper Rifle)** 를 게임에 추가하고,
+
+이 무기에 맞는 **줌(Zoom) 기능**을 구현하는 방법을 다룹니다.
+
+---
+
+## 📋 목차
+
+1. [새 무기 프리팹 제작하기](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#%EC%83%88-%EB%AC%B4%EA%B8%B0-%ED%94%84%EB%A6%AC%ED%8C%B9-%EC%A0%9C%EC%9E%91%ED%95%98%EA%B8%B0)
+2. [저격소총 픽업(Pickup) 프리팹 만들기](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#%EC%A0%80%EA%B2%A9%EC%86%8C%EC%B4%9D-%ED%94%BD%EC%97%85pickup-%ED%94%84%EB%A6%AC%ED%8C%B9-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+3. [ScriptableObject에 줌 속성 추가하기](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#scriptableobject%EC%97%90-%EC%A4%8C-%EC%86%8D%EC%84%B1-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+4. [ActiveWeapon에서 줌 로직 구현하기](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#activeweapon%EC%97%90%EC%84%9C-%EC%A4%8C-%EB%A1%9C%EC%A7%81-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+5. [StarterAssetsInputs에서 줌 입력 처리하기](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#starterassetsinputs%EC%97%90%EC%84%9C-%EC%A4%8C-%EC%9E%85%EB%A0%A5-%EC%B2%98%EB%A6%AC%ED%95%98%EA%B8%B0)
+6. [Input Action Map에 Zoom 바인딩 추가하기](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#input-action-map%EC%97%90-zoom-%EB%B0%94%EC%9D%B8%EB%94%A9-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+7. [테스트 및 디버깅](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#%ED%85%8C%EC%8A%A4%ED%8A%B8-%EB%B0%8F-%EB%94%94%EB%B2%84%EA%B9%85)
+
+---
+
+## 1. 새 무기 프리팹 제작하기
+
+### 🔹 개념
+
+- Unity에서 무기를 추가할 때는 **FBX 모델**을 불러와서 **Prefab**으로 만들어야 함.
+- Player 프리팹 내부 무기 교체 → 새 무기 Prefab 생성 → 무기 폴더에 저장.
+
+### 🔹 단계
+
+1. **Player Prefab Isolation 모드 열기**
+   - 기존 권총(Pistol) 오브젝트 언팩(→ 프리팹 연결 해제).
+   - 이름을 `SniperRifle` 로 변경.
+2. **모델 교체하기**
+   - Sniper Rifle FBX 가져오기 → 기존 권총 FBX 삭제.
+   - 위치(Position)와 회전(Rotation)을 조정하여 손에 잘 맞게 배치.
+3. **Prefab 저장하기**
+   - 무기 폴더(`Prefabs/Weapons`)에 전체 Sniper Rifle 오브젝트를 프리팹으로 저장.
+
+---
+
+## 2. 저격소총 픽업(Pickup) 프리팹 만들기
+
+### 🔹 개념
+
+- 게임 내에서 무기를 얻으려면 **Pickup 오브젝트**가 필요.
+- 기존 무기 Pickup을 변형(Variant)해서 제작.
+
+### 🔹 단계
+
+1. `Prefabs/Pickups` 폴더에서 기존 무기 프리팹을 **Prefab Variant**로 생성.
+2. 이름을 `SniperRiflePickup` 으로 변경.
+3. FBX 교체:
+   - Sniper Rifle FBX → Pickup에 적용.
+   - 크기 스케일을 기존 무기들과 비슷하게 조절.
+4. 무기 ScriptableObject 연결:
+   - Sniper Rifle ScriptableObject에 **weaponPrefab**으로 Sniper Rifle 프리팹 할당.
+
+---
+
+## 3. ScriptableObject에 줌 속성 추가하기
+
+### 🔹 개념
+
+- 무기가 줌 기능을 지원하는지 여부는 **WeaponSO**에 저장.
+- Boolean 값 `CanZoom` 으로 제어.
+
+### 🔹 코드
+
+```csharp
+[CreateAssetMenu(fileName = "WeaponSO", menuName = "Scriptable Objects/WeaponSO")]
+public class WeaponSO : ScriptableObject
+{
+    public GameObject weaponPrefab;
+    public int Dagage = 1;
+    public float FireRate = 0.5f;
+    public GameObject HitVFXPrefab;
+    public bool IsAutomatic = false;
+    public bool CanZoom = false;   // 🔹 새로 추가
+}
+```
+
+- **기본값**: `false` (대부분 무기는 줌 불필요).
+- **Sniper Rifle에만** `true` 설정.
+
+---
+
+## 4. ActiveWeapon에서 줌 로직 구현하기
+
+### 🔹 개념
+
+- **HandleShoot()** 와 같은 방식으로 `HandleZoom()` 작성.
+- 현재 무기가 `CanZoom == true` 일 때만 줌 동작 허용.
+
+### 🔹 코드
+
+```csharp
+void HandleZoom()
+{
+    if (!weaponSO.CanZoom) { return; }
+
+    if (starterAssetsInputs.zoom)
+    {
+        Debug.Log("Zooming In");
+    }
+    else
+    {
+        Debug.Log("Zooming Out");
+    }
+}
+```
+
+- 줌 키 입력 시 → `"Zooming In"` 로그 출력.
+- 입력 해제 시 → `"Zooming Out"` 로그 출력.
+
+---
+
+## 5. StarterAssetsInputs에서 줌 입력 처리하기
+
+### 🔹 개념
+
+- 기존 `ShootInput()` 과 같은 구조로 `ZoomInput()` 추가.
+- 외부에서 접근할 수 있는 `public bool zoom` 선언.
+
+### 🔹 코드
+
+```csharp
+namespace StarterAssets
+{
+    public class StarterAssetsInputs : MonoBehaviour
+    {
+        public bool zoom;
+
+        public void OnZoom(InputValue value)
+        {
+            ZoomInput(value.isPressed);
+        }
+
+        public void ZoomInput(bool newZoomState)
+        {
+            zoom = newZoomState;
+        }
+    }
+}
+```
+
+- `OnZoom()` : Input System에서 직접 호출되는 메서드.
+- `ZoomInput()` : `zoom` 상태 갱신.
+
+---
+
+## 6. Input Action Map에 Zoom 바인딩 추가하기
+
+### 🔹 개념
+
+- Input Action Asset에 새 `Zoom` 액션 추가.
+- 마우스와 게임패드에 바인딩 지정.
+
+### 🔹 단계
+
+1. **Player Action Map 열기** (`PlayerInputActions.inputactions`).
+2. **새 액션 추가**
+   - 이름: `Zoom` (StarterAssetsInputs의 OnZoom과 일치해야 함).
+   - 타입: `Button`.
+3. **바인딩 설정**
+   - **마우스**: Right Mouse Button.
+   - **게임패드**: Left Trigger.
+4. Interaction: `Press and Release` → 누르면 true, 떼면 false.
+
+---
+
+## 7. 테스트 및 디버깅
+
+### 🔹 단계
+
+1. Sniper Rifle ScriptableObject에서 `CanZoom = true` 로 설정.
+2. 플레이 모드 실행.
+3. Sniper Rifle 장착 후:
+   - **오른쪽 마우스 버튼** 누르면 `"Zooming In"`.
+   - 버튼 해제 시 `"Zooming Out"`.
+
+### 🔹 확인된 점
+
+- 권총/기관총 등은 `CanZoom = false` → 줌 입력 무시됨.
+- Sniper Rifle만 정상적으로 줌 동작.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380450/notion-blog/_/3D_/3D_/_6_3/image_3.png)
+
+---
+
+## ✅ 정리
+
+- **Prefab 단계**: Sniper Rifle 무기 + Pickup 생성.
+- **ScriptableObject 단계**: `CanZoom` 속성 추가 → 무기별 기능 분리.
+- **ActiveWeapon 단계**: `HandleZoom()` 구현 → 줌 로직 연결.
+- **StarterAssetsInputs 단계**: `zoom` bool + OnZoom 이벤트 처리.
+- **Input Action Map 단계**: Zoom 액션 추가 → 마우스 오른쪽 클릭 / 게임패드 트리거 바인딩.
+- **결과**: Sniper Rifle 무기에서만 줌 가능, Debug.Log 출력으로 동작 확인.
+
+---
+
+# { 🎯 저격 소총 줌(Zoom) 시스템 구현하기 }
+
+이번 강의는 **저격 소총 줌(Zoom) 시스템을 구현**하는 과정을 다룹니다.
+
+- **카메라 FOV(Field of View) 제어**
+- **비네트(zoom vignette) 효과 추가**
+- **무기별 줌 값 저장**
+- **줌 시 회전 속도(마우스 감도) 제어**
+
+---
+
+## 📋 목차
+
+1. [줌 시스템 개념 이해하기](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#%EC%A4%8C-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [비네트 UI 이미지 추가하기](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#%EB%B9%84%EB%84%A4%ED%8A%B8-ui-%EC%9D%B4%EB%AF%B8%EC%A7%80-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+3. [무기 ScriptableObject 수정하기](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#%EB%AC%B4%EA%B8%B0-scriptableobject-%EC%88%98%EC%A0%95%ED%95%98%EA%B8%B0)
+4. [ActiveWeapon 스크립트에서 줌 제어](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#activeweapon-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8%EC%97%90%EC%84%9C-%EC%A4%8C-%EC%A0%9C%EC%96%B4)
+5. [마우스 감도(회전 속도) 제어하기](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#%EB%A7%88%EC%9A%B0%EC%8A%A4-%EA%B0%90%EB%8F%84%ED%9A%8C%EC%A0%84-%EC%86%8D%EB%8F%84-%EC%A0%9C%EC%96%B4%ED%95%98%EA%B8%B0)
+6. [최종 동작 확인](https://www.notion.so/6-3-280e683f737e8016a90ae0d032763c9a#%EC%B5%9C%EC%A2%85-%EB%8F%99%EC%9E%91-%ED%99%95%EC%9D%B8)
+
+---
+
+## 1. 줌 시스템 개념 이해하기
+
+- **저격 소총 줌 구현 목표**
+  1. 카메라 FOV(Field of View)를 좁혀서 줌인 효과 만들기.
+  2. UI 비네트 이미지를 추가하여 스코프 느낌 표현.
+  3. 무기별로 다른 줌 값과 감도를 적용할 수 있도록 **ScriptableObject**로 설정.
+  4. 줌 시 마우스 회전 속도(감도)도 함께 줄여 현실적인 저격 감각 구현.
+- **Cinemachine Virtual Camera**
+  - 플레이어를 따라다니는 카메라.
+  - `m_Lens.FieldOfView` 속성 값을 조절해서 줌 인/아웃 가능.
+  - 기본값(default FOV)은 40 정도, 줌 시에는 10~20으로 줄임.
+
+---
+
+## 2. 비네트 UI 이미지 추가하기
+
+1. **프로젝트 구조 확인**
+   - `Assets/GDTV/Images` 폴더에 **zoom vignette 이미지**가 있음.
+2. **오버레이 캔버스(Overlay Canvas)에 이미지 배치**
+   - UI → Image 생성 후 `"ZoomVignette"`로 이름 변경.
+   - Source Image에 `zoom vignette` 드래그 앤 드롭.
+   - Rect Transform → **Alt+Stretch 버튼 클릭** → 화면 전체 크기로 늘리기.
+3. **비활성화 상태로 시작**
+   - 처음에는 보이지 않게 `GameObject.SetActive(false)`로 설정.
+   - 줌 상태에서만 `true`로 토글.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380451/notion-blog/_/3D_/3D_/_6_3/image_4.png)
+
+```csharp
+줌에 사용 할 이미지
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380451/notion-blog/_/3D_/3D_/_6_3/image_5.png)
+
+```csharp
+캔버스에 UI 이미지 생성 이미지 소스 넣어주기
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380451/notion-blog/_/3D_/3D_/_6_3/image_6.png)
+
+```csharp
+이미지를 늘려서 저격 화면처럼 만든다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380451/notion-blog/_/3D_/3D_/_6_3/image_7.png)
+
+```csharp
+각 오브젝트를 연결해 준다
+```
+
+---
+
+## 3. 무기 ScriptableObject 수정하기
+
+각 무기별로 **줌 설정 값**을 저장하도록 ScriptableObject 수정.
+
+```csharp
+[CreateAssetMenu(fileName = "WeaponSO", menuName = "Scriptable Objects/WeaponSO")]
+public class WeaponSO : ScriptableObject
+{
+    public GameObject weaponPrefab;
+    public int Damage = 1;
+    public float FireRate = 0.5f;
+    public GameObject HitVFXPrefab;
+    public bool IsAutomatic = false;
+    public bool CanZoom = false;         // 줌 가능 여부
+    public float ZoomAmount = 20f;       // 줌했을 때 FOV 값
+    public float ZoomRotationSpeed = 0.3f; // 줌했을 때 마우스 감도
+}
+```
+
+- **ZoomAmount** : 줌인 시 카메라 FOV 값 (예: 10~20).
+- **ZoomRotationSpeed** : 줌인 시 회전 속도 (감도).
+
+---
+
+## 4. ActiveWeapon 스크립트에서 줌 제어
+
+### (1) 초기 설정
+
+- Awake에서 **기본값 저장**
+  - `defaultFOV = playerFollowCamera.m_Lens.FieldOfView`
+    → 게임 시작 시 **카메라의 기본 시야각(FOV)** 값을 저장.
+  - `defaultRotationSpeed = firstPersonController.RotationSpeed`
+    → 게임 시작 시 **플레이어의 기본 회전 속도(마우스 감도)** 값을 저장.
+
+이렇게 저장해두면, 줌을 해제했을 때 원래 값으로 복구할 수 있음.
+
+---
+
+### (2) 줌 로직 구현 (HandleZoom)
+
+```csharp
+void HandleZoom()
+{
+    // 현재 무기가 줌 기능을 지원하지 않으면 그냥 종료
+    if (!weaponSO.CanZoom) { return; }
+
+    // 카메라 시야각(FOV)을 목표값으로 설정하기 위한 임시 변수
+    float targetFOV;
+
+    // 만약 플레이어가 줌 버튼(우클릭 등)을 누르고 있다면
+    if (starterAssetsInputs.zoom)
+    {
+        // 1) 무기에서 지정한 ZoomAmount 값으로 카메라 FOV 설정
+        targetFOV = weaponSO.ZoomAmount;
+
+        // 2) 무기에서 지정한 ZoomRotationSpeed 값으로 마우스 감도(회전 속도) 변경
+        firstPersonController.ChangeRotationSpeed(weaponSO.ZoomRotationSpeed);
+
+        // 3) 줌 상태임을 표현하기 위해 비네트 UI를 켬
+        zoomVignette.SetActive(true);
+    }
+    else // 플레이어가 줌 버튼을 떼었을 때 (줌 해제 상태)
+    {
+        // 1) 카메라 FOV를 기본 FOV 값으로 되돌림
+        targetFOV = defaultFOV;
+
+        // 2) 회전 속도를 기본 회전 속도로 되돌림
+        firstPersonController.ChangeRotationSpeed(defaultRotationSpeed);
+
+        // 3) 비네트 UI를 꺼서 줌 아님을 표시
+        zoomVignette.SetActive(false);
+    }
+
+    // 📌 Mathf.SmoothDamp : 값이 순간적으로 변하지 않고, 부드럽게 목표값으로 이동하도록 하는 함수
+    // currentFOV → 현재 카메라 FOV
+    // targetFOV → 이동하고자 하는 목표 FOV
+    // fovVelocity → SmoothDamp 내부에서 사용하는 속도 추적 변수(ref로 전달해야 함)
+    // 0.1f → 변화하는 데 걸리는 대략적인 시간 (작을수록 빠름)
+    currentFOV = Mathf.SmoothDamp(currentFOV, targetFOV, ref fovVelocity, 0.1f);
+
+    // 실제 시네머신 카메라의 FOV를 갱신
+    playerFollowCamera.m_Lens.FieldOfView = currentFOV;
+}
+```
+
+---
+
+- **줌 시**
+  - 카메라 FOV → `weaponSO.ZoomAmount` (예: 10~20, 시야 좁아짐)
+  - 회전 속도 → `weaponSO.ZoomRotationSpeed` (감도 낮아짐, 조준 쉬워짐)
+  - 비네트 이미지 활성화 → 스코프 느낌 제공
+- **줌 해제 시**
+  - 카메라 FOV → `defaultFOV` (게임 시작 시 기본 값으로 복원)
+  - 회전 속도 → `defaultRotationSpeed` (감도 원래대로)
+  - 비네트 비활성화 → 화면 깨끗하게 복원
+
+---
+
+👉 요약하면, **HandleZoom()은 줌 버튼 입력을 체크 → 무기 ScriptableObject 값 기반으로 카메라/감도/UI를 전환 → SmoothDamp로 부드럽게 적용**하는 역할을 합니다.
+
+---
+
+## 5. 마우스 감도(회전 속도) 제어하기
+
+- **FirstPersonController 수정**
+  - 기존 `RotationSpeed` 값을 직접 바꾸는 대신, **메소드로 변경**.
+
+```csharp
+public void ChangeRotationSpeed(float amount)
+{
+    RotationSpeed = amount;
+}
+```
+
+- **ActiveWeapon에서 호출**
+  - 줌 상태 → `firstPersonController.ChangeRotationSpeed(weaponSO.ZoomRotationSpeed)`
+  - 줌 해제 → `firstPersonController.ChangeRotationSpeed(defaultRotationSpeed)`
+
+---
+
+## 6. 최종 동작 확인
+
+1. **참조 연결**
+   - ActiveWeapon → `PlayerFollowCamera`, `ZoomVignette` 할당.
+2. **플레이 테스트**
+   - 저격 소총 장착 후 **우클릭(Zoom)** →
+     - 카메라 줌인 (FOV 좁아짐).
+     - 비네트 이미지 활성화.
+     - 마우스 감도 줄어들어 정밀 조준 가능.
+   - 줌 해제 시 원래 값으로 복원.
+3. **효과**
+   - 실제 게임처럼 스코프 줌 구현 완료.
+   - Counter-Strike 스타일 **퀵스코프(Quick Scope)** 연습 가능.
+
+---
+
+✅ **정리**
+
+- 카메라 줌 효과는 **FOV 조절**로 구현.
+- 시각적 몰입감을 위해 **비네트 이미지** 추가.
+- 무기별 줌 값과 감도는 **ScriptableObject**에서 관리.
+- 줌 시 감도 낮춰 현실적인 저격 느낌 제공.

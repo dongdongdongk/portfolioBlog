@@ -1,0 +1,1508 @@
+---
+title: '섹션 11: Collide Effects ( 적 충돌 이펙트 )'
+date: '2026-09-02'
+category: '게임 개발/Game Development in JS TS - The Complete Guide (w_'
+tags: ['게임 개발', 'Game Development in JS TS - The Complete Guide (w_']
+draft: false
+summary: ''
+---
+
+# { 프로젝트 타일 충돌 후 이동 거리 문제 해결 }
+
+## 1. 문제 분석
+
+```jsx
+현재 프로젝트 타일(발사체)은 적과 충돌하면 비활성화(setActive(false), setVisible(false)) 되지만,
+
+이동 거리(this.traveledDistance)를 초기화하지 않고 그대로 유지합니다.
+
+이로 인해, 다음에 발사될 때 이미 일정 거리를 이동한 상태로 간주되어
+
+짧은 거리만 이동한 후 사라지는 문제가 발생합니다.
+```
+
+## 2. 해결 방법
+
+### ✅ 충돌 후 이동 거리 초기화
+
+```jsx
+1. 적과 충돌할 때 this.traveledDistance = 0;을 추가하여 초기화합니다.
+
+2. deliversHit(target) 메서드를 만들어 충돌 후의 정리(cleanup) 작업을 한 곳에서 관리합니다.
+```
+
+## 3. 코드 수정
+
+### `Projectile.js` - 발사체 클래스 수정
+
+```jsx
+import Phaser from 'phaser'
+
+class Projectile extends Phaser.Physics.Arcade.Sprite {
+  constructor(scene, x, y, key) {
+    super(scene, x, y, key)
+
+    scene.add.existing(this)
+    scene.physics.add.existing(this)
+
+    this.speed = 300 // 발사 속도
+    this.maxDistance = 200 // 최대 이동 거리
+    this.traveledDistance = 0 // 현재까지 이동한 거리
+    this.damage = 10 // 공격력
+    this.cooldown = 500 // 재사용 대기시간(ms)
+  }
+
+  // 매 프레임마다 실행되는 업데이트 함수
+  preUpdate(time, delta) {
+    super.preUpdate(time, delta)
+
+    // 이동 거리 누적
+    this.traveledDistance += this.body.deltaAbsX()
+
+    // 최대 이동 거리를 초과하면 초기화
+    if (this.isOutofRange()) {
+      this.body.reset(0, 0) // 좌표 초기화
+      this.activateProjectile(false) // 비활성화
+      this.traveledDistance = 0 // 이동 거리 초기화
+    }
+  }
+
+  // 발사 기능
+  fire(x, y) {
+    this.activateProjectile(true) // 활성화
+    this.body.reset(x, y) // 위치 설정
+    this.setVelocityX(this.speed) // 속도 설정
+  }
+
+  // 적을 맞췄을 때 실행되는 함수
+  deliversHit(target) {
+    this.activateProjectile(false) // 발사체 비활성화
+    this.traveledDistance = 0 // 이동 거리 초기화
+    this.body.reset(0, 0) // 좌표 초기화
+  }
+
+  // 발사체 활성화/비활성화 함수
+  activateProjectile(isActive) {
+    this.setActive(isActive)
+    this.setVisible(isActive)
+  }
+
+  // 최대 이동 거리 초과 여부 확인
+  isOutofRange() {
+    return this.traveledDistance >= this.maxDistance
+  }
+}
+
+export default Projectile
+```
+
+```jsx
+deliversHit(target) 메서드에서 이동 거리 초기화 (this.traveledDistance = 0;) 추가
+
+isOutofRange() 메서드를 사용하여 발사체가 최대 이동 거리를 초과하면 초기화
+
+activateProjectile(isActive) 메서드로 중복되는 코드 정리
+
+		this.body.reset(0, 0);
+    // 🎯 3. 투사체의 위치를 (0,0)으로 리셋
+    //    - body.reset(x, y)는 물리 엔진에서 해당 객체의 위치를 강제로 변경
+    //    - 화면에서 완전히 사라지도록 특정 위치로 이동시킴
+    //    - 이렇게 하면 나중에 재사용할 때 좌표를 다시 설정할 수 있음
+
+```
+
+### `Enemy.js` - 적 클래스 수정
+
+```jsx
+이제 적이 피격될 때 takesHit() 메서드에서 deliversHit()를 호출하도록 변경합니다.
+```
+
+```jsx
+import Phaser from 'phaser'
+import collidable from '../mixins/collidable'
+
+class Enemy extends Phaser.Physics.Arcade.Sprite {
+  constructor(scene, x, y, key) {
+    super(scene, x, y, key)
+
+    scene.add.existing(this)
+    scene.physics.add.existing(this)
+    this.config = scene.config // 설정 값 가져오기
+
+    Object.assign(this, collidable)
+
+    this.init()
+    this.initEvents()
+  }
+
+  init() {
+    this.gravity = 800
+    this.speed = 50
+    this.timeFromLastTrun = 250
+    this.maxPatrolDistance = 600
+    this.currentPatrolDistance = 0
+
+    this.health = 40
+    this.damage = 20
+
+    this.body.setGravityY(500)
+    this.setCollideWorldBounds(true)
+    this.setOrigin(0.5, 1)
+    this.setImmovable(true)
+    this.setSize(20, 45)
+    this.setOffset(7, 20)
+    this.setVelocityX(this.speed)
+    this.platformCollidersLayer = null
+    this.rayGraphics = this.scene.add.graphics({
+      lineStyle: {
+        width: 2,
+        color: 0xaa00aa,
+      },
+    })
+  }
+
+  initEvents() {
+    this.scene.events.on(Phaser.Scenes.Events.UPDATE, this.update, this)
+  }
+
+  update(time, delta) {
+    this.patrol(time)
+  }
+
+  patrol(time) {
+    if (!this.body || !this.body.onFloor()) {
+      return
+    }
+    this.currentPatrolDistance += Math.abs(this.body.deltaX())
+
+    const { ray, hasHit } = this.raycast(this.body, this.platformCollidersLayer, {
+      raylength: 55,
+      precision: 0,
+      steepnes: 0.7,
+    })
+
+    if (
+      (!hasHit || this.currentPatrolDistance >= this.maxPatrolDistance) &&
+      this.timeFromLastTrun + 100 < time
+    ) {
+      this.setFlipX(!this.flipX)
+      this.setVelocityX((this.speed = -this.speed))
+      this.timeFromLastTrun = time
+      this.currentPatrolDistance = 0
+    }
+
+    if (this.config.debug) {
+      this.rayGraphics.clear()
+      this.rayGraphics.strokeLineShape(ray)
+    }
+  }
+
+  setPlatformColliders(platformCollidersLayer) {
+    this.platformCollidersLayer = platformCollidersLayer
+  }
+
+  // 적이 피격될 때 실행
+  takesHit(source) {
+    source.deliversHit(this) // 발사체가 충돌했음을 전달
+    this.health -= source.damage // 체력 감소
+    console.log('Enemy health: ', this.health)
+  }
+}
+
+export default Enemy
+```
+
+```jsx
+takesHit(source) 메서드에서 source.deliversHit(this); 호출
+
+→ 이제 발사체가 충돌하면 이동 거리가 초기화됩니다.
+```
+
+# { Phaser 3 프로젝트에서 투사체(Projectile) 충돌 이펙트 구현 }
+
+```jsx
+이번 구현에서는 Phaser 3로 만든 게임에서 투사체가 적(enemy)과 충돌할 때
+
+"타격 이펙트(hit effect)"를 표시하는 기능을 추가합니다.
+
+구현할 핵심 내용은 다음과 같습니다:
+
+1. 타격 이펙트 스프라이트(hit-effect)를 애니메이션으로 등록
+
+2. 투사체가 적과 충돌 시 해당 위치에 이펙트 표시
+
+3. 이펙트가 끝나면 자동으로 제거
+```
+
+![image.png](<%EC%84%B9%EC%85%98%2011%20Collide%20Effects%20(%20%EC%A0%81%20%EC%B6%A9%EB%8F%8C%20%EC%9D%B4%ED%8E%99%ED%8A%B8%20)/image.png>)
+
+## 1️⃣ 타격 이펙트 스프라이트 등록 (PreloadScene)
+
+```jsx
+타격 효과를 나타내는 **스프라이트 시트(hit_effect_sheet.png)**를 사전에 로드해야 합니다.
+```
+
+### `Preload.js`에서 로드
+
+```jsx
+class Preload extends Phaser.Scene {
+  constructor() {
+    super('PreloadScene')
+  }
+
+  preload() {
+    this.load.spritesheet('hit-sheet', 'assets/weapons/hit_effect_sheet.png', {
+      frameWidth: 32,
+      frameHeight: 32,
+    })
+  }
+}
+```
+
+```jsx
+frameWidth: 32, frameHeight: 32 → 스프라이트 크기를 지정
+
+hit-sheet 키로 해당 리소스를 불러올 수 있도록 설정
+```
+
+## 2️⃣ 타격 이펙트 애니메이션 등록 (`initAnims.js`)
+
+### 📌 **애니메이션 생성**
+
+```jsx
+export default (anims) => {
+  anims.create({
+    key: 'hit-effect',
+    frames: anims.generateFrameNumbers('hit-sheet', { start: 0, end: 4 }),
+    frameRate: 10,
+    repeat: 0, // 한 번만 실행
+  })
+}
+```
+
+```jsx
+hit-sheet에서 0~4번 프레임을 사용하여 hit-effect 애니메이션 생성
+
+frameRate: 10 → 초당 10 프레임 재생
+
+repeat: 0 → 반복 없이 한 번만 실행 후 종료
+```
+
+### 📌 **`Play.js`에서 애니메이션 로드**
+
+```jsx
+import initAnims from '../anims/initAnims'
+
+class Play extends Phaser.Scene {
+  create() {
+    initAnims(this.anims)
+  }
+}
+```
+
+## 3️⃣ 타격 이펙트 표시 (`SpriteEffect.js`)
+
+### 📌 **적이 투사체에 맞으면 해당 위치에 이펙트를 생성해야 함**
+
+```jsx
+→ 타격 이펙트 클래스(SpriteEffect.js) 구현
+```
+
+```jsx
+import Phaser from 'phaser'
+
+// 🎇 [SpriteEffect] 클래스: 타격 이펙트 등의 애니메이션 효과를 위한 클래스
+class SpriteEffect extends Phaser.GameObjects.Sprite {
+  /**
+   * 🎇 효과를 생성하는 생성자 (Constructor)
+   * @param {Phaser.Scene} scene - 효과가 추가될 씬(Scene)
+   * @param {number} x - 초기 X 좌표 (일반적으로 0, 이후 변경됨)
+   * @param {number} y - 초기 Y 좌표 (일반적으로 0, 이후 변경됨)
+   * @param {string} effectName - 적용할 애니메이션 이름 (예: 'hit-effect')
+   */
+  constructor(scene, x, y, effectName) {
+    // ✅ Phaser의 Sprite 생성자 호출 (effectName은 스프라이트 시트의 키)
+    super(scene, x, y, effectName)
+
+    // ✅ 이펙트를 씬에 추가 (화면에 표시되도록 함)
+    scene.add.existing(this)
+
+    // ✅ 이펙트에 물리 엔진 적용 (충돌 감지 가능)
+    scene.physics.add.existing(this)
+
+    // 📌 타격 효과를 적용할 대상 (초기에는 null)
+    this.target = null
+
+    // 📌 사용될 애니메이션 이름 저장
+    this.effectName = effectName
+  }
+
+  /**
+   * 🎯 이펙트를 대상의 중앙에 배치하는 함수
+   * - `this.target`이 설정된 경우에만 실행
+   * - 대상의 중앙 좌표를 가져와서 효과 위치를 맞춤
+   */
+  placeEffect() {
+    // ✅ 만약 타겟이 없으면 효과를 배치하지 않음
+    if (!this.target) return
+
+    // ✅ 타겟의 중앙 좌표를 가져옴
+    const center = this.target.getCenter()
+
+    // ✅ 효과 위치를 대상의 중앙으로 이동
+    this.body.reset(center.x, center.y)
+  }
+
+  /**
+   * 🎬 특정 대상에서 이펙트를 실행하는 함수
+   * @param {Phaser.GameObjects.Sprite} target - 효과를 실행할 대상 객체
+   * - 타겟을 설정한 후, 애니메이션을 실행하고 효과 위치를 조정
+   */
+  playOn(target) {
+    // ✅ 효과를 적용할 타겟 설정
+    this.target = target
+
+    // ✅ 설정된 애니메이션을 실행
+    this.play(this.effectName)
+
+    // ✅ 이펙트 위치를 타겟의 중앙으로 이동
+    this.placeEffect()
+  }
+}
+
+// ✅ 클래스 내보내기 (다른 파일에서 `import`하여 사용 가능)
+export default SpriteEffect
+```
+
+```jsx
+playOn(target) → 특정 대상(target)에서 애니메이션 실행
+
+placeEffect() → 타격 이펙트를 적의 중심 좌표(getCenter())에 배치
+
+play(this.effectName) → 미리 등록한 애니메이션(hit-effect) 실행
+```
+
+## 4️⃣ 투사체에서 타격 이펙트 실행 (`Projectile.js`)
+
+### 📌 **적이 투사체에 맞으면 `hit-effect` 애니메이션 실행**
+
+```jsx
+import Phaser from 'phaser'
+import SpriteEffect from '../effects/SpriteEffect'
+
+class Projectile extends Phaser.Physics.Arcade.Sprite {
+  constructor(scene, x, y, key) {
+    super(scene, x, y, key)
+
+    scene.add.existing(this)
+    scene.physics.add.existing(this)
+
+    this.speed = 300
+    this.maxDistance = 200
+    this.traveledDistance = 0
+    this.damage = 10
+    this.cooldown = 500
+  }
+
+  preUpdate(time, delta) {
+    super.preUpdate(time, delta)
+    this.traveledDistance += this.body.deltaAbsX()
+
+    if (this.isOutofRange()) {
+      this.body.reset(0, 0)
+      this.activateProjectile(false)
+      this.traveledDistance = 0
+    }
+  }
+
+  fire(x, y) {
+    this.activateProjectile(true)
+    this.body.reset(x, y)
+    this.setVelocityX(this.speed)
+  }
+
+  deliversHit(target) {
+    this.activateProjectile(false)
+    this.traveledDistance = 0
+    this.body.reset(0, 0)
+
+    // 🎯 타격 효과 표시
+    new SpriteEffect(this.scene, 0, 0, 'hit-effect').playOn(target)
+  }
+
+  activateProjectile(isActive) {
+    this.setActive(isActive)
+    this.setVisible(isActive)
+  }
+
+  isOutofRange() {
+    return this.traveledDistance && this.traveledDistance >= this.maxDistance
+  }
+}
+
+export default Projectile
+```
+
+```jsx
+deliversHit(target)
+
+		적에게 투사체가 맞으면 비활성화
+
+		새로운 타격 효과(SpriteEffect)를 생성하고 playOn(target) 실행
+
+		→ 타격 이펙트가 적의 중심에서 실행됨
+```
+
+![image.png](<%EC%84%B9%EC%85%98%2011%20Collide%20Effects%20(%20%EC%A0%81%20%EC%B6%A9%EB%8F%8C%20%EC%9D%B4%ED%8E%99%ED%8A%B8%20)/image%201.png>)
+
+## 5️⃣ 정리
+
+```jsx
+✔ 애니메이션 등록
+
+hit-sheet을 hit-effect 애니메이션으로 등록
+
+✔ 타격 이펙트 구현
+
+SpriteEffect.js에서 playOn(target) 함수로 이펙트를 적의 중심에 표시
+
+✔ 투사체 충돌 처리
+
+Projectile.js에서 deliversHit(target) 호출 시 타격 이펙트 실행
+
+✅ 투사체가 적에게 명중하면 해당 위치에 "타격 이펙트"가 나타남
+
+✅ 애니메이션이 끝나면 자동으로 사라짐
+
+✅ 적, 플레이어, 환경에 적용 가능 (확장성 있음)
+```
+
+# { 애니메이션이 끝난 후 이를 정리(destroy)하는 기능 구현 }
+
+```jsx
+Phaser에서 애니메이션 효과를 생성하고,
+
+애니메이션이 끝난 후 이를 정리(destroy)하는 기능을 구현하는 것입니다.
+```
+
+## 1. **애니메이션 종료 이벤트 처리**
+
+```jsx
+애니메이션이 완료되면 이를 처리하고,
+
+완료된 후 destroy() 메서드를 호출하여 객체를 정리합니다.
+
+animationcomplete 이벤트를 사용하여 애니메이션이 끝날 때 destroy()를 호출합니다.
+```
+
+```jsx
+// SpriteEffect 클래스의 생성자
+constructor(scene, x, y, effectName) {
+    super(scene, x, y);
+    scene.add.existing(this); // 씬에 이 스프라이트 추가
+    scene.physics.add.existing(this); // 물리엔진에 스프라이트 추가
+
+    this.target = null; // 대상 설정 (기본값 null)
+    this.effectName = effectName; // 애니메이션 이름
+
+    // 애니메이션이 끝날 때 실행될 함수 등록
+    this.on('animationcomplete', animation => {
+        // 애니메이션 이름이 effectName과 같으면 객체를 삭제
+        if (animation.key === this.effectName) {
+            this.destroy(); // 객체를 삭제
+        }
+    }, this); // 이 함수가 실행될 때 this를 SpriteEffect 객체로 지정
+}
+
+```
+
+```jsx
+animationcomplete 이벤트 리스너를 통해 애니메이션이 완료되었을 때
+
+destroy()를 호출하여 객체를 제거합니다.
+
+animation.key가 effectName과 일치하면 해당 객체를 정리합니다.
+```
+
+```jsx
+1. on('animationcomplete', ...)
+
+		이 부분은 animationcomplete라는 이벤트가 발생했을 때 실행될 코드를 등록하는 부분입니다.
+
+		animationcomplete 이벤트는 애니메이션이 끝났을 때 자동으로 발생합니다.
+
+		이벤트가 발생하면, 해당 애니메이션의 정보(animation 객체)가 전달됩니다.
+
+2. animation.key === this.effectName
+
+		애니메이션이 끝났을 때, 그 애니메이션이 우리가 지정한 effectName(예: "hitEffect")과 같은지 확인합니다.
+
+		만약 같다면, 그 애니메이션이 우리가 원하는 애니메이션이므로
+
+		그 때 destroy()를 호출하여 이 스프라이트 객체를 삭제합니다.
+
+3. this.destroy()
+
+		destroy()는 Phaser에서 객체를 게임 씬에서 제거하는 메서드입니다.
+
+		애니메이션이 끝난 후, 더 이상 필요 없는 객체는
+
+		destroy()로 삭제하여 메모리를 정리하고, 게임 성능을 최적화합니다.
+```
+
+### \* 생성자에 이벤트 리스너를 등록하는 이유
+
+```jsx
+Phaser에서 이벤트를 생성자에 등록하는 이유는 객체가 생성될 때 자동으로
+
+그 객체가 해야 할 일을 설정하고 처리할 수 있도록 하기 위함입니다.
+
+구체적으로, 객체가 생성되면서 애니메이션이 끝났을 때 어떤 작업을 해야 하는지 미리 설정해주는 것입니다.
+
+1. 생성자 역할
+
+		생성자는 객체가 처음 만들어질 때 호출되는 함수입니다.
+
+		Phaser에서 SpriteEffect 클래스의 생성자는 이 스프라이트(효과 객체)가 게임 씬에 처음 추가될 때 한 번 실행됩니다.
+
+		즉, SpriteEffect 객체가 씬에 추가되고, 게임 내에서 사용할 준비가 완료되는 시점에,
+
+		이 객체가 애니메이션이 끝날 때 어떤 동작을 해야 하는지 미리 정의하는 것입니다.
+
+2. 이벤트 리스너 등록 시점
+
+		이벤트 리스너를 생성자 안에 등록하는 이유는,
+
+		객체가 생성되면서 해당 객체가 다룰 **이벤트(여기서는 'animationcomplete')**를 미리 설정해놓기 위함입니다.
+
+				장점:
+
+				자동화된 처리: 객체가 생성될 때마다 자동으로 애니메이션이 끝났을 때 해야 할 작업을 지정해주므로,
+
+				나중에 play() 메서드를 호출하고 애니메이션이 끝나면 자동으로 처리됩니다.
+
+
+				유지보수 편리: 객체가 생성될 때마다 애니메이션 종료 후 어떻게 동작할지 미리 설정해두면,
+
+				나중에 이 객체가 여러 번 사용될 때마다 동일한 처리가 일관되게 이뤄집니다.
+
+
+				효율적 코드 관리: 이벤트 리스너가 객체의 생성 시점에 등록되므로, 나중에 다른 코드에서
+
+				객체의 상태를 변경할 때마다 애니메이션 종료 시 자동으로 처리할 수 있습니다.
+
+3. 애니메이션 효과의 자동 정리
+
+		생성자에 이벤트 리스너를 등록하면, 해당 객체가 애니메이션을 재생하고,
+
+		애니메이션이 끝날 때마다 자동으로 정리 작업을 할 수 있게 됩니다.
+
+		객체가 애니메이션을 재생하고 끝나면 destroy()가 호출되어 객체가 자동으로 제거됩니다.
+
+
+4. 생성자에서 이벤트 등록하는 이유
+
+		객체와 관련된 이벤트를 객체 내부에서 관리하기 위해서입니다.
+
+		예를 들어, SpriteEffect 객체가 애니메이션을 관리하고,
+
+		그 애니메이션이 끝나면 자신을 자동으로 제거하는 것처럼, 객체 자신이 담당하는 일을 처리하도록 만드는 것입니다.
+
+		생성자 안에서 이벤트 리스너를 설정하면 객체의 생성 시점에
+
+		해당 이벤트와 관련된 로직이 이미 연결되기 때문에, 나중에 코드에서 추가적인 설정 없이 자동으로 처리할 수 있습니다.
+
+5. on('animationcomplete', ...)과 this
+
+		this.on('animationcomplete', ...)에서 this는 해당 SpriteEffect 객체를 의미합니다.
+
+		이 this를 통해 이벤트 리스너 안에서 현재 객체가 가진 메서드나 속성에 접근할 수 있습니다.
+
+		예를 들어, this.destroy()를 호출하여 애니메이션이 끝난 후 객체를 제거하는 작업을 할 수 있게 됩니다.
+```
+
+## 2. **`placeEffect()` 메서드 개선**
+
+```jsx
+placeEffect() 메서드에서 this.body가 존재하는지 확인합니다.
+
+this.body가 없을 경우 위치를 설정하지 않고 메서드를 종료합니다.
+
+이 개선을 통해 애니메이션이 종료된 후
+
+객체가 이미 정리된 상태에서도 placeEffect()가 호출되지 않도록 방지합니다.
+```
+
+```jsx
+placeEffect() {
+    // target이 없거나 body가 없다면 메서드를 종료
+    if (!this.target || !this.body) {
+        return;
+    }
+    const center = this.target.getCenter();
+    this.body.reset(center.x, center.y);
+}
+
+```
+
+```jsx
+placeEffect()에서는 target과 body가 존재하는 경우에만 위치를 설정하도록 합니다.
+```
+
+## 3. **애니메이션 효과 실행**
+
+```jsx
+playOn() 메서드에서는 target을 설정하고 애니메이션을 시작합니다.
+
+placeEffect()를 호출하여 타겟 위치에 애니메이션을 배치합니다.
+```
+
+```jsx
+playOn(target) {
+    this.target = target;
+    this.play(this.effectName);  // effectName으로 애니메이션 재생
+    this.placeEffect();          // 타겟 위치에 효과 배치
+}
+```
+
+```jsx
+애니메이션이 완료되면 destroy()가 호출되어 객체가 정리됩니다.
+
+placeEffect()는 target과 body가 있을 때만 효과를 위치시킵니다.
+```
+
+# { Sprite Effect의 Pre-update 활용 }
+
+```jsx
+이 강의에서는 **스프라이트 효과(Sprite Effect)**를 적(enemy)의 몸체에 적용하는 방법을 다룹니다.
+
+적이 움직일 때, 스프라이트 효과가 올바른 위치에 유지되도록 Pre-update 라이프사이클 함수를 활용합니다.
+```
+
+## 1. Pre-update 함수의 역할
+
+```jsx
+Pre-update 함수는 스프라이트가 활성 상태일 때 여러 번 호출됩니다.
+
+이 함수 내부에서 **placeEffect()**를 호출하여, 효과가 적의 현재 위치에 맞춰 갱신되도록 합니다.
+```
+
+## 2. Pre-update 함수 구현
+
+```jsx
+preUpdate(time, delta) {
+    super.preUpdate(time, delta);
+    this.placeEffect();
+}
+```
+
+```jsx
+super.preUpdate(time, delta) : 상속받은 Phaser의 preUpdate 메서드를 호출하여 기본 동작을 유지해야 합니다.
+
+placeEffect() 호출 : 적의 위치에 맞춰 효과 위치를 업데이트합니다.
+```
+
+## 3. placeEffect() 함수
+
+```jsx
+placeEffect() {
+    if (!this.target || !this.body) {
+        return;
+    }
+    const center = this.target.getCenter();
+    this.body.reset(center.x, center.y);
+}
+```
+
+```jsx
+this.target : 이펙트를 적용할 대상 (적 객체).
+
+this.target.getCenter() : 대상의 중앙 좌표를 가져옵니다.
+
+this.body.reset(center.x, center.y) : 스프라이트 효과의 위치를 대상의 중앙으로 재설정합니다.
+```
+
+## 4. playOn() 함수: 효과 시작
+
+```jsx
+playOn(target) {
+    this.target = target;
+    this.play(this.effectName);
+    this.placeEffect();
+}
+```
+
+```jsx
+this.target 설정 : 효과를 적용할 대상을 지정합니다.
+
+this.play(this.effectName) : 지정된 애니메이션을 재생합니다.
+
+this.placeEffect() : 처음 효과가 생성될 때 위치를 올바르게 설정합니다.
+```
+
+## 5. 애니메이션 완료 후 삭제
+
+```jsx
+this.on(
+  'animationcomplete',
+  (animation) => {
+    if (animation.key === this.effectName) {
+      this.destroy()
+    }
+  },
+  this
+)
+```
+
+```jsx
+애니메이션이 완료되면, destroy() 를 호출하여 효과 객체를 제거합니다.
+```
+
+# { EffectManager 리팩토링 }
+
+```jsx
+이 강의에서는 EffectManager를 리팩토링하여 이펙트 관리를 보다 효율적으로 만드는 방법을 배웁니다.
+```
+
+## 📌 현재 코드의 문제점
+
+```jsx
+Projectile 클래스에서 직접 이펙트를 생성하고 적용하는 코드가 포함되어 있습니다.
+
+이펙트 관리를 한 곳에서 처리하는 것이 더 효율적이므로, 이를 EffectManager 클래스로 분리합니다.
+```
+
+## ✅ 리팩토링 목표
+
+```jsx
+1. 이펙트 생성과 적용을 EffectManager에서 관리
+
+2. Projectile 클래스에서 이펙트 관련 코드 제거
+
+3. 더 깔끔하고 유지보수하기 쉬운 코드로 정리
+```
+
+## 🛠 리팩토링 과정
+
+### 1️⃣ EffectManager 클래스 생성
+
+```jsx
+class EffectManager {
+  constructor(scene) {
+    this.scene = scene
+  }
+
+  playEffectOn(effectName, target) {
+    const effect = new SpriteEffect(this.scene, 0, 0, effectName)
+    effect.playOn(target)
+  }
+}
+
+export default EffectManager
+```
+
+```jsx
+playEffectOn(effectName, target)
+
+effectName(이펙트 이름)과 target(적 객체)을 받아 이펙트를 적용합니다.
+
+기존 Projectile 클래스에서 이펙트 생성 코드를 제거하고,
+
+EffectManager가 이펙트 생성을 책임지도록 변경했습니다.
+```
+
+### 2️⃣ Projectile 클래스 수정
+
+```jsx
+import EffectManager from '../effects/EffectManager'
+
+class Projectile extends Phaser.Physics.Arcade.Sprite {
+  constructor(scene, x, y, key) {
+    super(scene, x, y, key)
+
+    scene.add.existing(this)
+    scene.physics.add.existing(this)
+
+    this.speed = 300
+    this.maxDistance = 200
+    this.traveledDistance = 0
+    this.damage = 10
+    this.cooldown = 500
+
+    this.effectManager = new EffectManager(this.scene)
+  }
+
+  deliversHit(target) {
+    this.activateProjectile(false)
+    this.traveledDistance = 0
+    this.body.reset(0, 0)
+
+    this.effectManager.playEffectOn('hit-effect', target) // 매니저 추가
+  }
+}
+```
+
+```jsx
+deliversHit(target)
+
+기존에는 new SpriteEffect(...)를 직접 생성했지만,
+
+이제 EffectManager에서 이펙트를 실행하도록 변경했습니다.
+
+this.effectManager.playEffectOn("hit-effect", target); 한 줄로 이펙트를 적용할 수 있습니다.
+```
+
+## 리팩토링 결과
+
+```jsx
+✔ EffectManager가 이펙트를 관리하므로 Projectile이 이펙트 생성에 신경 쓰지 않아도 됨
+
+✔ 코드가 더 직관적이고 유지보수하기 쉬운 구조로 변경됨
+
+✔ 추후 다양한 이펙트를 추가할 때 확장성이 높아짐
+```
+
+# { Projectile 타격 효과 개선 }
+
+```jsx
+이 강의에서는 **Projectile(발사체)**가 적을 타격할 때 **효과(이펙트)**가
+
+올바르게 표시되도록 개선하는 작업을 진행합니다.
+
+기본적으로 Projectile이 적을 맞출 때, 이펙트가 적의 중앙에만 표시되는 문제가 있었습니다.
+
+이를 해결하기 위해 Projectile이 충돌한 Y 위치를 유지하여 타격 이펙트가 올바른 위치에서 재생되도록 수정합니다.
+```
+
+## 📌 1. **타격 효과 위치 문제**
+
+```jsx
+Projectile이 적을 맞출 때, 효과가 항상 적의 중심 좌표에만 표시됨
+
+Projectile이 높거나 낮은 위치에서 적을 맞춰도 효과가 항상 같은 곳(중앙)에 생성됨
+
+해결 방법: Projectile이 적을 맞춘 Y 좌표를 기록하고 이를 이펙트에 반영
+```
+
+## 🛠 2. **Projectile 타격 좌표 저장** (`deliversHit()` 수정)
+
+### ✅ **기존 코드 문제**
+
+```jsx
+const impactPosition = { x: this.x, y: this.y }
+this.effectManager.playEffectOn('hit-effect', target, impactPosition)
+```
+
+```jsx
+Projectile의 현재 위치(x, y)를 바로 사용
+
+Projectile이 충돌한 Y 좌표가 아니라 적의 중앙 좌표가 사용됨
+```
+
+### ✅ **수정된 코드**
+
+```jsx
+const impactPosition = { x: this.x, y: this.y } // 충돌 위치 저장
+this.effectManager.playEffectOn('hit-effect', target, impactPosition)
+```
+
+```jsx
+impactPosition을 생성할 때 Projectile의 Y 좌표를 저장
+
+이 좌표를 EffectManager로 전달하여 타격 효과를 실제 충돌 위치에 표시
+```
+
+## 3. **EffectManager 수정 (이펙트 위치 반영)**
+
+### ✅ **이전 코드 (잘못된 위치 문제)**
+
+```jsx
+playEffectOn(effectName, target) {
+    const effect = new SpriteEffect(this.scene, 0, 0, effectName);
+    effect.playOn(target);
+}
+```
+
+```jsx
+impactPosition 정보를 사용하지 않음 → 적의 중앙에서만 효과가 발생
+```
+
+### ✅ **수정된 코드**
+
+```jsx
+playEffectOn(effectName, target, impactPosition) {
+    const effect = new SpriteEffect(this.scene, 0, 0, effectName, impactPosition);
+    effect.playOn(target);
+}
+```
+
+```jsx
+impactPosition을 추가로 전달하여 타격 위치를 반영
+```
+
+## 4. **SpriteEffect 수정 (정확한 위치에서 효과 표시)**
+
+### ✅ **기존 코드 (항상 적의 중앙에 효과 표시)**
+
+```jsx
+const center = this.target.getCenter()
+this.body.reset(center.x, center.y)
+```
+
+```jsx
+X, Y 모두 적의 중앙 좌표 사용 → 위치가 항상 일정
+```
+
+### ✅ **수정된 코드**
+
+```jsx
+const center = this.target.getCenter()
+this.body.reset(center.x, this.impactPosition.y)
+```
+
+```jsx
+X 좌표는 적의 중앙 유지
+
+Y 좌표는 Projectile이 실제로 충돌한 위치 사용
+
+→ Projectile이 적의 머리, 몸통, 발을 맞추면 그에 맞는 위치에서 효과가 재생됨
+```
+
+## 5. **Projectile hitbox 크기 조정**
+
+```jsx
+Projectile(투사체) 의 크기가 커서 부자연스러웠기 때문에 hitbox 크기 조정
+```
+
+```jsx
+this.body.setSize(this.width - 13, this.height - 20)
+```
+
+```jsx
+너비(width)는 13px 축소
+
+높이(height)는 20px 축소
+
+→ 보다 정확한 충돌 감지 가능
+```
+
+# { Birdman이 피격될 때 애니메이션 적용하기 }
+
+```jsx
+이 강의에서는 적(Birdman)이 피격될 때, ‘피격 애니메이션’을 추가하여 보다 자연스럽게 표현하는 방법을 배웁니다.
+
+기본적으로 적들은 idle(기본 대기) 애니메이션을 가지고 있지만,
+
+공격을 받으면 ‘피격 상태’ 애니메이션을 잠시 재생한 후 다시 idle 애니메이션으로 돌아가도록 설정할 것입니다.
+```
+
+![image.png](<%EC%84%B9%EC%85%98%2011%20Collide%20Effects%20(%20%EC%A0%81%20%EC%B6%A9%EB%8F%8C%20%EC%9D%B4%ED%8E%99%ED%8A%B8%20)/image%202.png>)
+
+## 1. 애니메이션 추가하기
+
+```jsx
+먼저, birdman-hurt라는 새로운 애니메이션을 추가해야 합니다.
+
+이를 위해 anims/birdmanAnims.js 파일에서 애니메이션을 생성합니다.
+```
+
+### 📌 코드: `birdman-hurt` 애니메이션 추가
+
+```jsx
+export default (anims) => {
+  anims.create({
+    key: 'birdman-idle', // 기본 애니메이션 (대기)
+    frames: anims.generateFrameNumbers('birdman', { start: 0, end: 12 }),
+    frameRate: 10,
+    repeat: -1,
+  })
+
+  anims.create({
+    key: 'birdman-hurt', // 피격 애니메이션
+    frames: anims.generateFrameNumbers('birdman', { start: 25, end: 26 }),
+    frameRate: 10,
+    repeat: 0, // 1번만 실행 후 멈춤
+  })
+}
+```
+
+```jsx
+birdman-idle: Birdman이 기본적으로 반복 재생하는 애니메이션입니다.
+
+birdman-hurt: Birdman이 공격받았을 때 25~26번 프레임을 사용하여 피격 애니메이션을 1회 실행합니다.
+```
+
+## 2. Birdman 클래스에서 피격 애니메이션 적용하기
+
+```jsx
+적이 피격되었을 때, 기본 idle 애니메이션을 중단하고 hurt 애니메이션을 재생해야 합니다.
+
+이를 위해 Birdman.js에서 takesHit 메서드를 오버라이드합니다.
+```
+
+### 📌 코드: `takesHit` 오버라이드하여 피격 애니메이션 적용
+
+```jsx
+import Enemy from './Enemy'
+import initAnims from './anims/birdmanAnims'
+
+class Birdman extends Enemy {
+  constructor(scene, x, y) {
+    super(scene, x, y, 'birdman')
+    initAnims(scene.anims) // 애니메이션 초기화
+  }
+
+  update(time, delta) {
+    super.update(time, delta)
+
+    // 피격 애니메이션이 실행 중이면, idle 애니메이션을 재생하지 않음
+    if (this.isPlayingAnims('birdman-hurt')) {
+      return
+    }
+
+    this.play('birdman-idle', true)
+  }
+
+  takesHit(source) {
+    super.takesHit(source) // 부모 클래스(Enemy)의 takesHit 실행
+    this.play('birdman-hurt', true) // 피격 애니메이션 재생
+  }
+}
+
+export default Birdman
+```
+
+```jsx
+update(time, delta)
+
+birdman-hurt 애니메이션이
+
+재생 중이라면 idle 애니메이션을 덮어쓰지 않도록 함.
+
+그렇지 않으면 기본 birdman-idle 애니메이션을 실행.
+
+takesHit(source)
+
+부모 클래스(Enemy)의 takesHit를 실행하여 피해를 적용.
+
+이후 birdman-hurt 애니메이션을 실행하여 Birdman이 피격 상태임을 나타냄.
+```
+
+### \*`update()`가 사용된 이유:
+
+```jsx
+update()는 부모 씬에서 매 프레임마다 호출되도록 직접 설정됨
+
+Enemy 클래스에서 initEvents()를 통해 씬(Scene)의 update 이벤트에 등록하고 있음.
+
+initEvents() {
+    this.scene.events.on(Phaser.Scenes.Events.UPDATE, this.update, this);
+}
+
+이로 인해 update()가 자동으로 매 프레임 호출됨.
+
+로직을 제어하기 용이함
+
+		preUpdate()를 오버라이드하는 경우, Phaser의 기본 애니메이션 갱신 기능을 방해할 수 있음.
+
+		update()는 게임 개발자가 직접 로직을 수정하기 좋음.
+
+		예를 들어, takesHit()에서 birdman-hurt 애니메이션이 실행 중이면
+
+		birdman-idle이 덮어씌워지지 않도록 update() 내부에서 조건문을 사용.
+
+
+preUpdate()를 사용해야 할 경우:
+
+		Arcade.Sprite의 기본 애니메이션 및 물리 연산을 유지하면서 특정 행동을 추가해야 하는 경우
+
+		애니메이션이 자동으로 갱신되도록 하면서, 그 전에 특정 로직을 실행해야 하는 경우
+
+		하지만, 여기서는 update()를 통해 게임 씬의 이벤트 루프에서 직접 컨트롤하는 방식이 더 적절합니다.
+
+
+
+
+
+initEvents()를 쉽게 설명하면?
+
+📌 이 함수가 하는 일
+
+		이 함수는 게임이 매 프레임마다 자동으로 update() 함수를 실행하도록 설정하는 역할을 합니다.
+
+🛠️ 어떻게 동작하는가?
+
+		this.scene.events.on(...)
+
+		**현재 씬(scene)**에서 특정 이벤트가 발생할 때 실행할 함수를 등록하는 코드입니다.
+
+		여기서는 Phaser.Scenes.Events.UPDATE라는 **"업데이트 이벤트"**를 감지하면,
+
+		update() 함수를 실행하도록 설정합니다.
+
+Phaser.Scenes.Events.UPDATE
+
+		**Phaser가 자동으로 제공하는 "업데이트 이벤트"**입니다.
+
+		게임에서는 화면이 초당 수십~수백 번(예: 60FPS)씩 갱신됩니다.
+
+		이 이벤트는 매 프레임마다 발생하며, 우리가 등록한 update() 함수가 매번 실행됩니다.
+
+this.update, this
+
+		첫 번째 this.update: update() 함수가 실행되도록 설정
+
+		두 번째 this: this를 현재 객체(즉, Enemy 클래스의 인스턴스)로 지정
+
+		이렇게 해야 update() 내부에서 this를 사용해 Enemy의 속성이나 메서드에 접근할 수 있음
+
+
+
+요약하면
+
+즉 initEvents()에서 씬 ( 이 Enemy 객체가 속해 있는 Phaser의 게임 씬 )의
+
+UPDATE 이벤트가 발생할 때마다 update()가 자동 실행되도록 설정했고,
+
+update() 함수 안에서 patrol(time)을 호출하여 적(Enemy)이 계속 순찰(patrol)하도록 만든 거예요! 🚶‍♂️
+
+즉, patrol()을 매 프레임 실행하기 위해 씬의 UPDATE 이벤트에 연결한 것입니다.
+```
+
+## 3. Enemy 클래스에서 피격 로직 추가하기
+
+```jsx
+Enemy.js에서는 takesHit 메서드를 정의하여 기본적인 피격 로직을 처리합니다.
+```
+
+### 📌 코드: `Enemy.js`에서 `takesHit` 추가
+
+```jsx
+class Enemy extends Phaser.Physics.Arcade.Sprite {
+  constructor(scene, x, y, key) {
+    super(scene, x, y, key)
+    scene.add.existing(this)
+    scene.physics.add.existing(this)
+
+    this.health = 40 // 기본 체력
+    this.damage = 20 // 기본 공격력
+  }
+
+  takesHit(source) {
+    source.deliversHit(this) // 공격자(source)의 hit 로직 실행
+    this.health -= source.damage // 체력 감소
+    console.log('Enemy health: ', this.health)
+  }
+}
+```
+
+```jsx
+takesHit(source)는 적이 공격받았을 때 실행됩니다.
+
+source.deliversHit(this)를 호출하여 공격자가 적에게 타격을 주는 로직을 수행합니다.
+
+this.health -= source.damage로 체력을 감소시키고, 로그를 출력합니다.
+```
+
+## 4. 피격 애니메이션 유지하기
+
+```jsx
+현재 상태에서는 birdman-hurt 애니메이션이 실행된 후 바로 idle 애니메이션이
+
+덮어써지기 때문에, 피격 애니메이션이 정상적으로 표시되지 않습니다.
+
+이를 방지하기 위해 isPlayingAnims()를 사용하여 birdman-hurt
+
+애니메이션이 실행 중일 때 idle 애니메이션이 실행되지 않도록 해야 합니다.
+```
+
+### 📌 코드: `Birdman.js`에서 애니메이션 덮어쓰기 방지
+
+```jsx
+update(time, delta) {
+    super.update(time, delta);
+
+    // 현재 hurt 애니메이션이 실행 중이면 idle 애니메이션 실행 안 함
+    if (this.isPlayingAnims('birdman-hurt')) {
+        return;
+    }
+
+    this.play('birdman-idle', true);
+}
+```
+
+```jsx
+이제 birdman-hurt 애니메이션이 끝날 때까지 idle
+
+애니메이션이 실행되지 않으므로, 피격 효과가 정상적으로 표시됩니다.
+```
+
+## ✅ 정리
+
+```jsx
+1. 새로운 피격 애니메이션(birdman-hurt)을 추가하여 Birdman이 공격받았을 때 이를 표현함.
+
+2. Birdman의 takesHit() 메서드를 오버라이드하여 피격 애니메이션을 실행함.
+
+3. 애니메이션이 덮어쓰이지 않도록 isPlayingAnims()를
+
+사용하여 birdman-hurt가 실행 중일 때 idle 애니메이션이 실행되지 않도록 함.
+
+4. 체력이 0 이하가 되면 적을 제거하는 로직을 추가하여, 피격 시 체력이 다하면 게임에서 사라지도록 설정함.
+```
+
+# { Birdman 처치 애니메이션 구현 }
+
+```jsx
+이번 강의에서는 Birdman이 체력이 0 이하로 떨어지면 사라지는 효과를 추가합니다.
+
+Birdman이 죽을 때의 애니메이션을 추가하고, 게임에서 제거되는 과정을 구현합니다.
+```
+
+## 1. Birdman이 처치될 때의 효과
+
+```jsx
+Birdman이 공격을 받아 체력이 0 이하가 되면, 다음과 같은 효과를 추가합니다.
+
+1. 적의 색을 빨간색(또는 원하는 색)으로 변경
+
+2. 살짝 위로 점프 후, 지도 밖으로 추락
+
+3. 화면에서 완전히 사라지면 객체를 삭제
+```
+
+## 2. 코드 구현
+
+### (1) Birdman 클래스 (`Birdman.js`)
+
+```jsx
+Birdman 클래스에서 takesHit() 메서드를 수정하여 Birdman이
+
+공격받으면 "맞는 애니메이션"을 실행하도록 합니다.
+```
+
+```jsx
+takesHit(source) {
+    super.takesHit(source);
+    this.play('birdman-hurt', true);
+}
+```
+
+```jsx
+Birdman이 피격될 때(takesHit)
+
+→ 'birdman-hurt' 애니메이션 실행
+```
+
+```jsx
+이제 Birdman의 체력이 0 이하로 떨어지면 죽는 애니메이션을 추가합니다.
+```
+
+```jsx
+update(time, delta) {
+    super.update(time, delta);
+
+    if (this.isPlayingAnims('birdman-hurt')) {
+        return;
+    }
+
+    if (this.health <= 0) {
+        this.play('birdman-die', true);
+        return;
+    }
+
+    this.play('birdman-idle', true);
+}
+
+```
+
+```jsx
+Birdman이 체력이 0 이하일 때
+
+→ 'birdman-die' 애니메이션 실행
+```
+
+### (2) Enemy 클래스 (`Enemy.js`)
+
+```jsx
+Birdman이 체력이 0 이하가 되면 특정 효과를 적용해야 합니다.
+
+takesHit() 메서드를 수정합니다.
+```
+
+```jsx
+takesHit(source) {
+    source.deliversHit(this);
+    this.health -= source.damage;
+    console.log("Enemy health: ", this.health);
+
+    if (this.health <= 0) {
+        // 1. 적을 빨간색으로 변경
+        this.setTint(0xff0000);
+
+        // 2. 위로 점프하도록 속도 설정
+        this.setVelocity(0, -200);
+
+        // 3. 충돌 체크 해제 (맵에서 사라지도록)
+        this.body.checkCollision.none = true;
+        this.setCollideWorldBounds(false);
+
+    }
+}
+
+```
+
+```jsx
+색상을 빨간색(0xff0000)으로 변경
+
+살짝 위로 점프 (setVelocity(0, -200))
+
+충돌 감지를 해제 (body.checkCollision.none = true)
+```
+
+### (3) Birdman 애니메이션 추가 (`birdmanAnims.js`)
+
+```jsx
+Birdman의 사망 애니메이션(birdman-die)을 추가합니다.
+```
+
+```jsx
+export default (anims) => {
+  anims.create({
+    key: 'birdman-die',
+    frames: anims.generateFrameNumbers('birdman', { start: 1, end: 1 }),
+    frameRate: 10,
+    repeat: 0,
+  })
+}
+```
+
+```jsx
+'birdman-die' 애니메이션은 Birdman이 사망할 때 실행됩니다.
+```
+
+# { 적 제거 기능 구현하기 }
+
+## 1. 적이 화면 밖으로 나가면 제거하기
+
+### 1.1 `update` 함수에서 화면 벗어남 감지
+
+```jsx
+적이 화면을 벗어나면 제거해야 합니다. 이를 위해 update 함수에서 적의 위치를 확인합니다.
+```
+
+### 코드 추가 (Enemy 클래스)
+
+```jsx
+update(time, delta) {
+    // 적이 화면 아래(600px)를 벗어나면 제거
+    if (this.getBounds().bottom > 600) {
+        this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.update, this); // 업데이트 이벤트 제거
+        this.setActive(false);  // 비활성화
+        this.rayGraphics.clear();  // 그래픽 정리
+        this.destroy();  // 객체 제거
+        return;
+    }
+
+    this.patrol(time);
+}
+
+```
+
+```jsx
+this.getBounds().bottom > 600
+
+		적의 하단 경계(getBounds().bottom)가 600px보다 크면(즉, 화면 아래로 나가면)
+
+this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.update, this);
+
+		씬의 업데이트 이벤트에서 해당 적 제거
+
+this.setActive(false);
+
+		더 이상 게임 로직에서 처리되지 않도록 비활성화
+
+this.rayGraphics.clear();
+
+		적의 감지선을 제거
+
+this.destroy();
+
+		적 객체를 완전히 제거
+```
+
+## 2. 적 제거 후 남아있는 참조 문제 해결
+
+```jsx
+적이 제거된 후에도 업데이트가 호출될 경우,
+
+this가 undefined가 되어 에러가 발생할 수 있습니다.
+
+이를 방지하기 위해 적이 제거된 경우 추가 로직을 실행하지 않도록 Birdman 클래스의 update 함수에서 체크합니다.
+```
+
+### 코드 수정 (Birdman 클래스)
+
+```jsx
+update(time, delta) {
+    super.update(time, delta);
+
+    // 적이 비활성화된 경우 이후 로직 실행 안 함
+    if (!this.active) {
+        return;
+    }
+
+    if (this.isPlayingAnims('birdman-hurt')) {
+        return;
+    }
+
+    if (this.health <= 0) {
+        this.play('birdman-die', true);
+        return;
+    }
+
+    this.play('birdman-idle', true);
+}
+
+```
+
+```jsx
+if (!this.active) { return; }
+
+		적이 비활성화되었으면(this.active === false) 이후 코드 실행을 중단하여 오류 방지
+
+if (this.health <= 0) { this.play('birdman-die', true); return; }
+
+		적의 체력이 0 이하이면 birdman-die 애니메이션을 실행하고 더 이상 idle 애니메이션이 실행되지 않도록 함
+```
+
+## 3. 이벤트 리스너 제거
+
+```jsx
+적이 제거된 후에도 이벤트 리스너가 남아있으면 메모리 누수가 발생할 수 있습니다.
+
+따라서 적을 제거할 때 이벤트 리스너도 함께 삭제해야 합니다.
+```
+
+### 코드 추가 (Enemy 클래스)
+
+```jsx
+update(time, delta) {
+    if (this.getBounds().bottom > 600) {
+        this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.update, this); // 이벤트 제거
+        this.setActive(false);
+        this.rayGraphics.clear();
+        this.destroy();
+        return;
+    }
+
+    this.patrol(time);
+}
+
+```
+
+```jsx
+this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.update, this);
+
+적이 제거될 때 업데이트 이벤트 리스너도 삭제하여 불필요한 호출을 방지
+```

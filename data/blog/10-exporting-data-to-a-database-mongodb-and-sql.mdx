@@ -1,0 +1,325 @@
+---
+title: '섹션 10: Exporting Data to a Database: MongoDB and SQLite'
+date: '2026-09-02'
+category: '기타, 사용 적음/크롤링 & 파이썬'
+tags: ['기타, 사용 적음', '크롤링 & 파이썬']
+draft: false
+summary: ''
+---
+
+```python
+이번에는 스크래핑 한 데이터를 DB 로 보내는 방법을 알아본다
+```
+
+# 파이프라인 실행 실험하기 ( Pipelines )
+
+```python
+ Scrapy 파이프라인의 open_spider와 close_spider 메서드를 만들고 스파이더 실행 시작과 종료 시점에 제대로 호출되는지 확인 해본다.
+
+ 이를 통해 파이프라인이 올바르게 설정되었는지, 그리고 특정 시점에 특정 작업을 수행할 수 있는지 검증한다.
+```
+
+## 1. pipelines.py 파일 열고 파이프 라인 실험하기
+
+```python
+1. pipelines.py 파일을 연다.
+
+이 파일에는 프로젝트 이름을 따서 생성된 클래스가 있다. 예를 들어, 프로젝트 이름이 spider_tutorial이면
+
+클래스 이름은 SpiderTutorialPipeline이 된다.
+
+처음 이 클래스에는 process_item이라는 함수만 있으며, 이 함수는 현재 아이템을 반환하는 역할만 한다.
+
+2. open_spider와 close_spider 함수 추가
+
+파이프라인 클래스에 두 개의 함수를 더 추가한다. open_spider와 close_spider라는 함수이다.
+
+open_spider : 이 함수는 스파이더가 실행될 때 호출
+
+close_spider : 이 함수는 스파이더가 실행을 마칠 때 호출
+
+3. 로그 메시지 추가
+
+open_spider와 close_spider 함수가 제대로 작동하는지 확인하기 위해 로그 메시지를 추가한다.
+
+이를 위해 Python의 내장 모듈인 logging을 import 해준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380907/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_10_Exporting_Data_to_a_Database_MongoDB_and_SQL/Untitled.png)
+
+## 2. Settings.py 파일 설정
+
+```python
+파이프라인을 활성화하려면 settings.py 파일을 수정해야 한다. ITEM_PIPELINES 설정을 찾아 활성화한다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380905/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_10_Exporting_Data_to_a_Database_MongoDB_and_SQL/Untitled_1.png)
+
+### 여러개의 파이프 라인 사용하기
+
+```python
+여러 파이프라인을 사용할 경우, 숫자가 작은 파이프라인이 먼저 실행 된다
+
+# settings.py
+ITEM_PIPELINES = {
+    'spider_tutorial.pipelines.NewActionPipeline': 200,
+    'spider_tutorial.pipelines.SpiderTutorialPipeline': 300,
+}
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380906/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_10_Exporting_Data_to_a_Database_MongoDB_and_SQL/Untitled_2.png)
+
+# 몽고디비 연결해서 사용하기 ( MongoDB )
+
+```python
+몽고 DB 아틀라스를 사용하도록 한다
+
+* 몽고DB 를 클라우드 말고 로컬에서 사용하려면 엔터프라이즈를 사용하도록 하자
+```
+
+```python
+MongoDB 클라우드 계정 생성
+
+몽고 DB 아틀라스에 계정 생성하고 데이터 베이스 만들고 클러스터 만들어준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380906/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_10_Exporting_Data_to_a_Database_MongoDB_and_SQL/Untitled_3.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380906/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_10_Exporting_Data_to_a_Database_MongoDB_and_SQL/Untitled_4.png)
+
+## 필요한 라이브러리 설치
+
+```python
+MongoDB에 데이터를 저장하기 위해 두 개의 라이브러리를 설치한다
+
+pymongo는 Python에서 MongoDB에 연결하고 상호작용하기 위한 공식 MongoDB 드라이버
+
+dnspython은 DNS(Domain Name System) 기능을 Python에서 사용할 수 있게 해주는 라이브러리
+```
+
+```python
+(my_scrapy_venv) C:\Users\dhk93\firstproject>conda install pymongo dnspython -y
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380906/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_10_Exporting_Data_to_a_Database_MongoDB_and_SQL/Untitled_5.png)
+
+## 오류 : Pymongo 를 찾지 못하는 오류
+
+```python
+pymongo 를 설치하고 import 를 하는데 pymongo 를 찾지 못하는 오류가 있다
+
+이떄는 IDE 의 아래 부분에 알맞은 내 프로젝트 설정을 찾아서 수정해준다 ex ) 3.11.9
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380906/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_10_Exporting_Data_to_a_Database_MongoDB_and_SQL/Untitled_6.png)
+
+## PyCharm에서 MongoDB 파이프라인 클래스 생성
+
+```python
+클래스 생성: MongoDBPipeline 클래스를 생성한다.
+
+라이브러리 임포트: pymongo를 임포트한다.
+
+* 클라이언트 아이디와 패스워드를 작성해서 연결해준다
+```
+
+```python
+from itemadapter import ItemAdapter
+
+import logging  # 로그를 작성하기 위해 logging 모듈을 가져옵니다.
+import pymongo  # MongoDB와 상호작용하기 위해 pymongo 모듈을 가져옵니다.
+
+class MongodbPipeline:
+    collection_name = 'transcripts'  # MongoDB에서 사용할 컬렉션 이름을 설정합니다.
+
+    def open_spider(self, spider):
+        """
+        스파이더가 열릴 때 실행되는 메서드.
+        MongoDB 클라이언트와 데이터베이스에 연결합니다.
+        """
+        # MongoDB 클라이언트를 생성하고 클러스터에 연결합니다.
+        self.client = pymongo.MongoClient("mongodb+srv://dhk9309:kim14582367@cluster0.6ebciyv.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+
+        # 데이터베이스를 선택합니다. 데이터베이스가 존재하지 않으면 새로 생성됩니다.
+        self.db = self.client['My_Database']
+
+    def close_spider(self, spider):
+        """
+        스파이더가 닫힐 때 실행되는 메서드.
+        여기서는 스파이더가 종료되었음을 로그에 기록합니다.
+        """
+        logging.warning('Spider Closed - Pipeline')  # 스파이더가 닫혔음을 경고 레벨로 로그에 기록합니다.
+        self.client.close()
+
+    def process_item(self, item, spider):
+        """
+        스크랩된 각 아이템을 처리하는 메서드.
+        아이템을 MongoDB 컬렉션에 삽입합니다.
+        """
+        # 아이템을 딕셔너리로 변환하고, 설정된 컬렉션에 삽입합니다.
+        self.db[self.collection_name].insert_one(dict(item))
+
+        # 처리된 아이템을 반환합니다.
+        return item
+```
+
+```python
+setting 파일에서 파이프 라인을 활성화 해주고 class 이름인 ex) MongodbPipeline 을 넣어주도록 하자
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380907/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_10_Exporting_Data_to_a_Database_MongoDB_and_SQL/Untitled_7.png)
+
+```python
+임포트 성공
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380907/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_10_Exporting_Data_to_a_Database_MongoDB_and_SQL/Untitled_8.png)
+
+# SQLite3 연결해서 사용하기 ( SQLite3 )
+
+```python
+from itemadapter import ItemAdapter
+
+import logging
+import pymongo
+import sqlite3
+
+class SQLLitePipeline:
+    collection_name = "transcripts"
+
+    def open_spider(self, spider):
+        # SQLite 데이터베이스 연결 및 테이블 생성
+        self.connection = sqlite3.connect("transcripts.db")  # SQLite 데이터베이스 연결
+        self.c = self.connection.cursor()  # 커서 생성
+
+        # transcripts 테이블 생성 쿼리 실행
+        try:
+            self.c.execute(
+                """
+                CREATE TABLE transcripts (
+                    title TEXT,
+                    plot TEXT,
+                    transcript TEXT,
+                    url TEXT
+                )
+                """
+            )
+            self.connection.commit()  # 변경사항 커밋
+        except sqlite3.OperationalError:
+            pass  # 테이블이 이미 존재하는 경우 예외 처리
+
+    def close_spider(self, spider):
+        # 스파이더 종료 시 SQLite 연결 닫기
+        self.connection.close()
+
+    def process_item(self, item, spider):
+        # SQLite에 아이템 삽입
+        self.c.execute(
+            '''
+            INSERT INTO transcripts (title, plot, transcript, url)
+            VALUES (?, ?, ?, ?)
+            ''', (
+                item.get('title'),
+                item.get('plot'),
+                item.get('transcript'),
+                item.get('url')
+            )
+        )
+        self.connection.commit()  # 변경사항 커밋
+        return item
+```
+
+## SQLite 설정 및 데이터베이스 연결
+
+```python
+ Python에서 SQLite를 사용하기 위해 별도의 라이브러리 설치 없이 기본적으로 제공되는 SQLite3 모듈을 import 한다
+```
+
+## 데이터베이스를 생성하고 연결
+
+```python
+SQLite 데이터베이스를 생성하고 연결하기 위해 open_spider 메서드를 수정
+```
+
+```python
+ def open_spider(self, spider):
+        # SQLite 데이터베이스 연결 및 테이블 생성
+        self.connection = sqlite3.connect("transcripts.db")  # SQLite 데이터베이스 연결
+        self.c = self.connection.cursor()  # 커서 생성
+
+        # transcripts 테이블 생성 쿼리 실행
+        try:
+            self.c.execute(
+                """
+                CREATE TABLE transcripts (
+                    title TEXT,
+                    plot TEXT,
+                    transcript TEXT,
+                    url TEXT
+                )
+                """
+            )
+            self.connection.commit()  # 변경사항 커밋
+        except sqlite3.OperationalError:
+            pass  # 테이블이 이미 존재하는 경우 예외 처리
+
+
+
+
+  * create 가 계속 되면 오류가 발생하기 때문에 try 를 사용해서 오류가 발생하면 넘어가도록 pass 해준다
+
+```
+
+## 데이터 삽입
+
+```python
+process_item 메서드를 수정하여 SQLite 데이터베이스에 데이터를 삽입
+```
+
+```python
+    def process_item(self, item, spider):
+        try:
+            self.c.execute('''
+                INSERT INTO transcripts (title, plot, transcript, url)
+                VALUES (?, ?, ?, ?)
+            ''', (
+                item.get('title'),
+                item.get('plot'),
+                item.get('transcript'),
+                item.get('url')
+            ))
+            self.connection.commit()
+        except sqlite3.Error as e:
+            print(f"Error inserting data: {e}")
+
+        return item
+```
+
+## 데이터 타입 변환
+
+```python
+일부 데이터는 리스트 형태일 수 있으므로, 이를 문자열로 변환하여 처리해야 한다
+
+# transcript 리스트를 문자열로 변환
+        transcript_list = item.get('transcript')
+        transcript_string = ' '.join(transcript_list) if transcript_list else ''
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380907/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_10_Exporting_Data_to_a_Database_MongoDB_and_SQL/Untitled_9.png)
+
+## 데이터베이스 종료
+
+```python
+Spider를 닫을 때, 데이터베이스 연결을 닫아야 한다.
+```
+
+```python
+    def close_spider(self, spider):
+        self.connection.close()
+```
+
+```python
+임포트 성공
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380905/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_10_Exporting_Data_to_a_Database_MongoDB_and_SQL/Untitled_10.png)

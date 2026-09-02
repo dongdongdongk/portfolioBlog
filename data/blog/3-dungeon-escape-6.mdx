@@ -1,0 +1,3842 @@
+---
+title: '섹션 3: Dungeon Escape - 6'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { Line Trace와 Custom Trace Channel 만들기 }
+
+## 📚 강의 개요
+
+플레이어가 바라보는 방향의 액터를 감지하기 위해 **Line Trace (Ray Casting)** 개념을 배우고, 더 정확한 감지를 위한 **Shape Trace**와 **Custom Trace Channel**을 만듭니다.
+
+---
+
+## 🎯 왜 Line Trace가 필요한가?
+
+### 해결하려는 문제
+
+```
+현재 상태:
+✅ 마우스 클릭 감지 가능
+❌ 어떤 액터를 클릭했는지 모름
+
+필요한 기능:
+→ 플레이어가 바라보는 방향에 무엇이 있는지 감지
+→ Collectable Item인지 Lock인지 판별
+→ 충분히 가까이 있는지 확인
+```
+
+**Line Trace의 역할**:
+보이지 않는 선을 쏴서 충돌하는 액터를 찾는 기술!
+
+---
+
+## 🔫 Line Trace (Ray Casting) 기본 개념
+
+### 작동 원리
+
+```
+[플레이어 카메라] ────────────────→ [타겟]
+    (시작점)        보이지 않는 선     (끝점)
+```
+
+**단계별 과정**:
+
+```cpp
+1. 시작점(Start) 정의
+   → 플레이어 카메라 위치
+   → FVector Start;
+
+2. 끝점(End) 계산
+   → 시작점 + (앞 방향 × 거리)
+   → FVector End;
+
+3. Line Trace 함수 호출
+   → Start부터 End까지 선 추적
+   → 선에 닿는 첫 번째 액터 반환
+```
+
+---
+
+### 시각적 이해
+
+```
+플레이어 시점:
+
+    👤 Player
+    │
+    │ 카메라 (시작점)
+    │
+    ▼
+────────────→ Line Trace (보이지 않는 선)
+            │
+            │ 충돌 감지!
+            │
+            ▼
+           🏺 Collectable Item (감지됨!)
+```
+
+---
+
+## ⚠️ Line Trace의 2가지 문제점
+
+### 문제 1: 선이 너무 얇음
+
+**상황**:
+
+```
+선의 두께 = 0 (정확히 1픽셀)
+    │
+    │←── 조금만 각도가 틀어져도
+    ↓     아이템을 놓침!
+   🏺
+```
+
+**문제점**:
+
+- 플레이어가 정확히 조준해야만 감지됨
+- 약간만 빗나가도 실패
+- 게임 경험이 답답함
+
+---
+
+### 문제 2: 원하지 않는 액터 감지
+
+**상황**:
+
+```
+Player → ─────────────────────→ 🏺 Item
+              │
+              🪑 Chair (방해물!)
+              ↑
+        여기서 먼저 충돌!
+```
+
+**문제점**:
+
+```
+Line Trace는 첫 번째로 충돌하는 액터를 반환
+
+의자 → ❌ 원하는 것이 아님
+바닥 → ❌ 원하는 것이 아님
+벽   → ❌ 원하는 것이 아님
+
+우리가 원하는 것:
+수집 가능한 아이템 ✅
+Lock 액터 ✅
+```
+
+---
+
+## 💡 해결책
+
+### 문제 1 해결: Shape Trace (Sphere Sweep)
+
+**Line Trace 대신 구(Sphere)를 추적!**
+
+```
+Line Trace (선):
+    │  ← 너무 얇음
+    │
+    ↓
+
+Shape Trace (구):
+   ⚪  ← 넓은 감지 범위!
+    │
+    ↓
+```
+
+**장점**:
+
+```
+구의 반경 안에 들어오면 감지!
+→ 정확히 조준 안 해도 OK
+→ 더 자연스러운 게임 플레이
+```
+
+---
+
+### 문제 2 해결: Custom Trace Channel
+
+**개념**:
+특정 액터만 반응하는 전용 채널 생성!
+
+```
+기본 Trace Channels:
+├── Visibility (가시성)
+├── Camera (카메라)
+└── ...
+
+새로 만들 Custom Channel:
+└── Interact ← 우리만의 채널!
+```
+
+**작동 방식**:
+
+```
+모든 액터:
+├── Chair → Interact 채널: Ignore (무시)
+├── Floor → Interact 채널: Ignore
+├── Wall  → Interact 채널: Ignore
+│
+└── Collectable Item → Interact 채널: Block (차단) ✅
+└── Lock Actor       → Interact 채널: Block ✅
+
+Shape Trace with Interact Channel:
+→ Block으로 설정된 액터만 감지!
+→ 의자, 바닥, 벽 등은 무시됨
+```
+
+---
+
+## 🔧 Custom Trace Channel 만들기
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380628/notion-blog/_/_/_5_C_/_3_Dungeon_Escape_-_6/image.png)
+
+### 1단계: 프로젝트 설정에서 생성
+
+**경로**:
+
+1. **Edit** → **Project Settings**
+2. **Engine** 섹션 → **Collision**
+3. **Trace Channels** 섹션 찾기
+
+---
+
+### 2단계: New Trace Channel 추가
+
+**작업**:
+
+1. **New Trace Channel...** 버튼 클릭
+2. 설정 입력:
+
+```
+Name: Interact
+Default Response: Ignore
+Description: Custom channel for player interaction
+```
+
+**각 항목 설명**:
+
+- **Name**: 채널 이름 (코드에서 사용)
+- **Default Response**: 기본 반응
+  - **Ignore**: 모든 액터가 기본적으로 무시
+  - 우리가 원하는 액터만 수동으로 Block 설정
+
+---
+
+### 3단계: 결과 확인
+
+**생성 후**:
+
+```
+Trace Responses:
+├── Visibility
+├── Camera
+└── Interact ← 새로 생성됨!
+```
+
+---
+
+## 🎨 액터에 Trace Channel 설정하기
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380628/notion-blog/_/_/_5_C_/_3_Dungeon_Escape_-_6/image_1.png)
+
+### Collectable Item 설정
+
+**파일**: `BP_GlassStatue` (수집 가능한 아이템 블루프린트)
+
+### 작업 순서:
+
+1. 블루프린트 열기
+2. **Static Mesh Component** 선택
+3. Details 패널에서 **Collision** 섹션 찾기
+4. **Collision Presets** → **Custom** 선택
+5. **Trace Responses** 펼치기
+6. **Interact** 찾아서 **Block**으로 변경
+
+**설정 전**:
+
+```
+Collision Preset: Default
+└── Interact: Ignore (상속됨)
+
+```
+
+**설정 후**:
+
+```
+Collision Preset: Custom
+└── Interact: Block ✅
+
+```
+
+---
+
+### Lock Actor 설정
+
+**파일**: `BP_TestDoorLock` (자물쇠 블루프린트)
+
+### 어떤 컴포넌트를 설정해야 할까?
+
+**컴포넌트 구조**:
+
+```
+BP_TestDoorLock
+├── RootComp
+├── TriggerComp ← 이것을 설정!
+├── KeyItemMesh
+└── TableMesh
+
+```
+
+**TriggerComp를 선택하는 이유**:
+
+```
+TriggerComp만 클릭 가능하게 만들기!
+
+만약 다른 것도 설정하면:
+✗ TableMesh 클릭 → Lock 감지됨 (원하지 않음)
+✗ KeyItemMesh 클릭 → Lock 감지됨 (원하지 않음)
+
+TriggerComp만 설정:
+✓ Trigger 영역 클릭 → Lock 감지 (원하는 것!)
+✓ 테이블 클릭 → 무시됨
+
+```
+
+---
+
+### 설정 방법:
+
+1. **TriggerComp** 선택 (중요!)
+2. Details 패널 → **Collision** 섹션
+3. **Collision Presets** → **Custom**
+4. **Trace Responses** → **Interact** → **Block**
+
+**완성**:
+
+```
+TriggerComp:
+└── Collision Preset: Custom
+    └── Trace Responses:
+        └── Interact: Block ✅
+
+KeyItemMesh:
+└── Collision Preset: Default
+    └── Interact: Ignore (건드리지 않음)
+
+TableMesh:
+└── Collision Preset: Default
+    └── Interact: Ignore (건드리지 않음)
+
+```
+
+---
+
+## 🔍 다른 액터들의 기본 상태 확인
+
+### 의자(Chair) 확인하기
+
+**레벨에서**:
+
+1. 의자 액터 선택
+2. Static Mesh Component 클릭
+3. Collision 설정 확인
+
+**현재 상태**:
+
+```
+Collision Preset: Default (또는 Custom)
+└── Trace Responses:
+    └── Interact: Ignore ✅
+
+```
+
+**의미**:
+
+```
+의자는 Interact 채널을 무시함
+→ Shape Trace가 의자를 통과함
+→ 의자 뒤의 아이템도 감지 가능!
+
+```
+
+---
+
+## 💡 전체 시스템 동작 원리
+
+### Shape Trace with Custom Channel
+
+```
+1. 플레이어가 마우스 클릭
+   ↓
+2. Interact() 함수 호출
+   ↓
+3. Shape Trace 실행
+   - 채널: Interact
+   - 모양: Sphere (구)
+   - 시작: 카메라 위치
+   - 끝: 카메라 앞 일정 거리
+   ↓
+4. Interact 채널을 Block하는 액터 검색
+   ↓
+5. 결과 반환
+   - Collectable Item 감지? → 아이템 획득
+   - Lock 감지? → 아이템 배치 시도
+   - 아무것도 없음? → 아무 일도 안 함
+
+```
+
+---
+
+### 실제 게임 시나리오
+
+**시나리오 1: 아이템 앞에 의자가 있음**
+
+```
+Player → 🪑 → 🏺
+         Chair  Item
+
+Line Trace:
+→ 의자에서 멈춤 ❌
+
+Shape Trace (Interact Channel):
+→ 의자 무시 (Ignore)
+→ 아이템 감지 (Block) ✅
+
+```
+
+---
+
+**시나리오 2: 약간 빗나간 조준**
+
+```
+Player
+   │
+   │  ╱ 약간 빗나감
+   │ ╱
+   ↓╱
+  🏺
+
+Line Trace:
+→ 아이템 놓침 ❌
+
+Shape Trace (Sphere):
+   ⚪ ← 구의 반경 안
+    │    아이템 포함
+    ↓
+   🏺 ✅
+
+```
+
+---
+
+## 🎯 Collision 설정 이해하기
+
+### Collision Presets
+
+```
+Default:
+└── 언리얼 기본 설정 사용
+    └── Interact: Ignore (기본값)
+
+Custom:
+└── 수동으로 각 채널 설정 가능
+    └── Interact: Block 또는 Ignore 선택
+
+```
+
+---
+
+### Trace Responses vs Object Responses
+
+**Trace Responses** (추적 반응):
+
+```
+용도: Line Trace, Shape Trace 등
+채널 예시:
+├── Visibility: 가시성 검사
+├── Camera: 카메라 충돌
+└── Interact: 상호작용 (우리가 만든 것)
+
+```
+
+**Object Responses** (물체 반응):
+
+```
+용도: 물리적 충돌
+채널 예시:
+├── WorldStatic: 정적 오브젝트
+├── WorldDynamic: 동적 오브젝트
+├── Pawn: 플레이어, NPC
+└── ...
+
+```
+
+---
+
+### 응답 타입
+
+```
+Ignore (무시):
+→ 충돌 없음, 통과함
+→ Trace가 이 액터를 무시
+
+Overlap (겹침):
+→ 충돌 감지하지만 통과 가능
+→ Trigger 같은 용도
+
+Block (차단):
+→ 충돌 감지하고 막음
+→ Trace가 여기서 멈춤
+
+```
+
+---
+
+## 📝 설정 요약
+
+### Custom Trace Channel 생성
+
+```
+Project Settings → Collision
+└── New Trace Channel
+    ├── Name: Interact
+    └── Default Response: Ignore
+
+```
+
+---
+
+### 액터별 설정
+
+| 액터                 | 컴포넌트    | Interact 설정 |
+| -------------------- | ----------- | ------------- |
+| **Collectable Item** | Static Mesh | Block ✅      |
+| **Lock Actor**       | TriggerComp | Block ✅      |
+| **Lock Actor**       | KeyItemMesh | Ignore        |
+| **Lock Actor**       | TableMesh   | Ignore        |
+| **Chair**            | Static Mesh | Ignore (기본) |
+| **Floor**            | Static Mesh | Ignore (기본) |
+| **Wall**             | Static Mesh | Ignore (기본) |
+
+---
+
+## 🔑 핵심 개념 정리
+
+### 1. Line Trace vs Shape Trace
+
+```
+Line Trace:
+장점: 간단, 정확
+단점: 너무 얇음, 놓치기 쉬움
+
+Shape Trace:
+장점: 넓은 감지 범위, 자연스러움
+단점: 약간 더 복잡
+
+```
+
+---
+
+### 2. Custom Trace Channel의 장점
+
+```
+문제: 의자, 바닥, 벽 등 모든 것 감지
+해결: Custom Channel 사용
+
+결과:
+→ 원하는 액터만 Block 설정
+→ 나머지는 자동으로 Ignore
+→ 정확한 상호작용 가능
+
+```
+
+---
+
+### 3. 왜 TriggerComp만 Block?
+
+```
+Lock Actor 구조:
+├── TriggerComp (클릭 가능 영역)
+├── KeyItemMesh (시각적 표현)
+└── TableMesh (받침대)
+
+TriggerComp만 Block:
+→ 정확한 위치에서만 상호작용
+→ 테이블 아무데나 클릭해도 작동 안 함
+→ 의도된 게임 디자인
+
+```
+
+---
+
+## 🎓 다음 강의 예고
+
+**구현할 내용**:
+
+```cpp
+1. Shape Trace 코드 작성
+   - 시작점, 끝점 계산
+   - Sphere Shape 생성
+   - Trace 실행
+
+2. 결과 처리
+   - Collectable Item 감지 → 획득
+   - Lock 감지 → 아이템 배치
+   - 아무것도 없음 → 무시
+
+3. 디버그 시각화
+   - Shape Trace 선 그리기
+   - 감지된 액터 확인
+
+```
+
+---
+
+## 💭 초보자 Q&A
+
+**Q: Line Trace와 Raycast는 같은 건가요?**
+A: 네! Line Trace는 언리얼 용어이고, Raycast는 일반적인 게임 개발 용어입니다. 같은 개념입니다.
+
+**Q: Shape Trace는 항상 Sphere여야 하나요?**
+A: 아니요! Box, Capsule 등 다른 모양도 사용 가능합니다. 상황에 따라 선택하면 됩니다.
+
+**Q: 왜 기본 응답을 Ignore로 설정하나요?**
+A: 모든 액터가 기본적으로 무시하게 만들고, 우리가 원하는 것만 Block으로 설정하기 위해서입니다. 이렇게 하면 실수로 다른 액터가 감지되는 것을 방지할 수 있습니다.
+
+**Q: Custom Object Channel과 Trace Channel의 차이는?**
+A:
+
+- **Object Channel**: 물리적 충돌 (캐릭터가 벽에 부딪침)
+- **Trace Channel**: 감지/검사 (플레이어가 아이템을 바라봄)
+
+**Q: Collision Preset을 Custom으로 바꾸면 다른 설정도 바뀌나요?**
+A: Custom으로 바꾸면 모든 채널을 수동으로 설정해야 합니다. 필요한 것만 바꾸고 나머지는 기본값 유지하는 것을 추천합니다.
+
+**Q: Lock의 모든 컴포넌트를 Block으로 설정하면 안 되나요?**
+A: 가능하지만 좋지 않습니다:
+
+- TableMesh까지 Block → 테이블 아무데나 클릭해도 작동
+- 의도하지 않은 상호작용 발생
+- TriggerComp만 설정 → 정확한 영역에서만 작동
+
+---
+
+## ✅ 이번 강의 체크리스트
+
+완료했다면 체크:
+
+- [ ] Line Trace 개념 이해
+- [ ] Shape Trace의 장점 이해
+- [ ] Custom Trace Channel 필요성 이해
+- [ ] Project Settings에서 Interact 채널 생성
+- [ ] Collectable Item에 Interact Block 설정
+- [ ] Lock Actor의 TriggerComp에 Block 설정
+- [ ] 다른 액터들이 Ignore 상태인지 확인
+
+**다음 강의 준비**:
+
+- [ ] C++에서 Shape Trace 코드 작성법 배우기
+- [ ] 감지된 액터 처리하는 방법 배우기
+
+# { UWorld 오브젝트와 Sweep 함수 이해하기 }
+
+## 📚 강의 개요
+
+게임 월드를 관리하는 **UWorld 오브젝트**를 이해하고, **GetWorld()** 함수로 접근하는 방법을 배웁니다. Shape Trace를 실행할 **SweepSingleByChannel()** 함수도 살펴봅니다.
+
+---
+
+## 🌍 UWorld 오브젝트란?
+
+### 기본 개념
+
+**정의**: 게임이 시작될 때 생성되는 최상위 오브젝트
+
+```
+게임 시작
+    ↓
+UWorld 오브젝트 생성 (자동)
+    ↓
+모든 액터와 레벨 관리
+```
+
+**UWorld의 역할**:
+
+```
+UWorld 오브젝트
+├── 레벨 관리
+├── 모든 액터 관리
+├── 시간 관리
+├── 물리 시뮬레이션
+└── Trace 함수 제공 ← 우리가 사용할 것!
+```
+
+---
+
+### 비유로 이해하기
+
+**UWorld = 게임 무대 전체**
+
+```
+연극 비유:
+UWorld = 극장 무대 전체
+├── 배우들 (Actors)
+├── 소품들 (Components)
+├── 조명 (Lighting)
+└── 무대 관리자 (관리 시스템)
+
+코드에서:
+UWorld = 게임 세계
+├── Player, Enemy (Actors)
+├── 벽, 바닥 (Static Meshes)
+├── 카메라, 라이트
+└── Trace, 타이머 등 (유틸리티 함수)
+```
+
+---
+
+## 🔍 GetWorld() 함수
+
+### 사용 방법
+
+```cpp
+UWorld* World = GetWorld();
+```
+
+**이 함수의 특징**:
+
+```
+✓ Actor와 Component 내부에서 사용 가능
+✓ 어디서든 호출 가능
+✓ 게임의 World 오브젝트 포인터 반환
+```
+
+---
+
+### 실제 사용 예시
+
+```cpp
+void ADungeonEscapeCharacter::Interact()
+{
+    // World 오브젝트에 접근
+    UWorld* World = GetWorld();
+
+    // World의 함수 호출
+    World->SweepSingleByChannel(...);
+}
+```
+
+**화살표 연산자 (->)**:
+
+```cpp
+GetWorld()->함수이름();
+         ↑
+    포인터이기 때문에 -> 사용
+```
+
+---
+
+## 📖 UWorld 문서 살펴보기
+
+### 공식 문서 구조
+
+**문서 링크**: (강의 리소스 섹션에 제공)
+
+```
+UWorld Documentation
+├── 개요 (Overview)
+├── 변수 목록 (Variables)
+│   ├── TimeSeconds ← 게임 시간
+│   ├── DeltaTimeSeconds
+│   └── ...
+│
+└── 함수 목록 (Functions)
+    ├── LineTraceByChannel ← Line Trace
+    ├── SweepSingleByChannel ← Shape Trace (우리가 사용)
+    └── 수많은 유틸리티 함수들
+```
+
+---
+
+## 🎯 Trace 함수들
+
+### 1. LineTraceByChannel (사용 안 함)
+
+**함수 시그니처**:
+
+```cpp
+bool LineTraceByChannel(
+    FHitResult& OutHit,           // 결과를 담을 변수
+    const FVector& Start,         // 시작 위치
+    const FVector& End,           // 끝 위치
+    ECollisionChannel TraceChannel // Trace 채널
+)
+```
+
+**설명**:
+
+- 시작점부터 끝점까지 **선**을 추적
+- 첫 번째 블로킹 히트 반환
+- 우리는 **너무 얇아서 사용 안 함**
+
+---
+
+### 2. SweepSingleByChannel (사용할 것!)
+
+**함수 시그니처**:
+
+```cpp
+bool SweepSingleByChannel(
+    FHitResult& OutHit,                    // 1. 결과 (Out 매개변수)
+    const FVector& Start,                  // 2. 시작 위치
+    const FVector& End,                    // 3. 끝 위치
+    const FQuat& Rot,                      // 4. 회전
+    ECollisionChannel TraceChannel,        // 5. Trace 채널
+    const FCollisionShape& CollisionShape, // 6. 충돌 모양
+    const FCollisionQueryParams& Params = ..., // 7. 추가 설정 (기본값)
+    const FCollisionResponseParams& ... = ...  // 8. 응답 설정 (기본값)
+)
+```
+
+**설명**:
+
+- 시작점부터 끝점까지 **도형**을 추적 (Sweep)
+- Shape Trace라고도 함
+- 더 넓은 감지 범위!
+
+---
+
+## 💡 Out 매개변수 이해하기
+
+### Out Parameter란?
+
+**일반적인 함수**:
+
+```cpp
+int Add(int a, int b)
+{
+    return a + b;  // return으로 결과 반환
+}
+
+int result = Add(3, 5);  // result = 8
+```
+
+**Out Parameter 사용 함수**:
+
+```cpp
+bool SweepSingleByChannel(
+    FHitResult& OutHit,  // ← Out Parameter (참조)
+    ...
+)
+```
+
+---
+
+### 왜 Out Parameter를 사용할까?
+
+**문제 상황**:
+
+```
+Sweep 함수가 반환해야 할 정보:
+1. 성공/실패 여부 (bool)
+2. 충돌한 액터 정보 (Actor*)
+3. 충돌 위치 (Vector)
+4. 충돌 지점의 노멀 벡터
+... 등등 많은 정보!
+
+하지만 함수는 한 개의 값만 return 가능!
+```
+
+**해결책: Out Parameter**:
+
+```cpp
+bool result = SweepSingleByChannel(
+    OutHit,  // ← 이 변수에 모든 정보를 담아줌!
+    ...
+);
+
+// 함수 호출 후:
+// result = true/false (성공 여부)
+// OutHit = 모든 충돌 정보 (Actor, 위치 등)
+```
+
+---
+
+### 참조 (&) 이해하기
+
+**일반 변수 전달**:
+
+```cpp
+void Function(int x)  // 복사본 전달
+{
+    x = 10;  // 원본은 변경 안 됨
+}
+
+int num = 5;
+Function(num);
+// num은 여전히 5
+```
+
+**참조 전달**:
+
+```cpp
+void Function(int& x)  // 원본 전달 (&)
+{
+    x = 10;  // 원본이 변경됨!
+}
+
+int num = 5;
+Function(num);
+// num이 10으로 변경됨!
+```
+
+---
+
+### Sweep 함수의 Out Parameter
+
+```cpp
+// 1. 빈 변수 준비
+FHitResult HitResult;
+
+// 2. Sweep 함수 호출
+bool bHit = GetWorld()->SweepSingleByChannel(
+    HitResult,  // ← 함수가 이 변수를 채워줌!
+    Start,
+    End,
+    ...
+);
+
+// 3. 함수 호출 후 사용
+if (bHit)
+{
+    // HitResult에 충돌 정보가 담겨 있음!
+    AActor* HitActor = HitResult.GetActor();
+    FVector HitLocation = HitResult.Location;
+}
+```
+
+---
+
+## 🎨 기본값 매개변수
+
+### 기본값이란?
+
+```cpp
+bool SweepSingleByChannel(
+    FHitResult& OutHit,
+    const FVector& Start,
+    const FVector& End,
+    const FQuat& Rot,
+    ECollisionChannel TraceChannel,
+    const FCollisionShape& CollisionShape,
+    const FCollisionQueryParams& Params = FCollisionQueryParams::DefaultQueryParam,  // ← 기본값!
+    const FCollisionResponseParams& ResponseParam = FCollisionResponseParams::DefaultResponseParam  // ← 기본값!
+)
+```
+
+**의미**:
+
+```
+기본값이 있는 매개변수는 생략 가능!
+
+호출 방법 1 (모든 매개변수 제공):
+SweepSingleByChannel(Hit, Start, End, Rot, Channel, Shape, Params, ResponseParam);
+
+호출 방법 2 (기본값 사용):
+SweepSingleByChannel(Hit, Start, End, Rot, Channel, Shape);
+                                                          ↑
+                        나머지는 기본값 자동 사용!
+```
+
+---
+
+### 왜 기본값을 사용할까?
+
+```cpp
+// 복잡한 설정이 필요 없는 대부분의 경우:
+GetWorld()->SweepSingleByChannel(
+    HitResult,
+    Start,
+    End,
+    FQuat::Identity,
+    ECC_GameTraceChannel1,
+    FCollisionShape::MakeSphere(50.0f)
+    // Params와 ResponseParam은 생략! (기본값 사용)
+);
+
+// 특별한 설정이 필요한 경우에만:
+FCollisionQueryParams Params;
+Params.AddIgnoredActor(this);  // 자신은 무시
+
+GetWorld()->SweepSingleByChannel(
+    HitResult,
+    Start,
+    End,
+    FQuat::Identity,
+    ECC_GameTraceChannel1,
+    FCollisionShape::MakeSphere(50.0f),
+    Params  // 커스텀 설정 사용
+);
+```
+
+---
+
+## ⏱️ 실습: TimeSeconds 변수 사용하기
+
+### TimeSeconds란?
+
+**정의**: 레벨 플레이 시작 후 경과한 시간 (초 단위)
+
+```
+게임 시작: TimeSeconds = 0.0
+1초 후:    TimeSeconds = 1.0
+5초 후:    TimeSeconds = 5.0
+1분 후:    TimeSeconds = 60.0
+```
+
+---
+
+### 실습 코드
+
+**Lock.cpp의 Tick 함수**:
+
+```cpp
+void ALock::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    // World 오브젝트 가져오기
+    UWorld* World = GetWorld();
+
+    // TimeSeconds 출력
+    UE_LOG(LogTemp, Warning, TEXT("Time Seconds: %f"),
+        World->TimeSeconds);
+}
+```
+
+**코드 분석**:
+
+```cpp
+GetWorld()->TimeSeconds
+    ↓         ↓
+  World    변수 접근
+ 오브젝트
+```
+
+---
+
+### 실행 결과
+
+```
+게임 시작:
+LogTemp: Warning: Time Seconds: 0.000000
+LogTemp: Warning: Time Seconds: 0.016667
+LogTemp: Warning: Time Seconds: 0.033333
+LogTemp: Warning: Time Seconds: 0.050000
+...
+(1초 후)
+LogTemp: Warning: Time Seconds: 1.000000
+LogTemp: Warning: Time Seconds: 1.016667
+...
+```
+
+**Tick이 매 프레임 호출되므로 계속 증가!**
+
+---
+
+## 📝 Sweep 함수 준비하기
+
+### 현재 Interact 함수
+
+```cpp
+void ADungeonEscapeCharacter::Interact()
+{
+    UE_LOG(LogTemp, Warning, TEXT("Interact function called"));
+
+    // 다음 강의에서 구현 예정
+    // GetWorld()->SweepSingleByChannel();
+}
+```
+
+**주석 처리한 이유**:
+
+```
+아직 준비되지 않은 것들:
+❌ Start, End 위치 계산
+❌ FHitResult 변수 이해
+❌ 참조 매개변수 사용법
+❌ FCollisionShape 생성
+
+다음 강의들에서 차례로 배울 예정!
+```
+
+---
+
+## 🔑 핵심 개념 정리
+
+### 1. UWorld 오브젝트
+
+```
+역할: 게임 세계 전체 관리
+접근: GetWorld() 함수
+용도: Trace 함수, 타이머, 시간 등
+```
+
+---
+
+### 2. GetWorld() 함수
+
+```cpp
+// Actor나 Component 내부에서 사용
+UWorld* World = GetWorld();
+
+// World의 기능 사용
+World->SweepSingleByChannel(...);
+World->TimeSeconds;
+World->SpawnActor(...);
+```
+
+---
+
+### 3. Out Parameter
+
+```
+일반 return: 한 개의 값만 반환
+Out Parameter: 여러 정보를 변수에 채워줌
+
+사용법:
+FHitResult Hit;  // 빈 변수 준비
+Function(Hit);   // 함수가 채워줌
+// Hit 사용
+```
+
+---
+
+### 4. 기본값 매개변수
+
+```cpp
+Function(필수값1, 필수값2, 선택값 = 기본값);
+
+호출:
+Function(A, B);      // 선택값은 기본값 사용
+Function(A, B, C);   // 선택값 직접 지정
+```
+
+---
+
+## 🎯 다음 강의 예고
+
+**배울 내용**:
+
+```
+1. 참조 매개변수 상세 학습
+   → FHitResult& OutHit 이해하기
+
+2. Start, End 위치 계산
+   → 카메라 위치, 방향 벡터
+
+3. FCollisionShape 생성
+   → Sphere, Box, Capsule
+
+4. 실제 Sweep 함수 호출
+   → 모든 준비 완료!
+
+5. 결과 처리
+   → HitResult에서 Actor 가져오기
+   → Collectable인지 Lock인지 판별
+```
+
+---
+
+## 💭 초보자 Q&A
+
+**Q: UWorld는 누가 만드나요?**
+A: 언리얼 엔진이 자동으로 생성합니다. 게임 시작 시 자동으로 만들어지고, 우리는 GetWorld()로 접근만 하면 됩니다.
+
+**Q: GetWorld()는 어디서든 호출 가능한가요?**
+A: Actor나 Component 클래스 내부에서만 가능합니다. 일반 C++ 클래스에서는 사용할 수 없습니다.
+
+**Q: Out Parameter와 return의 차이가 뭔가요?**
+A:
+
+- return: 한 개의 값만 반환
+- Out Parameter: 여러 정보를 한꺼번에 받을 수 있음
+
+Sweep 함수는 성공 여부(bool)도 반환하고, 충돌 정보(HitResult)도 반환해야 하므로 Out Parameter를 사용합니다.
+
+**Q: 참조(&)가 어려워요.**
+A: 지금은 "함수가 변수를 채워준다"고만 이해하면 됩니다. 다음 강의에서 자세히 배울 예정입니다.
+
+**Q: TimeSeconds는 왜 Tick에서 출력하나요?**
+A: Tick은 매 프레임마다 호출되기 때문에 시간이 증가하는 것을 실시간으로 볼 수 있습니다. 실습용입니다.
+
+**Q: 왜 SweepSingleByChannel이고 SweepMultiByChannel도 있나요?**
+A:
+
+- **Single**: 첫 번째로 충돌한 액터 **하나만** 반환
+- **Multi**: 충돌한 **모든 액터들** 반환
+
+우리는 첫 번째 아이템/Lock만 필요하므로 Single을 사용합니다.
+
+---
+
+# { Shape Trace의 시작점과 끝점 계산하기 }
+
+## 📚 강의 개요
+
+Shape Trace를 실행하기 위한 **Start(시작점)**과 **End(끝점)** 위치를 계산하고, **Debug Line**을 그려서 시각적으로 확인하는 방법을 배웁니다.
+
+---
+
+## 🎯 시작점과 끝점이 필요한 이유
+
+### Shape Trace의 작동 방식
+
+```
+[Start] ──────────────→ [End]
+  시작점    Sphere 이동    끝점
+
+Sweep 함수에 필요한 정보:
+1. Start: 어디서 시작할지
+2. End: 어디서 끝낼지
+3. Shape: 무슨 모양으로 추적할지
+```
+
+**우리가 원하는 것**:
+
+```
+플레이어 카메라 위치에서 시작
+    ↓
+앞쪽 방향으로 3미터
+    ↓
+그 사이에 있는 아이템/Lock 감지!
+```
+
+---
+
+## 📍 시작점(Start) 계산하기
+
+### 카메라 컴포넌트 사용
+
+**왜 카메라 위치를 사용할까?**
+
+```
+카메라 = 플레이어가 보는 시점
+
+           👁️ Camera
+            ↓
+    이 위치가 우리가
+    "보고 있는" 정확한 지점!
+```
+
+**생각해보면 당연**:
+
+- 우리가 화면에서 보는 것 = 카메라가 보는 것
+- 아이템을 "바라본다" = 카메라가 향하는 방향
+- 따라서 카메라 위치 = 시작점으로 완벽!
+
+---
+
+### 카메라 컴포넌트 변수 확인
+
+**헤더 파일**:
+
+```cpp
+UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera)
+class UCameraComponent* FirstPersonCameraComponent;
+```
+
+**생성자에서 생성됨**:
+
+```cpp
+ADungeonEscapeCharacter::ADungeonEscapeCharacter()
+{
+    FirstPersonCameraComponent = CreateDefaultSubobject<UCameraComponent>(
+        TEXT("First Person Camera")
+    );
+    // ... 설정들
+}
+```
+
+**이미 준비되어 있음!**
+
+- 템플릿이 자동으로 만들어줌
+- 우리는 그냥 사용하면 됨!
+
+---
+
+### Start 위치 코드
+
+```cpp
+FVector Start = FirstPersonCameraComponent->GetComponentLocation();
+```
+
+**코드 분석**:
+
+```cpp
+FirstPersonCameraComponent  // 카메라 컴포넌트
+    ->                       // 포인터 접근 연산자
+    GetComponentLocation()   // 위치를 반환하는 함수
+```
+
+**반환값**: `FVector` (3D 공간의 좌표)
+
+```cpp
+FVector(X, Y, Z)  // 예: (100.0, 200.0, 150.0)
+```
+
+---
+
+## 🎯 끝점(End) 계산하기
+
+### 필요한 정보
+
+```
+카메라 앞 3미터를 계산하려면:
+1. 카메라 위치 (Start)
+2. 카메라가 바라보는 방향
+3. 거리 (얼마나 멀리?)
+```
+
+---
+
+### Forward Vector(전방 벡터) 이해하기
+
+**Forward Vector란?**
+
+```
+카메라가 바라보는 방향을 나타내는 벡터
+길이 = 1 (단위 벡터)
+```
+
+**시각적 이해**:
+
+```
+       카메라
+         👁️
+         │
+         │ ← Forward Vector (빨간 화살표)
+         ↓   길이: 1cm (단위 벡터)
+        ───→
+```
+
+**코드**:
+
+```cpp
+FVector ForwardVector = FirstPersonCameraComponent->GetForwardVector();
+```
+
+---
+
+### 단위 벡터의 특성
+
+**단위 벡터 = 길이가 1인 벡터**
+
+```
+ForwardVector의 길이 = 1.0
+
+특징:
+✓ 방향만 나타냄
+✓ 거리는 나타내지 않음
+✓ 곱셈으로 원하는 길이 조정 가능
+```
+
+**곱셈 예시**:
+
+```cpp
+ForwardVector * 1   = 1cm 앞
+ForwardVector * 100 = 100cm (1m) 앞
+ForwardVector * 300 = 300cm (3m) 앞 ✓ 우리가 원하는 것!
+```
+
+---
+
+### 최대 상호작용 거리 변수
+
+**헤더 파일에 추가**:
+
+```cpp
+UPROPERTY(EditAnywhere)
+float MaxInteractDistance = 300.0f;
+```
+
+**각 부분 설명**:
+
+- `EditAnywhere`: 에디터에서 값 수정 가능
+- `float`: 소수점 숫자
+- `= 300.0f`: 기본값 300 (3미터)
+
+**왜 300?**
+
+```
+언리얼 엔진 단위:
+100 = 1미터
+
+300 = 3미터
+→ 팔을 뻗어서 닿을 수 있는 거리
+```
+
+---
+
+### End 위치 계산 공식
+
+**수식**:
+
+```
+End = Start + (Forward Vector × Distance)
+```
+
+**단계별 계산**:
+
+```cpp
+// 1. 시작점
+FVector Start = 카메라 위치;
+// 예: (100, 200, 150)
+
+// 2. 방향 벡터
+FVector Forward = 카메라 전방 벡터;
+// 예: (1, 0, 0) - 정규화된 방향
+
+// 3. 거리만큼 확장
+FVector Offset = Forward * 300.0f;
+// 예: (1, 0, 0) * 300 = (300, 0, 0)
+
+// 4. 끝점 계산
+FVector End = Start + Offset;
+// 예: (100, 200, 150) + (300, 0, 0) = (400, 200, 150)
+```
+
+---
+
+### 실제 코드
+
+```cpp
+FVector End = Start +
+    (FirstPersonCameraComponent->GetForwardVector() * MaxInteractDistance);
+```
+
+**한 줄로 표현**:
+
+```cpp
+시작점 + (방향 × 거리) = 끝점
+```
+
+---
+
+## 🖼️ 시각적 이해
+
+### 3D 공간에서의 계산
+
+```
+           👤 Player
+           │
+        👁️ Camera (100, 200, 150)
+           │
+           │ Forward Vector (1, 0, 0)
+           ↓
+Start ──────────────────────────────→ End
+(100, 200, 150)           (400, 200, 150)
+           │←──── 300cm ────→│
+```
+
+---
+
+### 카메라 회전에 따른 변화
+
+**정면을 볼 때**:
+
+```
+Camera →  Forward = (1, 0, 0)
+End = Start + (300, 0, 0)
+```
+
+**왼쪽을 볼 때**:
+
+```
+Camera ↑  Forward = (0, 1, 0)
+End = Start + (0, 300, 0)
+```
+
+**위를 볼 때**:
+
+```
+Camera ⤴  Forward = (0.7, 0, 0.7)
+End = Start + (210, 0, 210)
+```
+
+**항상 카메라가 바라보는 방향으로 3미터!**
+
+---
+
+## 🎨 Debug Line 그리기
+
+### DrawDebugLine 함수
+
+**목적**: 계산한 Start와 End가 올바른지 시각적으로 확인!
+
+```cpp
+DrawDebugLine(
+    GetWorld(),        // 1. 어떤 월드에?
+    Start,             // 2. 시작점
+    End,               // 3. 끝점
+    FColor::Red,       // 4. 선 색상
+    false,             // 5. 영구 표시?
+    5.0f               // 6. 지속 시간 (초)
+);
+```
+
+---
+
+### 매개변수 상세 설명
+
+### 1. GetWorld()
+
+```cpp
+GetWorld()  // 현재 게임 월드 오브젝트
+```
+
+- 어떤 월드에 선을 그릴지 알려줌
+
+---
+
+### 2, 3. Start, End
+
+```cpp
+Start  // FVector: 선의 시작점
+End    // FVector: 선의 끝점
+```
+
+---
+
+### 4. FColor::Red
+
+```cpp
+FColor::Red   // 빨간색
+
+// 다른 색상들:
+FColor::Blue
+FColor::Green
+FColor::Yellow
+FColor::White
+FColor::Black
+```
+
+**Scope Resolution Operator (::)**:
+
+```cpp
+FColor::Red
+  ↑     ↑
+구조체  미리 정의된 색상
+```
+
+---
+
+### 5. bPersistentLines (영구 표시)
+
+```cpp
+false  // 영구 표시 안 함
+
+true:  선이 계속 남아있음 (레벨에 영구 표시)
+false: 일정 시간 후 사라짐 (다음 매개변수로 시간 지정)
+```
+
+**우리의 선택: false**
+
+```
+이유: 계속 남아있으면 화면이 선으로 가득 참!
+→ 5초 후 사라지게 설정
+```
+
+---
+
+### 6. LifeTime (지속 시간)
+
+```cpp
+5.0f  // 5초
+
+bPersistentLines = false일 때만 사용
+5초 동안 선이 보이다가 자동으로 사라짐
+```
+
+---
+
+### 기본값 매개변수
+
+**함수 원형**:
+
+```cpp
+void DrawDebugLine(
+    const UWorld* InWorld,
+    FVector const& LineStart,
+    FVector const& LineEnd,
+    FColor const& Color,
+    bool bPersistentLines = false,     // 기본값 있음
+    float LifeTime = -1.0f,            // 기본값 있음
+    uint8 DepthPriority = 0,           // 기본값 있음
+    float Thickness = 0.0f             // 기본값 있음
+);
+```
+
+**기본값 이후는 생략 가능**:
+
+```cpp
+// 최소 호출
+DrawDebugLine(World, Start, End, Color);
+
+// 지속 시간까지 지정
+DrawDebugLine(World, Start, End, Color, false, 5.0f);
+
+// 선 두께까지 지정
+DrawDebugLine(World, Start, End, Color, false, 5.0f, 0, 2.0f);
+```
+
+---
+
+## 💻 완성된 코드
+
+### 헤더 파일
+
+```cpp
+// DungeonEscapeCharacter.h
+class DUNGEONESCAPE_API ADungeonEscapeCharacter : public ACharacter
+{
+    UPROPERTY(EditAnywhere)
+    float MaxInteractDistance = 300.0f;
+
+    void Interact();
+};
+```
+
+---
+
+### CPP 파일
+
+```cpp
+// DungeonEscapeCharacter.cpp
+void ADungeonEscapeCharacter::Interact()
+{
+    // 1. 시작점: 카메라 위치
+    FVector Start = FirstPersonCameraComponent->GetComponentLocation();
+
+    // 2. 끝점: 카메라 앞 3미터
+    FVector End = Start +
+        (FirstPersonCameraComponent->GetForwardVector() * MaxInteractDistance);
+
+    // 3. 디버그 선 그리기
+    DrawDebugLine(
+        GetWorld(),      // 게임 월드
+        Start,           // 시작점
+        End,             // 끝점
+        FColor::Red,     // 빨간색
+        false,           // 영구 표시 안 함
+        5.0f             // 5초 후 사라짐
+    );
+}
+```
+
+---
+
+## 🧪 테스트하기
+
+### 게임 실행 및 확인
+
+**1단계: 게임 플레이**
+
+```
+에디터에서 플레이 버튼 클릭
+```
+
+**2단계: 상호작용 키 누르기**
+
+```
+마우스 왼쪽 버튼 또는 E키
+```
+
+**3단계: 선 확인**
+
+```
+빨간색 선이 그려짐!
+→ 카메라 위치에서 시작
+→ 카메라가 보는 방향으로 3미터
+```
+
+---
+
+### 선이 잘 안 보이는 이유
+
+**문제**:
+
+```
+선이 카메라 바로 앞에서 시작
+→ 1인칭 시점에서는 선이 시작점에 가려짐
+```
+
+**해결책 1: 옆으로 이동**
+
+```
+마우스 클릭 → 옆으로 이동
+→ 선이 옆에서 보임!
+```
+
+**해결책 2: 게임 일시정지**
+
+```
+마우스 클릭 → F8 키 (게임 일시정지)
+→ 선이 그대로 유지됨
+→ 마우스로 카메라 자유롭게 이동 가능
+```
+
+---
+
+### Outliner에서 확인하기
+
+**상세 확인 방법**:
+
+1. **게임 일시정지** (F8)
+2. **Outliner** 열기
+3. 플레이어 찾기 (검색: "Player" 또는 "Character")
+4. **카메라 컴포넌트** 클릭
+5. 뷰포트에서 카메라 위치 확인
+
+**확인할 수 있는 것**:
+
+```
+✓ 카메라 위치 = 선의 시작점
+✓ 카메라 회전 = 선의 방향
+✓ 선이 카메라 정면을 향함
+```
+
+---
+
+### Local Space 전환
+
+**버튼**: 뷰포트 상단의 **Local** 버튼
+
+**효과**:
+
+```
+World Space: 월드 기준 좌표 표시
+Local Space: 액터 기준 좌표 표시
+
+Local로 전환:
+→ 카메라의 실제 회전 확인 가능
+→ 선이 카메라 정면(Forward)과 일치하는지 확인
+```
+
+---
+
+## 🔑 핵심 개념 정리
+
+### 1. Start 계산
+
+```cpp
+FVector Start = FirstPersonCameraComponent->GetComponentLocation();
+
+의미: "플레이어가 보는 위치"
+```
+
+---
+
+### 2. Forward Vector
+
+```
+단위 벡터 (길이 = 1)
+방향만 나타냄
+거리는 곱셈으로 조정
+```
+
+---
+
+### 3. End 계산 공식
+
+```
+End = Start + (Direction × Distance)
+
+실제:
+End = CameraLocation + (ForwardVector × 300)
+```
+
+---
+
+### 4. DrawDebugLine
+
+```
+목적: 계산 결과를 시각적으로 확인
+위치: Start부터 End까지 선 그리기
+시간: 5초 후 자동 삭제
+```
+
+---
+
+## 📐 벡터 연산 복습
+
+### 벡터 곱셈 (스칼라)
+
+```cpp
+FVector(1, 0, 0) * 300 = FVector(300, 0, 0)
+
+각 성분에 곱해짐:
+X: 1 × 300 = 300
+Y: 0 × 300 = 0
+Z: 0 × 300 = 0
+```
+
+---
+
+### 벡터 덧셈
+
+```cpp
+FVector(100, 200, 150) + FVector(300, 0, 0)
+= FVector(400, 200, 150)
+
+각 성분끼리 더해짐:
+X: 100 + 300 = 400
+Y: 200 + 0   = 200
+Z: 150 + 0   = 150
+```
+
+---
+
+## 🎓 다음 강의 예고
+
+**구현할 내용**:
+
+```
+1. FCollisionShape 생성
+   → Sphere, Box, Capsule 중 선택
+
+2. FHitResult 변수 준비
+   → 충돌 정보를 받을 변수
+
+3. SweepSingleByChannel 호출
+   → 실제 Shape Trace 실행!
+
+4. 결과 처리
+   → 충돌한 액터 확인
+   → Collectable인지 Lock인지 판별
+```
+
+---
+
+## 💭 초보자 Q&A
+
+**Q: 왜 카메라 위치를 사용하나요? 캐릭터 위치는 안 되나요?**
+A: 캐릭터 위치는 발 밑입니다. 우리는 "보는" 방향을 추적해야 하므로 카메라 위치가 정확합니다.
+
+**Q: Forward Vector의 길이가 왜 1인가요?**
+A: 단위 벡터로 정규화되어 있기 때문입니다. 방향만 나타내고, 거리는 곱셈으로 조절합니다.
+
+**Q: 300.0f에서 f는 왜 붙이나요?**
+A: C++에서 `f`가 없으면 double 타입입니다. `f`를 붙여서 float 타입임을 명시합니다.
+
+**Q: DrawDebugLine이 안 보이는데요?**
+A:
+
+1. 선이 카메라 정면에 있어서 가려질 수 있습니다 → 옆으로 이동
+2. 5초가 지나서 사라졌을 수 있습니다 → 다시 클릭
+3. F8로 일시정지하고 확인해보세요
+
+**Q: MaxInteractDistance를 변경하려면?**
+A:
+
+1. BP_Player 블루프린트 열기
+2. Details 패널에서 "Max Interact Distance" 찾기
+3. 원하는 값으로 변경 (예: 500 = 5미터)
+
+**Q: 왜 End를 직접 계산하나요? 함수가 없나요?**
+A: 게임마다 상호작용 거리가 다르기 때문에, 우리가 직접 계산해서 유연하게 조정할 수 있게 만듭니다.
+
+---
+
+# { FCollisionShape으로 Sphere 생성하고 시각화하기 }
+
+## 📚 강의 개요
+
+Shape Trace에 사용할 **구(Sphere) 충돌 모양**을 만들고, **DrawDebugSphere** 함수로 게임 내에서 시각적으로 확인하는 방법을 배웁니다.
+
+---
+
+## 🎯 왜 Collision Shape이 필요한가?
+
+### Sweep 함수의 요구사항
+
+**SweepSingleByChannel 함수 시그니처**:
+
+```cpp
+bool SweepSingleByChannel(
+    FHitResult& OutHit,
+    const FVector& Start,
+    const FVector& End,
+    const FQuat& Rot,
+    ECollisionChannel TraceChannel,
+    const FCollisionShape& CollisionShape,  // ← 이것이 필요!
+    ...
+);
+```
+
+**현재 준비된 것**:
+
+```
+✅ Start - 시작점 (카메라 위치)
+✅ End - 끝점 (카메라 앞 3미터)
+❌ CollisionShape - 아직 안 만듦!
+```
+
+---
+
+## 📐 FCollisionShape 구조체
+
+### 기본 개념
+
+**정의**: 충돌 감지에 사용되는 도형의 모양과 크기를 정의
+
+```
+FCollisionShape가 지원하는 모양들:
+├── Sphere (구) ← 우리가 사용!
+├── Box (상자)
+├── Capsule (캡슐)
+└── Line (선)
+```
+
+---
+
+### 문서 살펴보기
+
+**공식 문서 구조**:
+
+```
+FCollisionShape Documentation
+├── 개요
+│   └── "구, 캡슐, 상자, 선 등의 충돌 모양"
+│
+└── 함수 목록 (Make Functions)
+    ├── MakeBox() - 상자 생성
+    ├── MakeCapsule() - 캡슐 생성
+    ├── MakeSphere() - 구 생성 ← 사용!
+    └── ...
+```
+
+---
+
+## ⚪ MakeSphere 함수
+
+### 함수 시그니처
+
+```cpp
+static FCollisionShape MakeSphere(float Radius);
+```
+
+**매개변수**:
+
+- `Radius` (float): 구의 반지름
+
+**반환값**:
+
+- `FCollisionShape`: 생성된 구 모양
+
+---
+
+### 반지름(Radius) 이해하기
+
+**반지름이란?**
+
+```
+        ● 중심점
+        │
+        │ ← Radius (반지름)
+        │
+        ↓
+    ────●────
+   ╱    │    ╲
+  ●     │     ● 가장자리
+   ╲    │    ╱
+    ────●────
+
+반지름 = 중심에서 가장자리까지의 거리
+```
+
+**예시**:
+
+```
+Radius = 30
+→ 구의 지름 = 60 (반지름 × 2)
+→ 언리얼 단위: 30cm
+```
+
+---
+
+### Static 함수란?
+
+```cpp
+FCollisionShape::MakeSphere(30.0f);
+            ↑         ↑
+         구조체    Static 함수
+          이름
+```
+
+**Static 함수의 특징**:
+
+```
+일반 함수:
+FCollisionShape shape;  // 객체 생성 필요
+shape.SomeFunction();   // 객체로 호출
+
+Static 함수:
+FCollisionShape::MakeSphere(30);  // 바로 호출 가능!
+→ 객체 생성 없이 바로 사용
+→ Scope Resolution Operator (::) 사용
+```
+
+---
+
+## 💻 Sphere 생성 코드
+
+### 1단계: 반지름 변수 추가
+
+**헤더 파일**:
+
+```cpp
+UPROPERTY(EditAnywhere)
+float InteractionSphereRadius = 30.0f;
+```
+
+**각 부분 설명**:
+
+- `EditAnywhere`: 에디터에서 조정 가능
+- `float`: 소수점 숫자
+- `= 30.0f`: 기본값 30 (30cm)
+
+**왜 30?**
+
+```
+언리얼 단위: 100 = 1미터
+
+30 = 0.3미터 = 30cm
+→ 주먹 크기 정도
+→ 아이템을 클릭하기 적당한 크기
+```
+
+---
+
+### 2단계: Collision Shape 생성
+
+**CPP 파일 (Interact 함수)**:
+
+```cpp
+FCollisionShape InteractionSphere =
+    FCollisionShape::MakeSphere(InteractionSphereRadius);
+```
+
+**단계별 분석**:
+
+```cpp
+FCollisionShape  // 1. 변수 타입
+InteractionSphere  // 2. 변수 이름
+=  // 3. 할당
+FCollisionShape::MakeSphere(  // 4. Static 함수 호출
+    InteractionSphereRadius  // 5. 반지름 전달
+);
+```
+
+**결과**:
+
+```
+InteractionSphere 변수 안에
+반지름 30cm의 구 모양 정보가 담김!
+```
+
+---
+
+## 🎨 DrawDebugSphere로 시각화하기
+
+### 왜 시각화가 필요한가?
+
+**문제**:
+
+```
+구를 만들었지만...
+게임에서 보이지 않음!
+→ 크기가 적당한지 확인할 수 없음
+```
+
+**해결책**:
+
+```
+DrawDebugSphere 사용
+→ 게임 월드에 구를 그려서 확인!
+```
+
+---
+
+### DrawDebugSphere 함수
+
+**함수 시그니처**:
+
+```cpp
+void DrawDebugSphere(
+    const UWorld* InWorld,          // 1. 월드 오브젝트
+    FVector const& Center,          // 2. 구의 중심 위치
+    float Radius,                   // 3. 반지름
+    int32 Segments,                 // 4. 구의 세그먼트 수 (정밀도)
+    FColor const& Color,            // 5. 색상
+    bool bPersistentLines = false,  // 6. 영구 표시 여부
+    float LifeTime = -1.0f,         // 7. 지속 시간
+    uint8 DepthPriority = 0,        // 8. 깊이 우선순위
+    float Thickness = 0.0f          // 9. 선 두께
+);
+```
+
+---
+
+### 매개변수 상세 설명
+
+### 1. InWorld (월드 오브젝트)
+
+```cpp
+GetWorld()
+```
+
+- 어떤 월드에 그릴지 지정
+- DrawDebugLine과 동일
+
+---
+
+### 2. Center (중심 위치)
+
+```cpp
+End  // 끝점에 그리기
+```
+
+**선택 가능한 위치**:
+
+```
+Start: 시작점에 구 그리기
+End: 끝점에 구 그리기 (우리 선택!)
+
+이유: 끝점이 더 흥미로움!
+→ 실제로 아이템이 감지되는 영역
+```
+
+---
+
+### 3. Radius (반지름)
+
+```cpp
+InteractionSphereRadius  // 30.0f
+```
+
+- 구의 크기 결정
+- FCollisionShape 생성할 때와 **같은 값** 사용!
+
+---
+
+### 4. Segments (세그먼트 수)
+
+```cpp
+20
+```
+
+**세그먼트란?**
+
+```
+구를 만드는 선의 개수
+
+Segments = 8:          Segments = 20:
+   ╱─╲                    ╱──╲
+  ╱   ╲                  ╱    ╲
+ │     │     vs.        │      │
+  ╲   ╱                  ╲    ╱
+   ╲─╱                    ╲──╱
+ 각진 구              부드러운 구
+
+높을수록: 부드럽지만 성능 ↓
+낮을수록: 각지지만 성능 ↑
+```
+
+**20이 적당**:
+
+- 충분히 부드러움
+- 성능 부담 적음
+
+---
+
+### 5. Color (색상)
+
+```cpp
+FColor::Blue  // 파란색
+```
+
+**다른 색상 예시**:
+
+```cpp
+FColor::Red
+FColor::Green
+FColor::Yellow
+FColor::Cyan
+FColor::Magenta
+```
+
+**빨간 선과 구별하기**:
+
+- Line: Red (빨강)
+- Sphere: Blue (파랑) ← 쉽게 구별!
+
+---
+
+### 6, 7. bPersistentLines, LifeTime
+
+```cpp
+false,  // 영구 표시 안 함
+5.0f    // 5초 후 사라짐
+```
+
+- DrawDebugLine과 동일
+
+---
+
+### 완성된 코드
+
+```cpp
+DrawDebugSphere(
+    GetWorld(),                    // 게임 월드
+    End,                           // 끝점에 그리기
+    InteractionSphereRadius,       // 반지름 30
+    20,                            // 세그먼트 20개
+    FColor::Blue,                  // 파란색
+    false,                         // 영구 표시 안 함
+    5.0f                           // 5초 후 사라짐
+);
+```
+
+---
+
+## 🎮 게임에서 확인하기
+
+### 실행 결과
+
+**마우스 클릭 시**:
+
+```
+빨간 선 그려짐
+    +
+파란 구 그려짐 (끝점에)
+```
+
+**시각적 표현**:
+
+```
+Camera
+  👁️
+  │
+  │ ← 빨간 선 (Direction)
+  ↓
+ ⚪ ← 파란 구 (Interaction Area)
+```
+
+---
+
+### 추가 구 그리기 (시작점)
+
+**더 재미있게 만들기!**
+
+```cpp
+// 시작점에도 구 그리기 (녹색)
+DrawDebugSphere(
+    GetWorld(),
+    Start,                         // 시작점!
+    InteractionSphereRadius,
+    20,
+    FColor::Green,                 // 녹색으로 구별!
+    false,
+    5.0f
+);
+
+// 끝점에 구 그리기 (파란색)
+DrawDebugSphere(
+    GetWorld(),
+    End,                           // 끝점
+    InteractionSphereRadius,
+    20,
+    FColor::Blue,
+    false,
+    5.0f
+);
+```
+
+---
+
+### 완성된 시각화
+
+```
+      👁️ Camera
+      │
+     ⚪ 녹색 구 (Start)
+      │
+      │ 빨간 선
+      ↓
+     ⚪ 파란 구 (End)
+
+Sweep 동작:
+녹색 구가 파란 구 위치까지 이동
+→ 그 사이의 모든 것을 감지!
+```
+
+---
+
+## 💡 Sweep의 작동 원리 이해
+
+### 실제 Sweep 시뮬레이션
+
+**F8로 일시정지 후 관찰**:
+
+```
+Step 1: 시작
+⚪ ─────────────────────
+녹색 구
+
+Step 2: 중간
+────── ⚪ ──────────────
+
+Step 3: 끝
+──────────────────── ⚪
+                   파란 구
+
+Sweep = 시작점 구가 끝점까지 "쓸고" 지나감
+```
+
+---
+
+### Line Trace vs Shape Trace 비교
+
+**실제 게임에서 비교**:
+
+```
+Line Trace (선):
+    │  ← 얇음
+    │
+    ↓
+   🏺 아이템
+
+정확히 조준해야 감지!
+약간만 벗어나면 실패 ❌
+
+Shape Trace (구):
+   ⚪  ← 넓은 범위
+    │
+    ↓
+   🏺 아이템
+
+구 안에만 들어오면 감지!
+대충 조준해도 성공 ✅
+```
+
+---
+
+## 📝 완성된 Interact 함수
+
+### 전체 코드
+
+```cpp
+void ADungeonEscapeCharacter::Interact()
+{
+    // 1. 시작점과 끝점 계산
+    FVector Start = FirstPersonCameraComponent->GetComponentLocation();
+    FVector End = Start +
+        (FirstPersonCameraComponent->GetForwardVector() * MaxInteractDistance);
+
+    // 2. Debug Line 그리기
+    DrawDebugLine(GetWorld(), Start, End, FColor::Red, false, 5.0f);
+
+    // 3. Collision Shape 생성 (구)
+    FCollisionShape InteractionSphere =
+        FCollisionShape::MakeSphere(InteractionSphereRadius);
+
+    // 4. Debug Sphere 그리기 (끝점)
+    DrawDebugSphere(
+        GetWorld(),
+        End,
+        InteractionSphereRadius,
+        20,
+        FColor::Blue,
+        false,
+        5.0f
+    );
+}
+```
+
+---
+
+### 헤더 파일
+
+```cpp
+// DungeonEscapeCharacter.h
+class DUNGEONESCAPE_API ADungeonEscapeCharacter : public ACharacter
+{
+    UPROPERTY(EditAnywhere)
+    float MaxInteractDistance = 300.0f;  // 상호작용 거리
+
+    UPROPERTY(EditAnywhere)
+    float InteractionSphereRadius = 30.0f;  // 구 반지름
+
+    void Interact();
+};
+```
+
+---
+
+## 🔧 값 조정하기
+
+### 블루프린트에서 조정
+
+**BP_Player 블루프린트**:
+
+```
+Details 패널:
+├── Max Interact Distance: 300 (3미터)
+└── Interaction Sphere Radius: 30 (30cm)
+```
+
+**실험해보기**:
+
+```
+Radius = 10:  작은 구 (정밀 조준 필요)
+Radius = 30:  적당한 크기 (기본값)
+Radius = 100: 큰 구 (너무 쉬움)
+
+거리 = 100:  1미터 (너무 가까움)
+거리 = 300:  3미터 (적당함)
+거리 = 500:  5미터 (멀리서도 가능)
+```
+
+---
+
+## 🎯 실전 팁
+
+### 디버그 시각화 활용
+
+**개발 중**:
+
+```cpp
+// 구를 여러 개 그려서 확인
+DrawDebugSphere(GetWorld(), Start, ..., FColor::Green, ...);  // 시작
+DrawDebugSphere(GetWorld(), End, ..., FColor::Blue, ...);     // 끝
+
+→ Sweep 범위를 명확히 볼 수 있음
+```
+
+**최종 릴리즈**:
+
+```cpp
+// 디버그 코드 제거 또는 조건부 컴파일
+#if WITH_EDITOR
+    DrawDebugSphere(...);
+#endif
+```
+
+---
+
+### 불필요한 디버그 제거
+
+**강의 마지막에 한 것**:
+
+```cpp
+// 시작점 구 제거 (너무 많음)
+// DrawDebugSphere(GetWorld(), Start, ...);
+
+// 로그 제거 (너무 시끄러움)
+// UE_LOG(LogTemp, Warning, TEXT("Interact"));
+```
+
+**남겨둘 것**:
+
+- 끝점의 파란 구 (Sweep 영역 확인용)
+- 빨간 선 (방향 확인용)
+
+---
+
+## 🔑 핵심 개념 정리
+
+### 1. FCollisionShape
+
+```cpp
+FCollisionShape::MakeSphere(Radius)
+
+역할: Sweep에 사용할 도형 정의
+타입: Sphere, Box, Capsule, Line
+우리 선택: Sphere (구)
+```
+
+---
+
+### 2. Static 함수
+
+```
+객체 생성 없이 바로 호출 가능
+:: (Scope Resolution Operator) 사용
+
+FCollisionShape::MakeSphere(30)
+          ↑
+       Static
+```
+
+---
+
+### 3. Radius (반지름)
+
+```
+중심에서 가장자리까지의 거리
+
+Radius = 30
+→ 지름 = 60
+→ 언리얼 단위로 30cm
+```
+
+---
+
+### 4. DrawDebugSphere
+
+```
+목적: 구를 시각적으로 확인
+위치: Start 또는 End
+색상: 구별을 위해 다른 색 사용
+```
+
+---
+
+## 🎓 다음 강의 예고
+
+**마지막 준비 단계**:
+
+```
+현재 준비된 것:
+✅ Start, End 위치
+✅ FCollisionShape (구)
+✅ 시각화 (Debug Sphere)
+
+다음에 할 것:
+1. FHitResult 변수 준비
+2. ECollisionChannel 설정 (Interact 채널)
+3. SweepSingleByChannel 함수 호출!
+4. 충돌 결과 처리
+   → Actor 가져오기
+   → Collectable vs Lock 판별
+```
+
+---
+
+## 💭 초보자 Q&A
+
+**Q: 왜 구(Sphere)를 사용하나요?**
+A:
+
+- 모든 방향으로 균등한 감지 범위
+- 계산이 간단함
+- 자연스러운 상호작용 느낌
+
+**Q: Segments가 뭔가요?**
+A: 구를 그리는 선의 개수입니다. 많을수록 부드럽지만, 20 정도면 충분합니다.
+
+**Q: 왜 끝점에만 구를 그리나요?**
+A: 끝점이 실제로 아이템을 감지하는 영역이기 때문입니다. 시작점은 카메라 위치라서 덜 중요합니다.
+
+**Q: InteractionSphere 변수를 왜 만드나요? 바로 함수에 전달하면 안 되나요?**
+A:
+
+```cpp
+// 가능은 합니다:
+SweepSingleByChannel(..., FCollisionShape::MakeSphere(30), ...);
+
+// 하지만 변수로 만들면:
+FCollisionShape InteractionSphere = FCollisionShape::MakeSphere(30);
+SweepSingleByChannel(..., InteractionSphere, ...);
+→ 코드가 더 읽기 쉬움
+→ 여러 곳에서 재사용 가능
+```
+
+**Q: 30cm가 너무 작지 않나요?**
+A: 실제로 게임을 해보면 적당합니다! 너무 크면 아이템을 정확히 클릭하는 재미가 없어지고, 너무 작으면 답답합니다. 30은 좋은 균형입니다.
+
+**Q: Shape Trace는 언제 시작해서 언제 끝나나요?**
+A: Start 위치의 구가 End 위치까지 "쓸고" 지나가는 전체 경로를 확인합니다. 시작부터 끝까지 모든 위치를 검사합니다.
+
+---
+
+# { C++의 참조(Reference) 완벽 이해하기 }
+
+## 📚 강의 개요
+
+C++의 **참조(Reference)** 개념을 배웁니다. 참조는 기존 변수의 **별칭(Alias)**으로, Sweep 함수에서 사용되는 중요한 개념입니다.
+
+---
+
+## 🎯 왜 참조를 배워야 할까?
+
+### SweepSingleByChannel에서 사용
+
+```cpp
+bool SweepSingleByChannel(
+    FHitResult& OutHit,        // ← 앰퍼샌드(&)가 보임!
+    const FVector& Start,       // ← 여기도!
+    const FVector& End,         // ← 여기도!
+    ...
+);
+```
+
+**앰퍼샌드(&)의 의미**:
+
+- 참조(Reference)를 나타냄
+- 함수에서 중요하게 사용됨
+
+---
+
+## 🔑 참조(Reference)란?
+
+### 기본 개념
+
+**정의**: 기존 변수의 **별칭(또 다른 이름)**
+
+```cpp
+float MyFloat = 3.4f;      // 원본 변수
+float& FloatRef = MyFloat; // 참조 (별칭)
+```
+
+**비유**:
+
+```
+원본 변수 = 김철수 (본명)
+참조 변수 = 철수야 (애칭)
+
+둘 다 같은 사람을 가리킴!
+```
+
+---
+
+### 시각적 이해
+
+```
+메모리:
+┌──────────────┐
+│ MyFloat: 3.4 │ ← 실제 데이터가 저장된 위치
+└──────────────┘
+       ↑
+       │
+   ┌───┴───┐
+   │       │
+MyFloat  FloatRef
+(본명)   (별칭)
+```
+
+**핵심**:
+
+- 둘 다 **같은 메모리 위치**를 가리킴
+- FloatRef는 MyFloat의 **또 다른 이름**일 뿐!
+
+---
+
+## 📝 참조 생성 방법
+
+### 기본 문법
+
+```cpp
+데이터타입& 참조이름 = 원본변수;
+```
+
+**예시**:
+
+```cpp
+float MyFloat = 3.4f;
+float& FloatRef = MyFloat;  // FloatRef는 MyFloat의 별칭
+```
+
+**구성 요소**:
+
+- `float`: 데이터 타입
+- `&`: 참조 표시 (앰퍼샌드)
+- `FloatRef`: 참조 변수 이름
+- `= MyFloat`: 어떤 변수의 별칭인지 지정
+
+---
+
+## 🎨 참조 사용하기
+
+### 값 읽기
+
+```cpp
+float MyFloat = 3.4f;
+float& FloatRef = MyFloat;
+
+// FloatRef로 값 읽기
+float NewNumber = FloatRef + 10.0f;  // 3.4 + 10 = 13.4
+
+// MyFloat로 값 읽기 (똑같음!)
+float NewNumber2 = MyFloat + 10.0f;  // 3.4 + 10 = 13.4
+```
+
+**핵심**: FloatRef를 사용하든 MyFloat를 사용하든 **완전히 동일**!
+
+---
+
+### 값 변경하기
+
+```cpp
+float MyFloat = 3.4f;
+float& FloatRef = MyFloat;
+
+// 참조로 값 변경
+FloatRef = 4.5f;
+
+// 결과: MyFloat도 4.5가 됨!
+// 왜? 같은 메모리를 가리키니까!
+```
+
+**중요**:
+
+```
+FloatRef를 변경 = MyFloat를 변경
+MyFloat를 변경 = FloatRef를 변경
+
+완전히 같은 것!
+```
+
+---
+
+## 🆚 포인터 vs 참조 비교
+
+### 포인터 사용
+
+```cpp
+float MyFloat = 3.4f;
+float* FloatPtr = &MyFloat;  // 주소 저장 (&연산자 필요)
+
+// 값 읽기
+float Value = *FloatPtr + 10.0f;  // 역참조(*) 필요
+
+// 값 변경
+*FloatPtr = 4.5f;  // 역참조(*) 필요
+```
+
+**복잡한 점**:
+
+- `&`: 주소 가져오기 연산자
+- : 역참조 연산자
+- 여러 연산자 사용해야 함
+
+---
+
+### 참조 사용
+
+```cpp
+float MyFloat = 3.4f;
+float& FloatRef = MyFloat;  // 그냥 연결!
+
+// 값 읽기
+float Value = FloatRef + 10.0f;  // 그냥 사용!
+
+// 값 변경
+FloatRef = 4.5f;  // 그냥 대입!
+```
+
+**간단한 점**:
+
+- 특별한 연산자 불필요
+- 일반 변수처럼 사용
+
+---
+
+### 비교 표
+
+| 특징            | 포인터               | 참조                |
+| --------------- | -------------------- | ------------------- |
+| **생성**        | `float* ptr = &var;` | `float& ref = var;` |
+| **값 읽기**     | `*ptr` (역참조 필요) | `ref` (그냥 사용)   |
+| **값 변경**     | `*ptr = 5;`          | `ref = 5;`          |
+| **안전성**      | 위험 (null 가능)     | 안전 (null 불가)    |
+| **재할당**      | 가능                 | **불가능**          |
+| **사용 난이도** | 어려움               | 쉬움                |
+| **강력함**      | 매우 강력            | 제한적              |
+
+---
+
+## 🏗️ 구조체/클래스와 참조
+
+### FVector 참조 예시
+
+```cpp
+FVector MyVec(1.0f, 2.0f, 3.0f);  // 원본 벡터
+FVector& VecRef = MyVec;          // 참조 생성
+```
+
+---
+
+### 멤버 접근 - 점 연산자 사용!
+
+```cpp
+// 참조로 멤버 접근 (점 연산자)
+VecRef.X = 10.0f;
+VecRef.Y = 20.0f;
+VecRef.Z = 999.0f;
+
+// 결과: MyVec도 변경됨!
+// MyVec = (10, 20, 999)
+```
+
+**포인터와의 차이**:
+
+```cpp
+// 포인터는 화살표 연산자(->)
+FVector* VecPtr = &MyVec;
+VecPtr->X = 10.0f;  // 화살표!
+
+// 참조는 점 연산자(.)
+FVector& VecRef = MyVec;
+VecRef.X = 10.0f;   // 점!
+```
+
+---
+
+### 멤버 함수 호출
+
+```cpp
+FVector MyVec(1.0f, 2.0f, 3.0f);
+FVector& VecRef = MyVec;
+
+// 참조로 함수 호출
+FString VecString = VecRef.ToString();
+
+// MyVec로 호출한 것과 완전히 동일!
+```
+
+---
+
+## ⚠️ 참조의 중요한 규칙 3가지
+
+### 규칙 1: 재할당 불가능
+
+```cpp
+float MyFloat = 3.4f;
+float OtherFloat = 32.3f;
+
+float& FloatRef = MyFloat;  // MyFloat의 별칭
+
+// 이렇게 하면?
+FloatRef = OtherFloat;
+
+// 결과:
+// FloatRef가 OtherFloat를 가리키게 되는 것이 아님! ❌
+// OtherFloat의 값(32.3)을 MyFloat에 대입함! ✓
+// → MyFloat = 32.3이 됨
+```
+
+**핵심**:
+
+```
+참조는 한 번 연결되면 평생 그 변수만 가리킴!
+다른 변수로 바꿀 수 없음!
+```
+
+---
+
+### 규칙 2: 초기화 필수
+
+```cpp
+// ❌ 잘못된 코드 - 컴파일 에러!
+float& FloatRef;  // 무엇의 별칭인지 지정 안 함
+
+// ✅ 올바른 코드
+float MyFloat = 3.4f;
+float& FloatRef = MyFloat;  // 반드시 초기화!
+```
+
+**이유**:
+
+```
+별칭은 반드시 "누구"의 별칭인지 명시해야 함
+본명 없는 별칭은 의미가 없음!
+```
+
+---
+
+### 규칙 3: null 불가능
+
+```cpp
+// ❌ 잘못된 코드 - 컴파일 에러!
+float& FloatRef = nullptr;  // 참조는 null이 될 수 없음!
+
+// 포인터는 가능
+float* FloatPtr = nullptr;  // 이건 OK
+```
+
+**참조가 더 안전한 이유**:
+
+```
+포인터: null일 수 있음 → 역참조 시 크래시 위험
+참조: null 불가능 → 항상 안전하게 사용 가능
+```
+
+---
+
+## 💻 실습 코드
+
+### 과제 코드
+
+```cpp
+void ADungeonEscapeCharacter::Interact()
+{
+    // 1. 원본 벡터 생성
+    FVector MyVec(1.0f, 2.0f, 3.0f);
+
+    // 2. 참조 생성
+    FVector& VecRef = MyVec;
+
+    // 3. 변경 전 로그
+    UE_LOG(LogTemp, Warning, TEXT("Before - MyVec: %s"),
+        *MyVec.ToString());
+    UE_LOG(LogTemp, Warning, TEXT("Before - VecRef: %s"),
+        *VecRef.ToString());
+
+    // 4. 참조로 값 변경
+    VecRef.X = 10.0f;
+    VecRef.Y = 20.0f;
+    VecRef.Z = 999.0f;
+
+    // 5. 변경 후 로그
+    UE_LOG(LogTemp, Warning, TEXT("After - MyVec: %s"),
+        *MyVec.ToString());
+    UE_LOG(LogTemp, Warning, TEXT("After - VecRef: %s"),
+        *VecRef.ToString());
+}
+```
+
+---
+
+### 실행 결과
+
+```
+LogTemp: Warning: Before - MyVec: X=1.000 Y=2.000 Z=3.000
+LogTemp: Warning: Before - VecRef: X=1.000 Y=2.000 Z=3.000
+
+LogTemp: Warning: After - MyVec: X=10.000 Y=20.000 Z=999.000
+LogTemp: Warning: After - VecRef: X=10.000 Y=20.000 Z=999.000
+```
+
+**관찰**:
+
+```
+변경 전: 둘 다 (1, 2, 3)
+VecRef만 변경했는데
+변경 후: 둘 다 (10, 20, 999)!
+
+→ 같은 메모리를 가리키기 때문!
+```
+
+---
+
+## 🔍 ToString()의 앞 별표(\*)
+
+### 코드 분석
+
+```cpp
+UE_LOG(LogTemp, Warning, TEXT("%s"), *MyVec.ToString());
+                                     ↑
+                                   이게 뭐지?
+```
+
+**설명**:
+
+```cpp
+MyVec.ToString()  // FString을 반환
+*MyVec.ToString() // FString을 const TCHAR*로 변환
+```
+
+**왜 필요한가?**
+
+```
+UE_LOG의 %s는 C 스타일 문자열을 기대함
+→ const TCHAR* 타입 필요
+
+FString은 언리얼 문자열 클래스
+→ * 연산자로 C 스타일로 변환
+
+* 연산자: FString의 변환 연산자
+```
+
+---
+
+## 🎯 참조의 실전 활용
+
+### 왜 함수에서 참조를 사용할까?
+
+**문제 상황**:
+
+```cpp
+// 일반 매개변수 (값 복사)
+void Function(FVector Vec)  // Vec은 복사본!
+{
+    Vec.X = 100;  // 원본은 변경 안 됨!
+}
+
+FVector Original(1, 2, 3);
+Function(Original);
+// Original은 여전히 (1, 2, 3)
+```
+
+**참조 사용**:
+
+```cpp
+// 참조 매개변수
+void Function(FVector& Vec)  // Vec은 원본의 별칭!
+{
+    Vec.X = 100;  // 원본이 변경됨!
+}
+
+FVector Original(1, 2, 3);
+Function(Original);
+// Original이 (100, 2, 3)으로 변경됨!
+```
+
+---
+
+### SweepSingleByChannel에서의 활용
+
+```cpp
+bool SweepSingleByChannel(
+    FHitResult& OutHit,  // 참조!
+    ...
+)
+```
+
+**동작 방식**:
+
+```cpp
+// 호출하는 쪽
+FHitResult HitResult;  // 빈 변수 준비
+SweepSingleByChannel(HitResult, ...);
+                     ↑
+                   원본 전달
+
+// 함수 안에서
+OutHit.GetActor();  // 충돌 정보 채움
+                    // OutHit = HitResult의 별칭
+                    // → 원본에 직접 쓰기!
+
+// 함수 밖에서
+HitResult.GetActor();  // 채워진 정보 사용 가능!
+```
+
+**장점**:
+
+1. **복사 없음**: 큰 데이터도 효율적
+2. **원본 수정**: 함수가 원본을 직접 변경 가능
+3. **Out Parameter**: 여러 값을 반환하는 효과
+
+---
+
+## 🔑 핵심 개념 정리
+
+### 1. 참조 = 별칭
+
+```
+원본 변수의 또 다른 이름
+같은 메모리를 가리킴
+```
+
+---
+
+### 2. 참조 생성
+
+```cpp
+타입& 참조이름 = 원본변수;
+
+float& ref = original;
+FVector& vecRef = myVec;
+```
+
+---
+
+### 3. 사용법
+
+```cpp
+// 포인터처럼 복잡한 연산자 불필요
+// 일반 변수처럼 사용!
+
+ref = 10;      // 대입
+ref + 5;       // 연산
+ref.X = 20;    // 멤버 접근 (점 연산자)
+```
+
+---
+
+### 4. 3가지 규칙
+
+```
+1. 재할당 불가 (한 번 연결되면 평생 그 변수)
+2. 초기화 필수 (반드시 누구의 별칭인지 지정)
+3. null 불가 (포인터와 달리 항상 유효)
+```
+
+---
+
+### 5. 포인터와 비교
+
+```
+참조:
+✓ 사용 쉬움
+✓ 안전함
+✗ 덜 강력함
+
+포인터:
+✗ 사용 어려움
+✗ 위험함 (null, 역참조 문제)
+✓ 매우 강력함
+```
+
+---
+
+## 🎓 다음 강의 예고
+
+**함수 매개변수로서의 참조**:
+
+```cpp
+// 다음에 배울 내용
+void Function(FVector& Vec)  // 참조 매개변수
+{
+    Vec.X = 100;  // 원본 변경!
+}
+
+// Out Parameter 패턴
+bool GetData(FHitResult& OutResult)
+{
+    OutResult = ...;  // 결과 채우기
+    return true;
+}
+
+// Sweep 함수 완성
+GetWorld()->SweepSingleByChannel(
+    HitResult,  // 참조로 전달!
+    ...
+);
+```
+
+---
+
+## 💭 초보자 Q&A
+
+**Q: 참조와 포인터, 언제 뭘 써야 하나요?**
+A:
+
+- **함수 매개변수**: 참조 사용 (간단하고 안전)
+- **동적 메모리, null 필요**: 포인터 사용
+- **언리얼**: 대부분 참조 사용 (포인터는 Actor\* 등)
+
+**Q: 참조를 사용하면 메모리가 2배로 늘어나나요?**
+A: 아니요! 참조는 별칭일 뿐, 새로운 메모리를 차지하지 않습니다. 컴파일러가 최적화합니다.
+
+**Q: 왜 재할당이 안 되나요?**
+A: 참조는 "별칭"이기 때문입니다. 철수라는 사람의 애칭을 "철수야"라고 정했으면, 나중에 "영희야"로 바꿀 수 없는 것과 같습니다.
+
+**Q: null 참조가 왜 안 되나요?**
+A: 별칭은 반드시 누군가를 가리켜야 합니다. "아무도 아닌 사람"의 별칭은 의미가 없죠!
+
+_Q: ToString() 앞의 는 뭔가요?
+A: FString을 C 스타일 문자열(const TCHAR_)로 변환하는 연산자입니다. UE_LOG의 %s가 C 스타일을 요구하기 때문입니다.
+
+**Q: 참조가 포인터보다 덜 강력하다는 게 무슨 뜻인가요?**
+A:
+
+- 재할당 불가 (포인터는 가능)
+- null 불가 (포인터는 가능)
+- 포인터 연산 불가 (배열 순회 등)
+
+하지만 대부분의 경우 이런 기능이 필요 없고, 참조가 더 안전하고 편합니다!
+
+---
+
+# { 함수의 참조 매개변수(Reference Parameters) 완벽 이해 }
+
+## 📚 강의 개요
+
+함수에서 **참조 매개변수**를 사용하는 방법과, 일반 매개변수와의 차이점을 배웁니다. 이것은 **SweepSingleByChannel** 함수를 이해하는 데 필수적입니다!
+
+---
+
+## 🎯 값 전달(Pass by Value) vs 참조 전달(Pass by Reference)
+
+### 1. 값 전달 (기본 방식)
+
+**예시 코드**:
+
+```cpp
+void TestFunction(float MyFloat)  // 일반 매개변수
+{
+    MyFloat = 10.3f;  // 복사본 변경
+}
+
+float MyFloat = 3.4f;
+TestFunction(MyFloat);  // 함수 호출
+
+// MyFloat는 여전히 3.4! ❌
+```
+
+**무슨 일이 일어났나?**
+
+```
+1. 함수 호출 시
+   MyFloat (3.4) → 복사본 생성 → 함수의 MyFloat (3.4)
+
+2. 함수 내부
+   함수의 MyFloat를 10.3으로 변경
+
+3. 함수 종료
+   복사본 소멸
+   원본 MyFloat는 여전히 3.4!
+```
+
+**시각적 표현**:
+
+```
+메모리:
+┌────────────────┐
+│ 원본: 3.4      │  ← 변경 안 됨!
+└────────────────┘
+
+함수 호출 시:
+┌────────────────┐
+│ 원본: 3.4      │
+└────────────────┘
+        ↓ 복사
+┌────────────────┐
+│ 복사본: 3.4    │  → 10.3으로 변경
+└────────────────┘  → 함수 종료 시 소멸
+
+```
+
+---
+
+### 2. 참조 전달 (Reference)
+
+**예시 코드**:
+
+```cpp
+void TestFunction(float& MyFloat)  // 참조 매개변수 (&)
+{
+    MyFloat = 10.3f;  // 원본 변경!
+}
+
+float MyFloat = 3.4f;
+TestFunction(MyFloat);  // 함수 호출
+
+// MyFloat가 10.3으로 변경됨! ✅
+```
+
+**무슨 일이 일어났나?**
+
+```
+1. 함수 호출 시
+   MyFloat의 별칭이 함수로 전달됨
+   복사본 생성 안 됨!
+
+2. 함수 내부
+   MyFloat = 원본의 별칭
+   원본을 직접 수정!
+
+3. 함수 종료
+   원본이 10.3으로 변경되어 있음!
+```
+
+**시각적 표현**:
+
+```
+메모리:
+┌────────────────┐
+│ MyFloat: 3.4   │  ← 원본
+└────────────────┘
+        ↑
+        │ 별칭 전달 (복사 안 함!)
+        │
+  함수의 MyFloat
+  (같은 메모리 가리킴)
+        │
+        ↓ 10.3으로 변경
+┌────────────────┐
+│ MyFloat: 10.3  │  ← 원본 변경됨!
+└────────────────┘
+```
+
+---
+
+### 3. 포인터 전달 (Pointer)
+
+**예시 코드**:
+
+```cpp
+void TestFunction(float* MyFloat)  // 포인터 매개변수 (*)
+{
+    *MyFloat = 10.3f;  // 역참조해서 원본 변경
+}
+
+float MyFloat = 3.4f;
+TestFunction(&MyFloat);  // 주소 전달 (&연산자)
+
+// MyFloat가 10.3으로 변경됨! ✅
+```
+
+**참조와의 차이**:
+
+```cpp
+// 참조
+TestFunction(MyFloat);     // 그냥 전달
+MyFloat = 10.3f;           // 함수 내에서 직접 사용
+
+// 포인터
+TestFunction(&MyFloat);    // & 연산자로 주소 전달
+*MyFloat = 10.3f;          // * 연산자로 역참조 필요
+```
+
+---
+
+## 📊 비교표
+
+| 특징             | 값 전달              | 참조 전달             | 포인터 전달           |
+| ---------------- | -------------------- | --------------------- | --------------------- |
+| **함수 선언**    | `void Func(float x)` | `void Func(float& x)` | `void Func(float* x)` |
+| **함수 호출**    | `Func(var)`          | `Func(var)`           | `Func(&var)`          |
+| **함수 내 사용** | `x = 10`             | `x = 10`              | `*x = 10`             |
+| **원본 변경**    | ❌ 안 됨             | ✅ 됨                 | ✅ 됨                 |
+| **복사 발생**    | ✅ 복사됨            | ❌ 복사 안 됨         | ❌ 복사 안 됨         |
+| **null 가능**    | -                    | ❌ 불가               | ✅ 가능               |
+| **사용 난이도**  | 쉬움                 | 쉬움                  | 어려움                |
+
+---
+
+## 💡 왜 참조 매개변수를 사용할까?
+
+### 이유 1: 추가 반환값으로 활용
+
+**일반적인 방법 (return)**:
+
+```cpp
+FVector SetVector()
+{
+    FVector NewVec(10, 20, 30);
+    return NewVec;  // 한 개만 반환 가능
+}
+
+FVector MyVec = SetVector();
+```
+
+**참조 사용 (Out Parameter)**:
+
+```cpp
+void SetVector(FVector& MyVec)  // Out Parameter
+{
+    MyVec.X = 10;
+    MyVec.Y = 20;
+    MyVec.Z = 30;
+}
+
+FVector MyVec;
+SetVector(MyVec);  // MyVec이 (10, 20, 30)으로 변경됨!
+```
+
+---
+
+### 여러 개의 값을 반환하고 싶다면?
+
+**참조 매개변수의 진가!**
+
+```cpp
+bool GetPlayerInfo(
+    FVector& OutLocation,   // Out Parameter 1
+    FRotator& OutRotation,  // Out Parameter 2
+    float& OutHealth        // Out Parameter 3
+)
+{
+    OutLocation = FVector(100, 200, 300);
+    OutRotation = FRotator(0, 90, 0);
+    OutHealth = 100.0f;
+
+    return true;  // 성공 여부
+}
+
+// 사용
+FVector Location;
+FRotator Rotation;
+float Health;
+
+bool bSuccess = GetPlayerInfo(Location, Rotation, Health);
+if (bSuccess)
+{
+    // Location, Rotation, Health 모두 채워짐!
+}
+```
+
+**장점**:
+
+```
+return: 1개만 반환 가능
+Out Parameter: 원하는 만큼 반환 가능!
+
+일반적인 패턴:
+→ return: bool (성공/실패)
+→ Out Parameters: 실제 데이터들
+```
+
+---
+
+### 이유 2: 성능 향상
+
+**큰 구조체를 전달할 때**:
+
+```cpp
+// ❌ 나쁜 예 - 값 전달 (복사)
+void ProcessVector(FVector Vec)  // 전체 복사!
+{
+    // Vec 사용...
+}
+
+FVector BigVec(1, 2, 3);
+ProcessVector(BigVec);
+// BigVec의 모든 데이터(X, Y, Z)를 복사
+// 메모리 사용 ↑, 시간 소모 ↑
+```
+
+```cpp
+// ✅ 좋은 예 - 참조 전달
+void ProcessVector(const FVector& Vec)  // 주소만 전달!
+{
+    // Vec 사용...
+}
+
+FVector BigVec(1, 2, 3);
+ProcessVector(BigVec);
+// 주소만 전달 (8바이트 고정)
+// 메모리 사용 ↓, 빠름 ↑
+```
+
+**성능 차이**:
+
+```
+값 전달:
+FVector 크기 = 12바이트 (float × 3)
+복사 시간 + 메모리 필요
+
+참조 전달:
+포인터 크기 = 8바이트 (64비트 시스템)
+복사 안 함, 주소만 전달
+```
+
+---
+
+## 🔒 const 참조 (Const Reference)
+
+### 기본 개념
+
+**문법**:
+
+```cpp
+void Function(const FVector& Vec)  // const 참조
+{
+    // Vec을 읽을 수만 있음
+    // Vec을 변경할 수 없음!
+}
+```
+
+---
+
+### 예시
+
+```cpp
+void PrintVector(const FVector& Vec)
+{
+    UE_LOG(LogTemp, Warning, TEXT("Vector: %s"),
+        *Vec.ToString());  // ✅ 읽기 OK
+
+    Vec.X = 100;  // ❌ 컴파일 에러! 변경 불가
+}
+```
+
+---
+
+### 왜 사용할까?
+
+**의문점**:
+
+```
+변경할 수 없다면 왜 참조로 전달하나?
+그냥 값으로 전달하면 되지 않나?
+```
+
+**답: 성능!**
+
+```cpp
+// 값 전달 - 복사 발생
+void PrintVector(FVector Vec)  // 12바이트 복사
+{
+    // Vec 사용...
+}
+
+// const 참조 - 복사 없음
+void PrintVector(const FVector& Vec)  // 8바이트 주소만
+{
+    // Vec 사용...
+}
+
+성능:
+const 참조가 더 빠름!
+복사 안 하면서도 읽기는 가능
+```
+
+**const의 의미**:
+
+```
+"이 함수는 이 변수를 변경하지 않겠다"는 약속
+→ 실수로 수정하는 것 방지
+→ 안전성 보장
+```
+
+---
+
+## 📝 Out Parameter 명명 규칙
+
+### Out 접두사
+
+**관례**:
+
+```cpp
+// Out Parameter는 이름 앞에 'Out' 붙이기
+bool GetData(
+    FVector& OutResult,      // Out: 결과를 담을 변수
+    FString& OutMessage      // Out: 메시지를 담을 변수
+)
+{
+    OutResult = FVector(1, 2, 3);
+    OutMessage = TEXT("Success");
+    return true;
+}
+```
+
+**왜 Out을 붙일까?**
+
+```
+코드를 읽는 사람이 쉽게 알 수 있음:
+"아, 이 변수는 함수가 값을 채워주는구나!"
+```
+
+---
+
+## 💻 실습 코드
+
+### 과제: 값 전달 vs 참조 전달 비교
+
+```cpp
+// 1. 일반 매개변수로 테스트 함수 생성
+void TestFunction(FVector Vec)  // 값 전달
+{
+    Vec.X = 100.0f;
+    Vec.Y = 999.0f;
+    Vec.Z = -50.0f;
+}
+
+void ADungeonEscapeCharacter::Interact()
+{
+    // 테스트 벡터 생성
+    FVector TestVec(1.0f, 1.0f, 1.0f);
+
+    // 변경 전 로그
+    UE_LOG(LogTemp, Warning, TEXT("Before: %s"),
+        *TestVec.ToString());
+
+    // 함수 호출
+    TestFunction(TestVec);
+
+    // 변경 후 로그
+    UE_LOG(LogTemp, Warning, TEXT("After: %s"),
+        *TestVec.ToString());
+}
+```
+
+---
+
+### 실행 결과 1: 값 전달
+
+```
+LogTemp: Warning: Before: X=1.000 Y=1.000 Z=1.000
+LogTemp: Warning: After: X=1.000 Y=1.000 Z=1.000
+
+→ 변경 안 됨! (복사본만 변경됨)
+```
+
+---
+
+### 참조로 변경
+
+```cpp
+// 2. 참조 매개변수로 변경
+void TestFunction(FVector& Vec)  // 참조 전달 (&)
+{
+    Vec.X = 100.0f;
+    Vec.Y = 999.0f;
+    Vec.Z = -50.0f;
+}
+
+// 호출 코드는 동일
+```
+
+---
+
+### 실행 결과 2: 참조 전달
+
+```
+LogTemp: Warning: Before: X=1.000 Y=1.000 Z=1.000
+LogTemp: Warning: After: X=100.000 Y=999.000 Z=-50.000
+
+→ 변경됨! (원본 직접 변경됨)
+```
+
+---
+
+## 🎯 SweepSingleByChannel 이해하기
+
+### 함수 시그니처 분석
+
+```cpp
+bool SweepSingleByChannel(
+    FHitResult& OutHit,              // Out Parameter! (&)
+    const FVector& Start,             // const 참조 (&)
+    const FVector& End,               // const 참조 (&)
+    const FQuat& Rot,                 // const 참조 (&)
+    ECollisionChannel TraceChannel,   // 값 전달
+    const FCollisionShape& CollisionShape,  // const 참조 (&)
+    ...
+);
+```
+
+---
+
+### 매개변수 종류별 분석
+
+### 1. OutHit (Out Parameter)
+
+```cpp
+FHitResult& OutHit  // 참조, const 아님!
+```
+
+**의미**:
+
+```
+이 변수를 함수가 채워줄 것!
+→ 충돌 정보를 여기에 저장
+→ 함수 호출 후 사용 가능
+```
+
+**왜 참조?**
+
+```
+충돌 정보를 반환하기 위해
+return은 bool로 성공/실패만 알림
+실제 데이터는 OutHit에!
+```
+
+---
+
+### 2. Start, End, Rot (const 참조)
+
+```cpp
+const FVector& Start
+const FVector& End
+const FQuat& Rot
+```
+
+**의미**:
+
+```
+이 변수들을 읽기만 함
+변경하지 않음 (const)
+```
+
+**왜 const 참조?**
+
+```
+성능: 큰 구조체 복사 안 함
+안전성: 실수로 변경 방지
+FVector, FQuat는 12~16바이트
+→ 참조로 전달하면 8바이트만 필요
+```
+
+---
+
+### 사용 예시
+
+```cpp
+void ADungeonEscapeCharacter::Interact()
+{
+    // 1. Start, End 준비 (const 참조로 전달될 것)
+    FVector Start = ...;
+    FVector End = ...;
+
+    // 2. OutHit 준비 (함수가 채울 것)
+    FHitResult HitResult;  // 빈 변수
+
+    // 3. Sweep 호출
+    bool bHit = GetWorld()->SweepSingleByChannel(
+        HitResult,  // 참조 전달 - 함수가 채움!
+        Start,      // const 참조 - 읽기만
+        End,        // const 참조 - 읽기만
+        ...
+    );
+
+    // 4. 결과 사용
+    if (bHit)
+    {
+        // HitResult가 채워져 있음!
+        AActor* HitActor = HitResult.GetActor();
+    }
+}
+```
+
+---
+
+## 🔑 핵심 개념 정리
+
+### 1. 값 전달 vs 참조 전달
+
+```
+값 전달:
+→ 복사본 생성
+→ 원본 안전
+→ 느림 (큰 데이터)
+
+참조 전달:
+→ 원본 직접 접근
+→ 원본 변경 가능
+→ 빠름 (주소만 전달)
+```
+
+---
+
+### 2. Out Parameter 패턴
+
+```cpp
+bool Function(
+    Type& OutResult  // 결과를 담을 변수
+)
+{
+    OutResult = ...;  // 함수가 채움
+    return true;      // 성공 여부
+}
+```
+
+**장점**:
+
+- 여러 값 반환 가능
+- 성공/실패 + 데이터 동시 전달
+
+---
+
+### 3. const 참조
+
+```cpp
+void Function(const Type& Param)
+```
+
+**언제 사용?**
+
+- 큰 구조체 전달 (성능)
+- 변경하지 않을 때 (안전성)
+- 읽기만 할 때
+
+---
+
+### 4. 명명 규칙
+
+```
+Out Parameter: OutXxx
+const 참조: 일반 이름
+일반 참조: 상황에 따라
+```
+
+---
+
+## 🎓 다음 강의 예고
+
+**드디어 Sweep 함수 호출!**
+
+```cpp
+void ADungeonEscapeCharacter::Interact()
+{
+    // 준비 완료:
+    ✅ FVector Start, End
+    ✅ FCollisionShape InteractionSphere
+    ✅ FHitResult 이해
+    ✅ 참조 매개변수 이해
+
+    // 다음에 할 것:
+    FHitResult HitResult;
+    bool bHit = GetWorld()->SweepSingleByChannel(
+        HitResult,           // Out Parameter
+        Start,               // const 참조
+        End,                 // const 참조
+        FQuat::Identity,     // 회전 (없음)
+        ECC_GameTraceChannel1,  // Interact 채널
+        InteractionSphere    // 구 모양
+    );
+
+    // 결과 처리
+    if (bHit)
+    {
+        AActor* HitActor = HitResult.GetActor();
+        // Collectable? Lock? 판별!
+    }
+}
+```
+
+---
+
+## 💭 초보자 Q&A
+
+**Q: 언제 값 전달, 언제 참조 전달을 사용하나요?**
+A:
+
+- **값 전달**: int, float, bool 같은 작은 타입
+- **참조 전달**: 구조체, 클래스 같은 큰 타입
+- **Out Parameter**: 함수가 값을 채워야 할 때
+
+**Q: const 참조는 언제 사용하나요?**
+A: 큰 데이터를 전달하지만 변경하지 않을 때! 성능 + 안전성 모두 확보.
+
+**Q: 참조와 포인터 중 뭐가 더 좋나요?**
+A:
+
+- 함수 매개변수: 참조가 더 쉽고 안전
+- 동적 메모리, null 필요: 포인터
+- 언리얼: 대부분 참조 사용
+
+**Q: Out Parameter는 왜 const가 아닌가요?**
+A: 함수가 그 변수를 변경(채우기)해야 하기 때문입니다! const면 변경 불가능해서 의미가 없습니다.
+
+**Q: return과 Out Parameter 중 뭐가 더 좋나요?**
+A:
+
+```cpp
+// 한 개만 반환: return이 깔끔
+FVector GetPosition() { return ...; }
+
+// 여러 개 반환: Out Parameter
+bool GetInfo(FVector& OutPos, float& OutHP)
+```
+
+**Q: 왜 Start, End는 const 참조인가요?**
+A:
+
+1. 성능: FVector 복사 안 함
+2. 안전성: 함수가 실수로 변경 못하게
+3. 의도 명확: "읽기만 한다"는 표시
+
+---

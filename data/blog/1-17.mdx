@@ -1,0 +1,571 @@
+---
+title: '재능 교환 -1'
+date: '2026-09-02'
+category: '풀스택/프로젝트 정리'
+tags: ['풀스택', '프로젝트 정리']
+draft: false
+summary: ''
+---
+
+# 무한 댓글 구현
+
+```jsx
+import React, { useMemo, useEffect, useState } from "react";
+import { AiOutlinePlusCircle } from "react-icons/ai";
+import { Link, useParams, useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
+import axios from "axios";
+import { toast } from "react-toastify";
+
+// Comment 컴포넌트는 각각의 댓글을 표시합니다.
+const Comment = ({ comment, onReplayClick, onDeleteComment }) => (
+  <div className="comment flex space-x-4 border-b border-border py-8">
+    {/* 댓글의 이미지가 있는 경우에는 해당 이미지를 표시합니다. */}
+    {comment && comment.imgUrl ? (
+      <img
+        src={comment.imgUrl}
+        alt="Avatar Preview"
+        className="h-[70px] w-[70px] rounded-full"
+      />
+    ) : (
+      // 댓글의 이미지가 없는 경우에는 기본 이미지를 표시합니다.
+      <img
+        src="/images/users/user.png"
+        alt="Avatar Preview"
+        className="h-[70px] w-[70px] rounded-full"
+      />
+    )}
+    <div>
+      {/* 댓글의 작성자 이름을 표시합니다. */}
+      <h4 className="font-primary text-lg font-medium capitalize">
+        {comment.userId}
+      </h4>
+      {/* 댓글의 작성일자를 표시하고, 답글 및 삭제 버튼을 제공합니다. */}
+      <p className="mt-2.5">
+        {new Date(comment.regDate).toLocaleString()}
+        {/* 답글 버튼을 클릭하면 onReplayClick 함수를 호출합니다. */}
+        <button
+          className="ml-4 text-primary"
+          onClick={() => onReplayClick(comment.id)}
+        >
+          Replay
+        </button>
+        {onDeleteComment && (
+          // 삭제 버튼을 클릭하면 onDeleteComment 함수를 호출합니다.
+          <button
+            type="button" // 폼 제출을 방지하기 위해 type을 명시합니다.
+            className="ml-4 text-red-500"
+            onClick={(e) => {
+              e.preventDefault(); // 폼 제출을 방지합니다.
+              console.log("Delete button clicked");
+              onDeleteComment(comment.id);
+            }}
+          >
+            Delete
+          </button>
+        )}
+      </p>
+      {/* 댓글의 내용을 표시합니다. */}
+      <p className="mt-5">{comment.content}</p>
+    </div>
+  </div>
+);
+
+// CommentSection 컴포넌트는 댓글과 답글을 관리하고 표시합니다.
+const CommentSection = ({
+  comments,
+  onReplayClick,
+  selectedCommentId,
+  showReplyInput,
+  replyContent,
+  setReplyContent,
+  handleCancelReply,
+  handleReplySubmit,
+  onDeleteComment,
+}) => (
+  <div className="comments">
+    {/* 댓글 섹션의 제목을 표시합니다. */}
+    <h3 className="h5 inline-block border-b-[3px] border-primary font-primary font-medium leading-8">
+      댓글
+    </h3>
+    {/* 각 댓글을 순회하면서 Comment 컴포넌트를 렌더링합니다. */}
+    {comments.map((comment) => (
+      <div key={comment.id}>
+        <Comment
+          comment={comment}
+          onReplayClick={onReplayClick}
+          onDeleteComment={onDeleteComment}
+        />
+        {/* 선택된 댓글이 있고, 답글 입력 상태인 경우에 답글을 작성할 수 있는 입력창을 표시합니다. */}
+        {selectedCommentId === comment.id && showReplyInput && (
+          <div>
+            {/* 답글을 입력할 수 있는 텍스트 에어리어를 표시합니다. */}
+            <textarea
+              cols="30"
+              rows="3"
+              value={replyContent}
+              onChange={(e) => setReplyContent(e.target.value)}
+              placeholder="답글을 입력하세요..."
+            />
+            {/* 답글 작성 취소 버튼 및 답글 작성 버튼을 표시합니다. */}
+            <button onClick={handleCancelReply}>취소</button>
+            <button onClick={() => handleReplySubmit(comment.id)}>
+              답글 작성
+            </button>
+          </div>
+        )}
+        {/* 해당 댓글의 답글을 재귀적으로 렌더링합니다. */}
+        {renderReplies(
+          comment.children,
+          onReplayClick,
+          selectedCommentId,
+          showReplyInput,
+          replyContent,
+          setReplyContent,
+          handleCancelReply,
+          handleReplySubmit,
+          onReplayClick
+        )}
+      </div>
+    ))}
+  </div>
+);
+
+// ReplayComment 컴포넌트는 답글을 표시합니다.
+const ReplayComment = ({ comment, onReplayClick, onDeleteComment }) => (
+  <div className="comment ml-3 flex space-x-4 border-b border-border py-8">
+    <img src="../images/icons/replay-arrow.svg" alt="commentArrow" />
+    {/* 답글의 이미지가 있는 경우에는 해당 이미지를 표시합니다. */}
+    {comment && comment.imgUrl ? (
+      <img
+        src={comment.imgUrl}
+        alt="Avatar Preview"
+        className="h-[70px] w-[70px] rounded-full"
+      />
+    ) : (
+      // 답글의 이미지가 없는 경우에는 기본 이미지를 표시합니다.
+      <img
+        src="/images/users/user.png"
+        alt="Avatar Preview"
+        className="h-[70px] w-[70px] rounded-full"
+      />
+    )}
+    <div>
+      {/* 답글의 작성자 이름을 표시합니다. */}
+      <h4 className="font-primary text-lg font-medium capitalize">
+        {comment.userId}
+      </h4>
+      {/* 답글의 작성일자를 표시하고, 답글 및 삭제 버튼을 제공합니다. */}
+      <p className="mt-2.5">
+        {new Date(comment.regDate).toLocaleString()}
+        {/* 답글 버튼을 클릭하면 onReplayClick 함수를 호출합니다. */}
+        <button
+          className="ml-4 text-primary"
+          onClick={() => onReplayClick(comment.id)}
+        >
+          Replay
+        </button>
+        {onDeleteComment && (
+          // 삭제 버튼을 클릭하면 onDeleteComment 함수를 호출합니다.
+          <button
+            type="button" // 폼 제출을 방지하기 위해 type을 명시합니다.
+            className="ml-4 text-red-500"
+            onClick={(e) => {
+              e.preventDefault(); // 폼 제출을 방지합니다.
+              console.log("Delete button clicked");
+              onDeleteComment(comment.id);
+            }}
+          >
+            Delete
+          </button>
+        )}
+      </p>
+      {/* 답글의 내용을 표시합니다. */}
+      <p className="mt-5">{comment.content}</p>
+    </div>
+  </div>
+);
+
+// renderReplies 함수는 답글들을 재귀적으로 렌더링합니다.
+const renderReplies = (
+  replies,
+  onReplayClick,
+  selectedCommentId,
+  showReplyInput,
+  replyContent,
+  setReplyContent,
+  handleCancelReply,
+  handleReplySubmit,
+  onDeleteComment
+) =>
+  replies &&
+  replies.length > 0 && (
+    <div className="ml-3">
+      {/* 각 답글을 순회하면서 ReplayComment 컴포넌트를 렌더링합니다. */}
+      {replies.map((reply) => (
+        <div key={reply.id}>
+          <ReplayComment
+            comment={reply}
+            onReplayClick={onReplayClick}
+            onDeleteComment={onDeleteComment}
+          />
+          {/* 선택된 답글이 있고, 답글 입력 상태인 경우에 답글을 작성할 수 있는 입력창을 표시합니다. */}
+          {selectedCommentId === reply.id && showReplyInput && (
+            <div>
+              {/* 답글을 입력할 수 있는 텍스트 에어리어를 표시합니다. */}
+              <textarea
+                cols="30"
+                rows="3"
+                value={replyContent}
+                onChange={(e) => setReplyContent(e.target.value)}
+                placeholder="답글을 입력하세요..."
+              />
+              {/* 답글 작성 취소 버튼 및 답글 작성 버튼을 표시합니다. */}
+              <button onClick={handleCancelReply}>취소</button>
+              <button onClick={() => handleReplySubmit(reply.id)}>
+                답글 작성
+              </button>
+            </div>
+          )}
+          {/* 해당 답글의 답글을 재귀적으로 렌더링합니다. */}
+          {renderReplies(
+            reply.children,
+            onReplayClick,
+            selectedCommentId,
+            showReplyInput,
+            replyContent,
+            setReplyContent,
+            handleCancelReply,
+            handleReplySubmit,
+            onDeleteComment
+          )}
+        </div>
+      ))}
+    </div>
+  );
+
+// NoticeDetailComponent 컴포넌트는 공지사항 세부 정보를 표시하고 관리합니다.
+const NoticeDetailComponent = () => {
+  // URL 파라미터에서 noticeId를 추출합니다.
+  const { noticeId } = useParams();
+  // 공지사항 정보를 저장할 상태 변수를 선언합니다.
+  const [notice, setNotice] = useState({});
+  // 댓글 정보를 저장할 상태 변수를 선언합니다.
+  const [comments, setComments] = useState([]);
+  // 새로운 댓글의 내용을 저장할 상태 변수를 선언합니다.
+  const [newCommentContent, setNewCommentContent] = useState("");
+  // 새로운 댓글의 부모 댓글 ID를 저장할 상태 변수를 선언합니다.
+  const [newCommentParentId, setNewCommentParentId] = useState("");
+  // 답글 입력 상태를 저장할 상태 변수를 선언합니다.
+  const [showReplyInput, setShowReplyInput] = useState(false);
+  // 답글 내용을 저장할 상태 변수를 선언합니다.
+  const [replyContent, setReplyContent] = useState("");
+  // 선택된 댓글 ID를 저장할 상태 변수를 선언합니다.
+  const [selectedCommentId, setSelectedCommentId] = useState(null);
+  // React Router의 useNavigate 훅을 사용하여 페이지 이동 함수를 받아옵니다.
+  const navigate = useNavigate();
+  // 사용자 정보를 Redux의 상태에서 가져옵니다.
+  const { user } = useSelector((state) => state.user);
+
+  // 페이지 로드 시, 공지사항 데이터와 댓글 데이터를 가져오기 위한 useEffect 훅을 사용합니다.
+  useEffect(() => {
+    // 공지사항 데이터를 가져오는 비동기 함수를 정의합니다.
+    const fetchNoticeData = async () => {
+      try {
+        // 서버에서 공지사항 데이터를 가져옵니다.
+        const response = await axios.get(
+          process.env.REACT_APP_SERVER + `/v1/notices/${noticeId}`
+        );
+        // 가져온 데이터를 상태에 저장합니다.
+        setNotice(response.data);
+        console.log(response.data);
+      } catch (error) {
+        console.error("데이터를 불러오는 중 에러 발생:", error);
+      }
+    };
+
+    // 댓글 데이터를 가져오는 비동기 함수를 정의합니다.
+    const fetchCommentData = async () => {
+      try {
+        // 서버에서 댓글 데이터를 가져옵니다.
+        const response = await axios.get(
+          process.env.REACT_APP_SERVER + `/v1/comment/${noticeId}`
+        );
+        // 가져온 데이터를 상태에 저장합니다.
+        setComments(response.data);
+      } catch (error) {
+        console.error("댓글을 불러오는 중 에러 발생:", error);
+      }
+    };
+
+    // 정의한 비동기 함수들을 실행합니다.
+    fetchNoticeData();
+    fetchCommentData();
+  }, [noticeId]);
+
+  // 공지사항 삭제를 처리하는 함수입니다.
+  const handleDeleteNotice = async () => {
+    try {
+      // 로컬 스토리지에서 액세스 토큰을 가져옵니다.
+      const accessToken = localStorage.getItem("accessToken");
+
+      // 사용자가 공지사항 작성자인 경우에만 삭제를 허용합니다.
+      if (user && user.id === notice.writer) {
+        // 서버에 공지사항 삭제를 요청합니다.
+        const response = await axios.delete(
+          process.env.REACT_APP_SERVER + `/v1/notices/${noticeId}`,
+          {
+            headers: {
+              Authorization: accessToken,
+            },
+          }
+        );
+
+        console.log(response.data);
+        // 성공 메시지를 토스트로 표시하고, 목록 페이지로 이동합니다.
+        toast.success(response.data.returnMessage);
+        navigate("/notice");
+      } else {
+        // 작성자가 아닌 경우 삭제 권한이 없음을 알리는 에러 메시지를 토스트로 표시합니다.
+        toast.error("글을 삭제할 권한이 없습니다.");
+      }
+    } catch (error) {
+      console.error("글 삭제 중 에러 발생:", error);
+      // 에러 메시지를 토스트로 표시합니다.
+      toast.error(error.response.data.message);
+    }
+  };
+
+```
+
+```jsx
+  // 댓글 작성을 처리하는 함수입니다.
+  const handleCommentSubmit = async (e) => {
+    // 폼 제출의 기본 동작을 막습니다.
+    e.preventDefault();
+
+    try {
+      // 로컬 스토리지에서 액세스 토큰을 가져옵니다.
+      const accessToken = localStorage.getItem("accessToken");
+
+      // 서버에 새로운 댓글 등록을 요청합니다.
+      const response = await axios.post(
+        process.env.REACT_APP_SERVER + `/v1/comment/register`,
+        {
+          noticeId: noticeId,
+          parentId: newCommentParentId,
+          writer: user.id,
+          content: newCommentContent,
+        },
+        {
+          withCredentials: true,
+          headers: {
+            Authorization: accessToken,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      // 댓글 등록 후, 업데이트된 댓글 목록을 가져옵니다.
+      const updatedComments = await axios.get(
+        process.env.REACT_APP_SERVER + `/v1/comment/${noticeId}`
+      );
+      // 업데이트된 댓글 목록으로 상태를 업데이트합니다.
+      setComments(updatedComments.data);
+
+      // 댓글 작성 폼을 초기화합니다.
+      setNewCommentContent("");
+      setNewCommentParentId("");
+    } catch (error) {
+      console.error("댓글을 등록하는 중 에러 발생:", error);
+    }
+  };
+
+  // 답글 작성 버튼을 클릭했을 때 처리하는 함수입니다.
+  const handleReplayClick = (commentId) => {
+    // 선택된 댓글 ID와 답글 입력 상태를 업데이트하여 답글 입력 창을 표시합니다.
+    setSelectedCommentId(commentId);
+    setShowReplyInput(true);
+    setReplyContent("");
+  };
+
+  // 답글 작성 취소 버튼을 클릭했을 때 처리하는 함수입니다.
+  const handleCancelReply = () => {
+    // 선택된 댓글 ID와 답글 입력 상태를 초기화하여 답글 입력 창을 숨깁니다.
+    setSelectedCommentId(null);
+    setShowReplyInput(false);
+    setReplyContent("");
+  };
+
+  // 답글 작성을 처리하는 함수입니다.
+  const handleReplySubmit = async (parentId) => {
+    try {
+      // 로컬 스토리지에서 액세스 토큰을 가져옵니다.
+      const accessToken = localStorage.getItem("accessToken");
+
+      // 서버에 답글 등록을 요청합니다.
+      const response = await axios.post(
+        process.env.REACT_APP_SERVER + `/v1/comment/register`,
+        {
+          noticeId: noticeId,
+          parentId: parentId,
+          writer: user.id,
+          content: replyContent,
+        },
+        {
+          withCredentials: true,
+          headers: {
+            Authorization: accessToken,
+          },
+        }
+      );
+
+      console.log("Notice ID:", noticeId);
+      // 답글 등록 후, 업데이트된 댓글 목록을 가져옵니다.
+      const updatedComments = await axios.get(
+        process.env.REACT_APP_SERVER + `/v1/comment/${noticeId}`
+      );
+      // 업데이트된 댓글 목록으로 상태를 업데이트합니다.
+      setComments(updatedComments.data);
+
+      // 답글 입력 창을 초기화합니다.
+      setShowReplyInput(false);
+      setReplyContent("");
+    } catch (error) {
+      console.error("댓글을 등록하는 중 에러 발생:", error);
+    }
+  };
+
+  // 댓글 삭제를 처리하는 함수입니다.
+  const handleDeleteComment = async (commentId) => {
+    try {
+      // 로컬 스토리지에서 액세스 토큰을 가져옵니다.
+      const accessToken = localStorage.getItem("accessToken");
+
+      // 서버에 댓글 삭제를 요청합니다.
+      const response = await axios.delete(
+        process.env.REACT_APP_SERVER + `/v1/comment/${commentId}`,
+        {
+          headers: {
+            Authorization: accessToken,
+          },
+        }
+      );
+
+      // 삭제 성공 메시지를 토스트로 표시합니다.
+      toast.success(response.data.returnMessage);
+
+      // 삭제 후, 업데이트된 댓글 목록을 가져옵니다.
+      const updatedComments = await axios.get(
+        process.env.REACT_APP_SERVER + `/v1/comment/${noticeId}`
+      );
+      // 업데이트된 댓글 목록으로 상태를 업데이트합니다.
+      setComments(updatedComments.data);
+    } catch (error) {
+      console.error("댓글 삭제 중 에러 발생:", error);
+      // 에러 메시지를 토스트로 표시합니다.
+      toast.error(error.response.data.message);
+    }
+  };
+
+  // NoticeDetailComponent 컴포넌트의 JSX를 반환합니다.
+  return (
+    <section className="section blog-single">
+      <div className="container">
+        <div className="row justify-center">
+          <div className="lg:col-10">
+            {/* 공지사항의 이미지를 표시합니다. */}
+            <img className="rounded-xl" src="images/blog-single.png" alt="" />
+          </div>
+          <div className="mt-10 max-w-[810px] lg:col-9">
+            <div className="mb-4 flex items-center justify-between">
+              {/* 공지사항의 제목을 표시합니다. */}
+              <h1 className="h2">{notice.title}</h1>
+              {/* 작성자가 로그인한 사용자인 경우, 글 수정 및 삭제 버튼을 표시합니다. */}
+              {user && user.id === notice.writer && (
+                <div className="flex space-x-2">
+                  {/* 글 수정 버튼을 클릭하면 해당 글의 수정 페이지로 이동합니다. */}
+                  <Link to={`/notice-update/${notice.id}`}>
+                    <button className="btn btn-outline-primary btn-sm">
+                      글 수정
+                    </button>
+                  </Link>
+                  {/* 글 삭제 버튼을 클릭하면 handleDeleteNotice 함수를 호출합니다. */}
+                  <button
+                    className="btn btn-outline-primary btn-sm"
+                    onClick={handleDeleteNotice}
+                  >
+                    글 삭제
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="mb-5 mt-6 flex items-center space-x-3">
+              {/* 작성자의 프로필 이미지를 표시합니다. */}
+              <img
+                src="/images/users/user.png"
+                alt="user-avatar"
+                className="h-8 w-8 rounded-full"
+              />
+              {/* 작성자의 이름을 표시합니다. */}
+              <span className="text-gray-500">{notice.writerName}</span>
+              {/* 작성일자를 표시합니다. */}
+              <span className="text-gray-500">
+                {new Date(notice.regDate).toLocaleString()}
+              </span>
+            </div>
+            {/* 공지사항의 내용을 표시합니다. */}
+            <div dangerouslySetInnerHTML={{ __html: notice.content }} />
+          </div>
+        </div>
+        {/* CommentSection 컴포넌트를 사용하여 댓글 섹션을 표시합니다. */}
+        <CommentSection
+          comments={comments}
+          onReplayClick={handleReplayClick}
+          selectedCommentId={selectedCommentId}
+          showReplyInput={showReplyInput}
+          replyContent={replyContent}
+          setReplyContent={setReplyContent}
+          handleCancelReply={handleCancelReply}
+          handleReplySubmit={handleReplySubmit}
+          onDeleteComment={handleDeleteComment}
+        />
+        {/* 사용자가 로그인한 경우에만 댓글 작성 폼을 표시합니다. */}
+        {user && (
+          <div className="mt-10 max-w-[810px] lg:col-9">
+            {/* 댓글 작성 폼을 표시합니다. */}
+            <form onSubmit={handleCommentSubmit}>
+              <div className="mb-6">
+                <h3 className="h4">댓글 작성</h3>
+              </div>
+              {/* 댓글 내용을 입력하는 텍스트 에어리어를 표시합니다. */}
+              <div className="mb-4">
+                <textarea
+                  cols="30"
+                  rows="5"
+                  value={newCommentContent}
+                  onChange={(e) => setNewCommentContent(e.target.value)}
+                  placeholder="댓글을 작성하세요..."
+                  className="w-full p-4 border border-border rounded-md"
+                  required
+                />
+              </div>
+              {/* 댓글 작성 버튼을 표시합니다. */}
+              <button
+                type="submit"
+                className="btn btn-primary btn-lg flex items-center"
+              >
+                {/* 댓글 작성 아이콘을 표시합니다. */}
+                <AiOutlinePlusCircle className="mr-2" />
+                댓글 작성
+              </button>
+            </form>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+};
+
+export default NoticeDetailComponent;
+```

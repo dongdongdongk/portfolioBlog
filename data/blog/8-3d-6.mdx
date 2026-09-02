@@ -1,0 +1,3965 @@
+---
+title: '섹션 8: 제트팩 저니 - 제트팩을 이용한 3D 플랫폼 게임 - 6'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 🎮 State Machine으로 애니메이션 전환 관리하기 }
+
+## 🎯 이번 강의 목표
+
+기존에 사용하던 "Blend Poses by bool/enum" 노드 대신, **State Machine(상태 머신)**을 활용해 더 체계적으로 애니메이션을 관리합니다.
+
+- 이동(Locomotion)과 비행(Flying) 애니메이션을 하나의 State Machine으로 통합
+- 전환 규칙(Transition Rule)을 사용해 상태 간 자연스러운 전환
+- 애니메이션 그래프를 깔끔하게 정리
+
+---
+
+## 💡 핵심 개념
+
+### State Machine이란?
+
+```
+상태 머신(State Machine)
+  ↓
+캐릭터의 "상태"를 관리하는 시스템
+  ├─ 상태: "걷기", "달리기", "점프", "비행" 등
+  ├─ 전환: 상태 A → 상태 B로 언제 바뀔지 규칙 설정
+  └─ 장점: 복잡한 애니메이션을 체계적으로 관리
+```
+
+**왜 State Machine을 사용하나요?**
+
+- "Blend Poses" 노드는 간단하지만, 애니메이션이 많아지면 그래프가 복잡해짐
+- State Machine은 각 상태를 독립적으로 관리하고, 전환 규칙을 시각적으로 확인 가능
+- 유지보수와 확장이 훨씬 쉬움
+
+---
+
+## 📋 현재 상황 파악
+
+### Before: 기존 구조
+
+```
+Anim Graph
+  ├─ Cached Locomotion (캐시된 이동 상태 머신)
+  ├─ Flying (비행 상태 머신)
+  └─ Blend Poses by Movement Mode (이동 모드에 따라 블렌딩)
+       ↓
+     Output Pose
+```
+
+**문제점:**
+
+- 이동과 비행을 별도로 관리
+- 블렌딩 노드로 섞어주는 구조
+- 확장 시 그래프가 복잡해질 가능성
+
+---
+
+## 🔧 새로운 구조 만들기
+
+### 1단계: 새로운 State Machine 생성
+
+```
+Anim Graph에서
+  ├─ 우클릭 → Add New State Machine
+  └─ 이름: "Movement" (전체 움직임 관리)
+```
+
+**Movement State Machine의 역할:**
+
+```
+Movement
+  ├─ Thruster Inactive (추진기 꺼짐 = 일반 이동)
+  └─ Thruster Active (추진기 켜짐 = 비행)
+```
+
+### 2단계: 기존 노드 정리
+
+```
+삭제할 것:
+  ├─ Blend Poses by Movement Mode 노드
+  └─ Flying State Machine (여기서)
+
+변경할 것:
+  └─ Movement 노드를 Output Pose에 직접 연결
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380765/notion-blog/_/_/_5_/_8_-_3D_-_6/image.png)
+
+---
+
+## 🎨 State Machine 내부 구성
+
+### Thruster Inactive 상태 (추진기 꺼짐)
+
+```
+1. Locomotion State Machine 캐싱
+   Anim Graph → Locomotion 우클릭
+     ↓
+   "New Save Cached Pose" 선택
+     ↓
+   이름: "Cached Locomotion"
+```
+
+**캐싱(Caching)이란?**
+
+- 애니메이션 데이터를 임시 저장해두는 것
+- 같은 애니메이션을 여러 곳에서 재사용할 때 성능 향상
+- 계산을 한 번만 하고 결과를 여러 번 사용
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380761/notion-blog/_/_/_5_/_8_-_3D_-_6/image_1.png)
+
+```
+2. Thruster Inactive 상태에서 사용
+   상태 더블클릭 → 내부 진입
+     ↓
+   우클릭 → "Use Cached Pose"
+     ↓
+   "Cached Locomotion" 선택
+     ↓
+   Result에 연결
+```
+
+### Thruster Active 상태 (추진기 켜짐)
+
+```
+1. Flying State Machine 캐싱
+   Anim Graph → Flying 우클릭
+     ↓
+   "New Save Cached Pose" 선택
+     ↓
+   이름: "Cached Flying"
+
+2. Thruster Active 상태에서 사용
+   상태 더블클릭 → 내부 진입
+     ↓
+   우클릭 → "Use Cached Pose"
+     ↓
+   "Cached Flying" 선택
+     ↓
+   Result에 연결
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380763/notion-blog/_/_/_5_/_8_-_3D_-_6/image_2.png)
+
+---
+
+## ⚙️ 전환 규칙 설정
+
+### Inactive → Active 전환 (일반 이동 → 비행)
+
+```
+Movement State Machine에서
+  ├─ Thruster Inactive 상태 드래그
+  └─ Thruster Active 상태에 연결
+       ↓
+     전환 화살표 생성
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380764/notion-blog/_/_/_5_/_8_-_3D_-_6/image_3.png)
+
+**전환 규칙 더블클릭:**
+
+```
+노드 구성:
+  Movement Mode (변수)
+    ↓
+  Equal (Enum) 노드
+    ├─ 입력: Movement Mode 값
+    ├─ 비교 대상: Flying
+    └─ 출력: Bool (참/거짓)
+         ↓
+       Result (Can Enter Transition)
+```
+
+**Equal (Enum) 노드란?**
+
+- 두 개의 열거형(Enum) 값을 비교하는 노드
+- 입력값 == 비교값이면 `True` 반환
+- 이동 모드가 "Flying"과 같으면 전환 허용
+
+**동작 원리:**
+
+```
+Movement Mode == Flying?
+  ├─ Yes → True → 비행 상태로 전환
+  └─ No → False → 전환 안 함
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380764/notion-blog/_/_/_5_/_8_-_3D_-_6/image_4.png)
+
+### Active → Inactive 전환 (비행 → 일반 이동)
+
+```
+Movement State Machine에서
+  ├─ Thruster Active 상태 드래그
+  └─ Thruster Inactive 상태에 연결
+       ↓
+     반대 방향 전환 화살표 생성
+```
+
+**전환 규칙 더블클릭:**
+
+```
+노드 구성 1: 걷는 중인지 확인
+  Movement Mode
+    ↓
+  Equal (Enum)
+    ├─ 비교 대상: Walking
+    └─ 출력: Bool
+
+노드 구성 2: 떨어지는 중인지 확인
+  Movement Mode
+    ↓
+  Equal (Enum)
+    ├─ 비교 대상: Falling
+    └─ 출력: Bool
+
+두 결과를 OR 노드로 결합
+  Bool 1 (Walking 확인)
+    ↓
+  OR Bool 노드
+    ├─ 입력 A: Walking 확인 결과
+    ├─ 입력 B: Falling 확인 결과
+    └─ 출력: Bool
+         ↓
+       Result
+```
+
+**OR Bool 노드란?**
+
+```
+논리 OR 연산자
+  ├─ A 또는 B 중 하나라도 True면 → True
+  ├─ A와 B 모두 False일 때만 → False
+  └─ 예: 걷기(True) 또는 떨어지기(False) = True
+```
+
+**AND Bool 노드와의 차이:**
+
+```
+AND (그리고)
+  └─ A와 B 모두 True일 때만 → True
+
+OR (또는)
+  └─ A 또는 B 중 하나만 True여도 → True
+```
+
+**동작 원리:**
+
+```
+Walking == True 또는 Falling == True?
+  ├─ Yes → True → 일반 이동 상태로 전환
+  └─ No → False → 비행 상태 유지
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380764/notion-blog/_/_/_5_/_8_-_3D_-_6/image_5.png)
+
+---
+
+## 📊 최종 구조
+
+### Anim Graph 전체 흐름
+
+```
+Movement State Machine
+  ├─ Thruster Inactive
+  │    └─ Use Cached Pose: Locomotion
+  │
+  └─ Thruster Active
+       └─ Use Cached Pose: Flying
+
+전환 규칙:
+  Inactive → Active
+    └─ Movement Mode == Flying
+
+  Active → Inactive
+    └─ Movement Mode == Walking OR Falling
+```
+
+### State Machine 계층 구조
+
+```
+Movement (최상위 State Machine)
+  ├─ State: Thruster Inactive
+  │    └─ Contains: Locomotion State Machine (cached)
+  │
+  └─ State: Thruster Active
+       └─ Contains: Flying State Machine (cached)
+```
+
+---
+
+## ✅ 테스트 및 확인
+
+### 테스트 항목
+
+```
+1. 기본 이동
+   ├─ W/A/S/D 키로 걷기
+   └─ 애니메이션 정상 작동 확인
+
+2. 점프
+   ├─ Space 바 점프
+   └─ Falling 애니메이션 확인
+
+3. 비행
+   ├─ 추진기 활성화 (이전 설정한 키)
+   └─ Flying 애니메이션으로 전환 확인
+
+4. 비행 → 착지
+   ├─ 추진기 비활성화
+   └─ Locomotion으로 복귀 확인
+```
+
+### 컨트롤러 테스트
+
+```
+키보드/마우스 외에도
+  ├─ 게임패드로 테스트
+  └─ 모든 입력에서 정상 작동 확인
+```
+
+---
+
+## 🧹 작업 공간 정리
+
+### 탭 정리하기
+
+```
+문제점:
+  └─ State Machine 안팎을 들어갔다 나올 때마다 새 탭 생성
+       ↓
+     탭이 너무 많아져 복잡함
+
+해결 방법:
+  탭 우클릭
+    ↓
+  "Close All But Anim Graph and Event Graph"
+    ↓
+  필요한 탭만 남기고 모두 닫기
+```
+
+### Anim Graph 다시 열기
+
+```
+탭을 닫았을 때:
+  Animation Graph
+    ↓
+  Default Shared Group
+    ↓
+  Anim Graph 더블클릭
+    ↓
+  다시 열림
+```
+
+---
+
+## 📝 핵심 정리
+
+### State Machine vs Blend Poses 비교
+
+| 항목          | Blend Poses   | State Machine    |
+| ------------- | ------------- | ---------------- |
+| **복잡도**    | 간단          | 초기 설정 복잡   |
+| **가독성**    | 많아지면 복잡 | 체계적           |
+| **확장성**    | 어려움        | 쉬움             |
+| **사용 시기** | 단순 블렌딩   | 복잡한 상태 관리 |
+
+### 언제 무엇을 사용할까?
+
+```
+Blend Poses 사용:
+  ├─ 2-3개의 간단한 애니메이션 블렌딩
+  ├─ Bool 값에 따른 단순 전환
+  └─ 추가 확장 계획 없음
+
+State Machine 사용:
+  ├─ 여러 상태가 복잡하게 연결됨
+  ├─ 전환 조건이 다양함
+  ├─ 향후 상태 추가 가능성
+  └─ 체계적 관리 필요
+```
+
+### 주요 노드 정리
+
+```
+Equal (Enum)
+  ├─ 기능: 열거형 값 비교
+  ├─ 입력: Enum 변수
+  ├─ 출력: Bool (같으면 True)
+  └─ 용도: 전환 조건 판단
+
+OR Bool
+  ├─ 기능: 논리 OR 연산
+  ├─ 입력: Bool A, Bool B
+  ├─ 출력: Bool (하나라도 True면 True)
+  └─ 용도: 여러 조건 중 하나만 만족해도 전환
+
+AND Bool
+  ├─ 기능: 논리 AND 연산
+  ├─ 입력: Bool A, Bool B
+  ├─ 출력: Bool (모두 True일 때만 True)
+  └─ 용도: 모든 조건을 만족해야 전환
+
+Save Cached Pose
+  ├─ 기능: 애니메이션 결과 저장
+  ├─ 용도: 한 번 계산한 애니메이션 재사용
+  └─ 장점: 성능 최적화
+
+Use Cached Pose
+  ├─ 기능: 저장된 애니메이션 불러오기
+  ├─ 용도: 캐시된 포즈 사용
+  └─ 연결: Save Cached Pose와 짝
+```
+
+---
+
+## ⚠️ 주의사항
+
+```
+1. 캐싱 주의
+   ├─ Save와 Use는 반드시 짝으로 사용
+   ├─ 캐시 이름을 명확하게 설정
+   └─ 불필요한 캐싱은 메모리 낭비
+
+2. 전환 규칙 검증
+   ├─ 양방향 전환 모두 설정했는지 확인
+   ├─ 전환 조건이 명확한지 검토
+   └─ 무한 루프 방지
+
+3. State Machine 네이밍
+   ├─ 상태 이름은 명확하게 (Idle, Walking, Flying 등)
+   ├─ 전환 규칙도 이름 지정 가능
+   └─ 유지보수를 위해 일관된 네이밍 규칙
+
+4. 탭 관리
+   ├─ 작업 후 불필요한 탭 정리
+   ├─ Anim Graph/Event Graph는 유지
+   └─ 필요할 때 다시 열기 가능
+
+5. 테스트 필수
+   ├─ 구조 변경 후 반드시 테스트
+   ├─ 모든 전환 경로 확인
+   └─ 키보드/컨트롤러 모두 테스트
+```
+
+---
+
+## 🎓 학습 포인트
+
+### 설계 철학
+
+```
+강사의 선호:
+  "상태가 있을 때는 State Machine을 사용"
+
+이유:
+  ├─ 명확한 상태 구분
+  ├─ 전환 규칙 시각화
+  ├─ 확장성과 유지보수성
+  └─ 그래프 가독성
+```
+
+### 실무 팁
+
+```
+1. 초기 설계
+   ├─ 필요한 상태 먼저 정의
+   ├─ 전환 경로 설계
+   └─ State Machine으로 구현
+
+2. 복잡도 증가 시
+   ├─ 계층적 State Machine 활용
+   ├─ 캐싱으로 성능 최적화
+   └─ 명확한 네이밍으로 관리
+
+3. 디버깅
+   ├─ State Machine 창에서 현재 상태 확인 가능
+   ├─ 전환이 안 되면 규칙 확인
+   └─ 변수값 출력으로 디버깅
+```
+
+---
+
+## 🚀 다음 단계
+
+```
+현재 완성:
+  ├─ Movement State Machine (이동/비행 통합)
+  ├─ 전환 규칙 설정
+  └─ 깔끔한 Anim Graph
+
+다음 강의 예상:
+  ├─ 추가 애니메이션 상태 (공격, 상호작용 등)
+  ├─ 애니메이션 블렌딩 세밀 조정
+  └─ State Machine 고급 기능
+```
+
+---
+
+## 💡 핵심 요약
+
+```
+State Machine 활용
+  ↓
+체계적인 애니메이션 관리
+  ↓
+  ├─ 상태: 추진기 켜짐/꺼짐
+  ├─ 캐싱: Locomotion/Flying
+  └─ 전환: Movement Mode 기반
+       ↓
+     깔끔하고 확장 가능한 구조 완성
+```
+
+**이번 강의의 핵심:**
+
+- Blend 노드보다 State Machine이 복잡해 보이지만, 장기적으로 관리가 쉬움
+- 전환 규칙을 사용해 조건에 따른 자동 전환
+- 캐싱을 통해 같은 애니메이션을 효율적으로 재사용
+- 체계적인 구조로 향후 확장 준비 완료
+
+# { 🔊 애니메이션 노티파이로 발자국 소리 추가하기 }
+
+## 🎯 이번 강의 목표
+
+캐릭터의 움직임에 생동감을 더하기 위해 **발자국 소리**를 구현합니다.
+
+- 걷기/달리기 애니메이션에 발소리 추가
+- 점프 시작/착지 소리 추가
+- Animation Notify 시스템 활용
+
+---
+
+## 💡 핵심 개념: Animation Notify
+
+### Animation Notify(애니메이션 노티파이)란?
+
+```
+Animation Notify
+  ↓
+애니메이션의 특정 시점에 "이벤트"를 발생시키는 마커
+  ├─ 용도: 사운드 재생, 파티클 생성, 함수 호출 등
+  ├─ 위치: 애니메이션 타임라인에 배치
+  └─ 동작: 애니메이션이 해당 지점에 도달하면 자동 실행
+```
+
+**왜 필요한가요?**
+
+- 애니메이션과 사운드를 정확히 동기화
+- 발이 땅에 닿는 순간에만 소리 재생
+- 코드 없이 애니메이션 에디터에서 직접 설정 가능
+
+---
+
+## 📋 준비물 확인
+
+### 사운드 에셋 위치
+
+```
+Assets → Sounds
+  ├─ Footsteps 폴더
+  │    ├─ 개별 발자국 사운드들
+  │    └─ MS_Footsteps (메타 사운드)
+  │
+  └─ Jump 폴더
+       └─ MS_Jump (점프 사운드)
+```
+
+**메타 사운드(Meta Sound)란?**
+
+- 여러 사운드를 조합한 시스템
+- 랜덤하게 사운드 선택 + 음높이 변화
+- 같은 소리가 반복되어도 자연스러움
+
+---
+
+## 🚶 걷기 애니메이션에 발자국 추가
+
+### 1단계: 애니메이션 열기
+
+```
+경로:
+  Assets → Kick → Animations
+    ↓
+  Kick_Walk_Fwd (앞으로 걷기) 더블클릭
+```
+
+### 2단계: Notify Track 확인
+
+```
+애니메이션 에디터 하단
+  ├─ Timeline (타임라인)
+  └─ Notifies 섹션
+       └─ Notify Track (알림 트랙)
+```
+
+**Notify Track이란?**
+
+```
+Notify Track (알림 트랙)
+  ↓
+애니메이션에 노티파이를 배치하는 레이어
+  ├─ 기본: 1개 트랙 제공
+  ├─ 추가 가능: 트랙 드롭다운 → "Insert Notify Track"
+  └─ 삭제: 트랙 선택 → "Remove Notify Track"
+```
+
+**여러 트랙을 사용하는 이유:**
+
+- 소리, 파티클, 커스텀 이벤트 등을 구분해서 관리
+- 가독성 향상
+- 편집 용이
+
+### 3단계: 첫 번째 발자국 노티파이 추가
+
+```
+1. 타임라인에서 발이 땅에 닿는 순간 찾기
+   Shift + 드래그로 재생 헤드 이동
+     ↓
+   왼발이 땅에 닿는 지점 확인
+
+2. Notify Track에서 우클릭
+     ↓
+   Add Notify → Play Sound
+     ↓
+   깃발 모양 마커 생성
+
+3. 마커 위치 조정
+   ├─ 클릭 + 드래그로 이동
+   └─ Shift + 드래그로 정밀 조정
+```
+
+**Play Sound Notify란?**
+
+- 엔진에 내장된 노티파이
+- 사운드 재생 전용
+- 가장 자주 사용되는 노티파이
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380765/notion-blog/_/_/_5_/_8_-_3D_-_6/image_6.png)
+
+### 4단계: 사운드 할당
+
+```
+Details 패널 (마커 선택 시)
+  ├─ Sound 항목 클릭
+  │    ↓
+  │  MS_Footsteps 검색
+  │    ↓
+  │  선택 후 왼쪽 화살표(←) 클릭
+  │
+  └─ 사운드 자동 할당 완료
+```
+
+### 5단계: 두 번째 발자국 추가
+
+```
+1. 오른발이 땅에 닿는 지점으로 스크럽
+   (애니메이션 중간쯤)
+
+2. 우클릭 → Add Notify → Play Sound
+   ├─ 이전에 선택한 MS_Footsteps 자동 할당
+   └─ 다른 사운드로 변경 가능
+
+3. 재생(▶) 버튼으로 확인
+   두 발자국 소리가 정확한 타이밍에 재생되는지 체크
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380765/notion-blog/_/_/_5_/_8_-_3D_-_6/image_7.png)
+
+### 6단계: 위치 미세 조정
+
+```
+재생하면서 확인:
+  ├─ 발이 땅에 닿는 순간과 소리가 일치하는지
+  ├─ 너무 빠르거나 느리면 마커 이동
+  └─ 자연스러울 때까지 반복 조정
+```
+
+---
+
+## 🏃 달리기 애니메이션에 발자국 추가
+
+### 문제 상황
+
+```
+현재:
+  ├─ 걷기 애니메이션: 발자국 소리 O
+  └─ 달리기 애니메이션: 발자국 소리 X
+
+Blend Space에서:
+  ├─ 천천히 이동: 걷기 애니메이션 재생 → 소리 들림
+  ├─ 중간 속도: 걷기 + 달리기 블렌드 → 소리 약간 들림
+  └─ 빠르게 이동: 달리기 애니메이션 재생 → 소리 안 들림
+```
+
+### 해결: 달리기 애니메이션에 노티파이 추가
+
+```
+1. Kick_Run_Fwd 애니메이션 열기
+   Assets → Kick → Animations → Kick_Run_Fwd
+
+2. Footsteps Notify Track에 노티파이 추가
+   ├─ 우클릭 → Add Notify → Play Sound
+   ├─ MS_Footsteps 선택
+   └─ 발이 땅에 닿는 두 지점에 배치
+
+3. 재생 + 조정 반복
+   달리기 리듬에 맞춰 자연스럽게 위치 조정
+```
+
+**타임랩스 작업:**
+
+- 강의에서는 미세 조정 과정을 빠르게 진행
+- 실제로는 여러 번 재생하며 위치 조정 필요
+
+---
+
+## 🦘 점프 애니메이션에 소리 추가
+
+### 착지 사운드 (Jump End)
+
+```
+1. 애니메이션 열기
+   ABP_Kick → Locomotion → Jump_End
+
+2. Notify Track 2개 생성 및 이름 지정
+   ├─ Track 1 이름: "Footstep 1"
+   └─ Track 2 이름: "Footstep 2"
+```
+
+**왜 트랙을 나눴나요?**
+
+- 왼발/오른발 구분
+- 관리 편의성
+- 필수는 아니지만 정리에 도움
+
+```
+3. 첫 번째 착지 소리
+   Footstep 1 트랙에서
+     ├─ 우클릭 → Add Notify → Play Sound
+     ├─ MS_Footsteps 선택
+     └─ 첫 발이 땅에 닿는 지점에 배치
+
+4. 두 번째 착지 소리
+   Footstep 2 트랙에서
+     ├─ 우클릭 → Add Notify → Play Sound
+     ├─ MS_Footsteps 선택
+     └─ 두 번째 발이 땅에 닿는 지점에 배치
+
+5. 재생 및 조정
+   착지 타이밍과 소리가 정확히 맞는지 확인
+```
+
+### 점프 시작 사운드 (Jump Start)
+
+```
+1. 애니메이션 열기
+   Jump_Start 애니메이션
+
+2. 중요: 애니메이션 시작 부분 잘림 확인
+   ├─ Jump Start 애니메이션 전체를 재생하지 않음
+   ├─ 시작 부분이 잘려서 사용됨
+   └─ 노티파이를 너무 앞쪽에 배치하면 재생 안 됨
+
+3. 노티파이 추가
+   우클릭 → Add Notify → Play Sound
+```
+
+```
+4. 점프 사운드 할당
+   Details 패널에서
+     ├─ Sound 선택
+     ├─ Assets → Sounds → Jump
+     ├─ MS_Jump 선택
+     └─ 왼쪽 화살표(←) 클릭으로 할당
+
+5. 위치 조정
+   ├─ 발이 땅에서 떨어지는 순간에 배치
+   ├─ 잘린 부분을 고려해 충분히 뒤쪽에 배치
+   └─ 게임에서 테스트하며 조정
+```
+
+---
+
+## ✅ 테스트 및 최적화
+
+### 레벨에서 테스트
+
+```
+1. 걷기 테스트
+   ├─ W/A/S/D로 천천히 이동
+   └─ 발자국 소리 확인
+
+2. 달리기 테스트
+   ├─ 빠르게 이동
+   └─ 달리기 발자국 소리 확인
+
+3. 점프 테스트
+   ├─ Space 바로 점프
+   ├─ 점프 시작 소리 확인
+   └─ 착지 소리 확인
+
+4. 공중 낙하 테스트
+   ├─ 높은 곳에서 떨어지기
+   └─ 착지 소리 확인
+```
+
+### 예상치 못한 발견
+
+```
+점프 애니메이션에서:
+  ├─ Jump Start의 점프 사운드가
+  ├─ Falling 애니메이션 시작 시에도 재생됨
+  └─ 강사 평가: "이것도 괜찮네요, 멋진 것 같아요"
+```
+
+**이유:**
+
+- 애니메이션 전환 시 노티파이도 함께 실행
+- 자연스럽게 느껴지면 그대로 유지 가능
+
+---
+
+## 📊 완성된 구조
+
+### 애니메이션별 노티파이 정리
+
+```
+Kick_Walk_Fwd (걷기)
+  └─ Footsteps Track
+       ├─ Play Sound: MS_Footsteps (왼발)
+       └─ Play Sound: MS_Footsteps (오른발)
+
+Kick_Run_Fwd (달리기)
+  └─ Footsteps Track
+       ├─ Play Sound: MS_Footsteps (왼발)
+       └─ Play Sound: MS_Footsteps (오른발)
+
+Jump_Start (점프 시작)
+  └─ Notify Track
+       └─ Play Sound: MS_Jump
+
+Jump_End (착지)
+  ├─ Footstep 1 Track
+  │    └─ Play Sound: MS_Footsteps
+  └─ Footstep 2 Track
+       └─ Play Sound: MS_Footsteps
+```
+
+### 사운드 시스템 흐름
+
+```
+플레이어 행동
+  ↓
+애니메이션 재생
+  ↓
+타임라인이 노티파이 지점 도달
+  ↓
+Play Sound Notify 실행
+  ↓
+Meta Sound 재생
+  ├─ 랜덤하게 사운드 선택
+  └─ 음높이 무작위 변화
+       ↓
+     자연스러운 발자국 소리
+```
+
+---
+
+## 📝 핵심 정리
+
+### Notify Track 관리
+
+```
+Notify Track (알림 트랙)
+  ├─ 생성: 트랙 드롭다운 → "Insert Notify Track"
+  ├─ 삭제: 트랙 선택 → "Remove Notify Track"
+  ├─ 이름 변경: 트랙 클릭하여 이름 입력
+  └─ 용도: 노티파이 타입별로 구분
+```
+
+### Notify 추가 방법
+
+```
+1. 타임라인에서 위치 선정
+   Shift + 드래그로 정확한 프레임 찾기
+
+2. Notify Track 우클릭
+   Add Notify → 원하는 타입 선택
+
+3. 사운드 할당 (Play Sound의 경우)
+   Details 패널 → Sound → 에셋 선택
+
+4. 위치 미세 조정
+   클릭 + 드래그로 이동
+
+5. 테스트 및 반복
+   재생 버튼으로 확인 → 조정 반복
+```
+
+### 내장 노티파이 종류
+
+```
+엔진 제공 노티파이:
+  ├─ Play Sound: 사운드 재생
+  ├─ Play Particle Effect: 파티클 생성
+  ├─ Play Camera Shake: 카메라 흔들림
+  └─ 기타 여러 종류 제공
+
+커스텀 노티파이:
+  └─ Add Notify → New Notify
+       ↓
+     직접 기능 구현 가능
+```
+
+---
+
+## ⚠️ 주의사항
+
+```
+1. 애니메이션 잘림 확인
+   ├─ 일부 애니메이션은 시작/끝이 잘려서 사용됨
+   ├─ 노티파이를 잘린 부분에 배치하면 실행 안 됨
+   └─ 실제 재생 구간 확인 필수
+
+2. 타이밍 정확성
+   ├─ 발이 땅에 닿는 정확한 순간에 배치
+   ├─ 너무 빠르면: 소리가 먼저 남
+   └─ 너무 느리면: 소리가 늦게 남
+
+3. Blend Space 고려
+   ├─ 블렌드되는 모든 애니메이션에 노티파이 필요
+   ├─ 걷기만 추가하면 달릴 때 소리 안 남
+   └─ 사용되는 모든 애니메이션 확인
+
+4. 메타 사운드 활용
+   ├─ 단일 사운드보다 메타 사운드 권장
+   ├─ 랜덤 요소로 자연스러움 증가
+   └─ 반복되는 소리의 단조로움 방지
+
+5. 성능 고려
+   ├─ 너무 많은 노티파이는 성능 저하
+   ├─ 필수적인 것만 추가
+   └─ 멀티플레이어에서는 최적화 더 중요
+```
+
+---
+
+## 💡 추가 팁
+
+### 노티파이 복사
+
+```
+같은 노티파이를 여러 곳에 사용할 때:
+  ├─ Ctrl + C (복사)
+  ├─ Ctrl + V (붙여넣기)
+  └─ 설정을 유지하면서 빠르게 배치
+```
+
+### 다른 애니메이션에 복사
+
+```
+한 애니메이션의 노티파이를
+다른 애니메이션에 적용:
+  ├─ 노티파이 선택 → Ctrl + C
+  ├─ 다른 애니메이션 열기
+  └─ 원하는 위치에서 Ctrl + V
+```
+
+### 볼륨 조절
+
+```
+Details 패널에서:
+  ├─ Volume Multiplier: 소리 크기 조절
+  ├─ Pitch Multiplier: 음높이 조절
+  └─ 개별 노티파이마다 설정 가능
+```
+
+---
+
+## 🎓 실무 활용
+
+### 노티파이 활용 예시
+
+```
+발자국 소리 외에도:
+  ├─ 공격 애니메이션: 타격 사운드, 이펙트
+  ├─ 스킬 애니메이션: 파티클, 카메라 쉐이크
+  ├─ 재장전 애니메이션: 탄약 사운드
+  ├─ 문 열기: 삐걱 소리
+  └─ 무기 장착/해제: 클릭 사운드
+```
+
+### 커스텀 노티파이
+
+```
+더 복잡한 기능이 필요하면:
+  ├─ New Notify 생성
+  ├─ Blueprint나 C++로 기능 구현
+  ├─ 예: 적에게 피해 주기, UI 표시 등
+  └─ 재사용 가능한 시스템 구축
+```
+
+---
+
+## 🚀 다음 단계 예상
+
+```
+현재 완성:
+  ├─ 이동 사운드 (걷기/달리기)
+  ├─ 점프 사운드 (시작/착지)
+  └─ 제트팩 사운드 (이전 강의)
+
+추가 가능성:
+  ├─ 표면별 다른 발자국 소리
+  ├─ 무기/스킬 사운드
+  ├─ 환경음 추가
+  └─ 음향 최적화
+```
+
+---
+
+## 💡 핵심 요약
+
+```
+Animation Notify 시스템
+  ↓
+애니메이션의 특정 시점에 이벤트 발생
+  ↓
+  ├─ Play Sound로 사운드 재생
+  ├─ 발이 땅에 닿는 순간 배치
+  └─ Meta Sound로 자연스러운 변화
+       ↓
+     생동감 있는 캐릭터 완성
+```
+
+**이번 강의의 핵심:**
+
+- Animation Notify는 애니메이션과 이벤트를 연결하는 핵심 시스템
+- Play Sound Notify로 간단하게 사운드 추가 가능
+- 타이밍이 정확해야 자연스러움
+- 메타 사운드로 반복의 단조로움 제거
+- 게임 내 테스트로 최종 검증 필수
+
+# { ⛽ 제트팩 연료 시스템 구현하기 }
+
+## 🎯 이번 강의 목표
+
+무제한으로 사용 가능한 제트팩에 **연료 시스템**을 추가하여 게임성을 향상시킵니다.
+
+- 제트 연료 변수 추가 및 관리
+- 연료 소모 시스템 구현
+- 프레임 독립적인 연료 감소
+- 인터페이스를 통한 캐릭터-컨트롤러 통신
+
+---
+
+## 💡 핵심 개념: 게임 리소스 관리
+
+### 왜 연료 제한이 필요한가?
+
+```
+현재 문제:
+  └─ 제트팩을 무제한으로 사용 가능
+       ↓
+     게임성 부족
+
+연료 시스템 추가 시:
+  ├─ 전략적 사용 필요
+  ├─ 리소스 관리 요소 추가
+  ├─ 연료 아이템 탐색 동기 부여
+  └─ 플랫포밍 가치 상승
+```
+
+**리소스 희소성(Resource Scarcity):**
+
+- 제한된 자원을 효율적으로 사용해야 하는 게임 메커니즘
+- 긴장감과 전략성 부여
+- 플레이어의 의사결정 중요도 증가
+
+---
+
+## 🔧 연료 변수 설정
+
+### BP_Kix에 변수 추가
+
+```
+1. Jet Fuel (현재 연료)
+   ├─ Type: Float
+   ├─ Default Value: 50.0
+   ├─ Category: Jet Fuel
+   └─ 역할: 현재 남은 연료량
+
+2. Max Jet Fuel (최대 연료)
+   ├─ Type: Float
+   ├─ Default Value: 50.0
+   ├─ Category: Jet Fuel
+   └─ 역할: 연료 최대 한계값
+
+3. Jet Fuel Drain Rate (연료 소모율)
+   ├─ Type: Float
+   ├─ Default Value: 5.0
+   ├─ Category: Jet Fuel
+   └─ 역할: 초당 소모되는 연료량
+```
+
+### 변수 설계 패턴
+
+```
+게임 오브젝트 속성 관리 패턴:
+  ├─ Current Value (현재 값)
+  │    └─ 예: Jet Fuel, Health, Mana
+  │
+  └─ Max Value (최대 값)
+       └─ 예: Max Jet Fuel, Max Health, Max Mana
+
+이유:
+  ├─ 현재값이 최대값을 초과하지 않도록 제한
+  ├─ 회복 시 기준값으로 사용
+  └─ UI 표시 (현재/최대)
+```
+
+---
+
+## 🎮 인터페이스 구조 이해하기 (핵심!)
+
+### 왜 이렇게 복잡하게 하는가?
+
+```
+설계 철학:
+  ├─ 제트팩은 캐릭터에 물리적으로 부착됨
+  ├─ 시각/음향 효과도 캐릭터가 담당
+  └─ 따라서 연료도 캐릭터가 관리해야 함
+
+하지만:
+  ├─ 입력은 PlayerController가 처리
+  └─ 컨트롤러와 캐릭터 간 통신 필요
+       ↓
+     인터페이스 사용!
+```
+
+### 구조 흐름도
+
+```
+사용자 입력
+  ↓
+BP_KixPlayerController
+  ├─ IA_Jetpack 입력 감지
+  │
+  ├─ Apply Thrust Input (물리 추진력)
+  │    └─ BPI_Jetpack 인터페이스 호출
+  │         ↓
+  │       BP_Kix에서 구현된 함수 실행
+  │
+  └─ Drain Jet Fuel (연료 소모)
+       └─ BPI_Jetpack 인터페이스 호출
+            ↓
+          BP_Kix에서 구현된 함수 실행
+               ↓
+             Consume Jet Fuel for Frame 함수 실행
+```
+
+### 각 Blueprint의 역할
+
+```
+BPI_Jetpack (인터페이스)
+  ├─ 역할: 함수 "선언"만 (구현 없음)
+  ├─ 함수: Apply Thrust Input, Drain Jet Fuel
+  └─ 목적: 컨트롤러와 캐릭터 간 계약서
+
+BP_Kix (캐릭터)
+  ├─ BPI_Jetpack 인터페이스 상속
+  ├─ 인터페이스 함수 "구현"
+  ├─ Drain Jet Fuel 구현:
+  │    └─ Consume Jet Fuel for Frame 호출
+  └─ 실제 연료 변수 보유 및 관리
+
+BP_KixPlayerController (컨트롤러)
+  ├─ 입력 처리 담당
+  ├─ Controlled Character 가져오기
+  └─ BPI_Jetpack 인터페이스로 함수 호출
+       ↓
+     어떤 캐릭터든 인터페이스만 있으면 호출 가능!
+```
+
+---
+
+## 📐 인터페이스 동작 원리 상세 설명
+
+### Step 1: 인터페이스에 함수 추가
+
+```
+BPI_Jetpack 인터페이스
+  ├─ 기존: Apply Thrust Input
+  └─ 추가: Drain Jet Fuel
+       ├─ 입력: 없음
+       ├─ 출력: 없음
+       └─ 역할: "이 함수를 호출할 거야" 선언
+```
+
+**인터페이스란?**
+
+- 함수의 "껍데기"만 정의
+- 실제 동작은 구현하는 쪽에서 작성
+- 여러 Blueprint가 같은 함수 이름으로 통신 가능
+
+### Step 2: BP_Kix에서 인터페이스 구현
+
+```
+BP_Kix Blueprint
+  ├─ Class Settings → Interfaces
+  │    └─ BPI_Jetpack 추가됨 (이미 이전에 추가)
+  │
+  └─ Event Graph 또는 Functions
+       └─ Drain Jet Fuel (Event) 구현
+            ↓
+          Consume Jet Fuel for Frame 함수 호출
+
+```
+
+**Drain Jet Fuel 구현:**
+
+```
+Event Drain Jet Fuel
+  ↓
+Consume Jet Fuel for Frame 함수 호출
+  ↓
+연료 감소 로직 실행
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380765/notion-blog/_/_/_5_/_8_-_3D_-_6/image_8.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380765/notion-blog/_/_/_5_/_8_-_3D_-_6/image_9.png)
+
+### Step 3: BP_KixPlayerController에서 호출
+
+```
+IA_Jetpack Triggered 이벤트
+  ↓
+Get Controlled Character
+  ├─ 현재 조종 중인 캐릭터 가져오기
+  └─ BP_Kix 인스턴스 반환
+       ↓
+Validated Get (유효성 검사)
+  ├─ 캐릭터가 존재하는지 확인
+  └─ Valid인 경우만 진행
+       ↓
+Drain Jet Fuel (BPI_Jetpack)
+  ├─ 인터페이스 함수 호출
+  └─ Target: Controlled Character
+       ↓
+     BP_Kix의 구현된 함수 실행!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380761/notion-blog/_/_/_5_/_8_-_3D_-_6/image_10.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380761/notion-blog/_/_/_5_/_8_-_3D_-_6/image_11.png)
+
+### 왜 직접 호출하지 않고 인터페이스를 쓰나?
+
+```
+직접 호출 방식:
+  BP_KixPlayerController
+    ↓
+  BP_Kix의 특정 함수 직접 호출
+    ├─ 문제 1: BP_Kix에 의존성 생김
+    ├─ 문제 2: 다른 캐릭터로 교체 시 코드 수정 필요
+    └─ 문제 3: 확장성 부족
+
+인터페이스 방식:
+  BP_KixPlayerController
+    ↓
+  BPI_Jetpack 인터페이스 호출
+    ├─ 장점 1: 어떤 캐릭터든 인터페이스만 구현하면 OK
+    ├─ 장점 2: 캐릭터 교체해도 컨트롤러 코드 불변
+    └─ 장점 3: 확장성 뛰어남
+```
+
+**실무 예시:**
+
+```
+여러 캐릭터가 있을 때:
+  ├─ BP_Kix (로봇 캐릭터)
+  ├─ BP_Human (인간 캐릭터)
+  └─ BP_Alien (외계인 캐릭터)
+
+모두 BPI_Jetpack 구현하면:
+  └─ 같은 PlayerController로 모두 조종 가능!
+       각자 다른 방식으로 연료 소모 구현 가능
+```
+
+---
+
+## 🔧 연료 소모 함수 구현
+
+### Consume Jet Fuel for Frame 함수
+
+```
+함수 생성:
+  ├─ 이름: Consume Jet Fuel for Frame
+  ├─ Category: Jet Fuel
+  └─ 역할: 한 프레임당 연료 소모량 계산 및 적용
+```
+
+### 노드 구성 상세
+
+```
+1. 현재 연료 가져오기
+   Get Jet Fuel
+     ↓
+   현재 연료값 (Float)
+
+2. 소모량 계산
+   Jet Fuel Drain Rate (5.0)
+     ↓
+   Multiply (×)
+     ├─ A: Jet Fuel Drain Rate
+     └─ B: Get World Delta Seconds
+          ↓
+        프레임당 소모량
+
+3. 연료 차감
+   Subtract (-)
+     ├─ A: 현재 Jet Fuel
+     └─ B: 프레임당 소모량
+          ↓
+        새로운 연료값
+
+4. 범위 제한
+   Clamp (Float)
+     ├─ Value: 새로운 연료값
+     ├─ Min: 0.0 (음수 방지)
+     └─ Max: Max Jet Fuel (최대값 방지)
+          ↓
+        제한된 연료값
+
+5. 연료 업데이트
+   Set Jet Fuel
+     └─ 제한된 연료값
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380761/notion-blog/_/_/_5_/_8_-_3D_-_6/image_12.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380762/notion-blog/_/_/_5_/_8_-_3D_-_6/image_13.png)
+
+---
+
+## 📊 주요 노드 설명
+
+### Get World Delta Seconds
+
+```
+Get World Delta Seconds
+  ↓
+이전 프레임과 현재 프레임 사이의 시간 (초)
+  ├─ 60 FPS: 약 0.0166초
+  ├─ 30 FPS: 약 0.0333초
+  └─ 가변적: 프레임마다 다름
+```
+
+**왜 필요한가?**
+
+```
+프레임 독립성 (Frame Independence)
+
+Delta Time 사용 안 함:
+  ├─ 60 FPS: 연료가 빠르게 소모
+  └─ 30 FPS: 연료가 느리게 소모
+       ↓
+     프레임레이트에 따라 게임이 달라짐!
+
+Delta Time 사용:
+  ├─ 소모율 × Delta Time = 실제 소모량
+  └─ 모든 프레임레이트에서 동일한 속도
+       ↓
+     일관된 게임 경험!
+```
+
+**계산 예시:**
+
+```
+Drain Rate = 5.0 (초당 5씩 감소)
+
+60 FPS (Delta = 0.0166):
+  5.0 × 0.0166 = 0.083 (한 프레임당)
+  60프레임 = 약 5.0 (1초당)
+
+30 FPS (Delta = 0.0333):
+  5.0 × 0.0333 = 0.1665 (한 프레임당)
+  30프레임 = 약 5.0 (1초당)
+
+결과: 프레임레이트와 무관하게 초당 5씩 감소!
+```
+
+### Clamp (Float)
+
+```
+Clamp (Float) 노드
+  ├─ Value: 제한할 값
+  ├─ Min: 최소값
+  └─ Max: 최대값
+       ↓
+     Min ≤ 결과값 ≤ Max
+```
+
+**동작 원리:**
+
+```
+Value = -10, Min = 0, Max = 50
+  ↓ Value가 Min보다 작음
+  Result = 0
+
+Value = 25, Min = 0, Max = 50
+  ↓ Value가 범위 내
+  Result = 25
+
+Value = 100, Min = 0, Max = 50
+  ↓ Value가 Max보다 큼
+  Result = 50
+```
+
+**연료 시스템에서의 역할:**
+
+```
+문제 상황:
+  Jet Fuel = 2.0
+  소모량 = 3.0
+    ↓
+  2.0 - 3.0 = -1.0 (음수!)
+
+Clamp 적용:
+  Clamp(-1.0, Min=0, Max=50)
+    ↓
+  Result = 0.0 (음수 방지)
+
+추가 보호:
+  연료 회복 시 최대값 초과 방지
+  Clamp(60, Min=0, Max=50)
+    ↓
+  Result = 50.0
+```
+
+---
+
+## 🔄 전체 실행 흐름
+
+### 프레임별 동작 순서
+
+```
+매 프레임마다:
+
+1. 입력 확인
+   IA_Jetpack Triggered 이벤트 발생 중?
+     ├─ Yes → 계속 진행
+     └─ No → 아무 일도 안 함
+
+2. 컨트롤러에서 처리
+   BP_KixPlayerController
+     ├─ Apply Thrust Input (추진력)
+     └─ Drain Jet Fuel (연료 소모)
+          ↓
+        인터페이스 함수 호출
+
+3. 캐릭터에서 실행
+   BP_Kix
+     └─ Drain Jet Fuel 이벤트 수신
+          ↓
+        Consume Jet Fuel for Frame 호출
+
+4. 연료 계산
+   ├─ 현재 연료: 50.0
+   ├─ 소모율: 5.0
+   ├─ Delta Time: 0.0166 (60FPS)
+   ├─ 소모량: 5.0 × 0.0166 = 0.083
+   ├─ 새 연료: 50.0 - 0.083 = 49.917
+   └─ Clamp: 49.917 (0~50 범위 내)
+
+5. 연료 업데이트
+   Set Jet Fuel = 49.917
+
+다음 프레임에서 반복...
+```
+
+---
+
+## ✅ 테스트 설정
+
+### Instance Editable 설정
+
+```
+목적:
+  플레이 중 실시간으로 연료값 관찰
+
+설정 방법:
+  Jet Fuel 변수 선택
+    ↓
+  Details 패널
+    ↓
+  눈 아이콘(👁️) 클릭
+    ↓
+  Instance Editable 활성화
+```
+
+**Instance Editable이란?**
+
+- 에디터에서 개별 인스턴스의 값을 볼 수 있게 함
+- 플레이 중에도 값 변화 실시간 확인 가능
+- 디버깅에 매우 유용
+
+### 테스트 절차
+
+```
+1. Play (플레이 시작)
+
+2. Outliner에서 BP_Kix 찾기
+   ├─ World Outliner 패널
+   └─ BP_Kix 선택
+
+3. Details 패널 확인
+   ├─ Jet Fuel 섹션으로 스크롤
+   └─ Jet Fuel 값 확인 (50.0)
+
+4. 제트팩 사용
+   ├─ 제트팩 키 누르기
+   └─ Jet Fuel 값 감소 확인
+        49.917 → 49.834 → ...
+
+5. 연료 고갈 확인
+   계속 사용하면
+     ↓
+   Jet Fuel = 0.0
+     ↓
+   하지만... 여전히 제트팩 사용 가능!
+```
+
+---
+
+## 📝 현재 문제점
+
+### 연료 제한 미적용
+
+```
+구현된 것:
+  ├─ 연료 변수 ✅
+  ├─ 연료 소모 시스템 ✅
+  └─ 프레임 독립적 감소 ✅
+
+미구현:
+  └─ 연료가 0일 때 제트팩 사용 차단 ❌
+       ↓
+     다음 강의에서 해결 예정
+```
+
+**필요한 조건:**
+
+```
+제트팩 사용 가능 조건:
+  Jet Fuel > 0
+    ├─ True → 제트팩 작동
+    └─ False → 제트팩 차단
+```
+
+---
+
+## 🎓 핵심 정리
+
+### 리소스 관리 시스템 구조
+
+```
+변수 설계:
+  ├─ Current (현재값)
+  ├─ Max (최대값)
+  └─ Rate (변화율)
+
+계산 공식:
+  New Value = Current - (Rate × Delta Time)
+
+범위 제한:
+  Clamped Value = Clamp(New Value, 0, Max)
+```
+
+### 인터페이스 패턴 정리
+
+```
+왜 사용하나?
+  ├─ 객체 간 느슨한 결합
+  ├─ 재사용성 향상
+  └─ 확장성 증가
+
+사용 방법:
+  1. 인터페이스에 함수 선언
+  2. 캐릭터에서 구현
+  3. 컨트롤러에서 호출
+```
+
+### Frame Independence (프레임 독립성)
+
+```
+핵심 원칙:
+  모든 시간 기반 계산에 Delta Time 곱하기
+
+적용 대상:
+  ├─ 이동 속도
+  ├─ 회전 속도
+  ├─ 리소스 소모/회복
+  └─ 타이머 등
+```
+
+---
+
+## ⚠️ 주의사항
+
+```
+1. Delta Time 필수
+   ├─ 모든 "속도" 계산에 Delta Time 사용
+   ├─ 누락 시 프레임레이트 의존적 동작
+   └─ 테스트: 다양한 FPS에서 확인
+
+2. Clamp 중요성
+   ├─ 음수 방지 (Min = 0)
+   ├─ 최대값 초과 방지 (Max = Max Value)
+   └─ 버그 및 예외 상황 방지
+
+3. 인터페이스 구현 확인
+   ├─ Class Settings에서 인터페이스 추가 확인
+   ├─ 함수 구현 누락 시 호출 안 됨
+   └─ 컴파일 에러는 안 나지만 동작 안 함
+
+4. Instance Editable 활용
+   ├─ 디버깅에 매우 유용
+   ├─ 플레이 중 값 변화 확인
+   └─ 하지만 퍼블리시 시 노출 주의
+
+5. 카테고리 정리
+   ├─ 변수를 카테고리별로 그룹화
+   ├─ Jet Fuel 관련은 "Jet Fuel" 카테고리
+   └─ 가독성과 유지보수성 향상
+```
+
+---
+
+## 💡 추가 개념: 인터페이스 심화
+
+### 인터페이스의 실제 활용
+
+```
+게임에서 인터페이스 예시:
+
+BPI_Damageable (피해 받을 수 있는)
+  ├─ Take Damage 함수
+  └─ 구현 대상:
+       ├─ 플레이어
+       ├─ 적
+       ├─ 파괴 가능 오브젝트
+       └─ 차량 등
+
+사용:
+  총알이 충돌 시
+    ↓
+  충돌 객체가 BPI_Damageable 구현했나?
+    ├─ Yes → Take Damage 호출
+    └─ No → 무시
+```
+
+### 여러 인터페이스 구현
+
+```
+BP_Kix는 여러 인터페이스 구현 가능:
+  ├─ BPI_Jetpack
+  ├─ BPI_Damageable
+  ├─ BPI_Interactable
+  └─ BPI_Saveable
+
+각 인터페이스의 함수들을 모두 구현
+  ↓
+다양한 시스템과 통신 가능
+```
+
+---
+
+## 🚀 다음 단계 예상
+
+```
+현재 완성:
+  ├─ 연료 변수 시스템 ✅
+  ├─ 연료 소모 메커니즘 ✅
+  └─ 프레임 독립적 계산 ✅
+
+다음 강의:
+  ├─ 연료 0일 때 제트팩 차단
+  ├─ 연료 UI 표시 (HUD)
+  ├─ 연료 회복 아이템
+  └─ 사운드/비주얼 피드백
+```
+
+---
+
+## 💡 핵심 요약
+
+```
+제트팩 연료 시스템
+  ↓
+Current, Max, Rate 변수 설정
+  ↓
+Delta Time으로 프레임 독립적 계산
+  ↓
+Clamp로 범위 제한
+  ↓
+인터페이스로 컨트롤러-캐릭터 통신
+  ↓
+연료 소모 구현 완료 (제한은 다음 강의)
+```
+
+**인터페이스 동작 정리:**
+
+```
+컨트롤러 → 인터페이스 호출 → 캐릭터 구현 실행
+
+이유:
+  ├─ 느슨한 결합
+  ├─ 재사용성
+  └─ 확장성
+```
+
+**이번 강의의 핵심:**
+
+- 리소스 관리는 Current/Max/Rate 패턴 사용
+- Delta Time은 시간 기반 계산의 필수 요소
+- Clamp로 값의 범위를 항상 제한
+- 인터페이스는 객체 간 통신의 표준 방법
+- 다음 강의에서 연료 제한 로직 완성 예정
+
+# { 🚫 제트팩 연료 제한 시스템 구현하기 }
+
+## 🎯 이번 강의 목표
+
+연료가 **실제로 제한**되도록 시스템을 완성합니다.
+
+- 연료 0일 때 제트팩 시작 차단
+- 비행 중 연료 고갈 시 자동 정지
+- Do Once 노드로 중복 실행 방지
+- Blueprint 주석으로 코드 정리
+
+---
+
+## 📋 현재 문제 상황
+
+### 이전 강의에서 구현한 것
+
+```
+✅ 연료 변수 (Jet Fuel, Max Jet Fuel)
+✅ 연료 소모 시스템 (Consume Jet Fuel for Frame)
+✅ 프레임 독립적 계산 (Delta Time)
+
+❌ 연료 0일 때 제한 없음
+  ↓
+문제: 연료가 없어도 제트팩 계속 사용 가능!
+```
+
+### 테스트 환경 설정
+
+```
+빠른 테스트를 위해:
+  BP_Kix 선택
+    ↓
+  Details 패널
+    ↓
+  Jet Fuel Drain Rate = 20.0
+    (기본값 5.0에서 변경)
+    ↓
+  연료가 훨씬 빠르게 소모됨
+```
+
+---
+
+## 🔧 구현 요구사항
+
+### 두 가지 핵심 기능
+
+```
+1. 시작 차단
+   ├─ 제트팩을 시작하려 할 때
+   ├─ Jet Fuel > 0 확인
+   └─ 연료 없으면 시작 불가
+
+2. 자동 정지
+   ├─ 비행 중 Jet Fuel = 0 도달
+   ├─ 즉시 제트팩 정지
+   └─ 추가 연료 소모 중단
+```
+
+---
+
+## 💡 Has Fuel 인터페이스 함수 추가
+
+### BPI_Jetpack에 함수 생성
+
+```
+인터페이스: BPI_Jetpack
+  ├─ 기존: Apply Thrust Input
+  ├─ 기존: Drain Jet Fuel
+  └─ 신규: Has Fuel
+       ├─ 입력: 없음
+       └─ 출력: Has Fuel (Boolean)
+
+```
+
+**Has Fuel의 역할:**
+
+- 현재 연료가 있는지 확인
+- True/False로 간단히 반환
+- PlayerController에서 쉽게 체크 가능
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380762/notion-blog/_/_/_5_/_8_-_3D_-_6/image_14.png)
+
+### BP_Kix에서 Has Fuel 구현
+
+```
+Blueprint: BP_Kix
+  └─ Implement Interface: Has Fuel
+
+노드 구성:
+  Get Jet Fuel
+    ↓
+  Greater (>)
+    ├─ A: Jet Fuel
+    └─ B: 0.0
+         ↓
+       Boolean (True/False)
+         ↓
+       Return Has Fuel
+```
+
+**로직 설명:**
+
+```
+Jet Fuel > 0?
+  ├─ 50.0 > 0 → True (연료 있음)
+  ├─ 10.0 > 0 → True (연료 있음)
+  ├─ 0.0 > 0 → False (연료 없음)
+  └─ -5.0 > 0 → False (음수, 연료 없음)
+```
+
+### ⚠️ 강의 중 실수와 수정
+
+```
+처음 구현 (잘못됨):
+  Jet Fuel <= 0
+    ↓
+  연료가 0 이하일 때 True 반환
+    ↓
+  "연료 없을 때" True라는 의미!
+    ↓
+  우리가 원하는 것과 반대!
+
+수정 후 (올바름):
+  Jet Fuel > 0
+    ↓
+  연료가 0보다 클 때 True 반환
+    ↓
+  "연료 있을 때" True!
+```
+
+**실수 발견 과정:**
+
+- 테스트: 제트팩이 시작 안 됨
+- 원인: Has Fuel이 항상 False 반환
+- 해결: 부등호 방향 변경 (≤ → >)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380762/notion-blog/_/_/_5_/_8_-_3D_-_6/image_15.png)
+
+---
+
+## 🎮 BP_KixPlayerController 구현
+
+### 1단계: 제트팩 시작 시 연료 확인 (Started 이벤트)
+
+```
+IA_Jetpack Started 이벤트
+  ↓
+Branch (조건 분기)
+  ├─ Condition: Has Fuel 결과
+  │
+  ├─ True (연료 있음)
+  │    └─ Start Jetpack
+  │
+  └─ False (연료 없음)
+       └─ 아무 것도 안 함
+```
+
+**노드 구성:**
+
+```
+1. Get Controlled Character
+   └─ 현재 조종 중인 캐릭터 가져오기
+
+2. Has Fuel (BPI_Jetpack)
+   ├─ Target: Controlled Character
+   └─ Return: Boolean (Has Fuel)
+
+3. Branch
+   ├─ Condition: Has Fuel 결과
+   ├─ True → Start Jetpack
+   └─ False → 실행 안 함
+```
+
+### 2단계: 비행 중 연료 확인 (Triggered 이벤트)
+
+```
+IA_Jetpack Triggered 이벤트 (매 프레임)
+  ↓
+Branch (조건 분기)
+  ├─ Condition: Has Fuel 결과
+  │
+  ├─ True (연료 있음)
+  │    ├─ Apply Thrust Input
+  │    └─ Drain Jet Fuel
+  │
+  └─ False (연료 없음)
+       └─ Stop Jetpack
+```
+
+**동작 원리:**
+
+```
+매 프레임마다:
+  Has Fuel 확인
+    ↓
+  연료 있으면:
+    ├─ 추진력 계속 적용
+    └─ 연료 계속 소모
+
+  연료 없으면:
+    └─ 제트팩 즉시 정지
+```
+
+---
+
+## 🔁 Do Once 노드로 중복 방지
+
+### 문제 발견
+
+```
+첫 테스트 결과:
+  연료 0 도달 → 제트팩 정지
+    ↓
+  하지만...
+    └─ 정지 사운드가 계속 반복 재생!
+         (spam 상태)
+```
+
+**원인 분석:**
+
+```
+Triggered 이벤트는 매 프레임마다 실행됨
+  ↓
+연료 0일 때:
+  매 프레임마다 Stop Jetpack 호출
+    ↓
+  정지 사운드가 매 프레임마다 재생
+    ↓
+  소리 spam!
+```
+
+### Do Once 노드란?
+
+```
+Do Once 노드
+  ↓
+여러 번 호출되어도 한 번만 실행
+  ├─ 첫 실행: 통과
+  ├─ 이후 실행: 차단
+  └─ Reset 전까지 계속 차단
+```
+
+**핀 구성:**
+
+```
+Do Once
+  ├─ Enter (입력)
+  ├─ Completed (출력 - 첫 실행만)
+  └─ Reset (리셋 입력)
+       ↓
+     Reset 실행 시 다시 사용 가능
+```
+
+### Do Once 적용
+
+```
+Triggered → Has Fuel False 경로
+  ↓
+Do Once
+  ├─ Enter: False 경로에서 진입
+  └─ Completed: Stop Jetpack
+       ↓
+     첫 번째만 실행, 이후 차단
+```
+
+**동작 흐름:**
+
+```
+프레임 1: 연료 0 도달
+  → Do Once 통과 → Stop Jetpack 실행 ✅
+
+프레임 2~N: 여전히 연료 0
+  → Do Once 차단 → Stop Jetpack 실행 안 됨 ✅
+
+결과: 정지는 한 번만!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380762/notion-blog/_/_/_5_/_8_-_3D_-_6/image_16.png)
+
+---
+
+## 🔄 Reset 메커니즘
+
+### 문제: Do Once는 언제 리셋?
+
+```
+Do Once가 차단 상태가 되면:
+  └─ 다시 제트팩을 사용할 수 없음
+       ↓
+     Reset이 필요!
+```
+
+### Reset Jetpack Do Once 커스텀 이벤트
+
+```
+Custom Event 생성:
+  이름: Reset Jetpack Do Once
+    ↓
+  Do Once의 Reset 핀에 연결
+```
+
+**언제 Reset을 호출?**
+
+```
+제트팩을 시작할 때!
+
+Started → Has Fuel True → Start Jetpack
+  ↓
+Reset Jetpack Do Once 호출
+  ↓
+Do Once 리셋 완료
+  ↓
+다음에 연료가 떨어지면 다시 정지 가능
+```
+
+**흐름 정리:**
+
+```
+1. 제트팩 시작
+   └─ Do Once 리셋
+
+2. 비행 중 연료 고갈
+   └─ Do Once로 한 번만 정지
+
+3. 연료 보충 후 다시 시작
+   └─ Do Once 리셋 (1번으로 돌아감)
+```
+
+---
+
+## 🎛️ Jetpack Active 변수 추가
+
+### 왜 필요한가?
+
+```
+문제 상황:
+  Completed 이벤트 (버튼 뗄 때)
+    ↓
+  항상 Stop Jetpack 호출
+    ↓
+  하지만... 제트팩이 이미 꺼져있으면?
+    └─ 불필요한 Stop 호출!
+```
+
+### Jetpack Active 변수
+
+```
+변수 추가:
+  ├─ 이름: Jetpack Active
+  ├─ Type: Boolean
+  ├─ Default: False
+  └─ 역할: 제트팩 현재 상태 추적
+```
+
+### 변수 업데이트 로직
+
+```
+제트팩 시작 시:
+  Start Jetpack
+    ↓
+  Set Jetpack Active = True
+    ↓
+  "지금 제트팩 켜짐" 기록
+
+제트팩 정지 시:
+  Stop Jetpack
+    ↓
+  Set Jetpack Active = False
+    ↓
+  "지금 제트팩 꺼짐" 기록
+```
+
+### Completed 이벤트에 적용
+
+```
+Before (문제):
+  Completed 이벤트
+    ↓
+  무조건 Stop Jetpack 호출
+    ↓
+  이미 꺼진 상태여도 호출!
+
+After (해결):
+  Completed 이벤트
+    ↓
+  Branch
+    ├─ Condition: Jetpack Active
+    ├─ True → Stop Jetpack
+    └─ False → 아무것도 안 함
+```
+
+---
+
+## 📊 전체 시스템 흐름도
+
+### Started 이벤트 (제트팩 버튼 누름)
+
+```
+IA_Jetpack Started
+  ↓
+Get Controlled Character
+  ↓
+Has Fuel? (인터페이스 호출)
+  ├─ True (연료 있음)
+  │    ├─ Start Jetpack
+  │    ├─ Set Jetpack Active = True
+  │    └─ Reset Jetpack Do Once
+  │
+  └─ False (연료 없음)
+       └─ (아무것도 안 함)
+```
+
+### Triggered 이벤트 (버튼 누르는 중, 매 프레임)
+
+```
+IA_Jetpack Triggered
+  ↓
+Get Controlled Character
+  ↓
+Has Fuel? (인터페이스 호출)
+  ├─ True (연료 있음)
+  │    ├─ Apply Thrust Input
+  │    └─ Drain Jet Fuel
+  │
+  └─ False (연료 없음)
+       ├─ Do Once
+       │    ├─ 첫 실행만 통과
+       │    └─ Completed → Stop Jetpack
+       │                    ├─ Stop Movement Mode Flying
+       │                    └─ Set Jetpack Active = False
+       │
+       └─ 이후 프레임은 차단
+```
+
+### Completed 이벤트 (버튼 뗌)
+
+```
+IA_Jetpack Completed
+  ↓
+Branch
+  ├─ Condition: Jetpack Active
+  │
+  ├─ True (제트팩 켜져있음)
+  │    └─ Stop Jetpack
+  │         ├─ Stop Movement Mode Flying
+  │         └─ Set Jetpack Active = False
+  │
+  └─ False (이미 꺼짐)
+       └─ (아무것도 안 함)
+```
+
+---
+
+## 🧹 Blueprint 정리 (주석 활용)
+
+### Comment Box 추가
+
+```
+노드 그룹 선택 → 우클릭
+  ↓
+Add Comment
+  ↓
+주석 박스 생성
+```
+
+### 주석 내용 및 색상
+
+```
+1. Started 이벤트 그룹
+   ├─ 내용: "제어 캐릭터에 연료가 있으면 제트팩 시작"
+   └─ 색상: 빨간색
+
+2. Triggered 이벤트 그룹
+   ├─ 내용: "연료가 있으면 추진력 적용 및 연료 소모,
+   │         없으면 제트팩 정지"
+   └─ 색상: 빨간색
+
+3. Completed 이벤트 그룹
+   ├─ 내용: "입력 완료 시 제트팩 정지"
+   └─ 색상: 빨간색
+
+4. 모든 입력 함수 (IA_Look, IA_Move, IA_Jump, IA_Jetpack)
+   ├─ 내용: "입력 처리"
+   └─ 색상: 파란색
+```
+
+**주석 색상 변경:**
+
+```
+주석 박스 선택
+  ↓
+Details 패널
+  ↓
+Color → 원하는 색 선택
+  ↓
+색상 제거: 휴지통으로 드래그
+```
+
+### Bubble (말풍선) 토글
+
+```
+주석 박스 선택
+  ↓
+Details 패널
+  ↓
+Comment Bubble (체크박스)
+  ├─ 체크: 축소 시 말풍선 표시
+  └─ 해제: 말풍선 없음 (깔끔)
+```
+
+---
+
+## ✅ 테스트
+
+### 기본 테스트
+
+```
+1. 연료 있을 때
+   ├─ 제트팩 버튼 누름 → 시작 ✅
+   └─ 정상 비행 ✅
+
+2. 연료 없을 때
+   ├─ 제트팩 버튼 누름 → 시작 안 됨 ✅
+   └─ 아무 일도 안 일어남 ✅
+
+3. 비행 중 연료 고갈
+   ├─ 연료 0 도달 → 자동 정지 ✅
+   ├─ 정지 사운드 한 번만 ✅
+   └─ 버튼 계속 눌러도 추가 실행 없음 ✅
+
+4. 버튼 떼기
+   ├─ 제트팩 켜진 상태: 정지 실행 ✅
+   └─ 이미 꺼진 상태: 실행 안 됨 ✅
+```
+
+### 테스트용 연료 리필 시스템
+
+```
+목적:
+  연료 고갈 후 자동으로 리필하여
+  반복 테스트 가능하게 함
+
+구현 (임시):
+  Stop Jetpack 이벤트 그래프
+    ↓
+  Delay (4초)
+    ↓
+  Set Jet Fuel = Max Jet Fuel
+    ↓
+  연료 완전 보충
+```
+
+**주석 추가:**
+
+```
+Comment: "TEST - 테스트 완료 후 삭제 예정"
+  ↓
+테스트가 끝나면 이 노드들 제거
+```
+
+**테스트 시나리오:**
+
+```
+1. 제트팩 사용
+   └─ 연료 50 → 0 소모
+
+2. 자동 정지
+   └─ 정지 사운드 한 번
+
+3. 4초 대기
+   └─ 연료 자동 리필 (50)
+
+4. 다시 사용 가능
+   └─ 반복 테스트
+```
+
+---
+
+## 🎨 Reroute Node (경로 재지정 노드)
+
+### Reroute Node란?
+
+```
+Reroute Node
+  ↓
+연결선을 깔끔하게 정리하는 노드
+  ├─ 기능: 단순히 신호 전달
+  ├─ 용도: 복잡한 연결 정리
+  └─ 생성: 연결선 더블클릭
+```
+
+**사용 예시:**
+
+```
+Before (복잡):
+  노드 A ───────┐
+               │ (교차하는 선들)
+  노드 B ──┐   │
+          │   │
+  노드 C ──┴───┴→ 노드 D
+
+After (깔끔):
+  노드 A → Reroute ┐
+  노드 B → Reroute ┼→ 노드 D
+  노드 C → Reroute ┘
+```
+
+**추가 방법:**
+
+```
+1. 연결선 더블클릭
+   └─ Reroute Node 자동 생성
+
+2. Reroute 우클릭
+   └─ "Add Reroute Node Here"
+
+3. Reroute Node 이동
+   └─ 드래그로 위치 조정
+```
+
+---
+
+## 📝 핵심 노드 정리
+
+### Branch (조건 분기)
+
+```
+Branch 노드
+  ├─ Condition (조건): Boolean 입력
+  ├─ True (참): 조건이 True일 때 실행
+  └─ False (거짓): 조건이 False일 때 실행
+```
+
+**활용:**
+
+```
+Has Fuel? → Branch
+  ├─ True → 제트팩 작동
+  └─ False → 제트팩 차단
+```
+
+### Do Once
+
+```
+Do Once 노드
+  ├─ Enter: 실행 입력
+  ├─ Completed: 첫 실행만 출력
+  └─ Reset: 리셋 시 다시 사용 가능
+```
+
+**활용:**
+
+```
+매 프레임 호출되는 곳에서
+첫 한 번만 실행하고 싶을 때
+```
+
+### Greater (>)
+
+```
+Greater 노드 (> 비교)
+  ├─ A: 첫 번째 값
+  ├─ B: 두 번째 값
+  └─ Return: Boolean (A > B)
+```
+
+**다른 비교 노드:**
+
+```
+├─ Less (<): A < B
+├─ Greater or Equal (>=): A >= B
+├─ Less or Equal (<=): A <= B
+└─ Equal (==): A == B
+```
+
+### Set (변수 설정)
+
+```
+Set [Variable Name]
+  ├─ 입력: 설정할 값
+  └─ 효과: 변수 값 업데이트
+```
+
+---
+
+## ⚠️ 주의사항
+
+```
+1. Has Fuel 구현 확인
+   ├─ > (Greater) 사용 필수
+   ├─ <= 사용 시 반대 동작!
+   └─ 테스트로 검증
+
+2. Do Once 리셋 필수
+   ├─ Reset 없으면 한 번만 작동
+   ├─ 제트팩 시작 시 리셋
+   └─ 반복 사용 가능하게
+
+3. Jetpack Active 관리
+   ├─ 시작 시: True 설정
+   ├─ 정지 시: False 설정
+   └─ 상태 동기화 중요
+
+4. Comment 정리
+   ├─ 복잡한 로직은 주석 추가
+   ├─ 색상으로 구분
+   └─ 테스트 코드는 표시
+
+5. 테스트 코드 제거
+   ├─ 개발 중: 연료 리필 유지
+   ├─ 완성 후: 테스트 노드 삭제
+   └─ 주석으로 표시해두기
+```
+
+---
+
+## 🎓 디자인 패턴 학습
+
+### State Management (상태 관리)
+
+```
+Jetpack Active 변수
+  ↓
+객체의 현재 상태를 추적
+  ├─ True: 제트팩 작동 중
+  └─ False: 제트팩 정지 상태
+
+활용:
+  상태에 따라 다른 동작 수행
+  ├─ Active → 정지 가능
+  └─ Inactive → 정지 불필요
+```
+
+### Guard Clause (보호 구문)
+
+```
+Has Fuel 체크
+  ↓
+조건을 만족하지 않으면 조기 종료
+  ├─ 연료 없음 → 실행 안 함
+  └─ 연료 있음 → 계속 진행
+
+장점:
+  ├─ 불필요한 실행 방지
+  ├─ 코드 안전성 향상
+  └─ 명확한 조건 표현
+```
+
+### One-Shot Execution (일회 실행)
+
+```
+Do Once 패턴
+  ↓
+특정 이벤트를 한 번만 실행
+  ├─ 중복 방지
+  ├─ 리소스 절약
+  └─ Reset으로 재사용
+
+적용:
+  ├─ 사운드 재생
+  ├─ 애니메이션 트리거
+  └─ 상태 전환
+```
+
+---
+
+## 🚀 다음 단계
+
+### 현재 완성
+
+```
+✅ 연료 시스템 완전 구현
+  ├─ 연료 소모 ✅
+  ├─ 시작 차단 ✅
+  ├─ 자동 정지 ✅
+  └─ 중복 방지 ✅
+
+❌ UI 부재
+  └─ 플레이어가 연료량을 볼 수 없음
+```
+
+### HUD (Heads-Up Display) 필요성
+
+```
+문제:
+  ├─ 에디터: BP_Kix 선택 → Details에서 확인 가능
+  └─ 게임: 연료량을 볼 방법 없음
+
+해결:
+  HUD 요소 추가
+    ├─ Health Bar (체력 표시줄)
+    ├─ Fuel Bar (연료 표시줄)
+    └─ 기타 게임 정보
+```
+
+**다음 강의 예상:**
+
+```
+HUD 구현
+  ├─ UMG (Unreal Motion Graphics)
+  ├─ Widget Blueprint
+  ├─ Progress Bar
+  └─ 연료 실시간 표시
+```
+
+---
+
+## 💡 핵심 요약
+
+```
+연료 제한 시스템 완성
+  ↓
+Has Fuel 인터페이스 함수
+  ├─ Jet Fuel > 0 확인
+  └─ Boolean 반환
+
+조건 분기
+  ├─ Started: Has Fuel → Start or Block
+  ├─ Triggered: Has Fuel → Continue or Stop
+  └─ Completed: Jetpack Active → Stop or Skip
+
+중복 방지
+  ├─ Do Once: 한 번만 정지
+  └─ Reset: 다음 사용 준비
+
+상태 관리
+  ├─ Jetpack Active 변수
+  └─ 시작/정지 시 업데이트
+```
+
+**Blueprint 정리:**
+
+```
+Comment Box
+  ├─ 기능별 그룹화
+  ├─ 색상 구분
+  └─ 가독성 향상
+
+Reroute Node
+  ├─ 연결선 정리
+  └─ 깔끔한 그래프
+```
+
+**이번 강의의 핵심:**
+
+- 리소스 제한은 게임 메커니즘의 핵심
+- 인터페이스로 상태 확인 간단히 구현
+- Do Once로 중복 실행 방지
+- Boolean 변수로 상태 추적
+- 주석과 정리로 코드 유지보수성 향상
+- 다음은 HUD로 플레이어에게 정보 시각화
+
+# { 🎁 제트 연료 픽업 아이템 만들기 }
+
+## 🎯 이번 강의 목표
+
+플레이어가 수집할 수 있는 **제트 연료 픽업 아이템**을 생성합니다.
+
+- BP_JetFuel 액터 생성
+- 충돌(Collision) 설정
+- 오버랩 이벤트 구현
+- 커스텀 충돌 프리셋 생성
+
+---
+
+## 📁 프로젝트 구조 정리
+
+### 폴더 생성
+
+```
+Blueprints 폴더
+  └─ Pickups (새 폴더)
+       └─ BP_JetFuel (새 Blueprint Class)
+```
+
+### Blueprint Class 생성
+
+```
+Pickups 폴더에서
+  ├─ 우클릭 → Blueprint Class
+  ├─ Parent Class: Actor
+  └─ Name: BP_JetFuel
+```
+
+---
+
+## 🔧 BP_JetFuel 구성
+
+### Static Mesh Component 추가
+
+```
+Components 패널
+  ├─ Add Component → Static Mesh
+  └─ Name: FuelMesh
+
+FuelMesh 설정:
+  └─ Static Mesh: SM_JetFuel
+
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380762/notion-blog/_/_/_5_/_8_-_3D_-_6/image_17.png)
+
+```csharp
+에셋 이주
+```
+
+---
+
+## ⚠️ 핵심 개념: 충돌 시스템 완전 정복
+
+### 당신의 질문: "왜 두 곳에서 충돌을 설정하나요?"
+
+이 질문은 **매우 중요**하고 많은 초보자가 헷갈리는 부분입니다!
+
+---
+
+## 🎓 충돌 설정의 두 레벨
+
+### 레벨 1: Static Mesh 에셋 (SM_JetFuel)
+
+```
+Static Mesh 에셋 자체
+  ↓
+"이 메시의 기본 충돌 모양과 기본 설정"
+  ├─ Collision Geometry (충돌 형상)
+  │    └─ 물리적인 충돌 모양 정의
+  │
+  └─ Default Collision Preset (기본 충돌 프리셋)
+       └─ 이 메시를 사용하는 모든 곳의 기본값
+```
+
+**역할:**
+
+- **템플릿** 역할
+- 이 메시를 어디서 사용하든 기본으로 적용될 설정
+- 한 번 설정하면 모든 곳에서 재사용
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380763/notion-blog/_/_/_5_/_8_-_3D_-_6/image_18.png)
+
+### 레벨 2: Blueprint Component (BP_JetFuel의 FuelMesh)
+
+```
+Blueprint의 Static Mesh Component
+  ↓
+"이 특정 인스턴스의 충돌 설정"
+  └─ 기본값을 오버라이드(덮어쓰기) 가능
+       ├─ 에셋 기본값 사용
+       └─ 또는 이 액터만의 특별한 설정
+```
+
+**역할:**
+
+- **인스턴스별 커스터마이징**
+- 같은 메시를 다른 용도로 사용할 때 유용
+- 에셋 기본값을 무시하고 변경 가능
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380763/notion-blog/_/_/_5_/_8_-_3D_-_6/image_19.png)
+
+```csharp
+여기서 실수가 있었다 콜리전 프리셋 설정을 No Colision 으로 해서 충돌이 일어나지 않았다
+```
+
+---
+
+## 💡 왜 이런 구조인가?
+
+### 실제 게임 예시로 이해하기
+
+```
+예시: 나무 통 (SM_WoodenBarrel)
+
+Static Mesh 에셋 설정:
+  └─ Collision Preset: BlockAll (기본값)
+       "일반적으로 통은 모든 것을 막는다"
+
+사용 케이스 1: 일반 통
+  Blueprint: BP_NormalBarrel
+    └─ Component Preset: BlockAll (기본값 사용)
+         "그냥 장애물로 사용"
+
+사용 케이스 2: 폭발하는 통
+  Blueprint: BP_ExplosiveBarrel
+    └─ Component Preset: Custom
+         ├─ Generate Overlap Events: True
+         └─ "총알과 겹침 감지 필요"
+
+사용 케이스 3: 장식용 통
+  Blueprint: BP_DecorativeBarrel
+    └─ Component Preset: NoCollision
+         "통과 가능한 배경 장식"
+```
+
+**핵심:**
+
+- **같은 메시**, **다른 용도**
+- 에셋 기본값 + 필요시 오버라이드
+
+---
+
+## 📊 두 레벨의 관계 다이어그램
+
+```
+SM_JetFuel (Static Mesh 에셋)
+  ├─ Collision Shape: Capsule (물리 형상)
+  └─ Default Preset: BlockAll (기본 설정)
+       ↓ (상속)
+
+BP_JetFuel (Blueprint Actor)
+  └─ FuelMesh Component
+       ├─ Option 1: 기본값 사용 (BlockAll)
+       ├─ Option 2: 오버라이드 (Pickup)
+       └─ 최종 결정: Pickup 프리셋 사용!
+
+결과:
+  ├─ SM_JetFuel 에셋 자체는 변경 안 됨
+  ├─ 다른 곳에서 사용하면 여전히 BlockAll
+  └─ BP_JetFuel에서만 Pickup으로 동작
+```
+
+---
+
+## 🎯 모범 사례 (Best Practice)
+
+### 권장 워크플로우
+
+```
+1. Static Mesh 에셋 설정
+   ├─ 목적: 가장 일반적인 용도의 기본값 설정
+   ├─ Collision Shape: 반드시 설정 (물리 형상)
+   └─ Collision Preset: 가장 흔한 용도로 설정
+        예: 벽 → BlockAll
+        예: 바닥 → BlockAll
+        예: 장식물 → NoCollision
+
+2. Blueprint Component 설정
+   ├─ 목적: 특수한 경우만 오버라이드
+   └─ 기본값과 다른 동작이 필요할 때만 변경
+```
+
+### 이번 강의 적용
+
+```
+SM_JetFuel 에셋:
+  ├─ Collision Shape: Capsule 단순화 ✅
+  └─ Default Preset: BlockAll (일반적인 메시)
+       "만약 일반 소품으로 쓴다면 이게 맞음"
+
+BP_JetFuel Component:
+  └─ Override Preset: Pickup
+       "하지만 이건 픽업 아이템이니까 변경!"
+```
+
+---
+
+## 🔍 Static Mesh 충돌 형상 정리
+
+### Collision Geometry 확인 및 수정
+
+```
+SM_JetFuel 더블클릭
+  ↓
+Static Mesh Editor 열림
+  ↓
+Collision → Show Simple Collision
+```
+
+### 발견한 문제
+
+```
+현재 상태:
+  ├─ Collision Hull 1: 복잡한 폴리곤 메시
+  └─ Collision Hull 2: Capsule
+
+문제점:
+  ├─ 폴리곤 메시: 불필요하게 복잡
+  ├─ 계산 비용 높음
+  └─ 단순한 Capsule만으로 충분
+```
+
+### 정리 작업
+
+```
+1. 불필요한 Collision Hull 삭제
+   ├─ 복잡한 폴리곤 Hull 선택
+   └─ Delete 키 → 삭제
+
+2. Capsule만 유지
+   ├─ Simple Collision: Capsule
+   └─ 계산 효율적
+```
+
+---
+
+## 💡 충돌 형상 종류와 성능
+
+### Simple Collision Types (단순 충돌)
+
+```
+성능 순위 (빠름 → 느림):
+
+1. Sphere (구)
+   ├─ 속성: Radius (반지름)
+   └─ 계산: 가장 빠름
+
+2. Capsule (캡슐)
+   ├─ 속성: Radius, Height
+   └─ 계산: 매우 빠름
+
+3. Box (박스)
+   ├─ 속성: Width, Height, Depth
+   └─ 계산: 빠름
+
+4. Convex Hull (볼록 껍질)
+   ├─ 속성: 단순화된 폴리곤
+   └─ 계산: 중간
+
+5. Complex Collision (복잡한 충돌)
+   ├─ 속성: 실제 메시 폴리곤
+   └─ 계산: 매우 느림 (피해야 함)
+```
+
+**원칙:**
+
+```
+가능한 한 단순한 형상 사용
+  ├─ Sphere, Capsule, Box 우선
+  ├─ 정확도보다 성능 중요
+  └─ 대부분의 경우 충분함
+```
+
+---
+
+## ⚙️ Collision Settings 상세 설명
+
+### Collision Complexity (충돌 복잡도)
+
+```
+Project Default (Use Simple Collision As Complex)
+  ├─ Simple Collision을 사용
+  └─ 권장 설정
+```
+
+### Collision Enabled (충돌 활성화)
+
+```
+Query Only (쿼리 전용)
+  ├─ 용도: Overlap 이벤트, Trace (레이캐스트)
+  ├─ 물리: 적용 안 됨 (중력, 힘 등)
+  └─ 픽업 아이템에 적합!
+
+Physics Only (물리 전용)
+  ├─ 용도: 물리 시뮬레이션
+  ├─ Overlap: 이벤트 안 발생
+  └─ 물리 객체에 적합
+
+Query and Physics (둘 다)
+  ├─ 용도: 둘 다 필요한 경우
+  └─ 예: 상자를 밀 수도, 감지도 가능
+
+No Collision (충돌 없음)
+  └─ 장식용, 완전히 통과
+```
+
+**픽업 아이템:**
+
+```
+Query Only 선택 이유:
+  ├─ Overlap 이벤트만 필요
+  ├─ 물리 계산 불필요 (중력, 힘 등)
+  └─ 성능 최적화
+```
+
+---
+
+## 🎯 Object Type과 Collision Channels
+
+### Object Type (객체 유형)
+
+```
+WorldStatic
+  └─ 움직이지 않는 환경 오브젝트
+       예: 벽, 바닥, 건물
+
+WorldDynamic
+  └─ 움직일 수 있는 환경 오브젝트
+       예: 상자, 문
+
+Pawn
+  └─ 플레이어나 AI가 제어하는 캐릭터
+       예: 캐릭터, 적
+
+PhysicsBody
+  └─ 물리 시뮬레이션 객체
+       예: 돌멩이, 폭탄
+
+기타...
+```
+
+### Collision Channels (충돌 채널)
+
+```
+주요 채널:
+  ├─ Visibility (보이기)
+  ├─ Camera (카메라)
+  ├─ WorldStatic
+  ├─ WorldDynamic
+  ├─ Pawn
+  └─ 커스텀 채널 추가 가능
+```
+
+### Collision Response (충돌 반응)
+
+```
+Ignore (무시)
+  └─ 충돌 감지 안 함
+
+Overlap (겹침)
+  ├─ 통과 가능
+  └─ Overlap 이벤트 발생
+
+Block (차단)
+  ├─ 통과 불가
+  └─ 물리적으로 막힘
+```
+
+---
+
+## 🔧 BP_JetFuel 충돌 설정 과정
+
+### 초기 설정 (Custom)
+
+```
+FuelMesh Component
+  ├─ Collision Preset: Custom
+  ├─ Collision Enabled: Query Only
+  ├─ Object Type: WorldStatic
+  └─ Collision Responses:
+       ├─ 모든 채널: Ignore
+       └─ Pawn: Overlap
+```
+
+**설정 이유:**
+
+```
+Query Only
+  └─ Overlap 이벤트만 필요
+
+모든 채널 Ignore
+  └─ 불필요한 충돌 계산 제거
+
+Pawn만 Overlap
+  └─ 플레이어 캐릭터만 감지
+```
+
+### Generate Overlap Events 확인
+
+```
+FuelMesh Component
+  └─ Generate Overlap Events: True ✅
+       (반드시 체크 필요!)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380763/notion-blog/_/_/_5_/_8_-_3D_-_6/image_20.png)
+
+---
+
+## 🎯 캐릭터 충돌 분석
+
+### BP_Kix의 충돌 구조
+
+```
+BP_Kix
+  ├─ Capsule Component
+  │    ├─ Collision Preset: Pawn
+  │    ├─ Object Type: Pawn
+  │    └─ Generate Overlap Events: True ✅
+  │
+  └─ Skeletal Mesh Component
+       ├─ Collision Preset: CharacterMesh
+       ├─ Object Type: Pawn
+       └─ Generate Overlap Events: False ❌
+```
+
+### 왜 Capsule을 사용?
+
+```
+Capsule 선택 이유:
+  ├─ Simple Shape (단순 형상)
+  │    └─ 계산 비용 낮음
+  │
+  ├─ Generate Overlap Events: True
+  │    └─ 기본적으로 활성화
+  │
+  └─ 성능 최적화
+       └─ Mesh보다 훨씬 빠름
+
+Mesh를 안 쓰는 이유:
+  ├─ 복잡한 형상 (수천 개 폴리곤)
+  ├─ 계산 비용 높음
+  └─ Generate Overlap Events 기본 꺼짐
+```
+
+---
+
+## 🔄 충돌 상호작용 원리
+
+### Overlap이 발생하는 조건
+
+```
+두 오브젝트가 Overlap하려면:
+
+Object A와 Object B의 관계:
+  ├─ 둘 다 Generate Overlap Events: True
+  │
+  └─ 서로의 채널에 대한 Response:
+       최소 하나는 Overlap이어야 함
+
+예시:
+  BP_JetFuel (FuelMesh)
+    ├─ Pawn 채널: Overlap
+    └─ Generate Overlap: True
+
+  BP_Kix (Capsule)
+    ├─ WorldStatic 채널: Block
+    └─ Generate Overlap: True
+
+  결과:
+    └─ Block과 Overlap 중 "낮은 것" 적용
+         → Overlap 발생! ✅
+```
+
+**우선순위:**
+
+```
+Block > Overlap > Ignore
+
+충돌 결정:
+  ├─ 둘 다 Block → Block
+  ├─ 하나는 Block, 하나는 Overlap → Overlap
+  └─ 하나라도 Ignore → Ignore
+```
+
+---
+
+## ✅ Overlap 테스트
+
+### Event Graph 구현
+
+```
+Event Begin Overlap
+  ├─ Other Actor (충돌한 액터)
+  └─ Print String
+       └─ In String: Other Actor의 이름
+```
+
+**노드 구성:**
+
+```
+Event ActorBeginOverlap
+  ├─ Other Actor 핀
+  │    ↓
+  │  Get Display Name
+  │    ↓
+  └─ Print String
+       └─ 화면에 이름 출력
+```
+
+### 레벨 테스트
+
+```
+1. BP_JetFuel을 레벨에 배치
+
+2. Play
+
+3. 캐릭터로 접근
+   └─ Capsule이 FuelMesh와 겹침
+
+4. 결과 확인
+   └─ 화면에 "BP_Kix" 출력 ✅
+```
+
+---
+
+## 🎨 Custom Collision Preset 생성
+
+### 왜 커스텀 프리셋?
+
+```
+현재 문제:
+  └─ Collision Preset: Custom
+       ├─ 설정이 일관되지 않음
+       ├─ 다른 픽업 아이템마다 다시 설정 필요
+       └─ 실수 가능성 높음
+
+해결:
+  └─ "Pickup" 프리셋 생성
+       ├─ 한 번만 설정
+       ├─ 모든 픽업에 재사용
+       └─ 일관성 보장
+```
+
+### Pickup Preset 생성
+
+```
+Edit → Project Settings
+  ↓
+Engine → Collision
+  ↓
+Preset 섹션
+  ↓
++ New Preset
+```
+
+**설정값:**
+
+```
+Name: Pickup
+
+Collision Enabled: Query Only
+
+Object Type: WorldStatic
+
+Collision Responses:
+  ├─ Default: Ignore (모든 채널)
+  └─ Pawn: Overlap
+```
+
+### BP_JetFuel에 적용
+
+```
+1. 먼저 Compile 필요
+   (새 프리셋이 목록에 나타남)
+
+2. FuelMesh Component
+   └─ Collision Preset: Pickup 선택
+
+3. 결과:
+   ├─ Custom → Pickup
+   └─ 재사용 가능한 설정 완료!
+```
+
+---
+
+## 🔄 Static Mesh vs Component 설정 정리
+
+### SM_JetFuel (에셋) 최종 설정
+
+```
+Static Mesh 에셋
+  ├─ Collision Shape: Capsule (단순 형상)
+  └─ Collision Preset: BlockAll (기본값)
+       "일반적인 용도의 기본값"
+```
+
+### BP_JetFuel Component 최종 설정
+
+```
+FuelMesh Component
+  └─ Collision Preset: Pickup (오버라이드)
+       "픽업 아이템용 특수 설정"
+```
+
+**왜 에셋은 BlockAll, 컴포넌트는 Pickup?**
+
+```
+에셋 (SM_JetFuel):
+  └─ "이 메시의 일반적인 용도는 소품"
+       예: 배경에 배치된 연료통
+       → BlockAll이 맞음
+
+컴포넌트 (BP_JetFuel):
+  └─ "이 특정 액터는 픽업 아이템"
+       예: 수집 가능한 아이템
+       → Pickup으로 오버라이드
+```
+
+---
+
+## 📝 핵심 정리
+
+### 충돌 설정 두 레벨 요약
+
+```
+레벨 1: Static Mesh 에셋
+  ├─ 역할: 템플릿 (기본값)
+  ├─ 설정: 가장 흔한 용도
+  └─ 영향: 이 메시를 사용하는 모든 곳
+
+레벨 2: Blueprint Component
+  ├─ 역할: 인스턴스별 커스터마이징
+  ├─ 설정: 특수한 경우 오버라이드
+  └─ 영향: 이 Blueprint만
+```
+
+### 모범 사례 정리
+
+```
+1. Static Mesh 에셋
+   ├─ Collision Shape: 반드시 설정
+   │    └─ 단순한 형상 사용 (Capsule, Box 등)
+   │
+   └─ Collision Preset: 일반적인 용도
+        └─ 대부분의 경우에 맞는 설정
+
+2. Blueprint Component
+   ├─ 기본값 사용: 대부분의 경우
+   └─ 오버라이드: 특수한 용도만
+        예: 픽업, 트리거, 파괴 가능 등
+
+3. Custom Preset
+   ├─ 자주 쓰는 설정은 프리셋으로
+   └─ 일관성과 재사용성 향상
+```
+
+---
+
+## 💡 실전 예시
+
+### 같은 메시, 다른 용도
+
+```
+SM_WoodenCrate (나무 상자 메시)
+
+에셋 기본 설정:
+  └─ Collision Preset: BlockAll
+       "일반 장애물"
+
+사용 케이스들:
+
+1. BP_NormalCrate (일반 상자)
+   └─ Preset: BlockAll (기본값 사용)
+
+2. BP_BreakableCrate (파괴 가능 상자)
+   └─ Preset: Destructible (커스텀)
+        ├─ Generate Overlap: True
+        └─ Physics Enabled
+
+3. BP_DecorativeCrate (장식 상자)
+   └─ Preset: NoCollision
+        "통과 가능"
+
+4. BP_HealthCrate (체력 상자)
+   └─ Preset: Pickup
+        "픽업 아이템"
+```
+
+---
+
+## ⚠️ 주의사항
+
+```
+1. Collision Shape 필수
+   ├─ Static Mesh에 충돌 형상 없으면
+   └─ Component 설정해도 작동 안 함!
+
+2. Generate Overlap Events
+   ├─ Overlap 필요하면 반드시 체크
+   └─ 양쪽 모두 True여야 함
+
+3. 성능 고려
+   ├─ 단순한 형상 우선 (Capsule, Box)
+   ├─ Query Only vs Physics
+   └─ 불필요한 채널은 Ignore
+
+4. Custom Preset 활용
+   ├─ 반복되는 설정은 프리셋으로
+   └─ 프로젝트 전체 일관성
+
+5. 테스트 필수
+   ├─ 설정 변경 후 반드시 테스트
+   └─ Overlap 이벤트 발생 확인
+```
+
+---
+
+## 🚀 다음 단계
+
+```
+현재 완성:
+  ├─ BP_JetFuel 액터 생성 ✅
+  ├─ 충돌 시스템 설정 ✅
+  ├─ Overlap 감지 확인 ✅
+  └─ Custom Preset 생성 ✅
+
+다음 강의 예상:
+  ├─ Overlap 시 연료 보충 구현
+  ├─ 픽업 사운드/이펙트
+  ├─ 픽업 후 액터 제거
+  └─ UI 업데이트 연동
+```
+
+---
+
+## 💡 핵심 요약
+
+```
+충돌 설정의 두 레벨
+  ↓
+에셋 = 템플릿 (기본값)
+컴포넌트 = 인스턴스 (커스터마이징)
+  ↓
+에셋: 일반적인 용도
+컴포넌트: 특수한 경우 오버라이드
+  ↓
+같은 메시, 다양한 용도 가능!
+```
+
+**모범 사례:**
+
+- 에셋: Collision Shape 반드시 설정 + 일반적인 Preset
+- 컴포넌트: 대부분 기본값, 필요시만 오버라이드
+- 프리셋: 반복되는 설정은 Custom Preset으로
+
+**이번 강의의 핵심:**
+
+- 충돌 시스템의 레이어드 구조 이해
+- Simple Collision으로 성능 최적화
+- Query Only로 픽업 아이템 구현
+- Custom Preset으로 재사용성 향상
+- Capsule 활용으로 효율적인 감지
+
+# { ⛽ 제트 연료 픽업으로 연료 보충 구현하기 }
+
+## 🎯 이번 강의 목표
+
+픽업 아이템과 충돌 시 **실제로 연료를 보충**하는 기능을 구현합니다.
+
+- BP_Kix에 연료 보충 함수 추가
+- BPI_Jetpack 인터페이스에 함수 추가
+- BP_JetFuel에서 오버랩 시 연료 보충 호출
+- 픽업 후 아이템 제거
+
+---
+
+## 📋 구현 흐름 미리보기
+
+```
+BP_JetFuel (픽업 아이템)
+  ↓
+Event ActorBeginOverlap (플레이어와 충돌)
+  ↓
+BPI_Jetpack::Handle Refill Fuel (인터페이스 호출)
+  ↓
+BP_Kix::Handle Refill Fuel (인터페이스 구현)
+  ↓
+연료 보충 로직 실행
+  ↓
+픽업 아이템 제거
+```
+
+---
+
+## 🔧 1단계: BPI_Jetpack 인터페이스에 함수 추가
+
+### 새 함수 생성
+
+```
+BPI_Jetpack 인터페이스 열기
+  ↓
+Functions → + 버튼
+  ↓
+Name: Handle Refill Fuel
+```
+
+### 입력 파라미터 추가
+
+```
+Handle Refill Fuel 함수
+  ├─ Input: Fuel Amount (Float)
+  └─ 역할: 보충할 연료량 전달
+```
+
+**왜 파라미터가 필요한가?**
+
+```
+유연성:
+  ├─ 작은 연료통: 25 보충
+  ├─ 큰 연료통: 50 보충
+  └─ 완전 보충: Max Jet Fuel만큼
+```
+
+---
+
+## 💡 2단계: BP_Kix에서 인터페이스 구현
+
+### Handle Refill Fuel 구현
+
+```
+BP_Kix Event Graph
+  └─ Implement Interface Function
+       └─ Handle Refill Fuel
+```
+
+### 노드 구성 상세
+
+```
+1. 현재 연료 + 보충량 계산
+   Get Jet Fuel
+     ↓
+   Add (+)
+     ├─ A: Jet Fuel (현재 연료)
+     └─ B: Fuel Amount (보충량)
+          ↓
+        새로운 연료값
+
+2. 최대값 제한
+   Clamp (Float)
+     ├─ Value: 새로운 연료값
+     ├─ Min: 0.0
+     └─ Max: Max Jet Fuel
+          ↓
+        제한된 연료값
+
+3. 연료 업데이트
+   Set Jet Fuel
+     └─ 제한된 연료값으로 설정
+```
+
+### 로직 설명
+
+```
+예시 1: 정상 보충
+  현재 연료: 20
+  보충량: 30
+  최대 연료: 50
+    ↓
+  20 + 30 = 50
+    ↓
+  Clamp(50, 0, 50) = 50 ✅
+
+예시 2: 최대치 초과 방지
+  현재 연료: 40
+  보충량: 30
+  최대 연료: 50
+    ↓
+  40 + 30 = 70
+    ↓
+  Clamp(70, 0, 50) = 50 ✅
+  (최대값으로 제한됨)
+
+예시 3: 음수 방지
+  현재 연료: -5 (버그 상황)
+  보충량: 10
+  최대 연료: 50
+    ↓
+  -5 + 10 = 5
+    ↓
+  Clamp(5, 0, 50) = 5 ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380763/notion-blog/_/_/_5_/_8_-_3D_-_6/image_21.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380764/notion-blog/_/_/_5_/_8_-_3D_-_6/image_22.png)
+
+---
+
+## 🎮 3단계: BP_JetFuel에서 오버랩 처리
+
+### Event ActorBeginOverlap 수정
+
+```
+Before (이전 강의):
+  Event ActorBeginOverlap
+    ↓
+  Print String (테스트용)
+    └─ Other Actor 이름 출력
+
+After (이번 강의):
+  Event ActorBeginOverlap
+    ↓
+  Other Actor가 BPI_Jetpack 구현했는지 확인
+    ↓
+  Handle Refill Fuel 호출
+    ↓
+  픽업 아이템 제거
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380764/notion-blog/_/_/_5_/_8_-_3D_-_6/image_23.png)
+
+### 노드 구성 상세
+
+```
+1. 오버랩 이벤트
+   Event ActorBeginOverlap
+     ├─ Other Actor: 충돌한 액터
+     └─ 매개변수 제공
+
+2. 인터페이스 구현 확인
+   Does Implement Interface
+     ├─ Target: Other Actor
+     ├─ Interface: BPI_Jetpack
+     └─ Return: Boolean
+          ├─ True: 인터페이스 구현함
+          └─ False: 구현 안 함
+
+3. 조건 분기
+   Branch
+     ├─ Condition: Does Implement Interface 결과
+     │
+     ├─ True 경로:
+     │    └─ 연료 보충 진행
+     │
+     └─ False 경로:
+          └─ 아무것도 안 함
+```
+
+### Does Implement Interface 노드란?
+
+```
+Does Implement Interface
+  ↓
+특정 액터가 인터페이스를 구현했는지 확인
+  ├─ 안전한 타입 체크
+  ├─ 잘못된 액터에 호출 방지
+  └─ 런타임 에러 방지
+
+예시:
+  BP_Kix: BPI_Jetpack 구현 → True ✅
+  BP_Enemy: BPI_Jetpack 미구현 → False ❌
+  BP_Rock: BPI_Jetpack 미구현 → False ❌
+```
+
+---
+
+## 🔄 4단계: 연료 보충 호출
+
+### Handle Refill Fuel 호출
+
+```
+Branch True 경로
+  ↓
+Handle Refill Fuel (Message)
+  ├─ Target: Other Actor
+  └─ Fuel Amount: 얼마를 보충할지?
+```
+
+### Fuel Amount 설정 방법
+
+### 방법 1: 고정값 사용
+
+```
+Handle Refill Fuel
+  └─ Fuel Amount: 25.0 (직접 입력)
+       "이 픽업은 항상 25 보충"
+```
+
+### 방법 2: 변수 사용 (권장)
+
+```
+BP_JetFuel에 변수 추가:
+  ├─ Name: Refill Amount
+  ├─ Type: Float
+  ├─ Default: 25.0
+  ├─ Instance Editable: True ✅
+  └─ Category: Fuel
+
+사용:
+  Handle Refill Fuel
+    └─ Fuel Amount: Refill Amount 변수
+         "레벨마다 다른 값 설정 가능"
+```
+
+**Instance Editable의 장점:**
+
+```
+레벨 디자이너가 조정 가능:
+  ├─ 작은 픽업: Refill Amount = 15
+  ├─ 중간 픽업: Refill Amount = 25
+  ├─ 큰 픽업: Refill Amount = 50
+  └─ 완전 회복: Refill Amount = 100 (최대치로 제한됨)
+```
+
+### 방법 3: 최대치까지 보충
+
+```
+Handle Refill Fuel
+  └─ Fuel Amount: 1000.0 (큰 값)
+       ↓
+     Clamp로 Max Jet Fuel까지만 보충됨
+       "항상 풀 충전"
+```
+
+---
+
+## 🗑️ 5단계: 픽업 아이템 제거
+
+### Destroy Actor 노드
+
+```
+Handle Refill Fuel 호출 후
+  ↓
+Destroy Actor
+  ├─ Target: Self (픽업 아이템 자신)
+  └─ 효과: 월드에서 완전히 제거
+```
+
+**전체 흐름:**
+
+```
+Event ActorBeginOverlap
+  ↓
+Does Implement Interface? → Branch
+  ├─ True:
+  │    ├─ Handle Refill Fuel
+  │    │    └─ 연료 보충
+  │    └─ Destroy Actor
+  │         └─ 픽업 제거
+  │
+  └─ False:
+       └─ (아무것도 안 함)
+```
+
+---
+
+## ✅ 테스트
+
+### 기본 테스트
+
+```
+1. BP_JetFuel을 레벨에 배치
+
+2. BP_Kix의 Jet Fuel을 낮게 설정
+   └─ 예: 10.0
+
+3. Play
+
+4. 픽업 아이템으로 이동
+   └─ 충돌 시 연료 증가 확인
+
+5. 픽업 아이템 사라짐 확인
+```
+
+### 엣지 케이스 테스트
+
+```
+테스트 1: 최대치 초과 방지
+  ├─ Jet Fuel: 45
+  ├─ Refill Amount: 25
+  ├─ Max Jet Fuel: 50
+  └─ 결과: 50 (70이 아님) ✅
+
+테스트 2: 이미 풀 충전
+  ├─ Jet Fuel: 50
+  ├─ Refill Amount: 25
+  └─ 결과: 50 (변화 없음) ✅
+
+테스트 3: 연료 0에서 보충
+  ├─ Jet Fuel: 0
+  ├─ Refill Amount: 25
+  └─ 결과: 25 ✅
+```
+
+---
+
+## 📊 완성된 시스템 구조
+
+### 전체 데이터 흐름
+
+```
+BP_JetFuel (픽업)
+  ├─ Component: FuelMesh
+  │    └─ Collision: Pickup Preset
+  │
+  └─ Event Graph:
+       Event ActorBeginOverlap
+         ↓
+       Other Actor (예: BP_Kix)
+         ↓
+       Does Implement Interface?
+         ├─ Check: BPI_Jetpack
+         └─ Result: True (BP_Kix가 구현함)
+              ↓
+            Handle Refill Fuel (Interface Call)
+              ├─ Target: Other Actor
+              └─ Fuel Amount: Refill Amount
+                   ↓
+                 BP_Kix의 구현 실행
+                   ↓
+                 Jet Fuel 증가
+                   ↓
+                 Destroy Actor (픽업 제거)
+```
+
+### 인터페이스 시스템 정리
+
+```
+BPI_Jetpack (인터페이스)
+  ├─ Apply Thrust Input
+  ├─ Drain Jet Fuel
+  ├─ Has Fuel
+  └─ Handle Refill Fuel ← 이번 강의 추가
+       └─ Input: Fuel Amount
+
+BP_Kix (구현체)
+  ├─ Implement Interface: BPI_Jetpack
+  └─ Handle Refill Fuel 구현:
+       Get Jet Fuel
+         ↓
+       Add (Fuel Amount)
+         ↓
+       Clamp (0, Max Jet Fuel)
+         ↓
+       Set Jet Fuel
+```
+
+---
+
+## 💡 인터페이스 패턴의 강점
+
+### 다양한 픽업 타입 지원
+
+```
+같은 인터페이스, 다른 구현:
+
+BP_SmallFuel
+  └─ Refill Amount: 15
+
+BP_MediumFuel
+  └─ Refill Amount: 25
+
+BP_LargeFuel
+  └─ Refill Amount: 50
+
+BP_FullRefill
+  └─ Refill Amount: 1000 (Max까지)
+
+모두 같은 인터페이스 사용!
+  └─ 코드 수정 없이 다양한 픽업 생성
+```
+
+### 다른 캐릭터 지원
+
+```
+BP_Kix
+  ├─ BPI_Jetpack 구현
+  └─ Jet Fuel 변수 보유
+
+BP_AlienCharacter (미래 추가)
+  ├─ BPI_Jetpack 구현
+  └─ Alien Fuel 변수 보유
+
+BP_JetFuel은 수정 없이
+  └─ 둘 다 지원!
+```
+
+---
+
+## 📝 핵심 노드 정리
+
+### Does Implement Interface
+
+```
+Does Implement Interface
+  ├─ Target: 확인할 액터
+  ├─ Interface: 인터페이스 클래스
+  └─ Return: Boolean
+       ├─ True: 구현함
+       └─ False: 구현 안 함
+
+용도:
+  ├─ 안전한 타입 체크
+  ├─ 인터페이스 호출 전 확인
+  └─ 런타임 에러 방지
+```
+
+### Add (Float)
+
+```
+Add
+  ├─ A: 첫 번째 값
+  ├─ B: 두 번째 값
+  └─ Return: A + B
+
+변형:
+  ├─ Subtract (-): A - B
+  ├─ Multiply (×): A × B
+  └─ Divide (÷): A ÷ B
+```
+
+### Clamp (Float)
+
+```
+Clamp
+  ├─ Value: 제한할 값
+  ├─ Min: 최소값
+  └─ Max: 최대값
+       ↓
+     Min ≤ Result ≤ Max
+
+역할:
+  └─ 값의 범위 보장
+       ├─ 연료 0~Max 유지
+       └─ 체력 0~Max 유지
+```
+
+### Destroy Actor
+
+```
+Destroy Actor
+  ├─ Target: 제거할 액터
+  └─ 효과: 월드에서 완전히 제거
+
+주의:
+  ├─ 되돌릴 수 없음
+  ├─ 모든 컴포넌트 함께 제거
+  └─ 이벤트와 타이머도 정리됨
+```
+
+---
+
+## ⚠️ 주의사항
+
+```
+1. Clamp 필수
+   ├─ 연료 보충 시 항상 Clamp 사용
+   ├─ 최대값 초과 방지
+   └─ 음수 방지 (안전장치)
+
+2. Does Implement Interface
+   ├─ 인터페이스 호출 전 반드시 확인
+   ├─ 미구현 액터에 호출 시 에러
+   └─ Branch로 안전하게 처리
+
+3. Destroy Actor 타이밍
+   ├─ 연료 보충 완료 후 제거
+   ├─ 너무 빨리 제거 시 보충 안 됨
+   └─ 실행 순서 중요
+
+4. Instance Editable 활용
+   ├─ 레벨마다 다른 값 설정 가능
+   ├─ 게임 밸런스 조정 용이
+   └─ 디자이너 친화적
+
+5. 네트워크 고려 (멀티플레이어)
+   ├─ Destroy Actor는 서버에서만
+   ├─ 연료 보충도 서버 권한
+   └─ 클라이언트는 복제만
+```
+
+---
+
+## 🎓 설계 패턴 학습
+
+### Interface Segregation (인터페이스 분리)
+
+```
+BPI_Jetpack의 함수들:
+  ├─ Apply Thrust Input (입력 처리)
+  ├─ Drain Jet Fuel (연료 소모)
+  ├─ Has Fuel (상태 확인)
+  └─ Handle Refill Fuel (연료 보충)
+
+각 함수는 명확한 단일 책임
+  ├─ 이해하기 쉬움
+  ├─ 재사용 가능
+  └─ 테스트 용이
+```
+
+### Dependency Injection (의존성 주입)
+
+```
+Fuel Amount를 파라미터로 전달
+  ↓
+픽업이 보충량 결정
+  ↓
+캐릭터는 받은 값만 처리
+  ↓
+책임 분리, 유연성 증가
+```
+
+---
+
+## 🚀 다음 단계 예상
+
+```
+현재 완성:
+  ├─ 연료 시스템 ✅
+  ├─ 연료 제한 ✅
+  ├─ 픽업 아이템 ✅
+  └─ 연료 보충 ✅
+
+추가 가능 기능:
+  ├─ HUD에 연료 표시
+  ├─ 픽업 사운드/이펙트
+  ├─ 픽업 애니메이션 (회전 등)
+  ├─ 다양한 픽업 타입
+  └─ 연료 부족 경고 UI
+```
+
+---
+
+## 💡 핵심 요약
+
+```
+연료 보충 시스템
+  ↓
+인터페이스 함수: Handle Refill Fuel
+  ├─ 파라미터: Fuel Amount
+  └─ 반환: 없음
+
+구현:
+  Current + Amount → Clamp → Set Jet Fuel
+
+픽업 로직:
+  Overlap → Check Interface → Refill → Destroy
+
+안전 장치:
+  ├─ Does Implement Interface (타입 체크)
+  ├─ Clamp (범위 제한)
+  └─ Branch (조건 분기)
+```
+
+**이번 강의의 핵심:**
+
+- 인터페이스로 느슨한 결합 유지
+- 파라미터로 유연성 제공
+- Clamp로 항상 유효한 값 보장
+- Does Implement Interface로 안전성 확보
+- Destroy Actor로 픽업 후 정리
+- Instance Editable로 디자이너 친화적 설계
+
+**설계 원칙:**
+
+- 단일 책임: 각 함수는 하나의 역할만
+- 개방-폐쇄: 새 픽업 추가 시 기존 코드 수정 불필요
+- 의존성 역전: 구체적인 클래스가 아닌 인터페이스에 의존

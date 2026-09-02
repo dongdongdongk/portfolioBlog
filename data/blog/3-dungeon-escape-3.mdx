@@ -1,0 +1,2503 @@
+---
+title: '섹션 3: Dungeon Escape - 3'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380624/notion-blog/_/_/_5_C_/_3_Dungeon_Escape_-_3/image.png)
+
+# { 트리거 컴포넌트 만들기 }
+
+## 목표
+
+**충돌 감지가 가능한 트리거 컴포넌트 생성**
+
+- Transform 있음 (위치, 회전, 크기)
+- Box Collision 있음 (충돌 감지)
+- Mover 컴포넌트 제어 가능
+
+---
+
+## 1. Mover vs Trigger 비교
+
+### Mover Component (이전 강의)
+
+```cpp
+UMover : public UActorComponent
+```
+
+**특징**:
+
+- Transform ❌ (위치 없음)
+- 독립적으로 작동
+- 액터를 움직이는 로직만
+
+### Trigger Component (이번 강의)
+
+```cpp
+UTriggerComponent : public UBoxComponent
+```
+
+**특징**:
+
+- Transform ✅ (위치, 회전, 크기)
+- Box Collision ✅ (충돌 감지)
+- 플레이어/오브젝트 진입 감지
+
+---
+
+## 2. UBoxComponent 선택 이유
+
+### 상속 계층
+
+```
+UActorComponent (기본 컴포넌트)
+    ↓
+USceneComponent (Transform 있음)
+    ↓
+UShapeComponent (모양 있음)
+    ↓
+UBoxComponent (박스 충돌)
+```
+
+### UBoxComponent가 제공하는 것
+
+**1. Transform**:
+
+- 위치 (Location)
+- 회전 (Rotation)
+- 크기 (Scale)
+
+**2. Box Collision**:
+
+- 박스 모양 충돌 영역
+- 에디터에서 보임 (게임 중엔 안 보임)
+- 크기 조절 가능
+
+**3. 충돌 감지**:
+
+- 다른 오브젝트 진입 감지
+- 플레이어 감지
+- 이벤트 발생 가능
+
+---
+
+## 3. 트리거 사용 계획
+
+### 사용 예시 1: 압력판 (Pressure Plate)
+
+```
+플레이어
+    ↓ 밟음
+압력판 (Trigger Component)
+    ↓ 감지
+문 (Mover Component)
+    ↓ 활성화
+문 열림
+```
+
+### 사용 예시 2: 아이템 잠금 시스템
+
+```
+올바른 아이템
+    ↓ 배치
+자물쇠 (Trigger Component)
+    ↓ 감지
+문 (Mover Component)
+    ↓ 활성화
+문 열림
+```
+
+---
+
+## 4. 새 클래스 생성
+
+### 클래스 생성 단계
+
+```
+1. Tools > New C++ Class
+2. All Classes 검색: "Box Component"
+3. Shape Component 아래 UBoxComponent 선택
+4. 이름: TriggerComponent
+5. Create Class
+```
+
+---
+
+## 5. 생성된 코드 문제점
+
+### 기본 생성 코드 (불완전)
+
+**TriggerComponent.h**:
+
+```cpp
+UCLASS()  // ← 비어있음!
+class DUNGEONESCAPE_API UTriggerComponent : public UBoxComponent
+{
+    GENERATED_BODY()
+
+    // BeginPlay 없음
+    // TickComponent 없음
+};
+```
+
+**문제점**:
+
+- `UCLASS()` 매크로가 비어있음
+- `BeginPlay()` 함수 없음
+- `TickComponent()` 함수 없음
+- 에디터에서 추가 불가능
+
+---
+
+## 6. Mover에서 코드 복사
+
+### UCLASS 매크로 복사
+
+**Mover.h에서**:
+
+```cpp
+UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+```
+
+**의미**:
+
+- **ClassGroup=(Custom)**: 에디터에서 "Custom" 카테고리에 표시
+- **BlueprintSpawnableComponent**: 에디터에서 추가 가능
+
+**TriggerComponent.h에 붙여넣기**:
+
+```cpp
+UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+class DUNGEONESCAPE_API UTriggerComponent : public UBoxComponent
+{
+    GENERATED_BODY()
+```
+
+### BeginPlay & TickComponent 추가
+
+**TriggerComponent.h**:
+
+```cpp
+UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+class DUNGEONESCAPE_API UTriggerComponent : public UBoxComponent
+{
+    GENERATED_BODY()
+
+protected:
+    // Called when the game starts
+    virtual void BeginPlay() override;
+
+public:
+    // Called every frame
+    virtual void TickComponent(float DeltaTime,
+                               ELevelTick TickType,
+                               FActorComponentTickFunction* ThisTickFunction) override;
+};
+```
+
+---
+
+## 7. 접근 지정자 이해하기
+
+### protected vs public
+
+```cpp
+class UTriggerComponent
+{
+protected:
+    virtual void BeginPlay() override;
+    // 자식 클래스만 접근 가능
+
+public:
+    virtual void TickComponent(...) override;
+    // 모든 곳에서 접근 가능
+
+private:
+    FVector MyData;
+    // 이 클래스 내부에서만 접근 가능
+};
+```
+
+### 접근 지정자 비교표
+
+| 지정자        | 같은 클래스 | 자식 클래스 | 외부 |
+| ------------- | ----------- | ----------- | ---- |
+| **private**   | ✅          | ❌          | ❌   |
+| **protected** | ✅          | ✅          | ❌   |
+| **public**    | ✅          | ✅          | ✅   |
+
+**왜 BeginPlay는 protected?**
+
+- 자식 클래스에서 오버라이드 가능
+- 외부에서 직접 호출할 필요 없음
+
+**왜 TickComponent는 public?**
+
+- 엔진이 매 프레임 호출해야 함
+- 외부 접근 필요
+
+---
+
+## 8. 함수 정의 추가
+
+### Visual Studio에서 빠르게 생성
+
+**방법 1: Quick Actions**
+
+```
+1. BeginPlay 위에 커서
+2. Alt + Enter
+3. "Create definition" 선택
+```
+
+**방법 2: 수동 작성**
+
+**TriggerComponent.cpp**:
+
+```cpp
+#include "TriggerComponent.h"
+
+void UTriggerComponent::BeginPlay()
+{
+    Super::BeginPlay();
+}
+
+void UTriggerComponent::TickComponent(float DeltaTime,
+                                       ELevelTick TickType,
+                                       FActorComponentTickFunction* ThisTickFunction)
+{
+    Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+}
+```
+
+---
+
+## 9. Super 키워드 이해하기
+
+### Super란?
+
+**Super = 부모 클래스 참조**
+
+```cpp
+class UTriggerComponent : public UBoxComponent
+                                     ↑
+                                   부모 클래스
+```
+
+### Super::BeginPlay() 호출
+
+```cpp
+void UTriggerComponent::BeginPlay()
+{
+    Super::BeginPlay();  // UBoxComponent의 BeginPlay() 호출
+
+    // 우리 코드
+}
+```
+
+**왜 필요?**
+
+```
+UBoxComponent::BeginPlay()에는:
+- 충돌 초기화 코드
+- Transform 설정 코드
+- 기타 중요한 초기화
+
+→ 이것들을 실행하지 않으면 제대로 작동 안 함!
+```
+
+### 상속 체인에서 Super 호출
+
+```
+UTriggerComponent::BeginPlay()
+    ↓ Super::BeginPlay() 호출
+UBoxComponent::BeginPlay()
+    ↓ Super::BeginPlay() 호출
+UShapeComponent::BeginPlay()
+    ↓ Super::BeginPlay() 호출
+USceneComponent::BeginPlay()
+    ↓
+...계속...
+```
+
+**모든 부모의 초기화 코드가 실행됨!**
+
+### 잘못된 예 (Super 호출 안 함)
+
+```cpp
+void UTriggerComponent::BeginPlay()
+{
+    // Super::BeginPlay();  ← 없음!
+
+    UE_LOG(LogTemp, Display, TEXT("Trigger alive!"));
+}
+
+// 결과: 충돌이 제대로 초기화 안 됨! ❌
+```
+
+---
+
+## 10. 테스트 코드 추가
+
+### 로그 출력
+
+**TriggerComponent.cpp**:
+
+```cpp
+void UTriggerComponent::BeginPlay()
+{
+    Super::BeginPlay();
+
+    UE_LOG(LogTemp, Display, TEXT("Trigger component is alive!"));
+}
+```
+
+---
+
+## 11. 컴파일 및 테스트
+
+### 전체 빌드 (권장)
+
+```
+1. 언리얼 에디터 닫기
+2. Visual Studio > Build > Rebuild Solution
+3. 빌드 완료 후 에디터 다시 열기
+```
+
+**왜 전체 빌드?**
+
+- 새 클래스 생성
+- UCLASS 매크로 변경
+- Live Coding으로 안 될 수 있음
+
+---
+
+## 12. 에디터에서 사용하기
+
+### Trigger Component 추가
+
+```
+1. Quick Add > Cube (또는 기존 액터 선택)
+2. Details > Add Component
+3. "Trigger" 검색
+4. Custom 카테고리에서 Trigger Component 선택
+5. 추가!
+```
+
+### Box Collision 확인
+
+**Components 패널에서**:
+
+- Trigger Component 선택
+- Viewport에 **주황색 박스** 표시됨
+- 이것이 충돌 영역
+
+**크기 조절**:
+
+```
+Details > Shape
+- Box Extent X: 박스 너비
+- Box Extent Y: 박스 깊이
+- Box Extent Z: 박스 높이
+```
+
+**예시**:
+
+```
+Box Extent:
+X: 100 (너비 200cm)
+Y: 100 (깊이 200cm)
+Z: 50  (높이 100cm)
+```
+
+---
+
+## 13. 게임 실행 및 확인
+
+### 테스트
+
+```
+1. Play 버튼
+2. Output Log 확인
+```
+
+**Output Log**:
+
+```
+LogTemp: Display: Trigger component is alive!
+```
+
+**성공!** ✅
+
+### 게임 중 Box Collision
+
+- **에디터**: 주황색 박스 보임
+- **게임 실행**: 안 보임 (투명)
+- **기능**: 여전히 충돌 감지 작동
+
+---
+
+## 14. Scene Component vs Actor Component 복습
+
+### 컴포넌트 타입 비교
+
+| 항목          | Actor Component | Scene Component | Box Component |
+| ------------- | --------------- | --------------- | ------------- |
+| **Transform** | ❌              | ✅              | ✅            |
+| **계층 구조** | ❌              | ✅              | ✅            |
+| **충돌**      | ❌              | ❌              | ✅            |
+| **예시**      | UMover          | Camera          | Trigger       |
+
+### 선택 가이드
+
+```
+Transform 필요 없음 → UActorComponent
+    예: Mover, Health, Timer
+
+Transform 필요 → USceneComponent
+    예: Camera, Light (충돌 없음)
+
+충돌 감지 필요 → UBoxComponent/USphereComponent
+    예: Trigger, Hitbox
+```
+
+---
+
+## 15. 다음 단계 예고
+
+### 구현할 기능
+
+**1. 충돌 감지**:
+
+```cpp
+void UTriggerComponent::BeginPlay()
+{
+    // 충돌 이벤트 바인딩
+    OnComponentBeginOverlap.AddDynamic(...);
+}
+```
+
+**2. Mover 제어**:
+
+```cpp
+void UTriggerComponent::ActivateMover()
+{
+    // Mover->ShouldMove = true;
+}
+```
+
+**3. 압력판 로직**:
+
+- 플레이어 진입 → 문 열림
+- 플레이어 나감 → 문 닫힘
+
+---
+
+## 완성된 코드
+
+### TriggerComponent.h
+
+```cpp
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Components/BoxComponent.h"
+#include "TriggerComponent.generated.h"
+
+UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+class DUNGEONESCAPE_API UTriggerComponent : public UBoxComponent
+{
+    GENERATED_BODY()
+
+protected:
+    virtual void BeginPlay() override;
+
+public:
+    virtual void TickComponent(float DeltaTime,
+                               ELevelTick TickType,
+                               FActorComponentTickFunction* ThisTickFunction) override;
+};
+```
+
+### TriggerComponent.cpp
+
+```cpp
+#include "TriggerComponent.h"
+
+void UTriggerComponent::BeginPlay()
+{
+    Super::BeginPlay();  // 필수!
+
+    UE_LOG(LogTemp, Display, TEXT("Trigger component is alive!"));
+}
+
+void UTriggerComponent::TickComponent(float DeltaTime,
+                                       ELevelTick TickType,
+                                       FActorComponentTickFunction* ThisTickFunction)
+{
+    Super::TickComponent(DeltaTime, TickType, ThisTickFunction);  // 필수!
+}
+```
+
+---
+
+## 핵심 정리
+
+### 1. UBoxComponent 사용 이유
+
+- Transform ✅
+- Collision ✅
+- 충돌 감지 기능 ✅
+
+### 2. UCLASS 매크로
+
+```cpp
+UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+// 에디터에서 추가 가능하게 만듦
+```
+
+### 3. Super 키워드
+
+```cpp
+Super::BeginPlay();  // 부모 클래스 함수 호출 (필수!)
+```
+
+### 4. 접근 지정자
+
+- **protected**: BeginPlay (자식만)
+- **public**: TickComponent (외부 접근)
+- **private**: 내부 변수 (클래스 내부만)
+
+### 5. Box Collision
+
+- 에디터에서 주황색으로 표시
+- 게임 중엔 안 보임
+- 크기 조절 가능
+
+**다음: 충돌 감지 구현! 🎯**
+
+# { 언리얼 컴포넌트 시스템 완벽 가이드 (유니티와 비교) }
+
+## 1. 유니티 vs 언리얼: 근본적인 차이
+
+### 유니티의 컴포넌트
+
+```csharp
+// 유니티: 모든 컴포넌트가 동일한 레벨
+GameObject player = new GameObject();
+player.AddComponent<Transform>();      // 위치
+player.AddComponent<Rigidbody>();      // 물리
+player.AddComponent<BoxCollider>();    // 충돌
+player.AddComponent<PlayerScript>();   // 커스텀
+
+// 모두 동일한 Component 클래스에서 상속
+```
+
+**유니티 특징**:
+
+- ✅ 단순함: 모든 컴포넌트가 비슷
+- ✅ 빠른 학습
+- ❌ 유연성 부족: Transform을 제거할 수 없음
+
+### 언리얼의 컴포넌트
+
+```cpp
+// 언리얼: 컴포넌트가 계층 구조를 가짐
+AActor* Player = GetWorld()->SpawnActor<AActor>();
+UActorComponent* Health;           // Transform 없음
+USceneComponent* Root;             // Transform 있음
+UStaticMeshComponent* Mesh;        // Transform + Mesh
+UBoxComponent* Collision;          // Transform + Collision
+```
+
+**언리얼 특징**:
+
+- ✅ 세밀한 제어
+- ✅ 높은 유연성
+- ❌ 초기 학습 곡선
+
+---
+
+## 2. 언리얼 컴포넌트 계층 구조
+
+### 전체 상속 트리
+
+```
+UObject (언리얼 최상위 클래스)
+    ↓
+UActorComponent (기본 컴포넌트)
+    ↓
+    ├─ 단독 컴포넌트들 (Transform 없음)
+    │  ├─ UMovementComponent
+    │  ├─ UAudioComponent
+    │  └─ 우리가 만든 UMover
+    │
+    └─ USceneComponent (Transform 있음)
+        ↓
+        ├─ UCameraComponent (카메라)
+        ├─ ULightComponent (조명)
+        ├─ UStaticMeshComponent (메시)
+        │
+        └─ UShapeComponent (모양/충돌)
+            ↓
+            ├─ UBoxComponent (박스 충돌)
+            ├─ USphereComponent (구체 충돌)
+            ├─ UCapsuleComponent (캡슐 충돌)
+            └─ 우리가 만든 UTriggerComponent
+```
+
+---
+
+## 3. UActorComponent (기본 컴포넌트)
+
+### 개념
+
+**가장 기본적인 컴포넌트 타입**
+
+- 3D 공간에 존재하지 않음
+- Transform 없음 (위치, 회전, 크기 X)
+- 순수한 "로직" 또는 "기능"만
+
+### 실제 예시
+
+```cpp
+// UMover: 움직임 로직만
+class UMover : public UActorComponent
+{
+    // Transform 없음
+    // 위치 정보 없음
+    // 단지 로직만 제공
+
+    void TickComponent(float DeltaTime)
+    {
+        // GetOwner()로 부모 액터를 움직임
+    }
+};
+```
+
+### UActorComponent가 제공하는 것
+
+**1. 생명주기 함수**:
+
+```cpp
+BeginPlay()      // 게임 시작 시
+TickComponent()  // 매 프레임
+EndPlay()        // 종료 시
+```
+
+**2. 소유자 접근**:
+
+```cpp
+AActor* Owner = GetOwner();  // 이 컴포넌트를 가진 액터
+```
+
+**3. 기본 기능**:
+
+- 활성화/비활성화
+- 에디터 통합
+- 복제(Replication)
+
+### 유니티 비교
+
+```csharp
+// 유니티: MonoBehaviour
+public class Mover : MonoBehaviour
+{
+    // Transform은 자동으로 있음 (제거 불가)
+    void Update() { }
+}
+
+// 언리얼: ActorComponent
+class UMover : public UActorComponent
+{
+    // Transform 없음 (선택사항)
+    void TickComponent() { }
+}
+```
+
+---
+
+## 4. USceneComponent (Transform 컴포넌트)
+
+### 개념
+
+**3D 공간에 존재하는 컴포넌트**
+
+- Transform 있음 (위치, 회전, 크기)
+- 계층 구조 가능 (부모-자식 관계)
+- 다른 컴포넌트에 부착 가능
+
+### Transform 정보
+
+```cpp
+class USceneComponent : public UActorComponent
+{
+public:
+    // Transform 함수들
+    FVector GetComponentLocation();
+    FRotator GetComponentRotation();
+    FVector GetComponentScale3D();
+
+    void SetWorldLocation(FVector NewLocation);
+    void SetRelativeRotation(FRotator NewRotation);
+
+    // 부모-자식 관계
+    void AttachToComponent(USceneComponent* Parent);
+    TArray<USceneComponent*> GetAttachChildren();
+};
+```
+
+### 계층 구조 예시
+
+```
+Root (Scene Component)
+├─ Camera (Scene Component)
+│  └─ Light (Scene Component)
+│
+└─ Mesh (Scene Component)
+   ├─ Weapon (Scene Component)
+   └─ Shield (Scene Component)
+```
+
+### 유니티와 비교
+
+```csharp
+// 유니티: Transform은 항상 있음
+public class MyScript : MonoBehaviour
+{
+    void Start()
+    {
+        transform.position = new Vector3(0, 0, 0);  // 항상 가능
+    }
+}
+
+// 언리얼: SceneComponent만 Transform 있음
+class UMySceneComponent : public USceneComponent
+{
+    void BeginPlay()
+    {
+        SetWorldLocation(FVector(0, 0, 0));  // 가능!
+    }
+};
+
+class UMyActorComponent : public UActorComponent
+{
+    void BeginPlay()
+    {
+        // SetWorldLocation(...);  ← 불가능! Transform 없음!
+    }
+};
+```
+
+---
+
+## 5. UBoxComponent (충돌 컴포넌트)
+
+### 상속 체인
+
+```
+UActorComponent
+    ↓
+USceneComponent (Transform 추가)
+    ↓
+UPrimitiveComponent (렌더링 + 물리)
+    ↓
+UShapeComponent (모양)
+    ↓
+UBoxComponent (박스 모양)
+```
+
+### 각 단계에서 추가되는 기능
+
+**USceneComponent**:
+
+- ✅ Transform (위치, 회전, 크기)
+- ✅ 계층 구조
+
+**UPrimitiveComponent**:
+
+- ✅ 렌더링 (화면에 그리기)
+- ✅ 물리 시뮬레이션
+- ✅ 충돌 감지
+
+**UShapeComponent**:
+
+- ✅ 간단한 모양 (박스, 구, 캡슐)
+- ✅ 충돌 설정
+
+**UBoxComponent**:
+
+- ✅ 박스 모양
+- ✅ Box Extent (크기 설정)
+
+### 실제 사용
+
+```cpp
+class UTriggerComponent : public UBoxComponent
+{
+    void BeginPlay()
+    {
+        // Transform 있음
+        SetWorldLocation(FVector(0, 0, 100));
+
+        // 크기 조절
+        SetBoxExtent(FVector(100, 100, 50));
+
+        // 충돌 감지
+        OnComponentBeginOverlap.AddDynamic(...);
+    }
+};
+```
+
+---
+
+## 6. 실전 비교표
+
+### 컴포넌트 타입별 기능
+
+| 기능           | ActorComponent | SceneComponent | BoxComponent |
+| -------------- | -------------- | -------------- | ------------ |
+| **생명주기**   | ✅             | ✅             | ✅           |
+| **Tick**       | ✅             | ✅             | ✅           |
+| **GetOwner()** | ✅             | ✅             | ✅           |
+| **Transform**  | ❌             | ✅             | ✅           |
+| **부모-자식**  | ❌             | ✅             | ✅           |
+| **렌더링**     | ❌             | ❌             | ✅           |
+| **충돌**       | ❌             | ❌             | ✅           |
+| **Box 모양**   | ❌             | ❌             | ✅           |
+
+### 언리얼 vs 유니티
+
+| 항목            | 유니티          | 언리얼         |
+| --------------- | --------------- | -------------- |
+| **기본 클래스** | MonoBehaviour   | 여러 선택지    |
+| **Transform**   | 항상 있음       | 선택사항       |
+| **계층 구조**   | GameObject 계층 | Component 계층 |
+| **학습 난이도** | 쉬움            | 어려움         |
+| **유연성**      | 낮음            | 높음           |
+| **성능 최적화** | 제한적          | 세밀함         |
+
+---
+
+## 7. 왜 이렇게 복잡하게?
+
+### 언리얼의 철학
+
+**"필요한 것만 추가하자"**
+
+```cpp
+// 예시 1: Health 시스템 (위치 필요 없음)
+class UHealthComponent : public UActorComponent
+{
+    float Health = 100.0f;
+
+    void TakeDamage(float Damage)
+    {
+        Health -= Damage;
+    }
+
+    // Transform 불필요! 메모리 절약!
+};
+
+// 예시 2: 3D 모델 (위치 필요)
+class UStaticMeshComponent : public USceneComponent
+{
+    // Transform 있음
+    // 렌더링 가능
+    // 충돌 가능
+};
+```
+
+### 성능 최적화
+
+**메모리 사용량 비교**:
+
+```
+ActorComponent:
+- 기본 데이터만
+- 크기: ~100 bytes
+
+SceneComponent:
+- 기본 데이터
+- Transform (12 floats)
+- 크기: ~200 bytes
+
+BoxComponent:
+- 기본 데이터
+- Transform
+- 충돌 데이터
+- 물리 데이터
+- 크기: ~500 bytes
+```
+
+**1000개의 컴포넌트**:
+
+```
+ActorComponent:  100 KB
+SceneComponent:  200 KB
+BoxComponent:    500 KB
+
+→ 필요 없는 기능이 없으면 메모리 절약!
+```
+
+---
+
+## 8. 실전 선택 가이드
+
+### 어떤 컴포넌트를 상속받을까?
+
+```
+┌─────────────────────────────────────┐
+│  Transform이 필요한가?              │
+└─────────────┬───────────────────────┘
+              │
+        ┌─────┴─────┐
+        NO          YES
+        │            │
+   ActorComponent   SceneComponent
+        │            │
+    예: Mover    ┌───┴───────────┐
+    예: Health   │ 렌더링 필요?    │
+    예: AI       └───┬───────────┘
+                     │
+                ┌────┴────┐
+                NO       YES
+                │         │
+          SceneComponent  PrimitiveComponent
+          예: Camera Root  │
+                      ┌────┴────────┐
+                      │ 충돌 필요?   │
+                      └────┬────────┘
+                           │
+                      ┌────┴────┐
+                      NO       YES
+                      │         │
+                StaticMesh  ShapeComponent
+                          (BoxComponent 등)
+```
+
+### 구체적인 예시
+
+**1. 타이머 시스템**:
+
+```cpp
+// Transform 필요 없음
+class UTimerComponent : public UActorComponent
+{
+    float RemainingTime;
+    void Countdown(float DeltaTime);
+};
+```
+
+**2. 카메라 위치**:
+
+```cpp
+// Transform 필요, 렌더링/충돌 불필요
+class UCameraComponent : public USceneComponent
+{
+    // 위치, 회전만 필요
+};
+```
+
+**3. 압력판**:
+
+```cpp
+// Transform + 충돌 필요
+class UTriggerComponent : public UBoxComponent
+{
+    // 위치 + 충돌 감지
+};
+```
+
+---
+
+## 9. Components 패널 이해하기
+
+### 에디터에서 보는 계층
+
+```
+Door Actor
+├─ [Static Mesh Component] (Root)  ← Scene Component
+│  └─ Material
+│
+├─ [Box Component]                  ← Scene Component
+│  └─ Collision Settings
+│
+├─ [Trigger Component]              ← Scene Component (우리가 만든 것)
+│
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  ← 구분선
+│
+├─ [Mover Component]                ← Actor Component (우리가 만든 것)
+└─ [Health Component]               ← Actor Component
+```
+
+**위쪽 (Scene Components)**:
+
+- Transform 있음
+- 부모-자식 관계 가능
+- 드래그로 계층 변경 가능
+
+**아래쪽 (Actor Components)**:
+
+- Transform 없음
+- 독립적
+- 목록으로만 표시
+
+---
+
+## 10. 유니티 개발자를 위한 매핑
+
+### 유니티 → 언리얼 변환표
+
+| 유니티          | 언리얼                 | 비고          |
+| --------------- | ---------------------- | ------------- |
+| `GameObject`    | `AActor`               | 씬의 오브젝트 |
+| `Component`     | `UActorComponent`      | 기능 추가     |
+| `Transform`     | `USceneComponent`      | 위치 정보     |
+| `MonoBehaviour` | `UActorComponent`      | 스크립트      |
+| `BoxCollider`   | `UBoxComponent`        | 충돌          |
+| `MeshRenderer`  | `UStaticMeshComponent` | 메시          |
+| `Camera`        | `UCameraComponent`     | 카메라        |
+
+### 코드 비교
+
+**유니티**:
+
+```csharp
+public class Door : MonoBehaviour
+{
+    public float speed = 1.0f;
+
+    void Update()
+    {
+        // Transform은 자동으로 있음
+        transform.position += Vector3.up * speed * Time.deltaTime;
+    }
+}
+```
+
+**언리얼 (ActorComponent)**:
+
+```cpp
+class UMover : public UActorComponent
+{
+    float Speed = 1.0f;
+
+    void TickComponent(float DeltaTime)
+    {
+        // Transform 없음! GetOwner()로 액터 제어
+        FVector Location = GetOwner()->GetActorLocation();
+        Location.Z += Speed * DeltaTime;
+        GetOwner()->SetActorLocation(Location);
+    }
+};
+```
+
+**언리얼 (SceneComponent)**:
+
+```cpp
+class UMySceneComp : public USceneComponent
+{
+    float Speed = 1.0f;
+
+    void TickComponent(float DeltaTime)
+    {
+        // Transform 있음! 직접 제어
+        FVector Location = GetComponentLocation();
+        Location.Z += Speed * DeltaTime;
+        SetWorldLocation(Location);
+    }
+};
+
+```
+
+---
+
+## 11. 실전 예제
+
+### 예제 1: 체력 시스템
+
+```cpp
+// ActorComponent 사용 (Transform 불필요)
+UCLASS()
+class UHealthComponent : public UActorComponent
+{
+    GENERATED_BODY()
+
+private:
+    UPROPERTY(EditAnywhere)
+    float MaxHealth = 100.0f;
+
+    float CurrentHealth;
+
+public:
+    void BeginPlay() override
+    {
+        CurrentHealth = MaxHealth;
+    }
+
+    void TakeDamage(float Damage)
+    {
+        CurrentHealth -= Damage;
+        if (CurrentHealth <= 0)
+        {
+            GetOwner()->Destroy();
+        }
+    }
+};
+
+// 사용:
+// Door Actor에 추가
+// Transform 없어도 됨 - 메모리 효율적!
+
+```
+
+### 예제 2: 회전하는 플랫폼
+
+```cpp
+// SceneComponent 사용 (Transform 필요)
+UCLASS()
+class URotatingComponent : public USceneComponent
+{
+    GENERATED_BODY()
+
+private:
+    UPROPERTY(EditAnywhere)
+    float RotationSpeed = 90.0f;  // 도/초
+
+public:
+    void TickComponent(float DeltaTime, ...) override
+    {
+        Super::TickComponent(DeltaTime, ...);
+
+        // Transform 직접 제어
+        FRotator NewRotation = GetComponentRotation();
+        NewRotation.Yaw += RotationSpeed * DeltaTime;
+        SetWorldRotation(NewRotation);
+    }
+};
+
+// 사용:
+// Platform Actor의 Mesh에 부착
+// 메시를 회전시킴
+
+```
+
+### 예제 3: 트리거 (우리 프로젝트)
+
+```cpp
+// BoxComponent 사용 (Transform + 충돌)
+UCLASS()
+class UTriggerComponent : public UBoxComponent
+{
+    GENERATED_BODY()
+
+public:
+    void BeginPlay() override
+    {
+        Super::BeginPlay();
+
+        // Transform 설정
+        SetBoxExtent(FVector(100, 100, 50));
+
+        // 충돌 감지
+        OnComponentBeginOverlap.AddDynamic(
+            this, &UTriggerComponent::OnOverlapBegin
+        );
+    }
+
+    UFUNCTION()
+    void OnOverlapBegin(UPrimitiveComponent* OverlappedComponent,
+                        AActor* OtherActor, ...)
+    {
+        UE_LOG(LogTemp, Display, TEXT("Something entered!"));
+    }
+};
+
+// 사용:
+// Door Actor에 추가
+// 플레이어 감지
+
+```
+
+---
+
+## 핵심 정리
+
+### 1. 언리얼은 "계층 구조"
+
+```
+ActorComponent (기본)
+    ↓
+SceneComponent (+ Transform)
+    ↓
+BoxComponent (+ Collision)
+
+```
+
+### 2. 유니티와의 차이
+
+**유니티**:
+
+- 모든 것이 Component
+- Transform 항상 있음
+- 단순하지만 유연성 낮음
+
+**언리얼**:
+
+- 다양한 컴포넌트 타입
+- Transform은 선택사항
+- 복잡하지만 유연성 높음
+
+### 3. 선택 기준
+
+```
+위치 필요 없음 → ActorComponent
+위치 필요 → SceneComponent
+충돌 필요 → BoxComponent/SphereComponent
+
+```
+
+### 4. 우리 프로젝트
+
+```
+UMover : public UActorComponent
+- 위치 불필요
+- 로직만 제공
+- GetOwner()로 액터 제어
+
+UTriggerComponent : public UBoxComponent
+- 위치 필요
+- 충돌 필요
+- 플레이어 감지
+
+```
+
+**언리얼의 컴포넌트는 더 세밀하고 최적화된 시스템! 🎯**
+
+# { C++ 생성자 (Constructor) 함수 }
+
+## 생성자란?
+
+**클래스의 객체가 생성될 때 자동으로 호출되는 특수 함수**
+
+```cpp
+Door door;  // ← 이 순간 생성자 호출!
+```
+
+---
+
+## 1. 생성자의 특징
+
+### 일반 함수와의 차이
+
+```cpp
+// 일반 함수
+void BeginPlay()  // 반환 타입 있음
+{
+    // ...
+}
+
+// 생성자
+UMover()  // 반환 타입 없음!
+{
+    // ...
+}
+```
+
+**생성자의 특수한 점**:
+
+1. **반환 타입 없음** (void도 없음)
+2. **클래스 이름과 동일**
+3. **자동으로 호출됨**
+
+---
+
+## 2. 생성자 선언과 정의
+
+### 헤더 파일 (.h)
+
+```cpp
+UCLASS()
+class UTriggerComponent : public UBoxComponent
+{
+    GENERATED_BODY()
+
+public:
+    // 생성자 선언
+    UTriggerComponent();  // 클래스 이름과 동일!
+
+protected:
+    virtual void BeginPlay() override;
+};
+```
+
+### 소스 파일 (.cpp)
+
+```cpp
+#include "TriggerComponent.h"
+
+// 생성자 정의
+UTriggerComponent::UTriggerComponent()
+{
+    // 초기화 코드
+}
+```
+
+---
+
+## 3. 생성자의 용도
+
+### 주요 사용 목적
+
+**1. 변수 초기화**:
+
+```cpp
+UTriggerComponent::UTriggerComponent()
+{
+    Health = 100.0f;
+    MaxSpeed = 600.0f;
+    bIsActive = true;
+}
+```
+
+**2. 컴포넌트 설정**:
+
+```cpp
+UTriggerComponent::UTriggerComponent()
+{
+    // Tick 활성화
+    PrimaryComponentTick.bCanEverTick = true;
+
+    // 충돌 설정
+    SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+}
+```
+
+**3. 서브 오브젝트 생성**:
+
+```cpp
+// AMyActor 클래스의 생성자
+// 이 액터가 생성될 때 딱 한 번 실행된다
+AMyActor::AMyActor()
+{
+    // ▶ UStaticMeshComponent 생성
+    // CreateDefaultSubobject 는
+    // "이 액터가 기본적으로 항상 가지고 있을 부품(컴포넌트)을 만든다"는 뜻
+    //
+    // UStaticMeshComponent :
+    //  - 3D 모델(메쉬)을 화면에 보여주는 컴포넌트
+    //
+    // TEXT("Mesh") :
+    //  - 에디터에서 보이는 이 컴포넌트의 이름
+    //  - 블루프린트/디테일 패널에서 식별용으로 사용됨
+    MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
+
+    // ▶ RootComponent 설정
+    // RootComponent 는 액터의 "기준점(중심)"
+    // 위치, 회전, 스케일의 기준이 된다
+    //
+    // 여기서는 MeshComponent를 루트로 지정했으므로
+    // 액터를 이동/회전하면 메쉬도 같이 움직인다
+    RootComponent = MeshComponent;
+}
+
+```
+
+---
+
+## 4. 변수 초기화: 두 가지 방법
+
+### 방법 1: 헤더에서 직접 초기화 (간단)
+
+```cpp
+// TriggerComponent.h
+UCLASS()
+class UTriggerComponent : public UBoxComponent
+{
+    GENERATED_BODY()
+
+private:
+    UPROPERTY(EditAnywhere)
+    float MoveTime = 4.0f;  // ← 여기서 초기화
+
+    UPROPERTY(EditAnywhere)
+    bool ShouldMove = false;  // ← 여기서 초기화
+};
+```
+
+**장점**:
+
+- ✅ 간결함
+- ✅ 값이 바로 보임
+
+**단점**:
+
+- ❌ 조건문 사용 불가
+- ❌ 복잡한 로직 불가
+
+### 방법 2: 생성자에서 초기화 (유연)
+
+```cpp
+// TriggerComponent.cpp
+UTriggerComponent::UTriggerComponent()
+{
+    MoveTime = 4.0f;  // ← 생성자에서 초기화
+    ShouldMove = false;
+
+    // 복잡한 로직 가능!
+    if (SomeCondition)
+    {
+        MoveTime = 10.0f;
+    }
+}
+```
+
+**장점**:
+
+- ✅ 조건문 사용 가능
+- ✅ 복잡한 로직 가능
+- ✅ 다른 함수 호출 가능
+
+**단점**:
+
+- ❌ 코드가 분산됨
+
+---
+
+## 5. PrimaryComponentTick 구조체
+
+### bCanEverTick 변수
+
+```cpp
+UTriggerComponent::UTriggerComponent()
+{
+    PrimaryComponentTick.bCanEverTick = true;  // Tick 활성화
+}
+```
+
+**의미**:
+
+- `bCanEverTick = true`: TickComponent() 매 프레임 호출
+- `bCanEverTick = false`: TickComponent() 호출 안 됨 (성능 최적화)
+
+### 'b' 접두사
+
+**언리얼 명명 규칙**:
+
+```cpp
+bool bCanEverTick;     // b = boolean
+bool bShouldMove;      // b = boolean
+bool bIsAlive;         // b = boolean
+
+float Health;          // 접두사 없음
+int32 Count;           // 접두사 없음
+```
+
+**규칙**: Bool 변수는 항상 'b'로 시작
+
+---
+
+## 6. PrimaryComponentTick의 다른 옵션들
+
+### 자주 사용하는 설정
+
+```cpp
+UTriggerComponent::UTriggerComponent()
+{
+    // Tick 관련
+    PrimaryComponentTick.bCanEverTick = true;  // Tick 활성화
+    PrimaryComponentTick.bStartWithTickEnabled = true;  // 시작부터 활성화
+    PrimaryComponentTick.TickInterval = 0.5f;  // 0.5초마다 Tick (성능 최적화)
+
+    // Tick 그룹 설정
+    PrimaryComponentTick.TickGroup = TG_PrePhysics;  // 물리 전에 실행
+}
+```
+
+### Tick 비활성화 (성능 최적화)
+
+```cpp
+UMyComponent::UMyComponent()
+{
+    // Tick이 필요 없으면 끄기
+    PrimaryComponentTick.bCanEverTick = false;
+}
+
+// TickComponent 함수를 만들지 않아도 됨
+```
+
+**언제 끄나?**
+
+- 매 프레임 업데이트 불필요한 경우
+- 이벤트 기반으로만 작동하는 경우
+- 성능 최적화가 중요한 경우
+
+---
+
+## 7. 생성자 호출 시점
+
+### 호출 순서
+
+```
+1. 에디터 로드 시
+   ↓
+2. 생성자 호출  ← 여기!
+   ↓
+3. 게임 시작
+   ↓
+4. BeginPlay 호출
+   ↓
+5. Tick 시작
+```
+
+### 중요한 차이점
+
+**생성자**:
+
+- ✅ 에디터에서도 실행됨
+- ✅ 게임 시작 전에 실행됨
+- ⚠️ 게임 월드 접근 제한적
+
+**BeginPlay**:
+
+- ✅ 게임 시작 시 실행
+- ✅ 게임 월드 완전 접근 가능
+- ❌ 에디터에서 실행 안 됨
+
+### 실제 로그 예시
+
+```cpp
+UTriggerComponent::UTriggerComponent()
+{
+    UE_LOG(LogTemp, Display, TEXT("Constructor called"));
+}
+
+void UTriggerComponent::BeginPlay()
+{
+    Super::BeginPlay();
+    UE_LOG(LogTemp, Display, TEXT("BeginPlay called"));
+}
+```
+
+**Output Log**:
+
+```
+# 에디터 로드 시
+LogTemp: Display: Constructor called  ← 게임 시작 전!
+
+# Play 버튼 클릭 시
+LogTemp: Display: BeginPlay called
+```
+
+---
+
+## 8. 생성자 vs BeginPlay 비교
+
+### 사용 구분
+
+| 작업               | 생성자          | BeginPlay            |
+| ------------------ | --------------- | -------------------- |
+| **변수 초기화**    | ✅ 권장         | ⚠️ 가능하지만 비권장 |
+| **Tick 설정**      | ✅ 권장         | ❌ 너무 늦음         |
+| **GetOwner()**     | ⚠️ nullptr 가능 | ✅ 안전              |
+| **다른 액터 찾기** | ❌ 불가능       | ✅ 가능              |
+| **게임 로직**      | ❌ 부적합       | ✅ 권장              |
+| **에디터 실행**    | ✅              | ❌                   |
+
+### 실전 가이드
+
+**생성자에서 하기**:
+
+```cpp
+UTriggerComponent::UTriggerComponent()
+{
+    // ✅ 기본값 설정
+    MoveTime = 4.0f;
+
+    // ✅ Tick 설정
+    PrimaryComponentTick.bCanEverTick = true;
+
+    // ✅ 충돌 설정
+    SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+}
+```
+
+**BeginPlay에서 하기**:
+
+```cpp
+void UTriggerComponent::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // ✅ Owner 접근
+    AActor* Owner = GetOwner();
+
+    // ✅ 다른 컴포넌트 찾기
+    Mover = Owner->FindComponentByClass<UMover>();
+
+    // ✅ 게임 로직
+    StartLocation = Owner->GetActorLocation();
+}
+```
+
+---
+
+## 9. 완성된 TriggerComponent 코드
+
+### TriggerComponent.h
+
+```cpp
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Components/BoxComponent.h"
+#include "TriggerComponent.generated.h"
+
+UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+class DUNGEONESCAPE_API UTriggerComponent : public UBoxComponent
+{
+    GENERATED_BODY()
+
+public:
+    // 생성자
+    UTriggerComponent();
+
+protected:
+    virtual void BeginPlay() override;
+
+public:
+    virtual void TickComponent(float DeltaTime,
+                               ELevelTick TickType,
+                               FActorComponentTickFunction* ThisTickFunction) override;
+};
+```
+
+### TriggerComponent.cpp
+
+```cpp
+#include "TriggerComponent.h"
+
+// 생성자: 객체 생성 시 자동 호출
+UTriggerComponent::UTriggerComponent()
+{
+    // Tick 활성화 (TickComponent 함수가 매 프레임 호출됨)
+    PrimaryComponentTick.bCanEverTick = true;
+
+    // 테스트 로그 (생성자는 에디터 로드 시에도 실행됨)
+    UE_LOG(LogTemp, Display, TEXT("Trigger component constructed!"));
+}
+
+// BeginPlay: 게임 시작 시 호출
+void UTriggerComponent::BeginPlay()
+{
+    Super::BeginPlay();  // 부모 클래스 초기화 (필수!)
+
+    UE_LOG(LogTemp, Display, TEXT("Trigger component is alive!"));
+}
+
+// TickComponent: 매 프레임 호출 (bCanEverTick = true일 때)
+void UTriggerComponent::TickComponent(float DeltaTime,
+                                       ELevelTick TickType,
+                                       FActorComponentTickFunction* ThisTickFunction)
+{
+    Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+    // 매 프레임 실행할 코드
+}
+```
+
+---
+
+## 10. 실전 예제
+
+### 예제 1: 기본 초기화
+
+```cpp
+class UHealthComponent : public UActorComponent
+{
+private:
+    float Health;
+    float MaxHealth;
+
+public:
+    UHealthComponent()
+    {
+        // 생성자에서 초기화
+        MaxHealth = 100.0f;
+        Health = MaxHealth;
+
+        // Tick 불필요 (이벤트 기반)
+        PrimaryComponentTick.bCanEverTick = false;
+    }
+};
+```
+
+### 예제 2: 조건부 초기화
+
+```cpp
+class UDifficultyComponent : public UActorComponent
+{
+private:
+    float EnemyHealth;
+
+public:
+    UDifficultyComponent()
+    {
+        // 난이도에 따라 다르게 초기화
+        if (GetWorld()->GetGameState()->Difficulty == HARD)
+        {
+            EnemyHealth = 200.0f;
+        }
+        else
+        {
+            EnemyHealth = 100.0f;
+        }
+    }
+};
+```
+
+### 예제 3: 서브 컴포넌트 생성
+
+```cpp
+class AMyCharacter : public ACharacter
+{
+private:
+    UStaticMeshComponent* Weapon;
+
+public:
+    AMyCharacter()
+    {
+        // 생성자에서 컴포넌트 생성
+        Weapon = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Weapon"));
+        Weapon->SetupAttachment(GetMesh(), TEXT("WeaponSocket"));
+
+        PrimaryActorTick.bCanEverTick = true;
+    }
+};
+```
+
+---
+
+## 11. 디버깅 팁
+
+### 생성자 실행 확인
+
+```cpp
+UTriggerComponent::UTriggerComponent()
+{
+    // 어느 시점에 호출되는지 확인
+    UE_LOG(LogTemp, Warning, TEXT("=== Constructor Start ==="));
+
+    PrimaryComponentTick.bCanEverTick = true;
+
+    UE_LOG(LogTemp, Warning, TEXT("=== Constructor End ==="));
+}
+
+void UTriggerComponent::BeginPlay()
+{
+    Super::BeginPlay();
+    UE_LOG(LogTemp, Warning, TEXT("=== BeginPlay ==="));
+}
+```
+
+**Output**:
+
+```
+# 에디터 열 때
+LogTemp: Warning: === Constructor Start ===
+LogTemp: Warning: === Constructor End ===
+
+# Play 클릭
+LogTemp: Warning: === BeginPlay ===
+```
+
+---
+
+## 핵심 정리
+
+### 1. 생성자란?
+
+```cpp
+UTriggerComponent()  // 클래스명과 동일, 반환 타입 없음
+{
+    // 객체 생성 시 자동 호출
+}
+```
+
+### 2. 주요 용도
+
+- 변수 기본값 설정
+- Tick 활성화/비활성화
+- 충돌 설정
+- 컴포넌트 생성
+
+### 3. PrimaryComponentTick
+
+```cpp
+PrimaryComponentTick.bCanEverTick = true;  // Tick 활성화
+```
+
+### 4. 호출 시점
+
+```
+생성자 → BeginPlay → Tick
+(에디터)  (게임 시작)  (매 프레임)
+```
+
+### 5. 생성자 vs BeginPlay
+
+- **생성자**: 초기 설정
+- **BeginPlay**: 게임 로직
+
+### 6. 'b' 접두사
+
+```cpp
+bool bCanEverTick;  // Bool 변수는 'b'로 시작
+```
+
+**생성자로 깔끔한 초기화! 🎯**
+
+# { Unreal Engine: 컴포넌트 간 연결 완벽 가이드 }
+
+## 🎯 이 튜토리얼의 목적
+
+문에 닿으면 문이 열리는 트리거를 만들기 위해, **트리거 컴포넌트**가 **무버 컴포넌트**를 찾아서 활성화하는 방법을 배웁니다.
+
+---
+
+## 📌 전체 구조 이해하기
+
+```
+[문 액터 (Actor)]
+    ├─ [무버 컴포넌트] ← 문을 움직이게 하는 컴포넌트
+    └─ [메시 등 다른 컴포넌트들]
+
+[큐브 액터 (Actor)]
+    └─ [트리거 컴포넌트] ← 플레이어가 닿으면 감지하는 컴포넌트
+```
+
+**목표:** 트리거 컴포넌트 → 문 액터 → 무버 컴포넌트로 연결하기
+
+---
+
+## 📝 1단계: 문 액터를 선택할 수 있게 만들기
+
+### 헤더 파일 (TriggerComponent.h)
+
+```cpp
+class MYPROJECT_API UTriggerComponent : public UActorComponent
+{
+    GENERATED_BODY()
+
+    // 에디터에서 선택할 수 있는 액터 포인터
+    UPROPERTY(EditAnywhere)
+    AActor* MoverActor;
+};
+```
+
+### 용어 설명
+
+- **`UPROPERTY(EditAnywhere)`**: 언리얼 에디터에서 값을 설정할 수 있게 만드는 매크로
+- **`AActor*`**: 액터를 가리키는 포인터 (주소를 저장하는 변수)
+- **`MoverActor`**: 변수 이름 (문 액터를 저장할 공간)
+
+### 에디터에서 설정하기
+
+1. 큐브 액터 선택
+2. Details 패널에서 "Trigger Component" 찾기
+3. "Mover Actor" 항목에서 문 액터 선택
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380624/notion-blog/_/_/_5_C_/_3_Dungeon_Escape_-_3/image_1.png)
+
+---
+
+## 📝 2단계: 무버 컴포넌트를 사용할 준비하기
+
+### 헤더 파일에 include 추가
+
+```cpp
+// TriggerComponent.h
+
+#include "CoreMinimal.h"
+#include "Components/ActorComponent.h"
+#include "Mover.h"  // ⚠️ 반드시 아래 줄보다 위에 작성!
+#include "TriggerComponent.generated.h"  // 이것보다 위에!
+```
+
+### 왜 순서가 중요한가?
+
+`.generated.h` 파일은 언리얼이 자동 생성하는 파일입니다. 이 파일이 다른 include들을 참조하기 때문에 **반드시 맨 마지막**에 와야 합니다.
+
+### 무버 포인터 변수 추가
+
+```cpp
+class MYPROJECT_API UTriggerComponent : public UActorComponent
+{
+    GENERATED_BODY()
+
+public:
+    UPROPERTY(EditAnywhere)
+    AActor* MoverActor;  // 1단계에서 만든 것
+
+    UMover* Mover;  // 무버 컴포넌트를 저장할 변수
+};
+```
+
+---
+
+## 📝 3단계: BeginPlay에서 컴포넌트 찾기
+
+### 소스 파일 (TriggerComponent.cpp)
+
+```cpp
+void UTriggerComponent::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 1단계: MoverActor가 설정되어 있는지 확인
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    if (MoverActor != nullptr)
+    {
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 2단계: 액터에서 UMover 컴포넌트 찾기
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        Mover = MoverActor->FindComponentByClass<UMover>();
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 3단계: 컴포넌트를 찾았는지 확인
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        if (Mover != nullptr)
+        {
+            // 성공! 무버를 활성화
+            Mover->ShouldMove = true;
+            UE_LOG(LogTemp, Display, TEXT("무버 컴포넌트를 성공적으로 찾았습니다!"));
+        }
+        else
+        {
+            // 실패: 액터에 무버 컴포넌트가 없음
+            UE_LOG(LogTemp, Warning, TEXT("무버 컴포넌트를 찾을 수 없습니다!"));
+        }
+    }
+    else
+    {
+        // 실패: MoverActor가 설정되지 않음
+        UE_LOG(LogTemp, Error, TEXT("MoverActor가 nullptr입니다!"));
+    }
+}
+```
+
+---
+
+## 🔍 코드 상세 분석
+
+### 1. Null 체크란?
+
+```cpp
+if (MoverActor != nullptr)
+
+```
+
+- **nullptr**: "아무것도 가리키지 않는 포인터"
+- **체크 이유**: nullptr인 포인터를 사용하면 게임이 크래시됨
+- **비유**: 빈 상자를 열려고 하면 오류가 나는 것과 같음
+
+### 2. FindComponentByClass 함수
+
+```cpp
+Mover = MoverActor->FindComponentByClass<UMover>();
+
+```
+
+### 동작 원리
+
+1. `MoverActor` (문 액터)가 가진 모든 컴포넌트를 검색
+2. `UMover` 타입의 컴포넌트를 찾음
+3. 찾으면 → 그 컴포넌트의 포인터 반환
+4. 못 찾으면 → nullptr 반환
+
+### 문법 설명
+
+- `>`: 포인터로 멤버에 접근할 때 사용
+- `<UMover>`: 템플릿 문법 (어떤 타입을 찾을지 지정)
+
+### 3. 포인터 사용
+
+```cpp
+Mover->ShouldMove = true;
+
+```
+
+- `Mover`: 포인터 변수
+- `>`: "포인터가 가리키는 대상의 멤버에 접근"
+- `ShouldMove`: 무버 컴포넌트의 변수 (true면 움직임)
+
+---
+
+## 🎬 실행 시나리오
+
+### 시나리오 1: MoverActor 미설정
+
+```
+에디터에서 Mover Actor를 선택하지 않음
+    ↓
+MoverActor == nullptr
+    ↓
+출력: "MoverActor가 nullptr입니다!"
+    ↓
+문이 움직이지 않음
+
+```
+
+### 시나리오 2: 잘못된 액터 선택
+
+```
+의자 액터를 Mover Actor로 선택 (무버 컴포넌트 없음)
+    ↓
+MoverActor != nullptr (통과)
+    ↓
+FindComponentByClass 실행
+    ↓
+Mover == nullptr (무버 컴포넌트를 못 찾음)
+    ↓
+출력: "무버 컴포넌트를 찾을 수 없습니다!"
+    ↓
+문이 움직이지 않음
+
+```
+
+### 시나리오 3: 정상 작동 ✅
+
+```
+문 액터를 Mover Actor로 선택 (무버 컴포넌트 있음)
+    ↓
+MoverActor != nullptr (통과)
+    ↓
+FindComponentByClass 실행
+    ↓
+Mover != nullptr (무버 컴포넌트 발견!)
+    ↓
+Mover->ShouldMove = true 실행
+    ↓
+출력: "무버 컴포넌트를 성공적으로 찾았습니다!"
+    ↓
+문이 움직임! 🚪
+
+```
+
+---
+
+## 🛡️ 안전한 코딩 습관
+
+### 항상 Null 체크하기
+
+```cpp
+// ❌ 나쁜 예 - 크래시 위험!
+Mover = MoverActor->FindComponentByClass<UMover>();
+Mover->ShouldMove = true;  // Mover가 nullptr이면 크래시!
+
+// ✅ 좋은 예
+if (Mover != nullptr)
+{
+    Mover->ShouldMove = true;  // 안전!
+}
+
+```
+
+### 디버그 로그 활용
+
+```cpp
+UE_LOG(LogTemp, Display, TEXT("변수 값: %d"), SomeValue);
+UE_LOG(LogTemp, Warning, TEXT("경고 메시지"));
+UE_LOG(LogTemp, Error, TEXT("에러 발생!"));
+
+```
+
+- 게임 실행 중 Output Log에서 확인 가능
+- 문제 해결에 매우 유용!
+
+---
+
+## 💡 핵심 개념 정리
+
+| 개념                     | 설명                          | 비유                      |
+| ------------------------ | ----------------------------- | ------------------------- |
+| **포인터**               | 메모리 주소를 저장하는 변수   | 집 주소가 적힌 쪽지       |
+| **nullptr**              | 아무것도 가리키지 않는 포인터 | 빈 쪽지                   |
+| **->**                   | 포인터로 멤버 접근            | 주소로 집을 찾아감        |
+| **FindComponentByClass** | 특정 타입의 컴포넌트 검색     | 서랍장에서 특정 물건 찾기 |
+| **UPROPERTY**            | 언리얼 에디터와 연동          | 에디터에서 값 조정 가능   |
+
+---
+
+## 🚀 다음 단계
+
+이 패턴을 응용하면:
+
+- 버튼을 눌러 라이트 켜기
+- 열쇠로 문 열기
+- 스위치로 다리 내리기
+
+**모든 액터/컴포넌트 간 통신에 동일한 방식을 사용할 수 있습니다!**
+
+# { C++의 Truthy와 Falsy 값 & 포인터 검사 간소화 }
+
+## 🎯 목표
+
+Null 포인터 검사를 더 간결하고 깔끔하게 작성하는 방법 배우기
+
+---
+
+## 📚 C++의 Truthy(참 값)와 Falsy(거짓 값)
+
+### Truthy - 참으로 간주되는 값들
+
+```cpp
+true                    // boolean 키워드
+"Hello"                 // 문자열
+'A'                     // 문자
+10                      // 양수 정수
+-999                    // 음수
+3.14f                   // 부동소수점
+유효한 포인터             // 실제 주소를 가진 포인터
+```
+
+**핵심:** 0이 아닌 모든 값은 참!
+
+### Falsy - 거짓으로 간주되는 값들
+
+```cpp
+false                   // boolean 키워드
+0                       // 정수 0
+0.0f                    // 부동소수점 0
+nullptr                 // C++ 권장 (null 포인터)
+NULL                    // C 스타일 (구식, 사용 지양)
+```
+
+**핵심:** 0 또는 null 관련 값은 거짓!
+
+---
+
+## 🔍 포인터와 Truthy/Falsy
+
+### 포인터의 특성
+
+```cpp
+// ✅ Truthy - 유효한 포인터
+AActor* MyActor = GetWorld()->SpawnActor<AActor>();
+// MyActor는 실제 메모리 주소(0이 아닌 값)를 가짐 → True
+
+// ❌ Falsy - Null 포인터들
+AActor* Actor1 = nullptr;    // False
+AActor* Actor2 = NULL;       // False (구식)
+AActor* Actor3 = 0;          // False (가능하지만 비권장)
+```
+
+### 왜 포인터가 True/False인가?
+
+- **유효한 포인터**: 메모리 주소 저장 (예: `0x12345678`) → 0이 아닌 값 → **True**
+- **Null 포인터**: 주소가 없음 (값이 `0`) → **False**
+
+---
+
+## 🔄 코드 간소화: Before & After
+
+### ❌ 기존 방식 (장황함)
+
+```cpp
+void UTriggerComponent::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // 명시적으로 nullptr과 비교
+    if (MoverActor != nullptr)
+    {
+        Mover = MoverActor->FindComponentByClass<UMover>();
+
+        // 또 다시 명시적 비교
+        if (Mover != nullptr)
+        {
+            Mover->ShouldMove = true;
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Mover component not found"));
+        }
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("MoverActor is nullptr"));
+    }
+}
+```
+
+### ✅ 간소화된 방식 (깔끔함)
+
+```cpp
+void UTriggerComponent::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // 포인터 자체를 조건으로 사용
+    if (MoverActor)  // MoverActor != nullptr과 동일!
+    {
+        Mover = MoverActor->FindComponentByClass<UMover>();
+
+        if (Mover)  // Mover != nullptr과 동일!
+        {
+            Mover->ShouldMove = true;
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Mover component not found"));
+        }
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("MoverActor is nullptr"));
+    }
+}
+```
+
+---
+
+## 📖 동작 원리 상세 설명
+
+### if (MoverActor) 분석
+
+```cpp
+if (MoverActor)  // 이렇게 쓰면...
+```
+
+### 내부 동작
+
+```
+1. MoverActor의 값 확인
+2. 값이 nullptr(0)인가?
+   └─ Yes → False → else 블록 실행
+   └─ No → True → if 블록 실행
+```
+
+### 두 표현은 완전히 동일!
+
+```cpp
+if (MoverActor)           // 간결한 방식
+if (MoverActor != nullptr) // 명시적 방식
+// 컴파일 후 생성되는 코드는 정확히 같음!
+```
+
+---
+
+## 🚫 논리 NOT 연산자 (!)
+
+### Null을 확인하는 또 다른 방법
+
+```cpp
+AActor* MyActor = nullptr;
+
+// 방법 1: 명시적 비교
+if (MyActor == nullptr)
+{
+    // MyActor가 null일 때 실행
+}
+
+// 방법 2: 논리 NOT 사용
+if (!MyActor)  // "MyActor가 아니라면" → "null이라면"
+{
+    // MyActor가 null일 때 실행
+}
+```
+
+### 실전 예제
+
+```cpp
+void UTriggerComponent::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // MoverActor가 없으면 경고하고 종료
+    if (!MoverActor)  // MoverActor == nullptr과 동일
+    {
+        UE_LOG(LogTemp, Error, TEXT("MoverActor is not set!"));
+        return;  // 더 이상 진행 안 함
+    }
+
+    // 여기부터는 MoverActor가 유효하다는 것이 보장됨
+    Mover = MoverActor->FindComponentByClass<UMover>();
+
+    if (!Mover)  // Mover == nullptr과 동일
+    {
+        UE_LOG(LogTemp, Warning, TEXT("No Mover component"));
+        return;
+    }
+
+    // 여기서는 Mover도 유효함
+    Mover->ShouldMove = true;
+```
+
+---
+
+## 💡 다양한 if 문 스타일 비교
+
+### 같은 의미, 다른 표현
+
+```cpp
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 패턴 1: 포인터가 유효한지 확인
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+if (Mover != nullptr) { }  // 가장 명시적
+if (Mover)            { }  // 가장 간결 ✅ (실무에서 선호)
+if (nullptr != Mover) { }  // 가독성 떨어짐 (비권장)
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 패턴 2: 포인터가 null인지 확인
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+if (Mover == nullptr) { }  // 명시적
+if (!Mover)           { }  // 간결 ✅ (실무에서 선호)
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 실무 권장 스타일
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Early return 패턴 (가독성 최고!)
+if (!Mover) return;  // null이면 바로 리턴
+Mover->ShouldMove = true;  // 유효성이 보장된 상태
+```
+
+---
+
+## 🎨 실전 코드 스타일 가이드
+
+### ⭐ 추천 스타일 (깔끔하고 읽기 쉬움)
+
+```cpp
+void UTriggerComponent::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // Early return으로 유효성 검사
+    if (!MoverActor)
+    {
+        UE_LOG(LogTemp, Error, TEXT("MoverActor not set"));
+        return;
+    }
+
+    Mover = MoverActor->FindComponentByClass<UMover>();
+
+    if (!Mover)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Mover component not found"));
+        return;
+    }
+
+    // 이 시점에서 모든 것이 유효함
+    Mover->ShouldMove = true;
+    UE_LOG(LogTemp, Display, TEXT("Mover activated successfully"));
+}
+```
+
+### 왜 이 스타일이 좋은가?
+
+1. **중첩 감소**: if 안에 if 안에 if... 없음
+2. **명확한 흐름**: 위에서 아래로 읽기 쉬움
+3. **오류 우선 처리**: 문제부터 걸러냄
+4. **유효성 보장**: 마지막 코드는 안전함
+
+---
+
+## 📋 핵심 개념 정리 테이블
+
+| 표현식                | 의미               | 결과       | 추천도          |
+| --------------------- | ------------------ | ---------- | --------------- |
+| `if (ptr != nullptr)` | 포인터가 유효한가? | True/False | ⭐⭐⭐ 명시적   |
+| `if (ptr)`            | 포인터가 유효한가? | True/False | ⭐⭐⭐⭐⭐ 간결 |
+| `if (ptr == nullptr)` | 포인터가 null인가? | True/False | ⭐⭐⭐ 명시적   |
+| `if (!ptr)`           | 포인터가 null인가? | True/False | ⭐⭐⭐⭐⭐ 간결 |
+| `if (NULL)`           | 사용하지 말 것!    | -          | ❌ 구식         |
+
+---
+
+## 🎯 실전 팁
+
+### 1. nullptr vs NULL vs 0
+
+```cpp
+// ✅ 현대 C++ (C++11 이후)
+AActor* Actor = nullptr;  // 타입 안전, 명확한 의도
+
+// ⚠️ 구식 C 스타일
+AActor* Actor = NULL;     // 사용 가능하지만 비권장
+
+// ❌ 혼란스러움
+AActor* Actor = 0;        // 문법상 가능하지만 의도가 불명확
+```
+
+### 2. 언제 명시적으로 쓸까?
+
+```cpp
+// 간단한 null 체크 → 간결하게
+if (Mover) { }
+
+// 복잡한 조건 → 명시적으로
+if (Mover != nullptr && Mover->IsActive() && !Mover->IsPaused())
+{
+    // 조건이 복잡하면 != nullptr를 써서 명확하게
+}
+```
+
+### 3. 주석 활용
+
+```cpp
+// 처음에는 주석으로 이해 돕기
+if (MoverActor)  // nullptr 체크와 동일
+{
+    // ...
+}
+
+// 익숙해지면 주석 제거
+if (MoverActor)
+{
+    // ...
+}
+```
+
+---
+
+## 🔥 실무에서 자주 보는 패턴
+
+```cpp
+// 패턴 1: Early return (가장 흔함)
+if (!MyPointer) return;
+
+// 패턴 2: 유효성 검사 후 사용
+if (MyPointer)
+{
+    MyPointer->DoSomething();
+}
+
+// 패턴 3: 삼항 연산자
+int Value = MyPointer ? MyPointer->GetValue() : 0;
+
+// 패턴 4: 체이닝
+if (Actor && Actor->GetComponent() && Actor->GetComponent()->IsValid())
+{
+    // 모든 단계가 유효할 때만 실행
+}
+```
+
+---
+
+## ✅ 마무리 체크리스트
+
+- [ ] Truthy/Falsy 개념 이해
+- [ ] 포인터가 0이 아닌 값 = True 이해
+- [ ] `if (ptr)`와 `if (ptr != nullptr)` 동일함 이해
+- [ ] `!ptr`로 null 체크 가능함 이해
+- [ ] Early return 패턴 사용해보기
+- [ ] nullptr 사용 (NULL 대신)
+
+**핵심 메시지:** 간결하고 읽기 쉬운 코드가 좋은 코드! 🚀

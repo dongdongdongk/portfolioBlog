@@ -1,0 +1,3388 @@
+---
+title: 'React.js & 백엔드 연결하기'
+date: '2026-09-02'
+category: '풀스택/React, NodeJS, Express 및 MongoDB - MERN 풀스택 가이드'
+tags: ['풀스택', 'React, NodeJS, Express 및 MongoDB - MERN 풀스택 가이드']
+draft: false
+summary: ''
+---
+
+## 회원등록 기능 연결하기 (임시)
+
+```jsx
+import React, { useState, useContext } from 'react'
+
+import Card from '../../shared/components/UIElements/Card'
+import Input from '../../shared/components/FormElements/Input'
+import Button from '../../shared/components/FormElements/Button'
+import { useForm } from '../../shared/hooks/form-hook'
+import {
+  VALIDATOR_EMAIL,
+  VALIDATOR_MINLENGTH,
+  VALIDATOR_REQUIRE,
+} from '../../shared/util/validators'
+import { AuthContext } from '../../shared/context/auth-context'
+
+import './Auth.css'
+
+const Auth = () => {
+  const auth = useContext(AuthContext)
+  const [isLoginMode, setIsLoginMode] = useState(true)
+  const [formState, inputHandler, setFormData] = useForm(
+    {
+      email: {
+        value: '',
+        isValid: false,
+      },
+      password: {
+        value: '',
+        isValid: false,
+      },
+    },
+    false
+  )
+
+  const switchModeHandler = () => {
+    if (!isLoginMode) {
+      setFormData(
+        {
+          ...formState.inputs,
+          name: undefined,
+        },
+        formState.inputs.email.isValid && formState.inputs.password.isValid
+      )
+    } else {
+      setFormData(
+        {
+          ...formState.inputs,
+          name: {
+            value: '',
+            isValid: false,
+          },
+        },
+        false
+      )
+    }
+    setIsLoginMode((prevMode) => !prevMode)
+  }
+
+  const authSubmitHandler = async (event) => {
+    event.preventDefault()
+
+    if (isLoginMode) {
+    } else {
+      try {
+        const response = await fetch('http://localhost:5000/api/users/signup', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: formState.inputs.name.value,
+            email: formState.inputs.email.value,
+            password: formState.inputs.password.value,
+          }),
+        })
+        console.log(response)
+        const responseData = await response.json()
+        auth.login()
+      } catch (error) {
+        console.log(error)
+      }
+    }
+  }
+
+  return (
+    <Card className="authentication">
+      <h1>Login Required</h1>
+      <hr />
+      <form onSubmit={authSubmitHandler}>
+        {!isLoginMode && (
+          <Input
+            element="input"
+            id="name"
+            type="text"
+            label="Name"
+            validators={[VALIDATOR_REQUIRE()]}
+            errorText="Please enter a name"
+            onInput={inputHandler}
+          />
+        )}
+        <Input
+          element="input"
+          id="email"
+          type="email"
+          label="E-Mail"
+          validators={[VALIDATOR_EMAIL()]}
+          errorText="Please enter a valid email address."
+          onInput={inputHandler}
+        />
+        <Input
+          element="input"
+          id="password"
+          type="password"
+          label="Password"
+          validators={[VALIDATOR_MINLENGTH(5)]}
+          errorText="Please enter a valid password at least 5 Ch."
+          onInput={inputHandler}
+        />
+        <Button type="submit" disabled={!formState.isValid}>
+          {isLoginMode ? 'LOGIN' : 'SIGNUP'}
+        </Button>
+      </form>
+      <Button inverse onClick={switchModeHandler}>
+        SWITCH TO {isLoginMode ? 'SIGNUP' : 'LOGIN'}
+      </Button>
+    </Card>
+  )
+}
+
+export default Auth
+```
+
+```jsx
+회원 등록을 위해서 fetch 를 사용한 코드를 추가한다
+
+    const authSubmitHandler = async (event) => {
+        event.preventDefault();
+
+        if (isLoginMode) {
+
+        } else {
+            try {
+                const response = await fetch('http://localhost:5000/api/users/signup', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: formState.inputs.name.value,
+                        email: formState.inputs.email.value,
+                        password: formState.inputs.password.value
+                    })
+                });
+                console.log(response);
+                const responseData = await response.json();
+                auth.login();
+            } catch (error) {
+                console.log(error)
+            }
+        }
+    }
+
+그리고 폼을 제출하면 오류가 나는데 이는 cors 오류 때문이다
+
+* 여기서 form 에 실수해서 버튼을 두개다 넣어버려서 오류가 발생했었다 form 에 버튼을 넣을때는 조심하자....
+```
+
+# CORS 오류 처리하기
+
+```jsx
+const express = require('express')
+
+const placesRoutes = require('./routes/places-route')
+const usersRoutes = require('./routes/user-route')
+const HttpError = require('./models/http-error')
+
+const app = express()
+// mongoose 라이브러리 불러오기
+const mongoose = require('mongoose')
+
+app.use(express.json()) // 본문 라우터 위에 있어야 한다 순서대로 읽기 때문
+app.use(express.urlencoded({ extended: true }))
+
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Origin, X-Requested-With, Content-Type, Accept, Authorization'
+  )
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE')
+
+  next()
+})
+
+app.use('/api/places', placesRoutes) // => /api/places/ 로 시작하는 요청 라우팅
+app.use('/api/users', usersRoutes)
+
+// 에러 핸들링 미들웨어: 요청이 들어올 때 항상 실행되는 미들웨어입니다.
+app.use((req, res, next) => {
+  // HttpError 모델을 사용하여 '없는 페이지' 에러를 생성합니다.
+  const error = new HttpError('없는 페이지 입니다', 404)
+
+  // 생성한 에러를 던져서 다음 에러 핸들러로 전달합니다.
+  throw error
+})
+
+// 에러 핸들링 미들웨어: 이전에 던져진 에러를 처리하는 미들웨어입니다.
+app.use((error, req, res, next) => {
+  // 이미 응답이 전송되었는지 확인합니다.
+  if (res.headersSent) {
+    // 이미 응답이 전송된 경우 다음 에러 핸들러로 이동합니다.
+    return next(error)
+  }
+
+  // 에러 응답을 전송합니다. 에러 코드가 정의되어 있지 않으면 500을 사용합니다.
+  res.status(error.code || 500).json({ message: error.message || '알 수 없는 에러' })
+})
+
+// MongoDB 서버에 연결
+mongoose
+  .connect(
+    'mongodb+srv://dhk9309:kim1458@cluster0.ckluwao.mongodb.net/mern?retryWrites=true&w=majority'
+  )
+  .then(() => {
+    console.log('데이터 베이스 연결 성공')
+  })
+  .catch(() => {
+    console.log('데이터 베이스 연결 실패')
+  })
+
+app.listen(5000)
+```
+
+```jsx
+서버의 app.js 에 새로운 미들웨어를 등록해준다
+
+app.use((req, res, next) => {
+    // 1. 모든 도메인에 대해 자원 공유를 허용합니다.
+    res.setHeader('Access-Control-Allow-Origin', '*');
+
+    // 2. 허용되는 헤더를 설정합니다.
+    res.setHeader(
+        'Access-Control-Allow-Headers',
+        'Origin, X-Requested-With, Content-Type, Accept, Authorization'
+    );
+
+    // 3. 허용되는 HTTP 메소드를 설정합니다.
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE');
+
+    // 다음 미들웨어로 이동합니다.
+    next();
+});
+
+이부분인데 cors 오류를 해결할 수 있다
+
+라이브러리를 사용할수도 있지만 이번에는 그냥 코드를 입력해서 해결하였다
+```
+
+```jsx
+상세 설명:
+
+res.setHeader('Access-Control-Allow-Origin', '*');:
+
+이 헤더는 모든 도메인에 대해 자원 공유를 허용하도록 설정한다.
+
+*는 모든 도메인을 의미합니다. 이렇게 설정하면 어떤 도메인에서도 이 서버의 자원에 접근할 수 있게 된다.
+
+만약 특정 도메인만을 허용하려면 해당 도메인을 명시적으로 지정할 수 있다. ( 클라이언트 주소를 적어주면 된다 )
+
+res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');:
+
+이 헤더는 허용되는 요청 헤더를 설정한다. 여기에 명시된 헤더들은 클라이언트가 서버로 보낼 수 있는 요청 헤더의 목록이다.
+
+예를 들어, 브라우저가 AJAX 요청을 보낼 때 이 헤더들이 허용되지 않으면 브라우저는 요청을 차단한다.
+
+res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE');:
+
+이 헤더는 허용되는 HTTP 메소드를 설정한다.
+
+여기에 명시된 메소드들은 클라이언트가 서버에게 허용된 메소드로 요청할 수 있다.
+
+위 코드에서는 GET, POST, PATCH, DELETE 메소드를 허용하고 있다.
+```
+
+# 로딩 스피너 추가하기
+
+```jsx
+// Auth.js
+
+import React, { useState, useContext } from 'react'
+
+import Card from '../../shared/components/UIElements/Card'
+import Input from '../../shared/components/FormElements/Input'
+import Button from '../../shared/components/FormElements/Button'
+import ErrorModal from '../../shared/components/UIElements/ErrorModal'
+import LoadingSpinner from '../../shared/components/UIElements/LoadingSpinner'
+import { useForm } from '../../shared/hooks/form-hook'
+import {
+  VALIDATOR_EMAIL,
+  VALIDATOR_MINLENGTH,
+  VALIDATOR_REQUIRE,
+} from '../../shared/util/validators'
+import { AuthContext } from '../../shared/context/auth-context'
+
+import './Auth.css'
+
+const Auth = () => {
+  const auth = useContext(AuthContext)
+  const [isLoginMode, setIsLoginMode] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState()
+  const [formState, inputHandler, setFormData] = useForm(
+    {
+      email: {
+        value: '',
+        isValid: false,
+      },
+      password: {
+        value: '',
+        isValid: false,
+      },
+    },
+    false
+  )
+
+  const switchModeHandler = () => {
+    if (!isLoginMode) {
+      setFormData(
+        {
+          ...formState.inputs,
+          name: undefined,
+        },
+        formState.inputs.email.isValid && formState.inputs.password.isValid
+      )
+    } else {
+      setFormData(
+        {
+          ...formState.inputs,
+          name: {
+            value: '',
+            isValid: false,
+          },
+        },
+        false
+      )
+    }
+    setIsLoginMode((prevMode) => !prevMode)
+  }
+
+  const authSubmitHandler = async (event) => {
+    event.preventDefault()
+
+    if (isLoginMode) {
+    } else {
+      try {
+        setIsLoading(true)
+        const response = await fetch('http://localhost:5000/api/users/signup', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: formState.inputs.name.value,
+            email: formState.inputs.email.value,
+            password: formState.inputs.password.value,
+          }),
+        })
+        console.log(response)
+        const responseData = await response.json()
+        setIsLoading(false)
+        auth.login()
+      } catch (error) {
+        setIsLoading(false)
+        setError(error.message || '알수없는 오류가 발생 하였습니다')
+      }
+    }
+  }
+
+  return (
+    <Card className="authentication">
+      {isLoading && <LoadingSpinner asOverlay />}
+      <h1>Login Required</h1>
+      <hr />
+      <form onSubmit={authSubmitHandler}>
+        {!isLoginMode && (
+          <Input
+            element="input"
+            id="name"
+            type="text"
+            label="Name"
+            validators={[VALIDATOR_REQUIRE()]}
+            errorText="Please enter a name"
+            onInput={inputHandler}
+          />
+        )}
+        <Input
+          element="input"
+          id="email"
+          type="email"
+          label="E-Mail"
+          validators={[VALIDATOR_EMAIL()]}
+          errorText="Please enter a valid email address."
+          onInput={inputHandler}
+        />
+        <Input
+          element="input"
+          id="password"
+          type="password"
+          label="Password"
+          validators={[VALIDATOR_MINLENGTH(5)]}
+          errorText="Please enter a valid password at least 5 Ch."
+          onInput={inputHandler}
+        />
+        <Button type="submit" disabled={!formState.isValid}>
+          {isLoginMode ? 'LOGIN' : 'SIGNUP'}
+        </Button>
+      </form>
+      <Button inverse onClick={switchModeHandler}>
+        SWITCH TO {isLoginMode ? 'SIGNUP' : 'LOGIN'}
+      </Button>
+    </Card>
+  )
+}
+
+export default Auth
+```
+
+```jsx
+// LoadingSpinner.js
+
+import React from 'react'
+
+import './LoadingSpinner.css'
+
+const LoadingSpinner = (props) => {
+  return (
+    <div className={`${props.asOverlay && 'loading-spinner__overlay'}`}>
+      <div className="lds-dual-ring"></div>
+    </div>
+  )
+}
+
+export default LoadingSpinner
+```
+
+```jsx
+// LoadingSpinner.css
+
+.lds-dual-ring {
+  display: inline-block;
+  width: 64px;
+  height: 64px;
+}
+
+.lds-dual-ring:after {
+  content: ' ';
+  display: block;
+  width: 46px;
+  height: 46px;
+  margin: 1px;
+  border-radius: 50%;
+  border: 5px solid #510077;
+  border-color: #510077 transparent #510077 transparent;
+  animation: lds-dual-ring 1.2s linear infinite;
+}
+
+.loading-spinner__overlay {
+  height: 100%;
+  width: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+@keyframes lds-dual-ring {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+```
+
+```jsx
+Auth 컴포넌트의 상태 설정:
+
+Auth 컴포넌트에서 isLoading 상태를 useState(false)로 초기화한다.
+
+isLoading은 데이터 로딩 중에는 true로 설정되고, 로딩이 완료되면 다시 false로 설정된다.
+
+로딩 스피너 컴포넌트의 조건부 렌더링:
+
+LoadingSpinner 컴포넌트는 asOverlay 프로퍼티를 받아와서, 이 값이 참일 경우 스피너를 오버레이 형태로 렌더링한다.
+
+asOverlay 값에 따라 스피너의 스타일이 오버레이 형태로 변하게 된다.
+
+Auth 컴포넌트에서 로딩 상태 관리:
+
+authSubmitHandler 함수 내에서 데이터를 로딩하는 비동기 작업이 시작되기 전에 setIsLoading(true)를 호출하여 isLoading을 true로 변경한다.
+
+데이터 로딩이 완료되면, setIsLoading(false)를 호출하여 isLoading을 다시 false로 변경한다.
+
+데이터 로딩 도중에 오류가 발생하면 오류 처리 로직에서도 setIsLoading(false)를 호출하여 로딩 상태를 해제한다.
+
+로딩 스피너의 조건부 렌더링을 활용한 UI 표시:
+
+{isLoading && <LoadingSpinner asOverlay />} 부분은 JSX 내에서 조건부 렌더링을 수행한다.
+
+isLoading이 참일 경우에만 LoadingSpinner 컴포넌트가 렌더링되며, 로딩이 완료되면 자동으로 사라진다.
+
+로딩 스피너 컴포넌트 내부 구현:
+
+LoadingSpinner 컴포넌트 내에서는 CSS 스타일링 및 로딩 스피너 애니메이션을 설정한다.
+
+이 부분은 asOverlay 값에 따라 오버레이 스타일을 적용하는 등의 스타일 관리가 이루어진다.
+```
+
+# 오류 메세지 출력하기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381304/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled.png)
+
+```jsx
+import React, { useState, useContext } from 'react'
+
+import Card from '../../shared/components/UIElements/Card'
+import Input from '../../shared/components/FormElements/Input'
+import Button from '../../shared/components/FormElements/Button'
+import ErrorModal from '../../shared/components/UIElements/ErrorModal'
+import LoadingSpinner from '../../shared/components/UIElements/LoadingSpinner'
+import { useForm } from '../../shared/hooks/form-hook'
+import {
+  VALIDATOR_EMAIL,
+  VALIDATOR_MINLENGTH,
+  VALIDATOR_REQUIRE,
+} from '../../shared/util/validators'
+import { AuthContext } from '../../shared/context/auth-context'
+
+import './Auth.css'
+
+const Auth = () => {
+  const auth = useContext(AuthContext)
+  const [isLoginMode, setIsLoginMode] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState()
+  const [formState, inputHandler, setFormData] = useForm(
+    {
+      email: {
+        value: '',
+        isValid: false,
+      },
+      password: {
+        value: '',
+        isValid: false,
+      },
+    },
+    false
+  )
+
+  const switchModeHandler = () => {
+    if (!isLoginMode) {
+      setFormData(
+        {
+          ...formState.inputs,
+          name: undefined,
+        },
+        formState.inputs.email.isValid && formState.inputs.password.isValid
+      )
+    } else {
+      setFormData(
+        {
+          ...formState.inputs,
+          name: {
+            value: '',
+            isValid: false,
+          },
+        },
+        false
+      )
+    }
+    setIsLoginMode((prevMode) => !prevMode)
+  }
+
+  const authSubmitHandler = async (event) => {
+    event.preventDefault()
+
+    if (isLoginMode) {
+    } else {
+      try {
+        setIsLoading(true)
+        const response = await fetch('http://localhost:5000/api/users/signup', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: formState.inputs.name.value,
+            email: formState.inputs.email.value,
+            password: formState.inputs.password.value,
+          }),
+        })
+        const responseData = await response.json()
+        if (!response.ok) {
+          throw new Error(responseData.message)
+        }
+        setIsLoading(false)
+        auth.login()
+      } catch (error) {
+        setIsLoading(false)
+        setError(error.message || '알수없는 오류가 발생 하였습니다')
+      }
+    }
+  }
+
+  const errorHandler = () => {
+    setError(null)
+  }
+
+  return (
+    <>
+      <ErrorModal error={error} onClear={errorHandler} />
+      <Card className="authentication">
+        {isLoading && <LoadingSpinner asOverlay />}
+        <h1>Login Required</h1>
+        <hr />
+        <form onSubmit={authSubmitHandler}>
+          {!isLoginMode && (
+            <Input
+              element="input"
+              id="name"
+              type="text"
+              label="Name"
+              validators={[VALIDATOR_REQUIRE()]}
+              errorText="Please enter a name"
+              onInput={inputHandler}
+            />
+          )}
+          <Input
+            element="input"
+            id="email"
+            type="email"
+            label="E-Mail"
+            validators={[VALIDATOR_EMAIL()]}
+            errorText="Please enter a valid email address."
+            onInput={inputHandler}
+          />
+          <Input
+            element="input"
+            id="password"
+            type="password"
+            label="Password"
+            validators={[VALIDATOR_MINLENGTH(5)]}
+            errorText="Please enter a valid password at least 5 Ch."
+            onInput={inputHandler}
+          />
+          <Button type="submit" disabled={!formState.isValid}>
+            {isLoginMode ? 'LOGIN' : 'SIGNUP'}
+          </Button>
+        </form>
+        <Button inverse onClick={switchModeHandler}>
+          SWITCH TO {isLoginMode ? 'SIGNUP' : 'LOGIN'}
+        </Button>
+      </Card>
+    </>
+  )
+}
+
+export default Auth
+```
+
+```jsx
+Auth 컴포넌트에서의 오류 처리:
+
+authSubmitHandler 함수 내부에서 데이터를 전송하고 응답을 기다리는 동안 try-catch 블록을 사용하여 오류를 처리한다.
+
+데이터를 성공적으로 받아왔다면,
+
+if (!response.ok)를 통해 응답이 성공이 아닌 경우(response.ok가 false)에 대한 처리를 수행한다.
+
+( 이렇게 하는 이유는 요청이 성공하면 서버에서 응답이 어떻게 오든 그냥 try 로 넘어가 버리기 때문 )
+
+오류 발생 시 동작:
+
+오류가 발생하면 throw new Error(responseData.message);를 통해 에러 객체를 생성하고,
+
+해당 에러 객체의 message 속성에 서버에서 전송한 오류 메시지를 설정한다.
+
+catch 블록에서는 setIsLoading(false);를 통해 로딩 상태를 해제하고,
+
+setError(error.message || '알수없는 오류가 발생 하였습니다');를 통해 상태에 오류 메시지를 설정한다.
+
+ErrorModal 컴포넌트:
+
+ErrorModal 컴포넌트는 전달받은 props.error 값을 사용하여 오류 메시지를 표시한다.
+
+모달은 Modal 컴포넌트를 사용하여 구현되며, 오류 메시지와 확인 버튼을 포함한다.
+
+확인 버튼을 누르면 props.onClear 함수가 호출되어 오류 메시지를 초기화하고(modal을 닫음), 사용자에게 오류를 알린다.
+
+사용자에게 오류 메시지 표시:
+
+ErrorModal은 {!!props.error}를 통해 props.error 값이 존재할 경우에만 렌더링된다.
+
+따라서 authSubmitHandler에서 오류가 발생하면 setError를 통해 상태에 오류 메시지가 설정되고,
+
+ErrorModal이 렌더링되어 사용자에게 오류를 시각적으로 표시한다.
+
+Button 컴포넌트:
+
+모달 안에서 사용된 확인 버튼은 Button 컴포넌트를 사용한다.
+
+이 버튼을 누르면 props.onClear 함수가 호출되어 오류 메시지를 초기화하고(modal을 닫음), 사용자에게 오류를 알린다.
+```
+
+## 요청이 성공했을 때라도 HTTP 상태 코드가 400번대 또는 500번대인 경우에는 **`fetch`** 프로미스가 거부(reject)되지 않음
+
+```jsx
+HTTP 상태 코드에서 400번대와 500번대는 각각 클라이언트 오류와 서버 오류를 나타낸다.
+
+클라이언트 오류는 주로 잘못된 요청이나 부적절한 데이터를 서버로 보낸 경우에 발생하며,
+
+서버 오류는 서버 측에서 요청을 처리할 때 문제가 발생한 경우이다.
+
+일반적으로 이러한 상태 코드는 오류를 나타내므로 클라이언트에서는 이를 처리해야 한다.
+
+그러나 JavaScript의 fetch 함수는 네트워크 요청이 성공했을 때라도
+
+HTTP 상태 코드가 400번대 또는 500번대인 경우에는 fetch 프로미스가 거부(reject)되지 않는다.
+
+즉, 네트워크 요청 자체가 성공적으로 이루어졌지만 서버가 클라이언트 요청을 처리하지 못했거나 서버 측에서 오류가 발생한 경우에도
+
+catch 블록으로 넘어가지 않는다.
+
+이를 해결하려면 fetch 함수에서 HTTP 상태 코드를 확인하고,
+
+상태 코드가 400번대 또는 500번대인 경우에는 프로미스를 거부하는 방식으로 처리해야 한다.
+
+ if (!response.ok) {
+		 throw new Error(responseData.message);
+ }
+
+이런식으로 강제로 오류를 발생시켜 줘야한다
+```
+
+# 로그인 요청 보내기 ( 임시 )
+
+```jsx
+// Users.js
+
+import React, { useState, useContext } from 'react'
+
+import Card from '../../shared/components/UIElements/Card'
+import Input from '../../shared/components/FormElements/Input'
+import Button from '../../shared/components/FormElements/Button'
+import ErrorModal from '../../shared/components/UIElements/ErrorModal'
+import LoadingSpinner from '../../shared/components/UIElements/LoadingSpinner'
+import { useForm } from '../../shared/hooks/form-hook'
+import {
+  VALIDATOR_EMAIL,
+  VALIDATOR_MINLENGTH,
+  VALIDATOR_REQUIRE,
+} from '../../shared/util/validators'
+import { AuthContext } from '../../shared/context/auth-context'
+
+import './Auth.css'
+
+const Auth = () => {
+  const auth = useContext(AuthContext)
+  const [isLoginMode, setIsLoginMode] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState()
+  const [formState, inputHandler, setFormData] = useForm(
+    {
+      email: {
+        value: '',
+        isValid: false,
+      },
+      password: {
+        value: '',
+        isValid: false,
+      },
+    },
+    false
+  )
+
+  const switchModeHandler = () => {
+    if (!isLoginMode) {
+      setFormData(
+        {
+          ...formState.inputs,
+          name: undefined,
+        },
+        formState.inputs.email.isValid && formState.inputs.password.isValid
+      )
+    } else {
+      setFormData(
+        {
+          ...formState.inputs,
+          name: {
+            value: '',
+            isValid: false,
+          },
+        },
+        false
+      )
+    }
+    setIsLoginMode((prevMode) => !prevMode)
+  }
+
+  const authSubmitHandler = async (event) => {
+    event.preventDefault()
+
+    setIsLoading(true)
+    if (isLoginMode) {
+      try {
+        const response = await fetch('http://localhost:5000/api/users/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: formState.inputs.email.value,
+            password: formState.inputs.password.value,
+          }),
+        })
+        const responseData = await response.json()
+        if (!response.ok) {
+          throw new Error(responseData.message)
+        }
+        setIsLoading(false)
+        auth.login()
+      } catch (error) {
+        setIsLoading(false)
+        setError(error.message || '알수없는 오류가 발생 하였습니다')
+      }
+    } else {
+      try {
+        const response = await fetch('http://localhost:5000/api/users/signup', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: formState.inputs.name.value,
+            email: formState.inputs.email.value,
+            password: formState.inputs.password.value,
+          }),
+        })
+        const responseData = await response.json()
+        if (!response.ok) {
+          throw new Error(responseData.message)
+        }
+        setIsLoading(false)
+        auth.login()
+      } catch (error) {
+        setIsLoading(false)
+        setError(error.message || '알수없는 오류가 발생 하였습니다')
+      }
+    }
+  }
+
+  const errorHandler = () => {
+    setError(null)
+  }
+
+  return (
+    <>
+      <ErrorModal error={error} onClear={errorHandler} />
+      <Card className="authentication">
+        {isLoading && <LoadingSpinner asOverlay />}
+        <h1>Login Required</h1>
+        <hr />
+        <form onSubmit={authSubmitHandler}>
+          {!isLoginMode && (
+            <Input
+              element="input"
+              id="name"
+              type="text"
+              label="Name"
+              validators={[VALIDATOR_REQUIRE()]}
+              errorText="Please enter a name"
+              onInput={inputHandler}
+            />
+          )}
+          <Input
+            element="input"
+            id="email"
+            type="email"
+            label="E-Mail"
+            validators={[VALIDATOR_EMAIL()]}
+            errorText="Please enter a valid email address."
+            onInput={inputHandler}
+          />
+          <Input
+            element="input"
+            id="password"
+            type="password"
+            label="Password"
+            validators={[VALIDATOR_MINLENGTH(5)]}
+            errorText="Please enter a valid password at least 5 Ch."
+            onInput={inputHandler}
+          />
+          <Button type="submit" disabled={!formState.isValid}>
+            {isLoginMode ? 'LOGIN' : 'SIGNUP'}
+          </Button>
+        </form>
+        <Button inverse onClick={switchModeHandler}>
+          SWITCH TO {isLoginMode ? 'SIGNUP' : 'LOGIN'}
+        </Button>
+      </Card>
+    </>
+  )
+}
+
+export default Auth
+```
+
+```jsx
+if (isLoginMode)
+
+이부분에 로그인 관련 요청을 보내서 로그인 하도록 코드를 작성해준다
+
+현재 중복이 굉장히 많아졌는데 이 부분은 뒤에 수정하도록 한다
+```
+
+# 사용자 정보 가져오기
+
+```jsx
+import React, { useEffect, useState } from 'react'
+import UserList from '../components/UserList'
+import ErrorModal from '../../shared/components/UIElements/ErrorModal'
+import LoadingSpinner from '../../shared/components/UIElements/LoadingSpinner'
+
+const Users = () => {
+  // 상태 설정: 데이터 로딩 여부, 에러 상태, 사용자 목록 데이터
+  const [isLoading, setIsLoading] = useState(false) // 데이터 로딩 중 여부
+  const [error, setError] = useState() // 에러 상태
+  const [loadedUsers, setLoadedUsers] = useState([]) // 로드된 사용자 목록
+
+  useEffect(() => {
+    // 컴포넌트가 마운트될 때 실행되는 useEffect 함수
+    const sendRequest = async () => {
+      // 비동기 함수 정의: API에 데이터 요청 및 처리
+      setIsLoading(true) // 로딩 중 상태 설정
+      try {
+        const response = await fetch('http://localhost:5000/api/users')
+        // API에서 데이터를 받아오는 HTTP 요청 수행
+
+        const responseData = await response.json()
+        // HTTP 응답 데이터를 JSON 형식으로 변환
+
+        if (!response.ok) {
+          // 응답이 성공적이지 않은 경우 (HTTP 상태 코드가 200번대가 아닌 경우)
+          throw new Error(responseData.message)
+          // 에러 객체를 던져서 catch 블록으로 이동
+        }
+
+        setLoadedUsers(responseData)
+        // 로드된 사용자 목록을 상태로 설정
+      } catch (error) {
+        // try 블록에서 에러 발생 시 실행
+        setError(error.message)
+        // 에러 상태를 설정
+      }
+      setIsLoading(false)
+      // 비동기 작업이 완료되면 로딩 상태 해제
+    }
+
+    sendRequest()
+    // useEffect가 처음 호출될 때 한 번 실행
+  }, [])
+
+  const errorHandler = () => {
+    // 에러 모달에서 '닫기' 버튼 클릭 시 실행되는 함수
+    setError(null)
+    // 에러 상태를 초기화하여 모달을 닫음
+  }
+
+  return (
+    <>
+      <ErrorModal error={error} onClear={errorHandler} />
+      {/* 에러 모달 컴포넌트: 에러 상태가 있으면 모달을 띄움 */}
+
+      {isLoading && (
+        <div className="center">
+          <LoadingSpinner />
+        </div>
+      )}
+      {/* 로딩 스피너 표시: 데이터 로딩 중일 때 로딩 스피너를 화면 중앙에 표시 */}
+
+      {!isLoading && loadedUsers && <UserList items={loadedUsers} />}
+      {/* 사용자 목록 표시: 로딩이 끝나고 로드된 사용자 목록이 있으면 UserList 컴포넌트에 전달하여 표시 */}
+    </>
+  )
+}
+
+export default Users
+```
+
+```jsx
+// UserList.jsx
+
+import React from 'react'
+
+import UserItem from './UserItem'
+import './UserList.css'
+import Card from '../../shared/components/UIElements/Card'
+
+const UserList = (props) => {
+  if (props.items.length === 0) {
+    return (
+      <div>
+        <Card>
+          <h2>No users found</h2>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <ul className="users-list">
+      {props.items.map((user) => (
+        <UserItem
+          key={user._id}
+          id={user._id}
+          image={user.image}
+          name={user.name}
+          placeCount={user.places.length}
+        />
+      ))}
+    </ul>
+  )
+}
+
+export default UserList
+```
+
+```jsx
+// UserItem.jsx
+
+import React from 'react'
+import { Link } from 'react-router-dom'
+
+import Avatar from '../../shared/components/UIElements/Avatar'
+import Card from '../../shared/components/UIElements/Card'
+
+import './UserItem.css'
+
+const UserItem = (props) => {
+  return (
+    <li className="user-item">
+      <Card className="user-item__content">
+        <Link to={`/${props.id}/places`}>
+          <div className="user-item__image">
+            <Avatar image={props.image} alt={props.name} />
+          </div>
+          <div className="user-item__info">
+            <h2>{props.name}</h2>
+            <h3>
+              {props.placeCount} {props.placeCount === 1 ? 'Place' : 'Places'}
+            </h3>
+          </div>
+        </Link>
+      </Card>
+    </li>
+  )
+}
+
+export default UserItem
+```
+
+```jsx
+초기 상태 설정:
+
+Users 컴포넌트에서 useState를 사용하여 초기 상태를 설정한다.
+
+isLoading은 데이터 로딩 중 여부를 나타내며, error는 에러 상태를 저장한다.
+
+loadedUsers는 API에서 로드한 사용자 목록을 저장한다.
+
+데이터 로딩과 에러 처리:
+
+useEffect를 사용하여 컴포넌트가 처음 렌더링될 때 API에서 데이터를 요청한다.
+
+sendRequest 함수는 fetch를 통해 API에 데이터를 요청하고,
+
+성공적인 응답일 경우 JSON으로 변환하여 setLoadedUsers를 호출하여 사용자 목록을 설정한다.
+
+만약 응답이 성공적이지 않으면 throw new Error를 사용하여 에러를 발생시킨다.
+
+비동기 요청이 완료되면 setIsLoading(false)를 호출하여 로딩 상태를 해제한다.
+
+에러 모달 및 로딩 스피너 표시:
+
+ErrorModal 컴포넌트를 사용하여 에러 상태가 있을 경우 에러 모달을 띄운니다.
+
+onClear prop은 에러 모달에서 '닫기' 버튼을 클릭할 때 실행되는 함수인 errorHandler를 전달한다.
+
+isLoading 상태가 true일 때, 로딩 스피너를 화면 중앙에 표시한다.
+
+유저 리스트 출력:
+
+UserList 컴포넌트는 props.items에 전달된 사용자 목록을 받아온다.
+
+사용자 목록이 비어있으면, "No users found" 메시지를 포함한 Card 컴포넌트를 반환한다.
+
+사용자 목록이 있으면, map 함수를 사용하여 각 사용자에 대한 UserItem 컴포넌트를 생성하여 출력한다.
+
+각 UserItem에는 사용자의 ID, 이미지, 이름, 및 장소 개수(placeCount)가 전달된다.
+
+유저 아이템 출력:
+
+UserItem 컴포넌트는 각 사용자에 대한 정보를 포함한 카드 형식의 아이템을 출력한다.
+
+Avatar 컴포넌트는 사용자의 이미지를 나타낸다.
+
+Link 컴포넌트를 사용하여 사용자의 ID에 기반하여 해당 사용자의 장소 페이지로 이동할 수 있는 링크를 제공한다.
+
+사용자의 이름과 장소 개수(placeCount)를 표시한다.
+
+장소 개수에 따라 "Place" 또는 "Places"로 표시되며, 이는 삼항 연산자를 통해 구현된다.
+```
+
+# 커스텀 HTTP 훅 생성하기
+
+```jsx
+fetch 를 사용하면서 추가적으로 여러가지 반복적이게 사용해야 하는 함수들이 존재하는데
+
+이를 개선하기 위해서 커스텀 훅을 만들어 리팩토링을 진행한다
+```
+
+```jsx
+import { useCallback, useState, useEffect, useRef } from 'react'
+
+export const useHttpClient = () => {
+  // 로딩 상태를 관리하는 useState 훅
+  const [isLoading, setIsLoading] = useState(false)
+  // 에러 상태를 관리하는 useState 훅
+  const [error, setError] = useState()
+
+  // 현재 진행 중인 HTTP 요청들을 추적하기 위한 useRef 훅
+  const activeHttpRequests = useRef([])
+
+  // HTTP 요청을 보내는 함수
+  const sendRequest = useCallback(async (url, method = 'GET', body = null, headers = {}) => {
+    // 요청을 보내기 전에 로딩 상태를 true로 설정
+    setIsLoading(true)
+    // AbortController를 사용하여 중간에 요청을 취소할 수 있도록 설정
+    const httpAbortController = new AbortController()
+    // 현재 진행 중인 HTTP 요청들을 추적하기 위해 배열에 추가
+    activeHttpRequests.current.push(httpAbortController)
+
+    try {
+      // fetch 함수를 사용하여 서버에 요청을 보냄
+      const response = await fetch(url, {
+        method,
+        body,
+        headers,
+        signal: httpAbortController.signal, // AbortController의 signal을 이용하여 중간에 요청을 취소할 수 있도록 함
+      })
+
+      // 서버로부터 받은 응답을 JSON 형태로 파싱
+      const responseData = await response.json()
+
+      // 리스트를 깔끔하게 유지하기 위해 사용되는 코드
+      activeHttpRequests.current = activeHttpRequests.current.filter(
+        (reqCtrl) => reqCtrl !== httpAbortController
+      )
+
+      // 응답이 성공적이지 않으면 에러를 던짐
+      if (!response.ok) {
+        throw new Error(responseData.message)
+      }
+
+      setIsLoading(false)
+
+      // 성공한 경우 응답 데이터를 반환
+      return responseData
+    } catch (error) {
+      // 요청 도중에 에러가 발생하면 에러 상태를 업데이트
+      setError(error.message)
+      setIsLoading(false)
+      throw error
+    }
+  }, [])
+
+  // 에러를 지우는 함수
+  const clearError = () => {
+    setError(null)
+  }
+
+  // 컴포넌트가 언마운트되거나 업데이트 되기 전에 실행되는 클린업 로직
+  useEffect(() => {
+    return () => {
+      // 언마운트되기 전에 현재 진행 중인 HTTP 요청들을 취소
+      activeHttpRequests.current.forEach((abortCtrl) => abortCtrl.abort())
+    }
+  }, [])
+
+  // isLoading, error, sendRequest, clearError를 반환하여 컴포넌트에서 사용할 수 있게 함
+  return { isLoading, error, sendRequest, clearError }
+}
+```
+
+## 이 훅의 기능
+
+```jsx
+로딩 상태 표시:
+
+컴포넌트에서 서버로 데이터를 요청할 때 로딩 중임을 나타내는 스피너 또는 인디케이터를 표시할 수 있다.
+
+에러 처리:
+
+서버 요청 중에 발생한 에러를 감지하고 이를 컴포넌트에서 처리하거나 사용자에게 알린다.
+
+HTTP 요청 취소:
+
+컴포넌트가 언마운트되거나 업데이트되기 전에 현재 진행 중인 모든 HTTP 요청을 안전하게 취소한다.
+
+간편한 HTTP 요청 전송:
+
+sendRequest 함수를 사용하여 간단하게 HTTP 요청을 보낼 수 있다.
+
+이 함수는 필요한 정보를 전달하고, 성공 또는 실패 시 적절한 상태를 업데이트한다.
+
+( 쉽게 말하면 fetch 를 더 쉽게 사용하기 위해서 )
+```
+
+## 상세 설명
+
+```jsx
+로딩 및 에러 상태 관리:
+
+useState 훅을 사용하여 isLoading과 error 상태를 생성한다.
+
+isLoading은 현재 요청이 진행 중인지 여부를 나타내는 데 사용된다. 초기값은 false로 설정된다.
+
+error는 요청 중에 발생한 에러를 담는 상태이다. 초기값은 undefined이다.
+
+진행 중인 HTTP 요청 추적:
+
+진행 중인 HTTP 요청을 추적하기 위해 useRef 훅을 사용합니다.
+
+useRef는 React에서 제공하는 특별한 훅으로, 컴포넌트의 렌더링과 관련 없이 값을 기억하고 유지할 수 있다.
+
+여기서 useRef를 사용하는 목적은 현재 진행 중인 HTTP 요청들을 배열에 저장하고,
+
+이 배열이 리렌더링 간에 값이 변경되지 않도록 하는 것이다.
+
+	* useRef로 변수 생성:
+
+	useRef 훅을 사용하여 activeHttpRequests라는 변수를 생성한다.
+
+	이 변수는 현재 진행 중인 HTTP 요청들을 추적하는 용도로 활용된다.
+
+
+	* 배열 대신 useRef 사용:
+
+	보통 배열을 사용하여 요청을 추적할 수 있지만,
+
+	이 경우 useRef를 사용하는 이유는 리렌더링 간에 값이 변경되지 않도록 하기 위함이다.
+
+	배열은 컴포넌트의 상태로 관리되면 리렌더링될 때마다 새로운 배열이 생성되어 값이 변경되는데,
+
+	useRef를 사용하면 값이 변경되지 않고 유지된다.
+
+
+	* 리렌더링 간 값 변경 방지:
+
+	useRef를 사용하면 해당 변수가 변경되어도 컴포넌트가 리렌더링되지 않는다.
+
+	따라서 현재 진행 중인 HTTP 요청을 추적하는 목적에서는 리렌더링에 영향을 받지 않는 것이 중요하다.
+
+	이를 통해 컴포넌트의 상태를 변경하더라도 useRef에 저장된 값은 계속해서 유지된다.
+
+간단하게 말하면, useRef를 사용하면
+
+현재 진행 중인 HTTP 요청들을 안정적으로 추적하면서도 리렌더링과 관련된 문제를 방지할 수 있다.
+
+HTTP 요청 보내기:
+
+sendRequest 함수는 클라이언트가 서버로 데이터를 요청하거나 서버에게 데이터를 전송할 때 사용된다.
+
+URL, 메서드, 바디, 헤더 등을 함수의 매개변수로 전달하여 다양한 유형의 요청을 처리할 수 있다.
+
+	* 요청 취소 가능하도록 설정:
+
+	함수 내에서 AbortController를 활용하여 중간에 요청을 취소할 수 있도록 설정한다.
+
+	이는 사용자가 요청을 취소하거나 다른 페이지로 이동할 때 현재 진행 중인 요청을 중단하는 데 유용하다.
+
+	AbortController를 이용하면 요청을 취소하거나 중단할 수 있어, 불필요한 네트워크 트래픽을 방지하고 성능을 향상시킬 수 있다.
+
+	AbortController의 signal은 HTTP 요청을 중간에 취소할 수 있는 메커니즘을 제공한다.
+
+	이것이 왜 필요한지와 signal이 어떻게 작동하는지를 살펴보겠다.
+
+
+		중간에 요청 취소의 필요성:
+
+		사용자가 어떤 동작을 취소하거나 다른 페이지로 이동할 때, 혹은 컴포넌트가 언마운트 될 때,
+
+		이미 보내진 HTTP 요청을 중단하고자 할 수 있다.
+
+		이때 AbortController의 signal을 이용하여 쉽게 중간에 요청을 취소할 수 있다.
+
+
+		AbortController 및 signal 사용:
+
+		AbortController는 생성된 컨트롤러에 대한 참조를 제공하며,
+
+		이 컨트롤러를 통해 여러 HTTP 요청에 대한 취소 신호를 전달할 수 있다.
+
+		signal은 AbortController의 인스턴스에서 파생된 것으로, HTTP 요청의 signal 속성에 할당하여 해당 요청이 중간에 취소되도록 설정한다.
+
+
+	예를 들어, 위의 코드에서 fetch 함수가 호출되면서 signal 속성이 httpAbortController.signal로 전달된다.
+
+	그리고 이 신호는 컨트롤러에 의해 관리되며,
+
+	나중에 컴포넌트가 언마운트되거나 클리어되는 경우 abort 메서드를 호출하여 모든 현재 진행 중인 HTTP 요청을 중단할 수 있다.
+
+	* 응답 데이터 처리:
+
+	서버로부터 받은 응답 데이터를 처리하고, 응답이 성공적인지 여부를 확인한다.
+
+	성공적인 응답이라면 해당 데이터를 반환하며, 실패한 경우에는 에러 상태를 업데이트한다.
+
+	* 로딩 상태 관리:
+
+	sendRequest 함수가 호출되면 로딩 상태를 활성화하여 현재 요청이 진행 중임을 나타낸다.
+
+	요청이 성공하거나 실패한 후에는 로딩 상태를 비활성화하여 사용자에게 적절한 시각적 피드백을 제공한다.
+
+activeHttpRequests.current는 현재 진행 중인 HTTP 요청들을 기록하는 리스트이다. 여기에는 요청이 진행 중일 때마다 추가된다.
+
+이 줄의 코드는 요청이 완료되었거나 에러가 발생했을 때, 해당하는 요청을 리스트에서 제거하는 역할을 한다.
+
+즉, 리스트를 깔끔하게 유지하기 위해 사용되는 코드이다.
+
+( activeHttpRequests.current는 useRef 훅을 통해 생성된 변수로, 현재 진행 중인 HTTP 요청들을 추적한다.
+
+filter 함수를 사용하여 activeHttpRequests.current 배열에서 httpAbortController와 일치하지 않는 것들만 남긴다.
+
+이렇게 함으로써,
+
+현재 처리 중인 요청이 완료되었거나 에러가 발생하여 요청이 중단되면 해당 httpAbortController를 배열에서 제거한다.
+
+이렇게 배열을 정리함으로써, 현재 진행 중인 HTTP 요청의 목록을 최신 상태로 유지하고 불필요한 항목을 제거할 수 있다.
+
+이는 컴포넌트가 언마운트되거나 업데이트될 때,
+
+즉 클린업 로직이 실행될 때 사용된 useEffect에서 중요한 역할을 한다.
+
+만약 요청이 완료되지 않은 상태에서 컴포넌트가 사라진다면, 해당 요청을 취소하고 메모리 누수를 방지한다. )
+
+에러 지우기:
+
+clearError 함수는 에러 상태를 null로 설정하여 에러를 지운다.
+
+컴포넌트에서 이 함수를 호출하면 에러 상태가 초기화된다.
+
+컴포넌트 클린업:
+
+컴포넌트 클린업은 useEffect를 활용하여 컴포넌트가 언마운트되거나 업데이트되기 전에 필요한 정리 작업을 수행하는 부분이다.
+
+여기서는 현재 진행 중인 모든 HTTP 요청을 취소하여 정리하는 로직이 포함되어 있다.
+
+	* useEffect로 클린업 로직 정의:
+
+	useEffect는 React에서 제공하는 특별한 훅으로, 컴포넌트의 렌더링 이후에 부가적인 작업을 수행할 수 있다.
+
+	여기서는 useEffect를 사용하여 컴포넌트의 클린업 로직을 정의한다.
+
+
+	* 컴포넌트 언마운트 또는 업데이트 전에 실행:
+
+	useEffect의 첫 번째 매개변수로 전달된 함수는 컴포넌트가 렌더링 된 후에 실행되지만, 언마운트되거나 업데이트되기 전에도 실행된다.
+
+	이를 통해 컴포넌트가 화면에서 사라지기 전에 필요한 정리 작업을 수행할 수 있다.
+
+
+	* 현재 진행 중인 HTTP 요청 취소:
+
+	useEffect 내부에서는 activeHttpRequests.current.forEach(abortCtrl => abortCtrl.abort()) 코드를 사용하여
+
+	현재 진행 중인 모든 HTTP 요청을 취소한다.
+
+	이 부분은 activeHttpRequests라는 useRef를 통해 추적된 HTTP 요청들을 검사하고,
+
+	각각의 AbortController를 이용하여 요청을 중단시킨다.
+
+	( AbortController의 .abort() 메서드는 현재 진행 중인 HTTP 요청을 중단하는 역할 )
+
+
+	* 컴포넌트 언마운트 시 실행:
+
+	useEffect 내부의 반환된 함수는 컴포넌트가 언마운트될 때 실행된다.
+
+	이 때, 현재 진행 중인 HTTP 요청을 취소하는 클린업 로직이 실행되어 컴포넌트가 더 이상 화면에 존재하지 않을 때의 처리를 수행한다.
+
+간단히 말하면, useEffect를 이용하여 컴포넌트가 더 이상 필요하지 않을 때,
+
+즉 언마운트되거나 업데이트되기 전에 현재 진행 중인 HTTP 요청을 취소하여 정리하는 역할을 한다.
+
+( 컴포넌트가 화면에서 사라지거나 업데이트되기 전에 현재 진행 중인 HTTP 요청을 취소하는 역할 )
+
+커스텀 훅 반환:
+
+isLoading, error, sendRequest, clearError를 객체로 묶어서 반환합니다.
+
+이를 통해 컴포넌트에서 해당 훅을 사용하여 HTTP 요청과 관련된 상태 및 함수에 쉽게 접근할 수 있습니다.
+```
+
+# 커스텀 HTTP 훅으로 회원가입 로그인 개선하기
+
+```jsx
+import React, { useState, useContext } from 'react'
+
+import Card from '../../shared/components/UIElements/Card'
+import Input from '../../shared/components/FormElements/Input'
+import Button from '../../shared/components/FormElements/Button'
+import ErrorModal from '../../shared/components/UIElements/ErrorModal'
+import LoadingSpinner from '../../shared/components/UIElements/LoadingSpinner'
+import { useForm } from '../../shared/hooks/form-hook'
+import { useHttpClient } from '../../shared/hooks/http-hook'
+import {
+  VALIDATOR_EMAIL,
+  VALIDATOR_MINLENGTH,
+  VALIDATOR_REQUIRE,
+} from '../../shared/util/validators'
+import { AuthContext } from '../../shared/context/auth-context'
+
+import './Auth.css'
+
+const Auth = () => {
+  const auth = useContext(AuthContext)
+
+  // 로그인 및 회원 가입을 위한 상태 및 커스텀 훅 초기화
+  const [isLoginMode, setIsLoginMode] = useState(true)
+  const { isLoading, error, sendRequest, clearError } = useHttpClient()
+  const [formState, inputHandler, setFormData] = useForm(
+    {
+      email: {
+        value: '',
+        isValid: false,
+      },
+      password: {
+        value: '',
+        isValid: false,
+      },
+    },
+    false
+  )
+
+  // 로그인 및 회원 가입 모드 전환
+  const switchModeHandler = () => {
+    if (!isLoginMode) {
+      // 회원 가입 모드에서 로그인 모드로 전환 시, 이름 입력 필드 추가
+      setFormData(
+        {
+          ...formState.inputs,
+          name: undefined,
+        },
+        formState.inputs.email.isValid && formState.inputs.password.isValid
+      )
+    } else {
+      // 로그인 모드에서 회원 가입 모드로 전환 시, 이름 입력 필드 제거
+      setFormData(
+        {
+          ...formState.inputs,
+          name: {
+            value: '',
+            isValid: false,
+          },
+        },
+        false
+      )
+    }
+    setIsLoginMode((prevMode) => !prevMode)
+  }
+
+  // 로그인 또는 회원 가입 시도
+  const authSubmitHandler = async (event) => {
+    event.preventDefault()
+
+    if (isLoginMode) {
+      // 로그인 모드일 때
+      try {
+        await sendRequest(
+          'http://localhost:5000/api/users/login',
+          'POST',
+          JSON.stringify({
+            email: formState.inputs.email.value,
+            password: formState.inputs.password.value,
+          }),
+          {
+            'Content-Type': 'application/json',
+          }
+        )
+        auth.login()
+      } catch (error) {
+        // 오류 발생 시
+      }
+    } else {
+      // 회원 가입 모드일 때
+      try {
+        await sendRequest(
+          'http://localhost:5000/api/users/signup',
+          'POST',
+          JSON.stringify({
+            name: formState.inputs.name.value,
+            email: formState.inputs.email.value,
+            password: formState.inputs.password.value,
+          }),
+          {
+            'Content-Type': 'application/json',
+          }
+        )
+        auth.login()
+      } catch (error) {
+        // 오류 발생 시
+      }
+    }
+  }
+
+  return (
+    <>
+      {/* HTTP 요청 오류를 표시하는 모달 및 로딩 스피너 */}
+      <ErrorModal error={error} onClear={clearError} />
+      {isLoading && <LoadingSpinner asOverlay />}
+
+      {/* 로그인/회원 가입 양식 */}
+      <Card className="authentication">
+        <h1>Login Required</h1>
+        <hr />
+
+        {/* 로그인/회원 가입 양식 */}
+        <form onSubmit={authSubmitHandler}>
+          {/* 회원 가입 모드에서만 보이는 이름 입력 필드 */}
+          {!isLoginMode && (
+            <Input
+              element="input"
+              id="name"
+              type="text"
+              label="Name"
+              validators={[VALIDATOR_REQUIRE()]}
+              errorText="Please enter a name"
+              onInput={inputHandler}
+            />
+          )}
+
+          {/* 이메일 및 비밀번호 입력 필드 */}
+          <Input
+            element="input"
+            id="email"
+            type="email"
+            label="E-Mail"
+            validators={[VALIDATOR_EMAIL()]}
+            errorText="Please enter a valid email address."
+            onInput={inputHandler}
+          />
+          <Input
+            element="input"
+            id="password"
+            type="password"
+            label="Password"
+            validators={[VALIDATOR_MINLENGTH(5)]}
+            errorText="Please enter a valid password at least 5 Ch."
+            onInput={inputHandler}
+          />
+
+          {/* 로그인/회원 가입 버튼 */}
+          <Button type="submit" disabled={!formState.isValid}>
+            {isLoginMode ? 'LOGIN' : 'SIGNUP'}
+          </Button>
+        </form>
+
+        {/* 로그인/회원 가입 모드 전환 버튼 */}
+        <Button inverse onClick={switchModeHandler}>
+          SWITCH TO {isLoginMode ? 'SIGNUP' : 'LOGIN'}
+        </Button>
+      </Card>
+    </>
+  )
+}
+
+export default Auth
+```
+
+```jsx
+커스텀 HTTP 훅 불러오기:
+
+useHttpClient를 /shared/hooks/http-hook에서 불러온다.
+
+새로운 HTTP 요청을 보낼 때 필요한 모든 설정이 이미 훅 내부에 구현되어 있다.
+
+커스텀 훅 초기 호출:
+
+useHttpClient를 호출하여 초기 설정을 수행한다.
+
+훅 내부에서는 요청 진행 상태 및 에러를 관리하므로, 해당 상태를 직접 선언할 필요가 없다.
+
+훅이 반환하는 객체를 구조 분해하여 sendRequest 함수와 clearError 함수에 쉽게 접근할 수 있다.
+
+( 커스텀 훅에 있는 함수 )
+
+요청 보내기:
+
+기존의 로딩 및 에러 상태를 더 이상 관리하지 않는다.
+
+대신, sendRequest 함수를 호출하여 요청을 보내고, 훅 내부에서 상태를 관리한다.
+
+sendRequest 함수는 프로미스를 반환하며, 성공 시 응답 데이터를, 실패 시 에러를 내부에서 처리한다.
+
+컴포넌트 클린업 및 에러 처리:
+
+useEffect를 사용하여 컴포넌트가 언마운트되기 전에 모든 HTTP 요청을 취소하는 클린업 로직을 추가한다.
+
+catch 블록에 내용이 없는 이유는, 커스텀 훅에서 이미 모든 에러 처리를 수행하고 있기 때문이다.
+
+Active HTTP 요청 정리:
+
+커스텀 훅 내부에서는 현재 진행 중인 HTTP 요청을 추적하고 관리한다.
+
+요청이 완료되면 해당 요청을 목록에서 제거하여 중복된 요청이 발생하지 않도록 한다.
+
+예외 처리 수정 및 훅 최적화:
+
+훅에서 발생하는 오류를 더 자세히 처리하기 위해 try-catch 문과 catch 블록을 추가한다.
+
+catch 블록에서는 에러를 설정하고, 오류가 있으면 새로운 오류를 발생시켜 컴포넌트에 알린다.
+
+컴포넌트에서 커스텀 훅 활용:
+
+Auth 페이지 컴포넌트에서 새로운 HTTP 훅을 활용하여 로그인 및 회원 가입 로직을 수정한다.
+
+커스텀 훅을 이용하면 로직이 간결해지고, 컴포넌트에서는 간편하게 요청을 보낼 수 있다.
+
+훅 내부에서의 Active HTTP 요청 정리 추가:
+
+HTTP 요청이 완료된 후 해당 요청을 목록에서 정리하여 컴포넌트가 언마운트되더라도 오류가 발생하지 않도록 한다.
+
+에러 처리 및 클린업 최적화:
+
+abort 함수의 이름 수정 및 중복된 코드 정리를 통해 코드를 간결하게 최적화한다.
+
+최종적으로 Auth 페이지에서 커스텀 훅을 사용하여 로그인 및 회원 가입이 잘 작동하는 것을 확인
+```
+
+# HTTP 훅을 사용하여 사용자 가져오기
+
+```jsx
+import React, { useEffect, useState } from 'react'
+import UserList from '../components/UserList'
+import ErrorModal from '../../shared/components/UIElements/ErrorModal'
+import LoadingSpinner from '../../shared/components/UIElements/LoadingSpinner'
+import { useHttpClient } from '../../shared/hooks/http-hook'
+
+const Users = () => {
+  const { isLoading, error, sendRequest, clearError } = useHttpClient()
+  const [loadedUsers, setLoadedUsers] = useState([]) // 로드된 사용자 목록
+
+  useEffect(() => {
+    // 컴포넌트가 마운트될 때 실행되는 useEffect 함수
+    const fetchUsers = async () => {
+      // 비동기 함수 정의: API에 데이터 요청 및 처리
+      try {
+        const responseData = await sendRequest('http://localhost:5000/api/users')
+
+        setLoadedUsers(responseData)
+      } catch (error) {}
+    }
+
+    fetchUsers()
+    // useEffect가 처음 호출될 때 한 번 실행
+  }, [sendRequest])
+
+  return (
+    <>
+      <ErrorModal error={error} onClear={clearError} />
+      {/* 에러 모달 컴포넌트: 에러 상태가 있으면 모달을 띄움 */}
+
+      {isLoading && (
+        <div className="center">
+          <LoadingSpinner />
+        </div>
+      )}
+      {/* 로딩 스피너 표시: 데이터 로딩 중일 때 로딩 스피너를 화면 중앙에 표시 */}
+
+      {!isLoading && loadedUsers && <UserList items={loadedUsers} />}
+      {/* 사용자 목록 표시: 로딩이 끝나고 로드된 사용자 목록이 있으면 UserList 컴포넌트에 전달하여 표시 */}
+    </>
+  )
+}
+
+export default Users
+```
+
+```jsx
+1. 커스텀 HTTP 훅 불러오기
+
+useHttpClient를 ../../shared/hooks/http-hook 경로에서 불러온다.
+
+파일 경로를 정확히 지정하여 해당 훅을 가져오는 것을 확인한다.
+
+2. 컴포넌트 상태 수정
+
+현재 컴포넌트의 상태 중 loadedUsers는 그대로 두고, 수정이 필요한 부분을 식별한다.
+
+useHttpClient를 호출하고 그 결과로 받아온 객체를 구조 분해하여 isLoading, error, fetchUsers, clearError를 얻는다.
+
+3. useEffect 함수 수정
+
+setIsLoading를 제거하고, 비동기 처리를 위해 try-catch 블록으로 감싸준다.
+
+sendRequest 함수를 await 키워드를 사용하여 대기하도록 변경한다.
+
+현재 GET 요청이 기본 설정으로 되어 있으므로, URL만 필요하고 body와 header는 전달하지 않는다.
+
+커스텀 훅에서 처리되는 responseData를 통해 파싱이 필요 없다.
+
+4. 의존성 처리
+
+useEffect에서 사용한 sendRequest를 의존성 배열에 추가한다.
+
+sendRequest 함수를 useCallback으로 래핑하여 커스텀 훅이 재생성되지 않도록 한다.
+
+이를 통해 훅이 다시 실행될 때 새로운 객체가 생성되지 않고 이전에 생성된 객체를 사용한다.
+
+5. 오류 처리 수정
+
+이전에 사용한 errorHandler를 제거하고, 오류가 발생했을 때 실행할 함수를 onClear 프로퍼티에 clearError로 할당합니다.
+
+이를 통해 에러가 발생한 경우 사용자에게 적절한 처리를 할 수 있도록 합니다.
+
+6. 최종 확인 및 새로고침
+
+모든 변경사항이 적절히 적용되었는지 확인하고, 페칭 및 오류 처리가 정상적으로 작동하는지 확인합니다.
+
+브라우저를 새로고침하여 컴포넌트가 예상대로 동작하는지 확인합니다.
+```
+
+## useCallback 을 사용한 이유
+
+```jsx
+1. useCallback이 하는 일:
+
+useCallback은 React에서 함수를 메모이제이션(기억)하는 훅이다.
+
+메모이제이션은 함수를 기억하여 불필요한 재생성을 방지하고 성능을 최적화하는 역할을 한다.
+
+2. 함수 재생성과 성능 이슈:
+
+함수를 생성할 때마다 새로운 참조(객체)가 생성되는데, 이는 컴퓨터 자원의 낭비를 일으킬 수 있다.
+
+특히 자주 렌더링되는 컴포넌트에서는 성능 이슈가 발생할 수 있다.
+
+3. useCallback의 구성:
+
+useCallback은 함수와 의존성 배열을 인자로 받는다.
+
+함수는 메모이제이션하고자 하는 함수를 전달하고,
+
+의존성 배열은 함수 내에서 사용하는 외부 변수나 상태 값들을 포함한다.
+
+4. useCallback의 사용 예시:
+
+코드에서 useCallback은 sendRequest 함수를 메모이제이션하는데 사용되었다.
+
+sendRequest는 useHttpClient 훅에서 반환된 함수로, 여러 번 호출되더라도 동일한 함수 참조를 사용한다.
+
+5. 성능 최적화:
+
+useCallback을 사용하면 함수가 동일한 참조를 유지하므로,
+
+부모 컴포넌트가 리렌더링되어도 자식 컴포넌트에서 해당 함수를 다시 만들지 않는다.
+
+이로써 불필요한 자식 컴포넌트의 재렌더링을 방지하여 성능을 최적화할 수 있다.
+
+6. 의존성 배열의 역할:
+
+useCallback의 두 번째 인자인 의존성 배열은 함수 내에서 참조하는 외부 변수나 상태 값들을 명시한다.
+
+이 의존성 배열이 변경되지 않으면 이전에 메모이제이션된 함수를 사용하게 된다.
+
+7. 왜 useCallback이 필요한가:
+
+특히 자식 컴포넌트에 props로 전달되는 콜백 함수들을 메모이제이션하여 불필요한 리렌더링을 방지할 때 유용하다.
+
+또한 이를 통해 컴포넌트의 불필요한 업데이트를 줄이고 성능을 향상시킬 수 있다.
+
+8. 요약:
+
+useCallback은 함수를 메모이제이션하여 성능을 최적화하는 데 사용되는 React 훅이다.
+
+특히, 자주 렌더링되는 컴포넌트에서 함수의 재생성을 방지하여 성능 이슈를 해결할 때 효과적으로 활용된다.
+```
+
+# 장소 추가(POST)하기
+
+```jsx
+// NewPlace.js
+
+import React, { useContext } from 'react'
+import { useNavigate } from 'react-router-dom'
+import Input from '../../shared/components/FormElements/Input'
+import Button from '../../shared/components/FormElements/Button'
+import { VALIDATOR_REQUIRE, VALIDATOR_MINLENGTH } from '../../shared/util/validators'
+import { useForm } from '../../shared/hooks/form-hook'
+import './PlaceForm.css'
+import { useHttpClient } from '../../shared/hooks/http-hook'
+import { AuthContext } from '../../shared/context/auth-context'
+import ErrorModal from '../../shared/components/UIElements/ErrorModal'
+import LoadingSpinner from '../../shared/components/UIElements/LoadingSpinner'
+
+const NewPlace = () => {
+  const navigate = useNavigate()
+  const auth = useContext(AuthContext)
+  const { isLoading, error, sendRequest, clearError } = useHttpClient()
+  const [formState, inputHandler] = useForm(
+    {
+      title: {
+        value: '',
+        isValid: false,
+      },
+      description: {
+        value: '',
+        isValid: false,
+      },
+      address: {
+        value: '',
+        isValid: false,
+      },
+    },
+    false
+  )
+
+  const placeSubmitHandler = async (event) => {
+    event.preventDefault()
+    try {
+      await sendRequest(
+        'http://localhost:5000/api/places',
+        'POST',
+        JSON.stringify({
+          title: formState.inputs.title.value,
+          description: formState.inputs.description.value,
+          address: formState.inputs.address.value,
+          creator: auth.userId,
+        }),
+        { 'Content-Type': 'application/json' }
+      )
+      navigate('/')
+    } catch (error) {}
+  }
+
+  return (
+    <>
+      <ErrorModal error={error} onClear={clearError} />
+      <form className="place-form" onSubmit={placeSubmitHandler}>
+        {isLoading && <LoadingSpinner asOverlay />}
+        <Input
+          id="title"
+          element="input"
+          type="text"
+          label="Title"
+          validators={[VALIDATOR_REQUIRE()]}
+          errorText="Please enter a valid title."
+          onInput={inputHandler}
+        />
+        <Input
+          id="description"
+          element="textarea"
+          label="Description"
+          validators={[VALIDATOR_MINLENGTH(5)]}
+          errorText="Please enter a valid description (at least 5 characters)."
+          onInput={inputHandler}
+        />
+        <Input
+          id="address"
+          element="input"
+          label="Address"
+          validators={[VALIDATOR_REQUIRE()]}
+          errorText="Please enter a valid address."
+          onInput={inputHandler}
+        />
+        <Button type="submit" disabled={!formState.isValid}>
+          ADD PLACE
+        </Button>
+      </form>
+    </>
+  )
+}
+
+export default NewPlace
+```
+
+```jsx
+프론트엔드의 places 폴더 아래 pages 폴더에 있는 NewPlaces.js 파일을 열어서 기존
+
+placeSubmitHandler에 요청을 전송하는 부분을 작업한다.
+
+// NewPlaces.js
+
+import { useHttpClient } from '../../shared/hooks/http-hook';  // 커스텀 훅 불러오기
+
+const NewPlace = () => {
+  const { isLoading, error, sendRequest, clearError } = useHttpClient();  // 객체 구조 분해로 필요한 항목 가져오기
+
+  // ... (이하 생략)
+};
+
+요청 보내기 및 데이터 전달
+
+요청을 보낼 URL은 http://localhost:5000/api/places이며, 해당 URL로 요청 시에 백엔드에서 요구하는 데이터를 전달한다.
+
+여기서 주의해야 할 부분은
+
+      await sendRequest('http://localhost:5000/api/places', 'POST', JSON.stringify({
+        title: formState.inputs.title.value,
+        description: formState.inputs.description.value,
+        address: formState.inputs.address.value,
+        creator: auth.userId
+
+creator: auth.userId 이 부분인데 현재 로그인 한 사람의 id 를 creator 에 넣어줘야 한다
+
+이 부분은 useContext 를 사용해서 해결해본다
+```
+
+## 로그인 유저 ID 자동으로 추가되게 하기
+
+### **`AuthContext` 정의**
+
+```jsx
+// auth-context.js
+
+import { createContext } from 'react'
+
+// AuthContext라는 새로운 컨텍스트를 생성합니다.
+export const AuthContext = createContext({
+  // 컨텍스트의 초기값을 설정합니다.
+  isLoggedIn: false, // 사용자의 로그인 상태를 나타냅니다. 초기값은 false로 설정되어 있습니다.
+  userId: null, // 현재 로그인한 사용자의 ID를 나타냅니다. 초기값은 null로 설정되어 있습니다.
+  login: () => {}, // 로그인 함수를 빈 함수로 설정합니다. 실제 구현은 컨텍스트를 사용하는 컴포넌트에서 이뤄집니다.
+  logout: () => {}, // 로그아웃 함수를 빈 함수로 설정합니다. 실제 구현은 컨텍스트를 사용하는 컴포넌트에서 이뤄집니다.
+})
+```
+
+```jsx
+AuthContext는 사용자의 로그인 상태(isLoggedIn)와 사용자 ID(userId)를 포함하는 컨텍스트이다.
+
+초기값으로는 로그아웃 상태이므로 isLoggedIn은 false로, userId는 null로 설정되어 있다.
+
+그리고 로그인 및 로그아웃을 위한 빈 함수(login, logout)를 가지고 있다.
+
+( 초기 값을 설정하는 부분 )
+```
+
+```jsx
+// App.js
+
+import React, { useState, useCallback } from 'react'
+import './App.css'
+import { Route, Routes, Navigate } from 'react-router-dom'
+import Users from './user/pages/Users'
+import NewPlace from './places/pages/NewPlace'
+import MainNavigation from './shared/components/Navigation/MainNavigation'
+import UserPlaces from './places/pages/UserPlaces'
+import UpdatePlace from './places/pages/UpdatePlace'
+import Auth from './user/pages/Auth'
+import { AuthContext } from './shared/context/auth-context'
+
+const App = () => {
+  // 로그인 상태와 사용자 ID를 관리하는 상태
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [userId, setUserId] = useState(null)
+
+  // useCallback을 사용한 로그인 함수
+  const login = useCallback((userId) => {
+    setIsLoggedIn(true)
+    setUserId(userId)
+  }, [])
+
+  // useCallback을 사용한 로그아웃 함수
+  const logout = useCallback(() => {
+    setIsLoggedIn(false)
+    setUserId(null)
+  }, [])
+
+  // 라우팅을 위한 JSX 설정
+  let routes
+  if (isLoggedIn) {
+    // 로그인한 경우의 라우트 설정
+    routes = (
+      <>
+        <Route path="/" element={<Users />} />
+        <Route path="/:userId/places" element={<UserPlaces />} />
+        <Route path="/places/new" element={<NewPlace />} />
+        <Route path="/places/:placeId" element={<UpdatePlace />} />
+        <Route path="*" element={<Navigate replace to="/" />} />
+      </>
+    )
+  } else {
+    // 로그인하지 않은 경우의 라우트 설정
+    routes = (
+      <>
+        <Route path="/" element={<Users />} />
+        <Route path="/:userId/places" element={<UserPlaces />} />
+        <Route path="/auth" element={<Auth />} />
+        <Route path="*" element={<Navigate replace to="/auth" />} />
+      </>
+    )
+  }
+
+  // AuthContext.Provider를 사용하여 전역적으로 사용되는 사용자 정보 관리
+  return (
+    <AuthContext.Provider
+      value={{
+        isLoggedIn: isLoggedIn,
+        userId: userId,
+        login: login,
+        logout: logout,
+      }}
+    >
+      <>
+        {/* 상단 네비게이션 바 */}
+        <MainNavigation />
+
+        {/* 메인 컨텐츠 영역 */}
+        <main>
+          {/* 라우트 설정 */}
+          <Routes>{routes}</Routes>
+        </main>
+      </>
+    </AuthContext.Provider>
+  )
+}
+
+export default App
+```
+
+```jsx
+App 컴포넌트에서는 AuthContext.Provider로 전역적으로 사용할 사용자 정보를 제공한다.
+
+이 컨텍스트의 value에는 현재 로그인 상태(isLoggedIn)와 사용자 ID(userId), 그리고 로그인 및 로그아웃을 수행하는 함수들이 포함되어 있다.
+
+이렇게 하면 AuthContext를 사용하는 하위 컴포넌트에서는 간단하게 useContext(AuthContext)를 통해 전역적인 사용자 정보에 접근할 수 있다.
+
+이는 로그인 상태를 관리하고 각 페이지에서 해당 정보를 사용할 수 있도록 하는 중요한 부분이다.
+
+**userId 가져오는 원리**
+
+사용자가 로그인에 성공하면 해당 사용자의 ID(userId)를 매개변수로 전달하여 login 함수를 호출한다.
+
+( **Auth.js 의 로그인 부분을 보면 auth.login(responseData.user._id); 부분이 있다 로그인 시 매개변수로 user._id 를 로그인 함수로 보낸다** )
+
+setIsLoggedIn(true);는 사용자가 로그인되었음을 나타내는 상태(isLoggedIn)를 true로 변경한다.
+
+setUserId(userId);는 userId 상태를 전달받은 값으로 설정한다.
+
+이렇게 함으로써, 로그인에 성공한 사용자의 ID가 userId 상태에 저장되게 된다.
+
+그리고 이 userId는 AuthContext.Provider를 통해 컨텍스트 값으로 제공된다.
+
+이후에는 해당 ID를 필요로 하는 컴포넌트에서 AuthContext를 이용하여 userId에 접근할 수 있다.
+
+간단히 말해, 로그인 함수를 통해 사용자가 로그인할 때 userId를 설정하고, 그 값은 컨텍스트를 통해 어디서든 접근 가능하게 된다.
+
+* auth.login ( ... ) 에서 login 은 어디의 로그인 함수인가? ( 그리고 어떻게 호출되는가 )
+
+단계별로 설명하자면
+
+app.js 의
+
+return (
+    <AuthContext.Provider
+      value={{
+        isLoggedIn: isLoggedIn,
+        userId: userId,
+        login: login,
+        logout: logout
+      }}
+    >
+
+여기서 AuthContext.Provider 을 사용해서 ( Provider  공급자 ) auth-context.js 로 value 들을 보내준다
+
+여기서 보내주는 login, logout 등은 app.js 에 선언된 함수들이다
+
+const login = useCallback((userId) => {
+    setIsLoggedIn(true);
+    setUserId(userId);
+  }, []);
+
+그리고 Auth.js 를 보면
+
+import { AuthContext } from "../../shared/context/auth-context"; 로
+
+auth-context.js 를 불러온 뒤 ( 현재는 초기값이 아니라 app.js 에서 곱급받은 value 의 값이 들어가 있을것이다 )
+
+const auth = useContext(AuthContext);
+
+로 선언하여 사용한다
+
+**auth.login(responseData.user._id);**
+
+```
+
+```jsx
+Auth.js 를 아래에서 확인해보자
+```
+
+```jsx
+// Auth.js
+
+import React, { useState, useContext } from 'react'
+
+import Card from '../../shared/components/UIElements/Card'
+import Input from '../../shared/components/FormElements/Input'
+import Button from '../../shared/components/FormElements/Button'
+import ErrorModal from '../../shared/components/UIElements/ErrorModal'
+import LoadingSpinner from '../../shared/components/UIElements/LoadingSpinner'
+import { useForm } from '../../shared/hooks/form-hook'
+import { useHttpClient } from '../../shared/hooks/http-hook'
+import {
+  VALIDATOR_EMAIL,
+  VALIDATOR_MINLENGTH,
+  VALIDATOR_REQUIRE,
+} from '../../shared/util/validators'
+import { AuthContext } from '../../shared/context/auth-context'
+
+import './Auth.css'
+
+const Auth = () => {
+  const auth = useContext(AuthContext)
+
+  // 로그인 및 회원 가입을 위한 상태 및 커스텀 훅 초기화
+  const [isLoginMode, setIsLoginMode] = useState(true)
+  const { isLoading, error, sendRequest, clearError } = useHttpClient()
+  const [formState, inputHandler, setFormData] = useForm(
+    {
+      email: {
+        value: '',
+        isValid: false,
+      },
+      password: {
+        value: '',
+        isValid: false,
+      },
+    },
+    false
+  )
+
+  // 로그인 및 회원 가입 모드 전환
+  const switchModeHandler = () => {
+    if (!isLoginMode) {
+      // 회원 가입 모드에서 로그인 모드로 전환 시, 이름 입력 필드 추가
+      setFormData(
+        {
+          ...formState.inputs,
+          name: undefined,
+        },
+        formState.inputs.email.isValid && formState.inputs.password.isValid
+      )
+    } else {
+      // 로그인 모드에서 회원 가입 모드로 전환 시, 이름 입력 필드 제거
+      setFormData(
+        {
+          ...formState.inputs,
+          name: {
+            value: '',
+            isValid: false,
+          },
+        },
+        false
+      )
+    }
+    setIsLoginMode((prevMode) => !prevMode)
+  }
+
+  // 로그인 또는 회원 가입 시도
+  const authSubmitHandler = async (event) => {
+    event.preventDefault()
+
+    if (isLoginMode) {
+      // 로그인 모드일 때
+      try {
+        const responseData = await sendRequest(
+          'http://localhost:5000/api/users/login',
+          'POST',
+          JSON.stringify({
+            email: formState.inputs.email.value,
+            password: formState.inputs.password.value,
+          }),
+          {
+            'Content-Type': 'application/json',
+          }
+        )
+        auth.login(responseData.user._id)
+      } catch (error) {
+        // 오류 발생 시
+      }
+    } else {
+      // 회원 가입 모드일 때
+      try {
+        const responseData = await sendRequest(
+          'http://localhost:5000/api/users/signup',
+          'POST',
+          JSON.stringify({
+            name: formState.inputs.name.value,
+            email: formState.inputs.email.value,
+            password: formState.inputs.password.value,
+          }),
+          {
+            'Content-Type': 'application/json',
+          }
+        )
+        auth.login(responseData.user._id)
+      } catch (error) {
+        // 오류 발생 시
+      }
+    }
+  }
+
+  return (
+    <>
+      {/* HTTP 요청 오류를 표시하는 모달 및 로딩 스피너 */}
+      <ErrorModal error={error} onClear={clearError} />
+      {isLoading && <LoadingSpinner asOverlay />}
+
+      {/* 로그인/회원 가입 양식 */}
+      <Card className="authentication">
+        <h1>Login Required</h1>
+        <hr />
+
+        {/* 로그인/회원 가입 양식 */}
+        <form onSubmit={authSubmitHandler}>
+          {/* 회원 가입 모드에서만 보이는 이름 입력 필드 */}
+          {!isLoginMode && (
+            <Input
+              element="input"
+              id="name"
+              type="text"
+              label="Name"
+              validators={[VALIDATOR_REQUIRE()]}
+              errorText="Please enter a name"
+              onInput={inputHandler}
+            />
+          )}
+
+          {/* 이메일 및 비밀번호 입력 필드 */}
+          <Input
+            element="input"
+            id="email"
+            type="email"
+            label="E-Mail"
+            validators={[VALIDATOR_EMAIL()]}
+            errorText="Please enter a valid email address."
+            onInput={inputHandler}
+          />
+          <Input
+            element="input"
+            id="password"
+            type="password"
+            label="Password"
+            validators={[VALIDATOR_MINLENGTH(5)]}
+            errorText="Please enter a valid password at least 5 Ch."
+            onInput={inputHandler}
+          />
+
+          {/* 로그인/회원 가입 버튼 */}
+          <Button type="submit" disabled={!formState.isValid}>
+            {isLoginMode ? 'LOGIN' : 'SIGNUP'}
+          </Button>
+        </form>
+
+        {/* 로그인/회원 가입 모드 전환 버튼 */}
+        <Button inverse onClick={switchModeHandler}>
+          SWITCH TO {isLoginMode ? 'SIGNUP' : 'LOGIN'}
+        </Button>
+      </Card>
+    </>
+  )
+}
+
+export default Auth
+```
+
+# 사용자 ID로 장소 불러오기
+
+```jsx
+// UserPlaces.js
+
+import React, { useEffect, useState } from 'react'
+import PlaceList from '../components/PlaceList'
+import { useParams } from 'react-router-dom'
+import { useHttpClient } from '../../shared/hooks/http-hook'
+import ErrorModal from '../../shared/components/UIElements/ErrorModal'
+import LoadingSpinner from '../../shared/components/UIElements/LoadingSpinner'
+
+const UserPlaces = () => {
+  // useState를 사용하여 loadedPlaces 상태와 setLoadedPlaces 업데이트 함수를 정의합니다.
+  const [loadedPlaces, setLoadedPlaces] = useState()
+
+  // useHttpClient 훅을 사용하여 HTTP 요청과 관련된 상태 및 함수들을 가져옵니다.
+  const { isLoading, error, sendRequest, clearError } = useHttpClient()
+
+  // useParams() 함수를 사용하여 현재 경로의 URL 매개변수에서 userId를 추출합니다.
+  const userId = useParams().userId
+
+  // useEffect를 사용하여 컴포넌트가 렌더링 될 때 한 번만 실행되는 비동기 함수를 정의합니다.
+  useEffect(() => {
+    // fetchPlaces 함수 내에서 HTTP 요청을 보내고 응답 데이터를 처리합니다.
+    const fetchPlaces = async () => {
+      try {
+        // sendRequest 함수를 사용하여 백엔드로 Get 요청을 보내고 응답 데이터를 받아옵니다.
+        const responseData = await sendRequest(`http://localhost:5000/api/places/user/${userId}`)
+
+        // 받아온 데이터 중 places 키의 값을 loadedPlaces 상태에 업데이트합니다.
+        setLoadedPlaces(responseData.places)
+      } catch (error) {
+        // 오류가 발생한 경우 여기에서 오류 처리를 추가할 수 있습니다.
+      }
+    }
+
+    // 컴포넌트가 렌더링 될 때 fetchPlaces 함수를 호출하여 데이터를 가져옵니다.
+    fetchPlaces()
+  }, [sendRequest, userId]) // useEffect의 의존성 배열에 sendRequest와 userId를 추가하여 해당 값이 변경될 때마다 useEffect를 다시 실행합니다.
+
+  // 반환되는 JSX에서는 ErrorModal, LoadingSpinner, PlaceList 등을 조건부로 렌더링합니다.
+  return (
+    <>
+      {/* ErrorModal 컴포넌트를 사용하여 오류가 있을 경우 모달을 표시합니다. */}
+      <ErrorModal error={error} onClear={clearError} />
+
+      {/* 로딩 중일 경우 LoadingSpinner를 표시합니다. */}
+      {isLoading && (
+        <div className="center">
+          <LoadingSpinner />
+        </div>
+      )}
+
+      {/* 로딩 중이 아니고 loadedPlaces가 존재하는 경우 PlaceList 컴포넌트를 렌더링합니다. */}
+      {!isLoading && loadedPlaces && <PlaceList items={loadedPlaces} />}
+    </>
+  )
+}
+
+// UserPlaces 컴포넌트를 내보냅니다.
+export default UserPlaces
+```
+
+```jsx
+장소 가져오기
+
+places-route.js 파일의 사용자 ID별 장소 가져오는 라우트를 통해 프론트엔드에서 백엔드로 Get 요청 보냄.
+
+사용자 장소 페이지에서는 useHttpClient 훅을 활용하여 백엔드에서 장소 목록을 가져옴.
+
+fetchPlaces 함수 내에서 sendRequest 함수를 이용해 해당 URL로 Get 요청을 보내 백엔드에서 사용자 ID에 해당하는 장소 목록을 받아옴.
+
+성공 시, 받아온 데이터를 loadedPlaces 상태에 업데이트하고 프론트엔드에서 장소를 동적으로 렌더링.
+
+useEffect를 활용하여 컴포넌트가 마운트될 때 한 번만 요청을 보내도록 설정.
+
+에러 및 로딩 처리
+
+ErrorModal 및 LoadingSpinner 컴포넌트를 사용하여 오류 및 로딩 상태를 처리.
+
+useEffect 내에서 요청 중에는 로딩 스피너를 표시하고, 오류가 발생한 경우 오류 모달을 표시.
+
+로딩 및 오류 상태는 각각 isLoading과 error 상태로 관리.
+```
+
+# 장소 업데이트하기
+
+```jsx
+import React, { useEffect, useState, useContext } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+
+import Input from '../../shared/components/FormElements/Input'
+import Button from '../../shared/components/FormElements/Button'
+import Card from '../../shared/components/UIElements/Card'
+import { VALIDATOR_REQUIRE, VALIDATOR_MINLENGTH } from '../../shared/util/validators'
+import { useForm } from '../../shared/hooks/form-hook'
+import { useHttpClient } from '../../shared/hooks/http-hook'
+import { AuthContext } from '../../shared/context/auth-context'
+import './PlaceForm.css'
+import LoadingSpinner from '../../shared/components/UIElements/LoadingSpinner'
+import ErrorModal from '../../shared/components/UIElements/ErrorModal'
+
+const UpdatePlace = () => {
+  // useNavigate 훅을 사용하여 페이지 간 이동을 담당하는 navigate 함수 호출
+  const navigate = useNavigate()
+
+  // AuthContext에서 사용자 정보를 가져옴
+  const auth = useContext(AuthContext)
+
+  // useHttpClient 훅을 통해 로딩 상태 및 에러 처리에 관련된 함수들을 가져옴
+  const { isLoading, error, sendRequest, clearError } = useHttpClient()
+
+  // 로드된 장소 데이터를 저장하는 state
+  const [loadedPlaces, setLoadedPlaces] = useState()
+
+  // URL 파라미터에서 placeId 추출
+  const placeId = useParams().placeId
+
+  // useForm 훅을 사용하여 양식 상태 및 관련 함수 초기화
+  const [formState, inputHandler, setFormData] = useForm(
+    {
+      title: {
+        value: '',
+        isValid: false,
+      },
+      description: {
+        value: '',
+        isValid: false,
+      },
+    },
+    false
+  )
+
+  // useEffect를 사용하여 페이지 로딩 시 특정 장소의 데이터를 가져오는 비동기 함수 호출
+  useEffect(() => {
+    const fetchPlaces = async () => {
+      try {
+        // sendRequest 함수를 사용하여 특정 장소의 데이터 가져오기
+        const responseData = await sendRequest(`http://localhost:5000/api/places/${placeId}`)
+
+        // 가져온 데이터로 loadedPlaces state 업데이트
+        setLoadedPlaces(responseData.places)
+
+        // 가져온 데이터를 사용하여 폼 데이터 업데이트
+        setFormData(
+          {
+            title: {
+              value: responseData.places.title,
+              isValid: true,
+            },
+            description: {
+              value: responseData.places.description,
+              isValid: true,
+            },
+          },
+          true
+        )
+      } catch (error) {
+        // 오류 발생 시 처리
+      }
+    }
+
+    // 페이지 로딩 시 fetchPlaces 함수 호출
+    fetchPlaces()
+  }, [sendRequest, placeId, setFormData])
+
+  // 장소 업데이트를 위한 submit 핸들러
+  const placeUpdateSubmitHandler = async (event) => {
+    event.preventDefault()
+    try {
+      // sendRequest 함수를 사용하여 장소 업데이트 요청 보내기
+      await sendRequest(
+        `http://localhost:5000/api/places/${placeId}`,
+        'PATCH',
+        JSON.stringify({
+          title: formState.inputs.title.value,
+          description: formState.inputs.description.value,
+        }),
+        {
+          'Content-Type': 'application/json',
+        }
+      )
+
+      // 업데이트 성공 시 사용자를 해당 사용자의 장소 개요 페이지로 리디렉션
+      navigate('/' + auth.userId + '/places')
+    } catch (error) {
+      // 오류 발생 시 처리
+    }
+  }
+
+  // 로딩 중일 때 LoadingSpinner 출력
+  if (isLoading) {
+    return (
+      <div className="center">
+        <LoadingSpinner />
+      </div>
+    )
+  }
+
+  // 로드된 장소가 없고 오류가 없을 때 Card 컴포넌트를 사용한 메시지 출력
+  if (!loadedPlaces && !error) {
+    return (
+      <div className="center">
+        <Card>
+          <h2>Could not find place!</h2>
+        </Card>
+      </div>
+    )
+  }
+
+  // 오류가 있을 때 ErrorModal 출력
+  return (
+    <>
+      <ErrorModal error={error} onClear={clearError} />
+      {/* 로딩 중이 아니고 로드된 장소가 있을 때 양식 렌더링 */}
+      {!isLoading && loadedPlaces && (
+        <form className="place-form" onSubmit={placeUpdateSubmitHandler}>
+          {/* Input 컴포넌트를 사용하여 제목 입력란 렌더링 */}
+          <Input
+            id="title"
+            element="input"
+            type="text"
+            label="Title"
+            validators={[VALIDATOR_REQUIRE()]}
+            errorText="Please enter a valid title."
+            onInput={inputHandler}
+            initialValue={loadedPlaces.title}
+            initialValid={true}
+          />
+          {/* Input 컴포넌트를 사용하여 설명 입력란 렌더링 */}
+          <Input
+            id="description"
+            element="textarea"
+            label="Description"
+            validators={[VALIDATOR_MINLENGTH(5)]}
+            errorText="Please enter a valid description (min. 5 characters)."
+            onInput={inputHandler}
+            initialValue={loadedPlaces.description}
+            initialValid={true}
+          />
+          {/* 장소 업데이트 버튼 */}
+          <Button type="submit" disabled={!formState.isValid}>
+            UPDATE PLACE
+          </Button>
+        </form>
+      )}
+    </>
+  )
+}
+
+export default UpdatePlace
+```
+
+```jsx
+**장소 업데이트 기능 구현**
+
+UpdatePlaces.js 파일에서 placeById를 라우터로 가져와야 함.
+
+백엔드로부터 장소 데이터를 가져와야 함.
+
+단일 페이지에 일부 엔티티에 대한 세부 사항을 포함하는 게 SPA의 일반적인 요구사항.
+
+백엔드에는 해당 작업을 위한 라우트가 있으며, getPlaceById를 트리거하는 Get 라우트 사용.
+
+**useHttpClient 훅 초기화**
+
+../../shared/hooks/http-hook에서 useHttpClient 불러와서 초기화.
+
+객체 구조 분해를 통해 useHttpClient 호출하여 isLoading, error, sendRequest, clearError 관리.
+
+**장소 데이터 로드를 위한 State 및 useEffect 추가**
+
+loadedPlace와 setLoadedPlace를 사용하는 state 추가.
+
+useEffect를 사용하여 페이지 로드 시 요청을 보내고 데이터를 가져오기.
+
+fetchPlace 함수를 만들어 백엔드에서 장소 데이터 가져오기.
+
+**데이터 로드 시 양식 업데이트**
+
+setLoadedPlace와 함께 setFormData 호출하여 양식 데이터 업데이트.
+
+**양식 렌더링 및 예외 처리**
+
+로딩 중인지(isLoading) 확인 후 로딩 중이면 LoadingSpinner 출력.
+
+로드한 장소가 없거나 에러가 없으면 양식을 렌더링.
+
+에러가 있으면 ErrorModal을 출력하고 해당 오류를 전달.loadedPlace의 title과 description 사용.
+
+**초기 값 및 렌더링 조건 수정**
+
+초기 값 및 로딩 조건 수정:
+
+	loadedPlace로 로드한 장소가 있는지 확인하고 로딩 중이 아니면 양식을 렌더링.
+
+	초기 값에 loadedPlace를 사용하여 로드한 장소가 있는지 확인.
+
+	초기 유효성은 true로 설정하여 초기화.
+
+	코드 순서를 조절하여 양식 렌더링 시 데이터가 너무 빨리 초기화되는 문제 해결.
+
+	( if (isLoading) 이 더 위로 가야한다 )
+
+**장소 업데이트 요청 보내기**
+
+sendRequest를 사용하여 백엔드로 PATCH 요청 보내기.
+
+요청 URL에 현재 장소의 ID를 추가.
+
+헤더에 Content-Type과 application/json 추가.
+
+응답이 성공하면 리디렉션하여 사용자를 이동시킴.
+
+navigate('/' + auth.userId + '/places');
+
+( Context 를 사용해서 네비게이트 위치를 지정 )
+
+```
+
+# 장소 삭제하기
+
+```jsx
+장소 삭제 기능을 구현한다
+
+여기서 주의깊게 볼 부분은 삭제 후 새로고침을 하는 부분인데
+```
+
+```jsx
+// PlaceItem
+
+import React, { useContext, useState } from 'react'
+
+// 컴포넌트 및 훅 임포트
+import Card from '../../shared/components/UIElements/Card'
+import Button from '../../shared/components/FormElements/Button'
+import Modal from '../../shared/components/UIElements/Modal'
+import ErrorModal from '../../shared/components/UIElements/ErrorModal'
+import LoadingSpinner from '../../shared/components/UIElements/LoadingSpinner'
+import { AuthContext } from '../../shared/context/auth-context'
+import { useHttpClient } from '../../shared/hooks/http-hook'
+
+// CSS 파일 임포트
+import './PlaceItem.css'
+
+const PlaceItem = (props) => {
+  // AuthContext로부터 사용자 인증 정보를 가져옴
+  const auth = useContext(AuthContext)
+
+  // useHttpClient 훅을 사용하여 HTTP 요청과 에러 처리를 담당하는 객체를 가져옴
+  const { isLoading, error, sendRequest, clearError } = useHttpClient()
+
+  // 지도 모달 열기/닫기를 위한 상태 관리
+  const [showMap, setShowMap] = useState(false)
+
+  // 삭제 확인 모달 열기/닫기를 위한 상태 관리
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+
+  // 지도 모달 열기 핸들러
+  const openMapHandler = () => setShowMap(true)
+
+  // 지도 모달 닫기 핸들러
+  const closeMapHandler = () => setShowMap(false)
+
+  // 삭제 확인 모달 열기 핸들러
+  const showDeleteWarningHandler = () => {
+    setShowConfirmModal(true)
+  }
+
+  // 삭제 확인 모달 취소 핸들러
+  const cancelDeleteHandler = () => {
+    setShowConfirmModal(false)
+  }
+
+  // 삭제 확인 모달에서 DELETE 버튼 클릭 시 처리 핸들러
+  const confirmDeleteHandler = async () => {
+    setShowConfirmModal(false)
+    try {
+      // 서버에 DELETE 요청을 보냄
+      await sendRequest(`http://localhost:5000/api/places/${props.id}`, 'DELETE')
+    } catch (error) {
+      // 에러 발생 시 아무 동작 없음 (추가 로직 필요)
+    }
+    // 삭제된 장소의 ID를 onDelete 콜백 함수를 통해 상위 컴포넌트에 전달
+    props.onDelete(props.id)
+  }
+
+  return (
+    <>
+      {/* 에러 모달 컴포넌트 */}
+      <ErrorModal error={error} onClear={clearError} />
+
+      {/* 지도 모달 컴포넌트 */}
+      <Modal
+        show={showMap}
+        onCancel={closeMapHandler}
+        header={props.address}
+        contentClass="place-item__modal-content"
+        footerClass="place-item__modal-actions"
+        footer={<Button onClick={closeMapHandler}>CLOSE</Button>}
+      >
+        <div className="map-container">
+          <h2>THE MAP</h2>
+        </div>
+      </Modal>
+
+      {/* 삭제 확인 모달 컴포넌트 */}
+      <Modal
+        show={showConfirmModal}
+        onCancel={cancelDeleteHandler}
+        header="Are you sure?"
+        footerClass="place-item__modal-actions"
+        footer={
+          <>
+            <Button inverse onClick={cancelDeleteHandler}>
+              CANCEL
+            </Button>
+            <Button danger onClick={confirmDeleteHandler}>
+              DELETE
+            </Button>
+          </>
+        }
+      >
+        <p>정말 삭제 하시겠습니까?</p>
+      </Modal>
+
+      {/* 장소 항목 */}
+      <li className="place-item">
+        {/* 카드 컴포넌트 */}
+        <Card className="place-item__content">
+          {isLoading && <LoadingSpinner asOverlay />}
+
+          {/* 장소 이미지 */}
+          <div className="place-item__image">
+            <img src={props.image} alt={props.title} />
+          </div>
+
+          {/* 장소 정보 */}
+          <div className="place-item__info">
+            <h2>{props.title}</h2>
+            <h3>{props.address}</h3>
+            <p>{props.description}</p>
+          </div>
+
+          {/* 장소 액션 버튼 */}
+          <div className="place-item__actions">
+            {/* 지도 보기 버튼 */}
+            <Button inverse onClick={openMapHandler}>
+              VIEW ON MAP
+            </Button>
+
+            {/* 사용자가 로그인 중일 때만 편집 및 삭제 버튼 표시 */}
+            {auth.isLoggedIn && <Button to={`/places/${props.id}`}>EDIT</Button>}
+
+            {auth.isLoggedIn && (
+              <Button danger onClick={showDeleteWarningHandler}>
+                DELETE
+              </Button>
+            )}
+          </div>
+        </Card>
+      </li>
+    </>
+  )
+}
+
+export default PlaceItem
+```
+
+```jsx
+// UserPlaces;
+
+import React, { useEffect, useState } from 'react'
+import PlaceList from '../components/PlaceList'
+import { useParams } from 'react-router-dom'
+import { useHttpClient } from '../../shared/hooks/http-hook'
+import ErrorModal from '../../shared/components/UIElements/ErrorModal'
+import LoadingSpinner from '../../shared/components/UIElements/LoadingSpinner'
+
+const UserPlaces = () => {
+  // useState를 사용하여 loadedPlaces 상태와 setLoadedPlaces 업데이트 함수를 정의합니다.
+  const [loadedPlaces, setLoadedPlaces] = useState()
+
+  // useHttpClient 훅을 사용하여 HTTP 요청과 관련된 상태 및 함수들을 가져옵니다.
+  const { isLoading, error, sendRequest, clearError } = useHttpClient()
+
+  // useParams() 함수를 사용하여 현재 경로의 URL 매개변수에서 userId를 추출합니다.
+  const userId = useParams().userId
+
+  // useEffect를 사용하여 컴포넌트가 렌더링 될 때 한 번만 실행되는 비동기 함수를 정의합니다.
+  useEffect(() => {
+    // fetchPlaces 함수 내에서 HTTP 요청을 보내고 응답 데이터를 처리합니다.
+    const fetchPlaces = async () => {
+      try {
+        // sendRequest 함수를 사용하여 백엔드로 Get 요청을 보내고 응답 데이터를 받아옵니다.
+        const responseData = await sendRequest(`http://localhost:5000/api/places/user/${userId}`)
+
+        // 받아온 데이터 중 places 키의 값을 loadedPlaces 상태에 업데이트합니다.
+        setLoadedPlaces(responseData.places)
+      } catch (error) {
+        // 오류가 발생한 경우 여기에서 오류 처리를 추가할 수 있습니다.
+      }
+    }
+
+    // 컴포넌트가 렌더링 될 때 fetchPlaces 함수를 호출하여 데이터를 가져옵니다.
+    fetchPlaces()
+  }, [sendRequest, userId]) // useEffect의 의존성 배열에 sendRequest와 userId를 추가하여 해당 값이 변경될 때마다 useEffect를 다시 실행합니다.
+
+  // 삭제 후 새로고침을 위한 함수
+  const placeDeletedHandler = (deletePlaceId) => {
+    setLoadedPlaces((prevPlaces) => prevPlaces.filter((place) => place._id !== deletePlaceId))
+  }
+  // 반환되는 JSX에서는 ErrorModal, LoadingSpinner, PlaceList 등을 조건부로 렌더링합니다.
+  return (
+    <>
+      {/* ErrorModal 컴포넌트를 사용하여 오류가 있을 경우 모달을 표시합니다. */}
+      <ErrorModal error={error} onClear={clearError} />
+
+      {/* 로딩 중일 경우 LoadingSpinner를 표시합니다. */}
+      {isLoading && (
+        <div className="center">
+          <LoadingSpinner />
+        </div>
+      )}
+
+      {/* 로딩 중이 아니고 loadedPlaces가 존재하는 경우 PlaceList 컴포넌트를 렌더링합니다. */}
+      {!isLoading && loadedPlaces && (
+        <PlaceList items={loadedPlaces} onDeletePlace={placeDeletedHandler} />
+      )}
+    </>
+  )
+}
+
+// UserPlaces 컴포넌트를 내보냅니다.
+export default UserPlaces
+```
+
+```jsx
+// PlaceList.js
+
+import React from 'react'
+
+import Card from '../../shared/components/UIElements/Card'
+import PlaceItem from './PlaceItem'
+
+import './PlaceList.css'
+
+const PlaceList = (props) => {
+  if (props.items.length === 0) {
+    return (
+      <div className="place-list center">
+        <Card>
+          <h2>No Places found. Maybe create one?</h2>
+          <button>Share Place</button>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <ul className="place-list">
+      {props.items.map((place) => (
+        <PlaceItem
+          key={place.id}
+          id={place.id}
+          image={place.image}
+          title={place.title}
+          description={place.description}
+          address={place.address}
+          creatorId={place.creator}
+          coordinates={place.location}
+          onDelete={props.onDeletePlace}
+        />
+      ))}
+    </ul>
+  )
+}
+
+export default PlaceList
+```
+
+```jsx
+useHttpClient 훅 불러오기 및 초기 설정
+
+1.1. /shared/hooks/http-hook에서 useHttpClient 훅을 import하여 사용 준비
+
+1.2. isLoading, error, sendRequest, clearError 등의 초기값을 useHttpClient로부터 객체 분해를 통해 정의
+
+삭제 요청을 전송하는 함수 작성
+
+2.1. confirmDeleteHandler 함수 내에서 HTTP 요청을 전송하는 함수 작성
+
+2.2. DELETE 요청을 보낼 특정 URL을 동적으로 생성하고 백틱(`)을 활용하여 설정
+
+2.3. try-catch 문을 활용하여 성공 및 실패 시의 작업을 구현
+
+2.4. 성공 시에는 특정 작업을 추가하고, catch 블록에서는 일단 작업을 비워둠
+
+삭제 후 페이지 업데이트 처리
+
+3.1. PlaceList 컴포넌트에 onDeletePlace 프로퍼티를 추가하여 삭제 후 작업을 외부에서 전달 가능하도록 설정
+
+3.2. PlaceItem 컴포넌트에서 onDelete 프로퍼티를 호출하여 onDeletePlace 함수를 실행하도록 구현 ( 상위 컴포넌트로 전달 )
+
+3.3. UserPlaces 컴포넌트에서 placeDeletedHandler 함수를 작성하여 LoadedPlaces를 업데이트
+
+LoadedPlaces 업데이트 시 삭제한 장소 제외 처리
+
+4.1. placeDeletedHandler 함수 내에서 setLoadedPlaces를 사용하여 현재 LoadedPlaces를 업데이트
+
+4.2. filter 메서드를 활용하여 deletedPlaceId를 제외한 장소만 유지하도록 설정
+
+4.3. deletedPlace를 제외한 새로운 배열로 LoadedPlace를 업데이트
+
+에러 및 로딩 상태 처리
+
+5.1. ErrorModal 및 LoadingSpinner 컴포넌트를 import하여 사용 가능하도록 설정
+
+5.2. confirmDeleteHandler 함수 내에서 에러 발생 시 ErrorModal을 표시하도록 구현
+
+5.3. 로딩 중일 때 LoadingSpinner를 표시하고 asOverlay 모드로 설정하여 가독성 향상
+
+ConfirmModal 닫기 및 모달 중복 방지
+
+6.1. confirmDeleteHandler 함수 내에서 setShowConfirmModal을 false로 설정하여 ConfirmModal을 닫도록 구현
+
+6.2. 여러 모달이 중복으로 열리는 상황을 방지하기 위해 조치
+
+```
+
+## 삭제 새로고침에 대한 추가 설명
+
+```jsx
+**PlaceList 컴포넌트에 onDeletePlace 프로퍼티 추가:**
+
+PlaceList 컴포넌트에는 삭제 후의 작업을 처리할 함수를 받아오기 위한 onDeletePlace 프로퍼티를 추가한다.
+
+( onDelete={props.onDeletePlace} 이게 UserPlaces.js 의 onDeletePlace 를 호출하고 있다 여기로 id 를 PlaceItem 에서 보내주는것 )
+
+이 프로퍼티는 삭제된 장소의 ID를 받아와서 필요한 작업을 수행하는 함수이다.
+
+**PlaceItem 컴포넌트에서 onDelete 프로퍼티 호출:**
+
+PlaceItem 컴포넌트는 각 장소 항목을 표현하는데, 여기서 삭제 버튼을 클릭하면 onDelete 프로퍼티를 호출한다.
+
+onDelete 프로퍼티는 해당 장소의 ID를 파라미터로 받아와서 삭제 후의 작업을 처리하는 함수이다.
+
+**onDeletePlace 함수 실행 (상위 컴포넌트로 전달):**
+
+onDeletePlace 함수는 onDelete 프로퍼티를 통해 PlaceItem 컴포넌트로부터 전달된 함수이다. (id 를 받아온)
+
+해당 함수는 삭제된 장소의 ID를 받아와서 상위 컴포넌트의 상태를 업데이트한다. ( 상위 컴포넌트 = UserPlaces.js )
+
+예를 들어, UserPlaces 컴포넌트의 placeDeletedHandler 함수가 onDeletePlace 함수이다. ( UserPlaces 아래 PlaceList 로 보내는 props 확인 )
+
+**UserPlaces 컴포넌트에서 placeDeletedHandler 함수 작성:**
+
+UserPlaces 컴포넌트에서는 삭제된 장소의 ID를 받아와서 LoadedPlaces 상태를 업데이트하는 함수를 작성한다.
+
+즉, placeDeletedHandler 함수는 LoadedPlaces 배열에서 삭제된 장소의 ID를 제외한 새로운 배열을 생성하여 상태를 업데이트한다.
+
+이렇게 함으로써, 삭제된 장소가 화면에서 사라지고 업데이트된 목록이 표시된다.
+
+이러한 순서로 onDeletePlace 함수를 통해 하위 컴포넌트에서 상위 컴포넌트로 삭제된 장소의 ID가 전달되고,
+
+상위 컴포넌트에서는 이 ID를 사용하여 업데이트된 목록을 렌더링한다.
+```
+
+# **사용자 권한에 따른 수정 및 삭제 버튼 표시**
+
+```jsx
+import React, { useContext, useState } from 'react'
+
+// 컴포넌트 및 훅 임포트
+import Card from '../../shared/components/UIElements/Card'
+import Button from '../../shared/components/FormElements/Button'
+import Modal from '../../shared/components/UIElements/Modal'
+import ErrorModal from '../../shared/components/UIElements/ErrorModal'
+import LoadingSpinner from '../../shared/components/UIElements/LoadingSpinner'
+import { AuthContext } from '../../shared/context/auth-context'
+import { useHttpClient } from '../../shared/hooks/http-hook'
+
+// CSS 파일 임포트
+import './PlaceItem.css'
+
+const PlaceItem = (props) => {
+  // AuthContext로부터 사용자 인증 정보를 가져옴
+  const auth = useContext(AuthContext)
+
+  // useHttpClient 훅을 사용하여 HTTP 요청과 에러 처리를 담당하는 객체를 가져옴
+  const { isLoading, error, sendRequest, clearError } = useHttpClient()
+
+  // 지도 모달 열기/닫기를 위한 상태 관리
+  const [showMap, setShowMap] = useState(false)
+
+  // 삭제 확인 모달 열기/닫기를 위한 상태 관리
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+
+  // 지도 모달 열기 핸들러
+  const openMapHandler = () => setShowMap(true)
+
+  // 지도 모달 닫기 핸들러
+  const closeMapHandler = () => setShowMap(false)
+
+  // 삭제 확인 모달 열기 핸들러
+  const showDeleteWarningHandler = () => {
+    setShowConfirmModal(true)
+  }
+
+  // 삭제 확인 모달 취소 핸들러
+  const cancelDeleteHandler = () => {
+    setShowConfirmModal(false)
+  }
+
+  // 삭제 확인 모달에서 DELETE 버튼 클릭 시 처리 핸들러
+  const confirmDeleteHandler = async () => {
+    setShowConfirmModal(false)
+    try {
+      // 서버에 DELETE 요청을 보냄
+      await sendRequest(`http://localhost:5000/api/places/${props.id}`, 'DELETE')
+    } catch (error) {
+      // 에러 발생 시 아무 동작 없음 (추가 로직 필요)
+    }
+    // 삭제된 장소의 ID를 onDelete 콜백 함수를 통해 상위 컴포넌트에 전달
+    props.onDelete(props.id)
+  }
+
+  return (
+    <>
+      {/* 에러 모달 컴포넌트 */}
+      <ErrorModal error={error} onClear={clearError} />
+
+      {/* 지도 모달 컴포넌트 */}
+      <Modal
+        show={showMap}
+        onCancel={closeMapHandler}
+        header={props.address}
+        contentClass="place-item__modal-content"
+        footerClass="place-item__modal-actions"
+        footer={<Button onClick={closeMapHandler}>CLOSE</Button>}
+      >
+        <div className="map-container">
+          <h2>THE MAP</h2>
+        </div>
+      </Modal>
+
+      {/* 삭제 확인 모달 컴포넌트 */}
+      <Modal
+        show={showConfirmModal}
+        onCancel={cancelDeleteHandler}
+        header="Are you sure?"
+        footerClass="place-item__modal-actions"
+        footer={
+          <>
+            <Button inverse onClick={cancelDeleteHandler}>
+              CANCEL
+            </Button>
+            <Button danger onClick={confirmDeleteHandler}>
+              DELETE
+            </Button>
+          </>
+        }
+      >
+        <p>정말 삭제 하시겠습니까?</p>
+      </Modal>
+
+      {/* 장소 항목 */}
+      <li className="place-item">
+        {/* 카드 컴포넌트 */}
+        <Card className="place-item__content">
+          {isLoading && <LoadingSpinner asOverlay />}
+
+          {/* 장소 이미지 */}
+          <div className="place-item__image">
+            <img src={props.image} alt={props.title} />
+          </div>
+
+          {/* 장소 정보 */}
+          <div className="place-item__info">
+            <h2>{props.title}</h2>
+            <h3>{props.address}</h3>
+            <p>{props.description}</p>
+          </div>
+
+          {/* 장소 액션 버튼 */}
+          <div className="place-item__actions">
+            {/* 지도 보기 버튼 */}
+            <Button inverse onClick={openMapHandler}>
+              VIEW ON MAP
+            </Button>
+
+            {/* 사용자가 로그인 중일 때만 편집 및 삭제 버튼 표시 */}
+            {auth.userId === props.creatorId && <Button to={`/places/${props.id}`}>EDIT</Button>}
+
+            {auth.userId === props.creatorId && (
+              <Button danger onClick={showDeleteWarningHandler}>
+                DELETE
+              </Button>
+            )}
+          </div>
+        </Card>
+      </li>
+    </>
+  )
+}
+
+export default PlaceItem
+```
+
+```jsx
+2.1. PlaceItem.js 파일에서 수정과 삭제 버튼이 항상 렌더링되어 사용자가 다른 사용자의 장소를 수정 및 삭제할 수 있는 문제를 확인한다.
+
+2.2. AuthContext를 사용하여 사용자 ID를 저장하고, 해당 ID와 장소를 생성한 ID가 동일한지 확인하여 수정 및 삭제 버튼을 표시할지 결정한다.
+
+2.3. PlaceItem.js 파일에서 로그인한 사용자의 ID와 장소를 생성한 ID를 비교하여 버튼을 표시한다.
+
+{auth.userId === props.creatorId &&
+
+* auth 의 현재 사용자 ID 와 props 를 통해 전달받은 글쓴이 ID 가 같은지 확인
+```
+
+# 사소한 수정들
+
+```jsx
+import React, { useContext } from "react";
+import { NavLink } from "react-router-dom";
+
+import { AuthContext } from "../../context/auth-context";
+
+import './NavLinks.css'
+
+const NavLinks = (props) => {
+
+    const auth = useContext(AuthContext);
+
+    return (
+        <ul className="nav-links">
+            <li>
+                <NavLink to='/'>ALL USERS</NavLink>
+            </li>
+            {auth.isLoggedIn && (
+                <li>
+                    <NavLink to={`/${auth.userId}/places`}>MY PLACES</NavLink>
+                </li>
+            )}
+            {auth.isLoggedIn && (
+                <li>
+                    <NavLink to='/places/new'>ADD PLACE</NavLink>
+                </li>
+            )}
+            {!auth.isLoggedIn && (
+                <li>
+                    <NavLink to='/auth'>AUTHENTICATE</NavLink>
+                </li>
+            )}
+            {auth.isLoggedIn && (
+                <button onClick={auth.logout}>LOGOUT</button>
+            )}
+
+        <네이/ul>
+    )
+}
+
+export default NavLinks
+```
+
+```jsx
+<NavLink to={`/${auth.userId}/places`}>MY PLACES</NavLink>
+
+이렇게 네비게이션을 수정해줘 현재 로그인한 사용자 장소로 이동 가능하게 해준다
+```
+
+# 네비게이트 문제
+
+```jsx
+import React, { useState, useContext } from 'react'
+import { useNavigate } from 'react-router-dom'
+import Card from '../../shared/components/UIElements/Card'
+import Input from '../../shared/components/FormElements/Input'
+import Button from '../../shared/components/FormElements/Button'
+import ErrorModal from '../../shared/components/UIElements/ErrorModal'
+import LoadingSpinner from '../../shared/components/UIElements/LoadingSpinner'
+import ImageUpload from '../../shared/components/FormElements/ImageUpload'
+
+import { useForm } from '../../shared/hooks/form-hook'
+import { useHttpClient } from '../../shared/hooks/http-hook'
+import {
+  VALIDATOR_EMAIL,
+  VALIDATOR_MINLENGTH,
+  VALIDATOR_REQUIRE,
+} from '../../shared/util/validators'
+import { AuthContext } from '../../shared/context/auth-context'
+
+import './Auth.css'
+
+const Auth = () => {
+  const auth = useContext(AuthContext)
+  const navigate = useNavigate()
+  // 로그인 및 회원 가입을 위한 상태 및 커스텀 훅 초기화
+  const [isLoginMode, setIsLoginMode] = useState(true)
+  const { isLoading, error, sendRequest, clearError } = useHttpClient()
+  const [formState, inputHandler, setFormData] = useForm(
+    {
+      email: {
+        value: '',
+        isValid: false,
+      },
+      password: {
+        value: '',
+        isValid: false,
+      },
+    },
+    false
+  )
+
+  // 로그인 및 회원 가입 모드 전환
+  const switchModeHandler = () => {
+    if (!isLoginMode) {
+      // 회원 가입 모드에서 로그인 모드로 전환 시, 이름 입력 필드 추가
+      setFormData(
+        {
+          ...formState.inputs,
+          name: undefined,
+          image: undefined,
+        },
+        formState.inputs.email.isValid && formState.inputs.password.isValid
+      )
+    } else {
+      // 로그인 모드에서 회원 가입 모드로 전환 시, 이름 입력 필드 제거
+      setFormData(
+        {
+          ...formState.inputs,
+          name: {
+            value: '',
+            isValid: false,
+          },
+          image: {
+            value: null,
+            isValid: false,
+          },
+        },
+        false
+      )
+    }
+    setIsLoginMode((prevMode) => !prevMode)
+  }
+
+  // 로그인 또는 회원 가입 시도
+  const authSubmitHandler = async (event) => {
+    event.preventDefault()
+
+    if (isLoginMode) {
+      // 로그인 모드일 때
+      try {
+        const responseData = await sendRequest(
+          'http://localhost:5000/api/users/login',
+          'POST',
+          JSON.stringify({
+            email: formState.inputs.email.value,
+            password: formState.inputs.password.value,
+          }),
+          {
+            'Content-Type': 'application/json',
+          }
+        )
+        navigate('/')
+        auth.login(responseData.user._id)
+      } catch (error) {
+        // 오류 발생 시
+      }
+    } else {
+      // 회원 가입 모드일 때
+      try {
+        const formData = new FormData()
+        formData.append('name', formState.inputs.name.value)
+        formData.append('email', formState.inputs.email.value)
+        formData.append('password', formState.inputs.password.value)
+        formData.append('image', formState.inputs.image.value)
+
+        const responseData = await sendRequest(
+          'http://localhost:5000/api/users/signup',
+          'POST',
+          formData
+        )
+        navigate('/')
+        auth.login(responseData.user._id)
+      } catch (error) {
+        // 오류 발생 시
+      }
+    }
+  }
+
+  return (
+    <>
+      {/* HTTP 요청 오류를 표시하는 모달 및 로딩 스피너 */}
+      <ErrorModal error={error} onClear={clearError} />
+      {isLoading && <LoadingSpinner asOverlay />}
+
+      {/* 로그인/회원 가입 양식 */}
+      <Card className="authentication">
+        <h1>Login Required</h1>
+        <hr />
+
+        {/* 로그인/회원 가입 양식 */}
+        <form onSubmit={authSubmitHandler}>
+          {/* 회원 가입 모드에서만 보이는 이름 입력 필드 */}
+          {!isLoginMode && (
+            <Input
+              element="input"
+              id="name"
+              type="text"
+              label="Name"
+              validators={[VALIDATOR_REQUIRE()]}
+              errorText="Please enter a name"
+              onInput={inputHandler}
+            />
+          )}
+          {!isLoginMode && <ImageUpload center id="image" onInput={inputHandler} />}
+
+          {/* 이메일 및 비밀번호 입력 필드 */}
+          <Input
+            element="input"
+            id="email"
+            type="email"
+            label="E-Mail"
+            validators={[VALIDATOR_EMAIL()]}
+            errorText="Please enter a valid email address."
+            onInput={inputHandler}
+          />
+          <Input
+            element="input"
+            id="password"
+            type="password"
+            label="Password"
+            validators={[VALIDATOR_MINLENGTH(6)]}
+            errorText="Please enter a valid password at least 5 Ch."
+            onInput={inputHandler}
+          />
+
+          {/* 로그인/회원 가입 버튼 */}
+          <Button type="submit" disabled={!formState.isValid}>
+            {isLoginMode ? 'LOGIN' : 'SIGNUP'}
+          </Button>
+        </form>
+
+        {/* 로그인/회원 가입 모드 전환 버튼 */}
+        <Button inverse onClick={switchModeHandler}>
+          SWITCH TO {isLoginMode ? 'SIGNUP' : 'LOGIN'}
+        </Button>
+      </Card>
+    </>
+  )
+}
+
+export default Auth
+```
+
+```jsx
+이상하게
+
+                navigate('/');
+                auth.login(responseData.user._id);
+
+순서가 이렇게 되어야지 동작한다 원인을 찾도록...
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381304/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_1.png)
+
+```jsx
+문제는 userId
+
+auth.login(responseData.user._id); 가 아니라
+
+auth.login(responseData.userId);
+
+로 해야했다 ( 계속 오류가 나고 있었는데 catch 에 걸리는게 없어서 ( 일단 201 성공이니까 )
+
+알수가 없었다 이렇게 수정하고나면
+
+auth.login(responseData.userId);
+navigate('/');
+
+올바른 순서로 올바르게 동작한다
+
+클라이언트쪽 catch 에 꼭 console 에러 메세지를 써주자
+```

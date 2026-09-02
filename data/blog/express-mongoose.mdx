@@ -1,0 +1,1026 @@
+---
+title: 'Express와 Mongoose 통합'
+date: '2026-09-02'
+category: '풀스택/The Web Developer 부트캠프 2022'
+tags: ['풀스택', 'The Web Developer 부트캠프 2022']
+draft: false
+summary: ''
+---
+
+# 기본적인 셋팅
+
+```jsx
+CRUD가 완전히 구현된 농장 판매대 애플리케이션을 만들기 위한 학습을 진행한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381383/notion-blog/_/The_Web_Developer_2022/node_js/Express_Mongoose_/Untitled.png)
+
+```jsx
+const express = require('express')
+const app = express()
+// getting-started.js
+const mongoose = require('mongoose')
+
+main().catch((err) => console.log(err))
+
+async function main() {
+  await mongoose.connect('mongodb://127.0.0.1:27017/movieApp') // 마지막 부분이 DB명
+  console.log('Mongo Connect Success')
+}
+
+app.listen(3000, () => {
+  console.log('Success')
+})
+```
+
+```jsx
+npm init -y
+npm express
+npm mongoose
+
+등 기본적인 라이브러리를 설치해주고
+
+express 연결과 mongoose 연결을 해준다
+```
+
+# 모델 설정
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381382/notion-blog/_/The_Web_Developer_2022/node_js/Express_Mongoose_/Untitled_1.png)
+
+```jsx
+const mongoose = require('mongoose') // 몽구스를 요청, DB연결은 필요없다 index 에서 요청할거니까
+
+// 상품 스키마 정의
+const productSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    require: true,
+  },
+  price: {
+    type: Number,
+    require: true,
+    min: 0,
+  },
+  category: {
+    type: String,
+    lowercase: true,
+    enum: ['fruit', 'vegetable', 'dairy'],
+  },
+})
+
+// 모델 정의
+const Product = mongoose.model('Product', productSchema)
+
+// 모델을 다른곳에서 사용 가능하게 익스포트
+module.exports = Product
+```
+
+```jsx
+농장 판매대 애플리케이션의 첫 모델로 'product'를 생성 ( 모델들은 따로 관리를 위해 폴더를 만들어서 작성 )
+
+상품 스키마를 정의하고
+
+모델을 정의한 뒤
+
+다른곳에서 모델을 사용 가능하게 익스포트 해줬다
+```
+
+# 시드 파일 생성
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381382/notion-blog/_/The_Web_Developer_2022/node_js/Express_Mongoose_/Untitled_2.png)
+
+```jsx
+애플리케이션을 개발하거나 테스트할 때 초기 데이터를 쉽게 삽입하고 관리하기 위해서 시드 파일 생성
+
+데이터베이스에는 필요한 최소한의 데이터가 있어야 애플리케이션을 효과적으로 개발하거나 테스트할 수 있다.
+
+시드 파일을 사용하면 데이터를 쉽게 삽입하고 업데이트할 수 있다
+```
+
+```jsx
+const mongoose = require('mongoose')
+const Product = require('./models/product') // 데이터 모델을 정의한 파일을 불러와서 사용
+
+main().catch((err) => console.log(err))
+
+async function main() {
+  await mongoose.connect('mongodb://127.0.0.1:27017/farmStand') // mongoose.connect를 사용하여 MongoDB에 연결
+  console.log('Mongo Connect Success')
+}
+
+// const p = new Product({
+//     name: 'Ruby Grapefruit',
+//     price: 1.99,
+//     category: 'fruit'
+// })
+
+// p.save()
+//     .then(p => {
+//         console.log(p)
+//     })
+//     .catch(e => {
+//         console.log(e)
+//     })
+
+const seedProducts = [
+  {
+    name: 'Fairy Eggplant',
+    price: 1.0,
+    category: 'vegetable',
+  },
+  {
+    name: 'Organic Goddess Melon',
+    price: 4.99,
+    category: 'fruit',
+  },
+  {
+    name: 'Organic Mini Seedless Watermelon',
+    price: 3.99,
+    category: 'fruit',
+  },
+  {
+    name: 'Organic Celery',
+    price: 1.5,
+    category: 'vegetable',
+  },
+  {
+    name: 'Chocolate Whole Milk',
+    price: 2.57,
+    category: 'dairy',
+  },
+]
+
+Product.insertMany(seedProducts)
+  .then((res) => {
+    console.log(res)
+  })
+  .catch((e) => {
+    console.log(e)
+  })
+```
+
+# 상품 목록 조회 구현
+
+## server
+
+```jsx
+const express = require('express')
+const cors = require('cors')
+
+const app = express()
+app.use(cors()) // cors
+// getting-started.js
+const mongoose = require('mongoose')
+
+// Product 모델 요청
+const Product = require('./models/product')
+
+main().catch((err) => console.log(err))
+
+async function main() {
+  await mongoose.connect('mongodb://127.0.0.1:27017/farmStand') // 마지막 부분이 DB명
+  console.log('Mongo Connect Success')
+}
+
+// 삼품 조회
+app.get('/products', async (req, res) => {
+  const products = await Product.find({})
+  console.log(products)
+  res.send(products)
+})
+
+app.listen(4000, () => {
+  console.log('Success')
+})
+```
+
+```jsx
+서버에 상품 조회 컨트롤러를 만들어준다
+```
+
+### client
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381382/notion-blog/_/The_Web_Developer_2022/node_js/Express_Mongoose_/Untitled_3.png)
+
+```jsx
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+const ProductPage = () => {
+  const [products, setProducts] = useState([])
+  useEffect(() => {
+    fetch('http://localhost:4000/products')
+      .then((response) => response.json())
+      .then((data) => setProducts(data))
+  }, [])
+
+  return (
+    <div>
+      <h1>ProductPage</h1>
+      <ul>
+        {products.map((product) => (
+          <li key={product.id}>
+            <Link to={`/product/${product._id}`}>{product.name}</Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+export default ProductPage
+```
+
+```jsx
+데이터를 호출해서 fetch 로 받은 뒤 ( axios 사용 가능 )
+
+리스트를 출력한다
+
+( router 처리등도 해줘야 한다 )
+
+<Link> 를 이용해서 상세 페이지로 이동할 때 _id 를 사용하는걸 주의하자
+
+( _id는 MongoDB에서 생성된 고유한 식별자인 ObjectId를 나타낸다 id )
+```
+
+## 상품 목록 상세 조회
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381382/notion-blog/_/The_Web_Developer_2022/node_js/Express_Mongoose_/Untitled_4.png)
+
+### server
+
+```jsx
+const express = require('express')
+const cors = require('cors')
+
+const app = express()
+app.use(cors()) // cors
+// getting-started.js
+const mongoose = require('mongoose')
+
+// Product 모델 요청
+const Product = require('./models/product')
+
+main().catch((err) => console.log(err))
+
+async function main() {
+  await mongoose.connect('mongodb://127.0.0.1:27017/farmStand') // 마지막 부분이 DB명
+  console.log('Mongo Connect Success')
+}
+
+// 삼품 조회
+app.get('/products', async (req, res) => {
+  const products = await Product.find({})
+  console.log(products)
+  res.send(products)
+})
+
+// 상품 상세 조회
+app.get('/products/:id', async (req, res) => {
+  const { id } = req.params
+  const product = await Product.findById(id)
+  console.log(product)
+  res.send(product)
+})
+
+app.listen(4000, () => {
+  console.log('Success')
+})
+```
+
+```jsx
+상품을 상세 조회하는 컨트롤러를 제작한다
+
+params 를 사용해서 URL 의 id 값을 불러와서 findById 로 찾아 사용한다
+
+```
+
+### client
+
+```jsx
+import { useEffect, useState } from 'react'
+import { useParams, Link } from 'react-router-dom'
+
+const ProductDetailPage = () => {
+  const params = useParams()
+  const [product, setProduct] = useState(null)
+
+  useEffect(() => {
+    fetch(`http://localhost:4000/products/${params.id}`)
+      .then((response) => response.json())
+      .then((data) => setProduct(data))
+      .catch((error) => {
+        console.error('상품 정보를 불러오는 데 실패했습니다.', error)
+        setProduct(null)
+      })
+  }, [params.id])
+
+  return (
+    <div>
+      {product ? (
+        <>
+          <h1>{product.name}</h1>
+          <ul>
+            <li>Price : {product.price}</li>
+            <li>Category : {product.category}</li>
+          </ul>
+        </>
+      ) : (
+        <p>상품 정보를 불러오는 중입니다...</p>
+      )}
+      <Link to={'/products'}>홈으로</Link>
+    </div>
+  )
+}
+
+export default ProductDetailPage
+```
+
+```jsx
+params 를 사용해서 id 가 포함된 요청을 보내고
+
+가져온 값을 사용해서 나머지 항목을 출력한다
+
+로딩 관련부분을 작성해주지 않으니 오류가 발생하였고
+
+로딩 되는 시간동안 출력될 부분을 작성해 주었다
+```
+
+## 상품 추가
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381382/notion-blog/_/The_Web_Developer_2022/node_js/Express_Mongoose_/Untitled_5.png)
+
+### server
+
+```jsx
+이벤트 핸들러를 추가해서 form 을 전송한다
+
+useNavigate 를 사용해서 리다이렉트 요청
+```
+
+```jsx
+const express = require('express')
+const cors = require('cors')
+const bodyParser = require('body-parser')
+const app = express()
+
+app.use(bodyParser.json())
+app.use(bodyParser.urlencoded({ extended: true }))
+app.use(cors()) // cors
+// getting-started.js
+const mongoose = require('mongoose')
+
+// Product 모델 요청
+const Product = require('./models/product')
+
+main().catch((err) => console.log(err))
+
+async function main() {
+  await mongoose.connect('mongodb://127.0.0.1:27017/farmStand') // 마지막 부분이 DB명
+  console.log('Mongo Connect Success')
+}
+
+// 삼품 조회
+app.get('/products', async (req, res) => {
+  const products = await Product.find({})
+  console.log(products)
+  res.send(products)
+})
+
+// 상품 상세 조회
+app.get('/products/:id', async (req, res) => {
+  const { id } = req.params
+  const product = await Product.findById(id)
+  console.log(product)
+  res.send(product)
+})
+
+// 상품 추가 (필요없을듯)
+app.get('/product/new', async (req, res) => {
+  console.log('UPDATE PAGE')
+})
+
+// 상품 추가
+app.post('/product/new', async (req, res) => {
+  const newProduct = new Product(req.body)
+  await newProduct.save()
+  res.send('making your product')
+})
+
+app.listen(4000, () => {
+  console.log('Success')
+})
+```
+
+```jsx
+상품 추가를 만들어 준다
+
+const bodyParser = require('body-parser') 를 잊지말자
+
+// 요즘은 이걸 사욯한다
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+```
+
+### client
+
+```jsx
+import axios from 'axios'
+import React, { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+const ProductAddPage = () => {
+  const navigate = useNavigate()
+
+  // 상태 초기화
+  const [formData, setFormData] = useState({
+    name: '',
+    price: '',
+    category: 'fruit', // 기본값 설정
+  })
+
+  // 입력값 변경 시 상태 업데이트
+  const handleChange = (e) => {
+    const { name, value } = e.target
+    setFormData((prevData) => ({
+      ...prevData,
+      [name]: value,
+    }))
+  }
+
+  // 폼 제출 핸들러
+  const onSubmitHandler = async (e) => {
+    e.preventDefault()
+
+    // 폼 데이터 전송
+    try {
+      await axios.post('http://localhost:4000/product/new', formData)
+      navigate('/products')
+    } catch (error) {
+      console.error('상품 추가 중 오류 발생:', error)
+    }
+  }
+
+  return (
+    <>
+      <h1>ProductAddPage</h1>
+      <form onSubmit={onSubmitHandler}>
+        <label htmlFor="name">ProductName</label>
+        <input type="text" name="name" id="name" value={formData.name} onChange={handleChange} />
+        <label htmlFor="price">Price</label>
+        <input
+          type="number"
+          name="price"
+          id="price"
+          value={formData.price}
+          onChange={handleChange}
+        />
+        <label htmlFor="category">Category</label>
+        <select name="category" id="category" value={formData.category} onChange={handleChange}>
+          <option value="fruit">fruit</option>
+          <option value="vegetable">vegetable</option>
+          <option value="dairy">dairy</option>
+        </select>
+        <input type="submit" value="상품추가" />
+      </form>
+    </>
+  )
+}
+
+export default ProductAddPage
+```
+
+```jsx
+사용자가 입력한 상품 정보를 저장하기 위해 상태(state)를 설정하고 초기화한다.
+
+handleChange 함수를 통해 각 입력 필드의 값이 변경될 때마다 해당 값을 상태에 업데이트한다.
+
+이 함수는 입력 필드의 onChange 이벤트 핸들러로 사용된다.
+
+각 입력 필드는 value와 onChange 속성을 통해 현재 상태를 반영하고,
+
+폼 전체는 onSubmit 이벤트 핸들러에 연결되어 제출되면 onSubmitHandler 함수가 호출된다.
+
+```
+
+## 상품 업데이트
+
+### server
+
+```jsx
+const express = require('express')
+const cors = require('cors')
+const bodyParser = require('body-parser')
+const app = express()
+
+app.use(bodyParser.json())
+app.use(bodyParser.urlencoded({ extended: true }))
+app.use(cors()) // cors
+// getting-started.js
+const mongoose = require('mongoose')
+
+// Product 모델 요청
+const Product = require('./models/product')
+
+main().catch((err) => console.log(err))
+
+async function main() {
+  await mongoose.connect('mongodb://127.0.0.1:27017/farmStand') // 마지막 부분이 DB명
+  console.log('Mongo Connect Success')
+}
+
+// 삼품 조회
+app.get('/products', async (req, res) => {
+  const products = await Product.find({})
+  console.log(products)
+  res.send(products)
+})
+
+// 상품 상세 조회
+app.get('/products/:id', async (req, res) => {
+  const { id } = req.params
+  const product = await Product.findById(id)
+  console.log(product)
+  res.send(product)
+})
+
+// 상품 추가 (필요없을듯)
+app.get('/product/new', async (req, res) => {
+  console.log('UPDATE PAGE')
+})
+
+// 상품 추가
+app.post('/product/new', async (req, res) => {
+  const newProduct = new Product(req.body)
+  await newProduct.save()
+  res.send('making your product')
+})
+
+// 상품 업데이트
+app.get('/product/:id/edit', async (req, res) => {
+  const product = await Product.findById(id)
+  res.send(product)
+})
+
+// 상품 업데이트
+app.put('/product/:id', async (req, res) => {
+  const { id } = req.params
+
+  try {
+    // findByIdAndUpdate 대신 findById 와 save 를 사용하여 업데이트
+    const product = await Product.findById(id)
+
+    if (!product) {
+      return res.status(404).send('상품을 찾을 수 없습니다.')
+    }
+
+    // 업데이트할 데이터 적용
+    product.set(req.body)
+
+    // 업데이트된 상품 저장
+    await product.save()
+
+    // 업데이트된 상품을 클라이언트에게 보냄
+    res.send(product)
+  } catch (error) {
+    console.error('상품 업데이트 중 오류 발생:', error)
+    res.status(500).send('상품 업데이트 중 오류 발생')
+  }
+})
+
+app.listen(4000, () => {
+  console.log('Success')
+})
+```
+
+```jsx
+findById 말고 findandUpdate 를 사용하였는데 반응이 없었다
+
+id 를 parmas 를 통해 가져오고 값을 가져온 뒤
+
+req.body 를 통해 받아온 ( 새로 입력받은 값 ) 값을 save() 해준다
+
+```
+
+### client
+
+```jsx
+import axios from 'axios'
+import React, { useState, useEffect } from 'react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
+const ProductUpdatePage = () => {
+  const navigate = useNavigate()
+  const params = useParams()
+
+  // 상태 초기화
+  const [formData, setFormData] = useState({
+    name: '',
+    price: 0,
+    category: 'fruit',
+  })
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await axios.get(`http://localhost:4000/products/${params.id}`)
+        setFormData(response.data)
+      } catch (error) {
+        console.error('상품 정보를 불러오는 데 실패했습니다.', error)
+      }
+    }
+
+    fetchData()
+  }, [params.id])
+
+  // 입력값 변경 시 상태 업데이트
+  const handleChange = (e) => {
+    const { name, value } = e.target
+    setFormData((prevData) => ({
+      ...prevData,
+      [name]: value,
+    }))
+  }
+
+  // 폼 제출 핸들러
+  const onSubmitHandler = async (e) => {
+    e.preventDefault()
+
+    // 폼 데이터 전송
+    try {
+      await axios.put(`http://localhost:4000/product/${params.id}`, formData)
+      navigate('/products')
+    } catch (error) {
+      console.error('상품 추가 중 오류 발생:', error)
+    }
+  }
+
+  return (
+    <>
+      <h1>ProductUpdatePage</h1>
+      <form onSubmit={onSubmitHandler}>
+        <label htmlFor="name">ProductName</label>
+        <input type="text" name="name" id="name" value={formData.name} onChange={handleChange} />
+        <label htmlFor="price">Price</label>
+        <input
+          type="number"
+          name="price"
+          id="price"
+          value={formData.price}
+          onChange={handleChange}
+        />
+        <label htmlFor="category">Category</label>
+        <select name="category" id="category" value={formData.category} onChange={handleChange}>
+          <option value="fruit">fruit</option>
+          <option value="vegetable">vegetable</option>
+          <option value="dairy">dairy</option>
+        </select>
+        <input type="submit" value="상품수정" />
+      </form>
+    </>
+  )
+}
+
+export default ProductUpdatePage
+```
+
+```jsx
+이번에는 데이터를 거의 전부 바꾸기 때문에 patch 대신 put 을 사용하였다
+
+useEffect 훅을 사용하여 컴포넌트가 처음 렌더링될 때,
+
+해당 제품의 정보를 서버에서 불러와서 setFormData를 통해 상태를 업데이트하고 있다
+
+fetchData() 함수를 useEffect 안에 넣으면 컴포넌트가 처음 마운트될 때
+
+서버에서 상품 정보를 가져와 초기값으로 설정할 수 있다. ( state 값을 변경해주기 때문에 )
+
+그 후에는 useEffect의 의존성 배열에 (맨 아래 []) params.id가 들어가 있으므로
+
+params.id 값이 변경될 때마다 해당 제품의 정보를 다시 가져오게 된다
+```
+
+## 상품 삭제
+
+```jsx
+const express = require('express')
+const cors = require('cors')
+const bodyParser = require('body-parser')
+const app = express()
+
+app.use(bodyParser.json())
+app.use(bodyParser.urlencoded({ extended: true }))
+app.use(cors()) // cors
+// getting-started.js
+const mongoose = require('mongoose')
+
+// Product 모델 요청
+const Product = require('./models/product')
+
+main().catch((err) => console.log(err))
+
+async function main() {
+  await mongoose.connect('mongodb://127.0.0.1:27017/farmStand') // 마지막 부분이 DB명
+  console.log('Mongo Connect Success')
+}
+
+// 삼품 조회
+app.get('/products', async (req, res) => {
+  const products = await Product.find({})
+  console.log(products)
+  res.send(products)
+})
+
+// 상품 상세 조회
+app.get('/products/:id', async (req, res) => {
+  const { id } = req.params
+  const product = await Product.findById(id)
+  console.log(product)
+  res.send(product)
+})
+
+// 상품 추가 (필요없을듯)
+app.get('/product/new', async (req, res) => {
+  console.log('UPDATE PAGE')
+})
+
+// 상품 추가
+app.post('/product/new', async (req, res) => {
+  const newProduct = new Product(req.body)
+  await newProduct.save()
+  res.send('making your product')
+})
+
+// 상품 업데이트
+app.get('/product/:id/edit', async (req, res) => {
+  const product = await Product.findById(id)
+  res.send(product)
+})
+
+// 상품 업데이트
+app.put('/product/:id', async (req, res) => {
+  const { id } = req.params
+
+  try {
+    // findByIdAndUpdate 대신 findById 와 save 를 사용하여 업데이트
+    const product = await Product.findById(id)
+
+    if (!product) {
+      return res.status(404).send('상품을 찾을 수 없습니다.')
+    }
+
+    // 업데이트할 데이터 적용
+    product.set(req.body)
+
+    // 업데이트된 상품 저장
+    await product.save()
+
+    // 업데이트된 상품을 클라이언트에게 보냄
+    res.send(product)
+  } catch (error) {
+    console.error('상품 업데이트 중 오류 발생:', error)
+    res.status(500).send('상품 업데이트 중 오류 발생')
+  }
+})
+
+// 상품 삭제
+app.delete('/product/:id', async (req, res) => {
+  const { id } = req.params
+  try {
+    const result = await Product.deleteOne({ _id: id })
+    // 삭제 성공 여부에 따라 응답
+    if (result.deletedCount > 0) {
+      res.status(200).send('DELETE SUCCESS')
+    } else {
+      res.status(404).send('ID NOT FOUND')
+    }
+  } catch (error) {
+    console.error('DELETE FAIL')
+    res.status(500).send('DELETE FAIL')
+  }
+})
+
+app.listen(4000, () => {
+  console.log('Success')
+})
+```
+
+```jsx
+URL 값을 받아서 ( params ) 삭제를 진행
+
+await Product.deleteOne({ _id: id }); 이런식으로 id 를 넣어줘야 한다
+
+( mongoDB 가 자동생성한  _id 에 받아온 id 를 넣어준다 )
+
+( res. 응답을 꼭 전달해주자 navigate 에서 오류가 생겨서 삭제후 리다이렉트가 진행되지 않았다 )
+```
+
+### client
+
+```jsx
+import axios from 'axios'
+import { useEffect, useState } from 'react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
+
+const ProductDetailPage = () => {
+  const params = useParams()
+  const [product, setProduct] = useState(null)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    fetch(`http://localhost:4000/products/${params.id}`)
+      .then((response) => response.json())
+      .then((data) => setProduct(data))
+      .catch((error) => {
+        console.error('상품 정보를 불러오는 데 실패했습니다.', error)
+        setProduct(null)
+      })
+  }, [params.id])
+  const deleteProduct = async () => {
+    try {
+      await axios.delete(`http://localhost:4000/product/${params.id}`)
+      navigate('/products')
+    } catch (error) {
+      console.error('DELETE FAIL', error)
+    }
+  }
+
+  return (
+    <div>
+      {product ? (
+        <>
+          <h1>{product.name}</h1>
+          <ul>
+            <li>Price : {product.price}</li>
+            <li>Category : {product.category}</li>
+          </ul>
+        </>
+      ) : (
+        <p>상품 정보를 불러오는 중입니다...</p>
+      )}
+      <Link to={'/products'}>홈으로</Link>
+      <Link to={`/product/${params.id}/edit`}>상품수정</Link>
+      <button type="button" onClick={deleteProduct}>
+        삭제하기
+      </button>
+    </div>
+  )
+}
+
+export default ProductDetailPage
+```
+
+```jsx
+간단하게 삭제 버튼을 추가해서 onClick 으로 삭제 함수를 연결해 줬다
+```
+
+## 상품 카테고리 페이지로 이동하기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381382/notion-blog/_/The_Web_Developer_2022/node_js/Express_Mongoose_/Untitled_6.png)
+
+### server
+
+```jsx
+// 삼품 조회
+app.get('/products', async (req, res) => {
+  const { category } = req.query
+  let products
+  console.log('category' + category)
+  if (category) {
+    // 카테고리가 제공된 경우 해당 카테고리에 속한 상품을 조회
+    products = await Product.find({ category })
+  } else {
+    // 카테고리가 제공되지 않은 경우 모든 상품 조회
+    products = await Product.find({})
+  }
+  console.log(products)
+  res.send(products)
+})
+```
+
+```jsx
+서버쪽은 req.query 로 ( 쿼리를 찾는 훅 )
+
+category 를 찾아서 조건에 맞는 결과를 찾는다
+
+( 여기서 주의할 점이 ProductPage 페이지에서  const [searchParams] = useSearchParams(); 으로 카테고리를 찾아줘야한다 )
+```
+
+### client
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381382/notion-blog/_/The_Web_Developer_2022/node_js/Express_Mongoose_/Untitled_7.png)
+
+```jsx
+import axios from 'axios'
+import { useEffect, useState } from 'react'
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
+
+const ProductDetailPage = () => {
+  const params = useParams()
+  const [product, setProduct] = useState(null)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    fetch(`http://localhost:4000/products/${params.id}`)
+      .then((response) => response.json())
+      .then((data) => setProduct(data))
+      .catch((error) => {
+        console.error('상품 정보를 불러오는 데 실패했습니다.', error)
+        setProduct(null)
+      })
+  }, [params.id])
+  const deleteProduct = async () => {
+    try {
+      await axios.delete(`http://localhost:4000/product/${params.id}`)
+      navigate('/products')
+    } catch (error) {
+      console.error('DELETE FAIL', error)
+    }
+  }
+
+  return (
+    <div>
+      {product ? (
+        <>
+          <h1>{product.name}</h1>
+          <ul>
+            <li>Price : {product.price}</li>
+            <Link to={`/products?category=${product.category}`}>
+              {' '}
+              // 카테고리 페이지로 이동하게 한다 Category : {product.category}
+            </Link>
+          </ul>
+        </>
+      ) : (
+        <p>상품 정보를 불러오는 중입니다...</p>
+      )}
+      <Link to={'/products'}>홈으로</Link>
+      <Link to={`/product/${params.id}/edit`}>상품수정</Link>
+      <button type="button" onClick={deleteProduct}>
+        삭제하기
+      </button>
+    </div>
+  )
+}
+
+export default ProductDetailPage
+```
+
+```jsx
+제품 디테일 페이지에서 카테고리 내용을 클릭하면 그 카테고리만 있는 페이지로 이동한다
+
+이동시에 쿼리 스트링을 사용해서
+
+/products?category=${product.category}
+
+이런식으로 주소를 써서 보내준다
+
+( 따로 라우터에서 지정하지 않아도 괜찮다 )
+```
+
+```jsx
+import { useEffect, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+
+const ProductPage = () => {
+  const [searchParams] = useSearchParams()
+  const category = searchParams.get('category')
+  const [products, setProducts] = useState([])
+
+  useEffect(() => {
+    const apiUrl = category
+      ? `http://localhost:4000/products?category=${category}`
+      : 'http://localhost:4000/products'
+
+    fetch(apiUrl)
+      .then((response) => response.json())
+      .then((data) => setProducts(data))
+  }, [category])
+
+  return (
+    <>
+      <h1>{category ? `${category}Page` : 'AllPage'}</h1>
+      <ul>
+        {products.map((product) => (
+          <li key={product._id}>
+            <Link to={`/product/${product._id}`}>{product.name}</Link>
+          </li>
+        ))}
+      </ul>
+      <Link to={'/product/new'}>상품등록</Link>
+      {category && <Link to={'/products'}>AllPage</Link>}
+    </>
+  )
+}
+
+export default ProductPage
+```
+
+```jsx
+[searchParams] = useSearchParams(); 을 사용해서 카테고리를 찾아서
+
+쿼리스트링에 카테고리를 포함해서 요청을 보내준다
+
+이후 받아온 카테고리를 이용해서 AllPage 등 화면단에 if 느낌으로 변화를 준다
+
+ex)  {category && <Link to={"/products"}>AllPage</Link>}
+
+( 내 예상에는 요청을 보낼 때 쿼리 스트링에 값을 보내줘서 원하는 카테고리만 출력 가능한것 같다 )
+```

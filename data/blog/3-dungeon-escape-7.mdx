@@ -1,0 +1,1855 @@
+---
+title: '섹션 3: Dungeon Escape - 7'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { Unreal Engine Shape Trace (셰이프 추적) 구현 가이드 }
+
+## 📋 개요
+
+이 강의는 Unreal Engine에서 **Shape Trace**를 사용하여 플레이어가 상호작용할 수 있는 오브젝트를 감지하는 방법을 다룹니다.
+
+---
+
+## 🎯 Shape Trace란?
+
+**Shape Trace**는 게임 월드에서 특정 모양(구, 박스, 캡슐 등)을 따라 충돌 검사를 수행하는 기능입니다.
+
+### 왜 사용하나요?
+
+- 플레이어가 아이템을 집을 수 있는지 확인
+- 문이나 스위치와 상호작용 가능한지 체크
+- 범위 내 적을 감지
+
+---
+
+## 🔧 핵심 함수: `SweepSingleByChannel`
+
+```cpp
+bool SweepSingleByChannel(
+    FHitResult& OutHit,           // 충돌 정보를 담을 구조체
+    const FVector& Start,         // 시작 위치
+    const FVector& End,           // 끝 위치
+    const FQuat& Rot,             // 회전값
+    ECollisionChannel TraceChannel, // 추적할 충돌 채널
+    const FCollisionShape& CollisionShape // 추적 모양
+)
+```
+
+### 파라미터 설명
+
+| 파라미터           | 타입                | 설명                            |
+| ------------------ | ------------------- | ------------------------------- |
+| **OutHit**         | `FHitResult&`       | 충돌 결과를 저장 (Out 파라미터) |
+| **Start**          | `FVector`           | 추적 시작 위치                  |
+| **End**            | `FVector`           | 추적 종료 위치                  |
+| **Rot**            | `FQuat`             | 추적 모양의 회전                |
+| **TraceChannel**   | `ECollisionChannel` | 어떤 채널에서 검사할지          |
+| **CollisionShape** | `FCollisionShape`   | 추적할 모양 (구, 박스 등)       |
+
+### 반환값
+
+- `true`: 무언가에 충돌함
+- `false`: 아무것도 충돌하지 않음
+
+---
+
+## 💻 실제 구현 코드
+
+### 1. 기본 설정
+
+```cpp
+void ADungeonEscapeCharacter::Interact()
+{
+    // 1. 시작점: 카메라 위치
+    FVector Start = FirstPersonCameraComponent->GetComponentLocation();
+
+    // 2. 끝점: 카메라 앞쪽 방향으로 MaxInteractDistance만큼
+    FVector End = Start + (FirstPersonCameraComponent->GetForwardVector() * MaxInteractDistance);
+
+    // 디버그 라인 그리기 (5초간 빨간선 표시)
+    DrawDebugLine(GetWorld(), Start, End, FColor::Red, false, 5.0f);
+}
+```
+
+### 2. 충돌 모양 생성
+
+```cpp
+// 구 모양의 충돌체 생성
+FCollisionShape InteractionSphere = FCollisionShape::MakeSphere(IntercationSphereRadius);
+
+// 디버그용: 구를 화면에 표시 (5초간 파란 구)
+DrawDebugSphere(GetWorld(), End, IntercationSphereRadius, 20, FColor::Blue, false, 5.0f);
+```
+
+### 3. Shape Trace 실행
+
+```cpp
+// 충돌 결과를 담을 구조체
+FHitResult HitResult;
+
+// Shape Trace 수행
+bool HasHit = GetWorld()->SweepSingleByChannel(
+    HitResult,                    // 결과 저장
+    Start,                        // 시작점
+    End,                          // 끝점
+    FQuat::Identity,              // 회전 없음
+    ECC_GameTraceChannel2,        // 커스텀 "Interact" 채널
+    InteractionSphere             // 구 모양
+);
+```
+
+### 4. 결과 처리
+
+```cpp
+if (HasHit)
+{
+    // 충돌한 액터 가져오기
+    AActor* HitActor = HitResult.GetActor();
+
+    // 액터 이름 출력
+    UE_LOG(LogTemp, Warning, TEXT("Hit Actor: %s"), *HitActor->GetActorNameOrLabel());
+}
+else
+{
+    // 아무것도 충돌하지 않음
+    UE_LOG(LogTemp, Warning, TEXT("No Actor Hit"));
+}
+```
+
+---
+
+## 🎨 주요 개념 정리
+
+### FHitResult 구조체
+
+충돌 정보를 담는 컨테이너입니다.
+
+```cpp
+FHitResult HitResult;
+
+// 사용 가능한 주요 정보들:
+HitResult.GetActor();        // 충돌한 액터
+HitResult.Location;          // 충돌 위치
+HitResult.ImpactPoint;       // 정확한 충돌 지점
+HitResult.Distance;          // 충돌까지의 거리
+```
+
+### FQuat::Identity
+
+"회전 없음"을 의미하는 특수한 값입니다.
+
+```cpp
+// 이 둘은 같은 의미
+FQuat::Identity
+FRotator(0, 0, 0)
+```
+
+### Out 파라미터
+
+함수가 값을 "채워서 돌려주는" 방식입니다.
+
+```cpp
+// 빈 구조체를 전달하면
+FHitResult HitResult;
+
+// 함수가 내부에서 정보를 채워줍니다
+GetWorld()->SweepSingleByChannel(HitResult, ...);
+
+// 이후 HitResult에서 정보를 꺼내 사용
+AActor* HitActor = HitResult.GetActor();
+```
+
+---
+
+## ⚙️ 커스텀 Trace Channel 설정
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380628/notion-blog/_/_/_5_C_/_3_Dungeon_Escape_-_7/image.png)
+
+### 1. 프로젝트 설정에서 생성
+
+`프로젝트 설정 → Collision → Trace Channels`
+
+- 새 Trace Channel 추가
+- 이름: `Interact`
+- 이렇게 하면 `ECC_GameTraceChannel2` 같은 내부 이름이 자동 할당됨
+
+### 2. 설정 파일 확인
+
+`프로젝트폴더/Config/DefaultEngine.ini`
+
+```
+[/Script/Engine.CollisionProfile]
++DefaultChannelResponses=(Channel=ECC_GameTraceChannel2,DefaultResponse=ECR_Block,bTraceType=True,bStaticObject=False,Name="Interact")
+```
+
+### 3. 코드에서 사용
+
+```cpp
+// 내부 이름 사용
+ECC_GameTraceChannel2
+
+// 또는 헤더에서 정의해서 사용
+#define ECC_Interact ECC_GameTraceChannel2
+```
+
+---
+
+## 🎮 작동 방식 플로우
+
+```
+1. 플레이어가 상호작용 키 입력 (왼쪽 마우스 버튼)
+   ↓
+2. Interact() 함수 호출
+   ↓
+3. 카메라 위치에서 앞쪽으로 선 계산
+   ↓
+4. 그 선을 따라 구 모양으로 추적
+   ↓
+5. "Interact" 채널로 설정된 오브젝트만 감지
+   ↓
+6. 충돌 발생?
+   ├─ YES → 액터 정보 가져와서 처리
+   └─ NO  → "충돌 없음" 메시지
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380628/notion-blog/_/_/_5_C_/_3_Dungeon_Escape_-_7/image_1.png)
+
+---
+
+## 🐛 디버그 시각화
+
+### DrawDebugLine
+
+```cpp
+DrawDebugLine(
+    GetWorld(),      // 월드 컨텍스트
+    Start,           // 시작점
+    End,             // 끝점
+    FColor::Red,     // 빨간색
+    false,           // 영구적이지 않음
+    5.0f            // 5초간 표시
+);
+```
+
+### DrawDebugSphere
+
+```cpp
+DrawDebugSphere(
+    GetWorld(),                  // 월드 컨텍스트
+    End,                         // 중심 위치
+    IntercationSphereRadius,     // 반지름
+    20,                          // 세그먼트 수 (부드러움)
+    FColor::Blue,                // 파란색
+    false,                       // 영구적이지 않음
+    5.0f                        // 5초간 표시
+);
+```
+
+---
+
+## 📝 전체 코드 요약
+
+```cpp
+void ADungeonEscapeCharacter::Interact()
+{
+    // 추적 범위 계산
+    FVector Start = FirstPersonCameraComponent->GetComponentLocation();
+    FVector End = Start + (FirstPersonCameraComponent->GetForwardVector() * MaxInteractDistance);
+
+    // 구 모양 생성
+    FCollisionShape InteractionSphere = FCollisionShape::MakeSphere(IntercationSphereRadius);
+
+    // Shape Trace 실행
+    FHitResult HitResult;
+    bool HasHit = GetWorld()->SweepSingleByChannel(
+        HitResult,
+        Start,
+        End,
+        FQuat::Identity,           // 회전 없음
+        ECC_GameTraceChannel2,     // Interact 채널
+        InteractionSphere
+    );
+
+    // 결과 처리
+    if (HasHit)
+    {
+        AActor* HitActor = HitResult.GetActor();
+        UE_LOG(LogTemp, Warning, TEXT("Hit Actor: %s"), *HitActor->GetActorNameOrLabel());
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("No Actor Hit"));
+    }
+}
+```
+
+---
+
+## 💡 핵심 포인트
+
+1. **Out 파라미터**: `FHitResult`는 참조(`&`)로 전달되어 함수가 정보를 채워줌
+2. **반환값과 Out 파라미터**: 반환값은 성공/실패, Out 파라미터는 상세 정보
+3. **커스텀 채널**: 특정 오브젝트만 감지하도록 필터링 가능
+4. **시각화**: `DrawDebug` 함수들로 추적 범위를 눈으로 확인 가능
+
+---
+
+## 🚀 다음 단계
+
+이제 충돌을 감지했으니, 다음은:
+
+- 감지된 액터에 특정 기능 실행 (문 열기, 아이템 줍기 등)
+- 인터페이스를 통한 상호작용 시스템 구현
+- UI 표시 (상호작용 가능 표시)
+
+# { Else If 문을 사용한 액터 타입 구분 }
+
+## 📋 개요
+
+Shape Trace로 감지한 액터가 **수집 가능한 아이템**인지 **자물쇠**인지 구분하는 방법을 배웁니다.
+
+---
+
+## 🎯 왜 구분이 필요한가?
+
+감지된 액터의 타입에 따라 다른 동작을 수행해야 합니다:
+
+- **수집 가능한 아이템**: 플레이어 인벤토리에 추가
+- **자물쇠**: 아이템을 사용하여 잠금 해제
+
+---
+
+## 🏷️ 태그 시스템 활용
+
+### 액터에 태그 설정 (블루프린트)
+
+```
+CollectableItem 블루프린트 → Tags: "CollectableItem"
+Lock 블루프린트 → Tags: "Lock"
+```
+
+### 코드에서 태그 확인
+
+```cpp
+bool ActorHasTag(FName Tag)
+```
+
+---
+
+## ⚡ Else If 문법
+
+### 기본 구조
+
+```cpp
+if (조건1)
+{
+    // 조건1이 참일 때 실행
+}
+else if (조건2)
+{
+    // 조건1이 거짓이고 조건2가 참일 때만 실행
+}
+else if (조건3)
+{
+    // 조건1, 2가 거짓이고 조건3이 참일 때만 실행
+}
+else
+{
+    // 모든 조건이 거짓일 때 실행
+}
+```
+
+### 핵심 포인트
+
+- **순차 평가**: 위에서 아래로 하나씩 검사
+- **한 번만 실행**: 하나의 조건이 참이면 나머지는 무시
+- **효율적**: 불필요한 검사를 건너뜀
+
+---
+
+## 💻 실제 구현
+
+### ❌ 잘못된 방법 1: else만 사용
+
+```cpp
+if (HitActor->ActorHasTag("CollectableItem"))
+{
+    // 수집 가능한 아이템 처리
+}
+else
+{
+    // ❌ 문제: Lock 태그가 없어도 실행됨
+    // Lock이 아닌 다른 액터일 수도 있음
+}
+```
+
+### ❌ 잘못된 방법 2: 독립적인 if 두 개
+
+```cpp
+if (HitActor->ActorHasTag("CollectableItem"))
+{
+    // 수집 가능한 아이템 처리
+}
+
+if (HitActor->ActorHasTag("Lock"))  // ❌ 첫 번째가 참이어도 검사함
+{
+    // 자물쇠 처리
+}
+// 비효율적: 두 조건 모두 항상 검사
+```
+
+### ✅ 올바른 방법: else if 사용
+
+```cpp
+if (HitActor->ActorHasTag("CollectableItem"))
+{
+    // HitActor는 수집 가능한 아이템
+    UE_LOG(LogTemp, Warning, TEXT("Collectable Item"));
+}
+else if (HitActor->ActorHasTag("Lock"))
+{
+    // HitActor는 자물쇠 액터
+    UE_LOG(LogTemp, Warning, TEXT("Lock Actor"));
+}
+```
+
+---
+
+## 📊 실행 흐름
+
+```
+HitActor 감지
+    ↓
+"CollectableItem" 태그 체크
+    ↓
+YES → 아이템 처리 → 종료 ✓
+    ↓
+NO → "Lock" 태그 체크
+    ↓
+YES → 자물쇠 처리 → 종료 ✓
+    ↓
+NO → 아무것도 안 함
+```
+
+---
+
+## 🎮 전체 코드
+
+```cpp
+void ADungeonEscapeCharacter::Interact()
+{
+    // Shape Trace 수행
+    FVector Start = FirstPersonCameraComponent->GetComponentLocation();
+    FVector End = Start + (FirstPersonCameraComponent->GetForwardVector() * MaxInteractDistance);
+
+    FCollisionShape InteractionSphere = FCollisionShape::MakeSphere(IntercationSphereRadius);
+
+    FHitResult HitResult;
+    bool HasHit = GetWorld()->SweepSingleByChannel(
+        HitResult,
+        Start,
+        End,
+        FQuat::Identity,
+        ECC_GameTraceChannel2,
+        InteractionSphere
+    );
+
+    if (HasHit)
+    {
+        AActor* HitActor = HitResult.GetActor();
+
+        // 액터 타입에 따라 다른 처리
+        if (HitActor->ActorHasTag("CollectableItem"))
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Collectable Item"));
+            // TODO: 아이템 획득 로직
+        }
+        else if (HitActor->ActorHasTag("Lock"))
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Lock Actor"));
+            // TODO: 잠금 해제 로직
+        }
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("No Actor Hit"));
+    }
+}
+```
+
+---
+
+## 💡 핵심 정리
+
+| 항목            | 설명                               |
+| --------------- | ---------------------------------- |
+| **else if**     | 이전 조건이 거짓일 때만 검사       |
+| **태그 시스템** | `ActorHasTag()`로 액터 타입 식별   |
+| **효율성**      | 불필요한 검사 방지                 |
+| **확장성**      | 새로운 타입 추가 시 `else if` 추가 |
+
+---
+
+## 🚀 다음 단계
+
+- 실제 아이템 획득 시스템 구현
+- 자물쇠 해제 로직 추가
+- 인벤토리 시스템 연동
+
+# { Cast를 사용한 포인터 타입 변환 }
+
+## 📋 개요
+
+`AActor` 포인터를 특정 클래스 포인터로 변환하여 해당 클래스의 고유한 프로퍼티와 함수에 접근하는 방법을 배웁니다.
+
+---
+
+## 🤔 왜 Cast가 필요한가?
+
+### 문제 상황
+
+```cpp
+AActor* HitActor = HitResult.GetActor();
+
+// ❌ 컴파일 에러!
+HitActor->ItemName;  // AActor에는 ItemName이 없음
+```
+
+`GetActor()`는 **AActor 포인터**를 반환합니다. 하지만:
+
+- `ACollectableItem`의 `ItemName` 프로퍼티
+- `ALock`의 `KeyItemName` 프로퍼티
+
+이런 **자식 클래스의 고유 멤버**에는 접근할 수 없습니다.
+
+---
+
+## 🔄 Cast 함수란?
+
+**Cast**는 포인터의 타입을 다른 클래스 타입으로 변환하는 템플릿 함수입니다.
+
+### 기본 문법
+
+```cpp
+Cast<변환할_클래스>(변환할_포인터)
+```
+
+### 반환값
+
+- **성공**: 변환된 타입의 포인터
+- **실패**: `nullptr` (null 포인터)
+
+---
+
+## 💻 실제 구현
+
+### 1. 헤더 파일 포함
+
+```cpp
+#include "CollectableItem.h"
+#include "Lock.h"
+```
+
+### 2. CollectableItem 캐스팅
+
+```cpp
+if (HitActor->ActorHasTag("CollectableItem"))
+{
+    // AActor* → ACollectableItem* 변환 시도
+    ACollectableItem* CollectableItem = Cast<ACollectableItem>(HitActor);
+
+    // 변환 성공 여부 확인 (안전장치)
+    if (CollectableItem)
+    {
+        // ✅ 이제 ItemName 접근 가능!
+        UE_LOG(LogTemp, Warning, TEXT("Collectable Item: %s"),
+               *CollectableItem->ItemName);
+    }
+}
+```
+
+### 3. Lock 캐스팅
+
+```cpp
+else if (HitActor->ActorHasTag("Lock"))
+{
+    // AActor* → ALock* 변환 시도
+    ALock* LockActor = Cast<ALock>(HitActor);
+
+    // 변환 성공 여부 확인
+    if (LockActor)
+    {
+        // ✅ KeyItemName 접근 가능!
+        UE_LOG(LogTemp, Warning, TEXT("Lock Actor Key: %s"),
+               *LockActor->KeyItemName);
+    }
+}
+```
+
+---
+
+## 📊 Cast 작동 원리
+
+```
+1. Cast<ACollectableItem>(HitActor) 호출
+   ↓
+2. HitActor가 실제로 ACollectableItem인지 확인
+   ↓
+YES → ACollectableItem* 포인터 반환
+   ↓
+NO → nullptr 반환
+```
+
+---
+
+## ⚠️ 중요: Null 체크는 필수!
+
+### Cast는 실패할 수 있습니다
+
+```cpp
+// ❌ 위험한 코드 - Null 체크 없음
+ACollectableItem* Item = Cast<ACollectableItem>(HitActor);
+Item->ItemName;  // Item이 nullptr이면 크래시!
+
+// ✅ 안전한 코드
+ACollectableItem* Item = Cast<ACollectableItem>(HitActor);
+if (Item)  // nullptr이 아닌지 확인
+{
+    Item->ItemName;  // 안전하게 접근
+}
+```
+
+---
+
+## 🎯 전체 코드
+
+```cpp
+void ADungeonEscapeCharacter::Interact()
+{
+    // Shape Trace 수행
+    FVector Start = FirstPersonCameraComponent->GetComponentLocation();
+    FVector End = Start + (FirstPersonCameraComponent->GetForwardVector() * MaxInteractDistance);
+
+    FCollisionShape InteractionSphere = FCollisionShape::MakeSphere(IntercationSphereRadius);
+
+    FHitResult HitResult;
+    bool HasHit = GetWorld()->SweepSingleByChannel(
+        HitResult,
+        Start,
+        End,
+        FQuat::Identity,
+        ECC_GameTraceChannel2,
+        InteractionSphere
+    );
+
+    if (HasHit)
+    {
+        AActor* HitActor = HitResult.GetActor();
+
+        // 수집 가능한 아이템 처리
+        if (HitActor->ActorHasTag("CollectableItem"))
+        {
+            ACollectableItem* CollectableItem = Cast<ACollectableItem>(HitActor);
+            if (CollectableItem)
+            {
+                UE_LOG(LogTemp, Warning, TEXT("Collectable Item: %s"),
+                       *CollectableItem->ItemName);
+            }
+        }
+
+        // 자물쇠 처리
+        else if (HitActor->ActorHasTag("Lock"))
+        {
+            ALock* LockActor = Cast<ALock>(HitActor);
+            if (LockActor)
+            {
+                UE_LOG(LogTemp, Warning, TEXT("Lock Actor Key: %s"),
+                       *LockActor->KeyItemName);
+
+                // 자물쇠의 함수도 호출 가능
+                bool IsKeyPlaced = LockActor->GetIsKeyPlaced();
+            }
+        }
+    }
+}
+```
+
+---
+
+## 🔍 Cast vs 일반 포인터 비교
+
+| 상황              | AActor\*     | Cast 후 포인터 |
+| ----------------- | ------------ | -------------- |
+| **공통 멤버**     | ✅ 접근 가능 | ✅ 접근 가능   |
+| **고유 프로퍼티** | ❌ 접근 불가 | ✅ 접근 가능   |
+| **고유 함수**     | ❌ 호출 불가 | ✅ 호출 가능   |
+
+### 예시
+
+```cpp
+AActor* HitActor = ...;
+
+// 공통 멤버 (AActor에 있음)
+HitActor->GetActorLocation();  // ✅ 가능
+HitActor->ActorHasTag("Tag");  // ✅ 가능
+
+// 고유 멤버 (ACollectableItem에만 있음)
+HitActor->ItemName;            // ❌ 불가능
+
+// Cast 후
+ACollectableItem* Item = Cast<ACollectableItem>(HitActor);
+if (Item)
+{
+    Item->GetActorLocation();  // ✅ 공통 멤버
+    Item->ItemName;            // ✅ 고유 멤버
+}
+```
+
+---
+
+## 💡 핵심 정리
+
+### Cast 사용 3단계
+
+1. **Cast 호출**: `Cast<목표타입>(원본포인터)`
+2. **Null 체크**: `if (변환된포인터)`
+3. **안전하게 사용**: 체크 블록 안에서 멤버 접근
+
+### 왜 이렇게 하나요?
+
+- **다형성**: 부모 타입 포인터로 자식 객체를 가리킬 수 있음
+- **타입 안전성**: Cast + Null 체크로 안전하게 타입 변환
+- **유연성**: 런타임에 실제 객체 타입에 따라 다른 동작 수행
+
+---
+
+## 🚀 다음 단계
+
+이제 캐스팅된 포인터로:
+
+- 아이템을 인벤토리에 추가
+- 자물쇠에 열쇠 사용
+- 각 오브젝트의 고유 기능 구현
+
+# { TArray를 사용한 인벤토리 시스템 구현 }
+
+## 📋 개요
+
+여러 개의 아이템을 저장하고 관리할 수 있는 **배열(TArray)**을 사용하여 간단한 인벤토리 시스템을 만듭니다.
+
+---
+
+## 🤔 왜 배열이 필요한가?
+
+### ❌ 잘못된 방법: 개별 변수 사용
+
+```cpp
+FString Item1;
+FString Item2;
+FString Item3;
+FString Item4;
+// ... 계속 추가? 😱
+```
+
+**문제점:**
+
+- 몇 개의 아이템을 담을지 미리 알 수 없음
+- 변수 관리가 복잡해짐
+- 함수 작성이 어려워짐
+- 확장성이 없음
+
+### ✅ 올바른 방법: 배열 사용
+
+```cpp
+TArray<FString> ItemList;  // 무한대의 아이템 저장 가능!
+```
+
+**장점:**
+
+- 하나의 변수로 여러 값 관리
+- 동적으로 추가/제거 가능
+- 내장 함수로 편리하게 관리
+- 확장성이 뛰어남
+
+---
+
+## 📦 TArray란?
+
+**TArray**는 **동일한 타입의 여러 값**을 저장할 수 있는 언리얼의 동적 배열입니다.
+
+### 기본 문법
+
+```cpp
+TArray<타입> 변수명;
+```
+
+### 예시
+
+```cpp
+TArray<FString> ItemList;      // 문자열 배열
+TArray<int32> Scores;          // 정수 배열
+TArray<AActor*> ActorList;     // 액터 포인터 배열
+```
+
+---
+
+## 🎯 주요 배열 함수
+
+| 함수         | 설명                | 사용 예시                       |
+| ------------ | ------------------- | ------------------------------- |
+| `Add()`      | 배열 끝에 요소 추가 | `ItemList.Add("Sword")`         |
+| `Remove()`   | 특정 요소 제거      | `ItemList.Remove("Sword")`      |
+| `RemoveAt()` | 인덱스로 제거       | `ItemList.RemoveAt(0)`          |
+| `Num()`      | 배열 크기 반환      | `int32 Count = ItemList.Num()`  |
+| `IsEmpty()`  | 비어있는지 확인     | `if (ItemList.IsEmpty())`       |
+| `Contains()` | 요소 포함 여부      | `if (ItemList.Contains("Key"))` |
+
+---
+
+## 💻 인벤토리 시스템 구현
+
+### 1. 헤더 파일에 배열 선언
+
+```cpp
+// DungeonEscapeCharacter.h
+
+UCLASS()
+class ADungeonEscapeCharacter : public ACharacter
+{
+    GENERATED_BODY()
+
+private:
+    // 플레이어 인벤토리
+    UPROPERTY(VisibleAnywhere, Category = "Inventory")
+    TArray<FString> ItemList;
+};
+```
+
+### UPROPERTY 속성 설명
+
+- `VisibleAnywhere`: 에디터에서 볼 수 있지만 수정 불가
+- `Category`: 에디터에서 카테고리로 그룹화
+- `private`: 다른 클래스에서 직접 접근 불가
+
+---
+
+### 2. 아이템 수집 구현
+
+```cpp
+// DungeonEscapeCharacter.cpp
+
+void ADungeonEscapeCharacter::Interact()
+{
+    // Shape Trace 수행
+    FVector Start = FirstPersonCameraComponent->GetComponentLocation();
+    FVector End = Start + (FirstPersonCameraComponent->GetForwardVector() * MaxInteractDistance);
+
+    FCollisionShape InteractionSphere = FCollisionShape::MakeSphere(IntercationSphereRadius);
+
+    FHitResult HitResult;
+    bool HasHit = GetWorld()->SweepSingleByChannel(
+        HitResult,
+        Start,
+        End,
+        FQuat::Identity,
+        ECC_GameTraceChannel2,
+        InteractionSphere
+    );
+
+    if (HasHit)
+    {
+        AActor* HitActor = HitResult.GetActor();
+
+        // 수집 가능한 아이템 처리
+        if (HitActor->ActorHasTag("CollectableItem"))
+        {
+            ACollectableItem* CollectableItem = Cast<ACollectableItem>(HitActor);
+            if (CollectableItem)
+            {
+                // 1. 인벤토리에 아이템 추가
+                ItemList.Add(CollectableItem->ItemName);
+
+                // 2. 월드에서 아이템 제거
+                CollectableItem->Destroy();
+
+                UE_LOG(LogTemp, Warning, TEXT("Collected: %s"),
+                       *CollectableItem->ItemName);
+            }
+        }
+
+        // 자물쇠 처리
+        else if (HitActor->ActorHasTag("Lock"))
+        {
+            ALock* LockActor = Cast<ALock>(HitActor);
+            if (LockActor)
+            {
+                // TODO: 아이템 사용 로직
+                LockActor->GetIsKeyPlaced();
+            }
+        }
+    }
+}
+```
+
+---
+
+## 🎮 작동 흐름
+
+```
+1. 플레이어가 아이템 클릭
+   ↓
+2. Shape Trace로 아이템 감지
+   ↓
+3. Cast로 ACollectableItem 포인터 획득
+   ↓
+4. ItemList.Add()로 아이템 이름 추가
+   ↓
+5. Destroy()로 월드에서 아이템 제거
+   ↓
+6. 인벤토리에서 아이템 확인 가능 ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380628/notion-blog/_/_/_5_C_/_3_Dungeon_Escape_-_7/image_2.png)
+
+---
+
+## 🔍 Destroy() 함수
+
+### 사용법
+
+```cpp
+CollectableItem->Destroy();
+```
+
+### 기능
+
+- 액터를 게임 월드에서 **완전히 제거**
+- 메모리에서도 정리됨
+- 되돌릴 수 없음 (영구 삭제)
+
+### 언제 사용?
+
+- 아이템을 주웠을 때
+- 적을 처치했을 때
+- 임시 오브젝트를 제거할 때
+
+---
+
+## 🎨 에디터에서 확인하기
+
+### 플레이 중 인벤토리 확인
+
+1. **Play in Editor** (PIE) 실행
+2. **Outliner**에서 플레이어 캐릭터 선택
+3. **Details** 패널에서 "Inventory" 카테고리 찾기
+4. **ItemList** 배열 확인
+
+### 예시
+
+```
+ItemList (2 elements)
+  [0] "Glass Statue"
+  [1] "Glass Statue 2"
+```
+
+---
+
+## 📊 배열 시각화
+
+### 아이템 수집 전
+
+```
+ItemList = []  // 비어있음
+```
+
+### 첫 번째 아이템 수집
+
+```cpp
+ItemList.Add("Glass Statue");
+
+ItemList = ["Glass Statue"]
+```
+
+### 두 번째 아이템 수집
+
+```cpp
+ItemList.Add("Glass Statue 2");
+
+ItemList = ["Glass Statue", "Glass Statue 2"]
+```
+
+---
+
+## 🛠️ 추가 기능 예시
+
+### 인벤토리 크기 확인
+
+```cpp
+int32 ItemCount = ItemList.Num();
+UE_LOG(LogTemp, Warning, TEXT("Inventory Count: %d"), ItemCount);
+```
+
+### 특정 아이템 보유 확인
+
+```cpp
+if (ItemList.Contains("Golden Key"))
+{
+    UE_LOG(LogTemp, Warning, TEXT("You have the Golden Key!"));
+}
+```
+
+### 인벤토리 비우기
+
+```cpp
+ItemList.Empty();  // 모든 아이템 제거
+```
+
+### 인벤토리가 비었는지 확인
+
+```cpp
+if (ItemList.IsEmpty())
+{
+    UE_LOG(LogTemp, Warning, TEXT("Inventory is empty!"));
+}
+```
+
+---
+
+## 🐛 디버깅 팁
+
+### 수집 시 로그 추가
+
+```cpp
+if (CollectableItem)
+{
+    UE_LOG(LogTemp, Warning, TEXT("Before Add - Count: %d"), ItemList.Num());
+
+    ItemList.Add(CollectableItem->ItemName);
+
+    UE_LOG(LogTemp, Warning, TEXT("After Add - Count: %d"), ItemList.Num());
+    UE_LOG(LogTemp, Warning, TEXT("Added Item: %s"), *CollectableItem->ItemName);
+
+    CollectableItem->Destroy();
+}
+```
+
+### 인벤토리 전체 출력
+
+```cpp
+UE_LOG(LogTemp, Warning, TEXT("=== Current Inventory ==="));
+for (int32 i = 0; i < ItemList.Num(); i++)
+{
+    UE_LOG(LogTemp, Warning, TEXT("[%d] %s"), i, *ItemList[i]);
+}
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 1. Destroy() 후 포인터 사용 금지
+
+```cpp
+CollectableItem->Destroy();
+// ❌ 이후 CollectableItem 사용 불가!
+CollectableItem->ItemName;  // 크래시!
+```
+
+### 2. 올바른 순서
+
+```cpp
+// ✅ 올바른 순서
+FString ItemName = CollectableItem->ItemName;  // 먼저 데이터 저장
+ItemList.Add(ItemName);                        // 배열에 추가
+CollectableItem->Destroy();                    // 마지막에 제거
+```
+
+---
+
+## 💡 핵심 정리
+
+| 개념                | 설명                      |
+| ------------------- | ------------------------- |
+| **TArray**          | 동적 배열, 여러 값 저장   |
+| **Add()**           | 배열에 요소 추가          |
+| **Destroy()**       | 액터를 월드에서 제거      |
+| **Num()**           | 배열 크기 반환            |
+| **VisibleAnywhere** | 에디터에서 읽기 전용 표시 |
+
+---
+
+## 🚀 다음 단계
+
+- 자물쇠에 아이템 사용 로직 구현
+- 올바른 키 아이템 확인
+- 아이템 제거 기능 추가
+- UI로 인벤토리 표시
+
+배열을 사용하면 복잡한 데이터 관리가 훨씬 쉬워집니다! 🎯
+
+# { TArray에서 아이템 제거 및 자물쇠 사용 구현 }
+
+## 📋 개요
+
+배열에서 아이템을 제거하는 방법을 배우고, 자물쇠에 올바른 아이템을 사용하는 로직을 구현합니다.
+
+---
+
+## 🎯 구현 목표
+
+### 자물쇠 상호작용 단계
+
+1. ✅ 자물쇠가 비어있는지 확인
+2. ✅ 인벤토리에 필요한 아이템이 있는지 확인
+3. ✅ 있으면 인벤토리에서 제거
+4. ✅ 자물쇠 활성화
+
+---
+
+## 🔧 RemoveSingle() 함수
+
+### 기본 문법
+
+```cpp
+int32 ItemsRemoved = 배열.RemoveSingle(제거할_요소);
+```
+
+### 동작 방식
+
+```cpp
+TArray<FString> ItemList = {"Sword", "Shield", "Potion", "Sword"};
+
+int32 Removed = ItemList.RemoveSingle("Sword");
+// Removed = 1 (성공)
+// ItemList = {"Shield", "Potion", "Sword"}  // 첫 번째 Sword만 제거
+```
+
+### 반환값
+
+- **1**: 아이템을 찾아서 제거함 (성공)
+- **0**: 아이템을 찾지 못함 (실패)
+
+---
+
+## 💡 RemoveSingle의 특징
+
+### 1. 첫 번째만 제거
+
+```cpp
+TArray<FString> Items = {"Key", "Sword", "Key"};
+
+Items.RemoveSingle("Key");
+// 결과: {"Sword", "Key"}  // 첫 번째 Key만 제거
+```
+
+### 2. 반환값으로 성공 여부 확인
+
+```cpp
+int32 Removed = Items.RemoveSingle("Shield");
+
+if (Removed)  // Removed가 1이면 true
+{
+    // 성공: 아이템이 있었고 제거됨
+}
+else  // Removed가 0이면 false
+{
+    // 실패: 아이템이 없었음
+}
+```
+
+### 3. 두 가지 기능 동시 수행
+
+- ✅ 배열에서 아이템 **검색**
+- ✅ 찾으면 **제거**
+
+---
+
+## 📊 실행 흐름 다이어그램
+
+```
+자물쇠 클릭
+    ↓
+자물쇠가 비어있나? (GetIsKeyPlaced() == false)
+    ↓
+YES → 인벤토리에서 필요한 아이템 제거 시도
+      ItemList.RemoveSingle(KeyItemName)
+      ↓
+      제거 성공? (ItemsRemoved == 1)
+      ↓
+      YES → SetIsKeyPlaced(true) 호출 ✅
+      ↓
+      NO → "아이템 없음" 로그 출력 ❌
+    ↓
+NO → (아무것도 안 함)
+```
+
+---
+
+## 💻 전체 코드 구현
+
+### 자물쇠 상호작용 로직
+
+```cpp
+else if (HitActor->ActorHasTag("Lock"))
+{
+    ALock* LockActor = Cast<ALock>(HitActor);
+    if (LockActor)
+    {
+        // 1단계: 자물쇠가 비어있는지 확인
+        if (!LockActor->GetIsKeyPlaced())
+        {
+            // 2단계: 인벤토리에서 필요한 아이템 찾아서 제거
+            int32 ItemsRemoved = ItemList.RemoveSingle(LockActor->KeyItemName);
+
+            // 3단계: 제거 성공 여부 확인
+            if (ItemsRemoved)
+            {
+                // 4단계: 자물쇠 활성화
+                LockActor->SetIsKeyPlaced(true);
+                UE_LOG(LogTemp, Warning, TEXT("Lock activated!"));
+            }
+            else
+            {
+                // 실패: 필요한 아이템이 인벤토리에 없음
+                UE_LOG(LogTemp, Warning, TEXT("Key Item '%s' not found in inventory."),
+                       *LockActor->KeyItemName);
+            }
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Lock already has a key!"));
+        }
+    }
+}
+```
+
+---
+
+## 🎮 실제 사용 예시
+
+### 시나리오 1: 올바른 아이템 사용 ✅
+
+```
+초기 상태:
+  ItemList = ["Glass Statue", "Torch"]
+  LockActor->KeyItemName = "Glass Statue"
+  LockActor->GetIsKeyPlaced() = false
+
+자물쇠 클릭
+    ↓
+1. 비어있는가? → YES (GetIsKeyPlaced() == false)
+    ↓
+2. RemoveSingle("Glass Statue") 호출
+    ↓
+3. ItemsRemoved = 1 (찾아서 제거 성공)
+    ↓
+4. SetIsKeyPlaced(true) 호출
+    ↓
+결과:
+  ItemList = ["Torch"]  // 아이템 제거됨
+  자물쇠 활성화됨! ✅
+```
+
+### 시나리오 2: 잘못된 아이템만 있는 경우 ❌
+
+```
+초기 상태:
+  ItemList = ["Torch", "Shield"]
+  LockActor->KeyItemName = "Glass Statue"
+
+자물쇠 클릭
+    ↓
+1. 비어있는가? → YES
+    ↓
+2. RemoveSingle("Glass Statue") 호출
+    ↓
+3. ItemsRemoved = 0 (아이템 없음)
+    ↓
+4. "Key Item 'Glass Statue' not found in inventory." 출력
+    ↓
+결과:
+  ItemList = ["Torch", "Shield"]  // 변화 없음
+  자물쇠 활성화 안 됨 ❌
+```
+
+### 시나리오 3: 이미 키가 있는 자물쇠 🔒
+
+```
+초기 상태:
+  ItemList = ["Glass Statue"]
+  LockActor->GetIsKeyPlaced() = true
+
+자물쇠 클릭
+    ↓
+1. 비어있는가? → NO (이미 키가 있음)
+    ↓
+아무것도 안 함 (또는 "Lock already has a key!" 로그)
+```
+
+---
+
+## 🔍 단계별 분석
+
+### 1단계: 자물쇠 비어있는지 확인
+
+```cpp
+if (!LockActor->GetIsKeyPlaced())
+```
+
+- `GetIsKeyPlaced()` → `false`: 자물쇠 비어있음 ✅
+- `GetIsKeyPlaced()` → `true`: 이미 키가 있음 ❌
+
+### 2단계: 아이템 제거 시도
+
+```cpp
+int32 ItemsRemoved = ItemList.RemoveSingle(LockActor->KeyItemName);
+```
+
+- 필요한 아이템을 인벤토리에서 찾음
+- 있으면 제거하고 `1` 반환
+- 없으면 `0` 반환
+
+### 3단계: 성공 여부 확인
+
+```cpp
+if (ItemsRemoved)  // ItemsRemoved가 1이면 true
+```
+
+- **1 (true)**: 제거 성공 → 자물쇠 활성화
+- **0 (false)**: 제거 실패 → 경고 메시지
+
+### 4단계: 자물쇠 활성화
+
+```cpp
+LockActor->SetIsKeyPlaced(true);
+```
+
+- `IsKeyPlaced`를 `true`로 설정
+- 트리거 컴포넌트 활성화
+- 키 메시 표시
+
+---
+
+## 🎨 에디터에서 확인하기
+
+### 플레이 중 테스트
+
+1. **아이템 수집**
+
+   ```
+   ItemList = ["Glass Statue"]
+   ```
+
+2. **자물쇠 클릭 (올바른 아이템)**
+
+   ```
+   Before: ItemList = ["Glass Statue"]
+   After:  ItemList = []  // 제거됨!
+   자물쇠 활성화됨 ✅
+   ```
+
+3. **자물쇠 클릭 (잘못된 아이템)**
+
+   ```
+   Before: ItemList = ["Torch"]
+   After:  ItemList = ["Torch"]  // 변화 없음
+   "Key Item not found" 로그 출력 ❌
+   ```
+
+---
+
+## 📝 배열 제거 함수 비교
+
+| 함수                 | 설명                     | 반환값               |
+| -------------------- | ------------------------ | -------------------- |
+| `RemoveSingle(Item)` | 첫 번째 일치 항목만 제거 | 제거된 개수 (0 or 1) |
+| `Remove(Item)`       | 모든 일치 항목 제거      | 제거된 개수          |
+| `RemoveAt(Index)`    | 특정 인덱스 제거         | 없음                 |
+| `Empty()`            | 모든 항목 제거           | 없음                 |
+
+### 예시
+
+```cpp
+TArray<FString> Items = {"Key", "Sword", "Key"};
+
+// RemoveSingle: 첫 번째만
+Items.RemoveSingle("Key");  // {"Sword", "Key"}
+
+// Remove: 모두 제거
+Items.Remove("Key");  // {"Sword"}
+```
+
+---
+
+## 💡 왜 int32를 사용하나?
+
+### 반환값의 의미
+
+```cpp
+int32 ItemsRemoved = ItemList.RemoveSingle("Key");
+
+// ItemsRemoved가 숫자인 이유:
+// - 0: 제거 안 됨 (찾지 못함)
+// - 1: 1개 제거됨 (성공)
+```
+
+### bool처럼 사용 가능
+
+```cpp
+// C++에서 0은 false, 0이 아닌 숫자는 true
+if (ItemsRemoved)  // ItemsRemoved가 1이면 true
+{
+    // 성공
+}
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 1. 논리 NOT 연산자 (`!`)
+
+```cpp
+if (!LockActor->GetIsKeyPlaced())  // ! = NOT
+{
+    // GetIsKeyPlaced()가 false일 때 실행
+    // 즉, 자물쇠가 비어있을 때
+}
+
+```
+
+### 2. ItemsRemoved의 bool 변환
+
+```cpp
+int32 ItemsRemoved = 1;  // true로 평가
+int32 ItemsRemoved = 0;  // false로 평가
+
+if (ItemsRemoved) // ItemsRemoved != 0과 같음
+{
+    // 1이면 실행
+}
+
+```
+
+---
+
+## 🎯 핵심 정리
+
+| 개념               | 설명                              |
+| ------------------ | --------------------------------- |
+| **RemoveSingle()** | 첫 번째 일치 항목 제거, 개수 반환 |
+| **반환값 1**       | 제거 성공 (아이템 있었음)         |
+| **반환값 0**       | 제거 실패 (아이템 없었음)         |
+| **! 연산자**       | 논리 NOT (true ↔ false 반전)     |
+| **int를 bool로**   | 0은 false, 0이 아닌 값은 true     |
+
+---
+
+## 🚀 다음 단계
+
+- 자물쇠에서 아이템 회수 기능 구현
+- 여러 자물쇠 관리
+- UI로 인벤토리 표시
+- 아이템 설명 추가
+
+배열의 RemoveSingle()을 사용하면 검색과 제거를 한 번에 처리할 수 있습니다! 🎯
+
+# { 자물쇠에서 아이템 회수 기능 구현 }
+
+## 📋 개요
+
+이미 활성화된 자물쇠를 다시 클릭하면 아이템을 인벤토리로 되돌리고 자물쇠를 비활성화하는 기능을 구현합니다.
+
+---
+
+## 🎯 구현 목표
+
+### 양방향 상호작용
+
+1. **자물쇠 비어있음** → 아이템 넣기 (이전 강의)
+2. **자물쇠에 키 있음** → 아이템 회수 (이번 강의) ⭐
+
+---
+
+## 🔄 작동 방식
+
+```
+자물쇠 클릭
+    ↓
+자물쇠가 비어있나?
+    ↓
+├─ YES (비어있음)
+│   ├─ 인벤토리에 필요한 아이템 있나?
+│   │   ├─ YES → 인벤토리에서 제거 + 자물쇠 활성화
+│   │   └─ NO  → "아이템 없음" 메시지
+│
+└─ NO (이미 키가 있음) ⭐
+    ├─ 자물쇠에서 아이템 가져오기
+    ├─ 인벤토리에 추가
+    └─ 자물쇠 비활성화
+```
+
+---
+
+## 💻 코드 구현
+
+### 완성된 자물쇠 상호작용 로직
+
+```cpp
+else if (HitActor->ActorHasTag("Lock"))
+{
+    ALock* LockActor = Cast<ALock>(HitActor);
+    if (LockActor)
+    {
+        // 자물쇠가 비어있는 경우
+        if (!LockActor->GetIsKeyPlaced())
+        {
+            // 인벤토리에서 아이템 제거 시도
+            int32 ItemsRemoved = ItemList.RemoveSingle(LockActor->KeyItemName);
+
+            if (ItemsRemoved)
+            {
+                // 성공: 자물쇠 활성화
+                LockActor->SetIsKeyPlaced(true);
+                UE_LOG(LogTemp, Warning, TEXT("Lock activated!"));
+            }
+            else
+            {
+                // 실패: 필요한 아이템 없음
+                UE_LOG(LogTemp, Warning, TEXT("Key Item '%s' not found in inventory."),
+                       *LockActor->KeyItemName);
+            }
+        }
+        // 자물쇠에 이미 키가 있는 경우 ⭐
+        else
+        {
+            // 1. 인벤토리에 아이템 추가
+            ItemList.Add(LockActor->KeyItemName);
+
+            // 2. 자물쇠 비활성화
+            LockActor->SetIsKeyPlaced(false);
+
+            UE_LOG(LogTemp, Warning, TEXT("Retrieved item from lock!"));
+        }
+    }
+}
+```
+
+---
+
+## 🔍 단계별 분석
+
+### else 블록의 의미
+
+```cpp
+if (!LockActor->GetIsKeyPlaced())
+{
+    // 자물쇠 비어있음 (false)
+}
+else
+{
+    // 자물쇠에 키 있음 (true) ⭐
+}
+```
+
+### 1단계: 인벤토리에 추가
+
+```cpp
+ItemList.Add(LockActor->KeyItemName);
+```
+
+- 자물쇠에 있던 아이템을 인벤토리로 가져옴
+- `Add()`: 배열 끝에 요소 추가
+
+### 2단계: 자물쇠 비활성화
+
+```cpp
+LockActor->SetIsKeyPlaced(false);
+```
+
+- `IsKeyPlaced`를 `false`로 변경
+- 트리거 컴포넌트 비활성화
+- 키 메시 숨김
+
+---
+
+## 📊 실행 흐름 예시
+
+### 시나리오: 아이템 넣기 → 다시 가져오기
+
+### 초기 상태
+
+```
+ItemList = ["Glass Statue"]
+LockActor->IsKeyPlaced = false (비어있음)
+```
+
+### 1. 첫 번째 클릭 (아이템 넣기)
+
+```
+자물쇠 클릭
+    ↓
+비어있나? → YES
+    ↓
+ItemList.RemoveSingle("Glass Statue")
+    ↓
+ItemsRemoved = 1 (성공)
+    ↓
+SetIsKeyPlaced(true)
+    ↓
+결과:
+  ItemList = []  // 비어짐
+  자물쇠 활성화 ✅
+```
+
+### 2. 두 번째 클릭 (아이템 회수) ⭐
+
+```
+자물쇠 클릭
+    ↓
+비어있나? → NO (이미 키가 있음)
+    ↓
+ItemList.Add("Glass Statue")
+    ↓
+SetIsKeyPlaced(false)
+    ↓
+결과:
+  ItemList = ["Glass Statue"]  // 다시 추가됨
+  자물쇠 비활성화 ✅
+```
+
+---
+
+## 🎮 게임 내 동작
+
+### 완전한 사이클
+
+```
+1. 아이템 수집
+   ItemList = ["Glass Statue"]
+   자물쇠: 비활성화 (빨간색)
+
+2. 자물쇠에 아이템 넣기 (첫 클릭)
+   ItemList = []
+   자물쇠: 활성화 (초록색)
+
+3. 자물쇠에서 아이템 회수 (두 번째 클릭)
+   ItemList = ["Glass Statue"]
+   자물쇠: 비활성화 (빨간색)
+
+4. 반복 가능 ♻️
+```
+
+---
+
+## 💡 SetIsKeyPlaced() 함수 복습
+
+### 역할
+
+```cpp
+void ALock::SetIsKeyPlaced(bool bNewIsKeyPlaced)
+{
+    IsKeyPlaced = bNewIsKeyPlaced;
+
+    if (IsKeyPlaced)
+    {
+        // 활성화
+        TriggerComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+        KeyItemMesh->SetVisibility(true);
+    }
+    else
+    {
+        // 비활성화
+        TriggerComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        KeyItemMesh->SetVisibility(false);
+    }
+}
+```
+
+### true vs false
+
+| SetIsKeyPlaced | 트리거   | 키 메시 | 상태       |
+| -------------- | -------- | ------- | ---------- |
+| `true`         | 활성화   | 보임    | 키 있음 🔓 |
+| `false`        | 비활성화 | 숨김    | 키 없음 🔒 |
+
+---
+
+## 🎨 시각적 비교
+
+### 비활성화 상태
+
+```
+자물쇠 🔒
+  └─ 트리거: OFF (빨간색)
+  └─ 키 메시: 보이지 않음
+  └─ IsKeyPlaced: false
+
+인벤토리: ["Glass Statue"]
+```
+
+### 활성화 상태
+
+```
+자물쇠 🔓
+  └─ 트리거: ON (초록색)
+  └─ 키 메시: 보임
+  └─ IsKeyPlaced: true
+
+인벤토리: []
+```
+
+---
+
+## 🔧 배열 함수 비교
+
+| 함수             | 동작         | 사용 시점             |
+| ---------------- | ------------ | --------------------- |
+| `Add()`          | 끝에 추가    | 아이템 수집, 회수     |
+| `RemoveSingle()` | 첫 번째 제거 | 아이템 사용           |
+| `Remove()`       | 모두 제거    | 특정 아이템 전부 삭제 |
+| `Empty()`        | 전체 비우기  | 인벤토리 초기화       |
+
+---
+
+## 🎯 전체 로직 정리
+
+```cpp
+void ADungeonEscapeCharacter::Interact()
+{
+    // Shape Trace 수행
+    FVector Start = FirstPersonCameraComponent->GetComponentLocation();
+    FVector End = Start + (FirstPersonCameraComponent->GetForwardVector() * MaxInteractDistance);
+
+    FCollisionShape InteractionSphere = FCollisionShape::MakeSphere(IntercationSphereRadius);
+    FHitResult HitResult;
+
+    bool HasHit = GetWorld()->SweepSingleByChannel(
+        HitResult, Start, End, FQuat::Identity,
+        ECC_GameTraceChannel2, InteractionSphere
+    );
+
+    if (HasHit)
+    {
+        AActor* HitActor = HitResult.GetActor();
+
+        // 수집 가능한 아이템
+        if (HitActor->ActorHasTag("CollectableItem"))
+        {
+            ACollectableItem* CollectableItem = Cast<ACollectableItem>(HitActor);
+            if (CollectableItem)
+            {
+                ItemList.Add(CollectableItem->ItemName);
+                CollectableItem->Destroy();
+            }
+        }
+
+        // 자물쇠
+        else if (HitActor->ActorHasTag("Lock"))
+        {
+            ALock* LockActor = Cast<ALock>(HitActor);
+            if (LockActor)
+            {
+                if (!LockActor->GetIsKeyPlaced())
+                {
+                    // 자물쇠 비어있음 → 아이템 넣기
+                    int32 ItemsRemoved = ItemList.RemoveSingle(LockActor->KeyItemName);
+                    if (ItemsRemoved)
+                    {
+                        LockActor->SetIsKeyPlaced(true);
+                    }
+                    else
+                    {
+                        UE_LOG(LogTemp, Warning, TEXT("Key Item not found!"));
+                    }
+                }
+                else
+                {
+                    // 자물쇠에 키 있음 → 아이템 회수 ⭐
+                    ItemList.Add(LockActor->KeyItemName);
+                    LockActor->SetIsKeyPlaced(false);
+                }
+            }
+        }
+    }
+}
+```
+
+---
+
+## 🎮 게임 메커니즘 활용
+
+### 퍼즐 디자인 예시
+
+1. **다중 자물쇠 시스템**
+
+   ```
+   자물쇠 A (빨간 열쇠 필요)
+   자물쇠 B (파란 열쇠 필요)
+   자물쇠 C (노란 열쇠 필요)
+
+   → 올바른 순서로 활성화해야 문 열림
+   ```
+
+2. **아이템 교환**
+
+   ```
+   방 1: 빨간 열쇠 획득
+   방 2: 빨간 열쇠로 자물쇠 열기
+   방 3: 빨간 열쇠 회수하여 다른 곳에 사용
+   ```
+
+3. **제한된 인벤토리**
+
+   ```
+   인벤토리 크기 제한
+   → 불필요한 아이템은 자물쇠에 보관
+   → 필요할 때 다시 가져오기
+   ```
+
+---
+
+## 💡 핵심 정리
+
+| 동작            | 조건                   | 실행 내용                                 |
+| --------------- | ---------------------- | ----------------------------------------- |
+| **아이템 넣기** | `IsKeyPlaced == false` | `RemoveSingle()` + `SetIsKeyPlaced(true)` |
+| **아이템 회수** | `IsKeyPlaced == true`  | `Add()` + `SetIsKeyPlaced(false)`         |
+
+### if-else 구조
+
+```cpp
+if (!IsKeyPlaced)
+{
+    // 자물쇠 비어있음 → 넣기
+}
+else
+{
+    // 자물쇠에 키 있음 → 빼기 ⭐
+}
+```
+
+---
+
+## 🚀 다음 단계
+
+이제 완성된 아이템 시스템으로:
+
+- ✅ 아이템 수집
+- ✅ 자물쇠에 아이템 사용
+- ✅ 자물쇠에서 아이템 회수
+- ✅ 반복 가능한 상호작용
+
+추가 개선 가능:
+
+- UI로 인벤토리 표시
+- 여러 종류의 자물쇠
+- 아이템 설명/아이콘
+- 사운드 효과
+
+양방향 상호작용으로 더 다양한 퍼즐을 만들 수 있습니다! 🎯

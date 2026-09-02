@@ -1,0 +1,1432 @@
+---
+title: 'Mongoose'
+date: '2026-09-02'
+category: '풀스택/The Web Developer 부트캠프 2022'
+tags: ['풀스택', 'The Web Developer 부트캠프 2022']
+draft: false
+summary: ''
+---
+
+# Mongoose 개념
+
+## **MongoDB와의 기본 상호작용**
+
+```jsx
+지금까지는 MongoDB 셸을 사용하여 간단한 데이터베이스 상호작용을 학습다.
+
+dogs, cats 등의 데이터를 생성하고 검색하며 CRUD 작업을 수행했다.
+```
+
+## **애플리케이션과의 상호작용**
+
+```jsx
+현실적으로 대부분의 상황에서는 몽고디비를 직접 사용하는 대신
+
+애플리케이션과 데이터베이스 간의 상호작용이 필요하다.
+
+사용자가 웹사이트나 앱을 통해 로그인할 때와 같이 사용자 계정을 MongoDB에 생성하려면
+
+Express나 Node와 같은 툴을 사용해야 한다.
+```
+
+## **MongoDB 드라이버**
+
+```jsx
+MongoDB와 여러 프로그래밍 언어 간에 연결을 지원하는 다양한 드라이버가 있다.
+
+예를 들어, Node.js용 MongoDB 드라이버를 사용하여 Node 앱과 MongoDB를 연결할 수 있다.
+```
+
+## **Mongoose 소개**
+
+```jsx
+Mongoose는 MongoDB와 Node.js를 연결하는데 사용되는 ODM(Object Data Mapper)이다.
+
+이것은 MongoDB 문서를 JavaScript 객체로 매핑하여 보다 편리하게 다룰 수 있도록 해준다.
+
+( 마이바티스(MyBatis)와 유사한 역할 )
+```
+
+## **ODM vs. ORM**
+
+```jsx
+ODM은 객체 데이터 매퍼를 의미하며, Mongoose는 MongoDB 문서를 JavaScript 객체로 매핑한다.
+
+ORM은 SQL 데이터를 프로그래밍 언어의 객체로 매핑하는 개념이며, SQL 데이터베이스에 대한 매퍼를 ORM이라고 한다.
+```
+
+## **Mongoose 활용**
+
+```jsx
+Mongoose를 사용하면 MongoDB와 Node.js 간의 연결이 더욱 간단해지며,
+
+유효성 검사, 사전에 정의된 스키마, 복잡한 쿼리 작성 등을 보다 쉽게 수행할 수 있다.
+
+* 스키마는 데이터베이스 테이블의 구조와 유사하며, 몽구스에서는 JavaScript 객체 형태로 정의
+```
+
+## **몽구스 연결 문제 해결에 관한 참고 사항**
+
+```jsx
+Solving mongoose 문제 해결
+최신 버전의 Node.js에서 몽구스를 사용 중인데 앱을 데이터베이스에 연결할 때 ECONNREFUSED 연결 거부 메시지가 나타나면, mongoose.connect 데이터베이스 연결 문자열에서 localhost 를127.0.0.1 로 변경해야 합니다.
+
+mongoose.connect('mongodb://127.0.0.1:27017/your_database_name_here')
+또한, 최신 몽구스 버전에서는 mongoose.connect 메서드에서 두 번째 인수로 옵션 오브젝트를 전달할 필요가 없습니다.
+
+따라서 최신 몽구스 버전을 사용할 때 mongoose.connect 호출은 위와 같이, useNewUrlParser, useUnifiedTopology, useCreateIndex, useFindAndModify 같은 옵션으로 오브젝트를 추가하지 않고 작성합니다.
+
+strictQuery 경고 메시지
+앱을 시작할 때 최신 몽구스 버전에서 다음과 같은 경고 메시지가 나타날 수 있습니다.
+
+DeprecationWarning: Mongoose: the `strictQuery` option will be switched back to `false` by default in Mongoose 7. Use `mongoose.set('strictQuery', false);` if you want to prepare for this change. Or use `mongoose.set('strictQuery', true);` to suppress this warning.
+
+이 경고 메시지 자체는 앱의 기능에 영향을 주지 않지만 언급된 mongoose.set('strictQuery', true);라인을 코드의 mongoose.connect 라인 위에 추가하면 경고를 사라지게 할 수 있습니다.
+
+앞으로 이 강의 참고 사항을 메모해 둔 후, 이후의 강의에서 동일한 문제가 발생하면 참고 사항의 해결 방법을 적용하세요.
+```
+
+# MongoDB 에 Mongoose를 연결하기
+
+```jsx
+https://mongoosejs.com/
+
+Mongoose 참고서는 Mongoosejs.com에 있다
+
+( Mongoose으로 작업할 때면 항상 열어두는게 좋다 )
+```
+
+```jsx
+npm i mongoose
+
+를 입력해서 몽구스를 설치해준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381389/notion-blog/_/The_Web_Developer_2022/node_js/Mongoose/Untitled.png)
+
+```jsx
+index.js 를 만들고
+
+기본적인 연결 셋팅을 해준다
+
+이후 node index.js 실행 성공이 뜨면 연결완료
+```
+
+```jsx
+// getting-started.js
+const mongoose = require('mongoose')
+
+main().catch((err) => console.log(err))
+
+async function main() {
+  await mongoose.connect('mongodb://127.0.0.1:27017/test') // 마지막 부분이 DB명
+  console.log('ConnectSuccess')
+}
+```
+
+# **모델 이해하기**
+
+```jsx
+Mongoose를 사용하여 생성되는 모델은 MongoDB 정보를 나타내는 JavaScript 클래스이다.
+
+모델은 특정 집합의 정보를 나타내는데 사용된다.
+
+이를 통해 MongoDB에서 가져온 데이터로 모델을 만들고 상호 작용하여
+
+데이터베이스에 새로운 정보를 보내거나 삭제, 업데이트하는 데 도움이 된다.
+```
+
+## **Mongoose 쿼리**
+
+```jsx
+MongoDB와 상호작용하기 위한 Mongoose의 메서드들은 결과로 Promise 객체가 아닌 Mongoose 쿼리 객체를 반환
+
+**Promise와의 차이**:
+
+이 쿼리 객체는 Promise 객체와는 다르지만,
+
+.then 메서드를 통해 비슷한 방식으로 결과를 처리할 수 있다.
+
+그러나 Mongoose 쿼리는 완전한 Promise가 아니므로 몇 가지 주의가 필요하다.
+
+**thenable 객체**:
+
+Mongoose 쿼리는 thenable 객체로 취급된다.
+
+따라서 .then을 사용하여 비동기적으로 결과를 다루게 된다.
+
+즉, Mongoose를 사용할 때는 Promise와는 조금 다른 방식으로 결과를 처리하며,
+
+.then 메서드를 사용하여 비동기 작업을 수행한다는 것이 핵심이다.
+```
+
+# Mongoose로 생성 ( 생성 : C )
+
+## **모델 생성 - 스키마 정의**
+
+```jsx
+첫 번째로 정의해야 할 모델은 스키마(Schema)이다.
+
+스키마는 MongoDB의 각 키에 대한 JavaScript의 다른 타입으로 구조를 정의한다.
+
+스키마를 정의함으로써 데이터를 구체화한다. 예를 들어, 영화 앱을 위해 영화 정보를 구성한다고 가정해보자
+```
+
+```jsx
+const movieSchema = new mongoose.Schema({
+  title: String,
+  year: Number,
+  score: Number,
+  rating: String,
+})
+```
+
+```jsx
+위의 코드에서 movieSchema는 각 키에 대한 데이터 타입을 정의한 것이다.
+
+제목은 문자열, 개봉 연도는 숫자, 평점은 숫자, 등급은 문자열이다.
+```
+
+## **모델 생성 - mongoose.model()**
+
+```jsx
+이제 스키마를 사용하여 모델을 생성한다
+```
+
+```jsx
+const Movie = mongoose.model('Movie', movieSchema)
+```
+
+```jsx
+여기서 중요한 것은 모델의 이름이다.
+
+이 이름은 단수형이면서 첫 문자는 대문자로 작성되어야 한다.
+
+Mongoose는 이 이름을 기반으로 자동으로 복수형의 집합을 생성한다.
+
+예를 들면, 위의 코드에서 Movie 모델은 movies 집합과 매핑된다.
+```
+
+## **모델 인스턴스 생성 및 저장**
+
+```jsx
+모델을 사용하여 MongoDB에 데이터를 저장
+
+이 코드를 통해 MongoDB에 데이터가 저장되었다.
+```
+
+```jsx
+// 모델 인스턴스 생성
+const amadeus = new Movie({
+  title: 'Amadeus',
+  year: 1986,
+  score: 9.2,
+  rating: 'R',
+})
+
+// 저장
+amadeus
+  .save()
+  .then((movie) => {
+    console.log('Movie saved:', movie)
+  })
+  .catch((error) => {
+    console.error('Error saving movie:', error)
+  })
+```
+
+```jsx
+흔히 사용하는 방법은 아니지만 한번에 여러개의 데이터를 넣는법
+```
+
+```jsx
+Movie.insertMany([
+  { title: 'Amelia', year: 2001, score: 8.3, rating: 'R' },
+  { title: 'Alien', year: 1979, score: 8.1, rating: 'R' },
+  { title: 'Amelia3', year: 2001, score: 8.3, rating: 'R' },
+  { title: 'Amelia5', year: 2031, score: 3.3, rating: 'R' },
+  { title: 'Amelia6', year: 2041, score: 6.3, rating: 'R' },
+])
+```
+
+## 전체 코드
+
+```jsx
+// getting-started.js
+const mongoose = require('mongoose')
+
+main().catch((err) => console.log(err))
+
+async function main() {
+  await mongoose.connect('mongodb://127.0.0.1:27017/movieApp') // 마지막 부분이 DB명
+  console.log('ConnectSuccess')
+}
+
+const movieSchema = new mongoose.Schema({
+  title: String,
+  year: Number,
+  score: Number,
+  rating: String,
+})
+
+const Movie = mongoose.model('Movie', movieSchema)
+
+const amadeus = new Movie({
+  title: 'Amadeus',
+  year: 1986,
+  score: 9.2,
+  rating: 'R',
+})
+
+amadeus
+  .save() // .save 사용
+  .then((movie) => {
+    console.log('Movie saved:', movie)
+  })
+  .catch((error) => {
+    console.error('Error saving movie:', error)
+  })
+
+Movie.insertMany([
+  { title: 'Amelia', year: 2001, score: 8.3, rating: 'R' },
+  { title: 'Alien', year: 1979, score: 8.1, rating: 'R' },
+  { title: 'Amelia3', year: 2001, score: 8.3, rating: 'R' },
+  { title: 'Amelia5', year: 2031, score: 3.3, rating: 'R' },
+  { title: 'Amelia6', year: 2041, score: 6.3, rating: 'R' },
+])
+```
+
+# Mongoose로 찾기 (조회 : R)
+
+## **find 메서드**
+
+```jsx
+find 메서드는 네이티브 MongoDB의 find와 유사하게 동작한다.
+
+쿼리와 키-값 쌍을 전달하여 검색하며, 일치하는 문서를 반환한다.
+
+결과는 Mongoose 쿼리 객체로 비동기적으로 처리되며, .then을 사용하여 데이터를 다룬다.
+```
+
+```jsx
+const Movie = require('Movie') // Movie 모델을 가져옴
+
+// 모든 영화를 찾음
+Movie.find().then((data) => console.log(data))
+
+// 특정 조건으로 영화를 찾음 (예: 15세 관람가)
+Movie.find({ rating: '15' }).then((data) => console.log(data))
+
+// 특정 연도 이후의 영화를 찾음 (예: 2015년 이후)
+Movie.find({ year: { $gte: 2015 } }).then((data) => console.log(data))
+```
+
+## **findOne 메서드**
+
+```jsx
+findOne 메서드는 find와 유사하지만, 결과 중 첫 번째 문서만 반환한다.
+
+주로 하나의 문서를 찾을 때 사용되며, 특정 조건을 지정할 수 있다.
+```
+
+## **findById 메서드**
+
+```jsx
+findById 메서드는 주로 Express 앱에서 사용되며, 주어진 ID에 해당하는 문서를 찾는다.
+
+단일 인자로 ID만 전달하면 된다.
+```
+
+```jsx
+const express = require('express')
+const app = express()
+const Movie = require('Movie')
+
+// 영화 ID에 해당하는 문서 찾기
+app.get('/movies/:id', (req, res) => {
+  const movieId = req.params.id
+
+  Movie.findById(movieId)
+    .then((movie) => res.json(movie))
+    .catch((err) => res.status(404).json({ error: 'Movie not found' }))
+})
+```
+
+# Mongoose로 업데이트 ( 업데이트 : U)
+
+## **Mongoose의 update 메서드**
+
+```jsx
+MongoDB에서는 갱신된 정보를 반환하지 않고,
+
+대신 'nModified'를 통해 몇 개의 문서가 갱신되었는지를 알려준다.
+
+Mongoose에서도 이와 유사한 방식으로 작동한다. 그러나 때로는 갱신된 데이터가 필요할 수 있다.
+```
+
+## **updateOne 메서드**
+
+```jsx
+updateOne 메서드는 첫 번째 항목을 갱신한다. 쿼리에 매치되는 첫 번째 항목을 주어진 정보로 갱신한다
+
+(첫번째 인자가 대상조건 , 두번째 인자가 변경 내용)
+
+(set 이 필요없어졌다
+```
+
+```jsx
+// 'name: Jean-Luc Picard'를 'ship: USS Enterprise'로 변경하는 과정
+Movie.updateOne({ name: 'Jean-Luc Picard' }, { ship: 'USS Enterprise' })
+
+// 영화 'Amadeus'의 개봉 연도를 1986에서 1984로 변경하는 예시
+Movie.updateOne({ title: 'Amadeus' }, { year: 1984 }).then((res) => console.log(res))
+```
+
+## **updateMany 메서드**
+
+```jsx
+updateMany 메서드는 여러 항목을 동시에 갱신한다
+```
+
+```jsx
+// 'Amadeus'와 'Stand By Me' 두 영화의 평점을 동시에 10점으로 변경하는 과정 ( 둘중 하나라도 같으면 갱신시킴 in )
+Movie.updateMany({ title: { $in: ['Amadeus', 'Stand By Me'] } }, { $set: { rating: 10 } })
+```
+
+## **findOneAndUpdate 메서드**
+
+```jsx
+findOneAndUpdate 메서드는 특정 기준에 맞는 문서를 찾아서 갱신하며, 갱신된 정보를 반환
+
+기본적으로는 갱신 전의 문서를 반환한다. 그러나 갱신된 문서를 반환받고 싶다면, { new: true }라는 옵션을 설정해야 한다.
+```
+
+```jsx
+Movie.findOneAndUpdate({ title: 'The Iron Giant' }, { $set: { rating: 7.8 } }, { new: true }).then(
+  (updatedMovie) => console.log(updatedMovie)
+)
+```
+
+### **경고 메시지 해결**
+
+```jsx
+Mongoose에서는 findOneAndUpdate와 관련된 경고 메시지가 나타날 수 있다.
+
+이 경고는 Mongoose에서 findOneAndUpdate를 내부적으로 사용하는데, 이에 대한 설정이 필요하다는 것을 알려주는 것
+```
+
+```jsx
+mongoose.set('useFindAndModify', false)
+```
+
+```jsx
+위 예시에서처럼 mongoose.set('useFindAndModify', false)를 사용하여 경고를 해결할 수 있다.
+
+이 설정은 Mongoose가 내부적으로 사용하는 findOneAndUpdate 대신 MongoDB의 findOneAndUpdate를 사용하도록 한다.
+
+이 설정을 적용하면, 더 이상 findOneAndUpdate에 관한 경고가 표시되지 않는다.
+
+이 옵션은 Mongoose 6.x 버전부터는 더 이상 디폴트로 설정되어 있지 않으므로, 사용자가 명시적으로 설정해주어야 한다.
+```
+
+# Mongoose로 삭제 ( 삭제 : D)
+
+## **Mongoose에서의 삭제 방법**
+
+```jsx
+Mongoose를 사용하여 데이터를 삭제하는 데는 두 가지 유형의 메서드가 있다.
+
+갱신과 마찬가지로 모델 메서드를 사용할 수 있다.
+```
+
+## remove( 사용 권장 x)
+
+```jsx
+remove 메서드는 MongoDB에 직접 삭제 명령을 전달하며 관련 문서가 없다.
+
+remove 메서드는 삭제된 개수만 반환하며, 갱신과 비슷한 메서드 이름을 사용한다.
+
+경고: deleteOne, deleteMany, bulkWrite를 사용하도록 권고됨.
+```
+
+```jsx
+const result = await Movie.remove({ title: 'Amelie' })
+console.log(`${result.deletedCount}개의 영화가 삭제되었습니다.`)
+```
+
+## **deleteOne메서드**
+
+```jsx
+특정 조건에 맞는 문서 중 첫 번째 문서를 삭제하는 메서드
+
+deleteOne 메서드는 조건에 맞는 첫 번째 문서만 삭제하며, 해당 문서가 없어도 오류를 발생시키지 않는다.
+
+반환 값은 삭제된 문서의 개수를 나타내는 객체이다.
+```
+
+```jsx
+// Movie 모델 정의
+const Movie = mongoose.model('Movie', {
+  title: String,
+  year: Number,
+})
+
+// 예제: deleteOne 메서드 사용
+const result = await Movie.deleteOne({ title: 'Inception' })
+
+// 결과 출력
+console.log(`${result.deletedCount}개의 영화가 삭제되었습니다.`)
+```
+
+## **deleteMany 메서드**
+
+```jsx
+특정 조건에 맞는 여러 데이터를 삭제
+```
+
+```jsx
+const result = await Movie.deleteMany({ year: { $gte: 1999 } })
+console.log(`${result.deletedCount}개의 영화가 삭제되었습니다.`)
+```
+
+## **findOneAndDelete 메서드**
+
+```jsx
+findOneAndDelete 메서드를 사용하여 특정 문서를 찾아 삭제
+
+삭제된 데이터가 반환되어 출력
+```
+
+```jsx
+const deletedMovie = await Movie.findOneAndDelete({ title: 'Alien' })
+console.log(`삭제된 영화: ${deletedMovie}`)
+```
+
+# **MongoDB 스키마**
+
+```jsx
+스키마에 제약조건을 만드는 방법에 대해서 배워본다
+```
+
+```jsx
+const mongoose = require('mongoose')
+
+main().catch((err) => console.log(err))
+
+async function main() {
+  await mongoose.connect('mongodb://127.0.0.1:27017/ShopApp')
+  console.log('ConnectSuccess')
+}
+
+const productSchema = new mongoose.Schema({
+  // 제약 조건을 걸어본다
+  name: {
+    type: String,
+    required: true, // 값이 필수적임
+  },
+  price: {
+    type: Number,
+  },
+})
+
+const Product = mongoose.model('Product', productSchema) // 모델 정의
+
+const bike = new Product({ price: 300 }) // 상품 생성 및 저장
+
+bike
+  .save()
+  .then((data) => {
+    console.log('Success')
+  })
+  .catch((err) => {
+    console.log('error')
+    console.log(err)
+  })
+```
+
+```jsx
+현재 name 에
+
+required : true 를 적어줬다
+
+이렇게 제약조건을 걸어주면 필수적으로 값이 필요해진다
+
+아래 bike 모델을 만들었을 때 name 이 필수값인데 없으므로 save 할 때 오류가 난다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381388/notion-blog/_/The_Web_Developer_2022/node_js/Mongoose/Untitled_1.png)
+
+```jsx
+console.log(err.errors.name.properties.message)
+
+이런식으로 메세지를 활용해서 상세하게 확인해보면
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381388/notion-blog/_/The_Web_Developer_2022/node_js/Mongoose/Untitled_2.png)
+
+## **스키마에 정의 되지 않은 속성은 무시된다**
+
+```jsx
+// 추가 정보를 포함한 상품 생성
+const bikeWithInfo = new Product({ name: 'Mountain Bike', price: 999, color: 'red' })
+
+// 콘솔 출력
+console.log(bikeWithInfo)
+```
+
+```jsx
+스키마에 정의되지 않은 color 속성은 무시된다
+
+데이터베이스에는 color: 'red'가 저장되지 않는다
+```
+
+## **스키마 타입 옵션**
+
+```jsx
+스키마 타입에 적용할 수 있는 다양한 옵션을 정의할 수 있다.
+
+이러한 옵션은 모든 스키마 타입에 적용 가능하며,
+
+required나 default와 같은 옵션을 사용할 수 있다.
+
+Default로 기본값을 설정할 수 있는데, 이는 값이 명시되지 않을 때 사용된다.
+```
+
+```jsx
+// "onSale"이라는 불리언 타입을 추가하고 기본값을 false로 설정하는 경우, 이는 해당 속성을 명시하지 않으면 자동으로 false로 설정
+
+const schema = {
+  onSale: {
+    type: Boolean,
+    default: false,
+  },
+  // 다른 속성들...
+}
+```
+
+## 특정 타입에 적용 가능한 제약 조건
+
+### **문자열에 대한 제약 조건**
+
+```jsx
+예를 들어, 문자열에 대해서는 lowercase나 uppercase를 설정하여 자동으로 대소문자를 조절하거나,
+
+ trim을 사용하여 문자열 앞뒤의 공백을 제거할 수 있다
+```
+
+```jsx
+const schema = {
+  title: {
+    type: String,
+    lowercase: true, // 소문자로 자동 변환
+    trim: true, // 앞뒤 공백 제거
+  },
+  // 다른 속성들...
+}
+```
+
+### **숫자에 대한 제약 조건**
+
+```jsx
+숫자에 대해서는 min과 max를 설정하여 최소 및 최대값을 지정할 수 있다.
+
+이를 통해 가격이 음수가 되지 않도록 하거나, 특정 범위 내의 값만 허용할 수 있다.
+```
+
+```jsx
+const schema = {
+  price: {
+    type: Number,
+    min: 0, // 최소값 설정
+    // 다른 숫자 제약 조건들...
+  },
+  // 다른 속성들...
+}
+```
+
+## **배열 타입과 기본값 설정**
+
+```jsx
+배열 타입의 예시로 'categories'를 추가하고, 이를 문자열의 배열로 설정하며 기본값을 ['Cycling', 'Safety']로 지정
+```
+
+```jsx
+const productSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true, // 값이 필수적임
+    maxlength: 20,
+  },
+  price: {
+    type: Number,
+    required: true,
+    min: 0,
+  },
+  onSale: {
+    type: Boolean,
+    default: false,
+  },
+  categories: [String], // String 배열로 설정
+})
+```
+
+```jsx
+const Product = mongoose.model('Product', productSchema) //  모델 정의
+
+const bike = new Product({ name: 'Bike Helmet', price: 455, categories: ['Cycling', 'Safety'] }) // 상품 생성 및 저장
+
+bike
+  .save()
+  .then((data) => {
+    console.log('Success')
+    console.log(data)
+  })
+  .catch((err) => {
+    console.log('error')
+    console.log(err.errors.name.properties.message)
+  })
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381389/notion-blog/_/The_Web_Developer_2022/node_js/Mongoose/Untitled_3.png)
+
+```jsx
+저장 결과
+```
+
+## **중첩된 객체**
+
+```jsx
+중첩된 객체에 대한 예시로 'qty'를 추가하고 그 안에 두 개의 하위 특성을 가진 객체를 정의하는 방법을 설명한다
+```
+
+```jsx
+const schema = {
+  qty: {
+    online: {
+      type: Number,
+      default: 0,
+    },
+    inStore: {
+      type: Number,
+      default: 0,
+    },
+  },
+  // 다른 속성들...
+}
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381389/notion-blog/_/The_Web_Developer_2022/node_js/Mongoose/Untitled_4.png)
+
+```jsx
+defalut 값으로 0 이 들어간 객체가 만들어졌다
+```
+
+# Mongoose에서는 업데이트 이후에 유효성 검사가 적용되지 않음
+
+```jsx
+스키마를 제작하고
+```
+
+```jsx
+const ProductSchema = new Schema({
+  name: {
+    type: String,
+    required: true,
+  },
+  price: {
+    type: Number,
+    min: 0,
+  },
+  category: {
+    type: String,
+    enum: ['Cycling'],
+  },
+  quantity: {
+    online: Number,
+    inStore: Number,
+  },
+})
+
+const Product = mongoose.model('Product', ProductSchema)
+```
+
+```jsx
+업데이트를 진행한다
+
+이때 runValidators: true 를 붙여주지 않으면 업데이트 시
+
+**유효성 검사를 건너뛴다**
+
+꼭 붙여주자
+```
+
+```jsx
+Product.findOneAndUpdate(
+  { name: 'Tire Pump' },
+  { $set: { price: -10.99 } },
+  { new: true, runValidators: true } // 갱신된 문서 반환 + 업데이트 시 유효성 검사가 적용
+)
+  .then((updatedProduct) => {
+    console.log(`Updated product: ${updatedProduct}`)
+  })
+  .catch((error) => {
+    console.error(`Error updating product: ${error}`)
+  })
+```
+
+```jsx
+* updateOne 예시
+
+Product.updateOne(
+  { name: 'Tire Pump' },
+  { $set: { price: -19.99 } },
+  { runValidators: true }   // 업데이트 시 붙여주자
+)
+  .then(result => {
+    console.log(`Update result: ${result}`);
+  })
+  .catch(error => {
+    console.error(`Error updating product: ${error}`);
+  });
+```
+
+# **Mongoose에서 커스텀 유효성 검사기 메시지 설정하기**
+
+```jsx
+Mongoose에서는 내장된 유효성 검사기를 사용할 때, 커스텀한 오류 메시지를 설정할 수 있다. [] 배열을 사용한다
+```
+
+```jsx
+price: {
+  type: Number,
+  min: [0, '가격은 양수여야 합니다...이얏호!']
+}
+
+// 최소값이 0으로 설정되었고, 오류 메시지는 "가격은 양수여야 합니다...이얏호!"로 설정되었다.
+```
+
+```jsx
+username: {
+  type: String,
+  minlength: [3, '사용자 이름은 최소 3글자 이상이어야 합니다.'],
+  maxlength: [20, '사용자 이름은 최대 20글자를 넘을 수 없습니다.']
+}
+
+// minlength와 maxlength를 사용하여 문자열의 최소 및 최대 길이를 설정하고, 커스텀한 오류 메시지를 추가
+```
+
+```jsx
+email: {
+  type: String,
+  match: [/^\S+@\S+\.\S+$/, '올바른 이메일 형식이 아닙니다.']
+}
+
+// match를 사용하여 정규 표현식을 통한 유효성 검사를 수행
+```
+
+```jsx
+password: {
+  type: String,
+  validate: {
+    validator: function(value) {
+      return value.length >= 6;
+    },
+    message: '비밀번호는 최소 6글자 이상이어야 합니다.'
+  }
+}
+
+// Custom Validator를 활용한 유효성 검사 및 메시지 설정
+// validate를 사용하여 사용자 정의 유효성 검사 함수를 적용하고, 오류 메시지를 설정
+```
+
+```jsx
+isAdmin: {
+  type: Boolean,
+  required: function() {
+    return this.role === 'admin';
+  },
+  message: '어드민 권한을 가진 경우에만 필수입니다.'
+}
+
+// 조건부 유효성 검사 및 메시지 설정: 필드 값이 특정 조건을 만족하지 않을 때만 유효성 검사를 적용하고, 커스텀 메시지를 설정하는 예제
+```
+
+## **커스텀 메시지 접근**
+
+```jsx
+const newProduct = new Product({ price: -10 })
+newProduct.save((err) => {
+  console.log(err.message) // "가격은 양수여야 합니다...이얏호!"
+})
+```
+
+# **다른 방법과 유효성 검사**
+
+```jsx
+다양한 유효성 검사 및 오류 처리 방법이 존재한다.
+
+클라이언트 측에서도 검사를 수행하거나, 메시지 패키지를 사용하는 등의 방법이 있다.
+```
+
+## **Enum 유효성 검사**
+
+```jsx
+enum을 사용하여 문자열 값이 배열 안에 있는지 확인하는 유효성 검사
+```
+
+```jsx
+size: {
+  type: String,
+  enum: ['S', 'M', 'L'],
+  message: '유효한 사이즈를 선택하세요.'
+}
+```
+
+```jsx
+예제에서는 상품의 size 필드에 enum을 적용하였고,
+
+유효하지 않은 값인 'XS'를 사용하여 유효성 검사를 시도한다.
+```
+
+```jsx
+const newProduct = new Product({ size: 'XS' })
+newProduct.save((err) => {
+  console.log(err.message) // "유효한 사이즈를 선택하세요."
+})
+```
+
+## **`message`** 속성을 사용하여 커스텀 메시지를 설정, 내장된 유효성 검사기에서 배열을 사용하여 커스텀 메시지를 설정
+
+```jsx
+**message 속성 사용**
+
+message 속성은 해당 필드에 대한 유효성 검사에서 오류가 발생했을 때 나타낼 메시지를 설정
+
+이 방법은 특정 필드의 여러 유효성 검사에서 오류 메시지를 일괄적으로 설정하고자 할 때 사용
+```
+
+```jsx
+size: {
+  type: String,
+  enum: ['S', 'M', 'L'],
+  message: '유효한 사이즈를 선택하세요.'
+}
+```
+
+```jsx
+**배열을 사용한 커스텀 메시지**
+
+내장된 유효성 검사기에서 배열을 사용하여 커스텀 메시지를 설정하는 방법은
+
+해당 유효성 검사에 대한 메시지를 설정하는 방법 중 하나이다.
+
+주로 내장된 유효성 검사기에 대한 추가적인 정보를 전달하고자 할 때 사용된다.
+```
+
+```jsx
+price: {
+  type: Number,
+  min: [0, '가격은 양수여야 합니다...이얏호!']
+}
+```
+
+# **Mongoose 스키마에 커스텀 메서드 추가하기**
+
+### 커스텀 메서드를 사용할때는 화살표 함수 사용 금지
+
+```jsx
+productSchema.methods.greet = function () {
+  console.log('HELLO!!! HI!! HOWDY!!!')
+}
+```
+
+```jsx
+화살표 함수는 함수를 정의할 때 상위 스코프의 this 값을 캡처하게 된다.
+
+이로 인해 화살표 함수가 어떤 인스턴스에서 호출되었는지에 관계없이 항상 같은 this 값을 사용하게 된다
+
+roductSchema.methods.greet 함수는 모델의 인스턴스 메서드로 사용되며,
+
+각 인스턴스에서 호출될 때 해당 인스턴스의 컨텍스트에 접근할 수 있어야 한다.
+
+그러나 화살표 함수를 사용하면 this가 정적으로 결정되므로 해당 인스턴스를 가리키지 않고 상위 스코프의 this를 사용하게 된다.
+```
+
+JavaScript에서 this
+
+## **인스턴스 메서드 정의하기**
+
+```jsx
+Mongoose 스키마에 인스턴스 메서드를 추가하는 것은
+
+모델의 각 인스턴스에서 호출 가능한 메서드를 정의하는 것이다.
+
+예를 들어, Product 스키마에 greet 메서드를 추가해보겠다.
+```
+
+```jsx
+const mongoose = require('mongoose')
+
+const productSchema = new mongoose.Schema({
+  name: String,
+  price: Number,
+  onSale: Boolean,
+  categories: [String],
+})
+
+// 인스턴스 메서드 정의
+productSchema.methods.greet = function () {
+  console.log(`HELLO!!! HI!! HOWDY!!! - from ${this.name}`)
+}
+
+// 모델 생성
+const Product = mongoose.model('Product', productSchema)
+
+// 특정 상품 인스턴스 생성 및 메서드 호출
+const p = new Product({ name: 'bike bag', price: 10 })
+p.greet() // 출력: HELLO!!! HI!! HOWDY!!! - from bike bag
+```
+
+### **인스턴스 메서드를 특정 상품 검색에 활용하기**
+
+```jsx
+이번에는 특정 상품을 찾아서 해당 상품의 greet 메서드를 호출해본다
+```
+
+```jsx
+// 비동기 함수로 특정 상품 찾기 및 greet 메서드 호출
+const findProduct = async () => {
+  try {
+    const foundProduct = await Product.findOne({ name: 'Bike Helmet' })
+    foundProduct.greet() // 출력: HELLO!!! HI!! HOWDY!!! - from Bike Helmet
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+findProduct()
+```
+
+### **인스턴스 메서드로 특정 상품의 특성 토글하기**
+
+```jsx
+이번에는 특정 상품의 onSale 특성을 토글하는 인스턴스 메서드를 추가해본다
+```
+
+```jsx
+// onSale 특성을 토글하는 인스턴스 메서드 정의
+productSchema.methods.toggleOnSale = function () {
+  this.onSale = !this.onSale
+  return this.save() // Promise 반환 save 는 암죽적으로 promise 반환
+}
+
+// 특정 상품 생성
+const foundProduct = await Product.findOne({ name: 'Bike Helmet' })
+
+// onSale 특성 토글 및 저장
+foundProduct
+  .toggleOnSale()
+  .then((updatedProduct) => {
+    console.log(updatedProduct)
+  })
+  .catch((error) => {
+    console.error(error)
+  })
+```
+
+### **인스턴스 메서드로 카테고리 추가하기**
+
+```jsx
+상품 모델에 카테고리를 추가하는 인스턴스 메서드를 정의해본다
+```
+
+```jsx
+// 카테고리 추가하는 인스턴스 메서드 정의
+productSchema.methods.addCategory = function (newCat) {
+  this.categories.push(newCat)
+  return this.save() // Promise 반환
+}
+
+// 특정 상품에 카테고리 추가 및 저장
+const foundProduct = await Product.findOne({ name: 'Bike Helmet' })
+foundProduct
+  .addCategory('Outdoors')
+  .then((updatedProduct) => {
+    console.log(updatedProduct)
+  })
+  .catch((error) => {
+    console.error(error)
+  })
+```
+
+## **정적 메서드 정의하기**
+
+```jsx
+정적 메서드는 모델 자체에서 호출 가능한 메서드로,
+
+특정 인스턴스와는 무관하게 모델 전체에 적용된다. 아래는 정적 메서드의 예시이다.
+
+( 아예 findOne 같은 메서드를 만든다 )
+```
+
+```jsx
+// 정적 메서드 정의
+productSchema.statics.findProductsByCategory = function (category) {
+  return this.find({ categories: category })
+}
+
+// 정적 메서드 호출
+const productsInCategory = await Product.findProductsByCategory('Outdoors')
+console.log(productsInCategory)
+```
+
+```jsx
+// 특정 조건을 충족하는 문서를 찾아 반환하는 경우 정적 메서드를 사용
+productSchema.statics.findByCategory = async function (category) {
+  return this.find({ category })
+}
+```
+
+```jsx
+// 모든 제품의 가격을 일괄적으로 조정하거나 특정 조건을 만족하는 모든 문서를 찾아 업데이트할 때
+productSchema.statics.adjustPrices = async function (percentage) {
+  const result = await this.updateMany({}, { $mul: { price: 1 + percentage / 100 } })
+  console.log(result)
+}
+```
+
+```jsx
+// 클래스 전반에 영향을 주는 작업을 정의할 때 정적 메서드를 활용
+productSchema.statics.clearAllData = async function () {
+  const result = await this.deleteMany({})
+  console.log(result)
+}
+```
+
+```jsx
+// 데이터베이스 초기화나 특정 데이터를 가공해야 할 때
+productSchema.statics.initializeData = async function () {
+  // 초기 데이터 삽입 또는 가공
+}
+```
+
+# 가상 Mongoose
+
+```jsx
+* 가상 Mongoose에서는 실제 데이터베이스에 저장되지 않지만, 코드에서 사용할 수 있는 가상 특성을 정의할 수 있다.
+
+* "특성"은 객체의 속성이나 필드를 나타낸다.
+
+* 이러한 기능을 통해 코드에서 데이터를 다룰 때 편리하고 유연한 방식으로 작업할 수 있다.
+
+* 예를 들어, 실제 데이터베이스에는 없는 "fullName"과 같은 특성을 가상 Mongoose를 사용하여 모델에 추가할 수 있다.
+
+* 이렇게 추가된 가상 특성은 코드에서 데이터베이스에 있는 것처럼 활용할 수 있고,
+
+	필요한 경우 가공이나 변환 작업을 통해 활용할 수 있다.
+
+* 이는 개발자에게 데이터 모델을 풍부하게 만들어주며,
+
+	데이터에 접근하거나 조작할 때 편리한 인터페이스를 제공한다.
+
+* 가상 특성은 실제 데이터베이스에 저장되지 않고 코드에서 사용하는 용도로 활용된다.
+```
+
+## **가상 특성 추가**
+
+```jsx
+// fullName 가상 특성 추가
+personSchema.virtual('fullName').get(function () {
+  return `${this.first} ${this.last}`
+})
+```
+
+```jsx
+virtual: 가상 특성을 정의할 때 사용하는 키워드.
+
+'fullName': 추가하려는 가상 특성의 이름.
+
+get: 가상 특성에 대한 Getter 함수를 정의.
+```
+
+## **가상 특성 Setter 추가**
+
+```jsx
+// fullName 가상 특성의 Setter 정의
+personSchema.virtual('fullName').set(function (value) {
+  const [firstName, lastName] = value.split(' ')
+  this.first = firstName
+  this.last = lastName
+})
+```
+
+```jsx
+set: 가상 특성에 대한 Setter 함수를 정의.
+
+value: Setter 함수에 전달되는 값을 나타내는 매개변수.
+```
+
+## **가상 특성 활용**
+
+```jsx
+// 사용 예제
+const person = new Person({ first: 'John', last: 'Doe' })
+console.log(person.fullName) // 출력: John Doe
+```
+
+```jsx
+person.fullName: 가상 특성에 접근하여 값을 얻는 방법.
+```
+
+## **가상 특성 Getter 및 Setter 함께 정의**
+
+```jsx
+// fullName 가상 특성의 Getter 및 Setter 정의
+personSchema
+  .virtual('fullName')
+  .get(function () {
+    return `${this.first} ${this.last}`
+  })
+  .set(function (value) {
+    const [firstName, lastName] = value.split(' ')
+    this.first = firstName
+    this.last = lastName
+  })
+```
+
+```jsx
+get 및 set을 연이어 사용하여 가상 특성의 Getter 및 Setter를 함께 정의.
+```
+
+## 전체적인 예시
+
+```jsx
+const mongoose = require('mongoose')
+
+// MongoDB 연결 설정
+mongoose.connect('mongodb://localhost/shopApp', { useNewUrlParser: true, useUnifiedTopology: true })
+
+// Person 모델의 스키마 정의
+const personSchema = new mongoose.Schema({
+  first: String,
+  last: String,
+})
+
+// fullName 가상 특성 추가 (Getter 및 Setter 함께 정의)
+personSchema
+  .virtual('fullName')
+  .get(function () {
+    return `${this.first} ${this.last}`
+  })
+  .set(function (value) {
+    const [firstName, lastName] = value.split(' ')
+    this.first = firstName
+    this.last = lastName
+  })
+
+// Person 모델 생성
+const Person = mongoose.model('Person', personSchema)
+
+// MongoDB 연결 후 동작
+mongoose.connection.once('open', function () {
+  console.log('MongoDB 연결 성공!')
+
+  // Person 모델을 사용하여 데이터 조작
+  const tammy = new Person({ first: 'Tammy', last: 'Chow' })
+
+  // fullName 가상 특성 활용
+  console.log(tammy.fullName) // 출력: Tammy Chow
+
+  // fullName 가상 특성의 Setter 활용
+  tammy.fullName = 'Tammy Xiao'
+  console.log(tammy.fullName) // 출력: Tammy Xiao
+
+  // MongoDB에 데이터 저장
+  tammy.save(function (err) {
+    if (err) return console.error(err)
+    console.log('데이터 저장 완료.')
+
+    // MongoDB 연결 종료
+    mongoose.connection.close()
+  })
+})
+```
+
+```jsx
+Person 모델에 가상 특성인 fullName을 추가하고 활용하는 예제
+```
+
+# **Mongoose 미들웨어 소개**
+
+```jsx
+Mongoose에서 미들웨어는 특정 동작(삭제, 저장, 업데이트 등)이 실행되기 전이나
+
+후에 특정 코드를 실행할 수 있게 해주는 강력한 기능 중 하나
+```
+
+## **미들웨어의 역할과 종류**
+
+```jsx
+역할:
+
+Mongoose 미들웨어는 특정 메서드 호출 전후에 코드를 실행하여 데이터 조작, 검증, 로깅 등 다양한 작업을 수행할 수 있다.
+
+종류:
+
+Mongoose에서는 **pre**와 **post** 훅을 사용하여 각각 메서드 호출의 앞과 뒤에서 실행되는 미들웨어를 정의할 수 있다.
+```
+
+## **기본적인 미들웨어 사용 예제**
+
+### **예제: 사용자 삭제 시 관련 데이터 삭제**
+
+```jsx
+예제 시나리오:
+
+사용자를 삭제할 때 관련된 모든 데이터를 삭제하는 상황을 가정한다.
+
+코드 구현:
+
+ Mongoose 미들웨어를 사용하여 사용자 삭제 시 동작할 pre 미들웨어를 구현한다.
+```
+
+```jsx
+personSchema.pre('remove', async function (next) {
+  // 사용자 삭제 전에 실행될 코드
+  await Comment.deleteMany({ user: this._id })
+  await Post.deleteMany({ user: this._id })
+  // 다른 관련 데이터 삭제 로직 추가 가능
+  next()
+})
+```
+
+### 예제: 사용자 정보를 저장하기 전에 특정 처리를 하고 싶은 경우
+
+```jsx
+const mongoose = require('mongoose')
+
+const userSchema = new mongoose.Schema({
+  username: String,
+  email: String,
+  // 다른 필드들...
+})
+
+// pre 미들웨어: 사용자 정보를 저장하기 전에 실행됨
+userSchema.pre('save', async function (next) {
+  // 특정 처리 수행
+  console.log(`사용자 ${this.username} 정보를 저장하기 전에 실행됨`)
+
+  // 다음 미들웨어로 제어를 전달
+  next()
+})
+
+const User = mongoose.model('User', userSchema)
+```
+
+## **비동기 미들웨어 및 Promise 활용**
+
+### 특정 비동기 작업을 수행한 후에 다음 동작을 실행하고 싶은 경우
+
+```jsx
+userSchema.pre('save', async function (next) {
+  // 비동기 작업 수행 (예: API 호출, 파일 업로드 등)
+  await someAsyncTask()
+
+  // 다음 미들웨어로 제어를 전달
+  next()
+})
+
+// 비동기 작업을 Promise를 반환하여 처리하는 경우
+userSchema.pre('save', function () {
+  return someAsyncTask().then(() => {
+    // 다음 미들웨어로 제어를 전달
+  })
+})
+```
+
+### 다음 미들웨어란?
+
+```jsx
+Mongoose의 미들웨어에서 비동기 작업을 수행할 때,
+
+해당 작업이 완료된 후에 다음 미들웨어로 제어를 전달하기 위해 next() 함수를 사용한다.
+
+여기서 next() 함수는 현재 미들웨어를 종료하고 다음 미들웨어로 실행 흐름을 이동시키는 역할을 한다.
+```
+
+```jsx
+Express에서 미들웨어는 요청 처리를 위해 연속적으로 적용되는 함수들의 체인이다.
+
+각각의 미들웨어는 요청 객체(req), 응답 객체(res), 그리고 다음 미들웨어로 넘어갈 수 있는 함수를 받는다.
+
+이 함수를 통해 현재 미들웨어의 작업이 끝나면 다음 미들웨어로 제어를 전달할 수 있다.
+```
+
+```jsx
+app.use((req, res, next) => {
+  // 현재 미들웨어에서 수행할 작업
+  console.log('현재 미들웨어 동작 중')
+
+  // 다음 미들웨어로 제어를 전달
+  next()
+})
+
+app.use((req, res) => {
+  // 다음 미들웨어에서 수행할 작업
+  console.log('다음 미들웨어 동작 중')
+})
+```
+
+## **this 키워드 활용 및 데이터 업데이트**
+
+### 사용자 정보를 저장하기 전에 데이터를 업데이트하고 싶은 경우.
+
+```jsx
+userSchema.pre('save', function (next) {
+  // this 키워드를 사용하여 현재 문서에 접근
+  this.lastUpdated = new Date()
+  next()
+})
+```
+
+## **미들웨어 순서와 실행 확인**
+
+### pre 미들웨어와 post 미들웨어의 실행 순서를 확인하고 싶은 경우.
+
+```jsx
+userSchema.pre('save', function (next) {
+  console.log('pre 미들웨어 실행')
+  next()
+})
+
+userSchema.post('save', function () {
+  console.log('post 미들웨어 실행')
+})
+
+// 위의 예제에서 save 메서드 호출 시, 먼저 pre 미들웨어가 실행되고 그 후 post 미들웨어가 실행된다.
+```
+
+## 오류들….
+
+```jsx
+SyntaxError: Invalid or unexpected token
+    at internalCompileFunction (node:internal/vm:77:18)
+    at wrapSafe (node:internal/modules/cjs/loader:1288:20)
+    at Module._compile (node:internal/modules/cjs/loader:1340:27)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1435:10)
+    at Module.load (node:internal/modules/cjs/loader:1207:32)
+    at Module._load (node:internal/modules/cjs/loader:1023:12)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:135:12)
+    at node:internal/main/run_main_module:28:49
+
+* 이럴땐 vscode 의 인코딩 설정을 EUC-KR 로 바꿔주자
+```
+
+```jsx
+(node:27012) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+* 노드 버전에서 지원을 안해서 그렇다 조금 버전을 낮춰보자
+
+그럴러면 nvm 을 사용해야한다
+```

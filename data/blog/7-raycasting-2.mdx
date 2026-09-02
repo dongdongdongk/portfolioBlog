@@ -1,0 +1,723 @@
+---
+title: '섹션 7: Raycasting - 2 -'
+date: '2026-09-02'
+category: '게임 개발/Game Development in JS TS - The Complete Guide (w_'
+tags: ['게임 개발', 'Game Development in JS TS - The Complete Guide (w_']
+draft: false
+summary: ''
+---
+
+# { 레이캐스팅(raycasting)의 최적화 }
+
+```jsx
+강의에서 다룬 내용은 레이캐스팅(raycasting)의 최적화에 대한 것입니다.
+
+레이캐스팅은 게임에서 적이 플랫폼을 감지하는 방식이지만,
+
+너무 자주 실행되면 성능 문제가 발생할 수 있습니다.
+
+따라서 적이 일정 거리(예: 2~5픽셀) 이상 이동했을 때만 레이캐스팅을 실행하도록 변경하는 방식으로 성능을 최적화하는 것이 목표입니다.
+```
+
+## 레이캐스팅이란? (기본 개념)
+
+```jsx
+게임에서 적이 바닥을 감지하거나 장애물을 인식하는 방식 중 하나입니다.
+
+적이 바닥을 밟고 있는지, 앞에 장애물이 있는지를 확인하기 위해
+
+"눈에 보이지 않는 선(레이, Ray)" 을 쏴서 체크하는 방식입니다.
+
+📌 예시
+
+		사람이 앞을 보면서 길을 찾는 것처럼, 적도 "레이" 를 쏴서 바닥이 있는지 확인
+
+		만약 바닥이 끊기면 "떨어지지 않게" 방향을 바꾸거나 점프
+
+🛠 레이캐스팅을 사용하면 적 AI가 자동으로 길을 탐색 할 수 있습니다.
+
+하지만 프레임마다(초당 60번) 실행되면 컴퓨터 성능에 부담이 될 수 있습니다.
+
+이를 최적화하는 것이 이번 강의의 핵심입니다!
+```
+
+## 기존 코드의 문제점
+
+```jsx
+현재 적은 매 프레임(1초에 60번) 레이캐스팅을 실행합니다.
+
+하지만 생각해보세요.
+
+"적이 아예 움직이지 않았는데도 레이캐스팅을 계속해야 할까요?"
+
+🚨 문제 발생 🚨
+
+		1. 적이 멈춰 있어도 계속 레이캐스팅을 실행 → 불필요한 연산 낭비
+
+		2. 적이 아주 조금씩 움직여도 계속 실행됨 → 너무 많은 연산 발생
+
+		3. 여러 개의 적이 존재하면 → 프레임 속도가 느려짐 (성능 저하)
+
+💡 해결책 → "적이 어느 정도(예: 5픽셀) 이동했을 때만" 레이캐스팅을 실행하도록 최적화
+
+```
+
+## 해결 방법: 일정 거리 이동 후에만 레이캐스팅 실행
+
+```jsx
+새로운 동작 방식
+
+		적의 이전 위치(prev.x)와 현재 위치(x)를 비교
+
+		만약 적이 5픽셀 이상 이동했다면 → 새로운 레이캐스팅 실행
+
+		5픽셀 미만으로 움직였다면?
+
+→ 이전 레이캐스팅 결과를 그대로 사용 (불필요한 연산 방지!)
+```
+
+## 개선된 코드 설명 (한 줄씩 분석)
+
+### 기존 `raycast` 함수에서 최적화된 코드
+
+```jsx
+raycast(body, layer, raylength = 30, precision = 0) {
+```
+
+```jsx
+body: 적의 위치와 크기 정보를 담고 있음
+
+layer: 충돌 감지를 할 타일 레이어 (즉, 플랫폼)
+
+raylength: 레이의 길이 (기본값: 30픽셀)
+
+precision: 최소 이동 거리 (예: 5픽셀 → 5픽셀 이상 이동해야 실행)
+```
+
+### 적의 이동 거리 계산
+
+```jsx
+this.bodyPositionDifferenceX += body.x - body.prev.x
+```
+
+```jsx
+body.x - body.prev.x → 현재 위치와 이전 위치의 차이(= 이동 거리)를 저장
+
+this.bodyPositionDifferenceX → 총 이동 거리 누적
+
+(이 변수가 5픽셀 이상이 되면 새로운 레이캐스팅 실행)
+```
+
+### 일정 거리(precision) 이하로 움직이면 이전 값 재사용
+
+```jsx
+if (Math.abs(this.bodyPositionDifferenceX) <= precision && this.prevHasHit !== null) {
+  return {
+    ray: this.prevRay, // 이전 레이 값 그대로 반환
+    hasHit: this.prevHasHit, // 이전 충돌 결과 그대로 반환
+  }
+}
+```
+
+```jsx
+
+이 코드는 적이 일정 거리(예: 5픽셀) 이하로 이동했을 때, 불필요한 연산을 하지 않고 이전 결과를 재사용하는 역할을 합니다.
+
+✅ 적이 너무 조금(precision 이하) 움직였다면 → 불필요한 연산을 하지 않음
+✅ 이전 프레임에서 이미 계산된 값이 있다면 → 그대로 사용 (최적화)
+✅ 불필요한 레이캐스팅 실행을 줄여 성능 향상!
+
+Math.abs(this.bodyPositionDifferenceX) <= precision
+
+📌 Math.abs()란?
+
+		Math.abs(숫자)는 **절댓값(absolute value)**을 반환하는 함수입니다.
+
+		즉, 음수를 양수로 변환해 줍니다.
+
+📌 this.bodyPositionDifferenceX란?
+
+		이 변수는 적의 이동 거리(현재 위치 - 이전 위치) 를 의미합니다.
+
+		만약 적이 왼쪽으로 이동하면 이동 거리가 음수(-) 가 될 수도 있기 때문에,
+
+		절댓값을 사용하여 항상 양수로 변환합니다.
+
+📌 <= precision
+
+		precision은 레이캐스팅을 실행할 최소 이동 거리 입니다.
+
+		예를 들어 precision = 5이면, 적이 5픽셀 이상 이동했을 때만 새로운 레이캐스팅 실행!
+
+		Math.abs(this.bodyPositionDifferenceX) <= precision
+
+		→ 적이 너무 조금 움직였으면(5픽셀 이하라면) 연산을 건너뜀
+
+
+
+this.prevHasHit !== null
+
+📌 this.prevHasHit란?
+
+		이 변수는 이전 프레임에서 적이 플랫폼과 충돌했는지 여부를 저장하는 변수입니다.
+
+		즉, 이전 프레임의 레이캐스팅 결과입니다.
+
+📌 !== null이 의미하는 것?
+
+		null이면 → 아직 이전 결과가 없음 (즉, 첫 번째 실행임)
+
+		null이 아니면 → 이전 프레임에서 이미 계산된 값이 있음
+
+✅ 이전 값이 있다면 그대로 사용 (새로운 연산을 하지 않음)
+
+✅ 이전 값이 없으면 새로운 레이캐스팅을 실행해야 함
+```
+
+### 새로운 레이 생성 및 충돌 체크
+
+```jsx
+const line = new Phaser.Geom.Line()
+let hasHit = false
+
+line.x1 = body.x + body.width
+line.y1 = body.y + body.halfHeight
+line.x2 = line.x1 + raylength
+line.y2 = line.y1 + raylength
+```
+
+```jsx
+새로운 "보이지 않는 선(레이)" 을 생성
+
+line.x1, line.y1: 적의 오른쪽에서 시작
+
+line.x2, line.y2: 오른쪽으로 raylength(30픽셀) 만큼 쏘기
+```
+
+### 충돌 감지 및 결과 저장
+
+```jsx
+const hits = layer.getTilesWithinShape(line)
+if (hits.length > 0) {
+  hasHit = this.prevHasHit = hits.some((hit) => hit.index !== -1)
+}
+```
+
+```jsx
+layer.getTilesWithinShape(line) → 레이가 닿은 플랫폼 타일 확인
+
+만약 타일이 존재하면 hasHit = true 저장
+
+이 한 줄의 코드는 충돌 감지 결과를 저장하고, 이전 결과도 업데이트 하는 역할을 합니다.
+
+한줄 설명
+
+		✅ layer.getTilesWithinShape(line) → 레이가 플랫폼 타일과 닿았는지 확인
+
+		✅ hits.length > 0 → 충돌이 감지되었는지 확인
+
+		✅ hits.some(hit => hit.index !== -1) → 실제 타일이 존재하는지 확인
+
+		✅ this.prevHasHit = hasHit → 이전 충돌 결과를 저장하여 최적화
+
+hits.some(hit => hit.index !== -1);
+
+📌 some()이란?
+
+		배열 안에 특정 조건을 만족하는 요소가 하나라도 있으면 true, 없으면 false를 반환하는 함수
+
+📌 쉽게 말해서
+
+		배열 안에 조건을 만족하는 값이 있으면 true!
+
+		없으면 false!
+
+📌 hits.some(hit => hit.index !== -1)
+
+		hit.index !== -1 → 타일이 실제로 존재하는지 체크
+
+		some() → 배열 hits 안에 index !== -1인 요소가 하나라도 있으면 true
+
+✅ index === -1 → 빈 공간 (공중)
+
+✅ index !== -1 → 실제 타일 (플랫폼)
+
+📌 이 코드가 한 줄로 합쳐진 이유
+
+		hasHit = this.prevHasHit = hits.some(hit => hit.index !== -1);
+
+		위 코드는 사실 아래 코드와 동일합니다:
+
+		const result = hits.some(hit => hit.index !== -1);
+		this.prevHasHit = result;
+		hasHit = result;
+
+		hasHit 변수에도 값 저장
+
+		this.prevHasHit에도 값 저장
+
+		한 번의 연산으로 두 개의 변수를 업데이트 → 코드 간결화 & 최적화
+```
+
+```jsx
+이전 값 저장하여 다음 프레임에서 재사용 가능!
+```
+
+```jsx
+this.prevRay = line
+this.bodyPositionDifferenceX = 0
+```
+
+```jsx
+this.prevRay = line; → 이전 레이 저장 (다음 프레임에서 재사용) ( line은 단순한 선이 아니라, 적이 앞을 감지하는 보이지 않는 레이(Ray) )
+
+this.bodyPositionDifferenceX = 0; → 이동 거리 초기화
+
+게임이 실행되는 동안 "엄청 빠르게" 계속 레이를 쏘고 있습니다.
+
+하지만, 최적화를 하지 않으면 초당 60번(프레임마다) 레이를 쏘게 되어 성능이 나빠질 수 있습니다!
+
+✅ 이전 프레임에서 레이를 쏜 위치와 결과를 기억하고 있다가,
+✅ 적이 너무 조금 움직였으면(5픽셀 이하), 새로운 레이를 쏘지 않고 기존 레이 데이터를 재사용!
+```
+
+## 최적화된 `update` 함수 (적 AI 움직임)
+
+```jsx
+update(time, delta) {
+    this.setVelocityX(30); // 적이 오른쪽으로 이동
+
+    // 레이캐스팅 실행 (이제 불필요한 실행을 줄임)
+    const { ray, hasHit } = this.raycast(this.body, this.platformCollidersLayer, 30, 5);
+
+    if (hasHit) {
+        console.log("플랫폼 충돌 감지!");
+    }
+
+    // 디버깅을 위해 레이 시각화
+    this.rayGraphics.clear();
+    this.rayGraphics.strokeLineShape(ray);
+}
+```
+
+```jsx
+✅ 적이 움직이면 오른쪽(30픽셀/s)으로 이동
+✅ 5픽셀 이상 이동하면 레이캐스팅 실행
+✅ 그림을 그려 디버깅 가능
+```
+
+# { 레이캐스팅(Raycasting) 방향 전환 구현 }
+
+```jsx
+적의 움직임을 개선하는 것이 목표입니다.
+
+적이 플랫폼의 끝에 도달하면 방향을 바꿔 반대쪽으로 이동하도록 만들 것입니다.
+
+이를 위해 레이캐스팅(Raycasting) 을 사용하여 적의 앞에 플랫폼이 있는지 감지하고, 없으면 방향을 전환합니다.
+```
+
+## 적이 플랫폼 끝에 도달하면 방향 전환
+
+```jsx
+update() 함수에서 raycast()를 호출하여 플랫폼의 끝을 감지합니다.
+```
+
+```jsx
+const { ray, hasHit } = this.raycast(this.body, this.platformCollidersLayer, 50, 10)
+```
+
+```jsx
+hasHit === true 👉 적의 앞에 플랫폼이 있다면 계속 이동
+
+hasHit === false 👉 적의 앞에 플랫폼이 없다면 방향 전환
+```
+
+```jsx
+if (!hasHit) {
+  this.setFlipX(!this.flipX) // 스프라이트 방향 반전
+  this.setVelocityX((this.speed = -this.speed)) // 반대 방향으로 이동
+}
+```
+
+```jsx
+this.setFlipX(!this.flipX)
+
+		적의 이미지를 좌우 반전하여 방향을 바꿈
+
+this.setVelocityX(this.speed = -this.speed)
+
+		speed 값을 반대로 변경하여 반대 방향으로 이동
+```
+
+## 레이를 적이 이동하는 방향으로 생성
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380511/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_7_Raycasting_-_2_-/image.png)
+
+```jsx
+// 적의 바라보는 방향(body.facing)에 따라 레이캐스트(raycast)를 수행하는 코드
+switch (body.facing) {
+  // 적이 오른쪽을 바라볼 때 (FACING_RIGHT)
+  case Phaser.Physics.Arcade.FACING_RIGHT: {
+    // 레이의 시작점 (x1, y1) 설정
+    line.x1 = x + width // x 좌표: 적의 오른쪽 끝
+    line.y1 = y + halfHeight // y 좌표: 적의 중앙 높이
+
+    // 레이의 끝점 (x2, y2) 설정
+    line.x2 = line.x1 + raylength // x2는 x1에서 오른쪽으로 raylength만큼 이동
+    line.y2 = line.y1 + raylength // y2는 y1에서 아래쪽으로 raylength만큼 이동
+
+    break // switch 문 종료
+  }
+
+  // 적이 왼쪽을 바라볼 때 (FACING_LEFT)
+  case Phaser.Physics.Arcade.FACING_LEFT: {
+    // 레이의 시작점 (x1, y1) 설정
+    line.x1 = x // x 좌표: 적의 왼쪽 끝
+    line.y1 = y + halfHeight // y 좌표: 적의 중앙 높이
+
+    // 레이의 끝점 (x2, y2) 설정
+    line.x2 = line.x1 - raylength // x2는 x1에서 왼쪽으로 raylength만큼 이동
+    line.y2 = line.y1 + raylength // y2는 y1에서 아래쪽으로 raylength만큼 이동
+
+    break // switch 문 종료
+  }
+}
+```
+
+```jsx
+적이 오른쪽을 보고 있다면 오른쪽으로 레이를 쏘고
+
+적이 왼쪽을 보고 있다면 왼쪽으로 레이를 쏩니다.
+```
+
+### `body.facing`이란?
+
+```jsx
+body.facing은 Phaser의 Arcade 물리 엔진에서
+
+현재 객체(여기서는 적 캐릭터)가 바라보고 있는 방향을 나타내는 속성입니다.
+
+Phaser에서는 이 속성을 이용해 객체가 왼쪽을 보고 있는지, 오른쪽을 보고 있는지 알 수 있습니다
+
+body.facing의 값
+
+Phaser에서는 body.facing이 다음과 같은 값들을 가질 수 있습니다.
+
+하지만 여기서는 적 캐릭터가 좌우로만 움직이므로 FACING_RIGHT(오른쪽)과 FACING_LEFT(왼쪽) 두 값만 사용합니다.
+```
+
+```jsx
+Phaser.Physics.Arcade.FACING_RIGHT // 1 (오른쪽)
+Phaser.Physics.Arcade.FACING_LEFT // -1 (왼쪽)
+Phaser.Physics.Arcade.FACING_UP // 2 (위쪽)
+Phaser.Physics.Arcade.FACING_DOWN // 3 (아래쪽)
+```
+
+## 무한 전환 버그 문제
+
+```jsx
+적 캐릭터가 끝에 도달하면 무한으로 방향을 전환하며 진동하는 버그가 발생했다.\
+
+코드에서 아래와 같이 this.prevHasHit = null을 설정해야 정상 동작
+```
+
+```jsx
+if (hits.length > 0) {
+  hasHit = this.prevHasHit = hits.some((hit) => hit.index !== -1)
+  this.prevHasHit = null
+}
+```
+
+### 1) 문제 발생 원인
+
+```jsx
+레이캐스팅 최적화를 위해 두 프레임마다(2픽셀 이동마다) 한 번씩 검사하도록 변경했습니다.
+
+그러나 this.prevHasHit 값을 저장하는 과정에서 버그가 발생할 수 있습니다.
+
+prevHasHit 값이 이전 프레임의 충돌 결과를 그대로 유지하다 보니,
+
+적이 방향을 바꿔도 여전히 이전 방향의 충돌 상태를 참조하는 문제 발생
+
+결과적으로 적이 계속 왔다 갔다 하는 무한 루프가 발생할 가능성이 있습니다.
+```
+
+### 2) 해결 방법
+
+```jsx
+this.prevHasHit = null을 추가하면 어떤 효과가 있는가?
+
+방향 전환 후 prevHasHit 값을 초기화하여
+
+새로운 방향에서 올바르게 레이캐스팅을 수행할 수 있도록 만듭니다.
+
+즉, 이전 프레임의 충돌 상태를 강제로 리셋하여 적이 방향을 바꾼 후 올바르게 레이를 쏘게 합니다.
+```
+
+# { 방향 전환 버그 수정 }
+
+```jsx
+문제점
+
+		적 캐릭터가 방향을 너무 빠르게 전환하면서 버그가 발생함.
+
+		같은 위치에서 왼쪽, 오른쪽을 반복해서 변경하는 문제가 있음.
+
+해결 방법
+
+		**시간 임계값(Threshold)**을 도입하여 일정 시간 동안 방향 전환을 막음.
+
+		timeFromLastTurn 변수를 추가하여 마지막 방향 전환 시간을 저장.
+
+		방향을 전환할 때, 현재 시간이 마지막 전환 시간 + 100ms 보다 클 때만 전환하도록 조건 추가.
+```
+
+```jsx
+수정된 로직 요약
+
+timeFromLastTurn 변수 추가
+
+		기본값 0으로 설정.
+
+update 함수에서 방향 전환 조건 수정
+
+		충돌 감지(hasHit)가 없을 때만 방향을 바꿈.
+
+		마지막 전환 시간 + 100ms < 현재 시간일 때만 방향을 전환.
+```
+
+## 수정된 `Enemy.js` 코드
+
+```jsx
+import Phaser from 'phaser'
+import collidable from '../mixins/collidable'
+
+class Enemy extends Phaser.Physics.Arcade.Sprite {
+  constructor(scene, x, y, key) {
+    super(scene, x, y, key)
+
+    scene.add.existing(this)
+    scene.physics.add.existing(this)
+
+    Object.assign(this, collidable)
+
+    this.init()
+    this.initEvents()
+  }
+
+  init() {
+    this.gravity = 800
+    this.speed = 50
+    this.timeFromLastTurn = 0 // 마지막 방향 전환 시간 변수 추가
+    this.body.setGravityY(500)
+    this.setCollideWorldBounds(true)
+    this.setOrigin(0.5, 1)
+    this.setImmovable(true)
+    this.setSize(20, 45)
+    this.setOffset(7, 20)
+    this.setVelocityX(this.speed)
+    this.platformCollidersLayer = null
+
+    this.rayGraphics = this.scene.add.graphics({
+      lineStyle: { width: 2, color: 0xaa00aa },
+    })
+  }
+
+  initEvents() {
+    this.scene.events.on(Phaser.Scenes.Events.UPDATE, this.update, this)
+  }
+
+  update(time, delta) {
+    const { ray, hasHit } = this.raycast(this.body, this.platformCollidersLayer, 50, 10)
+
+    // 방향 전환 조건: 충돌 감지X + (마지막 전환 시간 + 100ms < 현재 시간)
+    if (!hasHit && this.timeFromLastTurn + 100 < time) {
+      this.setFlipX(!this.flipX)
+      this.setVelocityX((this.speed = -this.speed))
+      this.timeFromLastTurn = time // 현재 시간 저장
+      console.log('방향 전환')
+    }
+
+    this.rayGraphics.clear()
+    this.rayGraphics.strokeLineShape(ray)
+  }
+
+  setPlatformColliders(platformCollidersLayer) {
+    this.platformCollidersLayer = platformCollidersLayer
+  }
+}
+
+export default Enemy
+```
+
+# { 최대 순찰 거리(Max Patrol Distance) 추가 }
+
+```jsx
+이번 강의에서는 최대 순찰 거리(Max Patrol Distance)
+
+개념을 추가하여 적이 일정 거리를 이동하면 방향을 전환하도록 구현했습니다.
+```
+
+```jsx
+1. 두 개의 새로운 멤버 변수 추가
+
+		maxPatrolDistance: 적이 순찰할 수 있는 최대 거리 (예: 100px, 200px 등)
+
+		currentPatrolDistance: 현재까지 이동한 거리
+
+2. 현재 이동 거리 계산
+
+		매 프레임마다 currentPatrolDistance를 증가
+
+		Math.abs(this.body.deltaX())를 사용하여 이동한 거리의 절댓값을 추가 (왼쪽 이동 시 음수가 되므로 절댓값 사용)
+
+3. 방향 전환 조건 변경
+
+		기존: 플랫폼 끝을 감지(hasHit)하면 방향 전환
+
+		변경:
+
+				플랫폼 끝을 감지했을 때
+
+				현재 이동 거리가 maxPatrolDistance 이상일 때
+
+				위 두 조건 중 하나라도 충족하면 방향 전환
+
+4. 방향 전환 시 처리
+
+		this.setFlipX(!this.flipX);를 호출하여 방향 반전
+
+		this.setVelocityX(this.speed = -this.speed);로 이동 방향 변경
+
+		currentPatrolDistance = 0;으로 초기화하여 다시 거리 측정 시작
+
+5. 테스트 및 조정
+
+		maxPatrolDistance = 100일 때 → 100px 이동 후 방향 전환
+
+		maxPatrolDistance = 200으로 변경 → 200px 이동 후 방향 전환
+```
+
+# { 순찰 기능 분리 간단한 리팩토링 }
+
+```jsx
+update 메서드에서 순찰 기능을 별도 patrol 함수로 분리.
+
+patrol 함수는 time을 매개변수로 받음.
+
+delta는 현재 필요하지 않으므로 제거.
+```
+
+## 안전성 체크 추가
+
+```jsx
+적(Enemy)이 공중에 떠 있거나, 플랫폼을 벗어났을 경우 오류를 방지하기 위한 조건 추가:
+
+적이 제거되었거나 바닥에 없을 경우, patrol 함수가 실행되지 않도록 설정.
+```
+
+```jsx
+if (!this.body || !this.body.onFloor()) {
+  return
+}
+```
+
+## 코드
+
+```jsx
+ 		update(time, delta) {
+        this.patrol(time);
+    }
+
+    patrol(time) {
+        if(!this.body || !this.body.onFloor()) {
+            return
+        }
+        this.currentPatrolDistance += Math.abs(this.body.deltaX());
+        const { ray, hasHit } = this.raycast(this.body, this.platformCollidersLayer, 50, 10);
+        console.log("hasHit", hasHit)
+        if ((!hasHit || this.currentPatrolDistance >= this.maxPatrolDistance) && this.timeFromLastTrun + 100 < time) {
+            this.setFlipX(!this.flipX);
+            this.setVelocityX(this.speed = -this.speed)
+            this.timeFromLastTrun = time
+            this.currentPatrolDistance = 0;
+            console.log("방향 전환")
+        }
+        this.rayGraphics.clear();
+        this.rayGraphics.strokeLineShape(ray);
+    }
+```
+
+# { 레이캐스트의 기울기(Steepness) 조절 }
+
+## 현재 레이캐스트의 문제점
+
+```jsx
+현재 레이캐스트(Raycast) 선의 각도는 고정되어 있음.
+
+더 가파른(steep) 레이를 만들고 싶다면 X축 이동 거리를 줄이고 Y축 이동 거리는 유지해야 함.
+```
+
+## 기울기 조절 방법
+
+```jsx
+steepness 값을 추가하여 X축의 길이를 조절하면 레이의 각도가 변함.
+
+steepness 값이 1이면 기존과 동일, 0.5면 더 가파르게, 0.1이면 매우 가파르게 설정됨.
+```
+
+## 기울기(steepness) 값 추가
+
+```jsx
+steepness(기본값 1)를 매개변수로 추가하여 동적으로 조절 가능하게 만듦.
+```
+
+```jsx
+raycast(body, layer, { raylength = 30, precision = 0, steepnes = 1 })
+```
+
+## X축과 Y축 값 조정
+
+```jsx
+X 방향의 이동 거리를 raylength * steepnes로 변경해 기울기를 조절함.
+
+steepness 값이 작을수록 더 가파른 각도가 됨.
+```
+
+```jsx
+switch (body.facing) {
+  case Phaser.Physics.Arcade.FACING_RIGHT: {
+    line.x1 = x + width
+    line.y1 = y + halfHeight
+    line.x2 = line.x1 + raylength * steepnes // X축 이동 거리 조절
+    line.y2 = line.y1 + raylength // Y축 이동 거리 유지
+    break
+  }
+  case Phaser.Physics.Arcade.FACING_LEFT: {
+    line.x1 = x
+    line.y1 = y + halfHeight
+    line.x2 = line.x1 - raylength * steepnes // X축 이동 거리 조절
+    line.y2 = line.y1 + raylength // Y축 이동 거리 유지
+    break
+  }
+}
+```
+
+## 결론
+
+```jsx
+steepness 값만 변경하여 레이캐스트의 기울기를 조절할 수 있음.
+
+steepness = 1
+
+		기존과 동일한 레이캐스트 각도.
+
+steepness = 0.5
+
+		레이캐스트가 더 가파르게 생성됨.
+
+steepness = 0.1
+
+		매우 가파른 각도로 변경됨.
+
+```

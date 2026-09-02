@@ -1,0 +1,418 @@
+---
+title: 'ROLLUP 고급 사용법 GROUPING 함수'
+date: '2026-09-02'
+category: '백엔드/Database'
+tags: ['백엔드', 'Database']
+draft: false
+summary: ''
+---
+
+[[Oracle] ROLLUP 고급 사용법 GROUPING 함수 :: 마이자몽](https://myjamong.tistory.com/191)
+
+```sql
+ORACLE SCOTT 계정의 EMP 테이블을 사용해서  실습을 진행
+```
+
+# **GROUP BY**
+
+```sql
+SELECT
+    DEPTNO
+    ,JOB
+    ,SUM(SAL)
+FROM EMP
+GROUP BY DEPTNO, JOB;
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380955/notion-blog/_/Database/SQL_/_/ROLLUP_GROUPING_/Untitled.png)
+
+```sql
+일반적으로 사용하는 GROUP BY 문입니다. SUM 함수를 이용해서 각 부서별, 직업별 급여의 합을 구했습니다.
+```
+
+# **ROLLUP**
+
+```sql
+SELECT
+    DEPTNO
+    ,JOB
+    ,SUM(SAL)
+FROM EMP
+GROUP BY ROLLUP(DEPTNO, JOB);
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380953/notion-blog/_/Database/SQL_/_/ROLLUP_GROUPING_/Untitled_1.png)
+
+```sql
+위의 GROUP BY절에 ROLLUP을 추가했습니다. 결과를  부서별, 직업별 뿐만아니라 전체 급여의 합과 부서별 급여의 합을 함께 출력합니다.
+```
+
+```sql
+그런데 여기서 의문이 드는게 있습니다. 전체 급여로도 합을 계산해주고 부서별로도 합을 구해주는건 좋은데... 전체 급여의 합만 보여주던가,
+
+부서별로 합만 보여주던가 둘 중 하나만 추가하고 싶은데... 그게 가능할까요?
+```
+
+## **전체 급여 합만 출력**
+
+```sql
+SELECT
+    DEPTNO
+    ,JOB
+    ,SUM(SAL)
+FROM EMP
+GROUP BY ROLLUP((DEPTNO, JOB));     -- 괄호를 사용
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380953/notion-blog/_/Database/SQL_/_/ROLLUP_GROUPING_/Untitled_2.png)
+
+## **부서별 급여 합만 출력**
+
+```sql
+SELECT
+    DEPTNO
+    ,JOB
+    ,SUM(SAL)
+FROM EMP
+GROUP BY DEPTNO, ROLLUP(JOB);
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380954/notion-blog/_/Database/SQL_/_/ROLLUP_GROUPING_/Untitled_3.png)
+
+# **ROLLUP의 원리**
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380954/notion-blog/_/Database/SQL_/_/ROLLUP_GROUPING_/Untitled_4.png)
+
+```sql
+위 이미지가 ROLLUP의 원리를 전부 설명해줍니다.
+
+각 번호는 해당 칼럼으로 GROUP BY를 한 결과를 준다는 뜻입니다.
+
+첫번째 GROUP BY절 같은 경우는 총 4개의 GROUP을 만든다는 뜻 입니다. ROLLUP은 아래와 같은 원리로 실행됩니다.
+```
+
+```sql
+1. ROLLUP의 인자로 들어온 칼럼을 오른쪽부터 하나씩 빼면서 GROUP을 만듭니다.
+
+2. "()"의 의미는 GROUP이 없는 즉, 전체에 대한 결과를 출력한다는 뜻 입니다. EX(SUM 함수 사용하면 전체 SUM 구한다는 뜻)
+
+3. 괄호로 묶여져 있는 컬럼은 하나로 본다는 뜻 입니다.
+
+4. ROLLUP 이전에 일반 컬럼과 GROUP BY 한다면, 일반 컬럼은 끝까지 남습니다.
+```
+
+## **GROUP BY ROLLUP(A, B, C) 예시**
+
+```sql
+SELECT
+    DEPTNO
+    ,JOB
+    ,ENAME
+    ,SUM(SAL)
+FROM EMP
+GROUP BY ROLLUP(DEPTNO,JOB,ENAME);
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380954/notion-blog/_/Database/SQL_/_/ROLLUP_GROUPING_/Untitled_5.png)
+
+```sql
+1. DEPTINO 가 10 이면서 JOB 이 CLERK 이고 이름이 MILLER 인 그룹의 총 급여 (빨강)
+
+2. DEPINO 가 10 이면서 JOB 이 CLERK 인 그룹 총 급여 (노랑)
+
+.....
+
+3. DEPINO 가 10 인 그룹의 총 급여 (파랑)
+
+4. 최종 총 급여(그룹없음) (초록)
+
+* 아래 DEPINO 30 을 보면 JOB SALESMAN 이면서 이름이 XXX 인 그룹의 급여를 구하고
+
+  DEPINO 가 30 이면서 JOB 이 SALESMAN 인 사람들의 총 급여를 구한다
+
+  이후 마지막으로 DEPINO 가 30 인 그룹의 총 급여를 구한다
+```
+
+## **GROUP BY ROLLUP(A, (B, C)) 예시**
+
+```sql
+SELECT
+    DEPTNO
+    ,JOB
+    ,ENAME
+    ,SUM(SAL)
+FROM EMP
+GROUP BY ROLLUP(DEPTNO,(JOB,ENAME));
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380954/notion-blog/_/Database/SQL_/_/ROLLUP_GROUPING_/Untitled_6.png)
+
+```sql
+위와 다른점은 DEPTNO 가 30 이고 JOB 이 SALESMAN 이면서 이름이 XXX 인 그룹의 총 급여를 구하는것은 똑같다 그러나 오른쪽 부터 하나씩 그룹이 빠져나가는데
+
+그럼 DEPTNO + JOB 이 아니라 (JOB + ENAME) 이 묶여있기 때문에 한번에 빠져
+
+DEPTNO 10 인 그룹의 총 급여를 찾는다
+
+요약하면 중간 과정이 하나 사라졌다
+```
+
+## **GROUP BY A, ROLLUP((B, C)) 예시**
+
+```sql
+SELECT
+    DEPTNO
+    ,JOB
+    ,ENAME
+    ,SUM(SAL)
+FROM EMP
+GROUP BY DEPTNO,ROLLUP((JOB,ENAME));
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380954/notion-blog/_/Database/SQL_/_/ROLLUP_GROUPING_/Untitled_7.png)
+
+```sql
+규칙의
+
+"ROLLUP 이전에 일반 컬럼과 GROUP BY 한다면, 일반 컬럼은 끝까지 남습니다." 의 예시이다
+
+DEPTNO 가 30 인 그룹까지만 구하고 총합은 구하지 않는다.
+
+```
+
+# **GROUPING 사용하기**
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380955/notion-blog/_/Database/SQL_/_/ROLLUP_GROUPING_/Untitled_8.png)
+
+```sql
+여태까지는 기본적으로 ROLLUP이 어떤 원리로 실행되는지 알아봤습니다. 그럼 위에 예제 처럼 결과를 출력할 수 있을까요?
+
+일단, 결과를 보니, 한 칼럼에서 컬럼 이외의 값이 나오기도하고, 급여 컬럼에서는 평균값과 합계값이 같이 나오는 것을 볼 수 있습니다.
+
+어떻게 결과를 이렇게 출력할 수 있을까요? 우선 GROUPING, GROUPING_ID 그리고 숫자 GROUP 추가에 대한 내용을 알아야합니다.
+```
+
+## **GROUPING**
+
+```sql
+SELECT
+    DEPTNO
+    ,GROUPING(DEPTNO) AS DG
+    ,JOB
+    ,GROUPING(JOB) AS JG
+    ,SUM(SAL)
+FROM EMP
+GROUP BY ROLLUP(DEPTNO, JOB);
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380955/notion-blog/_/Database/SQL_/_/ROLLUP_GROUPING_/Untitled_9.png)
+
+```sql
+GROUPING 함수는 ROLLUP이랑 같이 사용합니다. 해당 칼럼이 ROLLUP 되었을 때 그룹에서 빠져있다면 1을 반환합니다. 즉, GROUP BY ROLLUP 결과로 NULL이 나왔을 때 1을 반환합나다.
+```
+
+## **GROUPING_ID**
+
+```sql
+SELECT
+    DEPTNO
+    ,JOB
+    ,GROUPING(DEPTNO) AS DG
+    ,GROUPING(JOB) AS JG
+    ,GROUPING_ID(DEPTNO, JOB) GI
+    ,SUM(SAL)
+FROM EMP
+GROUP BY ROLLUP(DEPTNO, JOB);
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380953/notion-blog/_/Database/SQL_/_/ROLLUP_GROUPING_/Untitled_10.png)
+
+```sql
+GROUPING_ID 함수는 인자로 들어온 각각 칼럼의 GROUPING 함수 값을 2진수로 합쳐 해당 2진수 값을 10진수로 변환한 값을 반환해줍니다.
+
+쉽게 설명하면
+
+JOB 이 NULL 이고 DG의 값이 존재하고 JG 의 값이 NULL 이면 101 이라는 2진수 값이 반환되며 2진수 값을 계산하여 나온 10진수(5) 일때 어떤값을 거기에 넣어주는 식으로 사용한다
+```
+
+## **숫자 GROUP(결과 한번 더 출력하기)**
+
+```sql
+SELECT
+    DEPTNO
+    ,JOB
+    ,SUM(SAL)
+FROM EMP
+GROUP BY ROLLUP(1,DEPTNO, JOB);
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380953/notion-blog/_/Database/SQL_/_/ROLLUP_GROUPING_/Untitled_11.png)
+
+```sql
+숫자가 들어간 ROLLUP은 뭘까요? 결과를 보니 마지막 2개의 줄이 같은 값이 나왔습니다.
+
+헷갈릴 수 있지만 ROLLUP의 원리를 생각해보면 별 다를것 없습니다. JOB과 DEPTNO가 ROLLUP에서 빠지고 1만 남았을때 SUM(SAL)을 구하려고 합니다.
+
+상수에 대한 GROUP은 없습니다. 즉, 전체 행에 대한 결과를 출력하라는 의미와 같습니다.
+```
+
+## **GROUPING, GROUPING_ID, 숫자 GROUP 종합**
+
+```sql
+SELECT
+    DEPTNO
+    ,JOB
+    ,GROUPING(1) AS "1"
+    ,GROUPING(DEPTNO) AS "D"
+    ,GROUPING(2) AS "2"
+    ,GROUPING(JOB) AS "J"
+    ,GROUPING_ID(1, DEPTNO, 2, JOB) AS ID
+    ,SUM(SAL)
+FROM EMP
+GROUP BY ROLLUP(1,DEPTNO, 2, JOB);
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380953/notion-blog/_/Database/SQL_/_/ROLLUP_GROUPING_/Untitled_12.png)
+
+```sql
+GROUPING, GROUPING_ID, 숫자 GROUP 모두 같이 사용했습니다.
+
+한 테이블에 놓고 보니까 이해가 가시나요? 숫자가 ROLLUP에 온다고 해도 ROLLUP의 원리를 안다면 큰 차이가 없습니다.
+
+그냥 남아있는 칼럼들로 GROUP BY한 결과를 출력해주고 원리대로 진행합니다.
+
+설명하자면
+
+DEPTNO -> JOB 을 구하다가 JOB 이 먼저 빠져나간다
+
+이후
+
+DEPTNO 를 2 해서 2번 실행
+
+최종적으로 DEPTNO 까지 빠지고 최종 총합을 출력하는데 1이 있으니 총합을 출력해야 하기 때문에 총합을 2번 출력하게 된다.
+```
+
+# **최종 풀이**
+
+```sql
+SELECT
+    DECODE(
+        GROUPING_ID(1, DEPTNO, 2, JOB)
+        ,7, '전체'
+        ,15, '전체'
+        ,DEPTNO
+    ) AS DEPTNO
+    ,DECODE(
+        GROUPING_ID(1, DEPTNO, 2, JOB)
+        ,1, '합계'
+        ,3, '평균'
+        ,7, '합계'
+        ,15, '평균'
+        ,JOB
+    ) AS JOB
+    ,DECODE(
+        GROUPING_ID(1, DEPTNO, 2, JOB)
+        ,3, ROUND(AVG(SAL))
+        ,15, ROUND(AVG(SAL))
+        ,SUM( SAL)
+    ) AS SAL
+FROM EMP
+GROUP BY ROLLUP(1,DEPTNO, 2, JOB);
+```
+
+# 실습 예제
+
+```sql
+SELECT
+    NVL(B.STORE_NM, '--') AS 점포명,
+    NVL(A.MANAGER, '--') AS 점장,
+--    GROUPING(A.SALES_DATE),
+    CASE
+       WHEN GROUPING_ID(B.STORE_NM, A.MANAGER) = 3 THEN '합계'
+       WHEN GROUPING(A.SALES_DATE) = 1 THEN '소계'
+--       WHEN GROUPING(A.SALES_DATE) = 1 THEN '합계'
+       ELSE A.SALES_DATE
+    END "매출월",
+--    NVL(DECODE(B.STORE_NM,'ALL','합계','','소계'),A.SALES_DATE) AS 매출월,
+    CASE
+       WHEN GROUPING(A.SALES_DATE) =1 THEN '--'
+        WHEN SUM(A.SALES) >= 5000000 THEN '상'
+        WHEN SUM(A.SALES) >= 4000000 THEN '중'
+        ELSE '하'
+    END AS "월매출등급",
+      SUM(A.SALES) AS "매출",
+    ROUND(AVG(A.SALES)) AS "평균매출"
+FROM
+    STORE_INFO A
+INNER JOIN MST_STORE B                             -- 테스트 해보니 테이블에 데이터가 다 있어서 이너조인은 없어도 상관없었다.
+ON A.STORE_CD = B.STORE_CD
+WHERE A.SALES_DATE BETWEEN '202101' AND '202107'
+GROUP BY
+    ROLLUP((A.STORE_CD, A.MANAGER, B.STORE_NM), A.SALES_DATE)
+ORDER BY
+    A.STORE_CD, A.SALES_DATE;
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380953/notion-blog/_/Database/SQL_/_/ROLLUP_GROUPING_/Untitled_13.png)
+
+```sql
+아래처럼 출력되게 만들기
+
+신도림점	백종원	202101	중	4784640	4784640
+신도림점	백종원	202102	중	4386242	4386242
+신도림점	백종원	202103	중	4638240	4638240
+신도림점	백종원	202104	하	3476091	3476091
+신도림점	백종원	202105	상	5974587	5974587
+신도림점	백종원	202106	상	5906004	5906004
+신도림점	백종원	202107	중	4552822	4552822
+신도림점	백종원	소계	----	33718626	4816947
+신림점	김수현	202101	중	4746633	4746633
+신림점	김수현	202102	중	4827129	4827129
+신림점	김수현	202103	하	3531988	3531988
+신림점	김수현	202104	중	4305641	4305641
+신림점	김수현	202105	하	3715791	3715791
+신림점	김수현	202106	중	4774198	4774198
+신림점	김수현	202107	하	3241108	3241108
+신림점	김수현	소계	----	29142488	4163213
+강남역	박준수	202101	상	5698201	5698201
+강남역	박준수	202102	중	4870801	4870801
+강남역	박준수	202103	상	5246979	5246979
+강남역	박준수	202104	하	3276431	3276431
+강남역	박준수	202105	상	5424912	5424912
+강남역	박준수	202106	상	5132369	5132369
+강남역	박준수	202107	중	4896750	4896750
+강남역	박준수	소계	----	34546443	4935206
+수원역점	최수영	202101	하	3767655	3767655
+수원역점	최수영	202102	상	5256119	5256119
+수원역점	최수영	202103	상	5999095	5999095
+수원역점	최수영	202104	중	4680581	4680581
+수원역점	최수영	202105	상	5690660	5690660
+수원역점	최수영	202106	하	3452095	3452095
+수원역점	최수영	202107	상	5280667	5280667
+수원역점	최수영	소계	----	34126872	4875267
+서울역점	이정희	202101	상	5130203	5130203
+서울역점	이정희	202102	중	4378729	4378729
+서울역점	이정희	202103	상	5548481	5548481
+서울역점	이정희	202104	중	4117882	4117882
+서울역점	이정희	202105	중	4864900	4864900
+서울역점	이정희	202106	하	3305632	3305632
+서울역점	이정희	202107	중	4414070	4414070
+서울역점	이정희	소계	----	31759897	4537128
+건대역	양동후	202101	상	5038374	5038374
+건대역	양동후	202102	하	3449572	3449572
+건대역	양동후	202103	하	3593262	3593262
+건대역	양동후	202104	중	4916228	4916228
+건대역	양동후	202105	하	3421193	3421193
+건대역	양동후	202106	중	4681704	4681704
+건대역	양동후	202107	하	3892459	3892459
+건대역	양동후	소계	----	28992792	4141827
+홍대역점	장우상	202101	상	5226294	5226294
+홍대역점	장우상	202102	상	5521775	5521775
+홍대역점	장우상	202103	중	4235616	4235616
+홍대역점	장우상	202104	중	4559929	4559929
+홍대역점	장우상	202105	중	4528045	4528045
+홍대역점	장우상	202106	중	4465715	4465715
+홍대역점	장우상	202107	하	3511074	3511074
+홍대역점	장우상	소계	----	32048448	4578350
+----	----	합계	----	224335566	4578277
+```

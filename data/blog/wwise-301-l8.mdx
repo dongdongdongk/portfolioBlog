@@ -1,0 +1,808 @@
+---
+title: 'Wwise 301 L8'
+date: '2026-09-02'
+category: '게임 개발/WWISE'
+tags: ['게임 개발', 'WWISE']
+draft: false
+summary: ''
+---
+
+# { 🎵 두 부분으로 구성된 음악 시스템 }
+
+이번 강의는 **Wwise Adventure Game**에서 사용된 **2-파트(dual-layered) 음악 시스템**의 구조와 동작 원리를 학습합니다.
+
+이 시스템은 흔히 볼 수 없는 형태로, **지역(Region) 음악 시스템**과 **적(Enemy) 음악 시스템**이 동시에 작동하며 서로 동기화되어 있습니다.
+
+---
+
+## 📋 목차
+
+1. [두 부분 음악 시스템 개요](https://www.notion.so/28be683f737e807ba8ebdbbceecf7312#%EB%91%90-%EB%B6%80%EB%B6%84-%EC%9D%8C%EC%95%85-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B0%9C%EC%9A%94)
+2. [지역 음악 테마 구조](https://www.notion.so/28be683f737e807ba8ebdbbceecf7312#%EC%A7%80%EC%97%AD-%EC%9D%8C%EC%95%85-%ED%85%8C%EB%A7%88-%EA%B5%AC%EC%A1%B0)
+3. [적 음악 테마 구조](https://www.notion.so/28be683f737e807ba8ebdbbceecf7312#%EC%A0%81-%EC%9D%8C%EC%95%85-%ED%85%8C%EB%A7%88-%EA%B5%AC%EC%A1%B0)
+4. [음악 시스템 동기화 원리](https://www.notion.so/28be683f737e807ba8ebdbbceecf7312#%EC%9D%8C%EC%95%85-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EB%8F%99%EA%B8%B0%ED%99%94-%EC%9B%90%EB%A6%AC)
+
+---
+
+## 1. 두 부분 음악 시스템 개요
+
+### 🎧 핵심 개념
+
+- Wwise Adventure Game은 **Trigger 지역**(음악이 시작되는 구역)에 들어가면 특정 **환경 사운드**를 게시(Post)하는 식으로 동작합니다.
+- 하지만, 이 게임의 **음악 시스템**은 다른 일반적인 구조보다 한 단계 더 발전된 형태입니다.
+  → 음악이 **두 가지 레이어(부분)**로 구성되어 **동시에 재생**됩니다.
+
+### 🎼 두 개의 음악 시스템 구성
+
+1. **지역 음악 시스템 (Region Music System)**
+
+   → 플레이어가 어떤 지역에 있는지에 따라 음악이 전환됨.
+
+2. **적 음악 시스템 (Enemy Music System)**
+
+   → 근처의 적(enemy) 존재 여부 및 거리(distance)에 따라 음악이 변동됨.
+
+두 시스템이 동시에 동작하며, 서로 다른 역할을 맡습니다:
+
+- 지역 음악은 **배경 분위기(BGM)**를 담당.
+- 적 음악은 **전투 상황의 긴장감**을 담당.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380537/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L8/image.png)
+
+---
+
+## 2. 지역 음악 테마 구조
+
+### 🎶 구조 구성
+
+- 지역 음악은 **6개의 Music Playlist Container**로 구성되어 있습니다.
+  각 컨테이너는 **3~10개의 Music Segment(음악 구간)**을 포함합니다.
+- **7번째 Playlist Container**는 “무음(silence)”으로 설정되어 있어, 소리 없는 공간(예: 특정 이벤트 전)을 연출할 수 있습니다.
+
+### 🗺️ 지역 음악 전환 방식
+
+- 지역 음악은 **State(상태)**를 기반으로 전체 음악을 전환합니다.
+  - 플레이어가 다른 지역으로 이동하면,
+    → **Music Switch Container**가 새로운 Music Playlist Container로 교체됩니다.
+- Music Switch Container는 특정 **State**와 연결되어 있어,
+  → 한 번에 **하나의 지역 테마만 활성화**될 수 있습니다.
+
+### 🌲 Ambient 음악 사용
+
+- 플레이어가 지역 트리거 밖(즉, 특정 지역 내에 있지 않을 때) 이동 중이면
+  → “멜로디가 거의 없는 Ambient 테마”가 자동 재생됩니다.
+  (예: 탐험 구간, 비전투 지역 등)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380534/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L8/image_1.png)
+
+---
+
+## 3. 적 음악 테마 구조
+
+### ⚔️ 개념
+
+- 지역 음악이 플레이어의 위치에 따라 바뀌는 반면,
+  적 음악은 **적의 존재 및 거리 정보**에 따라 실시간으로 변합니다.
+- 즉, “플레이어 주변 환경”이 아닌 “위협 수준”에 따라 반응하는 음악입니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380535/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L8/image_2.png)
+
+### 👾 구성 요소
+
+- 적의 유형별로 각각 **3~4개의 Music Segment**로 이루어진 **Music Playlist Container**가 있습니다.
+- 이 Music Playlist Container는
+  → **Music_Enemies** 라는 메인 컨테이너에 모두 포함되어 있습니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380535/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L8/image_3.png)
+
+### 🎚️ 볼륨 제어 방식
+
+- 각 적 유형에 따라 **별도의 Game Parameter**가 존재하며,
+  해당 Game Parameter는 **적과 플레이어 사이의 거리(distance)**를 기반으로 볼륨을 제어합니다.
+  → 가까울수록 음악이 커지고, 멀어질수록 작아짐.
+
+### ⚙️ 기술적 규칙
+
+- 한 적 유형에 속한 여러 적이 동시에 존재할 수 있지만,
+  **Game Parameter는 가장 가까운 적의 거리 값만 반영**합니다.
+  (즉, 동일 적종 여러 마리를 만나도 하나만 계산됨)
+
+### 🎵 레이어 동작 특징
+
+- 세 종류의 적이 동시에 등장할 가능성은 낮기 때문에,
+  대부분의 상황에서는 **1~2개의 적 테마만 활성화**됩니다.
+- 하지만 **최종 전투(Core 퀘스트)**에서는
+  → 모든 Game Parameter가 최대값으로 설정되어
+  → **모든 적 테마의 볼륨이 최고치**가 됩니다.
+
+### 🧩 음악의 지속 재생
+
+- 지역 음악과 항상 **동기화**되어야 하기 때문에,
+  적 음악은 “현재 들리지 않더라도” **항상 재생 중**입니다.
+  (단, 볼륨이 0일 뿐 멈춘 게 아님)
+
+이 덕분에 음악을 일시정지하거나 재개할 때도
+
+→ 두 테마가 완벽히 타이밍을 유지할 수 있습니다.
+
+---
+
+## 4. 음악 시스템 동기화 원리
+
+### 🎼 동기화의 필요성
+
+- 적 음악과 지역 음악이 동시에 존재하는 구조에서는
+  서로 다른 음악이 박자나 코드(조성)가 다르면 불협화음이 발생할 수 있습니다.
+  → 따라서 두 테마는 **리듬(tempo)**과 **조(key)**가 동일해야 합니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380535/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L8/image_4.png)
+
+### 🎹 설계 방식
+
+- Wwise Adventure Game에서는
+  - 모든 지역 테마와 적 테마가
+    **같은 BPM(빠르기)**, **같은 Key(조성)**로 작곡되었습니다.
+- 이 덕분에 언제 어떤 테마가 겹치더라도
+  자연스럽게 섞여 들립니다.
+
+### 🧠 Wwise 내 구조적 분리
+
+- 복잡한 계층이 되지 않도록,
+  **적 음악 시스템과 지역 음악 시스템을 별도의 구조로 분리**했습니다.
+- 그러나 두 시스템은 **논리적으로 연결되어 동기화**됩니다.
+
+### 🔁 동기화 메커니즘
+
+1. **Music_Region Switch Container**
+   - 플레이어의 현재 위치를 감지하여
+     → 해당 지역의 Music Playlist Container로 전환함.
+   - 해당 지역 테마는 **반복(loop)**되며,
+     다른 지역으로 이동할 때만 바뀜.
+2. **Music_Enemies Playlist Container**
+   - 적 테마는 단발성(One-shot) 구조의 Playlist Container로 구성됨.
+   - 항상 지역 테마와 타이밍이 맞아야 하므로,
+     → 적 테마는 **지역 테마의 Music Segment 내부에서 호출(Post)** 됩니다.
+3. **효과**
+   - 어떤 게임 오브젝트에서 음악이 게시되든 관계없이
+     → 항상 같은 시점에서 음악이 시작되고
+     → 두 시스템이 완벽히 동기화됩니다.
+4. **일시정지 및 재개 시 동작**
+   - 지역 테마가 일시정지되면,
+     → 적 테마도 자동으로 정지 상태를 유지.
+   - 지역 테마를 다시 재개하면,
+     → 적 테마 역시 **같은 시점**에서 다시 활성화됩니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380536/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L8/image_5.png)
+
+---
+
+## 🧩 요약 정리
+
+| 구분          | 지역 음악 시스템               | 적 음악 시스템                          |
+| ------------- | ------------------------------ | --------------------------------------- |
+| **기준 요소** | 플레이어의 위치 (State 기반)   | 적의 존재 및 거리 (Game Parameter 기반) |
+| **구성 요소** | 여러 지역별 Playlist Container | 적 종류별 Playlist Container            |
+| **전환 방식** | State로 전환                   | 거리값에 따른 볼륨 조정                 |
+| **재생 방식** | 반복 재생 (Loop)               | 지속 재생 (Mute 상태 포함)              |
+| **동기화**    | Music Segment 기준             | 지역 음악 Segment에 종속                |
+| **작곡 조건** | 동일 Tempo & Key               | 동일 Tempo & Key                        |
+| **특징**      | 지역 분위기 연출               | 전투 상황 강조                          |
+
+---
+
+## 💡 핵심 포인트 정리
+
+- 🎵 **두 개의 음악 시스템이 동시에 작동**한다.
+- 🧠 **지역(State)** 과 **적(Game Parameter)** 을 기준으로 각각 제어된다.
+- 🔁 **모든 음악은 동기화된 Tempo/Key를 사용**하여 자연스럽게 겹친다.
+- 🎚️ **적 음악은 들리지 않아도 계속 재생 중**이며, 볼륨만 조정된다.
+- ⏸️ **지역 테마의 일시정지/재개**에 따라 **적 테마도 함께 제어**된다.
+
+---
+
+# { 🎵 음악 지역 State 설정하기 }
+
+이번 강의는 **플레이어의 위치(지역)에 따라 음악 State를 전환하는 방법**을 배우는 내용입니다.
+
+즉, **Village 지역으로 들어가면 ‘Village 음악’으로 바뀌고**, **밖으로 나오면 다시 기본 음악으로 전환되는** 시스템을 만드는 것이 목표입니다.
+
+---
+
+## 📋 목차
+
+1. [음악 State 개념 이해하기](https://www.notion.so/28be683f737e807ba8ebdbbceecf7312#%EC%9D%8C%EC%95%85-state-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Village 영역에 Trigger 만들기](https://www.notion.so/28be683f737e807ba8ebdbbceecf7312#village-%EC%98%81%EC%97%AD%EC%97%90-trigger-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+3. [Trigger 시각화 및 Collider 설정하기](https://www.notion.so/28be683f737e807ba8ebdbbceecf7312#trigger-%EC%8B%9C%EA%B0%81%ED%99%94-%EB%B0%8F-collider-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+4. [SetMusicState 스크립트 만들기](https://www.notion.so/28be683f737e807ba8ebdbbceecf7312#setmusicstate-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+5. [플레이어 진입 시 음악 State 변경하기](https://www.notion.so/28be683f737e807ba8ebdbbceecf7312#%ED%94%8C%EB%A0%88%EC%9D%B4%EC%96%B4-%EC%A7%84%EC%9E%85-%EC%8B%9C-%EC%9D%8C%EC%95%85-state-%EB%B3%80%EA%B2%BD%ED%95%98%EA%B8%B0)
+6. [플레이어 퇴장 시 음악 State 복귀시키기](https://www.notion.so/28be683f737e807ba8ebdbbceecf7312#%ED%94%8C%EB%A0%88%EC%9D%B4%EC%96%B4-%ED%87%B4%EC%9E%A5-%EC%8B%9C-%EC%9D%8C%EC%95%85-state-%EB%B3%B5%EA%B7%80%EC%8B%9C%ED%82%A4%EA%B8%B0)
+7. [테스트 및 주의할 점](https://www.notion.so/28be683f737e807ba8ebdbbceecf7312#%ED%85%8C%EC%8A%A4%ED%8A%B8-%EB%B0%8F-%EC%A3%BC%EC%9D%98%ED%95%A0-%EC%A0%90)
+
+---
+
+## 1. 🎼 음악 State 개념 이해하기
+
+- **State란?**
+  Wwise의 **Game Sync 시스템** 중 하나로, 게임의 **전역(Global)** 상태를 반영하는 데 사용됩니다.
+  예를 들어:
+  - 전투 중 → “Battle” 음악
+  - 마을 안 → “Village” 음악
+  - 평상시 → “Ambient” 음악
+    이런 식으로 **게임의 상황(State)에 따라 음악을 바꾸는 것**이 가능합니다.
+- **왜 State를 사용하는가?**
+  - State는 **전역(Global)** 단위로 작동하므로, 게임 전체의 음악 상태를 일관되게 유지할 수 있습니다.
+  - 각 오브젝트별로 개별 제어하는 **Switch**와 달리, State는 게임 전반에 적용되므로 **음악 전환용으로 가장 적합**합니다.
+
+---
+
+## 2. 🏡 Village 영역에 Trigger 만들기
+
+1. Unity 메뉴에서
+
+   **Audiokinetic → Certification → 301 → Lesson 8 → Setting a Music Region State** 선택.
+
+   → 해당 실습용 Scene이 열립니다.
+
+2. Village의 모양은 위에서 보면 둥글기 때문에,
+
+   **Sphere(구체)** 형태의 Trigger를 사용합니다.
+
+3. **Hierarchy 뷰**에서 아무 오브젝트도 선택되어 있지 않은 상태를 확인한 뒤,
+   - 빈 공간을 우클릭 → **3D Object → Sphere** 선택.
+4. **Move**, **Rotate**, **Scale** 도구를 사용해 Sphere가 Village 지역을 완전히 감싸도록 배치합니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380537/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L8/image_6.png)
+
+---
+
+## 3. 🎨 Trigger 시각화 및 Collider 설정하기
+
+### (1) Collider 설정
+
+- **Inspector > Sphere Collider** 에서
+  ✅ **Is Trigger** 옵션을 활성화합니다.
+  → 이제 물리 충돌 대신 **진입 감지용 Trigger**로 작동하게 됩니다.
+
+### (2) 시각화 (테스트용)
+
+- Trigger가 보이지 않으면 테스트가 어렵기 때문에, **반투명 재질(Material)**을 적용합니다.
+  - Project 뷰에서 `Trigger_Red`를 검색.
+  - Sphere 오브젝트 위로 드래그.
+  - → 빨간색 반투명 구체가 되어, 플레이어가 언제 Trigger 안에 들어가는지 눈으로 확인 가능.
+
+[💡Tip]
+
+`Sphere Trigger`는 **CPU 효율이 가장 좋은 형태**로, 다른 복잡한 모양보다 성능이 우수합니다.
+
+---
+
+## 4. 💻 SetMusicState 스크립트 만들기
+
+### (1) 새 스크립트 생성
+
+- **Sphere 오브젝트 선택 → Add Component → New Script → 이름: `SetMusicState`**
+- Visual Studio(또는 코드 편집기)로 엽니다.
+
+### (2) 초기 기본 코드
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class SetMusicState : MonoBehaviour {
+
+    void Start () {
+    }
+
+    void Update () {
+    }
+}
+```
+
+### (3) 불필요한 함수 제거
+
+Start(), Update()를 사용하지 않으므로 **모두 삭제**합니다.
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class SetMusicState : MonoBehaviour {
+
+}
+```
+
+---
+
+## 5. 🚪 플레이어 진입 시 음악 State 변경하기
+
+### (1) OnTriggerEnter 함수 만들기
+
+Trigger 안으로 들어올 때 호출되는 **Unity 내장 함수**를 추가합니다.
+
+```csharp
+private void OnTriggerEnter(Collider other) {
+}
+```
+
+- `Collider other`: Trigger에 닿은 오브젝트의 Collider 정보입니다.
+  → 즉, Player가 Trigger 안으로 들어오면 `other`가 Player의 Collider를 참조하게 됩니다.
+
+### (2) Player 태그 확인하기
+
+다른 오브젝트가 Trigger에 닿을 수도 있으므로,
+
+**‘Player’만 해당 로직이 실행되도록** 조건문을 추가합니다.
+
+```csharp
+if (other.CompareTag("Player")) {
+    // Player일 경우 실행
+}
+```
+
+- `CompareTag("Player")`: 해당 오브젝트의 태그가 "Player"인지 검사합니다.
+- true면 내부 코드를 실행, false면 무시.
+
+---
+
+### (3) Wwise State 프로퍼티 선언
+
+플레이어가 들어왔을 때 설정할 State를 **Wwise-Type 변수**로 연결하기 위해
+
+클래스 맨 위에 다음을 추가합니다:
+
+```csharp
+public AK.Wwise.State OnTriggerEnterState;
+```
+
+이제 스크립트는 다음과 같습니다:
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class SetMusicState : MonoBehaviour {
+    public AK.Wwise.State OnTriggerEnterState;
+
+    private void OnTriggerEnter(Collider other){
+        if(other.CompareTag("Player")){
+            OnTriggerEnterState.SetValue();
+        }
+    }
+}
+```
+
+- `OnTriggerEnterState.SetValue();`
+  → Wwise에서 지정한 **State 값으로 전환**합니다.
+  즉, 플레이어가 들어가면 Village 음악 State로 바뀌게 됩니다.
+
+---
+
+### (4) Unity에서 State 연결하기
+
+1. Sphere 오브젝트를 클릭.
+2. **Inspector → SetMusicState 스크립트 컴포넌트** 확인.
+3. `OnTriggerEnterState` 슬롯 오른쪽의 드롭다운 클릭.
+4. **MusicStates → Music_Regions → Village** 선택.
+
+이제 Village 안으로 들어오면 음악이 Village로 전환됩니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380536/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L8/image_7.png)
+
+---
+
+## 6. 🚶 플레이어 퇴장 시 음악 State 복귀시키기
+
+현재 상태는 “들어올 때만 바뀌고, 나가도 원래 음악으로 돌아가지 않음”입니다.
+
+이를 해결하기 위해 **OnTriggerExit()** 함수를 추가합니다.
+
+### (1) Exit용 State 프로퍼티 추가
+
+```csharp
+public AK.Wwise.State OnTriggerExitState;
+```
+
+### (2) OnTriggerExit 함수 복사/수정
+
+기존 `OnTriggerEnter()` 함수를 복사 후 아래에 붙여넣고 이름만 바꿉니다:
+
+```csharp
+private void OnTriggerExit(Collider other){
+    if(other.CompareTag("Player")){
+        OnTriggerExitState.SetValue();
+    }
+}
+```
+
+### (3) 최종 코드 전체
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class SetMusicState : MonoBehaviour {
+    public AK.Wwise.State OnTriggerEnterState;
+    public AK.Wwise.State OnTriggerExitState;
+
+    private void OnTriggerEnter(Collider other){
+        if(other.CompareTag("Player")){
+            OnTriggerEnterState.SetValue();
+        }
+    }
+
+    private void OnTriggerExit(Collider other){
+        if(other.CompareTag("Player")){
+            OnTriggerExitState.SetValue();
+        }
+    }
+}
+```
+
+---
+
+### (4) Unity에서 Exit State 연결
+
+1. Sphere 오브젝트 선택.
+2. Inspector의 `OnTriggerExitState` 속성 드롭다운 클릭.
+3. **MusicStates → Music_Regions → Nowhere** 선택.
+
+   → Sphere 밖으로 나가면 Ambient(기본) 음악으로 돌아갑니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380536/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L8/image_8.png)
+
+---
+
+## 7. 🎧 테스트 및 주의할 점
+
+### 테스트
+
+1. **Play 모드 실행.**
+2. Training Area에서 시작 → Ambient 음악이 재생됨.
+3. Sphere Trigger(Village) 안으로 이동 → Village 음악으로 전환됨.
+4. 다시 밖으로 나가면 → Ambient 음악으로 복귀.
+
+정상적으로 **음악 State 전환**이 이루어지면 성공입니다. ✅
+
+---
+
+### 주의할 점
+
+- **Trigger 겹침 주의:**
+  서로 다른 Trigger 영역이 겹치면 두 State가 동시에 작동할 수 있어 충돌이 발생합니다.
+  (예: Village Trigger와 Forest Trigger가 겹칠 경우)
+  → 이런 상황은 다음 강의 *“State가 겹치는 영역의 시스템 만들기”*에서 다루게 됩니다.
+- **Sphere Trigger의 장점:**
+  구체 형태이므로 계산이 간단해, **가장 CPU 효율적인 Trigger**입니다.
+- **State와 Switch의 차이:**
+  - **State:** 전역(Global) 단위, 게임 전체 음악이나 분위기 전환에 사용.
+  - **Switch:** 특정 오브젝트(예: Player 발소리) 등 **개별 사운드 제어**에 사용.
+
+---
+
+## 🎯 요약
+
+| 구분         | 기능       | 함수/프로퍼티                    | 설명                          |
+| ------------ | ---------- | -------------------------------- | ----------------------------- |
+| Trigger 감지 | 진입       | `OnTriggerEnter(Collider other)` | Trigger 안으로 들어갈 때 실행 |
+| Trigger 감지 | 퇴장       | `OnTriggerExit(Collider other)`  | Trigger 밖으로 나갈 때 실행   |
+| Player 확인  | 조건문     | `if(other.CompareTag("Player"))` | Player만 감지하도록 필터링    |
+| Wwise 연동   | State 설정 | `AK.Wwise.State`                 | Wwise의 전역 음악 상태 제어   |
+| 전환 실행    | 명령       | `.SetValue()`                    | 지정된 State로 음악 변경      |
+
+---
+
+✅ **결과:**
+
+플레이어가 Village Trigger 안으로 들어오면 **Village 음악**이 재생되고,
+
+밖으로 나가면 **Ambient 음악**으로 복귀합니다.
+
+---
+
+# { 🎵 State가 겹치는 영역의 시스템 만들기 }
+
+**Wwise Adventure Game | Lesson 8: Creating a System for Intersecting State Areas**
+
+---
+
+## 📋 목차
+
+1. [개요 및 문제 상황 이해하기](https://www.notion.so/Wwise-301-L8-28be683f737e807ba8ebdbbceecf7312#%EA%B0%9C%EC%9A%94-%EB%B0%8F-%EB%AC%B8%EC%A0%9C-%EC%83%81%ED%99%A9-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [기존 State 전환 방식의 한계](https://www.notion.so/Wwise-301-L8-28be683f737e807ba8ebdbbceecf7312#%EA%B8%B0%EC%A1%B4-state-%EC%A0%84%ED%99%98-%EB%B0%A9%EC%8B%9D%EC%9D%98-%ED%95%9C%EA%B3%84)
+3. [State 목록 시스템 설계 개념](https://www.notion.so/Wwise-301-L8-28be683f737e807ba8ebdbbceecf7312#state-%EB%AA%A9%EB%A1%9D-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EC%84%A4%EA%B3%84-%EA%B0%9C%EB%85%90)
+4. [SetMusicState 스크립트 작성 단계별 과정](https://www.notion.so/Wwise-301-L8-28be683f737e807ba8ebdbbceecf7312#setmusicstate-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%9E%91%EC%84%B1-%EB%8B%A8%EA%B3%84%EB%B3%84-%EA%B3%BC%EC%A0%95)
+   - 4.1. 기본 구조 만들기
+   - 4.2. List 선언과 초기화
+   - 4.3. static 선언으로 전역 공유화
+   - 4.4. OnTriggerEnter() 수정 (State 추가 및 설정)
+   - 4.5. OnTriggerExit() 수정 (State 제거 및 재설정)
+   - 4.6. 목록이 비었을 때 Nowhere State 설정
+5. [최종 코드 전체](https://www.notion.so/Wwise-301-L8-28be683f737e807ba8ebdbbceecf7312#%EC%B5%9C%EC%A2%85-%EC%BD%94%EB%93%9C-%EC%A0%84%EC%B2%B4)
+6. [작동 원리 및 테스트 과정](https://www.notion.so/Wwise-301-L8-28be683f737e807ba8ebdbbceecf7312#%EC%9E%91%EB%8F%99-%EC%9B%90%EB%A6%AC-%EB%B0%8F-%ED%85%8C%EC%8A%A4%ED%8A%B8-%EA%B3%BC%EC%A0%95)
+7. [핵심 개념 요약](https://www.notion.so/Wwise-301-L8-28be683f737e807ba8ebdbbceecf7312#%ED%95%B5%EC%8B%AC-%EA%B0%9C%EB%85%90-%EC%9A%94%EC%95%BD)
+
+---
+
+## 1️⃣ 개요 및 문제 상황 이해하기
+
+- 이번 강의의 목표는 **“서로 겹치는 음악 영역(Trigger)”**에서도
+  올바르게 **음악 State를 전환**할 수 있는 시스템을 만드는 것.
+- Wwise에서는 **Trigger 안으로 플레이어가 들어오면**
+  특정 **State (예: Village, Woodlands)** 를 설정해 음악 테마를 전환할 수 있다.
+- 하지만 현실적인 게임 맵에서는 다음과 같은 상황이 자주 생긴다:
+  - Village 지역과 Woodlands 지역이 **살짝 겹치는 영역**이 있음.
+  - 플레이어가 Village에서 나와 Woodlands로 들어가면 Woodlands 음악이 재생됨.
+  - 하지만 **이전 논리(OnTriggerExit)** 에 따르면,
+    플레이어가 Village Trigger를 완전히 떠났을 때
+    State가 **Nowhere**로 설정되어버리는 문제 발생.
+    → 즉, Woodlands 안에 있음에도 불구하고 **Ambient(기본 음악)** 이 재생됨.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380536/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L8/image_9.png)
+
+---
+
+## 2️⃣ 기존 State 전환 방식의 한계
+
+이전 방식:
+
+```csharp
+private void OnTriggerEnter(Collider other) {
+    if(other.CompareTag("Player")) {
+        OnTriggerEnterState.SetValue();
+    }
+}
+private void OnTriggerExit(Collider other) {
+    if(other.CompareTag("Player")) {
+        OnTriggerExitState.SetValue();
+    }
+}
+```
+
+- 문제점 💡
+  - 각 Trigger는 자기 자신만의 State 전환을 수행.
+  - Trigger가 여러 개 겹치면 **한쪽이 나가면서 전역 State를 덮어씀**.
+  - 결과적으로 현재 플레이어가 다른 Trigger 안에 있음에도
+    음악이 “없음(Nowhere)” 상태로 돌아가는 오류 발생.
+
+---
+
+## 3️⃣ State 목록 시스템 설계 개념
+
+이 문제를 해결하기 위한 아이디어:
+
+- **“State 목록(List)”** 을 만들어서
+  플레이어가 들어가 있는 **모든 Trigger의 State를 추적**한다.
+- 새로운 Trigger에 들어갈 때마다:
+  - 해당 State를 목록의 **앞부분(index 0)** 에 추가.
+  - → 가장 최근에 진입한 지역이 항상 목록의 맨 앞에 위치.
+- Trigger에서 나갈 때마다:
+  - 해당 State를 목록에서 **제거**.
+  - → 남은 State 중 맨 앞(0번째)을 다시 적용.
+- 목록이 완전히 비면:
+  - **Nowhere State** 로 설정.
+
+이 시스템 덕분에:
+
+- 겹치는 영역에서도 올바른 우선순위에 따라 음악이 바뀜.
+- 플레이어가 이동 경로에 따라 자연스럽게 음악 전환을 경험.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380534/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L8/image_10.png)
+
+---
+
+## 4️⃣ SetMusicState 스크립트 작성 단계별 과정
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380534/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L8/image_11.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380534/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L8/image_12.png)
+
+```csharp
+정확히 겹치는 다리
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380534/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L8/image_13.png)
+
+```csharp
+두 영역을 동시에 설정하고 SetMusicState 스크립트를 새로 만들어 준다 그리고 아래
+
+코드 참고
+```
+
+### 4.1. 기본 구조 만들기
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class SetMusicState : MonoBehaviour {
+    public AK.Wwise.State OnTriggerEnterState;
+    public AK.Wwise.State OnTriggerExitState;
+
+    private void OnTriggerEnter(Collider other){
+        if(other.CompareTag("Player")){
+            OnTriggerEnterState.SetValue();
+        }
+    }
+
+    private void OnTriggerExit(Collider other){
+        if(other.CompareTag("Player")){
+            OnTriggerExitState.SetValue();
+        }
+    }
+}
+```
+
+---
+
+### 4.2. List 선언과 초기화
+
+- 여러 State를 저장할 **목록** 생성.
+- 타입은 `AK.Wwise.State` (Wwise에서 제공하는 State 클래스).
+
+```csharp
+public List<AK.Wwise.State> ListOfStates = new List<AK.Wwise.State>();
+```
+
+---
+
+### 4.3. static 선언으로 전역 공유화
+
+- 각 Trigger 오브젝트마다 개별적으로 존재하지 않고,
+  **모든 Trigger가 하나의 동일한 목록을 공유**하도록 해야 한다.
+- 이를 위해 `static` 한정자 사용.
+
+```csharp
+public static List<AK.Wwise.State> ListOfStates = new List<AK.Wwise.State>();
+```
+
+➡️ 이렇게 하면 Village, Woodlands 등 모든 Trigger가
+
+공통의 **전역 State 목록**을 참조하게 된다.
+
+---
+
+### 4.4. OnTriggerEnter() 수정
+
+(플레이어가 Trigger 안으로 들어올 때)
+
+1. 들어온 지역의 State를 목록의 맨 앞(index 0)에 추가한다.
+2. 목록의 첫 번째 요소를 현재 활성화된 State로 설정한다.
+
+```csharp
+private void OnTriggerEnter(Collider other){
+    if(other.CompareTag("Player")){
+        ListOfStates.Insert(0, OnTriggerEnterState); // 0번째에 추가
+        ListOfStates[0].SetValue(); // 최신 State로 설정
+    }
+}
+```
+
+> 💡 Insert(0, element)
+>
+> → 기존 요소를 뒤로 밀고, 지정한 요소를 맨 앞에 삽입한다.
+
+---
+
+### 4.5. OnTriggerExit() 수정
+
+(플레이어가 Trigger 밖으로 나갈 때)
+
+1. 해당 Trigger의 State를 목록에서 제거한다.
+2. 목록에 다른 State가 남아 있다면 → 첫 번째 State를 다시 설정한다.
+3. 목록이 비었다면 → Nowhere State로 설정한다.
+
+```csharp
+private void OnTriggerExit(Collider other){
+    if(other.CompareTag("Player")){
+        ListOfStates.Remove(OnTriggerEnterState); // 현재 State 제거
+        if(ListOfStates.Count > 0){               // 목록이 비어있지 않다면
+            ListOfStates[0].SetValue();           // 가장 앞의 State로 전환
+        } else {
+            OnTriggerExitState.SetValue();        // 비었으면 Nowhere로 설정
+        }
+    }
+}
+```
+
+---
+
+### 4.6. Count 프로퍼티 활용
+
+- `.Count` : 목록 안에 있는 요소(Trigger State)의 개수.
+- 이 값이 0이면 → 아무 지역에도 속하지 않음을 의미.
+
+이 조건을 통해 **NullReferenceException 방지** 및
+
+**Nowhere State 자동 설정**을 구현했다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380535/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L8/image_14.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380535/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L8/image_15.png)
+
+```csharp
+State 가 변하는걸 확인 가능
+```
+
+---
+
+## 5️⃣ 최종 코드 전체
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class SetMusicState : MonoBehaviour {
+    public static List<AK.Wwise.State> ListOfStates = new List<AK.Wwise.State>();
+    public AK.Wwise.State OnTriggerEnterState;
+    public AK.Wwise.State OnTriggerExitState;
+
+    private void OnTriggerEnter(Collider other){
+        if(other.CompareTag("Player")){
+            ListOfStates.Insert(0, OnTriggerEnterState);
+            ListOfStates[0].SetValue();
+        }
+    }
+
+    private void OnTriggerExit(Collider other){
+        if(other.CompareTag("Player")){
+            ListOfStates.Remove(OnTriggerEnterState);
+            if(ListOfStates.Count > 0){
+                ListOfStates[0].SetValue();
+            } else {
+                OnTriggerExitState.SetValue();
+            }
+        }
+    }
+}
+```
+
+---
+
+## 6️⃣ 작동 원리 및 테스트 과정
+
+### 🧩 상황 예시
+
+1. **Village → Woodlands 이동**
+   - Village 진입 → `List = [Village]`
+   - Woodlands 진입 → `List = [Woodlands, Village]`
+     → Woodlands State 재생
+   - Village 나감 → `List = [Woodlands]`
+     → Woodlands State 유지
+2. **Woodlands → Village 복귀**
+   - Village 진입 → `List = [Village, Woodlands]`
+   - Woodlands 나감 → `List = [Village]`
+   - → Village 음악 다시 재생
+3. **아무 Trigger에도 없음**
+   - 모든 Trigger 나감 → `List = []`
+   - → Nowhere State로 전환 (Ambient 음악 재생)
+
+---
+
+## 7️⃣ 핵심 개념 요약
+
+| 개념                      | 설명                                                                     |
+| ------------------------- | ------------------------------------------------------------------------ |
+| **Trigger**               | 플레이어가 진입/이탈할 때 이벤트를 발생시키는 Collider 영역              |
+| **State**                 | 음악 테마를 제어하는 Wwise 오디오 상태 (예: Village, Woodlands, Nowhere) |
+| **List**                  | 플레이어가 현재 들어가 있는 모든 Trigger State를 관리하는 목록           |
+| **Insert(0, item)**       | 가장 앞에 새로운 State를 추가하여 우선순위를 최상단으로 지정             |
+| **Remove(item)**          | 특정 Trigger의 State를 목록에서 제거                                     |
+| **Count**                 | 목록 내의 요소 개수. 0이면 아무 지역에도 없음                            |
+| **static**                | 모든 Trigger 인스턴스가 공유하는 전역 데이터로 설정                      |
+| **OnTriggerEnter / Exit** | Collider 간의 진입/이탈을 감지하는 Unity 이벤트 함수                     |
+
+---
+
+### ✅ 결과 요약
+
+- **문제 해결:** 겹치는 음악 지역 간의 전환 오류 방지
+- **핵심 아이디어:** 모든 지역 State를 전역적으로 관리하는 `List` 시스템
+- **효과:** 플레이어가 어떤 지역에 있든 항상 올바른 음악이 재생됨
+- **추가 학습 포인트:** `List`, `static`, `if-else`, `Count`, `Insert`, `Remove` 등 기초 프로그래밍 개념의 실제 활용

@@ -1,0 +1,1818 @@
+---
+title: 'WWiSE 문서 작성'
+date: '2026-09-02'
+category: '게임 개발/WWISE'
+tags: ['게임 개발', 'WWISE']
+draft: false
+summary: ''
+---
+
+## Wwise 프로젝트 구조와 명명 규칙
+
+### 1. Wwise 계층 구조 (Actor-Mixer Hierarchy)
+
+```
+Master Audio Bus
+├── Music
+│   ├── MX_MainTheme
+│   ├── MX_Battle
+│   └── MX_Boss
+├── SFX
+│   ├── Player
+│   │   ├── Play_PLY_Footstep
+│   │   ├── Play_PLY_Jump
+│   │   └── Play_PLY_Attack
+│   ├── Enemy
+│   ├── Weapons
+│   ├── Environment
+│   └── Ambience
+├── UI
+│   ├── Play_UI_Button_Click
+│   ├── Play_UI_Button_Hover
+│   └── Play_UI_Menu_Open
+└── VO (Voice Over)
+
+```
+
+### 2. 명명 규칙 (Naming Convention)
+
+**Event 이름** (게임 코드에서 호출):
+
+```
+Play_[카테고리]_[대상]_[액션]
+Stop_[카테고리]_[대상]_[액션]
+
+예시:
+Play_PLY_Footstep_Grass
+Play_WPN_Sword_Swing
+Play_UI_Button_Click
+Play_AMB_Forest_Day
+Stop_MX_Battle
+
+```
+
+**Sound SFX 이름** (Wwise 내부 에셋):
+
+```
+[카테고리]_[대상]_[액션]_[번호]
+
+예시:
+PLY_Footstep_Grass_01
+PLY_Footstep_Grass_02
+WPN_Sword_Swing_01
+UI_Button_Click_01
+
+```
+
+**Switch/State 이름**:
+
+```
+[목적]_[값]
+
+예시:
+Surface_Grass
+Surface_Wood
+Surface_Metal
+GameState_Menu
+GameState_Combat
+
+```
+
+### 3. 카테고리 약어 표준
+
+```
+PLY - Player (플레이어)
+ENM - Enemy (적)
+WPN - Weapon (무기)
+UI - User Interface
+AMB - Ambience (환경음)
+ENV - Environment (환경 상호작용)
+MX - Music
+VO - Voice Over
+ITM - Item (아이템)
+VFX - Visual Effects (시각 효과 사운드)
+PRJ - Projectile (발사체)
+IMP - Impact (충돌)
+
+```
+
+## 엑셀 사운드 데이터베이스 템플릿
+
+### Sheet 1: Sound List (메인 리스트)
+
+| Event Name           | Category | Sub-Category | Description     | Priority | Switch/State               | RTPC      | File Count    | Loop | 3D/2D | Status      | Notes                    |
+| -------------------- | -------- | ------------ | --------------- | -------- | -------------------------- | --------- | ------------- | ---- | ----- | ----------- | ------------------------ |
+| Play_PLY_Footstep    | Player   | Movement     | 플레이어 발소리 | High     | Surface (Grass/Wood/Metal) | -         | 4 per surface | No   | 3D    | Complete    | Switch로 지형별 분기     |
+| Play_WPN_Sword_Swing | Weapon   | Melee        | 검 휘두르기     | High     | -                          | -         | 3             | No   | 3D    | In Progress |                          |
+| Play_UI_Button_Click | UI       | Menu         | 버튼 클릭       | High     | -                          | -         | 1             | No   | 2D    | Complete    |                          |
+| Play_AMB_Forest_Day  | Ambience | Outdoor      | 숲 배경음       | Medium   | -                          | TimeOfDay | 1             | Yes  | 2D    | Pending     | RTPC로 낮/밤 전환        |
+| Play_MX_Battle       | Music    | Combat       | 전투 음악       | High     | Intensity (Low/Med/High)   | -         | 3 layers      | Yes  | 2D    | Complete    | Horizontal re-sequencing |
+
+### Sheet 2: File Inventory (실제 파일 관리)
+
+| File Name                 | Event Name           | Format | Sample Rate | Bit Depth | Duration | File Size | Source    | License      | Import Date |
+| ------------------------- | -------------------- | ------ | ----------- | --------- | -------- | --------- | --------- | ------------ | ----------- |
+| PLY_Footstep_Grass_01.wav | Play_PLY_Footstep    | WAV    | 48kHz       | 24bit     | 0.3s     | 256KB     | Recorded  | Royalty-Free | 2025-10-01  |
+| UI_Button_Click_01.wav    | Play_UI_Button_Click | WAV    | 48kHz       | 16bit     | 0.1s     | 48KB      | Freesound | CC0          | 2025-10-02  |
+
+### Sheet 3: Switch/State Groups
+
+| Group Name | Type   | Values                    | Used By            | Notes     |
+| ---------- | ------ | ------------------------- | ------------------ | --------- |
+| Surface    | Switch | Grass, Wood, Metal, Stone | Footsteps, Impacts | 지형 타입 |
+| WeaponType | Switch | Sword, Axe, Bow           | Weapon sounds      | 무기 종류 |
+| GameState  | State  | Menu, Gameplay, Pause     | Music, Ambience    | 게임 상태 |
+| Intensity  | State  | Low, Medium, High         | Music              | 전투 강도 |
+
+### Sheet 4: RTPC (Real-Time Parameter Controls)
+
+| RTPC Name    | Range | Affects                    | Mapping        | Usage                                        |
+| ------------ | ----- | -------------------------- | -------------- | -------------------------------------------- |
+| PlayerSpeed  | 0-100 | Footstep rate, pitch       | Linear         | 플레이어 이동 속도에 따라 발소리 빠르기 조절 |
+| PlayerHealth | 0-100 | Music intensity, heartbeat | Curve          | 체력에 따라 음악/효과 변화                   |
+| TimeOfDay    | 0-24  | Ambience volume/filter     | Curve          | 시간에 따른 환경음 변화                      |
+| Distance     | 0-50m | Volume, LPF                | Distance curve | 거리 감쇠                                    |
+
+### Sheet 5: Implementation Checklist
+
+| Event Name           | Script Hook  | Scene/Level | Trigger Type    | Implemented | Tested | Issues           |
+| -------------------- | ------------ | ----------- | --------------- | ----------- | ------ | ---------------- |
+| Play_PLY_Footstep    | OnFootstep() | All         | Animation Event | ✓           | ✓      | -                |
+| Play_WPN_Sword_Swing | OnAttack()   | Combat      | Input           | ✓           | ✗      | 타이밍 조정 필요 |
+| Play_UI_Button_Click | OnClick()    | UI          | Button Event    | ✓           | ✓      | -                |
+
+### Sheet 6: Mix/Bus Structure
+
+| Bus Name         | Parent Bus | Volume (dB) | HDR | Effects | Notes         |
+| ---------------- | ---------- | ----------- | --- | ------- | ------------- |
+| Master Audio Bus | -          | 0           | -   | Limiter | 최상위        |
+| Music            | Master     | -3          | Yes | -       | 음악 전용     |
+| SFX              | Master     | 0           | Yes | -       | 효과음 전용   |
+| UI               | Master     | -6          | No  | -       | UI 사운드     |
+| Player           | SFX        | 0           | -   | -       | 플레이어 관련 |
+| Ambience         | SFX        | -8          | -   | Reverb  | 환경음        |
+
+## Wwise 프로젝트 작업 프로세스
+
+### Phase 1: 프리 프로덕션
+
+1. **엑셀에 모든 필요 사운드 리스팅** (위 템플릿 사용)
+2. **Switch/State 그룹 디자인** - 게임 시스템과 맞춰서 설계
+3. **Bus 구조 설계** - 믹싱을 고려한 계층 구조
+4. **명명 규칙 문서화** - 팀(혼자라도) 일관성 유지
+
+### Phase 2: Wwise 프로젝트 셋업
+
+1. **Work Unit 생성**
+   - Default Work Unit 대신 카테고리별로 분리
+   - Player.wwu, Enemy.wwu, UI.wwu 등
+2. **Switch/State 그룹 먼저 생성**
+3. **Bus 구조 생성**
+4. **Game Syncs 설정** (RTPC, State 등)
+
+### Phase 3: 사운드 임포트 및 구현
+
+1. **Placeholder 사운드로 Event 먼저 생성**
+   - 게임 코드와 연동 테스트
+2. **실제 사운드로 교체하면서 속성 조정**
+   - Randomizer로 변형 추가
+   - Volume/Pitch variation
+3. **Switch Container 활용**
+   - 같은 Event로 여러 상황 대응
+
+### Phase 4: 믹싱 및 최적화
+
+1. **Profiler로 실시간 모니터링**
+2. **메모리 사용량 체크**
+3. **SoundBank 구성** - 씬별로 분리
+
+## Wwise 특화 팁
+
+**Random Container 활용**:
+
+- 같은 사운드 여러 개를 Random Container에 넣어서 변화 제공
+- Play_PLY_Footstep → Random Container → 4개 파일
+
+**Switch Container로 효율화**:
+
+```
+Play_PLY_Footstep (Event)
+└── Footstep_Switch_Container
+    ├── Surface = Grass → Grass sounds
+    ├── Surface = Wood → Wood sounds
+    └── Surface = Metal → Metal sounds
+
+```
+
+**Music Switch Container로 적응형 음악**:
+
+```
+Play_MX_Battle (Event)
+└── Battle_Music_Switch_Container
+    ├── Intensity = Low → Calm layer
+    ├── Intensity = Medium → +Percussion
+    └── Intensity = High → +Full orchestra
+
+```
+
+**SoundBank 구성 전략**:
+
+- Init.bnk: 기본 설정, 필수 사운드
+- UI.bnk: 모든 UI 사운드
+- Level01.bnk: 레벨 1 전용 사운드
+- Global_SFX.bnk: 모든 레벨에서 쓰는 공통 사운드
+
+## 실전 예시 프로젝트 구조
+
+```
+YourGame_Wwise/
+├── Actor-Mixer Hierarchy/
+│   ├── Default Work Unit/
+│   ├── Player.wwu
+│   ├── Enemy.wwu
+│   ├── UI.wwu
+│   └── Music.wwu
+├── Events/
+│   ├── Player_Events.wwu
+│   ├── UI_Events.wwu
+│   └── Music_Events.wwu
+├── Master-Mixer Hierarchy/
+│   └── Default Work Unit (Bus 구조)
+├── Game Syncs/
+│   ├── States/
+│   │   └── GameState, Intensity
+│   └── Switches/
+│       └── Surface, WeaponType
+└── SoundBanks/
+    ├── Init.bnk
+    ├── UI.bnk
+    └── Level_01.bnk
+
+```
+
+## Sheet 1: Sound List (메인 사운드 데이터베이스)
+
+### 목적
+
+프로젝트의 모든 사운드를 한눈에 파악하고 진행 상황을 추적하는 핵심 시트입니다.
+
+### 각 컬럼 상세 설명
+
+**Event Name**
+
+- Wwise에서 생성할 Event 이름 (게임 코드에서 호출할 이름)
+- 예시: `Play_PLY_Jump`, `Play_UI_Button_Click`
+- 규칙: 무조건 `Play_`, `Stop_`, `Pause_` 등으로 시작
+
+**Category**
+
+- 대분류: Player, Enemy, UI, Music, Ambience, Weapon 등
+- 필터링과 정렬에 사용
+- 드롭다운 목록으로 만들어서 일관성 유지
+
+**Sub-Category**
+
+- 중분류: Movement, Combat, Menu, Outdoor 등
+- 더 세밀한 분류 필요할 때
+- 예: Category=Player, Sub-Category=Movement
+
+**Description**
+
+- 한글로 자세한 설명
+- "점프할 때 재생되는 소리, 높이에 따라 볼륨 조절 필요"
+- 나중에 찾기 쉽게 구체적으로 작성
+
+**Priority**
+
+- High / Medium / Low
+- 제작 순서 결정에 사용
+- High: 게임플레이 필수 사운드
+- Medium: 몰입감 향상 사운드
+- Low: 디테일 추가 사운드
+
+**Switch/State**
+
+- 이 Event가 사용하는 Switch/State 그룹 이름
+- 예: "Surface", "WeaponType", "GameState"
+- 없으면 "-" 또는 "None"
+- 여러 개면 쉼표로 구분: "Surface, WeaponType"
+
+**RTPC**
+
+- 이 Event가 사용하는 실시간 파라미터
+- 예: "PlayerSpeed", "Distance", "Health"
+- 게임 변수와 연동되는 요소
+
+**File Count**
+
+- 필요한 실제 오디오 파일 개수
+- Random Container용이면 3-5개
+- Switch Container용이면 Switch 값마다 개수
+- 예: Switch가 3개 값이고 각각 4개 변형 = 12개
+
+**Loop**
+
+- Yes / No
+- 음악, 앰비언스는 대부분 Yes
+- 효과음은 대부분 No
+
+**3D/2D**
+
+- 3D: 공간 상에 위치가 있는 사운드 (캐릭터, 환경음)
+- 2D: 위치 없는 사운드 (UI, 음악)
+
+**Status**
+
+- Not Started / In Progress / Complete / On Hold / Need Revision
+- 진행 상황 추적용
+- 조건부 서식으로 색깔 자동 변경 추천
+
+**Notes**
+
+- 추가 메모, 이슈, 아이디어
+- "너무 커서 볼륨 조정 필요", "레퍼런스: 젤다 BotW"
+
+### 실전 사용법
+
+**1단계: 게임 플레이하면서 리스트 작성**
+
+```
+게임을 플레이하거나 상상하면서:
+"캐릭터가 점프한다" → Play_PLY_Jump 추가
+"버튼을 클릭한다" → Play_UI_Button_Click 추가
+"적이 죽는다" → Play_ENM_Death 추가
+
+```
+
+**2단계: Priority 설정**
+
+- 먼저 High만 필터링해서 작업
+- High가 끝나면 Medium으로
+
+**3단계: Status 업데이트**
+
+- 매일 작업 후 상태 변경
+- 완료율 계산: `=COUNTIF(Status, "Complete")/COUNTA(Status)`
+
+**4단계: 필터 활용**
+
+```
+- Category별로 필터링해서 한 카테고리씩 작업
+- Status="In Progress"로 필터링해서 미완성 작업 확인
+- Priority="High" + Status<>"Complete"로 긴급 작업 확인
+
+```
+
+## Sheet 2: File Inventory (파일 관리)
+
+### 목적
+
+실제 오디오 파일을 추적하고 관리합니다. 라이선스와 출처를 기록해서 법적 문제 예방.
+
+### 각 컬럼 상세 설명
+
+**File Name**
+
+- 실제 파일 이름 (확장자 포함)
+- 예: `PLY_Footstep_Grass_01.wav`
+- Wwise에 임포트할 때 이 이름 그대로 사용
+
+**Event Name**
+
+- 이 파일이 사용되는 Event (Sheet 1과 연결)
+- 하나의 파일이 여러 Event에서 사용될 수 있음
+
+**Format**
+
+- WAV / MP3 / OGG 등
+- Wwise는 WAV 추천 (무손실)
+- 음악은 OGG나 AAC도 고려
+
+**Sample Rate**
+
+- 48kHz (권장) / 44.1kHz / 96kHz
+- 게임은 보통 48kHz 표준
+- 모든 파일 통일 권장
+
+**Bit Depth**
+
+- 16bit (일반) / 24bit (고품질) / 32bit float
+- 효과음: 16bit
+- 음악: 24bit
+- 최종 빌드에서는 압축됨
+
+**Duration**
+
+- 초 단위 길이
+- 예: 0.3s, 2.5s, 180s
+- 메모리 예측에 사용
+
+**File Size**
+
+- KB 또는 MB
+- 전체 메모리 사용량 계산
+- 합계: `=SUM(File Size 컬럼)`
+
+**Source**
+
+- 출처 기록
+- "Recorded" (직접 녹음)
+- "Freesound.org"
+- "Epidemic Sound"
+- "자체 제작"
+
+**License**
+
+- 라이선스 타입
+- "Royalty-Free"
+- "CC0"
+- "CC BY 3.0"
+- "Commercial License"
+- 법적 문제 예방을 위해 필수!
+
+**Import Date**
+
+- Wwise에 임포트한 날짜
+- 버전 관리에 유용
+
+### 실전 사용법
+
+**파일 명명 규칙 엄격히 지키기**:
+
+```
+잘못된 예: jump_sound.wav, sound123.wav, footstep_final_FINAL_v2.wav
+올바른 예: PLY_Jump_01.wav, PLY_Jump_02.wav, PLY_Jump_03.wav
+
+```
+
+**파일 다운로드/제작 시 바로 기록**:
+
+```
+1. Freesound에서 발소리 다운
+2. 파일명 변경: PLY_Footstep_Grass_01.wav
+3. 즉시 엑셀에 한 줄 추가
+4. Source, License 기록
+
+```
+
+**메모리 계산 자동화**:
+
+```
+=SUM(File Size 열) → 전체 크기
+=SUMIF(Event Name, "Play_PLY_*", File Size) → 플레이어 사운드만
+
+```
+
+**라이선스 위반 방지**:
+
+- Status 컬럼 추가 추천
+- "License Verified" / "Need to Check"
+- 빨간색으로 표시해서 릴리즈 전 확인
+
+## Sheet 3: Switch/State Groups
+
+### 목적
+
+Wwise의 Switch와 State를 미리 설계하고 문서화합니다. 게임 코드와의 연동을 계획.
+
+### Switch vs State 차이
+
+**Switch** (스위치):
+
+- 오브젝트별로 다른 값을 가질 수 있음
+- 예: 플레이어1은 Grass 위, 플레이어2는 Metal 위
+- 동시에 다른 값 가능
+- 용도: 지형, 무기 타입, 캐릭터 종류 등
+
+**State** (스테이트):
+
+- 게임 전체에 하나의 값만 존재
+- 예: 게임이 "전투" 상태면 모든 사운드가 영향받음
+- 동시에 하나의 값만
+- 용도: 게임 상태, 날씨, 시간대 등
+
+### 각 컬럼 상세 설명
+
+**Group Name**
+
+- Switch/State 그룹의 이름
+- 예: "Surface", "WeaponType", "GameState"
+
+**Type**
+
+- Switch 또는 State
+
+**Values**
+
+- 가능한 모든 값들 (쉼표로 구분)
+- 예: "Grass, Wood, Metal, Stone, Water"
+
+**Used By**
+
+- 어떤 사운드들이 이걸 사용하는지
+- 예: "모든 Footstep, Impact 사운드"
+
+**Notes**
+
+- 구현 방법, 주의사항
+- 예: "게임 코드의 PhysicsMaterial과 매칭 필요"
+
+### 실전 사용법
+
+**게임 시스템 분석**:
+
+```
+질문: "게임에서 뭐가 변하지?"
+
+예시 답변:
+- 지형이 바뀐다 → Surface Switch (Grass, Wood, Metal...)
+- 무기를 바꾼다 → WeaponType Switch (Sword, Axe, Bow...)
+- 게임 상태가 바뀐다 → GameState State (Menu, Gameplay, Pause...)
+- 전투 강도가 바뀐다 → Intensity State (Low, Med, High)
+
+```
+
+**Switch/State 디자인 예시**:
+
+**Surface Switch**:
+
+```
+Group Name: Surface
+Type: Switch
+Values: Grass, Wood, Metal, Stone, Water, Sand
+Used By: Footsteps, Impacts, Rolling sounds
+Notes: Unity의 PhysicsMaterial 이름과 정확히 매칭할 것
+
+```
+
+**GameState State**:
+
+```
+Group Name: GameState
+Type: State
+Values: MainMenu, Gameplay, Pause, GameOver, Cutscene
+Used By: Music, Ambience, UI
+Notes:
+- MainMenu → 메인 테마 재생
+- Gameplay → 게임 음악
+- Pause → 음악 Lowpass 필터
+- GameOver → 음악 정지, 효과음만
+
+```
+
+**WeaponType Switch**:
+
+```
+Group Name: WeaponType
+Type: Switch
+Values: Sword, Axe, Bow, Magic
+Used By: Attack, Swing, Hit sounds
+Notes: 캐릭터 무기 장착 시 SetSwitch 호출
+
+```
+
+**프로그래머와 소통**:
+
+```
+이 시트를 프로그래머에게 공유하면:
+"Surface Switch를 만들었으니,
+코드에서 AkSoundEngine.SetSwitch("Surface", "Grass", gameObject)
+이렇게 호출해주세요"
+
+```
+
+**Wwise에서 생성 순서**:
+
+```
+1. 이 시트 완성
+2. Wwise Game Syncs 탭 열기
+3. Switch Groups 폴더에 각 Switch 생성
+4. State Groups 폴더에 각 State 생성
+5. Sheet 1로 돌아가서 Event와 연결
+
+```
+
+## Sheet 4: RTPC (Real-Time Parameter Controls)
+
+### 목적
+
+게임 변수가 사운드에 실시간으로 영향을 주는 시스템을 설계합니다.
+
+### RTPC란?
+
+게임의 숫자 값(예: 속도, 체력, 거리)을 사운드 파라미터(볼륨, 피치, 필터)에 연결하는 기능입니다.
+
+### 각 컬럼 상세 설명
+
+**RTPC Name**
+
+- 게임에서 보낼 변수 이름
+- 예: "PlayerSpeed", "PlayerHealth", "Distance"
+
+**Range**
+
+- 게임에서 보낼 값의 범위
+- 예: 0-100 (퍼센트), 0-50 (미터), 0-10 (속도)
+
+**Affects**
+
+- 이 RTPC가 무엇에 영향을 주는지
+- 예: "Footstep rate", "Music volume", "Voice pitch"
+
+**Mapping**
+
+- Linear (선형): 1:1 비례
+- Curve (곡선): 특정 구간에서 급격히 변화
+- Logarithmic: 거리 감쇠 등
+
+**Usage**
+
+- 구체적인 사용 예시와 설명
+
+### 실전 예시
+
+**PlayerSpeed RTPC**:
+
+```
+RTPC Name: PlayerSpeed
+Range: 0-10 (m/s)
+Affects:
+  - Footstep playback rate (0.8x ~ 1.5x)
+  - Footstep pitch (+/- 200 cents)
+  - Wind sound volume (0dB ~ +6dB)
+Mapping:
+  - Rate: Linear
+  - Pitch: Slight curve (빠를수록 약간 더 높아짐)
+  - Wind: Exponential (빠를수록 급격히 커짐)
+Usage:
+  플레이어가 걷기/뛰기/달리기 할 때
+  속도에 따라 발소리 빠르기와 바람 소리 변화
+
+```
+
+**PlayerHealth RTPC**:
+
+```
+RTPC Name: PlayerHealth
+Range: 0-100 (%)
+Affects:
+  - Music intensity (State transition)
+  - Heartbeat volume (0dB ~ +10dB)
+  - Screen lowpass filter (20kHz ~ 1kHz)
+Mapping:
+  - Heartbeat: Inverse (체력 낮을수록 크게)
+  - Filter: Curve (30% 이하부터 급격히)
+Usage:
+  체력 50% 이하 → 심장박동 시작
+  체력 20% 이하 → 소리 흐릿해짐 (위기감)
+
+```
+
+**Distance RTPC**:
+
+```
+RTPC Name: Distance
+Range: 0-50 (meters)
+Affects:
+  - Volume (-∞dB ~ 0dB)
+  - Lowpass filter (20kHz ~ 500Hz)
+  - Reverb send (0dB ~ +10dB)
+Mapping:
+  - Volume: Logarithmic (거리 제곱 법칙)
+  - Filter: Curve (멀수록 고음 감쇠)
+  - Reverb: Linear (멀수록 증가)
+Usage:
+  3D 사운드의 거리 감쇠
+  Wwise의 Attenuation과 함께 사용
+
+```
+
+**TimeOfDay RTPC**:
+
+```
+RTPC Name: TimeOfDay
+Range: 0-24 (시간)
+Affects:
+  - Ambience volume curve
+  - Cricket sounds (18~6시에만)
+  - Bird sounds (6~18시에만)
+Mapping: Custom curve
+  - 6시: 새 소리 급증
+  - 12시: 새 소리 최대
+  - 18시: 새 소리 감소, 귀뚜라미 증가
+  - 24시: 귀뚜라미 최대
+Usage:
+  낮/밤 사이클에 따른 환경음 변화
+
+```
+
+### 실전 사용법
+
+**1단계: 게임 변수 확인**
+
+```
+프로그래머에게 물어보기:
+"게임에서 실시간으로 변하는 숫자 변수가 뭐가 있나요?"
+
+답변 예시:
+- 플레이어 속도
+- 플레이어 체력
+- 카메라와 오브젝트 사이 거리
+- 시간
+- 적의 수
+- 점수
+
+```
+
+**2단계: 사운드 연결 상상**
+
+```
+"이 변수가 사운드에 어떻게 영향을 줄 수 있을까?"
+
+속도 → 발소리 빠르기
+체력 → 심장박동, 음악 강도
+거리 → 볼륨, 필터
+시간 → 환경음 종류
+적의 수 → 음악 레이어 추가
+
+```
+
+**3단계: Wwise 구현**
+
+```
+Wwise에서:
+1. Game Syncs → Game Parameters → 새 RTPC 생성
+2. Sound 속성에서 RTPC 탭 열기
+3. Volume, Pitch 등에 RTPC 연결
+4. 커브 그려서 매핑 조정
+
+```
+
+**4단계: 게임 코드 연동**
+
+```
+프로그래머에게 요청:
+"PlayerHealth RTPC를 만들었으니,
+체력 변할 때마다
+AkSoundEngine.SetRTPCValue("PlayerHealth", currentHealth, gameObject)
+이렇게 보내주세요"
+
+```
+
+**테스트 팁**:
+
+```
+Wwise Profiler에서:
+- RTPC 값이 실시간으로 들어오는지 확인
+- 실제 게임 플레이하면서 효과 확인
+- 커브 조정이 필요하면 Wwise에서 수정
+
+```
+
+## Sheet 5: Implementation Checklist (구현 체크리스트)
+
+### 목적
+
+사운드가 게임에 실제로 통합되었는지 추적합니다. 프로그래밍 진행 상황 관리.
+
+### 각 컬럼 상세 설명
+
+**Event Name**
+
+- Sheet 1과 동일한 Event 이름
+
+**Script Hook**
+
+- 게임 코드에서 어떤 함수/위치에서 호출되는지
+- 예: "OnFootstep()", "PlayerController.Jump()", "UIButton.OnClick()"
+
+**Scene/Level**
+
+- 어떤 씬/레벨에서 사용되는지
+- "All", "Level_01", "MainMenu" 등
+
+**Trigger Type**
+
+- 어떤 방식으로 트리거되는지
+- Animation Event: 애니메이션 타임라인에서
+- Input: 키/버튼 입력 시
+- Collision: 충돌 시
+- Code: 특정 코드 로직에서
+- Timeline: 컷씬/시퀀스에서
+
+**Implemented**
+
+- ✓ / ✗ (체크박스)
+- 코드에 구현되었는지
+
+**Tested**
+
+- ✓ / ✗
+- 실제 게임에서 테스트했는지
+
+**Issues**
+
+- 발견된 문제점
+- "타이밍 0.1초 늦음", "볼륨 너무 큼", "가끔 재생 안됨"
+
+### 실전 사용법
+
+**구현 순서**:
+
+```
+1. Wwise에서 Event 생성
+2. Event Name을 이 시트에 추가
+3. 프로그래머와 미팅:
+   "이 Event를 어디서 호출해야 하나요?"
+   → Script Hook 작성
+4. 프로그래머가 구현
+   → Implemented 체크
+5. 함께 테스트
+   → Tested 체크
+6. 문제 발견 시
+   → Issues에 기록
+7. 수정 후 재테스트
+
+```
+
+**예시 워크플로우**:
+
+**발소리 구현**:
+
+```
+Event Name: Play_PLY_Footstep
+Script Hook: Animator - Footstep event in walk/run animations
+Scene/Level: All
+Trigger Type: Animation Event
+Implemented: ✓
+Tested: ✓
+Issues: - (없음)
+
+구현 과정:
+1. 애니메이터에 Footstep 이벤트 추가
+2. 각 프레임에서 FootstepEvent() 함수 호출
+3. 함수에서 AkSoundEngine.PostEvent("Play_PLY_Footstep") 호출
+4. 지형 감지해서 SetSwitch("Surface", detectedSurface)
+
+```
+
+**점프 소리 구현**:
+
+```
+Event Name: Play_PLY_Jump
+Script Hook: PlayerController.Jump() - at apex of jump
+Scene/Level: All
+Trigger Type: Input
+Implemented: ✓
+Tested: ✗
+Issues: 타이밍이 입력 시점인데 점프 최고점에서 나야 할 것 같음
+
+해결:
+1. 타이밍을 0.2초 지연
+2. 또는 애니메이션 이벤트로 변경
+3. 재테스트 예정
+
+```
+
+**UI 버튼**:
+
+```
+Event Name: Play_UI_Button_Click
+Script Hook: UIButton.OnClick() - Unity Event
+Scene/Level: MainMenu, PauseMenu
+Trigger Type: Button Event
+Implemented: ✓
+Tested: ✓
+Issues: 클릭 시 가끔 두 번 재생됨 (더블 클릭?)
+
+해결:
+1. OnPointerDown 대신 OnPointerUp 사용
+2. Cooldown 0.1초 추가
+3. 해결됨 ✓
+
+```
+
+**보스 음악**:
+
+```
+Event Name: Play_MX_Boss_Phase1
+Script Hook: BossController.OnPhaseChange(int phase)
+Scene/Level: Boss_Arena
+Trigger Type: Code (HP threshold)
+Implemented: ✓
+Tested: ✗
+Issues: Music State 전환이 부드럽지 않음
+
+해결 계획:
+1. Wwise에서 Transition 시간 조정
+2. Exit Cue 추가
+3. Fade out 커브 수정
+
+```
+
+**팀 협업 팁**:
+
+```
+- 이 시트를 프로그래머와 공유
+- 매일 체크리스트 업데이트
+- 주간 미팅에서 Issues 리뷰
+- 우선순위 높은 것부터 해결
+
+```
+
+## Sheet 6: Mix/Bus Structure (믹스 구조)
+
+### 목적
+
+Wwise의 오디오 버스 계층 구조를 문서화하고 믹싱 설정을 관리합니다.
+
+### Bus(버스)란?
+
+여러 사운드를 그룹으로 묶어서 한번에 제어하는 채널입니다. 음향 믹싱 콘솔의 채널과 같은 개념.
+
+### 각 컬럼 상세 설명
+
+**Bus Name**
+
+- 버스 이름
+- 예: "Master Audio Bus", "Music", "SFX", "Player"
+
+**Parent Bus**
+
+- 상위 버스 (계층 구조)
+- Master가 최상위, 나머지는 그 아래
+
+**Volume (dB)**
+
+- 기본 볼륨 설정
+- 0dB = 원본 볼륨
+- 3dB = 약간 작게
+- 6dB = 절반 정도
+- ∞dB = 음소거
+
+**HDR (High Dynamic Range)**
+
+- Yes / No
+- 중요한 사운드를 자동으로 강조
+- 음악, SFX에 주로 사용
+
+**Effects**
+
+- 적용된 이펙트
+- Reverb, Delay, EQ, Compressor, Limiter 등
+
+**Notes**
+
+- 설명, 사용 목적
+
+### 실전 예시 구조
+
+**기본 구조**:
+
+```
+Master Audio Bus (0dB, Limiter)
+├── Music (-3dB, HDR, EQ)
+│   ├── Music_Main (0dB)
+│   └── Music_Stinger (0dB)
+├── SFX (0dB, HDR)
+│   ├── Player (0dB)
+│   │   ├── Player_Movement (-2dB)
+│   │   └── Player_Combat (+1dB)
+│   ├── Enemy (-3dB)
+│   ├── Weapon (0dB)
+│   └── Environment (-6dB)
+├── Ambience (-8dB, Reverb)
+│   ├── Ambience_Indoor (0dB, Room Reverb)
+│   └── Ambience_Outdoor (0dB, Hall Reverb)
+├── UI (-6dB, No HDR)
+└── VO (Voice Over) (-3dB, EQ, Compressor)
+
+```
+
+**각 버스 설명**:
+
+**Master Audio Bus**:
+
+```
+Bus Name: Master Audio Bus
+Parent Bus: -
+Volume: 0dB
+HDR: No
+Effects: Limiter (방송 수준 제한)
+Notes: 모든 사운드의 최종 출력. 절대 0dB 넘지 않게.
+
+```
+
+**Music Bus**:
+
+```
+Bus Name: Music
+Parent Bus: Master Audio Bus
+Volume: -3dB (게임플레이 방해 안되게)
+HDR: Yes (중요한 순간에 더 강조)
+Effects:
+  - High Pass Filter @80Hz (저음 정리)
+  - Subtle Compression (다이나믹 정리)
+Notes:
+  모든 배경음악 여기로.
+  State로 Pause 시 Lowpass 필터 적용.
+
+```
+
+**SFX Bus**:
+
+```
+Bus Name: SFX
+Parent Bus: Master Audio Bus
+Volume: 0dB
+HDR: Yes (중요한 효과음 강조)
+Effects: -
+Notes: 모든 효과음의 부모
+
+```
+
+**Player Bus**:
+
+```
+Bus Name: Player
+Parent Bus: SFX
+Volume: 0dB
+HDR: No (플레이어 사운드는 항상 명확하게)
+Effects: -
+Notes:
+  플레이어 액션 사운드.
+  다른 사운드보다 우선순위 높음.
+
+```
+
+**Player_Combat Bus**:
+
+```
+Bus Name: Player_Combat
+Parent Bus: Player
+Volume: +1dB (전투감 강조)
+HDR: No
+Effects: Slight Saturation (타격감 강화)
+Notes: 공격, 스킬 사운드
+
+```
+
+**Enemy Bus**:
+
+```
+Bus Name: Enemy
+Parent Bus: SFX
+Volume: -3dB (플레이어보다 작게)
+HDR: Yes
+Effects: -
+Notes: 적 사운드. 너무 크면 플레이어 사운드 묻힘.
+
+```
+
+**Environment Bus**:
+
+```
+Bus Name: Environment
+Parent Bus: SFX
+Volume: -6dB (배경적 요소)
+HDR: Yes
+Effects: -
+Notes:
+  문, 상자, 오브젝트 상호작용.
+  중요하지 않으면 HDR로 자동 감소.
+
+```
+
+**Ambience Bus**:
+
+```
+Bus Name: Ambience
+Parent Bus: SFX
+Volume: -8dB (은은하게)
+HDR: Yes
+Effects: Reverb (공간감)
+Notes:
+  환경 배경음.
+  루프 사운드. 지치지 않게 작게.
+
+```
+
+**Ambience_Indoor Bus**:
+
+```
+Bus Name: Ambience_Indoor
+Parent Bus: Ambience
+Volume: 0dB
+HDR: Yes
+Effects: Small Room Reverb
+Notes: 실내 앰비언스
+
+```
+
+**Ambience_Outdoor Bus**:
+
+```
+Bus Name: Ambience_Outdoor
+Parent Bus: Ambience
+Volume: 0dB
+HDR: Yes
+Effects: Large Hall Reverb
+Notes: 실외 앰비언스
+
+```
+
+**UI Bus**:
+
+```
+Bus Name: UI
+Parent Bus: Master Audio Bus
+Volume: -6dB
+HDR: No (UI는 일정하게)
+Effects: -
+Notes:
+  메뉴, 버튼 사운드.
+  HDR 없음 = 항상 일정한 볼륨.
+
+```
+
+**VO Bus**:
+
+```
+Bus Name: VO
+Parent Bus: Master Audio Bus
+Volume: -3dB
+HDR: No
+Effects:
+  - EQ (음성 대역 강조)
+  - Compressor (일정한 볼륨)
+  - De-esser (치찰음 제거)
+Notes:
+  캐릭터 대사, 내레이션.
+  음성은 항상 명확하게 들려야 함.
+
+```
+
+### 믹싱 전략
+
+**볼륨 계층**:
+
+```
+중요도 순서:
+1. VO (-3dB) - 대사는 항상 들려야
+2. Player (0dB) - 플레이어 액션 중요
+3. Music (-3dB) - 분위기 조성
+4. UI (-6dB) - 방해 안되게
+5. Enemy (-3dB) - 플레이어보다 작게
+6. Environment (-6dB) - 배경적
+7. Ambience (-8dB) - 은은하게
+
+```
+
+### HDR 사용 전략
+
+**HDR이란?**
+
+- High Dynamic Range Audio
+- 중요한 사운드를 자동으로 강조하고, 덜 중요한 사운드를 자동으로 줄이는 기능
+- 예: 폭발음이 나올 때 배경음악과 환경음을 자동으로 낮춤
+
+**HDR 설정 가이드**:
+
+```
+HDR 사용 (Yes):
+- Music: 중요한 순간에 강조
+- SFX: 주요 효과음 우선
+- Enemy: 위협적인 소리 강조
+- Environment: 중요할 때만 들리게
+- Ambience: 조용히 깔리게
+
+HDR 사용 안함 (No):
+- Player: 항상 명확하게
+- UI: 일정한 볼륨 유지
+- VO: 대사는 항상 들려야
+
+```
+
+**HDR Window Threshold 설정**:
+
+```
+Bus: Music
+HDR Window Top Threshold: -6dB
+HDR Window Bottom Threshold: -24dB
+→ 다른 사운드가 시끄러우면 음악이 -24dB까지 자동 감소
+
+Bus: Ambience
+HDR Window Top Threshold: -8dB
+HDR Window Bottom Threshold: -∞dB
+→ 중요한 사운드 있으면 완전히 사라질 수 있음
+
+Bus: Player
+HDR: Disabled
+→ 플레이어 사운드는 절대 자동 감소 안됨
+
+```
+
+### Effect 체인 설정
+
+**Master Bus Effects**:
+
+```
+1. Wwise Peak Limiter
+   - Threshold: -0.3dB
+   - Release: 50ms
+   - 목적: 클리핑 방지, 최종 안전장치
+
+2. (옵션) Wwise Meter
+   - Loudness monitoring
+
+```
+
+**Music Bus Effects**:
+
+```
+1. Wwise Parametric EQ
+   - High Pass: 80Hz, 12dB/oct
+   - 목적: 불필요한 저음 제거, SFX 공간 확보
+
+2. Wwise Compressor
+   - Ratio: 2:1
+   - Threshold: -12dB
+   - Attack: 10ms
+   - Release: 100ms
+   - 목적: 다이나믹 일정하게 유지
+
+3. (State로 제어) Wwise Parametric EQ
+   - Pause State에서 활성화
+   - Low Pass: 1kHz
+   - 목적: 일시정지 시 몽롱한 느낌
+
+```
+
+**VO Bus Effects**:
+
+```
+1. Wwise Parametric EQ
+   - High Pass: 100Hz (럼블 제거)
+   - Boost: 2-4kHz, +3dB (명료도)
+   - 목적: 음성 명확하게
+
+2. Wwise Compressor
+   - Ratio: 4:1
+   - Threshold: -18dB
+   - Attack: 5ms
+   - Release: 50ms
+   - 목적: 음성 볼륨 일정하게
+
+3. Wwise De-esser (있다면)
+   - Frequency: 6-8kHz
+   - 목적: 'ㅅ' 소리 거슬리지 않게
+
+```
+
+**Ambience_Indoor Bus Effects**:
+
+```
+1. Wwise Convolution Reverb (또는 RoomVerb)
+   - Preset: Small Room
+   - Dry Level: 0dB
+   - Wet Level: -12dB
+   - 목적: 실내 공간감
+
+```
+
+**Ambience_Outdoor Bus Effects**:
+
+```
+1. Wwise Convolution Reverb
+   - Preset: Large Hall
+   - Dry Level: 0dB
+   - Wet Level: -18dB
+   - 목적: 야외 공간감
+
+```
+
+### 실전 믹싱 워크플로우
+
+**1단계: 버스 구조 만들기**
+
+```
+1. 이 시트에 버스 계층 설계
+2. Wwise Master-Mixer Hierarchy 열기
+3. 시트대로 버스 생성
+4. 부모-자식 관계 설정
+
+```
+
+**2단계: 기본 볼륨 설정**
+
+```
+1. 모든 버스 볼륨 0dB로 시작
+2. 게임 플레이하면서 들어보기
+3. 시트의 권장 볼륨으로 조정
+4. 미세 조정 반복
+
+```
+
+**3단계: HDR 설정**
+
+```
+1. Music, SFX, Ambience에 HDR 활성화
+2. Window 범위 설정
+3. 전투 씬에서 테스트
+   - 조용할 때: 음악 들림
+   - 폭발할 때: 음악 자동 감소
+4. 자연스러울 때까지 조정
+
+```
+
+**4단계: Effect 추가**
+
+```
+1. Master에 Limiter 추가 (필수)
+2. Music에 EQ, Compressor
+3. VO에 EQ, Compressor
+4. Ambience에 Reverb
+5. 하나씩 추가하면서 A/B 비교
+
+```
+
+**5단계: State 연동 믹싱**
+
+```
+예: Pause State
+1. GameState = Pause 일 때
+2. Music Bus에 Lowpass Filter
+3. SFX Bus Volume -20dB
+4. UI Bus Volume +3dB (상대적으로 강조)
+
+```
+
+### 믹싱 체크리스트
+
+**최종 믹스 전 확인사항**:
+
+```
+□ Peak이 0dB 넘는 순간 없는지 (Limiter 확인)
+□ 플레이어 사운드가 항상 명확한지
+□ 음악이 게임플레이 방해 안하는지
+□ 환경음이 너무 크지 않은지
+□ UI 사운드가 거슬리지 않는지
+□ 대사가 다른 사운드에 묻히지 않는지
+□ 조용한 순간이 너무 조용하지 않은지
+□ 시끄러운 순간이 너무 시끄럽지 않은지
+□ HDR이 자연스럽게 작동하는지
+□ 헤드폰/스피커 둘 다 테스트했는지
+
+```
+
+**씬별 믹싱 테스트**:
+
+```
+□ 메인 메뉴: UI 사운드만, 음악 명확
+□ 게임플레이 (조용): 환경음, 발소리 적절
+□ 게임플레이 (전투): 액션 사운드 우선, 음악 지원
+□ 보스전: 음악 강조, 보스 사운드 임팩트
+□ 컷씬: VO 최우선, 배경음 조용히
+□ 일시정지: 음악 필터, UI 명확
+
+```
+
+## 전체 워크플로우 통합 예시
+
+실제로 "플레이어 점프" 사운드를 처음부터 끝까지 어떻게 작업하는지 보여드릴게요.
+
+### Step 1: Sound List에 추가
+
+**Sheet 1: Sound List**
+
+```
+Event Name: Play_PLY_Jump
+Category: Player
+Sub-Category: Movement
+Description: 플레이어가 점프할 때 재생. 높이에 따라 다른 소리
+Priority: High
+Switch/State: -
+RTPC: JumpHeight (옵션)
+File Count: 3 (변형)
+Loop: No
+3D/2D: 3D
+Status: Not Started
+Notes: 레퍼런스 - 슈퍼마리오 점프 소리
+
+```
+
+### Step 2: 필요한 파일 리스트 작성
+
+**Sheet 2: File Inventory에 미리 추가**
+
+```
+File Name: PLY_Jump_01.wav
+Event Name: Play_PLY_Jump
+Format: WAV
+Sample Rate: 48kHz
+Bit Depth: 16bit
+Duration: 0.4s
+File Size: (제작 후 입력)
+Source: (제작 후 입력)
+License: (제작 후 입력)
+Import Date: (임포트 후 입력)
+
+```
+
+같은 방식으로 02, 03 추가.
+
+### Step 3: 사운드 제작/수집
+
+```
+1. Freesound.org에서 점프 소리 검색
+2. 적절한 소리 3개 다운로드
+3. Audacity에서 편집:
+   - 길이 0.4초로 통일
+   - 볼륨 노멀라이즈
+   - 48kHz, 16bit로 export
+4. 파일명 변경:
+   - PLY_Jump_01.wav
+   - PLY_Jump_02.wav
+   - PLY_Jump_03.wav
+5. 프로젝트 폴더에 저장
+
+```
+
+### Step 4: Sheet 2 업데이트
+
+```
+파일 제작 완료했으니:
+File Size: 각각 384KB
+Source: Freesound.org (링크)
+License: CC0
+Import Date: (아직)
+
+```
+
+### Step 5: Wwise에 임포트
+
+```
+1. Wwise Project Explorer 열기
+2. Actor-Mixer Hierarchy → Player.wwu 열기
+3. Player 폴더 아래 "Player_Movement" 폴더 생성
+4. 3개 wav 파일 드래그앤드롭
+5. Sheet 2에 Import Date 기록: 2025-10-14
+
+```
+
+### Step 6: Random Container 설정
+
+```
+1. Player_Movement에 Random Container 생성
+2. 이름: "PLY_Jump_Container"
+3. 3개 파일을 Container 안에 넣기
+4. Random Container 설정:
+   - Random mode: Shuffle
+   - Avoid repeat: 1
+
+```
+
+### Step 7: Event 생성
+
+```
+1. Events 폴더 → Player_Events.wwu 열기
+2. 새 Event 생성: "Play_PLY_Jump"
+3. Action 추가:
+   - Type: Play
+   - Target: PLY_Jump_Container
+4. Event 속성:
+   - 3D Positioning 활성화
+   - Attenuation: Default curve
+
+```
+
+### Step 8: Bus 라우팅
+
+**Sheet 6 확인**
+
+```
+Play_PLY_Jump는 Player → SFX → Master 경로로 가야 함
+
+```
+
+**Wwise에서**:
+
+```
+1. PLY_Jump_Container 선택
+2. General Settings → Output Bus
+3. "Player" bus 선택
+4. (Player bus는 이미 SFX의 자식)
+
+```
+
+### Step 9: 게임 통합 준비
+
+**Sheet 5: Implementation Checklist에 추가**
+
+```
+Event Name: Play_PLY_Jump
+Script Hook: PlayerController.OnJump() 또는 Animation Event
+Scene/Level: All
+Trigger Type: Input 또는 Animation Event
+Implemented: ✗ (아직)
+Tested: ✗
+Issues: (나중에)
+
+```
+
+### Step 10: 프로그래머와 협업
+
+```
+프로그래머에게:
+"Play_PLY_Jump Event를 만들었어요.
+플레이어가 점프할 때 호출해주세요.
+
+// C# 예시 (Unity)
+void Jump() {
+    // 점프 로직
+    AkSoundEngine.PostEvent("Play_PLY_Jump", gameObject);
+}
+
+// 또는 Animator Event로 구현 가능합니다"
+
+```
+
+### Step 11: 테스트
+
+```
+1. 게임 빌드
+2. Wwise Profiler 연결
+3. 점프 테스트:
+   - Event가 호출되는지 확인
+   - 소리가 재생되는지
+   - 3개 변형이 랜덤하게 나오는지
+   - 볼륨이 적절한지
+4. 이슈 발견 시 Sheet 5에 기록
+
+```
+
+**발견된 이슈 예시**:
+
+```
+Issues:
+- 점프 소리가 너무 조용함
+- 3D 위치가 플레이어 발이 아니라 중앙에서 들림
+
+```
+
+### Step 12: 수정
+
+```
+이슈 1 해결:
+1. Wwise에서 PLY_Jump_Container 선택
+2. Volume: +3dB로 조정
+3. 재테스트
+
+이슈 2 해결:
+프로그래머에게:
+"gameObject를 발 위치로 변경해주세요"
+또는
+"offset 추가해주세요"
+
+```
+
+### Step 13: Sheet 업데이트
+
+```
+Sheet 1:
+Status: Not Started → Complete
+
+Sheet 5:
+Implemented: ✓
+Tested: ✓
+Issues: (해결됨)
+
+```
+
+### Step 14: 고급 기능 추가 (옵션)
+
+**RTPC 추가 - 점프 높이에 따라 피치 변경**
+
+**Sheet 4: RTPC 추가**
+
+```
+RTPC Name: JumpHeight
+Range: 0-10 (meters)
+Affects: PLY_Jump pitch
+Mapping: Linear (높을수록 피치 높게)
+Usage: 점프 높이에 따라 소리 변화
+
+```
+
+**Wwise 설정**:
+
+```
+1. Game Syncs → Game Parameters → "JumpHeight" 생성
+2. PLY_Jump_Container → RTPC 탭
+3. Pitch에 JumpHeight 연결
+4. 커브: 0m = -200cents, 10m = +200cents
+
+```
+
+**코드 수정 요청**:
+
+```
+프로그래머에게:
+"점프 높이 계산해서 RTPC로 보내주세요"
+
+void Jump() {
+    float jumpHeight = CalculateJumpHeight();
+    AkSoundEngine.SetRTPCValue("JumpHeight", jumpHeight, gameObject);
+    AkSoundEngine.PostEvent("Play_PLY_Jump", gameObject);
+}
+
+```
+
+### Step 15: 최종 확인
+
+```
+✓ Sound List 완료
+✓ File Inventory 정리
+✓ Wwise Event 생성
+✓ Bus 라우팅 확인
+✓ 게임 통합
+✓ 테스트 완료
+✓ 문서 업데이트
+
+```
+
+## 프로젝트 전체 진행 팁
+
+### 주간 루틴
+
+**월요일: 계획**
+
+```
+1. Sheet 1에서 이번 주 작업 선택
+2. Priority와 Status로 필터링
+3. 목표: High priority 5-10개
+
+```
+
+**화-목: 제작**
+
+```
+1. 사운드 제작/수집
+2. Wwise 임포트 및 설정
+3. 매일 Sheet 업데이트
+4. 완료 시 Status 변경
+
+```
+
+**금요일: 통합 및 테스트**
+
+```
+1. 프로그래머와 통합 미팅
+2. Sheet 5 체크리스트 작업
+3. 게임에서 전체 테스트
+4. 이슈 정리
+
+```
+
+### 마일스톤별 목표
+
+**Milestone 1: Vertical Slice (2-3주)**
+
+```
+목표: 게임의 핵심 루프 사운드 완성
+- Player 필수 사운드 (이동, 점프, 공격)
+- UI 기본 사운드
+- 1개 배경음악
+- 기본 환경음
+
+Sheet 1 필터: Priority=High, Category=Player/UI
+예상: 20-30개 Event
+
+```
+
+**Milestone 2: Alpha (4-6주)**
+
+```
+목표: 모든 주요 기능에 사운드
+- 모든 플레이어 액션
+- 적 사운드
+- 무기 사운드
+- 레벨별 음악
+- 환경 상호작용
+
+Sheet 1 필터: Priority=High/Medium
+예상: 50-80개 Event
+
+```
+
+**Milestone 3: Beta (6-8주)**
+
+```
+목표: 완성도 높이기
+- 사운드 변형 추가
+- RTPC로 다이나믹 추가
+- 디테일 사운드
+- 믹싱 정리
+
+Sheet 1: 모든 Priority
+예상: 100-150개 Event
+
+```
+
+**Milestone 4: Polish (2-3주)**
+
+```
+목표: 최종 품질
+- 믹싱 최적화
+- 메모리 최적화
+- 버그 수정
+- QA 피드백 반영
+
+Sheet 5: 모든 Issues 해결
+
+```
+
+### 엑셀 자동화 팁
+
+**진행률 계산**:
+
+```
+=COUNTIF(Status,"Complete")/COUNTA(Status)*100 & "%"
+→ 35% 완료
+
+```
+
+**카테고리별 진행률**:
+
+```
+=COUNTIFS(Category,"Player",Status,"Complete")/COUNTIF(Category,"Player")*100 & "%"
+→ Player 카테고리: 80% 완료
+
+```
+
+**우선순위별 남은 작업**:
+
+```
+=COUNTIFS(Priority,"High",Status,"<>Complete")
+→ High priority 미완성: 5개
+
+```
+
+**예상 작업 시간**:
+
+```
+각 사운드마다 예상 시간 컬럼 추가:
+Time Estimate: 0.5h, 1h, 2h 등
+
+=SUMIF(Status,"Not Started",Time Estimate)
+→ 남은 작업 시간: 15h
+
+```
+
+**마감일 추적**:
+
+```
+Due Date 컬럼 추가
+조건부 서식:
+- 오늘 날짜 지남: 빨간색
+- 3일 남음: 노란색
+- 그 외: 초록색
+
+```
+
+### 백업 및 버전 관리
+
+**엑셀 백업**:
+
+```
+파일명 규칙:
+GameAudio_SoundList_v01_20251014.xlsx
+GameAudio_SoundList_v02_20251021.xlsx
+
+매주 버전 업
+중요 마일스톤마다 별도 저장
+
+```
+
+**Wwise 프로젝트 백업**:
+
+```
+1. Wwise 프로젝트 폴더 전체
+2. Git 사용 권장 (또는 클라우드)
+3. 매일 커밋
+4. 마일스톤마다 태그
+
+```
+
+**사운드 파일 백업**:
+
+```
+Originals/ 폴더: Wwise 관리
+별도 백업: 편집 전 원본도 보관
+클라우드: Google Drive, Dropbox 등
+
+```
+
+이렇게 체계적으로 관리하면 혼자 작업해도 프로덕션 수준의 퀄리티를 유지할 수 있어요. 처음엔 복잡해 보이지만, 일단 시스템 구축하면 나중에 정말 편합니다!
+
+더 궁금한 부분 있으면 말씀해주세요!

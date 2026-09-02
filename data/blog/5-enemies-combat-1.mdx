@@ -1,0 +1,1900 @@
+---
+title: '섹션 5: Enemies & Combat - 1'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+# { 🎮 유닛 기반 턴제 게임에 적(Enemy) 시스템 추가하기 }
+
+이번 강의에서는 기존의 플레이어 유닛만 있던 게임에 적 유닛을 추가하고, 플레이어 턴과 적 턴을 구분하는 턴제 시스템을 구현합니다.
+
+---
+
+## 📋 목차
+
+1. [Prefab Variant를 이용한 적 유닛 생성](https://claude.ai/chat/2ea0fd5a-9655-4482-937e-617a9862931d#1-prefab-variant%EB%A5%BC-%EC%9D%B4%EC%9A%A9%ED%95%9C-%EC%A0%81-%EC%9C%A0%EB%8B%9B-%EC%83%9D%EC%84%B1)
+2. [적 유닛 식별 시스템 구현](https://claude.ai/chat/2ea0fd5a-9655-4482-937e-617a9862931d#2-%EC%A0%81-%EC%9C%A0%EB%8B%9B-%EC%8B%9D%EB%B3%84-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B5%AC%ED%98%84)
+3. [턴 시스템 구현 - 플레이어 턴과 적 턴 구분](https://claude.ai/chat/2ea0fd5a-9655-4482-937e-617a9862931d#3-%ED%84%B4-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B5%AC%ED%98%84---%ED%94%8C%EB%A0%88%EC%9D%B4%EC%96%B4-%ED%84%B4%EA%B3%BC-%EC%A0%81-%ED%84%B4-%EA%B5%AC%EB%B6%84)
+4. [액션 포인트 재생성 로직 수정](https://claude.ai/chat/2ea0fd5a-9655-4482-937e-617a9862931d#4-%EC%95%A1%EC%85%98-%ED%8F%AC%EC%9D%B8%ED%8A%B8-%EC%9E%AC%EC%83%9D%EC%84%B1-%EB%A1%9C%EC%A7%81-%EC%88%98%EC%A0%95)
+5. [플레이어 입력 제한 로직](https://claude.ai/chat/2ea0fd5a-9655-4482-937e-617a9862931d#5-%ED%94%8C%EB%A0%88%EC%9D%B4%EC%96%B4-%EC%9E%85%EB%A0%A5-%EC%A0%9C%ED%95%9C-%EB%A1%9C%EC%A7%81)
+6. [적 턴 UI 시각화](https://claude.ai/chat/2ea0fd5a-9655-4482-937e-617a9862931d#6-%EC%A0%81-%ED%84%B4-ui-%EC%8B%9C%EA%B0%81%ED%99%94)
+7. [End Turn 버튼 표시/숨김 처리](https://claude.ai/chat/2ea0fd5a-9655-4482-937e-617a9862931d#7-end-turn-%EB%B2%84%ED%8A%BC-%ED%91%9C%EC%8B%9C%EC%88%A8%EA%B9%80-%EC%B2%98%EB%A6%AC)
+8. [간단한 적 AI 구현](https://claude.ai/chat/2ea0fd5a-9655-4482-937e-617a9862931d#8-%EA%B0%84%EB%8B%A8%ED%95%9C-%EC%A0%81-ai-%EA%B5%AC%ED%98%84)
+
+---
+
+## 1. Prefab Variant를 이용한 적 유닛 생성
+
+### 개념: Prefab Variant란?
+
+- **Prefab(프리팹)**: 게임 오브젝트를 재사용 가능한 에셋으로 저장한 것
+- **Prefab Variant(프리팹 변형)**: 기존 프리팹을 기반으로 일부만 변경한 새로운 버전
+  - 원본 프리팹의 모든 속성을 상속받음
+  - 필요한 부분만 오버라이드(덮어쓰기) 가능
+  - 원본이 업데이트되면 변형본도 자동으로 업데이트됨
+
+### 적 유닛 Prefab Variant 생성 과정
+
+1. **Project 창에서 Unit 프리팹 우클릭**
+2. **Create → Prefab Variant 선택**
+   - ⚠️ 주의: "Prefab"이 아니라 "Prefab Variant"를 선택해야 함
+3. **이름을 "UnitEnemy"로 변경**
+
+### 중요한 Unity 편집 팁: Post-Processing
+
+- **Prefab 편집 모드의 특징**:
+  - Prefab을 편집할 때는 별도의 씬(Scene)에서 작업
+  - 이 씬에는 **Post-Processing이 적용되지 않음**
+  - 실제 게임 씬에 배치하면 색상이 약간 다르게 보일 수 있음 (채도 증가 등)
+
+---
+
+## 2. 적 유닛 식별 시스템 구현
+
+### Unit 스크립트에 적 식별 필드 추가
+
+```csharp
+public class Unit : MonoBehaviour
+{
+    // [SerializeField]: private 변수를 Inspector에서 편집 가능하게 만드는 속성
+    // bool: true/false 값을 저장하는 불리언 타입
+    [SerializeField] private bool isEnemy;
+
+    // public 메서드로 외부에서 적 여부를 확인할 수 있게 함
+    // return: 메서드의 결과값을 반환
+    public bool IsEnemy()
+    {
+        return isEnemy; // isEnemy 필드의 값을 그대로 반환
+    }
+}
+
+```
+
+### Inspector에서 적 유닛 설정
+
+1. **기존 Unit 프리팹 선택**
+   - `isEnemy` 체크박스: **체크 해제** (플레이어 유닛)
+2. **UnitEnemy 프리팹 선택**
+   - `isEnemy` 체크박스: **체크** (적 유닛)
+
+### 적 유닛 선택 방지 로직
+
+```csharp
+public class UnitActionsSystem : MonoBehaviour
+{
+    private bool TryHnadleUnitSelection()
+    {
+        // 마우스 왼쪽 버튼 클릭 감지
+        if (Input.GetMouseButtonDown(0))
+        {
+            // 카메라에서 마우스 위치로 Ray(광선) 발사
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+
+            // Raycast: 광선이 충돌한 오브젝트 감지
+            // out RaycastHit: 충돌 정보를 raycastHit 변수에 저장
+            // float.MaxValue: 무한 거리
+            // unitLayerMask: Unit 레이어만 감지
+            if (Physics.Raycast(ray, out RaycastHit raycastHit, float.MaxValue, unitLayerMask))
+            {
+                // TryGetComponent: 충돌한 오브젝트에서 Unit 컴포넌트를 찾으려 시도
+                // out Unit unit: 찾은 컴포넌트를 unit 변수에 저장
+                if (raycastHit.transform.TryGetComponent<Unit>(out Unit unit))
+                {
+                    // 이미 선택된 유닛인지 확인
+                    if (unit == selectedUnit)
+                    {
+                        return false; // 재선택 방지
+                    }
+
+                    // ⭐ 적 유닛 선택 방지 로직
+                    if (unit.IsEnemy())
+                    {
+                        return false; // 적은 선택할 수 없음
+                    }
+
+                    SetSelectedUnit(unit); // 유닛 선택 처리
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+}
+```
+
+### 테스트 결과
+
+- 플레이어 유닛: 클릭 시 선택됨 ✅
+- 적 유닛: 클릭해도 선택되지 않음 ✅
+
+---
+
+## 3. 턴 시스템 구현 - 플레이어 턴과 적 턴 구분
+
+### 개념: 턴제 게임 시스템
+
+- **턴제(Turn-Based)**: 플레이어와 적이 번갈아가며 행동하는 게임 방식
+- **턴 순서**:
+  1. 플레이어 턴 → 행동 수행 → End Turn
+  2. 적 턴 → AI가 행동 수행 → 자동으로 턴 종료
+  3. 다시 플레이어 턴으로...
+
+### TurnSystem 스크립트에 턴 구분 로직 추가
+
+```csharp
+public class TurnSystem : MonoBehaviour
+{
+    public static TurnSystem Instance { get; private set; }
+
+    // EventHandler: C#의 이벤트 타입 (다른 스크립트에서 구독 가능)
+    public event EventHandler OnTurnChanged;
+
+    private int turnNumber = 1; // 현재 턴 번호
+
+    // ⭐ 플레이어 턴인지 적 턴인지 구분하는 변수
+    // true: 플레이어 턴, false: 적 턴
+    private bool isPlayerTurn = true;
+
+    private void Awake()
+    {
+        // Singleton 패턴: 게임 내에 TurnSystem이 하나만 존재하도록 보장
+        if (Instance != null)
+        {
+            Debug.LogError("There is more than one TurnSystem!");
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+    }
+
+    public void NextTurn()
+    {
+        turnNumber++; // 턴 번호 증가
+
+        // ⭐ 턴 전환: 플레이어 턴 ↔ 적 턴
+        // !: NOT 연산자 (true ↔ false 반전)
+        isPlayerTurn = !isPlayerTurn;
+
+        // ?.: null 조건 연산자 (구독자가 있으면 이벤트 발동)
+        OnTurnChanged?.Invoke(this, EventArgs.Empty);
+
+        Debug.Log("Turn " + turnNumber);
+    }
+
+    public int GetTurnNumber()
+    {
+        return turnNumber;
+    }
+
+    // ⭐ 외부에서 현재 턴이 플레이어 턴인지 확인할 수 있는 메서드
+    public bool IsPlayerTurn()
+    {
+        return isPlayerTurn;
+    }
+}
+```
+
+### 주요 개념 설명
+
+- **Singleton Pattern**:
+  - 게임 전체에서 하나의 인스턴스만 존재하도록 하는 디자인 패턴
+  - `Instance` 정적 변수로 어디서든 접근 가능 (`TurnSystem.Instance`)
+- **Event System**:
+  - `OnTurnChanged`: 턴이 바뀔 때 다른 스크립트들에게 알림
+  - 다른 스크립트들이 이 이벤트를 구독(Subscribe)하여 턴 변경 시 자동으로 반응
+
+---
+
+## 4. 액션 포인트 재생성 로직 수정
+
+### 개념: 액션 포인트 시스템
+
+- **Action Points**: 턴마다 유닛이 행동할 수 있는 횟수
+- **재생성 규칙**:
+  - 플레이어 유닛: 플레이어 턴이 시작될 때 재생성
+  - 적 유닛: 적 턴이 시작될 때 재생성
+
+### Unit 스크립트의 액션 포인트 재생성 로직
+
+```csharp
+public class Unit : MonoBehaviour
+{
+    private const int ACTION_POINTS_MAX = 2; // 최대 액션 포인트
+    private int actionPoints = ACTION_POINTS_MAX; // 현재 액션 포인트
+
+    private void Start()
+    {
+        // 다른 초기화 코드...
+
+        // ⭐ TurnSystem의 턴 변경 이벤트 구독
+        // +=: 이벤트에 메서드 추가 (구독)
+        TurnSystem.Instance.OnTurnChanged += TurnSystem_OnTurnChanged;
+    }
+
+    // 턴이 변경될 때마다 자동으로 호출되는 메서드
+    private void TurnSystem_OnTurnChanged(object sender, System.EventArgs e)
+    {
+        // ⭐ 복잡한 조건문: 액션 포인트 재생성 조건 판단
+        // 조건 1: (IsEnemy() && !TurnSystem.Instance.IsPlayerTurn())
+        //   → 이 유닛이 적이고 AND 현재 플레이어 턴이 아니면 (= 적 턴이면)
+        // 조건 2: (!IsEnemy() && TurnSystem.Instance.IsPlayerTurn())
+        //   → 이 유닛이 적이 아니고 (= 플레이어 유닛) AND 현재 플레이어 턴이면
+        // ||: OR 연산자 (둘 중 하나라도 true면 실행)
+        if ((IsEnemy() && !TurnSystem.Instance.IsPlayerTurn()) ||
+            (!IsEnemy() && TurnSystem.Instance.IsPlayerTurn()))
+        {
+            actionPoints = ACTION_POINTS_MAX; // 액션 포인트 재생성
+            OnAnyActionPointsChanged?.Invoke(this, EventArgs.Empty); // UI 업데이트 이벤트
+        }
+    }
+
+    public bool IsEnemy()
+    {
+        return isEnemy;
+    }
+}
+
+```
+
+### 논리 연산자 설명
+
+- **&&** (AND): 양쪽 조건이 모두 true일 때만 true
+- **||** (OR): 한쪽이라도 true면 true
+- **!** (NOT): true ↔ false 반전
+
+### 조건문 해석
+
+| 유닛 타입 | 현재 턴     | 조건 1 결과 | 조건 2 결과 | 최종 결과 | 액션 포인트 재생성 |
+| --------- | ----------- | ----------- | ----------- | --------- | ------------------ |
+| 적        | 적 턴       | true        | false       | true      | ✅                 |
+| 적        | 플레이어 턴 | false       | false       | false     | ❌                 |
+| 플레이어  | 플레이어 턴 | false       | true        | true      | ✅                 |
+| 플레이어  | 적 턴       | false       | false       | false     | ❌                 |
+
+---
+
+## 5. 플레이어 입력 제한 로직
+
+### 개념: 적 턴에는 플레이어가 조작할 수 없도록
+
+- 적 턴일 때는 플레이어의 모든 입력을 차단해야 함
+- 유닛 선택, 이동, 액션 등 모든 행동 불가
+
+### UnitActionsSystem 스크립트 수정
+
+```csharp
+public class UnitActionsSystem : MonoBehaviour
+{
+    private void Update()
+    {
+        // ⭐ isBusy 체크: 현재 액션 수행 중이면 새로운 입력 받지 않음
+        if (isBusy)
+        {
+            return; // Update 메서드 즉시 종료
+        }
+
+        // ⭐ 적 턴 체크: 플레이어 턴이 아니면 입력 받지 않음
+        if (!TurnSystem.Instance.IsPlayerTurn())
+        {
+            return; // Update 메서드 즉시 종료
+        }
+
+        // ⭐ UI 클릭 체크: UI 위에서 클릭했을 때 게임 오브젝트 선택 방지
+        // EventSystem: Unity UI 시스템
+        // IsPointerOverGameObject(): 마우스가 UI 위에 있는지 확인
+        if (EventSystem.current.IsPointerOverGameObject())
+        {
+            return;
+        }
+
+        // 이 아래 코드는 위의 모든 조건을 통과했을 때만 실행됨
+        // = 플레이어 턴이고, 바쁘지 않고, UI를 클릭하지 않았을 때
+
+        if (TryHnadleUnitSelection())
+        {
+            return;
+        }
+
+        HandleSelectedAction();
+    }
+}
+
+```
+
+### return 문의 역할
+
+- **return**: 메서드를 즉시 종료하고 빠져나감
+- **Early Return 패턴**: 조건이 맞지 않으면 바로 종료하여 불필요한 코드 실행 방지
+
+### 테스트 결과
+
+- **플레이어 턴**: 유닛 선택, 이동 가능 ✅
+- **적 턴**: 아무것도 클릭되지 않음 ✅
+- **End Turn 클릭**: 턴이 전환됨 ✅
+
+---
+
+## 6. 적 턴 UI 시각화
+
+### UI 요소 생성
+
+1. **Canvas → TurnSystemUI 하위에 배너 UI 생성**
+2. **기존 ActionBusyUI를 복사**:
+   - 이유: 비슷한 스타일의 배너를 재사용하기 위해
+3. **복사한 오브젝트 설정**:
+   - **이름**: EnemyTurnVisual
+   - **ActionBusyUI 스크립트 제거**: 새로운 용도이므로 기존 스크립트 삭제
+   - **TurnSystemUI의 자식으로 이동**: 턴 시스템 관련 UI이므로 논리적으로 그룹화
+
+### UI 스타일링
+
+1. **Image 컴포넌트**:
+   - Color: Black (배경색 검정)
+2. **Text (TextMeshPro) 컴포넌트**:
+   - Text: "ENEMY TURN"
+   - Color: Red (빨간색으로 경고감 표현)
+
+### Hierarchy 정리
+
+- **비활성화**: Inspector 상단의 체크박스 해제
+  - EnemyTurnVisual: 기본적으로 숨김
+  - ActionBusyUI: 깔끔한 작업 환경을 위해 숨김
+
+---
+
+## 7. End Turn 버튼 표시/숨김 처리
+
+### TurnSystemUI 스크립트 구현
+
+```csharp
+public class TurnSystemUI : MonoBehaviour
+{
+    [SerializeField] private Button endTurnButton; // End Turn 버튼 참조
+    [SerializeField] private TextMeshProUGUI turnNumberText; // 턴 번호 텍스트
+    [SerializeField] private GameObject enemyTurnVisualGameObject; // 적 턴 배너
+
+    private void Start()
+    {
+        // ⭐ Button 컴포넌트의 onClick 이벤트에 리스너 추가
+        // () => { } : 람다 표현식 (익명 함수)
+        // 버튼 클릭 시 TurnSystem.NextTurn() 호출
+        endTurnButton.onClick.AddListener(() =>
+        {
+            TurnSystem.Instance.NextTurn();
+        });
+
+        // 턴 변경 이벤트 구독
+        TurnSystem.Instance.OnTurnChanged += TurnSystem_OnTurnChanged;
+
+        // 초기 UI 상태 설정
+        UpdateTurnText();
+        UpdateEnemyTurnVisual();
+        UpdateEndTurnButtonVisibility();
+    }
+
+    // 턴 번호 텍스트 업데이트
+    private void UpdateTurnText()
+    {
+        // 문자열 연결: "TURN " + 숫자
+        turnNumberText.text = "TURN " + TurnSystem.Instance.GetTurnNumber();
+    }
+
+    // 턴 변경 시 호출되는 이벤트 핸들러
+    private void TurnSystem_OnTurnChanged(object sender, System.EventArgs e)
+    {
+        UpdateTurnText();
+        UpdateEnemyTurnVisual();
+        UpdateEndTurnButtonVisibility();
+    }
+
+    // ⭐ 적 턴 배너 표시/숨김
+    private void UpdateEnemyTurnVisual()
+    {
+        // SetActive(bool): GameObject의 활성화/비활성화 설정
+        // !IsPlayerTurn(): 플레이어 턴이 아니면 true (= 적 턴이면 true)
+        // 적 턴일 때 배너가 표시됨
+        enemyTurnVisualGameObject.SetActive(!TurnSystem.Instance.IsPlayerTurn());
+    }
+
+    // ⭐ End Turn 버튼 표시/숨김
+    private void UpdateEndTurnButtonVisibility()
+    {
+        // Button도 GameObject이므로 .gameObject로 접근
+        // 플레이어 턴일 때만 버튼 표시
+        endTurnButton.gameObject.SetActive(TurnSystem.Instance.IsPlayerTurn());
+    }
+}
+
+```
+
+### 람다 표현식 설명
+
+```csharp
+// 일반적인 메서드 방식
+private void OnEndTurnButtonClicked()
+{
+    TurnSystem.Instance.NextTurn();
+}
+
+// 람다 표현식 방식 (간단한 코드에 유용)
+() => { TurnSystem.Instance.NextTurn(); }
+
+// (): 매개변수 없음
+// =>: "goes to"라고 읽음, 화살표
+// { }: 실행할 코드 블록
+
+```
+
+### Inspector 설정
+
+1. **TurnSystemUI GameObject 선택**
+2. **SerializeField 변수들에 참조 할당**:
+   - `endTurnButton`: End Turn 버튼 드래그
+   - `turnNumberText`: Turn 번호 텍스트 드래그
+   - `enemyTurnVisualGameObject`: Enemy Turn 배너 드래그
+
+### 테스트 결과
+
+- **플레이어 턴**:
+  - End Turn 버튼 표시 ✅
+  - Enemy Turn 배너 숨김 ✅
+- **적 턴**:
+  - End Turn 버튼 숨김 ✅
+  - Enemy Turn 배너 표시 ✅
+
+---
+
+## 8. 간단한 적 AI 구현
+
+### 개념: 임시 AI 시스템
+
+- 이번 강의에서는 **완전한 AI가 아님**
+- 단순히 2초 대기 후 자동으로 턴을 넘기는 **임시 시스템**
+- 향후 강의에서 실제 AI 로직 구현 예정
+
+### EnemyAI 스크립트 생성
+
+1. **새 스크립트 생성**: EnemyAI.cs
+2. **새 GameObject 생성**: EnemyAI
+3. **스크립트를 GameObject에 연결**
+4. **Transform 리셋**: Position (0,0,0)
+
+### EnemyAI 스크립트 구현
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class EnemyAI : MonoBehaviour
+{
+    // ⭐ 타이머: 적 턴에서 얼마나 대기할지 측정
+    private float timer;
+
+    private void Start()
+    {
+        // 턴 변경 이벤트 구독
+        TurnSystem.Instance.OnTurnChanged += TurnSystem_OnTurnChanged;
+    }
+
+    private void Update()
+    {
+        // ⭐ 플레이어 턴일 때는 아무것도 하지 않음
+        if (TurnSystem.Instance.IsPlayerTurn())
+        {
+            return; // Update 종료
+        }
+
+        // 여기서부터는 적 턴일 때만 실행되는 코드
+
+        // ⭐ 타이머 감소
+        // Time.deltaTime: 이전 프레임에서 현재 프레임까지 걸린 시간 (초 단위)
+        // 매 프레임마다 타이머가 감소함
+        timer -= Time.deltaTime;
+
+        // ⭐ 타이머가 0 이하로 떨어지면 (2초가 지나면)
+        if (timer <= 0f)
+        {
+            // 적 턴 종료 → 플레이어 턴으로 전환
+            TurnSystem.Instance.NextTurn();
+        }
+    }
+
+    // 턴이 변경될 때마다 호출되는 이벤트 핸들러
+    private void TurnSystem_OnTurnChanged(object sender, System.EventArgs e)
+    {
+        // ⭐ 타이머 초기화: 적 턴이 시작될 때마다 2초로 설정
+        timer = 2f;
+    }
+}
+
+```
+
+### Time.deltaTime 개념
+
+- **프레임(Frame)**: 게임 화면이 업데이트되는 단위
+- **FPS (Frames Per Second)**: 1초당 프레임 수
+  - 60 FPS = 1초에 60번 Update 실행
+  - 30 FPS = 1초에 30번 Update 실행
+- **Time.deltaTime**: 이전 프레임과 현재 프레임 사이의 시간 간격
+  - 60 FPS: 약 0.0166초 (1/60)
+  - 30 FPS: 약 0.0333초 (1/30)
+- **사용 이유**: 프레임레이트에 관계없이 일정한 속도 보장
+
+### 타이머 작동 원리
+
+```
+적 턴 시작: timer = 2.0초
+프레임 1: timer = 2.0 - 0.016 = 1.984초
+프레임 2: timer = 1.984 - 0.016 = 1.968초
+...
+약 120프레임 후: timer = 0.0 - 0.016 = -0.016초 → 턴 종료!
+
+```
+
+### 최종 테스트 시나리오
+
+1. **게임 시작**: 플레이어 턴
+   - End Turn 버튼 표시 ✅
+   - 유닛 이동 가능 ✅
+2. **첫 번째 유닛 행동**:
+   - 유닛 선택
+   - 이동 (액션 포인트 1 소모)
+   - 한 번 더 이동 (액션 포인트 0)
+3. **두 번째 유닛 행동**:
+   - 다른 유닛 선택
+   - Spin 액션 사용
+4. **End Turn 클릭**:
+   - "ENEMY TURN" 배너 표시 ✅
+   - End Turn 버튼 숨김 ✅
+   - 플레이어 입력 차단 ✅
+5. **2초 대기**:
+   - EnemyAI가 자동으로 타이머 카운트다운
+   - 타이머 0 도달 → 자동으로 NextTurn() 호출
+6. **플레이어 턴 재개**:
+   - "ENEMY TURN" 배너 숨김 ✅
+   - End Turn 버튼 다시 표시 ✅
+   - 액션 포인트 2로 재생성 ✅
+   - 유닛 조작 가능 ✅
+
+---
+
+## 🎯 강의 핵심 요약
+
+### 1. Prefab Variant
+
+- 기존 프리팹 기반으로 일부만 변경한 변형본
+- 원본의 업데이트가 자동으로 반영됨
+- 적 유닛처럼 "거의 비슷하지만 약간 다른" 경우에 이상적
+
+### 2. 턴제 시스템 구조
+
+```
+TurnSystem
+├── turnNumber (턴 번호)
+├── isPlayerTurn (플레이어/적 턴 구분)
+└── OnTurnChanged (이벤트)
+
+Unit
+├── isEnemy (적 여부)
+├── actionPoints (액션 포인트)
+└── TurnSystem_OnTurnChanged (이벤트 구독)
+
+UnitActionsSystem
+└── Update()
+    ├── isBusy 체크
+    ├── IsPlayerTurn() 체크 ← 적 턴에 입력 차단
+    └── 입력 처리
+
+EnemyAI
+└── Update()
+    ├── IsPlayerTurn() 체크
+    ├── timer 감소
+    └── timer ≤ 0 → NextTurn()
+
+```
+
+### 3. 이벤트 시스템
+
+- **구독자 패턴**: 턴이 바뀌면 자동으로 알림
+- **느슨한 결합**: TurnSystem이 Unit, UI, AI를 직접 호출하지 않음
+- **확장성**: 새로운 스크립트도 쉽게 이벤트 구독 가능
+
+### 4. 조건문 활용
+
+- **Early Return**: 조건 불만족 시 즉시 종료
+- **논리 연산자**: &&(AND), ||(OR), !(NOT)
+- **복합 조건**: 여러 조건을 조합하여 정교한 로직 구현
+
+---
+
+## 📚 다음 강의 예고
+
+- 현재는 적이 단순히 대기만 함
+- 다음 강의에서는:
+  - **Shooting Action (사격 액션)** 구현
+  - 적을 공격할 수 있는 시스템
+  - 사격 범위, 데미지, 애니메이션 등
+
+# { 🎯 Unity 턴제 전략 게임 - ShootAction 구현하기 }
+
+이번 강의는 적 유닛을 조준하고 사격하는 ShootAction을 구현하는 내용입니다. 좋은 코드 아키텍처 덕분에 새로운 액션을 매우 쉽게 추가할 수 있습니다.
+
+---
+
+## 📋 목차
+
+1. [ShootAction 스크립트 생성 및 기본 구조](https://claude.ai/chat/728047b9-0e6a-449c-bc61-1f4f5187380e#1-shootaction-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%83%9D%EC%84%B1-%EB%B0%8F-%EA%B8%B0%EB%B3%B8-%EA%B5%AC%EC%A1%B0)
+2. [BaseAction 상속과 추상 메서드 구현](https://claude.ai/chat/728047b9-0e6a-449c-bc61-1f4f5187380e#2-baseaction-%EC%83%81%EC%86%8D%EA%B3%BC-%EC%B6%94%EC%83%81-%EB%A9%94%EC%84%9C%EB%93%9C-%EA%B5%AC%ED%98%84)
+3. [SpinAction 코드 복사로 초기 테스트](https://claude.ai/chat/728047b9-0e6a-449c-bc61-1f4f5187380e#3-spinaction-%EC%BD%94%EB%93%9C-%EB%B3%B5%EC%82%AC%EB%A1%9C-%EC%B4%88%EA%B8%B0-%ED%85%8C%EC%8A%A4%ED%8A%B8)
+4. [유효한 사격 범위 계산하기](https://claude.ai/chat/728047b9-0e6a-449c-bc61-1f4f5187380e#4-%EC%9C%A0%ED%9A%A8%ED%95%9C-%EC%82%AC%EA%B2%A9-%EB%B2%94%EC%9C%84-%EA%B3%84%EC%82%B0%ED%95%98%EA%B8%B0)
+5. [원형 사격 범위 구현](https://claude.ai/chat/728047b9-0e6a-449c-bc61-1f4f5187380e#5-%EC%9B%90%ED%98%95-%EC%82%AC%EA%B2%A9-%EB%B2%94%EC%9C%84-%EA%B5%AC%ED%98%84)
+6. [타겟 유닛 가져오기](https://claude.ai/chat/728047b9-0e6a-449c-bc61-1f4f5187380e#6-%ED%83%80%EA%B2%9F-%EC%9C%A0%EB%8B%9B-%EA%B0%80%EC%A0%B8%EC%98%A4%EA%B8%B0)
+7. [상태 머신(State Machine) 구현](https://claude.ai/chat/728047b9-0e6a-449c-bc61-1f4f5187380e#7-%EC%83%81%ED%83%9C-%EB%A8%B8%EC%8B%A0state-machine-%EA%B5%AC%ED%98%84)
+8. [타겟 조준 회전 구현](https://claude.ai/chat/728047b9-0e6a-449c-bc61-1f4f5187380e#8-%ED%83%80%EA%B2%9F-%EC%A1%B0%EC%A4%80-%ED%9A%8C%EC%A0%84-%EA%B5%AC%ED%98%84)
+9. [코드 리팩토링 - 공통 함수 추출](https://claude.ai/chat/728047b9-0e6a-449c-bc61-1f4f5187380e#9-%EC%BD%94%EB%93%9C-%EB%A6%AC%ED%8C%A9%ED%86%A0%EB%A7%81---%EA%B3%B5%ED%86%B5-%ED%95%A8%EC%88%98-%EC%B6%94%EC%B6%9C)
+
+---
+
+## 1. ShootAction 스크립트 생성 및 기본 구조
+
+### ShootAction 스크립트 만들기
+
+- **Action 폴더**에 새 스크립트 생성: `ShootAction.cs`
+- 모든 액션은 MonoBehaviour처럼 동작하므로 **Unit 프리팹에 직접 추가**
+  - 모든 유닛이 기본적으로 사격 능력을 가지므로 베이스 프리팹에 추가하는 것이 합리적
+
+### 기본 개념
+
+- **액션 시스템의 장점**:
+  - 잘 설계된 아키텍처 덕분에 새 액션 추가가 매우 간단함
+  - UI 코드, UnitActionSystem, GridVisual 등을 전혀 수정하지 않아도 됨
+  - 액션만 만들면 자동으로 시스템에 통합됨
+
+---
+
+## 2. BaseAction 상속과 추상 메서드 구현
+
+### BaseAction 상속하기
+
+```csharp
+public class ShootAction : BaseAction
+{
+    // BaseAction을 상속하면 에러 발생
+    // 이유: BaseAction에 정의된 추상(abstract) 메서드들을 구현해야 함
+}
+```
+
+### 추상 메서드 자동 구현
+
+**Visual Studio Code 사용 시:**
+
+- BaseAction에 커서를 두면 **전구 아이콘(💡)** 나타남
+- "Implement abstract class" 선택
+- 필요한 모든 추상 메서드가 자동으로 생성됨
+
+**생성되는 메서드들:**
+
+```csharp
+public class ShootAction : BaseAction
+{
+    // 1. 액션 이름 반환
+    public override string GetActionName()
+    {
+        return "Shoot"; // UI에 표시될 이름
+    }
+
+    // 2. 유효한 그리드 위치 목록 반환
+    public override List<GridPosition> GetValidActionGridPositionList()
+    {
+        throw new NotImplementedException();
+    }
+
+    // 3. 액션 실행
+    public override void TakeAction(GridPosition gridPosition, Action onActionComplete)
+    {
+        throw new NotImplementedException();
+    }
+}
+```
+
+---
+
+## 3. SpinAction 코드 복사로 초기 테스트
+
+### 왜 SpinAction 코드를 복사하는가?
+
+- 새 액션이 시스템에 제대로 통합되는지 **빠르게 테스트**하기 위함
+- 복잡한 로직 구현 전에 **기본 구조가 작동하는지 확인**
+- 좋은 아키텍처의 증거: 기존 코드 수정 없이 새 기능 추가 가능
+
+### SpinAction에서 복사할 코드
+
+```csharp
+public class ShootAction : BaseAction
+{
+    private float totalSpinAmount; // SpinAction에서 복사
+
+    void Update()
+    {
+        if (!isActive)
+        {
+            return;
+        }
+
+        // SpinAction과 동일한 회전 로직 (임시)
+        float spinAddAmount = 360f * Time.deltaTime;
+        transform.eulerAngles += new Vector3(0, spinAddAmount, 0);
+
+        totalSpinAmount += spinAddAmount;
+        if (totalSpinAmount >= 360f)
+        {
+            isActive = false;
+            onActionComplete();
+        }
+    }
+
+    public override void TakeAction(GridPosition gridPosition, Action onActionComplete)
+    {
+        this.onActionComplete = onActionComplete;
+        isActive = true;
+        totalSpinAmount = 0f;
+    }
+
+    public override List<GridPosition> GetValidActionGridPositionList()
+    {
+        GridPosition unitGridPosition = unit.GetGridPosition();
+
+        // 현재 위치만 반환 (SpinAction과 동일)
+        return new List<GridPosition>
+        {
+            unitGridPosition
+        };
+    }
+}
+```
+
+### 초기 테스트 결과
+
+- **게임 실행 시**: UI에 Move, Spin, **Shoot** 버튼이 자동으로 나타남
+- **Shoot 클릭 시**: SpinAction과 동일하게 360도 회전함
+- **증명된 것**:
+  - 새 액션이 시스템에 완벽히 통합됨
+  - UI 코드 수정 없음
+  - UnitActionSystem 수정 없음
+  - 단 30초 만에 새 액션 추가 완료
+
+### 좋은 코드 아키텍처의 힘
+
+> "We did not touch the UI. We did not touch the unit action system. We just made a brand new action and implemented it in 30 seconds."
+
+- **디커플링(Decoupling)**: 각 시스템이 독립적으로 작동
+- **확장성(Extensibility)**: 새 기능 추가가 매우 쉬움
+- **유지보수성(Maintainability)**: 기존 코드를 깨뜨리지 않음
+
+---
+
+## 4. 유효한 사격 범위 계산하기
+
+### 사격 범위 로직 개요
+
+1. **유닛 주변의 일정 범위 내** 모든 그리드 위치 검사
+2. 각 위치에 **적 유닛이 있는지** 확인
+3. 적이 있는 위치만 유효한 사격 위치로 반환
+
+### MoveAction 코드를 기반으로 시작
+
+**MoveAction의 범위 검사 로직**이 유사하므로 이를 복사해서 수정:
+
+```csharp
+public override List<GridPosition> GetValidActionGridPositionList()
+{
+    List<GridPosition> validGridPositionList = new List<GridPosition>();
+    GridPosition unitGridPosition = unit.GetGridPosition();
+
+    // 1. 사격 최대 거리 설정
+    int maxShootDistance = 7; // 7칸까지 사격 가능
+
+    // 2. 유닛 주변 모든 오프셋 검사
+    for (int x = -maxShootDistance; x <= maxShootDistance; x++)
+    {
+        for (int z = -maxShootDistance; z <= maxShootDistance; z++)
+        {
+            GridPosition offsetGridPosition = new GridPosition(x, z);
+            GridPosition testGridPosition = unitGridPosition + offsetGridPosition;
+
+            // 3. 유효성 검사들
+
+            // 3-1. 그리드 범위 내에 있는가?
+            if (!LevelGrid.Instance.IsValidGridPosition(testGridPosition))
+            {
+                continue; // 범위 밖이면 건너뛰기
+            }
+
+            // 3-2. 현재 유닛 위치와 같은가?
+            // (Shoot에서는 필요 없음 - 자기 자신을 쏠 수 없으므로)
+            // 삭제됨
+
+            // 3-3. 해당 위치에 유닛이 있는가?
+            if (!LevelGrid.Instance.HasAnyUnitOnGridPosition(testGridPosition))
+            {
+                continue; // 유닛이 없으면 건너뛰기
+                // MoveAction과 반대: Move는 빈 칸만, Shoot은 유닛 있는 칸만
+            }
+
+            // 여기까지 왔다면: 유효한 그리드 + 유닛 존재
+            validGridPositionList.Add(testGridPosition);
+        }
+    }
+
+    return validGridPositionList;
+}
+
+```
+
+### maxShootDistance를 변수로 분리
+
+**매직 넘버 방지** - 하드코딩된 숫자는 나중에 수정하기 어려움:
+
+```csharp
+public class ShootAction : BaseAction
+{
+    [SerializeField] private int maxShootDistance = 7; // Inspector에서 조정 가능
+
+    // 또는
+    private int maxShootDistance = 7; // 코드에서만 관리
+}
+
+```
+
+---
+
+## 5. 원형 사격 범위 구현
+
+### 문제점: 사각형 범위
+
+현재 코드는 **정사각형 영역**을 검사함:
+
+```
+■ ■ ■ ■ ■ ■ ■
+■ ■ ■ ■ ■ ■ ■
+■ ■ ■ U ■ ■ ■  ← U = 유닛
+■ ■ ■ ■ ■ ■ ■
+■ ■ ■ ■ ■ ■ ■
+
+```
+
+**실제 게임에서는** 원형(또는 다이아몬드형) 범위가 더 자연스러움:
+
+```
+    ■ ■ ■
+  ■ ■ ■ ■ ■
+■ ■ ■ U ■ ■ ■
+  ■ ■ ■ ■ ■
+    ■ ■ ■
+
+```
+
+### 원형 범위 구현하기
+
+**맨해튼 거리(Manhattan Distance)** 사용:
+
+- 대각선 이동 불가능한 그리드에서 두 점 사이의 거리
+- 공식: `distance = |x1 - x2| + |z1 - z2|`
+
+```csharp
+public override List<GridPosition> GetValidActionGridPositionList()
+{
+    List<GridPosition> validGridPositionList = new List<GridPosition>();
+    GridPosition unitGridPosition = unit.GetGridPosition();
+
+    for (int x = -maxShootDistance; x <= maxShootDistance; x++)
+    {
+        for (int z = -maxShootDistance; z <= maxShootDistance; z++)
+        {
+            GridPosition offsetGridPosition = new GridPosition(x, z);
+            GridPosition testGridPosition = unitGridPosition + offsetGridPosition;
+
+            if (!LevelGrid.Instance.IsValidGridPosition(testGridPosition))
+            {
+                continue;
+            }
+
+            // ★ 맨해튼 거리 계산 추가
+            int testDistance = Mathf.Abs(x) + Mathf.Abs(z);
+            // Mathf.Abs(): 절댓값 반환 (음수를 양수로 변환)
+            // 예: Abs(-3) = 3, Abs(5) = 5
+
+            if (testDistance > maxShootDistance)
+            {
+                continue; // 범위 밖이면 건너뛰기
+            }
+
+            if (!LevelGrid.Instance.HasAnyUnitOnGridPosition(testGridPosition))
+            {
+                continue;
+            }
+
+            validGridPositionList.Add(testGridPosition);
+        }
+    }
+
+    return validGridPositionList;
+}
+
+```
+
+## 📏 거리 재는 2가지 방법
+
+### 1. 직선 거리 (새처럼 날아가기)
+
+`□ □ 적
+□ ／□   ← 대각선으로 슉!
+나 □ □`
+
+**거리: 약 1.4칸**
+
+### 2. 맨해튼 거리 (격자 따라 걷기) ⭐
+
+`□ → 적
+□   ↑   ← 오른쪽 1칸 + 위로 1칸
+나 □ □`
+
+**거리: 2칸** (→ + ↑)
+
+`## 🔢 공식 (초간단)
+
+````
+맨해튼 거리 = 가로 칸수 + 세로 칸수`
+
+`int 거리 = Mathf.Abs(x) + Mathf.Abs(z);
+*// Abs = 절댓값 (음수를 양수로)*`
+
+---
+
+## 💡 왜 맨해튼 거리?
+
+**턴제 게임에서는 대각선으로 못 가요!**
+
+- ❌ 벽을 뚫고 갈 수 없음
+- ✅ 격자를 따라 움직여야 함
+
+### 거리 계산 예시
+
+유닛이 (0, 0)에 있고, maxShootDistance = 7일 때:
+
+| 테스트 위치 | x | z | 거리 계산 | 결과 |
+| --- | --- | --- | --- | --- |
+| (5, 5) | 5 | 5 | 5 + 5 = 10 | ❌ 범위 밖 (10 > 7) |
+| (4, 3) | 4 | 3 | 4 + 3 = 7 | ✅ 범위 내 (7 ≤ 7) |
+| (7, 0) | 7 | 0 | 7 + 0 = 7 | ✅ 범위 내 |
+| (-3, -3) | -3 | -3 | 3 + 3 = 6 | ✅ 범위 내 |
+
+### 디자인 선택
+
+```csharp
+// 방법 1: 정사각형 범위
+// 간단하지만 비현실적
+for (int x = -range; x <= range; x++)
+    for (int z = -range; z <= range; z++)
+        validPositions.Add(position);
+
+// 방법 2: 원형(다이아몬드) 범위 ← 강의에서 선택
+// 맨해튼 거리 사용, 더 자연스러움
+if (Mathf.Abs(x) + Mathf.Abs(z) <= range)
+    validPositions.Add(position);
+
+````
+
+> "This is a design question. If you want, you can leave it like this (square). But I prefer the circle range."
+
+---
+
+## 6. 타겟 유닛 가져오기
+
+### 문제: 적군만 타겟팅하기
+
+현재는 그리드에 **유닛이 있기만 하면** 유효한 위치로 판단:
+
+- 아군도 사격 대상이 되는 문제
+- 적군만 타겟팅하도록 필터링 필요
+
+### LevelGrid에 GetUnitAtGridPosition 추가
+
+**GridObject.cs에 먼저 추가:**
+
+```csharp
+public class GridObject
+{
+    private List<Unit> unitList; // 여러 유닛 저장 가능 (이동 중 겹칠 수 있음)
+
+    public bool HasAnyUnit()
+    {
+        return unitList.Count > 0; // 유닛이 하나라도 있으면 true
+    }
+
+    public Unit GetUnit()
+    {
+        // 유닛이 있으면 첫 번째 유닛 반환
+        if (HasAnyUnit())
+        {
+            return unitList[0];
+            // 액션 실행 시점에는 모든 유닛이 idle 상태
+            // → 한 그리드에 여러 유닛이 동시에 있을 수 없음
+            // → 첫 번째 유닛만 반환해도 안전
+        }
+        else
+        {
+            return null; // 유닛이 없으면 null
+        }
+    }
+}
+
+```
+
+**LevelGrid.cs에 public 메서드 추가:**
+
+```csharp
+public class LevelGrid : MonoBehaviour
+{
+    public Unit GetUnitAtGridPosition(GridPosition gridPosition)
+    {
+        GridObject gridObject = gridSystem.GetGridObject(gridPosition);
+        return gridObject.GetUnit(); // GridObject의 GetUnit() 호출
+    }
+}
+
+```
+
+### 적군 필터링 로직
+
+```csharp
+public override List<GridPosition> GetValidActionGridPositionList()
+{
+    // ... 이전 코드 ...
+
+    for (int x = -maxShootDistance; x <= maxShootDistance; x++)
+    {
+        for (int z = -maxShootDistance; z <= maxShootDistance; z++)
+        {
+            // ... 유효성 검사 ...
+
+            if (!LevelGrid.Instance.HasAnyUnitOnGridPosition(testGridPosition))
+            {
+                continue; // 유닛 없으면 건너뛰기
+            }
+
+            // ★ 타겟 유닛 가져오기
+            Unit targetUnit = LevelGrid.Instance.GetUnitAtGridPosition(testGridPosition);
+
+            // ★ 적군인지 확인
+            // 타겟의 IsEnemy()와 현재 유닛의 IsEnemy()가 같으면 → 같은 팀
+            if (targetUnit.IsEnemy() == unit.IsEnemy())
+            {
+                continue; // 아군이면 건너뛰기
+            }
+            // 다르면 → 적군이므로 유효한 타겟
+
+            validGridPositionList.Add(testGridPosition);
+        }
+    }
+
+    return validGridPositionList;
+}
+
+```
+
+### 팀 비교 로직 상세 설명
+
+| 현재 유닛        | 타겟 유닛        | IsEnemy() 비교        | 결과           |
+| ---------------- | ---------------- | --------------------- | -------------- |
+| 플레이어 (false) | 플레이어 (false) | false == false → true | ❌ 건너뛰기    |
+| 플레이어 (false) | 적 (true)        | false == true → false | ✅ 유효한 타겟 |
+| 적 (true)        | 플레이어 (false) | true == false → false | ✅ 유효한 타겟 |
+| 적 (true)        | 적 (true)        | true == true → true   | ❌ 건너뛰기    |
+
+### null 참조 예외 방지
+
+**Q: `GetUnitAtGridPosition()`이 null을 반환하면 `targetUnit.IsEnemy()`에서 에러가 나지 않나?**
+
+**A: 안전함. 이유:**
+
+```csharp
+// 1단계: 유닛 존재 여부 확인
+if (!LevelGrid.Instance.HasAnyUnitOnGridPosition(testGridPosition))
+{
+    continue; // 유닛이 없으면 여기서 건너뜀
+}
+
+// 2단계: 여기 도달했다면 유닛이 반드시 존재함
+Unit targetUnit = LevelGrid.Instance.GetUnitAtGridPosition(testGridPosition);
+// → null이 될 수 없음 (이미 HasAnyUnit()으로 확인함)
+
+// 3단계: 안전하게 사용 가능
+if (targetUnit.IsEnemy() == unit.IsEnemy())
+{
+    // ...
+}
+
+```
+
+---
+
+## 7. 상태 머신(State Machine) 구현
+
+### 왜 상태 머신이 필요한가?
+
+**즉시 사격 vs 단계적 사격:**
+
+```
+❌ 즉시 사격 (부자연스러움):
+클릭 → 즉시 총알 발사
+
+✅ 단계적 사격 (자연스러움):
+클릭 → 조준 → 사격 → 쿨다운
+
+```
+
+**턴제 전략 게임에서는** 신중하고 극적인 연출이 중요:
+
+1. **Aiming**: 천천히 조준
+2. **Shooting**: 총알 발사
+3. **Cooloff**: 사격 후 잠깐 대기
+
+### State enum 정의
+
+```csharp
+public class ShootAction : BaseAction
+{
+    // 상태 정의
+    private enum State
+    {
+        Aiming,   // 조준 중
+        Shooting, // 사격 중
+        Cooloff   // 쿨다운
+    }
+
+    private State state;          // 현재 상태
+    private float stateTimer;     // 각 상태의 남은 시간
+
+    // 각 상태의 지속 시간
+    private float aimingStateTime = 1f;    // 1초 동안 조준
+    private float shootingStateTime = 0.1f; // 0.1초 동안 사격
+    private float cooloffStateTime = 0.5f;  // 0.5초 쿨다운
+}
+
+```
+
+### Update에서 상태 처리
+
+```csharp
+void Update()
+{
+    if (!isActive)
+    {
+        return; // 액션이 비활성화 상태면 아무것도 안 함
+    }
+
+    // 1. 모든 상태에 공통으로 적용: 타이머 감소
+    stateTimer -= Time.deltaTime;
+
+    // 2. 현재 상태에 따라 다른 동작 수행
+    switch (state)
+    {
+        case State.Aiming:
+            // 조준 중에는 회전 처리 (나중에 구현)
+            Vector3 aimDir = (targetUnit.GetWorldPosition() - unit.GetWorldPosition()).normalized;
+            float rotateSpeed = 10f;
+            transform.forward = Vector3.Lerp(transform.forward, aimDir, Time.deltaTime * rotateSpeed);
+            break;
+
+        case State.Shooting:
+            // 사격 상태일 때만 총알 발사 (나중에 구현)
+            if (canShootBullet)
+            {
+                Shoot();
+                canShootBullet = false; // 한 번만 발사
+            }
+            break;
+
+        case State.Cooloff:
+            // 쿨다운은 타이머만 감소 (추가 동작 없음)
+            break;
+    }
+
+    // 3. 타이머가 다 되면 다음 상태로 전환
+    if (stateTimer <= 0f)
+    {
+        NextState();
+    }
+}
+
+```
+
+### 상태 전환 로직
+
+```csharp
+private void NextState()
+{
+    switch (state)
+    {
+        case State.Aiming:
+            // 조준 완료 → 사격 상태로
+            state = State.Shooting;
+            stateTimer = shootingStateTime; // 0.1초 타이머 설정
+            break;
+
+        case State.Shooting:
+            // 사격 완료 → 쿨다운 상태로
+            state = State.Cooloff;
+            stateTimer = cooloffStateTime; // 0.5초 타이머 설정
+            break;
+
+        case State.Cooloff:
+            // 쿨다운 완료 → 액션 종료
+            ActionComplete(); // BaseAction의 메서드 호출
+            break;
+    }
+}
+
+```
+
+### 액션 시작 시 초기화
+
+```csharp
+public override void TakeAction(GridPosition gridPosition, Action onActionComplete)
+{
+    ActionStart(onActionComplete); // BaseAction의 메서드
+
+    // 타겟 유닛 저장
+    targetUnit = LevelGrid.Instance.GetUnitAtGridPosition(gridPosition);
+
+    // 초기 상태 설정
+    state = State.Aiming;           // 조준부터 시작
+    stateTimer = aimingStateTime;   // 1초 타이머
+
+    canShootBullet = true;          // 총알 발사 가능 플래그
+}
+
+```
+
+### 상태 머신 흐름도
+
+```
+TakeAction() 호출
+    ↓
+[State.Aiming] (1초)
+    ├─ 타이머 감소
+    ├─ 타겟 방향으로 회전
+    └─ 타이머 <= 0 → NextState()
+    ↓
+[State.Shooting] (0.1초)
+    ├─ 타이머 감소
+    ├─ canShootBullet이 true면 Shoot() 한 번 호출
+    └─ 타이머 <= 0 → NextState()
+    ↓
+[State.Cooloff] (0.5초)
+    ├─ 타이머 감소
+    └─ 타이머 <= 0 → ActionComplete()
+    ↓
+액션 종료
+
+```
+
+### 사격 로직 구현
+
+```csharp
+private bool canShootBullet; // 총알 발사 가능 여부
+
+private void Shoot()
+{
+    // 타겟 유닛에 데미지 적용
+    targetUnit.Damage(40); // 40 데미지
+
+    // 나중에 총알 비주얼, 사운드 등 추가 예정
+}
+
+```
+
+**Unit.cs에 Damage 메서드 추가 (임시):**
+
+```csharp
+public class Unit : MonoBehaviour
+{
+    public void Damage(int damageAmount)
+    {
+        Debug.Log(transform.name + " took " + damageAmount + " damage!");
+        // 나중에 실제 체력 시스템 구현 예정
+    }
+}
+
+```
+
+### 코드 리팩토링: 타이머 체크 중복 제거
+
+**문제점:**
+
+```csharp
+// ❌ 중복 코드
+switch (state)
+{
+    case State.Aiming:
+        if (stateTimer <= 0f) { NextState(); }
+        break;
+    case State.Shooting:
+        if (stateTimer <= 0f) { NextState(); }
+        break;
+    case State.Cooloff:
+        if (stateTimer <= 0f) { NextState(); }
+        break;
+}
+
+```
+
+**해결책:**
+
+```csharp
+void Update()
+{
+    if (!isActive) return;
+
+    stateTimer -= Time.deltaTime;
+
+    // switch에서는 상태별 동작만 처리
+    switch (state)
+    {
+        case State.Aiming:
+            // 회전 로직만
+            break;
+        case State.Shooting:
+            // 발사 로직만
+            break;
+        case State.Cooloff:
+            // 아무것도 안 함
+            break;
+    }
+
+    // ✅ switch 밖에서 한 번만 타이머 체크
+    if (stateTimer <= 0f)
+    {
+        NextState();
+    }
+}
+
+```
+
+---
+
+## 8. 타겟 조준 회전 구현
+
+### 과제로 주어진 내용
+
+**목표**: MoveAction의 회전 로직을 참고해서 타겟을 향해 회전하기
+
+**힌트**: MoveAction의 `Vector3.Lerp()`를 사용한 부드러운 회전
+
+### MoveAction의 회전 로직 분석
+
+```csharp
+// MoveAction.cs의 Update()에서
+void Update()
+{
+    // ... 이동 로직 ...
+
+    // 회전 처리
+    float rotationSpeed = 10f;
+    transform.forward = Vector3.Lerp(
+        transform.forward,    // 현재 방향
+        moveDirection,        // 목표 방향
+        Time.deltaTime * rotationSpeed // 보간 비율
+    );
+}
+
+```
+
+### Vector3.Lerp() 개념
+
+**Lerp (Linear Interpolation) = 선형 보간:**
+
+```csharp
+Vector3.Lerp(시작값, 끝값, t)
+// t = 0.0 → 시작값 반환
+// t = 0.5 → 중간값 반환
+// t = 1.0 → 끝값 반환
+
+```
+
+**예시:**
+
+```csharp
+Vector3 start = new Vector3(0, 0, 1);  // 앞
+Vector3 end = new Vector3(1, 0, 0);    // 오른쪽
+
+Vector3 result = Vector3.Lerp(start, end, 0.3f);
+// 30% 회전한 방향 벡터 반환
+
+```
+
+**Time.deltaTime을 곱하는 이유:**
+
+- 매 프레임 조금씩 회전 (부드러운 효과)
+- 프레임레이트와 무관하게 일정한 속도
+
+### ShootAction에 회전 구현
+
+```csharp
+void Update()
+{
+    if (!isActive) return;
+
+    stateTimer -= Time.deltaTime;
+
+    switch (state)
+    {
+        case State.Aiming:
+            // ★ 조준 회전 로직
+            // 1. 타겟 방향 벡터 계산
+            Vector3 aimDir = (targetUnit.GetWorldPosition() - unit.GetWorldPosition()).normalized;
+            // GetWorldPosition()은 Unit에 추가한 헬퍼 함수
+
+            // 2. 부드럽게 회전
+            float rotateSpeed = 10f;
+            transform.forward = Vector3.Lerp(
+                transform.forward,  // 현재 방향
+                aimDir,             // 타겟 방향
+                Time.deltaTime * rotateSpeed
+            );
+            break;
+
+        case State.Shooting:
+            // 사격 로직
+            if (canShootBullet)
+            {
+                Shoot();
+                canShootBullet = false;
+            }
+            break;
+
+        case State.Cooloff:
+            break;
+    }
+
+    if (stateTimer <= 0f)
+    {
+        NextState();
+    }
+}
+
+```
+
+### Unit.cs에 GetWorldPosition() 추가
+
+```csharp
+public class Unit : MonoBehaviour
+{
+    // 월드 좌표 반환 헬퍼 함수
+    public Vector3 GetWorldPosition()
+    {
+        return transform.position;
+    }
+}
+
+```
+
+**왜 필요한가?**
+
+- `transform.position`을 직접 접근하는 것보다 **함수로 감싸는 것이 좋은 패턴**
+- 나중에 오프셋 추가, 높이 조정 등 변경이 쉬움
+- 캡슐화(Encapsulation) 원칙
+
+### 방향 벡터 계산 상세
+
+```csharp
+// 타겟 위치 - 현재 위치 = 방향 벡터
+Vector3 aimDir = (targetUnit.GetWorldPosition() - unit.GetWorldPosition()).normalized;
+
+// 예시:
+// targetUnit 위치: (5, 0, 5)
+// unit 위치: (0, 0, 0)
+// → (5, 0, 5) - (0, 0, 0) = (5, 0, 5)
+// → normalized = (0.707, 0, 0.707) // 크기가 1인 방향 벡터
+
+```
+
+**.normalized의 중요성:**
+
+- 벡터의 **방향만 유지**, 크기는 1로 만듦
+- 회전에는 방향만 필요 (거리는 무관)
+
+---
+
+## 9. 코드 리팩토링 - 공통 함수 추출
+
+### 중복 코드 발견
+
+**3개의 액션 모두 동일한 코드:**
+
+**MoveAction.cs:**
+
+```csharp
+public override void TakeAction(GridPosition gridPosition, Action onActionComplete)
+{
+    this.onActionComplete = onActionComplete; // ← 중복
+    isActive = true;                           // ← 중복
+    this.targetPosition = LevelGrid.Instance.GetWorldPosition(gridPosition);
+}
+
+// 액션 완료 시
+unitAnimator.SetBool("IsWalking", false);
+isActive = false;        // ← 중복
+onActionComplete();      // ← 중복
+
+```
+
+**SpinAction.cs:**
+
+```csharp
+public override void TakeAction(GridPosition gridPosition, Action onActionComplete)
+{
+    this.onActionComplete = onActionComplete; // ← 중복
+    isActive = true;                           // ← 중복
+    totalSpinAmount = 0f;
+}
+
+// 액션 완료 시
+isActive = false;        // ← 중복
+onActionComplete();      // ← 중복
+
+```
+
+**ShootAction.cs:**
+
+```csharp
+public override void TakeAction(GridPosition gridPosition, Action onActionComplete)
+{
+    this.onActionComplete = onActionComplete; // ← 중복
+    isActive = true;                           // ← 중복
+    targetUnit = LevelGrid.Instance.GetUnitAtGridPosition(gridPosition);
+    // ...
+}
+
+// 액션 완료 시
+isActive = false;        // ← 중복
+onActionComplete();      // ← 중복
+
+```
+
+### BaseAction에 공통 함수 추가
+
+**중복을 제거하고 재사용성 향상:**
+
+```csharp
+public abstract class BaseAction : MonoBehaviour
+{
+    protected Unit unit;
+    protected bool isActive = false;
+    protected Action onActionComplete;
+
+    // ★ 액션 시작 공통 로직
+    protected void ActionStart(Action onActionComplete)
+    {
+        isActive = true;                      // 액션 활성화
+        this.onActionComplete = onActionComplete; // 콜백 저장
+    }
+
+    // ★ 액션 완료 공통 로직
+    protected void ActionComplete()
+    {
+        isActive = false;    // 액션 비활성화
+        onActionComplete();  // 콜백 호출 (UnitActionSystem에 알림)
+    }
+
+    // ... 기존 추상 메서드들 ...
+}
+
+```
+
+**protected 접근 제한자:**
+
+- **public**: 모든 곳에서 접근 가능
+- **private**: 해당 클래스 내부에서만 접근 가능
+- **protected**: 해당 클래스와 **상속받은 자식 클래스**에서 접근 가능
+
+### 각 액션에서 사용하기
+
+**MoveAction 리팩토링:**
+
+```csharp
+public override void TakeAction(GridPosition gridPosition, Action onActionComplete)
+{
+    // ❌ 이전 코드
+    // this.onActionComplete = onActionComplete;
+    // isActive = true;
+
+    // ✅ 리팩토링 후
+    ActionStart(onActionComplete);
+
+    this.targetPosition = LevelGrid.Instance.GetWorldPosition(gridPosition);
+}
+
+private void Update()
+{
+    // ... 이동 로직 ...
+
+    if (Vector3.Distance(transform.position, targetPosition) <= stoppingDistance)
+    {
+        unitAnimator.SetBool("IsWalking", false);
+
+        // ❌ 이전 코드
+        // isActive = false;
+        // onActionComplete();
+
+        // ✅ 리팩토링 후
+        ActionComplete();
+    }
+}
+
+```
+
+**SpinAction 리팩토링:**
+
+```csharp
+public override void TakeAction(GridPosition gridPosition, Action onActionComplete)
+{
+    ActionStart(onActionComplete); // ✅ 공통 함수 사용
+    totalSpinAmount = 0f;
+}
+
+void Update()
+{
+    // ... 회전 로직 ...
+
+    if (totalSpinAmount >= 360f)
+    {
+        ActionComplete(); // ✅ 공통 함수 사용
+    }
+}
+
+```
+
+**ShootAction 리팩토링:**
+
+```csharp
+public override void TakeAction(GridPosition gridPosition, Action onActionComplete)
+{
+    ActionStart(onActionComplete); // ✅ 공통 함수 사용
+
+    targetUnit = LevelGrid.Instance.GetUnitAtGridPosition(gridPosition);
+    state = State.Aiming;
+    stateTimer = aimingStateTime;
+    canShootBullet = true;
+}
+
+private void NextState()
+{
+    switch (state)
+    {
+        case State.Cooloff:
+            ActionComplete(); // ✅ 공통 함수 사용
+            break;
+    }
+}
+
+```
+
+### 리팩토링의 이점
+
+**Before (중복 코드):**
+
+```
+MoveAction.cs:     isActive = true; onActionComplete = ...;
+SpinAction.cs:     isActive = true; onActionComplete = ...;
+ShootAction.cs:    isActive = true; onActionComplete = ...;
+
+```
+
+**After (공통 함수):**
+
+```
+BaseAction.cs:     ActionStart() { ... }
+MoveAction.cs:     ActionStart(onActionComplete);
+SpinAction.cs:     ActionStart(onActionComplete);
+ShootAction.cs:    ActionStart(onActionComplete);
+
+```
+
+**장점:**
+
+1. **코드 줄 수 감소**: 반복되는 2줄이 1줄로
+2. **유지보수 용이**: 로직 변경 시 BaseAction 한 곳만 수정
+3. **일관성 보장**: 모든 액션이 동일한 방식으로 동작
+4. **실수 방지**: `onActionComplete` 저장 깜빡하는 등의 실수 방지
+
+### 최종 테스트
+
+**모든 액션이 정상 작동하는지 확인:**
+
+```
+1. Move 클릭 → 이동 → ActionComplete() 호출 ✅
+2. Spin 클릭 → 360도 회전 → ActionComplete() 호출 ✅
+3. Shoot 클릭 → 조준 → 사격 → 쿨다운 → ActionComplete() 호출 ✅
+```
+
+**콘솔 확인:**
+
+```
+Unit_Enemy took 40 damage! // Damage() 로그 출력 ✅
+```
+
+---
+
+## 📝 전체 흐름 정리
+
+### 1. ShootAction 생성 및 초기 검증
+
+```
+ShootAction 스크립트 생성
+    ↓
+BaseAction 상속 (추상 메서드 구현)
+    ↓
+SpinAction 코드 복사 (임시)
+    ↓
+테스트: UI에 Shoot 버튼 나타남 ✅
+
+```
+
+### 2. 사격 범위 계산
+
+```
+MoveAction의 범위 검사 로직 복사
+    ↓
+maxShootDistance = 7 설정
+    ↓
+맨해튼 거리로 원형 범위 구현
+    ↓
+테스트: 다이아몬드 형태의 범위 표시 ✅
+
+```
+
+### 3. 타겟 필터링
+
+```
+LevelGrid.GetUnitAtGridPosition() 추가
+    ↓
+GridObject.GetUnit() 구현
+    ↓
+적군만 필터링 (IsEnemy() 비교)
+    ↓
+테스트: 적만 타겟팅 가능 ✅
+
+```
+
+### 4. 상태 머신 구현
+
+```
+State enum 정의 (Aiming, Shooting, Cooloff)
+    ↓
+Update()에서 상태별 처리
+    ↓
+NextState()로 상태 전환
+    ↓
+타이머로 각 상태 지속 시간 제어
+    ↓
+테스트: 조준 → 사격 → 쿨다운 흐름 ✅
+
+```
+
+### 5. 조준 회전
+
+```
+MoveAction의 Vector3.Lerp() 참고
+    ↓
+타겟 방향 벡터 계산
+    ↓
+부드러운 회전 구현
+    ↓
+Unit.GetWorldPosition() 헬퍼 함수 추가
+    ↓
+테스트: 타겟을 향해 회전 ✅
+
+```
+
+### 6. 코드 리팩토링
+
+```
+중복 코드 발견 (3개 액션 모두)
+    ↓
+BaseAction.ActionStart() 추가
+    ↓
+BaseAction.ActionComplete() 추가
+    ↓
+각 액션에서 공통 함수 호출로 변경
+    ↓
+테스트: 모든 액션 정상 작동 ✅
+
+```
+
+---
+
+## 🎯 핵심 개념 요약
+
+### 좋은 아키텍처의 힘
+
+1. **새 액션 추가가 30초 만에 가능**
+   - UI 코드 수정 불필요
+   - 시스템 코드 수정 불필요
+   - 액션만 만들면 자동 통합
+2. **디커플링 (Decoupling)**
+   - 각 시스템이 독립적으로 작동
+   - 한 시스템 변경이 다른 시스템에 영향 없음
+3. **확장성 (Extensibility)**
+   - 새 기능 추가가 매우 쉬움
+   - 기존 코드를 깨뜨리지 않음
+
+### 상태 머신 (State Machine)
+
+- **목적**: 복잡한 동작을 단계별로 제어
+- **구성 요소**:
+  - State enum (상태 정의)
+  - 현재 상태 저장 변수
+  - Update()에서 switch로 상태 처리
+  - NextState()로 상태 전환
+  - 타이머로 지속 시간 제어
+
+### 맨해튼 거리 (Manhattan Distance)
+
+- **공식**: `distance = |x1 - x2| + |z1 - z2|`
+- **용도**: 그리드 기반 게임에서 원형 범위 계산
+- **장점**: 정사각형보다 자연스러운 범위
+
+### Vector3.Lerp()를 이용한 부드러운 회전
+
+- **원리**: 현재 방향과 목표 방향 사이를 선형 보간
+- **장점**: 즉시 회전보다 자연스러움
+- **사용법**: `Lerp(현재, 목표, Time.deltaTime * 속도)`
+
+### 코드 리팩토링
+
+- **목적**: 중복 제거, 재사용성 향상
+- **방법**: 공통 로직을 부모 클래스로 이동
+- **이점**:
+  - 코드 줄 수 감소
+  - 유지보수 용이
+  - 일관성 보장
+  - 실수 방지
+
+---
+
+## 💡 다음 단계 예고
+
+현재는 사격 로직만 구현되고 **비주얼이 없는 상태**:
+
+- 총알 비주얼 추가
+- 사격 이펙트
+- 사운드 효과
+- 체력 시스템 구현
+
+다음 강의에서 이어집니다! 🎮

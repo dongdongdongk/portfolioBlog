@@ -1,0 +1,245 @@
+---
+title: '회원 도메인 설계'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# 회원 도메인 요구사항
+
+```java
+1. 회원을 가입하고 조회할 수 있다
+
+2. 회원은 일반과 VIP 두 가지 등급이 있다
+
+3. 회원 데이터는 자체 DB 를 구축할 수 있고 외부 시스템과 연동할 수 있다 (미확정)
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381135/notion-blog/_/_/_-_/_/Untitled.png)
+
+## 회원 저장소
+
+```java
+우리는 현재 회원 데이터의 저장 방식을 확정하지 못한 상태이므로 회원 저장소의 역할을 메모리 회원 저장소, DB 회원 저장소, 외부 시스템 연동 회원 저장소로 나누어 구현할 것이다.
+
+(역할과 구현)
+
+즉, 이후에 데이터 저장 방식이 확정되면 그때 저장 방식에 따라 구현하고 갈아끼워 주는 방식으로 설계한 것이다.
+```
+
+## 회원 클래스 다이어그램
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381133/notion-blog/_/_/_-_/_/Untitled_1.png)
+
+```java
+우선 회원 서비스, 즉 MemberService라는 '역할'을 인터페이스로 만들고, 그것에 대한 구현체로 MemberServiceImpl 클래스를 만들었다.
+
+또한 회원 저장소, 즉 MemberRepository라는 '역할'을 인터페이스로 만들고, 그것에 대한 구현체로 MemberMemoryRepository와 DbMemberRepository 클래스를 만들었다.
+
+* 참고 : MemberServiceImpl에서 Impl은 구현하다(implement)의 뜻으로 주로 인터페이스를 구현하는 구현 클래스가 하나일 경우에 붙여주는 구문이다.
+```
+
+## 회원 객체 다이어그램
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381134/notion-blog/_/_/_-_/_/Untitled_2.png)
+
+```java
+회원 객체 다이어그램은 객체 간의 메모리 참조 관계를 나타내고 있다. 즉, 클라이언트는 회원 서비스를 바라보고 회원 서비스는 메모리 회원 저장소를 바라보게 된다.
+```
+
+## **회원 도메인 개발**
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381134/notion-blog/_/_/_-_/_/Untitled_3.png)
+
+```java
+우선 Member라는 이름의 패키지를 하나 생성하고 해당 패키지 안에 등급을 설정하기 위한 Enum 타입의 Grade를 생성해준다.
+
+
+
+위에서 작성한 요구사항을 살펴보면 회원 등급에는 BASIC과 VIP 총 두 가지 등급이 있는 것을 확인할 수 있다.
+```
+
+```java
+package hello.core.member;
+
+public enum Grade {
+    BASIC,
+    VIP
+}
+```
+
+```java
+다음으로 회원 객체를 생성하기 위해 Member라는 이름의 클래스를 생성하고 아래와 같이 구현해주었다.
+
+참고 : IntelliJ의 경우 생성자 또는 Getter, Setter를 구현할 때, Windows는 단축키 Alt + Ins 키를 활용하여 간편하게 생성할 수 있다.
+```
+
+```java
+package hello.core.member;
+
+public class Member {
+    private Long id;
+    private String name;
+    private Grade grade;
+
+    public Member(Long id, String name, Grade grade) {
+        this.id = id;
+        this.name = name;
+        this.grade = grade;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public Grade getGrade() {
+        return grade;
+    }
+
+    public void setGrade(Grade grade) {
+        this.grade = grade;
+    }
+}
+```
+
+```java
+다음으로는 회원 저장소의 역할을 정의하기 위한 MemberRepository 인터페이스를 만들고, 아래와 같이 구현한다.
+```
+
+```java
+package hello.core.member;
+
+public interface MemberRepository {
+    void save(Member member);
+    Member findById(Long memberId);
+}
+```
+
+```java
+이후 위 인터페이스를 구현하는 구현 클래스로 MemoryMemberRepository 클래스를 생성하여 아래와 같이 구현한다.
+
+참고 : 위에서 HashMap으로 생성한 store의 경우 일반적으로는 동시성 이슈를 방지하기 위해서 ConcurrentHashMap으로 생성하는 것이 바람직하나 여기서는 예제를 최대한 단순화하기 위해서 HashMap을 사용하였다.
+```
+
+```java
+package hello.core.member;
+
+public class MemoryMemberRepository implements MemberRepository {
+
+    private static Map<Long, Member> store = new HashMap<>();
+
+    @Override
+    public void save(Member member) {
+        store.put(member.getId(), member);
+    }
+
+    @Override
+    public Member findById(Long memberId) {
+        return store.get(memberId);
+    }
+}
+```
+
+```java
+다음으로 회원 서비스의 역할을 정의하기 위한 MemberService 인터페이스를 만들고 아래와 같이 구현한다.
+```
+
+```java
+package hello.core.member;
+
+public interface MemberService {
+    void join(Member member);
+    Member findMember(Long memberId);
+}
+```
+
+```java
+이후 위 인터페이스를 구현하는 구현 클래스로 MemberServiceImpl 클래스를 생성하여 아래와 같이 구현한다.
+```
+
+```java
+package hello.core.member;
+
+public class MemberServiceImpl implements MemberService{
+
+    private final MemberRepository memberRepository = new MemoryMemberRepository();
+
+    @Override
+    public void join(Member member) {
+        memberRepository.save(member);
+    }
+
+    @Override
+    public Member findMember(Long memberId) {
+        return memberRepository.findById(memberId);
+    }
+}
+```
+
+## **회원 도메인 실행과 테스트**
+
+```java
+위에서 작성한 내용을 간단히 테스트 해보기 위해 MemberApp 클래스를 생성하여 아래와 같이 구현한다.
+```
+
+```java
+package hello.core;
+
+public class MemberApp {
+
+    public static void main(String[] args){
+        MemberService memberService = new MemberServiceImpl();
+        Member member = new Member(1L, "memberA", Grade.VIP);
+        memberService.join(member);
+
+        Member findMember = memberService.findMember(1L);
+        System.out.println("new member = " + member.getName());
+        System.out.println("find member = " + findMember.getName());
+    }
+}
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381134/notion-blog/_/_/_-_/_/Untitled_4.png)
+
+```java
+다만 위처럼 메인 메서드로 로직을 테스트하는 데에는 한계가 있다. 따라서 우리는 'JUnit'이라는 테스트 프레임워크를 사용할 것이다.
+
+
+기본적으로 세팅은 다 되어있으며 test 폴더 안에 패키지를 생성한 뒤 테스트를 위한 클래스를 생성하고 아래와 같이 구현해주면 된다.
+```
+
+```java
+package hello.core.member;
+
+public class MemberServiceTest {
+
+    MemberService memberService = new MemberServiceImpl();
+
+    @Test
+    void join(){
+        //given = 이런이런 환경 이런 값이 주어졌을때
+        Member member = new Member(1L, "memberA", Grade.VIP);
+
+        //when = 이렇게 했을때
+        memberService.join(member);
+        Member findMember = memberService.findMember(1L);
+
+        //then  = 이렇게 된다.
+        Assertions.assertThat(member).isEqualTo(findMember);
+    }
+}
+```

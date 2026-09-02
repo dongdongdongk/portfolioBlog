@@ -1,0 +1,284 @@
+---
+title: 'electron-react-boilerplate 사용'
+date: '2026-09-02'
+category: '풀스택/Electron'
+tags: ['풀스택', 'Electron']
+draft: false
+summary: ''
+---
+
+```jsx
+electron-react-boilerplate는 Electron과 React를 결합하여 데스크탑 애플리케이션을 개발하는 데 필요한
+
+기본 구조를 제공하는 프로젝트입니다.
+
+이 프로젝트는 Electron을 사용하여 크로스 플랫폼 데스크탑 애플리케이션을 만들고,
+
+React를 사용하여 사용자 인터페이스를 구성하는 데 도움을 줍니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381251/notion-blog/_/Electron/_/electron-react-boilerplate_/image.png)
+
+```jsx
+많은 개발 플랫폼과 라이브러리에서 다양한 boilerplate 템플릿을 제공하고 있습니다.
+
+이러한 템플릿은 기본적인 설정과 구조를 제공하여,
+
+개발자가 반복적인 작업을 피하고 더 빠르게 프로젝트를 시작할 수 있게 돕습니다.
+```
+
+## Main.js
+
+```jsx
+/* eslint global-require: off, no-console: off, promise/always-return: off */
+// ESLint 규칙을 비활성화하는 설정
+// - global-require: `require`를 코드 어디서든 사용할 수 있도록 허용
+// - no-console: `console.log` 사용 허용
+// - promise/always-return: 프로미스에서 항상 값을 반환하지 않아도 되도록 설정
+
+/**
+ * 이 모듈은 Electron의 메인 프로세스에서 실행됩니다.
+ * 여기서 렌더러 프로세스를 시작하고 IPC를 통해 다른 프로세스와 통신할 수 있습니다.
+ *
+ * `npm run build` 또는 `npm run build:main` 실행 시
+ * Webpack을 통해 `./src/main.js`로 컴파일됩니다.
+ * 이는 성능을 향상시키는 효과가 있습니다.
+ */
+import path from 'path'; // 파일 및 디렉토리 경로 처리를 위한 Node.js 기본 모듈
+import { app, BrowserWindow, shell, ipcMain } from 'electron'; // Electron의 주요 기능을 가져옴
+import { autoUpdater } from 'electron-updater'; // 자동 업데이트를 위한 모듈
+import log from 'electron-log'; // 로그를 파일에 기록하는 라이브러리
+import MenuBuilder from './menu'; // 애플리케이션 메뉴를 설정하는 커스텀 모듈
+import { resolveHtmlPath } from './util'; // HTML 파일의 경로를 동적으로 해결하는 유틸리티 함수
+
+// 자동 업데이트를 처리하는 클래스
+class AppUpdater {
+  constructor() {
+    log.transports.file.level = 'info'; // 로그 파일의 기록 레벨을 'info'로 설정
+    autoUpdater.logger = log; // autoUpdater의 로그 출력을 electron-log로 설정
+    autoUpdater.checkForUpdatesAndNotify(); // 업데이트 확인 후 사용자에게 알림
+  }
+}
+
+let mainWindow: BrowserWindow | null = null; // 메인 창을 저장할 변수 (초기값은 null)
+
+// IPC (프로세스 간 통신) 예제
+ipcMain.on('ipc-example', async (event, arg) => {
+  const msgTemplate = (pingPong: string) => `IPC test: ${pingPong}`; // 메시지 템플릿 함수
+  console.log(msgTemplate(arg)); // 콘솔에 메시지 출력
+  event.reply('ipc-example', msgTemplate('pong')); // 응답을 보냄 ('pong' 메시지)
+});
+
+// 프로덕션 환경에서 Source Map 지원 활성화 (디버깅용)
+if (process.env.NODE_ENV === 'production') {
+  const sourceMapSupport = require('source-map-support'); // 오류 추적을 위한 라이브러리
+  sourceMapSupport.install(); // Source Map 적용
+}
+
+// 개발 모드인지 확인
+const isDebug =
+  process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true';
+
+// 개발 모드에서는 추가적인 디버깅 기능 활성화
+if (isDebug) {
+  require('electron-debug')(); // 개발자 도구를 항상 활성화
+}
+
+// 개발자 도구 확장 프로그램 설치
+const installExtensions = async () => {
+  const installer = require('electron-devtools-installer'); // 개발자 도구 확장 프로그램 설치 모듈
+  const forceDownload = !!process.env.UPGRADE_EXTENSIONS; // 확장 프로그램 강제 업데이트 여부
+  const extensions = ['REACT_DEVELOPER_TOOLS']; // 설치할 확장 프로그램 목록
+
+  return installer
+    .default(
+      extensions.map((name) => installer[name]), // 확장 프로그램을 변환하여 설치
+      forceDownload,
+    )
+    .catch(console.log); // 오류 발생 시 콘솔에 출력
+};
+
+// 메인 창 생성 함수
+const createWindow = async () => {
+  if (isDebug) {
+    await installExtensions(); // 개발 모드일 경우 확장 프로그램 설치
+  }
+
+  // 애플리케이션 리소스 경로 설정
+  const RESOURCES_PATH = app.isPackaged
+    ? path.join(process.resourcesPath, 'assets') // 패키지된 환경에서는 `resourcesPath` 사용
+    : path.join(__dirname, '../../assets'); // 개발 환경에서는 `__dirname` 사용
+
+  // 특정 자산 파일의 경로를 얻는 헬퍼 함수
+  const getAssetPath = (...paths: string[]): string => {
+    return path.join(RESOURCES_PATH, ...paths);
+  };
+
+  // 메인 창 생성
+  mainWindow = new BrowserWindow({
+    show: false, // 초기에는 창을 숨김
+    width: 1024, // 창 너비
+    height: 728, // 창 높이
+    icon: getAssetPath('icon.png'), // 창 아이콘 설정
+    webPreferences: {
+      preload: app.isPackaged
+        ? path.join(__dirname, 'preload.js') // 패키지된 환경에서는 `preload.js` 사용
+        : path.join(__dirname, '../../.erb/dll/preload.js'), // 개발 환경에서는 `.erb/dll/preload.js` 사용
+    },
+  });
+
+  mainWindow.loadURL(resolveHtmlPath('index.html')); // HTML 파일 로드
+
+  // 창이 준비되었을 때 실행할 이벤트
+  mainWindow.on('ready-to-show', () => {
+    if (!mainWindow) {
+      throw new Error('"mainWindow" is not defined'); // 예외 처리
+    }
+    if (process.env.START_MINIMIZED) {
+      mainWindow.minimize(); // 환경 변수 설정에 따라 창을 최소화
+    } else {
+      mainWindow.show(); // 창을 보여줌
+    }
+  });
+
+  // 창이 닫혔을 때 실행할 이벤트
+  mainWindow.on('closed', () => {
+    mainWindow = null; // 창 변수를 null로 설정하여 참조 해제
+  });
+
+  const menuBuilder = new MenuBuilder(mainWindow); // 메뉴 빌더 인스턴스 생성
+  menuBuilder.buildMenu(); // 애플리케이션 메뉴 설정
+
+  // 외부 URL을 사용자의 기본 브라우저에서 열도록 설정
+  mainWindow.webContents.setWindowOpenHandler((edata) => {
+    shell.openExternal(edata.url); // 사용자의 기본 브라우저에서 링크 열기
+    return { action: 'deny' }; // Electron 내에서는 링크 열지 않음
+  });
+
+  // 자동 업데이트 확인 및 실행
+  new AppUpdater();
+};
+
+/**
+ * 애플리케이션 이벤트 리스너 설정
+ */
+
+// 모든 창이 닫혔을 때 실행할 이벤트
+app.on('window-all-closed', () => {
+  // macOS에서는 앱을 닫아도 백그라운드에서 실행되므로 종료하지 않음
+  if (process.platform !== 'darwin') {
+    app.quit(); // macOS가 아닌 경우 애플리케이션 종료
+  }
+});
+
+// 애플리케이션이 준비되면 실행할 작업
+app
+  .whenReady()
+  .then(() => {
+    createWindow(); // 메인 창 생성
+    app.on('activate', () => {
+      // macOS에서는 닫힌 창을 다시 열 수 있도록 처리
+      if (mainWindow === null) createWindow();
+    });
+  })
+  .catch(console.log); // 오류 발생 시 콘솔 출력
+
+```
+
+## util.ts
+
+```jsx
+resolveHtmlPath 유틸은 Electron 앱이 HTML 파일을 로드할 경로를 결정하는 함수입니다.
+
+개발 환경에서는 http://localhost:<PORT> 형태의 URL을 반환 (웹팩 개발 서버 사용)
+
+프로덕션 환경에서는 file:// 프로토콜을 사용해 로컬 파일 경로를 반환 (패키징된 앱 실행)
+
+즉, 환경에 따라 적절한 HTML 경로를 반환하는 역할을 합니다. 🚀
+```
+
+```jsx
+/* eslint import/prefer-default-export: off */
+// ESLint 규칙을 비활성화하는 설정
+// - import/prefer-default-export: 단일 export가 있는 경우 default export를 선호하는 규칙을 비활성화
+
+import { URL } from 'url'; // Node.js의 URL 클래스를 가져옴 (URL 조작에 사용)
+import path from 'path'; // 파일 및 디렉토리 경로 처리를 위한 Node.js 기본 모듈
+
+/**
+ * HTML 파일의 경로를 반환하는 함수
+ * - 개발 환경에서는 로컬 서버(`http://localhost:<PORT>`)에서 HTML을 로드
+ * - 프로덕션 환경에서는 패키징된 HTML 파일의 `file://` 경로를 반환
+ *
+ * @param {string} htmlFileName - 로드할 HTML 파일 이름 (예: 'index.html')
+ * @returns {string} - HTML 파일의 절대 경로 (HTTP 또는 file 프로토콜)
+ */
+export function resolveHtmlPath(htmlFileName: string) {
+  // 개발 환경인지 확인
+  if (process.env.NODE_ENV === 'development') {
+    const port = process.env.PORT || 1212; // 개발 서버 포트 설정 (기본값: 1212)
+    const url = new URL(`http://localhost:${port}`); // 개발 서버 URL 생성
+    url.pathname = htmlFileName; // URL의 경로를 지정된 HTML 파일로 설정
+    return url.href; // 최종적으로 완성된 URL을 반환
+  }
+
+  // 프로덕션 환경에서는 패키징된 HTML 파일을 로드
+  return `file://${path.resolve(__dirname, '../renderer/', htmlFileName)}`;
+  // path.resolve()를 사용해 `../renderer/` 디렉토리 내 HTML 파일의 절대 경로를 생성
+  // 이를 file 프로토콜과 함께 반환하여 로컬 파일 시스템에서 HTML을 로드할 수 있도록 함
+}
+
+```
+
+```jsx
+개발 환경 (NODE_ENV === 'development')
+
+		개발 중에는 webpack-dev-server 또는 다른 로컬 서버에서 애플리케이션을 실행합니다.
+
+		process.env.PORT를 사용하여 서버 포트를 가져오고
+
+		(기본값: 1212), http://localhost:<PORT>/<htmlFileName> 형식의 URL을 생성하여 반환합니다.
+
+프로덕션 환경
+
+		Electron이 패키징된 후 실행되는 경우, HTML 파일을 file:// 프로토콜을 사용하여 로드해야 합니다.
+
+		path.resolve(__dirname, '../renderer/', htmlFileName)를
+
+		사용하여 HTML 파일의 절대 경로를 생성하고, 이를 file:// 형식으로 반환합니다.
+
+
+
+사용 예시
+
+		const htmlPath = resolveHtmlPath('index.html');
+		console.log(htmlPath);
+		// 개발 환경일 경우: "http://localhost:1212/index.html"
+		// 프로덕션 환경일 경우: "file:///path/to/renderer/index.html"
+```
+
+## preload.d.ts
+
+```jsx
+이 코드는 렌더러 프로세스에서 window.electron을 사용할 수 있도록 타입을 정의하는 역할을 합니다.
+
+즉, Electron의 메인 프로세스와 통신하는 기능을 안전하게 제공할 수 있도록 도와줍니다.
+```
+
+```jsx
+declare global {
+  interface Window {
+    electron: ElectronHandler;
+  }
+}
+```
+
+```jsx
+TypeScript의 전역 타입 확장을 수행합니다.
+
+window 객체에 electron이라는 새로운 속성을 추가하고,
+
+그 타입을 ElectronHandler로 지정합니다.
+
+렌더러 프로세스에서 window.electron을 사용하면 자동 완성 및 타입 검사가 적용됨.
+```

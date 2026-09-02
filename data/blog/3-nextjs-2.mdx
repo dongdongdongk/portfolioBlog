@@ -1,0 +1,2176 @@
+---
+title: '섹션 3: NextJS 핵심 (앱 라우터) -2-'
+date: '2026-09-02'
+category: '풀스택/Next js'
+tags: ['풀스택', 'Next js']
+draft: false
+summary: ''
+---
+
+# { `loading.js` 파일 사용 }
+
+![image.png](<%EC%84%B9%EC%85%98%203%20NextJS%20%ED%95%B5%EC%8B%AC%20(%EC%95%B1%20%EB%9D%BC%EC%9A%B0%ED%84%B0)%20-2-/image.png>)
+
+## 문제 상황 요약
+
+```jsx
+/meals 페이지는 DB에서 데이터를 불러올 때 2~5초 지연이 있음
+
+이 때문에 유저는 화면이 멈춘 것처럼 느낄 수 있음
+
+특히 처음 로딩 시엔 더더욱 그렇다 (캐시가 없으니까)
+```
+
+## Next.js의 **자동 캐싱** 개념
+
+```jsx
+Next.js는 한번 들어간 페이지를 "자동으로" 캐싱합니다.
+
+다시 말해,
+
+		/meals에 한 번 들어가면
+
+		다음에 다시 들어올 때는 서버 요청 없이 바로 보여줌
+
+그래서 두 번째부터는 로딩 없이 빠르게 페이지가 뜸
+
+🧠 이게 가능한 이유는:
+
+		Next.js가 페이지를 구성할 때, 페이지의 내용뿐 아니라 그 페이지가 필요로 하는 데이터까지 백그라운드에서 캐시하기 때문입니다.
+```
+
+## 해결 방법: `loading.js` 파일 사용
+
+```jsx
+Next.js에서 제공하는 특별한 파일 시스템 기능을 사용합니다
+```
+
+### 구성 구조
+
+```jsx
+/app
+ └── /meals
+       ├── page.js           ✅ 페이지 자체
+       ├── loading.js        ✅ 데이터 로딩 중 표시
+       └── loading.module.css ✅ 로딩 스타일
+```
+
+## `loading.js` 개념 정리
+
+```jsx
+loading.js는 Next.js에서 자동으로 인식되는 파일로,
+
+해당 경로의 페이지(page.js)가 서버에서 데이터를 로딩하는 동안 표시됩니다.
+
+즉, 이 파일에 작성한 컴포넌트는
+
+		데이터가 다 준비될 때까지
+
+		중간에 보여주는 임시 화면 역할을 합니다.
+```
+
+## 코드 요약
+
+### loading.js
+
+```jsx
+import classes from './loading.module.css'
+
+export default function MealsLoading() {
+  return <p className={classes.loading}>식사를 불러오는 중…</p>
+}
+```
+
+## 전체 애플리케이션에 `loading`을 적용하려면?
+
+```jsx
+방법은 전역 layout.js 옆에 loading.js를 추가하면 됩니다.
+```
+
+```jsx
+/app
+ ├── layout.js         ✅ 앱 전체 레이아웃
+ ├── loading.js        ✅ 전역 로딩 UI ← 전체에 적용!
+ └── page.js
+```
+
+```jsx
+app/ 디렉토리 바로 아래에 있는 loading.js는
+
+모든 하위 페이지에서 데이터 로딩이 발생할 때 자동으로 사용됩니다.
+
+즉, 하위의 어떤 페이지가 서버에서 데이터를 불러올 때:
+
+전역 loading.js → 해당 페이지 loading.js 순서로 적용됩니다
+
+(둘 다 있으면 더 하위 폴더의 loading.js가 우선 적용)
+```
+
+# { `Suspense`를 이용한 더 세분화된 로딩 처리 }
+
+![image.png](<%EC%84%B9%EC%85%98%203%20NextJS%20%ED%95%B5%EC%8B%AC%20(%EC%95%B1%20%EB%9D%BC%EC%9A%B0%ED%84%B0)%20-2-/image%201.png>)
+
+## 1. `Suspense`를 이용한 더 세분화된 로딩 처리
+
+### 개념 설명: Suspense
+
+```jsx
+React에서 제공하는 내장 컴포넌트
+
+데이터를 로딩하는 동안 fallback이라는 대체 UI를 보여줍니다.
+```
+
+### Suspense를 쓰는 이유
+
+```jsx
+전체 페이지가 아니라 일부 컴포넌트만 로딩 중이라는 걸 보여줄 수 있음.
+
+헤더 같은 고정된 부분은 항상 보여주고, 실제 로딩이 필요한 컴포넌트만 기다림.
+```
+
+## 2. Meals 컴포넌트로 분리해서 Suspense로 감싸기
+
+```jsx
+<Suspense fallback={<p className={classes.loading}>Loading Page...</p>}>
+  <Meals />
+</Suspense>
+```
+
+```jsx
+Meals 컴포넌트는 async로 데이터를 불러옴
+
+그 데이터를 불러오는 동안엔 fallback에 지정된 <p>만 먼저 보여줌
+
+다 불러오면 MealsGrid가 화면에 나타남
+```
+
+## 3. Meals 컴포넌트 분리의 장점
+
+```jsx
+로직이 분리되어 코드가 깔끔해짐
+
+Suspense로 세밀한 로딩 처리 가능
+
+다른 컴포넌트에도 재사용하기 쉬움
+```
+
+## 4. 전체 코드 구조 요약
+
+```jsx
+// MealsPage (page.js)
+export default function MealsPage() {
+  return (
+    <>
+      <header>...</header>
+      <main>
+        <Suspense fallback={<p>로딩 중...</p>}>
+          <Meals />
+        </Suspense>
+      </main>
+    </>
+  )
+}
+
+// Meals 컴포넌트
+async function Meals() {
+  const meals = await getMeals()
+  return <MealsGrid meals={meals} />
+}
+```
+
+## 5. 정리 요약
+
+| 개념             | 설명                              |
+| ---------------- | --------------------------------- |
+| `loading.js`     | 페이지 전체 로딩 시 자동 표시     |
+| `Suspense`       | 컴포넌트 단위 로딩 처리 가능      |
+| `fallback`       | 로딩 중 보여줄 UI                 |
+| `async 컴포넌트` | 서버에서 데이터를 fetch할 수 있음 |
+| 코드 분리        | 유지보수 쉬움 + 재사용성 높음     |
+
+## 6. 추가 팁
+
+```jsx
+Suspense는 클라이언트 컴포넌트에서도 사용 가능하지만
+
+Next.js에서는 서버 컴포넌트에서도 작동하도록 특별히 확장되어 있음.
+
+Next.js에서 app/ 디렉토리를 사용할 경우엔
+
+이런 데이터 로딩 흐름이 자동으로 잘 연결되도록 설계되어 있음.
+```
+
+# { 에러 처리 하기 }
+
+![image.png](<%EC%84%B9%EC%85%98%203%20NextJS%20%ED%95%B5%EC%8B%AC%20(%EC%95%B1%20%EB%9D%BC%EC%9A%B0%ED%84%B0)%20-2-/image%202.png>)
+
+## 1. `error.js`란?
+
+```jsx
+error.js는 Next.js의 특수 파일 중 하나로, 페이지나 컴포넌트에서 발생한 오류를 처리하기 위한 전용 컴포넌트입니다.
+
+에러가 발생했을 때, 해당 경로에 존재하는 error.js가 자동으로 렌더링되어 사용자에게 에러 메시지를 보여줍니다.
+```
+
+## 2. 사용 목적
+
+```jsx
+네트워크 요청 실패 (예: 원격 DB 문제)
+
+데이터 로딩 실패
+
+잘못된 연산 등 JS 오류
+
+이러한 에러가 발생했을 때 앱이 멈추는 대신 사용자에게 친절한 메시지를 보여주기 위함입니다.
+```
+
+![image.png](<%EC%84%B9%EC%85%98%203%20NextJS%20%ED%95%B5%EC%8B%AC%20(%EC%95%B1%20%EB%9D%BC%EC%9A%B0%ED%84%B0)%20-2-/image%203.png>)
+
+## 3. 에러 처리 시나리오
+
+```jsx
+1. 에러가 발생할 수 있는 코드에 throw new Error(...) 추가
+
+2. Next.js가 이를 감지하고 error.js를 자동으로 렌더링
+
+3. 사용자에게는 커스터마이징된 에러 화면이 보여짐
+```
+
+```jsx
+// 예: lib/meals.js
+throw new Error('식사를 불러오는 데 실패했습니다.')
+```
+
+## 4. error.js 기본 구조
+
+```jsx
+'use client' // 반드시 필요함!
+
+export default function Error({ error }) {
+  return (
+    <main className="error">
+      <h1>오류가 발생했습니다!</h1>
+      <p>식사 자료 로딩에 실패했습니다. 나중에 다시 시도해 주세요.</p>
+    </main>
+  )
+}
+```
+
+### 중요한 점
+
+```jsx
+error.js는 반드시 클라이언트 컴포넌트여야 하므로 use client 지시어 필요
+
+error라는 props가 자동 전달되며, 더 구체적인 정보를 담고 있을 수 있음
+```
+
+## 5. error.js 위치
+
+```jsx
+error.js는 page.js 또는 layout.js와 같은 폴더 안에 위치해야 하며,
+
+그 폴더 및 하위 경로에서 발생하는 오류만 처리합니다.
+```
+
+```jsx
+📁 app/
+  ├─ layout.js
+  ├─ page.js
+  ├─ loading.js         ← 로딩 상태
+  ├─ error.js           ← 에러 상태 처리
+  └─ meals/
+        ├─ page.js
+        └─ error.js     ← 이 경로 전용 에러 처리
+
+📌 error.js 개념 요약
+- 에러 발생 시 자동 실행되는 특수 컴포넌트
+- 반드시 'use client' 지시어 필요
+- error props 전달됨
+- 레이아웃/페이지 단위로 세분화 가능
+```
+
+# { 404 오류 처리 }
+
+![image.png](<%EC%84%B9%EC%85%98%203%20NextJS%20%ED%95%B5%EC%8B%AC%20(%EC%95%B1%20%EB%9D%BC%EC%9A%B0%ED%84%B0)%20-2-/image%204.png>)
+
+## 문제: 잘못된 URL 입력 시 생기는 오류
+
+```jsx
+사용자가 존재하지 않는 URL을 입력할 경우
+
+예: /my-meal처럼 우리가 만들지 않은 경로에 접근하면
+
+기본적으로 Next.js가 자동으로 404 페이지를 보여줍니다.
+```
+
+## 해결 방법: 직접 404 페이지 커스터마이징 하기
+
+```jsx
+1. 기본 404 페이지는 자동 제공됨
+
+		아무 설정도 하지 않아도 Next.js가 기본적인 404 페이지를 보여줍니다.
+
+		이걸 그대로 써도 괜찮지만, 원한다면 직접 디자인해서 바꿀 수 있음.
+
+2. 사용자 정의 404 페이지 만들기
+
+		not-found.js 파일을 만들어서 사용자가 볼 수 있도록 커스터마이징 가능.
+
+		app 폴더 내에 어디에 두든 상관없지만, 위치에 따라 적용 범위가 달라짐:
+
+🔹 루트(app/)에 넣으면:
+
+		전역 404 처리됨 → 사이트 어디에서든 잘못된 경로에 대해 이 페이지가 보여짐.
+
+🔹 특정 폴더에 넣으면:
+
+		해당 경로 안에서만 적용됨 → 예를 들어 /meals 폴더에 넣으면 /meals/abc 같은 잘못된 경로만 해당 커스텀 페이지가 적용됨.
+```
+
+## 예시 코드
+
+![image.png](<%EC%84%B9%EC%85%98%203%20NextJS%20%ED%95%B5%EC%8B%AC%20(%EC%95%B1%20%EB%9D%BC%EC%9A%B0%ED%84%B0)%20-2-/image%205.png>)
+
+```jsx
+// app/not-found.js
+export default function NotFound() {
+  return (
+    <main className="not-found">
+      <h1>Page Not Found</h1>
+      <p>The page you are looking for does not exist.</p>
+    </main>
+  )
+}
+```
+
+```jsx
+function NotFound() : 컴포넌트 이름은 NotFound여야 함 (Next.js가 자동 인식)
+
+main 태그에 not-found라는 CSS 클래스 적용
+
+제목과 설명을 원하는 대로 커스터마이징 가능
+```
+
+# { 동적 라우팅을 이용한 식사 상세 페이지 구현 }
+
+![image.png](<%EC%84%B9%EC%85%98%203%20NextJS%20%ED%95%B5%EC%8B%AC%20(%EC%95%B1%20%EB%9D%BC%EC%9A%B0%ED%84%B0)%20-2-/image%206.png>)
+
+## 1. **동적 세그먼트 (Dynamic Segment)**
+
+```jsx
+파일명에 대괄호 []를 사용하면 URL에 따라 동적으로 페이지가 바뀜
+
+예: [mealSlug] 폴더 → /meals/spaghetti와 같은 경로에 대응됨
+
+이 파일은 URL에서 mealSlug 값을 읽고 해당 식사의 상세 내용을 보여주는 역할을 함.
+```
+
+```jsx
+/app/meals/[mealSlug]/page.js
+```
+
+## 2. **params로 동적 값 접근**
+
+```jsx
+Next.js는 자동으로 이 페이지에 props를 전달하고 그 안에 params라는 객체가 포함됨.
+
+여기엔 동적 세그먼트 값이 들어있음.
+
+이 mealSlug는 DB에서 어떤 식사 데이터를 가져올지 결정하는 식별자 역할을 함.
+```
+
+```jsx
+export default function MealDetailPage({ params }) {
+  const mealSlug = params.mealSlug
+}
+```
+
+## 3. **DB에서 데이터 가져오기**
+
+```jsx
+better-sqlite3를 사용해서 데이터베이스에서 식사 정보를 가져옴.
+```
+
+```jsx
+export function getMeal(slug) {
+  return db.prepare('SELECT * FROM meals WHERE slug = ?').get(slug)
+}
+```
+
+```jsx
+?는 SQL 인젝션 방지용 플레이스홀더임
+
+.get(slug)는 단일 데이터 한 건만 조회할 때 사용
+```
+
+### 바인딩 방법
+
+```jsx
+1. 단일 값 바인딩
+
+db.prepare('SELECT * FROM meals WHERE slug = ?').get(slug);
+
+?에 slug 값을 바인딩
+
+하나의 결과만 가져옴 (.get() 사용)
+```
+
+```jsx
+2. 여러 값 바인딩 (3개)
+
+db.prepare('SELECT * FROM meals WHERE creator = ? AND title = ? AND slug = ?').get(a, b, c);
+
+각 ?에 a, b, c 값이 순서대로 바인딩됨
+
+마찬가지로 결과는 하나 (.get())
+```
+
+```jsx
+3. 여러 결과가 필요한 경우
+
+db.prepare('SELECT * FROM meals WHERE creator = ?').all(creator);
+
+조건에 맞는 모든 행을 배열로 반환 (.all())
+```
+
+## 4. **이미지 처리 - Next.js의 Image 컴포넌트**
+
+```jsx
+Next.js는 성능 최적화를 위해 자체 이미지 컴포넌트를 제공함
+
+fill: 컨테이너 영역을 꽉 채우도록 이미지 비율 맞춰 자동 크기 조절
+
+성능 최적화, lazy loading, 사이즈 자동 조절 등을 지원
+```
+
+```jsx
+<Image src={meal.image} alt={meal.title} fill />
+```
+
+## 5. **dangerouslySetInnerHTML**
+
+```jsx
+문자열을 HTML 코드로 인식해서 브라우저에 그대로 출력하는 방법
+
+매우 조심해야 함 → 외부에서 입력된 HTML이면 XSS 공격에 취약
+```
+
+```jsx
+<p dangerouslySetInnerHTML={{ __html: meal.instructions }}></p>
+```
+
+```jsx
+meal.instructions가 '<h1>요리법</h1><p>내용</p>'와 같이 HTML 문자열이면, 이를 직접 HTML로 출력함
+
+반드시 검증된 데이터만 사용해야 안전
+```
+
+## 6. **줄바꿈 처리 (개행 → `<br />`)**
+
+```jsx
+일반 문자열에는 줄바꿈이 \n 문자로 되어있음
+
+HTML에서는 줄바꿈을 보려면 <br />을 써야 함
+```
+
+```jsx
+meal.instructions = meal.instructions.replace(/\n/g, '<br />')
+```
+
+```jsx
+/\n/g: 정규식으로 모든 줄바꿈 문자를 찾음 (g: 전체 검색)
+
+replace로 <br />로 바꿔줌
+```
+
+## 7. **메일 링크 생성**
+
+```jsx
+mailto:를 사용하면 클릭 시 이메일 앱이 열리도록 할 수 있음
+
+백틱 ` `을 써서 문자열 안에 변수를 삽입하는 템플릿 리터럴 문법 사용
+```
+
+```jsx
+<a href={`mailto:${meal.creator_email}`}>{meal.creator}</a>
+```
+
+## app/meals/[mealSlug]/page.js
+
+```jsx
+// Next.js의 Image 컴포넌트를 가져옵니다. 성능 최적화된 이미지 처리를 도와줍니다.
+import Image from 'next/image'
+
+// 스타일을 불러옵니다 (CSS 모듈)
+import classes from './page.module.css'
+
+// 특정 식사 데이터를 가져오는 함수
+import { getMeal } from '@/lib/meals'
+
+// 이 컴포넌트는 URL에 따라 선택된 식사의 상세 정보를 보여주는 페이지입니다.
+export default function MealDetailPage({ params }) {
+  // URL의 동적 세그먼트(mealSlug)를 이용해서 해당 식사를 가져옵니다.
+  const meal = getMeal(params.mealSlug)
+
+  // 줄바꿈(\n)을 HTML의 줄바꿈 태그(<br />)로 바꿉니다.
+  // 이렇게 해야 브라우저 화면에 줄바꿈이 적용됩니다.
+  meal.instructions = meal.instructions.replace(/\n/g, '<br />')
+
+  return (
+    <>
+      {/* 페이지 상단 - 이미지, 제목, 요약 정보 등 */}
+      <header className={classes.header}>
+        {/* 이미지 영역 */}
+        <div className={classes.image}>
+          {/* 이미지 컴포넌트: 데이터베이스에 있는 이미지 경로 사용 */}
+          <Image
+            src={meal.image} // 이미지 URL
+            alt={meal.title} // 대체 텍스트 (접근성)
+            fill // 부모 요소를 채움
+          />
+        </div>
+
+        {/* 텍스트 영역 (제목, 작성자, 요약) */}
+        <div className={classes.headerText}>
+          {/* 식사 제목 */}
+          <h1>{meal.title}</h1>
+
+          {/* 작성자 정보 (이메일로 메일 보내기) */}
+          <p className={classes.creator}>
+            by <a href={`mailto:${meal.creator_email}`}>{meal.creator}</a>
+          </p>
+
+          {/* 식사 요약 */}
+          <p className={classes.summary}>{meal.summary}</p>
+        </div>
+      </header>
+
+      {/* 본문 영역 - 조리 방법 설명 */}
+      <main>
+        {/* instructions에는 HTML이 포함되므로 HTML로 출력할 수 있도록 처리 */}
+        <p
+          className={classes.instructions}
+          dangerouslySetInnerHTML={{
+            __html: meal.instructions, // 문자열을 HTML로 출력
+          }}
+        ></p>
+      </main>
+    </>
+  )
+}
+```
+
+# { 존재하지 않는 (`meal`)를 요청하면 `getMeal` 함수는 `undefined`를 반환 오류 }
+
+## 상황 설명
+
+```jsx
+유저가 존재하지 않는 식사(meal)를 요청하면 getMeal 함수는 undefined를 반환함.
+
+이 상태에서 meal.instructions에 접근하려고 하면서 런타임 오류가 발생함.
+
+ex) http://localhost:3000/meals/spicy-currydfadfagdfafddfs
+
+* 왜냐하면 쿼리에서 아무것도 찾지 못하게 되기 때문
+```
+
+## 문제의 본질
+
+```jsx
+사실 이는 진짜 오류(error) 는 아님.
+
+단순히 유저가 존재하지 않는 데이터를 요청한 것일 뿐, 이는 404(Not Found) 상황임.
+```
+
+## 해결 방법
+
+![image.png](<%EC%84%B9%EC%85%98%203%20NextJS%20%ED%95%B5%EC%8B%AC%20(%EC%95%B1%20%EB%9D%BC%EC%9A%B0%ED%84%B0)%20-2-/image%207.png>)
+
+```jsx
+meal이 존재하지 않으면 (!meal) notFound() 함수를 호출함.
+
+notFound()는 next/navigation에서 제공되며, 컴포넌트 실행을 중단하고 가장 가까운 Not Found 페이지로 리디렉션함.
+```
+
+```jsx
+import { notFound } from 'next/navigation'
+
+if (!meal) {
+  notFound()
+}
+```
+
+# { ImagePicker 컴포넌트 제작 }
+
+![image.png](<%EC%84%B9%EC%85%98%203%20NextJS%20%ED%95%B5%EC%8B%AC%20(%EC%95%B1%20%EB%9D%BC%EC%9A%B0%ED%84%B0)%20-2-/image%208.png>)
+
+## 1. 개념적인 이해
+
+### ImagePicker 컴포넌트의 역할
+
+```jsx
+사용자가 이미지를 선택하게 해주고,
+
+선택한 이미지를 폼(form)에 제출할 수 있게 해줍니다.
+
+미리보기도 보여줄 수 있습니다.
+```
+
+### 왜 별도의 컴포넌트로 만들까?
+
+```jsx
+이미지 선택은 단순한 텍스트 입력과 달리 복잡한 기능 (미리보기, 파일 타입 제한 등)이 필요하기 때문입니다.
+
+따라서 독립된 ImagePicker 컴포넌트로 분리하여 관리하는 것이 좋습니다.
+```
+
+### 숨겨진 input을 클릭하는 버튼 만들기
+
+```jsx
+<input type="file" />는 스타일을 입히기 어렵기 때문에 숨겨놓고,
+
+우리가 만든 예쁜 버튼을 클릭했을 때 이 input이 대신 클릭되도록 하는 방식입니다.
+
+ref를 사용해서 버튼이 숨겨진 input을 직접 조작할 수 있도록 합니다.
+
+/* input을 화면에서 숨김 */
+.input {
+  display: none;
+}
+```
+
+### 클라이언트 컴포넌트로 지정해야 하는 이유
+
+```jsx
+브라우저에서 일어나는 클릭 같은 **인터랙션(상호작용)**은 서버가 아니라
+
+**클라이언트(사용자 브라우저)**에서 처리해야 합니다.
+
+그래서 상단에 'use client'; 지시어를 추가하여 컴포넌트를 클라이언트 컴포넌트로 지정합니다.
+```
+
+## `ImagePicker` 컴포넌트의 전체 코드
+
+```jsx
+'use client' // 이 컴포넌트가 브라우저(클라이언트)에서 동작해야 한다는 것을 Next.js에 알려줍니다.
+// 이유: 파일 업로드, 버튼 클릭 같은 브라우저 인터랙션이 필요하기 때문입니다.
+
+import { useRef } from 'react' // useRef 훅을 React로부터 가져옵니다. HTML 요소에 직접 접근하기 위해 사용합니다.
+import classes from './image-picker.module.css' // CSS 모듈을 import 합니다. className으로 스타일을 적용할 수 있게 됩니다.
+
+export default function ImagePicker({ label, name }) {
+  // imageInput이라는 이름의 ref 객체를 생성합니다.
+  // 나중에 <input type="file" /> 요소를 참조하기 위해 사용됩니다.
+  const imageInput = useRef()
+
+  // 이 함수는 사용자가 "사진 고르기" 버튼을 클릭했을 때 실행됩니다.
+  // input 요소를 코드로 클릭시켜서 파일 선택 창을 띄웁니다.
+  function handlePickClick() {
+    imageInput.current.click() // ref로 연결된 input 요소를 강제로 클릭시킴
+  }
+
+  return (
+    <>
+      {/* 전체 선택 영역을 감싸는 div */}
+      <div className={classes.picker}>
+        {/* 파일 선택 input과 연결된 라벨 */}
+        <label htmlFor={name}>{label}</label>
+        {/* 위 라벨은 input의 id와 연결되어 있어 클릭 시 input도 클릭됩니다 */}
+
+        {/* 파일 선택 input과 커스텀 버튼을 감싸는 div */}
+        <div className={classes.controls}>
+          {/* 파일 선택 input */}
+          <input
+            className={classes.input} // CSS에서 이 input을 숨기도록 설정되어 있음
+            type="file" // 파일 선택 input임을 의미
+            id={name} // label의 htmlFor와 연결하기 위한 id
+            accept="image/png, image/jpeg, image/jpg" // 허용할 이미지 파일 포맷 제한
+            name={name} // form 제출 시 이 input의 name 속성으로 서버로 전송됨
+            ref={imageInput} // useRef로 만든 imageInput을 여기에 연결하여 DOM 접근 가능하게 만듦
+          />
+
+          {/* 사용자가 클릭할 커스텀 버튼 */}
+          <button
+            className={classes.button} // 버튼 스타일 클래스 적용
+            type="button" // 버튼이 form을 제출하지 않도록 지정
+            onClick={handlePickClick} // 클릭하면 handlePickClick 함수 실행 → 숨겨진 input 클릭
+          >
+            Pick an Image {/* 버튼에 표시될 텍스트 */}
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
+```
+
+# { 이미지 업로드 전에 미리보기 기능 만들기 }
+
+![image.png](<%EC%84%B9%EC%85%98%203%20NextJS%20%ED%95%B5%EC%8B%AC%20(%EC%95%B1%20%EB%9D%BC%EC%9A%B0%ED%84%B0)%20-2-/image%209.png>)
+
+## 1. 왜 상태(state)가 필요한가요?
+
+```jsx
+유저가 이미지를 선택했을 때, 그것을 화면에 보여주려면 화면(UI)을 업데이트해야 합니다.
+
+React에서는 화면을 업데이트할 데이터는 state(상태) 로 관리합니다.
+```
+
+```jsx
+const [pickedImage, setPickedImage] = useState()
+```
+
+```jsx
+pickedImage: 현재 선택된 이미지의 URL 또는 null
+
+setPickedImage: pickedImage를 업데이트하는 함수
+
+🧠 상태(state)를 바꾸면 리액트는 자동으로 화면을 다시 그립니다 (리렌더링).
+```
+
+## 2. input 파일 선택과 이벤트 핸들링
+
+### 파일 선택 input
+
+```jsx
+<input type="file" onChange={handleImageChange} />
+```
+
+```jsx
+type="file": 유저가 이미지 파일을 선택할 수 있게 함
+
+onChange={handleImageChange}: 유저가 파일을 선택했을 때 실행할 함수
+```
+
+### 이벤트 핸들러 함수
+
+```jsx
+function handleImageChange(event) {
+  const file = event.target.files[0];
+  ...
+}
+```
+
+```jsx
+event.target.files → 선택된 파일들의 배열
+
+[0]을 사용한 이유: 지금은 한 개만 선택 가능하기 때문
+
+❗ 유저가 아무것도 선택하지 않은 경우도 있으니 if (!file)로 체크
+```
+
+## 3. 미리보기를 위한 URL 만들기 (FileReader)
+
+### FileReader 클래스
+
+```jsx
+const fileReader = new FileReader()
+fileReader.onload = () => {
+  setPickedImage(fileReader.result)
+}
+
+fileReader.readAsDataURL(file)
+```
+
+```jsx
+readAsDataURL(file): 선택된 파일을 브라우저에서 읽어서 이미지로 쓸 수 있는 Data URL을 만들어줌.
+
+fileReader.result: 변환된 URL (예: data:image/png;base64,...)
+
+onload: 변환이 완료되었을 때 실행되는 콜백 함수
+```
+
+```jsx
+[선택된 이미지 파일]
+     ↓ (readAsDataURL)
+[FileReader가 읽음]
+     ↓ (onload 함수 실행됨)
+["data:image/jpeg;base64,...."] ← fileReader.result
+     ↓
+[pickedImage 상태에 저장됨]
+     ↓
+<Image src={pickedImage} /> ← 화면에 보여짐
+```
+
+## 4. 이미지 미리보기 구현
+
+```jsx
+{
+  !pickedImage && <p>No image picked yet!</p>
+}
+{
+  pickedImage && <Image src={pickedImage} alt="Image selected" fill />
+}
+```
+
+```jsx
+조건부 렌더링:
+
+이미지가 선택되지 않았으면 → 텍스트 표시
+
+선택되었으면 → next/image 컴포넌트로 이미지 표시
+
+fill 속성: 이미지 크기를 알아서 채워줌 (꽉 채우기용)
+```
+
+## 5. 버튼으로 input 클릭하기 (숨겨진 input)
+
+```jsx
+const imageInput = useRef()
+
+function handlePickClick() {
+  imageInput.current.click()
+}
+```
+
+```jsx
+input은 숨기고, 버튼을 눌렀을 때 input을 강제로 클릭시킴
+
+useRef()를 사용해 input 요소에 접근 가능하게 함
+```
+
+## 전체 코드 + 주석 요약
+
+```jsx
+'use client'
+
+import { useRef, useState } from 'react'
+import classes from './image-picker.module.css'
+import Image from 'next/image'
+
+export default function ImagePicker({ label, name }) {
+  // 이미지 미리보기용 상태
+  const [pickedImage, setPickedImage] = useState()
+  // input 요소에 접근하기 위한 ref
+  const imageInput = useRef()
+
+  // 버튼 클릭 → input 파일 선택창 열기
+  function handlePickClick() {
+    imageInput.current.click()
+  }
+
+  // 파일이 선택되었을 때 실행되는 함수
+  function handleImageChange(event) {
+    const file = event.target.files[0] // 첫 번째 파일만 가져오기
+    if (!file) return // 선택되지 않았으면 종료
+
+    const fileReader = new FileReader()
+    // 읽기 완료되면 실행되는 함수
+    fileReader.onload = () => {
+      setPickedImage(fileReader.result) // 결과 URL을 상태에 저장
+    }
+    fileReader.readAsDataURL(file) // 파일을 Data URL로 읽기 시작
+  }
+
+  return (
+    <div className={classes.picker}>
+      <label htmlFor={name}>{label}</label>
+      <div className={classes.controls}>
+        <div className={classes.preview}>
+          {!pickedImage && <p>No image picked yet!</p>}
+          {pickedImage && <Image src={pickedImage} alt="Image selected" fill />}
+        </div>
+        <input
+          className={classes.input}
+          type="file"
+          id={name}
+          name={name}
+          accept="image/png, image/jpeg, image/jpg"
+          ref={imageInput}
+          onChange={handleImageChange}
+        />
+        <button className={classes.button} type="button" onClick={handlePickClick}>
+          Pick an Image
+        </button>
+      </div>
+    </div>
+  )
+}
+```
+
+# **{ 이미지 피커 컴포넌트 개선하기 }**
+
+```jsx
+‘이미지 피커’ 컴포넌트에 대해 개선할 수 있는 또는 해야 하는 두 가지 사항이 있습니다:
+
+1) 이미지가 선택되지 않은 경우 미리보기된 이미지를 재설정:
+
+if (!file) 블록에 setPickedImage(null); 추가:
+
+if (!file) {
+  setPickedImage(null);
+  return;
+}
+2) (숨겨진) <input> 요소에 필수 prop을 추가:
+
+<input
+  className={classes.input}
+  type="file"
+  id={name}
+  accept="image/png, image/jpeg"
+  name={name}
+  ref={imageInput}
+  onChange={handleImageChange}
+  required
+/>
+이렇게 하면 이미지가 선택되지 않을 경우 <form>을 제출할 수 없습니다.
+```
+
+# **{ form 제출** 처리 서버 액션 }
+
+## 1. 전체 흐름 정리부터 해볼게요
+
+```jsx
+지금 만든 페이지는 이런 역할을 해요:
+
+1. 유저가 form에 텍스트와 이미지 파일을 입력해요.
+
+2. 제출 버튼을 누르면, 이 정보가 서버 측 함수로 전달돼요.
+
+3. 서버 측 함수는 이 데이터를 처리해요 (지금은 콘솔 출력만 하고 있어요).
+
+4. 나중엔 이 데이터를 데이터베이스에 저장하고 이미지를 파일로 저장할 거예요.
+```
+
+## 개념 정리
+
+### 클라이언트 컴포넌트 vs 서버 컴포넌트
+
+```jsx
+use client를 쓰면 브라우저에서 실행되는 컴포넌트예요.
+
+특별히 안 쓰면 기본은 서버에서 실행되는 서버 컴포넌트예요
+```
+
+### Server Action 이란?
+
+```jsx
+폼이 제출될 때 자동으로 실행되는 서버 전용 함수입니다.
+
+클라이언트에서 폼을 제출하면, Next.js가 이 함수를 자동으로 서버에서 실행합니다.
+
+브라우저의 기본 동작인 페이지 새로고침 없이 처리됩니다.
+
+클라이언트와 서버가 자연스럽게 연결됩니다. → 이게 바로 Next.js가 풀스택 프레임워크인 이유예요!
+```
+
+## 문법 설명
+
+### Server Action 만드는 법
+
+```jsx
+async function shareMeal(formData) {
+  'use server' // 이 함수는 서버에서만 실행됨
+}
+```
+
+```jsx
+async: 비동기 처리 가능하도록 만들어줍니다.
+
+'use server': 이 함수는 서버에서만 실행되게 지정합니다.
+
+formData: HTML form에서 자동으로 전달되는 객체입니다.
+
+* async 를 꽅 써야함
+```
+
+### formData 객체란?
+
+```jsx
+formData.get("name")처럼 사용합니다.
+
+input 태그에서 name="name"으로 지정한 필드의 값을 가져옵니다.
+```
+
+```jsx
+예를 들어:
+
+<input type="text" name="name" />
+
+위 input에서 유저가 "Alice"를 입력하면,
+
+formData.get("name") // "Alice"
+```
+
+### form에서 Server Action 연결하기
+
+```jsx
+<form action={shareMeal}>
+```
+
+```jsx
+일반적으로는 action="/api/submit" 처럼 URL을 적지만
+
+Next.js에서는 서버 함수 자체를 넣을 수 있어요!
+
+이렇게 하면 페이지 새로고침 없이 서버로 데이터가 전달됩니다.
+```
+
+![image.png](<%EC%84%B9%EC%85%98%203%20NextJS%20%ED%95%B5%EC%8B%AC%20(%EC%95%B1%20%EB%9D%BC%EC%9A%B0%ED%84%B0)%20-2-/image%2010.png>)
+
+```jsx
+// 이미지 선택 컴포넌트를 가져옵니다
+import ImagePicker from '@/components/meals/image-picker'
+// 스타일 클래스들을 가져옵니다 (CSS 모듈 방식)
+import classes from './page.module.css'
+
+// 페이지 컴포넌트 정의
+export default function ShareMealPage() {
+  // ✅ 서버에서 실행될 함수입니다 (Server Action)
+  // 폼 제출 시 자동으로 실행됩니다
+  async function shareMeal(formData) {
+    'use server' // 이 함수는 오직 서버에서만 실행됩니다
+
+    // formData 객체에서 사용자가 입력한 값을 꺼냅니다
+    const meal = {
+      title: formData.get('title'), // 사용자가 입력한 음식 제목
+      summary: formData.get('summary'), // 음식에 대한 간단한 설명
+      instructions: formData.get('instructions'), // 음식 만드는 방법
+      image: formData.get('image'), // 업로드된 이미지 파일
+      creator: formData.get('name'), // 만든 사람의 이름
+      creator_email: formData.get('email'), // 만든 사람의 이메일
+    }
+
+    // 서버 콘솔(터미널)에 데이터 출력해보기
+    // 폼 제출이 제대로 동작하는지 확인용입니다
+    console.log('Meal shared:', meal)
+  }
+
+  // 컴포넌트가 렌더링하는 화면 정의 (JSX)
+  return (
+    <>
+      {/* 페이지 상단 제목과 설명 */}
+      <header className={classes.header}>
+        <h1>
+          Share your <span className={classes.highlight}>favorite meal</span>
+        </h1>
+        <p>Or any other meal you feel needs sharing!</p>
+      </header>
+
+      {/* 메인 콘텐츠 영역 */}
+      <main className={classes.main}>
+        {/* 폼 정의. action 속성에 Server Action 함수 전달 */}
+        <form className={classes.form} action={shareMeal}>
+          {/* 이름과 이메일 입력칸 */}
+          <div className={classes.row}>
+            <p>
+              <label htmlFor="name">Your name</label>
+              {/* 사용자의 이름 입력 필드. name이 "name"이므로 formData.get("name")으로 꺼낼 수 있어요 */}
+              <input type="text" id="name" name="name" required />
+            </p>
+            <p>
+              <label htmlFor="email">Your email</label>
+              {/* 이메일 입력 필드 */}
+              <input type="email" id="email" name="email" required />
+            </p>
+          </div>
+
+          {/* 음식 제목 입력칸 */}
+          <p>
+            <label htmlFor="title">Title</label>
+            <input type="text" id="title" name="title" required />
+          </p>
+
+          {/* 음식 요약 설명 입력칸 */}
+          <p>
+            <label htmlFor="summary">Short Summary</label>
+            <input type="text" id="summary" name="summary" required />
+          </p>
+
+          {/* 음식 조리 방법 입력칸 */}
+          <p>
+            <label htmlFor="instructions">Instructions</label>
+            <textarea id="instructions" name="instructions" rows="10" required></textarea>
+          </p>
+
+          {/* 이미지 파일 업로드 컴포넌트 사용 */}
+          {/* label: 화면에 보일 설명문, name: formData에서 꺼낼 키 이름 */}
+          <ImagePicker label="Your image" name="image" />
+
+          {/* 제출 버튼 영역 */}
+          <p className={classes.actions}>
+            {/* 버튼을 누르면 form이 제출되고 shareMeal 함수가 실행됨 */}
+            <button type="submit">Share Meal</button>
+          </p>
+        </form>
+      </main>
+    </>
+  )
+}
+```
+
+# { Server Action을 외부 파일로 분리해서 사용 }
+
+## 핵심 요약
+
+| 주제              | 내용                                                                        |
+| ----------------- | --------------------------------------------------------------------------- |
+| **Server Action** | 서버에서만 실행되는 특별한 함수. form 제출 시 자동 호출 가능                |
+| **문제 상황**     | 클라이언트 컴포넌트(`'use client'`) 안에 Server Action을 작성하면 에러 발생 |
+| **해결 방법**     | Server Action을 **별도 파일로 분리**하고, 거기서 `'use server'`를 선언      |
+| **장점**          | 클라이언트 컴포넌트와 서버 코드를 **분리**함으로써 보안/구조/재사용성 ↑     |
+
+## 정리: 외부 파일로 Server Action 분리하는 단계
+
+### 1. 새 파일 생성 (`lib/actions.js`)
+
+```jsx
+프로젝트 루트에 lib 폴더가 없으면 만들고
+
+그 안에 actions.js 또는 원하는 이름으로 파일 생성
+```
+
+```jsx
+/lib/actions.js
+```
+
+### 2. 이 파일에 `use server` 지시어 추가
+
+```jsx
+// 이 파일 안의 모든 함수는 Server Action이 됩니다
+'use server'
+
+export async function shareMeal(formData) {
+  const meal = {
+    title: formData.get('title'),
+    summary: formData.get('summary'),
+    instructions: formData.get('instructions'),
+    image: formData.get('image'),
+    creator: formData.get('name'),
+    creator_email: formData.get('email'),
+  }
+
+  // 서버 터미널에 로그 출력
+  console.log('Meal shared:', meal)
+}
+```
+
+```jsx
+export를 사용해 다른 파일에서 가져올 수 있게 함
+
+함수 안에는 use server를 안 써도 됨 → 파일 맨 위에 이미 선언했기 때문
+```
+
+### 3. 컴포넌트 파일에서 Server Action 가져오기
+
+```jsx
+// 페이지 컴포넌트 파일 (예: app/share/page.js)
+import { shareMeal } from '@/lib/actions'
+```
+
+```jsx
+이제 form action={shareMeal}처럼 사용할 수 있어요!
+```
+
+## 왜 분리해야 할까?
+
+```jsx
+"Server Action과 클라이언트 코드가 섞이면 에러와 보안 문제가 발생할 수 있기 때문입니다."
+
+use client가 선언된 컴포넌트 안에 Server Action을 작성하면 빌드 에러 발생
+
+서버 코드가 클라이언트로 노출되면 보안상 위험
+
+코드 분리로 가독성, 유지보수성 향상
+```
+
+## 중요한 포인트
+
+| 포인트                             | 설명                                                                                                                |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `'use server'` 위치                | 함수 안 ❌ → **파일 최상단에 선언**해야 모든 함수가 서버에서만 실행됨                                               |
+| 클라이언트 컴포넌트에서 사용 가능? | 직접 정의는 ❌ 하지만 **외부에서 import**한 Server Action은 사용 가능                                               |
+| import 방식                        | 클라이언트 컴포넌트에서도 Server Action을 safely 사용할 수 있음 (단, 직접 호출은 안 됨 — form action 등으로 연결됨) |
+
+```jsx
+[클라이언트 컴포넌트 or 페이지]
+    ↓  (form 제출)
+[action={shareMeal}]
+    ↓
+[lib/actions.js 내부 shareMeal 함수 실행]
+    ↓
+[서버에서 데이터 처리]
+```
+
+# { 이미지 업로드와 데이터베이스 저장 처리 }
+
+## 전체 목표
+
+```jsx
+사용자가 폼을 통해 음식(Meal)을 등록할 수 있게 하고,
+
+이미지는 서버의 public 폴더에 저장,
+
+나머지 데이터는 SQLite 데이터베이스에 저장한다.
+```
+
+## 주요 기술 스택
+
+```jsx
+Next.js + App Router
+
+Server Actions로 데이터 처리
+
+better-sqlite3로 SQLite 사용
+
+slugify: 제목을 URL-friendly한 형태로 변환
+
+xss: XSS 공격 방지
+
+fs: Node.js의 파일 시스템 모듈로 이미지 저장
+
+Next.js + App Router
+
+		Next.js는 React 기반 웹 프레임워크로 SSR, SSG, API 라우팅을 지원합니다.
+
+		App Router는 Next.js 13+에서 도입된 새로운 라우팅 방식으로,
+
+		app/ 폴더 구조에 따라 자동으로 라우팅이 구성됩니다.
+
+		layout.js, page.js, error.js, loading.js 등의 특수 파일을 통해 페이지 구조와 상태를 세밀하게 제어할 수 있으며,
+
+		서버 컴포넌트와 클라이언트 컴포넌트를 명확히 분리해 성능과 유지보수를 개선할 수 있습니다.
+
+Server Actions로 데이터 처리
+
+		Server Actions는 app/ 라우팅에서만 사용할 수 있는 Next.js의 서버 전용 함수입니다.
+
+		use server 지시어를 함수 상단에 선언하면 해당 함수는 서버에서만 실행됩니다.
+
+		주로 form 제출과 함께 실행되어 서버 측에서 DB 저장, 파일 처리 등 민감한 작업을 수행하며,
+
+		API 라우트 없이도 보안성과 간결한 코드 구조를 제공합니다.
+
+		redirect()와 함께 사용하면 제출 후 특정 페이지로 자동 이동할 수도 있습니다.
+
+better-sqlite3로 SQLite 사용
+
+		better-sqlite3는 Node.js에서 SQLite를 빠르고 안정적으로 사용할 수 있게 해주는 동기식 DB 라이브러리입니다.
+
+		SQL 문장을 .prepare()로 준비하고, .run(), .get(), .all() 등으로 실행합니다.
+
+		특히 객체를 전달하면 SQL의 @변수명과 자동 매핑되어 코드가 간결하고 SQL 인젝션도 방지됩니다.
+
+		별도의 연결 관리 없이 가볍게 사용할 수 있어 소규모 프로젝트에 적합합니다.
+
+slugify: 제목을 URL-friendly한 형태로 변환
+
+		slugify는 공백, 특수문자 등이 포함된 문자열을 URL에 적합하도록 정제해주는 함수입니다.
+
+		예: "My Favorite Meal!" → "my-favorite-meal". 슬러그는 URL, 파일명, DB 키 등에서 사용되며
+
+		일관된 고유 식별자로 활용됩니다. slugify(text, { lower: true })처럼 사용하면 자동으로 소문자 처리도 해줍니다.
+
+xss: XSS 공격 방지
+
+		xss는 HTML에 포함된 악성 스크립트(<script>) 등을 제거하여 Cross-Site Scripting 공격을 방지하는 필터 함수입니다.
+
+		사용자가 입력한 텍스트를 HTML로 출력할 경우, 반드시 필터링하여 실행 가능한 코드를 무력화해야 합니다.
+
+		예: <script>alert(1)</script> → &lt;script&gt;alert(1)&lt;/script&gt;. 주로 댓글, 게시글, 입력 설명 등에 사용합니다.
+
+fs: Node.js의 파일 시스템 모듈로 이미지 저장
+
+		Node.js의 fs(File System) 모듈은 서버 디스크에 파일을 읽고 쓰는 기능을 제공합니다.
+
+		fs.createWriteStream(path)으로 저장 스트림을 만들고, .write(buffer)로 파일을 씁니다.
+
+		브라우저에서 받은 이미지 파일은 File 객체이며, 이를 arrayBuffer()로 변환한 뒤
+
+		Buffer.from()을 사용해 저장합니다. 일반적으로 이미지 파일은 DB가 아닌 서버의
+
+		public/images와 같은 폴더에 저장하고, DB에는 경로만 저장합니다.
+```
+
+## 설치해야 할 패키지
+
+```jsx
+npm install slugify xss better-sqlite3
+```
+
+## 개념 요약
+
+| 개념                   | 설명                                                                              |
+| ---------------------- | --------------------------------------------------------------------------------- |
+| `slug`                 | URL에서 사용 가능한 문자열. 예: "Delicious Pizza" → "delicious-pizza"             |
+| `XSS`                  | 악성 스크립트를 HTML에 삽입하는 공격. 사용자가 입력한 HTML을 필터링해 방어해야 함 |
+| `buffer`               | 이미지 같은 바이너리 데이터를 다룰 때 사용하는 데이터 형식                        |
+| `fs.createWriteStream` | 파일을 서버 디스크에 저장하는 Node.js 함수                                        |
+| `Server Action`        | 서버에서만 실행되는 함수. 클라이언트에서 form을 submit하면 이 함수를 호출함       |
+| `public/` 폴더         | Next.js 앱에서 `/images/...`로 접근할 수 있는 정적 파일 폴더                      |
+
+## 주요 흐름 정리
+
+### 1. 클라이언트 폼 제출 → `Server Action` 실행
+
+```jsx
+// app/lib/actions.js
+'use server'
+
+import { saveMeal } from '@/lib/meals'
+import { redirect } from 'next/navigation'
+
+export async function shareMeal(formData) {
+  const meal = {
+    title: formData.get('title'),
+    summary: formData.get('summary'),
+    instructions: formData.get('instructions'),
+    image: formData.get('image'), // File 객체
+    creator: formData.get('name'),
+    creator_email: formData.get('email'),
+  }
+
+  await saveMeal(meal)
+  redirect('/meals') // 등록 후 meals 목록으로 이동
+}
+```
+
+### 2. `saveMeal()`로 데이터와 이미지 저장
+
+```jsx
+// lib/meals.js
+import sql from 'better-sqlite3' // SQLite를 Node.js에서 쉽게 사용할 수 있게 해주는 라이브러리
+import slugify from 'slugify' // 문자열을 URL에 사용할 수 있도록 변환해주는 도구 (ex. 공백 → 대시)
+import xss from 'xss' // XSS(Cross-Site Scripting) 공격을 방지하기 위한 보안 필터
+import fs from 'node:fs' // Node.js의 파일 시스템 모듈 (이미지를 파일로 저장할 때 사용)
+
+const db = sql('meals.db') // 현재 디렉토리에 있는 meals.db 파일을 열어 DB로 사용 (없으면 새로 생성됨)
+
+export async function saveMeal(meal) {
+  // 1. 사용자가 입력한 제목(title)을 기반으로 slug(고유 문자열 주소)를 생성합니다.
+  //    예: "Spicy Chicken" → "spicy-chicken"
+  //    이 slug는 나중에 URL 경로 또는 이미지 파일 이름으로 사용됩니다.
+  meal.slug = slugify(meal.title, { lower: true })
+
+  // 2. 사용자가 입력한 instructions(조리 방법, 설명 등)에 악성 스크립트가 포함되어 있을 수 있으므로,
+  //    HTML 태그를 필터링하여 보안상 안전하게 만들어 줍니다.
+  meal.instructions = xss(meal.instructions)
+
+  // 3. 업로드된 이미지의 파일 이름에서 확장자 (예: .jpg, .png 등)를 추출합니다.
+  //    File.name은 예: "photo.png" → split('.')으로 나누면 ['photo', 'png'], pop() → 'png'
+  //    pop = 배열의 마지막 요소를 제거하고, 그 값을 반환
+  const extension = meal.image.name.split('.').pop()
+
+  // 4. 이미지 파일의 새 이름을 생성합니다.
+  //    제목에서 만든 slug를 파일 이름으로 사용하고, 추출한 확장자를 붙입니다.
+  //    예: 'spicy-chicken.png'
+  const fileName = `${meal.slug}.${extension}`
+
+  // 5. 서버의 public/images 폴더에 이미지 파일을 저장하기 위한 쓰기 스트림(stream)을 생성합니다.
+  //    이 위치에 저장된 파일은 브라우저에서 접근 가능합니다 (ex: /images/spicy-chicken.png)
+  const stream = fs.createWriteStream(`public/images/${fileName}`)
+
+  // 업로드된 이미지 파일은 브라우저에서 File 객체로 전달됩니다.
+  // 이 File 객체에서 데이터를 꺼내기 위해 arrayBuffer()로 변환하고,
+  // Node.js의 Buffer.from()을 사용해 저장 가능한 형태로 바꿉니다.
+  const bufferedImage = await meal.image.arrayBuffer()
+
+  // 파일 쓰기 스트림에 이미지 데이터를 작성합니다.
+  // 작성이 완료되면 콜백 함수가 호출되어 성공 여부를 로그로 출력합니다.
+  stream.write(Buffer.from(bufferedImage), (error) => {
+    if (error) {
+      console.error('Error writing image file:', error) // 오류가 발생하면 에러 메시지 출력
+    } else {
+      console.log('Image file written successfully:', fileName) // 성공하면 성공 메시지 출력
+    }
+  })
+
+  // 6. 이미지 자체를 DB에 저장하지 않고,
+  //    브라우저에서 접근할 수 있는 이미지의 경로(`/images/파일명`)만 저장합니다.
+  //    예: "/images/spicy-chicken.png"
+  meal.image = `/images/${fileName}`
+
+  // 7. meal 객체에 담긴 데이터를 DB에 저장합니다.
+  //    각 필드에 해당하는 값들을 meal 객체에서 자동으로 추출하여 바인딩합니다.
+  //    (SQL 인젝션 방지를 위해 직접 값을 넣기보다, 바인딩 방식 사용)
+  db.prepare(
+    `
+    INSERT INTO meals
+    (title, summary, instructions, creator, creator_email, image, slug)
+    VALUES (
+      @title,
+      @summary,
+      @instructions,
+      @creator,
+      @creator_email,
+      @image,
+      @slug
+    )
+  `
+  ).run(meal) // run()에 meal 객체를 전달하면 위의 @필드명들과 자동 매핑됩니다
+}
+```
+
+### .arrayBuffer(), Buffer.from()?
+
+```jsx
+File 객체는 JavaScript에서 제공하는 브라우저 내장 타입이며, 대표적인 특징은:
+
+실제 이미지 데이터(바이너리 데이터)를 내부적으로 가지고 있음
+
+.name, .type, .size 등의 속성을 가짐
+
+.arrayBuffer() 메서드를 제공
+
+폼으로 업로드된 이미지 파일을 **서버에서 저장할 수 있는 형식(버퍼)**으로 변환하는 과정이 필요함
+```
+
+```jsx
+// meal.image는 form에서 받은 이미지 파일 (File 객체)
+// 이 File 객체에는 사용자가 업로드한 이미지 데이터가 들어 있음
+// 우리는 이 이미지를 서버의 디스크에 저장하려고 함
+
+// 하지만 File 객체는 브라우저 전용이며,
+// 바로 Node.js에서 저장할 수 있는 형식이 아님
+
+// 그래서 먼저 File 객체에서 원시 이진 데이터를 추출해야 함
+// arrayBuffer()는 브라우저의 File 또는 Blob 객체에서
+// 순수한 바이너리 데이터(ArrayBuffer)를 비동기로 읽어옴
+
+// 이 작업은 시간이 걸릴 수 있기 때문에 await 키워드로 기다려야 함
+const bufferedImage = await meal.image.arrayBuffer()
+
+// 이제 bufferedImage는 ArrayBuffer 형태의 이미지 데이터임
+// 하지만 Node.js 파일 시스템(fs)은 ArrayBuffer가 아니라
+// Node.js의 Buffer 형식을 요구함
+
+// 따라서 Buffer.from()을 사용해 ArrayBuffer를 Buffer로 변환한 다음
+// 파일로 저장해야 함
+stream.write(Buffer.from(bufferedImage))
+```
+
+## 데이터베이스 구성 (테이블 구조 예시)
+
+```jsx
+CREATE TABLE meals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT,
+  summary TEXT,
+  instructions TEXT,
+  creator TEXT,
+  creator_email TEXT,
+  image TEXT,
+  slug TEXT
+);
+```
+
+## 초보자를 위한 추가 설명
+
+```jsx
+📘 왜 파일을 DB에 저장하지 않나요?
+
+		이미지 파일을 DB에 저장하면 성능 저하, 용량 폭증, 관리 어려움
+
+		대신 파일은 디스크에 저장하고, **경로(URL)**만 DB에 저장합니다
+
+📘 public 폴더에 저장하는 이유?
+
+		Next.js에서 public/ 폴더는 외부에서 접근 가능한 정적 파일 위치
+
+		/images/xxx.png로 접근하면 실제로는 public/images/xxx.png에서 찾음
+```
+
+## 전체 흐름 요약 다이어그램
+
+```jsx
+[사용자 Form 입력]
+       ↓
+[Server Action - shareMeal]
+       ↓
+[saveMeal 호출]
+   1. slug 생성
+   2. instructions 보안 처리
+   3. 이미지 파일명 생성 및 저장
+   4. DB에 이미지 경로 포함 전체 데이터 저장
+       ↓
+[redirect('/meals')]로 페이지 이동
+
+```
+
+# { 버튼 시각적 피드백 만들기 }
+
+## 1. 기본 구조
+
+```jsx
+사용자가 입력하는 폼은 다음과 같은 요소로 구성되어 있습니다:
+```
+
+```jsx
+<form action={shareMeal}>
+  ...
+  <ImagePicker name="image" />
+  <MealsFormSubmit /> ← 제출 버튼
+</form>
+```
+
+```jsx
+action={shareMeal} → 서버 액션 (서버에서 데이터 처리)
+
+MealsFormSubmit → 우리가 커스터마이징할 버튼 컴포넌트
+```
+
+## 2. 문제점
+
+```jsx
+사용자가 버튼을 눌렀을 때 서버로 요청이 전송되는 동안 시간이 걸릴 수 있음
+
+→ 아무 반응이 없으면 사용자 입장에서 "버튼이 안 눌렸나?" 헷갈림
+
+✅ 해결책: 진행 중일 때 버튼의 내용을 "Submitting..." 으로 바꾸고 비활성화
+```
+
+## 3. 사용하는 훅: `useFormStatus`
+
+```jsx
+import { useFormStatus } from 'react-dom'
+```
+
+```jsx
+서버 액션과 함께 사용하는 훅
+
+Form 안에서만 사용 가능
+
+제출 상태를 알려주는 객체를 반환함
+
+가장 유용한 속성: pending → true면 요청 진행 중
+```
+
+## 4. MealsFormSubmit 컴포넌트 만들기
+
+```jsx
+'use client'
+
+import { useFormStatus } from 'react-dom'
+
+export default function MealsFormSubmit() {
+  const { pending } = useFormStatus()
+
+  return <button disabled={pending}>{pending ? 'Submitting...' : 'Share Meal'}</button>
+}
+```
+
+```jsx
+'use client': 클라이언트 컴포넌트임을 명시 (폼 상태 변화는 브라우저에서 감지해야 하므로)
+
+useFormStatus() 훅으로 상태 가져오기
+
+pending이 true일 때:
+
+		버튼 비활성화 (disabled)
+
+		텍스트 변경 (Submitting...)
+
+```
+
+## 5. 전체 폼 구조 (최종 예시)
+
+```jsx
+<form className={classes.form} action={shareMeal}>
+  ...
+  <ImagePicker label="Your image" name="image" />
+  <p className={classes.actions}>
+    <MealsFormSubmit />
+  </p>
+</form>
+```
+
+```jsx
+MealsFormSubmit은 form 안에서만 동작 가능
+
+별도 파일로 분리해서 클라이언트 컴포넌트로 작성
+```
+
+## 요약
+
+| 요소              | 설명                                                             |
+| ----------------- | ---------------------------------------------------------------- |
+| `useFormStatus()` | 서버 액션이 진행 중인지 확인하는 React 훅 (react-dom에서 import) |
+| `'use client'`    | 클라이언트 컴포넌트임을 명시해야 훅이 동작함                     |
+| 버튼 상태 변경    | `pending` 값에 따라 버튼의 텍스트와 비활성화 여부 변경           |
+| 위치 주의         | `useFormStatus`는 **폼 내부에서만** 동작 가능                    |
+
+# { 서버 측 유효성 검사 (Server-side Validation) 도입 }
+
+## 왜 서버에서도 유효성 검사가 필요할까?
+
+```jsx
+HTML required 속성으로 클라이언트 측 검사는 가능하지만,
+
+개발자 도구로 우회하거나 속성을 제거하면 무효한 값도 제출 가능!
+
+따라서 서버에서도 검사를 추가해야 진짜 안전하게 데이터 처리 가능!
+```
+
+## 어떻게 유효성 검사를 할까?
+
+### 1. 검사 함수 만들기
+
+```jsx
+function isInvalidText(text) {
+  return !text || text.trim() === ''
+}
+```
+
+```jsx
+text가 비어 있거나, 공백만 있는 경우 true 반환 (유효하지 않음)
+```
+
+### 2. 각 항목 검사
+
+```jsx
+if (
+  isInvalidText(meal.title) ||
+  isInvalidText(meal.summary) ||
+  isInvalidText(meal.instructions) ||
+  isInvalidText(meal.creator) ||
+  isInvalidText(meal.creator_email) ||
+  !meal.creator_email.includes('@') || // 이메일 형식 체크
+  !meal.image ||
+  meal.image.size === 0 // 이미지 존재 여부 체크
+) {
+  throw new Error('Invalid input - all fields are required.')
+}
+```
+
+```jsx
+모든 입력값을 검사하고, 하나라도 유효하지 않으면 에러 발생시킴
+```
+
+## 현재 문제점
+
+```jsx
+에러가 발생하면 에러 페이지로 이동
+
+사용자가 입력한 값들이 모두 사라짐 (사용자 경험 ↓)
+```
+
+## **더 좋은 서버 측 유효성 검사**
+
+```jsx
+✅ 서버 측 유효성 검사 더 좋은 방법들
+
+1. ✅ Zod (스키마 기반 검증, 최신 트렌드)
+   - 객체 스키마 정의로 타입 안정성 확보
+   - 유효성 규칙(길이, 형식 등)을 선언적으로 작성
+   - TypeScript와 궁합이 좋고, 오류 메시지 포맷 제공
+   - `safeParse`로 검증 후 에러 관리 가능
+
+2. ✅ Yup (폼 라이브러리와 궁합 좋은 검증 도구)
+   - Form validation에 특화된 유효성 검사 도구
+   - `required`, `min`, `email` 등 풍부한 유효성 체커 제공
+   - 조건적 검사 및 커스텀 메시지 설정 가능
+   - React Hook Form 등과도 잘 통합됨
+
+3. ✅ Custom Validator 함수 (직접 만든 검증 로직)
+   - 간단한 프로젝트나 의존성 줄이고 싶을 때 사용
+   - 공통 유효성 검사 로직을 함수로 추출해 재사용
+   - 이메일 형식, 필수값 등 기본 규칙 직접 정의
+   - 유지보수 및 확장은 다소 불편할 수 있음
+
+4. ✅ Class Validator + DTO (Nest.js 스타일)
+   - 데코레이터 기반으로 유효성 규칙 정의
+   - 백엔드 구조가 크거나 Nest.js를 사용하는 경우 적합
+   - `@IsEmail()`, `@IsNotEmpty()` 같은 선언적 방식 사용
+
+5. ✅ JOI (Node.js 백엔드에서 자주 사용되는 검증 도구)
+   - 객체 스키마 기반 유효성 검사
+   - 커스텀 메시지, 조건부 검증, 정규식 등 지원
+   - Express 등 기존 서버와 쉽게 통합 가능
+
+🎯 결론:
+작은 프로젝트는 간단한 함수로도 충분하지만,
+**Zod 또는 Yup 같은 스키마 기반 검증 도구**를 사용하면
+더 안전하고 유지보수하기 좋은 코드를 작성할 수 있습니다.
+
+```
+
+# { 새로고침 없이 에러 메시지 보여주기 }
+
+## 강의 전 useFormState ⇒ useActionState
+
+```jsx
+알 수 없는 이유로 React 팀은 이 훅의 이름을 갑자기 useActionState로 변경하기로 결정했습니다.
+
+또한 이제 react-dom이 아닌 react에서 가져와야 합니다.
+
+따라서 다음 강의에서 이 코드를 작성할 때
+
+import { useFormState } from 'react-dom';
+
+이 코드를 작성해야 합니다(그리고 이 코드를 사용하는 모든 곳에서도 useFormState() 대신 useActionState()를 사용해야 합니다):
+
+import { useActionState } from 'react';
+```
+
+## 전체 개요
+
+```jsx
+우리는 사용자가 폼(form)을 제출할 때 서버 측에서 값을 검사(유효성 검사) 하고,
+
+문제가 있다면 메시지를 다시 화면에 보여주는 방식을 구현하고 있습니다.
+
+이제는 에러가 생기면 페이지가 새로고침 없이 에러 메시지만 보여지게 하고,
+
+폼 상태도 관리되게끔 개선해보는 거예요.
+```
+
+![image.png](<%EC%84%B9%EC%85%98%203%20NextJS%20%ED%95%B5%EC%8B%AC%20(%EC%95%B1%20%EB%9D%BC%EC%9A%B0%ED%84%B0)%20-2-/image%2011.png>)
+
+## 사용되는 기술과 개념 요약
+
+| 기술/개념      | 설명                                                                        |
+| -------------- | --------------------------------------------------------------------------- |
+| Server Actions | 서버에서 실행되는 함수로, 폼이 제출되면 호출됩니다.                         |
+| useFormState   | 폼의 상태(state)를 저장하고, 서버 응답에 따라 다시 렌더링되도록 도와줍니다. |
+| redirect       | 서버에서 다른 페이지로 이동시킬 때 사용합니다.                              |
+| formData.get() | 폼에서 전송된 데이터 값을 추출합니다.                                       |
+
+## 핵심 목표
+
+```jsx
+사용자가 입력한 값이 잘못됐는지 확인 (서버에서!)
+
+문제가 있다면 에러 메시지를 사용자에게 보여줌
+
+폼 상태는 useFormState를 통해 관리
+```
+
+## 실제 코드 흐름 정리
+
+### 1. `shareMeal` – 서버에서 실행되는 함수(Server Action)
+
+```jsx
+'use server'
+
+export async function shareMeal(prevState, formData) {
+  const meal = {
+    title: formData.get('title'),
+    summary: formData.get('summary'),
+    instructions: formData.get('instructions'),
+    image: formData.get('image'),
+    creator: formData.get('name'),
+    creator_email: formData.get('email'),
+  }
+
+  if (
+    !meal.title.trim() ||
+    !meal.summary.trim() ||
+    !meal.instructions.trim() ||
+    !meal.creator.trim() ||
+    !meal.creator_email.trim() ||
+    !meal.creator_email.includes('@') ||
+    !meal.image ||
+    meal.image.size === 0
+  ) {
+    // 에러 발생 시 에러 메시지를 객체로 반환
+    return {
+      message: 'Invalid input. Please check your data.',
+    }
+  }
+
+  await saveMeal(meal)
+  redirect('/meals') // 성공 시 /meals 페이지로 이동
+}
+```
+
+### 2. `useFormState` 사용 – 폼 상태를 관리하고, 서버 응답 받기
+
+```jsx
+'use client' // 클라이언트 컴포넌트로 선언해야 함
+import { useFormState } from 'react-dom'
+import { shareMeal } from '@/lib/action'
+
+const [state, formAction] = useFormState(shareMeal, { message: null })
+```
+
+```jsx
+첫 번째 인자: 서버 액션 함수 (shareMeal)
+
+두 번째 인자: 초기 상태값
+```
+
+### 3. `form`에 `action` 설정
+
+```jsx
+<form action={formAction}>
+```
+
+```jsx
+formAction은 useFormState가 만든 폼 전송 핸들러
+
+이걸 통해 shareMeal 함수가 실행되고, 그 결과(response)가 다시 state에 저장됨
+```
+
+### 4. 에러 메시지 출력하기
+
+```jsx
+{
+  state.message && <p>{state.message}</p>
+}
+```
+
+```jsx
+state.message가 있다면 화면에 출력
+
+유효하지 않은 데이터 제출 시 이 메시지가 화면에 보임
+```
+
+## 전체 흐름 요약
+
+```jsx
+[사용자 폼 작성 ➡️ 제출]
+     ⬇️
+<Server Action (shareMeal)> 실행
+     ⬇️
+[유효성 검사 실패 시]: 에러 메시지를 반환
+[유효성 검사 성공 시]: saveMeal 호출 후 리디렉션
+     ⬇️
+폼 컴포넌트에서는 useFormState를 통해 응답을 받아
+state.message로 에러 메시지를 출력
+```
+
+# { 개발 환경과 배포 환경의 차이 캐싱 문제 }
+
+## 1. 개발 환경과 배포 환경의 차이
+
+| 개발 환경                        | 배포 환경                                  |
+| -------------------------------- | ------------------------------------------ |
+| `npm run dev`로 실행             | `npm run build` 후 `npm start`로 실행      |
+| 실시간 변경사항 반영 (핫 리로딩) | 변경사항 반영 안됨 (정적 생성 + 캐싱 때문) |
+| 느려도 개발 편의성 중심          | 빠르지만 캐싱 때문에 문제가 생길 수 있음   |
+
+## 2. 배포를 위한 단계
+
+```jsx
+# 1. 프로젝트 빌드 (정적 페이지 생성)
+npm run build
+
+# 2. 빌드된 앱 실행 (배포 서버 모드)
+npm start
+```
+
+```jsx
+이 과정을 거치면 Next.js가 사전 생성 가능한 페이지들을 미리 만들어서
+
+배포에 적합한 형태로 최적화된 앱을 준비합니다.
+```
+
+## 3. 왜 새로 등록한 음식이 안 보일까?
+
+```jsx
+✅ 개발 환경에서는:
+
+		meals.js에서 데이터를 실시간으로 읽고 새로 등록한 음식도 바로 표시됨
+
+❌ 배포 환경에서는:
+
+		페이지가 정적으로 미리 생성되어 있음
+
+		그 이후 변경된 데이터는 반영되지 않음
+
+		새로 등록한 음식은 다음 빌드 전까지는 페이지에 나타나지 않음
+```
+
+## 4. 이 문제의 원인 – **정적 생성 + 캐싱**
+
+```jsx
+📍Next.js의 기본 동작
+
+		npm run build 시 페이지들을 미리 렌더링
+
+		예: meals/page.js → 빌드 시 DB에서 데이터를 불러와 HTML로 저장
+
+		사용자 방문 시 이미 만들어진 HTML만 보여줌 → 엄청 빠름
+
+📍문제점
+
+		새 음식 추가해도 페이지를 다시 빌드하기 전까지는 데이터가 안 바뀜
+
+		페이지가 동적으로 변경될 수 있는 경우에는 정적 생성 방식은 부적합
+```
+
+## 정리
+
+| 내용      | 설명                                                                                            |
+| --------- | ----------------------------------------------------------------------------------------------- |
+| 정적 생성 | 빌드 시 HTML을 미리 생성해서 빠른 페이지 제공 가능                                              |
+| 장점      | 사용자 경험 좋음 (빠름, SEO 좋음)                                                               |
+| 단점      | 데이터 변경사항이 실시간 반영되지 않음                                                          |
+| 캐싱      | 정적으로 생성된 HTML이 브라우저나 서버에 캐시되어, 새 데이터가 보이지 않음                      |
+| 해결 방법 | 변경 가능한 데이터를 다루려면 **동적 렌더링**이나 **ISR(Incremental Static Regeneration)** 필요 |
+
+# { Next.js의 캐싱 문제 해결 }
+
+## 문제 상황: Next.js가 캐싱을 너무 잘해서 생기는 문제
+
+```jsx
+개발할 때는 잘 보이던 새로운 데이터(예: 새 음식)가
+
+배포 후에는 페이지에 바로 반영되지 않습니다.
+
+📦 왜냐하면?
+
+		Next.js는 성능을 높이기 위해 페이지를 미리 생성하고,
+
+		생성된 페이지를 캐시(저장) 해두기 때문입니다.
+
+✅ 캐시 덕분에 좋은 점
+
+		사용자가 페이지를 빠르게 볼 수 있습니다.
+
+❌ 하지만 문제점
+
+		새 데이터를 저장해도 페이지가 다시 만들어지지 않아서
+
+		예전 데이터가 계속 보입니다.
+```
+
+## 해결 방법: `revalidatePath()` 함수 사용
+
+```jsx
+Next.js는 이런 상황을 해결하기 위해
+
+내장된 함수인 revalidatePath() 를 제공합니다.
+
+🧠 이 함수가 하는 일
+
+		특정 경로(path)와 관련된 캐시를 지우고
+
+		해당 페이지를 다시 만들어줍니다.
+
+		즉, 새로운 데이터를 반영할 수 있게 합니다!
+```
+
+## 사용 예시
+
+```jsx
+revalidatePath('/meals')
+```
+
+```jsx
+이 코드는 /meals 경로(페이지)의 캐시를 삭제하고,
+
+다시 생성하도록 Next.js에게 요청하는 것입니다.
+```
+
+## 중첩 경로가 있다면?
+
+```jsx
+예를 들어 /meals/123 같은 하위 경로(중첩 페이지)가 있다면
+
+/meals만 재검사해선 하위 경로는 반영되지 않습니다.
+```
+
+### 이럴 때는 두 번째 인수 사용!
+
+```jsx
+revalidatePath('/meals', 'layout')
+```
+
+```jsx
+layout을 설정하면 해당 경로와 그 안의 모든 중첩된 경로들까지 캐시를 무효화합니다.
+
+기본값은 'page'로, 해당 페이지('/meals')만 재검사합니다.
+
+* 쉽게 말해서 layout 으로 두번째 인수를 하면 /meals 아래의 모든 경로를 전부 캐시 무효화 /meals/share/eat/rate 이래도
+```
+
+### revalidatePath(path, type) 함수의 두 인수
+
+```jsx
+revalidatePath(path, type)
+```
+
+| 인수                  | 의미                                                       | 예시                            |
+| --------------------- | ---------------------------------------------------------- | ------------------------------- |
+| `path` (첫 번째 인수) | **어느 경로의 캐시를 무효화(revalidate)할지**를 지정합니다 | `'/meals'`, `'/'`, `'/blog'` 등 |
+| `type` (두 번째 인수) | **해당 경로의 어느 수준까지 캐시를 무효화할지** 결정합니다 | `'page'` 또는 `'layout'`        |
+
+### 두 번째 인수: `type` (선택 사항, 기본값 `'page'`)
+
+| 값                | 의미                                                               | 결과                                               |
+| ----------------- | ------------------------------------------------------------------ | -------------------------------------------------- |
+| `'page'` (기본값) | **그 경로의 페이지만** 캐시 삭제                                   | `/meals` 페이지만 다시 만듦                        |
+| `'layout'`        | **그 경로에 연결된 layout과 그 아래 모든 하위 경로**까지 캐시 삭제 | `/meals`, `/meals/123`, `/meals/edit` 등 다 무효화 |
+
+## 최종 요약
+
+| 내용                  | 설명                                                                  |
+| --------------------- | --------------------------------------------------------------------- |
+| 문제                  | Next.js가 캐싱을 해서 새 음식이 등록돼도 바로 안 보임                 |
+| 해결                  | `revalidatePath()`를 사용해 캐시를 무효화                             |
+| 기본 사용법           | `revalidatePath('/meals')` ← `/meals` 경로만 다시 만듦                |
+| 중첩 경로 있을 때     | `revalidatePath('/meals', 'layout')` ← 하위 경로도 포함해서 다시 만듦 |
+| 전체 사이트 캐시 삭제 | `revalidatePath('/', 'layout')` 사용                                  |
+
+# { 로컬 Filesystem에 파일 저장 금지 }
+
+```jsx
+✅ 문제 상황:
+
+		개발 환경에서는 이미지가 잘 보이는데
+
+		배포 환경에서는 이미지가 보이지 않는다!
+
+✅ 원인:
+
+		이미지를 public/images 폴더에 저장하고 있기 때문
+
+		이 폴더는 개발 중에는 접근 가능하지만,
+
+		배포 환경에서는 무시된다
+
+✅ 왜 그런가요?
+
+		Next.js는 빌드할 때 .next 폴더를 만들어서,
+
+		그 안에 모든 정적 파일, 캐시, 페이지 등을 담는다
+
+
+		그런데 우리가 앱을 실행한 후에 새롭게 저장한 이미지는
+
+		.next 폴더 안에 포함되지 않는다
+
+
+		즉, 런타임 중 생긴 파일은
+
+		Next.js가 관리하지 않기 때문에 접근 불가
+
+✅ 결론:
+
+		public/ 폴더는 Next.js가 배포 시 따로 관리하지 않음
+
+		따라서 런타임 중에 public 폴더에 저장한 파일은
+
+		배포 환경에서 접근이 불가능
+
+✅ 공식 문서의 권장 방식:
+
+		AWS S3 같은 외부 파일 저장소를 사용하라
+
+		이미지를 업로드하거나 사용할 때는
+
+		런타임에서도 접근 가능한 외부 저장소가 필요하다
+```
+
+# { 정적 메타데이터 사용 }
+
+## 메타데이터란?
+
+```jsx
+웹 페이지 정보를 담는 데이터
+
+검색엔진, SNS에서 페이지를 설명하거나 요약할 때 사용됨
+```
+
+```jsx
+export const metadata = {
+  title: '페이지 제목',
+  description: '페이지 설명',
+}
+```
+
+## 메타데이터 위치와 우선순위
+
+| 위치                        | 적용 범위                      | 우선순위      |
+| --------------------------- | ------------------------------ | ------------- |
+| `layout.js`                 | 해당 layout이 감싼 모든 페이지 | 낮음          |
+| `layout.js` (중첩된 layout) | 그 내부 페이지에만 적용        | 중간          |
+| `page.js`                   | 해당 페이지에만 적용           | **가장 높음** |
+
+```jsx
+즉, 더 안쪽에 있는 페이지나 layout의 metadata가 우선 적용됨
+```
+
+## 실제 예시: meals/page.js
+
+![image.png](<%EC%84%B9%EC%85%98%203%20NextJS%20%ED%95%B5%EC%8B%AC%20(%EC%95%B1%20%EB%9D%BC%EC%9A%B0%ED%84%B0)%20-2-/image%2012.png>)
+
+```jsx
+export const metadata = {
+  title: 'All Meals',
+  description: 'Browse through a list of delicious meals shared by our community.',
+}
+```
+
+```jsx
+이렇게 하면 /meals 페이지에 들어갔을 때
+
+브라우저 탭 제목이 "All Meals"로 뜨고
+
+소스코드 <meta name="description">에 설명이 들어감
+```
+
+# { 동적 페이지의 메타데이터 }
+
+![image.png](<%EC%84%B9%EC%85%98%203%20NextJS%20%ED%95%B5%EC%8B%AC%20(%EC%95%B1%20%EB%9D%BC%EC%9A%B0%ED%84%B0)%20-2-/image%2013.png>)
+
+## 1. 정적인 metadata 설정과 다른 점
+
+```jsx
+정적인 페이지에서는 보통 이렇게 설정합니다:
+
+하지만 동적 페이지에서는 metadata라는 상수를 쓸 수 없습니다.
+
+대신 generateMetadata라는 함수를 사용해야 합니다.
+```
+
+```jsx
+export const metadata = {
+  title: '정적인 페이지 제목',
+  description: '설명 내용',
+}
+```
+
+## 2. `generateMetadata` 함수란?
+
+```jsx
+Next.js가 자동으로 찾아 실행하는 함수입니다.
+
+metadata를 동적으로 생성할 때 반드시 사용하는 함수입니다.
+
+이 함수는 반드시 async 함수여야 합니다.
+```
+
+```jsx
+export async function generateMetadata({ params }) {
+  // 동적으로 메타데이터를 생성
+}
+```
+
+```jsx
+params는 동적 경로에서 넘어온 데이터입니다.
+
+예: /meals/치킨 이라면 params.mealSlug는 "치킨"이 됩니다.
+```
+
+## 3. 동적 데이터로 메타데이터 생성하기
+
+```jsx
+const meal = getMeal(params.mealSlug) // 해당 slug로 meal 정보를 가져옴
+
+if (!meal) {
+  notFound() // meal이 없으면 404 페이지로 보내기
+}
+
+return {
+  title: meal.title,
+  description: meal.summary,
+}
+```
+
+```jsx
+title과 description을 해당 meal 데이터로 지정합니다.
+
+만약 데이터를 찾지 못하면 notFound()를 호출해 404 페이지로 이동시킵니다.
+```
+
+## 4. 왜 `notFound()`가 필요할까?
+
+```jsx
+meal이 존재하지 않으면 meal.title을 읽을 수 없기 때문에 에러 페이지가 뜹니다.
+
+그래서 안전하게 처리하려면 if (!meal) 조건으로 검사하고,
+
+notFound()를 호출해서 404 페이지를 띄워야 합니다.
+```

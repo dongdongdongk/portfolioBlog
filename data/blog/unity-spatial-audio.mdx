@@ -1,0 +1,875 @@
+---
+title: 'Unity에서의 Spatial Audio'
+date: '2026-09-02'
+category: '게임 개발/WWISE'
+tags: ['게임 개발', 'WWISE']
+draft: false
+summary: ''
+---
+
+# { 🎧 Spatial Audio 튜토리얼 준비하기 }
+
+이번 강의에서는 **Wwise의 Spatial Audio(공간 오디오)** 시스템을 실습하기 위한 준비 단계를 다룹니다.
+
+이 과정을 완료해야 이후의 Spatial Audio 튜토리얼(예: Room, Portal, Reflection 등)을 원활하게 진행할 수 있습니다.
+
+---
+
+## 📋 목차
+
+1. [Spatial Audio 개념 이해하기](https://www.notion.so/28de683f737e80529f64f76a5ddde908#spatial-audio-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Unity 프로젝트 만들기](https://www.notion.so/28de683f737e80529f64f76a5ddde908#unity-%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+3. [Wwise 프로젝트 준비하기](https://www.notion.so/28de683f737e80529f64f76a5ddde908#wwise-%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8-%EC%A4%80%EB%B9%84%ED%95%98%EA%B8%B0)
+4. [Unity 프로젝트 준비하기](https://www.notion.so/28de683f737e80529f64f76a5ddde908#unity-%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8-%EC%A4%80%EB%B9%84%ED%95%98%EA%B8%B0)
+5. [셋업 검토하기](https://www.notion.so/28de683f737e80529f64f76a5ddde908#%EC%85%8B%EC%97%85-%EA%B2%80%ED%86%A0%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. Spatial Audio 개념 이해하기
+
+- \*Spatial Audio(공간 오디오)\*\*란?
+  - 게임 내 **소리의 위치, 거리, 방향, 반사, 차폐 효과** 등을 현실적으로 표현하는 기술입니다.
+  - 리스너(플레이어의 귀)와 사운드 소스의 상대적 위치를 계산해 **3D 공간감**을 제공합니다.
+- **핵심 구성 요소**
+  - 🎧 **Listener(리스너)**:
+    - 플레이어의 청취 위치를 의미합니다.
+    - Unity에서는 주로 **플레이어 카메라**나 **캐릭터 오브젝트**에 부착합니다.
+  - 🔊 **Emitter(방사체)**:
+    - 사운드를 내는 오브젝트(예: 버튼, 스피커, 폭발물 등).
+    - 소리의 위치, 방향, 감쇠(Attenuation)를 가집니다.
+  - 🏠 **Room & Portal(공간과 포털)**:
+    - 소리가 방 안에 갇히거나, 문을 통해 약하게 들리게 하는 구조를 표현합니다.
+    - 예: 벽 너머에서 들리는 소리, 문틈으로 새는 소리 등.
+  - 🌊 **Auxiliary Sends(보조 전송)**:
+    - 리버브(잔향)나 환경음 같은 효과를 공간에 맞게 적용합니다.
+
+---
+
+## 2. Unity 프로젝트 만들기
+
+### 🎯 목적
+
+Wwise를 통합할 Unity 환경을 세팅합니다.
+
+### 🧭 단계
+
+1. **Unity 실행 → 새 프로젝트 생성**
+   - 최신 버전의 Unity 사용을 권장합니다.
+   - 예: “SpatialAudioTutorial” 이름으로 생성.
+2. **Unity 닫기**
+   - Wwise 통합 시 Unity를 닫은 상태여야 오류 없이 진행됩니다.
+3. **Audiokinetic Launcher 실행**
+   - 메뉴에서 `Unity 프로젝트 통합 (Integrate Wwise into Unity Project)` 선택.
+   - 방금 만든 Unity 프로젝트 폴더를 지정.
+4. **통합 완료**
+   - 이제 Unity 프로젝트에 Wwise 관련 플러그인과 스크립트가 자동으로 추가됩니다.
+
+---
+
+## 3. Wwise 프로젝트 준비하기
+
+### 🎯 목적
+
+튜토리얼에서 사용할 **사운드, 이벤트, 사운드뱅크**를 생성합니다.
+
+---
+
+### 1️⃣ Sound SFX 만들기
+
+- **Launcher를 통해 Wwise 프로젝트 열기**
+- **Actor-Mixer Hierarchy → Default Work Unit** 안에 새 **Sound SFX** 추가
+- **사운드 파일 가져오기** (예: 버튼 클릭 사운드, 환경음 등)
+
+---
+
+### 2️⃣ Sound Property 설정
+
+### 🎚 General Settings 탭
+
+- **Use game-defined auxiliary sends**
+  → ✔️ **활성화**
+  → 게임 내에서 정의된 리버브나 공간 효과를 사운드가 받을 수 있도록 허용합니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380583/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image.png)
+
+### 📍 Positioning 탭
+
+- **Listener Relative Routing** → ✔️ 활성화
+  → 리스너(플레이어) 기준으로 3D 공간 오디오 계산을 수행.
+- **3D Spatialization** → `Position + Orientation` 선택
+  → 위치뿐 아니라 방향성까지 포함한 공간적 소리 계산.
+- **Attenuation(감쇠)** → 새로 추가
+  → 사운드가 멀어질수록 볼륨이 점차 줄어드는 거리 기반 효과.
+  - 예: Max Distance = 20m (적절한 범위 설정)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380577/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_1.png)
+
+---
+
+### 3️⃣ Event 만들기
+
+- **Sound SFX 우클릭 → New Event → Play**
+  - 해당 사운드를 재생할 이벤트 생성.
+- **Event Editor**에서 이름 지정 (예: `Play_ButtonSound`)
+
+---
+
+### 4️⃣ SoundBank 생성
+
+- 단축키 `F7` → **SoundBank 레이아웃**으로 이동
+- 새 **SoundBank** 추가 (예: `SpatialAudio_Bank`)
+- 방금 만든 **Event**를 이 SoundBank에 **드래그 앤 드롭**
+- 프로젝트 저장 (Ctrl + S)
+
+---
+
+## 4. Unity 프로젝트 준비하기
+
+### 🎯 목적
+
+게임 씬 내에서 리스너, 방사체, 공간 등을 배치하고 Wwise 오브젝트와 연결합니다.
+
+---
+
+### 1️⃣ 프로젝트 열기
+
+- **Launcher → Unity 프로젝트 열기**
+- 상단 메뉴에서 **Window > Wwise Picker** 실행
+- **Refresh Project** 클릭 → Wwise 프로젝트와 동기화
+- **Generate SoundBanks** 클릭 → SoundBank 생성
+
+---
+
+### 2️⃣ 리스너 설정하기
+
+### 👂 리스너 오브젝트 생성
+
+- 플레이어 캐릭터 또는 카메라 오브젝트 선택
+- **AkSpatialAudioListener** 컴포넌트 추가
+  → 이때 자동으로 아래 컴포넌트들이 함께 추가됨:
+  - **AkAudioListener**
+  - **AkGameObj**
+  - **AkRoomAwareObject**
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380579/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_2.png)
+
+### ⚙ 설정 정리
+
+- **AkGameObj**
+  - “Environment Aware” 체크 해제 → 환경에 의한 보조 이펙트 비활성화
+  - “Use Default Listener” 활성화 → 기본 리스너로 설정
+- **경고 메시지 무시 가능**
+  - AkRoom 컴포넌트를 아직 사용하지 않기 때문에 나오는 메시지는 무시 가능.
+  - 나중에 Room/Portal 튜토리얼에서 다시 다룹니다.
+
+---
+
+### 3️⃣ 씬 만들기
+
+### 🧱 공간 구조 제작
+
+- **바닥과 건물 생성**
+  - `GameObject > 3D Object > Cube` 사용
+  - 건물 안에 두 개의 방(Room)을 만들고, 바깥에는 장애물(Obstacle) 배치
+  - SpatialAudioTutorial 예제에서는:
+    - 건물 = Mesh 사용
+    - 바닥/장애물 = Cube 사용
+
+### 🔘 방사체(Emitter) 생성
+
+- 예: `GameObject > 3D Object > Cylinder`
+- 각 공간의 안팎에 하나씩 배치 (총 2개 버튼)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380581/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_3.png)
+
+---
+
+### 4️⃣ 컴포넌트 연결
+
+### 🎵 AkAmbient
+
+- 방사체 오브젝트에 추가
+- **Trigger On**: 사운드를 언제 재생할지 설정 (예: On Start, On Trigger Enter 등)
+- **Event Name**: Wwise에서 만든 Event 선택 (`Play_ButtonSound`)
+
+### ⚙ AkGameObj
+
+- 자동 추가됨
+- “Use Default Listener” 옵션 활성화
+
+### 💽 AkBank
+
+- 방사체에 추가
+- Name: Wwise에서 만든 SoundBank (`SpatialAudio_Bank`) 선택
+
+---
+
+## 5. 셋업 검토하기
+
+### 🎯 목적
+
+모든 연결이 올바르게 이루어졌는지 테스트합니다.
+
+---
+
+### 1️⃣ 게임 실행
+
+- Unity에서 **Play** 버튼 클릭
+- **Wwise와 연결** (Wwise → Connect to Game)
+
+---
+
+### 2️⃣ 프로파일러(Profiler) 확인
+
+### 📈 Profiler Layout (단축키 F6)
+
+- 버튼을 눌러 사운드가 재생되는지 확인
+- 사운드가 Wwise에 정상적으로 전송되면 다음 그래프가 보입니다:
+
+> Button Outside Voice Graph with no Effect
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380582/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_4.png)
+
+---
+
+### 3️⃣ Game Object 3D Viewer 보기
+
+- 오른쪽 상단 톱니바퀴 아이콘 → **Profiler Settings** 클릭
+- **Spatial Audio** 항목 체크 → Game Object 3D Viewer에서 공간 정보 표시
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380582/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_5.png)
+
+### 단축키 `F12` → Game Object Profiler Layout
+
+- 3D Viewer에 리스너와 방사체가 표시됩니다.
+  (방사되지 않은 오브젝트는 보이지 않습니다)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380582/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_6.png)
+
+---
+
+### 4️⃣ 씬 저장
+
+- 모든 구성이 끝나면 씬을 저장합니다.
+  - 예: `SpatialAudio_Setup.unity`
+
+---
+
+## ✅ 요약
+
+| 항목                    | 핵심 내용                                                            |
+| ----------------------- | -------------------------------------------------------------------- |
+| **Unity 설정**          | 새 프로젝트 생성 → Wwise 통합                                        |
+| **Wwise 설정**          | Sound SFX + Event + SoundBank 생성                                   |
+| **Unity 오브젝트 구성** | 리스너(AkSpatialAudioListener), 방사체(AkAmbient), SoundBank(AkBank) |
+| **테스트**              | Profiler에서 사운드 재생 및 3D Viewer 확인                           |
+
+# { 🪞표면 리플렉터(Surface Reflector) 튜토리얼 }
+
+이번 강의는 **Wwise Reflect 플러그인과 Unity의 AkSurfaceReflector 컴포넌트**를 사용해,
+
+**소리가 표면에 반사되는 현실적인 공간 음향 효과(Initial Reflections)**를 구현하는 방법을 다룹니다.
+
+---
+
+## 📋 목차
+
+1. [개념 이해하기](https://www.notion.so/28de683f737e80529f64f76a5ddde908#%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [A. Wwise 프로젝트 설정](https://www.notion.so/28de683f737e80529f64f76a5ddde908#a-wwise-%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8-%EC%84%A4%EC%A0%95)
+3. [B. Unity 프로젝트 설정](https://www.notion.so/28de683f737e80529f64f76a5ddde908#b-unity-%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8-%EC%84%A4%EC%A0%95)
+4. [C. 셋업 검토하기 (Reflect 결과 확인)](https://www.notion.so/28de683f737e80529f64f76a5ddde908#c-%EC%85%8B%EC%97%85-%EA%B2%80%ED%86%A0%ED%95%98%EA%B8%B0-reflect-%EA%B2%B0%EA%B3%BC-%ED%99%95%EC%9D%B8)
+
+---
+
+## 1. 개념 이해하기
+
+### 🎧 1-1. 표면 리플렉터란?
+
+- **Surface Reflector**는 **소리가 벽, 바닥, 천장 같은 표면에서 반사되는 효과**를 시뮬레이션하는 시스템입니다.
+- 실제 공간에서 소리는 표면에 닿을 때 일부는 반사되고, 일부는 흡수됩니다.
+  이 반사음을 시뮬레이션하면 **공간의 크기, 재질, 방향감**이 훨씬 현실적으로 느껴집니다.
+
+---
+
+### 🪞 1-2. Reflect 플러그인의 역할
+
+- Wwise의 **Reflect 플러그인**은 **초기 반사음(Early Reflection)**을 계산하는 데 사용됩니다.
+- 어떤 표면에 반사되는지, 반사각이 어떤지, 반사 후 감쇠 정도(attenuation)는 얼마인지 등을 자동으로 계산해줍니다.
+- Reflect 플러그인을 사용하면:
+  - 벽, 바닥, 천장과 같은 표면을 지정할 수 있고,
+  - Acoustic Texture(음향 텍스처)에 따라 반사 특성이 달라집니다 (예: 금속, 나무, 천 등).
+
+---
+
+### 🧱 1-3. Acoustic Texture (음향 텍스처)
+
+- Acoustic Texture는 **소리의 반사, 흡수, 투과 특성**을 표현하는 **소재 데이터**입니다.
+- 예를 들어:
+  - **Metal** → 강하게 반사, 거의 흡수 없음
+  - **Carpet** → 반사 거의 없음, 흡수 강함
+- 이 텍스처는 Wwise의 ShareSets 탭 > Virtual Acoustics 폴더 안에 있습니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380582/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_7.png)
+
+---
+
+### 🌊 1-4. 반사의 순서 (Reflection Order)
+
+- 반사는 **몇 번 튕길 것인지**를 의미합니다.
+  - **1차 반사(1st order)**: 소리가 표면에 한 번 튕겨서 리스너에게 옴.
+  - **2차 반사(2nd order)**: 두 번 튕긴 후 도달.
+- Unity의 **AkWwiseInitializationSettings > Spatial Audio Settings**에서 Order를 설정할 수 있습니다.
+  - 기본값: 1
+  - 최대: 4
+
+---
+
+## 2. A. Wwise 프로젝트 설정
+
+이 단계에서는 **Reflect 플러그인과 Acoustic Texture를 가진 Auxiliary Bus**를 생성해줍니다.
+
+---
+
+### 🧩 2-1. Reflect 플러그인과 Acoustic Textures 추가하기
+
+1. 메뉴에서 **Project > Import Factory Assets...** 선택
+2. **Reflect and Acoustic Textures** 항목 체크
+3. **OK** 클릭
+
+→ 이제 ShareSets 탭의 Virtual Acoustics 폴더에 Acoustic Texture들이 자동으로 추가됩니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380582/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_8.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380583/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_9.png)
+
+---
+
+### 🎨 2-2. 새로운 Auxiliary Bus 생성 (초기 반사용)
+
+1. **Master Audio Bus**를 우클릭 → **New Child > Presets > Early Reflection Auxiliary Bus** 선택
+   - 이름 예시: `Reflect_EarlyReflections`
+2. 이 Bus는 Reflect 플러그인을 사용할 준비가 된 버스입니다.
+
+## 추천 순서:
+
+### 1. **Physically-Based Early Reflection** ⭐ (가장 추천)
+
+- **최신 방식**으로 물리 기반 음향 시뮬레이션
+- 가장 현실적이고 정확한 초기 반사음
+- **CPU 사용량**: 중간~높음
+- **사용 케이스**: 고품질 음향이 중요한 프로젝트, PC/콘솔 게임
+
+### 2. **Simplified Early Reflection**
+
+- 성능과 품질의 균형
+- **CPU 사용량**: 낮음~중간
+- **사용 케이스**: 모바일 게임이나 성능이 중요한 프로젝트
+
+### 3. **Legacy Early Reflection**
+
+- 이전 버전과의 호환성을 위한 옵션
+- **사용 케이스**: 기존 프로젝트를 유지해야 할 때만
+
+### 4. **Room Auxiliary Bus**
+
+- 단순한 룸 리버브 효과
+- 초기 반사음보다는 전체적인 공간감
+- **사용 케이스**: 간단한 공간 효과만 필요할 때
+
+## 실전 추천:
+
+- **PC/콘솔 게임** → **Physically-Based** 사용
+- **모바일/VR 게임** → **Simplified** 사용
+- **단순한 배경음악/효과음** → **Room** 사용
+
+프로젝트가 Unity 기반이고 2025년 프로젝트이므로, **Physically-Based Early Reflection**을 선택하는 것을 추천합니다. 나중에 성능 문제가 생기면 Simplified로 변경할 수 있습니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380577/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_10.png)
+
+---
+
+### 🎛️ 2-3. 사운드에 Reflect 연결하기
+
+1. Spatial Audio 튜토리얼 준비에서 사용한 사운드(방사체용 이벤트)를 엽니다.
+2. **General Settings 탭**에서
+   - `Early Reflections` 상자에 새로 만든 `Reflect_EarlyReflections` Bus를 추가합니다.
+3. Reflect 플러그인이 이제 해당 사운드의 반사를 계산하게 됩니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380577/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_11.png)
+
+---
+
+### 💾 2-4. 프로젝트 저장
+
+> 모든 설정이 끝났다면 Ctrl+S (Save All) 로 저장합니다.
+
+---
+
+## 3. B. Unity 프로젝트 설정
+
+이제 Unity에서 **AkSurfaceReflector 컴포넌트**를 추가해 실제 반사 표면을 구현합니다.
+
+---
+
+### 🧱 3-1. AkSurfaceReflector의 개념
+
+- **AkSurfaceReflector**는 Unity 내의 표면을 “소리가 반사되는 면”으로 정의하는 컴포넌트입니다.
+- 해당 컴포넌트가 붙은 **메쉬 표면**이 Spatial Audio에 전달되어 Reflect 플러그인이 반사음을 계산합니다.
+
+---
+
+### 🧩 3-2. 표면 리플렉터 오브젝트 만들기
+
+### 방법 1️⃣ 기존 메쉬에 AkSurfaceReflector 추가
+
+- 예: 벽이나 바닥의 Mesh Renderer 오브젝트에 바로 붙이기
+- 단, **삼각형이 너무 많을 경우** 게임 성능이 저하될 수 있음 → 단순한 충돌 메쉬 사용 권장
+
+### 방법 2️⃣ 별도 큐브 생성 후 사용 (튜토리얼 기본 방식)
+
+1. 메뉴에서 **GameObject > 3D Object > Cube** 생성
+2. **Mesh Renderer 컴포넌트 제거**
+   - 렌더링은 필요 없고, 충돌체만 남깁니다.
+3. **Box Collider**의 **Is Trigger** 체크
+4. **AkSurfaceReflector 컴포넌트 추가**
+5. **Mesh 필드**는 `None`으로 둡니다. (MeshFilter의 메쉬를 그대로 사용)
+6. **Acoustic Textures 배열**
+   - 각 하위 메쉬에 적용할 텍스처 선택 (또는 `None` → 필터링 없는 반사)
+7. **Transmission Loss Values**
+   - 표면을 통과하는 소리의 손실 정도를 설정
+   - 값이 높을수록 소리가 덜 통과함 (흡음율 증가)
+8. **Enable Diffraction (회절)** 체크
+   - 소리가 장애물 가장자리로 돌아나오는 효과 활성화
+9. **Associated Room**은 `None`으로 둠
+   - Room/Portal 시스템을 사용하지 않을 경우 기본값 유지
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380577/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_12.png)
+
+---
+
+### ⚙️ 3-3. Spatial Audio 설정 확인
+
+- 메뉴 경로: `AkWwiseInitializationSettings → Spatial Audio Settings`
+- **Reflection Order** 기본값: `1`
+  - 더 복잡한 반사를 원할 경우 `2~4`로 변경 가능
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380577/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_13.png)
+
+---
+
+### 🧭 3-4. 반사 경로 시각화하기
+
+- 사운드 방사체(Emitter)에 **AkSpatialAudioDebugDraw** 컴포넌트를 추가
+- Inspector에서 **반사 순서(Order)** 선택
+- 씬 뷰에서 반사 경로가 시각적으로 표시됩니다.
+  → 어떤 표면에서 몇 번 반사되는지 실시간으로 확인 가능
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380577/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_14.png)
+
+---
+
+## 4. C. 셋업 검토하기 (Reflect 결과 확인)
+
+이제 모든 연결이 올바르게 되어 있는지 Wwise에서 검증합니다.
+
+---
+
+### 🏗️ 4-1. Wwise Picker에서 SoundBank 생성
+
+1. Unity 메뉴 → **Windows > Wwise Picker** 열기
+2. **SoundBank 생성(Build SoundBank)** 버튼 클릭
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380578/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_15.png)
+
+---
+
+### 🎮 4-2. Unity에서 테스트
+
+1. 씬을 실행하고, Reflect 연결된 사운드(방사체)를 재생
+2. **Wwise Authoring → Remote Connect**로 Unity 게임에 연결
+3. **Profiler Layout**으로 전환
+
+---
+
+### 📈 4-3. Reflect 반사 확인 (Profiler)
+
+- Voice Graph에서 Reflect 플러그인이 적용된 Auxiliary Bus 노드가 보임
+- 해당 Reflect 노드를 더블 클릭 → **Reflect Effect Editor** 열기
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380578/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_16.png)
+
+### 확인 포인트:
+
+- 현재 활성화된 **리플렉션 리스트** 표시
+- `Texture(s)` 열에 두 개의 텍스처가 보이면 → **2차 반사**
+- 그래프에서 **감쇠 곡선(Attenuation Curve)**을 조정해 반사 세기 변경 가능
+
+> 💡 리플렉션이 안 보일 경우
+>
+> Reflect의 `Max Distance` 값이 리스너와 방사체의 거리보다 작은지 확인
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380578/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_17.png)
+
+---
+
+### 🧍‍♂️ 4-4. Game Object Profiler Layout (F12)
+
+1. 단축키 **F12**로 Game Object Profiler Layout으로 전환
+2. 상단 **3D Viewer Settings**에서
+   - `Reflection Paths`
+   - `Reflection Image Sources`
+     체크
+
+→ 게임 중 반사 경로와 리플렉션 표면이 3D 공간에서 시각적으로 표시됩니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380578/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_18.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380578/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_19.png)
+
+---
+
+### 🏠 4-5. 반사 경로가 보이지 않을 때의 주의점
+
+- 3D Viewer에서 **지오메트리(Geometry)**가 표시되지 않으면:
+  → `Initialization Settings > Monitor Queue Pool Size` 값을 늘리세요.
+- 건물 안/밖 반사 문제:
+  - 리스너가 건물 **밖**에 있을 때 내부 방사체의 리플렉션이 보이지 않음
+  - 리스너가 **안**에 있을 때 외부 방사체의 리플렉션이 보이지 않음
+  - 원인: 건물의 열린 부분도 반사 표면으로 인식되기 때문
+  - 해결 방법:
+    - 건물 전체 메쉬를 Surface Reflector로 사용하거나
+    - **포털(Portal)** 시스템을 추가하여 열린 공간을 정의
+
+---
+
+✅ **정리 요약**
+
+| 항목               | 핵심 내용                              |
+| ------------------ | -------------------------------------- |
+| Reflect 플러그인   | 초기 반사음 계산, Auxiliary Bus에 연결 |
+| Acoustic Texture   | 표면 재질의 반사/흡음 특성             |
+| AkSurfaceReflector | Unity에서 반사 표면 정의               |
+| Reflection Order   | 반사 횟수 (1~4)                        |
+| DebugDraw          | 반사 경로 시각화                       |
+| Profiler           | 반사 효과 시청 및 조정                 |
+| 문제 해결          | Distance, Queue Pool, Portal 설정 확인 |
+
+---
+
+이 튜토리얼을 완성하면 🎧
+
+소리가 **벽, 천장, 바닥에 자연스럽게 튕겨서 공간감 있는 반사음**을 구현할 수 있게 됩니다.
+
+즉, **“게임 속에서 실제 건물 안처럼 들리게 만드는 핵심 시스템”**이 완성되는 것입니다.
+
+---
+
+# { 🏠 Room(공간)과 Portal(포털) 튜토리얼 }
+
+이번 강의에서는 **Wwise Spatial Audio**에서
+
+**Room(공간)** 과 **Portal(포털)** 을 이용해 **소리가 공간을 통해 어떻게 전달되고 회절(Diffraction)되는지**를 학습합니다.
+
+즉, “문이 열린 방”, “벽으로 막힌 방”, “복도와 연결된 공간” 같은 현실적인 사운드 환경을 구현하는 방법입니다.
+
+---
+
+## 📋 목차
+
+1. [Room & Portal 개념 이해하기](https://www.notion.so/28de683f737e80529f64f76a5ddde908#room--portal-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [A. Wwise 프로젝트 설정](https://www.notion.so/28de683f737e80529f64f76a5ddde908#a-wwise-%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8)
+3. [B. Room (공간) 구성하기](https://www.notion.so/28de683f737e80529f64f76a5ddde908#b-room-%EA%B3%B5%EA%B0%84)
+4. [C. Portal (포털) 구성하기](https://www.notion.so/28de683f737e80529f64f76a5ddde908#c-portal-%ED%8F%AC%ED%84%B8)
+5. [D. 셋업 검토 및 시각화](https://www.notion.so/28de683f737e80529f64f76a5ddde908#d-%EC%85%8B%EC%97%85-%EA%B2%80%ED%86%A0%ED%95%98%EA%B8%B0)
+6. [E. Portal과 리버브 (Room Coupling)](https://www.notion.so/28de683f737e80529f64f76a5ddde908#e-%ED%8F%AC%ED%84%B8%EA%B3%BC-%EB%A6%AC%EB%B2%84%EB%B8%8C)
+7. [F. 공간음 (Room Tone) 구현하기](https://www.notion.so/28de683f737e80529f64f76a5ddde908#f-%EA%B3%B5%EA%B0%84%EC%9D%8C-room-tone)
+
+---
+
+## 1. Room & Portal 개념 이해하기
+
+### 🧩 Room (공간)
+
+- **Room**은 “소리가 머무는 공간”을 의미합니다.
+  예: 실내, 동굴, 교회, 복도 등.
+- 각 Room에는 **리버브(Reverb)** 효과가 다르게 설정될 수 있습니다.
+  → 작은 방은 잔향이 짧고, 성당은 잔향이 길죠.
+- **AkRoom 컴포넌트**를 통해 Unity의 특정 영역(콜라이더) 안을 “하나의 공간”으로 정의합니다.
+
+### 🚪 Portal (포털)
+
+- **Portal**은 서로 다른 Room들을 연결하는 “문/통로”입니다.
+  → 소리가 한 Room에서 다른 Room으로 전달될 때 통로 역할을 합니다.
+- 예:
+  - 실내(Room A) ↔ 실외(Room B)를 연결하는 문
+  - 복도(Room B) ↔ 방(Room C)을 연결하는 문
+- **AkRoomPortal 컴포넌트**로 정의되며,
+  소리가 포털을 통과할 때 **전달(Transmission)** 과 **회절(Diffraction)** 효과가 적용됩니다.
+
+### 🎧 Diffraction (회절)
+
+- 소리가 **직접 보이지 않는 경로를 돌아 들어오는 현상**입니다.
+  문 뒤에 있어도 소리가 살짝 들리는 이유가 이것입니다.
+
+---
+
+## 2. A. Wwise 프로젝트
+
+### 🎛 1) Reverb 효과 및 Auxiliary Bus 추가
+
+- 공간별 리버브를 다르게 적용하기 위해 **Auxiliary Bus(보조 버스)** 를 추가합니다.
+- `Master Audio Bus` 우클릭 → `New Child > Presets > Room Auxiliary Bus`
+- 예시:
+  - 작은 방 → `Rooms/Room_Medium`
+  - 큰 방 → `Cathedrals/Medium`
+
+> 💡 “Aux Bus”는 소리를 보조 경로로 보내 리버브나 필터 등의 이펙트를 걸 수 있게 해주는 장치입니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380579/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_20.png)
+
+공간 프리셋을 사용하여 두 개의 Auxiliary Bus를 추가하세요.
+
+1. **Master Audio Bus**를 우클릭하고 New Child > Presets으로 가서 Room Auxiliary Bus를 선택하세요
+2. **Effects** 탭 아래에서 각 공간에 대해 효과를 각각 선택하세요. 예: 작은 공간에는 Rooms/Room_Medium, 큰 공간에는 Cathedrals/Medium 사용.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380579/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_21.png)
+
+---
+
+### 🎚 2) Sound Property 설정 (Diffraction & Transmission)
+
+- Spatial Audio 튜토리얼 준비에서 만든 **사운드(Sound SFX)** 를 수정합니다.
+- `Positioning` 탭에서
+  ✅ **Enable Diffraction**
+  ✅ **Enable Transmission**
+  을 체크하세요.
+
+> ✅ 회절(Diffraction): 벽 모서리를 돌아 들어오는 소리
+>
+> ✅ 전달(Transmission): 벽을 통과해 약하게 들리는 소리
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380579/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_22.png)
+
+---
+
+### 📈 3) Diffraction 곡선 설정 (Environmental Curves)
+
+- 메뉴: `Project > Project Settings > Environmental Curves`
+- Wwise Unity Demo Scene 기준 예시:
+
+| Curve               | Point 1 (X,Y) | Point 2 (X,Y) | Curve Type                     |
+| ------------------- | ------------- | ------------- | ------------------------------ |
+| Diffraction Volume  | (0, 0)        | (100, -3)     | Linear                         |
+| Diffraction LPF     | (0, 0)        | (100, 60)     | Linear                         |
+| Transmission Volume | (0, 0)        | (100, -12)    | Sine (Constant Power Fade In)  |
+| Transmission LPF    | (0, 0)        | (100, 75)     | Sine (Constant Power Fade Out) |
+
+> 🔊 Volume: 얼마나 크게 들리는가
+>
+> 🔊 **LPF (Low Pass Filter)**: 고음이 얼마나 깎이는가
+>
+> 이 곡선으로 “소리가 벽에 가려졌을 때 감쇠되는 방식”을 시각적으로 조정할 수 있습니다.
+
+---
+
+### 💾 4) 저장 & SoundBank 생성
+
+- 변경 후 프로젝트 저장
+- Unity의 **Wwise Picker** 창(`Window > Wwise Picker`)에서 **SoundBank 새로고침**
+- `Generate SoundBank` 실행
+
+---
+
+## 3. B. Room (공간)
+
+### 🧱 1) Room 만들기
+
+- Unity에서 `GameObject > 3D Object > Cube`
+- `Mesh Renderer` 제거 (보이지 않게)
+- `Box Collider`에서 **Is Trigger** 체크
+- `AkRoom` 컴포넌트 추가
+- `Reverb Aux Bus`를 아까 만든 Bus로 지정
+
+> 이 오브젝트가 실제 “공간의 경계” 역할을 합니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380579/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_23.png)
+
+---
+
+### ⚠️ 2) Rigidbody 경고
+
+- Room에는 **Rigidbody**가 필요합니다.
+  → Room과 RoomAwareObject 간 상호작용 계산을 위해서입니다.
+  → 경고가 뜨면 “Add Rigidbody” 클릭
+
+---
+
+### 🎧 3) RoomAwareObject 확인
+
+- 소리를 내는 객체(Emitter)나 듣는 객체(Listener)는
+  반드시 **AkRoomAwareObject** 컴포넌트를 가져야 Room 인식이 가능합니다.
+- Spatial Audio Listener에는 자동으로 포함되어 있으니 확인만 하면 됩니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380580/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_24.png)
+
+---
+
+## 4. C. Portal (포털)
+
+### 🚪 1) Portal 생성
+
+- Unity 메뉴에서 `GameObject > Wwise > Room Portal`
+- 생성된 **AkRoomPortal** 오브젝트를
+  문처럼 열려 있는 부분에 배치하세요.
+
+> 노란색 선 = 포털의 크기
+>
+> 빨간선 = 앞/뒤 구분 (z축 방향이 앞면)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380580/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_25.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380580/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_26.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380580/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_27.png)
+
+```csharp
+연결하면 자동으로 이렇게 불이 들어온다
+```
+
+---
+
+### ⚙️ 2) Portal 설정
+
+- `Open On` → **Start**
+- `Close On` → **Nothing**
+- `Front Room`, `Back Room` → 연결할 Room 지정
+  - 예: 실외 ↔ 작은 방
+
+---
+
+## 5. D. 셋업 검토하기
+
+### 🧩 AkSpatialAudioDebugDraw 사용
+
+- 사운드 경로를 시각적으로 확인하려면
+  **Emitter(소리 원천)** 에 `AkSpatialAudioDebugDraw` 컴포넌트를 추가하세요.
+- `Draw Diffraction Paths` 체크
+  → 회절 경로를 Scene 뷰에서 확인 가능
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380580/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_28.png)
+
+---
+
+### 🕹 테스트 방법
+
+1. Unity에서 플레이 시작
+2. Wwise Authoring 연결
+3. 버튼 눌러 각 Room의 리버브 들어보기
+4. 포털을 통해 이동하며 회절(Diffraction) 변화 체험하기
+5. Game Object Profiler (F12) 열기 → Diffraction Paths 활성화
+
+---
+
+### 👀 3D Viewer에서 확인할 수 있는 내용
+
+- 각 Room과 Portal의 시각화
+- 회절 경로 표시 (모서리에 회절율 %)
+- 리스너 위치에 따른 소리의 감쇠
+- 포털을 통과하는 가상 경로 (초록색 선)
+- Room 이름이 리스너 하위에 표시됨
+
+> 🟢 리스너가 실외면 “Outdoors Room”
+>
+> 🏠 리스너를 방 안으로 옮기면 자동으로 Room 이름이 갱신됩니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380581/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_29.png)
+
+---
+
+## 6. E. 포털과 리버브
+
+### 🔁 Room Coupling (공간 연결)
+
+- **포털을 통해 전달되는 소리도, 리스너가 있는 Room의 리버브를 반영**할 수 있습니다.
+  → 예: 문틈 사이로 들리는 소리도 실내 잔향을 가집니다.
+- 설정 방법:
+  1. Room의 **Auxiliary Bus Property Editor** 열기
+  2. `General Settings` 탭 → ✅ **Use game-defined auxiliary sends** 체크
+  3. 이렇게 하면 한 Room의 리버브가 다른 Room으로 “전달”됩니다.
+     ![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380581/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_30.png)
+
+---
+
+### 🎧 테스트
+
+- 작은 Room에서 소리 재생
+- 리스너를 큰 Room으로 이동
+  → Voice Graph에서 작은 Room의 리버브가 큰 Room 리버브로 “넘어오는 것”을 확인 가능
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380581/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_31.png)
+
+---
+
+## 7. F. 공간음 (Room Tone)
+
+### 🌬 개념
+
+- 각 공간에는 “특유의 배경음”이 있을 수 있습니다.
+  예:
+  - 에어컨 소리
+  - 기계실의 진동음
+  - 교회 내부의 웅웅거림
+- 이를 Wwise에서는 **Room Tone**이라고 부릅니다.
+
+---
+
+### 🎧 구현 단계
+
+### 1) Wwise 설정
+
+1. 새로운 **Sound SFX** 생성 → 공간음으로 사용할 파일 지정
+2. “Use game-defined auxiliary sends” 체크 (리버브로 보내기 위함)
+3. SFX 우클릭 → `New Event > Play` → RoomTone 재생 이벤트 생성
+4. 저장 후 SoundBank 생성
+
+---
+
+### 2) Unity 설정
+
+1. 해당 Room 오브젝트(AkRoom)에 **Room Tone Event** 등록
+2. `Aux Send Level` 조정 (공간 리버브 양 조절)
+3. 이벤트 트리거 방식 선택 (OnEnable, OnStart 등)
+4. 씬 실행 후 Wwise Authoring 연결
+
+---
+
+### 🧩 결과 확인
+
+- 리스너가 공간 안에 있을 경우:
+  → 공간음이 리스너 위치에서 들림
+- 리스너가 다른 Room에 있을 경우:
+  → 포털 위치에서 공간음이 전달되어 들림
+- **3D Viewer**에서 리스너 이동에 따라 공간음 오브젝트가 Room 또는 Portal로 이동하는 걸 확인 가능
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380581/notion-blog/_/WWISE/_/Unity_Spatial_Audio/image_32.png)
+
+---
+
+## 🧠 요약 정리
+
+| 개념                | 역할          | 관련 컴포넌트             | 특징                       |
+| ------------------- | ------------- | ------------------------- | -------------------------- |
+| **Room**            | 공간 정의     | `AkRoom`                  | 리버브와 벽 통한 전달 제어 |
+| **Portal**          | Room 간 연결  | `AkRoomPortal`            | 회절/전달 경로 계산        |
+| **RoomAwareObject** | Room 인식     | 자동 또는 수동 추가       | 리스너/방사체 모두 필요    |
+| **DebugDraw**       | 시각적 확인   | `AkSpatialAudioDebugDraw` | Diffraction 경로 표시      |
+| **Room Coupling**   | 리버브 전송   | 설정 기반                 | 포털을 통해 리버브 전달    |
+| **Room Tone**       | 공간의 배경음 | `Room Tone Event`         | 공간별 환경음 구현         |
+
+---
+
+이 튜토리얼을 마치면 🔊
+
+- 서로 다른 방/실외 공간 간의 리버브 차이를 표현할 수 있고,
+- 문틈 너머로 회절된 소리나 전달음을 들을 수 있으며,
+- 공간마다 고유의 배경음을 설정해 **현실감 있는 사운드 공간**을 구현할 수 있습니다.

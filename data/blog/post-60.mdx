@@ -1,0 +1,128 @@
+---
+title: '엑셀 파일 다운받기'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381059/notion-blog/_/_/Spring_/_/Untitled.png)
+
+# 1.유저 정보 엑셀 파일 다운로드
+
+## 1.dependencies 추가
+
+```jsx
+<dependency>
+    <groupId>org.apache.poi</groupId>
+    <artifactId>poi</artifactId>
+    <version>4.1.2</version>
+</dependency>
+<dependency>
+    <groupId>org.apache.poi</groupId>
+    <artifactId>poi-ooxml</artifactId>
+    <version>4.1.2</version>
+</dependency>
+```
+
+```jsx
+엑셀 파일을 다운받기 위해서 2가지 의존성을 추가해준다.
+```
+
+## 2.form, 다운로드 버튼 만들기
+
+```jsx
+<form action="/user/download" method="get">
+  <button class="btn btn-sm btn-light text-primary" type="submit">
+    Excel 파일 출력
+  </button>
+</form>
+```
+
+```jsx
+다운로드를 위해서 from 내부에 버튼을 만들어준다 action 으로 컨트롤러를 찾아서 호출 해준다
+```
+
+## 3.Controller 제작
+
+```java
+@GetMapping("/download")
+    public void excelDownload(HttpServletResponse response,UserVO userVO) throws Exception {     // response 는 기본이고 UserVO 로 데이터를 받아와서 넣어준다 , @RequestMapping("/user/*") 때문에 user 은 생략 (form 의 /user/download)
+        List<UserVO> userVOS = userService.getUserList(userVO);
+        //        Workbook wb = new HSSFWorkbook();       //xls 로 출력할 때는 이걸 사용해준다
+        Workbook wb = new XSSFWorkbook();                 //xlsx 파일을 사용할 때 는 이걸 사용
+        Sheet sheet = wb.createSheet("첫번째 시트");
+        Row row = null;
+        Cell cell = null;
+        int rowNum = 0;
+
+        // Header
+        row = sheet.createRow(rowNum++);
+
+				cell = row.createCell(0);                         // 이렇게 한 세트로 행을 만들어준다 (value 에 행 이름)
+        cell.setCellValue("번호");
+
+				cell = row.createCell(1);
+        cell.setCellValue("이름");
+        cell = row.createCell(2);
+        cell.setCellValue("아이디");
+        cell = row.createCell(3);
+        cell.setCellValue("이메일");
+        cell = row.createCell(4);
+        cell.setCellValue("권한");
+        cell = row.createCell(5);
+        cell.setCellValue("전화번호");
+
+        // Body
+        for (int i=0; i<userVOS.size(); i++) {          // 반복문 userVOS.size(); 로 List 크기만큼 반복
+            UserVO user = userVOS.get(i);
+            row = sheet.createRow(rowNum++);
+
+						cell = row.createCell(0);                   // 이렇게 한 세트로 열의 데이터 출력
+            cell.setCellValue(i);
+
+						cell = row.createCell(1);
+            cell.setCellValue(user.getName());
+            cell = row.createCell(2);
+            cell.setCellValue(user.getId());
+            cell = row.createCell(3);
+            cell.setCellValue(user.getEmail());
+            cell = row.createCell(4);
+            cell.setCellValue(user.getRoleName());
+            cell = row.createCell(5);
+            cell.setCellValue(user.getPhoneNumber());
+        }
+
+        // 컨텐츠 타입과 파일명 지정
+        response.setContentType("ms-vnd/excel");
+      //  response.setHeader("Content-Disposition", "attachment;filename=example.xls");
+        response.setHeader("Content-Disposition", "attachment;filename=example.xlsx");          // filename=example.xlsx 이 부분의 example.xlsx 이게 이름이다
+
+        // Excel File Output
+        wb.write(response.getOutputStream());
+        wb.close();
+    }
+```
+
+## 4.데이터 가져오기
+
+```java
+**Mapper**
+
+<select id="getUserList" resultType="UserVO">
+	SELECT *
+	FROM USER
+</select>
+
+**DAO**
+
+public List<UserVO>getUserList(UserVO userVO)throws Exception;
+
+**Service**
+
+public List<UserVO> getUserList(UserVO userVO) throws Exception{
+        return userDAO.getUserList(userVO);
+    }
+
+```

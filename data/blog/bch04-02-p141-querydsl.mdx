@@ -1,0 +1,556 @@
+---
+title: 'BCh04 02 p141 Querydsl설정'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+```java
+기본적으로 데이터 베이스 테이블을 만들면 등록된 시간, 최종 수정된 시간 등을 컬럼으로 만들어서
+
+기록을 하는것이 일반적이다
+
+JPA 를 쓸때는 2가지 방식으로 기록이 가능하다
+
+1. 하이버 네이트 고유의 어노테이션을 사용하는 방법
+
+2. JPA 에서 지원하는 어노테이션을 활용하는 방법
+
+* 최근에는 JPA 를 활용해서 많이 사용한다
+
+이를 상속으로 빼 놓으면 편하게 처리가 가능해서 BaseEntity 를 설계해서 사용할것이다
+```
+
+# 자동으로 처리되는 날짜/시간 설정
+
+```java
+데이터 베이스 테이블을 만들면 등록된 시간, 최종 수정된 시간 등을 컬럼으로 만들어서 기록을 하기위한 설정을 추가한다
+
+BaseEntity 패키지와 추상클래스를 만든다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381204/notion-blog/_/_/_/_/BCh04_02_p141_Querydsl_/Untitled.png)
+
+```java
+@MappedSuperclass
+@EntityListeners(value = { AuditingEntityListener.class})
+@Getter
+abstract class BaseEntity {
+    @CreatedDate // 엔티티의 생성 시간을 자동으로 관리하고 엔티티가 언제 생성되었는지 추적하기 위한 기능
+    @Column(name = "regdate", updatable = false)   // updatable = false로 설정되어 엔티티를 업데이트할 때 수정되지 않도록한다
+    private LocalDateTime regDate;
+    @LastModifiedDate  // 엔티티의 수정 시간을 자동으로 관리하고 엔티티가 언제 수정되었는지 추적하기 위한 기능을 제공
+    @Column(name = "moddate")
+    private LocalDateTime modDate;
+}
+```
+
+## **@MappedSuperclass**
+
+```java
+이 어노테이션을 사용하면 공통 부분을 한 번에 정의하고, 나머지 엔티티 클래스에서 재사용할 수 있다
+
+( 예를 들어, 여러 엔티티 클래스가 공통적으로 생성일자(createdDate)와 수정일자(modifiedDate)를 가지고 있다 )
+
+* @Entity 클래스는 엔티티나 @MappedSuperclass로 지정한 클래스만 상속 가능
+
+* 추상 클래스로 선언할 것을 권장 (abstract)
+```
+
+## @CreatedDate
+
+```java
+데이터베이스 레코드가 생성될 때 해당 필드의 값을 현재 시간으로 설정 이는 데이터의 생성 시간을 추적하거나 데이터베이스 레코드의 생성 시간을 감사하는 데 유용하다.
+```
+
+## **@EntityListeners(value = { AuditingEntityListener.class})**
+
+```html
+엔티티의 특정 작업을 자동화하고 코드를 간단하게 유지하기 위해사용 예를 들어, 데이터를 저장할 때
+자동으로 날짜를 업데이트하거나 로그를 남기는 작업을 자동화할 때 사용 * **Spring Data JPA에서
+제공하는 이벤트 리스너로 엔티티의 영속, 수정 이벤트를 감지하는 역할**
+```
+
+## @LastModifiedDate
+
+```java
+엔티티의 수정 시간을 자동으로 관리하고 엔티티가 언제 수정되었는지 추적하기 위한 기능을 제공
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381200/notion-blog/_/_/_/_/BCh04_02_p141_Querydsl_/Untitled_1.png)
+
+## @EnableJpaAuditing
+
+```java
+엔티티 클래스의 감시(auditing) 기능을 활성화하는 데 사용
+
+위의 **@EntityListeners(value = { AuditingEntityListener.class})** 를 사용하기 위해서는 이 어노테이션을 붙여줘야한다  ****
+```
+
+# MyBatis 를 이용했을 경우와 JPA 를 이용하는 경우의 차이
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381201/notion-blog/_/_/_/_/BCh04_02_p141_Querydsl_/Untitled_2.png)
+
+## MyBatis 를 이용했을 경우
+
+```java
+실제로 어떤 객체를 파라미터로 전달했을 떄 그 객체의 내용물을 뽑아서 sql 로 만든다 (sql에서 jdbc 로 사용) 그리고 그 객체의 용도는 거기서 끝난다
+
+반대로 말하면 조회를 하게되면 그냥 sql 문이 조회가 되는거고 그 sql문이 가져온 데이터를 객체화 해서 전달하는 것이다
+```
+
+## JPA 를 이용하는 경우
+
+```java
+MyBatis 같은 경우에는 1,3번 객체들이 (전달되는) 같지가 않다 (3번은 db에서 나온 결과기 때문에)
+
+JPA 는 첫 객체를 Persistence Context 에 넣어주면 거기서 보관을 한다
+
+한마디로 Persistence Context 랑 통신을 하지 DB랑 통신을 하는것이 아니란 것이다
+```
+
+## 요약
+
+```java
+요약하면, MyBatis는 SQL 중심의 방식으로 SQL을 직접 작성하고 실행하며,
+
+객체는 쿼리 파라미터 및 결과로 사용된다.
+
+반면에 JPA는 객체 지향 방식으로 객체를 데이터베이스에 영속화 *( 객체를 지속적으로 보존하거나 저장하는 것을 의미) 하고
+
+JPQL *( JPQL은 엔티티 객체를 검색하고 필터링하기 위한 언어로, 데이터베이스와 상호 작용할 때 SQL을 사용하는 대신 엔티티 객체를 대상으로 쿼리를 작성)
+
+을 사용하여 데이터베이스와 상호 작용한다.
+
+MyBatis는 SQL을 더 직접적으로 다루며, JPA는 객체와 데이터베이스 사이의 중간 계층을 제공하여 객체 지향 프로그래밍을 강화한다.
+```
+
+# 엔티티클래스 작성과 Querydsl
+
+```java
+* 다양한 상황에 맞게 동적으로 JPQL 을 작성하는 방법
+
+* JOOQ 나 Querydsl 주로사용( 국내는 Querydsl)
+
+* Querydsl 의 경우에는 Q도메인이라는 클래스 생성
+
+* 동적으로 쿼리를 작성할 때 Q도메인을 이용
+```
+
+## Guestbook 엔티티 클래스 작성
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381202/notion-blog/_/_/_/_/BCh04_02_p141_Querydsl_/Untitled_3.png)
+
+```java
+package org.guestbook.entity;
+
+import lombok.*;
+
+import javax.persistence.*;
+
+@Entity
+@Getter
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@ToString
+public class Guestbook extends BaseEntity{
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long gno;
+
+    @Column(length = 100, nullable = false)
+    private String title;
+
+    @Column(length = 1500, nullable = false)
+    private String content;
+
+    @Column(length = 50, nullable = false)
+    private String writer;
+}
+```
+
+```java
+Guestbook 엔티티를 작성해주고 BaseEntity 클래스(위에서 만든)를 상속받아 자동으로 등록된 시간, 최종 수정된 시간 등을 컬럼으로 만들어서 기록을 하게한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381202/notion-blog/_/_/_/_/BCh04_02_p141_Querydsl_/Untitled_4.png)
+
+```java
+이후 실행시 자동으로 테이블을 등록해준다
+```
+
+# 오류: JPA 가 테이블을 자동으로 추가해주지 않을 경우
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381202/notion-blog/_/_/_/_/BCh04_02_p141_Querydsl_/Untitled_5.png)
+
+```java
+@SpringBootApplication
+@EnableJpaAuditing
+@EntityScan("org.guestbook.entity")
+public class GuestbookApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(GuestbookApplication.class, args);
+    }
+
+}
+```
+
+```java
+테이블을 자동으로 JPA 가 추가해주지 않으면
+
+@EntityScan("엔티티 패키지 경로")
+
+를 실행 클래스에 사용해주면 자동으로 테이블을 추가해준다
+```
+
+# 레퍼지토리 등록
+
+```java
+repository 라는 패키지를 만들고  GuestbookRepository 라는 인터페이스를 만들어준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381202/notion-blog/_/_/_/_/BCh04_02_p141_Querydsl_/Untitled_6.png)
+
+```java
+그리고 JpaRepository 를 상속받게 해야한다 (JpaRepository<@Entity 의 클래스타입 , @id(pk) 타입)>)
+```
+
+JpaRepository 인터페이스
+
+# 동적 쿼리 처리를 위한 쿼리 dsl 설정
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381202/notion-blog/_/_/_/_/BCh04_02_p141_Querydsl_/Untitled_7.png)
+
+```java
+위의 페이지에는 메이븐 뿐이기 때문에 스스로 추가를 해줘야 한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381204/notion-blog/_/_/_/_/BCh04_02_p141_Querydsl_/Untitled_8.png)
+
+```java
+build.gradle 에서 plugins 에
+
+id "com.ewerk.gradle.plugins.querydsl" version "1.0.10" // querydsl 플러그인 추가
+
+를 추가해준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381204/notion-blog/_/_/_/_/BCh04_02_p141_Querydsl_/Untitled_9.png)
+
+```java
+디펜던시에
+
+//querydsl
+implementation "com.querydsl:querydsl-jpa:${queryDslVersion}"
+annotationProcessor "com.querydsl:querydsl-apt:${queryDslVersion}"
+
+추가
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381200/notion-blog/_/_/_/_/BCh04_02_p141_Querydsl_/Untitled_10.png)
+
+```java
+// 쿼리 DSL 설정 시작
+
+// Querydsl 코드를 생성한 디렉토리 경로를 설정합니다.
+def querydslDir = "$buildDir/generated/querydsl"
+
+// Querydsl 플러그인 설정
+querydsl {
+    // JPA 엔터티를 기반으로 Querydsl 코드를 생성하도록 설정합니다.
+    jpa = true
+
+    // 생성된 Querydsl 코드를 저장할 디렉토리 경로를 지정합니다.
+    querydslSourcesDir = querydslDir
+}
+
+// 소스셋 설정
+sourceSets {
+    // 생성된 Querydsl 코드 디렉토리를 메인 소스 디렉토리로 추가합니다.
+    main.java.srcDir querydslDir
+}
+
+// 구성 설정
+configurations {
+    // Querydsl 의존성을 컴파일 의존성에 추가합니다.
+    querydsl.extendsFrom compileClasspath
+}
+
+// Querydsl 코드 컴파일 설정
+compileQuerydsl {
+    // 어노테이션 프로세서 경로를 Querydsl 의존성으로 설정합니다.
+    options.annotationProcessorPath = configurations.querydsl
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+    querydsl.extendsFrom compileClasspath
+}
+```
+
+```java
+마지막으로 gradle 의 task를 생성한다
+```
+
+## [**[Querydsl] Unable to load class 'com.mysema.codegen.model.Type' 에러**](https://dd-developer.tistory.com/94)
+
+```java
+스프링 부트 2.7 버전 이상과 Querydsl 5.0 버전 이상을 설정할 때 발생하는 에러
+
+Q타입 클래스를 만들기 위해 Gradle -> Tasks -> Other -> compileQuerydsl을 실행할 때 발생한다.
+
+
+
+Querydsl과 gradle 설정 정보가 일치하지 않기 때문
+```
+
+```java
+1. 그러므로 build.gradle에 querydsl 버전 설정을 추가한 후
+
+buildscript {
+    ext {
+        queryDslVersion = "5.0.0"
+    }
+}
+
+2. dependencies에 아래 2줄을 추가하면 된다
+
+implementation "com.querydsl:querydsl-jpa:${queryDslVersion}"
+annotationProcessor "com.querydsl:querydsl-apt:${queryDslVersion}"
+
+즉 querydsl의 버전을 명시하고, querydsl-jpa, querydsl-apt를 추가하면 해결할 수 있다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381200/notion-blog/_/_/_/_/BCh04_02_p141_Querydsl_/Untitled_11.png)
+
+```java
+Q타입 클래스가 정상적으로 생성된 것을 볼 수 있다
+```
+
+```java
+<전체코드>
+
+buildscript {
+    ext {
+        queryDslVersion = "5.0.0"
+    }
+}
+
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '2.7.7'
+    id 'io.spring.dependency-management' version '1.0.15.RELEASE'
+    id 'com.ewerk.gradle.plugins.querydsl' version '1.0.10'
+}
+
+group = 'study'
+version = '0.0.1-SNAPSHOT'
+sourceCompatibility = '11'
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    implementation "com.querydsl:querydsl-jpa:${queryDslVersion}"
+    annotationProcessor "com.querydsl:querydsl-apt:${queryDslVersion}"
+
+    implementation 'com.github.gavlyukovskiy:p6spy-spring-boot-starter:1.8.1'
+
+    compileOnly 'org.projectlombok:lombok'
+    runtimeOnly 'com.h2database:h2'
+    annotationProcessor 'org.projectlombok:lombok'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+//querydsl 추가 시작
+def querydslDir = "$buildDir/generated/querydsl"
+
+querydsl {
+    jpa = true
+    querydslSourcesDir = querydslDir
+}
+
+sourceSets {
+    main.java.srcDir querydslDir
+}
+
+configurations {
+    querydsl.extendsFrom compileClasspath
+}
+
+compileQuerydsl {
+    options.annotationProcessorPath = configurations.querydsl
+}
+//querydsl 추가 끝
+```
+
+```java
+<old 버전> **그냥 이거랑 똑같이,비슷하게 해라**
+
+buildscript {
+    ext {
+        queryDslVersion = "5.0.0"
+    }
+}
+
+plugins {
+    id 'java'
+    id 'war'
+    id 'org.springframework.boot' version '2.7.17'
+    id 'io.spring.dependency-management' version '1.0.15.RELEASE'
+    id 'com.ewerk.gradle.plugins.querydsl' version '1.0.10'
+}
+
+group = 'org.zerock.guestbook'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    sourceCompatibility = '11'
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation "com.querydsl:querydsl-jpa:${queryDslVersion}"
+    annotationProcessor "com.querydsl:querydsl-apt:${queryDslVersion}"
+    compileOnly 'org.projectlombok:lombok'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+    runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
+    annotationProcessor 'org.projectlombok:lombok'
+    providedRuntime 'org.springframework.boot:spring-boot-starter-tomcat'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    // https://mvnrepository.com/artifact/org.thymeleaf.extras/thymeleaf-extras-java8time
+    implementation group: 'org.thymeleaf.extras', name: 'thymeleaf-extras-java8time', version: '3.0.4.RELEASE'
+
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+// 쿼리 DSL 설정 시작
+
+// Querydsl 코드를 생성한 디렉토리 경로를 설정합니다.
+def querydslDir = "$buildDir/generated/querydsl"
+
+// Querydsl 플러그인 설정
+querydsl {
+    // JPA 엔터티를 기반으로 Querydsl 코드를 생성하도록 설정합니다.
+    jpa = true
+
+    // 생성된 Querydsl 코드를 저장할 디렉토리 경로를 지정합니다.
+    querydslSourcesDir = querydslDir
+}
+
+// 소스셋 설정
+sourceSets {
+    // 생성된 Querydsl 코드 디렉토리를 메인 소스 디렉토리로 추가합니다.
+    main.java.srcDir querydslDir
+}
+
+// 구성 설정
+configurations {
+    // Querydsl 의존성을 컴파일 의존성에 추가합니다.
+    querydsl.extendsFrom compileClasspath
+}
+
+// Querydsl 코드 컴파일 설정
+compileQuerydsl {
+    // 어노테이션 프로세서 경로를 Querydsl 의존성으로 설정합니다.
+    options.annotationProcessorPath = configurations.querydsl
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+    querydsl.extendsFrom compileClasspath
+}
+```
+
+```java
+이후 마지막으로 tack 를 실행하고 build 를 확인하면 querydsl 이 생겨난걸 확인 가능하다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381201/notion-blog/_/_/_/_/BCh04_02_p141_Querydsl_/Untitled_12.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381201/notion-blog/_/_/_/_/BCh04_02_p141_Querydsl_/Untitled_13.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381201/notion-blog/_/_/_/_/BCh04_02_p141_Querydsl_/Untitled_14.png)
+
+```java
+여기에는 엔티티 패키지에 있는 엔티티와 관련된 내용이 작성된다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381201/notion-blog/_/_/_/_/BCh04_02_p141_Querydsl_/Untitled_15.png)
+
+```java
+마지막으로 아까전에 만든 repository 에
+
+QuerydslPredicateExecutor<Guestbook>
+
+를 추가해준다
+
+이걸 추가해주는 이유는
+
+엔터티와 관련된 다양한 검색 조건(예: 이름, 작성일, 내용)을 동적으로 지정하여 데이터를 조회할 수 있게한다 (이게 없으면 동적 쿼리 사용 x) (후에 조금더 상세하게 설명추가)
+```
+
+# 쿼리 DSL(QueryDSL)의 'q 도메인’
+
+```java
+엔터티 클래스(Entity Class)에 대한 쿼리를 생성하고 사용하기 쉽게 도와주는 도메인 모델
+
+이 도메인 모델은 QueryDSL을 사용하여 데이터베이스에서 정보를 검색하거나 필터링할 때 도움이 된다
+```
+
+```java
+보통 엔터티 클래스의 이름 뒤에 "Q"를 붙이고 해당 엔터티의 필드 및 속성에 대한 정보를 포함한다
+
+이 정보는 QueryDSL을 사용하여 동적 쿼리를 작성하고 실행할 때 사용된다.
+
+"q 도메인"을 사용하면 정적인 문자열 쿼리 대신 Java 코드를 사용하여 쿼리를 구성할 수 있다
+
+예를 들어, "Person" 엔터티 클래스에 대한 "q 도메인"을 사용하면 "Person" 엔터티에 대한 쿼리를 다음과 같이 작성할 수 있다:
+```
+
+```java
+QPerson person = QPerson.person;
+
+List<Person> persons = new JPAQueryFactory(entityManager)
+    .select(person)
+    .from(person)
+    .where(person.age.gt(30))
+    .fetch();
+```

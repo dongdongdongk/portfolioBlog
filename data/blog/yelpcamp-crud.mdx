@@ -1,0 +1,912 @@
+---
+title: 'YelpCamp CRUD'
+date: '2026-09-02'
+category: '풀스택/The Web Developer 부트캠프 2022'
+tags: ['풀스택', 'The Web Developer 부트캠프 2022']
+draft: false
+summary: ''
+---
+
+# 기초 Express 앱 작성하기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381394/notion-blog/_/The_Web_Developer_2022/node_js/YelpCamp_CRUD/Untitled.png)
+
+```jsx
+기본적인 서버 셋팅을 해준다
+
+npm init -y
+
+npm express
+
+npm mongoose
+
+npm nodemon
+
+npm cors
+
+등등
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381393/notion-blog/_/The_Web_Developer_2022/node_js/YelpCamp_CRUD/Untitled_1.png)
+
+```jsx
+기본적인 클라이언트 셋팅을 해준다
+
+npx create-react-app . ( . 잊지말기 )
+
+npm install react-router-dom
+
+등등
+```
+
+## 캠프그라운드 모델 기초
+
+```jsx
+기본적인 모델을 작성한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381393/notion-blog/_/The_Web_Developer_2022/node_js/YelpCamp_CRUD/Untitled_2.png)
+
+```jsx
+const mongoose = require('mongoose') // 몽구스 연결
+
+const Schema = mongoose.Schema // 몽구스 스키마를 스키마로 저장 ( 자주 사용하기 위해 단축키 느낌 )
+
+const CampGroundSchema = new Schema({
+  // CampGround 스키마 정의
+  title: String,
+  price: String,
+  description: String,
+  location: String,
+})
+
+module.exports = mongoose.model('CampGround', CampGroundSchema) // 모델 내보내기
+```
+
+## 데이터 베이스 연결
+
+```jsx
+몽고DB에 몽구스를 활용해서 연결하고
+
+연결을 확인한다
+```
+
+```jsx
+const express = require('express')
+const mongoose = require('mongoose') // 몽구스 연결
+
+const app = express()
+
+mongoose.connect('mongodb://localhost:27017/yelp-camp') // 몽구스를 이용해서 몽고DB 연결
+
+// 연결 확인 코드
+const db = mongoose.connection // MongoDB 연결에 대한 정보를 얻는다. 이 정보를 db 변수에 할당
+db.on('error', console.error.bind(console, 'connection error'), {
+  useNewUrlParser: true, // 최신 버전의 드라이버와의 호환성을 유지
+  useUnifiedTopology: true,
+})
+db.once('open', () => {
+  // 한 번만 실행되는 이벤트 리스너 등록 MongoDB에 성공적으로 연결되었을 때 메세지
+  console.log('Database connected')
+})
+
+app.get('/', (req, res) => {
+  res.send('YELP CAMP')
+})
+
+app.listen(4000, () => {
+  console.log('serving on port 4000')
+})
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381393/notion-blog/_/The_Web_Developer_2022/node_js/YelpCamp_CRUD/Untitled_3.png)
+
+## 시드 파일 생성
+
+```jsx
+시드 폴더를 생성하고 시드 파일들을 만들어 준 뒤
+
+index.js 파일을 생성하고 DB와 연결해준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381393/notion-blog/_/The_Web_Developer_2022/node_js/YelpCamp_CRUD/Untitled_4.png)
+
+```jsx
+const mongoose = require('mongoose')
+const cities = require('./cities')
+const { places, descriptors } = require('./seedHelpers')
+const Campground = require('../models/campground')
+
+mongoose.connect('mongodb://localhost:27017/yelp-camp', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+
+const db = mongoose.connection
+
+db.on('error', console.error.bind(console, 'connection error:'))
+db.once('open', () => {
+  console.log('Database connected')
+})
+
+const sample = (array) => array[Math.floor(Math.random() * array.length)]
+
+const seedDB = async () => {
+  await Campground.deleteMany({}) // 모두 삭제 후 진행
+  for (let i = 0; i < 50; i++) {
+    // 50 개의 랜덤 데이터를 시드에서 가져와서 생성
+    const random1000 = Math.floor(Math.random() * 1000)
+    const camp = new Campground({
+      location: `${cities[random1000].city}, ${cities[random1000].state}`,
+      title: `${sample(descriptors)} ${sample(places)}`,
+    })
+    await camp.save()
+  }
+}
+
+seedDB().then(() => {
+  // 완료 후 DB 닫기
+  mongoose.connection.close()
+})
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381393/notion-blog/_/The_Web_Developer_2022/node_js/YelpCamp_CRUD/Untitled_5.png)
+
+```jsx
+50개의 데이터가 들어온걸 확인 가능하다
+```
+
+### 전체적인 진행
+
+```jsx
+**시드 데이터 기초 설정**:
+
+가짜 캠핑장 데이터를 생성하기 위해 시드 데이터를 사용할 것이다
+
+index.js 파일을 생성하고, 캠핑장 위치와 설명어 등을 제공하는 외부 파일인 cities.js와 seedHelpers.js를 불러온다.
+
+**Mongoose 연결 설정**:
+
+mongoose를 사용하여 MongoDB에 연결한다.
+
+연결이 성공하면 "Database connected"를 콘솔에 출력한다.
+
+**Express 앱 설정**:
+
+기본적인 Express 앱을 설정한다
+
+**시드 데이터 생성 로직 구현**:
+
+seeds 폴더를 생성하고, index.js 파일을 만들어 MongoDB에 데이터를 시드하는 로직을 작성한다.
+
+Campground 모델을 사용하여 데이터베이스에서 모든 기존 데이터를 삭제한다.
+
+**임의의 캠핑장 생성**:
+
+for 루프를 사용하여 50번 반복하면서 새로운 캠핑장을 생성한다.
+
+도시 및 주 데이터를 활용하여 캠핑장의 위치를 설정한다.
+
+**임의의 이름 생성**:
+
+seedHelpers.js 파일에서 제공하는 설명어와 장소 세트를 사용하여 각 캠핑장에 이름을 부여한다.
+
+sample 함수를 활용하여 임의의 값들을 선택한다.
+
+**데이터베이스에 저장**:
+
+생성된 캠핑장과 이름을 데이터베이스에 저장하고, 해당 내용을 콘솔에 출력하여 확인한다.
+
+**시드 데이터 로직 실행**:
+
+seeds/index.js 파일을 실행하여 데이터베이스에 새로운 캠핑장 데이터를 시드한다.
+
+**Mongoose 연결 종료**:
+
+시드 작업이 완료된 후에는 Mongoose 연결을 종료하여 데이터베이스와의 연결을 끊는다.
+
+**결과 확인**:
+
+시드 작업이 정상적으로 수행되었는지를 확인하기 위해 생성된 캠핑장들의 이름, 위치 등을 출력하여 확인한다.
+```
+
+# YelpCamp 조회
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381394/notion-blog/_/The_Web_Developer_2022/node_js/YelpCamp_CRUD/Untitled_6.png)
+
+```jsx
+캠프 목록을 조회하는 기능을 만든다
+```
+
+## server
+
+```jsx
+const express = require('express')
+const mongoose = require('mongoose') // 몽구스 연결
+const CampGround = require('./models/campground')
+const cors = require('cors')
+
+const app = express()
+app.use(cors())
+mongoose.connect('mongodb://localhost:27017/yelp-camp') // 몽구스를 이용해서 몽고DB 연결
+
+// 연결 확인 코드
+const db = mongoose.connection // MongoDB 연결에 대한 정보를 얻는다. 이 정보를 db 변수에 할당
+db.on('error', console.error.bind(console, 'connection error'), {
+  useNewUrlParser: true, // 최신 버전의 드라이버와의 호환성을 유지
+  useUnifiedTopology: true,
+})
+db.once('open', () => {
+  // 한 번만 실행되는 이벤트 리스너 등록 MongoDB에 성공적으로 연결되었을 때 메세지
+  console.log('Database connected')
+})
+
+// 조회
+app.get('/campground', async (req, res) => {
+  const campground = await CampGround.find({})
+  res.send(campground)
+})
+
+app.listen(4000, () => {
+  console.log('serving on port 4000')
+})
+```
+
+## client
+
+```jsx
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import axios from 'axios'
+
+const CampGround = () => {
+  const [camp, setCamp] = useState([])
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await axios.get('http://localhost:4000/campground')
+        setCamp(response.data)
+      } catch (error) {
+        console.error('FAIL LOAD CAMPGROUND DATA')
+        setCamp([])
+      }
+    }
+
+    fetchData()
+  }, [])
+
+  return (
+    <>
+      <h1>CampGround</h1>
+      <ul>
+        {camp.map((camp) => (
+          <li key={camp.id}>
+            <Link to={`/campground/${camp._id}`}>{camp.title}</Link>
+          </li>
+        ))}
+      </ul>
+    </>
+  )
+}
+
+export default CampGround
+```
+
+# YelpCamp 상세 조회
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381394/notion-blog/_/The_Web_Developer_2022/node_js/YelpCamp_CRUD/Untitled_7.png)
+
+```jsx
+캠프 상세 목록을 조회하는 기능을 구현한다
+```
+
+## server
+
+```jsx
+const express = require('express')
+const mongoose = require('mongoose') // 몽구스 연결
+const CampGround = require('./models/campground')
+const cors = require('cors')
+
+const app = express()
+app.use(cors())
+mongoose.connect('mongodb://localhost:27017/yelp-camp') // 몽구스를 이용해서 몽고DB 연결
+
+// 연결 확인 코드
+const db = mongoose.connection // MongoDB 연결에 대한 정보를 얻는다. 이 정보를 db 변수에 할당
+db.on('error', console.error.bind(console, 'connection error'), {
+  useNewUrlParser: true, // 최신 버전의 드라이버와의 호환성을 유지
+  useUnifiedTopology: true,
+})
+db.once('open', () => {
+  // 한 번만 실행되는 이벤트 리스너 등록 MongoDB에 성공적으로 연결되었을 때 메세지
+  console.log('Database connected')
+})
+
+// 조회
+app.get('/campground', async (req, res) => {
+  const campground = await CampGround.find({})
+  res.send(campground)
+})
+
+// 상세 조회
+app.get('/campground/:id', async (req, res) => {
+  const { id } = req.params
+  const campground = await CampGround.findById(id)
+  res.send(campground)
+})
+
+app.listen(4000, () => {
+  console.log('serving on port 4000')
+})
+```
+
+## client
+
+```jsx
+import { useEffect, useState } from 'react'
+import { useParams, Link, Navigate, useNavigate } from 'react-router-dom'
+import axios from 'axios'
+
+const CampGroundDetail = () => {
+  const params = useParams()
+  const [camp, setCamp] = useState({})
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await axios.get(`http://localhost:4000/campground/${params.id}`)
+        setCamp(response.data)
+      } catch (error) {
+        console.log('FAIL LOAD CAMPGROUND DETAIL')
+        setCamp([])
+      }
+    }
+    fetchData()
+  }, [])
+
+  const deleteCamp = async () => {
+    try {
+      await axios.delete(`http://localhost:4000/campground/${params.id}`)
+      navigate('/campground')
+    } catch (error) {
+      console.error('DELETE FAIL', error)
+    }
+  }
+
+  return (
+    <>
+      {camp ? (
+        <div>
+          <h1>{camp.title}</h1>
+          <h2>{camp.location}</h2>
+        </div>
+      ) : (
+        <p>캠프를 불러오는 중입니다...</p>
+      )}
+      <Link to={'/campground'}>홈으로</Link>
+      <Link to={`/campground/${params.id}/edit`}>캠프수정</Link>
+      <button type="button" onClick={deleteCamp}>
+        삭제하기
+      </button>
+    </>
+  )
+}
+
+export default CampGroundDetail
+```
+
+```jsx
+여기서
+
+const [camp, setCamp] = useState({});
+
+이부분을 null 이나 다른 [] 같은것으로 하면
+
+**깜빡임 문제**
+
+현재 useEffect 내에서 비동기 함수로 데이터를 가져오고 있다.
+
+비동기 함수가 실행되는 동안 setCamp(null)이 호출되면 컴포넌트가 null로 렌더링된다.
+
+이후 데이터가 로드되면 setCamp(response.data);으로 상태를 업데이트하게 된다.
+
+이렇게 되면 컴포넌트가 처음에 null로 렌더링되고, 나중에 데이터가 로드되면 다시 렌더링되는데,
+
+이로 인해 UI에서 깜빡이는 현상이 발생할 수 있다.
+
+**데이터 유형 불일치**
+
+useState(null)로 상태를 초기화하면, 컴포넌트가 처음 렌더링될 때
+
+camp은 null이므로 {camp.title} 및 {camp.location}에서 null.title 및 null.location을 읽으려고 시도하면 오류가 발생할 것이다.
+
+**결과**
+
+데이터를 로드하기 전에 빈 객체로 초기화하면 오류를 방지하면서 깜빡임 없이 로딩 상태를 다룰 수 있다.
+
+만약 로딩 상태를 명시적으로 다루고 싶다면, useState(null)을 사용할 수도 있다.
+
+이 경우에는 UI에서 로딩 상태를 처리해주어야 한다.
+```
+
+### 주의할점 new 와 :id
+
+```jsx
+// 상세 조회
+app.get('/campground/:id', async (req, res) => {
+    const { id } = req.params
+    const campground = await CampGround.findById(id);
+    res.send(campground);
+})
+
+// 캠프 추가
+app.get('/campground/new', async (req, res) => {
+    const { id } = req.params
+    const campground = await CampGround.findById(id);
+    res.send(campground);
+})
+
+예를들어 위와 같이 Restful 컨트롤러를 짠다면 문제가 생긴다 이유는 new 를 :id 로 인식해버리기 때문이다
+
+그렇기 때문에 new 를 :id 컨트롤러 위로 올려서 먼저 나오게 해줘야 한다
+
+( 리액트는 문제가 없다 )
+```
+
+# YelpCamp 추가
+
+```jsx
+새로운 캠프를 추가하는 기능을 구현한다
+```
+
+## server
+
+```jsx
+const express = require('express')
+const mongoose = require('mongoose') // 몽구스 연결
+const CampGround = require('./models/campground')
+const cors = require('cors')
+
+const app = express()
+app.use(cors())
+app.use(express.urlencoded({ extended: true }))
+app.use(express.json())
+mongoose.connect('mongodb://localhost:27017/yelp-camp') // 몽구스를 이용해서 몽고DB 연결
+
+// 연결 확인 코드
+const db = mongoose.connection // MongoDB 연결에 대한 정보를 얻는다. 이 정보를 db 변수에 할당
+db.on('error', console.error.bind(console, 'connection error'), {
+  useNewUrlParser: true, // 최신 버전의 드라이버와의 호환성을 유지
+  useUnifiedTopology: true,
+})
+db.once('open', () => {
+  // 한 번만 실행되는 이벤트 리스너 등록 MongoDB에 성공적으로 연결되었을 때 메세지
+  console.log('Database connected')
+})
+
+// 조회
+app.get('/campground', async (req, res) => {
+  const campground = await CampGround.find({})
+  res.send(campground)
+})
+
+// 상세 조회
+app.get('/campground/:id', async (req, res) => {
+  const { id } = req.params
+  const campground = await CampGround.findById(id)
+  res.send(campground)
+})
+
+// 추가
+app.post('/campground/new', async (req, res) => {
+  const newCamp = new CampGround(req.body)
+  await newCamp.save()
+  res.send('SaveSuccess')
+})
+
+app.listen(4000, () => {
+  console.log('serving on port 4000')
+})
+```
+
+```jsx
+app.use(express.urlencoded({ extended: true })); // URL-encoded 형식의 요청 바디를 파싱하는 역할
+app.use(express.json());  // JSON 형식의 요청 바디를 파싱하는 역할
+
+Express 애플리케이션에서 폼 데이터나 JSON 데이터를 요청으로부터 파싱하여 사용할 수 있도록 설정하는 미들웨어
+
+추가 잊지말자
+```
+
+## client
+
+```jsx
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import axios from 'axios'
+
+const CampGroundAdd = () => {
+  const navigate = useNavigate()
+  //상태 초기화
+  const [formData, setFormData] = useState({
+    title: '',
+    location: '',
+  })
+
+  // 입력값 변경 핸들러
+  const handleChange = (e) => {
+    const { name, value } = e.target
+    setFormData((prevDate) => ({
+      ...prevDate,
+      [name]: value,
+    }))
+  }
+
+  // 폼 제출 핸들러
+  const onSubmitHandler = async (e) => {
+    e.preventDefault()
+
+    //폼 데이터 전송
+    try {
+      await axios.post('http://localhost:4000/campground/new', formData)
+      navigate('/campground')
+    } catch (error) {
+      console.error('SAVE FAIL', error)
+    }
+  }
+
+  return (
+    <>
+      <h1>CampGroundAdd</h1>
+      <form onSubmit={onSubmitHandler}>
+        <label htmlFor="title">title</label>
+        <input type="text" name="title" id="title" value={formData.title} onChange={handleChange} />
+        <label htmlFor="location">location</label>
+        <input
+          type="text"
+          name="location"
+          id="location"
+          value={formData.location}
+          onChange={handleChange}
+        />
+        <button type="submit" value="submit">
+          Submit
+        </button>
+      </form>
+    </>
+  )
+}
+
+export default CampGroundAdd
+```
+
+# YelpCamp 업데이트
+
+```jsx
+캠프 내용을 업데이트 한다
+```
+
+## server
+
+```jsx
+const express = require('express')
+const mongoose = require('mongoose') // 몽구스 연결
+const CampGround = require('./models/campground')
+const cors = require('cors')
+
+const app = express()
+app.use(cors())
+app.use(express.urlencoded({ extended: true }))
+app.use(express.json())
+mongoose.connect('mongodb://localhost:27017/yelp-camp') // 몽구스를 이용해서 몽고DB 연결
+
+// 연결 확인 코드
+const db = mongoose.connection // MongoDB 연결에 대한 정보를 얻는다. 이 정보를 db 변수에 할당
+db.on('error', console.error.bind(console, 'connection error'), {
+  useNewUrlParser: true, // 최신 버전의 드라이버와의 호환성을 유지
+  useUnifiedTopology: true,
+})
+db.once('open', () => {
+  // 한 번만 실행되는 이벤트 리스너 등록 MongoDB에 성공적으로 연결되었을 때 메세지
+  console.log('Database connected')
+})
+
+// 조회
+app.get('/campground', async (req, res) => {
+  const campground = await CampGround.find({})
+  res.send(campground)
+})
+
+// 상세 조회
+app.get('/campground/:id', async (req, res) => {
+  const { id } = req.params
+  const campground = await CampGround.findById(id)
+  res.send(campground)
+})
+
+// 추가
+app.post('/campground/new', async (req, res) => {
+  const newCamp = new CampGround(req.body)
+  await newCamp.save()
+  res.send('SaveSuccess')
+})
+
+// 업데이트
+app.put('/campground/:id', async (req, res) => {
+  const { id } = req.params
+  try {
+    const camp = await CampGround.findById(id)
+
+    if (!camp) {
+      return res.status(404).send('CampFindFail')
+    }
+
+    camp.set(req.body)
+    await camp.save()
+
+    res.send(camp)
+  } catch (error) {
+    console('campUpdateFail', error)
+    res.status(500).send('campUpdateFail')
+  }
+})
+
+app.listen(4000, () => {
+  console.log('serving on port 4000')
+})
+```
+
+```jsx
+요청이 온 주소에서  /campground/:id
+
+id 를 params 로 추출해서 사용한다
+```
+
+## client
+
+```jsx
+import { useState, useEffect } from 'react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
+import axios from 'axios'
+
+const CampGroundUpdate = () => {
+  const params = useParams()
+  const navigate = useNavigate()
+
+  // 상태초기화
+  const [formData, setFormData] = useState({
+    title: '',
+    location: '',
+  })
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await axios.get(`http://localhost:4000/campground/${params.id}`)
+        console.log(params.id)
+        setFormData(response.data)
+      } catch (error) {
+        console.error('CAMP LOAD FAIL')
+      }
+    }
+    fetchData()
+  }, [params.id])
+
+  // 입력값 변경 시 상태 업데이트
+  const handleChange = (e) => {
+    const { name, value } = e.target
+    setFormData((prevData) => ({
+      ...prevData,
+      [name]: value,
+    }))
+  }
+
+  // 폼 제출 핸들러
+  const onSubmitHandler = async (e) => {
+    e.preventDefault()
+
+    // 폼 데이터 전송
+    try {
+      await axios.put(`http://localhost:4000/campground/${params.id}`, formData)
+      navigate('/campground')
+    } catch (error) {
+      console.error('SAVE FAIL', error)
+    }
+  }
+
+  return (
+    <>
+      <h1>CampGroundUpdate</h1>
+      <form>
+        <label htmlFor="title">title</label>
+        <input type="text" name="title" id="title" value={formData.title} onChange={handleChange} />
+        <label htmlFor="location">location</label>
+        <input
+          type="text"
+          name="location"
+          id="location"
+          value={formData.location}
+          onChange={handleChange}
+        />
+        <button type="submit" onClick={onSubmitHandler}>
+          Update
+        </button>
+      </form>
+      <Link to={'/campground'}>홈으로</Link>
+    </>
+  )
+}
+
+export default CampGroundUpdate
+```
+
+```jsx
+주소를 (params) 를 이용해서 id 를 가져와서 그걸로 요청을 보내 값을 받아와 폼에 초기값을 넣어준다
+
+ put 으로 데이터를 전송해서 업데이트를 진행한다
+```
+
+# YelpCamp 삭제
+
+```jsx
+캠프 상세 조회에서 삭제를 진행한다
+```
+
+## server
+
+```jsx
+const express = require('express')
+const mongoose = require('mongoose') // 몽구스 연결
+const CampGround = require('./models/campground')
+const cors = require('cors')
+
+const app = express()
+app.use(cors())
+app.use(express.urlencoded({ extended: true }))
+app.use(express.json())
+mongoose.connect('mongodb://localhost:27017/yelp-camp') // 몽구스를 이용해서 몽고DB 연결
+
+// 연결 확인 코드
+const db = mongoose.connection // MongoDB 연결에 대한 정보를 얻는다. 이 정보를 db 변수에 할당
+db.on('error', console.error.bind(console, 'connection error'), {
+  useNewUrlParser: true, // 최신 버전의 드라이버와의 호환성을 유지
+  useUnifiedTopology: true,
+})
+db.once('open', () => {
+  // 한 번만 실행되는 이벤트 리스너 등록 MongoDB에 성공적으로 연결되었을 때 메세지
+  console.log('Database connected')
+})
+
+// 조회
+app.get('/campground', async (req, res) => {
+  const campground = await CampGround.find({})
+  res.send(campground)
+})
+
+// 상세 조회
+app.get('/campground/:id', async (req, res) => {
+  const { id } = req.params
+  const campground = await CampGround.findById(id)
+  res.send(campground)
+})
+
+// 추가
+app.post('/campground/new', async (req, res) => {
+  const newCamp = new CampGround(req.body)
+  await newCamp.save()
+  res.send('SaveSuccess')
+})
+
+// 업데이트
+app.put('/campground/:id', async (req, res) => {
+  const { id } = req.params
+  try {
+    const camp = await CampGround.findById(id)
+
+    if (!camp) {
+      return res.status(404).send('CampFindFail')
+    }
+
+    camp.set(req.body)
+    await camp.save()
+
+    res.send(camp)
+  } catch (error) {
+    console('campUpdateFail', error)
+    res.status(500).send('campUpdateFail')
+  }
+})
+
+// 삭제
+app.delete('/campground/:id', async (req, res) => {
+  const { id } = req.params
+  try {
+    const result = await CampGround.deleteOne({ _id: id })
+    if (result.deletedCount > 0) {
+      res.status(200).send('DELETE SUCCESS')
+    } else {
+      res.status(404).send('ID NOT FOUND')
+    }
+  } catch (error) {
+    console.log('DELETE FAIL')
+    res.send(500).send('DELETE FAIL')
+  }
+})
+
+app.listen(4000, () => {
+  console.log('serving on port 4000')
+})
+```
+
+```jsx
+URL 값을 받아서 ( params ) 삭제를 진행
+
+await CampGround.deleteOne({ _id: id }); 이런식으로 id 를 넣어줘야 한다
+
+( mongoDB 가 자동생성한  _id 에 받아온 id 를 넣어준다 )
+
+( res. 응답을 꼭 전달해주자 navigate 에서 오류가 생겨서 삭제후 리다이렉트가 진행되지 않았다 )
+```
+
+## client
+
+```jsx
+import { useEffect, useState } from 'react'
+import { useParams, Link, Navigate, useNavigate } from 'react-router-dom'
+import axios from 'axios'
+
+const CampGroundDetail = () => {
+  const params = useParams()
+  const [camp, setCamp] = useState({})
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await axios.get(`http://localhost:4000/campground/${params.id}`)
+        setCamp(response.data)
+      } catch (error) {
+        console.log('FAIL LOAD CAMPGROUND DETAIL')
+        setCamp([])
+      }
+    }
+    fetchData()
+  }, [])
+
+  const deleteCamp = async () => {
+    try {
+      await axios.delete(`http://localhost:4000/campground/${params.id}`)
+      navigate('/campground')
+    } catch (error) {
+      console.error('DELETE FAIL', error)
+    }
+  }
+
+  return (
+    <>
+      {camp ? (
+        <div>
+          <h1>{camp.title}</h1>
+          <h2>{camp.location}</h2>
+        </div>
+      ) : (
+        <p>캠프를 불러오는 중입니다...</p>
+      )}
+      <Link to={'/campground'}>홈으로</Link>
+      <Link to={`/campground/${params.id}/edit`}>캠프수정</Link>
+      <button type="button" onClick={deleteCamp}>
+        삭제하기
+      </button>
+    </>
+  )
+}
+
+export default CampGroundDetail
+```
+
+```jsx
+간단하게 삭제 버튼을 추가해서 onClick 으로 삭제 함수를 연결해 줬다
+```

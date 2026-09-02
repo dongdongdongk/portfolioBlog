@@ -1,0 +1,835 @@
+---
+title: '자바 스트림(Stream)'
+date: '2026-09-02'
+category: '백엔드/JAVA'
+tags: ['백엔드', 'JAVA']
+draft: false
+summary: ''
+---
+
+# **스트림 역사(Stream)**
+
+```java
+기존의 Java에서 컬렉션 데이터를 처리할때 특정 조건에 따라 필터링을 하려면 복잡한 과정을 거쳐야 했다.
+
+
+
+반면에 SQL 문법의 경우 사용자가 원하는 조건의 데이터 목록을 검색할때 명시적이고 간단한 방법을
+
+이용했는데 Java8 에서 새로 추가된 기능인 스트림은 Java의 컬렉션 데이터에 대해 SQL 질의문 처럼 데이터를 처리할수 있는 기능을 가지고 있다.
+```
+
+# **스트림(Stream)이란??**
+
+## **기존 루프문 처리의 문제점**
+
+```java
+기존 Java에서 컬렉션 데이터를 처리할때는 for, foreach 루프문을 사용하면서 컬렉션 내의 요소들을
+
+하나씩 다루었다. 간단한 처리나 컬렉션의 크기가 작으면 큰 문제가 아니지만 복잡한 처리가 필요하거나
+
+컬렉션의 크기가 커지면 루프문의 사용은 성능저하를 일으키게 되었다.
+```
+
+## **스트림의 등장**
+
+```java
+스트림은 Java8에서 추가된 기능으로 컬렉션 데이터를 **선언형**으로 쉽게 처리할수 있다. 복잡한 루프문을
+
+사용하지 않아도 되며 루프문을 중첩해서 사용해야 되는 최악의 경우도 더이상 없어졌다.
+
+또한 스트림은 **병렬처리(Multi thread)**를 별도의 멀티스레드 구현없이도 쉽게 구현할수 있다.
+
+사과 필터를 예제로 스트림을 사용하지 않은 방법과 사용한 방법의 코드 차이점을 확인 해보겠다.
+
+1. 빨간색 사과 필터
+
+2. 무게순서대로 정렬
+
+3. 사과들의 고유번호 출력
+```
+
+### **[스트림 사용 X]**
+
+```java
+스트림을 사용하지 않을때는 각 필터링 단계마다 코드를 작성해야 한다.
+```
+
+```java
+// 빨간색 사과 필터링
+List<Apple> redApples = forEach(appleList, (Apple apple) -> apple.getColor().equals("RED")); // 요건 메서드가 2개여서 :: 사용 불가
+
+// 무게 순서대로 정렬
+redApples.sort(Comparator.comparing(Apple::getWeight));
+
+// 사과 고유번호 출력
+List<Integer> redHeavyAppleUid = new ArrayList<>();
+for (Apple apple : redApples)
+    redHeavyAppleUid.add(apple.getUidNum());
+```
+
+**자바 ::더블콜론 이란?**
+
+### **[스트림 사용 O]**
+
+```java
+스트림을 사용하여 단 한줄로 표현 할수 있다.
+```
+
+```java
+List<Integer> redHeavyAppleUid = appleList.stream()
+        .filter(apple -> apple.getColor().equals("RED"))        // 빨간색 사과 필터링
+        .sorted(Comparator.comparing(Apple::getWeight))         // 무게 순서대로 정렬
+        .map(Apple::getUidNum).collect(Collectors.toList());    // 사과 고유번호 출력
+```
+
+```java
+또한 스트림은 paralleStream 메서드를 통해 별도의 멀티스레드 구현 없이도 병렬처리가 가능하다.
+```
+
+```java
+List<Integer> redHeavyAppleUid = appleList.parallelStream()     // 병렬 처리
+        .filter(apple -> apple.getColor().equals("RED"))        // 빨간색 사과 필터링
+        .sorted(Comparator.comparing(Apple::getWeight))         // 무게 순서대로 정렬
+        .map(Apple::getUidNum).collect(Collectors.toList());    // 사과 고유번호 출력
+```
+
+## 스트림 API 함수와 특징
+
+```java
+예제에서 사용한 filter, sorted, map 같은 함수들은 Steam API 에서 제공하는 함수들이다.
+```
+
+![Untitled](<%EC%9E%90%EB%B0%94%20%EC%8A%A4%ED%8A%B8%EB%A6%BC(Stream)/Untitled.png>)
+
+```java
+스트림 API의 특징 정리
+
+* 선언형 : 더 간결하고 가독성이 좋아진다.
+
+* 함수의 조립 : 유연성이 좋아진다.
+
+* 병렬화 : 성능이 좋아진다.
+```
+
+# **스트림(Stream) 시작해보기**
+
+```java
+예제에서 사용할 Collection을 미리 정의해본다
+```
+
+```java
+List<Food>
+
+List<Food> foodList = new ArrayList<>();
+foodList.add(new Food("FlatBread",true,400,Food.Type.OTHER));
+foodList.add(new Food("OnionSoup",true,300,Food.Type.OTHER));
+foodList.add(new Food("LobsterRisotto",false,520,Food.Type.FISH));
+foodList.add(new Food("CaesarSalad",true,200,Food.Type.OTHER));
+foodList.add(new Food("BeefWellington",false,670,Food.Type.MEAT));
+foodList.add(new Food("FiletMignon",false,600,Food.Type.MEAT));
+foodList.add(new Food("CrispySalmon",false,620,Food.Type.FISH));
+foodList.add(new Food("StripSteak",false,740,Food.Type.MEAT));
+foodList.add(new Food("SearedScallops",false,340,Food.Type.FISH));
+```
+
+```java
+Food.java
+
+import java.lang.reflect.Type;
+
+public class Food {
+
+    public enum Type {
+        MEAT,
+        FISH,
+        OTHER
+    }
+
+    private final String name;
+    private final boolean isVegetarian;
+    private final int calories;
+    private final Type type;
+
+    public Food(String name, boolean isVegetarian, int calories, Type type) {
+        this.name = name;
+        this.isVegetarian = isVegetarian;
+        this.calories = calories;
+        this.type = type;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public boolean isVegetarian() {
+        return isVegetarian;
+    }
+
+    public int getCalories() {
+        return calories;
+    }
+
+    public Type getType() {
+        return type;
+    }
+}
+```
+
+## **스트림의 정의**
+
+```java
+위에서도 한번 설명 했었지만 스트림이란 **'데이터 처리연산을 지원하도록 소스에서 추출된 연속된 요소'** 로 정의 할수 있다. 정의의 내용을 하나씩 살펴보겠다.
+```
+
+### **연속된 요소 (Sequence of element)**
+
+```java
+컬렉션 자료구조와 마찬가지로 스트림은 특정 요소 형식으로 이루어진 연속된 값 집합의 인터페이스를 제공 한다.
+
+컬렉션에서는 시간, 공간의 복잡성과 관련된 요소 저장 및 연산이 이루어진다면 스트림에서는
+
+filter, sorted, map 처럼 표현 계산식으로 이루어져 있다.
+
+즉 컬렉션의 주제는 데이터, 스트림의 주제는 계산이다.
+```
+
+### **소스 (Source)**
+
+```java
+스트림은 컬렉션, 배열, I/O 자원등의 소스로부터 데이터를 소비하고 정렬된 컬렉션으로 스트림을 생성하면
+
+정렬이 그대로 유지된다. 즉 리스트로 스트림을 만들면 스트림의 요소는 리스트의 요소와 같은 순서를 유지한다.
+```
+
+### **데이터 처리 연산**
+
+```java
+스트림은 함수형 프로그래밍에서 지원하는 연산과 데이터베이스의 SQL 질의형과 비슷한 연산을 처리할수 있다.
+
+filter, sort, map, match 등으로 데이터를 조작할수 있고 순차적 혹은 병렬로 실행할수 있다.
+```
+
+## **파이프라이닝과 내부 반복**
+
+```java
+또한 스트림에는 **파이프라이닝, 내부 반복** 이라는 중요한 특징이 있다.
+```
+
+### **파이프라이닝 (Pipelining)**
+
+```java
+스트림 연산들은 서로 연결하여 큰 파이프 라인을 구성할수 있도록 스트림 자신을 반환한다.
+
+데이터 소스에 적용하는 데이터베이스 질의문과 비슷하다.
+```
+
+### **내부 반복**
+
+```java
+반복자를 이용하여 명시적으로 반복하는 컬렉션과 다르게 스트림은 내부 반복 기능을 제공한다.
+
+
+
+지금까지 설명한 내용을 바탕으로 예제 코드를 만들어 보자
+```
+
+```java
+List<String> highCaloriesFoodName = foodList.stream() // foodList라는 리스트를 스트림으로 변환합니다. 이를 통해 리스트의 요소들을 스트림 형태로 처리할 수 있습니다.
+        .filter(food -> food.getCalories() > 400) // filter 연산을 사용하여 칼로리가 400 이상인 음식만을 선택합니다.
+        .map(Food::getName) // map 연산을 사용하여 각 음식 객체에서 이름(getName 메서드)만을 추출합니다. 이로써 스트림의 요소는 음식 이름으로 변환됩니다.
+        .limit(3) // limit 연산을 사용하여 스트림에서 상위 3개의 요소만 선택합니다. 이 연산을 통해 결과 리스트에는 최대 3개의 음식 이름만 포함됩니다.
+        .collect(Collectors.toList()); // collect 연산을 사용하여 스트림의 요소를 리스트로 수집합니다.
+
+System.out.println(highCaloriesFoodName);
+```
+
+```java
+1. 위 코드에서 steram() 함수를 통해 foodList 라는 소스(Source) 로부터 연속된 요소를 얻어 스트림을 만들고
+
+2. 해당 스트림에 Stream API 함수인 filter, map, limit, collect 로 이어지는 데이터 처리연산을 적용한다.
+
+(collect를 제외한 filter, map, limit 연산은 파이프라인을 형성할수 있도록 스트림을 반환하는데 파이프라인은
+
+데이터 베이스의 SQL 질의문과 같은 존재이다.)
+
+
+
+3. 마지막으로 collect 연산으로 파이프라인을 처리하여 결과를 반환합니다. 단, collect는 스트림이 아닌 List를 반환한다.
+```
+
+# **스트림과 컬렉션의 차이점**
+
+```java
+스트림과 컬렉션은 둘다 연속된 요소형식의 값을 저장하는 자료구조 인터페이스를 제공한다.
+
+그렇다면
+
+컬렉션과 스트림은 어떤 차이점이 존재할까??
+
+
+
+비유적인 표현으로 HDD에 저장된 영상파일과 인터넷에있는 유튜브 영상을 비교해볼수 있다.
+
+HDD에 저장된 영상파일의 경우 내가 보고싶은 지점을 클릭하면 바로 재생되지만 유튜브같은 온라인 스트리밍
+
+동영상 같은 경우는 클릭한 재생 지점 근처만 로딩이 되고 다른 부분을 클릭하면 그때마다 데이터를 다시
+
+읽어서 재생하는 방식이다.
+```
+
+## **1. 데이터 계산 시점**
+
+```java
+이처럼 스트림과 컬렉션의 차이는 **데이터를 언제 계산하는지** 이다.
+
+	* 컬렉션 : 모든 요소는 컬렉션에 추가하기전에 계산되어야 한다.
+
+	* 스트림 : 요청할때만 요소를 계산하는 고정된 자료구조
+```
+
+```java
+사용자가 요청하는 값만 추출할수 있는 특성때문에 스트림은 컬렉션보다 프로그래밍에 장점이 있다.
+
+만약 소수의 집합을 만들고 사용자가 원하는 지점의 소수를 알고싶다고 할때 컬렉션의 경우 소수를 만드는
+
+과정에서 무한루프에 빠져버리기 때문에 사용자는 원하는것을 얻지 못할것이다.
+
+반면 스트림의 경우 사용자가 요청할때만 값을 계산하므로 이러한 문제에 유연하게 대처할수 있다.
+```
+
+## **2. 반복의 일회성**
+
+```java
+컬렉션과 스트림은 반복처리를 할때도 차이가 있습니다. 컬렉션의 경우 같은 소스에 대하여 여러번
+
+반복 처리를 할수 있지만 **스트림은 단 한번만 반복문을 처리**할수 있습니다.
+
+스트림에서는 소비(Consumer) 개념을 쓰기 때문에 한번 소비한 요소에 대해서 접근할수 없기 때문입니다.
+```
+
+```java
+Stream<Food> s = foodList.stream();
+s.forEach(System.out::println); // 정상
+s.forEach(System.out::println); // IllegalStateException 발생
+```
+
+```java
+만약 위 코드를 실행한다면 stream has already been operated upon or closed 라는 에러와 함께
+
+프로그램이 중단될것이다.
+```
+
+## **3. 외부반복, 내부반복**
+
+```java
+컬렉션의 경우 foreach 문법을 사용하여 사용자가 반복문을 직접 명시해야 하는데 이를 **외부반복** 이라 하고
+
+스트림은 라이브러리를 사용하는 **내부반복** 개념이다.
+```
+
+```java
+Food 리스트의 이름들을 추출하는 코드를 컬렉션과 스트림 두가지 방법으로 구현해보겠다.
+```
+
+### **[컬렉션]**
+
+```java
+List<String> foodNameList = new ArrayList<>();
+for(Food food : foodList){
+    foodNameList.add(food.getName());
+}
+```
+
+### **[스트림]**
+
+```java
+List<String> foodNameList = foodList.stream()
+        .map(Food::getName)
+        .collect(Collectors.toList());
+```
+
+```java
+컬렉션과 다르게 스트림은 별도의 반복자 없이도 반복문을 처리할수 있습니다. 스트림이 사용하는 내부반복의
+
+장점은 **작업을 병렬로 처리할수 있고 더 최적화된 다양한 순서로 처리할수 있다는 점이**다.
+```
+
+# **스트림 연산**
+
+```java
+java.util.stream.Stream 에는 스트림 API에서 제공하는 여러가지 연산이 정의 되있는데 스트림 연산들은
+
+크게 중간연산, 최종연산으로 구분할수 있다.
+
+* 중간연산 : 파이프라인으로 연결할수 있는 연산들
+
+* 최종연산 : 파이프라인을 실행한다음 닫는 연산
+```
+
+```java
+List<String> highCaloriesFoodName = foodList.stream()
+        .filter(food -> food.getCalories() > 400)	// 중간연산
+        .map(Food::getName)							// 중간연산
+        .limit(3)									// 중간연산
+        .collect(Collectors.toList());				// 최종연산
+```
+
+```java
+위 예제코드에서 보면 filter, map, limit은 중간연산이고 collect는 최종연산 이다.
+```
+
+## **중간연산**
+
+```java
+filter나 map 같은 중간연산은 다른 스트림을 반환하기 때문에 여러개의 중간연산을 연결하여 질의를 만들수있다.
+
+중요한 특징은 최종연산을 실행하기 전까지는 아무 연산도 수행하지 않는다는것이다.
+
+
+
+스트림 파이프라인에서 연산이 어떻게 진행되는지 확인해보기 위해 연산에 출력문을 넣어서 확인 해보겠다.
+```
+
+```java
+List<String> highCaloriesFoodName = foodList.stream()
+        .filter(food -> {
+            System.out.println("filter : " + food.getName());
+            return food.getCalories() > 400;
+        })
+        .map(food -> {
+            System.out.println("map : " + food.getName());
+            return food.getName();
+        })
+        .limit(3)
+        .collect(Collectors.toList());
+
+System.out.println(highCaloriesFoodName);
+```
+
+```java
+출력
+
+filter : FlatBread
+map : FlatBread
+filter : OnionSoup
+filter : LobsterRisotto
+map : LobsterRisotto
+filter : CaesarSalad
+filter : BeefWellington
+map : BeefWellington
+[FlatBread, LobsterRisotto, BeefWellington]
+```
+
+```java
+OnionSoup, CaesarSalad는 filter에서 필터링 되었기 때문에 map에서는 찍히지 않고 나머지 음식들이
+
+최종연산되어 출력되는것을 확인할수 있다.
+```
+
+## **최종연산**
+
+```java
+최종연산은 파이프라인 연산의 결과를 출력한다. 예제에서는 List 형태로만 결과를 받았지만 이 외에도
+
+Integer, void 등 다양한 형태로 출력할수 있다.
+```
+
+## **스트림 이용하기 요약**
+
+```java
+스트림을 사용하는 단계는 다음과 같이 3단계에 걸쳐서 진행된다.
+
+* 질의를 수행할 데이터소스 (ex 컬렉션)
+
+* 스트림 파이프라인을 구성할 중간 연산
+
+* 스트림 연산을 실행하고 결과로 출력할 최종연산
+```
+
+## 비유
+
+```java
+스트림(Stream)은 자바 8부터 도입된 데이터 처리 개념으로, 컬렉션(Collection)과 비슷한 요소들을 연속적으로 처리하는 방법을 제공합니다.
+
+스트림은 데이터를 다루는 작업을 간결하고 함수형 스타일로 표현할 수 있도록 도와줍니다.
+
+**비유**: 물 관리 시스템
+
+스트림을 이해하기 위해 물 관리 시스템을 생각해보겠습니다. 물 관리 시스템은 다양한 원천에서 물을 모으고, 처리하고, 배포하는 역할을 합니다.
+
+* **원천 데이터 수집**: 물 관리 시스템은 여러 곳에서 물을 모읍니다. 이 곳들은 물의 원천(빠둑, 우물, 강 등)이 됩니다.
+
+이것을 자바에서는 데이터 소스(컬렉션, 배열, 파일 등)로 생각할 수 있습니다.
+
+* **데이터 처리**: 모인 물을 정제하고 여러 처리 단계를 거칩니다. 예를 들어, 물을 여과하거나 살균하는 과정입니다.
+
+자바의 스트림은 데이터를 원하는 형태로 변환하거나 처리하는 역할을 합니다. 이것을 함수형 프로그래밍의 맵(Map) 및 필터(Filter) 작업으로 생각할 수 있습니다.
+
+* **데이터 분배**: 정제된 물을 다양한 목적지로 보냅니다. 예를 들어, 마을 주민들에게 배송하거나 공공시설에 보냅니다.
+
+자바의 스트림은 데이터를 다양한 목적지로 보내는데 사용됩니다. 예를 들어, 결과를 리스트로 수집하거나 출력하거나 그래프로 그릴 수 있습니다.
+
+* **파이프라인 처리**: 물 관리 시스템은 데이터가 흐르는 파이프라인을 만들어 처리합니다.
+
+이 파이프라인은 여러 단계로 나뉘어 있고, 각 단계는 이전 단계의 출력을 입력으로 받습니다.
+
+자바의 스트림도 비슷하게 데이터가 한 단계에서 다음 단계로 흐르면서 처리되는 파이프라인 개념입니다.
+
+스트림은 데이터 처리를 간결하게 표현하고, 병렬처리를 지원하여 성능을 향상시킬 수 있는 강력한 도구입니다. 이 비유를 통해 스트림의 기본 개념을 이해할 수 있을 것입니다.
+```
+
+# **스트림 사용 절차**
+
+## **1. 스트림 만들기**
+
+```java
+//배열 스트림 : Arrays.stream()
+
+String[] arr = new String[]{"a", "b", "c"};
+Stream<String> stream = Arrays.stream(arr);
+
+//컬렉션 스트림: .stream()
+
+List<String> list = Arrays.asList("a","b","c");
+Stream<String> stream = list.stream();
+
+//Stream.builder()
+
+Stream<String> builderStream = Stream.<String>builder()
+    .add("a").add("b").add("c")
+    .build();
+
+//람다식 Stream.generate(), iterate()
+
+Stream<String> generatedStream = Stream.generate(()->"a").limit(3);
+// 생성할 때 스트림의 크기가 정해져있지 않기(무한하기)때문에 최대 크기를 제한해줘야 한다.
+
+Stream<Integer> iteratedStream = Stream.iterate(0, n->n+2).limit(5); //0,2,4,6,8
+
+//기본 타입형 스트림
+
+IntStream intStream = IntStream.range(1, 5); // [1, 2, 3, 4]
+
+//병렬 스트림: parallelStream()
+
+Stream<String> parallelStream = list.parallelStream();
+```
+
+## **2. 중간 연산 (가공하기)**
+
+### **Filtering**
+
+```java
+스트림 내 요소들을 하나씩 평가해서 걸러내는 작업, if문 역할
+
+List<String> list = Arrays.asList("a","b","c");
+Stream<String> stream = list.stream()
+	.filter(list -> list.contains("a"));  //  .contains 메서드는 List 클래스의 일반 메서드이므로 메서드 레퍼런스(::)로 대체할 수 없습니다
+    // 'a'가 들어간 요소만 선택  [a]
+
+* 람다식의 리턴값은 boolean이고 true인 경우만 다음 단계 진행
+```
+
+### **Mapping**
+
+```java
+스트림 내 요소들을 하나씩 특정 값으로 변환하는 작업, 값을 변환하기 위한 람다를 인자로 받는다.
+
+스트림을 원하는 모양의 새로운 스트림으로 변환하고싶을 때 사용
+
+Stream<String> stream = list.stream()
+	.map(String::toUpperCase);
+	//[A,B,C]
+
+    .map(Integers::parseInt);
+    // 문자열 -> 정수로 변환
+```
+
+### **Sorting**
+
+```java
+스트림 내 요소들을 정렬하는 작업, Comparator 사용
+
+Stream<String> stream = list.stream()
+	.sorted() // [a,b,c] 오름차순 정렬
+    .sorted(Comparator.reverseOrder()) // [c,b,a] (내림차순)
+
+List<String> list = Arrays.asList("a","bb","ccc");
+Stream<String> stream = list.stream()
+	.sorted(Comparator.comparingInt(String::length)) // [ccc,bb,a] //문자열 길이 기준 정렬
+```
+
+### **기타 연산**
+
+```java
+Stream<String> stream = list.stream()
+		.distinct() // 중복 제거
+    .limit(max) // 최대 크기 제한
+    .skip(n)    // 앞에서부터 n개 skip하기
+    .peek(System.out::println) // 중간 작업결과 확인
+```
+
+## **3. 최종 연산 (결과 만들기)**
+
+### **Calculating**
+
+```java
+기본형 타입을 사용하는 경우 스트림 내 요소들로 최소, 최대, 합, 평균 등을 구하는 연산을 수행할 수 있다.
+
+IntStream stream = list.stream()
+		.count()   //스트림 요소 개수 반환
+    .sum()     //스트림 요소의 합 반환
+    .min()     //스트림의 최소값 반환
+    .max()     //스트림의 최대값 반환
+    .average() //스트림의 평균값 반환
+```
+
+### **Reduction**
+
+```java
+스트림의 요소를 하나씩 줄여가며 누적연산을 수행
+
+IntStream stream = IntStream.range(1,5);
+	.reduce(10, (total,num)->total+num);
+    //reduce(초기값, (누적 변수,요소)->수행문)
+    // 10 + 1+2+3+4+5 = 25
+```
+
+### **Collecting**
+
+```java
+스트림의 요소를 원하는 자료형으로 변환
+
+//예시 리스트
+List<Person> members = Arrays.asList(new Person("lee",26),
+									 new Person("kim", 23),
+									 new Person("park", 23));
+
+// toList() - 리스트로 반환
+members.stream()
+	.map(Person::getLastName)
+    .collect(Collectors.toList());
+    // [lee, kim, park]
+
+// joining() - 작업 결과를 하나의 스트링으로 이어 붙이기
+members.stream()
+	.map(Person::getLastName)
+    .collect(Collectors.joining(delimiter = "+" , prefix = "<", suffix = ">");
+    // <lee+kim+park>
+
+//groupingBy() - 그룹지어서 Map으로 반환
+members.stream()
+	.collect(Collectors.groupingBy(Person::getAge));
+	// {26 = [Person{lastName="lee",age=26}],
+    //  23 = [Person{lastName="kim",age=23},Person{lastName="park",age=23}]}
+
+//collectingAndThen() - collecting 이후 추가 작업 수행
+members.stream()
+	.collect(Collectors.collectingAndThen (Collectors.toSet(),
+    									   Collections::unmodifiableSet));
+	//Set으로 collect한 후 수정불가한 set으로 변환하는 작업 실행
+```
+
+### **Matching**
+
+```java
+특정 조건을 만족하는 요소가 있는지 체크한 결과를 반환: anyMatch(하나라도 만족하는 요소가 있는지), allMatch(모두 만족하는지), noneMatch(모두 만족하지 않는지)
+
+List<String> members = Arrays.asList("Lee", "Park", "Hwang");
+boolean matchResult = members.stream()
+						.anyMatch(members->members.contains("w")); //w를 포함하는 요소가 있는지, True
+
+boolean matchResult = members.stream()
+						.allMatch(members->members.length() >= 4); //모든 요소의 길이가 4 이상인지, False
+
+boolean matchResult = members.stream()
+						.noneMatch(members->members.endsWith("t")); //t로 끝나는 요소가 하나도 없는지, True
+
+```
+
+### **Iterating**
+
+```java
+forEach로 스트림을 돌면서 실행되는 작업
+
+members.stream()
+	.map(Person::getName)
+	.forEach(System.out::println);
+    //결과를 출력 (peek는 중간, forEach는 최종)
+```
+
+### **Finding**
+
+```java
+스트림에서 하나의 요소를 반환
+
+Person person = members.stream()
+					.findAny()   //먼저 찾은 요소 하나 반환, 병렬 스트림의 경우 첫번째 요소가 보장되지 않음
+          .findFirst() //첫번째 요소 반환
+```
+
+# **IntStream**
+
+```java
+숨바꼭질을 하기 위해서 술래가 1에서부터 10까지 숫자를 세고 사람을 찾으러 간다고 했을 때 이것을 for loop로 짠다면 아래와 같을 것이다.
+```
+
+```java
+@Test
+    public void for_loop() {
+        for (int i = 1 ; i <= 10 ; i++) {
+            System.out.println(i);
+        }
+    }
+```
+
+```java
+매우 간단하지만, 손이 많이 가고 심지어 라인에 세 줄을 필요로 하는 코드다.
+
+이걸 IntStream.range로 표현하면 아래와 같다.
+```
+
+```java
+@Test
+    public void intStream_range() {
+        IntStream.range(1, 11).forEach(System.out::println);
+    }
+```
+
+```java
+IntStream.range는 1에서 11 사이의 integer를 차례대로 스트림으로 방출한다.
+
+차례대로 방출되는 intenger마다 실행하면 되는 명령을 forEach로 정의할 수 있다.
+
+람다(lambda) 표현식으로 나타냈기 때문에 깔끔하게 System.out::println으로 정리됐다.
+```
+
+## rangeClosed()
+
+```java
+그런데 range의 두 번째 파라미터는 범위를 포함하지 않는데, 이게 가독성을 떨어뜨린다. 이때는 rangeClosed()를 사용하자.
+```
+
+```java
+@Test
+    public void intStream_rangeClosed() {
+        IntStream.rangeClosed(1, 10).forEach(System.out::println);
+    }
+```
+
+```java
+range() 와 차이는 두 번째 파라미터를 범위에 포함하느냐 차이일 뿐이다. 위의 세 가지 샘플은 모두 아래와 같이 결과를 보인다.
+
+* range() 는 (1,11) 은 10까지 11은 포함하지 않는다.
+
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+```
+
+## **모든 기존의 반복문은 IntStream으로 변환할 수 있을까?**
+
+```java
+결론부터 얘기하면 굳이 그렇게 할 수는 있지만 예쁘지 않고 가독성도 떨어질 수 있다.
+
+아래의 예를 보자. for loop에 break 문이 있다. 5를 만나면 그 순간 반복을 멈추라는 얘기다.
+```
+
+```java
+@Test
+    public void for_loop_break() {
+        for (int i = 1 ; i <= 10 ; i++) {
+            if (i == 5) {
+                break;
+            }
+            System.out.println(i);
+        }
+    }
+```
+
+```java
+이에 대한 결과는 아래와 같다.
+1
+2
+3
+4
+```
+
+```java
+위의 코드를 최대한 코드상으로 비슷하게 IntStream으로 바꿔보자.
+```
+
+```java
+@Test
+    public void intStream_range_break() {
+        IntStream.rangeClosed(1, 10).forEach(i -> {
+            if (i == 5) {
+                return;
+            }
+            System.out.println(i);
+        });
+    }
+```
+
+```java
+코드 모양은 비슷한데 결과도 똑같을까? 아래 결과를 살펴보자.
+1
+2
+3
+4
+6
+7
+8
+9
+10
+```
+
+```java
+5만 빼고 전부 실행이 됐다. 이는 사실 당연한 결과인데, 1에서부터 10까지 값을 방출하도록 IntStream을 정의했기 때문이다.
+
+Stream은 말 그대로 물줄기 같은 것이어서, 코드 상에서는 어디서부터 어디까지 방출하라고 정의했을 뿐이며,
+
+그 방출된 값들에 대해서 forEach 안에 정의된 내용을 수행하는 것이기 때문에, return 했다고 해서 거기서 멈추는 것이 아니라
+
+단지 숫자 5에 대해서만 아무것도 하지 않는다는 것이다.
+```
+
+```java
+100% 동일한 효과를 보도록 굳이 수정한다면 아래와 같은데 딱 봐도 깔끔하지 않다.
+```
+
+```java
+@Test
+    public void intStream_range_exception() {
+        try {
+            IntStream.rangeClosed(1, 10).forEach(i -> {
+                if (i == 5) {   // 수정 부분
+                    throw new RuntimeException("stop");
+                }
+                System.out.println(i);
+            });
+        } catch (RuntimeException e) {
+            // do nothing
+        }
+    }
+```
+
+## 결론
+
+```java
+1. 무조건 IntStream이 좋은 것이 아니고, 그때그때 상황에 따라 적절한 반복문을 쓰는 것이 필요하다.
+
+2. 하지만 IntStream을 잘 쓰면 코드가 깔끔해져서 좋다.
+
+3. Stream은 당연히 IntStream 말고도 여러 종류의 Stream이 있다.
+```
+
+# Stream 을 사용하지 말아야 할 때

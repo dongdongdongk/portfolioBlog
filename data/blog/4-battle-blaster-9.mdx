@@ -1,0 +1,689 @@
+---
+title: '섹션 4: Battle Blaster - 9'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 카메라 흔들림(Camera Shake) }
+
+게임에 **카메라 흔들림 효과**를 추가해서 폭발이나 충돌 시 화면이 흔들리게 만듭니다! 🎥
+
+---
+
+## 🎯 1. 카메라 흔들림이란?
+
+### 효과
+
+```
+카메라 흔들림 = 화면 흔들림 효과
+
+사용 예:
+- 폭발 시 💥
+- 충돌 시 💥
+- 지진 시 🌍
+- 강한 충격 시
+
+→ 게임에 물리적 충격감 부여!
+```
+
+### 이 게임에서의 2가지 흔들림
+
+```
+1. Hit Camera Shake (약한 흔들림)
+   → 발사체 충돌 시
+
+2. Death Camera Shake (강한 흔들림)
+   → Tank/Tower 파괴 시
+```
+
+---
+
+## 🎨 2. 카메라 흔들림 에셋 만들기
+
+### 블루프린트 생성
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380640/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_9/image.png)
+
+```
+Content Browser → 우클릭
+→ Blueprint Class
+→ Camera Shake Base 검색
+→ 선택
+→ 이름: BP_HitCameraShake
+```
+
+### 설정 (BP_HitCameraShake)
+
+```
+Details 패널:
+
+1. Shake Pattern: Perlin Noise 선택
+
+2. Location (위치 흔들림)
+   - X: Amplitude = 10, Frequency = 10
+   - Y: Amplitude = 10, Frequency = 10
+   - Z: Amplitude = 10, Frequency = 10
+
+3. Rotation: 사용 안 함 (0으로 유지)
+
+4. Timing
+   - Duration: 0.25초 (짧게)
+   - Blend In Time: 0.05초
+   - Blend Out Time: 0.05초
+```
+
+### 주요 설정 의미
+
+```cpp
+Amplitude (진폭):
+- 흔들림의 크기
+- 클수록 크게 흔들림
+
+Frequency (주파수):
+- 흔들림의 속도
+- 클수록 빠르게 흔들림
+
+Duration (지속 시간):
+- 흔들림 지속 시간
+
+Blend In/Out:
+- 부드러운 시작/끝
+- 자연스러운 효과
+```
+
+---
+
+## 💻 3. C++ 코드 구현
+
+### Projectile.h - 변수 선언
+
+```cpp
+UPROPERTY(EditAnywhere)
+TSubclassOf<UCameraShakeBase> HitCameraShakeClass;
+```
+
+### Projectile.cpp - OnHit에서 재생
+
+```cpp
+void AProjectile::OnHit(...)
+{
+    // ... (데미지, 파티클, 사운드)
+
+    // 카메라 흔들림 재생
+    if (HitCameraShakeClass)
+    {
+        APlayerController* PlayerController =
+            UGameplayStatics::GetPlayerController(GetWorld(), 0);
+
+        if (PlayerController)
+        {
+            PlayerController->ClientStartCameraShake(HitCameraShakeClass);
+        }
+    }
+
+    Destroy();
+}
+```
+
+---
+
+## 🔍 4. 핵심 함수 설명
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380639/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_9/image_1.png)
+
+### ClientStartCameraShake
+
+```cpp
+PlayerController->ClientStartCameraShake(CameraShakeClass);
+                  ↑
+            카메라 흔들림 시작
+
+파라미터:
+- CameraShakeClass: 재생할 카메라 흔들림 블루프린트
+```
+
+### PlayerController 가져오기
+
+```cpp
+APlayerController* PlayerController =
+    UGameplayStatics::GetPlayerController(GetWorld(), 0);
+    //                                                 ↑
+    //                                    플레이어 인덱스 (0 = 첫 번째)
+
+왜 필요한가?
+- 카메라 흔들림은 플레이어의 카메라를 흔듦
+- PlayerController가 카메라를 제어함
+```
+
+---
+
+## 💀 5. Death Camera Shake 구현
+
+### 에셋 생성 (BP_DeathCameraShake)
+
+```
+Shake Pattern: Perlin Noise
+
+Location:
+- X, Y, Z: Amplitude = 20, Frequency = 20
+  (Hit보다 2배 강함!)
+
+Timing:
+- Duration: 0.35초 (더 길게)
+- Blend In: 0.1초
+- Blend Out: 0.1초
+
+→ 더 강하고 오래 지속!
+```
+
+### BasePawn.h
+
+```cpp
+UPROPERTY(EditAnywhere)
+TSubclassOf<UCameraShakeBase> DeathCameraShakeClass;
+```
+
+### BasePawn.cpp - HandleDestruction
+
+```cpp
+void ABasePawn::HandleDestruction()
+{
+    // Death Particles
+    if (DeathParticles) { ... }
+
+    // Death Sound
+    if (DeathSound) { ... }
+
+    // Death Camera Shake
+    APlayerController* PlayerController =
+        UGameplayStatics::GetPlayerController(GetWorld(), 0);
+
+    if (PlayerController)
+    {
+        PlayerController->ClientStartCameraShake(DeathCameraShakeClass);
+    }
+}
+```
+
+---
+
+## 🎬 6. 실행 흐름
+
+### Hit Camera Shake
+
+```
+발사체 충돌
+    ↓
+OnHit 호출
+    ↓
+PlayerController 가져오기
+    ↓
+ClientStartCameraShake(HitCameraShakeClass)
+    ↓
+화면이 살짝 흔들림! (0.25초)
+```
+
+### Death Camera Shake
+
+```
+Tank/Tower 파괴
+    ↓
+HandleDestruction 호출
+    ↓
+PlayerController 가져오기
+    ↓
+ClientStartCameraShake(DeathCameraShakeClass)
+    ↓
+화면이 크게 흔들림! (0.35초)
+```
+
+---
+
+## 🎨 7. 블루프린트 설정
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380640/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_9/image_2.png)
+
+### BP_Projectile
+
+```
+Details 패널:
+- Hit Camera Shake Class = BP_HitCameraShake
+```
+
+### BP_Tank & BP_Tower
+
+```
+Details 패널:
+- Death Camera Shake Class = BP_DeathCameraShake
+```
+
+---
+
+## 💡 8. 효과 조정 팁
+
+### 더 강하게
+
+```
+Amplitude: 10 → 30
+Frequency: 10 → 30
+Duration: 0.25 → 0.5
+
+→ 더 크고 오래 흔들림
+```
+
+### 더 부드럽게
+
+```
+Blend In: 0.05 → 0.2
+Blend Out: 0.05 → 0.2
+
+→ 서서히 시작/끝
+```
+
+### 회전 추가
+
+```
+Rotation (Pitch, Yaw, Roll):
+- Amplitude = 5
+- Frequency = 5
+
+→ 회전하며 흔들림
+```
+
+---
+
+## 🎯 9. 핵심 정리
+
+```cpp
+// 카메라 흔들림 3단계:
+
+1. 블루프린트 생성
+   Camera Shake Base 상속
+   → Perlin Noise 패턴
+   → Amplitude, Frequency 설정
+
+2. C++ 변수 선언
+   TSubclassOf<UCameraShakeBase> ShakeClass;
+
+3. 코드에서 재생
+   PlayerController->ClientStartCameraShake(ShakeClass);
+
+완성! 🎥
+```
+
+---
+
+## ✅ 체크리스트
+
+```
+□ BP_HitCameraShake 생성 & 설정
+□ BP_DeathCameraShake 생성 & 설정
+□ Projectile.h에 HitCameraShakeClass 추가
+□ Projectile.cpp OnHit에서 재생
+□ BasePawn.h에 DeathCameraShakeClass 추가
+□ BasePawn.cpp HandleDestruction에서 재생
+□ BP_Projectile 설정
+□ BP_Tank, BP_Tower 설정
+□ 테스트 & 조정
+```
+
+---
+
+## 🌟 최종 효과
+
+```
+Before (카메라 흔들림 없음):
+폭발 → 화면 정적
+충돌 → 화면 정적
+😐 밋밋함
+
+After (카메라 흔들림 추가):
+폭발 → 화면 크게 흔들림! 💥
+충돌 → 화면 살짝 흔들림! 💥
+🤩 임팩트 있음!
+
+파티클 + 사운드 + 카메라 흔들림
+= 완벽한 피드백 조합!
+```
+
+간단한 카메라 흔들림으로 게임의 충격감과 몰입도가 크게 향상됩니다! 🚀
+
+# { TSubclassOf 쉬운 설명 }
+
+---
+
+## 🎯 1. 핵심 비유로 이해하기
+
+### 🏗️ 건물로 비유
+
+```
+UCameraShakeBase* = 건물 그 자체
+  ↓
+  실제 지어진 건물
+  이미 존재하는 건물
+
+TSubclassOf<UCameraShakeBase> = 건물 설계도
+  ↓
+  건물을 지을 수 있는 설계도
+  아직 짓지 않았지만 지을 수 있음
+```
+
+---
+
+## 💡 2. 실제 코드로 비교
+
+### ❌ 일반 포인터를 쓰면?
+
+```cpp
+UPROPERTY(EditAnywhere)
+UCameraShakeBase* HitCameraShake;  // 실제 객체
+
+문제점:
+1. 게임 시작할 때 이미 메모리에 생성되어 있어야 함
+2. C++ 코드에서 직접 생성해야 함
+3. 블루프린트 에디터에서 만든 걸 못 씀!
+
+예시:
+┌────────────────────┐
+│ 이미 만들어진 객체  │ ← 메모리에 존재
+│ (인스턴스)         │
+└────────────────────┘
+```
+
+### ✅ TSubclassOf를 쓰면?
+
+```cpp
+UPROPERTY(EditAnywhere)
+TSubclassOf<UCameraShakeBase> HitCameraShakeClass;  // 클래스 (설계도)
+
+장점:
+1. 블루프린트를 선택할 수 있음!
+2. 나중에 필요할 때 생성함
+3. 에디터에서 쉽게 바꿀 수 있음
+
+예시:
+┌────────────────────┐
+│ BP_HitCameraShake  │ ← 설계도 (블루프린트)
+│ (클래스)           │
+└────────────────────┘
+         ↓
+   필요할 때 생성
+         ↓
+┌────────────────────┐
+│ 실제 객체          │
+└────────────────────┘
+```
+
+---
+
+## 🎮 3. 게임 개발에서 왜 필요한가?
+
+### 상황 설명
+
+```
+우리는 C++ 코드를 작성함
+  ↓
+하지만 BP_HitCameraShake는 블루프린트 에디터에서 만듦
+  ↓
+C++ 코드는 블루프린트 파일을 직접 볼 수 없음!
+  ↓
+해결책: "설계도"만 저장해두고, 에디터에서 할당
+```
+
+### 작동 방식
+
+```cpp
+// C++에서 (코드)
+TSubclassOf<UCameraShakeBase> HitCameraShakeClass;
+// "이건 UCameraShakeBase 종류의 클래스를 받을 거야"
+
+// 에디터에서 (블루프린트)
+HitCameraShakeClass = BP_HitCameraShake 선택
+// "이 설계도를 사용해"
+
+// 실행 시 (게임)
+ClientStartCameraShake(HitCameraShakeClass);
+// "이 설계도로 객체를 만들어서 실행해"
+```
+
+---
+
+## 🔍 4. 단계별 상세 비교
+
+### Case 1: 일반 포인터 (안 좋은 방법)
+
+```cpp
+UCameraShakeBase* MyCameraShake;
+
+생성자에서:
+MyCameraShake = CreateDefaultSubobject<UCameraShakeBase>(...);
+// ❌ 복잡함
+// ❌ 블루프린트 못 씀
+// ❌ C++에서 모든 설정 해야 함
+
+사용할 때:
+// 그냥 사용... 하지만 이미 만들어져 있어야 함
+```
+
+### Case 2: TSubclassOf (좋은 방법)
+
+```cpp
+TSubclassOf<UCameraShakeBase> MyCameraShakeClass;
+
+생성자:
+// 아무것도 안 함! 에디터에서 할당!
+
+에디터에서:
+MyCameraShakeClass = BP_MyCameraShake 선택
+// ✅ 쉬움!
+// ✅ 블루프린트 사용 가능!
+// ✅ 언제든지 바꿀 수 있음!
+
+사용할 때:
+ClientStartCameraShake(MyCameraShakeClass);
+// 이때 비로소 객체 생성됨
+```
+
+---
+
+## 🎨 5. 실전 예시로 이해하기
+
+### 위젯 블루프린트에서 봤던 것!
+
+```cpp
+// 기억나시나요?
+TSubclassOf<UScreenMessage> ScreenMessageClass;
+         ↑                  ↑
+      설계도 타입          클래스 종류
+
+에디터에서:
+ScreenMessageClass = BP_ScreenMessage 선택
+
+코드에서:
+ScreenMessageWidget = CreateWidget<UScreenMessage>(
+    PlayerController,
+    ScreenMessageClass  // ← 설계도를 전달
+);
+```
+
+### 발사체에서도 본 것!
+
+```cpp
+TSubclassOf<AProjectile> ProjectileClass;
+         ↑               ↑
+      설계도 타입      발사체 종류
+
+에디터에서:
+ProjectileClass = BP_Projectile 선택
+
+코드에서:
+GetWorld()->SpawnActor<AProjectile>(
+    ProjectileClass,  // ← 설계도를 전달
+    Location,
+    Rotation
+);
+```
+
+---
+
+## 📊 6. 시각적 흐름도
+
+```
+개발 과정:
+┌──────────────┐
+│ C++ 코드     │
+│ TSubclassOf  │ → "클래스를 받을 준비 완료"
+└──────────────┘
+      ↓
+┌──────────────┐
+│ 컴파일       │
+└──────────────┘
+      ↓
+┌──────────────┐
+│ 에디터       │
+│ 블루프린트   │ → BP_HitCameraShake 생성
+│ 할당         │ → C++ 변수에 할당
+└──────────────┘
+      ↓
+┌──────────────┐
+│ 게임 실행    │
+│ 필요할 때    │ → ClientStartCameraShake 호출
+│ 객체 생성    │ → 그때 비로소 객체 생성!
+└──────────────┘
+```
+
+---
+
+## 🤔 7. 자주 하는 질문
+
+### Q1: 그냥 포인터 쓰면 안 돼요?
+
+```
+포인터 (UCameraShakeBase*):
+- 이미 존재하는 객체를 가리킴
+- C++에서만 만들 수 있음
+- 블루프린트 못 씀
+
+TSubclassOf:
+- 클래스(설계도)를 저장
+- 블루프린트 선택 가능! ✨
+- 에디터에서 쉽게 바꿈
+
+→ 게임 개발에서는 TSubclassOf가 훨씬 편함!
+```
+
+### Q2: 왜 이름이 "Class"로 끝나나요?
+
+```cpp
+HitCameraShakeClass
+                 ↑
+              "Class"
+
+의미:
+"이건 클래스(설계도)야, 실제 객체가 아니야"
+
+명명 규칙:
+- 일반 포인터: HitCameraShake
+- TSubclassOf: HitCameraShakeClass
+```
+
+### Q3: 언제 실제 객체가 만들어지나요?
+
+```cpp
+// 이 시점에는 설계도만 있음
+TSubclassOf<UCameraShakeBase> ShakeClass;
+
+// 이 함수를 호출할 때 비로소 객체 생성!
+ClientStartCameraShake(ShakeClass);
+                       ↑
+                "이 설계도로 객체 만들어줘"
+```
+
+---
+
+## 🎯 8. 핵심 정리
+
+### 한 문장 요약
+
+```
+TSubclassOf = "블루프린트를 선택할 수 있게 해주는 타입"
+```
+
+### 3줄 정리
+
+```cpp
+UCameraShakeBase*
+→ 실제 객체 (이미 존재)
+→ C++에서만 생성
+→ 블루프린트 X
+
+TSubclassOf<UCameraShakeBase>
+→ 클래스 (설계도)
+→ 에디터에서 블루프린트 선택 ✨
+→ 나중에 객체 생성
+
+→ 게임 개발에서는 TSubclassOf 사용!
+```
+
+---
+
+## 💡 9. 실용적인 비유 하나 더
+
+### 🍕 피자 주문으로 비유
+
+```
+UCameraShakeBase* = 배달된 피자
+  ↓
+  이미 만들어진 피자
+  지금 당장 먹어야 함
+  바꿀 수 없음
+
+TSubclassOf<UCameraShakeBase> = 피자 메뉴판
+  ↓
+  메뉴 중에 선택할 수 있음
+  주문하면 그때 만들어짐
+  언제든지 다른 메뉴로 바꿀 수 있음
+
+```
+
+### 게임 개발에서
+
+```
+BP_HitCameraShake (약한 흔들림) ─┐
+BP_DeathCameraShake (강한 흔들림) ├─ 메뉴판
+BP_EarthquakeShake (지진)        ─┘
+         ↓
+   TSubclassOf에 선택
+         ↓
+   필요할 때 주문 (생성)
+
+```
+
+---
+
+## ✅ 최종 정리
+
+```
+왜 TSubclassOf를 쓰는가?
+
+1. 블루프린트 선택 가능 ✨
+   → 에디터에서 쉽게 설정
+
+2. 유연함 💪
+   → 언제든지 다른 블루프린트로 교체
+
+3. 메모리 효율 🚀
+   → 필요할 때만 생성
+
+4. 게임 개발 표준 📚
+   → 언리얼 엔진의 권장 방식
+
+결론:
+TSubclassOf = 블루프린트 친화적인 "클래스 타입"
+
+```
+
+이제 `TSubclassOf`가 "블루프린트를 선택할 수 있게 해주는 특별한 타입"이라는 게 이해되셨나요? 🎓

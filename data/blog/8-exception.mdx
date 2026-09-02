@@ -1,0 +1,95 @@
+---
+title: '8. Exception 처리'
+date: '2026-09-02'
+category: '기타, 사용 적음/국비'
+tags: ['기타, 사용 적음', '국비']
+draft: false
+summary: ''
+---
+
+```jsx
+- 개발자는 개발 단계에서는 에러메세지를 확인 해야 함
+- 배포전 에러 처리 적용
+
+1. Front(Client) Error
+	 400 : paramter의 type이 틀릴 때
+	 403 : 권한
+	 404 : not found, URL이나 View 경로가 없을 때
+	 405 : method 형식이 틀릴 경우
+
+web.xml
+<!-- Client Error 처리 -->
+	<error-page>
+		<error-code>상태번호</error-code>
+		<location>jsp경로나, 에러를 처리할 URL주소</location>
+	</error-page>
+	<error-page>
+		<error-code>404</error-code>
+		<location>/WEB-INF/views/error/frontError.jsp</location>
+	</error-page>
+	<error-page>
+		<error-code>400</error-code>
+		<location>/error/error400</location>
+	</error-page>
+
+<!-- Server Error-->
+	<error-page>
+		<error-code>500</error-code>
+		<location>/WEB-INF/views/error/serverError.jsp</location>
+	</error-page>
+	<error-page>
+
+	<error-page>
+		<error-code>500</error-code>
+		<location>/error/error500</location>
+	</error-page>
+
+2. Server Error
+	 500 : Java에서 Exception 이 발생한 경우
+
+	1) 각각의 Controller 내부에 예외 처리하는 메서드를 선언
+
+	@ExceptionHandler(발생한예외Class명.class)
+		public ModelAndView getException(예외객체 선언) {
+			ModelAndView mv = new ModelAndView();
+			mv.setViewName("에러처리 jsp의 경로명");
+			return mv;
+		}
+	@ExceptionHandler(NullPointerException.class)
+	...
+	@ExceptionHandler(Exception.class)
+		public ModelAndView getException(Exception e) {
+			ModelAndView mv = new ModelAndView();
+			mv.setViewName("error/serverError");
+			return mv;
+		}
+
+	2) 예외를 전문적으로 처리하는 Controller 선언 - 예외를 전역 처리
+
+	@ControllerAdvice
+public class ServerErrorController {
+
+	//예외 처리 메서드
+	@ExceptionHandler(Exception.class)
+	public ModelAndView getException() {
+		ModelAndView mv = new ModelAndView();
+		mv.setViewName("error/serverError");
+		return mv;
+	}
+
+	@ExceptionHandler(SQLException.class)
+	public ModelAndView getSQLException() {
+		ModelAndView mv = new ModelAndView();
+		mv.setViewName("error/serverError");
+		return mv;
+	}
+
+	@ExceptionHandler(NullPointerException.class)
+	public ModelAndView getNullPointerException() {
+		ModelAndView mv = new ModelAndView();
+		mv.setViewName("error/serverError");
+		return mv;
+	}
+
+}
+```

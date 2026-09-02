@@ -1,0 +1,796 @@
+---
+title: 'JWT 토큰 사용법'
+date: '2026-09-02'
+category: '풀스택/개인 정리 (풀스택)'
+tags: ['풀스택', '개인 정리 (풀스택)']
+draft: false
+summary: ''
+---
+
+# JWT 개념
+
+## 쿠키와 세션의 문제점
+
+```jsx
+쿠키와 세션의 동일한 문제점은 주로 서버 부담과 보안에 관련된 문제이다.
+
+먼저, 서버 부담 측면에서는 사용자가 많아질수록 세션 스토어에 저장되는 사용자 정보의 증가로 인해 서버에 부하가 크게 발생한다.
+
+특히, 대규모 서비스의 경우 사용자 정보를 저장하는 데이터베이스의 부담이 커진다.
+
+또한, 세션의 경우 일정 주기마다 서버에서 DB에 접근하여 세션 정보를 갱신해야 하는데, 이로 인해 불필요한 오버헤드가 발생한다.
+
+보안 측면에서는 쿠키의 경우 클라이언트 측에서 정보를 저장하고 전송하므로 변조의 가능성이 있다.
+
+사용자가 로그인 정보를 클라이언트에서 변조할 경우, 서버는 올바르지 않은 사용자로 인식할 수 있다.
+
+이로 인해 보안 취약성이 발생하며, 특히 쿠키의 경우 브라우저 상에서 쉽게 확인 및 수정이 가능하여 보안 이슈가 발생할 수 있다.
+
+이러한 문제점을 해결하기 위해 최근에는
+
+JWT(제이슨 웹 토큰)와 같은 토큰 기반의 인증 방식이 더 많이 활용되고 있다.
+
+* 추가로 Auth 2.0 을 사용해서 로그인 정보를 서버가 직접 관리하지 않는 방식도 있다
+```
+
+## **JWT의 장점**
+
+```jsx
+서버 부담을 크게 덜어줌 ( 사용자 정보를 서버에서 저장 할 필요가 없음 )
+
+암호화 된 토큰을 사용해 안전한 통신 가능
+
+토큰 발행 전용 서버를 개설해 서버 부담 완화 가능 ( 로그인만 맡는 서버 )
+
+토큰에 특정 권한을 심을 수 있음 ( 어드민, 매니저 등등 )
+```
+
+## JWT 종류
+
+```jsx
+**Access Token : 사용자 정보에 접근**
+
+DB 에 있는 사용자 정보에 접근하기 위한 토큰
+
+**Refresh Token : Access Token 갱신 용도**
+
+Access Token 을 갱신하기 위한 토큰
+
+* Access Token 은 리프레쉬 토큰보다 유효기간이 훨씬 짧다 엑세스 토큰은 길어야 5~10분
+
+	정도고 리프레쉬 토큰은 엑세스 토큰을 갱신하기 위한 토큰이기 때문에 24시간 또는 일주일 정도 긴 유효기간을 줘서
+
+	리프레쉬 토큰만 가지고 있다면 추가적인 로그인을 하지 않아도 액세스 토큰을 갱신할 수 있게 한다
+```
+
+## JWT 구조
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381448/notion-blog/_/_/JWT_/Untitled.png)
+
+```jsx
+**헤더(Header):**
+
+헤더는 토큰의 타입과 사용된 암호화 알고리즘을 지정한다.
+
+예: {"alg": "HS256", "typ": "JWT"}
+
+**페이로드(Payload):**
+
+페이로드는 클레임(Claim)이라 불리는 정보의 조각들을 담고 있다.
+
+클레임은 사용자에 대한 정보나 토큰에 관한 추가 데이터를 의미합니다. ( 사용자 권한 )
+
+예: {"sub": "1234567890", "name": "John Doe", "admin": true}
+
+**시그니처(Signature):**
+
+시그니처는 헤더와 페이로드를 인코딩한 후, 서버에서 관리하는 비밀 키를 사용하여 생성된다.
+
+이를 통해 토큰이 정상적으로 생성되었는지, 변조되었는지를 확인할 수 있다.
+```
+
+## JWT 인증 절차
+
+```jsx
+1. 사용자 로그인 요청
+
+바디에 사용자 정보를 담아서 요청하게 된다
+
+2. 사버에서 암호화된 토큰 생성 ( 엑세스 토큰 + 리프레쉬 토큰 )
+
+서버에서는 사용자가 요청한 로그인 정보를 받아서 암호화된 토큰을 생성한다 이때 두가지 토큰을 동시에 발행한다
+
+3. 사용자는 토큰을 저장 ( Cookie, state 등 )
+
+서버에서 발행한 토큰은 여러가지 방법으로 전달이 가능하다 대표적으로 쿠키에 태워서 두 토큰을 보낼 수 있고
+
+두번째로는 res 객체에 토큰을 담아 보내고 클라이언트 단에서는 응답 받은 데이터를 state 에 저장해서 사용할 수 있다
+
+( 즉 사용자가 토큰을 어디에 저장할지는 사용자가 선택할 수 있게 되는거 )
+
+4. 이 후 모든 요청에 토큰을 태워 요청함
+
+3단계가 끝나면 즉 사용자가 로그인을 요청하고 서버에서 토큰을 발행하고 토큰을 클라이언트 에게 전달해주면
+
+이후 모든 클라이언트가 서버에 요청하는 req 에는 토큰을 태워서 요청하게 된다
+
+5. 서버는 토큰을 가지고 사용자 식별
+
+이 토큰을 받은 서버는 전달받은 서버는 엑세스 토큰을 사용하여 사용자를 식별할 수 있게 되고
+
+사용자가 식별되면 그에 맞는 서비스를 제공할 수 있게 된다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381446/notion-blog/_/_/JWT_/Untitled_1.png)
+
+# **JWT 토큰 구현 테스트 환경 구성**
+
+```jsx
+npm i express dotenv cors jsonwebtoken cookie-parser
+```
+
+```jsx
+기본적인 npm 을 설치해준다
+```
+
+## **dotenv**
+
+```jsx
+Node.js 애플리케이션에서 환경 변수를 쉽게 로드하고 사용할 수 있게 도와주는 패키지
+
+주로 설정 정보나 중요한 데이터를 안전하게 관리하고 싶을 때 사용된다.
+
+* 리액트는 npm i env-cmd 으로 설치하고
+
+환경변수를 REACT_APP_HOST = https://a7d2-121-160-217-134.ngrok-free.app 이런식으로 REACT_APP 을 꼭 부여줘야 한다
+
+* 리액트에서 사용 예제
+
+const apiUrl = process.env.REACT_APP_HOST;
+const Test = () => {
+    const [test, setTest] = useState();
+
+    const testButton = async () => {
+        try {
+            // const dummy =
+            // {
+            //     id : 'dong',
+            //     name : '김동현',
+            //     address : '대구'
+            // }
+            console.log(apiUrl)
+            const response = await axios.get(`${apiUrl}/admin/users/1`);
+             console.log(response.data)
+            setTest(response.data);
+        } catch (error) {
+            console.log(error);
+        }
+    }
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381446/notion-blog/_/_/JWT_/Untitled_2.png)
+
+```jsx
+const express = require('express')
+const dotenv = require('dotenv')
+const cookieParser = require('cookie-parser')
+const cors = require('cors')
+
+const app = express()
+dotenv.config()
+
+// 기본 설정을 해준다
+app.use(express.json())
+// 쿠키를 사용하여 JWT 를 사용할 예정이기 떄문에 사용
+app.use(express.cookieParser())
+app.use(
+  cors({
+    origin: 'http//localhost:3000',
+    methods: ['GET', 'POST'],
+    credentials: true,
+  })
+)
+
+app.listen(process.env.PORT, () => {
+  console.log(`server is on ${process.env.PORT}`)
+})
+```
+
+```jsx
+기본적인 셋팅을 해주고 env 를 사용해서 서버 포트를 설정해준다
+
+.env 파일을 만들고 사용은 process.env.PORT( 문서내 이름 ) 을 사용한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381447/notion-blog/_/_/JWT_/Untitled_3.png)
+
+## controller 생성
+
+```jsx
+MVC 패턴 라우터를 관리하기 위해서 controller 폴더를 만들고
+
+필요한 라우터들을 작성해준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381447/notion-blog/_/_/JWT_/Untitled_4.png)
+
+```jsx
+const userDatabase = require('../Database')
+const jwt = require('jsonwebtoken')
+
+const login = (req, res) => {}
+
+const accessToken = (req, res) => {}
+
+const refreshToken = (req, res) => {}
+
+const loginSuccess = (req, res) => {}
+
+const logout = (req, res) => {}
+
+module.exports = {
+  login,
+  accessToken,
+  refreshToken,
+  loginSuccess,
+  logout,
+}
+```
+
+```jsx
+여기서 userDatabase 는 지금 DB를 사용하는게 아니여서 임시로 만든 DB 대용 파일이다
+
+* 컨트롤러에서 미들웨어로 사용하는 것은 코드의 구조화, 유지보수성 향상, 다단계 작업의 분리, 재사용성 및 확장성을 고려하기 위함이다.
+```
+
+## index.js 파일 수정
+
+```jsx
+const express = require('express')
+const dotenv = require('dotenv')
+const cookieParser = require('cookie-parser')
+const cors = require('cors')
+const { login, accessToken, refreshToken, loginSuccess, logout } = require('./controller') // index.js 로 만들면 이렇게 폴더만 가져와도 자동으로 인식
+
+const app = express()
+dotenv.config()
+
+// 기본 설정을 해준다
+app.use(express.json())
+// 쿠키를 사용하여 JWT 를 사용할 예정이기 떄문에 사용
+app.use(cookieParser())
+app.use(
+  cors({
+    origin: 'http://localhost:3000',
+    methods: ['GET', 'POST'],
+    credentials: true,
+  })
+)
+
+app.post('/login', login)
+app.get('/accessToken', accessToken)
+app.get('/refreshToken', refreshToken)
+app.get('login/success', loginSuccess)
+app.post('logout', logout)
+
+app.listen(process.env.PORT, () => {
+  console.log(`server is on ${process.env.PORT}`)
+})
+```
+
+```jsx
+위와 같이 controller 에서 내보낸 모듈을 사용해서 코드를 작성해준다
+```
+
+# **JWT 토큰 사용법 (토큰발행, JSON Web Token 로그인 구현하기)**
+
+```jsx
+일단 클라이언트와 통신을 확인한다
+```
+
+## Controller
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381447/notion-blog/_/_/JWT_/Untitled_5.png)
+
+```jsx
+const login = (req, res, next) => {
+  const { email, password } = req.body
+
+  // email 을 비교해서 유저의 정보를 가져오기 ( 몽고DB는 findOne 가 되겠다 )
+  const userInfo = userDatabase.filter((item) => {
+    return item.email === email
+  })
+  console.log(userInfo)
+  next()
+}
+```
+
+```jsx
+클라이언트와 통신을 확인하기 위해서 임시로 유저의 정보를 찾게 filter 를 사용하고
+
+받아온 email 과 같은 email 을 찾아서 출력하도록 해본다
+```
+
+## 클라이언트 코드
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381447/notion-blog/_/_/JWT_/Untitled_6.png)
+
+```jsx
+import React from 'react'
+import { useState } from 'react'
+import './login.css'
+import axios from 'axios'
+
+export default function Login({ setIsLogin, setUser }) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+
+  const login = () => {
+    axios({
+      url: 'http://localhost:8123/login',
+      method: 'POST',
+      withCredentials: true,
+      data: {
+        email: email,
+        password: password,
+      },
+    }).then((result) => {
+      if (result.status === 200) {
+        window.open('/', '_self')
+      }
+    })
+  }
+
+  return (
+    <div>
+      <div className="loginContainer">
+        <div className="inputGroup">
+          <label className="inputLabel">email</label>
+          <input
+            type="email"
+            placeholder="email"
+            className="inputValue"
+            onChange={(e) => setEmail(e.target.value)}
+            value={email}
+          />
+        </div>
+        <div className="inputGroup">
+          <label className="inputLabel">password</label>
+          <input
+            type="password"
+            placeholder="password"
+            className="inputValue"
+            onChange={(e) => setPassword(e.target.value)}
+            value={password}
+          />
+        </div>
+        <button onClick={login} className="loginButton">
+          Login
+        </button>
+      </div>
+    </div>
+  )
+}
+```
+
+```jsx
+클라이언트의 엔드 포인트는 현재 위와 같이 되어있다
+
+로그인을 하면 window.open('/', '_self') 를 사용하여 새로고침을 한번 해준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381447/notion-blog/_/_/JWT_/Untitled_7.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381448/notion-blog/_/_/JWT_/Untitled_8.png)
+
+```jsx
+통신이 잘 진행되고 있다
+```
+
+## 엑세스 토큰 리프레쉬 토큰 발급
+
+```jsx
+이제 엑세스 토큰과 리프레쉬 토큰을 발급하도록 코드를 짜본다
+```
+
+```jsx
+const userDatabase = require('../Database')
+const jwt = require('jsonwebtoken')
+
+const login = (req, res, next) => {
+  const { email, password } = req.body
+
+  // email 을 비교해서 유저의 정보를 가져오기 ( 몽고DB는 findOne 가 되겠다 )
+  const userInfo = userDatabase.filter((item) => {
+    return item.email === email
+  })[0] // 첫번째 요소 가져오기
+  if (!userInfo) {
+    // 알맞은 유저가 없다면 오류 생성
+    res.status(403).json('Not Authorized')
+  } else {
+    try {
+      // access Token 발급
+      const accessToken = jwt.sign(
+        {
+          // 3개의 인자를 받는다
+          id: userInfo.id,
+          username: userInfo.username,
+          email: userInfo.email,
+        },
+        process.env.ACCESS_SECRET,
+        { expiresIn: '1m', issuer: 'About Tech' }
+      )
+
+      // refresh Token 발급
+      const refreshToken = jwt.sign(
+        {
+          // 리프레쉬는 똑같은데 시간이 더 길다
+          id: userInfo.id,
+          username: userInfo.username,
+          email: userInfo.email,
+        },
+        process.env.REFRESH_SECRET,
+        { expiresIn: '24h', issuer: 'About Tech' }
+      )
+
+      // token 전송
+      res.cookie('accessToken', accessToken, {
+        secure: false, //http 와 https 의 차이를 명시
+        httpOnly: true,
+      })
+
+      res.cookie('refreshToken', refreshToken, {
+        secure: false,
+        httpOnly: true,
+      })
+
+      res.status(200).json('login Success')
+    } catch (error) {
+      res.status(500).json(error)
+    }
+  }
+  next()
+}
+
+const accessToken = (req, res) => {}
+
+const refreshToken = (req, res) => {}
+
+const loginSuccess = (req, res) => {}
+
+const logout = (req, res) => {}
+
+module.exports = {
+  login,
+  accessToken,
+  refreshToken,
+  loginSuccess,
+  logout,
+}
+```
+
+## 토큰 발행 부분
+
+```jsx
+const accessToken = jwt.sign(
+  {
+    // 3개의 인자를 받는다
+    id: userInfo.id,
+    username: userInfo.username,
+    email: userInfo.email,
+  },
+  process.env.ACCESS_SECRET,
+  { expiresIn: '1m', issuer: 'About Tech' }
+)
+
+// refresh Token 발급
+const refreshToken = jwt.sign(
+  {
+    // 리프레쉬는 똑같은데 시간이 더 길다
+    id: userInfo.id,
+    username: userInfo.username,
+    email: userInfo.email,
+  },
+  process.env.REFRESH_SECRET,
+  { expiresIn: '24h', issuer: 'About Tech' }
+)
+```
+
+```jsx
+이 부분은 토큰을 발행해주는 부분으로 jwt.sign({},{},{}) 이라는 jsonwebtoken 의 기능을 사용한다
+
+여기서 3개의 인자를 받는데 jwt 의 구조를 설명할때 3가지 부분이랑 같다
+```
+
+```jsx
+**Payload (첫 번째 인자):**
+
+JWT에 포함되는 정보를 담고 있는 객체이다.
+
+이 객체의 속성들은 JWT에 인코딩되어 들어가게 된다. 주로 사용자의 고유 식별자, 권한, 클레임 등의 정보가 여기에 들어간다.
+
+* 인코딩 타입은 지정해주지 않으며 자동으로 hs256 으로 지정된다
+
+**비밀 키 (두 번째 인자):**
+
+JWT를 생성하고 검증하는 데 사용되는 비밀 키 이다.
+
+이 키는 서버에서만 알고 있어야 하며, JWT를 검증할 때 사용된다. 보안상 매우 중요한 부분이므로 안전하게 보관되어야 한다.
+
+**옵션 (세 번째 인자):**
+
+JWT의 옵션을 설정하는 객체이다.
+
+주로 토큰의 만료 시간(expiresIn), 알고리즘(algorithm), 발급자(issuer), 토큰의 주제(subject), 토큰의 대상(audience) 등을 설정할 수 있다.
+```
+
+## 응답 전달 부분
+
+```jsx
+// token 전송
+res.cookie('accessToken', accessToken, {
+  secure: false, //http 와 https 의 차이를 명시
+  httpOnly: true,
+})
+
+res.cookie('refreshToken', refreshToken, {
+  secure: false,
+  httpOnly: true,
+})
+```
+
+```jsx
+만들어진 토큰을 쿠키로 전달해준다
+
+res.cookie ({},{}) 첫번째 인자는 쿠키의 이름이며 두번째 인자는 값이다
+
+secure: false: 이 옵션은 쿠키를 안전한 연결(HTTPS)에서만 전송하도록 하는 것을 나타낸다 ( 실제로는 true 를 권장 )
+
+httpOnly: true: 이 옵션은 클라이언트 측에서 JavaScript를 통해 쿠키에 접근하는 것을 막는다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381448/notion-blog/_/_/JWT_/Untitled_9.png)
+
+```jsx
+로그인을 진행하고 나면
+
+올바르게 토큰이 발급된걸 확인 가능하다
+
+서버에서는 이제 이 토큰으로 사용자를 식별 가능하다
+```
+
+# 엑세스 토큰 로그인 유저 확인
+
+```jsx
+토큰을 발급받고 엑세스 토큰을 누르면 아래의 코드가 실행된다
+```
+
+```jsx
+// 토큰 확인 (엑세스 토큰 로그인 확인)
+const accessToken = (req, res) => {
+  try {
+    const token = req.cookies.accessToken // 요청에서 쿠키에 엑세스 토큰값 가져오기
+    const data = jwt.verify(token, process.env.ACCESS_SECRET) // 주어진 토큰과 비밀 키를 사용하여 토큰의 유효성을 검사 첫번째 인자 토큰 , 두번째 인자 비밀키
+
+    const userData = userDatabase.find((item) => {
+      //데이터 베이스의 email 과 같은 사용자 정보를 찾는다
+      return item.email === data.email
+    })
+
+    const { password, ...others } = userData // password를 분리하고, 나머지 속성들을 others에 담아 활용 ( 비밀번호 노출을 피하기 위해서 )
+    res.status(200).json(others)
+  } catch (error) {
+    res.status(500).json(error)
+  }
+}
+```
+
+```jsx
+이제 모든 요청에 담겨져 오는 쿠키에 토큰을 파싱하여 유저의 정보를 알아낸다
+
+jwt.verify({},{}) 를 사용하여 받아온 토큰 값과 비밀키를 넣어주어 유효성 검사를 한다
+
+그리고 받아온 값의 정보와 같은 유저가 데이터 베이스에 있는지 찾아주고
+
+응답으로 유저의 정보와 응답 상태를 보내준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381446/notion-blog/_/_/JWT_/Untitled_10.png)
+
+# 리프레쉬 토큰 사용하기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381446/notion-blog/_/_/JWT_/Untitled_11.png)
+
+```jsx
+1분이 지나면 액세스 토큰이 만료되어서 액세스 하지 못하게 된다
+```
+
+```jsx
+// 용도 액세스 토큰을 갱신
+const refreshToken = (req, res) => {
+  try {
+    const token = req.cookies.refreshToken
+    const data = jwt.verify(token, process.env.REFRESH_SECRET)
+
+    const userData = userDatabase.find((item) => {
+      //데이터 베이스의 email 과 같은 사용자 정보를 찾는다
+      return item.email === data.email
+    })
+
+    // access Token 재발급
+    const accessToken = jwt.sign(
+      {
+        // 새로 발급해줄때는 userData 에서 가져온다
+        id: userData.id,
+        username: userData.username,
+        email: userData.email,
+      },
+      process.env.ACCESS_SECRET,
+      { expiresIn: '1m', issuer: 'About Tech' }
+    )
+
+    res.cookie('accessToken', accessToken, {
+      secure: false, //http 와 https 의 차이를 명시
+      httpOnly: true,
+    })
+
+    res.status(200).json('Access Token Recreate')
+
+    // 액세스 토큰 새로 발급
+  } catch (error) {
+    res.status(500).json(error)
+  }
+}
+```
+
+```jsx
+이때 리프레쉬 토큰을 사용해준다
+
+데이터 베이스에서 같은 사용자를 찾고
+
+같은 사용자가 있다면 다시 엑세스 토큰을 발급해준다 ( 이때 리퀘스트에 담겨있는 액세스 토큰을 가져와 userdata.id 이렇게 재 사용한다
+```
+
+# 로그아웃
+
+```jsx
+//로그아웃
+const logout = (req, res) => {
+  try {
+    res.clearCookie('accessToken')
+    res.clearCookie('refreshToken')
+    res.status(200).json('Logout Success')
+  } catch (error) {
+    res.status(500).json(error)
+  }
+}
+```
+
+```jsx
+로그 아웃은 아주 쉽다
+
+쿠키를 모두 지워준다
+```
+
+# 로그인 완료 ( 로그인 상태 확인 )
+
+## server
+
+```jsx
+const loginSuccess = (req, res) => {
+  try {
+    const token = req.cookies.accessToken
+    const data = jwt.verify(token, process.env.ACCESS_SECRET)
+
+    const userData = userDatabase.find((item) => {
+      return item.email === data.email
+    })
+    res.status(200).json(userData)
+  } catch (error) {
+    res.status(500).json(error)
+  }
+}
+```
+
+```jsx
+쿠키의 액세스 토큰의 정보를 얻어서 응답을 보내준다
+```
+
+## client
+
+```jsx
+import logo from './logo.svg'
+import './App.css'
+import axios from 'axios'
+import Login from './components/Login'
+import { useEffect, useState } from 'react'
+
+function App() {
+  const [isLogin, setIsLogin] = useState(false)
+  const [user, setUser] = useState({})
+
+  const accessToken = () => {
+    axios({
+      url: 'http://localhost:8123/accesstoken',
+      method: 'GET',
+      withCredentials: true,
+    })
+  }
+
+  const refreshToken = () => {
+    axios({
+      url: 'http://localhost:8123/refreshtoken',
+      method: 'GET',
+      withCredentials: true,
+    })
+  }
+
+  const logout = () => {
+    axios({
+      url: 'http://localhost:8123/logout',
+      method: 'POST',
+      withCredentials: true,
+    }).then((result) => {
+      if (result.status === 200) {
+        window.open('/', '_self')
+      }
+    })
+  }
+
+  useEffect(() => {
+    try {
+      axios({
+        url: 'http://localhost:8123/login/success',
+        method: 'GET',
+        withCredentials: true,
+      })
+        .then((result) => {
+          if (result.data) {
+            setIsLogin(true)
+            setUser(result.data)
+          }
+        })
+        .catch((error) => {
+          console.log(error)
+        })
+    } catch (error) {
+      console.log(error)
+    }
+  }, [])
+
+  return (
+    <div className="App">
+      <header className="App-header">
+        <img src={logo} className="App-logo" alt="logo" />
+        <a onClick={accessToken} className="App-link">
+          get Access Token
+        </a>
+        <a onClick={refreshToken} className="App-link">
+          get Refresh Token
+        </a>
+        <a onClick={logout} className="App-link">
+          RemoveCookie
+        </a>
+        {isLogin ? (
+          <>
+            <h3>{user.username} 님이 로그인했습니다.</h3>
+            <button onClick={logout} className="loginButton">
+              Logout
+            </button>
+          </>
+        ) : (
+          <Login setUser={setUser} setIsLogin={setIsLogin} />
+        )}
+      </header>
+    </div>
+  )
+}
+
+export default App
+```
+
+```jsx
+그럼 3항 연산자로 useEffect를 사용해서 로그인 상태를 확인하고 갱신한다
+
+( 특이한건 로그인이나 로그아웃은 페이지를 리로드 하게 해서 화면을 전환 시킨다 )
+```

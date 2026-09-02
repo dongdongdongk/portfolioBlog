@@ -1,0 +1,1063 @@
+---
+title: '섹션 12: Melee Weapon'
+date: '2026-09-02'
+category: '게임 개발/Game Development in JS TS - The Complete Guide (w_'
+tags: ['게임 개발', 'Game Development in JS TS - The Complete Guide (w_']
+draft: false
+summary: ''
+---
+
+# { 근접 공격(밀리 공격) 구현하기 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380484/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_12_Melee_Weapon/image.png)
+
+```jsx
+Phaser에서 플레이어가 원거리 투사체(Projectile)뿐만 아니라
+
+근접 공격(밀리 공격, Melee Attack)도 할 수 있도록 기능을 추가하는 방법을 단계별로 정리하겠습니다.
+```
+
+## 1. 근접 공격용 스프라이트 시트 로드하기
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380482/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_12_Melee_Weapon/image_1.png)
+
+```jsx
+먼저, Preload.js에서 근접 공격에 사용할 스프라이트 시트를 불러옵니다.
+```
+
+```jsx
+this.load.spritesheet('sword-attack', 'assets/weapons/sword_sheet_1.png', {
+  frameWidth: 52,
+  frameHeight: 32,
+  spacing: 16,
+})
+```
+
+```jsx
+frameWidth: 각 프레임의 너비 (52px)
+
+frameHeight: 각 프레임의 높이 (32px)
+
+spacing: 프레임 간 간격 (16px)
+
+이제 sword-attack 스프라이트 시트를 사용할 수 있습니다.
+```
+
+## 2. 근접 공격 클래스 생성
+
+```jsx
+새로운 파일을 만들어서 근접 공격(밀리 공격)용 클래스를 작성합니다
+```
+
+### 파일명: `MeleeWeapon.js`
+
+```jsx
+import Phaser from 'phaser'
+
+class MeleeWeapon extends Phaser.Physics.Arcade.Sprite {
+  constructor(scene, x, y, weaponName) {
+    super(scene, x, y, weaponName)
+
+    scene.add.existing(this)
+    scene.physics.add.existing(this)
+
+    this.damage = 15 // 공격력 설정
+    this.attackSpeed = 1000 // 공격 속도 (1초)
+    this.weaponName = weaponName
+    this.wielder = null // 무기를 사용하는 캐릭터
+
+    this.activateWeapon(false) // 처음에는 보이지 않도록 설정
+  }
+
+  // 무기 휘두르기
+  swing(wielder) {
+    this.wielder = wielder
+    this.activateWeapon(true)
+    this.body.reset(wielder.x, wielder.y) // 플레이어 위치에 무기 위치 설정
+  }
+
+  // 무기의 활성화 여부 설정
+  activateWeapon(isActive) {
+    this.setActive(isActive)
+    this.setVisible(isActive)
+  }
+}
+
+export default MeleeWeapon
+```
+
+```jsx
+MeleeWeapon 클래스는 Phaser.Physics.Arcade.Sprite를 확장하여 만들었습니다.
+
+swing(wielder): 무기를 휘두를 때 실행되며, 플레이어 위치에 무기를 배치합니다.
+
+activateWeapon(isActive): 무기의 활성화 여부를 조절하여 보이거나 안 보이도록 합니다.
+```
+
+## 3. 플레이어 클래스에 근접 공격 추가
+
+```jsx
+이제 Player.js에서 근접 공격 기능을 추가합니다.
+```
+
+```jsx
+import MeleeWeapon from '../attacks/MeleeWeapon'
+
+class Player extends Phaser.Physics.Arcade.Sprite {
+  constructor(scene, x, y) {
+    super(scene, x, y, 'player')
+
+    scene.add.existing(this)
+    scene.physics.add.existing(this)
+
+    this.init()
+    this.initEvents()
+  }
+
+  init() {
+    this.meleeWeapon = new MeleeWeapon(this.scene, 0, 0, 'sword-attack')
+
+    this.scene.input.keyboard.on('keydown-E', () => {
+      console.log('E key was pressed')
+      this.play('throw', true) // 공격 애니메이션 재생
+      this.meleeWeapon.swing(this) // 근접 공격 실행
+    })
+  }
+}
+```
+
+```jsx
+
+this.meleeWeapon을 생성하여 플레이어가 사용할 무기를 초기화합니다.
+
+E 키를 누르면 swing()을 호출하여 근접 공격을 실행합니다.
+```
+
+# { MeleeWeapon 클래스에서 애니메이션 완료 시 무기를 숨기는 기능 추가 }
+
+## 1. 애니메이션 완료 이벤트 리스너 추가
+
+```jsx
+무기의 공격 애니메이션이 끝나면 자동으로 숨김 처리해야 함.
+
+on('animationcomplete', callback) 이벤트 리스너를 활용하여 구현.
+```
+
+```jsx
+this.on('animationcomplete', (animation) => {
+  if (animation.key === this.weaponAnim) {
+    this.activateWeapon(false)
+    this.body.reset(0, 0)
+  }
+})
+```
+
+```jsx
+animation.key가 this.weaponAnim(무기 스윙 애니메이션)과 같다면,
+
+→ this.activateWeapon(false)를 호출하여 무기를 비활성화.
+
+→ this.body.reset(0, 0)을 호출하여 위치 초기화.
+```
+
+## 2. 무기의 중심(origin) 설정
+
+```jsx
+무기의 위치가 캐릭터의 정중앙에서 자연스럽게 스윙되도록 조정.
+```
+
+```jsx
+this.setOrigin(0.5, 1)
+```
+
+```jsx
+setOrigin(0.5, 1)을 설정하여,
+
+→ X축 기준으로 중앙(0.5).
+
+→ Y축 기준으로 맨 아래(1).
+```
+
+# { MeleeWeapon 클래스: 검 애니메이션 및 위치 업데이트 }
+
+```jsx
+이 강의에서는 MeleeWeapon 클래스에서 검 애니메이션을 숨기고, 공격할 때 검의 위치를 업데이트하는 방법을 배웁니다.
+```
+
+## 1. **애니메이션이 끝난 후 검 숨기기**
+
+```jsx
+검이 휘둘러진 후 애니메이션이 끝나면 자동으로 비활성화해야 합니다
+```
+
+```jsx
+this.on('animationcomplete', (animation) => {
+  if (animation.key === this.weaponAnim) {
+    this.activateWeapon(false)
+    this.body.reset(0, 0)
+  }
+})
+```
+
+```jsx
+this.on('animationcomplete', animation => {...})
+
+		애니메이션이 끝날 때 이벤트를 감지합니다.
+
+if (animation.key === this.weaponAnim)
+
+		현재 실행된 애니메이션이 검 휘두르기 애니메이션인지 확인합니다.
+
+this.activateWeapon(false)
+
+		검을 비활성화하고 화면에서 숨깁니다.
+
+this.body.reset(0, 0)
+
+		검의 위치를 초기화하여 새 공격 시 정상적인 위치에서 실행되도록 함.
+```
+
+## 2. **공격 시 검의 위치를 업데이트하기**
+
+```jsx
+플레이어가 공격할 때 검의 위치를 지속적으로 갱신해야 합니다.
+
+이 작업을 위해 **preUpdate()**를 활용합니다.
+```
+
+```jsx
+preUpdate(time, delta) {
+    super.preUpdate(time, delta)
+    if (!this.active) {
+        return
+    }
+
+    if (this.wielder.lastDirection === Phaser.Physics.Arcade.FACING_RIGHT) {
+        this.setFlipX(false)
+        this.body.reset(this.wielder.x + 10, this.wielder.y)
+    } else {
+        this.setFlipX(true)
+        this.body.reset(this.wielder.x - 10, this.wielder.y)
+    }
+}
+
+```
+
+```jsx
+super.preUpdate(time, delta);
+
+		Phaser의 기본 업데이트 로직을 실행 (꼭 호출해야 함)
+
+if (!this.active) return;
+
+		검이 비활성화 상태라면 위치 업데이트를 하지 않음
+
+if (this.wielder.lastDirection === Phaser.Physics.Arcade.FACING_RIGHT)
+
+		플레이어가 오른쪽을 보고 있으면:
+
+		this.setFlipX(false) → 검이 뒤집히지 않도록 설정
+
+
+		this.body.reset(this.wielder.x + 10, this.wielder.y) → 검의 위치를 플레이어 오른쪽에 배치
+
+else
+
+		플레이어가 왼쪽을 보고 있으면:
+
+		this.setFlipX(true) → 검을 반전
+
+		this.body.reset(this.wielder.x - 10, this.wielder.y) → 검의 위치를 플레이어 왼쪽에 배치
+```
+
+## 검이 적보다 앞에 표시되도록 깊이(Depth) 설정
+
+```jsx
+현재 검이 적 뒤에 표시되는 문제가 있습니다.
+
+이를 해결하려면 **depth(깊이)**를 조정해야 합니다.
+```
+
+```jsx
+this.setDepth(10)
+```
+
+```jsx
+setDepth(10);
+
+검의 깊이를 설정하여 항상 캐릭터보다 앞쪽에 표시됨
+
+숫자가 클수록 화면에서 앞쪽에 위치
+```
+
+## **최종 코드**
+
+```jsx
+import Phaser from 'phaser'
+
+class MeleeWeapon extends Phaser.Physics.Arcade.Sprite {
+  constructor(scene, x, y, weaponName) {
+    super(scene, x, y, weaponName)
+
+    scene.add.existing(this)
+    scene.physics.add.existing(this)
+
+    this.damage = 15
+    this.attackSpeed = 1000
+    this.weaponAnim = weaponName + '-swing'
+    this.wielder = null
+
+    this.setOrigin(0.5, 1)
+    this.setDepth(10)
+    this.activateWeapon(false)
+
+    this.on('animationcomplete', (animation) => {
+      if (animation.key === this.weaponAnim) {
+        this.activateWeapon(false)
+        this.body.reset(0, 0)
+      }
+    })
+  }
+
+  preUpdate(time, delta) {
+    super.preUpdate(time, delta)
+    if (!this.active) {
+      return
+    }
+
+    if (this.wielder.lastDirection === Phaser.Physics.Arcade.FACING_RIGHT) {
+      this.setFlipX(false)
+      this.body.reset(this.wielder.x + 15, this.wielder.y)
+    } else {
+      this.setFlipX(true)
+      this.body.reset(this.wielder.x - 15, this.wielder.y)
+    }
+  }
+
+  swing(wielder) {
+    this.wielder = wielder
+    this.activateWeapon(true)
+    this.anims.play(this.weaponAnim, true)
+  }
+
+  activateWeapon(isActive) {
+    this.setActive(isActive)
+    this.setVisible(isActive)
+  }
+}
+
+export default MeleeWeapon
+```
+
+## \* `preUpdate()`와 `super.preUpdate()`가 필요한 이유
+
+```jsx
+우리는 MeleeWeapon 클래스를 만들어 플레이어가 검을 휘두를 수 있도록 하고 싶습니다.
+
+검은 플레이어가 움직일 때 따라다녀야 하고, 공격할 때 애니메이션이 실행되어야 합니다.
+```
+
+### 1️⃣ `preUpdate()`는 왜 필요한가?
+
+```jsx
+💡 검이 플레이어를 따라다니도록 만들기 위해서!
+
+문제:
+
+		검은 플레이어가 휘두를 때만 나타나야 함.
+
+		플레이어가 왼쪽으로 이동하면 검도 왼쪽으로 가야 함.
+
+		플레이어가 오른쪽으로 이동하면 검도 오른쪽으로 가야 함.
+
+		검이 플레이어의 위치를 따라오도록 매 프레임마다 위치를 업데이트해야 함!
+```
+
+### ✅ **해결책:**
+
+```jsx
+Phaser는 매 프레임마다 자동으로 실행되는 함수인 preUpdate()를 제공합니다.
+
+우리는 preUpdate()를 사용해서 플레이어의 위치에 맞게 검의 위치를 업데이트할 수 있습니다!
+```
+
+```jsx
+preUpdate(time, delta) {
+    super.preUpdate(time, delta) // 부모 클래스의 기본 동작 유지 (중요!)
+
+    if (!this.active) {
+        return  // 검이 비활성화되면 아무것도 하지 않음
+    }
+
+    if (this.wielder.lastDirection === Phaser.Physics.Arcade.FACING_RIGHT) {
+        this.setFlipX(false)  // 오른쪽을 보고 있으면 반전하지 않음
+        this.body.reset(this.wielder.x + 15, this.wielder.y) // 검을 오른쪽에 배치
+    } else {
+        this.setFlipX(true)  // 왼쪽을 보고 있으면 검을 반전
+        this.body.reset(this.wielder.x - 15, this.wielder.y) // 검을 왼쪽에 배치
+    }
+}
+```
+
+```jsx
+📌 이제 검이 플레이어를 따라다니면서 자연스럽게 공격할 수 있게 됨!
+```
+
+### 2️⃣ `super.preUpdate(time, delta)`는 왜 필요한가?
+
+```jsx
+💡 Phaser의 기본적인 물리 처리 & 애니메이션 기능을 유지하려면 필요!
+
+문제:
+
+		preUpdate()를 오버라이드(덮어쓰기)하면 부모 클래스의 **기본 동작(애니메이션, 충돌 감지 등)**이 사라짐.
+
+		즉, super.preUpdate(time, delta)를 호출하지 않으면 검이 충돌 처리를 하지 않고, 애니메이션도 제대로 실행되지 않음.
+
+✅ 해결책:
+
+		Phaser의 기본 동작을 유지하면서, 우리가 원하는 기능(검의 위치 변경)을 추가하려면
+
+		uper.preUpdate(time, delta)를 호출해야 함.
+```
+
+### `preUpdate()`가 `update()`가 아닌 이유!
+
+```jsx
+Phaser에는 update()와 preUpdate() 두 가지 업데이트 메서드가 있어요.
+
+그렇다면 왜 update()가 아니라 preUpdate()를 쓰는 걸까요? 🤔
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380482/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_12_Melee_Weapon/image_2.png)
+
+```jsx
+Phaser는 게임 루프에서 업데이트 순서를 철저히 관리합니다.
+
+💡 순서를 정리하면 다음과 같아요:
+
+1️⃣ preUpdate() 실행 (객체의 위치, 상태 등을 먼저 업데이트!)
+2️⃣ Phaser의 기본 업데이트 실행 (물리 엔진, 애니메이션, 충돌 감지 등)
+3️⃣ update() 실행 (플레이어 입력 처리, 게임 로직 등)
+
+✅ 검이 플레이어를 따라다녀야 해요!
+✅ 하지만 충돌 감지보다 늦게 움직이면 버그가 생길 수 있어요!
+✅ 그래서 preUpdate()에서 먼저 검의 위치를 조정한 뒤, 충돌 감지를 하도록 하는 거예요!
+```
+
+# { 근접 공격 시스템 구현 및 충돌 감지 수정 }
+
+```jsx
+이번 강의에서는 플레이어가 근접 공격(밀리 공격)을 할 때 적과 충돌을 감지하고,
+
+적에게 피해를 주며, 피격 이펙트를 표시하는 기능을 구현합니다.
+
+처음에는 collider를 사용했지만, 이 방식에는 문제가 있어서 overlap 방식으로 변경합니다.
+
+또한, 적이 너무 빨리 죽는 문제를 해결하기 위해 공격이 한 번만 적용되도록 수정합니다.
+```
+
+## 근접 무기 충돌 감지 추가
+
+### 기존 `collider` 방식 추가
+
+```jsx
+처음에는 **collider**를 사용해서 충돌을 감지하려고 합니다.
+
+우선, 무기에 충돌 감지 기능을 추가하는 코드입니다.
+```
+
+### 📌 **코드 추가: `playScene.js`**
+
+```jsx
+   createEnemyColliders(enemies, { colliders }) {
+        enemies
+            .addColliders(colliders.platformsColliders)
+            .addColliders(colliders.player, this.onPlayerCollision)
+            .addColliders(colliders.player.projectiles, this.onWeaponHit)
+            .addColliders(colliders.player.meleeWeapon, this.onWeaponHit) // // 기존의 투사체(Projectile) 충돌 감지 방식과 동일하게 무기에 충돌 감지를 추가
+    }
+```
+
+```jsx
+→ player.meleeWeapon(근접 무기)과 enemies(적들) 사이의 충돌을 감지하고 onWeaponHit 함수를 실행합니다.
+
+    onWeaponHit(entity, source) {
+        //console.log(`${entity} is taking a hit from ${source}`);
+        entity.takesHit(source);
+    }
+
+onWeaponHit(entity, source)
+
+→ entity(적)이 source(무기)와 충돌했을 때 takeHit() 함수를 실행하여 적이 피격당하도록 합니다.
+```
+
+### 코드 : `enemy.js`
+
+```jsx
+    takesHit(source) {
+        source.deliversHit(this);
+        this.health -= source.damage;
+        console.log("Enemy health: ", this.health)
+
+        if(this.health <= 0) {
+            this.setTint(0xff0000)
+            this.setVelocity(0, -200)
+            this.body.checkCollision.none = true;
+            this.setCollideWorldBounds(false);
+        }
+    }
+```
+
+```jsx
+source.damage
+
+→ 공격하는 무기의 공격력을 가져와서 적의 체력에서 차감합니다.
+```
+
+## 문제 발생: `collider` 방식의 한계
+
+```jsx
+위의 코드대로 실행해 보면, 근접 공격이 제대로 감지되지 않는 문제가 발생합니다.
+
+문제는 무기의 충돌 범위가 적의 충돌 범위 안에 있으면 충돌이 감지되지 않는다는 점입니다.
+
+💡 해결책: collider 대신 overlap을 사용하여 "충돌"이 아니라 "겹침"을 감지하도록 수정합니다.
+```
+
+## `overlap` 방식으로 변경
+
+### `addOverlap()` 함수 추가
+
+```jsx
+collidable.js
+```
+
+```jsx
+export default {
+  addColliders(otherGameObject, callback) {
+    this.scene.physics.add.collider(this, otherGameObject, callback, null, this)
+    return this
+  },
+
+  addOverlap(otherGameObject, callback) {
+    // addOverlap() 함수 추가 겹침 overlap 두개가 겹쳐질 때 callback 함수 실행
+    this.scene.physics.add.overlap(this, otherGameObject, callback, null, this)
+    return this
+  },
+
+  bodyPositionDifferenceX: 0,
+  prevRay: null,
+  prevHasHit: null,
+
+  raycast(body, layer, { raylength = 30, precision = 0, steepnes = 1 }) {
+    const { x, y, width, halfHeight } = body
+    // console.log("현재 감지 중인 레이어:", layer);
+
+    this.bodyPositionDifferenceX += body.x - body.prev.x
+
+    if (Math.abs(this.bodyPositionDifferenceX) <= precision && this.prevHasHit !== null) {
+      return {
+        ray: this.prevRay, // 이전 레이 값 그대로 반환
+        hasHit: this.prevHasHit, // 이전 충돌 결과 그대로 반환
+      }
+    }
+
+    const line = new Phaser.Geom.Line()
+    let hasHit = false
+
+    switch (body.facing) {
+      case Phaser.Physics.Arcade.FACING_RIGHT: {
+        line.x1 = x + width
+        line.y1 = y + halfHeight
+        line.x2 = line.x1 + raylength * steepnes
+        line.y2 = line.y1 + raylength
+        break
+      }
+      case Phaser.Physics.Arcade.FACING_LEFT: {
+        line.x1 = x
+        line.y1 = y + halfHeight
+        line.x2 = line.x1 - raylength * steepnes
+        line.y2 = line.y1 + raylength
+        break
+      }
+    }
+
+    const hits = layer.getTilesWithinShape(line)
+
+    // console.log("감지된 타일:", hits);
+    // console.log("타일 인덱스 값:", hits.map(hit => hit.index));
+    if (hits.length > 0) {
+      hasHit = this.prevHasHit = hits.some((hit) => hit.index !== -1)
+      this.prevHasHit = null
+    }
+
+    this.prevRay = line
+    this.bodyPositionDifferenceX = 0
+
+    // console.log("레이케스트")
+    return { ray: line, hasHit }
+  },
+}
+```
+
+## 무기에 `overlap` 적용
+
+```jsx
+    createEnemyColliders(enemies, { colliders }) {
+        enemies
+            .addColliders(colliders.platformsColliders)
+            .addColliders(colliders.player, this.onPlayerCollision)
+            .addColliders(colliders.player.projectiles, this.onWeaponHit)
+            .addOverlap(colliders.player.meleeWeapon, this.onWeaponHit) // overlap 적용
+    }
+```
+
+## 문제 발생: 공격이 너무 자주 실행됨
+
+```jsx
+overlap 방식으로 변경 후에는 한 번의 공격으로 여러 번 적중하는 문제가 발생합니다.
+
+적과 겹쳐 있는 동안 반복적으로 피해를 입히는 버그가 생깁니다.
+
+해결책: 공격을 한 번만 적용하고, 애니메이션이 끝나면 다시 활성화하는 방식으로 수정합니다
+```
+
+## 공격을 한 번만 적용하도록 수정
+
+```jsx
+deliversHit(target) {
+    // 충돌한 대상의 타격 효과(이펙트) 위치를 설정
+    // - x 좌표는 현재 무기의 x 위치
+    // - y 좌표는 무기의 중앙(getCenter().y)을 기준으로 설정
+    const impactPosition = { x: this.x, y: this.getCenter().y };
+
+    // 이펙트 매니저를 사용하여 'hit-effect' 효과를 타겟 위치에 표시
+    this.effectManager.playEffectOn('hit-effect', target, impactPosition);
+
+    // 공격이 한 번만 적용되도록 충돌 감지를 비활성화
+    this.body.checkCollision.none = true;
+}
+```
+
+```jsx
+this.body.checkCollision.none = true;
+
+충돌 감지를 비활성화하여 한 번만 공격이 적용되도록 설정.
+
+이 코드가 없으면 같은 적을 여러 번 연속해서 맞출 수도 있음.
+```
+
+### 비 활성화 된 충돌을 이벤트 감지로 다시 활성화
+
+```jsx
+this.on('animationcomplete', (animation) => {
+  // 현재 완료된 애니메이션이 무기 공격 애니메이션인지 확인
+  if (animation.key === this.weaponAnim) {
+    // 공격 애니메이션이 끝나면 무기를 비활성화 (공격이 끝났음을 의미)
+    this.activateWeapon(false)
+
+    // 충돌 감지를 다시 활성화하여 다음 공격이 적용될 수 있도록 함
+    this.body.checkCollision.none = false
+
+    // 무기의 충돌 박스를 초기 위치(0,0)로 재설정하여 이후 공격 시 정상적으로 동작하게 함
+    this.body.reset(0, 0)
+  }
+})
+```
+
+## 피격 이펙트 추가
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380484/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_12_Melee_Weapon/image_3.png)
+
+```jsx
+공격이 적중했을 때 시각적으로 표현하기 위해 피격 이펙트를 추가합니다.
+```
+
+### 📌 **코드 수정: `meleeWeapon.js`**
+
+```jsx
+deliversHit(target) {
+    // 공격이 적중한 위치를 설정 (무기의 현재 x 좌표와 중앙 y 좌표)
+    const impactPosition = { x: this.x, y: this.getCenter().y };
+
+    // 이펙트 매니저를 사용하여 'hit-effect' 효과를 대상(target) 위치에서 실행
+    this.effectManager.playEffectOn('hit-effect', target, impactPosition);
+
+    // 무기의 충돌 감지를 비활성화하여 동일한 공격이 여러 번 적용되지 않도록 설정
+    this.body.checkCollision.none = true;
+}
+
+```
+
+### 공격 범위 조정
+
+```jsx
+공격이 적중하는 위치를 조정하기 위해 impactPosition 값을 수정합니다.
+```
+
+### 📌 **코드 수정: `meleeWeapon.js`**
+
+```jsx
+const impactPosition = { x: this.x, y: this.getCenter().y }
+```
+
+```jsx
+getRightCenter().y를 사용해 피격 이펙트가 정확한 위치에 나오도록 수정.
+```
+
+# { Melee 공격 속도 조절하기 }
+
+```jsx
+현재 플레이어가 E 키를 눌러 근접 공격(칼 휘두르기)을 할 때,
+
+공격을 연속으로 무제한 사용할 수 있습니다.
+
+하지만 이렇게 하면 게임의 난이도가 낮아지고 재미가 떨어질 수 있습니다.
+
+따라서 "공격 속도"를 적용하여 일정 시간(예: 1초)마다 한 번씩 공격할 수 있도록 제한해야 합니다.
+```
+
+## 1. 현재 코드에서 공격 속도 조절이 없는 문제점
+
+```jsx
+this.scene.input.keyboard.on('keydown-E', () => {
+  console.log('E key was pressed')
+  this.play('throw', true)
+  this.meleeWeapon.swing(this)
+})
+```
+
+```jsx
+현재 코드에서는 E 키를 누르면 즉시 공격 애니메이션을 실행하고, 무제한으로 공격할 수 있습니다.
+
+따라서 공격 간격을 설정하여 일정 시간이 지나야 다시 공격할 수 있도록 해야 합니다.
+```
+
+## 2. 공격 속도 조절을 위한 변수 추가
+
+```jsx
+공격 간격을 설정하려면 마지막 공격 시간을 기록해야 합니다.
+
+이를 위해 timeFromLastSwing 변수를 추가합니다.
+```
+
+### 변수 초기화 (`init` 함수에서 추가)
+
+```jsx
+this.timeFromLastSwing = null
+```
+
+```jsx
+이 변수는 플레이어가 마지막으로 공격한 시간을 저장하며, 처음에는 null로 설정됩니다.
+```
+
+## 3. 공격 속도 제한 로직 추가
+
+```jsx
+keydown-E 이벤트 핸들러 내부에서 이전 공격 시간 + 공격 속도(예: 1000ms) 가 현재 시간보다 크면 공격하지 않도록 합니다.
+```
+
+```jsx
+this.scene.input.keyboard.on('keydown-E', () => {
+  // 현재 시간이 마지막 공격 시간 + 공격 속도보다 작으면 공격 불가
+  if (
+    this.timeFromLastSwing &&
+    this.timeFromLastSwing + this.meleeWeapon.attackSpeed > getTimestamp()
+  ) {
+    return // 공격 쿨다운 중이면 함수 종료
+  }
+
+  console.log('E key was pressed')
+  this.play('throw', true)
+  this.meleeWeapon.swing(this)
+
+  // 현재 공격한 시간을 기록
+  this.timeFromLastSwing = getTimestamp()
+})
+```
+
+### getTimestemp
+
+```jsx
+export const getTimestamp = () => {
+  let d = new Date()
+  return d.getTime()
+}
+```
+
+## 동작 방식
+
+```jsx
+E 키를 누르면 this.timeFromLastSwing 값을 확인합니다.
+
+만약 (마지막 공격 시간 + 공격 속도) > 현재 시간이면 공격을 하지 않고 return으로 종료합니다.
+
+그렇지 않으면 공격을 실행하고, this.timeFromLastSwing을 현재 시간으로 갱신합니다.
+
+이후, 일정 시간이 지나야 다시 공격할 수 있습니다.
+```
+
+# { 새로운 적 생성하기 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380484/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_12_Melee_Weapon/image_4.png)
+
+```jsx
+이번 강의에서는 새로운 적인 Snaky를 게임에 추가하는 과정을 다룹니다.
+
+Snaky는 Birdman과 비슷한 방식으로 구현되며, 적을 추가하는 전반적인 흐름을 이해하는 데 중요한 예제입니다.
+```
+
+## 1. Snaky 스프라이트 추가 및 로드
+
+```jsx
+먼저 Snaky의 스프라이트 시트를 게임에 로드해야 합니다. 이를 위해 preload 함수에서 스프라이트를 등록합니다.
+```
+
+```jsx
+this.load.spritesheet('snaky', 'assets/enemy/enemy_sheet_2.png', {
+  frameWidth: 32,
+  frameHeight: 32,
+})
+```
+
+```jsx
+이제 snaky 스프라이트를 사용할 수 있습니다.
+```
+
+## 2. Snaky 애니메이션 생성
+
+```jsx
+Snaky의 애니메이션을 정의해야 합니다.
+
+애니메이션은 snaky-walk, snaky-hurt, snaky-die 세 가지가 있습니다.
+```
+
+```jsx
+export default (anims) => {
+  anims.create({
+    key: 'snaky-walk',
+    frames: anims.generateFrameNumbers('snaky', { start: 0, end: 8 }),
+    frameRate: 10,
+    repeat: -1,
+  })
+
+  anims.create({
+    key: 'snaky-hurt',
+    frames: anims.generateFrameNumbers('snaky', { start: 22, end: 24 }),
+    frameRate: 10,
+    repeat: 0,
+  })
+
+  anims.create({
+    key: 'snaky-die',
+    frames: anims.generateFrameNumbers('snaky', { start: 1, end: 1 }),
+    frameRate: 10,
+    repeat: 0,
+  })
+}
+```
+
+## 3. Snaky 클래스 생성
+
+```jsx
+Birdman과 같은 방식으로 Snaky 클래스를 생성합니다.
+
+Snaky는 Enemy 클래스를 상속받아 기본적인 적의 동작을 유지합니다.
+```
+
+```jsx
+import Enemy from './Enemy'
+import initAnims from './anims/snakyAnims'
+
+class Snaky extends Enemy {
+  constructor(scene, x, y) {
+    super(scene, x, y, 'snaky')
+    initAnims(scene.anims)
+  }
+
+  init() {
+    super.init()
+    this.speed = 80
+    this.health = 40
+  }
+
+  update(time, delta) {
+    super.update(time, delta)
+    if (!this.active) {
+      return
+    }
+
+    if (this.isPlayingAnims('snaky-hurt')) {
+      return
+    }
+
+    if (this.health <= 0) {
+      this.play('snaky-die', true)
+      return
+    }
+
+    this.play('snaky-walk', true)
+  }
+
+  takesHit(source) {
+    super.takesHit(source)
+    this.play('snaky-hurt', true)
+  }
+}
+
+export default Snaky
+```
+
+```jsx
+init()에서 speed와 health 값을 설정
+
+update()에서 Snaky의 애니메이션을 제어
+
+takesHit()에서 공격을 받을 때 snaky-hurt 애니메이션 실행
+```
+
+## 4. Snaky를 스폰하는 과정
+
+### 1. 적을 관리하는 `Enemies` 그룹
+
+```jsx
+Enemies는 적들을 관리하는 그룹 클래스로, createEnemies() 함수에서 사용됩니다.
+
+이 그룹을 사용하면 여러 적 객체를 한 번에 관리할 수 있습니다.
+```
+
+```jsx
+import Enemies from '../groups/Enemies'
+```
+
+### 2. 적의 종류를 정의 (`ENEMY_TYPES`)
+
+```jsx
+import Birdman from '../entities/Birdman'
+import Snaky from '../entities/Snaky'
+
+export const ENEMY_TYPES = () => {
+  return {
+    Birdman,
+    Snaky,
+  }
+}
+```
+
+```jsx
+ENEMY_TYPES() 함수는 적의 종류를 객체로 반환합니다.
+
+키 값(Birdman, Snaky)을 사용하면 해당 적 클래스를 가져올 수 있습니다.
+```
+
+### 3. `createEnemies()` 함수: 적을 생성하는 핵심 코드
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380484/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_12_Melee_Weapon/image_5.png)
+
+```jsx
+createEnemies(spawnLayer, platformsColliders) {
+    // 적을 관리하는 그룹 객체 생성 (Enemies는 Phaser.Group을 확장한 클래스)
+    const enemies = new Enemies(this);
+
+    // enemies 그룹에서 적의 종류(Birdman, Snaky 등)를 가져옴
+    const enemyTypes = enemies.getTypes(); // ENEMY_TYPES()에서 정의된 적 목록을 가져옴
+
+    // 스폰 포인트 정보를 반복하여 각 위치에 적을 생성
+    spawnLayer.objects.forEach((spawnPoint) => {
+        /*
+         * spawnPoint.type에는 맵에서 설정한 적의 타입이 들어 있음
+         * 예를 들어, spawnPoint.type이 "Birdman"이면 enemyTypes["Birdman"]을 가져옴
+         * 따라서 아래 코드는 적을 적절한 위치(x, y)에서 생성하는 역할을 함
+         */
+        const enemy = new enemyTypes[spawnPoint.type](this, spawnPoint.x, spawnPoint.y);
+
+        // 적이 플랫폼과 충돌할 수 있도록 충돌 감지 설정
+        enemy.setPlatformColliders(platformsColliders);
+
+        // 생성된 적을 enemies 그룹에 추가하여 한 번에 관리할 수 있도록 함
+        enemies.add(enemy);
+    });
+
+    // 생성된 모든 적을 포함하는 enemies 그룹을 반환
+    return enemies;
+}
+
+```
+
+### 4. `createEnemies()` 호출하기 (`create()` 내부)
+
+```jsx
+const enemies = this.createEnemies(layers.enemySpawns, layers.platformsColliders)
+```
+
+```jsx
+적을 생성하는 createEnemies() 함수를 호출하여 enemies 그룹을 생성.
+
+layers.enemySpawns는 적이 등장할 위치 정보.
+
+layers.platformsColliders는 적이 플랫폼과 충돌할 수 있도록 설정하는 데이터.
+```
+
+### 5. 적과의 충돌 처리 (`createEnemyColliders()`)
+
+```jsx
+this.createEnemyColliders(enemies, {
+  colliders: {
+    platformsColliders: layers.platformsColliders,
+    player,
+  },
+})
+```
+
+```jsx
+적과 플레이어가 충돌했을 때, 플레이어가 피해를 입도록 설정.
+
+platformsColliders와 충돌하면 바닥을 통과하지 않도록 설정.
+```
+
+# { Snaky의 크기 조정하기 }
+
+```jsx
+이번 강의에서는 Snaky의 hitbox 크기를 조정하는 방법을 배웁니다.
+
+현재 Snaky의 실제 애니메이션 크기와 충돌 판정(hitbox)이 맞지 않기 때문에, 이를 조정해 더욱 자연스럽게 만들 것입니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380484/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_12_Melee_Weapon/image_6.png)
+
+## 현재 문제점 분석
+
+```jsx
+Snaky의 **충돌 영역(hitbox)**이 실제 스프라이트 크기보다 크거나 작아 부정확한 충돌 판정이 발생할 수 있습니다.
+
+특히, 스프라이트 이미지 내 여백이 많아 중심 정렬이 어렵다는 점도 문제입니다.
+
+이를 해결하기 위해 setSize(크기 조정) 및 setOffset(위치 조정)을 적용합니다.
+```
+
+```jsx
+init() {
+    super.init();
+    this.speed = 80;
+    this.health = 40;
+
+    // Snaky의 실제 크기를 반영하여 충돌 판정 조정
+    this.setSize(12, 45);  // 가로 12px, 세로 45px
+    this.setOffset(10, 15);  // x축 10px, y축 15px 만큼 이동
+}
+```
+
+### `setOffset(x, y)`의 역할 (충돌 위치 조정)
+
+```jsx
+setSize()로 크기를 줄였다고 해도, 충돌 영역이 캐릭터 중앙이 아닌 엉뚱한 곳에 위치할 수 있어.
+
+이때 setOffset(x, y)를 사용하면 충돌 영역을 원하는 위치로 이동할 수 있어!
+
+💡 예제
+👉 캐릭터 크기: 50px × 50px
+👉 충돌 크기: setSize(30, 40); (조금 작게 조정)
+👉 그런데 왼쪽으로 치우쳐 있으면?
+👉 setOffset(10, 5); (오른쪽으로 10px, 아래로 5px 이동)
+```

@@ -1,0 +1,2127 @@
+---
+title: '섹션 7: Polish - 2'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+# { 🎯 수류탄 시각 효과 완성하기 }
+
+이번 강의는 수류탄 액션에 폭발 이펙트, 화면 흔들림, 궤적 효과, 포물선 던지기 등 다양한 시각적 요소를 추가하여 완성도 높은 게임플레이를 구현하는 내용입니다.
+
+## 📋 목차
+
+1. [화면 흔들림(Screen Shake) 구현하기](https://claude.ai/chat/053f969a-90d7-4571-a9f1-36a625d520c4#1-%ED%99%94%EB%A9%B4-%ED%9D%94%EB%93%A4%EB%A6%BCscreen-shake-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+2. [폭발 VFX 파티클 시스템 만들기](https://claude.ai/chat/053f969a-90d7-4571-a9f1-36a625d520c4#2-%ED%8F%AD%EB%B0%9C-vfx-%ED%8C%8C%ED%8B%B0%ED%81%B4-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+3. [수류탄 궤적 Trail 효과 추가하기](https://claude.ai/chat/053f969a-90d7-4571-a9f1-36a625d520c4#3-%EC%88%98%EB%A5%98%ED%83%84-%EA%B6%A4%EC%A0%81-trail-%ED%9A%A8%EA%B3%BC-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+4. [Animation Curve를 이용한 포물선 구현](https://claude.ai/chat/053f969a-90d7-4571-a9f1-36a625d520c4#4-animation-curve%EB%A5%BC-%EC%9D%B4%EC%9A%A9%ED%95%9C-%ED%8F%AC%EB%AC%BC%EC%84%A0-%EA%B5%AC%ED%98%84)
+5. [랙돌 랜덤화로 자연스러운 사망 연출](https://claude.ai/chat/053f969a-90d7-4571-a9f1-36a625d520c4#5-%EB%9E%99%EB%8F%8C-%EB%9E%9C%EB%8D%A4%ED%99%94%EB%A1%9C-%EC%9E%90%EC%97%B0%EC%8A%A4%EB%9F%AC%EC%9A%B4-%EC%82%AC%EB%A7%9D-%EC%97%B0%EC%B6%9C)
+
+---
+
+## 1. 화면 흔들림(Screen Shake) 구현하기
+
+### 개념: Static Event를 활용한 전역 이벤트 시스템
+
+- **Static Event**: 클래스 자체에 속하는 이벤트로, 어떤 인스턴스에서도 발생시킬 수 있고 어디서든 구독 가능
+- 수류탄이 폭발할 때마다 화면을 흔들어 폭발의 임팩트를 강조
+
+### 구현 과정
+
+### 1-1. 수류탄 폭발 이벤트 선언
+
+```csharp
+public class GrenadeProjectile : MonoBehaviour
+{
+    // static 키워드: 이 이벤트는 클래스 자체에 속함
+    // 모든 GrenadeProjectile 인스턴스가 공유하는 이벤트
+    public static event EventHandler OnAnyGrenadeExploded;
+
+    private void Update()
+    {
+        // ... 기존 이동 로직 ...
+
+        if(Vector3.Distance(positionXZ, targetPostion) < reachedTargetDistance)
+        {
+            // 수류탄이 목표 지점에 도달했을 때
+
+            // 폭발 데미지 처리 로직
+            // ...
+
+            // 폭발 이벤트 발생
+            // ?. 연산자: 구독자가 있을 때만 실행 (null 체크)
+            OnAnyGrenadeExploded?.Invoke(this, EventArgs.Empty);
+
+            // 수류탄 오브젝트 파괴
+            Destroy(gameObject);
+        }
+    }
+}
+```
+
+### 1-2. 화면 흔들림 스크립트에서 이벤트 구독
+
+```csharp
+public class ScreenShakeActions : MonoBehaviour
+{
+    void Start()
+    {
+        // 총 발사 이벤트 구독 (기존)
+        ShootAction.OnAnyShoot += ShootAction_OnAnyShoot;
+
+        // 수류탄 폭발 이벤트 구독 (신규)
+        GrenadeProjectile.OnAnyGrenadeExploded += GrenadeProjectile_OnAnyGrenadeExploded;
+    }
+
+    private void ShootAction_OnAnyShoot(object sender, ShootAction.OnShootEventArgs e)
+    {
+        // 일반 총 발사: 기본 강도(1f)로 흔들림
+        ScreenShake.Instance.Shake();
+    }
+
+    private void GrenadeProjectile_OnAnyGrenadeExploded(object sender, EventArgs e)
+    {
+        // 수류탄 폭발: 강한 강도(5f)로 흔들림
+        // 폭발은 총소리보다 5배 강한 충격
+        ScreenShake.Instance.Shake(5f);
+    }
+}
+```
+
+### 핵심 개념 정리
+
+- **EventHandler**: C#의 표준 이벤트 델리게이트 타입
+- **?.Invoke()**: Null 조건부 연산자로 안전한 이벤트 호출
+- **intensity 매개변수**: 화면 흔들림의 강도를 조절하여 다양한 효과 표현
+
+---
+
+## 2. 폭발 VFX 파티클 시스템 만들기
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380479/notion-blog/_/3D_/_/_7_Polish_-_2/image.png)
+
+### 개념: 파티클 시스템 설정을 통한 폭발 효과 구현
+
+Unity의 파티클 시스템은 다양한 설정을 통해 현실적인 폭발 효과를 만들 수 있습니다.
+
+### 구현 과정
+
+### 2-1. 기본 폭발 파티클 설정
+
+1. **Bullet Hit VFX 복제**
+   - 기존 총알 충돌 이펙트를 복제하여 시작
+   - 이름: `Grenade Explode VFX`
+   - 씬 뷰에서 직접 편집 (프리팹 모드는 포스트프로세싱이 없어서 정확한 확인 어려움)
+2. **Looping 활성화 (테스트용)**
+   - 파티클 시스템의 Looping 체크박스 활성화
+   - 반복 재생되어 설정 조정 시 즉시 확인 가능
+
+### 2-2. Shape(형태) 설정
+
+```
+Shape Type: Sphere (구형)
+Radius: 2.0 (기존 0.2에서 증가)
+```
+
+- **Sphere**: 모든 방향으로 균등하게 파티클 발사
+- **Radius 증가**: 더 넓은 영역에서 파티클 생성 → 큰 폭발 표현
+
+### 2-3. Emission(발사량) 설정
+
+```
+Rate over Time: 0 (시간당 발사 비활성화)
+Bursts (버스트 모드):
+  - Count: 200 (한 번에 200개 파티클 발사)
+  - Cycles: 2 (2번 반복)
+  - Interval: 0.05초 (0.05초 간격으로 반복)
+```
+
+- **Bursts**: 특정 시점에 대량의 파티클을 한 번에 발사
+- **총 파티클 수**: 200 × 2 = 400개 (매우 밀도 높은 폭발)
+
+### 2-4. Start Speed(초기 속도) 설정
+
+```
+Start Speed: Random Between Two Constants
+  - Min: 3
+  - Max: 10
+```
+
+- 파티클마다 다른 속도로 발사되어 자연스러운 퍼짐 효과
+- 빠른 파티클과 느린 파티클이 섞여 입체감 생성
+
+### 2-5. Start Size(초기 크기) 설정
+
+```
+Start Size: Random Between Two Constants
+  - Min: 0.2
+  - Max: 0.6
+```
+
+- 다양한 크기의 파티클로 깊이감 표현
+- 작은 파편부터 큰 파편까지 혼합
+
+### 2-6. Trails(궤적) 설정
+
+**Trails 모듈 활성화 후:**
+
+```
+Lifetime: 0.1 (기존 1.0에서 감소)
+  - 궤적이 너무 길면 부자연스러우므로 짧게 설정
+
+Minimum Vertex Distance: 0.01
+  - 궤적을 그리는 점들 사이의 최소 거리
+  - 작을수록 부드러운 곡선
+
+Width over Trail: 0.1
+  - 궤적의 두께
+  - 기본값은 너무 두꺼워서 줄임
+```
+
+### 2-7. Material(재질) 설정
+
+**새 Material 생성: Grenade Explosion**
+
+```
+Base Map Color: White (순백색)
+Emission Map Color: 밝은 흰색
+Emission Intensity: 적당히 조절
+```
+
+- **Renderer 모듈**에서:
+  - Material: Grenade Explosion
+  - Trail Material: Grenade Explosion (동일)
+
+### 2-8. 최종 설정 저장
+
+```
+1. Looping 체크 해제 (테스트 완료)
+2. Stop Action: Destroy
+   - 파티클이 끝나면 자동으로 오브젝트 삭제
+3. Overrides → Apply All
+   - 프리팹에 모든 변경사항 저장
+```
+
+### 2-9. 코드로 폭발 VFX 생성
+
+```csharp
+public class GrenadeProjectile : MonoBehaviour
+{
+    // 폭발 이펙트 프리팹 참조
+    [SerializeField] private Transform grenadeExplodeVfxPrefeb;
+
+    private void Update()
+    {
+        if(Vector3.Distance(positionXZ, targetPostion) < reachedTargetDistance)
+        {
+            // ... 데미지 처리 ...
+
+            // 폭발 이펙트 생성
+            // targetPostion: 수류탄이 떨어진 바닥 위치
+            // Vector3.up * 1f: Y축으로 1유닛 위로 올림 (바닥에서 약간 띄움)
+            // Quaternion.identity: 회전 없음
+            Instantiate(
+                grenadeExplodeVfxPrefeb,
+                targetPostion + Vector3.up * 1f,
+                Quaternion.identity
+            );
+
+            Destroy(gameObject);
+        }
+    }
+}
+```
+
+### 핵심 개념 정리
+
+- **Burst 모드**: 순간적으로 많은 파티클을 생성하여 폭발 효과
+- **Random Between Two Constants**: 파티클마다 다른 값을 가져 자연스러움
+- **Trail 시스템**: 파티클의 이동 경로를 시각화하여 동적인 느낌
+- **Stop Action: Destroy**: 메모리 관리를 위한 자동 정리
+
+---
+
+## 3. 수류탄 궤적 Trail 효과 추가하기
+
+### 개념: Trail Renderer를 이용한 이동 궤적 표현
+
+Trail Renderer는 오브젝트가 움직인 경로를 시각적으로 표시하는 컴포넌트입니다.
+
+### 구현 과정
+
+### 3-1. Trail Renderer 복사 및 설정
+
+1. **Bullet Projectile의 Trail 복사**
+   - Bullet Projectile 프리팹의 Trail 자식 오브젝트 복사
+   - Grenade Projectile 프리팹에 붙여넣기
+2. **Trail Renderer 설정 조정**
+
+```
+Time: 0.2
+  - 궤적이 유지되는 시간 (초)
+  - 총알보다 조금 길게 설정
+
+Min Vertex Distance: 0.1
+  - 궤적 점 사이의 최소 거리
+  - 작을수록 부드러운 곡선
+```
+
+### 3-2. Trail Material 생성 및 설정
+
+**새 Material 생성: Grenade Trail**
+
+```
+Base Map Color: Pure White (255, 255, 255)
+  - 밝고 선명한 흰색 궤적
+
+Emission Map Color: Pure White
+Emission Intensity: 2.0
+  - 약간의 발광 효과로 가시성 향상
+```
+
+### 3-3. 폭발 시 Trail 처리 로직
+
+```csharp
+public class GrenadeProjectile : MonoBehaviour
+{
+    // Trail Renderer 컴포넌트 참조
+    [SerializeField] private TrailRenderer trailRenderer;
+
+    private void Update()
+    {
+        if(Vector3.Distance(positionXZ, targetPostion) < reachedTargetDistance)
+        {
+            // ... 폭발 처리 ...
+
+            // Trail을 부모로부터 분리
+            // null로 설정하면 월드 공간에 독립적으로 존재
+            trailRenderer.transform.parent = null;
+
+            // 수류탄 오브젝트는 파괴되지만
+            // Trail은 독립적으로 남아서 서서히 사라짐
+            Destroy(gameObject);
+        }
+    }
+}
+```
+
+### 핵심 개념 정리
+
+- **Transform.parent = null**: 부모-자식 관계 해제
+- **독립적 Trail**: 수류탄이 파괴되어도 궤적은 잠시 남아있음
+- **Time 속성**: Trail이 페이드 아웃되는 시간 제어
+
+---
+
+## 4. Animation Curve를 이용한 포물선 구현
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380477/notion-blog/_/3D_/_/_7_Polish_-_2/image_1.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380477/notion-blog/_/3D_/_/_7_Polish_-_2/image_2.png)
+
+### 개념: Animation Curve의 이해
+
+**Animation Curve**는 시간(X축)에 따른 값(Y축)의 변화를 그래프로 정의하는 도구입니다.
+
+- **X축**: 0~1 사이의 정규화된 진행도 (시작점 0, 도착점 1)
+- **Y축**: 해당 시점의 값 (높이, 속도 등)
+- **Key Points**: 그래프의 제어점 (추가/삭제/이동 가능)
+- **Tangent Handles**: 곡선의 부드러움 조절
+
+### 포물선 운동 구현 전략
+
+1. **XZ 평면 이동**: 일정한 속도로 목표 지점까지 직선 이동
+2. **Y축 높이**: Animation Curve로 제어하여 포물선 표현
+3. **정규화**: 거리에 관계없이 0~1 범위의 진행도 사용
+
+### 구현 과정
+
+### 4-1. Animation Curve 선언 및 설정
+
+```csharp
+public class GrenadeProjectile : MonoBehaviour
+{
+    // 인스펙터에서 편집 가능한 애니메이션 커브
+    [SerializeField] private AnimationCurve arcYAnimationCurve;
+
+    // 총 이동 거리 (정규화 계산용)
+    private float totalDistance;
+
+    // XZ 평면상의 현재 위치 (Y는 항상 0)
+    private Vector3 positionXZ;
+}
+```
+
+**Unity 인스펙터에서 Curve 편집:**
+
+```
+초기 설정 (포물선 모양):
+  - Key 1: Time=0.0, Value=0.6
+    (시작 시 60% 높이에서 출발)
+
+  - Key 2: Time=0.5, Value=1.0
+    (중간 지점에서 최고 높이 도달)
+
+  - Key 3: Time=1.0, Value=0.0
+    (도착 시 바닥 높이)
+
+Tangent 조정:
+  - 각 Key를 선택하여 곡선 핸들 조정
+  - 부드러운 포물선 형태 만들기
+```
+
+### 4-2. Setup 함수에서 초기값 계산
+
+```csharp
+public void Setup(GridPosition targetGridPosition, Action onGrenadeBehaviorComplete)
+{
+    this.onGrenadeBehaviorComplete = onGrenadeBehaviorComplete;
+
+    // 목표 지점의 월드 좌표 가져오기
+    targetPostion = LevelGrid.Instance.GetWorldPosition(targetGridPosition);
+
+    // 현재 위치를 XZ 평면으로 평탄화
+    positionXZ = transform.position;
+    positionXZ.y = 0;  // Y축을 0으로 만들어 평면 위치만 저장
+
+    // 시작 지점과 목표 지점 사이의 총 거리 계산
+    // 이 값은 정규화 계산에 사용됨
+    totalDistance = Vector3.Distance(positionXZ, targetPostion);
+}
+```
+
+### 4-3. Update 함수에서 포물선 이동 계산
+
+```csharp
+private void Update()
+{
+    // 1. XZ 평면에서 직선 이동 (기존 방식)
+    Vector3 moveDir = (targetPostion - positionXZ).normalized;
+    float moveSpeed = 15f;
+    positionXZ += moveDir * moveSpeed * Time.deltaTime;
+
+    // 2. 현재 거리 계산
+    float distance = Vector3.Distance(positionXZ, targetPostion);
+
+    // 3. 정규화된 진행도 계산 (0~1)
+    // 1 - (현재거리/총거리)로 반전시킴
+    // 예: 시작(먼거리) → 0, 도착(가까운거리) → 1
+    float distanceNormalized = 1 - distance / totalDistance;
+
+    // 4. 최대 높이 계산 (거리에 비례)
+    // 총 거리를 4로 나눔 → 먼 거리는 높이 올라감
+    float maxHeight = totalDistance / 4f;
+
+    // 5. Animation Curve에서 Y 위치 계산
+    // Evaluate(distanceNormalized): Curve의 X축 위치에서 Y값 추출
+    // maxHeight 곱하기: 0~1 범위를 실제 높이로 변환
+    float positionY = arcYAnimationCurve.Evaluate(distanceNormalized) * maxHeight;
+
+    // 6. 최종 위치 설정
+    // X, Z는 평면 이동 값, Y는 Curve에서 계산한 값
+    transform.position = new Vector3(positionXZ.x, positionY, positionXZ.z);
+
+    // 7. 도착 판정 및 폭발 처리
+    float reachedTargetDistance = .2f;
+    if(Vector3.Distance(positionXZ, targetPostion) < reachedTargetDistance)
+    {
+        // ... 폭발 로직 ...
+    }
+}
+
+```
+
+### 상세 동작 원리
+
+### 정규화(Normalization)의 중요성
+
+```
+예시 1: 짧은 거리 (2유닛)
+  - totalDistance = 2
+  - 시작: distance=2 → distanceNormalized=0
+  - 중간: distance=1 → distanceNormalized=0.5
+  - 도착: distance=0 → distanceNormalized=1
+
+예시 2: 긴 거리 (10유닛)
+  - totalDistance = 10
+  - 시작: distance=10 → distanceNormalized=0
+  - 중간: distance=5 → distanceNormalized=0.5
+  - 도착: distance=0 → distanceNormalized=1
+```
+
+→ 거리에 관계없이 항상 0~1 범위로 정규화되어 동일한 Curve 적용 가능
+
+### maxHeight 동적 계산
+
+```
+짧은 거리 (4유닛):
+  maxHeight = 4 / 4 = 1유닛 높이
+
+긴 거리 (16유닛):
+  maxHeight = 16 / 4 = 4유닛 높이
+```
+
+→ 거리에 비례하여 포물선 높이 자동 조절
+
+### Animation Curve의 Evaluate 함수
+
+```csharp
+// distanceNormalized = 0.5 (중간 지점)일 때
+float value = arcYAnimationCurve.Evaluate(0.5f);
+// Curve 그래프에서 X=0.5 위치의 Y값 반환
+// 예: Key 2의 값인 1.0이 반환됨
+
+// 최종 높이 계산
+positionY = 1.0 * maxHeight;
+// 최대 높이에 도달
+```
+
+# Evaluate 함수 쉬운 설명
+
+## 📊 Animation Curve란?
+
+그래프처럼 생긴 곡선입니다:
+
+```
+높이 (Y축)
+  ↑
+1.0|      ●  (중간에 최고점)
+0.6|●
+0.0|_________●
+   0   0.5   1.0  → 진행도 (X축)
+
+```
+
+## 🔍 Evaluate가 하는 일
+
+**"X 좌표를 주면, Y 값을 알려주는 함수"**
+
+```csharp
+// X 위치 0.5를 보고 싶어!
+float yValue = arcYAnimationCurve.Evaluate(0.5f);
+// → "Y값은 1.0이야!" 라고 반환
+
+// X 위치 0.0을 보고 싶어!
+float yValue = arcYAnimationCurve.Evaluate(0.0f);
+// → "Y값은 0.6이야!" 라고 반환
+
+// X 위치 1.0을 보고 싶어!
+float yValue = arcYAnimationCurve.Evaluate(1.0f);
+// → "Y값은 0.0이야!" 라고 반환
+
+```
+
+## 💡 쉬운 비유
+
+**그래프 자 같은 거예요!**
+
+1. X축에 자를 대고 (예: 0.5 위치)
+2. 위로 올라가서 곡선이랑 만나는 지점
+3. 그 높이(Y값)를 읽어주는 것
+
+```
+"0.5 지점의 높이가 궁금해!"
+→ Evaluate(0.5f)
+→ "1.0이야!"
+```
+
+**그래서 이렇게 사용:**
+
+```csharp
+float height = arcYAnimationCurve.Evaluate(진행률) * 최대높이;
+```
+
+진행률이 0.5(중간)이면 → Curve에서 1.0을 가져옴 → 최대 높이에 도달! 🚀
+
+### Animation Curve 활용 팁
+
+**다양한 궤적 만들기:**
+
+```
+1. 정상적인 포물선:
+   (0, 0.6) → (0.5, 1.0) → (1.0, 0)
+
+2. 낮게 던지기:
+   (0, 0.2) → (0.3, 0.5) → (1.0, 0)
+
+3. 수직으로 올렸다 떨어뜨리기:
+   (0, 0) → (0.5, 1.0) → (1.0, 0)
+
+4. 복잡한 궤적:
+   (0, 0.5) → (0.3, 1.0) → (0.6, 0.7) → (1.0, 0)
+```
+
+### 핵심 개념 정리
+
+- **분리된 이동 계산**: XZ는 직선, Y는 곡선으로 독립 계산
+- **정규화**: 거리에 무관하게 일관된 움직임 보장
+- **동적 높이**: 거리에 비례한 자연스러운 포물선
+- **Evaluate 함수**: X 입력 → Y 출력 변환
+
+---
+
+## 5. 랙돌 랜덤화로 자연스러운 사망 연출
+
+### 개념: 같은 이벤트에 다른 반응 만들기
+
+동일한 폭발로 여러 적이 동시에 죽을 때, 모두 똑같은 방향으로 쓰러지면 부자연스럽습니다. 작은 랜덤 변화로 각 캐릭터가 다르게 반응하도록 만들 수 있습니다.
+
+### 구현 과정
+
+### 5-1. 랜덤 방향 벡터 생성
+
+```csharp
+public class UnitRagdoll : MonoBehaviour
+{
+    public void Setup(Transform originalRootBone)
+    {
+        // 1. 본 위치/회전 복사
+        MatchAllChildTransforms(originalRootBone, ragdollRootBone);
+
+        // 2. 랜덤 방향 벡터 생성
+        Vector3 randomDir = new Vector3(
+            Random.Range(-1f, 1f),  // X: -1 ~ +1 사이 무작위
+            0,                       // Y: 0 (수평 방향만)
+            Random.Range(-1f, 1f)   // Z: -1 ~ +1 사이 무작위
+        );
+
+        // 3. 폭발력 적용 (원래 위치에서 약간 벗어난 곳에서 폭발)
+        ApplyExplosionToRagdll(
+            ragdollRootBone,
+            300f,                              // 폭발 힘
+            transform.position + randomDir,    // 폭발 중심점
+            10f                                // 폭발 반경
+        );
+    }
+}
+```
+
+### 5-2. Random.Range의 중요한 주의사항
+
+```csharp
+// ❌ 잘못된 사용 (정수 버전 호출)
+Random.Range(-1, 1)
+// 결과: -1 또는 0만 반환됨 (정수는 최대값 미포함)
+
+// ✅ 올바른 사용 (실수 버전 호출)
+Random.Range(-1f, 1f)
+// 결과: -1.0 ~ +1.0 사이의 모든 실수 값
+// 예: -0.73, 0.42, -0.15, 0.89 등
+```
+
+**왜 'f'를 붙여야 하는가?**
+
+- `1`은 정수 리터럴 → `Random.Range(int, int)` 호출
+- `1f`는 실수 리터럴 → `Random.Range(float, float)` 호출
+- 정수 버전은 [min, max) 범위 (최대값 미포함)
+- 실수 버전은 [min, max] 범위 (최대값 포함)
+
+### 5-3. 폭발 중심점에 랜덤성 추가
+
+```csharp
+// 원래 코드: 캐릭터 발 위치에서 폭발
+ApplyExplosionToRagdll(ragdollRootBone, 300f, transform.position, 10f);
+
+// 개선된 코드: 발 위치 + 랜덤 오프셋
+ApplyExplosionToRagdll(ragdollRootBone, 300f, transform.position + randomDir, 10f);
+```
+
+**효과:**
+
+```
+캐릭터 A: 폭발 중심이 (-0.5, 0, 0.3) 오프셋
+  → 왼쪽 뒤로 날아감
+
+캐릭터 B: 폭발 중심이 (0.7, 0, -0.4) 오프셋
+  → 오른쪽 앞으로 날아감
+
+캐릭터 C: 폭발 중심이 (0.1, 0, 0.9) 오프셋
+  → 거의 정면으로 날아감
+```
+
+### 5-4. AddExplosionForce 함수의 동작 원리
+
+```csharp
+private void ApplyExplosionToRagdll(
+    Transform root,
+    float explosionForce,      // 폭발 힘의 크기
+    Vector3 explosionPosition, // 폭발이 발생한 위치
+    float explosionRange       // 영향을 받는 반경
+)
+{
+    foreach (Transform child in root)
+    {
+        if (child.TryGetComponent<Rigidbody>(out Rigidbody childRigidbody))
+        {
+            // 폭발력 적용
+            // 각 Rigidbody에 폭발 중심에서 멀어지는 방향으로 힘 가해짐
+            childRigidbody.AddExplosionForce(
+                explosionForce,
+                explosionPosition,
+                explosionRange
+            );
+        }
+
+        // 재귀 호출로 모든 자식 본에 적용
+        ApplyExplosionToRagdll(child, explosionForce, explosionPosition, explosionRange);
+    }
+}
+```
+
+**AddExplosionForce의 내부 계산:**
+
+```
+1. 거리 계산:
+   distance = Vector3.Distance(rigidbody.position, explosionPosition)
+
+2. 방향 계산:
+   direction = (rigidbody.position - explosionPosition).normalized
+
+3. 힘의 크기 계산 (거리 반비례):
+   forceMagnitude = explosionForce * (1 - distance / explosionRange)
+
+4. 최종 힘 적용:
+   force = direction * forceMagnitude
+   rigidbody.AddForce(force)
+```
+
+### 시각적 차이 비교
+
+**랜덤화 이전:**
+
+```
+수류탄 폭발 → 모든 적이 정확히 같은 방향으로 쓰러짐
+→ 인형극 같은 부자연스러운 느낌
+```
+
+**랜덤화 이후:**
+
+```
+수류탄 폭발 → 각 적이 조금씩 다른 방향으로 날아감
+→ 실제 폭발의 혼란스러운 느낌
+```
+
+### 추가 개선 아이디어
+
+**더 복잡한 랜덤화 (강의에서 언급된 가능성):**
+
+```csharp
+// 폭발 중심에서 각 캐릭터까지의 방향 계산
+Vector3 directionFromExplosion = (transform.position - grenadePosition).normalized;
+
+// 계산된 방향으로 날아가도록
+ApplyExplosionToRagdll(ragdollRootBone, 300f, grenadePosition, 10f);
+```
+
+→ 더 현실적이지만 구현이 복잡
+→ 간단한 랜덤 오프셋으로도 충분히 자연스러움
+
+### 핵심 개념 정리
+
+- **작은 랜덤성**: 큰 변화 없이도 자연스러움 향상
+- **Random.Range(float, float)**: 'f' 접미사로 실수 범위 사용
+- **Y축 고정**: 수평 방향만 랜덤하게 하여 비현실적 움직임 방지
+- **폭발 중심 오프셋**: 같은 폭발도 각 개체에 다르게 영향
+
+---
+
+## 🎓 전체 강의 핵심 요약
+
+### 구현한 기능들
+
+1. **화면 흔들림**: Static Event로 폭발 충격 전달
+2. **폭발 VFX**: 파티클 시스템의 세밀한 조정
+3. **수류탄 궤적**: Trail Renderer로 비행 경로 표시
+4. **포물선 던지기**: Animation Curve로 자연스러운 궤적
+5. **랜덤 랙돌**: 작은 변화로 큰 자연스러움
+
+### 주요 학습 내용
+
+- **Static Event**: 클래스 레벨의 전역 이벤트 시스템
+- **파티클 시스템**: Burst, Trail, 다양한 설정의 조합
+- **Animation Curve**: 시간에 따른 값 변화를 그래프로 제어
+- **정규화**: 0~1 범위로 변환하여 일관된 동작 보장
+- **랜덤성**: Random.Range(float) vs Random.Range(int) 차이
+- **분리된 축 제어**: XZ 직선 + Y 곡선 = 포물선
+
+### 실무 응용 팁
+
+1. **파티클 최적화**: 너무 많은 파티클은 성능 저하
+2. **Curve 재사용**: 다양한 발사체에 같은 Curve 활용 가능
+3. **랜덤 시드**: 필요시 Random.InitState()로 재현 가능한 랜덤
+4. **Stop Action**: 자동 정리로 메모리 누수 방지
+
+이번 강의를 통해 단순한 기능에서 완성도 높은 게임플레이로 발전시키는 폴리싱(Polishing) 과정을 배웠습니다!
+
+# { 🎮 파괴 가능한 상자와 경로 탐색 업데이트 시스템 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380477/notion-blog/_/3D_/_/_7_Polish_-_2/image_3.png)
+
+이번 강의는 수류탄으로 파괴할 수 있는 상자를 만들고, 상자가 파괴되면 자동으로 경로 탐색 시스템을 업데이트하여 해당 위치를 이동 가능하게 만드는 시스템 구현
+
+---
+
+## 📋 목차
+
+1. [파괴 가능한 상자(Crate) 기본 설정하기](https://claude.ai/chat/dfa8223f-f112-4537-bb71-109b48c0e616#1-%ED%8C%8C%EA%B4%B4-%EA%B0%80%EB%8A%A5%ED%95%9C-%EC%83%81%EC%9E%90crate-%EA%B8%B0%EB%B3%B8-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+2. [상자 콜라이더 설정과 경로 차단 구현](https://claude.ai/chat/dfa8223f-f112-4537-bb71-109b48c0e616#2-%EC%83%81%EC%9E%90-%EC%BD%9C%EB%9D%BC%EC%9D%B4%EB%8D%94-%EC%84%A4%EC%A0%95%EA%B3%BC-%EA%B2%BD%EB%A1%9C-%EC%B0%A8%EB%8B%A8-%EA%B5%AC%ED%98%84)
+3. [DestructibleCrate 스크립트 작성](https://claude.ai/chat/dfa8223f-f112-4537-bb71-109b48c0e616#3-destructiblecrate-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%9E%91%EC%84%B1)
+4. [수류탄으로 상자 파괴 기능 추가](https://claude.ai/chat/dfa8223f-f112-4537-bb71-109b48c0e616#4-%EC%88%98%EB%A5%98%ED%83%84%EC%9C%BC%EB%A1%9C-%EC%83%81%EC%9E%90-%ED%8C%8C%EA%B4%B4-%EA%B8%B0%EB%8A%A5-%EC%B6%94%EA%B0%80)
+5. [경로 탐색 업데이트 설계 패턴 이해하기](https://claude.ai/chat/dfa8223f-f112-4537-bb71-109b48c0e616#5-%EA%B2%BD%EB%A1%9C-%ED%83%90%EC%83%89-%EC%97%85%EB%8D%B0%EC%9D%B4%ED%8A%B8-%EC%84%A4%EA%B3%84-%ED%8C%A8%ED%84%B4-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+6. [PathfindingUpdater 스크립트 구현](https://claude.ai/chat/dfa8223f-f112-4537-bb71-109b48c0e616#6-pathfindingupdater-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EA%B5%AC%ED%98%84)
+7. [Pathfinding 시스템에 SetIsWalkable 함수 추가](https://claude.ai/chat/dfa8223f-f112-4537-bb71-109b48c0e616#7-pathfinding-%EC%8B%9C%EC%8A%A4%ED%85%9C%EC%97%90-setiswalkable-%ED%95%A8%EC%88%98-%EC%B6%94%EA%B0%80)
+8. [전체 시스템 통합 및 테스트](https://claude.ai/chat/dfa8223f-f112-4537-bb71-109b48c0e616#8-%EC%A0%84%EC%B2%B4-%EC%8B%9C%EC%8A%A4%ED%85%9C-%ED%86%B5%ED%95%A9-%EB%B0%8F-%ED%85%8C%EC%8A%A4%ED%8A%B8)
+
+---
+
+## 1. 파괴 가능한 상자(Crate) 기본 설정하기
+
+### 상자 오브젝트 생성
+
+- **빈 게임 오브젝트 생성**: Hierarchy에서 Create Empty → 이름을 "Crate"로 변경
+- 이 오브젝트가 **부모(Parent)** 역할을 하며, 실제 시각적 요소는 자식으로 추가
+
+### 비주얼 모델 추가
+
+- **Polygon Prototype 에셋 활용**:
+  - 프로젝트 초반에 임포트한 에셋 팩 사용
+  - 경로: `Polygon Prototype → Prefabs → Props`
+  - `Crate_01` 프리팹을 선택하여 Crate 오브젝트의 **자식**으로 드래그
+
+### 크기와 위치 조정
+
+- **스케일 조정**:
+  - Crate_01(자식 오브젝트) 선택
+  - Scale을 X, Y, Z 모두 **1.2**로 설정
+  - 더 크고 눈에 잘 띄는 상자가 됨
+- **위치 조정**:
+  - 부모 Crate 오브젝트 선택
+  - Y Position을 **0**으로 설정 (바닥에 맞춤)
+  - 상자를 살짝 들어올리기 위해 Y를 **+0.6**만큼 이동
+  - 이유: 상자의 절반 높이만큼 올려서 바닥에 자연스럽게 놓이도록
+- **스냅 기능 끄기**:
+  - Scene View에서 자석 아이콘 클릭하여 비활성화
+  - 더 정밀한 위치 조정 가능
+
+### 재질(Material) 변경 (선택사항)
+
+- **기본 재질 변경**:
+  - Crate_01 오브젝트의 Material을 변경 가능
+  - 예시: `Texture_05` 선택 → 주황색 계열로 변경
+  - 기본 노란색보다 어둡고 다른 느낌 제공
+
+---
+
+## 2. 상자 콜라이더 설정과 경로 차단 구현
+
+### 비주얼 오브젝트 최적화
+
+- **Mesh Collider 제거**:
+  - Crate_01(자식) 오브젝트의 Mesh Collider 컴포넌트 삭제
+  - 이유: 시각적 요소는 렌더링만 담당하도록 분리
+
+### 부모 오브젝트에 콜라이더 추가
+
+- **Box Collider 추가**:
+  - 부모 Crate 오브젝트 선택
+  - `Add Component → Box Collider`
+  - 이유: 충돌 검사와 경로 차단을 부모 오브젝트에서 통합 관리
+
+### 콜라이더 크기와 위치 설정
+
+- **Size 설정**:
+  - 자식 오브젝트와 동일하게 **1.2**로 설정
+  - X, Y, Z 모두 1.2
+- **Center 위치 설정**:
+  - Y축 Center를 **0.6**으로 설정
+  - 자식 오브젝트의 위치 조정과 일치시킴
+  - 콜라이더가 실제 시각적 모델과 정확히 겹치도록
+
+### 레이어 설정으로 경로 차단
+
+- **Obstacles 레이어 적용**:
+  - Crate 오브젝트의 Layer를 **"Obstacles"**로 변경
+  - "Change children too?" 다이얼로그가 나오면 **Yes** 선택
+  - 자식 오브젝트도 함께 레이어 변경됨
+- **경로 차단 원리**:
+  - Pathfinding 시스템은 Setup 단계에서 **Raycast**를 사용
+  - `obstaclesLayerMask`에 설정된 레이어만 감지
+  - Obstacles 레이어의 오브젝트가 있는 위치는 **IsWalkable = false**로 설정됨
+
+### 테스트
+
+- **프리팹 생성**:
+  - Crate 오브젝트를 Prefabs 폴더로 드래그하여 프리팹 생성
+  - 나중에 여러 개 배치 가능
+- **Play Mode 테스트**:
+  - 씬에 Crate 배치
+  - Move Action으로 해당 위치 선택 시도
+  - **결과**: 빨간색(이동 불가)으로 표시됨
+  - 유닛이 상자를 피해서 이동함
+
+---
+
+## 3. DestructibleCrate 스크립트 작성
+
+### 스크립트 생성과 연결
+
+- **새 스크립트 생성**:
+  - Crate 오브젝트에 `Create Component → New Script`
+  - 이름: `DestructibleCrate`
+  - 자동으로 컴포넌트에 추가됨
+
+### 이벤트 시스템 구현
+
+```csharp
+using System;
+using UnityEngine;
+
+public class DestructibleCrate : MonoBehaviour
+{
+    // 정적 이벤트: 어떤 상자든 파괴될 때 발생
+    public static event EventHandler OnAnyDestroyed;
+
+    private GridPosition gridPosition;
+```
+
+- **static event EventHandler OnAnyDestroyed**:
+  - `static`: 특정 인스턴스가 아닌 **클래스 전체**에서 발생하는 이벤트
+  - `OnAny` 네이밍: "어떤 상자든"이라는 의미
+  - 어느 상자가 파괴되든 하나의 이벤트로 처리
+  - **EventHandler**: System 네임스페이스의 표준 이벤트 델리게이트 타입
+- **gridPosition 변수**:
+  - 이 상자가 그리드의 어느 위치에 있는지 저장
+  - private: 외부에서 직접 수정 불가
+
+**static 설**
+
+**non-static 이벤트** = 각 상자마다 개별 알람
+
+- 상자A가 파괴되면 → 상자A의 알람이 울림
+- 상자B가 파괴되면 → 상자B의 알람이 울림
+- 문제: 10개 상자가 있으면 10개 알람에 각각 구독해야 함 😓
+
+**static 이벤트** = 모든 상자가 공유하는 하나의 알람
+
+- 상자A 파괴 → 공용 알람 울림
+- 상자B 파괴 → 같은 공용 알람 울림
+- 장점: **한 번만 구독**하면 어떤 상자든 파괴 감지 가능 ✨
+
+---
+
+### 왜 이렇게 하나?
+
+```csharp
+// static 없으면 이렇게 해야 함 (귀찮음)
+crate1.OnDestroyed += Update;
+crate2.OnDestroyed += Update;
+crate3.OnDestroyed += Update;
+// ... 상자마다 일일이 구독
+
+// static 이면 (간편함)
+DestructibleCrate.OnAnyDestroyed += Update;
+// 끝! 모든 상자 커버됨
+
+```
+
+PathfindingUpdater는 "**어떤 상자가 부서졌는지**"만 알면 되지, "**특정 상자**"를 추적할 필요가 없으니까 static으로 만든 거야.
+
+### 초기화 함수
+
+```csharp
+    private void Start()
+    {
+        // 상자의 월드 좌표를 그리드 좌표로 변환하여 저장
+        gridPosition = LevelGrid.Instance.GetGridPosition(transform.position);
+    }
+```
+
+- **Start() 타이밍**: 게임 시작 시 한 번만 실행
+- **LevelGrid.Instance.GetGridPosition()**:
+  - 월드 좌표(World Position)를 그리드 좌표(Grid Position)로 변환
+  - 예: 월드 좌표 (5.0f, 0f, 7.0f) → 그리드 좌표 (5, 7)
+
+### 그리드 위치 반환 함수
+
+```csharp
+    public GridPosition GetGridPosition()
+    {
+        return gridPosition;
+    }
+```
+
+- **public**: 외부에서 이 상자의 그리드 위치를 알아야 할 때 사용
+- 단순히 저장된 값을 반환
+
+### 데미지 처리 함수
+
+```csharp
+    public void Damage()
+    {
+        // 게임 오브젝트 파괴
+        Destroy(gameObject);
+
+        // 이벤트 발생 (안전한 호출 방식)
+        OnAnyDestroyed?.Invoke(this, EventArgs.Empty);
+    }
+}
+```
+
+- **Destroy(gameObject)**:
+  - Unity 내장 함수
+  - 이 스크립트가 붙은 게임 오브젝트를 씬에서 제거
+  - 즉시 제거되는 것이 아니라 프레임 종료 시 제거됨
+- **OnAnyDestroyed?.Invoke()**:
+  - `?.` (Null-conditional operator): 이벤트에 구독자가 있으면 호출, 없으면 무시
+  - `this`: 파괴된 상자 자신을 sender로 전달
+  - `EventArgs.Empty`: 추가 데이터 없음을 의미
+- **설계 선택: 체력 시스템 vs 즉시 파괴**:
+  - 강의에서는 간단하게 **즉시 파괴** 방식 선택
+  - 체력 바 시스템도 가능하지만 더 복잡함
+
+---
+
+## 4. 수류탄으로 상자 파괴 기능 추가
+
+### GrenadeProjectile 스크립트 수정
+
+- **기존 수류탄 동작**:
+  - 날아가서 폭발
+  - 폭발 범위 내 유닛에게 데미지
+  - 이제 **상자도 파괴**하도록 기능 추가
+
+### Update() 함수 내 충돌 검사 부분 수정
+
+```csharp
+private void Update()
+{
+    // ... 수류탄 이동 로직 ...
+
+    float reachedTargetDistance = .2f;
+    if(Vector3.Distance(positionXZ, targetPostion) < reachedTargetDistance)
+    {
+        // 폭발 범위 설정
+        float damageRadius = 4f;
+
+        // 폭발 범위 내 모든 Collider 탐색
+        Collider[] colliderArray = Physics.OverlapSphere(targetPostion, damageRadius);
+
+        foreach(Collider collider in colliderArray)
+        {
+            // 유닛 데미지 처리 (기존 코드)
+            if (collider.TryGetComponent<Unit>(out Unit targetUnit))
+            {
+                targetUnit.Damage(30);
+            }
+
+            // 상자 파괴 처리 (새로 추가된 코드)
+            if (collider.TryGetComponent<DestructibleCrate>(out DestructibleCrate destructibleCrate))
+            {
+                destructibleCrate.Damage();
+            }
+        }
+
+        // ... 나머지 폭발 처리 ...
+    }
+}
+```
+
+### 코드 상세 설명
+
+**Physics.OverlapSphere() 이해**:
+
+```csharp
+Collider[] colliderArray = Physics.OverlapSphere(targetPostion, damageRadius);
+```
+
+- **기능**: 특정 위치를 중심으로 구(Sphere) 모양의 범위 내 모든 Collider 찾기
+- **targetPosition**: 수류탄이 폭발한 위치 (Vector3)
+- **damageRadius**: 폭발 반경 (4f = 4 Unity Units)
+- **반환값**: 범위 내 모든 Collider 배열
+
+**TryGetComponent 패턴**:
+
+```csharp
+if (collider.TryGetComponent<DestructibleCrate>(out DestructibleCrate destructibleCrate))
+{
+    destructibleCrate.Damage();
+}
+```
+
+- **TryGetComponent<T>()**:
+  - 해당 Collider의 게임 오브젝트에 T 컴포넌트가 있는지 확인
+  - 있으면 `true` 반환하고 `out` 매개변수에 컴포넌트 할당
+  - 없으면 `false` 반환
+
+### **TryGetComponent out?** (2번 찾기)
+
+```csharp
+// 1번째: 있는지 확인
+if (collider.GetComponent<DestructibleCrate>() != null)
+{
+    // 2번째: 다시 찾아서 가져오기 (중복!)
+    DestructibleCrate crate = collider.GetComponent<DestructibleCrate>();
+    crate.Damage();
+}
+
+```
+
+- GetComponent()를 **2번 호출** = 비효율적 🐌
+- 컴포넌트 찾기는 비용이 큰 작업
+
+---
+
+### TryGetComponent (1번에 해결)
+
+```csharp
+// 한 번에: 확인 + 가져오기
+if (collider.TryGetComponent<DestructibleCrate>(out DestructibleCrate crate))
+{
+    crate.Damage(); // 바로 사용
+}
+
+```
+
+- 컴포넌트를 **찾으면서 동시에 변수에 저장**
+- 1번만 찾으면 됨 = 성능 향상 ⚡
+
+---
+
+### out 매개변수의 역할
+
+```csharp
+out DestructibleCrate crate
+```
+
+- **out**: "이 변수에 결과를 담아서 돌려줄게"라는 의미
+- 함수가 **2가지를 반환**하는 셈:
+  1. `true/false` (있냐 없냐)
+  2. `crate` 변수 (찾은 컴포넌트)
+
+**결론**: 효율성 + 편의성을 동시에 잡은 패턴
+
+- **장점**:
+  - GetComponent()보다 안전
+  - null 체크 불필요
+  - 컴포넌트 존재 여부 확인과 할당을 한 번에
+- **실행 흐름**:
+  1. 폭발 범위 내 Collider 발견
+  2. DestructibleCrate 컴포넌트가 있는지 확인
+  3. 있으면 해당 상자의 Damage() 함수 호출
+  4. 상자 파괴 및 이벤트 발생
+
+### 테스트 결과
+
+- 수류탄을 상자 근처에 던지면:
+  - 폭발 발생
+  - 상자가 씬에서 사라짐 (Destroy 호출)
+  - **문제점**: 경로 탐색이 업데이트되지 않음
+  - 상자가 사라져도 여전히 이동 불가 지역으로 표시됨
+
+---
+
+## 5. 경로 탐색 업데이트 설계 패턴 이해하기
+
+### 문제 상황
+
+- 상자는 파괴되지만 Pathfinding 시스템이 이를 모름
+- 해당 그리드 위치가 여전히 `IsWalkable = false` 상태
+- 상자가 없어져도 유닛이 그 위치로 이동할 수 없음
+
+### 설계 접근법 3가지
+
+**접근법 1: DestructibleCrate에서 직접 Pathfinding 업데이트**
+
+```csharp
+// 이런 방식 (사용하지 않음)
+public void Damage()
+{
+    Destroy(gameObject);
+    Pathfinding.Instance.SetIsWalkable(gridPosition, true);
+}
+```
+
+- **장점**: 간단하고 직관적
+- **단점**:
+  - **강한 결합(Tight Coupling)**: DestructibleCrate가 Pathfinding을 직접 알아야 함
+  - 상자 스크립트가 경로 탐색 시스템에 **의존**하게 됨
+  - 재사용성과 유지보수성 저하
+
+**접근법 2: Pathfinding이 DestructibleCrate 이벤트 직접 구독**
+
+```csharp
+// Pathfinding.cs에서 (사용하지 않음)
+void Start()
+{
+    DestructibleCrate.OnAnyDestroyed += HandleCrateDestroyed;
+}
+```
+
+- **장점**: DestructibleCrate는 독립적으로 유지
+- **단점**:
+  - Pathfinding이 DestructibleCrate를 알아야 함
+  - Pathfinding의 책임이 너무 많아짐
+  - 다른 파괴 가능한 오브젝트 추가 시 Pathfinding 수정 필요
+
+**접근법 3: 중간 매개자 스크립트 사용 (선택된 방식)**
+
+```
+DestructibleCrate → (이벤트) → PathfindingUpdater → Pathfinding
+```
+
+- **장점**:
+  - **느슨한 결합(Loose Coupling)**: 각 클래스가 서로를 직접 모름
+  - **단일 책임 원칙**: PathfindingUpdater만 두 시스템을 연결하는 책임
+  - **확장성**: 새로운 파괴 가능한 오브젝트 추가 시 PathfindingUpdater만 수정
+
+### ScreenShake 예시와의 유사성
+
+- **ScreenShakeAction**:
+  - 다양한 액션(슈팅, 폭발 등)이 화면 흔들림 필요
+  - 각 액션이 ScreenShake를 직접 호출하지 않음
+  - 이벤트를 발생시키고, 중간 스크립트가 처리
+- **같은 패턴 적용**:
+  - DestructibleCrate: 파괴 이벤트만 발생
+  - PathfindingUpdater: 이벤트를 듣고 Pathfinding 업데이트
+  - Pathfinding: 업데이트 함수만 제공
+
+---
+
+## 6. PathfindingUpdater 스크립트 구현
+
+### 스크립트 생성
+
+- **새 스크립트 생성**:
+  - Project 창에서 `Create → C# Script`
+  - 이름: `PathfindingUpdater`
+- **새 게임 오브젝트 생성**:
+  - Hierarchy에서 `Create Empty`
+  - 이름: `PathfindingUpdater`
+  - Transform 리셋 (Position, Rotation 모두 0)
+  - 스크립트 컴포넌트 추가
+
+### 전체 코드
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class PathfindingUpdater : MonoBehaviour
+{
+    private void Start()
+    {
+        // DestructibleCrate의 정적 이벤트에 구독
+        DestructibleCrate.OnAnyDestroyed += DestructibleCrate_OnAnyDestroyed;
+    }
+
+    // 이벤트 핸들러: 상자가 파괴될 때 호출됨
+    private void DestructibleCrate_OnAnyDestroyed(object sender, System.EventArgs e)
+    {
+        // sender를 DestructibleCrate 타입으로 캐스팅
+        DestructibleCrate destructibleCrate = sender as DestructibleCrate;
+
+        // Pathfinding 시스템에 해당 위치를 이동 가능하게 설정
+        Pathfinding.Instance.SetIsWalkableGridPosition(
+            destructibleCrate.GetGridPosition(),
+            true
+        );
+    }
+}
+```
+
+### 코드 상세 설명
+
+**이벤트 구독 (Start)**:
+
+```csharp
+DestructibleCrate.OnAnyDestroyed += DestructibleCrate_OnAnyDestroyed;
+```
+
+- **+= 연산자**: 이벤트에 함수를 "구독"
+- **정적 이벤트 구독**: 클래스 이름으로 접근
+- Start()에서 구독: 게임 시작 시 한 번만 설정
+
+**이벤트 핸들러 함수**:
+
+```csharp
+private void DestructibleCrate_OnAnyDestroyed(object sender, System.EventArgs e)
+```
+
+- **EventHandler 시그니처**: `(object sender, EventArgs e)`
+  - `sender`: 이벤트를 발생시킨 객체
+  - `e`: 추가 이벤트 데이터 (여기서는 사용 안 함)
+
+**타입 캐스팅**:
+
+```csharp
+DestructibleCrate destructibleCrate = sender as DestructibleCrate;
+```
+
+- **as 연산자**: 안전한 타입 변환
+- `sender`는 `object` 타입이지만 실제로는 `DestructibleCrate`
+- 변환 실패 시 `null` 반환 (예외 발생 안 함)
+- 성공하면 DestructibleCrate의 메서드 사용 가능
+
+**경로 탐색 업데이트 호출**:
+
+```csharp
+Pathfinding.Instance.SetIsWalkableGridPosition(
+    destructibleCrate.GetGridPosition(),
+    true
+);
+```
+
+- **Pathfinding.Instance**: 싱글톤 패턴으로 접근
+- **SetIsWalkableGridPosition()**: 다음 섹션에서 구현할 함수
+- **첫 번째 인자**: 업데이트할 그리드 위치
+- **두 번째 인자**: `true` = 이동 가능하게 설정
+
+---
+
+## 7. Pathfinding 시스템에 SetIsWalkable 함수 추가
+
+### 기존 IsWalkableGridPosition 함수 확인
+
+```csharp
+public bool IsWalkableGridPosition(GridPosition gridPosition)
+{
+    return gridSystem.GetGridObject(gridPosition).IsWalkable();
+}
+```
+
+- **기능**: 특정 그리드 위치가 이동 가능한지 **확인**만 함
+- **반환값**: bool (true/false)
+- **읽기 전용**: 상태를 변경하지 않음
+
+### 새로운 Set 함수 추가
+
+```csharp
+public void SetIsWalkableGridPosition(GridPosition gridPosition, bool isWalkable)
+{
+    gridSystem.GetGridObject(gridPosition).SetIsWalkable(isWalkable);
+}
+```
+
+### 함수 상세 설명
+
+**매개변수**:
+
+- **gridPosition**: 변경할 그리드 위치
+  - GridPosition 구조체 (x, z 좌표)
+- **isWalkable**: 설정할 값
+  - `true`: 이동 가능
+  - `false`: 이동 불가
+
+**실행 과정**:
+
+1. **gridSystem.GetGridObject(gridPosition)**:
+   - GridSystem에서 해당 위치의 PathNode 가져오기
+   - PathNode: 경로 탐색에 사용되는 노드 객체
+2. **.SetIsWalkable(isWalkable)**:
+   - PathNode의 이동 가능 상태 변경
+   - 내부적으로 `isWalkable` 변수를 업데이트
+
+### PathNode 클래스 구조 (참고)
+
+```csharp
+// PathNode.cs (강의에서 직접 다루지 않지만 이해를 위해)
+public class PathNode
+{
+    private GridPosition gridPosition;
+    private bool isWalkable = true; // 기본값은 이동 가능
+
+    public bool IsWalkable()
+    {
+        return isWalkable;
+    }
+
+    public void SetIsWalkable(bool isWalkable)
+    {
+        this.isWalkable = isWalkable;
+    }
+}
+```
+
+### Pathfinding의 책임
+
+- **Setup() 단계**: 초기 이동 가능 여부 설정
+  - Raycast로 장애물 감지
+  - Obstacles 레이어의 오브젝트 위치를 이동 불가로 설정
+- **런타임 업데이트**: 동적으로 변경
+  - 상자 파괴 시 이동 가능하게
+  - 새로운 장애물 생성 시 이동 불가하게
+
+---
+
+## 8. 전체 시스템 통합 및 테스트
+
+### 실행 흐름 정리
+
+```
+1. 게임 시작
+   ↓
+2. Pathfinding.Setup() 실행
+   - 상자 위치가 이동 불가로 설정됨 (Raycast 감지)
+   ↓
+3. PathfindingUpdater.Start() 실행
+   - DestructibleCrate.OnAnyDestroyed 이벤트 구독
+   ↓
+4. 플레이어가 수류탄 투척
+   ↓
+5. GrenadeProjectile.Update()
+   - 폭발 범위 내 DestructibleCrate 감지
+   - destructibleCrate.Damage() 호출
+   ↓
+6. DestructibleCrate.Damage()
+   - Destroy(gameObject) 실행
+   - OnAnyDestroyed 이벤트 발생
+   ↓
+7. PathfindingUpdater.DestructibleCrate_OnAnyDestroyed()
+   - 파괴된 상자의 그리드 위치 가져오기
+   - Pathfinding.SetIsWalkableGridPosition(위치, true) 호출
+   ↓
+8. Pathfinding 시스템 업데이트
+   - 해당 그리드 위치의 PathNode.isWalkable = true
+   ↓
+9. 결과
+   - MoveAction에서 해당 위치가 초록색(이동 가능)으로 표시
+   - 유닛이 그 위치로 이동 가능
+```
+
+### 테스트 시나리오
+
+**초기 상태 확인**:
+
+1. Play Mode 진입
+2. 상자가 배치된 위치 확인
+3. Move Action 선택
+4. 상자 위치 클릭 시도
+   - **결과**: 빨간색, 이동 불가
+
+**상자 파괴 후 확인**:
+
+1. Grenade Action 선택
+2. 상자 근처에 수류탄 투척
+3. 수류탄 폭발
+   - **시각적 효과**: 폭발 파티클
+   - **상자**: 씬에서 사라짐
+4. Move Action 선택
+5. 이전 상자 위치 클릭
+   - **결과**: 초록색, 이동 가능
+6. 유닛이 해당 위치로 이동
+   - **확인**: 정상적으로 이동 완료
+
+### 게임 디자인 활용 예시
+
+**비밀 경로 만들기**:
+
+- 상자들로 막혀있는 길
+- 수류탄으로 파괴하면 지름길 발견
+- 전략적 요소 추가
+
+**적 차단 전술**:
+
+- 상자를 이용해 적의 이동 차단
+- 필요 시 파괴하여 아군 이동 경로 확보
+
+**레벨 디자인**:
+
+- 초반: 상자로 막힌 구역
+- 후반: 수류탄 획득 후 접근 가능
+- 단계적 맵 개방
+
+### 남은 개선 사항
+
+- **시각적 피드백**: 현재는 상자가 그냥 사라짐
+- **다음 강의 예고**:
+  - 파괴 파티클 효과 추가
+  - 파편(Debris) 시스템 구현
+  - 만족스러운 파괴 연출 완성
+
+### 핵심 개념 정리
+
+**이벤트 기반 시스템**:
+
+- 클래스 간 직접 참조 최소화
+- 이벤트로 느슨하게 연결
+- 유지보수와 확장성 향상
+
+**싱글톤 패턴 활용**:
+
+- Pathfinding.Instance
+- LevelGrid.Instance
+- 전역적으로 접근 가능한 시스템
+
+**TryGetComponent 패턴**:
+
+- 안전한 컴포넌트 접근
+- null 체크 간소화
+- 성능 효율적
+
+**그리드 기반 시스템**:
+
+- 월드 좌표 ↔ 그리드 좌표 변환
+- PathNode로 이동 가능 여부 관리
+- 동적 업데이트 지원
+
+이 시스템은 간단해 보이지만 **확장 가능한 아키텍처**를 보여주는 좋은 예시입니다. 새로운 파괴 가능한 오브젝트를 추가할 때도 같은 패턴을 적용할 수 있습니다.
+
+# { 🧊 상자 메쉬 파괴 시스템 구현하기 }
+
+이번 강의는 Unity의 ProBuilder를 사용해 상자(Crate)를 여러 조각으로 분해하고, 폭발 시 물리 효과를 적용하는 시각적 파괴 시스템을 구현하는 내용입니다.
+
+## 📋 목차
+
+1. [ProBuilder 패키지 설치하기](https://claude.ai/chat/6879da57-455e-47c5-a481-c5a8bf8aa329#1-probuilder-%ED%8C%A8%ED%82%A4%EC%A7%80-%EC%84%A4%EC%B9%98%ED%95%98%EA%B8%B0)
+2. [파괴용 프리팹 준비하기](https://claude.ai/chat/6879da57-455e-47c5-a481-c5a8bf8aa329#2-%ED%8C%8C%EA%B4%B4%EC%9A%A9-%ED%94%84%EB%A6%AC%ED%8C%B9-%EC%A4%80%EB%B9%84%ED%95%98%EA%B8%B0)
+3. [ProBuilder로 메쉬 변환하기](https://claude.ai/chat/6879da57-455e-47c5-a481-c5a8bf8aa329#3-probuilder%EB%A1%9C-%EB%A9%94%EC%89%AC-%EB%B3%80%ED%99%98%ED%95%98%EA%B8%B0)
+4. [Boolean 연산으로 메쉬 자르기](https://claude.ai/chat/6879da57-455e-47c5-a481-c5a8bf8aa329#4-boolean-%EC%97%B0%EC%82%B0%EC%9C%BC%EB%A1%9C-%EB%A9%94%EC%89%AC-%EC%9E%90%EB%A5%B4%EA%B8%B0)
+5. [여러 조각으로 상자 분할하기](https://claude.ai/chat/6879da57-455e-47c5-a481-c5a8bf8aa329#5-%EC%97%AC%EB%9F%AC-%EC%A1%B0%EA%B0%81%EC%9C%BC%EB%A1%9C-%EC%83%81%EC%9E%90-%EB%B6%84%ED%95%A0%ED%95%98%EA%B8%B0)
+6. [물리 컴포넌트 추가하기](https://claude.ai/chat/6879da57-455e-47c5-a481-c5a8bf8aa329#6-%EB%AC%BC%EB%A6%AC-%EC%BB%B4%ED%8F%AC%EB%84%8C%ED%8A%B8-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+7. [양면 렌더링 설정하기](https://claude.ai/chat/6879da57-455e-47c5-a481-c5a8bf8aa329#7-%EC%96%91%EB%A9%B4-%EB%A0%8C%EB%8D%94%EB%A7%81-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+8. [폭발 효과 코드 구현하기](https://claude.ai/chat/6879da57-455e-47c5-a481-c5a8bf8aa329#8-%ED%8F%AD%EB%B0%9C-%ED%9A%A8%EA%B3%BC-%EC%BD%94%EB%93%9C-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. ProBuilder 패키지 설치하기
+
+### ProBuilder란?
+
+- **ProBuilder**: Unity 내장 메쉬 편집 도구
+- 3D 모델을 직접 수정하거나 분할하는 작업을 Unity 에디터 안에서 수행 가능
+- 메쉬를 여러 조각으로 나누는(Boolean 연산) 기능 제공
+
+### 설치 과정
+
+1. **Window → Package Manager** 메뉴 열기
+2. 상단 드롭다운을 **Unity Registry**로 설정
+3. 패키지 목록이 로드될 때까지 대기
+4. 스크롤해서 **ProBuilder** 패키지 찾기
+5. **Install** 버튼 클릭
+6. 설치 완료 후 Package Manager 창 닫기
+
+---
+
+## 2. 파괴용 프리팹 준비하기
+
+### 새 프리팹 생성
+
+기존 상자 프리팹을 복사해서 파괴용 버전을 만듭니다.
+
+1. **Prefabs 폴더**에서 `Crate` 프리팹 찾기
+2. 프리팹 **복제(Duplicate)** 실행
+3. 이름을 `Crate Destroyed`로 변경
+
+### 씬에 배치하기
+
+**⚠️ 중요**: ProBuilder의 Boolean 연산은 **씬(Scene)에서만** 작동합니다.
+
+- 프리팹을 더블클릭해서 Prefab 모드로 들어가면 안 됨
+- **반드시 씬 하이라키(Hierarchy)로 드래그**해서 배치
+
+### 컴포넌트 정리
+
+파괴된 상자는 더이상 상호작용이 필요 없으므로:
+
+1. **Crate Script** 컴포넌트 제거
+2. **Collider** 컴포넌트 제거
+3. **Layer** 설정을 **Default**로 변경
+
+이제 남은 것은 시각적 메쉬(Visual)만 있는 순수한 모델입니다.
+
+---
+
+## 3. ProBuilder로 메쉬 변환하기
+
+### ProBuilder 창 열기
+
+1. **Tools → ProBuilder → ProBuilder Window** 메뉴 선택
+2. 작은 팔레트 형태의 윈도우가 열림
+
+### 메쉬를 ProBuilder 타입으로 변환
+
+1. Hierarchy에서 `Crate Destroyed` 내부의 **Visual** 게임오브젝트 선택
+2. ProBuilder 창에서 **"ProBuilderize"** 버튼 클릭
+   - 이 버튼은 일반 메쉬를 ProBuilder가 편집 가능한 형태로 변환
+   - 기본 옵션으로 변환하면 충분함
+
+### 변환 결과 확인
+
+- Inspector를 보면 **ProBuilder Mesh** 컴포넌트가 추가됨
+- 이제 이 메쉬에 대해 ProBuilder의 모든 기능 사용 가능
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380479/notion-blog/_/3D_/_/_7_Polish_-_2/image_4.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380479/notion-blog/_/3D_/_/_7_Polish_-_2/image_5.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380479/notion-blog/_/3D_/_/_7_Polish_-_2/image_6.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380479/notion-blog/_/3D_/_/_7_Polish_-_2/image_7.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380479/notion-blog/_/3D_/_/_7_Polish_-_2/image_8.png)
+
+```csharp
+Cube 도 Buiderize 해줘야 들어간다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380479/notion-blog/_/3D_/_/_7_Polish_-_2/image_9.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380477/notion-blog/_/3D_/_/_7_Polish_-_2/image_10.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380477/notion-blog/_/3D_/_/_7_Polish_-_2/image_11.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380477/notion-blog/_/3D_/_/_7_Polish_-_2/image_12.png)
+
+---
+
+## 4. Boolean 연산으로 메쉬 자르기
+
+### Experimental 기능 활성화
+
+Boolean 연산은 실험적(Experimental) 기능이므로 별도 활성화가 필요합니다.
+
+1. **Edit → Preferences** 메뉴 열기
+2. 좌측에서 **ProBuilder** 항목 선택
+3. **Experimental Features Enabled** 체크박스 활성화
+4. ⚠️ **중요**: 활성화 후 창을 건드리지 말 것
+   - 화면이 멈춘 것처럼 보이지만 실제로는 코드 컴파일 중
+   - 잠시 기다리면 완료됨
+
+### Boolean Tool 열기
+
+1. **Tools → ProBuilder → Experimental** 메�큐가 나타남
+2. **Boolean (CSG) Tool** 선택
+3. Boolean 윈도우 창이 열림
+
+### Boolean 연산의 개념
+
+**Boolean 연산**: 두 개의 3D 메쉬를 논리 연산으로 결합/제거하는 기술
+
+- **Subtraction(빼기)**: 첫 번째 메쉬에서 겹치는 부분 제거
+- **Union(합치기)**: 두 메쉬를 하나로 병합
+- **Intersection(교집합)**: 겹치는 부분만 남김 ← **우리가 사용할 방법**
+
+### 자를 도구(Cube) 준비하기
+
+1. Hierarchy에서 `Crate Destroyed` 오브젝트 우클릭
+2. **3D Object → Cube** 생성 (자식 오브젝트로 생성됨)
+3. 생성된 Cube를 ProBuilder 메쉬로 변환
+   - Cube 선택 후 ProBuilder 창에서 **ProBuilderize** 버튼 클릭
+
+### Boolean 연산 설정
+
+Boolean Tool 윈도우에서:
+
+1. **첫 번째 슬롯**: `Crate` (잘릴 대상) 드래그
+2. **두 번째 슬롯**: `Cube` (자르는 도구) 드래그
+3. **Operation 선택**: **Intersection** 선택
+   - 큐브와 겹치는 부분만 추출하겠다는 의미
+
+### Cube 위치 조정
+
+Boolean 연산 전에 큐브의 위치를 조정해서 원하는 부분을 자릅니다.
+
+- 예시: 상자의 한쪽 모서리를 잘라내고 싶다면 큐브를 그 위치에 배치
+- Transform 도구로 위치/크기 자유롭게 조정 가능
+
+### 프로젝트 저장하기
+
+⚠️ **필수 작업**: Boolean 연산은 실험 기능이므로 크래시 가능성이 있음
+
+- **Ctrl + S** (Windows) 또는 **Cmd + S** (Mac) 눌러서 프로젝트 저장
+- 만약을 대비한 안전장치
+
+### Boolean 연산 실행
+
+1. Boolean Tool 윈도우에서 **Apply** 버튼 클릭
+2. 성공하면 새로운 게임오브젝트가 Hierarchy에 생성됨
+3. 자동으로 선택되며, Scene 뷰에서 Transform 도구로 이동시켜 확인 가능
+4. **결과**: 큐브와 겹쳤던 부분만 추출된 조각 메쉬
+
+### Pivot 문제 해결법 (선택사항)
+
+가끔 생성된 메쉬가 카메라를 움직일 때 사라지는 버그가 발생할 수 있습니다.
+
+**원인**: 생성된 오브젝트의 Pivot(중심점) 위치 오류
+
+**해결법**:
+
+1. ProBuilder 창에서 **Center Pivot** 버튼 클릭
+2. 한 번 클릭해도 안 되면 **두 번** 클릭
+3. 이 문제는 항상 발생하는 건 아니므로, 문제가 없다면 건너뛰어도 됨
+
+---
+
+## 5. 여러 조각으로 상자 분할하기
+
+### 첫 번째 조각 제거
+
+- 방금 생성된 조각은 테스트용이므로 삭제
+- 이제 본격적으로 여러 큐브를 배치해서 상자 전체를 조각내기
+
+### 다양한 큐브 배치하기
+
+상자를 여러 조각으로 나누기 위해 큐브들을 전략적으로 배치합니다.
+
+**배치 전략**:
+
+- 첫 번째 큐브: 한쪽 모서리를 자르도록 배치
+- 두 번째 큐브: 복제(Duplicate) 후 옆면에 배치, 크기 조정
+- 세 번째 큐브: 아래쪽 부분을 자르도록 배치
+- 계속 반복해서 상자 전체를 작은 큐브들로 채움
+
+### 시각화 도움 기능
+
+큐브들이 많아지면 어디까지 배치했는지 보기 어려울 수 있습니다.
+
+**Scene 뷰 간소화**:
+
+- Scene 뷰 상단 도구 바에서 **Lighting** 버튼 끄기
+- 특수 효과들도 끄기
+- 메쉬의 와이어프레임만 보이게 되어 배치하기 쉬워짐
+
+### 배치 시 주의사항
+
+- **큐브들이 서로 겹치면 안 됨**: 각 조각이 독립적으로 생성되어야 함
+- **약간의 틈은 괜찮음**: 완벽하게 빈틈없이 채우지 않아도 됨
+  - 폭발 시 매우 빠르게 날아가므로 작은 틈은 눈에 띄지 않음
+- **조각 크기는 다양하게**: 현실적인 파괴 효과를 위해 크고 작은 조각 혼합
+
+### 모든 조각 생성하기
+
+큐브 배치가 완료되면 Boolean 연산을 반복 실행합니다.
+
+**절차**:
+
+1. Boolean Tool 윈도우 열기
+2. 첫 번째 슬롯: `Crate` 드래그
+3. 두 번째 슬롯: **첫 번째 Cube** 선택
+4. Operation: Intersection
+5. **Apply** 버튼 클릭
+6. 새 조각 생성됨
+7. ⚠️ **생성된 조각은 건드리지 말고** 바로 다음 큐브 선택
+8. 두 번째 슬롯에 **두 번째 Cube** 드래그
+9. **Apply** 버튼 클릭
+10. 모든 큐브에 대해 반복
+
+**팁**: 생성된 조각들은 나중에 한꺼번에 정리할 것이므로 지금은 그냥 두기
+
+### 시각 확인하기
+
+모든 조각이 생성되었으면 원본 오브젝트들을 숨겨서 결과를 확인합니다.
+
+1. Hierarchy에서 모든 **Cube 오브젝트**와 원본 **Crate** 선택
+2. Inspector 상단의 **체크박스 비활성화** (게임오브젝트 꺼짐)
+   - 단축키: **Alt + Shift + A** (Windows) 또는 **Option + Shift + A** (Mac)
+3. Scene 뷰의 **Lighting** 다시 켜기
+4. 특수 효과들도 다시 활성화
+
+**결과**: 상자가 여러 조각으로 분리된 모습 확인 가능
+
+### 조각 오브젝트 정리하기
+
+생성된 조각들을 관리하기 쉽게 정리합니다.
+
+1. 모든 새로 생성된 게임오브젝트 선택
+2. **이름 일괄 변경**: `Crate Part`로 변경
+3. 모든 조각을 **`Crate Destroyed` 오브젝트의 자식**으로 만들기
+   - 드래그해서 부모 오브젝트 안으로 이동
+
+### Pivot 버그 재확인
+
+일부 조각에서 여전히 사라지는 문제가 있다면:
+
+1. 문제 조각 선택
+2. ProBuilder 창에서 **Center Pivot** 버튼 클릭
+3. 필요하면 두 번 클릭
+
+### 원본 오브젝트 처리
+
+더 이상 필요 없는 원본들을 정리합니다.
+
+**옵션 1: 삭제**
+
+- Cube들과 원본 Crate 시각 오브젝트 모두 삭제
+
+**옵션 2: 비활성화 보관**
+
+- 나중에 조각 배치를 수정하고 싶을 수 있으므로 비활성화 상태로 보관
+- 추천 방법
+
+---
+
+## 6. 물리 컴포넌트 추가하기
+
+### Mesh Collider 추가
+
+조각들이 물리적으로 작동하려면 충돌 감지가 필요합니다.
+
+1. 모든 `Crate Part` 오브젝트 선택
+2. Inspector에서 **Add Component** 버튼 클릭
+3. **Mesh Collider** 추가
+4. **Convex** 옵션 체크
+   - **Convex란?**: 볼록한 형태로 충돌 처리
+   - ProBuilder로 생성된 복잡한 메쉬는 Convex 활성화 필수
+   - Convex가 없으면 물리 엔진이 제대로 작동하지 않음
+
+### Rigidbody 추가
+
+물리 시뮬레이션(중력, 힘)을 받으려면 Rigidbody가 필요합니다.
+
+1. 모든 `Crate Part` 오브젝트 선택 유지
+2. **Add Component** → **Rigidbody** 추가
+
+**Rigidbody의 역할**:
+
+- 중력 적용
+- 충돌 반응
+- 힘(Force) 받기 가능
+
+### 프리팹에 변경사항 적용
+
+1. Hierarchy에서 `Crate Destroyed` 오브젝트 선택
+2. Inspector 상단 **Overrides** 버튼 클릭
+3. **Apply All** 선택
+   - 씬에서 작업한 모든 변경사항이 프리팹에 저장됨
+
+### 물리 테스트
+
+1. 씬에 있는 `Crate Destroyed` 오브젝트를 **위로 살짝 들어올리기**
+   - Transform의 Y값을 증가시킴
+2. **Play 버튼** 클릭
+3. **결과**: 모든 조각이 중력에 의해 떨어지며 흩어짐
+
+이제 물리 시스템이 정상 작동하는 것을 확인했습니다!
+
+---
+
+## 7. 양면 렌더링 설정하기
+
+### 문제 발견
+
+Play 모드에서 카메라를 회전시키며 조각들을 관찰하면:
+
+- 특정 각도에서 조각의 **한쪽 면이 투명**하게 보임
+- 반대편에서 보면 정상적으로 보임
+
+### 원인 분석
+
+**Backface Culling(후면 컬링)**:
+
+- 기본적으로 Unity의 재질(Material)은 **한쪽 면만 렌더링**
+- 메쉬의 앞면(Front face)만 보이고, 뒷면(Back face)은 보이지 않음
+- ProBuilder로 잘린 조각들은 내부가 노출되는데, 이 내부에는 뒷면만 있음
+
+**왜 이런 일이 발생?**:
+
+- 원본 상자 모델은 속이 빈 상자 형태
+- 잘랐을 때 생긴 새 면(단면)은 두께가 없는 평면 하나
+- 그 평면의 뒷면을 보면 아무것도 렌더링되지 않음
+
+### 해결 방법 1: 메쉬에 두께 추가 (비추천)
+
+- 원본 상자 모델을 수정해서 벽에 두께를 줌
+- 시간이 많이 걸리고 복잡함
+
+### 해결 방법 2: 양면 렌더링 설정 (권장)
+
+재질 설정을 변경해서 양면을 모두 렌더링하도록 합니다.
+
+**절차**:
+
+1. 조각 오브젝트 선택
+2. Inspector에서 **Material** 항목 찾기
+3. 재질 이름 클릭 (예: `Polygon Prototype Material`)
+4. Project 창에서 해당 재질 파일이 선택됨
+5. Inspector에서 **Surface Options** 섹션 펼치기
+6. **Render Face** 드롭다운 찾기
+7. **Front** → **Both**로 변경
+
+**결과**:
+
+- 이제 어떤 각도에서 봐도 조각이 정상적으로 보임
+- 앞면과 뒷면 모두 렌더링됨
+
+---
+
+## 8. 폭발 효과 코드 구현하기
+
+### 씬 정리
+
+테스트용 `Crate Destroyed` 오브젝트를 씬에서 제거합니다.
+
+### DestructibleCrate 스크립트 수정
+
+### 1. 프리팹 참조 필드 추가
+
+```csharp
+public class DestructibleCrate : MonoBehaviour
+{
+    public static event EventHandler OnAnyDestroyed;
+
+    [SerializeField] private Transform crateDestroyedVfxPrefab; // 파괴된 상자 프리팹
+    // VFX = Visual Effects(시각 효과)의 약자
+    // 파괴 시 생성할 조각난 상자 프리팹을 저장하는 변수
+
+    private GridPosition gridPosition;
+
+    // ... 나머지 코드
+}
+
+```
+
+**SerializeField란?**:
+
+- private 변수를 Unity Inspector에서 편집 가능하게 만드는 속성
+- 코드에서는 private으로 보호하면서도 디자이너가 값을 설정할 수 있음
+
+### 2. Inspector에서 프리팹 할당
+
+1. Hierarchy 또는 Project에서 **Crate** 오브젝트 선택
+2. Inspector에서 **Destructible Crate** 스크립트 컴포넌트 찾기
+3. **Crate Destroyed Vfx Prefab** 필드에 `Crate Destroyed` 프리팹 드래그
+
+### 3. Damage 메서드 수정
+
+기존 코드:
+
+```csharp
+public void Damage()
+{
+    Destroy(gameObject); // 그냥 사라지기만 함
+    OnAnyDestroyed?.Invoke(this, EventArgs.Empty);
+}
+
+```
+
+수정된 코드:
+
+```csharp
+public void Damage()
+{
+    // 1. 파괴된 상자 프리팹을 현재 위치/회전에 생성
+    Transform createDestroyedTransform = Instantiate(
+        crateDestroyedVfxPrefab,        // 생성할 프리팹
+        transform.position,              // 생성 위치 (현재 상자 위치)
+        transform.rotation               // 생성 회전 (현재 상자 회전)
+    );
+
+    // 2. 생성된 조각들에게 폭발력 적용
+    ApplyExplosionToChildren(
+        createDestroyedTransform,        // 조각들의 부모 Transform
+        150f,                            // 폭발력 크기
+        transform.position,              // 폭발 중심점
+        10f                              // 폭발 영향 반경
+    );
+
+    // 3. 원본 상자 오브젝트 제거
+    Destroy(gameObject);
+
+    // 4. 다른 시스템에 파괴 이벤트 알림
+    OnAnyDestroyed?.Invoke(this, EventArgs.Empty);
+}
+
+```
+
+**코드 분석**:
+
+**Instantiate()**: 프리팹을 씬에 실제 오브젝트로 생성
+
+- 첫 번째 인자: 복제할 프리팹
+- 두 번째 인자: 생성 위치
+- 세 번째 인자: 생성 회전값
+- 반환값: 생성된 오브젝트의 Transform
+
+**ApplyExplosionToChildren()**: 아래에서 작성할 커스텀 함수
+
+- 생성된 조각들 각각에 물리 힘을 가함
+
+### 4. 폭발 함수 구현
+
+**유닛 Ragdoll 시스템에서 가져온 개념**:
+
+- 강의 이전 내용에서 유닛이 죽을 때 Ragdoll에 폭발력을 적용하는 기능 구현
+- 같은 원리를 상자 조각에도 적용
+
+```csharp
+private void ApplyExplosionToChildren(Transform root, float explosionForce, Vector3 explosionPosition, float explosionRange)
+{
+    // root의 모든 자식 오브젝트를 순회
+    foreach (Transform child in root)
+    {
+        // 현재 자식이 Rigidbody 컴포넌트를 가지고 있는지 확인
+        if (child.TryGetComponent<Rigidbody>(out Rigidbody childRigidbody))
+        {
+            // Rigidbody가 있으면 폭발력 적용
+            childRigidbody.AddExplosionForce(
+                explosionForce,      // 폭발력 크기
+                explosionPosition,   // 폭발 중심점
+                explosionRange       // 영향 반경
+            );
+        }
+
+        // 재귀 호출: 자식의 자식까지 모두 처리
+        ApplyExplosionToChildren(child, explosionForce, explosionPosition, explosionRange);
+    }
+}
+
+```
+
+**코드 상세 분석**:
+
+**foreach (Transform child in root)**:
+
+- Transform은 자신의 자식들에 대해 반복 가능(iterable)
+- `root`의 모든 직계 자식을 하나씩 순회
+
+**TryGetComponent<Rigidbody>()**:
+
+- 컴포넌트가 있는지 안전하게 확인하는 메서드
+- 있으면 `out` 매개변수에 컴포넌트를 저장하고 true 반환
+- 없으면 false 반환
+- GetComponent()보다 성능이 좋음 (null 체크 불필요)
+
+**AddExplosionForce()**:
+
+- Unity의 Rigidbody에 내장된 물리 함수
+- 특정 지점을 중심으로 폭발하는 듯한 힘을 가함
+- 거리에 반비례해서 힘이 약해짐
+- 자연스러운 폭발 효과 생성
+
+**재귀 호출(Recursion)**:
+
+- 함수가 자기 자신을 다시 호출
+- 계층 구조의 모든 깊이까지 탐색
+- 조각 밑에 또 다른 자식이 있어도 모두 처리됨
+
+**매개변수 의미**:
+
+- `root`: 폭발력을 적용할 오브젝트의 최상위 부모
+- `explosionForce`: 폭발의 강도 (150f = 꽤 강한 폭발)
+- `explosionPosition`: 폭발이 일어난 지점 (상자 중심)
+- `explosionRange`: 폭발이 영향을 미치는 반경 (10f = 10유닛)
+
+### 테스트 및 파라미터 조정
+
+### 초기 테스트
+
+1. Play 버튼 클릭
+2. 수류탄(Grenade) 액션 선택
+3. 상자 근처에 수류탄 투척
+4. **결과**: 상자가 폭발하며 조각으로 흩어짐!
+
+### 파라미터 의미
+
+```csharp
+ApplyExplosionToChildren(
+    createDestroyedTransform,
+    150f,                    // 이 값을 조정하면 조각이 날아가는 속도 변경
+    transform.position,
+    10f                      // 이 값을 조정하면 영향 받는 범위 변경
+);
+
+```
+
+**explosionForce (150f)**:
+
+- 값을 높이면: 조각들이 더 멀리, 빠르게 날아감
+- 값을 낮추면: 조각들이 가까이 떨어짐
+- 너무 낮으면: 그냥 아래로 떨어지는 것처럼 보임
+- 너무 높으면: 조각들이 화면 밖으로 사라질 수 있음
+
+**explosionRange (10f)**:
+
+- 폭발 중심에서 얼마나 먼 조각까지 영향을 받을지
+- 우리는 모든 조각이 폭발 중심 근처에 있으므로 10으로 충분
+
+### GrenadeProjectile과의 연결
+
+수류탄이 터질 때 상자를 파괴하는 부분 (참고용):
+
+```csharp
+public class GrenadeProjectile : MonoBehaviour
+{
+    private void Update()
+    {
+        // ... 수류탄 이동 로직
+
+        // 목표 지점 도착 시
+        if(Vector3.Distance(positionXZ, targetPostion) < reachedTargetDistance)
+        {
+            float damageRadius = 4f;
+            // 폭발 반경 내 모든 Collider 검색
+            Collider[] colliderArray = Physics.OverlapSphere(targetPostion, damageRadius);
+
+            foreach(Collider collider in colliderArray)
+            {
+                // 유닛 발견 시 데미지
+                if (collider.TryGetComponent<Unit>(out Unit targetUnit))
+                {
+                    targetUnit.Damage(30);
+                }
+
+                // 파괴 가능 상자 발견 시 파괴
+                if (collider.TryGetComponent<DestructibleCrate>(out DestructibleCrate destructibleCrate))
+                {
+                    destructibleCrate.Damage(); // ← 여기서 우리가 만든 함수 호출
+                }
+            }
+
+            // ... 수류탄 제거 및 이펙트 생성
+        }
+    }
+}
+
+```
+
+---
+
+## 🎯 최종 결과
+
+수류탄이 상자 근처에서 폭발하면:
+
+1. 원본 상자가 사라짐
+2. 같은 위치에 조각난 상자가 생성됨
+3. 모든 조각이 폭발 중심에서 바깥쪽으로 날아감
+4. 중력의 영향을 받아 바닥에 떨어짐
+5. 다른 오브젝트와 충돌하며 굴러다님
+
+**만족스러운 파괴 효과** 완성! 🎉
+
+---
+
+## 💡 핵심 개념 정리
+
+### ProBuilder
+
+- Unity 내장 메쉬 편집 도구
+- Boolean 연산으로 메쉬를 자르고 결합
+- 실험 기능이므로 작업 전 저장 필수
+
+### Boolean Intersection
+
+- 두 메쉬가 겹치는 부분만 추출
+- 상자를 조각내는 핵심 기법
+
+### Mesh Collider (Convex)
+
+- 복잡한 메쉬의 물리 충돌 처리
+- Convex 옵션 필수
+
+### Rigidbody
+
+- 물리 시뮬레이션의 핵심
+- 중력과 힘을 받을 수 있게 함
+
+### AddExplosionForce()
+
+- 폭발 효과를 쉽게 구현
+- 자연스러운 물리 연출
+
+### 재귀 함수
+
+- 계층 구조의 모든 자식 처리
+- 깊이와 관계없이 모든 조각 탐색

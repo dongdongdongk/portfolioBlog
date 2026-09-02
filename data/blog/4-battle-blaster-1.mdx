@@ -1,0 +1,1093 @@
+---
+title: '섹션 4: Battle Blaster - 1'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# BasePawn 클래스 초보자용 완벽 가이드
+
+## 📌 이 코드가 하는 일
+
+**BasePawn**은 게임에서 탱크와 타워가 **공통으로 사용할 기능**을 담은 "부모 클래스"입니다.
+
+### 왜 이렇게 만들었나요?
+
+- 탱크와 타워는 **비슷한 기능**이 많아요
+  - 둘 다 총을 쏠 수 있음
+  - 둘 다 포탑이 회전함
+  - 둘 다 비슷한 구조 (몸체 + 포탑)
+- 같은 코드를 두 번 작성하지 않기 위해 **공통 부분을 BasePawn에 모아둠**
+- 나중에 Tank와 Tower 클래스가 BasePawn을 **상속**받아서 사용
+
+---
+
+## 🔍 헤더 파일(.h) 분석
+
+### 1️⃣ 필수 인클루드
+
+```cpp
+#include "GameFramework/Pawn.h"
+#include "Components/CapsuleComponent.h"
+```
+
+- **Pawn**: 플레이어가 조종할 수 있는 기본 캐릭터
+- **CapsuleComponent**: 충돌 감지용 캡슐 모양 컴포넌트
+
+### 2️⃣ 클래스 선언
+
+```cpp
+class BATTLEBLASTER_API ABasePawn : public APawn
+```
+
+- `ABasePawn`: 우리가 만드는 클래스 이름 (A는 Actor의 약자)
+- `: public APawn`: APawn 클래스를 상속받음
+
+### 3️⃣ 컴포넌트 선언
+
+```cpp
+UPROPERTY(VisibleAnywhere)
+UCapsuleComponent* CapsuleComp;
+UPROPERTY(VisibleAnywhere)
+UStaticMeshComponent* BaseMesh;
+UPROPERTY(VisibleAnywhere)
+UStaticMeshComponent* TurretMesh;
+```
+
+**각 컴포넌트 설명:**
+
+| 컴포넌트      | 역할                 | 쉬운 비유             |
+| ------------- | -------------------- | --------------------- |
+| `CapsuleComp` | 충돌 감지 (루트)     | 보이지 않는 투명 캡슐 |
+| `BaseMesh`    | 탱크/타워의 몸체     | 차체/건물 하단        |
+| `TurretMesh`  | 포탑 (회전하는 부분) | 총구가 달린 상단      |
+
+**UPROPERTY(VisibleAnywhere)**: 언리얼 에디터에서 이 컴포넌트를 볼 수 있게 함
+
+---
+
+## 🔧 CPP 파일(.cpp) 분석
+
+### 1️⃣ 생성자 - 컴포넌트 만들기
+
+```cpp
+ABasePawn::ABasePawn()
+{
+    PrimaryActorTick.bCanEverTick = true;
+```
+
+- 매 프레임마다 `Tick()` 함수를 호출하게 설정
+
+### 📦 컴포넌트 생성 과정
+
+**단계별 설명:**
+
+```cpp
+// 1단계: 캡슐 컴포넌트 생성
+CapsuleComp = CreateDefaultSubobject<UCapsuleComponent>(TEXT("CapsuleComp"));
+```
+
+- `CreateDefaultSubobject`: 새로운 컴포넌트를 만드는 함수
+- `<UCapsuleComponent>`: 만들 컴포넌트 타입 지정
+- `TEXT("CapsuleComp")`: 컴포넌트의 이름
+
+```cpp
+// 2단계: 캡슐을 루트로 설정
+SetRootComponent(CapsuleComp);
+```
+
+- 모든 것의 기준점이 되는 **뿌리(Root)** 설정
+
+```cpp
+// 3단계: 베이스 메시 생성 및 부착
+BaseMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BaseMesh"));
+BaseMesh->SetupAttachment(CapsuleComp);
+```
+
+- 몸체 메시를 만들고 캡슐에 붙임
+
+```cpp
+// 4단계: 터렛 메시 생성 및 부착
+TurretMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TurretMesh"));
+TurretMesh->SetupAttachment(BaseMesh);
+```
+
+- 포탑 메시를 만들고 **몸체에** 붙임
+
+---
+
+## 🏗️ 구조도
+
+```
+CapsuleComp (루트) ← 충돌 감지
+    └─ BaseMesh (몸체) ← 캡슐에 부착
+        └─ TurretMesh (포탑) ← 몸체에 부착
+```
+
+**왜 이렇게 연결했나요?**
+
+- 캡슐이 움직이면 → 몸체도 따라 움직임
+- 몸체가 회전하면 → 포탑도 함께 회전
+- 포탑만 따로 회전 → 몸체는 그대로 (총구만 돌아감)
+
+---
+
+## 📚 나머지 함수들
+
+### BeginPlay()
+
+```cpp
+void ABasePawn::BeginPlay()
+{
+    Super::BeginPlay();
+}
+```
+
+- 게임이 시작될 때 **한 번만** 호출
+- `Super::BeginPlay()`: 부모 클래스의 BeginPlay도 실행
+
+### Tick()
+
+```cpp
+void ABasePawn::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+}
+```
+
+- **매 프레임마다** 호출 (초당 60~120번)
+- `DeltaTime`: 이전 프레임과의 시간 간격 (초 단위)
+
+### SetupPlayerInputComponent()
+
+```cpp
+void ABasePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+    Super::SetupPlayerInputComponent(PlayerInputComponent);
+}
+```
+
+- 키보드/마우스 입력을 연결하는 함수
+- 지금은 비어있지만 자식 클래스(Tank)에서 구현 예정
+
+---
+
+## 🎯 다음 단계 예상
+
+### Tank 클래스가 할 일:
+
+- ✅ BasePawn 상속받기
+- 카메라 추가
+- 키보드 입력 처리 (W/A/S/D)
+- 마우스로 포탑 회전
+
+### Tower 클래스가 할 일:
+
+- ✅ BasePawn 상속받기
+- 플레이어 자동 추적
+- 일정 시간마다 자동 발사
+- 사정거리 체크
+
+---
+
+## 💡 핵심 개념 정리
+
+### 상속의 장점
+
+```
+BasePawn (공통 기능)
+    ├─ Tank (플레이어 조종)
+    └─ Tower (AI 조종)
+```
+
+**효과:**
+
+- ✅ 코드 중복 제거
+- ✅ 유지보수 쉬워짐
+- ✅ 나중에 기능 추가 편리
+
+### UPROPERTY 지정자
+
+| 지정자              | 의미                   |
+| ------------------- | ---------------------- |
+| `VisibleAnywhere`   | 에디터에서 보기만 가능 |
+| `EditAnywhere`      | 에디터에서 수정 가능   |
+| `BlueprintReadOnly` | 블루프린트에서 읽기만  |
+
+---
+
+## ❓ 자주 하는 질문
+
+**Q: 왜 포인터(\*)를 쓰나요?**
+
+```cpp
+UCapsuleComponent* CapsuleComp;
+```
+
+A: 언리얼은 컴포넌트를 **동적으로 생성**하기 때문에 메모리 주소를 가리키는 포인터 필요
+
+**Q: TEXT() 매크로가 뭔가요?**
+
+```cpp
+TEXT("CapsuleComp")
+```
+
+A: 언리얼 엔진이 문자열을 올바르게 처리하도록 하는 매크로
+
+**Q: Super::는 뭔가요?**
+
+```cpp
+Super::BeginPlay();
+```
+
+A: 부모 클래스(APawn)의 함수를 호출
+
+---
+
+이 BasePawn 클래스는 **탱크와 타워의 공통 뼈대**입니다. 실제 게임 로직은 이를 상속받는 자식 클래스에서 구현하게 됩니다! 🎮
+
+# { Tank 클래스 초보자용 완벽 가이드 }
+
+## 📌 이 코드가 하는 일
+
+**Tank**는 BasePawn을 상속받아 **플레이어가 조종할 탱크**를 만드는 클래스입니다.
+
+### 왜 Tank 클래스를 따로 만들었나요?
+
+- BasePawn: 탱크와 타워의 **공통 기능** (몸체, 포탑, 발사)
+- **Tank**: 플레이어 전용 기능 추가 (카메라, 입력 처리)
+- Tower: AI 전용 기능 (자동 추적, 자동 발사)
+
+---
+
+## 🎯 Tank vs BasePawn 비교
+
+### 상속 구조도
+
+```
+BasePawn (부모) - 공통 기능
+    ├─ CapsuleComp (충돌)
+    ├─ BaseMesh (몸체)
+    └─ TurretMesh (포탑)
+         ↓
+    Tank (자식) - 플레이어 전용
+    ├─ SpringArmComp (카메라 지지대) ← 새로 추가
+    └─ CameraComp (카메라) ← 새로 추가
+```
+
+### 컴포넌트 비교표
+
+| 컴포넌트      | BasePawn | Tank     | 용도          |
+| ------------- | -------- | -------- | ------------- |
+| CapsuleComp   | ✅       | ✅(상속) | 충돌 감지     |
+| BaseMesh      | ✅       | ✅(상속) | 탱크 몸체     |
+| TurretMesh    | ✅       | ✅(상속) | 포탑          |
+| SpringArmComp | ❌       | ✅(추가) | 카메라 지지대 |
+| CameraComp    | ❌       | ✅(추가) | 플레이어 시점 |
+
+---
+
+## 🔍 헤더 파일(.h) 상세 분석
+
+### 1️⃣ 인클루드 부분
+
+```cpp
+#include "BasePawn.h"  // 부모 클래스
+#include "GameFramework/SpringArmComponent.h"  // 스프링 암
+#include "Camera/CameraComponent.h"  // 카메라
+```
+
+**왜 BasePawn.h를 포함하나요?**
+
+- Tank가 BasePawn을 상속받기 때문
+- 부모의 기능을 사용하려면 헤더 파일 필요
+
+### 2️⃣ 클래스 선언
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380631/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_1/image.png)
+
+```cpp
+class BATTLEBLASTER_API ATank : public ABasePawn
+```
+
+- `ATank`: 탱크 클래스
+- `: public ABasePawn`: **BasePawn을 상속받음** (핵심!)
+
+### 3️⃣ 새로운 컴포넌트 선언
+
+```cpp
+UPROPERTY(VisibleAnywhere)
+USpringArmComponent* SpringArmComp;
+
+UPROPERTY(VisibleAnywhere)
+UCameraComponent* CameraComp;
+```
+
+### 🎥 SpringArm과 Camera가 뭔가요?
+
+**SpringArm (스프링 암)**
+
+- **비유**: 카메라를 들고 있는 셀카봉 📸
+- **역할**:
+  - 카메라를 캐릭터에서 일정 거리 유지
+  - 벽이나 장애물에 부딪히면 자동으로 카메라를 당김
+  - 부드러운 카메라 움직임 제공
+
+**Camera (카메라)**
+
+- **역할**: 플레이어가 보는 실제 화면
+- **왜 SpringArm에 붙이나요?**
+  - 카메라만 직접 붙이면 위치 조정이 불편
+  - SpringArm을 통하면 거리/각도 조절이 쉬움
+
+---
+
+## 🔧 CPP 파일(.cpp) 상세 분석
+
+### 1️⃣ 생성자 - 컴포넌트 생성
+
+```cpp
+ATank::ATank()
+{
+```
+
+### 📦 SpringArm 생성
+
+```cpp
+SpringArmComp = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArmComp"));
+SpringArmComp->SetupAttachment(CapsuleComp);
+```
+
+**단계별 설명:**
+
+1. `CreateDefaultSubobject`: 스프링 암 컴포넌트 생성
+2. `SetupAttachment(CapsuleComp)`: **캡슐에 부착**
+
+**중요 포인트:**
+
+- `CapsuleComp`는 BasePawn에서 만든 것
+- 상속 덕분에 Tank에서도 **자동으로 사용 가능**!
+
+### 📷 Camera 생성
+
+```cpp
+CameraComp = CreateDefaultSubobject<UCameraComponent>(TEXT("CameraComp"));
+CameraComp->SetupAttachment(SpringArmComp);
+```
+
+**단계별 설명:**
+
+1. 카메라 컴포넌트 생성
+2. **스프링 암에 부착** (캡슐이 아님!)
+
+---
+
+## 🏗️ 최종 구조도
+
+### 계층 구조
+
+```
+CapsuleComp (루트) ← BasePawn에서 상속
+    ├─ BaseMesh ← BasePawn에서 상속
+    │   └─ TurretMesh ← BasePawn에서 상속
+    │
+    └─ SpringArmComp ← Tank에서 추가
+        └─ CameraComp ← Tank에서 추가
+```
+
+### 시각적 구조
+
+```
+        [Camera] 👁️
+           │
+      [SpringArm] 📏
+           │
+      [Capsule] ⚪ (투명 충돌체)
+           │
+       [BaseMesh] 🚗 (탱크 몸체)
+           │
+      [TurretMesh] 🔫 (포탑)
+```
+
+---
+
+## 📚 함수들 분석
+
+### BeginPlay()
+
+```cpp
+void ATank::BeginPlay()
+{
+    Super::BeginPlay();
+}
+```
+
+- **Super::BeginPlay()**: 부모(BasePawn)의 BeginPlay도 실행
+- 게임 시작 시 **한 번만** 호출
+
+### Tick()
+
+```cpp
+void ATank::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+}
+```
+
+- **매 프레임마다** 호출
+- 나중에 여기서 이동/회전 처리
+
+### SetupPlayerInputComponent()
+
+```cpp
+void ATank::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+    Super::SetupPlayerInputComponent(PlayerInputComponent);
+}
+```
+
+- **키보드/마우스 입력** 연결
+- 나중에 W/A/S/D 이동 구현 예정
+
+---
+
+## 💡 상속의 마법
+
+### Tank가 자동으로 갖게 되는 것들
+
+**BasePawn에서 물려받은 것:**
+
+```cpp
+✅ CapsuleComp    // 충돌 감지
+✅ BaseMesh       // 탱크 몸체
+✅ TurretMesh     // 포탑
+✅ BeginPlay()    // 게임 시작 함수
+✅ Tick()         // 매 프레임 함수
+```
+
+**Tank가 직접 추가한 것:**
+
+```cpp
+➕ SpringArmComp  // 카메라 지지대
+➕ CameraComp     // 카메라
+```
+
+### 코드로 비교하기
+
+**만약 상속을 안 했다면:**
+
+```cpp
+// Tank.cpp - 상속 없이 직접 만들 경우
+CapsuleComp = CreateDefaultSubobject<UCapsuleComponent>(...);  // 중복!
+BaseMesh = CreateDefaultSubobject<UStaticMeshComponent>(...);   // 중복!
+TurretMesh = CreateDefaultSubobject<UStaticMeshComponent>(...); // 중복!
+SpringArmComp = CreateDefaultSubobject<USpringArmComponent>(...);
+CameraComp = CreateDefaultSubobject<UCameraComponent>(...);
+
+// Tower.cpp - 또 똑같이 작성해야 함
+CapsuleComp = CreateDefaultSubobject<UCapsuleComponent>(...);  // 중복!
+BaseMesh = CreateDefaultSubobject<UStaticMeshComponent>(...);   // 중복!
+TurretMesh = CreateDefaultSubobject<UStaticMeshComponent>(...); // 중복!
+```
+
+**상속을 사용하면:**
+
+```cpp
+// Tank.cpp - 짧고 간결!
+SpringArmComp = CreateDefaultSubobject<USpringArmComponent>(...);
+CameraComp = CreateDefaultSubobject<UCameraComponent>(...);
+// BasePawn 것들은 자동으로 있음!
+
+// Tower.cpp - 역시 짧음!
+// AI 관련 코드만 추가
+// BasePawn 것들은 자동으로 있음!
+```
+
+---
+
+## 🎮 실제 게임에서 어떻게 보일까?
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380629/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_1/image_1.png)
+
+### 에디터에서 확인하는 방법
+
+1. **Tank를 레벨에 배치**
+
+```
+탱크 액터
+├─ CapsuleComp (충돌 - 투명)
+├─ BaseMesh (몸체 - 아직 메시 안 할당)
+├─ TurretMesh (포탑 - 아직 메시 안 할당)
+├─ SpringArmComp (길이 조절 가능)
+└─ CameraComp (여기서 보는 화면이 게임 화면)
+```
+
+1. **카메라 미리보기**
+
+- 뷰포트에서 카메라 아이콘 클릭
+- 플레이어가 볼 화면 실시간 확인 가능
+
+---
+
+## ❓ 자주 하는 질문
+
+**Q: CapsuleComp는 Tank.h에 없는데 어떻게 쓰나요?**
+
+```cpp
+SpringArmComp->SetupAttachment(CapsuleComp);  // 이게 가능한 이유?
+```
+
+A: BasePawn.h에 `public`으로 선언되어 있어서 자식 클래스에서 접근 가능!
+
+**Q: Super::BeginPlay()는 왜 호출하나요?**
+
+```cpp
+void ATank::BeginPlay()
+{
+    Super::BeginPlay();  // 이게 왜 필요?
+}
+```
+
+A: 부모의 초기화 코드도 실행해야 함. 안 하면 BasePawn의 설정이 적용 안 됨!
+
+**Q: SpringArm 없이 Camera만 붙이면 안 되나요?**
+
+```cpp
+CameraComp->SetupAttachment(CapsuleComp);  // 이렇게?
+```
+
+A: 가능하지만:
+
+- 벽 충돌 시 카메라가 벽 안으로 들어감 😵
+- 거리 조절이 어려움
+- 부드러운 움직임 구현 힘듦
+
+**Q: RootComponent vs CapsuleComp 차이는?**
+
+```cpp
+// 둘 다 가능한데 차이가 뭐죠?
+SpringArmComp->SetupAttachment(RootComponent);
+SpringArmComp->SetupAttachment(CapsuleComp);
+```
+
+A:
+
+- `RootComponent`: 현재 루트가 무엇이든 거기에 부착
+- `CapsuleComp`: 명확하게 캡슐에 부착
+- 이 경우 CapsuleComp가 루트라서 결과는 같음
+
+---
+
+## 🎯 핵심 요약
+
+### Tank 클래스의 정체성
+
+```
+Tank = BasePawn의 모든 것 + 플레이어 조종 기능
+```
+
+### 상속의 3대 장점
+
+1. **코드 재사용**: BasePawn 코드 중복 안 함
+2. **유지보수 편리**: BasePawn 수정하면 Tank도 자동 반영
+3. **확장 용이**: 새로운 기능만 추가하면 됨
+
+### 실제 구조
+
+```
+게임 시작
+    ↓
+BasePawn 생성자 실행
+    ↓
+Tank 생성자 실행 (SpringArm, Camera 추가)
+    ↓
+BasePawn::BeginPlay()
+    ↓
+Tank::BeginPlay()
+    ↓
+게임 플레이 (Tick 매 프레임 호출)
+```
+
+---
+
+이제 Tank 클래스의 **뼈대**가 완성되었습니다!
+다음 단계에서는 **실제 이동, 회전, 발사** 기능을 구현하게 됩니다. 🎮🚀
+
+# { Tank 블루프린트 설정 초보자용 완벽 가이드 }
+
+## 📌 이번 강의에서 배울 것
+
+1. **Tank C++ 클래스로 블루프린트 만들기**
+2. **컴포넌트에 메시 할당하기**
+3. **SpringArm과 Camera 설정하기**
+4. **플레이어가 Tank를 조종하도록 설정하기**
+
+---
+
+## 🎨 1단계: Tank 블루프린트 생성
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380629/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_1/image_2.png)
+
+### 작업 순서
+
+```
+1. 레벨에 있는 Tank C++ 액터 삭제
+   ↓
+2. Content 폴더에 "Blueprints" 폴더 생성
+   ↓
+3. 우클릭 → Blueprint Class → Tank 검색 → 선택
+   ↓
+4. 이름: BP_Tank
+```
+
+### 왜 블루프린트를 만드나요?
+
+| 방법                 | 장점             | 단점           |
+| -------------------- | ---------------- | -------------- |
+| **C++ 클래스만**     | 빠른 성능        | 값 조정이 불편 |
+| **블루프린트**       | 실시간 편집 가능 | 약간 느림      |
+| **C++ + BP 조합** ✅ | 양쪽 장점 활용   | -              |
+
+**결론**: C++로 구조를 만들고, BP에서 세부 설정!
+
+---
+
+## 🔧 2단계: 컴포넌트 설정
+
+### BP_Tank를 열면 보이는 것들
+
+```
+Components 패널:
+├─ CapsuleComp (루트) ← BasePawn에서
+├─ BaseMesh ← BasePawn에서
+├─ TurretMesh ← BasePawn에서
+├─ SpringArmComp ← Tank에서
+└─ CameraComp ← Tank에서
+```
+
+---
+
+## 🎯 3단계: 메시 할당하기
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380629/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_1/image_3.png)
+
+### BaseMesh 설정
+
+```
+1. BaseMesh 클릭
+   ↓
+2. Details 패널에서 Static Mesh 찾기
+   ↓
+3. 드롭다운 클릭 → "Tank" 검색
+   ↓
+4. "Tank_Base" 선택
+```
+
+**결과**: 탱크 몸체가 나타남 🚗
+
+### TurretMesh 설정
+
+```
+1. TurretMesh 클릭
+   ↓
+2. Static Mesh에서 "Tank_Turret" 선택
+```
+
+**결과**: 포탑이 몸체 위에 나타남 🔫
+
+### 완성된 모습
+
+```
+     🔫 (TurretMesh)
+      │
+    🚗 (BaseMesh)
+      │
+    ⚪ (CapsuleComp - 투명)
+```
+
+---
+
+## ⚙️ 4단계: CapsuleComp 조정
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380630/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_1/image_4.png)
+
+### 왜 캡슐을 조정하나요?
+
+- **캡슐 = 충돌 판정 영역**
+- 너무 작으면 → 총알이 통과
+- 너무 크면 → 벽에서 멀리 떨어져야 함
+
+### 설정값
+
+```cpp
+CapsuleComp 선택
+├─ Capsule Half Height: 60
+└─ Capsule Radius: 60
+```
+
+### 시각적 설명
+
+```
+조정 전:              조정 후:
+   ⚪ (작음)            ⚪⚪ (적당)
+   🚗                  🚗
+```
+
+---
+
+## 📐 5단계: BaseMesh 위치 조정
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380630/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_1/image_5.png)
+
+### 문제 상황
+
+```
+현재:          원하는 모습:
+  🚗
+  ⚪  ← 공중에 떠있음   🚗  ← 바퀴가 바닥에
+                      ⚪
+```
+
+### 해결 방법
+
+```
+1. BaseMesh 선택
+   ↓
+2. Location 스냅 끄기 (Viewport 상단)
+   ↓
+3. W키 누르고 아래로 드래그
+   ↓
+4. 바퀴가 캡슐 바닥에 올 때까지
+```
+
+**참고**:
+
+- 루트 컴포넌트(CapsuleComp)는 움직일 수 없음
+- 자식 컴포넌트(BaseMesh)를 움직여야 함
+
+---
+
+## 🔒 6단계: Collision 프리셋 설정
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380630/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_1/image_6.png)
+
+### 현재 문제
+
+```
+CapsuleComp의 Collision Preset = "OverlapAllDynamic"
+→ 모든 것과 겹침 (충돌 안 함!) ❌
+```
+
+### 올바른 설정
+
+```
+1. CapsuleComp 선택
+   ↓
+2. Details → Collision
+   ↓
+3. Collision Presets → "Pawn" 선택
+```
+
+### Collision Preset 비교
+
+| Preset                | 충돌 | 겹침 | 용도        |
+| --------------------- | ---- | ---- | ----------- |
+| **OverlapAllDynamic** | ❌   | ✅   | 트리거 영역 |
+| **Pawn** ✅           | ✅   | ❌   | 캐릭터/탱크 |
+| **BlockAll**          | ✅   | ❌   | 벽/장애물   |
+
+---
+
+## 📷 7단계: SpringArm과 Camera 설정
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380630/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_1/image_7.png)
+
+### SpringArm이 뭔가요?
+
+**비유**: 카메라를 들고 있는 셀카봉 📸
+
+```
+기능:
+1. 카메라를 일정 거리에 유지
+2. 벽에 부딪히면 자동으로 카메라 당김
+3. 부드러운 움직임 제공
+```
+
+### SpringArm의 숨겨진 기능
+
+**벽 통과 방지:**
+
+```
+벽 없을 때:          벽 있을 때:
+    👁️                  👁️
+    │                   │(자동으로 가까워짐)
+    📏                  📏
+    │                   │
+   🚗                 🚗🧱
+```
+
+### 목표: 탑다운 3인칭 시점
+
+**원하는 화면:**
+
+```
+      👁️ (카메라 - 높고 각도 있음)
+      /
+     /
+   🚗 (탱크 - 위에서 비스듬히 보임)
+```
+
+---
+
+## 🎮 8단계: SpringArm 설정하기
+
+### Target Arm Length (거리)
+
+```
+1. SpringArmComp 선택
+   ↓
+2. Details → Camera Settings
+   ↓
+3. Target Arm Length: 600
+```
+
+**시각적 설명:**
+
+```
+짧을 때 (300):       적당 (600):        길 때 (1000):
+    👁️                  👁️                   👁️
+    |                   |                     |
+   🚗                 🚗                    🚗
+  가까움             딱 좋음               너무 멀음
+```
+
+### Rotation (각도)
+
+```
+1. SpringArmComp 선택
+   ↓
+2. E키 눌러 회전 모드
+   ↓
+3. Y축(Pitch): -50도
+```
+
+**각도 비교:**
+
+```
+0도 (수평):         -50도 (추천):      -90도 (진짜 위):
+👁️ → 🚗              👁️                   👁️
+                     ↘                    ↓
+                     🚗                   🚗
+옆에서 봄          비스듬히           완전 위
+```
+
+---
+
+## 🎯 9단계: 권장 설정값
+
+### 강의에서 추천하는 값
+
+```cpp
+SpringArmComp:
+├─ Target Arm Length: 600
+└─ Rotation
+    └─ Pitch (Y): -50
+
+CapsuleComp:
+├─ Half Height: 60
+├─ Radius: 60
+└─ Collision Preset: Pawn
+
+BaseMesh:
+└─ Location Z: 바퀴가 캡슐 바닥에 오도록
+```
+
+### 실시간 테스트 방법
+
+```
+1. 블루프린트 Compile & Save
+   ↓
+2. 레벨에 BP_Tank 배치
+   ↓
+3. BP_Tank 선택
+   ↓
+4. Viewport에서 카메라 프리뷰 확인
+```
+
+**카메라 프리뷰 보는 법:**
+
+- 탱크 선택하면 작은 카메라 창이 뜸
+- 실제 게임에서 보일 화면
+
+---
+
+## 🎮 10단계: 플레이어 조종 설정
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380630/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_1/image_8.png)
+
+### 현재 문제
+
+```
+게임 플레이하면:
+→ Default Pawn으로 시작 (허공을 떠다님) ❌
+→ Tank를 조종할 수 없음
+```
+
+### 해결: Auto Possess Player
+
+```
+1. 레벨에 배치한 BP_Tank 선택
+   ↓
+2. Details 패널에서 "Auto Possess" 검색
+   ↓
+3. Auto Possess Player: "Player 0" 선택
+```
+
+### Auto Possess 옵션 설명
+
+| 옵션            | 의미                          |
+| --------------- | ----------------------------- |
+| **Disabled**    | 조종 안 됨                    |
+| **Player 0** ✅ | 첫 번째 플레이어가 조종       |
+| **Player 1**    | 두 번째 플레이어 (멀티플레이) |
+| **Player 2+**   | 세 번째+ 플레이어             |
+
+**싱글 플레이 게임 = 항상 Player 0!**
+
+---
+
+## ⚠️ 중요: Player Start vs Auto Possess
+
+### 두 가지 방법
+
+**방법 1: Player Start (이전 방식)**
+
+```
+레벨에 Player Start 배치
+→ 게임 모드에서 Default Pawn 설정
+→ 그 위치에서 시작
+```
+
+**방법 2: Auto Possess (현재 방식) ✅**
+
+```
+BP_Tank에 Auto Possess 설정
+→ 그 탱크를 직접 조종
+```
+
+### ⛔ 경고
+
+```
+Player Start + Auto Possess 동시 사용 = ❌ 충돌!
+→ 엔진이 혼란스러워함
+→ 둘 중 하나만 사용!
+```
+
+**이 프로젝트의 선택**: Auto Possess 사용
+
+---
+
+## 🎮 11단계: 테스트하기
+
+### 플레이 버튼 클릭
+
+**현재 상태:**
+
+```
+✅ 탱크 시점으로 게임 시작
+✅ 카메라가 위에서 비스듬히 봄
+❌ 아직 움직이지는 않음 (다음 강의에서!)
+```
+
+### 확인 사항 체크리스트
+
+- [ ] 탱크 모델이 보이나요?
+- [ ] 카메라 각도가 적당한가요?
+- [ ] 바퀴가 바닥에 닿아있나요?
+- [ ] 탱크 시점으로 시작하나요?
+
+---
+
+## 💡 핵심 개념 정리
+
+### SpringArm의 3가지 핵심 기능
+
+1. **거리 유지**
+
+```cpp
+Target Arm Length = 600
+→ 카메라가 항상 600 유닛 떨어짐
+```
+
+1. **자동 충돌 회피**
+
+```
+벽에 부딪히면 자동으로 카메라 당김
+→ 카메라가 벽 안으로 안 들어감
+```
+
+1. **부드러운 움직임**
+
+```
+탱크가 회전해도 카메라는 부드럽게 따라감
+```
+
+### CapsuleComp 역할
+
+```
+CapsuleComp = 보이지 않는 충돌 박스
+├─ 총알 맞는 판정
+├─ 벽 충돌 판정
+└─ 다른 탱크와 충돌 판정
+```
+
+---
+
+## ❓ 자주 하는 질문
+
+**Q: BaseMesh를 움직였는데 TurretMesh도 같이 움직여요!**
+
+```
+이유: TurretMesh가 BaseMesh의 자식이라서
+해결: 정상입니다! 원하는 동작임
+```
+
+**Q: 카메라 각도를 더 위에서 보고 싶어요!**
+
+```
+SpringArmComp → Rotation → Pitch를 -70이나 -80으로
+```
+
+**Q: 탱크가 더 가깝게/멀리 보이게 하려면?**
+
+```
+SpringArmComp → Target Arm Length 조정
+작게 = 가까움
+크게 = 멀리
+```
+
+**Q: Auto Possess가 작동 안 해요!**
+
+```
+확인사항:
+1. BP_Tank가 레벨에 배치되어 있나?
+2. Player Start를 동시에 사용하고 있지 않나?
+3. 정확히 "Player 0"으로 설정했나?
+```
+
+**Q: 게임 플레이하면 화면이 이상해요!**
+
+```
+CameraComp 클릭 → Viewport에서 카메라 프리뷰 확인
+→ SpringArm 각도/거리 재조정
+```
+
+---
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380631/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_1/image_9.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380629/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_1/image_10.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380629/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_1/image_11.png)

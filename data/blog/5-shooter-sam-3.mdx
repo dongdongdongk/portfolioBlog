@@ -1,0 +1,1911 @@
+---
+title: '섹션 5: Shooter Sam - 3'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { State Machine (스테이트 머신) 만들기 }
+
+## 1. 왜 State Machine이 필요한가?
+
+### 현재 문제점
+
+- ✅ **지상 이동 애니메이션**: Blend Space로 잘 작동
+- ❌ **점프 애니메이션**: 점프해도 계속 걷기/달리기 애니메이션만 재생
+
+### 점프의 복잡성
+
+**점프는 여러 단계로 구성:**
+
+1. **점프 시작** (Jump Start)
+2. **공중 정점** (Apex/Peak) - 가장 높은 지점
+3. **착지** (Landing)
+
+→ 단순한 Blend Space로는 관리 어려움
+
+### 해결책: State Machine
+
+**State Machine = 상태 관리 시스템**
+
+- 캐릭터의 여러 "상태"를 관리
+- 각 상태마다 다른 애니메이션 재생
+- 조건에 따라 상태 간 전환
+
+---
+
+## 2. State Machine 기본 개념
+
+### State (상태)란?
+
+**캐릭터가 할 수 있는 각각의 행동**
+
+**예시:**
+
+- **Grounded (지상)**: 걷기, 달리기, 정지
+- **Airborne (공중)**: 점프 중, 낙하 중
+- **Landing (착지)**: 땅에 닿는 순간
+- **Jump Start (점프 시작)**: 발을 구르는 순간
+
+### Transition (전환)이란?
+
+**한 상태에서 다른 상태로 바뀌는 것**
+
+**예시:**
+
+- Grounded → Airborne: 점프 키를 누름
+- Airborne → Grounded: 땅에 착지
+- Idle → Walk: 이동 키를 누름
+
+---
+
+## 3. State Machine 생성하기
+
+### 단계별 생성
+
+### Step 1: State Machine 노드 생성
+
+1. **Animation Graph** 내부에서 우클릭
+2. **"State Machines"** 검색
+3. **"Add New State Machine"** 선택
+4. 이름 변경: **"Locomotion"** (또는 Movement)
+
+**이름이 Locomotion인 이유:**
+
+- 점프도 이동의 일부
+- 모든 이동 관련 상태를 포함
+
+### Step 2: State Machine 구조
+
+**생성된 노드:**
+
+- **입력**: 없음 (내부에서 자체 관리)
+- **출력**: Pose (최종 애니메이션)
+- Output Pose에 연결할 수 있음
+
+---
+
+## 4. State Machine 내부 탐색
+
+### State Machine 안으로 들어가기
+
+**State Machine 노드를 더블클릭**
+→ 별도의 그래프가 열림
+
+### 기본 구성요소
+
+### Entry 노드
+
+- **시작점을 나타내는 특수 노드**
+- State Machine이 시작될 때 어느 상태로 갈지 결정
+- 초록색 화살표로 연결
+
+---
+
+## 5. 내비게이션 (위치 파악하기)
+
+### 어디에 있는지 확인하는 3가지 방법
+
+### 1) 상단 툴바 (Breadcrumb Trail)
+
+```
+ABP_ShooterCharacter > AnimGraph > Locomotion
+```
+
+- 현재 위치의 경로 표시
+- 클릭하면 해당 위치로 이동
+
+### 2) My Blueprint 패널
+
+```
+Graphs
+├── EventGraph
+└── AnimGraph
+    └── Locomotion (State Machine)
+```
+
+- 계층 구조로 표시
+- 클릭하여 이동 가능
+
+### 3) 탭 (Tabs)
+
+- 열었던 그래프들이 탭으로 표시
+- 처음에는 EventGraph, AnimGraph 두 개
+- State 안으로 들어가면 탭 증가
+- 탭 전환으로 빠른 이동
+
+**중요:** 복잡해질수록 이 도구들이 필수!
+
+---
+
+## 6. 첫 번째 상태 만들기: Grounded
+
+### State 생성
+
+### Step 1: Grounded State 추가
+
+1. State Machine 그래프 내에서 **우클릭**
+2. **"Add State"** 선택
+3. 이름: **"Grounded"**
+
+### Step 2: Entry 연결
+
+1. **Entry 노드**에서 화살표 드래그
+2. **Grounded**에 연결
+3. 의미: State Machine 시작 시 즉시 Grounded 상태로
+
+---
+
+### State 내부 설정
+
+### Step 3: Grounded 안으로 들어가기
+
+**Grounded 노드를 더블클릭**
+→ 새로운 그래프 열림
+
+**구성:**
+
+- **Output Animation Pose 노드** 있음
+- Animation Graph의 Output Pose와 동일
+- 이 상태가 재생할 애니메이션 연결
+
+---
+
+### Animation Graph에서 Blend Space 이동
+
+### Step 4: Blend Space 잘라내기
+
+1. **툴바**에서 **AnimGraph** 클릭 (또는 탭 전환)
+2. **BS_Locomotion** 노드 선택
+3. **우클릭 → Cut** (또는 Ctrl+X)
+
+### Step 5: Grounded에 붙여넣기
+
+1. **툴바**에서 **Grounded** 클릭 (또는 더블클릭)
+2. **Ctrl+V** (Paste)
+3. **Output Animation Pose**에 연결
+4. **Compile**
+
+**의미:**
+
+- Grounded 상태일 때 Blend Space 애니메이션 재생
+- 지상에서의 모든 이동 처리
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380656/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_3/image.png)
+
+---
+
+## 7. State Machine을 Output에 연결
+
+### 최종 연결
+
+### AnimGraph로 돌아가기
+
+1. **툴바**에서 **AnimGraph** 클릭
+2. **Locomotion State Machine** 출력 → **Output Pose** 연결
+3. **Compile**
+
+**결과:**
+
+- State Machine이 최종 애니메이션 결정
+- 내부 상태에 따라 적절한 애니메이션 재생
+
+---
+
+## 8. 테스트 및 확인
+
+### Anim Preview Editor에서 확인
+
+**현재 동작:**
+
+- Entry → Grounded 자동 이동
+- Grounded에서 Blend Space 재생
+- Speed/Angle 변수로 제어 가능
+- **이전과 똑같이 작동!**
+
+### 게임에서 테스트
+
+**Play 버튼으로 실행:**
+
+- 걷기, 달리기 정상 작동
+- 점프는 아직 애니메이션 없음 (다음 단계)
+
+---
+
+## 9. 두 번째 상태 만들기: Airborne
+
+### 실습 과제
+
+**목표:** 공중 상태 만들기
+
+**단계:**
+
+1. Locomotion State Machine에서 **우클릭**
+2. **Add State** → 이름: **"Airborne"**
+3. **Airborne 더블클릭**하여 내부 진입
+4. Asset Browser에서 **"Jump_Apex_Combat"** 검색
+5. 그래프로 드래그 → **Output Animation Pose** 연결
+
+**Jump_Apex_Combat란?**
+
+- 점프의 **정점(가장 높은 지점)** 애니메이션
+- 공중에 떠 있는 동안 재생
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380653/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_3/image_1.png)
+
+---
+
+## 10. Transition (전환) 만들기
+
+### Grounded → Airborne 전환
+
+### Step 1: 전환 생성
+
+1. **Locomotion State Machine**으로 돌아가기
+2. **Grounded**에서 화살표 드래그
+3. **Airborne**에 연결
+
+**결과:**
+
+- 두 상태 사이에 **원 모양 아이콘** 생성
+- 이것이 **Transition Rule (전환 규칙)**
+
+---
+
+### Transition Rule 이해하기
+
+### Step 2: 규칙 내부 확인
+
+**원 모양 아이콘을 더블클릭**
+
+**구성:**
+
+- **Result 노드** (빨간색 입력 핀)
+- 입력: **Boolean** (True/False)
+
+**작동 방식:**
+
+- **입력이 True**: 전환 실행 (Grounded → Airborne)
+- **입력이 False**: 전환 안 함 (Grounded 유지)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380655/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_3/image_2.png)
+
+---
+
+## 11. Is Airborne 변수 만들기
+
+### 전환 조건 변수 생성 (실습 과제)
+
+**목표:** 공중에 있는지 여부를 나타내는 변수
+
+### Step 1: Boolean 변수 생성
+
+1. **My Blueprint** → **Variables** → **"+"**
+2. 이름: **"IsAirborne"**
+3. 타입: **Boolean** (기본값이 이미 Boolean)
+
+### Step 2: Transition Rule에 연결
+
+1. **Grounded to Airborne** 전환 규칙 내부
+2. **IsAirborne** 변수를 그래프로 드래그 → **Get**
+3. **Result** 노드의 입력에 연결
+4. **Compile**
+
+**의미:**
+
+- IsAirborne = True → 공중으로 전환
+- IsAirborne = False → 지상 유지
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380655/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_3/image_3.png)
+
+---
+
+## 12. 테스트: 수동 전환
+
+### Anim Preview Editor에서 테스트
+
+### 전환 실행해보기
+
+1. **Compile** 후 미리보기
+2. **Anim Preview Editor**에서 **IsAirborne** 체크박스 찾기
+3. **체크 (True)** → 공중 애니메이션으로 전환!
+4. **체크 해제 (False)** → ... 아무 일도 안 일어남?
+
+**문제점:**
+
+- 공중 → 지상으로 돌아오는 전환이 없음!
+
+---
+
+## 13. 반대 방향 전환: Airborne → Grounded
+
+### 역방향 전환 만들기
+
+### Step 1: 전환 생성
+
+1. **Locomotion State Machine**으로 돌아가기
+2. **Airborne**에서 화살표 드래그
+3. **Grounded**에 연결
+
+**전환 이름 확인:**
+
+- 마우스를 원 위에 올리면 이름 표시
+- **"Airborne to Grounded"**
+
+---
+
+### NOT 연산자 사용하기
+
+### Step 2: 전환 규칙 설정
+
+**Airborne to Grounded 더블클릭**
+
+**목표:**
+
+- IsAirborne이 **False일 때** 전환
+- IsAirborne의 **반대** 값 사용
+
+### NOT 연산자 노드
+
+1. **IsAirborne** 변수를 그래프로 드래그 → **Get**
+2. 출력 핀 드래그 → **"NOT Boolean"** 검색
+3. **NOT** 노드 선택 (느낌표처럼 생김)
+4. NOT 출력 → **Result** 입력 연결
+
+**NOT 연산자란?**
+
+```
+입력: True  → 출력: False
+입력: False → 출력: True
+
+```
+
+**C++와 비교:**
+
+```cpp
+// C++
+bool result = !isAirborne;
+
+// Blueprint
+IsAirborne → NOT → Result
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380655/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_3/image_4.png)
+
+---
+
+## 14. 완전한 전환 시스템 테스트
+
+### 양방향 전환 확인
+
+### Compile 후 테스트
+
+1. **Anim Preview Editor** 열기
+2. **IsAirborne 체크 (True)**
+   - Grounded → Airborne 전환
+   - Jump Apex 애니메이션 재생
+3. **IsAirborne 체크 해제 (False)**
+   - Airborne → Grounded 전환
+   - Blend Space 애니메이션 재생
+
+**성공!** 양방향 전환 작동
+
+---
+
+## 15. State Machine 구조 정리
+
+### 현재 완성된 구조
+
+```
+Entry → Grounded ⇄ Airborne
+        (지상)     (공중)
+
+```
+
+**Grounded 상태:**
+
+- Blend Space Locomotion 재생
+- Speed/Angle로 걷기/달리기 제어
+- IsAirborne = True → Airborne 전환
+
+**Airborne 상태:**
+
+- Jump Apex Combat 재생
+- IsAirborne = False → Grounded 전환
+
+---
+
+## 16. 다음 단계 예고
+
+### 아직 해결 안 된 것
+
+### 1) 실제 게임과 연결
+
+**현재:**
+
+- 수동으로 IsAirborne 체크박스 조작
+- 게임에서는 자동으로 되어야 함
+
+**다음 강의:**
+
+- Event Graph에서 캐릭터 상태 확인
+- 점프 중이면 IsAirborne = True
+- 착지하면 IsAirborne = False
+
+### 2) 더 부드러운 점프 애니메이션
+
+**추가할 상태들:**
+
+- **Jump Start**: 점프 시작 순간
+- **Jump Loop**: 상승 중
+- **Fall Loop**: 하강 중
+- **Land**: 착지 순간
+
+**이유:**
+
+- 현재는 점프 정점만 있어서 부자연스러움
+- 점프의 각 단계마다 적절한 애니메이션 필요
+
+---
+
+## 17. 핵심 개념 총정리
+
+### State Machine의 구성요소
+
+**State (상태):**
+
+- 캐릭터의 특정 행동
+- 각 상태마다 애니메이션 지정
+- Output Animation Pose로 출력
+
+**Transition (전환):**
+
+- 상태 간 이동 규칙
+- Boolean 조건으로 제어
+- True일 때만 전환 실행
+
+**Entry:**
+
+- 시작점
+- 초기 상태 지정
+
+---
+
+### 변수와 조건
+
+**Boolean 변수:**
+
+- True/False 두 가지 값
+- 전환 조건으로 사용
+
+**NOT 연산자:**
+
+- Boolean 값 반전
+- True ↔ False
+
+**논리 조합:**
+
+- AND, OR 등도 사용 가능 (다음 강의)
+
+---
+
+## 18. 내비게이션 팁 정리
+
+### 길 잃지 않는 방법
+
+### 1) 항상 툴바 확인
+
+```
+ABP > AnimGraph > Locomotion > Grounded
+
+```
+
+- 현재 위치 명확히 표시
+- 클릭으로 빠른 이동
+
+### 2) 탭 활용
+
+- 자주 가는 곳은 탭으로 유지
+- 닫지 말고 전환하며 사용
+
+### 3) My Blueprint 참고
+
+- 전체 구조 한눈에 파악
+- 원하는 그래프로 직접 이동
+
+### 4) 더블클릭 습관화
+
+- State Machine → 더블클릭 → 내부
+- State → 더블클릭 → 내부
+- Transition → 더블클릭 → 규칙
+
+---
+
+## 19. 실무 적용 팁
+
+### State Machine 설계 원칙
+
+**명확한 상태 분리:**
+
+- 각 상태는 하나의 명확한 행동
+- 겹치는 부분 최소화
+
+**단순한 전환 조건:**
+
+- 복잡한 로직은 Event Graph에서
+- Transition은 Boolean 체크만
+
+**확장 가능성 고려:**
+
+- 나중에 상태 추가 쉽게
+- 공통 기능은 분리
+
+---
+
+### 디버깅 방법
+
+**현재 상태 확인:**
+
+- State Machine 노드에 현재 상태 표시
+- 예: "Grounded (Active)"
+
+**전환 로그:**
+
+- Print String으로 전환 시점 출력
+- IsAirborne 값 확인
+
+**미리보기 활용:**
+
+- Anim Preview Editor에서 변수 조작
+- 실제 게임 전에 테스트
+
+---
+
+## 20. 마무리
+
+### 이번 강의에서 배운 것
+
+✅ **State Machine의 개념과 필요성**
+✅ **State Machine 생성 및 구조**
+✅ **State (상태) 만들기**
+✅ **Transition (전환) 설정하기**
+✅ **Boolean 변수로 전환 제어**
+✅ **NOT 연산자 사용법**
+✅ **양방향 전환 구현**
+✅ **복잡한 그래프 내비게이션**
+
+### 현재 완성도
+
+- Grounded ↔ Airborne 전환 가능
+- 수동으로 IsAirborne 조작
+- 기본 구조 완성
+
+### 다음 강의 내용
+
+- IsAirborne을 캐릭터 상태와 연결
+- 점프/착지 자동 감지
+- 추가 상태 구현 (Jump Start, Land 등)
+- 완전한 점프 시스템 완성
+
+# { 점프 애니메이션 완성하기: IsAirborne 연결 및 상태 추가 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380655/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_3/image_5.png)
+
+## 1. 강의 목표
+
+### 두 가지 주요 작업
+
+**목표 1: IsAirborne을 실제 캐릭터 상태와 연결**
+
+- 현재: 수동으로 체크박스 조작
+- 목표: 점프하면 자동으로 True, 착지하면 자동으로 False
+
+**목표 2: 점프 애니메이션 개선**
+
+- 현재: Jump Apex(정점)만 있음
+- 추가: Jump Start(시작), Landing(착지) 상태
+- 결과: 부드럽고 자연스러운 점프
+
+---
+
+## 2. Event Graph 코드 정리하기
+
+### Sequence 노드로 정리
+
+**Sequence 노드란?**
+
+- 여러 작업을 순서대로 실행
+- 코드를 깔끔하게 정리
+
+**정리 과정:**
+
+1. Event Graph에서 **우클릭** → **"Sequence"** 검색
+2. **IsValid의 Is Valid 출력** → **Sequence 입력** 연결
+3. **Sequence의 Then 0** → 기존 **Set Speed** 연결
+4. **Then 1**은 IsAirborne 설정용으로 남겨둠
+
+**정리된 구조:**
+
+```
+IsValid
+    ↓
+[Sequence]
+    ↓
+Then 0 → Set Speed → Set Angle
+    ↓
+Then 1 → (IsAirborne 설정 추가 예정)
+```
+
+---
+
+## 3. IsAirborne 자동 설정 구현
+
+### Character Movement Component 활용
+
+**Is Falling 함수:**
+
+- 캐릭터가 공중에 있는지 확인
+- 반환: True (공중) / False (지상)
+- 점프와 낙하 모두 포함
+
+### 단계별 구현
+
+**Step 1: Pawn Owner에서 Movement Component 가져오기**
+
+1. **Sequence의 Then 1** 근처에서 우클릭
+2. **"Try Get Pawn Owner"** 검색 (새로 생성)
+3. 반환값 드래그 → **"Get Movement Component"** 검색
+
+**Step 2: Is Falling 함수 호출**
+
+1. **Get Movement Component** 반환값 드래그
+2. **"Is Falling"** 검색 (Movement 카테고리)
+3. Boolean 값 반환됨
+
+**Step 3: IsAirborne 변수에 설정**
+
+1. **IsAirborne** 변수를 그래프로 드래그 → **Set**
+2. **Is Falling 반환값** → **Set IsAirborne 입력** 연결
+3. **Sequence의 Then 1** → **Set IsAirborne 실행 핀** 연결
+
+**완성된 흐름:**
+
+```
+Then 1 → Try Get Pawn Owner → Get Movement Component
+         → Is Falling → Set IsAirborne
+```
+
+### 첫 번째 테스트
+
+**Compile & Play:**
+
+- 점프하면 자동으로 Airborne 상태로
+- 착지하면 자동으로 Grounded 상태로
+- **성공!**
+
+---
+
+## 4. 점프 애니메이션 종류
+
+### Asset Browser에서 확인
+
+**"Jump_Combat" 검색 시 3가지 애니메이션:**
+
+**Jump_Start_Combat:**
+
+- 점프 시작 순간 (땅에서 발 들어올림)
+- 매우 짧은 애니메이션
+
+**Jump_Apex_Combat (현재 사용 중):**
+
+- 점프 정점 (가장 높은 지점)
+- 공중에 떠 있는 자세
+
+**Jump_Land_Combat:**
+
+- 착지 순간 (발이 땅에 닿음)
+- 충격 흡수 자세
+
+---
+
+## 5. 개선된 State Machine 설계
+
+### 현재 vs 개선
+
+**현재 구조 (단순함):**
+
+```
+Grounded ⇄ Airborne
+```
+
+**개선된 구조 (자연스러움):**
+
+```
+Grounded → JumpStart → Airborne → Landing → Grounded
+```
+
+**각 단계:**
+
+1. **Grounded**: 지상 이동
+2. **JumpStart**: 점프 시작 애니메이션
+3. **Airborne**: 공중 체류
+4. **Landing**: 착지 애니메이션
+5. **Grounded**: 다시 지상으로
+
+---
+
+## 6. JumpStart 상태 만들기
+
+### 상태 생성 및 설정
+
+**Step 1: 새 상태 추가**
+
+1. **Locomotion State Machine**에서 우클릭
+2. **Add State** → 이름: **"JumpStart"**
+3. **더블클릭**하여 내부 진입
+4. **Jump_Start_Combat** 드래그 → **Output Animation Pose** 연결
+
+**Step 2: 기존 전환 삭제**
+
+- **Grounded ↔ Airborne** 직접 연결 모두 삭제 (Delete 키)
+
+**Step 3: 새로운 전환 생성**
+
+- **Grounded** → **JumpStart** 화살표 연결
+
+**Step 4: 전환 조건 설정**
+
+1. **Grounded to JumpStart** 전환 더블클릭
+2. **IsAirborne** 변수 드래그 → **Get**
+3. **Result**에 연결
+
+---
+
+### 자동 전환 설정
+
+**JumpStart → Airborne 전환:**
+
+**문제:** 애니메이션이 끝났는지 어떻게 알까?
+
+**해결책: Automatic Rule**
+
+1. **JumpStart → Airborne** 화살표 생성
+2. 전환 아이콘 **클릭** (더블클릭 아님!)
+3. **Details**에서 **"Automatic Rule Based On Sequence Player"** 검색
+4. **체크박스 켜기**
+
+**의미:**
+
+- 애니메이션이 끝나면 자동으로 다음 상태로 전환
+- 별도의 조건 불필요!
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380655/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_3/image_6.png)
+
+---
+
+## 7. Landing 상태 만들기 (실습)
+
+### 단계별 구현
+
+**Step 1: Landing 상태 생성**
+
+1. 우클릭 → **Add State** → 이름: **"Landing"**
+2. 더블클릭 → **Jump_Land_Combat** 드래그 → Output 연결
+
+**Step 2: Airborne → Landing 전환**
+
+1. **Airborne** → **Landing** 화살표 연결
+2. 전환 더블클릭
+3. **IsAirborne** → **NOT Boolean** → **Result** 연결
+   - NOT 연산자: Boolean 값 반전 (True ↔ False)
+
+**Step 3: Landing → Grounded 자동 전환**
+
+1. **Landing** → **Grounded** 화살표 연결
+2. 전환 **클릭** (더블클릭 아님)
+3. **Automatic Rule Based On Sequence Player** 체크
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380656/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_3/image_7.png)
+
+---
+
+## 8. 완성된 State Machine
+
+### 최종 구조
+
+| 상태          | 애니메이션        | 전환 조건          |
+| ------------- | ----------------- | ------------------ |
+| **Grounded**  | Blend Space       | IsAirborne = True  |
+| **JumpStart** | Jump_Start_Combat | 애니메이션 완료    |
+| **Airborne**  | Jump_Apex_Combat  | IsAirborne = False |
+| **Landing**   | Jump_Land_Combat  | 애니메이션 완료    |
+
+**흐름:**
+
+```
+Entry → Grounded → JumpStart → Airborne → Landing → Grounded
+```
+
+### 게임에서 테스트
+
+**Play 후 점프:**
+
+- ✅ 점프 시작 애니메이션
+- ✅ 공중 체류 애니메이션
+- ✅ 착지 애니메이션
+- ✅ 자연스러운 전환!
+
+---
+
+## 9. 전환 블렌딩 조정 (추가 개선)
+
+### 착지를 더 빠르게
+
+**문제:** 착지 시 발이 땅에 닿는 게 조금 느림
+
+**해결:**
+
+1. **Landing to Grounded** 전환 클릭
+2. **Details** → **Blend Settings** 찾기
+3. **Mode** 변경: **Exponential Out** 선택
+   - 빠르게 시작 → 느리게 끝
+   - 착지가 더 날렵해짐
+
+**재테스트:**
+
+- Compile & Play
+- 착지가 더 빠르고 반응적!
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380656/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_3/image_8.png)
+
+---
+
+## 10. 핵심 개념 정리
+
+### State Machine의 두 가지 전환 방식
+
+**1) 조건 기반 전환**
+
+- 변수 값으로 판단 (IsAirborne)
+- 예: Grounded → JumpStart
+
+**2) 애니메이션 기반 자동 전환**
+
+- Automatic Rule Based On Sequence Player
+- 애니메이션 완료 시 자동
+- 예: JumpStart → Airborne
+
+**두 방식을 조합해서 사용하는 것이 핵심!**
+
+### Sequence 노드의 장점
+
+- 코드 조직화
+- 실행 순서 명확
+- 확장 용이 (Then 2, 3... 추가 가능)
+
+---
+
+## 11. 트러블슈팅
+
+### 점프가 재생 안 됨
+
+**원인:** IsAirborne이 업데이트 안 됨
+**해결:** Event Graph에서 Is Falling 연결 확인, Compile 확인
+
+### 점프 시작/착지 애니메이션이 안 보임
+
+**정상입니다!**
+
+- 애니메이션이 0.1~0.2초로 매우 짧음
+- 실제로는 재생되고 자연스러움 향상
+- 느린 동작으로 확인 가능
+
+### 착지가 부자연스러움
+
+**해결:** Landing to Grounded 전환의 Blend Mode 조정
+
+---
+
+## 12. 완성!
+
+### 배운 내용
+
+✅ **Character Movement Component의 Is Falling 활용**
+✅ **Sequence 노드로 코드 정리**
+✅ **IsAirborne 자동 업데이트 구현**
+✅ **JumpStart, Landing 상태 추가**
+✅ **자동 전환 시스템 (Automatic Rule)**
+✅ **전환 블렌딩 조정**
+
+### 완성된 시스템
+
+- 지상 이동 (8방향, 3속도)
+- 점프 시작, 공중, 착지
+- 모든 전환 자동화
+- **프로페셔널한 캐릭터 애니메이션!**
+
+# { 애니메이션 블루프린트에 사용된 노드 분석 }
+
+## **이벤트 노드**
+
+**Event BlueprintUpdateAnimation (K2Node_Event_0)**
+
+- 애니메이션 블루프린트 전용 이벤트
+- 매 프레임마다 애니메이션 업데이트 시 호출됨
+- Tick 이벤트와 비슷하지만 애니메이션 시스템에 특화됨
+- DeltaTimeX 출력: 프레임 간 시간 간격
+
+## **검증 노드**
+
+**IsValid (K2Node_MacroInstance_0)**
+
+- 매크로 노드 (표준 매크로)
+- 객체가 유효한지(null이 아닌지, 파괴되지 않았는지) 확인
+- InputObject: TryGetPawnOwner의 결과를 받음
+- "Is Valid" / "Is Not Valid" 두 경로로 분기
+
+## **Pawn/Movement 관련**
+
+**TryGetPawnOwner (K2Node_CallFunction_0, K2Node_CallFunction_8)**
+
+- 애니메이션이 적용되는 Pawn(캐릭터) 참조 가져오기
+- 애니메이션 블루프린트 전용 함수
+- Pure 함수 (실행 핀 없음, 값만 반환)
+
+**GetVelocity (K2Node_CallFunction_2)**
+
+- Actor의 현재 속도 벡터 반환
+- Vector(X, Y, Z) 형태로 이동 속도 정보 제공
+
+**GetTransform (K2Node_CallFunction_4)**
+
+- Actor의 위치, 회전, 스케일 정보를 담은 Transform 반환
+- 로컬 좌표계 계산에 필요
+
+**GetMovementComponent (K2Node_CallFunction_9)**
+
+- Pawn의 Movement Component 참조 가져오기
+- CharacterMovementComponent 등의 이동 컴포넌트 접근
+
+**IsFalling (K2Node_CallFunction_10)**
+
+- 캐릭터가 낙하 중인지 확인 (공중에 있는지)
+- boolean 반환: true = 공중, false = 지상
+
+## **수학 연산 노드**
+
+**VSize (K2Node_CallFunction_3)**
+
+- Vector Size의 약자
+- Vector의 크기(길이)를 float 값으로 변환
+- √(X² + Y² + Z²) 계산
+- 용도: 속도 벡터의 크기 = 실제 이동 속력
+
+**InverseTransformDirection (K2Node_CallFunction_1)**
+
+- 월드 좌표계의 방향을 로컬 좌표계로 변환
+- T (Transform): 기준이 되는 Transform
+- Direction: 변환할 방향 벡터
+- 용도: 캐릭터 기준에서 앞/뒤/좌/우 이동 방향 파악
+
+**Conv_VectorToRotator (K2Node_CallFunction_6)**
+
+- Vector를 Rotator로 변환
+- 방향 벡터를 회전값(Roll, Pitch, Yaw)으로 변환
+- 이 경우 Yaw(좌우 회전각)만 사용
+
+## **흐름 제어**
+
+**Sequence (K2Node_ExecutionSequence_0)**
+
+- 실행 흐름을 여러 갈래로 분기
+- then_0: Speed, Angle 계산
+- then_1: IsAirborne 계산
+- 순서대로 실행됨
+
+## **변수 설정**
+
+**Set Speed (K2Node_VariableSet_0)**
+
+- Speed 변수에 값 저장
+- VSize의 결과(속력)를 저장
+- 애니메이션에서 블렌드 스페이스 등에 사용
+
+**Set Angle (K2Node_VariableSet_1)**
+
+- Angle 변수에 값 저장
+- Yaw 회전값(좌우 방향각) 저장
+- 8방향 이동 애니메이션 블렌딩에 사용
+
+**Set IsAirborne (K2Node_VariableSet_2)**
+
+- IsAirborne(공중 상태) 변수에 값 저장
+- IsFalling의 boolean 결과 저장
+- 점프/낙하 애니메이션 전환에 사용
+
+---
+
+## **전체 로직 요약**
+
+이 블루프린트는 **캐릭터 애니메이션을 위한 기본 변수들을 매 프레임 업데이트**하는 구조예요:
+
+1. **Event BlueprintUpdateAnimation** 실행 (매 프레임)
+2. **TryGetPawnOwner**로 캐릭터 참조 획득
+3. **IsValid**로 유효성 검증
+4. **Sequence**로 두 갈래 동시 실행:
+   - **경로 1**: 속도와 방향 계산
+     - GetVelocity → 이동 속도 벡터
+     - VSize → 속력(Speed) 계산 및 저장
+     - GetTransform + InverseTransformDirection → 로컬 좌표계로 변환
+     - Conv_VectorToRotator → Yaw 값(Angle) 추출 및 저장
+   - **경로 2**: 공중 상태 확인
+     - GetMovementComponent → IsFalling → IsAirborne 저장
+
+이 세 변수(Speed, Angle, IsAirborne)는 애님 그래프의 블렌드 스페이스나 상태 머신에서 사용되어 달리기/걷기/점프 애니메이션을 자연스럽게 전환하는데 쓰일 거예요.
+
+# { 블루프린트의 주요 노드 정리 }
+
+## **이벤트 노드 (Events)**
+
+**BeginPlay**
+
+- 액터가 게임에 생성될 때 한 번 실행
+- 초기화 작업에 주로 사용 (변수 설정, 컴포넌트 세팅 등)
+
+**Tick**
+
+- 매 프레임마다 실행 (보통 60fps면 초당 60번)
+- Delta Seconds 출력: 이전 프레임과의 시간 간격
+- 성능 주의: 무거운 로직 넣으면 fps 떨어짐
+
+**Event Dispatcher**
+
+- 커스텀 이벤트를 다른 블루프린트로 브로드캐스트
+- 예: "적이 죽었다"는 신호를 UI, 사운드, 퀘스트 시스템에 동시에 알림
+
+**Input Events (InputAction, InputAxis)**
+
+- 키보드/마우스/게임패드 입력 감지
+- InputAction: 눌렀다/뗐다 (점프, 공격)
+- InputAxis: 연속 값 (-1~1, 이동 방향)
+
+## **흐름 제어 (Flow Control)**
+
+**Branch**
+
+- if문, 조건이 True/False에 따라 실행 경로 분기
+- Condition 입력에 boolean 값
+
+**Sequence**
+
+- 실행 핀을 여러 개로 분기, 순서대로 실행
+- Then 0, Then 1, Then 2... 순서로 진행
+
+**ForLoop / ForEachLoop**
+
+- 반복문
+- ForLoop: 0부터 N-1까지 반복
+- ForEachLoop: 배열의 각 요소마다 실행
+
+**Switch (on Int/String/Enum)**
+
+- switch-case문
+- 값에 따라 여러 경로 중 하나를 선택
+
+**DoOnce / DoN**
+
+- DoOnce: 한 번만 실행, Reset 핀으로 초기화 가능
+- DoN: N번만 실행
+
+**Gate**
+
+- Open/Close로 실행 흐름을 제어
+- 문처럼 열어야 통과, 닫으면 차단
+
+**Delay**
+
+- 일정 시간 후 실행
+- Duration 입력에 초 단위
+
+**Retriggerable Delay**
+
+- 다시 호출되면 타이머가 리셋되는 Delay
+- 예: 마지막 입력 후 0.5초 뒤에 실행
+
+## **변수 관련**
+
+**Get/Set Variable**
+
+- 변수 읽기/쓰기
+- Get은 값만 가져옴, Set은 실행 핀 있음
+
+**Promote to Variable**
+
+- 핀을 우클릭해서 변수로 만들기
+- 임시 값을 저장해서 재사용
+
+**Cast To [클래스]**
+
+- 타입 변환/확인
+- 예: Actor를 Character로 캐스팅해서 Character 전용 기능 접근
+- 실패하면 Cast Failed 핀 실행
+
+**Get Player Character/Controller**
+
+- 플레이어 캐릭터나 컨트롤러 참조 가져오기
+
+**Get All Actors of Class**
+
+- 레벨에 있는 특정 클래스의 모든 액터를 배열로 반환
+- 예: 맵의 모든 적 찾기
+
+## **수학 연산 (Math)**
+
+**Add/Subtract/Multiply/Divide**
+
+- 기본 사칙연산 (+, -, \*, /)
+
+**> / < / >= / <= / ==**
+
+- 비교 연산, boolean 반환
+- Greater, Less, Equal 등
+
+**Lerp (Linear Interpolate)**
+
+- A와 B 사이를 Alpha(0~1) 비율로 보간
+- 부드러운 전환에 사용
+- 예: Lerp(현재위치, 목표위치, 0.1) → 10%씩 이동
+
+**Clamp**
+
+- 값을 최소~최대 범위로 제한
+- 예: Clamp(체력, 0, 100)
+
+**Random Float/Integer in Range**
+
+- 범위 내 랜덤 값 생성
+
+## **문자열 (String)**
+
+**Append**
+
+- 문자열 연결
+- "Hello" + " World" = "Hello World"
+
+**Format Text**
+
+- 문자열 포맷팅
+- "{0}님이 {1}점 획득" 같은 템플릿에 값 대입
+
+**Print String**
+
+- 화면에 디버그 텍스트 출력 (개발용)
+
+## **배열 (Array)**
+
+**Add**
+
+- 배열 끝에 요소 추가
+
+**Remove**
+
+- 특정 요소 제거
+
+**Get (배열)**
+
+- 인덱스로 요소 접근
+- 0부터 시작
+
+**Length**
+
+- 배열 크기 반환
+
+**Contains**
+
+- 특정 값이 배열에 있는지 확인 (boolean)
+
+**Find**
+
+- 값의 인덱스 찾기, 없으면 -1
+
+**Clear**
+
+- 배열 비우기
+
+## **타이머 (Timer)**
+
+**Set Timer by Event/Function Name**
+
+- 일정 시간마다 함수 실행
+- Looping 체크하면 반복
+- Time 입력에 간격(초)
+
+**Clear Timer**
+
+- 실행 중인 타이머 중지
+
+**Pause/Unpause Timer**
+
+- 타이머 일시정지/재개
+
+**Get Timer Remaining/Elapsed**
+
+- 남은 시간/경과 시간 확인
+
+## **컴포넌트 관련**
+
+**Add Component**
+
+- 런타임에 컴포넌트 추가
+- 예: Particle System, Audio Component
+
+**Get Component by Class**
+
+- 특정 타입의 컴포넌트 찾기
+
+**Destroy Component**
+
+- 컴포넌트 제거
+
+## **트랜스폼 (Transform)**
+
+**Get/Set Actor Location**
+
+- 액터의 월드 위치 읽기/쓰기
+
+**Get/Set Actor Rotation**
+
+- 액터의 회전값
+
+**Add Actor Local/World Offset**
+
+- 위치 이동
+- Local: 액터 기준 방향
+- World: 월드 절대 좌표
+
+**Set Actor Scale 3D**
+
+- 크기 변경
+
+**Look At Rotation**
+
+- A에서 B를 바라보는 회전값 계산
+- AI가 플레이어를 향하게 할 때 사용
+
+## **충돌/물리 (Collision/Physics)**
+
+**OnComponentBeginOverlap**
+
+- 충돌 박스에 뭔가 들어올 때
+- Other Actor 출력: 충돌한 상대
+
+**OnComponentEndOverlap**
+
+- 충돌 박스에서 나갈 때
+
+**OnComponentHit**
+
+- 물리 충돌 발생 시
+- Simulation Generates Hit Events 켜야 함
+
+**Set Simulate Physics**
+
+- 물리 시뮬레이션 켜기/끄기
+
+**Add Impulse/Force**
+
+- 물리적 힘 가하기
+- Impulse: 즉발적 힘 (폭발)
+- Force: 지속적 힘 (중력)
+
+## **애니메이션**
+
+**Play Anim Montage**
+
+- 애니메이션 몽타주 재생
+- 공격, 피격 같은 일회성 애니메이션
+
+**Set Anim Class Variable**
+
+- 애니메이션 블루프린트의 변수 변경
+- 예: 이동 속도, 공중 여부
+
+## **사운드**
+
+**Play Sound at Location**
+
+- 3D 공간의 특정 위치에서 소리 재생
+
+**Play Sound 2D**
+
+- UI 효과음 같은 2D 사운드
+
+**Spawn Sound Attached**
+
+- 액터에 붙여서 따라다니는 소리
+
+## **UI (UMG)**
+
+**Create Widget**
+
+- UI 위젯 생성
+- Class 입력에 위젯 블루프린트 지정
+
+**Add to Viewport**
+
+- 생성한 위젯을 화면에 표시
+
+**Remove from Parent**
+
+- 화면에서 위젯 제거
+
+**Set Visibility**
+
+- UI 요소 보이기/숨기기
+
+## **레벨/게임**
+
+**Open Level (by Name)**
+
+- 다른 레벨로 이동
+
+**Get Game Mode**
+
+- 현재 게임 모드 참조
+
+**Get Game Instance**
+
+- 게임 인스턴스(레벨 전환해도 유지되는 데이터) 접근
+
+**Quit Game**
+
+- 게임 종료
+
+## **디버깅**
+
+**Print String**
+
+- 화면에 텍스트 출력 (노란색 글씨)
+
+**Draw Debug Line/Box/Sphere**
+
+- 시각적 디버그 도형 그리기
+
+**Break [타입]**
+
+- 복합 타입(Vector, Rotator 등)을 개별 값으로 분해
+- 예: Vector → X, Y, Z
+
+**Make [타입]**
+
+- 개별 값으로 복합 타입 생성
+- 예: X, Y, Z → Vector
+
+---
+
+이 정도가 자주 쓰는 기본 노드들이에요. 각 노드는 우클릭해서 "Add Call to [함수명]"으로 추가하거나, 드래그로 핀을 끌어서 자동 완성할 수 있어요. 특정 분야(AI, 멀티플레이어, 머티리얼 등)에 대해 더 자세히 알고 싶으면 말해주세요!
+
+# 애디티브 애니메이션으로 캐릭터 조준 구현하기
+
+## 문제 상황
+
+게임에서 마우스로 위아래를 봐도 캐릭터가 반응하지 않는 문제가 있습니다. 좌우 회전은 캐릭터 전체가 돌아가면 되지만, 위아래를 보려면 특별한 애니메이션 처리가 필요합니다.
+
+## 해결 방법: 애디티브 애니메이션
+
+**애디티브 애니메이션**은 기존 애니메이션 위에 추가로 덧붙이는 애니메이션입니다. 걷기/뛰기 같은 기본 애니메이션을 유지하면서 팔과 머리만 따로 조준 동작을 추가할 수 있습니다.
+
+## 단계별 구현
+
+### 1단계: 조준 오프셋 애니메이션 찾기
+
+- Paragon 폴더 → Heroes → Wraith로 이동
+- "AO"(Aim Offset) 라벨이 붙은 애니메이션 찾기
+- "Idle_AO_Combat" 애니메이션 열기
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380656/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_3/image_9.png)
+
+### 2단계: 블렌드 스페이스 이해하기
+
+- **피치(Pitch)**: 위아래 보기
+  - 90 = 위를 똑바로 봄
+  - 0 = 정면
+  - 90 = 아래를 똑바로 봄
+- **요(Yaw)**: 좌우 보기 (이번에는 사용 안 함)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380653/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_3/image_10.png)
+
+### 3단계: 애니메이션 블루프린트에 적용
+
+1. 애니메이션 그래프에서 작업
+2. Asset Browser에서 "Idle AO" 검색하여 추가
+3. State Machine → Idle AO → Output Pose 순으로 연결
+4. 이렇게 하면 기본 애니메이션에 조준 동작이 추가됩니다
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380654/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_3/image_11.png)
+
+### 4단계: 피치 변수 만들기
+
+- 새 변수 "AimPitch" 생성 (Float 타입)
+- Aim Offset 노드의 Pitch 입력에 연결
+- 이제 값을 조절하면 캐릭터가 위아래를 봅니다
+
+### 5단계: 실제 마우스 회전과 연결
+
+Event Graph에서 작업:
+
+1. **Pawn Owner**에서 **Get Control Rotation** 가져오기
+   - 마우스 회전 정보를 가져옴
+2. **문제 발생**: 아래를 볼 때 0→-90이 아니라 360→270으로 표시됨
+3. **해결책**: Delta 계산
+
+   ```
+   Control Rotation - Actor Rotation = 원하는 값
+   ```
+
+4. 결과에서 Pitch만 분리해서 AimPitch 변수에 할당
+
+## 결과
+
+이제 게임을 플레이하면 마우스를 위아래로 움직일 때 캐릭터의 팔과 머리가 자연스럽게 따라 움직이며 조준합니다. 걷기, 달리기, 점프 등 어떤 동작을 하든 조준 애니메이션이 위에 덧붙여져서 작동합니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380654/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_3/image_12.png)
+
+# 프리뷰 베이스 포즈(Preview Base Pose)
+
+애디티브 애니메이션을 미리보기할 때 **어떤 기본 애니메이션 위에 덧붙여서 볼 것인지** 지정하는 설정입니다.
+
+## 왜 필요한가?
+
+애디티브 애니메이션은 **단독으로는 의미가 없고**, 항상 다른 애니메이션 위에 추가되어야 합니다.
+
+예를 들어:
+
+- 조준 오프셋 애니메이션만 보면 → 이상하게 보임
+- 달리기 애니메이션 + 조준 오프셋 → 자연스러움
+- 점프 애니메이션 + 조준 오프셋 → 자연스러움
+
+## 실제 사용 예시
+
+강의에서 본 "Idle_AO_Combat" 애니메이션의 경우:
+
+```
+Asset Details(에셋 세부 정보)에서
+└─ Additive Settings
+   └─ Preview Base Pose: Idle_Combat
+```
+
+이 설정 덕분에:
+
+- 에디터에서 애니메이션을 열면
+- 자동으로 "Idle_Combat" 포즈 위에 조준 동작이 덧붙여진 모습을 미리볼 수 있습니다
+
+## 요약
+
+**프리뷰 베이스 포즈 = 에디터에서 미리보기용 기본 애니메이션**
+
+실제 게임에서는 State Machine에서 나온 애니메이션이 베이스가 되지만, 에디터에서 애디티브 애니메이션을 단독으로 열어볼 때는 이 설정값을 사용해서 보여줍니다.
+
+작업자가 "이 애디티브 애니메이션이 실제로 어떻게 보일지" 확인하기 편하도록 도와주는 기능이에요.
+
+# { 게임 화면에 조준점(십자선) 만들기 }
+
+## 🎯 뭘 만드는 거예요?
+
+슈팅 게임을 해보셨나요? 화면 한가운데 **빨간 십자(+)** 표시 있죠? 그게 바로 **조준점(십자선, Crosshair)** 입니다.
+
+![십자선 예시]
+
+```
+        화면
+  ┌─────────────┐
+  │             │
+  │      +      │  ← 이 빨간 + 기호
+  │             │
+  └─────────────┘
+
+```
+
+---
+
+## 🧩 만드는 순서 (큰 그림)
+
+1. **설계도 만들기** - C++로 기본 틀 만들기
+2. **디자인하기** - 언리얼 에디터에서 예쁘게 꾸미기
+3. **화면에 띄우기** - 게임 시작하면 자동으로 보이게 하기
+
+마치 **집을 짓는 것**과 비슷해요:
+
+- C++ = 집의 기둥 (구조)
+- Blueprint = 인테리어 (꾸미기)
+- PlayerController = 입주 (실제 사용)
+
+---
+
+## 📝 Step 1: 기본 틀 만들기 (C++)
+
+### 왜 C++로 먼저 만들어요?
+
+나중에 기능 추가가 쉬워요. 예를 들어:
+
+- 체력바 추가
+- 탄창 개수 표시
+- 미니맵 추가
+
+지금은 빈 껍데기만 만들고, 나중에 필요할 때 채워 넣으면 됩니다.
+
+### 어떻게 만들어요?
+
+**언리얼 에디터에서:**
+
+```
+상단 메뉴: Tools
+  → New C++ Class 클릭
+  → "User Widget" 검색해서 선택
+  → 이름: "HUDWidget" 입력
+  → Create Class 클릭
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380654/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_3/image_13.png)
+
+**결과:**
+
+- HUDWidget.h (헤더 파일)
+- HUDWidget.cpp (구현 파일)
+
+두 파일이 생성되지만 **지금은 비어있어도 OK!** ✅
+
+---
+
+## 🎨 Step 2: 십자선 디자인하기 (Blueprint)
+
+이제 실제로 보이는 것을 만들 차례입니다.
+
+### 2-1: 새 위젯 만들기
+
+**Content Browser에서:**
+
+```
+1. "User Interface" 폴더 찾기 (없으면 새로 만들기)
+2. 폴더 안에서 우클릭
+3. "User Interface" → "Widget Blueprint" 선택
+4. 부모 클래스: "HUDWidget" 선택 (아까 만든 C++ 클래스)
+5. 이름: "WBP_HUD" 입력
+```
+
+**더블클릭해서 열기** → 위젯 에디터가 열립니다
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380654/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_3/image_14.png)
+
+---
+
+### 2-2: 캔버스 만들기
+
+위젯을 담을 **도화지**가 필요합니다.
+
+```
+왼쪽 Palette 패널에서:
+"Canvas Panel" 찾기
+→ 가운데 화면으로 드래그
+```
+
+**Canvas Panel = 그림을 그릴 도화지** 🎨
+
+---
+
+### 2-3: 십자선 만들기
+
+### 방법: 텍스트로 + 기호 만들기
+
+```
+Palette에서:
+"Text" 위젯 찾기
+→ Canvas Panel 위로 드래그
+```
+
+### 텍스트 설정하기
+
+**오른쪽 Details 패널에서:**
+
+**1. 내용 바꾸기**
+
+```
+Content → Text: "+"  입력
+```
+
+**2. 색깔 바꾸기**
+
+```
+Appearance → Color and Opacity
+→ 빨간색 선택
+→ Alpha (투명도): 0.7
+```
+
+> Alpha 1.0 = 완전 불투명
+>
+> Alpha 0.7 = 살짝 투명 (너무 진하지 않게)
+
+**3. 폰트 설정**
+
+```
+Font → Font Family: "Droid Sans Mono" 선택
+Font → Size: 30
+```
+
+**4. 정렬**
+
+```
+Justification:
+☑ Align Text Center (가운데 정렬)
+```
+
+---
+
+### 2-4: 화면 중앙에 배치하기 ⭐ (중요!)
+
+### 개념 이해: 앵커(Anchor)란?
+
+**앵커 = 배가 정박하는 닻**
+
+```
+작은 화면          큰 화면
+┌────┐           ┌────────┐
+│  + │    →      │   +    │
+└────┘           └────────┘
+   ↑                 ↑
+화면이 커져도 중앙에 고정!
+```
+
+앵커를 중앙에 두면 화면 크기가 바뀌어도 십자선이 중앙에 유지됩니다.
+
+### 설정 방법
+
+**Details 패널 → Slot (Canvas Panel Slot)**
+
+**1. 앵커 설정**
+
+```
+Anchors 클릭
+→ 가운데 동그라미 선택 (중앙 앵커)
+```
+
+**2. Position 초기화**
+
+```
+Position X: 0
+Position Y: 0
+```
+
+**3. Alignment 설정** (핵심!)
+
+```
+Alignment X: 0.5
+Alignment Y: 0.5
+```
+
+**Alignment가 뭔가요?**
+
+```
+(0, 0) = 왼쪽 위 모서리가 기준점
+┌─────
+│+
+│
+
+(0.5, 0.5) = 정중앙이 기준점
+    +
+  ╱│╲
+ ╱ │ ╲
+```
+
+십자선은 정중앙에 와야 하니까 0.5, 0.5로 설정!
+
+**4. Size to Content 체크**
+
+```
+☑ Size to Content
+```
+
+> 텍스트 크기에 맞춰서 위젯 크기 자동 조절
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380654/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_3/image_15.png)
+
+---
+
+### 2-5: 저장하기
+
+```
+좌상단: Compile (컴파일)
+그 옆: Save (저장)
+```
+
+---
+
+## 🚀 Step 3: 화면에 띄우기 (C++)
+
+위젯을 **만들었지만 아직 화면에 안 보입니다**.
+
+**비유:**
+
+- 케이크를 만들었지만 (위젯 제작)
+- 아직 식탁에 올리지 않음 (화면에 표시 안 함)
+
+### PlayerController가 뭐예요?
+
+**PlayerController = 플레이어를 조종하는 관리자**
+
+게임이 시작되면 PlayerController가:
+
+1. 캐릭터 조종 준비
+2. UI 화면 준비 ← 여기서 십자선도 띄움!
+3. 입력 처리
+
+---
+
+### 3-1: C++ 헤더 파일 수정
+
+**ShooterSamPlayerController.h** 파일 열기
+
+```cpp
+// 맨 위에 추가
+#include "HUDWidget.h"
+
+class AShooterSamPlayerController : public APlayerController
+{
+    // 블루프린트에서 지정할 위젯 클래스
+    UPROPERTY(EditAnywhere)
+    TSubclassOf<UHUDWidget> HUDWidgetClass;
+
+    // 실제로 생성된 위젯을 담을 변수
+    UPROPERTY()
+    UHUDWidget* HUDWidget;
+};
+```
+
+**용어 설명:**
+
+- `UPROPERTY(EditAnywhere)` = 언리얼 에디터에서 수정 가능
+- `TSubclassOf<>` = 클래스 타입을 담는 변수
+- `UHUDWidget*` = HUDWidget을 가리키는 포인터
+
+---
+
+### 3-2: C++ 구현 파일 수정
+
+**ShooterSamPlayerController.cpp** 파일 열기
+
+**BeginPlay() 함수 안에 추가:**
+
+```cpp
+void AShooterSamPlayerController::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // ... 기존 모바일 코드 ...
+
+    // ===== 여기부터 추가 =====
+
+    // 1단계: 위젯 생성 (메모리에 만들기)
+    HUDWidget = CreateWidget<UHUDWidget>(this, HUDWidgetClass);
+
+    // 2단계: 제대로 생성되었는지 확인
+    if (HUDWidget)
+    {
+        // 3단계: 화면에 표시
+        HUDWidget->AddToViewport();
+    }
+}
+```
+
+**코드 한 줄씩 이해하기:**
+
+```cpp
+HUDWidget = CreateWidget<UHUDWidget>(this, HUDWidgetClass);
+```
+
+- `CreateWidget` = 위젯 만드는 함수
+- `<UHUDWidget>` = 어떤 타입인지 알려줌
+- `this` = 이 PlayerController가 주인
+- `HUDWidgetClass` = 어떤 블루프린트로 만들지 (나중에 지정)
+
+```cpp
+if (HUDWidget)
+```
+
+- 제대로 만들어졌는지 확인
+- 만약 실패했으면 게임이 터지니까 체크!
+
+```cpp
+HUDWidget->AddToViewport();
+```
+
+- 만든 위젯을 실제 화면에 표시
+- 이제 비로소 게임에서 보임!
+
+---
+
+### 3-3: 블루프린트에서 연결하기
+
+C++ 코드만으로는 안 됩니다. **어떤 위젯을 쓸지** 알려줘야 해요!
+
+**Content Browser에서:**
+
+```
+1. "BP_PlayerController" 찾기
+2. 더블클릭해서 열기
+3. Details 패널 검색: "HUD Widget Class"
+4. 드롭다운 클릭 → "WBP_HUD" 선택
+5. Compile & Save
+```
+
+---
+
+## ✅ 완성! 테스트하기
+
+**Play 버튼 누르기!**
+
+화면 중앙에 빨간 십자선이 보이면 **성공!** 🎉
+
+---
+
+### Q4: 텍스트 말고 이미지로 만들 수 있나요?
+
+**물론이죠!**
+
+```
+1. 포토샵에서 십자선 PNG 이미지 만들기
+2. 언리얼에 Import
+3. Text 대신 "Image" 위젯 사용
+4. 이미지 선택
+```
+
+---
+
+## 📚 핵심 개념 정리
+
+### Widget = UI 요소
+
+버튼, 텍스트, 이미지 등 화면에 보이는 모든 것
+
+### Canvas Panel = 도화지
+
+위젯들을 배치할 수 있는 공간
+
+### Anchor = 닻
+
+화면 크기가 바뀌어도 위치 유지
+
+### Alignment = 기준점
+
+위젯의 어느 지점을 위치 기준으로 삼을지
+
+### CreateWidget = 생성
+
+메모리에 위젯 만들기 (아직 안 보임)
+
+### AddToViewport = 표시
+
+화면에 실제로 띄우기 (이제 보임!)
+
+---

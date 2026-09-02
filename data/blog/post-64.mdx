@@ -1,0 +1,335 @@
+---
+title: '풀 캘린더 사용하기'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# 풀 캘린더 초기화
+
+## 1.풀 캘린더 CDN 입력
+
+```jsx
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+```
+
+## 2.풀 캘린더 초기화
+
+```jsx
+<!DOCTYPE html>
+<html lang='en'>
+  <head>
+    <meta charset='utf-8' />
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
+    <script>
+
+      document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('calendar');
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+          initialView: 'dayGridMonth'
+        });
+        calendar.render();
+      });
+
+    </script>
+  </head>
+  <body>
+    <div id='calendar'></div>
+  </body>
+</html>
+```
+
+설명
+
+```jsx
+최종적으로 <body> 의 <div id='calendar'></div> 넣어서 캘린더를 출력하고
+
+head 부분의 아래 코드가 초기화 코드이다
+
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
+    <script>
+
+      document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('calendar');
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+          initialView: 'dayGridMonth'
+        });
+        calendar.render();
+      });
+
+    </script>
+```
+
+# 풀 캘린더 색상 변경하기
+
+1. 풀 캘린더 컨테이너 요소를 만들어준다
+
+```jsx
+<div id="calendar"></div>
+```
+
+1. css (link 등등) 를 사용해서 캘린더 id 를 잡아준 뒤 색상을 넣어준다.
+
+```jsx
+#calendar {
+  background-color: #your-color;
+}
+```
+
+# 풀 캘린더 이벤트 추가하기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381059/notion-blog/_/_/Spring_/_/Untitled.png)
+
+## 1. 풀 캘린더 초기화
+
+```jsx
+이벤트 객체의 기본 형태는 아래와 같이 배열로 되어있다. title 이 이벤트의 이름으로 출력된다
+
+var calendar = new Calendar(calendarEl, {
+  timeZone: 'UTC',
+  events: [
+    {
+      id: 'a',
+      title: 'my event',
+      start: '2018-09-01'
+			end : '2018-09-01'
+    }
+  ]
+})
+```
+
+## 2.이벤트 데이터를 DB에 넣어주기
+
+```jsx
+VO
+
+@Getter
+@Setter
+public class CalenderVO {
+    private Date scheduleStartdate;
+    private Date scheduleEnddate;
+    private Long scheduleNumber;
+}
+```
+
+```jsx
+
+**Controller**
+
+@PostMapping("insertSchedule")
+    public ModelAndView insertSchedule(CalenderVO calenderVO) throws Exception {
+        ModelAndView mv = new ModelAndView();
+        int result = cleanService.insertSchedule(calenderVO);
+        mv.setViewName("redirect:/clean/cleanSchedule");
+        return mv;
+    }
+
+**DAO**
+
+public int insertSchedule(CalenderVO calenderVO)throws Exception;
+
+**Service**
+
+public int insertSchedule(CalenderVO calenderVO)throws Exception{
+        return cleanDAO.insertSchedule(calenderVO);
+    }
+
+**Mapper**
+
+<insert id="insertSchedule" parameterType="CalenderVO">
+        INSERT INTO CALENDER(SCHEDULENUMBER,SCHEDULEENDDATE,SCHEDULESTARTDATE)
+        VALUES (#{scheduleNumber},#{scheduleEnddate},#{scheduleStartdate})
+    </insert>
+```
+
+## 3.등록 버튼 제작
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381059/notion-blog/_/_/Spring_/_/Untitled_1.png)
+
+```jsx
+모달 창을 사용해서 정보를 입력받는다
+
+모달창의 id="exampleModalLg" 이 버튼의 타겟임을 알려주고 버튼의 data-bs-target="#exampleModalLg" 이 타겟을 설정한다.
+
+(data-bs-toggle="modal" 이건 부트 스트랩 에서 모달창 이라는 뜻 같다)
+```
+
+```jsx
+<!-- 입력 modal -->
+<div class="modal fade" id="exampleModalLg" tabindex="-1" role="dialog" aria-labelledby="myLargeModalLabel"
+                 aria-hidden="true">
+                <div class="modal-dialog modal-lg" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">청소 스케줄 등록 </h5>
+                            <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="insertSchedule" method="post" action="/insertSchedule">
+                                <div class="mb-3">
+                                    <label for="exampleFormControlInput1">시작날짜</label>
+                                    <input class="form-control form-control-solid" id="exampleFormControlInput1"
+                                           name="scheduleStartdate" type="date">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="exampleFormControlInput1">종료날짜</label>
+                                    <input class="form-control form-control-solid" id="exampleFormControlInput2"
+                                           name="scheduleEnddate" type="date">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="exampleFormControlInput1">팀 번호</label>
+                                    <input class="form-control form-control-solid" id="exampleFormControlInput3"
+                                           name="scheduleNumber" type="number" min="0">
+                                </div>
+                                <div class="modal-footer">
+                                    <button class="btn btn-primary" id="btn" type="submit">등록</button>
+                                    <button class="btn btn-primary" type="button" data-bs-dismiss="modal">Close</button>
+
+                                </div>
+                            </form>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+<!--modal 버튼 -->
+
+<button class="btn btn-primary" type="button" data-bs-toggle="modal"
+         data-bs-target="#exampleModalLg">스케줄 등록
+</button>
+```
+
+# 풀 캘린더 이벤트 출력하기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381063/notion-blog/_/_/Spring_/_/Untitled_2.png)
+
+## 1.페이지에 List(이벤트 정보)를 보내주기
+
+```jsx
+
+**Mapper**
+
+<select id="getCleanList" parameterType="CalenderVO" resultType="CalenderVO">
+        SELECT SCHEDULENUMBER, SCHEDULEENDDATE, SCHEDULESTARTDATE
+        FROM CALENDER
+</select>
+
+**Controller**
+
+@GetMapping("cleanSchedule")
+    public ModelAndView cleanSchedule(CalenderVO calenderVO) throws Exception {
+        ModelAndView mv = new ModelAndView();
+        List<CalenderVO>calenderVOList=cleanService.getCleanList(calenderVO);
+        mv.addObject("events",calenderVOList);
+        mv.setViewName("clean/cleanSchedule");
+
+        return mv;
+    }
+
+**DAO**
+
+public List<CalenderVO>getCleanList(CalenderVO calenderVO)throws Exception;
+
+**Service**
+
+public List<CalenderVO>getCleanList(CalenderVO calenderVO)throws Exception{
+        return cleanDAO.getCleanList(calenderVO);
+    }
+```
+
+## 2. JSTL을 사용해서 출력하기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381064/notion-blog/_/_/Spring_/_/Untitled_3.png)
+
+```jsx
+JSTL 사용을 위해서 jsp 내에 script 로 사용했다
+
+																		events: [
+
+                                        <c:forEach var="event" items="${events}">
+                                        {
+                                            id : '${event.scheduleNumber}',
+                                            title: '청소${event.scheduleNumber}팀',
+                                            start: '${event.scheduleStartdate}',
+                                            end: '${event.scheduleEnddate}',
+                                            color: getRandomColor(),
+                                        },
+                                        </c:forEach>
+                                    ]
+```
+
+```jsx
+												<div id='calendar' class="mb-4">
+
+                        </div>
+                        <script>
+                            document.addEventListener('DOMContentLoaded', function() {
+                                let calendarEl = document.getElementById('calendar');
+                                let calendar = new FullCalendar.Calendar(calendarEl, {
+                                    eventClick: function(info) {
+                                        let scheduleNumber = info.event.id;
+
+                                        let action = prompt('Event: ' + scheduleNumber + '\n\n삭제 하시겠습니까?: \n1. No\n2. Yes');
+
+                                        if (action === '1') {
+
+                                            alert("청소" + scheduleNumber + '팀 스케줄 삭제 취소');
+
+                                        } else if (action === '2') {
+
+                                            alert("청소" + scheduleNumber + '팀 스케줄 삭제 ');
+
+                                            $.ajax({
+                                                url: "/clean/deleteSchedule",
+                                                type: "POST",
+                                                data: {
+                                                    scheduleNumber: scheduleNumber
+                                                },
+                                                success: function(response) {
+                                                    if (response === 'success') {
+                                                        info.event.remove();
+                                                        alert('이벤트 삭제 완료');
+                                                    } else {
+                                                        alert('이벤트 삭제 실패.');
+                                                    }
+                                                },
+                                                error: function() {
+                                                    alert('스케줄 삭제 완료.');
+                                                    info.event.remove();
+                                                }
+                                            });
+                                        } else {
+                                            // Invalid action or cancel
+                                            return;
+                                        }
+                                    },
+                                    initialView: 'dayGridMonth',
+                                    events: [
+
+                                        <c:forEach var="event" items="${events}">        // jstl 반복문을 사용해서 이벤트를 출력한다
+                                        {
+                                            id : '${event.scheduleNumber}',
+                                            title: '청소${event.scheduleNumber}팀',
+                                            start: '${event.scheduleStartdate}',
+                                            end: '${event.scheduleEnddate}',
+                                            color: getRandomColor(),
+                                        },
+                                        </c:forEach>
+                                    ]
+                                });
+                                calendar.render();                                       // 이벤트의 색을 랜덤하게 바꿔주는 기능
+                                function getRandomColor() {
+                                    let letters = '0123456789ABCDEF';
+                                    let color = '#';
+                                    for (let i = 0; i < 6; i++) {
+                                        color += letters[Math.floor(Math.random() * 16)];
+                                    }
+                                    return color;
+                                }
+
+                            });
+                        </script>
+```

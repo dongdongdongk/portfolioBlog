@@ -1,0 +1,3216 @@
+---
+title: '섹션 6: Collision Essentials - 2'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 🎯 Set Actor Location과 Sweep }
+
+## 📌 이 강의의 목표
+
+Set Actor Location으로 물체를 이동시킬 때 Sweep의 역할을 이해합니다.
+
+- Set Actor Location 사용법
+- Add Actor World Offset과의 차이
+- 한쪽만 Sweep할 때 결과
+- 한 번만 이동시킬 때 (텔레포트)
+
+---
+
+## 🔄 BP_Ball_SetActorLocation
+
+### Event Graph 구조
+
+```
+Event Tick
+  ↓
+Parent Tick
+  ↓
+ShouldMove 확인
+  ↓
+True이면
+  ↓
+Set Actor Location
+```
+
+### Event BeginPlay
+
+```
+Event BeginPlay
+  ↓
+NewLocation = Get Actor Location
+  ↓
+Parent BeginPlay 호출
+```
+
+**NewLocation**: 현재 위치를 저장하는 변수
+
+---
+
+## 📍 Set Actor Location 노드
+
+### 위치 계산
+
+```
+매 프레임마다
+  ↓
+NewLocation 업데이트
+  ├─ Forward Vector × (Delta Seconds × Speed)
+  └─ NewLocation에 더하기
+  ↓
+Set Actor Location (NewLocation)
+```
+
+**핵심**: 절대 위치를 직접 설정
+
+### Add Actor World Offset과 차이
+
+```
+Add Actor World Offset
+  └─ 현재 위치 + 오프셋
+      └─ 상대적 이동
+
+Set Actor Location
+  └─ 새 위치로 설정
+      └─ 절대적 위치 지정
+```
+
+**결과는 비슷**: 둘 다 매 프레임 조금씩 이동
+
+---
+
+## 🧪 테스트 1: 둘 다 Sweep 안 함
+
+### 설정
+
+```
+왼쪽 공
+  └─ ShouldSweep: False
+
+오른쪽 공
+  └─ ShouldSweep: False
+```
+
+### 결과
+
+```
+Play 실행
+  ↓
+서로를 향해 이동
+  ↓
+서로 통과! 😱
+```
+
+**이유**: Sweep 없으면 충돌 검사 안 함
+
+---
+
+## 🧪 테스트 2: 둘 다 Sweep 사용
+
+### 설정 변경
+
+```
+왼쪽 공
+  └─ ShouldSweep: True ✓
+
+오른쪽 공
+  └─ ShouldSweep: True ✓
+```
+
+### 결과
+
+```
+Play 실행
+  ↓
+서로를 향해 이동
+  ↓
+만나자마자 멈춤! ✅
+```
+
+**이유**: Sweep이 충돌 감지
+
+---
+
+## 🧪 테스트 3: 한쪽만 Sweep (중요!)
+
+### 설정
+
+```
+왼쪽 공 (Object A)
+  └─ ShouldSweep: True ✓
+
+오른쪽 공 (Object B)
+  └─ ShouldSweep: False ✗
+```
+
+### 결과
+
+```
+Play 실행
+  ↓
+Object A → Sweep으로 이동 → 멈춤 ✅
+Object B → Sweep 안 함 → 계속 진행 ❌
+  ↓
+Object B가 Object A를 통과!
+```
+
+**핵심**: Sweep은 본인만 멈춤, 상대를 못 막음!
+
+### 왜 이렇게 되나?
+
+```
+Object A (Sweep = True)
+  └─ "앞에 뭐 있나?" 검사
+      └─ Object B 발견
+          └─ 멈춤
+
+Object B (Sweep = False)
+  └─ 검사 안 함
+      └─ 그냥 위치 설정
+          └─ 겹쳐도 상관없음
+```
+
+**교훈**: 충돌하려면 **둘 다 Sweep** 해야 함!
+
+---
+
+## 🚀 BP_Ball_AddActorWorldOffset_BeginPlay
+
+### 한 번만 이동 (텔레포트)
+
+```
+Start Moving 호출 시
+  ↓
+Add Actor World Offset (단 1회)
+  ├─ DeltaLocation: Forward × 200
+  └─ bSweep: ShouldSweep 변수
+```
+
+**특징**: Tick이 아닌 한 번만 실행
+
+### Teleport Distance
+
+```
+Forward Vector × Teleport Distance (200)
+  ↓
+앞으로 200 유닛 순간이동
+```
+
+---
+
+## 🧪 테스트 4: 텔레포트 (Sweep 없이)
+
+### 설정
+
+```
+공
+  └─ ShouldSweep: False
+
+앞에 상자 배치
+```
+
+### 결과
+
+```
+Play 실행
+  ↓
+1.5초 후 Start Moving
+  ↓
+상자 반대편으로 순간이동! 🚀
+```
+
+**이유**: Sweep 안 하면 중간 검사 없이 그냥 이동
+
+---
+
+## 🧪 테스트 5: 텔레포트 (Sweep 사용)
+
+### 설정 변경
+
+```
+공
+  └─ ShouldSweep: True ✓
+```
+
+### 결과
+
+```
+Play 실행
+  ↓
+1.5초 후 Start Moving
+  ↓
+상자 바로 앞에서 멈춤! ✅
+```
+
+**Sweep 효과**: 경로에 장애물 있으면 그 앞에서 멈춤
+
+---
+
+## 🔍 Collision Preset 확인
+
+### SM_Sphere30 (공)
+
+```
+Collision Preset: BlockAll (또는 Default)
+  ├─ Collision Enabled: Query Only
+  ├─ Object Type: WorldStatic
+  └─ Responses: Block All
+```
+
+### SM_Cube (상자)
+
+```
+Collision Preset: BlockAll (또는 Default)
+  ├─ Collision Enabled: Query and Physics
+  ├─ Object Type: WorldStatic
+  └─ Responses: Block All
+```
+
+### 충돌 판정
+
+```
+공 (WorldStatic)
+  └─ WorldStatic → Block
+
+상자 (WorldStatic)
+  └─ WorldStatic → Block
+
+결과
+  └─ 둘 다 Block → 차단 ✅
+```
+
+---
+
+## 💡 핵심 정리
+
+### Sweep의 역할
+
+```
+Sweep = True
+  └─ 이동 경로 검사
+      ├─ 장애물 발견 → 멈춤
+      └─ 장애물 없음 → 이동
+
+Sweep = False
+  └─ 검사 안 함
+      └─ 무조건 이동 (겹쳐도 상관없음)
+```
+
+### 한쪽만 Sweep하면?
+
+```
+A (Sweep O) + B (Sweep X)
+  ↓
+A는 멈춤
+B는 통과
+  ↓
+결국 겹침!
+```
+
+### 텔레포트 구현
+
+```
+Add Actor World Offset (1회만)
+  ├─ Sweep = False → 벽 통과
+  └─ Sweep = True → 벽 앞에 멈춤
+```
+
+---
+
+## ⚙️ 쿼리 시스템만 사용
+
+### 지금까지 모든 이동
+
+```
+Add Actor World Offset
+Set Actor Location
+  ↓
+둘 다 Query System만 사용
+  ↓
+Physics System 필요 없음
+```
+
+### 확인
+
+```
+Collision Enabled: Query Only
+  ↓
+물리 시스템 꺼짐
+  ↓
+Sweep으로 여전히 차단 ✅
+```
+
+**다음 강의**: Physics System 사용 (힘으로 이동)
+
+---
+
+## 📊 비교표
+
+| 이동 방식              | 특징      | Sweep | 시스템  |
+| ---------------------- | --------- | ----- | ------- |
+| Add Actor World Offset | 상대 이동 | 필수  | Query   |
+| Set Actor Location     | 절대 위치 | 필수  | Query   |
+| Add Force (다음)       | 힘 적용   | 자동  | Physics |
+
+---
+
+## ⚠️ 주의사항
+
+### 둘 다 Sweep 필요
+
+```
+한쪽만 Sweep
+  └─ 제대로 안 막힘!
+      └─ 둘 다 Sweep 해야 함
+```
+
+### Collision Preset
+
+```
+레벨 인스턴스
+  └─ Default로 되어있는지 확인
+      └─ 의도치 않은 재정의 주의
+```
+
+### Query Only로도 작동
+
+```
+물리 시스템 꺼도
+  └─ Sweep 작동
+      └─ Query만 있으면 됨
+```
+
+---
+
+## 📝 핵심 정리
+
+### Sweep의 중요성
+
+```
+Sweep 없이 이동
+  └─ 충돌 무시
+      └─ 모든 것 통과
+
+Sweep으로 이동
+  └─ 충돌 검사
+      └─ 장애물에 막힘
+```
+
+### 텔레포트
+
+```
+한 번만 이동
+  ├─ Sweep = False → 장애물 통과
+  └─ Sweep = True → 장애물 앞 멈춤
+```
+
+### 쿼리 시스템
+
+```
+Add Actor World Offset
+Set Actor Location
+  └─ Query System 사용
+      └─ Physics 필요 없음
+```
+
+---
+
+## 🎓 다음 단계
+
+Physics System으로 이동
+
+```
+힘(Force)으로 물체 이동
+  └─ Add Force
+      └─ Physics System 사용
+```
+
+---
+
+## 📚 용어 정리
+
+| 용어               | 설명                      |
+| ------------------ | ------------------------- |
+| Set Actor Location | 절대 위치로 액터 이동     |
+| NewLocation        | 목표 위치를 저장하는 변수 |
+| Teleport Distance  | 순간이동 거리             |
+| Query System       | 충돌 검사 시스템          |
+| Physics System     | 물리 시뮬레이션 시스템    |
+
+# { 🎯 Add Force로 물리 이동 }
+
+## 📌 이 강의의 목표
+
+힘(Force)을 사용하여 물체를 이동시키는 방법과 Physics System의 특징을 이해합니다.
+
+- Add Force 노드 사용법
+- Physics System vs Query System
+- Collision Enabled: Physics Only
+- Probe 옵션의 역할
+
+---
+
+## 🚀 BP_Ball_AddForce
+
+### Start Moving 로직
+
+```
+Start Moving 호출
+  ↓
+Add Force (BallMesh)
+  ├─ Force: Forward Vector × Force Magnitude
+  └─ 한 번만 실행
+```
+
+**특징**: Tick이 아닌 Start Moving에서 1회만 실행
+
+### Force 계산
+
+```
+Force (벡터)
+  ├─ 방향: Get Actor Forward Vector
+  └─ 크기: Force Magnitude (큰 숫자)
+```
+
+**Force**: 방향과 크기를 가진 벡터
+
+---
+
+## ⚙️ 물리 시뮬레이션 설정
+
+### BallMesh 설정
+
+```
+Collision Preset: PhysicsActor
+  ├─ Collision Enabled: Query and Physics
+  ├─ Object Type: PhysicsBody
+  └─ Responses: Block All
+
+Physics 섹션
+  ├─ Simulate Physics: ✓ True
+  └─ Enable Gravity: ✗ False
+```
+
+**Simulate Physics**: 물리 법칙 적용 (필수!)
+**Enable Gravity**: 중력 사용 안 함
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380731/notion-blog/_/_/_5_/_6_Collision_Essentials_-_2/image.png)
+
+---
+
+## 🧪 테스트 1: 물리 충돌
+
+### 설정
+
+```
+두 공 모두
+  ├─ Collision Preset: PhysicsActor
+  └─ Simulate Physics: True
+```
+
+### 결과
+
+```
+Play 실행
+  ↓
+공들이 힘으로 날아감
+  ↓
+서로 충돌
+  ↓
+튕겨나감! 🎾
+```
+
+**Physics System**: 충돌 시 자동으로 반발력 적용
+
+---
+
+## 🔧 Physics System의 특징
+
+### 자동 충돌 처리
+
+```
+Add Force
+  ↓
+물리 엔진이 자동으로 처리
+  ├─ 충돌 감지
+  ├─ 반발력 계산
+  └─ 튕겨내기
+```
+
+**Sweep 불필요**: 물리 엔진이 알아서 함
+
+### Query System과 비교
+
+```
+Query System (Sweep)
+  └─ 경로 검사 → 막힘 → 멈춤
+
+Physics System (Force)
+  └─ 물리 계산 → 충돌 → 튕김
+```
+
+---
+
+## 🧪 테스트 2: Physics Only
+
+### 설정 변경
+
+```
+SM_Sphere30 (Static Mesh Asset)
+  └─ Collision Enabled: Physics Only
+      └─ Query System 꺼짐 ✗
+      └─ Physics System만 켜짐 ✓
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380728/notion-blog/_/_/_5_/_6_Collision_Essentials_-_2/image_1.png)
+
+### Blueprint 설정
+
+```
+BP_Ball_AddForce
+  └─ BallMesh
+      └─ Collision Preset: Default
+          └─ SM_Sphere30 설정 따름
+```
+
+### 레벨 인스턴스 확인
+
+```
+왼쪽 공
+  └─ BallMesh → Collision Preset: Default ✓
+
+오른쪽 공
+  └─ BallMesh → Collision Preset: Default ✓
+```
+
+### 결과
+
+```
+Play 실행
+  ↓
+Physics System만 사용
+  ↓
+여전히 튕김! ✅
+```
+
+**핵심**: Query 없어도 Physics만으로 충돌 작동
+
+---
+
+## ⚠️ 잘못된 설정: Query Only
+
+### 설정
+
+```
+SM_Sphere30
+  └─ Collision Enabled: Query Only
+```
+
+### 문제점
+
+```
+Query Only
+  ├─ Physics 불가능 ✗
+  ├─ Simulate Physics 불가능 ✗
+  └─ Add Force 불가능 ✗
+```
+
+### 에러 메시지
+
+```
+경고 1:
+"SM_Sphere가 Physics 시뮬레이션 설정되었지만
+Collision Enabled가 호환되지 않음"
+
+경고 2:
+"힘 추가하려면 Physics Only 또는
+Query and Physics로 설정 필요"
+```
+
+**결과**: 작동 안 함!
+
+---
+
+## 🔍 Probe 옵션
+
+### Probe Only 설정
+
+```
+Collision Enabled: Probe Only
+  └─ 충돌 감지만 함
+      ├─ 힘 전달 안 함 ✗
+      └─ Hit Callback은 실행 ✓
+```
+
+### 테스트
+
+```
+Play 실행
+  ↓
+공들이 만남
+  ↓
+서로 통과! 😱
+  └─ 힘이 없어서 안 튕김
+```
+
+**Probe**: 충돌 감지만 하고 물리적 반응 없음
+
+### 용도
+
+```
+Probe Only
+  └─ "충돌했다"는 것만 알고 싶을 때
+      └─ OnComponentHit 같은 이벤트만 필요
+          └─ 실제로 막거나 튕기진 않음
+```
+
+---
+
+## 📊 Collision Enabled 비교
+
+### Physics Only
+
+```
+Physics Only
+  ├─ Physics System: ✓
+  ├─ Query System: ✗
+  ├─ 물리 충돌: ✓ 튕김
+  ├─ Line Trace: ✗ 무시됨
+  └─ Sweep: ✗ 작동 안 함
+```
+
+### Query and Physics
+
+```
+Query and Physics
+  ├─ Physics System: ✓
+  ├─ Query System: ✓
+  ├─ 물리 충돌: ✓ 튕김
+  ├─ Line Trace: ✓ 감지됨
+  └─ Sweep: ✓ 작동함
+```
+
+### Probe Only
+
+```
+Probe Only
+  ├─ 충돌 감지: ✓
+  ├─ 힘 전달: ✗
+  ├─ Hit Callback: ✓
+  └─ 튕김: ✗
+```
+
+---
+
+## 💡 핵심 개념
+
+### Add Force 사용 조건
+
+```
+필수 조건
+  ├─ Simulate Physics = True
+  └─ Collision Enabled
+      ├─ Physics Only ✓
+      ├─ Query and Physics ✓
+      └─ Query Only ✗ (안 됨!)
+```
+
+### 두 가지 시스템
+
+```
+Query System
+  └─ Sweep, Line Trace, Overlap
+      └─ 직접 위치 설정할 때 사용
+
+Physics System
+  └─ 힘, 중력, 물리 법칙
+      └─ 물리 엔진이 자동 처리
+```
+
+---
+
+## 🎯 실전 활용
+
+### 캐릭터 이동
+
+```
+Add Actor World Offset (Sweep)
+  └─ Query System
+      └─ 직접 제어
+```
+
+### 발사체 (총알, 미사일)
+
+```
+Add Force
+  └─ Physics System
+      └─ 물리적으로 날아감
+```
+
+### 떨어지는 물체
+
+```
+Simulate Physics + Enable Gravity
+  └─ Physics System
+      └─ 자연스럽게 떨어짐
+```
+
+### 감지만 필요
+
+```
+Probe Only
+  └─ 이벤트만 발생
+      └─ 막거나 튕기진 않음
+```
+
+---
+
+## 📋 비교표
+
+| Collision Enabled | Physics | Query | 물리 충돌 | Trace/Sweep | 용도      |
+| ----------------- | ------- | ----- | --------- | ----------- | --------- |
+| No Collision      | ✗       | ✗     | ✗         | ✗           | 장식      |
+| Query Only        | ✗       | ✓     | ✗         | ✓           | 트리거    |
+| Physics Only      | ✓       | ✗     | ✓         | ✗           | 물리 물체 |
+| Query and Physics | ✓       | ✓     | ✓         | ✓           | 캐릭터    |
+| Probe Only        | -       | ✓     | 감지만    | ✓           | 센서      |
+
+---
+
+## ⚠️ 주의사항
+
+### Query Only는 힘 불가
+
+```
+Add Force + Query Only
+  └─ 에러 발생! ⚠️
+      └─ Physics Only 이상 필요
+```
+
+### Simulate Physics 필수
+
+```
+Add Force 사용하려면
+  └─ Simulate Physics = True
+      └─ 안 하면 작동 안 함
+```
+
+### Probe의 한계
+
+```
+Probe Only
+  └─ 충돌 감지만 함
+      └─ 막지도, 튕기지도 않음
+```
+
+---
+
+## 📝 핵심 정리
+
+### Add Force
+
+```
+힘을 가해서 물체 이동
+  └─ Physics System 사용
+      ├─ 자동 충돌 처리
+      ├─ 튕김 효과
+      └─ Sweep 불필요
+```
+
+### Physics vs Query
+
+```
+Physics System
+  └─ 물리 법칙으로 충돌
+      └─ 자연스럽고 현실적
+
+Query System
+  └─ 경로 검사로 충돌
+      └─ 직접 제어 가능
+```
+
+### Collision Enabled
+
+```
+Physics 사용하려면
+  ├─ Physics Only
+  └─ Query and Physics
+
+Query 사용하려면
+  ├─ Query Only
+  └─ Query and Physics
+```
+
+---
+
+## 🎓 다음 단계
+
+Projectile Movement Component 학습
+
+```
+발사체 이동 전용 컴포넌트
+  └─ 물리 + 직접 제어 조합
+```
+
+---
+
+## 📚 용어 정리
+
+| 용어             | 설명                         |
+| ---------------- | ---------------------------- |
+| Add Force        | 물체에 힘을 가하는 노드      |
+| Force Magnitude  | 힘의 크기                    |
+| Simulate Physics | 물리 시뮬레이션 활성화       |
+| PhysicsActor     | 물리 물체용 Collision Preset |
+| PhysicsBody      | 물리 물체 Object Type        |
+| Physics Only     | 물리만 사용, 쿼리 안 함      |
+| Probe Only       | 감지만 하고 힘 전달 안 함    |
+
+---
+
+## 🔧 실습 체크리스트
+
+```
+✅ BP_Ball_AddForce 열기
+✅ Add Force 노드 확인
+✅ PhysicsActor Preset 확인
+✅ Simulate Physics 체크 확인
+✅ Physics Only 테스트
+✅ Query Only 에러 확인
+✅ Probe Only 테스트
+✅ 튕김 효과 확인
+```
+
+# { 🎯 Projectile Movement Component }
+
+## 📌 이 강의의 목표
+
+Projectile Movement Component로 물체를 이동시키는 두 가지 방법을 이해합니다.
+
+- Physics 시뮬레이션과 조합
+- Sweep으로 이동
+- Bounce 기능
+- 두 시스템의 차이점
+
+---
+
+## 🚀 BP_Ball_ProjectileMovement 구조
+
+### Components
+
+```
+Components
+  ├─ BallMesh (Static Mesh)
+  └─ Projectile Movement (새로운 컴포넌트!)
+```
+
+### Event Graph
+
+```
+Event Graph
+  └─ 비어있음!
+      └─ 컴포넌트가 자동으로 처리
+```
+
+**특징**: 코드 없이 컴포넌트만으로 이동
+
+---
+
+## ⚙️ Projectile Movement 설정
+
+### 기본 파라미터
+
+```
+Projectile Movement Component
+  ├─ Initial Speed: 200
+  ├─ Projectile Gravity Scale: 0 (중력 없음)
+  └─ Updated Component: BallMesh (자동 설정)
+```
+
+**Initial Speed**: 시작 속도
+**Gravity Scale**: 중력 영향 (0 = 중력 없음)
+**Updated Component**: 어떤 컴포넌트를 이동시킬지
+
+---
+
+## 🎮 패턴 5: Physics 시뮬레이션
+
+### 설정
+
+```
+BallMesh
+  └─ Simulate Physics: ✓ True
+
+Projectile Movement
+  └─ Initial Speed: 200
+```
+
+### 작동 방식
+
+```
+Projectile Movement가 BallMesh 확인
+  ↓
+"Physics 시뮬레이션 중이네?"
+  ↓
+힘을 가해서 발사
+  ↓
+이후는 Physics System이 처리
+```
+
+**핵심**: 마치 Add Force처럼 작동
+
+### 결과
+
+```
+Play 실행
+  ↓
+공들이 날아감
+  ↓
+서로 충돌
+  ↓
+튕겨나감! 🎾
+```
+
+**Physics System 사용**: Add Force와 동일한 효과
+
+---
+
+## 🎮 패턴 6: Sweep으로 이동
+
+### 설정
+
+```
+BallMesh
+  └─ Simulate Physics: ✗ False
+
+Projectile Movement
+  ├─ Initial Speed: 200
+  └─ Sweep Collision: ✓ True (기본값)
+```
+
+### 작동 방식
+
+```
+Projectile Movement가 BallMesh 확인
+  ↓
+"Physics 안 하네?"
+  ↓
+Sweep으로 위치 업데이트
+  ↓
+Query System 사용
+```
+
+**핵심**: Add Actor World Offset (Sweep)처럼 작동
+
+### 결과
+
+```
+Play 실행
+  ↓
+공들이 날아감
+  ↓
+서로 충돌
+  ↓
+멈춤! 🛑
+```
+
+**Query System 사용**: 튕기지 않고 멈춤
+
+---
+
+## 🎾 Bounce 기능
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380729/notion-blog/_/_/_5_/_6_Collision_Essentials_-_2/image_2.png)
+
+### Bounce 옵션
+
+```
+Projectile Movement
+  ├─ Should Bounce: ✓ True
+  └─ Bounciness: 0.6
+```
+
+**Should Bounce**: 튕김 활성화
+**Bounciness**: 튕김 세기 (0~1 이상)
+
+### 테스트
+
+```
+Simulate Physics: False
+Should Bounce: True
+  ↓
+Play 실행
+  ↓
+공들이 충돌
+  ↓
+튕겨나감! 🎾
+  └─ 하지만 Physics 아님!
+```
+
+**가짜 물리**: 실제 물리가 아닌 위치 계산으로 튕김 시뮬레이션
+
+### Bounciness 값
+
+```
+Bounciness: 0.0
+  └─ 튕기지 않음 (멈춤)
+
+Bounciness: 0.6
+  └─ 약간 튕김
+
+Bounciness: 1.0
+  └─ 완전히 튕김 (에너지 보존)
+
+Bounciness: 1.5
+  └─ 더 강하게 튕김 (에너지 증가!)
+```
+
+---
+
+## 🔧 Sweep Collision 옵션
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380729/notion-blog/_/_/_5_/_6_Collision_Essentials_-_2/image_3.png)
+
+### Sweep 끄기
+
+```
+Projectile Movement
+  └─ Sweep Collision: ✗ False
+```
+
+### 결과
+
+```
+Simulate Physics: False
+Sweep Collision: False
+  ↓
+Play 실행
+  ↓
+서로 통과! 😱
+```
+
+**이유**: Query도 안 쓰고, Physics도 안 씀
+
+---
+
+## 💡 핵심 규칙
+
+### Physics 시뮬레이션 O
+
+```
+Simulate Physics: True
+  ↓
+Projectile Movement가 힘으로 발사
+  ↓
+Physics System이 알아서 처리
+  ↓
+Sweep 필요 없음
+```
+
+### Physics 시뮬레이션 X
+
+```
+Simulate Physics: False
+  ↓
+Projectile Movement가 Sweep으로 이동
+  ↓
+Query System 사용
+  ↓
+Sweep 필수!
+```
+
+---
+
+## 📊 조합별 결과
+
+### 1. Physics + Sweep
+
+```
+Simulate Physics: ✓
+Sweep Collision: ✓ (무시됨)
+  ↓
+Physics System 사용
+  ↓
+튕김 (물리적)
+```
+
+### 2. Physics + No Sweep
+
+```
+Simulate Physics: ✓
+Sweep Collision: ✗ (무시됨)
+  ↓
+Physics System 사용
+  ↓
+튕김 (물리적)
+```
+
+### 3. No Physics + Sweep
+
+```
+Simulate Physics: ✗
+Sweep Collision: ✓
+  ↓
+Query System 사용
+  ↓
+멈춤 (또는 Bounce로 튕김)
+```
+
+### 4. No Physics + No Sweep
+
+```
+Simulate Physics: ✗
+Sweep Collision: ✗
+  ↓
+아무것도 안 씀
+  ↓
+통과 😱
+```
+
+---
+
+## 🎨 Bounce는 가짜!
+
+### 실제 Physics
+
+```
+Add Force
+  ↓
+Physics System
+  ↓
+진짜 힘 계산
+  ↓
+자연스러운 튕김
+```
+
+### Projectile Bounce
+
+```
+Sweep으로 충돌 감지
+  ↓
+속도 방향 반전 계산
+  ↓
+위치 업데이트
+  ↓
+"튕기는 것처럼" 보임
+```
+
+**차이**: Physics는 진짜, Bounce는 시뮬레이션
+
+---
+
+## 🎯 다른 Movement Components
+
+### Floating Pawn Movement
+
+```
+폰(Pawn) 이동용
+  └─ Sweep으로 이동
+      └─ Query System 사용
+```
+
+### Character Movement Component
+
+```
+캐릭터 전용
+  ├─ Sweep으로 이동 (Query)
+  └─ 물리 물체에 힘 전달 (Physics)
+      └─ 둘 다 사용!
+```
+
+**Character Movement**: 가장 복잡하고 정교함
+
+---
+
+## 📋 설정 선택 가이드
+
+### Physics만 필요
+
+```
+Collision Enabled: Physics Only
+  └─ 물리 물체, 떨어지는 돌
+```
+
+### Query만 필요
+
+```
+Collision Enabled: Query Only
+  └─ 트리거, 직접 제어 이동
+```
+
+### 둘 다 필요
+
+```
+Collision Enabled: Query and Physics
+  └─ 캐릭터, 복잡한 상호작용
+```
+
+**원칙**: 필요한 것만 사용 (성능!)
+
+---
+
+## 📊 비교표
+
+| 설정                | Physics Sim | Sweep  | 시스템  | 결과 |
+| ------------------- | ----------- | ------ | ------- | ---- |
+| Physics O + Sweep O | ✓           | 무시됨 | Physics | 튕김 |
+| Physics O + Sweep X | ✓           | 무시됨 | Physics | 튕김 |
+| Physics X + Sweep O | ✗           | ✓      | Query   | 멈춤 |
+| Physics X + Sweep X | ✗           | ✗      | 없음    | 통과 |
+
+---
+
+## 💡 핵심 정리
+
+### Projectile Movement의 두 얼굴
+
+```
+Physics 시뮬레이션 ON
+  └─ 힘으로 발사 (Add Force처럼)
+
+Physics 시뮬레이션 OFF
+  └─ Sweep으로 이동 (Add Actor World Offset처럼)
+```
+
+### Bounce 기능
+
+```
+Physics 없이도 튕김 가능
+  └─ 가짜 물리 (위치 계산)
+      └─ Bounciness로 세기 조절
+```
+
+### 차단 조건
+
+```
+둘 중 하나 필요
+  ├─ Physics System 사용
+  └─ Query System 사용 (Sweep)
+
+둘 다 없으면
+  └─ 통과!
+```
+
+---
+
+## ⚠️ 주의사항
+
+### Physics 우선
+
+```
+Simulate Physics = True이면
+  └─ Sweep 설정 무시됨
+      └─ Physics가 우선
+```
+
+### Sweep 필수 (Physics 없을 때)
+
+```
+Simulate Physics = False면
+  └─ Sweep Collision = True 필수
+      └─ 안 하면 통과
+```
+
+### Bounce 오해
+
+```
+Bounce ≠ 실제 물리
+  └─ 위치 계산으로 시뮬레이션
+      └─ Physics보다 가볍고 빠름
+```
+
+---
+
+## 📝 최종 정리
+
+### Projectile Movement Component
+
+```
+편리한 발사체 이동 컴포넌트
+  ├─ Physics 있으면 → 힘으로 발사
+  ├─ Physics 없으면 → Sweep으로 이동
+  └─ Bounce 옵션 → 가짜 튕김
+```
+
+### 두 시스템 차이
+
+```
+Physics System
+  └─ 진짜 물리 (무거움)
+
+Query System
+  └─ 경로 검사 (가벼움)
+```
+
+### 선택 기준
+
+```
+필요한 것만 사용
+  └─ 성능 최적화
+```
+
+---
+
+## 📚 용어 정리
+
+| 용어                   | 설명                      |
+| ---------------------- | ------------------------- |
+| Projectile Movement    | 발사체 이동 컴포넌트      |
+| Initial Speed          | 시작 속도                 |
+| Gravity Scale          | 중력 영향 (0 = 중력 없음) |
+| Updated Component      | 이동시킬 컴포넌트         |
+| Should Bounce          | 튕김 활성화               |
+| Bounciness             | 튕김 세기 (0~1+)          |
+| Sweep Collision        | Sweep 사용 여부           |
+| Floating Pawn Movement | 폰 이동 컴포넌트          |
+| Character Movement     | 캐릭터 이동 컴포넌트      |
+
+---
+
+## 🔧 실습 체크리스트
+
+```
+✅ BP_Ball_ProjectileMovement 열기
+✅ Projectile Movement 설정 확인
+✅ Physics Sim + Projectile 테스트
+✅ No Physics + Sweep 테스트
+✅ Bounce 기능 테스트
+✅ Bounciness 값 변경
+✅ Sweep Collision 끄기 테스트
+✅ 통과하는 경우 확인
+```
+
+# { 🎯 Hit 콜백과 Overlap 콜백 }
+
+## 📌 이 강의의 목표
+
+충돌 이벤트(Hit, Overlap)가 발생하는 조건과 사용법을 이해합니다.
+
+- Hit 콜백 발생 조건
+- Overlap 콜백 발생 조건
+- Generate Overlap Events
+- Simulation Generates Hit Events
+
+---
+
+## 🎨 테스트 씬 구성
+
+### Hit Callback 플랫폼
+
+```
+공 → 벽
+  └─ Hit 이벤트 테스트
+```
+
+### Overlap Callback 플랫폼
+
+```
+공 → 트리거 박스
+  └─ Overlap 이벤트 테스트
+```
+
+---
+
+## 💥 Hit 콜백 (OnComponentHit)
+
+### BP_Ball_AddActorWorldOffset_Tick_Hit
+
+### 구조
+
+```
+Event BeginPlay
+  ↓
+BallMesh의 OnComponentHit에 바인딩
+  ↓
+Hit 발생 시
+  ├─ 파티클 생성 (폭발 효과)
+  ├─ 사운드 재생
+  └─ 액터 파괴
+```
+
+### BallMesh 설정
+
+```
+Collision Preset: BlockAll
+  ├─ Collision Enabled: Query and Physics
+  ├─ Object Type: WorldStatic
+  └─ Responses: Block All
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380729/notion-blog/_/_/_5_/_6_Collision_Essentials_-_2/image_4.png)
+
+---
+
+## 🧪 테스트 1: Sweep 없이
+
+### 설정
+
+```
+ShouldSweep: False ✗
+```
+
+### 결과
+
+```
+Play 실행
+  ↓
+공이 벽 통과
+  ↓
+아무 일도 안 일어남 😱
+```
+
+**이유**: Sweep 없으면 Hit 콜백 발생 안 함
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380730/notion-blog/_/_/_5_/_6_Collision_Essentials_-_2/image_5.png)
+
+---
+
+## 🧪 테스트 2: Sweep 사용
+
+### 설정 변경
+
+```
+ShouldSweep: True ✓
+```
+
+### 결과
+
+```
+Play 실행
+  ↓
+공이 벽에 충돌
+  ↓
+폭발 파티클 + 사운드 ✅
+  ↓
+공 파괴
+```
+
+**핵심**: Hit 콜백은 Sweep 필수!
+
+---
+
+## 💡 Hit 콜백 발생 조건
+
+### 1. Block 상호작용
+
+```
+충돌 반응이 Block이어야 함
+  ├─ Overlap → Hit 콜백 ✗
+  ├─ Ignore → Hit 콜백 ✗
+  └─ Block → Hit 콜백 ✓
+```
+
+### 테스트: Overlap으로 변경
+
+```
+SM_Sphere30
+  └─ Collision Preset: Custom
+      └─ WorldStatic → Overlap
+
+결과
+  └─ Hit 이벤트 발생 안 함 ✗
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380730/notion-blog/_/_/_5_/_6_Collision_Essentials_-_2/image_6.png)
+
+**이유**: Overlap < Block (약한 쪽 선택)
+
+---
+
+## 🔄 Overlap 콜백 (OnComponentBeginOverlap)
+
+### BP_Ball_AddActorWorldOffset_Tick_Overlap
+
+### 구조
+
+```
+Event BeginPlay
+  ↓
+BallMesh의 OnComponentBeginOverlap에 바인딩
+  ↓
+Overlap 발생 시
+  └─ Branch (From Sweep?)
+      ├─ True → 파란색 구체 (Impact Point)
+      └─ False → 주황색 구체 (Actor Location)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380730/notion-blog/_/_/_5_/_6_Collision_Essentials_-_2/image_7.png)
+
+**From Sweep**: Overlap이 Sweep의 결과인지 확인하는 불린
+
+---
+
+## 📦 BP_TriggerVolume (트리거 박스)
+
+### Box Component 설정
+
+```
+Collision Preset: OverlapAllDynamic
+  ├─ Collision Enabled: Query Only
+  ├─ Object Type: WorldDynamic
+  └─ Responses: Overlap All
+```
+
+**Query Only**: 물리 없이 Overlap만 감지
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380730/notion-blog/_/_/_5_/_6_Collision_Essentials_-_2/image_8.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380730/notion-blog/_/_/_5_/_6_Collision_Essentials_-_2/image_9.png)
+
+---
+
+## 🧪 테스트 3: Overlap (Sweep 있음)
+
+### 설정
+
+```
+BallMesh
+  ├─ Object Type: WorldStatic
+  └─ WorldDynamic → Block
+
+TriggerBox
+  ├─ Object Type: WorldDynamic
+  └─ WorldStatic → Overlap
+
+ShouldSweep: True ✓
+```
+
+### 충돌 판정
+
+```
+Ball의 Box에 대한 반응: Block
+Box의 Ball에 대한 반응: Overlap
+  ↓
+더 약한 것 선택
+  ↓
+Overlap 상호작용 ✓
+
+```
+
+### 결과
+
+```
+Play 실행
+  ↓
+공이 박스 통과
+  ↓
+파란색 구체 표시 ✅
+  └─ Impact Point에 생성
+
+```
+
+**From Sweep = True**: Sweep Hit Result에 유효한 데이터
+
+---
+
+## 🧪 테스트 4: Overlap (Sweep 없음)
+
+### 설정 변경
+
+```
+ShouldSweep: False ✗
+```
+
+### 결과
+
+```
+Play 실행
+  ↓
+공이 박스 통과
+  ↓
+주황색 구체 표시 🟠
+  └─ Actor Location에 생성
+```
+
+**From Sweep = False**: Hit Result가 비어있음
+
+### 차이점
+
+```
+Sweep = True
+  └─ Sweep Hit Result에 정확한 Impact Point
+
+Sweep = False
+  └─ Sweep Hit Result가 비어있음
+      └─ Actor Location 사용
+```
+
+---
+
+## 🚫 Overlap 콜백이 안 나오는 경우
+
+### 1. Block 상호작용
+
+```
+TriggerBox
+  └─ WorldStatic → Block
+
+결과
+  └─ Overlap이 아닌 Block
+      └─ Overlap 콜백 ✗
+      └─ 공이 멈춤
+```
+
+### 2. Ignore 상호작용
+
+```
+TriggerBox
+  └─ WorldStatic → Ignore
+
+결과
+  └─ 충돌 없음
+      └─ Overlap 콜백 ✗
+      └─ 공이 통과 (이벤트 없음)
+```
+
+**핵심**: Overlap 상호작용이어야 Overlap 콜백 발생!
+
+---
+
+## ⚙️ Generate Overlap Events (중요!)
+
+### 필수 조건
+
+```
+Overlap 콜백이 발생하려면
+  ↓
+양쪽 컴포넌트 모두
+  └─ Generate Overlap Events = True ✓
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380728/notion-blog/_/_/_5_/_6_Collision_Essentials_-_2/image_10.png)
+
+**둘 중 하나라도 False면 이벤트 안 나옴!**
+
+### 테스트
+
+```
+BallMesh
+  └─ Generate Overlap Events: ✗ False
+
+결과
+  └─ Overlap 콜백 발생 안 함 ✗
+```
+
+### 다시 활성화
+
+```
+BallMesh
+  └─ Generate Overlap Events: ✓ True
+
+결과
+  └─ Overlap 콜백 정상 작동 ✅
+```
+
+---
+
+## ⚙️ Simulation Generates Hit Events
+
+### Physics 충돌의 Hit 이벤트
+
+```
+물리 시뮬레이션으로 충돌할 때
+  └─ Simulation Generates Hit Events = True 필요
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380728/notion-blog/_/_/_5_/_6_Collision_Essentials_-_2/image_11.png)
+
+### BP_Ball_AddForce 테스트
+
+### 1. Hit 이벤트 바인딩
+
+```
+Event BeginPlay
+  ↓
+BallMesh의 OnComponentHit에 바인딩
+  ↓
+Hit 발생 시
+  └─ 녹색 구체 그리기 (Impact Point)
+```
+
+### 2. Physics Only 설정
+
+```
+BallMesh
+  ├─ Collision Enabled: Physics Only
+  ├─ Responses: Block All
+  └─ Simulate Physics: True
+```
+
+### 3. 첫 번째 테스트
+
+```
+Simulation Generates Hit Events: False ✗
+  ↓
+Play 실행
+  ↓
+공이 벽에 충돌하지만
+  ↓
+녹색 구체 없음 ✗
+```
+
+**이유**: Physics 충돌인데 설정 안 함
+
+### 4. 설정 변경
+
+```
+Simulation Generates Hit Events: True ✓
+  ↓
+Play 실행
+  ↓
+공이 벽에 충돌
+  ↓
+녹색 구체 표시 ✅
+```
+
+---
+
+## 🔍 Probe 데모
+
+### 설정
+
+```
+BallMesh
+  ├─ Collision Enabled: Probe Only
+  ├─ Simulation Generates Hit Events: True
+  └─ Simulate Physics: True
+```
+
+### 결과
+
+```
+Play 실행
+  ↓
+공이 벽 통과 🚶
+  ↓
+하지만 Hit 이벤트는 계속 발생! ⚠️
+  └─ 녹색 구체가 여러 개 생성됨
+```
+
+**Probe**: 충돌 감지만 하고 물리력 없음
+
+### 주의사항
+
+```
+Probe는 접촉 중 계속 Hit 이벤트 발생
+  └─ 스팸처럼 여러 번 트리거됨 ⚠️
+      └─ 한 번만 실행하도록 로직 필요
+```
+
+---
+
+## 📋 Hit vs Overlap 비교
+
+### Hit 콜백 조건
+
+```
+필수 조건
+  ├─ Block 상호작용
+  └─ Sweep 사용
+      또는
+      Simulation Generates Hit Events = True
+```
+
+### Overlap 콜백 조건
+
+```
+필수 조건
+  ├─ Overlap 상호작용
+  └─ 양쪽 모두 Generate Overlap Events = True
+```
+
+---
+
+## 📊 상세 비교표
+
+| 항목          | Hit 콜백                        | Overlap 콜백            |
+| ------------- | ------------------------------- | ----------------------- |
+| 상호작용      | Block                           | Overlap                 |
+| Sweep (Query) | 필요                            | 선택                    |
+| Physics       | 가능                            | 불가능                  |
+| 설정 옵션     | Simulation Generates Hit Events | Generate Overlap Events |
+| 양쪽 설정     | Physics만 필요                  | 양쪽 모두 필요          |
+| 발생 빈도     | 충돌 순간                       | 진입/퇴장 시            |
+
+---
+
+## 💡 핵심 정리
+
+### Hit 콜백 (OnComponentHit)
+
+```
+발생 조건
+  ├─ Block 상호작용
+  └─ 방법 1: Sweep 사용 (Query)
+      또는
+      방법 2: Physics + Simulation Generates Hit Events
+```
+
+### Overlap 콜백 (OnComponentBeginOverlap)
+
+```
+발생 조건
+  ├─ Overlap 상호작용
+  └─ 양쪽 모두 Generate Overlap Events = True
+```
+
+### From Sweep
+
+```
+Overlap 이벤트에서
+  ├─ True → Sweep Hit Result 유효 (Impact Point)
+  └─ False → Hit Result 비어있음 (Actor Location)
+```
+
+### Probe
+
+```
+충돌 감지만 함
+  ├─ Hit 이벤트 발생
+  └─ 물리력 없음 (통과함)
+```
+
+---
+
+## ⚠️ 중요 주의사항
+
+### Generate Overlap Events
+
+```
+양쪽 컴포넌트 모두 True여야 함!
+  └─ 하나라도 False면 작동 안 함
+```
+
+### Simulation Generates Hit Events
+
+```
+Physics 충돌의 Hit 이벤트에만 필요
+  └─ Sweep Hit는 이거 없어도 됨
+```
+
+### Probe 스팸
+
+```
+Probe는 접촉 중 계속 이벤트 발생
+  └─ Do Once 같은 로직 필요
+```
+
+---
+
+## 📚 용어 정리
+
+| 용어                            | 설명                                |
+| ------------------------------- | ----------------------------------- |
+| OnComponentHit                  | 충돌(Block) 시 발생하는 이벤트      |
+| OnComponentBeginOverlap         | 겹침(Overlap) 시작 시 이벤트        |
+| Generate Overlap Events         | Overlap 콜백 활성화 옵션            |
+| Simulation Generates Hit Events | Physics 충돌 Hit 콜백 활성화        |
+| From Sweep                      | Overlap이 Sweep의 결과인지 확인     |
+| Sweep Hit Result                | Sweep 결과 데이터 (Impact Point 등) |
+| Impact Point                    | 충돌 지점 좌표                      |
+| Probe Only                      | 충돌 감지만 하고 힘 전달 안 함      |
+
+---
+
+## 🔧 실습 체크리스트
+
+```
+✅ BP_Ball_Hit 테스트
+✅ Sweep 없이 Hit 안 나오는 것 확인
+✅ Sweep으로 Hit 발생 확인
+✅ Overlap으로 변경하면 Hit 안 나옴 확인
+✅ BP_Ball_Overlap 테스트
+✅ From Sweep True/False 차이 확인
+✅ Generate Overlap Events 끄기 테스트
+✅ Physics Hit + Simulation Generates Hit Events
+✅ Probe Only 테스트
+✅ 스팸 현상 확인
+```
+
+# { 🎯 충돌 최적화 (Collision Optimization) }
+
+## 📌 이 강의의 목표
+
+불필요한 충돌 이벤트를 제거하여 게임 성능을 최적화하는 방법을 학습합니다.
+
+- Custom Preset의 문제점
+- OverlapAllDynamic의 성능 문제
+- 커스텀 Collision Preset 생성
+- Pawn Object Type 활용
+
+---
+
+## ⚠️ Custom Preset의 문제점
+
+### 왜 Custom을 피해야 하나?
+
+```
+Custom Preset
+  └─ 와일드카드 (무엇이든 될 수 있음)
+      ├─ 컴포넌트마다 설정이 다를 수 있음
+      └─ 혼란스러움 ⚠️
+
+내장 Preset
+  └─ 항상 동일한 설정
+      └─ 명확함 ✅
+```
+
+**원칙**: 가능하면 Preset 사용, Custom은 최후의 수단
+
+---
+
+## 🔴 문제 상황: OverlapAllDynamic
+
+### BP_SmallSphere 구조
+
+```
+Components
+  └─ Sphere Volume (Sphere Component)
+      └─ Collision Preset: OverlapAllDynamic
+```
+
+### OverlapAllDynamic 설정
+
+```
+Collision Enabled: Query Only
+Object Type: WorldDynamic
+Responses: Overlap All (모든 채널 Overlap!)
+```
+
+**문제**: 모든 것과 겹침 이벤트 발생! 😱
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380728/notion-blog/_/_/_5_/_6_Collision_Essentials_-_2/image_12.png)
+
+---
+
+## 📊 성능 문제 시연
+
+### Overlap 이벤트
+
+```
+Event BeginPlay
+  ↓
+Bind to OnComponentBeginOverlap
+  ↓
+Overlap 발생 시
+  ├─ Cast to Game Mode
+  ├─ 점수 증가
+  └─ 구체 파괴
+```
+
+### 테스트 설정
+
+```
+Sphere Spawner
+  ├─ Spawn Time: 0.2초
+  └─ SmallSphere Lifetime: 60초
+      └─ 많은 구체 생성!
+```
+
+### Print String 추가
+
+```
+OnSphereOverlap
+  ↓
+Print String (Other Actor 이름)
+```
+
+**Get Display Name**: Actor를 String으로 변환
+
+---
+
+## 🧪 문제 확인
+
+### 결과
+
+```
+Play 실행
+  ↓
+화면에 이름들이 스팸! 📢📢📢
+  └─ BP_SmallSphere_42
+  └─ BP_SmallSphere_73
+  └─ BP_SmallSphere_19
+  └─ ... (계속 반복)
+```
+
+**문제**: 구체끼리 계속 Overlap 이벤트 발생!
+
+### 분석
+
+```
+원하는 것
+  └─ 플레이어 폰과만 Overlap
+
+실제 상황
+  └─ 모든 구체끼리 Overlap
+      ├─ 수백 개의 불필요한 이벤트
+      └─ 성능 저하! ⚠️
+```
+
+---
+
+## 💡 해결 방법: Pawn Object Type
+
+### BP_BotPawn 확인
+
+```
+Components
+  └─ BotMesh (Static Mesh)
+      └─ Collision Preset: BlockAllDynamic
+          └─ Object Type: WorldDynamic
+```
+
+**문제**: 구체도 WorldDynamic이라 충돌함!
+
+### CharacterMesh Preset으로 변경
+
+```
+BotMesh
+  └─ Collision Preset: CharacterMesh
+      ├─ Collision Enabled: Query Only
+      ├─ Object Type: Pawn ✅
+      └─ Responses
+          ├─ Visibility → Ignore
+          ├─ Camera → Block
+          ├─ WorldStatic → Block
+          ├─ WorldDynamic → Block
+          ├─ PhysicsBody → Block
+          └─ 기타 → Block
+```
+
+**핵심**: Object Type을 Pawn으로 변경!
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380728/notion-blog/_/_/_5_/_6_Collision_Essentials_-_2/image_12.png)
+
+---
+
+## 🔧 SmallSphere 최적화
+
+### Custom 설정
+
+```
+Sphere Volume
+  └─ Collision Preset: Custom
+      ├─ Collision Enabled: Query Only
+      ├─ Object Type: WorldDynamic
+      └─ Responses
+          ├─ 모두 → Ignore
+          └─ Pawn → Overlap ✅
+```
+
+**전략**: Pawn만 Overlap, 나머지는 무시
+
+### 충돌 판정
+
+```
+SmallSphere (WorldDynamic)
+  └─ Pawn → Overlap
+
+BotMesh (Pawn)
+  └─ WorldDynamic → Block
+
+결과
+  └─ Overlap < Block
+      └─ Overlap 상호작용 ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380728/notion-blog/_/_/_5_/_6_Collision_Essentials_-_2/image_13.png)
+
+---
+
+## 🧪 최적화 결과 테스트
+
+### 결과
+
+```
+Play 실행
+  ↓
+화면에 아무것도 안 나옴! ✅
+  └─ 구체끼리 무시됨
+  └─ 블래스터도 무시됨
+
+폰으로 구체에 접근
+  ↓
+Overlap 이벤트 발생! ✅
+  └─ 점수 증가
+  └─ 구체 파괴
+```
+
+**성공**: 불필요한 이벤트 제거!
+
+---
+
+## 🎨 커스텀 Preset 생성
+
+### 문제점
+
+```
+현재 상태
+  └─ SmallSphere가 Custom 사용
+      └─ 명확하지 않음
+      └─ 재사용 어려움
+```
+
+### 해결: Pickup Preset 생성
+
+```
+Edit → Project Settings
+  ↓
+Engine → Collision
+  ↓
+Preset → New...
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380728/notion-blog/_/_/_5_/_6_Collision_Essentials_-_2/image_14.png)
+
+---
+
+## ⚙️ Pickup Preset 설정
+
+### 이름
+
+```
+Name: Pickup
+Description: 플레이어와만 겹치는 픽업용
+```
+
+### 설정값
+
+```
+Collision Enabled: Query Only
+  └─ 물리 불필요
+
+Object Type: WorldDynamic
+  └─ 움직일 수 있음
+
+Responses
+  ├─ 모두 → Ignore
+  └─ Pawn → Overlap
+```
+
+**용도**: 플레이어만 주울 수 있는 아이템
+
+---
+
+## 🔄 적용
+
+### SmallSphere 업데이트
+
+```
+Sphere Volume
+  └─ Collision Preset: Custom → Pickup
+```
+
+**장점**:
+
+- 명확함 ✅
+- 재사용 가능 ✅
+- 다른 픽업 아이템에도 동일하게 적용 ✅
+
+---
+
+## 🎯 BP_BotPawn 확인
+
+### BotMesh 설정
+
+```
+Collision Preset: BlockAllDynamic
+  ├─ Object Type: WorldDynamic
+  └─ WorldDynamic → Block
+```
+
+**결과**: 구체(WorldDynamic)를 무시하지 않음
+
+**하지만**: 구체가 Pawn만 Overlap하므로 문제없음!
+
+---
+
+## 📊 최적화 비교
+
+### Before (OverlapAllDynamic)
+
+```
+100개 구체 생성
+  ↓
+100 × 100 = 10,000번 Overlap 체크
+  ↓
+불필요한 이벤트 수천 개 발생
+  ↓
+성능 저하 ⚠️
+```
+
+### After (Pickup Preset)
+
+```
+100개 구체 생성
+  ↓
+폰과만 체크
+  ↓
+필요한 이벤트만 발생
+  ↓
+성능 향상 ✅
+```
+
+---
+
+## 💡 최적화 원칙
+
+### 1. 특정 타입만 체크
+
+```
+❌ 모든 것과 Overlap
+✅ 필요한 Object Type만 Overlap
+```
+
+### 2. Custom 피하기
+
+```
+최적화 후
+  ↓
+커스텀 Preset 생성
+  ↓
+재사용
+```
+
+### 3. 후처리 필터링 피하기
+
+```
+❌ 모든 Overlap 받고 → 나중에 필터링
+✅ 필요한 것만 받기
+```
+
+---
+
+## 🎨 Object Type 전략
+
+### 분류 체계
+
+```
+WorldStatic
+  └─ 고정 물체 (벽, 바닥)
+
+WorldDynamic
+  └─ 움직이는 물체 (문, 플랫폼, 일반 물체)
+
+Pawn
+  └─ 캐릭터 (플레이어, AI)
+
+PhysicsBody
+  └─ 물리 물체
+
+Pickup (커스텀)
+  └─ 픽업 아이템
+```
+
+**전략**: 목적에 맞는 Object Type 사용
+
+---
+
+## 📋 Preset 생성 가이드
+
+### 언제 만들까?
+
+```
+새 Preset 생성 시점
+  ├─ Custom 설정 완료 후
+  ├─ 여러 곳에서 재사용할 때
+  └─ 명확한 용도가 있을 때
+```
+
+### 명명 규칙
+
+```
+용도를 명확히
+  ├─ Pickup (픽업 아이템)
+  ├─ Enemy (적 캐릭터)
+  ├─ Projectile (발사체)
+  └─ Trigger (트리거 볼륨)
+```
+
+---
+
+## ⚠️ 주의사항
+
+### Preset이 안 보일 때
+
+```
+새 Preset 생성 후
+  ↓
+Blueprint에서 안 보임
+  ↓
+Compile 버튼 클릭
+  ↓
+Preset 목록에 나타남
+```
+
+### Print String 제거
+
+```
+최적화 완료 후
+  └─ 디버그용 Print String 삭제
+      └─ 불필요한 연산 제거
+```
+
+---
+
+## 📝 핵심 정리
+
+### 문제
+
+```
+OverlapAllDynamic
+  └─ 모든 것과 Overlap
+      └─ 수천 개의 불필요한 이벤트
+          └─ 성능 저하
+```
+
+### 해결
+
+```
+1. Pawn Object Type 사용
+   └─ 캐릭터만 구분 가능
+
+2. Pickup Preset 생성
+   ├─ Pawn만 Overlap
+   └─ 나머지 Ignore
+
+3. 불필요한 이벤트 제거
+   └─ 성능 향상
+```
+
+### 원칙
+
+```
+필요한 것만 체크
+  └─ 후처리 필터링 ✗
+  └─ 사전 필터링 ✅
+```
+
+---
+
+## 🎓 실전 팁
+
+### 픽업 아이템
+
+```
+모든 픽업 아이템에 Pickup Preset 사용
+  ├─ 체력 팩
+  ├─ 탄약
+  ├─ 코인
+  └─ 파워업
+```
+
+### 트리거 볼륨
+
+```
+특정 Object Type만 트리거
+  ├─ Pawn만 트리거
+  └─ 발사체만 트리거
+```
+
+### 적 캐릭터
+
+```
+Enemy Preset 생성
+  ├─ Pawn과만 상호작용
+  └─ 적끼리는 무시
+```
+
+---
+
+## 📚 용어 정리
+
+| 용어              | 설명                                |
+| ----------------- | ----------------------------------- |
+| OverlapAllDynamic | 모든 것과 겹치는 Preset (성능 나쁨) |
+| Pawn Object Type  | 캐릭터용 Object Type                |
+| CharacterMesh     | 캐릭터 메시용 Preset                |
+| Pickup Preset     | 픽업 아이템용 커스텀 Preset         |
+| Get Display Name  | Actor 이름을 String으로 변환        |
+| Spawn Time        | 생성 간격                           |
+| Lifetime          | 생명 시간                           |
+
+---
+
+## 🔧 실습 체크리스트
+
+```
+✅ BP_SmallSphere 확인
+✅ OverlapAllDynamic 문제 확인
+✅ Print String으로 스팸 확인
+✅ BP_BotPawn Object Type 변경
+✅ SmallSphere Custom 설정
+✅ Pawn만 Overlap 확인
+✅ Pickup Preset 생성
+✅ SmallSphere에 Pickup 적용
+✅ 최적화 결과 테스트
+✅ Print String 삭제
+```
+
+---
+
+## 💡 최종 요약
+
+### Before
+
+```
+구체 100개
+  ×
+모든 것과 체크
+  =
+10,000+ 불필요한 이벤트
+```
+
+### After
+
+```
+구체 100개
+  ×
+폰만 체크
+  =
+필요한 이벤트만
+```
+
+**결과**: 성능 대폭 향상! 🚀
+
+# { 🎯 커스텀 Object Channel과 발사체 충돌 }
+
+## 📌 이 강의의 목표
+
+플레이어와 적의 발사체가 서로 다르게 동작하도록 커스텀 Object Channel을 만듭니다.
+
+- 커스텀 Object Channel 생성
+- 플레이어/적 발사체 분리
+- 자기 자신을 맞히지 않게 설정
+- 발사체끼리 충돌 방지
+
+---
+
+## ⚠️ 해결해야 할 문제들
+
+### 문제 1: 자기 자신 맞히기
+
+```
+소켓이 배럴 안에 있으면
+  ↓
+블래스터 빔 생성
+  ↓
+즉시 자기 몸에 Hit!
+  ↓
+발사 안 됨 😱
+```
+
+**임시 해결**: 소켓을 배럴 밖으로 이동
+**근본 해결**: 충돌 설정 변경 필요!
+
+### 문제 2: 발사체끼리 충돌
+
+```
+블래스터 빔들이 서로 충돌
+  ↓
+불필요한 Hit 이벤트
+  ↓
+성능 저하
+```
+
+### 문제 3: 팀킬
+
+```
+적의 발사체가 다른 적 맞힘
+플레이어의 발사체가 다른 플레이어 맞힘
+  ↓
+원하지 않는 피해!
+```
+
+---
+
+## 🎨 해결 전략
+
+### 필요한 구분
+
+```
+1. 플레이어 메시 (Player)
+2. 적 메시 (Enemy)
+3. 플레이어 발사체 (PlayerProjectile)
+4. 적 발사체 (EnemyProjectile)
+```
+
+**방법**: 커스텀 Object Channel 생성!
+
+---
+
+## 🛠️ 1단계: 커스텀 Object Channel 생성
+
+### Player Channel
+
+```
+Edit → Project Settings
+  ↓
+Engine → Collision
+  ↓
+Object Channels → New Object Channel
+```
+
+```
+Name: Player
+Default Response: Block
+```
+
+**Accept 클릭**
+
+### Enemy Channel
+
+```
+Object Channels → New Object Channel
+```
+
+```
+Name: Enemy
+Default Response: Block
+```
+
+## Object Channel이란?
+
+**Object Channel은 "충돌 카테고리"를 새로 만드는 기능입니다.**
+
+언리얼에 기본으로 있는 `WorldStatic`, `WorldDynamic`, `Pawn` 같은 것들이 바로 Object Channel인데, 이것만으로 부족할 때 `Player`, `Enemy`, `Projectile` 같은 **나만의 카테고리**를 추가로 만들 수 있습니다.
+
+예를 들어, "적은 적의 총알에 안 맞게 하고 싶다"면 `Enemy`라는 Object Channel을 만들고, 적 메시는 `Object Type: Enemy`로 설정한 뒤, 적 총알은 `Enemy에 대한 반응: Ignore`로 설정하면 됩니다. 이렇게 하면 적끼리는 서로 무시하고, 플레이어만 맞출 수 있게 됩니다.
+
+**핵심**: Object Channel = 충돌 그룹을 새로 만드는 것. "너는 Player팀", "너는 Enemy팀" 이렇게 나눠서 팀별로 다른 충돌 규칙을 적용할 수 있게 해줍니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380728/notion-blog/_/_/_5_/_6_Collision_Essentials_-_2/image_15.png)
+
+**Accept 클릭**
+
+---
+
+## 🎭 2단계: 메시용 Preset 생성
+
+### PlayerMesh Preset
+
+```
+Presets → New...
+```
+
+```
+Name: PlayerMesh
+Description: 플레이어가 조종하는 메시
+
+Collision Enabled: Query and Physics
+Object Type: Player ✅
+
+Responses:
+  ├─ 모두 → Ignore (먼저)
+  ├─ WorldStatic → Block
+  ├─ WorldDynamic → Block
+  ├─ Player → Block
+  └─ Enemy → Block
+```
+
+**Accept 클릭**
+
+### EnemyMesh Preset
+
+```
+Presets → New...
+```
+
+```
+Name: EnemyMesh
+Description: 적이 조종하는 메시
+
+Collision Enabled: Query and Physics
+Object Type: Enemy ✅
+
+Responses:
+  ├─ 모두 → Ignore
+  ├─ WorldStatic → Block
+  ├─ WorldDynamic → Block
+  ├─ Player → Block
+  └─ Enemy → Block
+```
+
+**Accept 클릭**
+
+## 메시용 Preset을 왜 만드나?
+
+**메시(캐릭터 몸체)와 발사체(총알)는 충돌 규칙이 달라야 하기 때문입니다.**
+
+예를 들어 플레이어 캐릭터는 벽도 막아야 하고, 적도 막아야 하고, 다른 플레이어도 막아야 합니다. 하지만 플레이어의 총알은 플레이어 자신은 통과해야 하고, 적만 맞춰야 합니다. 이렇게 **역할이 다르면 Collision Preset도 따로 만들어야** 합니다.
+
+`PlayerMesh` Preset은 "플레이어 캐릭터 몸체용"으로 벽/적/다른 플레이어를 모두 Block하고, `PlayerProjectile` Preset은 "플레이어 총알용"으로 플레이어는 Ignore하고 적만 Block합니다. 같은 Player 팀이지만 메시와 발사체는 **해야 할 일이 다르니까** 각각 전용 Preset을 만드는 겁니다.
+
+**핵심**: 캐릭터 몸 ≠ 총알. 역할이 다르면 Preset도 따로 만들어서 각자에게 맞는 충돌 규칙을 적용합니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380728/notion-blog/_/_/_5_/_6_Collision_Essentials_-_2/image_16.png)
+
+---
+
+## 🤖 3단계: 메시에 적용
+
+### BP_BotPawn (플레이어)
+
+```
+BotMesh
+  └─ Collision Preset: PlayerMesh
+```
+
+**Save**
+
+### BP_Bot (적)
+
+```
+BotMesh
+  └─ Collision Preset: EnemyMesh
+```
+
+**Save**
+
+---
+
+## 🎯 4단계: Pickup Preset 수정
+
+### 문제
+
+```
+BP_SmallSphere
+  └─ Pawn과 Overlap
+      └─ 더 이상 Pawn 안 씀!
+          └─ Player로 변경 필요
+```
+
+### 해결
+
+```
+Project Settings → Collision
+  ↓
+Pickup Preset → Edit
+```
+
+```
+Responses:
+  ├─ 모두 → Ignore
+  ├─ Pawn → Ignore (변경)
+  └─ Player → Overlap ✅
+```
+
+**Accept 클릭**
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380728/notion-blog/_/_/_5_/_6_Collision_Essentials_-_2/image_17.png)
+
+---
+
+## 🚀 5단계: 발사체 클래스 분리
+
+### 왜 분리?
+
+```
+플레이어 발사체
+  └─ 적만 맞춰야 함
+
+적 발사체
+  └─ 플레이어만 맞춰야 함
+```
+
+**방법**: 자식 클래스 생성!
+
+### BP_PlayerBlasterBeam 생성
+
+```
+BP_BlasterBeam 우클릭
+  ↓
+Create Child Blueprint Class
+  ↓
+Name: BP_PlayerBlasterBeam
+```
+
+### BP_EnemyBlasterBeam 생성
+
+```
+BP_BlasterBeam 우클릭
+  ↓
+Create Child Blueprint Class
+  ↓
+Name: BP_EnemyBlasterBeam
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380728/notion-blog/_/_/_5_/_6_Collision_Essentials_-_2/image_18.png)
+
+---
+
+## 🎨 6단계: 발사체 Preset 생성
+
+### 기존 BlasterBeam 에 자손 클래스 만들기
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380729/notion-blog/_/_/_5_/_6_Collision_Essentials_-_2/image_19.png)
+
+```csharp
+기본 Blaster 에 자손으로 만들기 Enemy Blaster Player Blaster
+```
+
+### PlayerProjectile Preset
+
+```
+Presets → New...
+```
+
+```
+Name: PlayerProjectile
+Description: 플레이어를 무시하는 발사체
+
+Collision Enabled: Query Only ✅
+  └─ Projectile Movement가 Sweep 사용
+  └─ Physics 불필요
+
+Object Type: Player ✅
+
+Responses:
+  ├─ 모두 → Ignore
+  ├─ WorldStatic → Block
+  ├─ WorldDynamic → Block
+  ├─ Player → Ignore ✅ (자기편 무시!)
+  └─ Enemy → Block ✅ (적만 맞춤!)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380729/notion-blog/_/_/_5_/_6_Collision_Essentials_-_2/image_20.png)
+
+**Accept 클릭**
+
+### EnemyProjectile Preset
+
+```
+Presets → New...
+```
+
+```
+Name: EnemyProjectile
+Description: 적을 무시하는 발사체
+
+Collision Enabled: Query Only
+Object Type: Enemy ✅
+
+Responses:
+  ├─ 모두 → Ignore
+  ├─ WorldStatic → Block
+  ├─ WorldDynamic → Block
+  ├─ Enemy → Ignore ✅ (자기편 무시!)
+  └─ Player → Block ✅ (플레이어만 맞춤!)
+```
+
+**Accept 클릭**
+
+---
+
+## ⚠️ 실습 문제 사례 (중요!)
+
+### 문제 상황
+
+```
+EnemyProjectile Preset 생성 시
+  ├─ Object Type: WorldDynamic (잘못된 설정!)
+  └─ Enemy → Block
+```
+
+### 왜 문제?
+
+```
+EnemyMesh
+  ├─ Object Type: Enemy
+  └─ WorldDynamic → Block
+
+EnemyProjectile
+  ├─ Object Type: WorldDynamic (잘못!)
+  └─ Enemy → Block
+
+충돌 판정
+  ↓
+적 메시(Enemy)의 WorldDynamic 반응: Block
+발사체(WorldDynamic)의 Enemy 반응: Block
+  ↓
+Block + Block = Block
+  ↓
+적이 자기 발사체에 맞음! 😱
+```
+
+### 해결 방법
+
+```
+EnemyProjectile Preset → Edit
+  ↓
+Object Type: Enemy로 변경 ✅
+  ↓
+Responses
+  └─ Enemy → Ignore ✅
+```
+
+### 충돌 판정 (수정 후)
+
+```
+EnemyMesh
+  ├─ Object Type: Enemy
+  └─ Enemy → Block
+
+EnemyProjectile
+  ├─ Object Type: Enemy ✅
+  └─ Enemy → Ignore ✅
+
+충돌 판정
+  ↓
+적 메시(Enemy)의 Enemy 반응: Block
+발사체(Enemy)의 Enemy 반응: Ignore
+  ↓
+Block + Ignore = Ignore
+  ↓
+적이 자기 발사체를 무시! ✅
+```
+
+### 핵심 교훈
+
+```
+발사체의 Object Type
+  =
+발사한 주체의 Object Type
+  ↓
+같은 팀끼리 무시 가능!
+```
+
+---
+
+## 🔧 7단계: 발사체에 Preset 적용
+
+### BP_PlayerBlasterBeam
+
+```
+BeamMesh
+  └─ Collision Preset: PlayerProjectile
+```
+
+**Compile & Save**
+
+### BP_EnemyBlasterBeam
+
+```
+BeamMesh
+  └─ Collision Preset: EnemyProjectile
+```
+
+**Compile & Save**
+
+---
+
+## 🎮 8단계: 생성 클래스 변경
+
+### BP_BotPawn (플레이어)
+
+```
+FireRifle 함수
+  ↓
+Spawn Actor
+  └─ Class: BP_BlasterBeam
+      ↓
+      BP_PlayerBlasterBeam으로 변경 ✅
+```
+
+### BP_Bot (적)
+
+```
+SpawnBlasterBeam 함수
+  ↓
+Spawn Actor
+  └─ Class: BP_BlasterBeam
+      ↓
+      BP_EnemyBlasterBeam으로 변경 ✅
+```
+
+---
+
+## 🧪 테스트 결과
+
+### 성공 케이스
+
+```
+✅ 플레이어 발사체 → 적 Hit
+✅ 적 발사체 → 플레이어 Hit
+✅ 플레이어 발사체 → 플레이어 무시
+✅ 적 발사체 → 적 무시
+✅ 발사체 → 벽 Hit
+✅ 소켓이 배럴 안에 있어도 OK
+```
+
+---
+
+## 🔄 추가: 발사체끼리 충돌 방지
+
+### 문제
+
+```
+플레이어 발사체 + 적 발사체 충돌
+  ↓
+불필요한 Hit 이벤트
+```
+
+### 해결 방법 1: WorldDynamic 사용
+
+### PlayerProjectile 수정
+
+```
+Edit PlayerProjectile
+  ↓
+Object Type: WorldDynamic
+Responses:
+  ├─ WorldDynamic → Ignore ✅
+  ├─ Player → Ignore
+  └─ Enemy → Block
+```
+
+### EnemyProjectile 수정
+
+```
+Edit EnemyProjectile
+  ↓
+Object Type: WorldDynamic
+Responses:
+  ├─ WorldDynamic → Ignore ✅
+  ├─ Enemy → Ignore
+  └─ Player → Block
+```
+
+**주의**: 다른 WorldDynamic 물체도 무시됨!
+
+### 해결 방법 2: Projectile Channel 생성 (권장)
+
+```
+New Object Channel: Projectile
+  ↓
+PlayerProjectile
+  ├─ Object Type: Projectile
+  └─ Projectile → Ignore
+
+EnemyProjectile
+  ├─ Object Type: Projectile
+  └─ Projectile → Ignore
+```
+
+**장점**: 다른 WorldDynamic 물체는 여전히 맞춤
+
+---
+
+## 📊 최종 충돌 매트릭스
+
+### 플레이어 발사체
+
+| Target        | 결과     |
+| ------------- | -------- |
+| 플레이어 메시 | Ignore   |
+| 적 메시       | Block ✅ |
+| 벽            | Block    |
+| 다른 발사체   | Ignore   |
+
+### 적 발사체
+
+| Target        | 결과     |
+| ------------- | -------- |
+| 적 메시       | Ignore   |
+| 플레이어 메시 | Block ✅ |
+| 벽            | Block    |
+| 다른 발사체   | Ignore   |
+
+---
+
+## 💡 핵심 개념 정리
+
+### Object Channel vs Object Type
+
+```
+Object Channel
+  └─ 충돌 카테고리 (Player, Enemy 등)
+
+Object Type
+  └─ 내가 어떤 카테고리인지
+```
+
+### 같은 팀 무시하기
+
+```
+발사체 Object Type = 발사한 주체 Type
+  ↓
+자기 Type에 대한 반응 = Ignore
+  ↓
+같은 팀끼리 무시!
+```
+
+### Query Only 사용
+
+```
+발사체는 Sweep으로 이동
+  └─ Query Only면 충분
+  └─ Physics 불필요
+```
+
+---
+
+## 📝 단계별 체크리스트
+
+```
+✅ Player Object Channel 생성
+✅ Enemy Object Channel 생성
+✅ PlayerMesh Preset 생성
+✅ EnemyMesh Preset 생성
+✅ BP_BotPawn → PlayerMesh 적용
+✅ BP_Bot → EnemyMesh 적용
+✅ Pickup Preset → Player Overlap으로 수정
+✅ BP_PlayerBlasterBeam 생성
+✅ BP_EnemyBlasterBeam 생성
+✅ PlayerProjectile Preset 생성
+✅ EnemyProjectile Preset 생성 (Object Type 확인!)
+✅ 발사체에 Preset 적용
+✅ 생성 클래스 변경
+✅ Compile 후 테스트
+```
+
+---
+
+## ⚠️ 흔한 실수와 해결
+
+### 실수 1: Object Type 잘못 설정
+
+```
+❌ EnemyProjectile Object Type: WorldDynamic
+✅ EnemyProjectile Object Type: Enemy
+
+이유
+  └─ 같은 Type끼리 Ignore해야 자기편 안 맞춤
+```
+
+### 실수 2: Compile 안 함
+
+```
+Preset 변경 후
+  └─ Blueprint Compile 필수!
+      └─ 안 하면 반영 안 됨
+```
+
+### 실수 3: Preset이 안 보임
+
+```
+새 Preset 생성 후
+  ↓
+다른 곳 클릭 → Collision으로 다시 이동
+  ↓
+드롭다운 다시 열기
+  ↓
+Preset 나타남
+```
+
+---
+
+## 🎓 실전 팁
+
+### Preset 명명 규칙
+
+```
+{역할}{타입}
+  ├─ PlayerMesh (플레이어 메시)
+  ├─ EnemyMesh (적 메시)
+  ├─ PlayerProjectile (플레이어 발사체)
+  └─ EnemyProjectile (적 발사체)
+```
+
+### 디버깅 방법
+
+```
+Print String으로 Other Actor 출력
+  ↓
+어떤 것과 충돌하는지 확인
+  ↓
+문제 발견
+```
+
+### 성능 최적화
+
+```
+Query Only 사용
+  └─ Sweep만 필요하면
+      └─ Physics 끄기
+```
+
+---
+
+## 📚 용어 정리
+
+| 용어                  | 설명                    |
+| --------------------- | ----------------------- |
+| Object Channel        | 커스텀 충돌 카테고리    |
+| Child Blueprint Class | 자식 블루프린트 클래스  |
+| PlayerProjectile      | 플레이어 발사체 Preset  |
+| EnemyProjectile       | 적 발사체 Preset        |
+| Query Only            | 쿼리만 사용 (물리 없음) |
+| Team Kill             | 같은 팀끼리 공격        |
+| Get Display Name      | Actor 이름 String으로   |
+
+---
+
+## 💡 최종 요약
+
+### 문제
+
+```
+1. 자기 자신 맞히기
+2. 발사체끼리 충돌
+3. 같은 팀 공격
+```
+
+### 해결
+
+```
+1. 커스텀 Object Channel 생성
+   └─ Player, Enemy
+
+2. 메시 Preset 생성
+   └─ PlayerMesh, EnemyMesh
+
+3. 발사체 자식 클래스 생성
+   └─ BP_PlayerBlasterBeam
+   └─ BP_EnemyBlasterBeam
+
+4. 발사체 Preset 생성
+   └─ Object Type = 발사 주체
+   └─ 자기 Type은 Ignore
+   └─ 상대 Type은 Block
+```
+
+### 핵심
+
+```
+같은 Object Type끼리
+  └─ Ignore 설정
+      └─ 자기편 안 맞춤!
+```
+
+---
+
+## 🔧 실습 문제 해결 가이드
+
+### 증상: 적이 자기 발사체에 맞음
+
+```
+1. EnemyProjectile Preset 확인
+   └─ Object Type이 Enemy인지?
+
+2. Object Type이 다르면
+   └─ Enemy로 변경
+
+3. Responses 확인
+   └─ Enemy → Ignore인지?
+
+4. Blueprint Compile
+   └─ BP_EnemyBlasterBeam
+
+5. 테스트
+```
+
+**원인**: Object Type을 잘못 설정하면 충돌 판정에서 Ignore가 작동 안 함!

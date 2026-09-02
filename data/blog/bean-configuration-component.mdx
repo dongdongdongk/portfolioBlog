@@ -1,0 +1,103 @@
+---
+title: '@Bean, @Configuration, @Component 차이'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# 어노테이션을 활용한 Bean 등록 이유
+
+```java
+기존의 Spring MVC에서는 xml을 활용하여 Bean을 등록하고 있었다.
+
+하지만 프로젝트의 규모가 커짐에 따라 사용하는 요소들을 xml에 등록하는 것이 상당히 번거로워 져서
+
+어노테이션(Annotation, @)를 활용한 Bean 등록 방법이 탄생하게 되었다.
+```
+
+# **Spring Bean 구성 요소**
+
+```java
+* class: Bean으로 등록할 Java 클래스
+
+* id: Bean의 고유 식별자
+
+* scope: Bean을 생성하기 위한 방법(singleton, prototype 등)
+
+* constructor-arg: Bean 생성 시 생성자에 전달할 파라미터
+
+* property: Bean 생성 시 setter에 전달할 인수
+```
+
+## xml 을 사용해서 Bean을 등록하고 사용하는 예제
+
+```java
+Person 클래스 생성
+```
+
+```java
+public class Person {
+    private String name;
+    private int age;
+
+    // Getter와 Setter 메서드
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+}
+```
+
+```java
+XML 구성 파일을 생성
+
+이 XML 구성에서는 "personBean"이라는 ID를 가진 스프링 빈을 정의하고, <bean> 및 <property> 요소를 사용하여 클래스, 범위 및 설정해야 하는 속성을 지정
+```
+
+```xml
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <!-- ID가 "personBean"인 Person 빈을 정의합니다. -->
+    <bean id="personBean" class="com.example.Person" scope="singleton">
+        <!-- property 요소를 사용하여 "name" 속성을 설정합니다. -->
+        <property name="name" value="홍길동" />
+
+        <!-- property 요소를 사용하여 "age" 속성을 설정합니다. -->
+        <property name="age" value="30" />
+    </bean>
+</beans>
+```
+
+```java
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
+
+public class MyApp {
+    public static void main(String[] args) {
+        // 스프링 XML 구성을 로드합니다.
+        ApplicationContext context = new ClassPathXmlApplicationContext("beans.xml");
+
+        // 스프링 컨테이너에서 "personBean" 스프링 빈을 검색합니다.
+        Person person = (Person) context.getBean("personBean");
+
+        // Person 빈의 속성에 액세스하고 출력합니다.
+        System.out.println("이름: " + person.getName());
+        System.out.println("나이: " + person.getAge());
+    }
+}
+```

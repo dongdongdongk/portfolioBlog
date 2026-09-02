@@ -1,0 +1,1649 @@
+---
+title: '섹션 8: 제트팩 저니 - 제트팩을 이용한 3D 플랫폼 게임 - 3'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { ⚙️ Character Movement 파라미터 조정 }
+
+## 🎯 이번 강의 목표
+
+Character Movement Component의 다양한 파라미터를 조정해서 원하는 게임 느낌을 만듭니다.
+점프, 가속, 공중 제어, 경사면 등을 커스터마이징합니다.
+
+---
+
+## 🦘 점프 파라미터
+
+### 1. Gravity Scale (중력 배율)
+
+```
+BP_Kicks
+  ↓
+CharacterMovement 선택
+  ↓
+Character Movement (Walking)
+  ↓
+Gravity Scale
+```
+
+**기본값: 1.0**
+
+```
+의미:
+기본 중력의 몇 배로 떨어질지
+
+값 증가:
+  ├─ 2.0: 2배 빠르게 낙하
+  ├─ 3.0: 3배 빠르게 낙하
+  └─ 5.0: 5배 빠르게 낙하
+
+효과:
+더 빠른 낙하
+  ↓
+스타일화된 느낌
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380754/notion-blog/_/_/_5_/_8_-_3D_-_3/image.png)
+
+### 2. Jump Z Velocity (점프 속도)
+
+```
+Character Movement (Walking)
+  ↓
+Jump / Fall
+  ↓
+Jump Z Velocity
+```
+
+**기본값: 420**
+
+```
+단위: cm/s (센티미터/초)
+
+값 증가:
+  ├─ 600: 조금 높게
+  ├─ 1200: 많이 높게
+  ├─ 1600: 매우 높게
+  └─ 1800: 아주 높게
+
+⚠️ 주의:
+1600 입력 시 자동으로 16m/s로 변환
+  ↓
+16미터/초 = 1600cm/초
+  ↓
+단위 변환 자동 처리
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380753/notion-blog/_/_/_5_/_8_-_3D_-_3/image_1.png)
+
+### 권장 조합 (스타일화된 게임)
+
+```
+Gravity Scale: 3~5
+Jump Z Velocity: 1200~1800
+
+효과:
+  ├─ 높이 점프
+  ├─ 빠른 낙하
+  └─ 탱탱한 느낌 (마리오 스타일)
+```
+
+---
+
+## 🏃 이동 파라미터
+
+### 1. Max Acceleration (최대 가속도)
+
+```
+Character Movement (Walking)
+  ↓
+Max Acceleration
+```
+
+**기본값: 2048**
+
+```
+의미:
+최대 속도까지 얼마나 빨리 가속하는가
+
+낮은 값 (기본):
+  └─ 부드러운 가속 (램프 업)
+      W 누름 → 서서히 빨라짐
+
+높은 값 (100,000):
+  └─ 즉시 최대 속도
+      W 누름 → 바로 최대 속도
+
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380753/notion-blog/_/_/_5_/_8_-_3D_-_3/image_2.png)
+
+**테스트**
+
+```
+100,000으로 설정
+  ↓
+Play → W 누름
+  ↓
+즉시 전속력 이동
+  ↓
+램프 없음
+```
+
+### 2. Ground Friction (지면 마찰)
+
+```
+Character Movement (Walking)
+  ↓
+Ground Friction
+```
+
+**기본값: 8.0**
+
+```
+의미:
+멈출 때 얼마나 빨리 감속하는가
+
+낮은 값:
+  └─ 미끄러짐 (아이스 스케이트)
+
+높은 값 (10):
+  └─ 즉시 정지
+```
+
+### 3. Braking Friction Factor
+
+```
+Character Movement (Walking)
+  ↓
+Braking Friction Factor
+```
+
+**기본값: 2.0**
+
+```
+의미:
+감속 시 마찰력 배수
+
+Ground Friction과 함께 작동
+  ↓
+감속 속도 결정
+```
+
+---
+
+## 🌬️ 공중 제어
+
+### Air Control
+
+```
+Character Movement (Walking)
+  ↓
+Jump / Fall
+  ↓
+Air Control
+```
+
+**기본값: 0.05**
+
+```
+의미:
+공중에서 방향 전환 가능 정도
+
+값 범위: 0.0 ~ 1.0
+
+0.0:
+  └─ 공중 제어 불가
+      점프 후 방향 못 바꿈
+
+0.5:
+  └─ 제한적 제어
+      약간 방향 조정 가능
+
+1.0:
+  └─ 완전한 제어
+      지면과 동일하게 조작
+```
+
+### 현실적 vs 스타일화
+
+**현실적 (0.05~0.2)**
+
+```
+점프 후:
+  └─ 방향 거의 못 바꿈
+      현실 물리학과 유사
+
+용도:
+리얼리즘 중시 게임
+```
+
+**스타일화 (0.5~1.0)**
+
+```
+점프 후:
+  └─ 자유롭게 방향 전환
+
+장점:
+  ├─ 절벽에서 점프 → 되돌아올 수 있음
+  ├─ 공중 아이템 수집
+  └─ 플랫포머 게임 느낌
+
+⚠️ Max Acceleration도 높여야 함
+   (안 그러면 느리게 반응)
+```
+
+### 권장 조합 (플랫포머)
+
+```
+Max Acceleration: 100,000
+Air Control: 1.0
+
+효과:
+공중에서 즉시 방향 전환 가능
+```
+
+---
+
+## 🪜 걷기 관련 파라미터
+
+### 1. Max Step Height (최대 계단 높이)
+
+```
+Character Movement (Walking)
+  ↓
+Max Step Height
+```
+
+**기본값: 45cm**
+
+```
+의미:
+점프 없이 올라갈 수 있는 최대 높이
+
+45cm 이하:
+  └─ 자동으로 걸어 올라감
+
+45cm 초과:
+  └─ 점프 필요
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380753/notion-blog/_/_/_5_/_8_-_3D_-_3/image_3.png)
+
+**테스트**
+
+```
+45cm 박스 생성:
+  ├─ Modeling Mode
+  ├─ Box 선택
+  ├─ Height: 45
+  └─ Accept
+
+Max Step Height: 45
+  └─ 박스 위로 걸어 올라감 ✅
+
+Max Step Height: 42
+  └─ 박스 못 올라감 ❌
+      (점프 필요)
+
+Max Step Height: 100
+  └─ 100cm까지 올라감 ✅
+```
+
+### 2. Walkable Floor Angle (걷기 가능한 바닥 각도)
+
+```
+Character Movement (Walking)
+  ↓
+Walkable Floor Angle
+```
+
+**기본값: 44.76° (약 45°)**
+
+```
+의미:
+몇 도 경사까지 걸어 올라갈 수 있는가
+
+45° 미만:
+  └─ 걸어서 올라감
+
+45° 이상:
+  └─ 미끄러짐 (못 올라감)
+```
+
+**테스트**
+
+```
+45° 경사면 생성:
+  ├─ Box 크기 조정
+  ├─ Rotation Z: 45°
+  └─ 배치
+
+Walkable Floor Angle: 44.76
+  └─ 45° 경사 못 올라감 ❌
+
+Walkable Floor Angle: 50
+  └─ 45° 경사 올라감 ✅
+
+Walkable Floor Angle: 90
+  └─ 벽도 올라감 (부자연스러움)
+```
+
+**권장값**
+
+```
+일반 게임: 44~50°
+  └─ 현실적인 느낌
+
+특수 게임: 더 높게
+  └─ 벽 타기 등
+```
+
+---
+
+## 🎮 파라미터 조합 예시
+
+### 현실적인 게임
+
+```
+Gravity Scale: 1.0
+Jump Z Velocity: 420
+Max Acceleration: 2048 (기본)
+Ground Friction: 8.0
+Air Control: 0.05~0.2
+Max Step Height: 45
+Walkable Floor Angle: 44.76
+
+느낌:
+무거운, 현실적, 신중한 움직임
+```
+
+### 스타일화된 플랫포머
+
+```
+Gravity Scale: 3~5
+Jump Z Velocity: 1600~1800
+Max Acceleration: 100,000
+Ground Friction: 10
+Air Control: 1.0
+Max Step Height: 50~100
+Walkable Floor Angle: 50
+
+느낌:
+가볍고, 반응성 좋고, 탱탱한
+(마리오, 소닉 스타일)
+```
+
+### 액션 게임 (중간)
+
+```
+Gravity Scale: 2.0
+Jump Z Velocity: 800~1000
+Max Acceleration: 4096
+Ground Friction: 8.0
+Air Control: 0.3~0.5
+Max Step Height: 45
+Walkable Floor Angle: 45
+
+느낌:
+빠르고 반응성 좋지만 현실적
+```
+
+---
+
+## 🔍 파라미터별 효과 정리
+
+### 점프 관련
+
+| 파라미터        | 낮은 값              | 높은 값           |
+| --------------- | -------------------- | ----------------- |
+| Gravity Scale   | 느린 낙하, 부유 느낌 | 빠른 낙하, 탱탱함 |
+| Jump Z Velocity | 낮은 점프            | 높은 점프         |
+| Air Control     | 방향 못 바꿈         | 자유로운 조작     |
+
+### 이동 관련
+
+| 파라미터         | 낮은 값       | 높은 값        |
+| ---------------- | ------------- | -------------- |
+| Max Acceleration | 부드러운 가속 | 즉시 최대 속도 |
+| Ground Friction  | 미끄러짐      | 즉시 정지      |
+
+### 지형 관련
+
+| 파라미터             | 낮은 값       | 높은 값       |
+| -------------------- | ------------- | ------------- |
+| Max Step Height      | 작은 단차만   | 높은 장애물도 |
+| Walkable Floor Angle | 완만한 경사만 | 가파른 경사도 |
+
+---
+
+## 💡 조정 팁
+
+### 1. 반복 테스트
+
+```
+파라미터 변경
+  ↓
+Play 테스트
+  ↓
+느낌 확인
+  ↓
+다시 조정
+  ↓
+반복
+
+완벽한 값은 테스트로만 찾을 수 있음
+```
+
+### 2. 한 번에 하나씩
+
+```
+❌ 여러 개 동시 변경:
+   어떤 게 영향 주는지 모름
+
+✅ 하나씩 변경:
+   효과 명확히 파악
+```
+
+### 3. 기본값 기억
+
+```
+테스트 전:
+기본값 메모 또는 스크린샷
+
+Reset 버튼:
+  └─ 파라미터 옆 곡선 화살표
+      기본값으로 복구
+```
+
+### 4. 게임 장르에 맞게
+
+```
+플랫포머:
+  └─ 높은 점프, 강한 제어
+
+슈팅:
+  └─ 빠른 반응, 현실적 중력
+
+RPG:
+  └─ 적당한 균형
+```
+
+---
+
+## 📝 용어 정리
+
+| 용어                 | 설명                        |
+| -------------------- | --------------------------- |
+| Gravity Scale        | 중력 배율 (낙하 속도)       |
+| Jump Z Velocity      | 점프 초기 속도 (높이)       |
+| Max Acceleration     | 최대 가속도                 |
+| Ground Friction      | 지면 마찰력                 |
+| Air Control          | 공중 조작 가능 정도         |
+| Max Step Height      | 자동으로 올라가는 최대 높이 |
+| Walkable Floor Angle | 걷기 가능한 최대 경사 각도  |
+| 램프 업              | 서서히 가속하는 것          |
+
+---
+
+## ⚠️ 주의사항
+
+### 단위 변환
+
+```
+Jump Z Velocity:
+  ├─ 1600 입력
+  └─ 16 m/s로 자동 변환
+
+의미:
+1600 cm/s = 16 m/s
+  ↓
+같은 값, 다른 표기
+
+실수하지 않도록 주의!
+```
+
+### 극단적인 값 피하기
+
+```
+❌ Gravity Scale: 50
+   → 너무 빠른 낙하, 부자연스러움
+
+❌ Air Control: 0 + 높은 점프
+   → 조작 불가, 답답함
+
+❌ Max Acceleration: 1000000
+   → 너무 급작스러움
+
+✅ 적절한 범위 내에서 조정
+```
+
+### 애니메이션과의 조화
+
+```
+파라미터 변경 시:
+  ↓
+애니메이션 속도도 조정 필요
+
+예:
+점프 높아짐
+  ↓
+점프 애니메이션 Play Rate 조정
+  ↓
+자연스러운 일치
+```
+
+---
+
+## 🎯 현재 상태
+
+### 완성된 것
+
+```
+✅ 모든 기본 이동 (WASD)
+✅ 카메라 회전 (마우스)
+✅ 점프 애니메이션
+✅ Idle/Walk/Run 블렌딩
+✅ Character Movement 커스터마이징
+```
+
+### 조정 가능한 것
+
+```
+✅ 점프 높이/속도
+✅ 가속/감속
+✅ 공중 제어
+✅ 경사/계단 처리
+```
+
+---
+
+# { 🔄 연속 점프와 State Alias }
+
+## 🎯 이번 강의 목표
+
+점프 버튼을 누르고 있으면 연속으로 점프하도록 만듭니다.
+State Alias를 사용해 State Machine을 깔끔하게 정리합니다.
+
+---
+
+## 🦘 현재 점프의 문제점
+
+### Started vs Triggered
+
+**현재 설정 (Started)**
+
+```
+BP_KicksPlayerController
+
+IA Jump (Started)
+  ↓
+Jump 함수 호출
+
+동작:
+스페이스바 누르는 순간 1번만
+  ↓
+누르고 있어도 1번만 점프
+  ↓
+다시 점프하려면:
+  └─ 버튼 떼기 → 다시 누르기
+```
+
+**Triggered로 변경**
+
+```
+IA Jump (Triggered)
+  ↓
+Jump 함수 호출
+
+동작:
+누르고 있는 동안 계속 호출
+  ↓
+매 프레임 Jump 함수 실행
+  ↓
+연속 점프!
+```
+
+---
+
+## 🎬 연속 점프 애니메이션 문제
+
+### 문제 발생
+
+```
+점프 버튼 계속 누름
+  ↓
+Jump 함수 계속 호출
+  ↓
+연속으로 점프함
+
+하지만 애니메이션:
+JumpEnd → IdleWalkRun → JumpStart
+  ↓
+착지 애니메이션 전부 재생
+  ↓
+다시 점프 시작 재생
+  ↓
+부자연스러움!
+```
+
+**원하는 것**
+
+```
+착지 직후 다시 점프하면
+  ↓
+JumpEnd 스킵
+  ↓
+바로 JumpStart로
+  ↓
+자연스러운 연속 점프
+```
+
+---
+
+## 🔧 해결: JumpEnd → JumpStart 전환
+
+### 새 Transition 추가
+
+**State Machine (Locomotion)**
+
+```
+JumpEnd에서 드래그
+  ↓
+JumpStart로 연결
+  ↓
+새 화살표 생성
+```
+
+**Transition Rule**
+
+```
+화살표 더블클릭
+  ↓
+[GET Is In Air] → [Result]
+
+의미:
+JumpEnd 중에 다시 공중으로 올라가면
+  (= 연속 점프)
+  ↓
+JumpStart로 즉시 전환
+```
+
+### 결과
+
+```
+연속 점프:
+
+1번 점프:
+IdleWalkRun → JumpStart → JumpMid → JumpEnd
+
+착지 중 2번 점프:
+JumpEnd → JumpStart (바로!)
+  ↓
+착지 애니메이션 스킵
+  ↓
+자연스러운 연속 점프
+```
+
+---
+
+## 🎨 State Alias - 깔끔한 정리
+
+### 문제: 중복 화살표
+
+```
+현재 State Machine:
+
+IdleWalkRun → JumpStart (Is In Air)
+JumpEnd → JumpStart (Is In Air)
+
+2개 화살표
+  ↓
+같은 목적지 (JumpStart)
+  ↓
+같은 조건 (Is In Air)
+  ↓
+중복!
+```
+
+**복잡해지는 경우**
+
+```
+State가 많아지면:
+  ├─ State1 → JumpStart
+  ├─ State2 → JumpStart
+  ├─ State3 → JumpStart
+  └─ ...
+
+화살표가 너무 많음
+  ↓
+복잡하고 지저분
+```
+
+---
+
+## 🔖 State Alias란?
+
+### 정의
+
+```
+State Alias (상태 별칭):
+여러 State에서 하나의 State로
+가는 전환을 묶어주는 기능
+
+비유:
+"JumpStart로 가는 관문"
+```
+
+### 작동 원리
+
+```
+일반 방식:
+State A → State X
+State B → State X
+State C → State X
+
+State Alias 방식:
+State A ┐
+State B ├→ [Alias] → State X
+State C ┘
+
+화살표 3개 → 1개
+```
+
+---
+
+## 🔧 State Alias 생성
+
+### 1. Alias 추가
+
+```
+State Machine 빈 곳에서 우클릭
+  ↓
+Add State Alias
+  ↓
+이름: To Jump Start
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380753/notion-blog/_/_/_5_/_8_-_3D_-_3/image_4.png)
+
+**네이밍**
+
+```
+"To ~" 형식 권장
+  ├─ To Jump Start
+  ├─ To Idle
+  └─ To Death
+
+목적지를 명확히 표시
+```
+
+### 2. 목적지 설정
+
+```
+To Jump Start 선택
+  ↓
+Details 패널
+  ↓
+State Alias 섹션
+  ↓
+JumpStart 체크 ✅
+
+의미:
+이 Alias는 JumpStart로 연결됨
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380753/notion-blog/_/_/_5_/_8_-_3D_-_3/image_5.png)
+
+### 3. 출발지 설정
+
+```
+Details 패널 계속
+  ↓
+Use Transition From 섹션
+  ↓
+원하는 State 체크:
+  ├─ IdleWalkRun ✅
+  └─ JumpEnd ✅
+
+의미:
+이 2개 State에서 Alias로 연결
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380754/notion-blog/_/_/_5_/_8_-_3D_-_3/image_6.png)
+
+### 4. Transition Rule 설정
+
+```
+Alias에서 화살표 나옴
+  ↓
+더블클릭
+  ↓
+[GET Is In Air] → [Result]
+
+이 조건이 모든 출발지에 적용됨
+```
+
+---
+
+## 🔄 Before & After
+
+### Before (기존 방식)
+
+```
+State Machine:
+
+IdleWalkRun ─────→ JumpStart
+                   ↑
+JumpEnd ───────────┘
+
+화살표 2개
+각각 Transition Rule 필요
+```
+
+### After (State Alias 사용)
+
+```
+State Machine:
+
+IdleWalkRun ┐
+            ├→ [To Jump Start] → JumpStart
+JumpEnd ────┘
+
+화살표 1개 (Alias 화살표)
+Transition Rule 1개만
+```
+
+---
+
+## 💡 State Alias의 장점
+
+### 1. 깔끔한 시각화
+
+```
+Before:
+화살표가 많음
+  ↓
+복잡하고 지저분
+
+After:
+Alias로 묶음
+  ↓
+깔끔하고 명확
+```
+
+### 2. 유지보수 용이
+
+```
+조건 변경 시:
+
+Before:
+모든 Transition Rule 수정
+  ├─ IdleWalkRun → JumpStart
+  ├─ JumpEnd → JumpStart
+  └─ ... 각각 수정
+
+After:
+Alias Transition Rule 1개만 수정
+  ↓
+한 번에 모두 적용
+```
+
+### 3. 확장성
+
+```
+새 State 추가 시:
+
+Before:
+새 화살표 그리기
+  ↓
+Transition Rule 새로 작성
+
+After:
+Alias 설정에서 체크만
+  ↓
+자동으로 연결
+```
+
+---
+
+## 🎨 State Alias 고급 기능
+
+### 여러 Transition Rule
+
+```
+Alias에서 여러 화살표 가능:
+
+[To Jump Start] → JumpStart (조건 1)
+[To Jump Start] → IdleWalkRun (조건 2)
+
+하지만 복잡해지므로
+  ↓
+가급적 단순하게 유지
+```
+
+### 양방향 Alias
+
+```
+To Jump Start (들어오기)
+From Jump Start (나가기)
+
+둘 다 만들 수 있음
+```
+
+---
+
+## 🔍 전체 흐름 정리
+
+### 연속 점프 시나리오
+
+```
+1. 첫 점프
+   IdleWalkRun → JumpStart → JumpMid → JumpEnd
+
+2. 착지 직전 스페이스바 계속 누름
+   JumpEnd 중 Is In Air = True
+   ↓
+
+3. Alias 작동
+   JumpEnd → [To Jump Start] → JumpStart
+   ↓
+
+4. 즉시 다시 점프
+   JumpStart → JumpMid → JumpEnd
+
+5. 반복 가능
+```
+
+### State Machine 구조
+
+```
+Entry → IdleWalkRun
+         ↓ (Is In Air)
+      [To Jump Start] ─→ JumpStart
+         ↑ (Is In Air)     ↓ (애니메이션 끝)
+      JumpEnd ←─── JumpMid
+         ↓ (NOT Is In Air)
+      IdleWalkRun
+```
+
+---
+
+## 📝 용어 정리
+
+| 용어                | 설명                      |
+| ------------------- | ------------------------- |
+| State Alias         | 여러 전환을 묶는 별칭     |
+| Started             | 입력 시작 순간만 1번 실행 |
+| Triggered           | 입력 중 계속 실행         |
+| Use Transition From | 어떤 State에서 출발할지   |
+| State Alias 섹션    | 어느 State로 갈지         |
+
+---
+
+## ⚠️ 주의사항
+
+### Started vs Triggered 선택
+
+```
+Started (권장):
+  ├─ 버튼 1번 누름 = 1번 점프
+  └─ 의도적인 점프
+
+Triggered:
+  ├─ 버튼 누르고 있음 = 계속 점프
+  └─ 연속 점프 (튀어오르기)
+
+게임 디자인에 따라 선택
+```
+
+### State Alias 남용 주의
+
+```
+❌ 모든 전환에 Alias 사용:
+   오히려 복잡해짐
+
+✅ 중복되는 전환만 사용:
+   같은 목적지 + 같은 조건
+
+원칙:
+간단할 때는 직접 연결
+복잡할 때만 Alias
+```
+
+### Transition Rule 공유
+
+```
+Alias의 Transition Rule:
+  └─ 모든 출발 State에 적용
+
+다른 조건 필요하면:
+  └─ Alias 사용 안 함
+      개별 전환 사용
+```
+
+---
+
+## 💡 실전 팁
+
+### 언제 State Alias 사용?
+
+```
+✅ 사용하면 좋은 경우:
+  ├─ 3개 이상 State → 같은 State
+  ├─ 같은 조건
+  └─ 자주 추가/변경되는 구조
+
+❌ 사용 안 해도 되는 경우:
+  ├─ 2개 이하 전환
+  ├─ 조건이 다름
+  └─ 고정된 구조
+```
+
+### 네이밍 규칙
+
+```
+명확한 이름:
+  ├─ To [목적지]
+  ├─ From [출발지]
+  └─ Enter [State]
+
+예:
+  ├─ To Jump Start
+  ├─ To Death
+  └─ Enter Combat
+```
+
+---
+
+## 🎯 현재 상태
+
+### 완성된 것
+
+```
+✅ 기본 이동/점프
+✅ 애니메이션 시스템
+✅ 연속 점프
+✅ State Alias 정리
+```
+
+### State Machine 구조
+
+```
+깔끔한 State Machine:
+  ├─ Entry → IdleWalkRun
+  ├─ [To Jump Start] (Alias)
+  ├─ JumpStart
+  ├─ JumpMid
+  └─ JumpEnd
+```
+
+---
+
+## ✅ 체크리스트
+
+**연속 점프 구현**
+
+- [ ] IA Jump: Started → Triggered 변경
+- [ ] JumpEnd → JumpStart Transition 추가
+- [ ] Transition Rule: Is In Air
+
+**State Alias 생성**
+
+- [ ] To Jump Start Alias 생성
+- [ ] 목적지: JumpStart 체크
+- [ ] 출발지: IdleWalkRun, JumpEnd 체크
+- [ ] Transition Rule: Is In Air
+
+**기존 전환 제거**
+
+- [ ] IdleWalkRun → JumpStart 삭제
+- [ ] JumpEnd → JumpStart (직접 연결) 삭제
+
+**테스트**
+
+- [ ] 연속 점프 작동
+- [ ] 애니메이션 자연스러움
+- [ ] State Machine 깔끔해짐
+
+**축하합니다! 캐릭터 이동 시스템 완성!** 🎉
+
+# { 🔥 Socket 추가 - 제트팩 추진기 준비 }
+
+## 🎯 이번 강의 목표
+
+Skeletal Mesh에 Socket을 추가하고 제트팩 추진기 이펙트를 미리보기합니다.
+나중에 게임에서 사용할 수 있도록 정확한 위치에 배치합니다.
+
+---
+
+## 🎨 나이아가라 시스템 확인
+
+### NS_JetpackThruster
+
+```
+Content/Effects/Thruster/
+  ↓
+NS_JetpackThruster 더블클릭
+  ↓
+Niagara System Editor 실행
+```
+
+**보는 방법**
+
+```
+우클릭 + 드래그: 회전
+마우스 휠: 확대/축소
+
+효과:
+파란색 불꽃 이펙트
+(제트팩 추진기)
+```
+
+**Niagara System이란?**
+
+```
+Unreal Engine의 파티클 시스템
+  ├─ 불, 연기, 폭발 등
+  ├─ 시각 효과(VFX) 제작
+  └─ 실시간 렌더링
+```
+
+---
+
+## 🔌 Socket이란?
+
+### 정의
+
+```
+Socket (소켓):
+Skeletal Mesh의 특정 뼈에
+에셋을 부착할 수 있는 연결점
+
+비유:
+USB 포트처럼
+"여기에 꽂으세요" 지점
+```
+
+### 용도
+
+```
+무기 장착:
+  └─ 손 뼈에 총/칼 소켓
+
+모자:
+  └─ 머리 뼈에 소켓
+
+제트팩:
+  └─ 등 뼈에 소켓
+
+소품:
+  └─ 각종 부착물
+```
+
+### 장점
+
+```
+뼈를 따라 움직임:
+  ├─ 애니메이션과 함께 이동
+  ├─ 자동으로 회전
+  └─ 수동 위치 조정 불필요
+
+한 번 설정하면:
+  └─ 모든 애니메이션에서 작동
+```
+
+---
+
+## 🔧 Socket 추가 - 준비
+
+### 1. Skeletal Mesh Editor 열기
+
+```
+Content/Kicks/
+  ↓
+SKM_Kicks 더블클릭
+  ↓
+Skeletal Mesh Editor 실행
+```
+
+**또는**
+
+```
+SKM_Kicks 선택
+  ↓
+우측 상단 Skeleton 아이콘 클릭
+  ↓
+Skeleton Editor 실행
+  (어느 쪽이든 가능)
+```
+
+### 2. 애니메이션 미리보기
+
+**왜 필요?**
+
+```
+제트팩이 움직임
+  ↓
+애니메이션에 따라 위치 변함
+  ↓
+비행 자세에서 확인 필요
+```
+
+**설정**
+
+```
+Skeletal Mesh Editor
+  ↓
+Animation Preview (우측)
+  ↓
+A_Kix_FlyIdle 선택
+  ↓
+제트팩 움직임 확인 가능
+```
+
+---
+
+## 🦴 적절한 뼈 찾기
+
+### Skeleton Tree 탐색
+
+```
+Skeleton Tree (좌측)
+  ↓
+뼈 구조 확인:
+
+Kix_Pelvis (골반)
+  └─ Kix_Spine0
+      └─ Kix_Spine1
+          └─ Kix_JetpackBase (제트팩 베이스!)
+              ├─ Kix_L_Jet (왼쪽 제트)
+              └─ Kix_R_Jet (오른쪽 제트)
+```
+
+### 왜 Spine이 아닌 Jet 뼈?
+
+```
+Kix_Spine1 선택 시:
+  └─ 척추 중앙
+      불꽃이 몸에서 나옴
+      부자연스러움
+
+Kix_L_Jet / Kix_R_Jet:
+  └─ 각 제트팩 정확한 위치
+      불꽃이 제트팩에서 나옴
+      자연스러움
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380754/notion-blog/_/_/_5_/_8_-_3D_-_3/image_7.png)
+
+---
+
+## 🔌 Socket 추가 - 왼쪽
+
+### 1. Socket 생성
+
+```
+Skeleton Tree
+  ↓
+Kix_L_Jet (왼쪽 제트) 우클릭
+  ↓
+Add Socket
+  ↓
+이름: Thruster_L
+```
+
+**네이밍**
+
+```
+Thruster: 추진기
+_L: Left (왼쪽)
+
+명확한 이름 사용 권장
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380754/notion-blog/_/_/_5_/_8_-_3D_-_3/image_8.png)
+
+### 2. Preview Asset 추가
+
+```
+Thruster_L 소켓 우클릭
+  ↓
+Add Preview Asset
+  ↓
+Niagara System 선택
+  ↓
+NS_JetpackThruster
+```
+
+**Preview Asset이란?**
+
+```
+미리보기용 에셋
+  ├─ 에디터에서만 보임
+  ├─ 게임에는 안 나타남
+  └─ 위치 조정용
+
+실제 게임:
+  └─ 나중에 Blueprint에서 추가
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380754/notion-blog/_/_/_5_/_8_-_3D_-_3/image_9.png)
+
+### 3. 위치 및 회전 조정
+
+**초기 상태**
+
+```
+추진기가 옆으로 향함
+  ↓
+잘못된 방향
+```
+
+**회전 조정**
+
+```
+E 키 (Rotation Mode)
+  ↓
+Snap 켜기 (10도 단위)
+  ↓
+Z축 90도 회전
+  ↓
+아래로 향하게
+```
+
+**위치 조정**
+
+```
+W 키 (Translation Mode)
+  ↓
+아래로 이동
+  ↓
+제트팩 구멍에서 나오도록
+
+애니메이션 재생/일시정지 반복
+  ↓
+여러 자세에서 확인
+  ↓
+미세 조정
+```
+
+---
+
+## 🔌 Socket 추가 - 오른쪽
+
+### 과정 반복
+
+```
+1. Kix_R_Jet 우클릭
+   └─ Add Socket
+   └─ 이름: Thruster_R
+
+2. Thruster_R 우클릭
+   └─ Add Preview Asset
+   └─ NS_JetpackThruster
+
+3. 회전 및 위치 조정
+   └─ Z축 90도
+   └─ 아래로 이동
+   └─ 제트팩 위치 맞춤
+```
+
+**주의사항**
+
+```
+⚠️ 뼈가 아닌 소켓 선택!
+
+Skeleton Tree에서:
+  ├─ Kix_R_Jet (뼈)
+  └─ Thruster_R (소켓) ← 이것 선택
+
+뼈를 움직이면:
+  └─ 애니메이션 망가짐!
+```
+
+---
+
+## 🎨 머티리얼 인스턴스 커스터마이징
+
+### 현재 머티리얼 구조
+
+```
+NS_JetpackThruster
+  ↓
+Sprite Renderer
+  ↓
+MI_JetpackThruster (Material Instance)
+  ↓
+M_JetpackThruster (Base Material)
+```
+
+### 색상 변경 방법
+
+**❌ 직접 수정 (비추천)**
+
+```
+MI_JetpackThruster 직접 수정
+  ↓
+원본이 바뀜
+  ↓
+다른 용도로 못 씀
+```
+
+**✅ 새 인스턴스 생성 (권장)**
+
+```
+MI_JetpackThruster 우클릭
+  ↓
+Create Material Instance
+  ↓
+이름: MI_JetpackThruster_Yellow
+  ↓
+색상 파라미터 조정
+```
+
+### 색상 파라미터
+
+```
+Material Instance 열기
+  ↓
+Thruster 카테고리
+  ↓
+색상 파라미터:
+  ├─ Color A
+  ├─ Color B
+  └─ Emissive (발광)
+
+조정 가능:
+  ├─ 빨강 (Red)
+  ├─ 노랑 (Yellow)
+  ├─ 보라 (Purple)
+  └─ 원하는 색
+```
+
+### Niagara에 적용
+
+```
+NS_JetpackThruster 열기
+  ↓
+Sprite Renderer 선택
+  ↓
+Material
+  ↓
+MI_JetpackThruster_Yellow 선택
+  ↓
+저장
+  ↓
+Skeletal Mesh Editor에서 확인
+```
+
+---
+
+## 📊 전체 구조 정리
+
+### Socket 구조
+
+```
+SKM_Kicks (Skeletal Mesh)
+  └─ SKEL_Kicks (Skeleton)
+      └─ Kix_JetpackBase (뼈)
+          ├─ Kix_L_Jet (뼈)
+          │   └─ Thruster_L (소켓)
+          │       └─ NS_JetpackThruster (Preview)
+          └─ Kix_R_Jet (뼈)
+              └─ Thruster_R (소켓)
+                  └─ NS_JetpackThruster (Preview)
+```
+
+### 작동 원리
+
+```
+게임 중:
+  ↓
+애니메이션 재생
+  ↓
+뼈 움직임
+  ↓
+소켓도 함께 움직임
+  ↓
+부착된 이펙트도 따라감
+  ↓
+자연스러운 추진기 위치
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Socket vs Bone
+
+```
+Bone (뼈):
+  ├─ 애니메이션의 일부
+  ├─ 메시 변형 담당
+  └─ 직접 수정하면 안 됨
+
+Socket (소켓):
+  ├─ 뼈에 부착된 연결점
+  ├─ 에셋 부착용
+  └─ 뼈 기준 오프셋 가능
+```
+
+### Preview Asset vs 실제 게임
+
+```
+Preview Asset:
+  ├─ 에디터에서만 보임
+  ├─ 위치 조정 확인용
+  └─ 게임에 나타나지 않음
+
+실제 게임:
+  ├─ Blueprint에서 추가 필요
+  └─ 소켓에 부착 (다음 강의)
+```
+
+### Material Instance
+
+```
+Base Material:
+  └─ 원본 셰이더
+
+Material Instance:
+  └─ 파라미터만 변경
+      ├─ 색상
+      ├─ 텍스처
+      └─ 기타 속성
+
+장점:
+  ├─ 빠른 생성
+  ├─ 가벼움
+  └─ 여러 버전 쉽게
+```
+
+---
+
+## 📝 용어 정리
+
+| 용어              | 설명                            |
+| ----------------- | ------------------------------- |
+| Socket            | 뼈에 에셋을 부착하는 연결점     |
+| Niagara System    | Unreal Engine 파티클 시스템     |
+| Preview Asset     | 에디터 미리보기용 에셋          |
+| Material Instance | 파라미터 조정용 머티리얼 복사본 |
+| Thruster          | 추진기                          |
+| Sprite Renderer   | 2D 이미지를 3D에 렌더링         |
+
+---
+
+## ⚠️ 주의사항
+
+### 뼈 vs 소켓 선택
+
+```
+조정 시:
+  ├─ 소켓 선택 ✅
+  └─ 뼈 선택 ❌
+
+뼈 움직이면:
+  └─ 애니메이션 망가짐
+  └─ 복구 어려움
+
+항상 소켓 선택 확인!
+```
+
+### Preview Asset은 게임에 안 나타남
+
+```
+에디터에서 보임:
+  └─ 위치 확인용
+
+게임에서 안 보임:
+  └─ Blueprint로 추가 필요
+      (다음 강의)
+```
+
+### 여러 애니메이션에서 확인
+
+```
+FlyIdle뿐만 아니라:
+  ├─ Run
+  ├─ Jump
+  └─ 기타 동작
+
+모든 자세에서:
+  └─ 제트팩 위치 자연스러운지 확인
+```
+
+---
+
+## 🎯 현재 상태
+
+### 완성된 것
+
+```
+✅ Socket 2개 추가
+   ├─ Thruster_L (왼쪽)
+   └─ Thruster_R (오른쪽)
+
+✅ Preview Asset 추가
+   └─ NS_JetpackThruster
+
+✅ 위치 조정 완료
+   └─ 제트팩에서 불꽃 나옴
+```
+
+### 아직 안 된 것
+
+```
+❌ 게임에서 보이지 않음
+   (Preview Asset만 설정)
+
+다음:
+Blueprint에서 실제로 추가
+```
+
+---

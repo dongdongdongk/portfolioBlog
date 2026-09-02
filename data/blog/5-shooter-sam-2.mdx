@@ -1,0 +1,2806 @@
+---
+title: '섹션 5: Shooter Sam - 2'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 🦴 스켈레탈 애니메이션 시스템 완전 이해 }
+
+이번 강의는 언리얼 엔진의 스켈레탈 애니메이션 시스템을 구성하는 4가지 핵심 에셋과 그들의 관계를 이해합니다. 스켈레톤, 스켈레탈 메시, 애니메이션의 작동 원리를 배웁니다.
+
+---
+
+## 📋 목차
+
+1. [스켈레탈 애니메이션이란?](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#1-%EC%8A%A4%EC%BC%88%EB%A0%88%ED%83%88-%EC%95%A0%EB%8B%88%EB%A9%94%EC%9D%B4%EC%85%98%EC%9D%B4%EB%9E%80)
+2. [4가지 핵심 에셋 이해하기](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#2-4%EA%B0%80%EC%A7%80-%ED%95%B5%EC%8B%AC-%EC%97%90%EC%85%8B-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+3. [스켈레톤 에셋 살펴보기](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#3-%EC%8A%A4%EC%BC%88%EB%A0%88%ED%86%A4-%EC%97%90%EC%85%8B-%EC%82%B4%ED%8E%B4%EB%B3%B4%EA%B8%B0)
+4. [스켈레탈 메시 에셋 살펴보기](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#4-%EC%8A%A4%EC%BC%88%EB%A0%88%ED%83%88-%EB%A9%94%EC%8B%9C-%EC%97%90%EC%85%8B-%EC%82%B4%ED%8E%B4%EB%B3%B4%EA%B8%B0)
+5. [애니메이션 시퀀스 에셋 살펴보기](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#5-%EC%95%A0%EB%8B%88%EB%A9%94%EC%9D%B4%EC%85%98-%EC%8B%9C%ED%80%80%EC%8A%A4-%EC%97%90%EC%85%8B-%EC%82%B4%ED%8E%B4%EB%B3%B4%EA%B8%B0)
+6. [에셋 간 빠른 전환 방법](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#6-%EC%97%90%EC%85%8B-%EA%B0%84-%EB%B9%A0%EB%A5%B8-%EC%A0%84%ED%99%98-%EB%B0%A9%EB%B2%95)
+7. [실습: 다양한 메시와 애니메이션 테스트](https://claude.ai/chat/69c625f6-b0b2-417c-8d35-304cdb2e772a#7-%EC%8B%A4%EC%8A%B5-%EB%8B%A4%EC%96%91%ED%95%9C-%EB%A9%94%EC%8B%9C%EC%99%80-%EC%95%A0%EB%8B%88%EB%A9%94%EC%9D%B4%EC%85%98-%ED%85%8C%EC%8A%A4%ED%8A%B8)
+
+---
+
+## 1. 스켈레탈 애니메이션이란?
+
+### 기본 개념
+
+**스켈레탈 애니메이션(Skeletal Animation):**
+
+```
+정의:
+스켈레톤(뼈대)에 애니메이션을 적용하여 만드는 애니메이션
+
+작동 원리:
+1. 뼈대(Skeleton) 생성
+2. 뼈대에 외형(Mesh) 입히기
+3. 뼈대를 움직이면 → 메시도 따라 움직임
+```
+
+---
+
+### 실생활 비유
+
+**인형의 구조와 비슷합니다:**
+
+```
+장난감 인형:
+├── 뼈대 (관절이 있는 골격) → Skeleton
+├── 피부/옷 (겉모습)          → Skeletal Mesh
+└── 포즈 (관절 위치)          → Animation
+
+움직임:
+뼈대 관절을 움직임 → 피부/옷도 자동으로 따라 움직임
+```
+
+---
+
+### 정적 메시와의 차이
+
+**Static Mesh (정적 메시):**
+
+```
+구조:
+- 뼈대 없음
+- 고정된 3D 모델
+- 변형 불가능
+
+용도:
+- 건물, 바위, 가구
+- 움직이지 않는 오브젝트
+```
+
+**Skeletal Mesh (스켈레탈 메시):**
+
+```
+구조:
+- 뼈대 있음
+- 변형 가능한 3D 모델
+- 애니메이션 적용 가능
+
+용도:
+- 캐릭터, 동물
+- 움직이는 생명체
+```
+
+---
+
+## 2. 4가지 핵심 에셋 이해하기
+
+### 시스템 구성 요소
+
+언리얼 엔진의 스켈레탈 애니메이션은 4가지 에셋으로 구성됩니다:
+
+```
+스켈레탈 애니메이션 시스템:
+├── 1. Skeleton (스켈레톤)
+├── 2. Skeletal Mesh (스켈레탈 메시)
+├── 3. Animation Sequence (애니메이션 시퀀스)
+└── 4. Animation Blueprint (애니메이션 블루프린트)
+```
+
+---
+
+### 1. Skeleton (스켈레톤)
+
+**역할: 뼈대 구조 정의**
+
+```
+Skeleton Asset:
+├── Bone(뼈)들의 집합
+├── 뼈들의 계층 구조
+├── 각 뼈의 이름과 관계
+└── 뼈들의 기본 위치
+
+기능:
+- 모델의 구조를 만드는 뼈의 모음
+- 애니메이션 적용의 기준점
+- Mesh와 Animation을 연결하는 접착제
+```
+
+**중요한 특징:**
+
+```
+스켈레톤은 보이지 않습니다!
+- 뼈대 자체는 눈에 보이지 않음
+- 메시를 입혀야 시각적으로 확인 가능
+```
+
+---
+
+### 2. Skeletal Mesh (스켈레탈 메시)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380653/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_2/image.png)
+
+**역할: 시각적 외형**
+
+```
+Skeletal Mesh Asset:
+├── 3D 모델의 외형 (피부, 옷 등)
+├── 특정 Skeleton에 연결됨
+├── Skeleton의 뼈에 가중치로 바인딩
+└── 뼈가 움직이면 따라서 변형됨
+
+기능:
+- Skeleton의 시각적 표현
+- 실제로 화면에 보이는 부분
+- 텍스처, 재질 포함
+```
+
+---
+
+### 3. Animation Sequence (애니메이션 시퀀스)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380649/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_2/image_1.png)
+
+**역할: 실제 움직임 데이터**
+
+```
+Animation Sequence Asset:
+├── 키프레임(Keyframe)들의 집합
+├── 각 프레임에서의 뼈 위치/회전
+├── 시간에 따른 뼈의 변화
+└── 특정 Skeleton 전용
+
+기능:
+- 걷기, 뛰기, 점프 등 개별 동작
+- 뼈대를 조작하여 애니메이션 생성
+- 재생 가능한 움직임 시퀀스
+```
+
+---
+
+### 4. Animation Blueprint (애니메이션 블루프린트)
+
+**역할: 애니메이션 로직 관리**
+
+```
+Animation Blueprint:
+├── 여러 애니메이션 간 전환
+├── 블렌딩(부드러운 전환)
+├── 게임 로직과 연동
+└── State Machine (상태 기계)
+
+기능:
+- Idle → Walk → Run 자동 전환
+- 속도에 따라 애니메이션 선택
+- 복잡한 애니메이션 시스템 구축
+```
+
+**이 강의에서는 처음 3가지에 집중합니다.**
+
+---
+
+### 에셋 간 관계도
+
+**스켈레톤이 중심:**
+
+```
+                Skeleton (중심)
+                    ↓
+        ┌───────────┼───────────┐
+        ↓           ↓           ↓
+  Skeletal     Skeletal    Animation
+   Mesh 1       Mesh 2      Sequence 1
+                             ↓
+                        Animation
+                        Sequence 2
+```
+
+**호환성 규칙:**
+
+```cpp
+// 같은 Skeleton을 사용하면
+if (Mesh.Skeleton == Animation.Skeleton) {
+    // 모든 조합 가능 ✓
+    Mesh1 + Animation1 = OK
+    Mesh1 + Animation2 = OK
+    Mesh2 + Animation1 = OK
+    Mesh2 + Animation2 = OK
+}
+
+// 다른 Skeleton이면
+else {
+    // 호환 안 됨 ✗
+    MannequinMesh + WraithAnimation = Error
+}
+```
+
+---
+
+### 접착제로서의 스켈레톤
+
+**Skeleton의 핵심 역할:**
+
+```
+Skeleton = 메시와 애니메이션을 연결하는 접착제
+
+예시:
+SK_Wraith (Skeleton)
+  ↓ 연결
+├── SKM_Wraith (메시)
+├── SKM_Wraith_Red (메시)
+├── SKM_Wraith_Green (메시)
+└── Animations:
+    ├── Walk_Fwd
+    ├── Walk_Bwd
+    ├── Idle
+    └── Run
+
+결과:
+- 3개의 메시 × 4개의 애니메이션
+- = 12가지 조합 모두 가능!
+```
+
+---
+
+## 3. 스켈레톤 에셋 살펴보기
+
+### 스켈레톤 에셋 찾기
+
+**파일 경로:**
+
+```
+Content Browser:
+└── ParagonWraith (Paragon 콘텐츠)
+    └── Characters
+        └── Heroes
+            └── Wraith
+                └── Meshes
+                    └── Wraith_Skeleton (에셋)
+```
+
+**에셋 타입 확인:**
+
+```
+Wraith_Skeleton
+└── Type: Skeleton
+```
+
+---
+
+### 스켈레톤 에디터 열기
+
+**더블클릭으로 열기:**
+
+```
+Skeleton Editor 구성:
+├── Viewport (중앙): 3D 미리보기
+├── Skeleton Tree (왼쪽): 뼈 목록
+├── Preview Scene Settings (오른쪽): 미리보기 설정
+└── Asset Browser (오른쪽 하단): 관련 에셋
+```
+
+---
+
+### Skeleton Tree (뼈 목록)
+
+**왼쪽 패널 - 뼈의 계층 구조:**
+
+```
+Skeleton Tree:
+├── Root (루트)
+    ├── Pelvis (골반)
+    │   ├── Spine_01 (척추 1)
+    │   │   ├── Spine_02 (척추 2)
+    │   │   │   ├── Spine_03 (척추 3)
+    │   │   │       ├── Neck_01 (목)
+    │   │   │       │   └── Head (머리)
+    │   │   │       ├── Clavicle_L (왼쪽 쇄골)
+    │   │   │       │   └── Shoulder_L
+    │   │   │       │       └── Elbow_L
+    │   │   │       │           └── Hand_L
+    │   │   │       └── Clavicle_R (오른쪽 쇄골)
+    │   ├── Thigh_L (왼쪽 허벅지)
+    │   │   └── Calf_L
+    │   │       └── Foot_L
+    │   └── Thigh_R (오른쪽 허벅지)
+```
+
+**특징:**
+
+```
+계층 구조 (Hierarchy):
+- 부모 뼈가 움직이면 자식 뼈도 따라 움직임
+- 예: Spine 회전 → Neck, Arms 모두 회전
+```
+
+---
+
+### 개별 뼈 확인하기
+
+**뼈 선택:**
+
+```
+Skeleton Tree에서 "Spine_01" 클릭
+  ↓
+Viewport에서 해당 뼈가 하이라이트
+  ↓
+척추 뼈의 위치 확인 가능
+```
+
+**다른 뼈들:**
+
+```
+"Head" 클릭 → 머리 뼈 위치 확인
+"Hand_L" 클릭 → 왼손 뼈 위치 확인
+"Foot_R" 클릭 → 오른발 뼈 위치 확인
+```
+
+---
+
+### Preview Mesh (미리보기 메시)
+
+**Preview Scene Settings:**
+
+```
+오른쪽 패널:
+└── Preview Mesh (Animation)
+    └── 현재: SKM_Wraith
+
+역할:
+- Skeleton은 보이지 않으므로
+- Skeletal Mesh를 입혀서 표시
+- 뼈의 위치를 시각적으로 확인
+```
+
+**다른 메시로 미리보기 변경 가능:**
+
+```
+Preview Mesh 드롭다운:
+├── SKM_Wraith (기본)
+├── SKM_Wraith_Red
+├── SKM_Wraith_Green
+└── SKM_Wraith_LunarOps
+
+→ 같은 Skeleton 사용하는 메시만 표시됨
+```
+
+---
+
+### 뼈 조작 실험
+
+**회전 모드로 뼈 움직이기:**
+
+```
+1. Skeleton Tree에서 "Spine_01" 선택
+   ↓
+2. Viewport에서 회전 툴(E) 활성화
+   ↓
+3. 척추 뼈를 회전
+   ↓
+결과:
+- 척추가 회전
+- 상체 전체가 함께 회전 (자식 뼈들)
+- 메시도 자연스럽게 변형
+```
+
+**이것이 애니메이션의 원리:**
+
+```
+애니메이션 = 시간에 따른 뼈의 회전/이동 기록
+
+Walk 애니메이션:
+프레임 1: Spine 0°,  Leg 10°
+프레임 2: Spine 2°,  Leg 20°
+프레임 3: Spine 4°,  Leg 30°
+...
+→ 연속 재생하면 걷는 동작
+```
+
+---
+
+## 4. 스켈레탈 메시 에셋 살펴보기
+
+### 스켈레탈 메시 에셋 찾기
+
+**같은 폴더:**
+
+```
+Content/ParagonWraith/Characters/Heroes/Wraith/Meshes/
+├── Wraith_Skeleton (Skeleton)
+└── Wraith (Skeletal Mesh) ← 이것
+```
+
+**에셋 타입:**
+
+```
+Wraith
+└── Type: Skeletal Mesh
+```
+
+---
+
+### 스켈레탈 메시 에디터 열기
+
+**더블클릭으로 열기:**
+
+```
+Skeletal Mesh Editor 구성:
+├── Viewport (중앙): 메시 미리보기
+├── Skeleton Tree (왼쪽): 뼈 구조
+├── Morph Targets (왼쪽): 표정 등
+├── Asset Details (오른쪽): 메시 속성
+└── Preview Scene Settings (오른쪽): 설정
+```
+
+---
+
+### 뷰포트에서 보이는 것
+
+**시각적 차이:**
+
+```
+Skeleton Editor:
+- 뼈대 구조에 집중
+- 메시는 미리보기용
+
+Skeletal Mesh Editor:
+- 메시(외형)에 집중
+- 더 상세한 표면 정보
+- 텍스처, 재질 확인 가능
+```
+
+---
+
+### Asset Details 패널
+
+**메시 정보 확인:**
+
+```
+Asset Details:
+├── Skeleton: Wraith_Skeleton (어떤 뼈대 사용)
+├── Materials: 사용 중인 재질들
+├── LOD Settings: 세부 수준 설정
+├── Physics Asset: 물리 충돌 설정
+└── Post Process Anim Blueprint: 추가 애니메이션
+```
+
+**중요한 연결:**
+
+```cpp
+SKM_Wraith.Skeleton = Wraith_Skeleton
+
+// 이 메시는 Wraith_Skeleton을 사용하므로
+// Wraith_Skeleton용 애니메이션만 재생 가능
+```
+
+---
+
+### Skeleton Tree에서 뼈 보기
+
+**왼쪽 패널:**
+
+```
+Skeleton Tree:
+└── 똑같은 뼈 구조 표시
+    └── Wraith_Skeleton의 뼈들
+
+이유:
+- Skeletal Mesh는 Skeleton을 참조
+- 같은 뼈 구조를 공유
+```
+
+---
+
+## 5. 애니메이션 시퀀스 에셋 살펴보기
+
+### 애니메이션 에셋 찾기
+
+**파일 경로:**
+
+```
+Content/ParagonWraith/Characters/Heroes/Wraith/
+└── Animations (폴더)
+    ├── Walk_Fwd (앞으로 걷기)
+    ├── Walk_Bwd (뒤로 걷기)
+    ├── Walk_Lt (왼쪽 걷기)
+    ├── Walk_Rt (오른쪽 걷기)
+    ├── Idle_Combat (전투 대기)
+    ├── Run_Fwd (달리기)
+    └── ... (많은 애니메이션들)
+```
+
+**에셋 타입:**
+
+```
+Walk_Fwd
+└── Type: Animation Sequence (녹색 아이콘)
+```
+
+---
+
+### 애니메이션 에디터 열기
+
+**더블클릭으로 Walk_Fwd 열기:**
+
+```
+Animation Editor 구성:
+├── Viewport (중앙 위): 애니메이션 재생
+├── Timeline (중앙 아래): 타임라인과 키프레임
+├── Details (왼쪽): 애니메이션 세부 정보
+├── Skeleton Tree (오른쪽 위): 뼈 목록
+└── Asset Browser (오른쪽 아래): 다른 애니메이션들
+```
+
+---
+
+### Viewport - 애니메이션 재생
+
+**중앙 상단:**
+
+```
+Viewport:
+- 애니메이션이 반복 재생됨
+- Walk_Fwd: 앞으로 걷는 동작
+- 자동으로 루프(반복) 재생
+```
+
+**재생 컨트롤:**
+
+```
+하단 컨트롤:
+├── ▶ Play: 재생
+├── ⏸ Pause: 일시정지
+├── ⏹ Stop: 정지
+├── ⏮ 처음으로
+├── ⏭ 끝으로
+└── 🔁 Loop: 반복 재생
+```
+
+---
+
+### Timeline - 키프레임
+
+**중앙 하단:**
+
+```
+Timeline:
+├── 시간축: 0.00초 ~ 1.2초 (애니메이션 길이)
+├── 키프레임: 주요 포즈가 기록된 시점
+└── 재생 헤드: 현재 재생 위치 (빨간 선)
+
+조작:
+- 타임라인 드래그: 수동으로 프레임 이동
+- 키프레임 확인: 각 프레임의 포즈 확인
+```
+
+---
+
+**키프레임 이해:**
+
+```
+애니메이션 구조:
+
+시간: 0.0초      0.3초      0.6초      0.9초      1.2초
+      ●──────────●──────────●──────────●──────────●
+     왼발    오른발    왼발    오른발    왼발
+     앞      앞       앞      앞       앞
+
+키프레임 (Keyframe):
+- ●로 표시된 주요 포즈
+- 각 키프레임마다 모든 뼈의 위치/회전 저장
+
+중간 프레임:
+- 키프레임 사이는 자동으로 보간(Interpolation)
+- 부드러운 전환 생성
+```
+
+---
+
+### 수동 프레임 탐색
+
+**타임라인 조작:**
+
+```
+1. 재생 일시정지
+   ↓
+2. 타임라인 재생 헤드 드래그
+   ↓
+3. 각 프레임의 포즈 확인
+
+예시:
+0.0초: 왼발 뒤, 오른발 앞
+0.3초: 양발 나란히
+0.6초: 왼발 앞, 오른발 뒤
+0.9초: 양발 나란히
+1.2초: 왼발 뒤, 오른발 앞 (반복 시작)
+```
+
+---
+
+### Details 패널 - 애니메이션 정보
+
+**왼쪽 패널:**
+
+```
+Animation Details:
+├── Skeleton: Wraith_Skeleton (사용하는 뼈대)
+├── Animation Length: 1.2초
+├── Frame Rate: 30 FPS
+├── Number of Frames: 36 프레임
+└── Additive Settings: 추가 애니메이션 설정
+
+중요:
+Skeleton 정보로 호환성 확인
+```
+
+---
+
+### Skeleton Tree - 영향받는 뼈
+
+**오른쪽 상단:**
+
+```
+Skeleton Tree:
+├── 모든 뼈 표시
+└── 체크박스: 이 애니메이션이 영향주는 뼈
+
+예시:
+☑ Root
+☑ Pelvis
+☑ Spine_01
+☑ Spine_02
+☑ Thigh_L
+☑ Thigh_R
+...
+
+→ 체크된 뼈들이 애니메이션으로 움직임
+```
+
+---
+
+### Asset Browser - 빠른 애니메이션 전환
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380649/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_2/image_1.png)
+
+**오른쪽 하단:**
+
+```
+Asset Browser:
+- 같은 Skeleton의 모든 애니메이션 목록
+- 이름으로 검색 가능
+- 더블클릭으로 빠른 전환
+```
+
+**사용 예:**
+
+```
+1. Asset Browser에서 "Idle" 검색
+   ↓
+2. "Idle_Combat" 찾기
+   ↓
+3. Name 열 확장 (전체 이름 보기)
+   ↓
+4. 더블클릭
+   ↓
+결과: Idle_Combat 애니메이션으로 전환
+      뷰포트에서 대기 자세 재생
+```
+
+---
+
+### 다양한 애니메이션 확인
+
+**Walk 시리즈:**
+
+```
+Walk_Fwd: 앞으로 걷기
+Walk_Bwd: 뒤로 걷기
+Walk_Lt:  왼쪽으로 걷기 (사이드 스텝)
+Walk_Rt:  오른쪽으로 걷기 (사이드 스텝)
+
+→ 나중에 WASD 키에 매핑할 애니메이션들
+```
+
+**기타 애니메이션:**
+
+```
+Idle_Combat: 전투 대기 (가만히 서있기)
+Run_Fwd:     달리기
+Jump_Start:  점프 시작
+Jump_Loop:   공중에 떠있을 때
+Jump_End:    착지
+...
+```
+
+---
+
+## 6. 에셋 간 빠른 전환 방법
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380651/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_2/image_2.png)
+
+### 에디터 상단의 전환 버튼
+
+**모든 에디터의 공통 기능:**
+
+```
+에디터 상단 (오른쪽):
+├── [Skeleton] : Skeleton 에디터로 이동
+├── [Mesh]     : Skeletal Mesh 에디터로 이동
+└── [Animation]: Animation 에디터로 이동
+```
+
+---
+
+### Skeleton 에디터에서
+
+**현재: Wraith_Skeleton 열려있음:**
+
+```
+상단 버튼:
+├── [Skeleton] ← 현재 여기
+├── [Mesh]     → 클릭 시 SKM_Wraith 열림
+└── [Animation]→ 클릭 시 애니메이션 목록
+```
+
+---
+
+### Skeletal Mesh 에디터에서
+
+**현재: SKM_Wraith 열려있음:**
+
+```
+상단 버튼:
+├── [Skeleton] → 클릭 시 Wraith_Skeleton 열림
+├── [Mesh]     ← 현재 여기
+└── [Animation]→ 클릭 시 애니메이션 목록
+```
+
+---
+
+### Animation 에디터에서
+
+**현재: Walk_Fwd 열려있음:**
+
+```
+상단 버튼:
+├── [Skeleton] → Wraith_Skeleton 열림
+├── [Mesh]     → SKM_Wraith 열림
+└── [Animation]← 현재 여기
+
++ [Anim Blueprint] 버튼도 있음 (아직 미생성)
+```
+
+---
+
+### Preview Mesh 전환
+
+**애니메이션 에디터에서 메시 변경:**
+
+```
+방법 1: 상단 메뉴
+Preview Scene Settings
+  ↓
+Preview Mesh (Animation)
+  ↓
+드롭다운에서 선택
+```
+
+**방법 2: Settings 패널:**
+
+```
+오른쪽 상단 Settings (톱니바퀴)
+  ↓
+Preview Scene Settings
+  ↓
+Preview Controller
+  ↓
+Preview Mesh (Animation)
+```
+
+---
+
+**사용 가능한 메시들:**
+
+```
+Preview Mesh 드롭다운:
+├── SKM_Wraith (기본)
+├── SKM_Wraith_Red
+├── SKM_Wraith_Green
+└── SKM_Wraith_LunarOps
+
+조건:
+- 같은 Skeleton (Wraith_Skeleton) 사용
+- 다른 Skeleton 메시는 목록에 없음
+```
+
+---
+
+### 메시 전환 실습
+
+**Walk_Fwd 애니메이션에서:**
+
+```
+1. Preview Mesh → SKM_Wraith_Red 선택
+   ↓
+   빨간색 Wraith가 걷는 애니메이션 재생
+
+2. Preview Mesh → SKM_Wraith_Green 선택
+   ↓
+   초록색 Wraith가 같은 걷기 애니메이션
+
+3. Preview Mesh → SKM_Wraith_LunarOps 선택
+   ↓
+   LunarOps 버전이 같은 걷기 애니메이션
+```
+
+**핵심:**
+
+```
+같은 Animation (Walk_Fwd)
++
+다른 Skeletal Mesh (색상/디자인)
+=
+모두 호환됨 (같은 Skeleton 사용)
+```
+
+---
+
+## 7. 실습: 다양한 메시와 애니메이션 테스트
+
+### 도전 과제
+
+```
+목표:
+1. BP_ShooterCharacter에서 다른 Wraith 메시 사용
+2. 다양한 방향의 걷기 애니메이션 찾기
+   - Walk_Fwd (앞)
+   - Walk_Bwd (뒤)
+   - Walk_Lt (왼쪽)
+   - Walk_Rt (오른쪽)
+```
+
+---
+
+### 해답: 다양한 애니메이션 테스트
+
+**BP_ShooterCharacter 블루프린트 열기:**
+
+```
+Components:
+└── Mesh 선택
+    ↓
+    Details → Animation
+    ↓
+    Anim to Play (재생할 애니메이션)
+```
+
+---
+
+**Walk_Fwd (앞으로 걷기) - 기본값:**
+
+```
+Anim to Play: Walk_Fwd
+
+결과:
+- 캐릭터가 앞으로 걷는 동작
+- 현재 설정
+```
+
+---
+
+**Walk_Bwd (뒤로 걷기):**
+
+```
+Anim to Play 드롭다운
+  ↓
+"Walk_Bwd" 검색
+  ↓
+선택
+
+결과:
+- 캐릭터가 뒤로 걷는 동작
+- S 키 누를 때 사용할 애니메이션
+```
+
+---
+
+**Walk_Lt (왼쪽 걷기):**
+
+```
+Anim to Play: Walk_Lt
+
+결과:
+- 캐릭터가 왼쪽으로 사이드 스텝
+- A 키 누를 때 사용할 애니메이션
+```
+
+---
+
+**Walk_Rt (오른쪽 걷기):**
+
+```
+Anim to Play: Walk_Rt
+
+결과:
+- 캐릭터가 오른쪽으로 사이드 스텝
+- D 키 누를 때 사용할 애니메이션
+```
+
+**모든 방향 애니메이션 확인 완료!**
+
+---
+
+### 해답: 다양한 메시 테스트
+
+**Skeletal Mesh Asset 변경:**
+
+```
+Mesh 컴포넌트 선택
+  ↓
+Details → Mesh
+  ↓
+Skeletal Mesh Asset 드롭다운
+```
+
+---
+
+**SKM_Wraith_LunarOps (빨간색):**
+
+```
+선택: SKM_Wraith_LunarOps
+
+외형:
+- 빨간색 갑옷
+- 공격적인 느낌
+- 적(Enemy) 캐릭터로 사용 예정
+
+애니메이션:
+- Walk_Fwd 잘 작동 ✓
+- 모든 Walk 애니메이션 호환 ✓
+```
+
+---
+
+**SKM_Wraith_Green (초록색):**
+
+```
+선택: SKM_Wraith_Green
+
+외형:
+- 초록색 디테일
+- 뾰족한 장식
+- 멋진 외형
+- 플레이어 캐릭터로 사용 가능
+
+애니메이션:
+- 모든 애니메이션 완벽 호환 ✓
+```
+
+---
+
+**SKM_Wraith (기본):**
+
+```
+선택: SKM_Wraith
+
+외형:
+- 기본 회색
+- 깔끔한 디자인
+- 플레이어 캐릭터로도 사용 가능
+
+애니메이션:
+- 모든 애니메이션 호환 ✓
+```
+
+---
+
+### 메시별 용도 계획
+
+**강의 중 언급된 계획:**
+
+```
+BP_ShooterCharacter (현재 블루프린트):
+└── SKM_Wraith_LunarOps (빨간색)
+    └── 적(Enemy) 기본 캐릭터로 사용
+
+나중에 만들 블루프린트:
+BP_ShooterCharacter_Player (자식 블루프린트):
+└── SKM_Wraith_Green or SKM_Wraith
+    └── 플레이어 캐릭터로 사용
+    └── 특별한 설정 추가
+```
+
+---
+
+### 왜 모든 메시가 작동하나?
+
+**핵심 원리 반복:**
+
+```
+모든 Wraith 메시들:
+├── SKM_Wraith
+├── SKM_Wraith_Red
+├── SKM_Wraith_Green
+└── SKM_Wraith_LunarOps
+
+공통점:
+└── 모두 Wraith_Skeleton 사용
+
+결과:
+├── 같은 뼈 구조
+├── 같은 뼈 이름
+├── 같은 계층 구조
+└── 모든 Wraith 애니메이션과 호환
+```
+
+---
+
+### 마네킹과의 비교
+
+**왜 마네킹 메시는 안 되나?**
+
+```
+Mannequin 메시:
+└── SK_Mannequin (다른 Skeleton)
+
+Wraith 애니메이션:
+└── Wraith_Skeleton 전용
+
+호환성:
+SK_Mannequin ≠ Wraith_Skeleton
+→ 호환 안 됨 ✗
+```
+
+---
+
+**마네킹 에셋 위치:**
+
+```
+Content/Characters/Mannequins/Meshes/
+├── SK_Mannequin (Skeleton)
+├── SKM_Manny_Simple (메시)
+└── 전용 애니메이션들
+
+→ Wraith 애니메이션과 호환 안 됨
+→ 변형되거나 작동 안 함
+```
+
+---
+
+### 게임 실행 테스트
+
+**최종 확인:**
+
+```
+1. BP_ShooterCharacter 설정:
+   - Mesh: SKM_Wraith_LunarOps (빨간색)
+   - Animation: Walk_Fwd
+
+2. 컴파일 & 저장
+
+3. 게임 실행 (Play)
+
+결과:
+- 빨간색 Wraith 캐릭터 스폰
+- 앞으로 걷는 애니메이션 재생
+- 정상 작동 확인 ✓
+```
+
+---
+
+## 💡 핵심 요약
+
+### 4가지 핵심 에셋
+
+```
+1. Skeleton (스켈레톤):
+   - 뼈대 구조 정의
+   - 보이지 않음
+   - 메시와 애니메이션의 연결고리
+
+2. Skeletal Mesh (스켈레탈 메시):
+   - 시각적 외형
+   - 특정 Skeleton에 바인딩
+   - 뼈의 움직임에 따라 변형
+
+3. Animation Sequence (애니메이션 시퀀스):
+   - 실제 움직임 데이터
+   - 키프레임으로 구성
+   - 특정 Skeleton 전용
+
+4. Animation Blueprint (애니메이션 블루프린트):
+   - 여러 애니메이션 전환 로직
+   - 다음 강의에서 다룰 예정
+```
+
+### 호환성 규칙
+
+```
+같은 Skeleton 사용:
+- Mesh ↔ Mesh: 교체 가능 ✓
+- Animation ↔ Animation: 교체 가능 ✓
+- Mesh ↔ Animation: 모든 조합 가능 ✓
+
+다른 Skeleton 사용:
+- 호환 안 됨 ✗
+- 변형되거나 작동 안 함
+```
+
+### 에디터 전환
+
+```
+모든 에디터 상단:
+├── [Skeleton] : 뼈대 확인
+├── [Mesh]     : 외형 확인
+└── [Animation]: 동작 확인
+
+→ 빠른 전환으로 작업 효율성 증가
+```
+
+### 실용적 활용
+
+```
+게임 제작 시:
+1. Skeleton 선택 (뼈대 구조)
+2. 여러 Skeletal Mesh 준비 (다양한 캐릭터)
+3. Animation 제작 또는 구입
+4. 같은 Skeleton이면 모두 호환
+
+예시:
+- 적 캐릭터: 빨간색 메시
+- 플레이어: 초록색 메시
+- 같은 애니메이션 공유 → 작업량 감소
+```
+
+**축하합니다! 스켈레탈 애니메이션 시스템의 기초를 완전히 이해했습니다!** 🦴✨
+
+다음 강의에서는 Animation Blueprint로 여러 애니메이션을 자동으로 전환하는 방법을 배웁니다!
+
+# { 애니메이션 블루프린트 완전 정리 }
+
+## 1. 애니메이션 블루프린트 소개
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380652/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_2/image_3.png)
+
+### 개념
+
+- **스켈레탈 애니메이션을 제어하는 시스템**
+- 여러 애니메이션을 재생하고 부드럽게 전환(Transition)
+- 스켈레톤(골격 구조)에 종속되어 작동
+- 게임플레이 코드와 연동되어 캐릭터 움직임을 자동으로 제어
+
+---
+
+## 2. 프로젝트 설정
+
+### 생성 과정
+
+1. **Content Browser**에서 자료 폴더로 이동
+2. 새 폴더 생성: "Animations"
+3. 우클릭 → **Animation Blueprint** 선택
+4. 사용할 **Skeleton 선택** (예: Wraith Skeleton)
+5. 네이밍: "ABP_ShooterCharacter"
+6. 저장
+
+### 캐릭터에 적용
+
+1. 캐릭터 블루프린트 열기
+2. Skeletal Mesh 컴포넌트 선택
+3. \*"Use Animation Asset"**에서 **"Use Animation Blueprint"\*\*로 변경
+4. **Anim Class**를 방금 만든 ABP로 설정
+5. 뷰포트에서 캐릭터가 A-Pose로 표시됨 (아직 애니메이션 없음)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380652/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_2/image_4.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380652/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_2/image_5.png)
+
+---
+
+## 3. 에디터 인터페이스 이해
+
+### 주요 패널 구성
+
+- **좌측 상단**: 애니메이션 미리보기 창
+- **좌측 하단**: My Blueprint (블루프린트 정보, 변수 목록)
+- **중앙**: **Animation Graph** ⭐ 가장 중요!
+- **우측**: Details Panel (선택한 노드의 상세 정보)
+- **하단**:
+  - Asset Browser (사용 가능한 애니메이션 목록)
+  - Preview Scene Settings
+  - Anim Preview Editor (변수 실시간 조절)
+
+### 기본 조작
+
+- **우클릭 + 드래그**: 화면 이동
+- **마우스 휠**: 확대/축소
+- **좌클릭**: 노드 선택 → Details에서 정보 확인
+
+---
+
+## 4. 애니메이션 그래프 기초
+
+### Output Pose 노드
+
+- **최종 애니메이션을 결정하는 노드**
+- "Result" 입력 핀으로 애니메이션을 받음
+- 이 노드에 연결된 애니메이션이 실제로 재생됨
+
+### 첫 애니메이션 연결하기
+
+1. **Asset Browser**에서 원하는 애니메이션 검색 (예: "Idle_Combat")
+2. 마우스로 **드래그 → Animation Graph에 드롭**
+3. 애니메이션 노드의 **출력 핀**(Pose 오른쪽) 클릭
+4. **Output Pose의 Result 핀**으로 드래그하여 연결
+5. **컴파일** 버튼 클릭 (상단 체크 아이콘)
+6. 미리보기 창에서 애니메이션 재생 확인
+
+### Loop 설정
+
+- 애니메이션 노드 선택
+- Details 패널에서 **"Loop Animation"** 체크
+- 체크하지 않으면 1회 재생 후 정지
+- 다시 컴파일하면 반복 재생
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380652/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_2/image_6.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380652/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_2/image_7.png)
+
+---
+
+## 5. Blend 노드로 애니메이션 섞기
+
+### Blend Poses by Float (양방향 블렌드)
+
+**두 개의 애니메이션을 하나로 합치는 노드**
+
+### 생성 방법
+
+1. Animation Graph 내부에서 **우클릭**
+2. "Blend Poses by Float" 검색 → Enter
+3. 2개의 입력 핀(A, B)과 1개의 출력 핀(Result) 확인
+
+### 연결 구조
+
+```
+Idle_Combat → A 핀
+Walk_Forward → B 핀
+Blend 노드 출력 → Output Pose
+```
+
+### Alpha 값의 의미
+
+- **입력 핀**: Alpha (Float 타입, 초록색)
+- **Alpha = 0**: A 애니메이션 100% (Idle)
+- **Alpha = 1**: B 애니메이션 100% (Walk)
+- **Alpha = 0.5**: 50:50 믹스
+- **Alpha = 0.1**: A 90% + B 10% (아주 천천히 걷기)
+- **Alpha = 0.8**: A 20% + B 80% (빠르게 걷기)
+
+### 연결 해제
+
+- **Alt + 클릭**: 특정 연결선 삭제
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380653/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_2/image_8.png)
+
+---
+
+## 6. 변수로 실시간 제어하기
+
+### 문제점
+
+매번 Alpha 값을 변경할 때마다 컴파일해야 함 → 비효율적
+
+### 해결: 변수 생성
+
+### 변수 만들기
+
+1. **My Blueprint** 패널의 **Variables** 섹션
+2. **"+" 버튼** 클릭
+3. 기본 타입은 Boolean
+4. **타입 변경**: 드롭다운에서 **Float** 선택
+   - Float: 소수점 숫자
+   - Int: 정수
+   - Boolean: True/False
+   - String: 문자열
+   - Vector: 3D 좌표 등
+5. 이름 변경: "Speed" (Details 패널에서도 가능)
+
+### 변수 사용하기
+
+1. Speed 변수를 **좌클릭 + 드래그**하여 Graph로
+2. **"Get Speed"** 선택 (값 가져오기)
+3. Speed 노드의 **출력 핀**(초록색) 클릭
+4. Blend 노드의 **Alpha 입력 핀**으로 연결
+5. 컴파일
+
+### 실시간 테스트
+
+1. **Anim Preview Editor** 패널 확인
+2. Speed 변수 슬라이더 표시됨
+3. **컴파일 없이** 실시간으로 값 조절 가능
+   - 0 → Idle 재생
+   - 1 → Walk 재생
+   - 0~1 사이 → 부드럽게 블렌딩
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380653/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_2/image_9.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380649/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_2/image_10.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380649/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_2/image_11.png)
+
+---
+
+## 7. 실습: 좌우 걷기 블렌딩
+
+### 과제
+
+Left Walk와 Right Walk를 블렌딩하여 Speed 변수로 제어
+
+### 구현 과정
+
+1. Animation Graph에서 **우클릭** → "Blend Poses by Float"
+2. Asset Browser에서 **"Walk_Left"** 검색 → A 핀에 연결
+3. **"Walk_Right"** 검색 → B 핀에 연결
+4. Blend 출력 → **Output Pose**에 연결
+5. 기존 **Speed 변수**를 Alpha에 재사용
+6. 각 애니메이션 노드에서 **Loop Animation 체크**
+7. 컴파일
+
+### 결과 확인
+
+- **Speed = 0**: 왼쪽으로 걷기
+- **Speed = 1**: 오른쪽으로 걷기
+- **Speed = 0.5**: 좌우 동시 (부자연스러움 - 실제로는 잘 안 씀)
+
+---
+
+## 8. 핵심 개념 정리
+
+### 핀(Pin) 이해
+
+- **좌측 핀 = 입력 (Input)**
+- **우측 핀 = 출력 (Output)**
+- 출력 → 입력 방향으로만 연결 가능
+- **색상**으로 타입 구분 (초록색 = Float)
+
+### 컴파일의 중요성
+
+- 노드 구조나 설정 변경 시 **반드시 컴파일**
+- 컴파일 = 변경사항을 실제 시스템에 적용
+- 변수 사용 시는 컴파일 없이 실시간 변경 가능
+
+### 실제 게임에서의 작동 방식
+
+1. **플레이어가 이동 키를 누름**
+2. **게임플레이 코드**가 캐릭터 속도 계산
+3. 코드가 **Speed 변수 값 변경**
+4. Animation Blueprint가 **자동으로 적절한 애니메이션 재생**
+   - 정지 → Speed = 0 → Idle
+   - 걷기 시작 → Speed 증가 → Walk 블렌딩
+   - 뛰기 → Speed = 1 → 완전한 Walk
+
+---
+
+## 9. 다음 단계 예고
+
+### 현재 방식의 한계
+
+- Blend 노드는 2개 애니메이션만 처리
+- 복잡한 이동(8방향, 달리기 등)은 비효율적
+
+### 실무 해결책
+
+**Blend Space** 사용
+
+- 더 강력한 블렌딩 시스템
+- 여러 방향, 여러 속도를 한 번에 처리
+- 다음 강의에서 배울 예정
+
+### 이번 강의의 가치
+
+- Animation Blueprint의 **기본 원리 이해**
+- **변수와 게임플레이 코드의 연동** 개념 파악
+- 실제 프로젝트 준비를 위한 기초 다지기
+
+# { Blend Space 애니메이션 에셋 }
+
+## 1. Blend Space란?
+
+### 문제점: Blend 노드의 한계
+
+- **Blend Poses by Float**는 2개 애니메이션만 블렌딩 가능
+- 여러 애니메이션(8방향 이동, 걷기/뛰기 등)을 처리하려면 **노드가 너무 많아짐**
+- 관리가 매우 어렵고 복잡해짐
+
+### 해결책: Blend Space
+
+- **2D 그래프를 사용해 여러 애니메이션을 한 번에 관리**
+- 두 개의 축(파라미터)으로 애니메이션 제어
+- 훨씬 효율적이고 직관적인 시스템
+
+---
+
+## 2. Blend Space 생성
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380650/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_2/image_12.png)
+
+### 만드는 방법
+
+1. Animations 폴더에서 **우클릭**
+2. **Animation → Blend Space** 선택
+3. **Skeleton 선택** (Wraith)
+4. 네이밍: **"BS_Locomotion"** (또는 BS_Movement)
+   - BS = Blend Space
+   - Locomotion = 이동의 전문 용어
+5. 더블클릭으로 열기
+
+---
+
+## 3. 에디터 인터페이스
+
+### 화면 구성
+
+- **중앙**: **2D 그래프 영역** (가장 중요!)
+- **좌측**: 애니메이션 미리보기
+- **우측**: Details 패널
+- **하단**: Asset Browser (애니메이션 목록)
+
+### 2D 그래프의 두 축
+
+기본적으로 "None"으로 설정되어 있음 → 의미있게 변경 필요
+
+---
+
+## 4. 축(Axis) 설정하기
+
+### Details 패널에서 설정
+
+**Horizontal Axis (가로축)**: **Angle (각도)**
+
+- 이동 방향 제어 (앞/뒤/좌/우)
+- 최소값: **180**
+- 최대값: **180**
+- 완전한 원(360도)을 표현
+
+**Vertical Axis (세로축)**: **Speed (속도)**
+
+- 이동 속도 제어 (정지/걷기/달리기)
+- 최소값: **0**
+- 최대값: **200**
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380650/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_2/image_13.png)
+
+---
+
+## 5. Speed 축 이해하기
+
+### 속도 값의 의미
+
+**그래프 위치별 의미:**
+
+- **하단 (Speed = 0)**: 정지 상태 (Idle)
+- **중간 (Speed = 100)**: 걷기 (Walk)
+- **상단 (Speed = 200)**: 달리기/조깅 (Jog)
+
+**블렌딩 구간:**
+
+- **0 ~ 100 사이**: Idle에서 Walk로 부드럽게 전환
+- **100 ~ 200 사이**: Walk에서 Jog로 부드럽게 전환
+
+### 미리보기 조작
+
+- **Ctrl + 마우스 드래그**: 그래프 내에서 미리보기 값 실시간 변경
+- 위아래로 움직이면 속도 변화 확인 가능
+
+---
+
+## 6. Angle 축 이해하기
+
+### 각도 값의 의미 (게임 내 방향)
+
+```
+        앞 (0°)
+         ↑
+         |
+왼쪽 (-90°) ← ● → 오른쪽 (90°)
+         |
+         ↓
+    뒤 (±180°)
+
+```
+
+**각도별 방향:**
+
+- **0°**: 앞으로 이동
+- **90°**: 오른쪽으로 이동
+- **180° (또는 -180°)**: 뒤로 이동
+- **90°**: 왼쪽으로 이동
+
+### 중요 포인트
+
+- **±180도는 같은 뒤쪽 방향**
+- 그래프 왼쪽 끝(-180)과 오른쪽 끝(180) = 둘 다 뒤로 이동
+- 음수/양수는 회전 방향만 다를 뿐 결과는 동일
+
+---
+
+## 7. 애니메이션 배치하기
+
+### 기본 원칙
+
+1. Asset Browser에서 애니메이션 선택
+2. **좌클릭 + 드래그**로 그래프에 배치
+3. **Shift 키**: 그리드에 정확히 스냅
+4. 원(동그라미) 모양으로 표시됨
+
+### 첫 번째: 앞 방향 구축
+
+### 1) Idle (정지)
+
+- **위치**: 중앙 하단
+- **좌표**: Angle = 0, Speed = 0
+- 애니메이션: **Idle_Combat**
+
+### 2) Walk Forward (앞으로 걷기)
+
+- **위치**: 중앙 중간
+- **좌표**: Angle = 0, Speed = 100
+- 애니메이션: **Walk_Forward**
+
+### 3) Jog Forward (앞으로 달리기)
+
+- **위치**: 중앙 상단
+- **좌표**: Angle = 0, Speed = 200
+- 애니메이션: **Jog_Forward_Combat**
+
+**결과 확인:**
+
+- Ctrl + 드래그로 Speed를 0 → 100 → 200으로 움직이면
+- Idle → Walk → Jog로 부드럽게 전환
+
+---
+
+### 두 번째: 오른쪽 방향 구축
+
+### Speed = 0 (정지)
+
+- **위치**: 오른쪽 하단
+- **좌표**: Angle = 90, Speed = 0
+- 애니메이션: **Idle_Combat** (동일)
+
+### Speed = 100 (걷기)
+
+- **위치**: 오른쪽 중간
+- **좌표**: Angle = 90, Speed = 100
+- 애니메이션: **Walk_Right**
+
+### Speed = 200 (달리기)
+
+- **위치**: 오른쪽 상단
+- **좌표**: Angle = 90, Speed = 200
+- 애니메이션: **Jog_Right**
+
+**개념 이해:**
+
+- 각도 90도에서 Speed를 변경하면
+- 오른쪽 방향으로 Idle → Walk → Jog
+
+---
+
+### 세 번째: 뒤 방향 구축 (특별한 경우!)
+
+**중요**: 뒤쪽은 **양쪽 끝** 모두에 배치해야 함
+
+### 왼쪽 끝 (-180도)
+
+- Speed = 0: **Idle_Combat**
+- Speed = 100: **Walk_Backward**
+- Speed = 200: **Jog_Backward_Combat**
+
+### 오른쪽 끝 (+180도)
+
+- Speed = 0: **Idle_Combat**
+- Speed = 100: **Walk_Backward**
+- Speed = 200: **Jog_Backward_Combat**
+
+**왜 양쪽 모두?**
+
+- 180도와 +180도는 수학적으로 같은 방향
+- 블렌딩이 부드럽게 연결되도록 양쪽에 동일하게 배치
+
+---
+
+### 네 번째: 왼쪽 방향 구축 (실습 과제)
+
+### 배치해야 할 위치
+
+- **Angle = -90 (왼쪽 중앙 라인)**
+- Speed = 0: **Idle_Combat**
+- Speed = 100: **Walk_Left**
+- Speed = 200: **Jog_Left**
+
+---
+
+## 8. 완성된 Blend Space 구조
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380650/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_2/image_14.png)
+
+### 전체 레이아웃 (9개 지점)
+
+```
+Speed 200 |  Jog_Left  |  Jog_Forward  |  Jog_Right  | Jog_Backward
+          |            |               |             |
+Speed 100 | Walk_Left  | Walk_Forward  | Walk_Right  | Walk_Backward
+          |            |               |             |
+Speed 0   |    Idle    |     Idle      |    Idle     |     Idle
+          |___________|_______________|_____________|______________
+         -90°         0°             90°           ±180°
+      (왼쪽)        (앞)          (오른쪽)         (뒤)
+
+```
+
+### 각 지점의 역할
+
+- **4개의 방향** (앞/뒤/좌/우)
+- **3개의 속도** (정지/걷기/달리기)
+- **자동 블렌딩**: 지점 사이를 부드럽게 전환
+
+---
+
+## 9. 실전 작동 방식
+
+### 예시 상황
+
+**상황 1: 앞으로 천천히 걷기 시작**
+
+- Angle = 0 (앞)
+- Speed = 0 → 50 증가
+- 결과: Idle과 Walk_Forward가 50:50 블렌딩
+
+**상황 2: 오른쪽으로 전속력 달리기**
+
+- Angle = 90 (오른쪽)
+- Speed = 200
+- 결과: Jog_Right 100% 재생
+
+**상황 3: 오른쪽 앞 대각선으로 걷기**
+
+- Angle = 45 (앞과 오른쪽 중간)
+- Speed = 100
+- 결과: Walk_Forward와 Walk_Right가 자동으로 블렌딩
+
+**상황 4: 뒤로 조깅**
+
+- Angle = 180 (또는 -180)
+- Speed = 150
+- 결과: Walk_Backward와 Jog_Backward 블렌딩
+
+---
+
+## 10. 게임플레이 연동 개념
+
+### 실제 게임에서의 흐름
+
+1. **플레이어가 WASD 키 입력**
+2. **게임 코드가 계산:**
+   - 이동 방향 → Angle 값 설정
+   - 이동 속도 → Speed 값 설정
+3. **Blend Space가 자동으로:**
+   - 해당 위치의 애니메이션들을 블렌딩
+   - 부드러운 움직임 생성
+
+### 다음 단계 예고
+
+- Animation Blueprint에 Blend Space 연결
+- 게임플레이 변수와 Blend Space 파라미터 연결
+- 실제로 작동하는 캐릭터 만들기
+
+---
+
+## 11. 유용한 팁
+
+### 애니메이션 이름 표시
+
+- 그래프 상단의 **버튼 클릭**
+- 각 동그라미에 애니메이션 이름 표시
+- 관리가 훨씬 쉬워짐
+
+### Speed = 0일 때의 규칙
+
+- **모든 각도에서 동일한 Idle 사용**
+- 정지 상태에서는 방향이 의미 없음
+- 움직일 때만 방향(Angle)이 중요
+
+### Shift 키 활용
+
+- 그리드에 정확히 배치하려면 **Shift + 드래그**
+- 깔끔한 정렬로 관리 편의성 향상
+
+---
+
+## 12. 핵심 정리
+
+### Blend Space의 장점
+
+✅ **여러 애니메이션을 한 화면에서 관리**
+✅ **2개의 파라미터로 복잡한 움직임 제어**
+✅ **자동 블렌딩으로 부드러운 전환**
+✅ **직관적인 2D 그래프 인터페이스**
+
+### 필수 개념
+
+- **Speed (세로축)**: 얼마나 빠르게? (0=정지, 100=걷기, 200=달리기)
+- **Angle (가로축)**: 어느 방향으로? (0=앞, 90=오른쪽, ±180=뒤, -90=왼쪽)
+- **자동 블렌딩**: 지점 사이의 모든 값은 자동으로 계산됨
+
+### 다음에 배울 것
+
+- Animation Blueprint에서 Blend Space 사용
+- 변수로 Speed와 Angle 제어
+- 실제 게임 캐릭터에 적용
+
+# { 캐릭터 속도를 Blend Space에 연결하기 }
+
+## 1. 기본 설정: Animation Blueprint에 Blend Space 추가
+
+### 기존 테스트 노드 정리
+
+1. Animation Graph 열기
+2. 기존에 만들었던 테스트용 노드들 **전체 선택** (좌클릭 + 드래그)
+3. **Delete 키**로 삭제
+4. 깨끗한 상태로 시작
+
+### Blend Space 노드 추가 (실습 과제)
+
+**목표:**
+
+1. Asset Browser에서 **BS_Locomotion** 찾기
+2. Animation Graph로 드래그 & 드롭
+3. Blend Space 출력 → **Output Pose** 연결
+4. **Speed**와 **Angle** 변수 생성 (둘 다 Float 타입)
+5. 변수들을 Blend Space의 입력 핀에 연결
+
+---
+
+## 2. Blend Space 노드 구조 이해
+
+### 입력과 출력
+
+```
+[Speed 변수] ──→ Speed 입력
+                        ↓
+              [Blend Space 노드] ──→ Output Pose
+                        ↑
+[Angle 변수] ──→ Angle 입력
+```
+
+### 노드 상세
+
+- **2개의 입력 핀** (초록색 = Float):
+  - Speed: 속도 제어 (0~200)
+  - Angle: 방향 제어 (-180~180)
+- **1개의 출력 핀**:
+  - 블렌딩된 최종 애니메이션 Pose
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380650/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_2/image_15.png)
+
+---
+
+## 3. 변수 생성 및 연결
+
+### Speed 변수
+
+- **이전 강의에서 만든 Speed 변수 재사용 가능**
+- 이미 Float 타입이므로 그대로 사용
+
+### Angle 변수 생성
+
+1. My Blueprint → Variables → **"+" 버튼**
+2. 이름: **"Angle"**
+3. 타입: **Float**
+4. Animation Graph에 드래그 → **Get Angle**
+
+### 연결하기
+
+- Speed 변수 → Blend Space의 **Speed 입력**
+- Angle 변수 → Blend Space의 **Angle 입력**
+
+---
+
+## 4. 실시간 테스트
+
+### Anim Preview Editor에서 확인
+
+**컴파일 후:**
+
+1. **Speed 슬라이더 조절**
+   - 0 → Idle
+   - 100 → Walk
+   - 200 → Jog
+2. **Angle 슬라이더 조절**
+   - 0 → 앞으로
+   - 90 → 오른쪽
+   - 90 → 왼쪽
+   - ±180 → 뒤로
+
+### 노드 내부 시각화
+
+- **Blend Space 노드 안에 작은 점 표시**
+- 현재 Speed/Angle 위치를 실시간으로 보여줌
+- 매우 직관적인 디버깅 도구!
+
+---
+
+## 5. 실제 게임플레이 연동 개념
+
+### 문제점
+
+현재는 **미리보기 창에서만 수동 조절 가능**
+→ 실제 게임에서는 **캐릭터 움직임에 따라 자동으로 변해야 함**
+
+### 해결 방법
+
+**게임플레이 코드에서 값 가져오기:**
+
+1. 플레이어가 이동 키 입력
+2. Character Movement Component가 속도 계산
+3. **Animation Blueprint가 캐릭터의 속도 읽어옴**
+4. **Speed 변수에 자동 설정**
+5. Blend Space가 적절한 애니메이션 재생
+
+### 캐릭터의 실제 속도
+
+- Character Movement Component에서 확인 가능
+- **기본 보행 속도: 500 cm/s** (Max Walk Speed)
+- 이 값을 가져와서 사용할 예정
+
+---
+
+## 6. Event Graph 소개
+
+### Animation Graph vs Event Graph
+
+**Animation Graph (애니메이션 그래프):**
+
+- **애니메이션 관련 작업만** 가능
+- 노드 연결로 애니메이션 블렌딩
+- 값 표시 및 연결만 가능
+
+**Event Graph (이벤트 그래프):**
+
+- **로직 작성 가능** (블루프린트 코드)
+- 캐릭터에서 데이터 가져오기
+- 변수 계산 및 설정
+- 함수 호출 등 프로그래밍 작업
+
+### 왜 Event Graph가 필요한가?
+
+Animation Graph에서는:
+
+- ❌ 캐릭터 포인터 가져오기 불가
+- ❌ 속도 계산 불가
+- ❌ 함수 호출 불가
+
+Event Graph에서:
+
+- ✅ Shooter Character 접근 가능
+- ✅ 속도 가져오기 가능
+- ✅ 변수 설정 가능
+
+---
+
+## 7. Event Graph로 속도 연결하기
+
+### 기본 구조 이해
+
+**이미 있는 기본 노드들:**
+
+### 1) Try Get Pawn Owner
+
+- **애니메이션 블루프린트의 소유자를 반환**
+- 이 경우 소유자 = **Shooter Character**
+- 반환 타입: **Pawn** (포인터)
+- 출력 핀: 캐릭터에 대한 포인터
+
+### 2) Event Blueprint Update Animation
+
+- **애니메이션이 업데이트될 때마다 실행**
+- C++의 **Tick 함수와 동일**
+- 매 프레임 호출됨
+- **속도 업데이트하기에 완벽한 장소**
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380650/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_2/image_16.png)
+
+---
+
+## 8. 블루프린트 노드 구현
+
+### 전체 흐름 개요
+
+```
+Event Blueprint Update Animation
+    ↓
+포인터 유효성 검사 (IsValid)
+    ↓
+캐릭터의 속도 가져오기 (Get Velocity)
+    ↓
+벡터 길이 계산 (Vector Length)
+    ↓
+Speed 변수에 설정 (Set Speed)
+```
+
+---
+
+### 단계별 구현
+
+### Step 1: 포인터 유효성 검사
+
+**포인터 사용 전 항상 확인 필수!**
+
+1. **Try Get Pawn Owner**의 반환값 드래그
+2. **"IsValid"** 검색 → 물음표 아이콘 선택
+3. **IsValid 노드 생성됨**
+
+**IsValid 노드 구조:**
+
+- **입력 실행 핀**: Event에서 연결
+- **출력 실행 핀 2개**:
+  - **Is Valid**: 포인터가 유효할 때 실행
+  - **Is Not Valid**: 포인터가 null일 때 실행
+
+**연결:**
+
+- Event Blueprint Update Animation → IsValid 입력
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380651/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_2/image_17.png)
+
+---
+
+### Step 2: Speed 변수 설정 노드
+
+1. **Speed 변수**를 Event Graph로 드래그
+2. **"Set Speed"** 선택
+3. **Set 노드 생성**
+
+**Set Speed 노드:**
+
+- **입력 실행 핀**: IsValid의 **Is Valid**에서 연결
+- **Speed 입력 핀**: 설정할 새 값 (Float)
+
+**의미:**
+
+- 포인터가 유효할 때만 Speed 설정
+- 안전한 코드 작성
+
+---
+
+### Step 3: 캐릭터의 속도 가져오기
+
+1. **Try Get Pawn Owner** 반환값 다시 드래그
+2. **"Get Velocity"** 검색 → 선택
+3. **Get Velocity 노드 생성**
+
+**Get Velocity 노드:**
+
+- 캐릭터의 현재 이동 속도 반환
+- **반환 타입: Vector** (X, Y, Z 방향 속도)
+- 실행 핀 없음 (값만 반환)
+
+---
+
+### Step 4: 벡터를 Float로 변환
+
+**문제:** Get Velocity는 Vector를 반환하지만, Speed는 Float 필요
+
+**해결:**
+
+1. **Get Velocity** 반환값 드래그
+2. **"Vector Length"** 검색 → 선택
+3. **Vector Length 노드 생성**
+
+**Vector Length란?**
+
+- 벡터의 **크기(magnitude)** 계산
+- 3D 공간에서의 실제 이동 속도
+- 공식: √(X² + Y² + Z²)
+- Float 값 반환
+
+**예시:**
+
+- Velocity = (300, 400, 0)
+- Vector Length = √(300² + 400²) = 500
+
+---
+
+### Step 5: 최종 연결
+
+**Vector Length 출력** → **Set Speed의 Speed 입력**
+
+---
+
+## 9. 전체 노드 구조 정리
+
+```
+Event Blueprint Update Animation
+    ↓
+[Try Get Pawn Owner] → IsValid? ─┐
+                                  │
+                      Is Valid ───┘
+                          ↓
+                    [Set Speed] ← Vector Length ← Get Velocity
+                                                        ↑
+                                          [Try Get Pawn Owner]
+```
+
+---
+
+## 10. 실행 핀의 이해
+
+### 노드의 두 가지 타입
+
+### 실행 핀이 있는 노드
+
+- **무언가를 변경하는 작업**
+- 예: Set Speed, IsValid
+- 왼쪽에 입력 핀, 오른쪽에 출력 핀
+- **순서대로 실행됨**
+
+### 실행 핀이 없는 노드
+
+- **값만 반환하는 작업**
+- 예: Get Velocity, Vector Length, Try Get Pawn Owner
+- 다른 노드가 필요할 때 자동 호출
+- **필요할 때만 실행됨**
+
+---
+
+## 11. 게임에서 테스트
+
+### 컴파일 및 실행
+
+1. **Compile** 버튼 클릭
+2. **Play** 버튼으로 게임 시작
+3. 캐릭터 조종해보기
+
+### 예상 동작
+
+**정지 상태:**
+
+- Speed = 0
+- Idle 애니메이션 재생
+
+**이동 키를 누르면:**
+
+- Character Movement가 속도 계산
+- Event Graph가 매 프레임 속도 가져옴
+- Speed 변수 자동 업데이트
+- Blend Space가 적절한 애니메이션 재생
+
+---
+
+## 12. 키보드 vs 게임패드 차이
+
+### 키보드 입력의 문제
+
+- **디지털 입력**: 0 또는 1 (꺼짐/켜짐)
+- 키를 누르면 **즉시 최대 속도**
+- Idle → Jog로 **순간 전환**
+- Walk 애니메이션 거의 볼 수 없음
+
+### 게임패드의 장점
+
+- **아날로그 입력**: 0~1 사이 연속 값
+- 엄지스틱 조절로 **중간 속도 가능**
+- Idle → Walk → Jog **자연스러운 전환**
+- 훨씬 부드러운 게임플레이
+
+**테스트 결과:**
+
+- 엄지스틱 살짝 → 천천히 걷기
+- 엄지스틱 끝까지 → 최고 속도 조깅
+- 중간 값으로 부드러운 가속
+
+---
+
+## 13. 추가 설정: 더 부드러운 움직임
+
+### Character Movement Component 조정
+
+### 1) Ground Friction (지면 마찰) 감소
+
+- 기본값: **8**
+- 변경값: **4**
+- 효과: 미끄러짐 증가
+
+### 2) Braking Deceleration Walking (제동 감속) 제거
+
+- 기본값: 2048
+- 변경값: **0**
+- 효과: 멈출 때 슬라이딩
+
+### 왜 이렇게 하는가?
+
+**목적:**
+
+- 키보드 사용 시에도 **중간 속도 체험**
+- 즉시 멈추지 않고 **관성 추가**
+- 더 자연스러운 느낌
+
+**결과:**
+
+- 키를 떼도 캐릭터가 조금 미끄러짐
+- 그 순간 Walk 애니메이션 보임
+- 완벽하진 않지만 개선됨
+
+**주의:**
+
+- 게임 느낌에 따라 조절 필요
+- 너무 미끄러우면 조작감 나빠짐
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380651/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_2/image_18.png)
+
+---
+
+## 14. 아직 구현 안 된 것: Angle (방향)
+
+### 현재 상태
+
+- ✅ Speed는 자동 업데이트
+- ❌ Angle은 아직 0으로 고정
+- 결과: **앞으로만 이동 가능**
+
+### 다음 강의 예고
+
+**Angle (각도) 계산 방법:**
+
+- 캐릭터가 바라보는 방향
+- 실제 이동하는 방향
+- 두 방향의 차이 → Angle 값
+- 180 ~ +180 범위로 변환
+
+**구현하면:**
+
+- 앞/뒤/좌/우 모든 방향 이동
+- 제자리에서 돌 때도 자연스러운 애니메이션
+- 완전한 8방향 Blend Space 활용
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380651/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_2/image_19.png)
+
+---
+
+## 15. 핵심 개념 총정리
+
+### Animation Blueprint의 두 영역
+
+**Animation Graph:**
+
+- ✅ 애니메이션 노드 배치
+- ✅ 블렌딩 설정
+- ✅ 변수 연결
+- ❌ 로직 작성 불가
+
+**Event Graph:**
+
+- ✅ 캐릭터 데이터 접근
+- ✅ 계산 및 로직
+- ✅ 변수 값 설정
+- ✅ 매 프레임 업데이트
+
+### 블루프린트 기초
+
+**노드 = 함수:**
+
+- 입력 핀: 파라미터
+- 출력 핀: 반환값
+- 실행 핀: 실행 순서 제어
+
+**안전한 코딩:**
+
+- 포인터 사용 전 **항상 IsValid 체크**
+- null 포인터 접근 방지
+
+**업데이트 타이밍:**
+
+- Event Blueprint Update Animation
+- 매 프레임 실행
+- 실시간 데이터 동기화
+
+---
+
+## 16. 실전 적용 팁
+
+### 디버깅 방법
+
+1. **Blend Space 노드 내부 점 확인**
+   - Speed/Angle 현재 값 시각적 표시
+2. **Anim Preview Editor**
+   - 변수 값 실시간 모니터링
+3. **Print String 노드** (필요시)
+   - 값 화면에 출력하여 확인
+
+### 최적화 고려사항
+
+- Get Velocity는 비용이 적음
+- 매 프레임 호출해도 성능 문제 없음
+- 복잡한 계산은 Tick 주기 조절 고려
+
+### 확장 가능성
+
+- 현재: Speed만 연동
+- 다음: Angle 추가
+- 미래: 점프, 공중 상태 등 추가 가능
+
+---
+
+## 17. 마무리
+
+### 이번 강의에서 배운 것
+
+✅ **Blend Space를 Animation Blueprint에 추가**
+✅ **Event Graph 기본 개념**
+✅ **블루프린트 노드 연결 방법**
+✅ **캐릭터 속도를 애니메이션에 연동**
+✅ **포인터 안전하게 사용하기**
+✅ **실시간 업데이트 구현**
+
+### 다음 단계
+
+- Angle (방향) 계산 및 연결
+- 전방향 이동 구현
+- 더 복잡한 애니메이션 로직
+
+### 현재 완성도
+
+- 앞으로 이동 시 애니메이션 작동
+- 속도에 따른 Idle/Walk/Jog 전환
+- 게임플레이와 애니메이션 연동 완료!
+
+# { 캐릭터 각도(Angle)를 Blend Space에 연결하기 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380651/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_2/image_20.png)
+
+## 1. 목표 이해하기
+
+### 현재 상황
+
+- ✅ **Speed는 연결 완료** → 속도에 따라 Idle/Walk/Jog 전환
+- ❌ **Angle은 아직 0으로 고정** → 앞으로만 이동 가능
+
+### 이번 강의 목표
+
+**Angle 값을 자동으로 계산하여 모든 방향 이동 구현**
+
+**필요한 Angle 값:**
+
+- **0°**: 앞으로 이동
+- **90°**: 오른쪽으로 이동
+- **90°**: 왼쪽으로 이동
+- **180° (또는 -180°)**: 뒤로 이동
+
+---
+
+## 2. 핵심 개념: Velocity(속도)의 두 가지 의미
+
+### Velocity 벡터란?
+
+**Velocity = 방향 + 속도**
+
+- 3D 공간에서의 이동 정보를 담은 벡터
+- **X, Y, Z** 세 값으로 구성
+
+**예시:**
+
+```
+Velocity = (500, 0, 0)
+→ X축(앞) 방향으로 500 속도
+→ 캐릭터가 정면으로 달림
+
+Velocity = (0, 500, 0)
+→ Y축(오른쪽) 방향으로 500 속도
+→ 캐릭터가 오른쪽으로 달림
+
+Velocity = (353, 353, 0)
+→ 대각선 방향으로 이동
+→ 앞쪽 + 오른쪽 45도
+```
+
+### 이전 강의 복습
+
+**Vector Length (벡터 길이):**
+
+- Velocity에서 **속도만** 추출
+- √(X² + Y² + Z²)
+- 방향 무시, 크기만 계산
+
+**이번 강의:**
+
+- Velocity에서 **방향(각도)만** 추출
+- 속도 무시, 각도만 계산
+
+---
+
+## 3. World Space vs Local Space
+
+### 문제 상황
+
+**Get Velocity는 World Space 반환**
+
+- World Space = 게임 월드 기준 좌표
+- 캐릭터가 어디를 보든 같은 방향이 같은 값
+
+**예시:**
+
+- 캐릭터가 북쪽 보고 있을 때 앞으로 이동 = (1, 0, 0)
+- 캐릭터가 동쪽 보고 있을 때 앞으로 이동 = (0, 1, 0)
+- **같은 "앞"인데 다른 값!**
+
+### 해결책: Local Space로 변환
+
+**Local Space = 캐릭터 기준 좌표**
+
+- 캐릭터가 어디를 보든 "앞"은 항상 같은 값
+- 캐릭터 시점에서의 상대적 방향
+
+**변환 후:**
+
+- 앞으로 이동 = **항상 (1, 0, 0)**
+- 뒤로 이동 = **항상 (-1, 0, 0)**
+- 오른쪽 이동 = **항상 (0, 1, 0)**
+- 왼쪽 이동 = **항상 (0, -1, 0)**
+
+---
+
+## 4. 단계별 구현
+
+### 전체 흐름
+
+```
+Get Velocity (World Space)
+    ↓
+InverseTransformDirection (Local Space로 변환)
+    ↓
+MakeRotFromX (벡터 → 회전값 변환)
+    ↓
+요(Yaw) 값 추출
+    ↓
+Set Angle
+```
+
+---
+
+### Step 1: Get Velocity 재사용
+
+**이전 강의에서 만든 노드 활용**
+
+- 이미 **Get Velocity** 노드 있음
+- 같은 노드를 Speed와 Angle 둘 다에서 사용
+
+---
+
+### Step 2: Local Space로 변환
+
+### InverseTransformDirection 노드 생성
+
+1. **Get Velocity** 반환값 드래그
+2. **"InverseTransformDirection"** 검색
+3. 노드 선택
+
+### 노드 구조
+
+**입력 1 - Vector (벡터):**
+
+- Get Velocity 연결
+- World Space의 속도 벡터
+
+**입력 2 - Transform (변환 기준):**
+
+- 무엇을 기준으로 변환할 것인가?
+- 캐릭터의 Transform 필요
+
+---
+
+### Step 3: 캐릭터의 Transform 가져오기
+
+### Transform이란?
+
+**게임 오브젝트의 3가지 정보:**
+
+- **Location (위치)**: X, Y, Z 좌표
+- **Rotation (회전)**: 어느 방향을 보는지
+- **Scale (크기)**: 얼마나 큰지
+
+**Outliner에서 Actor 선택하면 Details 패널에 표시됨**
+
+### Get Actor Transform 노드
+
+1. **Try Get Pawn Owner** 반환값 드래그
+2. **"Get Actor Transform"** 검색
+3. 노드 선택
+4. **InverseTransformDirection**의 Transform 입력에 연결
+
+**의미:**
+
+- 캐릭터를 기준으로 (캐릭터의 Transform 사용)
+- 속도 벡터를 변환
+
+---
+
+### Step 4: 벡터를 회전값으로 변환
+
+### MakeRotFromX 노드
+
+1. **InverseTransformDirection** 반환값 드래그
+2. **"MakeRotFromX"** 검색
+3. 노드 선택
+
+**기능:**
+
+- 벡터(방향)를 회전 각도로 변환
+- 반환 타입: **FRotator** (회전 정보)
+
+**FRotator 구성:**
+
+- **Pitch (피치)**: 위/아래 회전 (고개 끄덕임)
+- **Yaw (요)**: 좌/우 회전 (고개 좌우 돌림) ← **우리가 필요한 것!**
+- **Roll (롤)**: 좌/우 기울임 (고개 갸우뚱)
+
+---
+
+### Step 5: Yaw 값만 추출하기
+
+### Split Struct Pin (구조체 핀 분리)
+
+**FRotator는 3개 값의 묶음 → 개별 접근 필요**
+
+1. **MakeRotFromX**의 반환값 **우클릭**
+2. **"Split Struct Pin"** 선택
+3. Pitch, Yaw, Roll로 분리됨
+
+**결과:**
+
+- 반환값 핀이 3개로 나뉨
+- 각각의 값에 개별 접근 가능
+
+**우리가 사용할 것:**
+
+- **Yaw 핀**만 사용 (나머지 무시)
+
+---
+
+### Step 6: Angle 변수에 설정 (실습 과제)
+
+**목표:**
+
+1. **Angle 변수** Set 노드 생성
+2. **Set Speed** 노드에 실행 핀 연결 (순서대로 실행)
+3. **Yaw 값**을 Angle의 입력에 연결
+
+**연결 구조:**
+
+```
+Set Speed 출력 → Set Angle 입력
+Yaw 값 → Set Angle의 Angle 입력
+```
+
+---
+
+## 5. 완성된 노드 구조
+
+### 전체 블루프린트
+
+```
+Event Blueprint Update Animation
+    ↓
+[Try Get Pawn Owner] → IsValid?
+                          ↓
+                    ┌─────┴─────┐
+                    ↓           ↓
+            [Get Velocity] [Get Actor Transform]
+                    ↓           ↓
+            InverseTransformDirection
+                    ↓
+              MakeRotFromX
+                    ↓
+              (Split Struct)
+              ↙    ↓    ↘
+         Pitch  Yaw  Roll
+                ↓
+         [Set Angle]
+                ↑
+         [Set Speed] ← Vector Length ← Get Velocity
+```
+
+---
+
+## 6. Yaw 값의 의미
+
+### Yaw가 나타내는 각도
+
+**Local Space 기준:**
+
+```
+         앞 (Yaw = 0°)
+              ↑
+              |
+왼쪽 (-90°) ← ● → 오른쪽 (90°)
+              |
+              ↓
+         뒤 (±180°)
+```
+
+### 실제 값 예시
+
+**앞으로 이동 (W 키):**
+
+- Velocity (Local) = (1, 0, 0)
+- Yaw = **0°**
+- Blend Space의 앞 애니메이션 재생
+
+**오른쪽으로 이동 (D 키):**
+
+- Velocity (Local) = (0, 1, 0)
+- Yaw = **90°**
+- Blend Space의 오른쪽 애니메이션 재생
+
+**왼쪽으로 이동 (A 키):**
+
+- Velocity (Local) = (0, -1, 0)
+- Yaw = **90°**
+- Blend Space의 왼쪽 애니메이션 재생
+
+**뒤로 이동 (S 키):**
+
+- Velocity (Local) = (-1, 0, 0)
+- Yaw = **180°** (또는 -180°)
+- Blend Space의 뒤 애니메이션 재생
+
+**대각선 이동 (W+D 키):**
+
+- Velocity (Local) = (0.707, 0.707, 0)
+- Yaw = **45°**
+- 앞과 오른쪽 애니메이션 **자동 블렌딩**
+
+---
+
+## 7. 테스트 및 결과 확인
+
+### 컴파일 후 게임 플레이
+
+1. **Compile** 버튼 클릭
+2. **Save** 저장
+3. **Play** 게임 시작
+
+### 테스트 항목
+
+**키보드 테스트:**
+
+- **W**: 앞으로 달리기 → Jog Forward
+- **S**: 뒤로 달리기 → Jog Backward
+- **A**: 왼쪽으로 달리기 → Jog Left
+- **D**: 오른쪽으로 달리기 → Jog Right
+- **W+D**: 대각선 → 앞+오른쪽 블렌딩
+- **키를 떼면**: Idle
+
+**게임패드 테스트 (더 좋음):**
+
+- 아날로그 스틱 살짝 → Walk 애니메이션
+- 아날로그 스틱 끝까지 → Jog 애니메이션
+- 모든 방향으로 부드러운 전환
+
+### 예상 결과
+
+✅ **모든 방향 이동 가능**
+✅ **속도에 따라 Idle/Walk/Jog 전환**
+✅ **방향 전환 시 부드러운 블렌딩**
+✅ **대각선 이동도 자연스럽게 블렌딩**
+
+---
+
+## 8. 핵심 개념 정리
+
+### Velocity의 이중성
+
+**Velocity 벡터 하나로:**
+
+- Vector Length → **Speed** (얼마나 빠른가?)
+- MakeRotFromX → Yaw → **Angle** (어느 방향인가?)
+
+### Space 변환의 중요성
+
+**World Space:**
+
+- 게임 월드 기준
+- 절대 좌표
+
+**Local Space:**
+
+- 캐릭터 기준
+- 상대 좌표
+- **애니메이션에 필요한 것!**
+
+### Rotator의 Yaw
+
+**FRotator의 3요소:**
+
+- Pitch: 위/아래 (필요 없음)
+- **Yaw: 좌/우 (우리가 원하는 것!)**
+- Roll: 기울임 (필요 없음)
+
+---
+
+## 9. 수학 깊이 이해 (선택사항)
+
+### 강의에서 다루지 않은 이유
+
+**Game Dev TV 과정의 범위를 벗어남**
+
+- 벡터 수학의 세부 원리
+- 좌표계 변환 이론
+- 삼각함수 계산
+
+### 더 배우고 싶다면?
+
+**Game Dev TV의 전용 수학 강좌 추천**
+
+- 게임 개발에 필요한 수학 전체 커버
+- 벡터, 행렬, 회전 등
+- 강의 리소스 섹션에 링크 있음
+
+### 현재 수준에서 알아야 할 것
+
+✅ **개념적 이해:**
+
+- Velocity = 방향 + 속도
+- Space 변환 필요성
+- Yaw = 수평 회전 각도
+
+✅ **실용적 사용법:**
+
+- InverseTransformDirection로 변환
+- MakeRotFromX로 각도 추출
+- Yaw 값을 Angle로 사용
+
+---
+
+## 10. 트러블슈팅
+
+### 문제: 애니메이션이 이상하게 재생됨
+
+**원인:**
+
+- Angle 값 범위가 Blend Space와 불일치
+- World Space로 계산함
+
+**해결:**
+
+- InverseTransformDirection 사용 확인
+- Get Actor Transform 연결 확인
+
+### 문제: 뒤로 갈 때 애니메이션 안 나옴
+
+**원인:**
+
+- Yaw 값이 180도와 -180도 사이 불일치
+
+**해결:**
+
+- Blend Space에 ±180도 둘 다 배치했는지 확인
+- 강의 2에서 다룬 내용 복습
+
+### 문제: 대각선 이동이 부자연스러움
+
+**원인:**
+
+- Blend Space에 중간 애니메이션 부족
+
+**해결:**
+
+- 현재 구조로는 정상 (8방향만 있음)
+- 더 매끄러운 블렌딩 원하면 16방향 추가 가능
+
+---
+
+## 11. 최종 정리
+
+### 완성된 시스템
+
+**2개의 변수 자동 업데이트:**
+
+- ✅ **Speed**: Vector Length로 계산
+- ✅ **Angle**: Yaw 값으로 계산
+
+**Blend Space 완전 작동:**
+
+- ✅ 8방향 이동
+- ✅ 3단계 속도 (Idle/Walk/Jog)
+- ✅ 자동 블렌딩
+
+### Event Graph의 역할
+
+**매 프레임 실행:**
+
+1. 캐릭터 포인터 유효성 검사
+2. Velocity 가져오기
+3. Speed 계산 및 설정
+4. Angle 계산 및 설정
+5. Blend Space가 자동으로 적절한 애니메이션 재생
+
+### 다음 단계
+
+이제 기본 이동 애니메이션 완성!
+
+- 점프 애니메이션 추가
+- 공중 상태 처리
+- 무기 애니메이션 등 확장 가능
+
+---
+
+## 12. 핵심 노드 치트시트
+
+```
+InverseTransformDirection
+→ World Space를 Local Space로 변환
+→ 입력: Vector, Transform
+→ 출력: 변환된 Vector
+
+Get Actor Transform
+→ 액터의 위치, 회전, 크기 정보
+→ 출력: Transform
+
+MakeRotFromX
+→ 벡터(방향)를 회전각으로 변환
+→ 입력: Vector
+→ 출력: FRotator (Pitch, Yaw, Roll)
+
+Split Struct Pin
+→ 구조체를 개별 값으로 분리
+→ FRotator → Pitch, Yaw, Roll
+```
+
+---
+
+## 13. 실무 팁
+
+### 디버깅 방법
+
+**Blend Space 노드 내부 점 확인:**
+
+- Speed와 Angle의 실시간 값 시각적 표시
+- 예상 위치에 있는지 확인
+
+**Print String 활용:**
+
+- Yaw 값을 화면에 출력
+- 예상 각도와 일치하는지 확인
+
+### 성능 최적화
+
+**현재 구현은 이미 최적화됨:**
+
+- 간단한 수학 연산만 사용
+- 매 프레임 실행해도 부담 없음
+- 추가 최적화 불필요
+
+### 확장 가능성
+
+**더 복잡한 시스템으로 발전:**
+
+- 점프/낙하 상태 추가
+- 무기별 다른 애니메이션
+- 상태 머신(State Machine) 도입

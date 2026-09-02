@@ -1,0 +1,125 @@
+---
+title: '스프링 컨테이너 생성'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# 스프링 컨테이너 생성
+
+```java
+스프링 컨테이너가 생성되는 과정을 알아보자.
+```
+
+```java
+//스프링 컨테이너 생성
+ApplicationContext applicationContext = new AnnotationConfigApplicationContext(AppConfig.class);
+```
+
+```java
+* ApplicationContext 를 스프링 컨테이너라 한다.
+
+* ApplicationContext 는 인터페이스이다.
+
+* 스프링 컨테이너는 XML을 기반으로 만들 수 있고, 애노테이션 기반의 자바 설정 클래스로 만들 수 있다.
+
+* 직전에 AppConfig 를 사용했던 방식이 애노테이션 기반의 자바 설정 클래스로 스프링 컨테이너를 만든 것이다
+
+* 자바 설정 클래스를 기반으로 스프링 컨테이너( ApplicationContext )를 만들어보자.
+
+new AnnotationConfigApplicationContext(AppConfig.class); //생성자를 만들 때 생성자의 파라미터 매개변수로 AppConfig.class 를 넣어준다
+
+이 클래스(AnnotationConfigApplicationContext) 는 ApplicationContext 인터페이스의 구현체이다.
+```
+
+```java
+참고: 더 정확히는 스프링 컨테이너를 부를 때 BeanFactory , ApplicationContext 로 구분해서 이야기한다.
+
+이 부분은 뒤에서 설명하겠다. BeanFactory 를 직접 사용하는 경우는 거의 없으므로 일반적으로 ApplicationContext 를 스프링 컨테이너라 한다.
+
+우리는 그냥 쉽게 ApplicationContext 가 스프링 컨테이너라 이해하면 된다
+```
+
+# 스프링 컨테이너의 생성 과정
+
+## 1. 스프링 컨테이너 생성
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381135/notion-blog/_/_/_-_/_/Untitled.png)
+
+```java
+new AnnotationConfigApplicationContext(AppConfig.class) 스프링 컨테이너를 생성할 때는 구성 정보를 지정해주어야 한다. 여기서는 AppConfig.class 를 구성 정보로 지정했다.
+
+1. new AnnotationConfigApplicationContext 를 하면서 AppConfig.class 정보를 준다 (스프링 컨테이너를 생성할때는 AppConfig 라는 구성 정보를 지정해 줘야하고 그게 매개변수로 받는
+
+AppConfig.class 이다
+
+2. 그럼 스프링 컨테이너가 만들어지고 컨테이너 내부에는 스프링 빈 저장소가 있다 (여기서 키는 빈 이름이고 값은 빈 객체가 된다.)
+```
+
+## 2. 스프링 빈 등록
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381133/notion-blog/_/_/_-_/_/Untitled_1.png)
+
+```java
+스프링 컨테이너는 파라미터로 넘어온 설정 클래스 정보를 사용해서 스프링 빈을 등록한다
+
+빈 이름은 메서드 이름을 사용한다.
+
+빈 이름을 직접 부여할 수 도 있다.
+
+Ex) @Bean(name="memberService2")
+
+빈 객체는 new 한 인스턴스 객체 (MemberServiceImpl) 가 등록된다
+
+결과적으로 이렇게 등록한 모든것을 "스프링 빈" 이라고 한다
+```
+
+### 주의
+
+```java
+주의: 빈 이름은 항상 다른 이름을 부여해야 한다. 같은 이름을 부여하면, 다른 빈이 무시되거나, 기존 빈을 덮어버리거나 설정에 따라 오류가 발생한다
+```
+
+## 3. 스프링 빈 의존관계 설정 - 준비
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381134/notion-blog/_/_/_-_/_/Untitled_2.png)
+
+```java
+위의 그림은 스프링 빈을 등록한걸 표현한 것 이다
+```
+
+## 4. 스프링 빈 의존관계 설정 - 완료
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381134/notion-blog/_/_/_-_/_/Untitled_3.png)
+
+```java
+* 스프링 컨테이너는 설정 정보를 참고해서 의존관계를 주입(DI)한다.
+
+	1. memberService 의 의존관계에 memberRepository 를 넣어줬고 memberRepository 는 MemoryMemberRepository 인스턴스를 생성하고 있다
+
+	2. OrderService 는 memberRepository 와 discoutPolicy 를 의존관계에 넣어주었다 (각각 인스턴스 생성해준다 RateDiscountPolicy)
+
+* 단순히 자바 코드를 호출하는 것 같지만, 차이가 있다. 이 차이는 뒤에 싱글톤 컨테이너에서 설명한다.
+
+* 이렇게 스프링이 동적인 객체 인스턴스 의존 관계를 연결해 준다 (이렇게 실제 스프링 빈이 의존관계가 다 연결되게 된다)
+```
+
+### 참고
+
+```java
+참고
+
+스프링은 빈을 생성하고, 의존관계를 주입하는 단계가 나누어져 있다.
+
+그런데 이렇게 자바 코드로 스프링 빈을 등록하면 생성자를 호출하면서 의존관계 주입도 한번에 처리된다. 여기서는 이해를 돕기 위해 개념적으로 나누어 설명했다.
+
+ 자세한 내용은 의존관계 자동 주입에서 다시 설명하겠다
+```
+
+### 정리
+
+```java
+스프링 컨테이너를 생성하고, 설정(구성) 정보를 참고해서 스프링 빈도 등록하고, 의존관계도 설정했다. 이제 스프링 컨테이너에서 데이터를 조회해보자.
+```

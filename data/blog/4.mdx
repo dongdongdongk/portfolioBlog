@@ -1,0 +1,1075 @@
+---
+title: '섹션 4: 퀴즈 마스터'
+date: '2026-09-02'
+category: '게임 개발/2D 게임을 만들기 위한 C# 유니티 학습'
+tags: ['게임 개발', '2D 게임을 만들기 위한 C# 유니티 학습']
+draft: false
+summary: ''
+---
+
+# { UI 캔버스와 배경 이미지 설정하기 }
+
+## 1. 프로젝트 기본 세팅
+
+```csharp
+새 유니티 2D 프로젝트를 시작하세요.
+
+샘플 씬 이름을 **"Game"**으로 설정해 주세요.
+```
+
+## 2. 이미지 리소스 준비
+
+```csharp
+강의 자료에 있는 스프라이트 이미지들을 프로젝트에 가져오기
+
+		배경 이미지
+
+		버튼 이미지
+
+		게임 디자인 미리 보기 이미지 등
+
+직접 만든 이미지도 사용 가능, 다만 크기를 비슷하게 맞추는 것이 좋아요.
+```
+
+## 3. UI와 Canvas의 개념
+
+### UI란?
+
+```csharp
+User Interface (사용자 인터페이스)
+
+👉 말 그대로 **사용자(플레이어)**가 게임과 직접 상호작용하는 모든 화면 요소를 말해요.
+
+✅ UI의 대표적인 예시:
+
+		버튼: "시작하기", "다음", "다시 하기" 등 클릭 가능한 요소
+
+		텍스트: 점수, 설명, 대사 같은 글자
+
+		슬라이더: 볼륨 조절 바 같은 거
+
+		체크박스나 드롭다운 메뉴: 설정 화면에서 많이 봤죠?
+
+		미니맵: 화면 구석에 나오는 게임 맵
+
+		게임 HUD: 체력, 탄약, 스코어 표시 등
+
+📝 정리하면,
+
+		게임 안에서 플레이어가 보는 정보나 조작하는 부분은 전부 UI입니다.
+```
+
+### 캔버스(Canvas)란?
+
+```csharp
+UI 요소들을 담는 그릇이자, 화면에 표시되는 위치와 방식을 조절하는 공간이에요.
+
+✅ 캔버스의 역할
+
+		UI 요소들을 한 곳에 모아서 관리함
+
+		UI를 화면에 어떻게 보여줄지 결정함
+
+		UI가 월드 안의 오브젝트들과 혼동되지 않게 따로 분리함
+```
+
+### 화면 공간(SCREEN SPACE) vs 월드 공간(WORLD SPACE)
+
+```csharp
+스크린 공간(Screen Space)	카메라나 3D 월드와는 독립적으로, 화면 위에 고정되는 영역	점수, 버튼, 체력바 등
+
+월드 공간(World Space)	게임 내 3D 또는 2D 월드 상의 실제 위치에 존재	캐릭터, 배경, 몬스터 등
+
+🧠 쉽게 말해:
+
+UI는 스크린 공간에 위치하고
+
+게임 오브젝트들은 월드 공간에 위치합니다.
+```
+
+### 캔버스의 3가지 종류
+
+```csharp
+유니티에서는 캔버스가 어떻게 UI를 배치할지에 따라 세 가지 방식이 있어요.
+```
+
+```csharp
+Screen Space - Overlay	화면 위에 직접 오버레이됨. 가장 단순하고 일반적	대부분의 UI
+
+Screen Space - Camera	특정 카메라와 연결되어 표시됨	카메라 움직임에 따라 UI 위치 연동할 때
+
+World Space	UI가 월드 안에 배치됨 (UI도 하나의 오브젝트처럼)	3D 게임에서 캐릭터 머리 위 HP 표시 등
+```
+
+### 캔버스 안의 구조
+
+```csharp
+캔버스는 계층 구조를 가집니다.
+
+		부모인 Canvas 안에
+
+				Image, Text, Button 같은 UI 요소들이 자식으로 들어감
+
+
+		UI는 항상 캔버스 안에 있어야 화면에 보입니다.
+```
+
+### UI 요소의 위치와 크기 조절: RectTransform
+
+```csharp
+UI 요소들은 일반 Transform 대신 RectTransform을 사용해요.
+
+		📏 Width & Height: 너비/높이
+
+		🎯 Anchors: 어디를 기준으로 위치를 잡을지
+
+		💠 Pivot: 중심점 (회전, 스케일의 기준)
+
+		📌 Position: 현재 위치
+
+UI를 정밀하게 배치하거나 다양한 화면 해상도에 맞추기 위해 꼭 알아야 하는 개념입니다.
+```
+
+## 4. Canvas 추가하기
+
+```csharp
+**Hierarchy(계층 창)**에서 우클릭 → UI → Canvas 선택
+
+유니티가 자동으로 Canvas와 함께 EventSystem도 추가함
+
+		이벤트 시스템은 나중에 버튼 등 상호작용할 때 필요하므로 지우지 마세요.
+
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380362/notion-blog/_/2D_C_/_4_/image.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380355/notion-blog/_/2D_C_/_4_/image_1.png)
+
+## 5. Canvas에 이미지 추가
+
+```csharp
+Canvas 안에서 우클릭 → UI → Image 선택
+
+Image 오브젝트가 캔버스의 자식으로 생성됨
+
+인스펙터에서 확인하면 Rect Transform을 사용함
+
+		일반 오브젝트의 Transform과 비슷하지만 UI 전용임
+
+		위치(Position), 크기(Width/Height), 회전(Rotation), 앵커(Anchors) 등 포함
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380358/notion-blog/_/2D_C_/_4_/image_2.png)
+
+## 6. Scene 뷰와 Game 뷰의 차이
+
+```csharp
+Scene 뷰는 개발자가 전체 월드를 편집하는 공간
+
+Game 뷰는 실제 게임을 플레이어가 보는 시점
+
+캔버스는 Scene 뷰에서 잘 안 보일 수 있으니 Game 뷰에서 확인하는 게 중요
+```
+
+## 7. UI 위치 조정: Anchor & Pivot 사용법
+
+```csharp
+1. Rect Transform 왼쪽 상단의 네모 아이콘 클릭 → Anchor Presets 열기
+
+2. 원하는 기준점(anchor)을 선택 가능
+
+		예: 왼쪽 상단, 중앙, 오른쪽 하단 등
+
+3. Shift 키를 누르면 **Pivot(기준점)**도 함께 설정
+
+4. Alt 키를 누르면 **Position(위치)**도 함께 설정
+
+🧠 Tip: Shift + Alt를 함께 누르고 Preset을 클릭하면 한 번에 기준점 + 위치 + 피벗 설정 완료!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380360/notion-blog/_/2D_C_/_4_/image_3.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380361/notion-blog/_/2D_C_/_4_/image_4.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380361/notion-blog/_/2D_C_/_4_/image_5.png)
+
+### 앵커(Anchor)란?
+
+```csharp
+"UI가 어디를 기준으로 붙어 있을지 정하는 점"
+
+예시:
+
+		버튼을 화면 왼쪽 위에 고정하고 싶다면, 앵커를 왼쪽 위로 설정하면 돼.
+
+		화면 크기가 바뀌어도 앵커에 맞춰 UI가 따라 움직여.
+
+🧠 쉽게 말하면:
+
+		"이 버튼은 화면의 왼쪽 위 모서리를 기준으로 배치할게!" 라고 알려주는 거야.
+```
+
+### 피벗(Pivot)이란?
+
+```csharp
+"UI 요소 안에서 위치 계산의 중심점"
+
+예시:
+
+		버튼의 가운데를 기준으로 회전하거나 크기를 조절하려면 피벗을 가운데로 설정.
+
+		피벗은 해당 UI 요소 자체의 기준점이야.
+
+🧠 쉽게 말하면:
+
+		"이 UI의 어느 지점을 중심으로 움직이고 회전할까?"를 정하는 거야.
+```
+
+### 정리: Anchor Presets 사용 팁
+
+```csharp
+1. Anchor만 바꾸고 싶을 때
+→ 그냥 클릭
+
+2. Anchor + Pivot 같이 바꾸고 싶을 때
+→ Shift 누르고 클릭
+
+3. Anchor + Position 같이 바꾸고 싶을 때
+→ Alt 누르고 클릭
+
+4. Anchor + Pivot + Position 한 번에 바꾸고 싶을 때
+→ Shift + Alt 누르고 클릭
+```
+
+### 비유로 이해하면?
+
+```csharp
+Anchor: 벽에 못을 박고 그림을 거는 위치 (벽에서 어디에 걸 건지)
+
+Pivot: 그림 안에서 고리의 위치 (그림의 어디를 걸 건지)
+```
+
+## 8. 해상도 설정
+
+```csharp
+Game 뷰 상단에서 **Free Aspect → 1920x1080(Full HD)**로 변경
+
+실제 게임 해상도에 맞춰 UI 배치를 확인하기 좋음
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380362/notion-blog/_/2D_C_/_4_/image_6.png)
+
+```csharp
+* 이 설정을 조절함으로서 메인 카메라가 정사각형으로 고정 되어 있는 문제를 해결 가능하다
+```
+
+## 9. 캔버스 분리: 미리보기와 배경 구분
+
+```csharp
+✅ 미리보기용 캔버스
+
+		첫 번째 Canvas 이름을 PreviewCanvas로 변경
+
+		UI 미리 보기용 이미지를 Image의 Source Image에 드래그
+
+		Color → Alpha 값을 0.25로 변경 (반투명)
+
+		Canvas 설정에서 Sort Order를 100으로 설정 (항상 위에 보이게)
+
+✅ 배경용 캔버스
+
+		Hierarchy에서 우클릭 → UI → Canvas 추가
+
+		이름을 BackgroundCanvas로 변경
+
+		그 안에 Image 추가
+
+		Anchor Preset에서 Shift + Alt + 오른쪽 하단 클릭 → 전체 화면으로 채움
+
+		배경 이미지를 Source Image로 드래그
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380362/notion-blog/_/2D_C_/_4_/image_7.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380362/notion-blog/_/2D_C_/_4_/image_8.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380362/notion-blog/_/2D_C_/_4_/image_9.png)
+
+### Override Sorting
+
+```csharp
+✅ 기본 동작
+
+		유니티에서는 UI 요소들이 Hierarchy 상의 순서와 Sorting Layer / Order에 따라 화면에 앞뒤로 보이게 됩니다.
+
+		자식 캔버스는 기본적으로 부모 캔버스의 정렬 방식을 따라가요.
+
+📌 하지만!
+
+		특정 UI 요소를 무조건 위에 보여주고 싶을 때,
+
+		혹은 자식 UI가 따로 정렬돼야 할 때,
+
+		Override Sorting을 켜주면, 부모의 정렬을 무시하고 자신의 정렬 기준으로 따로 작동합니다.
+```
+
+# { 캔버스에 텍스트 추가하기 }
+
+## 1. TextMeshPro란?
+
+```csharp
+TextMeshPro는 Unity에서 더 정교하고 멋진 텍스트를 표현할 수 있게 해주는 고급 텍스트 시스템이에요.
+
+기본 텍스트보다 폰트 제어, 스타일링, 효과가 더 뛰어나요.
+```
+
+## 2. TextMeshPro 설치 및 설정
+
+### 2-1. 설치
+
+```csharp
+1. Unity 상단 메뉴 → Window → Package Manager로 이동
+
+2. 왼쪽 드롭다운에서 Packages: Unity Registry 선택
+
+3. TextMeshPro 검색
+
+4. 아직 설치되지 않았다면 Install 클릭
+
+		→ 이미 설치되어 있으면 Remove나 Update 버튼이 있을 수 있어요
+```
+
+### 2-2. 필수 리소스 가져오기
+
+```csharp
+1. 다시 Window → TextMeshPro → Import TMP Essential Resources 선택
+
+2. Import 창이 뜨면 모두 선택 상태에서 Import 클릭
+
+3. Assets 폴더 안에 TextMeshPro 관련 폴더가 생깁니다
+```
+
+## 3. 캔버스에 텍스트 추가하기
+
+### 3-1. 기본 TextMeshPro 텍스트 추가
+
+```csharp
+1. Hierarchy 창 → 캔버스에서 우클릭 → UI → Text - TextMeshPro 선택
+
+2. 텍스트 오브젝트가 생성됨
+
+3. 원하는 위치로 드래그해서 이동
+
+4. 사이즈 조절: Rect Transform에서 숫자 입력 (예: 너비 750, 높이 150 등)
+```
+
+### 3-2. 텍스트 내용 수정
+
+```csharp
+Inspector 창에서 TextMeshPro 컴포넌트 확인
+
+Text Input Field에서 게임 타이틀 입력 (예: Quiz-i-cool)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380355/notion-blog/_/2D_C_/_4_/image_10.png)
+
+## 4. 폰트 커스터마이징
+
+### 4-1. 무료 폰트 구해서 프로젝트에 추가
+
+```csharp
+인터넷에서 무료 또는 오픈소스 폰트를 찾아 다운로드
+
+Assets 폴더에 추가
+```
+
+### 4-2. Font Asset 생성
+
+```csharp
+Window → TextMeshPro → Font Asset Creator 열기
+
+Source Font File에 원하는 폰트 드래그
+
+Generate Font Atlas 클릭
+
+생성 완료되면 Save as로 저장 (예: Prisma SDF)
+
+생성된 Font Asset을 텍스트 오브젝트에 끌어다 넣기
+
+( 한글 폰트면 살짝의 설정이 필요하다 )
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380355/notion-blog/_/2D_C_/_4_/image_11.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380357/notion-blog/_/2D_C_/_4_/image_12.png)
+
+```csharp
+위와 같이 세팅해주고 ( Atlas Resolution 은 조금 줄여도 괜찮다 )
+
+제너레이트
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380357/notion-blog/_/2D_C_/_4_/image_13.png)
+
+```csharp
+만들어진 폰트를 클릭하고 Dynamic 으로 pointSize 는 60으로 수정해준다
+```
+
+## 5. 텍스트 스타일링
+
+### 5-1. 색상 변경
+
+```csharp
+Vertex Color 클릭 후 원하는 색 선택
+
+또는 Color Gradient를 사용해 위아래 색 다르게 지정 (예: 하늘색 그라데이션)
+```
+
+### 5-2. 효과 적용
+
+```csharp
+Underlay (그림자 효과)
+
+		Underlay 활성화 → 색상, 위치(Offset), 퍼짐 정도(Softness), 크기(Dilate) 조절
+
+Glow (글로우 효과)
+
+		Glow 활성화 → 색상 선택 (파란빛 흰색 등)
+
+		Inner/Outer Glow, Power 옵션 조절로 빛나는 효과 만들기
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380357/notion-blog/_/2D_C_/_4_/image_14.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380357/notion-blog/_/2D_C_/_4_/image_15.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380357/notion-blog/_/2D_C_/_4_/image_16.png)
+
+## 정리
+
+```csharp
+TextMeshPro
+
+		고급 텍스트 시스템, 기본 Text보다 훨씬 좋음
+
+설치 방법
+
+		Package Manager + Essential Resources Import
+
+텍스트 추가
+
+		캔버스 우클릭 → UI → Text - TextMeshPro
+
+폰트 변경
+
+		Font Asset 생성 후 적용
+
+스타일 효과
+
+		색상, 그림자, 글로우 등 다양하게 적용 가능
+```
+
+# { 버튼 추가 }
+
+## 버튼 추가 (TextMeshPro 버튼 사용)
+
+```csharp
+실습 순서:
+
+		QuizCanvas 우클릭 → UI → TextMeshPro - Button 선택
+
+		버튼이 캔버스 위에 추가됨
+
+📌 TextMeshPro 버튼은 일반 텍스트보다 선명하고 예쁘게 보이는 텍스트를 사용합니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380358/notion-blog/_/2D_C_/_4_/image_17.png)
+
+## ⚠ 버튼이 안 보이는 이유와 해결법
+
+```csharp
+문제: 버튼이 배경과 같은 레이어에 있어서 안 보임
+
+해결:
+
+		QuizCanvas 클릭
+
+		Canvas 컴포넌트 > Sort Order를 0 → 1로 변경
+
+		버튼이 배경보다 위에 올라와서 보이게 됨
+
+
+* 다른 옵션으로 변경 되었다 sort 옵션을 찾아보자 ( 앞에 한번 설명했음 )
+```
+
+## 버튼 구성 요소 이해하기
+
+```csharp
+Text(TMP): 버튼에 표시될 글자 (자식 객체로 있음)
+
+Image 컴포넌트: 버튼 배경 이미지
+
+Button 컴포넌트: 실제로 클릭 가능한 기능 처리 부분
+```
+
+## 버튼 기능 테스트
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380358/notion-blog/_/2D_C_/_4_/image_18.png)
+
+```csharp
+Interactable 옵션: 클릭 가능 여부 제어 (비활성화 시 회색으로 표시됨)
+
+Color Tint: 버튼 상태별 색 설정
+
+(기본, 마우스 오버, 클릭, 비활성화 등)
+
+🎯 간단하게 하기 위해:
+
+		Transition(전환) 옵션을 Color Tint → None으로 변경
+
+		👉 색상 효과는 없애고 나중에 스크립트로 직접 제어하기 위함
+```
+
+## 버튼 배경 이미지 변경
+
+```csharp
+문제: 단순한 색상 버튼은 밋밋함
+
+해결:
+
+		Source Image에 네온_정사각_파랑 스프라이트 적용
+
+		Image Type → Sliced로 변경
+
+📌 Sliced는 버튼이 커져도 모서리는 깨지지 않게 해줍니다
+
+(단, 이걸 사용하려면 이미지에 테두리(Borders) 설정 필요)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380358/notion-blog/_/2D_C_/_4_/image_19.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380358/notion-blog/_/2D_C_/_4_/image_20.png)
+
+## 스프라이트 테두리 설정
+
+```csharp
+실습 순서:
+
+		Sprites 폴더 → 해당 이미지 선택
+
+		Sprite Editor 열기
+
+		네 면에 75 정도로 Border 추가
+
+		Apply(적용) 후 닫기
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380359/notion-blog/_/2D_C_/_4_/image_21.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380359/notion-blog/_/2D_C_/_4_/image_22.png)
+
+## 버튼 정렬을 위한 레이아웃 그룹 만들기
+
+```csharp
+문제: 버튼을 일일이 배치하면 번거롭고 관리 어려움
+
+해결: Layout Group 사용
+```
+
+### 실습 순서:
+
+```csharp
+1. QuizCanvas 내에 빈 오브젝트 생성 → AnswerButtonGroup으로 이름 변경
+
+2. 생성한 버튼을 드래그해서 그룹에 자식으로 넣기
+
+3. AnswerButtonGroup에 Vertical Layout Group 컴포넌트 추가
+
+		레이아웃 옵션 설명:
+
+				Padding: 바깥 여백 (문서 여백처럼 생각)
+
+				Spacing: 버튼 간의 간격
+
+				Child Alignment: 정렬 위치 (예: Middle Center → 중앙 정렬)
+
+				Child Controls Size: 버튼 크기 자동 조절
+
+				Width, Height 체크 시 그룹 크기에 맞게 버튼도 조정됨
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380359/notion-blog/_/2D_C_/_4_/image_23.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380359/notion-blog/_/2D_C_/_4_/image_24.png)
+
+# { 스크립터블 오브젝트 사용하기 ( 질문 만들기 ) }
+
+## 이번 강의 목표
+
+```csharp
+**스크립터블 오브젝트(ScriptableObject)**를 사용해 퀴즈 질문지를 만듭니다.
+```
+
+## 새로운 폴더 생성
+
+```csharp
+Scripts: 모든 C# 스크립트 저장
+
+Questions: 질문용 스크립터블 오브젝트 저장
+```
+
+## 스크립터블 오브젝트란?
+
+```csharp
+간단히 말해, “데이터만 저장하는 스크립트”입니다.
+
+유니티에서 우리가 보통 사용하는 스크립트는 게임 오브젝트에 붙여서 행동을 정의하죠. (MonoBehaviour)
+
+하지만 스크립터블 오브젝트는 게임 오브젝트에 붙지 않고, 단순히 데이터를 저장해 놓는 용도로 사용합니다.
+```
+
+### 왜 사용할까요?
+
+```csharp
+1. 데이터와 코드를 분리
+
+		게임 데이터를 코드에 직접 쓰면 수정이 어려움 → 실수도 많아짐 😵
+
+		데이터만 따로 빼서 보관하면 훨씬 유지보수가 쉬워져요
+
+2. 재사용 가능
+
+		하나의 스크립터블 오브젝트를 여러 오브젝트가 공유해서 쓸 수 있어요
+
+		예: 무기 데이터를 여러 캐릭터가 공유해서 사용
+
+3. 메모리 효율성
+
+		매번 복사하지 않고, 참조만 하니까 메모리도 덜 먹음
+
+4. 인스펙터에서 쉽게 편집 가능
+
+		코드 몰라도 인스펙터에서 값만 바꾸면 게임 데이터를 수정할 수 있어요
+```
+
+### Unity에서 실제 활용 예
+
+```csharp
+퀴즈 게임
+
+		질문과 답변 저장
+
+RPG 게임
+
+		무기/아이템 스탯 저장
+
+카드 게임
+
+		카드 정보 (이름, 이미지, 효과) 저장
+
+튜토리얼 게임
+
+		각 단계 설명 텍스트 저장
+```
+
+### 정리하자면
+
+```csharp
+목적
+
+		데이터만 저장하는 용도
+
+위치
+
+		씬에 존재하지 않음
+
+특징
+
+		코드와 분리되어 관리가 쉬움
+
+장점
+
+		재사용성, 메모리 절약, 인스펙터 편집 가능
+
+예시
+
+		퀴즈 질문, 무기 정보, 카드 속성 등
+```
+
+## 스크립터블 오브젝트 생성 (실습)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380359/notion-blog/_/2D_C_/_4_/image_25.png)
+
+### 새 스크립트 만들기
+
+```csharp
+QuestionSO.cs라는 이름으로 생성
+
+기본 함수 Start(), Update()는 삭제
+
+MonoBehaviour → ScriptableObject로 변경
+```
+
+```csharp
+using UnityEngine;
+// Unity의 기본 기능들을 사용하기 위해 꼭 필요한 선언입니다.
+// 예: ScriptableObject, SerializeField, TextArea 등을 사용하기 위해 필요합니다.
+
+// CreateAssetMenu 속성(attribute)을 추가합니다.
+// 이 코드를 통해 Unity 에디터 내에서 스크립터블 오브젝트를 쉽게 만들 수 있게 됩니다.
+//
+// menuName: 유니티의 "Create" 메뉴에 표시될 이름입니다. (예: Create > Quiz Question)
+// fileName: 새로 생성될 스크립터블 오브젝트의 기본 이름입니다. (예: New Question)
+[CreateAssetMenu(menuName = "Quiz Question", fileName = "New Question")]
+public class QuestionSO : ScriptableObject
+{
+    // TextArea 속성은 에디터 인스펙터에서 문자열을 여러 줄로 입력할 수 있게 해줍니다.
+    // 괄호 안의 숫자는 (최소 줄 수, 최대 줄 수)를 의미합니다.
+    // 예: 최소 2줄, 최대 6줄까지 확장 가능한 텍스트 박스를 만듭니다.
+    [TextArea(2, 6)]
+
+    // SerializeField는 private 변수라도 유니티 에디터의 인스펙터에서 값을 설정할 수 있도록 해줍니다.
+    // 이 변수는 코드 외부에서는 직접 접근할 수 없지만, 에디터에서는 값을 입력할 수 있습니다.
+    // question 변수는 퀴즈의 질문 텍스트를 담는 곳입니다.
+    [SerializeField]
+    string question = "새로운 질문을 입력하세요";
+    // 초기값은 "새로운 질문을 입력하세요"이며, 이후 에디터에서 자유롭게 수정 가능합니다.
+}
+```
+
+```csharp
+CreateAssetMenu: 프로젝트에서 직접 생성 가능하게 만듦
+
+TextArea: 인스펙터에서 편하게 텍스트 편집 가능 (최소 2줄 ~ 최대 6줄)
+
+SerializeField: 외부 클래스는 접근 불가하지만 인스펙터에서는 보임
+```
+
+## 유니티에서 확인
+
+```csharp
+유니티에서 컴파일 후 Assets/Questions 폴더에서 우클릭
+
+Create > Quiz Question 선택 → 새로운 질문 생성됨
+
+질문 텍스트 입력 가능 (기본값: "새로운 질문을 입력하세요")
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380360/notion-blog/_/2D_C_/_4_/image_26.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380360/notion-blog/_/2D_C_/_4_/image_27.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380360/notion-blog/_/2D_C_/_4_/image_28.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380360/notion-blog/_/2D_C_/_4_/image_29.png)
+
+```csharp
+최종적으로 5개의 질문을 등록해봤다.
+```
+
+# { Getter 메서드 }
+
+## private 변수 + SerializeField
+
+```csharp
+[SerializeField] string question = "새로운 질문을 입력하세요";
+```
+
+```csharp
+private으로 설정하면 외부에서 직접 접근할 수 없습니다.
+
+하지만 SerializeField를 붙이면 Unity Inspector에서 값은 편집 가능하게 할 수 있습니다.
+
+이렇게 하면 데이터는 보호하면서도 유니티 에디터에서 쉽게 조정할 수 있죠.
+```
+
+## Getter 메서드의 개념
+
+```csharp
+[CreateAssetMenu(menuName = "Quiz Question", fileName = "New Question")]
+public class QuestionSo : ScriptableObject
+{
+    [TextArea(2,6)]
+    [SerializeField] string question = "새로운 질문을 입력하세요";
+
+    public string GetQuestion()
+    {
+        return question;
+    }
+}
+```
+
+```csharp
+Getter 메서드는 외부에서 private 변수의 값을 읽기 전용으로 접근하게 해주는 메서드입니다.
+
+외부 스크립트에서는 question에 직접 접근할 수 없지만, GetQuestion()을 통해 복사본을 얻을 수 있습니다.
+
+이렇게 하면 스크립트 외부에서 데이터를 바꾸는 실수를 방지할 수 있습니다.
+```
+
+## 외부 클래스에서 ScriptableObject 사용하기
+
+```csharp
+questionText = questionSO.GetQuestion();
+```
+
+```csharp
+questionSO는 QuestionSo 타입의 ScriptableObject 인스턴스입니다.
+
+외부 클래스에서는 .question처럼 변수에 직접 접근할 수는 없고,
+
+대신 .GetQuestion()처럼 공개된 메서드를 통해 간접적으로 접근합니다.
+```
+
+## 접근 제어를 통한 데이터 보호
+
+```csharp
+데이터를 무분별하게 바꾸는 것을 막기 위해 private + getter 구조를 사용합니다.
+
+ScriptableObject의 데이터는 읽기는 가능하지만 쓰기는 제한되도록 만드는 것이 좋습니다.
+```
+
+```csharp
+요약하자면, ScriptableObject는 재사용 가능한 데이터 저장소이고,
+
+Getter 메서드는 해당 데이터를 안전하게 읽기 전용으로 외부에 노출하는 방법입니다.
+
+이 구조는 코드를 더 안전하고 깔끔하게 유지하게 해줍니다.
+```
+
+# { 스크립터블 오브젝트와 배열을 이용한 퀴즈 시스템 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380361/notion-blog/_/2D_C_/_4_/image_30.png)
+
+## 1. **스크립터블 오브젝트(ScriptableObject)의 구조**
+
+```csharp
+ScriptableObject는 게임 데이터(여기선 퀴즈 데이터)를 에디터에서 직접 입력하고 재사용할 수 있는 방법입니다.
+```
+
+```csharp
+이 스크립터블 오브젝트는 다음 데이터를 포함합니다:
+
+		문제 텍스트 (question)
+
+		4개의 보기 (answers) – 배열을 사용
+
+		정답 인덱스 (correctAnswerIndex)
+```
+
+```csharp
+[CreateAssetMenu(menuName = "Quiz Question", fileName = "New Question")]
+public class QuestionSo : ScriptableObject
+{
+    [TextArea(2,6)]
+    [SerializeField] string question = "새로운 질문을 입력하세요";
+    [SerializeField] string[] answers = new string[4];
+    [SerializeField] int correctAnswerIndex;
+
+    public string GetQuestion() => question;
+    public string GetAnswer(int index) => answers[index];
+    public int GetCorrectAnswerIndex() => correctAnswerIndex;
+}
+```
+
+## 2. **배열(Array)에 대한 이해**
+
+```csharp
+배열이란?
+
+		같은 타입의 변수들을 그룹화할 수 있는 구조
+
+		0번부터 인덱스가 시작됨 (제로 인덱싱)
+
+		데이터를 유연하고 반복적으로 다루기 쉬움
+```
+
+```csharp
+int[] oddNumbers = { 1, 3, 5, 7, 9 };     // 직접 값 입력
+int[] oddNumbers = new int[5];           // 크기만 선언 후 나중에 값 입력
+```
+
+## 3. **퀴즈 보기를 배열로 저장하는 이유**
+
+```csharp
+각 보기를 따로따로 변수로 만들면 복잡하고 비효율적
+
+배열을 사용하면 4개의 보기를 하나로 관리할 수 있고, 인덱스로 쉽게 접근 가능
+```
+
+## 4. **정답을 저장하는 방법**
+
+```csharp
+**correctAnswerIndex**라는 정수형 변수로 배열의 정답 위치를 저장
+
+예: 정답이 4번째 보기라면, correctAnswerIndex = 3 (인덱스는 0부터 시작하므로)
+```
+
+# { ScriptableObject에 저장된 질문 데이터를 UI에 표시 }
+
+## 목표
+
+```csharp
+ScriptableObject에 저장된 질문 데이터를 가져와
+
+UI(Canvas)에 있는 TextMeshPro 텍스트 컴포넌트에 연결하여
+
+실제 게임 화면에 질문이 표시되도록 만드는 것
+```
+
+## 1. ✅ 새 스크립트 생성: `Quiz.cs`
+
+```csharp
+어디에 추가?
+
+		QuizCanvas 게임오브젝트에 추가함
+
+목적
+
+		이 스크립트는 게임의 중앙 로직 컨트롤러가 되며,
+
+		깔끔한 프로젝트 구조를 위해 Assets/Scripts 폴더로 옮김
+
+		Quiz.cs가 데이터와 UI 사이를 연결해주는 컨트롤러 역할
+```
+
+```csharp
+// Quiz.cs
+// 이 스크립트는 퀴즈 질문 데이터를 UI 텍스트에 표시하는 역할을 합니다.
+
+public class Quiz : MonoBehaviour  // MonoBehaviour는 Unity의 기본 컴포넌트 클래스입니다.
+{
+    // Inspector에서 설정할 수 있도록 SerializeField를 사용합니다.
+
+    [SerializeField] TextMeshProUGUI questionText;
+    // UI에 있는 TextMeshPro 텍스트 요소를 참조합니다.
+    // 이 텍스트 박스에 퀴즈 질문을 표시할 것입니다.
+
+    [SerializeField] QuestionSo questions;
+    // ScriptableObject 형태로 만든 질문 데이터(QuestionSo)를 참조합니다.
+    // 여기에 질문 내용, 보기, 정답 등이 들어있습니다.
+
+    void Start()
+    {
+        // 게임이 시작될 때(오브젝트가 활성화될 때) 자동으로 실행됩니다.
+
+        questionText.text = questions.GetQuestion();
+        // ScriptableObject에서 질문 텍스트를 가져와
+        // UI 텍스트 컴포넌트(questionText)에 표시합니다.
+    }
+}
+
+```
+
+### ScriptableObject 참조 추가
+
+```csharp
+질문 데이터를 담고 있는 ScriptableObject 변수를 생성
+
+private로 선언하면 외부에서 못 보이므로 SerializeField 속성으로 인스펙터에 노출
+
+→ 캔버스에 연결할 수 있게 함
+```
+
+```csharp
+[SerializeField] QuestionSo questions;
+```
+
+### TextMeshPro 텍스트 연결
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380361/notion-blog/_/2D_C_/_4_/image_31.png)
+
+```csharp
+상단에 네임스페이스 추가
+
+대소문자 주의: TextMeshProUGUI는 UI 요소 전용임
+
+질문 내용을 표시할 텍스트 요소 변수 선언
+
+[SerializeField] TextMeshProUGUI questionText;
+```
+
+```csharp
+using TMPro;
+```
+
+### Start()에서 텍스트 설정
+
+```csharp
+void Start()
+{
+    questionText.text = questions.GetQuestion();
+}
+```
+
+```csharp
+questions는 ScriptableObject 변수
+
+GetQuestion() 메서드를 사용하여 질문 문자열을 가져옴
+
+해당 문자열을 questionText.text에 설정
+
+→ 결과적으로 UI 텍스트가 변경됨
+```
+
+## 인스펙터 설정
+
+```csharp
+QuizCanvas 오브젝트 클릭
+
+Quiz 스크립트 컴포넌트에
+
+Question Text 필드: UI에서 TextMeshPro 오브젝트를 드래그
+
+Questions 필드: ScriptableObject를 드래그해서 연결
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380361/notion-blog/_/2D_C_/_4_/image_32.png)
+
+## Unity에서 인스펙터를 통해 **오브젝트끼리 연결 (** `Quiz` 스크립트를 `QuizCanvas` 연결 원리 )
+
+### 1. `Quiz` 스크립트를 `QuizCanvas`에 붙임
+
+```csharp
+먼저 Unity에서 QuizCanvas라는 UI 오브젝트를 선택하고
+
+Quiz.cs 스크립트를 Add Component 해서 붙이죠
+
+그럼 이제 이 오브젝트는 Quiz 스크립트를 실행하게 됩니다.
+```
+
+### 2. `[SerializeField] TextMeshProUGUI questionText;` ← 여기가 포인트!
+
+```csharp
+이 줄은 TextMeshProUGUI 타입의 컴포넌트를 연결할 공간이에요.
+
+private이지만 [SerializeField] 덕분에 인스펙터에서 보이게 됩니다.
+
+👉 이건 그냥 "이 변수에 뭔가를 넣을 수 있게 해줘!" 라는 뜻이에요.
+```
+
+### 3. 인스펙터에서 연결하는 방법
+
+```csharp
+1. QuizCanvas를 클릭
+
+2. Inspector에 Quiz (Script)라는 컴포넌트가 보일 거예요
+
+3. 그 안에 Question Text라는 슬롯이 있어요
+
+4. 여기에 Canvas 안에 있는 TextMeshPro 오브젝트 (예: Question Text)를 드래그해서 넣기만 하면 됨!
+
+이제 Quiz.cs 안의 questionText 변수는 그 드래그한 UI 텍스트 컴포넌트를 가리키게 돼요.
+```
+
+### 이렇게 연결되면…
+
+```csharp
+questionText.text = questions.GetQuestion();
+```
+
+```csharp
+"이 연결된 텍스트 박스(questionText)의 글자를, 질문 데이터에서 받아온 텍스트로 바꿔줘!"
+
+라는 뜻이 되는 거예요.
+```

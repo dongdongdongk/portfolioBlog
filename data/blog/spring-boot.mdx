@@ -1,0 +1,684 @@
+---
+title: 'Spring Boot 실습'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# Board
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381119/notion-blog/_/_/_-Spring_boot/Spring_Boot_/Untitled.png)
+
+```java
+상속과 인터페이스 사용을 위해 board 를 따로 만들어줬다.
+```
+
+## BoardVO
+
+```java
+package com.iu.base.board;
+
+import java.sql.Date;
+import java.util.List;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@Setter
+@Getter
+public class BoardVO {
+	private Long num;
+	private String title;
+	private String info;
+	private String writer;
+	private Date regDate;
+	private Long hit;
+	private List<BoardFileVO> boardFileVOs;    // 나중에 join 을 위해서 추가됨
+}
+```
+
+## BoardFileVO
+
+```java
+package com.iu.base.board;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class BoardFileVO {
+
+	private Long fileNum;
+	private Long num;
+	private String fileName;
+	private String oriName;
+
+}
+```
+
+## BoardDAO
+
+```java
+package com.iu.base.board;
+
+import java.util.List;
+
+import com.iu.base.util.Pager;
+
+public interface BoardDAO {
+
+	//글갯수
+	public Long getTotalCount(Pager pager) throws Exception;
+
+	//글리스트 조회
+	public List<BoardVO> getList(Pager pager) throws Exception;
+
+	//글하나 조회(detail)
+	public BoardVO getDetail(BoardVO boardVO) throws Exception;
+
+	//File 조회
+	public BoardFileVO getFileDetail(BoardFileVO boardFileVO) throws Exception;
+
+	//글쓰기
+	public int setInsert(BoardVO boardVO) throws Exception;
+
+	//글수정
+	public int setUpdate(BoardVO boardVO) throws Exception;
+
+	//글삭제
+	public int setDelete(BoardVO boardVO) throws Exception;
+
+	public int setBoardFileAdd(BoardFileVO boardFileVO) throws Exception;
+}
+```
+
+## BoardService
+
+```java
+package com.iu.base.board;
+
+import java.util.List;
+
+import org.springframework.web.multipart.MultipartFile;
+
+import com.iu.base.util.Pager;
+
+public interface BoardService {
+	//글리스트 조회
+	public List<BoardVO> getList(Pager pager) throws Exception;
+
+	//글하나 조회(detail)
+	public BoardVO getDetail(BoardVO boardVO) throws Exception;
+
+	//File 조회
+	public BoardFileVO getFileDetail(BoardFileVO boardFileVO) throws Exception;
+
+	//글쓰기
+	public int setInsert(BoardVO boardVO,MultipartFile[] multipartFiles) throws Exception;
+
+	//글수정
+	public int setUpdate(BoardVO boardVO) throws Exception;
+
+	//글삭제
+	public int setDelete(BoardVO boardVO) throws Exception;
+
+}
+```
+
+# Notice
+
+## NoticeController
+
+```java
+package com.iu.base.board.notice;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.ModelAndView;
+
+import com.fasterxml.jackson.annotation.JsonCreator.Mode;
+import com.iu.base.board.BoardFileVO;
+import com.iu.base.board.BoardVO;
+import com.iu.base.util.Pager;
+
+import lombok.extern.slf4j.Slf4j;
+
+@Controller
+@RequestMapping("/notice/*")  // 요청 URL과 Controller의 메서드를 매핑하기 위해 사용되는 어노테이션, Controller 클래스와 메서드에 각각 적용될 수 있다.
+															// 클래스에 적용되면 해당 클래스의 모든 메서드에서 공통적으로 사용되는 URL 경로를 지정 , 메서드에 적용되면 해당 메서드가 처리할 요청 URL을 지정
+@Slf4j                                 //lombok 사용을 위한 어노테이션 (자동으로 로깅 객체를 만들어준다 )
+public class NoticeController {
+
+	@Autowired
+	private NoticeService noticeService;
+
+
+	@ModelAttribute("board")   // 핸들러 메소드가 실행될 때마다 해당 메소드의 반환값을 Model에 자동으로 추가 <h1>${board} 게시판</h1> 일 때 notice 게시판 으로 출력
+	public String getBoard() {
+		return "notice";         // jsp 에서 ${board} = 모두 notice 로 (아래 메소드 들과는 무관하다 딱 ${board} 만 notice 로 )
+	}
+
+	@GetMapping("detail")  // URL로 GET 요청이 들어오면 @GetMapping 어노테이션을 사용하여 해당 URL과 매칭된 메소드를 찾아서 실행시킵 (detail 이 들어오면 아래 메소드 실행)
+	public ModelAndView getDetail(NoticeVO noticeVO) throws Exception{
+		ModelAndView mv = new ModelAndView();
+		BoardVO boardVO = noticeService.getDetail(noticeVO);
+
+		mv.addObject("boardVO", boardVO); // ( 이름, 데이터 값) 나중에 ${속성이름} 로 참조
+		mv.setViewName("board/detail");   // 어떤 JSP 파일을 보여줄지 결정하는 메소드  board - detail 경로
+
+		return mv;
+	}
+
+	@GetMapping("fileDown")
+	public ModelAndView getFileDown(BoardFileVO boardFileVO) throws Exception{
+		boardFileVO = noticeService.getFileDetail(boardFileVO);
+		ModelAndView mv = new ModelAndView();
+		mv.addObject("boardFileVO", boardFileVO);
+		mv.setViewName("fileManager");
+		return mv;
+	}
+
+	//list
+	@GetMapping("list")
+	public ModelAndView getList(ModelAndView mv, Pager pager) throws Exception{
+
+		log.info("search : {}", pager.getSearch());
+		log.info("kind : {}", pager.getKind());
+
+		List<BoardVO> ar = noticeService.getList(pager);
+
+		mv.addObject("list", ar);
+		mv.setViewName("board/list");
+		return mv;
+	}
+
+	//add
+	@GetMapping("add")
+	public ModelAndView setInsert() throws Exception{
+		ModelAndView mv = new ModelAndView();
+		mv.setViewName("board/add");
+		return mv;
+	}
+
+	@PostMapping("add") // @GetMapping은 데이터를 요청할 때 사용되고, @PostMapping은 데이터를 전송할 때 (Post는 클라이언트가 서버로 데이터를 전송할 때)
+	public ModelAndView setInsert(NoticeVO noticeVO,MultipartFile[] boardFiles) throws Exception{
+		for(MultipartFile multipartFile:boardFiles) {
+			log.info("OriginalName: {} Size: {}", multipartFile.getOriginalFilename(), multipartFile.getSize());
+		}
+		int result = noticeService.setInsert(noticeVO,boardFiles);
+		//boardFiles는 jsp에서 온 파라미터 이름과 동일하게 하려고, Service는 어떤 이름이 와도 상관X
+		ModelAndView mv = new ModelAndView();
+		mv.setViewName("redirect:./list");
+		return mv;
+	}
+}
+```
+
+## NoticeDAO
+
+```java
+package com.iu.base.board.notice;
+
+import org.apache.ibatis.annotations.Mapper;
+
+import com.iu.base.board.BoardDAO;
+
+@Mapper                                            // @Mapper 어노테이션을 이용해서 코드 중복을 크게 줄였다 sqlsession 을 더이상 사용 할 필요가 없다.
+public interface NoticeDAO extends BoardDAO {
+
+}
+```
+
+- @Mapper 상세 설명
+
+  ```java
+
+  **sqlsession 사용**
+
+  package com.example.dao;
+
+  import java.util.List;
+
+  import org.apache.ibatis.session.SqlSession;
+  import org.springframework.beans.factory.annotation.Autowired;
+  import org.springframework.stereotype.Repository;
+
+  import com.example.dto.NoticeDTO;
+
+  @Repository
+  public class NoticeDAOImpl implements NoticeDAO {
+
+      @Autowired
+      private SqlSession sqlSession;
+
+      private static final String NAMESPACE = "com.example.mapper.NoticeMapper";
+
+      @Override
+      public List<NoticeDTO> getAllNotices() {
+          return sqlSession.selectList(NAMESPACE + ".selectAllNotices");
+      }
+
+      @Override
+      public NoticeDTO getNoticeById(int id) {
+          return sqlSession.selectOne(NAMESPACE + ".selectNoticeById", id);
+      }
+
+      @Override
+      public void addNotice(NoticeDTO notice) {
+          sqlSession.insert(NAMESPACE + ".insertNotice", notice);
+      }
+
+      @Override
+      public void updateNotice(NoticeDTO notice) {
+          sqlSession.update(NAMESPACE + ".updateNotice", notice);
+      }
+
+      @Override
+      public void deleteNotice(int id) {
+          sqlSession.delete(NAMESPACE + ".deleteNotice", id);
+      }
+
+  }
+
+  ============================================================================================================================================================
+
+  **@Mapper을 사용한 예제
+
+  인터페이스**
+  package com.example.dao;  //@Mapper 을 사용할 때 는 일반적으로 인터페이스를 사용한다. xml 설정 대신 인터페이스를 사용하여 sql 매핑을 정의하기 때문에
+
+  import java.util.List;
+
+  import org.apache.ibatis.annotations.Mapper;
+
+  import com.example.dto.NoticeDTO;
+
+  @Mapper
+  public interface NoticeMapper {
+
+      List<NoticeDTO> selectAllNotices();
+
+      NoticeDTO selectNoticeById(int id);
+
+      void insertNotice(NoticeDTO notice);
+
+      void updateNotice(NoticeDTO notice);
+
+      void deleteNotice(int id);
+
+  }
+
+  ==========================================================================================================================================================
+
+  package com.example.dao;
+
+  import java.util.List;
+
+  import org.springframework.beans.factory.annotation.Autowired;
+  import org.springframework.stereotype.Repository;
+
+  import com.example.dto.NoticeDTO;
+
+  @Repository
+  public class NoticeDAOImpl implements NoticeDAO {
+
+      @Autowired
+      private NoticeMapper noticeMapper;
+
+      @Override
+      public List<NoticeDTO> getAllNotices() {
+          return noticeMapper.selectAllNotices();
+      }
+
+      @Override
+      public NoticeDTO getNoticeById(int id) {
+          return noticeMapper.selectNoticeById(id);
+      }
+
+      @Override
+      public void addNotice(NoticeDTO notice) {
+          noticeMapper.insertNotice(notice);
+      }
+
+      @Override
+      public void updateNotice(NoticeDTO notice) {
+          noticeMapper.updateNotice(notice);
+      }
+
+      @Override
+      public void deleteNotice(int id) {
+          noticeMapper.deleteNotice(id);
+      }
+
+  }
+  ```
+
+## NoticeService
+
+```java
+package com.iu.base.board.notice;
+
+import java.util.List;
+import java.util.Random;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.iu.base.board.BoardFileVO;
+import com.iu.base.board.BoardService;
+import com.iu.base.board.BoardVO;
+import com.iu.base.util.FileManager;
+import com.iu.base.util.Pager;
+import lombok.extern.slf4j.Slf4j;
+
+@Service
+@Slf4j
+@Transactional(rollbackFor=Exception.class)      // @Transactional  데이터베이스의 상태를 변화시키 위해  일련의 작업들을 하나로 묶어서 처리하는것
+																								 // 수행된 모든 작업이 성공적으로 처리되면 DB에 commit이 되고 아니면 전부 취소된다 (은행 입금 , 출금 변화 생각)
+
+public class NoticeService implements BoardService{
+
+	@Autowired
+	private NoticeDAO noticeDAO;
+
+	@Value("${app.upload.notice}")       // 주소의 값을 가져와서 path 변수에 저장하는 기능 (@Value 값을 가져와서 변수에 저장)
+	private String path;                 // application.properties 에 주소가 적혀있다.
+
+	@Autowired
+	private FileManager fileManager;
+	@Override
+	public List<BoardVO> getList(Pager pager) throws Exception {
+		// TODO Auto-generated method stub
+		pager.makeStartRow();
+		pager.makeNum(noticeDAO.getTotalCount(pager));
+		return noticeDAO.getList(pager);
+	}
+	@Override
+	public BoardVO getDetail(BoardVO boardVO) throws Exception {
+		// TODO Auto-generated method stub
+		return noticeDAO.getDetail(boardVO);
+	}
+	@Override
+	public BoardFileVO getFileDetail(BoardFileVO boardFileVO) throws Exception {
+		// TODO Auto-generated method stub
+		return noticeDAO.getFileDetail(boardFileVO);
+	}
+	@Override
+	public int setInsert(BoardVO boardVO,MultipartFile[] multipartFiles) throws Exception {
+		int result = noticeDAO.setInsert(boardVO);
+
+		if(multipartFiles != null) {
+			for(MultipartFile multipartFile:multipartFiles) {
+				//조건식 또는 =>multipartFile.getSize() != 0
+				if(!multipartFile.isEmpty()) {
+					String fileName = fileManager.saveFile(path, multipartFile);
+					BoardFileVO boardFileVO = new BoardFileVO();
+					boardFileVO.setFileName(fileName);
+					boardFileVO.setOriName(multipartFile.getOriginalFilename());
+					boardFileVO.setNum(boardVO.getNum());
+					result = noticeDAO.setBoardFileAdd(boardFileVO);
+				}
+			}
+		}
+		return result; //noticeDAO.setInsert(boardVO);
+	}
+	@Override
+	public int setUpdate(BoardVO boardVO) throws Exception {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+	@Override
+	public int setDelete(BoardVO boardVO) throws Exception {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+
+}
+```
+
+@Transactional
+
+## NoticeVO
+
+```java
+package com.iu.base.board.notice;
+
+import com.iu.base.board.BoardVO;
+
+public class NoticeVO extends BoardVO{
+
+}
+```
+
+## NoticeMapper
+
+```java
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+ <mapper namespace="com.iu.base.board.notice.NoticeDAO">
+ 	<sql id="search">
+ 		<where>
+ 			<if test="kind == 'title'">
+ 				TITLE LIKE CONCAT('%',#{search},'%')
+ 			</if>
+ 			<if test="kind == 'contents'">
+ 				CONTENTS LIKE CONCAT('%',#{search},'%')
+ 			</if>
+ 			<if test="kind == 'writer'">
+ 				WRITER LIKE CONCAT('%',#{search},'%')
+ 			</if>
+ 		</where>
+ 	</sql>
+
+ 	<insert id="setInsert" parameterType="BoardVO" useGeneratedKeys="true" keyProperty="num">  // parameterType: 쿼리에 전달될 매개변수의 자료형
+ 		INSERT INTO NOTICE (NUM, TITLE,INFO,WRITER,REGDATE,HIT)                                  // useGeneratedKeys: 자동 생성된 키 값을 사용할지 여부  (여기서는 num 이 시퀸서다)
+ 		VALUES(#{num}, #{title},#{info},#{writer},now(),0)                                       // keyProperty: 자동 생성된 키 값을 매핑할 VO의 프로퍼티 이름
+ 	</insert>
+
+ 	<insert id="setBoardFileAdd" parameterType="BoardFileVO">
+ 		INSERT INTO NOTICEFILES (NUM, FILENAME,ORINAME)
+ 		VALUES(#{num}, #{fileName},#{oriName})
+ 	</insert>
+
+ 	<update id="setUpdate" parameterType="com.iu.base.board.BoardVO">
+ 		UPDATE NOTICE SET TITLE=#{title} WHERE NUM=#{num}
+ 	</update>
+
+ 	<delete id="setDelete" parameterType="com.iu.base.board.BoardVO">
+ 		DELETE FROM NOTICE WHERE NUM=#{num}
+ 	</delete>
+
+ 	<select id="getDetail" parameterType="BoardVO" resultMap="getDetailResult">
+		SELECT *
+		FROM NOTICE N
+			LEFT JOIN
+			NOTICEFILES NF
+			USING(NUM)
+		WHERE NUM=#{num}
+ 	</select>
+
+ 	<resultMap type="NoticeVO" id="getDetailResult">
+  		<id column="num" property="num"/>
+	  		<result column="title" property="title"/>
+	  		<result column="info" property="info"/>
+	  		<result column="writer" property="writer"/>
+	  		<result column="regDate" property="regDate"/>
+	  		<result column="hit" property="hit"/>
+		<collection property="boardFileVOs" javaType="List" ofType="BoardFileVO">
+			<id column="fileNum" property="fileNum"/>
+				<result column="fileName" property="fileName"/>
+				<result column="oriName" property="oriName"/>
+		</collection>
+  	</resultMap>
+
+  	<select id="getFileDetail" parameterType="BoardFileVO" resultType="BoardFileVO">
+  		SELECT * FROM NOTICEFILES WHERE FILENUM=#{fileNum}
+  	</select>
+
+ 	<select id="getList" parameterType="Pager" resultType="NoticeVO">
+		SELECT * FROM NOTICE
+		<include refid="search"></include>
+		ORDER BY NUM DESC
+		LIMIT #{startRow}, #{perPage}
+ 	</select>
+
+ 	<select id="getTotalCount" resultType="Long" parameterType="Pager">
+		SELECT COUNT(NUM) FROM NOTICE
+		<include refid="search"></include>
+ 	</select>
+
+ </mapper>
+```
+
+# 공통
+
+## list
+
+```java
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
+<!DOCTYPE html>
+<html>
+<head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+        <meta name="description" content="" />
+        <meta name="author" content="" />
+        <title>Modern Business - Start Bootstrap Template</title>
+        <!-- css favicon  -->
+        <c:import url="../temp/style.jsp"></c:import>
+        <!-- css favicon -->
+    </head>
+<body class="d-flex flex-column h-100">
+	<main class="flex-shrink-0">
+		<!-- Navigation-->
+        <c:import url="../temp/header.jsp"></c:import>
+    	<!-- Header-->
+    	<section class="bg-light py-5">
+			<div class="container px-5 my-5">
+				<div class="text-center mb-5">
+					<h1 class="fw-bolder">${board}List</h1>                         // 게시판 이름을 @ModelAttribute 로 가져와서 사용
+					<p class="lead fw-normal text-muted mb-0">${board} 게시판 입니다.</p>
+				</div>
+
+				<div>
+					<table class="table table-hover">
+						<thead>
+							<tr>
+								<th>Num</th>
+								<th>Title</th>
+								<th>Writer</th>
+								<th>Date</th>
+								<th>Hit</th>
+							</tr>
+						</thead>
+						<tbody>
+							<c:forEach items="${list}" var="boardVO">                // var 은 list 를 아래에서 boardVO 라는 이름으로 참조하겠다는 뜻이다 ${boardVO.num}
+								<tr>
+									<td>${boardVO.num}</td>
+									<td><a href="./detail?num=${boardVO.num}">${boardVO.title}</a></td>
+									<td>
+									<c:catch>                    // try-catch문과 유사한 역할, 예외가 발생하지 않은 경우 다음 코드를 정상적으로 실행, 예외가 있는 경우 예외 처리 후 다음 코드를 계속해서 실행
+										<c:forEach begin="1" end="${boardVO.depth}">--</c:forEach> //boardVO.depth 값만큼 "-" 문자열을 출력하고 있 물어보자
+									</c:catch>
+									<a href="./detail?num=${boardVO.num}">${boardVO.title}</a></td>
+									<td>${boardVO.writer}</td>
+									<td>${boardVO.regDate}</td>
+									<td>${boardVO.hit}</td>
+								</tr>
+							</c:forEach>
+						</tbody>
+					</table>
+
+	<%-- 				<c:if test="${pager.pre}">
+						<a href="./list?page=${pager.startNum-1}">이전</a>
+					</c:if>
+
+					<c:forEach begin="${pager.startNum}" end="${pager.lastNum}" var="i">
+     		 			<a href="./list?page=${i}">${i}</a>
+     		 		</c:forEach>
+
+     		 		<c:if test="${pager.next}">
+						<a href="./list?page=${pager.lastNum+1}">다음</a>
+					</c:if> --%>
+
+					<div class="row">
+						<nav aria-label="Page navigation example">
+							<ul class="pagination ">
+								<li class="page-item "><a class="page-link"
+									href="./list?page=1" aria-label="Previous"
+									data-board-page="1"> <span aria-hidden="true">&laquo;</span>
+								</a></li>
+								<li class="page-item ${pager.pre?'disabled':''}"><a
+									class="page-link" href="./list?page=${pager.startNum-1}"
+									aria-label="Previous" data-board-page="${pager.startNum-1}">
+										<span aria-hidden="true">&lsaquo;</span>
+								</a></li>
+
+								<c:forEach begin="${pager.startNum}" end="${pager.lastNum}"
+									var="i">
+									<li class="page-item"><a class="page-link"
+										href="./list?page=${i}" data-board-page="${i}">${i}</a></li>
+								</c:forEach>
+
+								<li class="page-item ${pager.next eq false ? 'disabled' : ''}">
+									<%--${pager.after eq false ? 'disabled' : ''} --%> <a
+									class="page-link" href="./list?page=${pager.startNum+1}" aria-label="Next"
+									data-board-page="${pager.lastNum+1}"> <span
+										aria-hidden="true">&rsaquo;</span>
+								</a>
+								</li>
+								<li class="page-item ">
+									<%--${pager.after eq false ? 'disabled' : ''} --%> <a
+									class="page-link" href="./list?page=${pager.totalPage}" aria-label="Next"
+									data-board-page="${pager.totalPage}"> <span
+										aria-hidden="true">&raquo;</span>
+								</a>
+								</li>
+							</ul>
+						</nav>
+					</div>
+
+					<form action="./list">      //  action = 이 폼이 제출될 URL을 지정
+						<select name="kind">
+							<option value="title">Title</option>
+							<option value="contents">Contents</option>
+							<option value="writer">Writer</option>
+						</select>
+
+						<input type="text" name="search">
+						<button type="submit">Search</button>
+					</form>
+				</div>
+			</div>
+		</section>
+		<a href="./add">WRITER</a>
+	</main>
+	<!-- Footer 적용 -->
+   	<c:import url="../temp/footer.jsp"></c:import>
+   	<script src="https://code.jquery.com/jquery-3.4.1.slim.min.js"></script>
+   	<!-- Footer 끝 -->
+   	<script src="https://code.jquery.com/jquery-3.4.1.slim.min.js"></script>
+
+</body>
+</html>
+```

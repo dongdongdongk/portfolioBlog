@@ -1,0 +1,3276 @@
+---
+title: '3'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 🎮 UI 입력 모드 & 버튼 기능 구현 }
+
+## 🎯 목표
+
+마우스 커서를 표시하고, 버튼 클릭으로 재시작/종료 기능 구현하기
+
+---
+
+## 📋 전체 시스템 구조
+
+```
+UI 입력 시스템
+  ├─ Player Controller로 로직 이동
+  │   ├─ Show End Game Widget 함수
+  │   └─ 입력 모드 제어
+  │
+  ├─ 입력 모드 변경
+  │   ├─ UI Only (메뉴 표시 시)
+  │   └─ Game Only (게임 플레이 시)
+  │
+  └─ 버튼 기능
+      ├─ Replay: 레벨 재시작
+      └─ Quit: 게임 종료
+```
+
+---
+
+## 🎮 1단계: Player Controller로 로직 이동
+
+### 1-1. 왜 Player Controller인가?
+
+**Player Controller의 역할**
+
+```
+특징:
+  ✅ 입력 처리
+  ✅ UI 관리
+  ✅ 마우스 커서 제어
+  ✅ 게임 흐름 제어
+
+vs Character:
+  └─ Character: 게임플레이 로직
+  └─ Player Controller: 입력/UI 로직
+```
+
+💡 **설계 원칙**: 책임 분리 (Separation of Concerns)
+
+### 1-2. BP_Player_Controller_Base에 함수 추가
+
+**함수 생성**
+
+```
+BP_Player_Controller_Base
+  ↓
+Functions → + 버튼
+  ├─ 이름: Show End Game Widget
+  └─ 입력 추가
+      ├─ 이름: Won Game
+      └─ 타입: Boolean
+```
+
+**자식 클래스에서 구현**
+
+```
+함수 내용: 비워둠
+이유: 자식 클래스(BP_Kix_Player_Controller)에서 Override
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380681/notion-blog/_/_/_5_/3/image.png)
+
+### 1-3. BP_Kick에서 호출
+
+**기존 코드 수정**
+
+```
+Win Game / Lose Game 이벤트
+  ↓
+Show End Game Widget (Macro) ❌ 제거
+  ↓
+Get Player Controller
+  ↓
+Cast to BP_Player_Controller_Base
+  ↓
+Show End Game Widget 함수 호출
+  ├─ Won Game: true (Win Game)
+  └─ Won Game: false (Lose Game)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380676/notion-blog/_/_/_5_/3/image_1.png)
+
+**Get Player Controller**
+
+```
+용도: 현재 플레이어의 컨트롤러 가져오기
+출력: Player Controller
+참고: Cast 필요 (구체적 타입으로)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380678/notion-blog/_/_/_5_/3/image_2.png)
+
+---
+
+## 🔧 2단계: BP_Kix_Player_Controller에서 구현
+
+### 2-1. Override 함수
+
+**함수 Override**
+
+```
+BP_Kix_Player_Controller
+  ↓
+Functions → Override
+  └─ Show End Game Widget 선택
+```
+
+**Override란?**
+
+```
+개념: 부모 함수를 자식에서 재정의
+효과:
+  ├─ 부모의 빈 함수를 채움
+  └─ 자식만의 로직 구현
+
+장점:
+  ✅ 부모에서 호출 가능
+  ✅ Casting 불필요
+```
+
+### 2-2. Soft Class Reference 변수
+
+```
+Variables → + 버튼
+  ├─ 이름: End Game Widget Class
+  ├─ 타입: WBP_End_Game
+  └─ Soft Class Reference: 체크 ✅
+
+Details 패널에서 설정:
+  └─ Default Value: WBP_End_Game
+```
+
+### 2-3. Load End Game Widget Class (Custom Event)
+
+**Custom Event 생성**
+
+```
+이름: Load End Game Widget Class
+
+내용:
+  Async Load Class Asset
+    ├─ Asset Class: End Game Widget Class
+    └─ Completed → Create End Game Menu
+```
+
+**역할**
+
+```
+Soft Reference를 실제 클래스로 로드
+  ↓
+로딩 완료 시 위젯 생성
+```
+
+### 2-4. Show End Game Widget 구현
+
+**노드 구조**
+
+```
+Show End Game Widget
+  ↓
+Is Valid Class?
+  ├─ Class: End Game Widget Class
+  └─ Return Value
+      ↓
+Branch
+  ├─ True → Create End Game Menu (이미 로드됨)
+  └─ False → Load End Game Widget Class (로드 필요)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380680/notion-blog/_/_/_5_/3/image_3.png)
+
+**Is Valid Class**
+
+```
+용도: 클래스가 이미 로드됐는지 확인
+True: 바로 사용 가능
+False: Async Load 필요
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380680/notion-blog/_/_/_5_/3/image_4.png)
+
+---
+
+## 🎨 3단계: Create End Game Menu 함수
+
+### 3-1. 함수 내용
+
+**노드 구조**
+
+```
+Create Widget
+  ├─ Class: End Game Widget Class (해결된 참조)
+  └─ Owning Player: Self
+  ↓
+변수 저장: End Game Widget
+  ↓
+Add to Viewport
+  ↓
+Set Menu Text
+  └─ Menu Text: Get End Menu Text(Won Game)
+  ↓
+Set Position to Center
+  ↓
+Set Input Mode UI Only
+  ├─ Player Controller: Self
+  ├─ Widget to Focus: End Game Widget
+  └─ Mouse Lock Mode: None
+  ↓
+Set Show Mouse Cursor: true
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380680/notion-blog/_/_/_5_/3/image_5.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380680/notion-blog/_/_/_5_/3/image_6.png)
+
+### 3-2. Get End Menu Text 함수
+
+**Pure Function 생성**
+
+```
+이름: Get End Menu Text
+입력: Won Game (Boolean)
+출력: End Menu Text (Text)
+Pure: 체크 ✅
+```
+
+**구현**
+
+```
+Branch
+  ├─ Condition: Won Game
+  ├─ True → Return "You Won"
+  └─ False → Return "You Lost"
+```
+
+**Pure Function 활용**
+
+```
+특징:
+  ✅ 실행 핀 없음
+  ✅ 여러 곳에서 호출 가능
+  ✅ 값만 반환
+
+용도: 조건에 따른 값 변환
+```
+
+---
+
+## 🖱️ 4단계: 입력 모드 제어
+
+### 4-1. Set Input Mode UI Only
+
+**기능**
+
+```
+용도: 입력을 UI로만 제한
+효과:
+  ✅ 마우스 커서 표시 가능
+  ✅ UI 클릭 가능
+  ❌ 캐릭터 조작 불가
+  ❌ 키보드 입력 무시
+```
+
+**파라미터**
+
+```
+Player Controller: Self
+  └─ 입력 모드를 설정할 컨트롤러
+
+Widget to Focus: End Game Widget
+  └─ 포커스 받을 위젯 (키보드 입력)
+
+Mouse Lock Mode: None
+  ├─ Do Not Lock: 자유
+  ├─ Lock on Capture: 클릭 시 고정
+  └─ Lock Always: 항상 고정
+```
+
+### 4-2. Set Show Mouse Cursor
+
+```
+타입: Boolean
+값: true
+효과: 마우스 커서 표시
+
+중요: Set Input Mode만으로는 커서 안 보임!
+```
+
+💡 **입력 모드 + 커서 표시 둘 다 필요**
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380680/notion-blog/_/_/_5_/3/image_7.png)
+
+---
+
+## 🏗️ 5단계: WBP_End_Game - Set Position to Center
+
+### 5-1. 함수로 분리
+
+**기존 문제**
+
+```
+BP_Kix_Player_Controller에서
+화면 중앙 계산 로직 포함
+  ↓
+위젯 로직이 컨트롤러에 섞임 ❌
+```
+
+**해결: 위젯 자체에 함수 추가**
+
+```
+WBP_End_Game
+  ↓
+Functions → + 버튼
+  └─ 이름: Set Position to Center
+```
+
+### 5-2. 함수 구현
+
+**노드 구조**
+
+```
+Get Viewport Size
+  ↓
+Split (X, Y)
+  ↓
+/ 4 (약간 위쪽 배치)
+
+Size Box Root
+  ├─ Get Width Override
+  └─ Get Height Override
+  ↓
+/ 2
+
+계산:
+  Position X = ViewportX / 4 - Width / 2
+  Position Y = ViewportY / 4 - Height / 2
+  ↓
+Make Vector2D
+  ↓
+Set Position in Viewport
+  └─ Target: Self
+```
+
+**Self 사용**
+
+```
+위젯 자체에서 호출
+  └─ Target: Self (이 위젯)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380681/notion-blog/_/_/_5_/3/image_8.png)
+
+---
+
+## 🔘 6단계: 버튼 기능 구현
+
+### 6-1. 버튼을 변수로
+
+```
+Designer 탭
+  ↓
+Button 선택
+  ├─ Button_PlayAgain
+  └─ Button_Quit
+  ↓
+Is Variable: 체크 ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380681/notion-blog/_/_/_5_/3/image_9.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380675/notion-blog/_/_/_5_/3/image_10.png)
+
+### 6-2. On Clicked 이벤트 추가
+
+**방법**
+
+```
+Button 선택
+  ↓
+Details 패널 → Events
+  ↓
+On Clicked 옆 + 버튼
+  ↓
+Event Graph에 이벤트 노드 생성
+```
+
+**On Clicked**
+
+```
+발동: 버튼 클릭 시
+용도: 버튼 기능 구현
+참고: Press/Release/Hover 등도 가능
+```
+
+### 6-3. Replay 버튼 구현
+
+**노드 구조**
+
+```
+On Clicked (Button_PlayAgain)
+  ↓
+Get Player Controller (Index 0)
+  ↓
+Set Input Mode Game Only
+  ├─ Player Controller: 가져온 컨트롤러
+  └─ Flush Input: true
+  ↓
+Set Show Mouse Cursor: false
+  ↓
+Open Level (by Object Reference)
+  └─ Level: JetpackLevel (Soft Reference)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380675/notion-blog/_/_/_5_/3/image_11.png)
+
+**각 노드 설명**
+
+**Get Player Controller**
+
+```
+용도: 플레이어 컨트롤러 가져오기
+입력: Player Index (0 = 첫 번째)
+출력: Player Controller
+활용: 입력 모드 복원
+```
+
+**Set Input Mode Game Only**
+
+```
+용도: 입력을 게임으로만 제한
+효과:
+  ✅ 캐릭터 조작 가능
+  ✅ 키보드 입력 작동
+  ❌ UI 입력 무시
+
+Flush Input:
+  └─ 남은 입력 버퍼 비우기
+```
+
+**Open Level (by Object Reference)**
+
+```
+용도: 레벨 로드
+입력: Level (Soft Object Reference)
+효과: 레벨 재시작
+
+vs by Name:
+  ├─ by Name: 문자열 (오타 위험)
+  └─ by Object: 직접 선택 ✅
+```
+
+💡 **Soft Object Reference**
+
+- 레벨은 자동으로 Soft Reference
+- 메모리 효율적
+- 필요할 때 로드
+
+### 6-4. Quit 버튼 구현
+
+**노드 구조**
+
+```
+On Clicked (Button_Quit)
+  ↓
+Quit Game
+  ├─ Specific Player: 지정 가능
+  ├─ Quit Preference: Quit
+  └─ Ignore Platform Restrictions: false
+```
+
+**Quit Game**
+
+```
+용도: 게임 종료
+효과:
+  ├─ 에디터: Play 중지
+  └─ 빌드: 프로그램 종료
+
+Quit Preference:
+  ├─ Quit: 즉시 종료
+  └─ Background: 백그라운드로
+```
+
+---
+
+## 🔄 작동 흐름 완전 분석
+
+### 패배 시나리오
+
+```
+1. 플레이어가 Lose Box와 충돌
+   ↓
+2. BP_Lose_Box
+   └─ Lose Game (Interface) 호출
+       ↓
+3. BP_Kick의 Lose Game 이벤트
+   └─ Get Player Controller
+       ↓
+4. Cast to BP_Player_Controller_Base
+   └─ Show End Game Widget(Won Game = false)
+       ↓
+5. BP_Kix_Player_Controller (Override 함수)
+   ├─ Is Valid Class?
+   │   ├─ False → Load End Game Widget Class
+   │   │   └─ Async Load → Create End Game Menu
+   │   └─ True → Create End Game Menu
+   ↓
+6. Create End Game Menu
+   ├─ Create Widget
+   ├─ Add to Viewport
+   ├─ Set Menu Text("You Lost")
+   ├─ Set Position to Center
+   ├─ Set Input Mode UI Only
+   └─ Set Show Mouse Cursor(true)
+   ↓
+7. 화면에 메뉴 표시 + 마우스 커서 표시
+```
+
+### Replay 버튼 클릭
+
+```
+1. 플레이어가 Replay 버튼 클릭
+   ↓
+2. On Clicked (Button_PlayAgain)
+   ↓
+3. Get Player Controller
+   └─ 현재 플레이어 컨트롤러 가져오기
+   ↓
+4. Set Input Mode Game Only
+   └─ UI 모드 → 게임 모드 전환
+   ↓
+5. Set Show Mouse Cursor(false)
+   └─ 마우스 커서 숨김
+   ↓
+6. Open Level (JetpackLevel)
+   └─ 레벨 재시작
+   ↓
+7. 게임 처음부터 시작
+```
+
+---
+
+## 📊 핵심 노드 정리
+
+### 입력 모드 노드
+
+**Set Input Mode UI Only**
+
+```
+용도: UI 전용 입력 모드
+입력:
+  ├─ Player Controller
+  ├─ Widget to Focus
+  └─ Mouse Lock Mode
+효과:
+  ✅ UI 클릭 가능
+  ❌ 게임 입력 차단
+```
+
+**Set Input Mode Game Only**
+
+```
+용도: 게임 전용 입력 모드
+입력:
+  ├─ Player Controller
+  └─ Flush Input
+효과:
+  ✅ 게임 입력 가능
+  ❌ UI 입력 무시
+```
+
+**Set Show Mouse Cursor**
+
+```
+타입: Boolean
+True: 커서 표시
+False: 커서 숨김
+주의: 입력 모드와 별개!
+```
+
+### 레벨 관리 노드
+
+**Open Level (by Object Reference)**
+
+```
+용도: 레벨 로드
+입력: Level (Soft Reference)
+효과: 현재 레벨 언로드 후 새 레벨 로드
+```
+
+**Open Level (by Name)**
+
+```
+용도: 이름으로 레벨 로드
+입력: Level Name (String)
+단점: 오타 위험 ⚠️
+```
+
+**Quit Game**
+
+```
+용도: 게임 종료
+효과: 프로그램 종료
+에디터: Play 모드 중지
+```
+
+### 위젯 노드
+
+**Add to Viewport**
+
+```
+용도: 위젯 화면 표시
+Z-Order: 나중에 추가할수록 위
+제거: Remove from Parent
+```
+
+**Set Position in Viewport**
+
+```
+용도: 위젯 위치 지정
+입력: Position (Vector2D)
+기준: 화면 왼쪽 위 (0,0)
+```
+
+---
+
+## 🎯 입력 모드 비교
+
+### UI Only vs Game Only
+
+```
+UI Only
+  ✅ 마우스 클릭 → 위젯
+  ✅ 키보드 → 위젯 (포커스)
+  ❌ WASD → 무시
+  ❌ 마우스 → 카메라 회전 안 됨
+
+Game Only
+  ❌ 마우스 클릭 → 위젯 무시
+  ❌ 키보드 → 위젯 무시
+  ✅ WASD → 캐릭터 이동
+  ✅ 마우스 → 카메라 회전
+
+Game and UI (사용 안 함)
+  ✅ 모든 입력 작동
+  └─ 혼란 가능성
+```
+
+---
+
+## 💡 설계 패턴
+
+### 1. 책임 분리
+
+```
+BP_Kick (Character)
+  └─ 게임플레이 로직
+  └─ 승패 감지
+
+BP_Player_Controller
+  └─ 입력 모드 관리
+  └─ UI 표시 제어
+
+WBP_End_Game (Widget)
+  └─ UI 표시
+  └─ 버튼 기능
+```
+
+### 2. Override 패턴
+
+```
+Base Class (부모)
+  └─ 빈 함수 정의
+      └─ 인터페이스 역할
+
+Child Class (자식)
+  └─ 함수 구현
+      └─ 실제 로직
+
+장점:
+  ✅ Casting 불필요
+  ✅ 확장 용이
+```
+
+### 3. Pure Function
+
+```
+Get End Menu Text
+  입력: Won Game
+  출력: Text
+
+특징:
+  ✅ 부작용 없음
+  ✅ 같은 입력 → 같은 출력
+  ✅ 여러 곳 재사용
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 1. 입력 모드 복원
+
+```
+❌ UI Only로 변경 후 복원 안 하면
+  └─ 게임 조작 불가
+
+✅ Replay 버튼에서
+  └─ Set Input Mode Game Only
+  └─ Set Show Mouse Cursor(false)
+```
+
+### 2. Soft Reference 설정
+
+```
+❌ End Game Widget Class 설정 안 하면
+  └─ Async Load 실패
+  └─ 위젯 표시 안 됨
+
+✅ Details 패널에서 설정
+  └─ Default Value: WBP_End_Game
+```
+
+### 3. Get Player Controller
+
+```
+Player Index: 0
+  └─ 첫 번째 플레이어
+
+멀티플레이어:
+  ├─ 각 플레이어 Index 다름
+  └─ 적절한 Index 사용 필요
+```
+
+### 4. Widget 변수 저장
+
+```
+❌ 변수 저장 안 하면
+  └─ Set Input Mode에서 참조 불가
+
+✅ Promote to Variable
+  └─ End Game Widget
+```
+
+---
+
+## 🔧 개선 방향 (다음 단계)
+
+### 현재 한계
+
+```
+문제:
+  ├─ Widget이 직접 레벨 열기
+  ├─ Widget이 직접 게임 종료
+  └─ 위젯에 게임 로직 포함 ❌
+
+이유:
+  └─ 책임 분리 원칙 위반
+```
+
+### 개선 방안
+
+```
+Event Dispatcher (이벤트 디스패처)
+  ├─ Widget: 버튼 클릭 알림만
+  ├─ Controller: 실제 기능 처리
+  └─ 느슨한 결합
+```
+
+**다음 강의 주제**
+
+- Event Dispatcher 활용
+- 위젯 → 컨트롤러 이벤트 전달
+- 더 깔끔한 아키텍처
+
+---
+
+## ✨ 완성된 시스템
+
+✅ 마우스 커서 표시/숨김
+
+✅ 입력 모드 전환 (UI ↔ Game)
+
+✅ 버튼 클릭 기능
+
+✅ 레벨 재시작
+
+✅ 게임 종료
+
+✅ Player Controller로 로직 분리
+
+✅ Pure Function 활용
+
+✅ Soft Reference 최적화
+
+✅ Override 패턴 활용
+
+**핵심 학습 내용**:
+
+1. 입력 모드 제어의 중요성
+2. Player Controller의 역할
+3. 책임 분리 설계
+4. Pure Function 활용
+5. Soft Reference 활용
+
+# { 🎯 Event Dispatcher (이벤트 디스패처) }
+
+## 🎯 목표
+
+위젯에서 중요한 로직을 분리하고, Event Dispatcher로 느슨한 결합 구현하기
+
+---
+
+## 📋 핵심 개념: Delegate (델리게이트)
+
+### Delegate란?
+
+```
+개념: 이벤트를 "방송"하는 시스템
+비유: 라디오 방송국
+
+방송국 (Delegate):
+  └─ 신호 송출 (Call)
+
+청취자 (Listener):
+  └─ 라디오 켜고 듣기 (Bind)
+
+특징:
+  ✅ 방송국은 누가 듣는지 몰라도 됨
+  ✅ 청취자는 원할 때 튜닝
+  ✅ 여러 청취자 가능
+```
+
+### Blueprint에서의 이름
+
+```
+C++ 용어: Delegate (델리게이트)
+Blueprint 용어: Event Dispatcher (이벤트 디스패처)
+
+→ 같은 개념, 다른 이름
+```
+
+---
+
+## 🏗️ 현재 구조의 문제점
+
+### 기존 방식
+
+```
+WBP_End_Game (위젯)
+  ├─ On Clicked (Button_Quit)
+  │   └─ Quit Game ❌ (직접 호출)
+  │
+  └─ On Clicked (Button_PlayAgain)
+      ├─ Set Input Mode ❌
+      ├─ Set Show Mouse Cursor ❌
+      └─ Open Level ❌ (직접 호출)
+```
+
+**문제점**
+
+```
+위젯이 너무 많은 책임:
+  ❌ 게임 종료
+  ❌ 입력 모드 제어
+  ❌ 레벨 관리
+
+→ 위젯은 "표시"만 해야 함!
+```
+
+### 개선된 방식
+
+```
+WBP_End_Game (위젯)
+  ├─ On Clicked (Button_Quit)
+  │   └─ Call On Quit (이벤트 방송만) ✅
+  │
+  └─ On Clicked (Button_PlayAgain)
+      └─ Call On Play Again (이벤트 방송만) ✅
+
+BP_Kix_Player_Controller
+  ├─ On Quit 이벤트 수신
+  │   └─ Quit Game (실제 처리)
+  │
+  └─ On Play Again 이벤트 수신
+      ├─ Set Input Mode
+      ├─ Set Show Mouse Cursor
+      └─ Open Level
+```
+
+**장점**
+
+```
+책임 분리:
+  ✅ 위젯: UI 표시 + 이벤트 방송
+  ✅ Controller: 게임 로직 처리
+  ✅ 느슨한 결합 (Loose Coupling)
+```
+
+---
+
+## 🎨 1단계: Event Dispatcher 생성
+
+### 1-1. WBP_End_Game에 추가
+
+```
+WBP_End_Game 열기
+  ↓
+Event Dispatchers 패널
+  ↓
++ 버튼 클릭
+  ├─ 이름: On Quit
+  └─ 이름: On Play Again
+```
+
+**Event Dispatcher 특징**
+
+```
+위치: Variables/Functions와 같은 패널
+색상: 빨간색 봉투 아이콘
+용도: 이벤트 방송
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380677/notion-blog/_/_/_5_/3/image_12.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380677/notion-blog/_/_/_5_/3/image_13.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380677/notion-blog/_/_/_5_/3/image_14.png)
+
+### 1-2. 버튼에서 호출
+
+**On Clicked (Button_Quit) 수정**
+
+```
+기존:
+  Quit Game 직접 호출 ❌
+
+변경:
+  On Quit 드래그
+    → Call On Quit 선택 ✅
+```
+
+**On Clicked (Button_PlayAgain) 수정**
+
+```
+기존:
+  Set Input Mode, Open Level 등 ❌
+
+변경:
+  On Play Again 드래그
+    → Call On Play Again 선택 ✅
+```
+
+**Call Event Dispatcher**
+
+```
+노드 이름: Call [Event Dispatcher 이름]
+입력: Target (Self)
+출력: 없음
+기능: 이벤트 방송
+
+비유: 라디오 방송 송출
+```
+
+💡 **컴파일 필수!**
+
+```
+Event Dispatcher 추가 후
+  ↓
+반드시 Compile
+  ↓
+다른 곳에서 접근 가능
+```
+
+---
+
+## 🔗 2단계: Event Dispatcher에 이벤트 할당
+
+### 2-1. 개념 이해
+
+**Bind (바인딩)이란?**
+
+```
+의미: 이벤트를 델리게이트에 "연결"
+비유: 라디오 주파수 맞추기
+
+Bind 전:
+  Call On Quit 호출
+    → 아무 일도 안 일어남
+
+Bind 후:
+  Call On Quit 호출
+    → Bind된 이벤트 실행 ✅
+```
+
+### 2-2. Custom Event 생성
+
+**AssignToEndMenuDelegates**
+
+```
+BP_Kix_Player_Controller
+  ↓
+Event Graph
+  ↓
+우클릭 → Add Custom Event
+  └─ 이름: AssignToEndMenuDelegates
+```
+
+**입력 추가**
+
+```
+Details 패널 → Inputs
+  ├─ 이름: End Menu (또는 End Game Widget)
+  └─ 타입: WBP_End_Game (Object Reference)
+```
+
+💡 **왜 Custom Event?**
+
+```
+함수 안 되는 이유:
+  ❌ Bind는 비동기적
+  ❌ 함수에서 불가능
+
+Custom Event:
+  ✅ Event Graph에서 실행
+  ✅ Bind 가능
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380677/notion-blog/_/_/_5_/3/image_15.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380677/notion-blog/_/_/_5_/3/image_16.png)
+
+### 2-3. Bind Event 노드 사용
+
+**노드 구조**
+
+```
+AssignToEndMenuDelegates
+  ↓
+End Menu (입력)
+  ↓
+Is Valid?
+  ├─ Is Not Valid → (종료)
+  └─ Is Valid
+      ↓
+End Menu 드래그
+  └─ On Quit → Bind Event to On Quit
+      ↓
+  On Quit_Event 자동 생성
+```
+
+**Bind Event to On Quit**
+
+```
+용도: 델리게이트에 이벤트 연결
+입력:
+  ├─ Target: 위젯 (End Menu)
+  └─ Event: 연결할 이벤트 (자동 생성)
+효과:
+  └─ Call On Quit 시 Event 실행
+```
+
+**자동 생성되는 이벤트**
+
+```
+이름: On Quit_Event (빨간색 노드)
+타입: Custom Event
+용도: 실제 로직 구현 위치
+```
+
+### 2-4. On Quit 이벤트 구현
+
+```
+On Quit_Event
+  ↓
+Quit Game
+  ├─ Specific Player: None
+  ├─ Quit Preference: Quit
+  └─ Ignore Platform Restrictions: false
+```
+
+### 2-5. On Play Again도 동일하게
+
+```
+End Menu 드래그
+  └─ On Play Again → Bind Event to On Play Again
+      ↓
+  On Play Again_Event 자동 생성
+      ↓
+  구현:
+    ├─ Set Input Mode Game Only
+    │   └─ Player Controller: Self
+    ├─ Set Show Mouse Cursor: false
+    └─ Open Level (JetpackLevel)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380678/notion-blog/_/_/_5_/3/image_17.png)
+
+---
+
+## 🔄 3단계: Create Menu에서 Bind 호출
+
+### 3-1. Create End Game Menu 함수 수정
+
+```
+Create End Game Menu 함수
+  ↓
+Create Widget
+  ↓
+변수 저장: End Game Widget
+  ↓
+Add to Viewport
+  ↓
+Set Menu Text
+  ↓
+Set Position to Center
+  ↓
+Set Input Mode UI Only
+  ↓
+Set Show Mouse Cursor
+  ↓
+AssignToEndMenuDelegates 호출 ✨ (새로 추가)
+  └─ End Menu: End Game Widget
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380678/notion-blog/_/_/_5_/3/image_18.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380678/notion-blog/_/_/_5_/3/image_19.png)
+
+**AssignToEndMenuDelegates 호출**
+
+```
+위치: 위젯 생성 직후
+입력: End Game Widget (생성한 위젯)
+효과: 델리게이트에 이벤트 연결
+```
+
+💡 **타이밍 중요**
+
+```
+위젯 생성 전 Bind:
+  ❌ 위젯이 없어서 실패
+
+위젯 생성 후 Bind:
+  ✅ 정상 작동
+```
+
+### 3-2. 불필요한 변수 제거
+
+**문제 발견**
+
+```
+End Game Widget (사용 중)
+End Game Widget (안 쓰는 중복) ❌
+  └─ 삭제 필요
+```
+
+**변수 정리**
+
+```
+사용: End Game Widget
+삭제: 중복 변수
+
+확인:
+  └─ 모든 참조가 올바른 변수 사용
+```
+
+---
+
+## 📊 작동 흐름 완전 분석
+
+### 초기화 단계
+
+```
+1. 게임 시작
+   ↓
+2. 플레이어 패배
+   ↓
+3. BP_Kick → Lose Game
+   ↓
+4. Get Player Controller
+   └─ Cast to BP_Player_Controller_Base
+       ↓
+5. Show End Game Widget(Won Game = false)
+   ↓
+6. BP_Kix_Player_Controller (Override)
+   ├─ Is Valid Class?
+   └─ Create End Game Menu
+       ↓
+7. Create Widget (WBP_End_Game)
+   ↓
+8. 변수 저장: End Game Widget
+   ↓
+9. Add to Viewport
+   ↓
+10. Set Menu Text, Position, Input Mode 등
+    ↓
+11. AssignToEndMenuDelegates 호출 ✨
+    └─ End Menu: End Game Widget
+        ↓
+12. Bind Event to On Quit
+    └─ On Quit_Event 연결
+    ↓
+13. Bind Event to On Play Again
+    └─ On Play Again_Event 연결
+    ↓
+14. 초기화 완료 (Bind 완료)
+```
+
+### Quit 버튼 클릭 시
+
+```
+1. 플레이어가 Quit 버튼 클릭
+   ↓
+2. On Clicked (Button_Quit)
+   ↓
+3. Call On Quit (델리게이트 호출)
+   └─ Target: Self (위젯)
+   ↓
+4. Bind된 이벤트 찾기
+   └─ On Quit_Event (Player Controller)
+   ↓
+5. On Quit_Event 실행
+   ↓
+6. Quit Game
+   ↓
+7. 게임 종료
+```
+
+### Replay 버튼 클릭 시
+
+```
+1. 플레이어가 Replay 버튼 클릭
+   ↓
+2. On Clicked (Button_PlayAgain)
+   ↓
+3. Call On Play Again (델리게이트 호출)
+   └─ Target: Self (위젯)
+   ↓
+4. Bind된 이벤트 찾기
+   └─ On Play Again_Event (Player Controller)
+   ↓
+5. On Play Again_Event 실행
+   ├─ Set Input Mode Game Only
+   ├─ Set Show Mouse Cursor(false)
+   └─ Open Level (JetpackLevel)
+   ↓
+6. 레벨 재시작
+```
+
+---
+
+## 🎓 핵심 노드 기능
+
+### Event Dispatcher 관련
+
+**Call [Event Dispatcher]**
+
+```
+용도: 델리게이트 호출 (방송)
+입력: Target (델리게이트 소유 객체)
+효과: Bind된 모든 이벤트 실행
+비유: 라디오 송출
+
+예시:
+  Call On Quit
+    └─ On Quit에 Bind된 이벤트들 실행
+```
+
+**Bind Event to [Event Dispatcher]**
+
+```
+용도: 델리게이트에 이벤트 연결
+입력:
+  ├─ Target: 델리게이트 소유 객체
+  └─ Event: 연결할 이벤트 (자동 생성)
+효과: Call 시 Event 실행
+비유: 라디오 주파수 맞추기
+
+예시:
+  Bind Event to On Quit
+    ├─ Target: End Menu Widget
+    └─ Event: On Quit_Event
+```
+
+**Unbind (사용 안 함, 참고용)**
+
+```
+용도: 델리게이트에서 이벤트 분리
+사용: 메모리 정리, 더 이상 필요 없을 때
+```
+
+---
+
+## 💡 Event Dispatcher vs 기존 방식
+
+### 기존 방식 (함수 직접 호출)
+
+```
+WBP_End_Game
+  ↓
+Get Player Controller
+  ↓
+Cast to BP_Kix_Player_Controller
+  ↓
+함수 호출
+
+문제점:
+  ❌ 위젯이 Controller 타입 알아야 함
+  ❌ 강한 결합 (Tight Coupling)
+  ❌ 확장 어려움
+```
+
+### Event Dispatcher 방식
+
+```
+WBP_End_Game
+  ↓
+Call On Quit (방송)
+
+Player Controller
+  ↓
+On Quit_Event (수신)
+
+장점:
+  ✅ 위젯은 Controller 몰라도 됨
+  ✅ 느슨한 결합 (Loose Coupling)
+  ✅ 여러 객체가 동시 수신 가능
+  ✅ 확장 쉬움
+```
+
+---
+
+## 🔍 비유로 이해하기
+
+### 라디오 방송국
+
+```
+방송국 (WBP_End_Game):
+  └─ "Quit 신호 송출!" (Call On Quit)
+
+청취자 1 (Player Controller):
+  └─ "Quit 신호 들림" → Quit Game
+
+청취자 2 (가능):
+  └─ "Quit 신호 들림" → 로그 저장
+
+청취자 3 (가능):
+  └─ "Quit 신호 들림" → 통계 전송
+```
+
+### 문 종 (Door Bell)
+
+```
+초인종 (Event Dispatcher):
+  └─ 누르면 "띵동!" (Call)
+
+집 안 사람들:
+  ├─ 엄마: "문 열어야지" (On Quit_Event)
+  ├─ 아빠: "누가 왔나 확인" (다른 Event)
+  └─ 강아지: "짖기!" (또 다른 Event)
+
+→ 누가 반응할지 초인종은 몰라도 됨
+```
+
+---
+
+## 🏗️ 설계 원칙
+
+### 1. 단일 책임 원칙 (Single Responsibility)
+
+```
+WBP_End_Game:
+  ✅ UI 표시
+  ✅ 버튼 클릭 감지
+  ✅ 이벤트 방송
+  ❌ 게임 로직 (X)
+
+BP_Kix_Player_Controller:
+  ✅ 입력 모드 제어
+  ✅ 레벨 관리
+  ✅ 게임 흐름 제어
+  ❌ UI 렌더링 (X)
+```
+
+### 2. 느슨한 결합 (Loose Coupling)
+
+```
+위젯은 누가 듣는지 몰라도 됨
+  ↓
+Call만 하면 됨
+  ↓
+새 리스너 추가 쉬움
+  ↓
+유지보수 편함
+```
+
+### 3. 이벤트 기반 아키텍처
+
+```
+동작 → 이벤트 발생 → 리스너 반응
+
+예시:
+  버튼 클릭 → On Quit 방송 → 여러 시스템 반응
+```
+
+---
+
+## 🎯 실전 활용 예시
+
+### 여러 리스너
+
+```
+Call On Quit 시:
+  ├─ Player Controller: Quit Game
+  ├─ Analytics Manager: 통계 저장
+  ├─ Achievement System: 업적 체크
+  └─ Cloud Save: 자동 저장
+
+→ 위젯은 이들을 몰라도 됨!
+```
+
+### 파라미터 전달 (확장)
+
+```
+Event Dispatcher에 입력 추가 가능:
+
+On Play Again
+  └─ Difficulty (Integer) 추가
+      ↓
+  Call On Play Again
+    └─ Difficulty: 2
+      ↓
+  On Play Again_Event
+    └─ Difficulty 받아서 처리
+```
+
+---
+
+## 📝 주의사항
+
+### 1. Compile 필수
+
+```
+❌ Event Dispatcher 추가 후 Compile 안 하면
+  └─ 다른 곳에서 접근 불가
+
+✅ 추가 즉시 Compile
+  └─ Bind 가능
+```
+
+### 2. Bind 타이밍
+
+```
+❌ 위젯 생성 전 Bind
+  └─ Target이 없어서 실패
+
+✅ 위젯 생성 후 Bind
+  └─ 정상 작동
+```
+
+### 3. 변수 정리
+
+```
+❌ 중복 변수 사용
+  └─ 혼란, 버그 유발
+
+✅ 하나의 변수만 사용
+  └─ End Game Widget
+```
+
+### 4. Is Valid 체크
+
+```
+✅ Bind 전 Is Valid 체크
+  └─ Null Reference 방지
+```
+
+### 5. Unbind (메모리 관리)
+
+```
+위젯 제거 시:
+  └─ Unbind 권장 (메모리 누수 방지)
+
+하지만:
+  └─ 위젯 Destroy 시 자동 정리됨
+```
+
+---
+
+## 🎨 코드 정리 팁
+
+### Comment 사용
+
+```
+코멘트 추가:
+  노드 선택 → C 키
+  └─ "Assign Callbacks to End Menu Event Dispatchers"
+
+색상 지정:
+  └─ 녹색 (이벤트 할당)
+  └─ 주황색 (비동기 로드)
+
+Balloon 표시:
+  └─ 코멘트 설명 추가
+```
+
+---
+
+## ✨ 완성된 시스템
+
+### WBP_End_Game (위젯)
+
+```
+✅ Event Dispatcher 선언
+  ├─ On Quit
+  └─ On Play Again
+
+✅ 버튼 클릭 시 방송만
+  ├─ Call On Quit
+  └─ Call On Play Again
+
+❌ 게임 로직 없음
+```
+
+### BP_Kix_Player_Controller
+
+```
+✅ Event Dispatcher에 Bind
+  └─ AssignToEndMenuDelegates
+
+✅ 이벤트 수신 및 처리
+  ├─ On Quit_Event → Quit Game
+  └─ On Play Again_Event → Restart
+
+✅ 입력 모드, 레벨 관리
+```
+
+---
+
+## 🚀 Event Dispatcher 활용 범위
+
+### 사용 가능한 곳
+
+```
+✅ Widget (UI)
+✅ Actor (게임 오브젝트)
+✅ Component (컴포넌트)
+✅ Character (캐릭터)
+✅ Game Mode (게임 모드)
+✅ 모든 Blueprint 클래스
+```
+
+### 활용 예시
+
+```
+Character:
+  └─ On Death (사망 시)
+      └─ UI, 사운드, 파티클 반응
+
+Pickup:
+  └─ On Collected (수집 시)
+      └─ Inventory, UI, 효과음 반응
+
+Door:
+  └─ On Opened (열렸을 때)
+      └─ 퀘스트, 적 스폰, 컷씬 시작
+
+Boss:
+  └─ On Phase Change (페이즈 전환)
+      └─ UI, 음악, 카메라 변경
+```
+
+---
+
+## 🎓 핵심 정리
+
+### Event Dispatcher란?
+
+```
+개념: 이벤트 방송 시스템
+비유: 라디오 방송
+목적: 느슨한 결합
+
+작동:
+  1. Declare (선언)
+  2. Call (방송)
+  3. Bind (수신 등록)
+  4. Event (반응)
+```
+
+### 장점
+
+```
+✅ 느슨한 결합
+✅ 확장성
+✅ 재사용성
+✅ 유지보수성
+✅ 여러 리스너 가능
+```
+
+### vs 다른 방식
+
+```
+직접 호출:
+  └─ 강한 결합, 확장 어려움
+
+Interface:
+  └─ 타입 필요, 1:1 통신
+
+Event Dispatcher:
+  └─ 타입 불필요, 1:N 방송
+```
+
+---
+
+## 📖 학습 포인트
+
+1. **Event Dispatcher 개념**
+   - 방송 시스템
+   - 느슨한 결합
+2. **Bind의 중요성**
+   - 연결 필수
+   - 타이밍 중요
+3. **책임 분리**
+   - 위젯 = UI
+   - Controller = 로직
+4. **확장 가능성**
+   - 여러 리스너
+   - 쉬운 추가
+5. **실전 활용**
+   - 모든 클래스 가능
+   - 다양한 상황
+
+# 📊 Blueprint 데이터 타입 완벽 가이드
+
+## 🎯 목표
+
+Blueprint에서 사용하는 다양한 데이터 타입의 종류와 용도 이해하기
+
+---
+
+## 📋 데이터 타입이란?
+
+```
+개념: 변수에 저장할 수 있는 값의 종류
+역할:
+  ├─ 저장 가능한 값 결정
+  ├─ 수행 가능한 연산 결정
+  └─ 메모리 사용량 결정
+
+시각적 구분:
+  └─ 색상으로 구분
+      └─ 노드 핀의 색 = 데이터 타입
+```
+
+**비유**
+
+```
+데이터 타입 = 컨테이너 종류
+
+병 (Float):
+  └─ 액체 담기 (소수점 숫자)
+
+상자 (Integer):
+  └─ 물건 담기 (정수)
+
+봉투 (String):
+  └─ 편지 담기 (문자)
+```
+
+---
+
+## 🔢 1. 기본 타입 (Primitive Types)
+
+### Boolean (부울) - 빨간색
+
+```
+색상: 빨간색
+값: True 또는 False (2가지만)
+표시: 체크박스
+메모리: 1비트 (실제로는 1바이트 사용)
+
+용도:
+  ✅ 참/거짓 판단
+  ✅ 스위치 ON/OFF
+  ✅ 조건문
+
+예시:
+  ├─ Is Jumping: true/false
+  ├─ Has Key: true/false
+  └─ Game Over: true/false
+```
+
+**주요 사용처**
+
+```
+Branch 노드:
+  └─ Condition 입력 (Boolean)
+
+비교 연산자 출력:
+  ├─ == (같음)
+  ├─ != (다름)
+  ├─ > (큼)
+  └─ < (작음)
+  → 모두 Boolean 반환
+```
+
+---
+
+## 🔢 2. 정수 타입 (Integer Types)
+
+### Byte (바이트) - 초록색
+
+```
+색상: 초록색 (밝음)
+크기: 8비트 = 1바이트
+범위: 0 ~ 255 (256개 값)
+부호: 없음 (Unsigned)
+  └─ 음수 불가 ❌
+
+용도:
+  ✅ 작은 양수만 필요할 때
+  ✅ 메모리 절약
+  ✅ 열거형 내부 값
+
+예시:
+  └─ 플레이어 수 (0~4)
+```
+
+### Integer (정수) - 초록색
+
+```
+색상: 초록색 (중간)
+크기: 32비트 = 4바이트
+범위: -2,147,483,648 ~ 2,147,483,647
+부호: 있음 (Signed)
+
+용도:
+  ✅ 일반적인 정수
+  ✅ 카운터, 인덱스
+  ✅ 가장 많이 사용 ⭐
+
+예시:
+  ├─ 체력: 100
+  ├─ 점수: 5000
+  ├─ 배열 인덱스: 0, 1, 2...
+  └─ 적 수: -5 (빚) ~ 999
+```
+
+### Integer64 (정수64) - 초록색
+
+```
+색상: 초록색 (어두움)
+크기: 64비트 = 8바이트
+범위: 매우 큰 수
+  └─ ±9,223,372,036,854,775,807
+
+용도:
+  ✅ 매우 큰 수 필요할 때
+  ✅ 타임스탬프
+  ✅ 대규모 통계
+
+예시:
+  └─ 총 플레이 시간 (밀리초)
+```
+
+💡 **선택 가이드**
+
+```
+대부분: Integer (32비트) 사용
+작은 범위만: Byte
+매우 큰 수: Integer64
+```
+
+---
+
+## 🔢 3. 실수 타입 (Float Types)
+
+### Float (플로트) - 초록색
+
+```
+색상: 초록색 (연한 초록)
+크기: 32비트 = 4바이트
+값: 소수점 포함 가능
+범위: 약 ±3.4 × 10^38
+
+용도:
+  ✅ 소수점 필요한 모든 것
+  ✅ 위치, 회전, 속도
+  ✅ 퍼센트, 배율
+
+예시:
+  ├─ 이동 속도: 600.5
+  ├─ 체력 비율: 0.75 (75%)
+  ├─ 위치: 123.456
+  └─ 각도: 45.0
+```
+
+**Integer vs Float**
+
+```
+Integer:
+  ├─ 1, 2, 100, -50
+  └─ 소수점 없음
+
+Float:
+  ├─ 1.0, 2.5, 100.999, -50.123
+  └─ 소수점 가능 ✅
+```
+
+---
+
+## 📝 4. 문자 타입 (String Types)
+
+### String (문자열) - 분홍색
+
+```
+색상: 분홍색 (밝음)
+내용: 문자의 연속
+용도:
+  ✅ 일반적인 텍스트
+  ✅ 파일 경로
+  ✅ 디버그 메시지
+
+예시:
+  ├─ "Hello World"
+  ├─ "Player Name: John"
+  └─ "C:/Games/Save.dat"
+
+특징:
+  ✅ 대소문자 구분
+  ✅ 공백 허용
+  ✅ 연산 가능 (Append)
+```
+
+### Name (이름) - 보라색
+
+```
+색상: 보라색
+내용: 식별자
+용도:
+  ✅ 오브젝트 식별
+  ✅ 룩업 테이블
+  ✅ 소켓/본 이름
+
+예시:
+  ├─ "Head" (본 이름)
+  ├─ "Muzzle" (소켓 이름)
+  └─ "Player1" (태그)
+
+특징:
+  ❌ 대소문자 구분 안 함
+  ❌ 공백 사용 불가
+  ✅ 빠른 검색 (최적화)
+  ✅ 메모리 효율적
+```
+
+### Text (텍스트) - 분홍색
+
+```
+색상: 분홍색 (진함)
+내용: UI용 텍스트
+용도:
+  ✅ 위젯 텍스트
+  ✅ 사용자에게 보이는 문자
+  ✅ 지역화 지원 ⭐
+
+예시:
+  ├─ "You Won!"
+  ├─ "Press Start"
+  └─ "게임 종료" (한글 지원)
+
+특징:
+  ✅ 다국어 번역 가능
+  ✅ 포맷팅 지원
+  ✅ UI 전용
+```
+
+**비교 표**
+
+```
+| 타입   | 용도              | 대소문자 | 공백 | 지역화 |
+|--------|-------------------|----------|------|--------|
+| String | 일반 텍스트       | 구분     | 가능 | 불가   |
+| Name   | 식별자/태그       | 무시     | 불가 | 불가   |
+| Text   | UI 표시           | 구분     | 가능 | 가능   |
+```
+
+---
+
+## 🎨 5. 기하학 타입 (Geometry Types)
+
+### Vector (벡터) - 노란색
+
+```
+색상: 노란색
+구성: X, Y, Z (3개의 Float)
+용도:
+  ✅ 3D 위치
+  ✅ 방향
+  ✅ 속도
+
+예시:
+  Vector(100.0, 200.0, 300.0)
+    ├─ X: 100.0
+    ├─ Y: 200.0
+    └─ Z: 300.0
+
+활용:
+  ├─ Actor Location
+  ├─ Movement Direction
+  └─ Velocity
+```
+
+### Rotator (회전자) - 주황색
+
+```
+색상: 주황색
+구성: Pitch, Yaw, Roll (3개의 Float)
+용도:
+  ✅ 3D 회전
+
+예시:
+  Rotator(0.0, 90.0, 0.0)
+    ├─ Pitch: 0.0 (위아래)
+    ├─ Yaw: 90.0 (좌우)
+    └─ Roll: 0.0 (기울기)
+
+활용:
+  ├─ Actor Rotation
+  ├─ Camera Angle
+  └─ Object Orientation
+```
+
+### Transform (트랜스폼) - 주황색
+
+```
+색상: 주황색 (진함)
+구성: Location + Rotation + Scale
+  ├─ Location: Vector (위치)
+  ├─ Rotation: Rotator (회전)
+  └─ Scale: Vector (크기)
+
+용도:
+  ✅ 완전한 3D 변환 정보
+
+활용:
+  ├─ Get Socket Transform
+  ├─ Set Actor Transform
+  └─ Spawn Actor Transform
+```
+
+**복합 타입 (Composite Types)**
+
+```
+Vector, Rotator, Transform:
+  └─ 여러 Float로 구성됨
+  └─ Split Struct Pin으로 분리 가능
+
+예시:
+  Vector 분리
+    ├─ X (Float)
+    ├─ Y (Float)
+    └─ Z (Float)
+```
+
+---
+
+## 🏗️ 6. 고급 타입 (Advanced Types)
+
+### Struct (구조체) - 파란색
+
+```
+색상: 파란색
+별칭: Structure (C++)
+개념: 여러 값의 집합
+
+예시 - Hit Result:
+  ├─ Impact Point (Vector)
+  ├─ Impact Normal (Vector)
+  ├─ Hit Actor (Object)
+  ├─ Hit Component (Object)
+  └─ Distance (Float)
+
+용도:
+  ✅ 관련 데이터 묶기
+  ✅ 여러 값을 하나로
+
+장점:
+  ✅ 데이터 정리
+  ✅ 함수 파라미터 단순화
+  ✅ 재사용 가능
+```
+
+### Interface (인터페이스) - 청록색
+
+```
+색상: 청록색 (녹색+노랑)
+개념: 함수 약속
+
+특징:
+  ✅ 함수 시그니처만 정의
+  ✅ 구현은 각 클래스에서
+  ✅ 느슨한 결합
+
+예시:
+  BPI_Interact
+    ├─ Activate 함수
+    └─ DeActivate 함수
+
+사용:
+  └─ Interface Message 노드
+      └─ 빨간색 노드
+```
+
+### Enum (열거형) - 진한 초록색
+
+```
+색상: 진한 초록색
+개념: 정의된 값들의 목록
+내부: 실제로는 Integer
+
+예시 - Movement Mode:
+  ├─ Walking (내부: 0)
+  ├─ Falling (내부: 1)
+  ├─ Flying (내부: 2)
+  └─ Swimming (내부: 3)
+
+장점:
+  ✅ 의미 있는 이름
+  ✅ 오타 방지
+  ✅ 코드 가독성
+
+vs Integer:
+  ❌ 0 = 걷기? 뛰기?
+  ✅ Walking = 명확!
+```
+
+### Object Types (오브젝트 타입) - 파란색
+
+```
+색상: 파란색 (여러 종류)
+종류:
+  ├─ Object Reference (오브젝트 참조)
+  ├─ Class Reference (클래스 참조)
+  ├─ Soft Object Reference (소프트)
+  └─ Soft Class Reference (소프트)
+
+계층:
+  Object
+    └─ Actor
+        ├─ Pawn
+        │   └─ Character
+        ├─ Controller
+        │   └─ Player Controller
+        └─ Game Mode
+
+용도:
+  ✅ 게임 오브젝트 참조
+  ✅ Blueprint 간 통신
+  ✅ 동적 생성
+```
+
+---
+
+## 📊 타입별 색상 정리
+
+```
+빨간색:
+  └─ Boolean
+
+초록색 (밝음):
+  └─ Byte
+
+초록색 (중간):
+  └─ Integer
+
+초록색 (어두움):
+  └─ Integer64
+
+초록색 (연함):
+  └─ Float
+
+진한 초록색:
+  └─ Enum
+
+분홍색 (밝음):
+  └─ String
+
+보라색:
+  └─ Name
+
+분홍색 (진함):
+  └─ Text
+
+노란색:
+  └─ Vector
+
+주황색:
+  └─ Rotator
+
+주황색 (진함):
+  └─ Transform
+
+파란색:
+  ├─ Struct
+  └─ Object Types
+
+청록색:
+  └─ Interface
+```
+
+---
+
+## 💾 메모리 크기 비교
+
+```
+1비트 = 최소 단위
+8비트 = 1바이트
+
+Boolean: 1비트 (실제 1바이트)
+Byte: 1바이트 (8비트)
+Integer: 4바이트 (32비트)
+Integer64: 8바이트 (64비트)
+Float: 4바이트 (32비트)
+
+String: 가변 (내용에 따라)
+Name: 최적화됨 (룩업 테이블)
+Text: 가변 + 지역화 정보
+
+Vector: 12바이트 (Float × 3)
+Rotator: 12바이트 (Float × 3)
+Transform: 36바이트 (Vector × 3)
+```
+
+---
+
+## 🎯 타입 선택 가이드
+
+### 숫자가 필요할 때
+
+```
+소수점 필요:
+  └─ Float
+
+정수만 필요:
+  ├─ 작은 범위 (0~255): Byte
+  ├─ 일반적인 경우: Integer ⭐
+  └─ 매우 큰 수: Integer64
+
+참/거짓만:
+  └─ Boolean
+```
+
+### 문자가 필요할 때
+
+```
+UI에 표시:
+  └─ Text ⭐
+
+일반 텍스트:
+  └─ String
+
+식별자/태그:
+  └─ Name
+```
+
+### 위치/회전이 필요할 때
+
+```
+위치만:
+  └─ Vector
+
+회전만:
+  └─ Rotator
+
+위치+회전+크기:
+  └─ Transform
+```
+
+### 정해진 값 중 선택
+
+```
+여러 상태 중 하나:
+  └─ Enum
+
+참/거짓만:
+  └─ Boolean
+```
+
+---
+
+## 🔍 실전 예시
+
+### 캐릭터 스탯
+
+```
+Health (Float):
+  └─ 75.5
+
+Max Health (Integer):
+  └─ 100
+
+Is Alive (Boolean):
+  └─ true
+
+Character Name (Text):
+  └─ "Hero"
+
+State (Enum):
+  └─ Walking
+```
+
+### 게임 설정
+
+```
+Player Count (Integer):
+  └─ 4
+
+Difficulty (Enum):
+  ├─ Easy
+  ├─ Normal
+  └─ Hard
+
+Master Volume (Float):
+  └─ 0.8 (80%)
+
+Map Name (Name):
+  └─ "LevelOne"
+```
+
+### 트랜스폼 정보
+
+```
+Spawn Location (Vector):
+  └─ (100, 200, 50)
+
+Spawn Rotation (Rotator):
+  └─ (0, 90, 0)
+
+Spawn Transform (Transform):
+  ├─ Location: (100, 200, 50)
+  ├─ Rotation: (0, 90, 0)
+  └─ Scale: (1, 1, 1)
+```
+
+---
+
+## ⚙️ 타입 변환 (Casting)
+
+### 자동 변환
+
+```
+Integer → Float:
+  ✅ 자동 변환
+  예: 5 → 5.0
+
+Float → Integer:
+  ❌ 자동 변환 안 됨
+  ✅ Round/Floor/Ceil 사용
+```
+
+### 명시적 변환
+
+```
+Float to Integer (노드):
+  ├─ Round: 반올림
+  ├─ Floor: 내림
+  └─ Ceil: 올림
+
+String to Integer:
+  └─ String to Int 노드
+
+Integer to String:
+  └─ To String 노드
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### 기본 vs 복합
+
+```
+기본 타입 (Primitive):
+  ├─ Boolean
+  ├─ Integer
+  ├─ Float
+  ├─ String
+  └─ 단일 값
+
+복합 타입 (Composite):
+  ├─ Vector (Float × 3)
+  ├─ Rotator (Float × 3)
+  ├─ Transform (여러 타입)
+  └─ Struct (사용자 정의)
+```
+
+### 참조 vs 값
+
+```
+값 타입:
+  ├─ Integer, Float, Boolean
+  └─ 복사됨
+
+참조 타입:
+  ├─ Object Reference
+  └─ 원본 가리킴
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 1. Float 정밀도
+
+```
+❌ Float 정확도 제한
+  └─ 0.1 + 0.2 ≠ 0.3
+  └─ 근사값
+
+✅ 돈 계산은 Integer 사용
+  └─ 센트 단위로 저장
+```
+
+### 2. Name vs String
+
+```
+❌ Name으로 UI 텍스트
+  └─ 대소문자 구분 안 됨
+
+✅ Text 사용
+  └─ 정확한 표시
+```
+
+### 3. Enum 확장
+
+```
+✅ 나중에 값 추가 가능
+❌ 순서 변경 주의
+  └─ 저장된 데이터 영향
+```
+
+### 4. 메모리 효율
+
+```
+100개 변수:
+  Byte: 100바이트
+  Integer: 400바이트
+  Integer64: 800바이트
+
+→ 필요한 만큼만 사용
+```
+
+---
+
+## 🎓 학습 포인트
+
+1. **타입의 목적**
+   - 적재적소 사용
+   - 메모리 효율
+   - 코드 명확성
+2. **색상 기억**
+   - 노드 핀 색 = 타입
+   - 연결 가능 여부 판단
+3. **복합 타입 활용**
+   - Vector, Rotator
+   - Split Struct Pin
+   - 데이터 정리
+4. **문자 타입 구분**
+   - String: 일반
+   - Name: 식별
+   - Text: UI
+5. **Enum의 가치**
+   - 가독성
+   - 안전성
+   - 유지보수
+
+---
+
+## ✨ 요약
+
+```
+데이터 타입 = 값의 종류 + 사용법
+
+기본:
+  ├─ Boolean (참/거짓)
+  ├─ Integer (정수)
+  ├─ Float (실수)
+  └─ String (문자)
+
+기하:
+  ├─ Vector (위치)
+  ├─ Rotator (회전)
+  └─ Transform (전체)
+
+고급:
+  ├─ Struct (묶음)
+  ├─ Enum (선택지)
+  ├─ Interface (약속)
+  └─ Object (참조)
+
+선택 기준:
+  └─ 목적에 맞는 타입 사용
+```
+
+이제 데이터 타입을 완벽히 이해했으니, 적재적소에 올바른 타입을 선택할 수 있습니다! 🎉
+
+# { 🏗️ Construction Script (구성 스크립트) }
+
+## 🎯 목표
+
+Construction Script를 이해하고, 환경에 따라 자동으로 색이 바뀌는 절차적 오브젝트 만들기
+
+---
+
+## 📋 Blueprint의 3가지 탭
+
+### 기본 탭 구조
+
+```
+Blueprint를 열면:
+  ├─ Viewport (뷰포트)
+  │   └─ 컴포넌트 시각 편집
+  │
+  ├─ Event Graph (이벤트 그래프)
+  │   └─ 게임플레이 로직
+  │
+  └─ Construction Script (구성 스크립트) ⭐
+      └─ 초기화 및 설정
+```
+
+---
+
+## 🔨 Construction Script란?
+
+### 개념
+
+```
+이름: Construction Script (건설 스크립트)
+의미: "건설할 때 실행되는 스크립트"
+
+비유: 건물 지을 때 설계도
+  └─ 집 짓기 전에 미리 정해놓는 것
+```
+
+### 실행 시점
+
+```
+✅ 실행되는 경우:
+  ├─ Blueprint 인스턴스 생성 시
+  ├─ 레벨에 배치할 때
+  ├─ Blueprint 컴파일할 때
+  ├─ Details 패널에서 값 변경 시
+  ├─ Actor 이동/회전/스케일 시
+  └─ 에디터에서 속성 변경 시
+
+❌ 실행 안 되는 경우:
+  └─ 게임 플레이 중 (Play 후) ⚠️
+```
+
+**중요!**
+
+```
+게임 시작 전:
+  ✅ Construction Script 실행
+
+게임 시작 후 (Play):
+  ❌ Construction Script 실행 안 됨
+  ✅ Event Graph만 실행
+```
+
+### vs Event Graph
+
+```
+Construction Script:
+  ├─ 언제: 배치/편집 시
+  ├─ 용도: 초기 설정
+  └─ 게임 중: 실행 안 됨
+
+Event Graph:
+  ├─ 언제: 게임 플레이 중
+  ├─ 용도: 게임 로직
+  └─ 게임 중: 실행됨
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380678/notion-blog/_/_/_5_/3/image_20.png)
+
+---
+
+## 🎨 실전 예제: 절차적 색 변경
+
+### 목표
+
+```
+제트 연료 색상을 위치에 따라 자동 변경:
+  ├─ 허공: 노란색
+  ├─ 플랫폼 위: 파란색
+  └─ 압력판 위: 빨간색
+
+```
+
+### 절차적 (Procedural)이란?
+
+```
+개념: 조건에 따라 자동으로 변경
+비유: 카멜레온
+
+수동 방식:
+  └─ 하나하나 손으로 색 변경 ❌
+
+절차적 방식:
+  └─ 위치만 바꾸면 자동 변경 ✅
+```
+
+---
+
+## 🔍 1단계: Line Trace로 아래 확인
+
+### Line Trace by Channel
+
+```
+용도: 레이저처럼 직선으로 쏴서 부딪힌 것 감지
+비유: 레이저 포인터
+
+입력:
+  ├─ Start: 시작점
+  ├─ End: 끝점
+  ├─ Trace Channel: 감지 채널
+  └─ Actors to Ignore: 무시할 액터
+
+출력:
+  ├─ Return Value: 맞았는지 (Boolean)
+  └─ Out Hit: 맞은 정보 (Hit Result)
+```
+
+### 노드 구조
+
+```
+Construction Script
+  ↓
+Line Trace by Channel
+  ├─ Start: Get Actor Location
+  │   └─ 현재 액터 위치
+  │
+  └─ End: Get Actor Location + (0, 0, -200)
+      └─ 현재 위치에서 200 아래
+```
+
+**Start 계산**
+
+```
+Get Actor Location (Self)
+  └─ 제트 연료의 현재 위치
+```
+
+**End 계산**
+
+```
+Get Actor Location + Vector(0, 0, -200)
+  └─ 현재 위치에서 Z축으로 200 내려간 곳
+
+Vector(0, 0, -200):
+  ├─ X: 0 (좌우 이동 없음)
+  ├─ Y: 0 (앞뒤 이동 없음)
+  └─ Z: -200 (아래로 200)
+```
+
+💡 **+ 연산자 (벡터)**
+
+```
+Vector + Vector = 새 Vector
+
+예시:
+  (100, 200, 300) + (0, 0, -200)
+  = (100, 200, 100)
+```
+
+### 추가 설정
+
+```
+Ignore Self: 체크 ✅
+  └─ 자기 자신은 무시
+
+Trace Channel: Visibility
+  └─ 보이는 오브젝트만 감지
+
+Draw Debug Type: For Duration (5초)
+  └─ 디버그 선 표시
+```
+
+**Draw Debug Type**
+
+```
+None: 안 보임
+For One Frame: 1프레임만
+For Duration: 지정 시간 동안 ✅
+
+용도: 디버깅 (문제 해결)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380679/notion-blog/_/_/_5_/3/image_21.png)
+
+---
+
+## 🎨 2단계: 기본 색 설정 (노란색)
+
+### Set Material 노드
+
+```
+용도: 메시의 재질 변경
+타겟: Fuel Mesh (Static Mesh Component)
+
+입력:
+  ├─ Target: Fuel Mesh
+  ├─ Element Index: 0
+  │   └─ 첫 번째 재질 슬롯
+  └─ Material: MI_JetFuel
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380679/notion-blog/_/_/_5_/3/image_22.png)
+
+**Element Index란?**
+
+```
+메시는 여러 재질 슬롯 가능:
+  ├─ 0: 첫 번째 재질
+  ├─ 1: 두 번째 재질
+  └─ 2: 세 번째 재질
+
+제트 연료:
+  └─ 0번만 변경 (몸통 색)
+```
+
+### Branch로 조건 분기
+
+```
+Line Trace by Channel
+  └─ Return Value (Boolean)
+      ↓
+Branch
+  ├─ True: 뭔가 맞음
+  │   └─ 파란색으로
+  │
+  └─ False: 허공
+      └─ 노란색으로
+```
+
+**False 경로 (허공)**
+
+```
+Set Material
+  ├─ Target: Fuel Mesh
+  ├─ Element Index: 0
+  └─ Material: MI_JetFuel (노란색)
+```
+
+---
+
+## 🔷 3단계: 플랫폼 위 색 (파란색)
+
+### Material Instance 복제
+
+```
+MI_JetFuel 복제
+  ↓
+이름: MI_JetFuel_AbovePlatform
+  ↓
+Color Override: 파란색으로 변경
+```
+
+**Material Instance란?**
+
+```
+개념: 재질의 변형 버전
+비유: 같은 옷의 다른 색
+
+장점:
+  ✅ 원본 손상 없음
+  ✅ 파라미터만 변경
+  ✅ 가볍고 빠름
+```
+
+### True 경로 설정
+
+```
+Branch → True
+  ↓
+Set Material
+  ├─ Target: Fuel Mesh
+  ├─ Element Index: 0
+  └─ Material: MI_JetFuel_AbovePlatform (파란색)
+```
+
+---
+
+## 🔴 4단계: 압력판 위 색 (빨간색)
+
+### Hit Result 분석
+
+```
+Line Trace → Out Hit
+  └─ Hit Result Struct
+
+내용:
+  ├─ Hit Actor: 맞은 액터
+  ├─ Hit Component: 맞은 컴포넌트
+  ├─ Impact Point: 충돌 지점
+  └─ 기타 정보들
+```
+
+### Break Hit Result
+
+```
+용도: Hit Result의 내부 값 꺼내기
+비유: 선물 상자 뜯기
+
+Out Hit → Break Hit Result
+  ↓
+개별 값 추출:
+  ├─ Hit Actor ⭐
+  ├─ Impact Point
+  ├─ Distance
+  └─ 등등...
+```
+
+### Cast to BP_PressurePlate
+
+```
+Break Hit Result → Hit Actor
+  ↓
+Cast to BP_PressurePlate
+  ├─ 성공: 압력판이 맞음 ✅
+  └─ 실패: 압력판 아님
+```
+
+**Cast란?**
+
+```
+개념: "이게 압력판 맞아?" 확인
+비유: 신분증 확인
+
+성공:
+  └─ "네, 압력판입니다"
+      └─ As BP Pressure Plate 출력
+
+실패:
+  └─ "아니요, 다른 겁니다"
+      └─ Cast Failed 실행
+```
+
+### 최종 구조
+
+```
+Line Trace → Return Value
+  ↓
+Branch
+  ├─ False (허공)
+  │   └─ Set Material: 노란색
+  │
+  └─ True (뭔가 맞음)
+      ↓
+      Cast to BP_PressurePlate
+        ├─ 성공 (압력판)
+        │   └─ Set Material: 빨간색 ⭐
+        │
+        └─ 실패 (일반 플랫폼)
+            └─ Set Material: 파란색
+```
+
+### 빨간색 Material 추가
+
+```
+MI_JetFuel 복제
+  ↓
+이름: MI_JetFuel_AbovePlate
+  ↓
+Color Override: 빨간색
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380679/notion-blog/_/_/_5_/3/image_23.png)
+
+## 🎯 Cast의 진짜 의미
+
+## ❌ 흔한 오해
+
+```
+Cast = "바꾼다" (X)
+```
+
+---
+
+## ✅ 실제 의미
+
+```
+Cast = "확인하고 접근한다"
+```
+
+---
+
+## 📦 비유로 이해하기
+
+### 상자 예시
+
+```
+상자가 있음 (Actor)
+  ↓
+"이게 보물상자야?"
+  ↓
+Cast to 보물상자
+  ├─ 성공: "맞아! 보물상자야"
+  │   └─ 보물 꺼내기 가능 ✅
+  │
+  └─ 실패: "아니야, 그냥 상자야"
+      └─ 보물 없음
+```
+
+**바꾸는 게 아님!**
+
+```
+❌ 일반 상자 → 보물상자로 변신
+✅ 이미 보물상자인지 확인
+```
+
+---
+
+## 🔍 Cast의 2가지 역할
+
+### 1. 타입 확인
+
+```
+"너 압력판 맞아?"
+  ├─ 맞으면: 성공
+  └─ 아니면: 실패
+```
+
+### 2. 기능 접근
+
+```
+성공하면:
+  └─ 압력판 전용 기능 사용 가능
+
+예시:
+  Cast to BP_PressurePlate
+    └─ Does Un Press 변수 접근 가능
+```
+
+---
+
+## 🎮 게임 예시
+
+### Pokemon으로 비유
+
+```
+야생 포켓몬 만남 (Actor)
+  ↓
+Cast to 피카츄
+  ├─ 성공: "피카츄다!"
+  │   └─ 전기 공격 사용 가능
+  │
+  └─ 실패: "피카츄 아니네"
+      └─ 전기 공격 불가
+```
+
+**변신 아님!**
+
+```
+❌ 꼬부기를 피카츄로 변신
+✅ 이미 피카츄인지 확인
+```
+
+---
+
+## 💡 왜 "Cast"라는 이름?
+
+```
+프로그래밍 용어:
+  Type Casting = 타입 변환
+
+하지만 Blueprint에서:
+  ❌ 실제로 바꾸지 않음
+  ✅ "이 타입 맞는지 확인"
+```
+
+---
+
+## 🔑 핵심 정리
+
+```
+Cast to BP_PressurePlate:
+
+❌ "압력판으로 바꿔!"
+✅ "압력판 맞아? 맞으면 압력판 기능 쓸게"
+
+성공 = 원래부터 압력판이었음
+실패 = 처음부터 압력판 아니었음
+```
+
+---
+
+## 📝 정확한 번역
+
+```
+Cast (영어) = 주조하다, 던지다
+  └─ 프로그래밍: "타입 확인"
+
+올바른 이해:
+  └─ "타입 체크 + 접근 권한"
+```
+
+---
+
+## 핵심
+
+```
+Cast 성공:
+  └─ 맞은 게 그 타입이 맞을 때
+
+Cast 실패:
+  └─ 맞은 게 다른 타입일 때
+```
+
+---
+
+## 🎯 완성된 시스템
+
+### 작동 방식
+
+```
+제트 연료 배치/이동 시:
+  ↓
+Construction Script 실행
+  ↓
+아래로 Line Trace (200 유닛)
+  ↓
+맞았나?
+  ├─ No → 노란색 (허공)
+  │
+  └─ Yes → 압력판인가?
+      ├─ Yes → 빨간색 (압력판 위)
+      └─ No → 파란색 (플랫폼 위)
+```
+
+### 절차적 특성
+
+```
+제트 연료를 이동하면:
+  1. Construction Script 자동 실행
+  2. 현재 위치에서 Line Trace
+  3. 맞은 오브젝트 확인
+  4. 자동으로 색 변경 ✅
+
+→ 수동 변경 불필요!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380679/notion-blog/_/_/_5_/3/image_24.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380679/notion-blog/_/_/_5_/3/image_25.png)
+
+---
+
+## 📊 핵심 노드 기능
+
+### Line Trace by Channel
+
+```
+용도: 직선 레이캐스트
+입력:
+  ├─ Start: 시작점 (Vector)
+  ├─ End: 끝점 (Vector)
+  ├─ Trace Channel: 감지 채널
+  └─ Actors to Ignore: 무시 목록
+
+출력:
+  ├─ Return Value: 맞았는지 (Boolean)
+  └─ Out Hit: 충돌 정보 (Hit Result)
+
+옵션:
+  ├─ Trace Complex: 복잡한 충돌 사용
+  ├─ Ignore Self: 자신 무시
+  └─ Draw Debug Type: 디버그 표시
+```
+
+### Break Hit Result
+
+```
+용도: Hit Result 구조체 분해
+입력: Hit Result
+출력:
+  ├─ Blocking Hit: 차단했는지
+  ├─ Hit Actor: 맞은 액터 ⭐
+  ├─ Hit Component: 맞은 컴포넌트
+  ├─ Impact Point: 충돌 지점
+  ├─ Impact Normal: 충돌 면의 방향
+  ├─ Distance: 거리
+  └─ 기타 정보들
+```
+
+### Set Material
+
+```
+용도: 메시 재질 변경
+타겟: Primitive Component
+입력:
+  ├─ Element Index: 재질 슬롯 번호
+  └─ Material: 새 재질
+```
+
+### Cast To
+
+```
+용도: 타입 확인 및 변환
+형식: Cast to [클래스명]
+출력:
+  ├─ 성공 핀
+  ├─ 실패 핀 (Cast Failed)
+  └─ As [클래스]: 변환된 객체
+```
+
+---
+
+## 🎓 Construction Script 활용
+
+### 적합한 용도
+
+```
+✅ 초기 설정:
+  ├─ 재질 변경
+  ├─ 메시 크기 조정
+  ├─ 컴포넌트 배치
+  └─ 절차적 생성
+
+✅ 환경 감지:
+  ├─ 주변 확인
+  ├─ 표면 감지
+  └─ 다른 오브젝트 찾기
+
+✅ 조건부 설정:
+  ├─ 위치에 따라
+  ├─ 주변 오브젝트에 따라
+  └─ 파라미터에 따라
+
+```
+
+### 부적합한 용도
+
+```
+❌ 게임플레이 로직:
+  └─ Play 중 실행 안 됨
+
+❌ 반복 실행:
+  └─ Tick처럼 계속 실행 불가
+
+❌ 플레이어 입력:
+  └─ 게임 중 작동 안 함
+```
+
+---
+
+## 💡 실전 활용 예시
+
+### 1. 절차적 울타리
+
+```
+Construction Script:
+  ├─ 시작점과 끝점 사이 거리 측정
+  ├─ 필요한 기둥 개수 계산
+  └─ 자동으로 기둥 생성/배치
+```
+
+### 2. 자동 정렬 선반
+
+```
+Construction Script:
+  ├─ 아이템 개수 확인
+  ├─ 간격 계산
+  └─ 아이템들 자동 정렬
+```
+
+### 3. 지형 따라가는 울타리
+
+```
+Construction Script:
+  ├─ 아래로 Line Trace
+  ├─ 지형 높이 감지
+  └─ 울타리 Z 위치 조정
+```
+
+### 4. 조건부 메시 표시
+
+```
+Construction Script:
+  ├─ 파라미터 확인
+  └─ 조건에 따라 메시 On/Off
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 1. 게임 중 실행 안 됨
+
+```
+❌ Play 중 Actor 이동해도
+  → Construction Script 실행 안 됨
+
+✅ 에디터에서 Actor 이동
+  → Construction Script 실행 ✅
+
+해결:
+  └─ 게임 중 변경은 Event Graph 사용
+```
+
+### 2. 무한 루프 주의
+
+```
+❌ Construction Script에서
+  → 자신의 위치 변경
+  → 다시 Construction Script 실행
+  → 무한 루프 ⚠️
+
+✅ 읽기만 하고 변경 조심
+```
+
+### 3. 성능 고려
+
+```
+❌ 너무 복잡한 계산
+  → 에디터 느려짐
+
+✅ 간단한 설정만
+  └─ 복잡한 건 Event Graph로
+```
+
+### 4. Material Instance 필요
+
+```
+❌ Material 직접 수정
+  → 모든 곳에 영향
+
+✅ Material Instance 생성
+  └─ 개별 파라미터만 변경
+```
+
+---
+
+## 🔍 디버깅 팁
+
+### Draw Debug Type 활용
+
+```
+None:
+  └─ 디버그 안 보임 (최종)
+
+For One Frame:
+  └─ 1프레임만 (테스트)
+
+For Duration:
+  └─ 지정 시간 (디버깅) ✅
+  └─ Draw Time: 5.0초
+```
+
+### Print String 추가
+
+```
+Construction Script에서:
+  Print String
+    └─ "Construction Script 실행됨!"
+
+→ 언제 실행되는지 확인 가능
+```
+
+---
+
+## ✨ 핵심 정리
+
+### Construction Script 특징
+
+```
+실행 시점:
+  ✅ Blueprint 배치 시
+  ✅ 컴파일 시
+  ✅ 속성 변경 시
+  ❌ 게임 플레이 중 (X)
+
+용도:
+  ✅ 초기 설정
+  ✅ 절차적 생성
+  ✅ 조건부 구성
+
+장점:
+  ✅ 자동화
+  ✅ 실시간 미리보기
+  ✅ 반복 작업 제거
+```
+
+### Line Trace 활용
+
+```
+용도:
+  ├─ 충돌 감지
+  ├─ 거리 측정
+  ├─ 오브젝트 찾기
+  └─ 표면 검사
+
+팁:
+  ├─ Draw Debug로 확인
+  ├─ Ignore Self 체크
+  └─ Break Hit Result로 분석
+```
+
+### 절차적 생성의 가치
+
+```
+수동 방식:
+  └─ 100개 배치 → 100번 색 변경 ❌
+
+절차적 방식:
+  └─ 100개 배치 → 자동으로 색 변경 ✅
+
+이점:
+  ✅ 시간 절약
+  ✅ 실수 방지
+  ✅ 유지보수 쉬움
+```
+
+---
+
+## 🎓 학습 포인트
+
+1. **Construction Script 이해**
+   - 게임 전 실행
+   - 초기화 용도
+   - 에디터 전용
+2. **Line Trace 활용**
+   - 충돌 감지
+   - 환경 분석
+   - 절차적 설정
+3. **절차적 생성**
+   - 조건 기반 변경
+   - 자동화
+   - 효율성
+4. **Material Instance**
+   - 재질 변형
+   - 파라미터 변경
+   - 독립적 설정
+5. **Break Struct**
+   - 구조체 분해
+   - 내부 값 접근
+   - 데이터 추출
+
+---
+
+이제 Construction Script로 똑똑한 오브젝트를 만들 수 있습니다! 🎉
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380679/notion-blog/_/_/_5_/3/image_24.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380679/notion-blog/_/_/_5_/3/image_25.png)

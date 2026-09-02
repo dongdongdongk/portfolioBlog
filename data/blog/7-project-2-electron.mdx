@@ -1,0 +1,592 @@
+---
+title: '섹션 7: Project 2 Electron 애플리케이션에서 사용자 설정을 저장'
+date: '2026-09-02'
+category: '풀스택/Electron'
+tags: ['풀스택', 'Electron']
+draft: false
+summary: ''
+---
+
+# { Electron에서 데이터 저장(Store) 구현 정리 }
+
+```jsx
+이 강의에서는 Electron에서 데이터를 저장하는 방법에 대해 설명하며,
+
+JSON 파일을 활용한 간단한 Store 클래스를 직접 구현합니다.
+```
+
+## 1. 데이터 저장 방법
+
+```jsx
+Electron에서 데이터를 저장하는 방법에는 여러 가지가 있습니다.
+
+		1.LocalStorage: 작은 크기의 데이터 저장에 적합 (예: 타임스탬프 저장)
+
+		2.IndexedDB: HTML5 API 기반의 데이터 저장 방식
+
+		3.Flat File (JSON 파일 저장): 파일 시스템을 이용하여 데이터를 JSON 파일로 저장
+
+		4.Database:
+
+			내장형 DB: SQLite, NeDB 등
+
+			원격 DB: Firebase, Mongo Atlas 등
+
+이번 강의에서는 JSON 파일을 활용한 Store를 구현하여 설정값을 저장합니다.
+```
+
+## 2. Store 클래스 구현
+
+```jsx
+설정을 저장하는 Store 클래스를 구현하여 데이터를 JSON 파일로 저장하고 불러오는 기능을 만듭니다.
+```
+
+### (1) Store 클래스 파일 생성
+
+```jsx
+Electron 프로젝트 루트 디렉토리에 Store.js 파일을 생성합니다.
+```
+
+### (2) Store 클래스 코드
+
+1. 필요한 모듈 불러오기
+
+```jsx
+electron: Electron API 사용
+
+path: 경로 조작을 위한 Node.js 모듈
+
+fs: 파일 읽기/쓰기 모듈
+```
+
+```jsx
+const electron = require('electron')
+const path = require('path')
+const fs = require('fs')
+```
+
+2. Store 클래스 생성
+
+```jsx
+// Node.js의 'fs'와 'path' 모듈을 가져옴
+const fs = require('fs')
+const path = require('path')
+const electron = require('electron')
+
+// JSON 파일을 읽어 기존 데이터를 파싱하는 함수
+function parseDataFile(filePath, defaults) {
+  try {
+    // 파일이 존재하면 JSON 파일을 읽고 파싱하여 반환
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'))
+  } catch (error) {
+    // 파일이 없거나 읽기 오류가 발생하면 기본 값을 반환
+    return defaults
+  }
+}
+
+// Store 클래스: 로컬 설정 저장소를 다루는 역할
+class Store {
+  /**
+   * @param {Object} options - 설정 옵션
+   * @param {string} options.configName - 저장할 JSON 파일 이름
+   * @param {Object} options.defaults - 기본 데이터 (초기값)
+   */
+  constructor(options) {
+    // Electron의 userData 경로 가져오기 (애플리케이션 데이터 저장 경로)
+    const userDataPath = (electron.app || electron.remote.app).getPath('userData')
+
+    // 저장할 JSON 파일의 전체 경로 지정
+    this.path = path.join(userDataPath, options.configName + '.json')
+
+    // 기존 데이터를 읽어오거나 기본 데이터를 설정
+    this.data = parseDataFile(this.path, options.defaults)
+  }
+
+  /**
+   * 데이터를 가져오는 메서드
+   * @param {string} key - 가져올 데이터의 키
+   * @returns {*} - 해당 키의 값
+   */
+  get(key) {
+    return this.data[key]
+  }
+
+  /**
+   * 데이터를 설정하는 메서드
+   * @param {string} key - 저장할 키
+   * @param {*} val - 저장할 값
+   */
+  set(key, val) {
+    // 데이터 객체에 키-값을 저장
+    this.data[key] = val
+
+    // JSON 파일로 데이터를 저장 (동기 방식)
+    fs.writeFileSync(this.path, JSON.stringify(this.data, null, 2)) // 가독성을 위해 들여쓰기 추가
+  }
+}
+
+// 사용 예시
+const store = new Store({
+  configName: 'settings', // 'settings.json' 파일로 저장
+  defaults: { theme: 'light', language: 'en' }, // 기본값
+})
+
+store.set('theme', 'dark') // 테마 값을 'dark'로 설정
+console.log(store.get('theme')) // 'dark' 출력
+```
+
+```jsx
+constructor(options): 저장할 파일 경로를 지정하고 초기 데이터를 설정
+
+get(key): 저장된 데이터를 가져옴
+
+set(key, val): 데이터를 저장하고 JSON 파일로 기록
+```
+
+3. JSON 파일을 읽는 함수
+
+```jsx
+function parseDataFile(filePath, defaults) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath))
+  } catch (error) {
+    return defaults
+  }
+}
+```
+
+```jsx
+readFileSync(filePath): JSON 파일을 읽어 데이터를 반환
+
+오류가 발생하면 기본값(defaults)을 반환하여 초기 설정을 제공
+```
+
+4. Store 클래스 내보내기
+
+```jsx
+module.exports = Store
+```
+
+```jsx
+Store 클래스를 내보내어 다른 파일에서 사용 가능하게 함
+```
+
+## 3. Store 클래스를 Electron 앱에서 사용
+
+```jsx
+main.js에서 Store 클래스를 사용하여 설정 데이터를 관리합니다.
+```
+
+### (1) Store 클래스 불러오기
+
+```jsx
+const Store = require('./store')
+```
+
+### (2) Store 객체 생성 및 기본 설정
+
+```jsx
+const store = new Store({
+  configName: 'user-settings',
+  defaults: {
+    settings: {
+      cpuOverload: 80,
+      alertFrequency: 5,
+    },
+  },
+})
+```
+
+```jsx
+configName: 저장할 JSON 파일 이름 (예: user-settings.json)
+
+defaults: 기본 설정값 (cpuOverload: 80, alertFrequency: 5)
+```
+
+## 4. JSON 파일 저장 경로
+
+```jsx
+macOS: ~/Library/Application Support/AppName/user-settings.json
+
+Windows: %APPDATA%\AppName\user-settings.json
+
+Linux: ~/.config/AppName/user-settings.json
+
+Electron의 app.getPath('userData')를 사용하여 운영체제에 맞는 저장 경로를 자동으로 설정합니다.
+```
+
+# { Electron에서 `store` 데이터를 렌더러로 보내 출력하기 }
+
+```jsx
+메인 프로세스에서 렌더러 프로세스로 프리로드를 통해 store 데이터를 send()로 일방적으로 보내
+
+출력하기
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381250/notion-blog/_/Electron/Electron_From_Scratch_JavaScript_/_7_Project_2_Electron_/image.png)
+
+## Electron의 프로세스 구조
+
+```jsx
+Electron은 크게 두 개의 프로세스로 구성됨:
+
+		1. 메인 프로세스 (Node.js 실행)
+
+				앱의 생명주기를 관리 (app.on("ready", ...))
+
+				창 (BrowserWindow) 생성 및 관리
+
+				OS와 직접 상호작용 (파일 시스템, 하드웨어 정보 등)
+
+
+		2. 렌더러 프로세스 (HTML, CSS, JavaScript 실행)
+
+				웹 페이지를 띄우고 UI를 그림
+
+				사용자의 입력을 받음
+
+⚠️ 메인과 렌더러는 서로 다른 프로세스이므로 직접 데이터를 주고받을 수 없음!
+
+➡️ ipcMain, ipcRenderer, webContents.send() 등을 사용해야 함!
+```
+
+## 메인 프로세스에서 `store` 데이터를 렌더러로 전송
+
+```jsx
+main.js에서 webContents.send()를 사용하여 데이터를 보냄
+```
+
+```jsx
+mainWindow.webContents.on('dom-ready', () => {
+  mainWindow.webContents.send('settings:get', store.get('settings'))
+})
+```
+
+```jsx
+이벤트: dom-ready
+
+		렌더러 프로세스에서 HTML이 모두 로드되었을 때 발생하는 이벤트
+
+동작:
+
+		store.get("settings")로 저장된 설정 데이터를 가져옴
+
+		webContents.send("settings:get", 데이터)로 렌더러 프로세스로 데이터를 보냄
+```
+
+## store 의 get 메서드를 사용해서 지정한 경로의 .json 파일의 데이터를 가져옴
+
+```jsx
+set 으로 저장한 경로에 ( 없을때는 기본 값 ) 생성된 user-settings.json 을 store 의 메서드 get(key) 를
+
+사용해서 가져와서 키값으로 전체 데이터를 가져온다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381250/notion-blog/_/Electron/Electron_From_Scratch_JavaScript_/_7_Project_2_Electron_/image_1.png)
+
+## `preload.js`에서 렌더러가 이벤트를 받을 수 있도록 설정
+
+```jsx
+Electron은 보안상 렌더러에서 ipcRenderer를 직접 사용할 수 없음
+
+➡️ contextBridge를 사용하여 안전하게 이벤트를 받을 수 있도록 preload.js에서 설정해야 함
+```
+
+```jsx
+const { contextBridge, ipcRenderer } = require('electron')
+
+contextBridge.exposeInMainWorld('electron', {
+  getComInfo: () => ipcRenderer.invoke('getComInfo'),
+  getCpuUsage: () => ipcRenderer.invoke('getCpuUsage'),
+  getUptime: () => ipcRenderer.invoke('getUptime'),
+
+  // 이벤트 리스너 추가 (렌더러에서 `on` 메서드 사용 가능)
+  on: (channel, callback) => {
+    ipcRenderer.on(channel, (event, data) => callback(data))
+  },
+})
+```
+
+```jsx
+contextBridge.exposeInMainWorld()
+
+		electron.on(channel, callback)을 만들어서 렌더러에서 사용할 수 있도록 함
+
+ipcRenderer.on(channel, callback)
+
+		settings:get 이벤트가 오면 callback(data) 실행
+```
+
+## 렌더러에서 데이터를 받음
+
+```jsx
+window.electron.on('settings:get', (settings) => {
+  console.log('설정 데이터:', settings)
+  document.getElementById('cpu-overload').value = settings.cpuOverload
+  document.getElementById('alert-frequency').value = settings.alertFrequency
+  cpuOverload = settings.cpuOverload
+  alertFrequency = settings.alertFrequency
+})
+```
+
+```jsx
+이벤트 리스너 등록 (window.electron.on)
+
+		settings:get 이벤트가 발생하면 callback(settings) 실행
+
+		콘솔에 store.get("settings") 값이 출력됨!
+
+		( cpu바 그리고 알람 시간을 적용하기 위해 변수에 가져온 값을 넣어준다 )
+```
+
+## 최종 요약
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381250/notion-blog/_/Electron/Electron_From_Scratch_JavaScript_/_7_Project_2_Electron_/image_2.png)
+
+```jsx
+✅ 결과적으로 렌더러에서 요청하지 않아도 메인 프로세스에서 store 데이터를 보낼 수 있음!
+```
+
+# { Electron에서 유저 설정을 저장하는 과정 }
+
+```jsx
+Electron에서 유저 설정(예: CPU 사용률 경고 값, 알림 빈도 등)을 저장하는 과정을 초보도 이해하기 쉽게 설명
+```
+
+## 1. 사용자가 설정을 입력하고 저장 버튼을 누름
+
+### 1. 사용자가 설정을 입력하고 저장 버튼을 누름
+
+```jsx
+HTML에서 사용자는 CPU 사용률과 알림 빈도를 입력할 수 있습니다.
+```
+
+```jsx
+<form id="settings-form">
+  <label for="cpu-overload">CPU 사용률 제한:</label>
+  <input type="number" id="cpu-overload" value="80">
+
+  <label for="alert-frequency">알림 빈도:</label>
+  <input type="number" id="alert-frequency" value="5">
+
+  <button type="submit">저장</button>
+</form>
+
+<div id="alert" class="hide"></div>
+
+```
+
+## 2. 저장 버튼을 누르면 렌더러 프로세스(`renderer.js`)에서 설정을 메인 프로세스로 보냄
+
+### `renderer.js` (사용자의 입력값을 메인 프로세스로 보내는 역할)
+
+```jsx
+document.addEventListener('DOMContentLoaded', () => {
+  const settingsForm = document.getElementById('settings-form')
+
+  if (!settingsForm) {
+    console.error('settingsForm 요소를 찾을 수 없습니다!')
+    return
+  }
+
+  settingsForm.addEventListener('submit', (e) => {
+    e.preventDefault() // 폼 기본 제출 동작 막기
+
+    const cpuOverload = document.getElementById('cpu-overload').value
+    const alertFrequency = document.getElementById('alert-frequency').value
+
+    // 메인 프로세스로 설정 데이터 전송
+    window.electron.send('settings:set', { cpuOverload, alertFrequency })
+
+    showAlert('설정이 저장되었습니다.')
+  })
+})
+
+function showAlert(msg) {
+  const alert = document.getElementById('alert')
+  alert.classList.remove('hide')
+  alert.innerText = msg
+
+  setTimeout(() => {
+    alert.classList.add('hide')
+  }, 3000)
+}
+```
+
+```jsx
+1. settings-form 폼이 제출(submit)되면 이벤트 리스너가 실행됨
+
+2. cpuOverload와 alertFrequency 값을 입력 필드에서 가져옴
+
+3. window.electron.send("settings:set", { cpuOverload, alertFrequency })를
+
+	 호출하여 메인 프로세스로 데이터를 전송
+
+4. showAlert() 함수를 호출하여 저장 완료 메시지를 3초 동안 화면에 표시
+```
+
+## 3. 메인 프로세스(`main.js`)에서 설정을 저장
+
+### `main.js` (설정을 받아서 저장하는 역할)
+
+```jsx
+ipcMain.on('settings:set', (event, newSettings) => {
+  store.set('settings', newSettings)
+  console.log('새 설정 저장됨:', newSettings)
+
+  // 변경된 설정을 렌더러 프로세스로 다시 보내기 (즉시 UI 반영)
+  mainWindow.webContents.send('settings:get', store.get('settings'))
+})
+```
+
+```jsx
+1. ipcMain.on("settings:set", callback)을 통해 렌더러에서 보낸 데이터를 받음
+
+2. store.set("settings", newSettings);를 호출하여 파일에 설정을 저장
+
+3. console.log("새 설정 저장됨:", newSettings);로 터미널에 저장된 데이터를 출력
+
+4. mainWindow.webContents.send("settings:get", store.get("settings"));로
+
+   렌더러에 새 설정을 다시 보내어 UI를 업데이트
+```
+
+## 4. 저장된 설정을 파일(`store.js`)에 기록
+
+### `store.js` (설정을 JSON 파일로 저장)
+
+```jsx
+const electron = require('electron') // Electron 모듈 가져오기
+const path = require('path') // 파일 및 디렉터리 경로 처리를 위한 Node.js 내장 모듈
+const fs = require('fs') // 파일 시스템 모듈 (파일 읽기/쓰기 용도)
+
+// Store 클래스: 사용자 설정을 JSON 파일에 저장하고 불러오는 역할
+class Store {
+  /**
+   * Store 클래스 생성자
+   * @param {Object} options - 설정 옵션 객체
+   * @param {string} options.configName - 저장할 JSON 파일 이름 (확장자는 자동 추가됨)
+   * @param {Object} options.defaults - 기본값 객체 (설정 파일이 없을 경우 사용됨)
+   */
+  constructor(options) {
+    // Electron의 userData 경로 가져오기
+    // userData 경로: Windows는 AppData/Roaming, macOS는 Library/Application Support, Linux는 .config
+    const userDataPath = (electron.app || electron.remote.app).getPath('userData')
+
+    // 설정 파일의 전체 경로 (예: C:\Users\사용자\AppData\Roaming\MyApp\user-settings.json)
+    this.path = path.join(userDataPath, options.configName + '.json')
+
+    // 기존 설정 파일이 있다면 불러오고, 없으면 기본값 사용
+    this.data = parseDataFile(this.path, options.defaults)
+  }
+
+  /**
+   * 특정 키의 값을 가져오는 메서드
+   * @param {string} key - 가져올 설정 값의 키
+   * @returns {*} - 해당 키에 저장된 값
+   */
+  get(key) {
+    return this.data[key]
+  }
+
+  /**
+   * 특정 키의 값을 설정하고, JSON 파일에 저장하는 메서드
+   * @param {string} key - 저장할 설정 값의 키
+   * @param {*} val - 저장할 값
+   */
+  set(key, val) {
+    this.data[key] = val // 데이터 객체에 값 저장
+    fs.writeFileSync(this.path, JSON.stringify(this.data, null, 2)) // JSON 파일에 저장 (2번째 인수는 들여쓰기 설정)
+  }
+}
+
+/**
+ * JSON 설정 파일을 읽어와서 객체로 변환하는 함수
+ * @param {string} filePath - 읽어올 파일 경로
+ * @param {Object} defaults - 기본값 객체 (파일이 없거나 오류 발생 시 사용됨)
+ * @returns {Object} - JSON 데이터를 파싱한 객체
+ */
+function parseDataFile(filePath, defaults) {
+  try {
+    // JSON 파일을 동기적으로 읽어와서 객체로 변환하여 반환
+    return JSON.parse(fs.readFileSync(filePath))
+  } catch (error) {
+    console.log('파일 읽기 오류:', error) // 오류 발생 시 콘솔에 출력
+    return defaults // 파일이 없거나 읽기 실패하면 기본값 반환
+  }
+}
+
+module.exports = Store // Store 클래스를 외부에서 사용할 수 있도록 내보냄
+```
+
+```jsx
+1. Electron의 app.getPath("userData")를 사용하여 사용자의 설정을 저장할 경로를 찾음
+
+		Windows: C:\Users\사용자\AppData\Roaming\MyApp\user-settings.json
+
+		Mac: /Users/사용자/Library/Application Support/MyApp/user-settings.json
+
+2. this.path = path.join(userDataPath, options.configName + '.json');으로 설정 파일 경로를 생성
+
+3. set(key, val) 메서드가 호출되면 설정 데이터를 JSON 파일로 저장
+```
+
+## 5. 메인 프로세스가 설정을 렌더러 프로세스로 다시 보내 UI 업데이트
+
+```jsx
+사용자가 설정을 변경하면 렌더러 프로세스의 UI에도 즉시 반영해야 합니다.
+
+이 과정은 메인 프로세스에서 settings:get 이벤트를 다시 보내는 방식으로 이루어집니다.
+```
+
+```jsx
+ipcMain.on('settings:set', (event, newSettings) => {
+  store.set('settings', newSettings)
+  console.log('새 설정 저장됨:', newSettings)
+
+  // 변경된 설정을 렌더러 프로세스로 다시 보내기
+  mainWindow.webContents.send('settings:get', store.get('settings'))
+})
+```
+
+```jsx
+settings:set 이벤트를 통해 설정을 저장한 후, 즉시 렌더러 프로세스에 다시 보냄
+
+이렇게 하면 UI가 최신 상태로 유지됨
+```
+
+## 6. 렌더러 프로세스(`renderer.js`)에서 새 설정을 받아 UI 업데이트
+
+### `renderer.js` (설정 데이터를 받아서 UI 업데이트)
+
+```jsx
+window.electron.on('settings:get', (settings) => {
+  console.log('설정 데이터:', settings)
+  document.getElementById('cpu-overload').value = settings.cpuOverload
+  document.getElementById('alert-frequency').value = settings.alertFrequency
+  cpuOverload = settings.cpuOverload
+  alertFrequency = settings.alertFrequency
+})
+```
+
+```jsx
+1. window.electron.on("settings:get", callback)을 통해 메인 프로세스에서 설정 데이터를 받아옴
+
+2. document.getElementById("cpu-overload").value = settings.cpuOverload;를
+
+   사용해 입력 필드 값을 변경된 설정값으로 업데이트
+
+3. cpuOverload, alertFrequency 변수에 가져온 값을 넣어줘서 cpu 바가 빨간색으로 변하거나 알람 시간을
+
+   알맞게 설정하도록 해준다
+```
+
+## 전체 과정 요약
+
+```jsx
+1️⃣ 사용자가 설정을 입력하고 저장 버튼을 누름 (index.html)
+2️⃣ 렌더러 프로세스(renderer.js)에서 메인 프로세스로 settings:set 이벤트를 보냄
+3️⃣ 메인 프로세스(main.js)가 설정을 파일(store.js)에 저장
+4️⃣ 메인 프로세스가 settings:get 이벤트를 다시 렌더러 프로세스로 보냄
+5️⃣ 렌더러 프로세스(renderer.js)에서 새로운 설정을 받아 UI를 업데이트
+```

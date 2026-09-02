@@ -1,0 +1,4222 @@
+---
+title: '섹션 8: 제트팩 저니 - 제트팩을 이용한 3D 플랫폼 게임 - 1'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 🎮 Character 클래스와 Skeletal Mesh 기초 }
+
+## 🎯 이번 강의 목표
+
+Character 클래스의 특징과 Skeletal Mesh(스켈레탈 메시)의 구조를 이해합니다.
+Pawn과 Character의 차이점을 파악하고, 게임 캐릭터 제작을 준비합니다.
+
+---
+
+## 📊 클래스 계층구조 복습
+
+```
+Actor (액터)
+  ↓
+Pawn (폰) - 빙의 가능
+  ↓
+Character (캐릭터) - 게임 캐릭터 전용
+```
+
+### 각 클래스의 특징
+
+**Actor**
+
+- 레벨에 배치/스폰 가능
+- 기본 기능만 제공
+
+**Pawn (Actor 상속)**
+
+- Actor의 모든 기능
+- 빙의(조종) 가능
+- Movement Component 직접 추가 필요
+
+**Character (Pawn 상속)**
+
+- Actor + Pawn의 모든 기능
+- 게임 캐릭터에 특화된 추가 기능
+
+---
+
+## 🔧 Character 클래스의 기본 구성
+
+### 자동 포함 컴포넌트
+
+**1. Character Movement Component**
+
+```
+기능: 캐릭터 전용 이동 처리
+특징:
+  ├─ Pawn과 달리 자동으로 포함됨
+  ├─ 걷기, 점프, 수영 등 캐릭터 동작 지원
+  └─ 캐릭터에 맞는 물리 처리
+```
+
+**2. Skeletal Mesh Component (스켈레탈 메시)**
+
+```
+기능: 애니메이션 가능한 3D 모델
+특징:
+  ├─ Static Mesh와 다름 (뼈대 구조 있음)
+  ├─ 애니메이션 재생 가능
+  └─ 자동으로 포함됨
+```
+
+**3. Arrow Component (화살표)**
+
+```
+기능: 캐릭터가 바라보는 방향 표시
+특징:
+  ├─ 에디터에서만 보임
+  ├─ 게임 실행 시 안 보임
+  └─ 방향 설정용
+```
+
+### 일반적으로 추가하는 컴포넌트
+
+**Spring Arm + Camera**
+
+```
+구조:
+Character
+  └─ Spring Arm (카메라 지지대)
+      └─ Camera (시점)
+
+목적: 플레이어 캐릭터 시점 제공
+```
+
+---
+
+## 🦴 Skeletal Mesh vs Static Mesh
+
+### Static Mesh (정적 메시)
+
+```
+특징:
+  ├─ 움직이지 않는 3D 모델
+  ├─ 뼈대 없음
+  ├─ Collision Hull로 충돌 처리
+  └─ 건물, 소품 등에 사용
+
+예: 바위, 벽, 상자
+```
+
+### Skeletal Mesh (스켈레탈 메시)
+
+```
+특징:
+  ├─ 뼈대(Skeleton) 구조
+  ├─ 애니메이션 가능
+  ├─ Physics Asset으로 충돌 처리
+  └─ 캐릭터, 생물 등에 사용
+
+예: 사람, 동물, 움직이는 캐릭터
+```
+
+---
+
+## 🦴 Skeleton(스켈레톤) 구조
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380746/notion-blog/_/_/_5_/_8_-_3D_-_1/image.png)
+
+### 정의
+
+뼈대 = 본(Bone)들의 계층구조
+
+```
+계층 구조 예시:
+Pelvis (골반) - 루트
+  ├─ Spine (척추)
+  │   ├─ Chest (가슴)
+  │   │   ├─ Neck (목)
+  │   │   │   └─ Head (머리)
+  │   │   ├─ Left Shoulder (왼쪽 어깨)
+  │   │   │   └─ Left Arm (왼쪽 팔)
+  │   │   │       └─ Left Hand (왼쪽 손)
+  │   │   │           └─ Fingers (손가락들)
+  │   │   └─ Right Shoulder (오른쪽 어깨)
+  │   │       └─ ... (대칭 구조)
+  ├─ Left Leg (왼쪽 다리)
+  └─ Right Leg (오른쪽 다리)
+```
+
+### 본(Bone)의 특징
+
+**부모-자식 관계**
+
+```
+부모 본이 움직이면
+  ↓
+자식 본도 따라 움직임
+
+예:
+팔 본 회전
+  ↓
+손 본도 함께 회전
+  ↓
+손가락 본도 함께 회전
+```
+
+**Skinning (스키닝)**
+
+```
+본 ←→ 메시 폴리곤 연결
+
+본이 움직이면
+  ↓
+연결된 폴리곤도 변형
+  ↓
+자연스러운 애니메이션
+```
+
+### Weight (가중치)
+
+각 폴리곤이 본에 영향받는 정도
+
+```
+Weight 색상 표시:
+  ├─ 빨강: 100% 영향 (완전히 따라감)
+  ├─ 주황/노랑: 50-80% 영향
+  ├─ 초록: 20-50% 영향
+  └─ 파랑: 거의 영향 없음
+
+예:
+팔꿈치 부분
+  ├─ 위쪽: 위팔 본에 강하게 연결
+  ├─ 중간: 두 본에 골고루 연결
+  └─ 아래: 아래팔 본에 강하게 연결
+
+→ 부드러운 굽힘 표현
+```
+
+---
+
+## 🔍 Physics Asset (피직스 애셋)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380741/notion-blog/_/_/_5_/_8_-_3D_-_1/image_1.png)
+
+### 정의
+
+Skeletal Mesh의 충돌 처리용 형태 모음
+
+### Static Mesh와의 차이
+
+**Static Mesh**
+
+```
+Collision Hull
+  └─ 하나의 단순한 형태
+      (박스, 캡슐, 구 등)
+```
+
+**Skeletal Mesh**
+
+```
+Physics Asset
+  └─ 여러 개의 Physics Body
+      ├─ 각 본에 부착
+      ├─ 본과 함께 움직임
+      └─ 동적인 충돌 처리
+
+예:
+팔 본 → 캡슐 형태
+다리 본 → 캡슐 형태
+머리 본 → 구 형태
+```
+
+### Physics Body (피직스 바디)
+
+```
+특징:
+  ├─ 간단한 형태 (캡슐, 박스, 구)
+  ├─ 특정 본에 부착
+  ├─ 본 움직임에 따라 이동
+  └─ 모든 본에 필요하진 않음
+
+목적:
+애니메이션하는 메시의
+역동적인 충돌 처리
+```
+
+---
+
+## 📁 샘플 프로젝트 에셋 구조
+
+### Kicks 폴더 내용
+
+```
+Kicks/
+  ├─ SKM_Kicks (Skeletal Mesh)
+  ├─ SKEL_Kicks (Skeleton)
+  ├─ PHYS_Kicks (Physics Asset)
+  └─ Animations/
+      ├─ Kicks_Idle (유휴 애니메이션)
+      ├─ Kicks_Walk (걷기)
+      ├─ Kicks_Run (달리기)
+      └─ ...
+```
+
+### 네이밍 규칙
+
+```
+SKM_ : Skeletal Mesh (스켈레탈 메시)
+SKEL_ : Skeleton (스켈레톤)
+PHYS_ : Physics Asset (피직스 애셋)
+```
+
+---
+
+## 🛠️ Skeletal Mesh 에디터 살펴보기
+
+### SKM_Kicks 열기
+
+```
+Content Browser
+  ↓
+Kicks 폴더
+  ↓
+SKM_Kicks 더블클릭
+  ↓
+Skeletal Mesh Editor 실행
+```
+
+### 주요 패널
+
+**1. Viewport (뷰포트)**
+
+```
+기능: 3D 메시 확인
+조작:
+  ├─ 마우스 드래그: 회전
+  ├─ 우클릭 드래그: 이동
+  └─ 스크롤: 확대/축소
+```
+
+**2. Skeleton Tree (왼쪽)**
+
+```
+기능: 본 계층구조 표시
+
+표시 내용:
+  ├─ 모든 본 이름
+  ├─ 부모-자식 관계 (들여쓰기)
+  └─ 선택 가능
+
+사용법:
+본 클릭 → 뷰포트에서 강조 표시
+```
+
+**3. Asset Details (오른쪽)**
+
+```
+기능: 메시 설정 확인/변경
+
+주요 정보:
+  ├─ 연결된 Skeleton
+  ├─ 머티리얼 설정
+  ├─ LOD 설정
+  └─ Physics Asset 연결
+```
+
+### 본 선택 및 조작
+
+**본 선택 방법**
+
+```
+방법 1: Skeleton Tree에서 클릭
+방법 2: Viewport에서 본 직접 클릭
+```
+
+**본 회전 테스트**
+
+```
+1. 본 선택
+   ↓
+2. 회전 도구(E) 활성화
+   ↓
+3. 드래그로 회전
+   ↓
+4. 메시가 따라 움직임 확인
+
+⚠️ 주의: 에디터 닫으면 변경사항 저장 안 됨
+       (테스트용일 뿐)
+```
+
+### 뷰 옵션 조정
+
+**Character 메뉴 → Show**
+
+```
+Bones
+  ├─ All Hierarchy: 모든 본 표시
+  └─ Selected Only: 선택한 본만 표시
+
+Mesh
+  └─ Draw Mesh Overlay: 가중치 색상 표시
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380744/notion-blog/_/_/_5_/_8_-_3D_-_1/image_2.png)
+
+**가중치 확인하기**
+
+```
+1. 본 선택
+   ↓
+2. Mesh → Draw Mesh Overlay → Bone Weights
+   ↓
+3. 선택한 본의 가중치를 색상으로 확인
+
+빨강 = 강한 영향
+파랑 = 약한 영향
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380746/notion-blog/_/_/_5_/_8_-_3D_-_1/image_3.png)
+
+---
+
+## 🎬 Skeleton Editor (스켈레톤 에디터)
+
+### 열기
+
+```
+Content Browser
+  ↓
+SKEL_Kicks 더블클릭
+  ↓
+Skeleton Editor 실행
+```
+
+### Skeletal Mesh Editor와 차이점
+
+**Skeletal Mesh Editor**
+
+- 메시 + 스켈레톤 함께 편집
+- 메시 중심 작업
+
+**Skeleton Editor**
+
+- 스켈레톤만 편집
+- 본 구조 중심 작업
+- 메시는 참조로만 표시
+
+### 에디터 간 전환
+
+```
+우측 상단 아이콘:
+  ├─ 🦴 Skeleton 아이콘: Skeleton Editor
+  ├─ 📐 Mesh 아이콘: Skeletal Mesh Editor
+  └─ 🎬 Animation 아이콘: Animation Editor
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380746/notion-blog/_/_/_5_/_8_-_3D_-_1/image_4.png)
+
+---
+
+## 🎬 Animation Editor (애니메이션 에디터)
+
+### 열기 방법
+
+**방법 1: 아이콘 클릭**
+
+```
+Skeletal Mesh/Skeleton Editor
+  ↓
+우측 상단 🎬 아이콘 클릭
+  ↓
+Animation Editor 실행
+```
+
+**방법 2: 애니메이션 에셋 직접 열기**
+
+```
+Content Browser
+  ↓
+Kicks/Animations
+  ↓
+Kicks_Idle 더블클릭
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380746/notion-blog/_/_/_5_/_8_-_3D_-_1/image_5.png)
+
+### Animation Editor 구조
+
+**Viewport**
+
+```
+기능: 애니메이션 재생 확인
+
+컨트롤:
+  ├─ 재생/정지 버튼
+  ├─ 타임라인 스크러빙
+  └─ 재생 속도 조절
+```
+
+**Asset Browser (오른쪽)**
+
+```
+기능: 같은 스켈레톤 애니메이션 목록
+
+사용법:
+애니메이션 더블클릭 → 즉시 재생
+```
+
+**Skeleton Tree**
+
+```
+기능: 본 구조 + 애니메이션 확인
+
+특징:
+본 선택 → 애니메이션 중 움직임 추적
+```
+
+### 애니메이션 재생
+
+```
+1. 애니메이션 선택
+   (예: Kicks_Idle)
+   ↓
+2. 자동 재생 또는 재생 버튼 클릭
+   ↓
+3. 본 움직임 확인
+   - Skeleton Tree에서 본 선택
+   - 애니메이션 따라 본 이동 관찰
+```
+
+---
+
+## 🔗 에셋 간 연결 관계
+
+### 필수 연결
+
+```
+Skeletal Mesh ←→ Skeleton
+       ↓
+Animation Assets
+       ↓
+Physics Asset
+
+모두 같은 Skeleton 공유해야 함
+```
+
+### 왜 분리되어 있나?
+
+**재사용성**
+
+```
+하나의 Skeleton
+  ↓
+여러 Skeletal Mesh 사용 가능
+(같은 구조, 다른 외형)
+  ↓
+여러 Animation 공유
+(모든 메시가 같은 애니메이션 사용)
+
+예:
+남성 캐릭터 메시
+여성 캐릭터 메시
+  ↓
+같은 Humanoid Skeleton
+  ↓
+같은 걷기/뛰기 애니메이션 공유
+```
+
+### 에디터 간 빠른 전환
+
+```
+우측 상단 아이콘으로 즉시 이동:
+
+🦴 → Skeleton
+📐 → Skeletal Mesh
+🎬 → Animation
+
+연결된 에셋만 표시됨
+```
+
+---
+
+## ⚙️ 실습: Kicks 캐릭터 탐색
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380746/notion-blog/_/_/_5_/_8_-_3D_-_1/image_6.png)
+
+### 1. Skeletal Mesh 확인
+
+```
+SKM_Kicks 열기
+  ↓
+본 선택하며 구조 파악
+  ├─ Skeleton Tree에서 계층 확인
+  ├─ 본 회전해보기
+  └─ 가중치 색상 확인
+
+목표: 본과 메시의 관계 이해
+```
+
+### 2. Skeleton 확인
+
+```
+SKEL_Kicks 열기
+  ↓
+본만 집중해서 보기
+  ├─ 메시는 반투명
+  └─ 본 구조만 명확히
+
+목표: 순수 본 계층 이해
+```
+
+### 3. Animation 확인
+
+```
+Kicks_Idle 열기
+  ↓
+애니메이션 재생
+  ↓
+본 선택하며 움직임 관찰
+
+추가 애니메이션도 열어보기:
+  ├─ Kicks_Walk
+  ├─ Kicks_Run
+  └─ ...
+
+목표: 애니메이션 작동 방식 이해
+```
+
+### 4. Physics Asset 확인
+
+```
+PHYS_Kicks 열기
+  ↓
+Physics Body 확인
+  ├─ 각 본에 부착된 형태
+  ├─ 모든 본에 있지 않음
+  └─ 게임에 따라 정밀도 다름
+
+목표: 충돌 처리 구조 이해
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Character vs Pawn
+
+```
+Pawn
+  ├─ 기본 빙의 기능
+  ├─ Movement Component 수동 추가
+  └─ Mesh Component 수동 추가
+
+Character (Pawn 상속)
+  ├─ Character Movement Component 자동
+  ├─ Skeletal Mesh Component 자동
+  ├─ 캐릭터 전용 함수들
+  └─ 게임 캐릭터에 최적화
+```
+
+### Static vs Skeletal Mesh
+
+```
+Static Mesh
+  ├─ 뼈 없음
+  ├─ 애니메이션 불가
+  ├─ 단순 충돌
+  └─ 환경, 소품용
+
+Skeletal Mesh
+  ├─ 뼈 구조
+  ├─ 애니메이션 가능
+  ├─ Physics Asset 충돌
+  └─ 캐릭터, 생물용
+```
+
+### 애니메이션 구조
+
+```
+Skeleton (뼈대)
+  ↓
+본들의 계층구조
+  ↓
+각 본에 폴리곤 가중치 부여
+  ↓
+본 움직임 → 메시 변형
+  ↓
+애니메이션 완성
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 에디터에서 본 회전
+
+```
+❌ 저장되지 않음
+   단순 테스트용
+
+✅ 실제 애니메이션은
+   Animation Asset에서 제작
+```
+
+### 에셋 연결
+
+```
+⚠️ Skeletal Mesh와 Animation은
+   반드시 같은 Skeleton 공유해야 함
+
+다른 Skeleton → 오류 발생
+```
+
+### Physics Asset
+
+```
+⚠️ 모든 본에 Physics Body 필요 없음
+
+필요한 부위만:
+  ├─ 충돌 감지 필요 부위
+  ├─ 물리 시뮬레이션 필요 부위
+  └─ 게임 성능에 따라 조절
+```
+
+---
+
+## 🎯 다음 단계
+
+```
+준비 완료:
+  ✅ Character 클래스 이해
+  ✅ Skeletal Mesh 구조 파악
+  ✅ 샘플 에셋 확인
+
+다음 작업:
+  → Character 클래스 생성
+  → Kicks 메시 적용
+  → 기본 이동 구현
+```
+
+---
+
+## 📝 용어 정리
+
+| 용어          | 설명                             |
+| ------------- | -------------------------------- |
+| Character     | 게임 캐릭터용 클래스 (Pawn 상속) |
+| Skeletal Mesh | 뼈대가 있는 3D 모델              |
+| Skeleton      | 본들의 계층구조                  |
+| Bone (본)     | 스켈레톤의 개별 뼈               |
+| Skinning      | 본과 메시 연결                   |
+| Weight        | 본이 폴리곤에 미치는 영향도      |
+| Physics Asset | Skeletal Mesh 충돌 처리 에셋     |
+| Physics Body  | 각 본의 충돌 형태                |
+| Animation     | 본 움직임 데이터                 |
+
+---
+
+## ✅ 이해도 체크
+
+- [ ] Character가 Pawn과 어떻게 다른지 설명할 수 있나요?
+- [ ] Skeletal Mesh와 Static Mesh의 차이를 아나요?
+- [ ] Skeleton과 Bone의 관계를 이해했나요?
+- [ ] Weight(가중치)가 무엇인지 아나요?
+- [ ] Physics Asset의 역할을 설명할 수 있나요?
+- [ ] 세 가지 에디터(Skeleton, Mesh, Animation)를 구분할 수 있나요?
+
+**모두 체크되었다면 다음 강의로 진행하세요!** 🚀
+
+# { 🎮 첫 번째 Character 블루프린트 생성 }
+
+## 🎯 이번 강의 목표
+
+Character 블루프린트를 생성하고 Skeletal Mesh를 적용합니다.
+메시 방향과 위치를 조정하고, Capsule Component 크기를 설정합니다.
+
+---
+
+## 📁 프로젝트 폴더 구조 설정
+
+### 1. 폴더 생성
+
+```
+Content/
+  └─ Blueprints/ (새로 생성)
+      └─ Kicks/ (새로 생성)
+          └─ BP_Kicks (여기에 생성 예정)
+```
+
+**작업 순서**
+
+```
+1. Content 폴더에서 우클릭
+   ↓
+2. New Folder → "Blueprints"
+   ↓
+3. Blueprints 안에서 우클릭
+   ↓
+4. New Folder → "Kicks"
+```
+
+### 네이밍 규칙
+
+```
+BP_ : Blueprint의 약자
+폴더명과 일치하는 이름 사용 권장
+```
+
+---
+
+## 🔧 Character 블루프린트 생성
+
+### 1. 블루프린트 생성
+
+```
+Kicks 폴더에서 우클릭
+  ↓
+Blueprint Class 선택
+  ↓
+Character 선택 (처음 사용!)
+  ↓
+이름: BP_Kicks
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380746/notion-blog/_/_/_5_/_8_-_3D_-_1/image_7.png)
+
+### 2. 에디터 설정 조정
+
+**문제**: 에셋 에디터가 새 창에서 열림
+
+**해결**
+
+```
+Edit → Editor Preferences
+  ↓
+Asset Editors
+  ↓
+Open Location: Main Window 선택
+
+효과: 모든 에셋 에디터가 상단 탭에 도킹됨
+```
+
+---
+
+## 📋 Character 블루프린트 구조
+
+### BP_Kicks 열면 보이는 탭들
+
+```
+상단 탭:
+  ├─ Viewport: 컴포넌트 시각 편집
+  ├─ Construction Script: 생성 시 실행 로직
+  └─ Event Graph: 게임플레이 로직
+```
+
+### Event Graph 기본 이벤트
+
+```
+회색으로 표시된 이벤트들:
+  ├─ Event BeginPlay: 게임 시작 시 실행
+  ├─ Event ActorBeginOverlap: 충돌 시작
+  └─ Event Tick: 매 프레임 실행
+
+⚠️ Actor 블루프린트와 동일
+```
+
+---
+
+## 🧩 기본 컴포넌트 구조
+
+### Viewport에 기본 포함된 컴포넌트
+
+```
+CapsuleComponent (루트)
+  ├─ ArrowComponent
+  └─ Mesh (Skeletal Mesh Component)
+─────────────────────────────
+CharacterMovement (별도)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380746/notion-blog/_/_/_5_/_8_-_3D_-_1/image_8.png)
+
+### 1. CapsuleComponent (캡슐)
+
+```
+특징:
+  ├─ 루트 컴포넌트 (고정)
+  ├─ 이름 변경 불가
+  ├─ 삭제 불가
+  └─ Character의 필수 요소
+
+역할:
+  ├─ 충돌 감지 (벽, 바닥, 천장)
+  ├─ 캐릭터 배치 기준점
+  └─ 대부분의 물리 처리
+```
+
+**왜 Capsule인가?**
+
+```
+장점:
+  ├─ 회전 시 충돌 처리 안정적
+  ├─ 계단/경사 이동 부드러움
+  └─ 모든 방향 동일한 너비
+
+다른 형태(박스 등)는
+회전 시 충돌 범위 변경 → 문제 발생
+```
+
+### 2. ArrowComponent (화살표)
+
+```
+기능: 캐릭터가 바라보는 방향 표시
+
+특징:
+  ├─ 에디터에서만 보임
+  ├─ 게임 실행 시 보이지 않음
+  └─ 방향 설정 참고용
+```
+
+### 3. Mesh (Skeletal Mesh Component)
+
+```
+이름: "Mesh" (기본값)
+
+특징:
+  ├─ Character 클래스에서 자동 생성
+  ├─ CapsuleComponent에 부착
+  └─ Skeletal Mesh Asset 할당 필요
+
+⚠️ Static Mesh 할당 불가
+   오직 Skeletal Mesh만 가능
+```
+
+### 4. CharacterMovement
+
+```
+위치: 수평선 아래 분리 표시
+
+이유:
+  ├─ Actor Component 기반
+  ├─ 다른 컴포넌트에 부착 불가
+  ├─ 위치/회전 속성 없음
+  └─ 독립적 존재
+
+기능:
+캐릭터 이동 로직 처리
+(걷기, 달리기, 점프 등)
+```
+
+---
+
+## 🎨 Skeletal Mesh 할당
+
+### 1. Mesh 선택 및 할당
+
+```
+Viewport 또는 Components 패널
+  ↓
+Mesh 컴포넌트 선택
+  ↓
+Details 패널
+  ↓
+Mesh 섹션
+  ↓
+Skeletal Mesh Asset 드롭다운
+  ↓
+SKM_Kicks 선택
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380746/notion-blog/_/_/_5_/_8_-_3D_-_1/image_9.png)
+
+### 2. 문제 발생: 잘못된 방향과 위치
+
+```
+발생한 문제:
+  ├─ 메시가 너무 높음 (공중에 떠있음)
+  └─ 메시가 Y 방향 향함 (화살표는 X 방향)
+
+원인:
+메시의 피벗 포인트가 Y 방향 기준
+```
+
+### 왜 Y 방향을 향하나?
+
+```
+3D 모델링 툴 좌표계 차이:
+
+Maya/Blender 등:
+  ├─ Y축이 전방
+  └─ 표준 방식
+
+Unreal Engine:
+  ├─ X축이 전방
+  └─ 엔진 내부 표준
+
+→ Import 시 방향 차이 발생
+
+⚠️ Unreal Marketplace 에셋 대부분이
+   Y 방향을 향함 (매우 흔한 상황)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380741/notion-blog/_/_/_5_/_8_-_3D_-_1/image_10.png)
+
+---
+
+## 🔄 메시 방향 및 위치 조정
+
+### 1. 방향 수정 (회전)
+
+```
+Mesh 컴포넌트 선택
+  ↓
+회전 도구(E) 활성화
+  ↓
+기즈모 잡고 90도 회전
+  ↓
+Z축 기준 -90도 회전
+
+결과: 메시가 X 방향(전방) 향함
+```
+
+**Details 패널 수치 입력**
+
+```
+Transform → Rotation
+  └─ Z: -90.0
+
+또는 직접 기즈모로 회전
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380741/notion-blog/_/_/_5_/_8_-_3D_-_1/image_11.png)
+
+### 2. 위치 조정 (이동)
+
+```
+목표: 발이 Capsule 바닥에 위치
+
+작업:
+  ├─ 이동 도구(W) 활성화
+  ├─ 메시를 아래로 이동
+  └─ 발이 캡슐 바닥에 닿을 때까지
+
+⚠️ 정확한 수치는 나중에 조정
+```
+
+---
+
+## 📏 Capsule Component 크기 조정
+
+### 왜 조정이 필요한가?
+
+```
+Capsule의 역할:
+
+1. 배치 기준점
+   └─ Capsule 바닥 = 바닥에 닿는 지점
+
+2. 충돌 감지
+   └─ 벽, 바닥, 천장과 충돌
+
+→ 캐릭터 메시와 크기가 맞아야 함
+```
+
+### 레벨에 배치해서 확인
+
+```
+BP_Kicks를 레벨에 드래그
+  ↓
+문제 발견:
+  ├─ Capsule은 바닥에 있음
+  └─ 발은 공중에 떠있음
+
+이유:
+Capsule 바닥이 배치 기준점이므로
+메시 발이 Capsule 바닥에 없으면
+공중에 뜬 상태로 배치됨
+```
+
+### Capsule 크기 조정
+
+**1. Capsule Half Height (높이)**
+
+```
+CapsuleComponent 선택
+  ↓
+Details 패널
+  ↓
+Shape 섹션
+  ↓
+Capsule Half Height 조정
+
+설명:
+  ├─ "Half Height" = 절반 높이
+  ├─ 실제 높이 = 이 값 × 2
+  └─ 캡슐 중심에서 위/아래 거리
+
+권장값: 70
+  └─ 실제 높이 = 140
+```
+
+**조정 방법**
+
+```
+방법 1: 값 클릭 후 좌우 드래그
+방법 2: 직접 숫자 입력
+
+실시간으로 Viewport에서 변화 확인
+```
+
+**2. Capsule Radius (반지름)**
+
+```
+역할: 캐릭터의 가로 충돌 범위
+
+너무 얇으면:
+  ├─ 팔이 벽 통과
+  └─ 부자연스러움
+
+너무 두꺼우면:
+  ├─ 좁은 길 통과 불가
+  └─ 답답한 느낌
+
+권장값: 34
+  └─ 메시와 벽 사이 여유 공간 확보
+```
+
+### 메시 위치 최종 조정
+
+```
+CapsuleComponent 설정:
+  ├─ Half Height: 70
+  └─ Radius: 34
+
+Mesh 위치 조정:
+  └─ Location Z: -70
+
+의미:
+발이 Capsule 바닥에 정확히 위치
+(Half Height = -Z 위치)
+```
+
+**확인**
+
+```
+레벨에 배치
+  ↓
+발이 바닥에 정확히 닿는지 확인
+  ↓
+필요시 미세 조정
+```
+
+---
+
+## 🎯 실습: Character 설정 완성
+
+### 전체 작업 흐름
+
+```
+1. Character 블루프린트 생성
+   Kicks 폴더 → Blueprint Class → Character
+   ↓
+2. Skeletal Mesh 할당
+   Mesh 컴포넌트 → SKM_Kicks
+   ↓
+3. 메시 회전
+   Z: -90 (전방 향하게)
+   ↓
+4. Capsule 크기 조정
+   Half Height: 70
+   Radius: 34
+   ↓
+5. 메시 위치 조정
+   Location Z: -70 (발이 바닥에)
+   ↓
+6. 레벨 배치 확인
+   제대로 바닥에 서있는지 확인
+```
+
+### 최종 설정값 정리
+
+**CapsuleComponent**
+
+```
+Shape:
+  ├─ Capsule Half Height: 70
+  └─ Capsule Radius: 34
+```
+
+**Mesh (Skeletal Mesh Component)**
+
+```
+Transform:
+  ├─ Location
+  │   ├─ X: 0
+  │   ├─ Y: 0
+  │   └─ Z: -70
+  └─ Rotation
+      ├─ X: 0
+      ├─ Y: 0
+      └─ Z: -90
+
+Mesh:
+  └─ Skeletal Mesh Asset: SKM_Kicks
+```
+
+---
+
+## ⚠️ 현재 상태와 한계
+
+### 완성된 것
+
+```
+✅ Character 블루프린트 생성
+✅ Skeletal Mesh 할당
+✅ 방향 및 위치 조정
+✅ Capsule 크기 설정
+✅ 레벨 배치 가능
+```
+
+### 아직 안 되는 것
+
+```
+❌ Play를 눌러도 이 캐릭터로 시작 안 됨
+   이유: 기본 Pawn이 따로 설정됨
+
+❌ 캐릭터를 조종할 수 없음
+   이유: 입력 설정 안 됨
+
+❌ 움직임 구현 안 됨
+   이유: 입력과 이동 로직 연결 안 됨
+```
+
+### 왜 기본 Pawn이 나오나?
+
+```
+현재 상황:
+Play 누르면 기본 Pawn으로 시작
+
+이유:
+프로젝트 설정에서
+"기본 Pawn 클래스"를 지정하지 않음
+
+해결 (다음 강의):
+Game Mode에서 BP_Kicks를
+기본 Pawn으로 설정
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Character의 Capsule Component
+
+```
+역할:
+  ├─ 1. 충돌 감지
+  │   └─ 벽, 바닥, 천장과의 충돌
+  ├─ 2. 배치 기준
+  │   └─ 바닥에 놓을 때 기준점
+  └─ 3. 물리 처리
+      └─ 대부분의 충돌 계산
+
+특징:
+  ├─ 루트 컴포넌트 (변경 불가)
+  ├─ 삭제/이름 변경 불가
+  └─ Character 클래스의 핵심
+```
+
+### Skeletal Mesh 방향 문제
+
+```
+일반적인 문제:
+Marketplace 에셋 → Y 방향 향함
+
+해결:
+  ├─ 메시는 루트가 아니므로
+  ├─ 자유롭게 회전 가능
+  └─ Z축 -90도 회전
+
+⚠️ 거의 모든 캐릭터 에셋에서 발생
+   표준 작업으로 생각하기
+```
+
+### Capsule 크기 조정 원칙
+
+```
+Half Height:
+  └─ 캐릭터 키의 절반
+     (머리 위 여유 조금 포함)
+
+Radius:
+  ├─ 메시보다 약간 크게
+  ├─ 팔 움직임 고려
+  └─ 벽과의 여유 공간 확보
+
+위치 관계:
+Mesh Z = -(Capsule Half Height)
+  └─ 발이 Capsule 바닥에 위치
+```
+
+---
+
+## 🔍 추가 설명
+
+### Static Mesh vs Skeletal Mesh Component
+
+```
+Static Mesh Component:
+  ├─ Static Mesh Asset 할당
+  └─ 움직이지 않는 물체
+
+Skeletal Mesh Component:
+  ├─ Skeletal Mesh Asset만 할당
+  └─ 애니메이션 가능한 캐릭터
+
+⚠️ 서로 호환 안 됨
+   Mesh 컴포넌트에 Static Mesh 할당 불가
+```
+
+### Component 부착 계층
+
+```
+부착 가능 컴포넌트:
+  ├─ Scene Component
+  ├─ Static/Skeletal Mesh
+  ├─ Camera, Light 등
+  └─ 위치/회전/스케일 있음
+
+부착 불가 컴포넌트:
+  ├─ Movement Component
+  ├─ AI Controller 등
+  └─ Actor Component 직속
+  └─ 위치/회전 속성 없음
+
+→ Components 패널에서 선으로 구분
+```
+
+---
+
+## 📝 용어 정리
+
+| 용어              | 설명                                 |
+| ----------------- | ------------------------------------ |
+| Capsule Component | Character의 루트 컴포넌트, 충돌 처리 |
+| Half Height       | 캡슐 절반 높이 (실제 높이의 1/2)     |
+| Radius            | 캡슐 반지름 (가로 충돌 범위)         |
+| Pivot Point       | 3D 모델의 중심점, 회전 기준          |
+| 루트 컴포넌트     | 최상위 컴포넌트, 변경 불가           |
+| 도킹              | 창을 탭으로 붙여서 표시              |
+
+---
+
+## 🎯 다음 단계
+
+```
+현재 완료:
+  ✅ Character 블루프린트 생성
+  ✅ 메시 설정 완료
+  ✅ 크기 조정 완료
+
+다음 작업:
+  → Game Mode 설정
+     (BP_Kicks를 기본 Pawn으로)
+  → 입력 설정
+     (키보드/마우스 매핑)
+  → 이동 로직 구현
+     (Blueprint에서 Input 처리)
+
+```
+
+---
+
+## ✅ 체크리스트
+
+**기본 설정**
+
+- [ ] Blueprints/Kicks 폴더 생성
+- [ ] BP_Kicks Character 생성
+- [ ] 에디터 창 도킹 설정
+
+**메시 설정**
+
+- [ ] SKM_Kicks 할당
+- [ ] Z축 -90도 회전
+- [ ] 발이 Capsule 바닥에 위치
+
+**Capsule 설정**
+
+- [ ] Half Height: 70
+- [ ] Radius: 34
+- [ ] 레벨 배치 시 바닥에 제대로 서있음
+
+**이해도 확인**
+
+- [ ] Capsule Component의 역할을 설명할 수 있나요?
+- [ ] 왜 메시가 Y 방향을 향하는지 아나요?
+- [ ] Half Height와 Mesh Z 위치의 관계를 이해했나요?
+- [ ] CharacterMovement가 왜 별도로 표시되는지 아나요?
+
+**모두 완료했다면 다음 강의로!** 🚀
+
+# { 🎮 Game Mode 설정 및 기본 Pawn 지정 }
+
+## 🎯 이번 강의 목표
+
+Game Mode를 생성하고 BP_Kicks를 기본 Pawn으로 설정합니다.
+Play 시 자동으로 캐릭터를 소유하도록 만듭니다.
+
+---
+
+## 📁 폴더 및 Game Mode 생성
+
+### 1. 폴더 생성
+
+```
+Content/Blueprints/
+  └─ Game/ (새로 생성)
+      └─ BP_JetpackGameMode (여기에 생성)
+```
+
+### 2. Game Mode 블루프린트 생성
+
+```
+Game 폴더에서 우클릭
+  ↓
+Blueprint Class
+  ↓
+Game Mode Base 선택
+  ↓
+이름: BP_JetpackGameMode
+```
+
+---
+
+## ⚙️ Game Mode 설정
+
+### Default Pawn Class 변경
+
+```
+BP_JetpackGameMode 열기
+  ↓
+Details 패널
+  ↓
+Classes 섹션
+  ↓
+Default Pawn Class
+  ↓
+BP_Kicks 선택
+  ↓
+Compile & Save
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380741/notion-blog/_/_/_5_/_8_-_3D_-_1/image_12.png)
+
+**설정 의미**
+
+```
+이 Game Mode 사용 시
+  ↓
+자동으로 BP_Kicks 생성
+  ↓
+플레이어가 소유
+```
+
+---
+
+## 🎮 프로젝트에 Game Mode 적용
+
+### Project Settings 설정
+
+```
+Edit → Project Settings
+  ↓
+Maps & Modes
+  ↓
+Default GameMode
+  ↓
+GameModeBase → BP_JetpackGameMode 변경
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380741/notion-blog/_/_/_5_/_8_-_3D_-_1/image_13.png)
+
+**결과**
+
+```
+Play 누르면
+  ↓
+BP_JetpackGameMode 사용
+  ↓
+BP_Kicks 자동 생성 및 소유
+```
+
+---
+
+## 🧹 레벨 정리
+
+### 레벨에 있는 BP_Kicks 삭제
+
+**이유**
+
+```
+Game Mode가 자동으로 생성하므로
+레벨에 미리 배치할 필요 없음
+
+배치된 것과 생성된 것
+  ↓
+2개 존재 → 혼란 발생
+
+⚠️ 레벨에 배치된 것은 삭제!
+```
+
+**확인**
+
+```
+Play 후 Detach(F8)
+  ↓
+뒤돌아보기
+  ↓
+BP_Kicks 1개만 존재 확인
+```
+
+---
+
+## ⚠️ 현재 상태
+
+### 완성된 것
+
+```
+✅ Game Mode 생성
+✅ 기본 Pawn 설정
+✅ Play 시 자동 소유
+```
+
+### 아직 안 되는 것
+
+```
+❌ 움직임 입력 (WASD)
+❌ 마우스 회전
+❌ 캐릭터 조종 불가
+
+다음: Enhanced Input 설정 필요
+```
+
+---
+
+## 💡 핵심 정리
+
+```
+Game Mode 역할:
+  └─ 게임 규칙 정의
+      └─ Default Pawn Class 지정
+
+설정 흐름:
+1. Game Mode 생성
+2. Default Pawn 설정
+3. Project Settings 적용
+  ↓
+Play 시 자동 소유
+```
+
+---
+
+## ✅ 체크리스트
+
+- [ ] Game 폴더 생성
+- [ ] BP_JetpackGameMode 생성
+- [ ] Default Pawn Class → BP_Kicks 설정
+- [ ] Project Settings → Default GameMode 설정
+- [ ] 레벨의 BP_Kicks 인스턴스 삭제
+- [ ] Play 시 캐릭터 소유 확인
+
+**다음: Enhanced Input 설정!** 🚀
+
+# { 📷 Camera와 Spring Arm 추가 }
+
+## 🎯 목표
+
+캐릭터에 Camera와 Spring Arm을 추가해 3인칭 시점 구현
+
+---
+
+## 🔧 컴포넌트 추가
+
+### 작업 순서
+
+```
+BP_Kicks 열기
+  ↓
+CapsuleComponent 선택
+  ↓
+Add → Spring Arm
+  (이름: SpringArm)
+  ↓
+SpringArm 선택
+  ↓
+Add → Camera
+  (이름: Camera)
+```
+
+**구조**
+
+```
+CapsuleComponent
+  └─ SpringArm
+      └─ Camera
+```
+
+---
+
+## ⚙️ Spring Arm 설정
+
+### Target Arm Length 조정
+
+```
+SpringArm 선택
+  ↓
+Details → Camera Settings
+  ↓
+Target Arm Length: 250 (원하는 거리)
+
+효과: 카메라와 캐릭터 사이 거리
+```
+
+---
+
+## ✅ 결과
+
+```
+Play 누르면
+  ↓
+캐릭터를 뒤에서 볼 수 있음
+  ↓
+더 이상 캐릭터 머리 안쪽 시점 아님
+```
+
+---
+
+## 🎯 다음 단계
+
+```
+완료: ✅ 카메라 시점
+
+다음:
+  → Input 설정
+  → 카메라 회전 (마우스)
+  → 캐릭터 이동 (WASD)
+  → 제트팩 기능 구현
+```
+
+**다음: Enhanced Input 설정!** 🚀
+
+# { 🎮 Enhanced Input 준비 - Input Action과 Input Mapping Context }
+
+## 🎯 이번 강의 목표
+
+캐릭터 조종을 위한 Enhanced Input 에셋을 생성합니다.
+Player Controller에서 입력을 처리하는 구조를 이해합니다.
+
+---
+
+## 💡 입력 구현 방식 비교
+
+### 방법 1: Character 블루프린트에서 직접 구현
+
+```
+이전 Bot Pawn 방식:
+  ├─ Event Graph에 Input Mapping Context 추가
+  ├─ Event Graph에 기능 구현
+  └─ 모든 로직이 하나의 클래스에
+
+단점:
+하나의 클래스에 너무 많은 기능
+  ↓
+God Class (갓 클래스) 문제
+```
+
+### 방법 2: Player Controller에서 구현 ✅
+
+```
+이번 Kicks Character 방식:
+  ├─ Player Controller가 입력 처리
+  ├─ Character는 캐릭터 기능만
+  └─ 역할 분리
+
+장점:
+  ├─ 코드 정리 (Clean Code)
+  ├─ 유지보수 쉬움
+  └─ 역할 명확히 분리
+```
+
+---
+
+## 🚫 God Class란?
+
+### 정의
+
+```
+God Class (신 클래스):
+하나의 클래스가 너무 많은 기능을 처리
+
+예:
+Character 클래스에서
+  ├─ 입력 처리
+  ├─ 이동 로직
+  ├─ 애니메이션
+  ├─ 전투 시스템
+  ├─ UI 업데이트
+  └─ ... 너무 많음!
+
+문제점:
+  ├─ 코드가 길고 복잡
+  ├─ 버그 찾기 어려움
+  ├─ 수정 시 다른 기능 영향
+  └─ 팀 작업 시 충돌
+```
+
+### 해결: 역할 분리
+
+```
+권장 구조:
+  ├─ Player Controller: 입력 처리
+  ├─ Character: 캐릭터 동작
+  ├─ Animation BP: 애니메이션
+  └─ 각자 역할만 담당
+```
+
+---
+
+## 📁 폴더 구조 설정
+
+### Input 폴더 생성
+
+```
+Content/Blueprints/
+  └─ Input/ (새로 생성)
+      ├─ InputActions/ (새로 생성)
+      │   └─ IA_Look (여기에 생성 예정)
+      └─ IMC_KickActions (여기에 생성 예정)
+```
+
+---
+
+## 🎯 Input Action 생성 - IA_Look
+
+### 1. Input Action 생성
+
+```
+InputActions 폴더에서 우클릭
+  ↓
+Input → Input Action
+  ↓
+이름: IA_Look
+```
+
+### 2. Value Type 설정
+
+```
+IA_Look 열기
+  ↓
+Value Type 변경
+  ↓
+Digital (bool) → Axis2D (Vector2D) 선택
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380743/notion-blog/_/_/_5_/_8_-_3D_-_1/image_14.png)
+
+**왜 Axis2D인가?**
+
+```
+마우스 입력:
+  ├─ X축 이동 (좌우)
+  └─ Y축 이동 (상하)
+
+2차원 입력 필요
+  ↓
+Axis2D (Vector2D) 사용
+
+Vector2D = (X, Y) 값
+```
+
+---
+
+## 🗺️ Input Mapping Context 생성
+
+### 1. IMC 생성
+
+```
+Input 폴더에서 우클릭
+  ↓
+Input → Input Mapping Context
+  ↓
+이름: IMC_KickActions
+```
+
+**네이밍**
+
+```
+IMC_ : Input Mapping Context 약자
+KickActions : Kicks 캐릭터의 모든 입력
+```
+
+### 2. Mapping 추가
+
+```
+IMC_KickActions 열기
+  ↓
+Mappings 섹션
+  ↓
++ 버튼 (Add Mapping)
+  ↓
+드롭다운 열기
+  ↓
+IA_Look 선택
+```
+
+### 3. 입력 키 연결
+
+```
+IA_Look 매핑 확장
+  ↓
++ 버튼 (Add Key)
+  ↓
+드롭다운 열기
+  ↓
+Mouse → Mouse XY 2D-Axis 선택
+```
+
+**구조**
+
+```
+IMC_KickActions
+  └─ IA_Look
+      └─ Mouse XY 2D-Axis
+
+의미:
+마우스 XY 움직임 → IA_Look으로 전달
+```
+
+---
+
+## 🎮 Enhanced Input 구조 복습
+
+### 전체 흐름
+
+```
+1. 물리적 입력
+   마우스 이동
+   ↓
+2. Input Mapping Context
+   Mouse XY → IA_Look 연결
+   ↓
+3. Input Action
+   IA_Look (Axis2D 값)
+   ↓
+4. Blueprint 처리
+   Player Controller에서 구현 (다음 강의)
+   ↓
+5. 게임 동작
+   카메라 회전
+```
+
+### 각 에셋의 역할
+
+**Input Action (IA_Look)**
+
+```
+역할:
+  ├─ "무엇을" 할지 정의
+  ├─ 입력 값 타입 지정
+  └─ Blueprint에서 참조
+
+특징:
+  ├─ 실제 키와 무관
+  ├─ 추상적 액션
+  └─ 값 타입만 정의
+```
+
+**Input Mapping Context (IMC_KickActions)**
+
+```
+역할:
+  ├─ "어떤 키가" Input Action과 연결되는지
+  ├─ 여러 키를 하나의 Action에 연결 가능
+  └─ 상황별로 다른 IMC 사용 가능
+
+특징:
+  ├─ 실제 키 바인딩
+  ├─ 런타임에 활성화/비활성화
+  └─ 여러 IMC 동시 사용 가능
+```
+
+---
+
+## 🔄 이전 프로젝트와의 차이
+
+### Bot Pawn 방식 (이전)
+
+```
+구조:
+Bot Pawn BP
+  ├─ BeginPlay: IMC 추가
+  ├─ Input Action 처리
+  └─ 모든 로직 구현
+
+특징:
+  └─ 간단하지만 확장성 낮음
+```
+
+### Kicks Character 방식 (이번)
+
+```
+구조:
+Player Controller BP (다음 강의)
+  ├─ BeginPlay: IMC 추가
+  └─ Input Action 처리
+      ↓
+Character BP
+  └─ 순수한 캐릭터 기능만
+
+특징:
+  └─ 복잡하지만 확장성 높음
+```
+
+---
+
+## 🎯 현재 상태
+
+### 완성된 것
+
+```
+✅ Input 폴더 구조
+✅ IA_Look (Axis2D)
+✅ IMC_KickActions
+✅ Mouse XY → IA_Look 연결
+```
+
+### 아직 안 된 것
+
+```
+❌ Player Controller 클래스 없음
+❌ IMC 활성화 안 됨
+❌ Input Action 처리 로직 없음
+❌ 실제 카메라 회전 구현 안 됨
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### God Class 문제
+
+```
+피해야 할 패턴:
+하나의 클래스에 모든 기능
+
+해결:
+  ├─ Player Controller: 입력
+  ├─ Character: 동작
+  ├─ Game Mode: 게임 규칙
+  └─ 각자 역할 분리
+```
+
+### Enhanced Input 3요소
+
+```
+1. Input Action
+   └─ 추상적 행동 정의
+
+2. Input Mapping Context
+   └─ 키와 Action 연결
+
+3. Blueprint 구현
+   └─ Action 발생 시 실제 동작
+```
+
+### Axis2D (Vector2D)
+
+```
+구성:
+  ├─ X 값 (좌우)
+  └─ Y 값 (상하)
+
+사용처:
+  ├─ 마우스 이동
+  ├─ 게임패드 스틱
+  └─ 2차원 방향 입력
+```
+
+---
+
+## 📝 용어 정리
+
+| 용어                  | 설명                                    |
+| --------------------- | --------------------------------------- |
+| God Class             | 너무 많은 기능을 가진 클래스 (안티패턴) |
+| Input Action          | 추상적 행동 정의 (예: Look, Move)       |
+| Input Mapping Context | 키와 Action 연결                        |
+| Axis2D                | 2차원 입력 값 (Vector2D)                |
+| Player Controller     | 입력 처리 전담 클래스                   |
+| Clean Code            | 깔끔하고 유지보수 쉬운 코드             |
+
+---
+
+## 🎯 다음 단계
+
+```
+준비 완료:
+  ✅ IA_Look 생성
+  ✅ IMC_KickActions 생성
+  ✅ Mouse XY 연결
+
+다음 작업:
+  → Player Controller 클래스 생성
+  → IMC 활성화
+  → IA_Look 처리 구현
+  → 카메라 회전 로직
+```
+
+---
+
+## ✅ 체크리스트
+
+**폴더 및 에셋**
+
+- [ ] Input/InputActions 폴더 생성
+- [ ] IA_Look 생성
+- [ ] Value Type: Axis2D 설정
+- [ ] IMC_KickActions 생성
+- [ ] IA_Look 매핑 추가
+- [ ] Mouse XY 2D-Axis 연결
+
+**이해도 확인**
+
+- [ ] God Class가 무엇인지 설명할 수 있나요?
+- [ ] 왜 Player Controller에서 입력을 처리하나요?
+- [ ] Axis2D가 무엇인지 아나요?
+- [ ] Input Action과 Mapping Context의 차이를 아나요?
+
+**다음 강의: Player Controller 생성!** 🚀
+
+# { 🎮 Player Controller와 Look 입력 구현 }
+
+## 🎯 이번 강의 목표
+
+Player Controller 블루프린트를 생성하고 마우스로 카메라를 회전시키는 기능을 구현합니다.
+Character와 Player Controller의 역할 차이를 이해합니다.
+
+---
+
+## 📁 Player Controller 생성
+
+### 1. 폴더 및 블루프린트 생성
+
+```
+Content/Blueprints/
+  └─ Player/ (새로 생성)
+      └─ BP_KicksPlayerController
+```
+
+**작업 순서**
+
+```
+Blueprints 폴더에서 우클릭
+  ↓
+New Folder → "Player"
+  ↓
+Player 폴더에서 우클릭
+  ↓
+Blueprint Class → Player Controller
+  ↓
+이름: BP_KicksPlayerController
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380743/notion-blog/_/_/_5_/_8_-_3D_-_1/image_15.png)
+
+### 2. Game Mode에 등록
+
+```
+BP_JetpackGameMode 열기
+  ↓
+Details 패널
+  ↓
+Classes 섹션
+  ↓
+Player Controller Class
+  ↓
+BP_KicksPlayerController 선택
+  ↓
+Compile & Save
+```
+
+**설정 의미**
+
+```
+이제 게임 시작 시
+  ↓
+BP_KicksPlayerController 사용
+  ↓
+기본 Player Controller 대신
+```
+
+---
+
+## ✅ Player Controller 작동 확인
+
+### 테스트 코드 작성
+
+```
+BP_KicksPlayerController 열기
+  ↓
+Event Graph
+  ↓
+Event BeginPlay
+  ↓
+Print String
+  └─ In String: "BP Kicks Player Controller"
+```
+
+**결과**
+
+```
+Play 누르면
+  ↓
+좌측 상단에
+"BP Kicks Player Controller" 출력
+  ↓
+우리가 만든 Controller가 사용 중임을 확인
+```
+
+---
+
+## 🔄 입력 처리 방식 비교
+
+### 이전 방식: Pawn에서 직접 처리
+
+**Bot Pawn에서 했던 방식**
+
+```
+Event BeginPlay
+  ↓
+Get Controller (컨트롤러 가져오기)
+  ↓
+Cast to PlayerController (형변환)
+  ↓
+Get Subsystem (Enhanced Input Local Player Subsystem)
+  ↓
+Add Mapping Context
+  ↓
+Input Action 처리
+```
+
+**왜 복잡했나?**
+
+```
+Pawn 자체는 Player Controller가 아님
+  ↓
+Controller를 "소유"하고 있을 뿐
+  ↓
+그래서 Get Controller로 가져온 후
+  ↓
+PlayerController로 형변환 필요
+  ↓
+그래야 Enhanced Input 기능 사용 가능
+```
+
+### 새 방식: Player Controller에서 직접 처리 ✅
+
+**BP_KicksPlayerController에서**
+
+```
+Event BeginPlay
+  ↓
+Get Subsystem (Enhanced Input Local Player Subsystem)
+  ↓
+Add Mapping Context
+  ↓
+Input Action 처리
+```
+
+**왜 간단한가?**
+
+```
+이미 Player Controller 내부에 있음
+  ↓
+Get Controller 불필요
+  ↓
+Cast to PlayerController 불필요
+  ↓
+바로 Enhanced Input 기능 사용 가능
+```
+
+---
+
+## 🔧 Enhanced Input Subsystem 가져오기
+
+### 두 가지 방법
+
+**방법 1: Player Controller 입력 필요 (구식)**
+
+```
+우클릭 → "Enhanced Input Local Player Subsystem"
+  ↓
+Player Controller 카테고리 선택
+  ↓
+노드 생성
+  ├─ Target 입력 필요
+  └─ Self 노드 연결
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380743/notion-blog/_/_/_5_/_8_-_3D_-_1/image_16.png)
+
+**방법 2: 입력 불필요 (신식, 권장) ✅**
+
+```
+우클릭 → "Enhanced Input Local Player Subsystem"
+  ↓
+Local Player Subsystem 카테고리 선택
+  ↓
+노드 생성
+  └─ 입력 핀 없음 (바로 사용 가능)
+```
+
+**차이점**
+
+```
+방법 1 (Player Controller 카테고리):
+  └─ Target 입력 필요 → Self 연결
+
+방법 2 (Local Player Subsystem 카테고리):
+  └─ 입력 불필요 → 자동으로 현재 Player Controller 사용
+
+⚠️ Player Controller 안에서는 방법 2 사용 권장
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380743/notion-blog/_/_/_5_/_8_-_3D_-_1/image_17.png)
+
+---
+
+## 🔄 전체 흐름
+
+```
+1. 게임 시작 (BeginPlay)
+   ↓
+2. 입력 관리자 가져오기 (Get Subsystem)
+   ↓
+3. 입력 설정 등록 (Add Mapping Context)
+
+━━━━━━━━ 준비 완료 ━━━━━━━━
+
+4. 마우스 움직임 감지 (IA_Look Triggered)
+   ↓
+5. X, Y 값 분리 (Break Vector 2D)
+   ↓
+6. X → 좌우 회전 (Add Yaw Input)
+   Y → 상하 회전 (Add Pitch Input)
+   ↓
+7. Player Controller 회전
+   ↓
+8. Spring Arm이 따라감
+   ↓
+9. Camera 회전 완료!
+```
+
+---
+
+## 💡 핵심만 정리
+
+| 노드                | 역할        | 한마디로             |
+| ------------------- | ----------- | -------------------- |
+| BeginPlay           | 시작 신호   | "게임 시작!"         |
+| Get Subsystem       | 입력 관리자 | "입력 담당자 불러와" |
+| Add Mapping Context | 설정 등록   | "이 규칙 쓸게"       |
+| IA_Look             | 입력 감지   | "마우스 움직였어!"   |
+| Break Vector 2D     | 값 분리     | "좌우/상하 나눠"     |
+| Add Yaw             | 좌우 회전   | "고개 가로젓기"      |
+| Add Pitch           | 상하 회전   | "고개 끄덕이기"      |
+| Self                | 자기 자신   | "나를"               |
+
+---
+
+## 🎯 왜 이렇게 하나?
+
+```
+분리된 이유:
+
+마우스 움직임 (X, Y)
+  ↓
+X는 좌우 (Yaw)에만
+Y는 상하 (Pitch)에만
+  ↓
+각각 다른 회전축 사용
+  ↓
+자연스러운 카메라 회전
+```
+
+---
+
+## 🗺️ Input Mapping Context 추가
+
+### Blueprint 구현
+
+```
+Event BeginPlay
+  ↓
+Enhanced Input Local Player Subsystem
+  (Local Player Subsystem 카테고리)
+  ↓
+Add Mapping Context
+  ├─ Mapping Context: IMC_KickActions
+  ├─ Priority: 0 (기본값)
+  └─ Options: 기본값
+```
+
+**완성된 구조**
+
+```
+[Event BeginPlay] → [Get Subsystem] → [Add Mapping Context]
+                                            └─ IMC_KickActions
+```
+
+---
+
+## 🎬 Input Action 처리 - IA_Look
+
+### 1. Input Action 이벤트 생성
+
+```
+Event Graph에서 우클릭
+  ↓
+"IA_Look" 검색
+  ↓
+Enhanced Action Events → IA Look
+  ↓
+Triggered 선택
+```
+
+**이벤트 종류**
+
+```
+Started: 입력 시작 순간
+Ongoing: 입력 지속 중
+Triggered: 입력 활성화 (일반적으로 사용)
+Completed: 입력 완료
+Canceled: 입력 취소
+```
+
+### 2. 테스트: 값 출력해보기
+
+```
+IA Look (Triggered)
+  ↓
+Get Action Value (액션 값 가져오기)
+  ↓
+Break Vector 2D (Vector2D 분해)
+  ├─ X: 마우스 좌우 이동
+  └─ Y: 마우스 상하 이동
+  ↓
+Vector 2D to String (문자열 변환)
+  ↓
+Print String
+```
+
+**테스트 결과**
+
+```
+Play 후 마우스 이동:
+  ├─ 좌우 이동 → X 값 변화 (Y는 0)
+  ├─ 상하 이동 → Y 값 변화 (X는 0)
+  └─ 원 그리기 → X, Y 모두 변화
+
+→ Input Action이 제대로 작동함!
+```
+
+---
+
+## 🎥 카메라 회전 구현
+
+### Player Controller의 회전 기능
+
+**Player Controller 내장 함수**
+
+```
+Add Pitch Input
+  └─ 상하 회전 (고개 끄덕임)
+
+Add Yaw Input
+  └─ 좌우 회전 (고개 가로젓기)
+
+Add Roll Input
+  └─ 좌우 기울기 (사용 안 함)
+```
+
+**왜 이 함수들을 사용하나?**
+
+```
+Player Controller는 자체 회전값을 가짐
+  ↓
+이 회전값을 컴포넌트가 따라가게 할 수 있음
+  ↓
+캐릭터의 특정 컴포넌트만 회전 가능
+  (예: Spring Arm만 회전, 메시는 회전 안 함)
+```
+
+### Blueprint 구현
+
+```
+IA Look (Triggered)
+  ↓
+Get Action Value
+  ↓
+Break Vector 2D
+  ├─ X → Add Yaw Input (좌우 회전)
+  └─ Y → Add Pitch Input (상하 회전)
+```
+
+**연결 구조**
+
+```
+[IA Look Triggered]
+  ↓
+[Get Action Value] → [Break Vector 2D]
+                        ├─ X → [Add Yaw Input]
+                        └─ Y → [Add Pitch Input]
+```
+
+---
+
+## ⚙️ Character 설정 조정
+
+### 문제 1: 캐릭터 메시가 함께 회전함
+
+**현상**
+
+```
+마우스 좌우 이동 시
+  ↓
+캐릭터 메시도 함께 회전
+  ↓
+원하지 않는 동작
+```
+
+**원인**
+
+```
+BP_Kicks → Details 패널
+  └─ Pawn
+      └─ Use Controller Rotation Yaw: ✅ (체크됨)
+
+의미:
+캐릭터가 Controller 회전을 따라감
+```
+
+**해결**
+
+```
+BP_Kicks 열기
+  ↓
+Details 패널
+  ↓
+Pawn 섹션
+  ↓
+Use Controller Rotation Yaw: ❌ (체크 해제)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380743/notion-blog/_/_/_5_/_8_-_3D_-_1/image_18.png)
+
+### 문제 2: 아무것도 회전하지 않음
+
+**현상**
+
+```
+Use Controller Rotation Yaw 해제 후
+  ↓
+마우스 움직여도 아무 반응 없음
+```
+
+**원인**
+
+```
+Spring Arm이 Controller 회전을 따라가도록
+설정하지 않음
+```
+
+**해결**
+
+```
+BP_Kicks → SpringArm 선택
+  ↓
+Details 패널
+  ↓
+Camera Settings 섹션
+  ↓
+Use Pawn Control Rotation: ✅ (체크)
+```
+
+**설정 의미**
+
+```
+Use Pawn Control Rotation:
+Spring Arm이 Controller 회전을 따라감
+
+결과:
+  ├─ Controller 회전 → Spring Arm 회전
+  ├─ Spring Arm에 부착된 Camera도 회전
+  └─ 캐릭터 메시는 회전 안 함
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380744/notion-blog/_/_/_5_/_8_-_3D_-_1/image_19.png)
+
+---
+
+## 🔧 회전 방향 문제 해결
+
+### 문제: Y축 반전
+
+**현상**
+
+```
+마우스 위로 → 카메라 아래 봄
+마우스 아래로 → 카메라 위 봄
+
+→ 직관과 반대!
+```
+
+**원인**
+
+```
+Unreal Engine의 Y축 방향
+  ↓
+위로 = 양수
+아래로 = 음수
+  ↓
+일반적인 마우스 감각과 반대
+```
+
+### 해결: Negate Modifier
+
+**IA_Look 에셋 수정**
+
+```
+IA_Look 열기
+  ↓
+Modifiers 섹션
+  ↓
++ 버튼 (Add Modifier)
+  ↓
+Negate (부정, 반전)
+  ↓
+설정:
+  ├─ X: ❌ (체크 해제)
+  ├─ Y: ✅ (체크) - Y축만 반전
+  └─ Z: ❌ (체크 해제)
+```
+
+**Modifier란?**
+
+```
+Input Action의 값을 변형하는 기능
+
+Negate Modifier:
+  └─ 값을 반전 (양수 ↔ 음수)
+
+예:
+Y 체크 시
+  ├─ 마우스 위 (+1) → 입력값 -1
+  └─ 마우스 아래 (-1) → 입력값 +1
+```
+
+**결과**
+
+```
+마우스 위로 → 카메라 위 봄 ✅
+마우스 아래로 → 카메라 아래 봄 ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380744/notion-blog/_/_/_5_/_8_-_3D_-_1/image_20.png)
+
+---
+
+## 🎯 전체 구조 정리
+
+### Component 설정
+
+```
+BP_Kicks:
+  ├─ CapsuleComponent
+  │   └─ Use Controller Rotation Yaw: ❌
+  │
+  └─ SpringArm
+      ├─ Use Pawn Control Rotation: ✅
+      └─ Camera (자동으로 따라감)
+```
+
+### Blueprint 흐름
+
+```
+BP_KicksPlayerController:
+
+1. 초기화
+   Event BeginPlay
+     ↓
+   Get Subsystem
+     ↓
+   Add Mapping Context (IMC_KickActions)
+
+2. 입력 처리
+   IA Look (Triggered)
+     ↓
+   Get Action Value
+     ↓
+   Break Vector 2D
+     ├─ X → Add Yaw Input (좌우)
+     └─ Y → Add Pitch Input (상하)
+         ↓
+   Player Controller 회전 변경
+         ↓
+   SpringArm이 따라감 (Use Pawn Control Rotation)
+         ↓
+   Camera도 따라감 (SpringArm에 부착)
+```
+
+## 🎮 Blueprint 노드 기능 설명
+
+## 📋 전체 구조 한눈에 보기
+
+```
+게임 시작 → 입력 시스템 준비 → 마우스 입력 감지 → 카메라 회전
+```
+
+---
+
+## 🔧 각 노드 설명
+
+### 1. Event BeginPlay
+
+```
+기능: 게임 시작 시 1번만 실행
+언제: Player Controller가 생성될 때
+용도: 초기 설정 (여기서는 입력 시스템 준비)
+```
+
+### 2. Enhanced Input Local Player Subsystem
+
+```
+기능: 향상된 입력 시스템 관리자 가져오기
+역할: 입력 설정을 추가/제거할 수 있게 해줌
+비유: 입력 시스템의 "관리자"
+```
+
+### 3. Add Mapping Context
+
+```
+기능: 입력 설정 추가
+입력값:
+  ├─ Mapping Context: IMC_KixMoven (어떤 설정을 쓸지)
+  ├─ Priority: 0 (우선순위, 숫자 클수록 우선)
+  └─ Options: 추가 옵션
+
+쉽게 말하면: "이 입력 규칙을 사용하겠습니다" 선언
+```
+
+---
+
+### 4. IA_Look (Triggered)
+
+```
+기능: 마우스 움직임 감지
+종류:
+  ├─ Started: 처음 시작할 때만
+  ├─ Ongoing: 계속 입력 중일 때
+  ├─ Triggered: 입력이 발생할 때 (일반적)
+  ├─ Completed: 입력 완료 시
+  └─ Canceled: 입력 취소 시
+
+출력:
+  ├─ Action Value: 입력 값 (X, Y)
+  ├─ Elapsed Seconds: 입력 지속 시간
+  └─ Triggered Seconds: 트리거된 시간
+```
+
+**왜 Triggered를 쓰나?**
+
+```
+마우스는 계속 움직임
+  ↓
+Triggered: 움직이는 동안 계속 실행
+  ↓
+카메라가 부드럽게 따라감
+```
+
+### 5. Break Vector 2D
+
+```
+기능: Vector2D를 X, Y로 분리
+입력: (X, Y) 묶음
+출력: X 값, Y 값 따로
+
+예:
+입력 (5, 3)
+  ↓
+X = 5 (마우스 좌우)
+Y = 3 (마우스 상하)
+```
+
+---
+
+### 6. Add Yaw Input
+
+```
+기능: 좌우 회전 (고개 가로젓기)
+입력: Val (회전 속도)
+Target: Player Controller
+
+비유: 고개를 "아니요" 하며 좌우로 흔들기
+```
+
+### 7. Add Pitch Input
+
+```
+기능: 상하 회전 (고개 끄덕이기)
+입력: Val (회전 속도)
+Target: Player Controller
+
+비유: 고개를 "네" 하며 상하로 끄덕이기
+```
+
+### 8. Self
+
+```
+기능: 자기 자신 참조
+여기서: Player Controller 자신
+용도: Target에 연결 (누가 회전할지 지정)
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Player Controller의 회전
+
+```
+Player Controller는 자체 회전값 보유
+  ↓
+컴포넌트가 이 회전값을 따라갈 수 있음
+  ↓
+Use Pawn Control Rotation 체크 시
+  ↓
+해당 컴포넌트가 Controller 회전 따라감
+```
+
+### 선택적 회전
+
+```
+Character 전체 회전:
+Use Controller Rotation Yaw: ✅
+  └─ 캐릭터 메시가 컨트롤러와 함께 회전
+
+Camera만 회전:
+  ├─ Character: Use Controller Rotation Yaw: ❌
+  └─ SpringArm: Use Pawn Control Rotation: ✅
+      └─ 메시는 고정, 카메라만 회전
+```
+
+### Input Action에서 Character/Controller 접근
+
+```
+어디서든 Input Action 처리 가능:
+  ├─ Player Controller BP
+  ├─ Character BP
+  └─ 둘 다 가능
+
+하지만 역할 분리 위해:
+  ├─ Player Controller: 입력 처리
+  └─ Character: 동작 구현
+```
+
+---
+
+## ⚠️ 주의사항
+
+### Self 노드
+
+```
+Blueprint에서 우클릭 → "Self"
+  ↓
+현재 블루프린트 자신의 참조
+
+Player Controller BP에서 Self:
+  └─ Player Controller 참조
+
+Character BP에서 Self:
+  └─ Character 참조
+```
+
+### Enhanced Input Subsystem 두 종류
+
+```
+❌ Player Controller 카테고리:
+   Target 입력 필요 (구식)
+
+✅ Local Player Subsystem 카테고리:
+   입력 불필요 (신식, 권장)
+
+Player Controller 안에서는
+항상 두 번째 방법 사용!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380744/notion-blog/_/_/_5_/_8_-_3D_-_1/image_21.png)
+
+### Break Vector 2D
+
+```
+Vector2D = (X, Y) 구조
+
+Break Vector 2D:
+  └─ Vector2D를 X, Y로 분리
+
+사용 이유:
+X와 Y를 각각 다른 곳에 사용
+(X → Yaw, Y → Pitch)
+```
+
+---
+
+## 📝 용어 정리
+
+| 용어                      | 설명                                   |
+| ------------------------- | -------------------------------------- |
+| Player Controller         | 입력을 처리하고 Pawn을 조종하는 클래스 |
+| Self                      | Blueprint 자기 자신의 참조             |
+| Subsystem                 | Engine의 특정 기능을 담당하는 시스템   |
+| Add Pitch Input           | 상하 회전 입력 추가 (고개 끄덕임)      |
+| Add Yaw Input             | 좌우 회전 입력 추가 (고개 가로젓기)    |
+| Add Roll Input            | 좌우 기울기 입력 추가 (사용 안 함)     |
+| Use Pawn Control Rotation | Controller 회전을 따라가는 설정        |
+| Negate                    | 값을 반전시키는 Modifier               |
+| Cast                      | 형변환, 특정 타입으로 변환             |
+
+---
+
+## 🎯 현재 상태
+
+### 완성된 것
+
+```
+✅ Player Controller 생성
+✅ Game Mode에 등록
+✅ Input Mapping Context 추가
+✅ IA_Look 처리 구현
+✅ 카메라 회전 (마우스)
+✅ Y축 반전 수정
+```
+
+### 아직 안 되는 것
+
+```
+❌ WASD 이동 불가
+❌ 캐릭터 이동 로직 없음
+
+다음: Move Input Action 구현
+```
+
+---
+
+## ✅ 체크리스트
+
+**Player Controller 설정**
+
+- [ ] BP_KicksPlayerController 생성
+- [ ] Game Mode에 등록
+- [ ] BeginPlay에서 IMC 추가
+
+**Input 처리**
+
+- [ ] IA_Look 이벤트 생성
+- [ ] Break Vector 2D
+- [ ] Add Yaw Input 연결
+- [ ] Add Pitch Input 연결
+
+**Character 설정**
+
+- [ ] Use Controller Rotation Yaw 해제
+- [ ] SpringArm: Use Pawn Control Rotation 체크
+
+**Input Action 수정**
+
+- [ ] IA_Look에 Negate Modifier 추가
+- [ ] Y축만 체크
+
+**테스트**
+
+- [ ] 마우스 좌우로 카메라 회전
+- [ ] 마우스 상하로 카메라 회전
+- [ ] 메시는 회전 안 함
+- [ ] 마우스 위 = 카메라 위
+
+**다음 강의: WASD 이동 구현!** 🚀
+
+# { 🎮 WASD 이동 구현 }
+
+## 🎯 이번 강의 목표
+
+WASD 키로 캐릭터를 움직이게 만듭니다.
+카메라가 바라보는 방향으로 이동하도록 구현합니다.
+
+---
+
+## 📝 IA_Move Input Action 생성
+
+### 1. Input Action 만들기
+
+```
+Input/InputActions 폴더
+  ↓
+우클릭 → Input Action
+  ↓
+이름: IA_Move
+  ↓
+Value Type: Axis2D (Vector2D)
+```
+
+**왜 Axis2D?**
+
+```
+W/S = 앞뒤 (Y축)
+A/D = 좌우 (X축)
+
+2차원 이동 필요 → Axis2D
+```
+
+---
+
+## ⌨️ WASD 키 매핑 설정
+
+### 1. IMC에 IA_Move 추가
+
+```
+IMC_KickActions 열기
+  ↓
++ 버튼 (Add Mapping)
+  ↓
+IA_Move 선택
+```
+
+### 2. WASD 키 4개 추가
+
+```
+IA_Move 매핑에서:
+  ├─ + 버튼 → W 키
+  ├─ + 버튼 → A 키
+  ├─ + 버튼 → S 키
+  └─ + 버튼 → D 키
+```
+
+**현재 상태**
+
+```
+모든 키가 X축에만 입력됨 (기본값)
+  ↓
+수정자로 조정 필요!
+```
+
+---
+
+## 🔧 Modifier로 키 조정하기
+
+### 이해하기: 축(Axis)이란?
+
+```
+2D 평면:
+  ├─ X축: 좌우 (-)왼쪽 / (+)오른쪽
+  └─ Y축: 전후 (-)뒤 / (+)앞
+
+키보드 하나당 1개 축만 사용 가능
+  ↓
+Modifier로 어느 축에 넣을지 결정
+```
+
+### A 키 설정 (왼쪽 = 음수)
+
+```
+A 키 확장
+  ↓
+Add Modifier → Negate (반전)
+  ↓
+설정:
+  ├─ X: ✅ (체크)
+  ├─ Y: ❌
+  └─ Z: ❌
+
+결과: A 누르면 X = -1 (왼쪽)
+```
+
+### D 키 설정 (오른쪽 = 양수)
+
+```
+D 키는 Modifier 불필요
+
+기본값 그대로 사용
+  ↓
+결과: D 누르면 X = +1 (오른쪽)
+```
+
+### W 키 설정 (앞 = Y축 양수)
+
+```
+W 키 확장
+  ↓
+Add Modifier → Swizzle Input Axis Values
+  (축 변경: X → Y로 이동)
+  ↓
+Order 설정:
+첫 글자를 Y로 (YXZ)
+
+결과: W 누르면 Y = +1 (앞)
+```
+
+**Swizzle이 뭐야?**
+
+```
+Swizzle = 축 순서 바꾸기
+
+기본: X축 입력
+  ↓
+Swizzle로 Y로 변경
+  ↓
+Y축에 입력됨
+```
+
+### S 키 설정 (뒤 = Y축 음수)
+
+```
+S 키는 2개 Modifier 필요!
+
+1. Swizzle (Y축으로 이동)
+   ↓
+   Add Modifier → Swizzle
+   Order: YXZ
+
+2. Negate (음수로 변경)
+   ↓
+   Add Modifier → Negate
+   설정:
+     ├─ X: ❌
+     ├─ Y: ✅ (체크)
+     └─ Z: ❌
+
+결과: S 누르면 Y = -1 (뒤)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380744/notion-blog/_/_/_5_/_8_-_3D_-_1/image_22.png)
+
+---
+
+## 📊 최종 매핑 정리
+
+```
+W 키:
+  └─ Swizzle (Y축) → Y = +1 (앞)
+
+A 키:
+  └─ Negate (X축) → X = -1 (왼쪽)
+
+S 키:
+  ├─ Swizzle (Y축)
+  └─ Negate (Y축) → Y = -1 (뒤)
+
+D 키:
+  └─ (수정자 없음) → X = +1 (오른쪽)
+```
+
+---
+
+## ✅ 입력 테스트
+
+### Blueprint에서 값 확인
+
+```
+BP_KicksPlayerController
+
+IA Move (Triggered)
+  ↓
+Get Action Value
+  ↓
+Split Struct Pin (우클릭)
+  ├─ X 값
+  └─ Y 값
+  ↓
+Print String (테스트용)
+```
+
+**테스트 결과**
+
+```
+W 누름: X=0, Y=1 ✅
+A 누름: X=-1, Y=0 ✅
+S 누름: X=0, Y=-1 ✅
+D 누름: X=1, Y=0 ✅
+```
+
+---
+
+## 🚶 캐릭터 이동 구현 - 핵심 원리
+
+### 1. Character Movement Component란?
+
+```
+Character 클래스의 자동 컴포넌트
+  ↓
+캐릭터 이동 전담 시스템
+
+기능:
+  ├─ 걷기/달리기 처리
+  ├─ 중력 적용
+  ├─ 가속/감속 처리
+  ├─ 점프 처리
+  └─ 물리 계산
+
+우리가 할 일:
+"이 방향으로 가고 싶어요" 알려주기만!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380745/notion-blog/_/_/_5_/_8_-_3D_-_1/image_23.png)
+
+### 2. Add Input Vector 함수
+
+```
+기능: Movement Component에 이동 방향 전달
+
+입력:
+  ├─ Target: Movement Component
+  ├─ World Vector: 월드 기준 방향
+  └─ Force: 강제 적용 여부 (옵션)
+
+Movement Component가 알아서:
+  ├─ 속도 계산
+  ├─ 가속/감속
+  ├─ 충돌 처리
+  └─ 실제 이동
+```
+
+---
+
+## 🧭 "카메라 보는 방향"으로 이동 - 원리
+
+### 문제 상황
+
+```
+W 키 = "앞으로"
+  ↓
+어느 쪽이 "앞"인가?
+
+월드 기준 X 방향? → ❌
+카메라 보는 방향! → ✅
+```
+
+### 해결 방법
+
+```
+1. Player Controller의 회전 가져오기
+   (컨트롤러 = 카메라 회전)
+   ↓
+2. 그 회전의 "앞 방향" 벡터 구하기
+   ↓
+3. 그 방향으로 이동 입력
+```
+
+---
+
+## 📐 Blueprint 구현 - 전방 이동 (W/S)
+
+### 전체 흐름
+
+```
+[IA Move Triggered]
+  ↓
+[Get Control Rotation] → 컨트롤러 회전
+  ↓
+[Get Forward Vector] → 앞 방향 벡터
+  ↓
+[Get IA_Move Y값] → W/S 입력 (-1 ~ +1)
+  ↓
+[벡터 × Y값] → 최종 이동 방향
+  ↓
+[Add Input Vector] → Movement Component에 전달
+```
+
+### 노드 연결 순서
+
+**1. 컨트롤러 회전 가져오기**
+
+```
+Get Control Rotation
+  └─ Target: Self (Player Controller)
+
+출력: Rotator (회전값)
+```
+
+**2. 앞 방향 벡터로 변환**
+
+```
+Get Forward Vector
+  └─ In Rot: Control Rotation
+
+출력: Vector (0~1 사이 방향)
+```
+
+**3. W/S 입력값 가져오기**
+
+```
+Get IA_Move
+  └─ Return Value 우클릭
+      → Split Struct Pin
+
+출력: X, Y 값 분리
+```
+
+**4. 방향과 입력 곱하기**
+
+```
+Forward Vector × Y값
+
+결과:
+  ├─ Y=1 (W): 앞 방향
+  ├─ Y=-1 (S): 뒤 방향 (반대)
+  └─ Y=0: 이동 없음
+```
+
+**5. Movement Component 가져오기**
+
+```
+Get Controlled Pawn → Get Movement Component
+
+이유:
+Player Controller → Pawn 찾기
+  ↓
+Pawn → Movement Component 찾기
+```
+
+**6. 이동 입력 전달**
+
+```
+Add Input Vector
+  ├─ Target: Movement Component
+  └─ World Vector: (Forward × Y)
+```
+
+---
+
+## 📐 Blueprint 구현 - 좌우 이동 (A/D)
+
+### 전체 흐름
+
+```
+거의 동일하지만:
+  ├─ Forward → Right Vector 사용
+  └─ Y값 → X값 사용
+```
+
+### 노드 연결
+
+**1. 오른쪽 방향 벡터**
+
+```
+Get Control Rotation
+  ↓
+Get Right Vector
+
+출력: 컨트롤러의 오른쪽 방향
+```
+
+**2. A/D 입력값 사용**
+
+```
+Get IA_Move X값
+
+X값:
+  ├─ A: -1 (왼쪽)
+  ├─ D: +1 (오른쪽)
+  └─ 안 누름: 0
+```
+
+**3. 두 번째 Add Input Vector 호출**
+
+```
+Add Input Vector
+  ├─ Target: Movement Component
+  └─ World Vector: (Right × X)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380745/notion-blog/_/_/_5_/_8_-_3D_-_1/image_24.png)
+
+---
+
+## 🔄 두 방향 결합 원리
+
+### Movement Component가 알아서 처리
+
+```
+Add Input Vector를 2번 호출:
+  ├─ 1번: 전방 이동
+  └─ 2번: 좌우 이동
+
+Movement Component가:
+  ↓
+두 벡터를 합침
+  ↓
+대각선 이동도 자동 계산!
+
+예:
+W + D 동시 누름
+  ├─ Forward Vector (앞)
+  ├─ Right Vector (오른쪽)
+  └─ 합쳐서 "오른쪽 앞" 이동
+```
+
+---
+
+## 🎨 캐릭터 회전 설정
+
+### 문제: 메시가 안 돌아감
+
+```
+현재:
+  ├─ 컨트롤러만 회전
+  ├─ 카메라만 회전
+  └─ 캐릭터 메시는 고정
+
+원하는 것:
+이동 방향을 바라보게!
+```
+
+### 해결: Orient Rotation to Movement
+
+```
+BP_Kicks 열기
+  ↓
+CharacterMovement 선택
+  ↓
+Character Movement 섹션
+  ↓
+Orient Rotation to Movement: ✅ (체크)
+
+의미:
+이동하는 방향으로 메시 회전
+```
+
+### Rotation Rate 설정
+
+```
+Character Movement 섹션
+  ↓
+Rotation Rate
+  └─ Yaw: 360 (또는 720)
+
+의미:
+  ├─ 360: 1초에 한 바퀴
+  ├─ 720: 1초에 두 바퀴
+  └─ 클수록 빠르게 회전
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380745/notion-blog/_/_/_5_/_8_-_3D_-_1/image_25.png)
+
+---
+
+## ⚠️ 충돌하는 설정 주의!
+
+### 안 되는 조합
+
+```
+❌ 동시 체크하면 안 됨:
+
+1. Use Controller Rotation Yaw (Pawn)
+   └─ "컨트롤러 방향 따라가"
+
++
+
+2. Orient Rotation to Movement (CharacterMovement)
+   └─ "이동 방향 바라봐"
+
+결과: 두 설정이 싸움 → 떨림 발생
+```
+
+### 올바른 설정
+
+```
+✅ 우리가 원하는 것:
+
+BP_Kicks (Self):
+  └─ Use Controller Rotation Yaw: ❌
+
+CharacterMovement:
+  ├─ Orient Rotation to Movement: ✅
+  └─ Rotation Rate Yaw: 720
+```
+
+---
+
+## 🔧 메시 위치 미세 조정
+
+### 문제: 발이 땅에 안 닿음
+
+```
+현재 Mesh Location Z: -70
+  ↓
+약간 공중에 떠있음
+```
+
+### 해결
+
+```
+BP_Kicks → Mesh 선택
+  ↓
+Location Z: -73 (조금씩 조정)
+  ↓
+Play 테스트 반복
+  ↓
+발이 정확히 땅에 닿을 때까지
+```
+
+---
+
+## 📊 전체 Blueprint 구조 정리
+
+```
+BP_KicksPlayerController:
+
+━━━━━━━ 초기화 ━━━━━━━
+Event BeginPlay
+  ↓
+Add Mapping Context (IMC_KickActions)
+
+━━━━━━━ W/S 이동 ━━━━━━━
+IA Move (Triggered)
+  ↓
+Get Control Rotation
+  ↓
+Get Forward Vector
+  ↓
+× Get IA_Move Y값
+  ↓
+Get Controlled Pawn
+  ↓
+Get Movement Component
+  ↓
+Add Input Vector
+
+━━━━━━━ A/D 이동 ━━━━━━━
+Get Control Rotation
+  ↓
+Get Right Vector
+  ↓
+× Get IA_Move X값
+  ↓
+Get Controlled Pawn
+  ↓
+Get Movement Component
+  ↓
+Add Input Vector
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### 1. 방향 벡터 (Direction Vector)
+
+```
+벡터 = 방향 + 크기
+
+Forward Vector:
+  └─ 회전값의 "앞" 방향
+
+Right Vector:
+  └─ 회전값의 "오른쪽" 방향
+
+크기 1로 정규화됨 (단위 벡터)
+```
+
+### 2. 벡터 × 스칼라
+
+```
+Vector × Float = 새로운 Vector
+
+예:
+Forward(1, 0, 0) × 0.5
+  = (0.5, 0, 0)
+
+의미: 같은 방향, 절반 속도
+```
+
+### 3. Movement Component가 하는 일
+
+```
+우리가 주는 것:
+"이 방향으로 가고 싶어요"
+
+Component가 하는 일:
+  ├─ 속도 계산 (가속/감속)
+  ├─ 최대 속도 제한
+  ├─ 중력 적용
+  ├─ 충돌 감지
+  ├─ 경사면 처리
+  └─ 실제 위치 변경
+```
+
+### 4. Control Rotation vs Pawn Rotation
+
+```
+Control Rotation:
+  ├─ Player Controller의 회전
+  ├─ 마우스로 변경
+  └─ 카메라 방향
+
+Pawn Rotation:
+  ├─ Character 메시의 회전
+  ├─ 이동 방향으로 변경
+  └─ 캐릭터가 바라보는 방향
+
+서로 독립적!
+```
+
+---
+
+## 📝 용어 정리
+
+| 용어                        | 설명                            |
+| --------------------------- | ------------------------------- |
+| Modifier                    | Input Action 값을 변형하는 기능 |
+| Negate                      | 값을 반전 (양수↔음수)          |
+| Swizzle                     | 축 순서 변경 (X→Y 등)           |
+| Forward Vector              | 앞 방향 벡터                    |
+| Right Vector                | 오른쪽 방향 벡터                |
+| Add Input Vector            | Movement에 이동 방향 전달       |
+| Orient Rotation to Movement | 이동 방향으로 회전              |
+| Rotation Rate               | 회전 속도 (초당 각도)           |
+| Split Struct Pin            | 구조체를 개별 값으로 분리       |
+
+---
+
+## 🎯 현재 상태
+
+### 완성된 것
+
+```
+✅ IA_Move 생성
+✅ WASD 키 매핑
+✅ Modifier 설정
+✅ 전방/후방 이동
+✅ 좌우 이동
+✅ 대각선 이동 (자동)
+✅ 이동 방향으로 회전
+```
+
+### 아직 안 된 것
+
+```
+❌ 애니메이션 (유휴 상태만)
+❌ 달리기 애니메이션
+❌ 점프
+❌ 제트팩
+
+다음: 애니메이션 구현
+```
+
+---
+
+## ✅ 체크리스트
+
+**Input Action 설정**
+
+- [ ] IA_Move 생성 (Axis2D)
+- [ ] IMC에 추가
+- [ ] W, A, S, D 키 추가
+- [ ] A: Negate X
+- [ ] W: Swizzle Y
+- [ ] S: Swizzle Y + Negate Y
+- [ ] D: 수정자 없음
+
+**Blueprint 구현**
+
+- [ ] IA Move 이벤트 생성
+- [ ] 전방 이동 구현
+- [ ] 좌우 이동 구현
+- [ ] Movement Component 연결
+
+**Character 설정**
+
+- [ ] Orient Rotation to Movement 체크
+- [ ] Rotation Rate: 720
+- [ ] Use Controller Rotation Yaw 해제
+- [ ] Mesh Z 위치 조정
+
+**테스트**
+
+- [ ] WASD 모든 방향 이동
+- [ ] 대각선 이동 (W+D 등)
+- [ ] 이동 시 회전
+- [ ] 발이 땅에 닿음
+
+**다음 강의: 애니메이션 시스템!** 🚀
+
+# { 🦘 점프(Jump) 구현과 캐스팅 최적화 }
+
+## 🎯 이번 강의 목표
+
+점프 기능을 구현하고, 캐스팅 최적화 기법을 배웁니다.
+변수 캐싱(Caching)으로 성능을 개선합니다.
+
+---
+
+## 📝 IA_Jump Input Action 생성
+
+### 1. Input Action 만들기
+
+```
+Input/InputActions 폴더
+  ↓
+우클릭 → Input Action
+  ↓
+이름: IA_Jump
+  ↓
+Value Type: Digital (bool) - 기본값 그대로
+```
+
+**왜 Digital(bool)?**
+
+```
+점프는 2가지 상태만 있음:
+  ├─ 점프 중 (True)
+  └─ 점프 안 함 (False)
+
+Axis2D 불필요
+  ↓
+Digital(bool)로 충분
+```
+
+### 2. IMC에 추가
+
+```
+IMC_KickActions 열기
+  ↓
++ 버튼 (Add Mapping)
+  ↓
+IA_Jump 선택
+  ↓
+키 추가: Space Bar
+```
+
+**Modifier 불필요**
+
+```
+스페이스바 1개만
+  ↓
+축 변환 필요 없음
+  ↓
+Modifier 추가 안 함
+```
+
+---
+
+## 🎮 점프 구현 - 방법 1 (간단하지만 권장 안 함)
+
+### Character에서 직접 구현
+
+```
+BP_Kicks (Character)
+  ↓
+IA Jump (Started)
+  ↓
+Jump (함수)
+```
+
+**Blueprint**
+
+```
+[IA Jump Started] → [Jump]
+```
+
+**문제점**
+
+```
+❌ 입력 처리가 Character에 있음
+❌ Player Controller와 역할 분리 안 됨
+❌ 우리가 원하는 구조 아님
+```
+
+---
+
+## 🎮 점프 구현 - 방법 2 (권장, 하지만 비효율)
+
+### Player Controller에서 구현
+
+```
+BP_KicksPlayerController
+  ↓
+IA Jump (Started)
+  ↓
+Get Controlled Pawn (폰 가져오기)
+  ↓
+Cast to Character (캐릭터로 형변환)
+  ↓
+Jump (함수 호출)
+```
+
+**Blueprint**
+
+```
+[IA Jump Started]
+  ↓
+[Get Controlled Pawn]
+  ↓
+[Cast to Character]
+  ↓
+[Jump]
+```
+
+**문제점**
+
+```
+⚠️ 스페이스바 누를 때마다 캐스팅 발생
+  ↓
+불필요한 반복 작업
+  ↓
+성능 낭비
+```
+
+---
+
+## 💡 캐스팅(Casting)이란?
+
+### 정의
+
+```
+Casting = 형변환
+상위 클래스 → 하위 클래스로 변환
+
+예:
+Pawn (부모) → Character (자식)
+```
+
+### 왜 필요한가?
+
+```
+Get Controlled Pawn:
+  └─ 반환 타입: Pawn
+
+하지만:
+Jump 함수는 Character 클래스에만 있음
+  ↓
+Pawn에는 Jump 없음
+  ↓
+Character로 캐스팅 필요!
+```
+
+**클래스 계층**
+
+```
+Pawn (부모)
+  ├─ 기본 기능만
+  └─ Jump 함수 없음
+      ↓
+Character (자식)
+  ├─ Pawn의 모든 기능 +
+  └─ Jump 함수 있음
+```
+
+### 캐스팅 원리
+
+```
+Cast to Character:
+
+입력: Pawn 타입 객체
+  ↓
+확인: "이게 실제로 Character인가?"
+  ↓
+성공: Character 기능 사용 가능
+실패: Cast Failed 실행
+```
+
+---
+
+## ⚡ 캐스팅 최적화 - 변수 캐싱(Caching)
+
+### 문제 상황
+
+```
+매번 점프할 때마다:
+  ↓
+Get Controlled Pawn
+  ↓
+Cast to Character
+  ↓
+비효율적!
+
+해결:
+한 번만 캐스팅하고 저장
+```
+
+### 해결 방법: 변수에 저장
+
+```
+게임 시작 시 (BeginPlay):
+  ↓
+1번만 캐스팅
+  ↓
+변수에 저장 (캐싱)
+  ↓
+이후 변수 사용
+```
+
+---
+
+## 🔧 Blueprint 구현 - 최적화된 점프
+
+### 1. Store Essential Variables 함수
+
+**Event BeginPlay에서 실행**
+
+```
+Event BeginPlay
+  ↓
+Store Essential Variables (함수)
+```
+
+**Store Essential Variables 내용**
+
+```
+1. Get Controlled Pawn
+   ↓
+2. Cast to Character
+   ↓
+3. 변수에 저장: Controlled Character
+```
+
+### 2. Controlled Character 변수 생성
+
+**Cast to Character 결과 저장**
+
+```
+Cast to Character 노드
+  ↓
+As Character 핀 우클릭
+  ↓
+Promote to Variable
+  ↓
+이름: Controlled Character
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380745/notion-blog/_/_/_5_/_8_-_3D_-_1/image_26.png)
+
+**변수 타입**
+
+```
+변수명: Controlled Character
+타입: Character (Object Reference)
+카테고리: Essential Variables
+```
+
+### 3. Movement Component도 저장
+
+```
+Get Controlled Pawn
+  ↓
+Get Movement Component
+  ↓
+변수 저장: Movement Component
+
+카테고리: Essential Variables
+
+```
+
+**왜 Movement도 저장?**
+
+```
+IA_Move에서 매번:
+  ├─ Get Controlled Pawn
+  └─ Get Movement Component
+
+비효율적!
+  ↓
+한 번만 가져와서 저장
+  ↓
+변수 재사용
+
+```
+
+---
+
+## 📊 최종 Blueprint 구조
+
+### Event BeginPlay (초기화)
+
+```
+Event BeginPlay
+  ↓
+Add Mapping Context (IMC_KickActions)
+  ↓
+Store Essential Variables
+  ↓
+  ├─ Get Controlled Pawn
+  │   └─ Cast to Character
+  │       └─ SET Controlled Character
+  │
+  └─ Get Controlled Pawn
+      └─ Get Movement Component
+          └─ SET Movement Component
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380745/notion-blog/_/_/_5_/_8_-_3D_-_1/image_27.png)
+
+### IA_Jump (점프 실행)
+
+```
+IA Jump (Started)
+  ↓
+GET Controlled Character (변수)
+  ↓
+Is Valid? (유효성 검사)
+  ├─ Valid → Jump (함수 호출)
+  └─ Not Valid → (아무것도 안 함)
+
+```
+
+---
+
+## 🔍 Is Valid 노드
+
+### 기능
+
+```
+Is Valid:
+객체가 유효한지 확인
+
+유효 = Null이 아님
+
+```
+
+### 왜 필요한가?
+
+```
+Controlled Character가 없을 수도:
+  ├─ 아직 설정 안 됨
+  ├─ 삭제됨
+  └─ 기타 오류
+
+Is Valid 확인:
+  ├─ Valid → 안전하게 사용
+  └─ Not Valid → 크래시 방지
+
+```
+
+### Validated Get
+
+```
+변수 드래그 후
+  ↓
+우클릭
+  ↓
+Convert to Validated Get
+
+자동으로 Is Valid 체크 추가
+
+```
+
+---
+
+## 🔄 IA_Move 최적화
+
+### 기존 방식 (비효율)
+
+```
+IA Move (Triggered)
+  ↓
+매번:
+  ├─ Get Controlled Pawn
+  └─ Get Movement Component
+
+```
+
+### 최적화 방식
+
+```
+IA Move (Triggered)
+  ↓
+GET Movement Component (변수)
+  ↓
+Add Input Vector
+
+```
+
+**차이점**
+
+```
+기존: 매 프레임마다 2개 함수 호출
+최적화: 변수 1개만 읽기
+
+성능 향상!
+
+```
+
+---
+
+## 📁 변수 정리 - 카테고리 설정
+
+### Essential Variables 카테고리
+
+```
+Controlled Character
+  └─ Category: Essential Variables
+
+Movement Component
+  └─ Category: Essential Variables
+
+```
+
+**카테고리의 장점**
+
+```
+변수 패널에서:
+  ↓
+Essential Variables 폴더
+  ├─ Controlled Character
+  └─ Movement Component
+
+정리되어 찾기 쉬움
+
+```
+
+---
+
+## 💡 성능 최적화 원리
+
+### 캐스팅 비용
+
+```
+Cast to Character:
+  ├─ 타입 확인
+  ├─ 메모리 접근
+  └─ 상대적으로 비싼 작업
+
+매 프레임 반복하면:
+  ↓
+누적되어 성능 저하
+
+```
+
+### 캐싱의 효과
+
+```
+기존 (비효율):
+점프 10번 = 캐스팅 10번
+
+최적화 (캐싱):
+점프 10번 = 캐스팅 1번 (초기화 시)
+          + 변수 읽기 10번
+
+변수 읽기 >>> 캐스팅보다 훨씬 빠름
+
+```
+
+### 언제 캐싱하나?
+
+```
+✅ 캐싱하면 좋은 경우:
+  ├─ 자주 사용하는 값
+  ├─ 변하지 않는 값
+  └─ 가져오기 비싼 값
+
+❌ 캐싱 불필요한 경우:
+  ├─ 1번만 사용
+  ├─ 자주 변하는 값
+  └─ 가져오기 저렴한 값
+
+```
+
+---
+
+## 🎯 전체 흐름 정리
+
+### 1. 게임 시작
+
+```
+Event BeginPlay
+  ↓
+Input 설정
+  └─ Add Mapping Context
+
+필수 변수 저장
+  ├─ Controlled Character 저장
+  └─ Movement Component 저장
+
+```
+
+### 2. 점프 입력
+
+```
+스페이스바 누름
+  ↓
+IA Jump Started
+  ↓
+Controlled Character (변수)
+  ↓
+Is Valid?
+  └─ Yes → Jump
+
+```
+
+### 3. 이동 입력
+
+```
+WASD 누름
+  ↓
+IA Move Triggered
+  ↓
+Movement Component (변수)
+  ↓
+Add Input Vector
+
+```
+
+---
+
+## 📝 용어 정리
+
+| 용어                | 설명                             |
+| ------------------- | -------------------------------- |
+| Casting             | 형변환, 상위→하위 클래스 변환    |
+| Caching             | 값을 변수에 저장해서 재사용      |
+| Essential Variables | 필수 변수 (자주 쓰는 것들)       |
+| Validated Get       | Is Valid 체크 포함 변수 가져오기 |
+| Is Valid            | 객체가 유효한지 확인             |
+| Promote to Variable | 값을 변수로 승격                 |
+| Object Reference    | 객체 참조 (메모리 주소)          |
+
+---
+
+## ⚠️ 주의사항
+
+### Cast Failed 처리
+
+```
+Cast to Character
+  ├─ As Character (성공)
+  └─ Cast Failed (실패)
+
+실패 시:
+Jump 함수 호출 안 됨
+  ↓
+크래시 방지
+
+```
+
+### Is Valid 중요성
+
+```
+변수 사용 전 항상 확인:
+
+❌ 바로 사용:
+   Null일 경우 크래시
+
+✅ Is Valid 후 사용:
+   안전하게 사용
+
+```
+
+### Started vs Triggered
+
+```
+IA_Jump는 Started 사용
+
+Started:
+  └─ 키를 누르는 순간 1번만
+
+Triggered:
+  └─ 키를 누르고 있는 동안 계속
+
+점프는 1번만 실행되어야 함
+  ↓
+Started 적합
+
+```
+
+---
+
+## 🎯 현재 상태
+
+### 완성된 것
+
+```
+✅ IA_Jump 생성
+✅ 스페이스바 매핑
+✅ 점프 구현
+✅ 캐스팅 최적화
+✅ 변수 캐싱
+✅ 필수 변수 정리
+
+```
+
+### 최적화 완료
+
+```
+✅ Controlled Character 캐싱
+✅ Movement Component 캐싱
+✅ 매 프레임 캐스팅 제거
+✅ IA_Move 최적화
+
+```
+
+### 다음 단계
+
+```
+→ 게임패드(콘솔 컨트롤러) 입력
+→ 애니메이션 시스템
+
+```
+
+---
+
+## ✅ 체크리스트
+
+**Input Action 설정**
+
+- [ ] IA_Jump 생성 (Digital)
+- [ ] IMC에 추가
+- [ ] Space Bar 매핑
+
+**최적화 구현**
+
+- [ ] Store Essential Variables 함수 생성
+- [ ] Controlled Character 변수 생성
+- [ ] Movement Component 변수 생성
+- [ ] Event BeginPlay에서 저장
+
+**점프 구현**
+
+- [ ] IA Jump Started 이벤트
+- [ ] Controlled Character 가져오기
+- [ ] Is Valid 체크
+- [ ] Jump 함수 호출
+
+**변수 정리**
+
+- [ ] Essential Variables 카테고리 생성
+- [ ] 모든 필수 변수 카테고리 설정
+
+**IA_Move 최적화**
+
+- [ ] Movement Component 변수 사용
+- [ ] Get Controlled Pawn 제거
+- [ ] Get Movement Component 제거
+
+**테스트**
+
+- [ ] 점프 작동 확인
+- [ ] 여러 번 점프 테스트
+- [ ] 이동 중 점프 테스트
+
+**다음 강의: 게임패드 입력!** 🎮

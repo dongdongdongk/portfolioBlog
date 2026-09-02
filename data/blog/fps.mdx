@@ -1,0 +1,194 @@
+---
+title: '유니티 FPS 제한으로 과부하 제어'
+date: '2026-09-02'
+category: '게임 개발/유니티 개인 정리'
+tags: ['게임 개발', '유니티 개인 정리']
+draft: false
+summary: ''
+---
+
+# { 🎮 유니티 FPS 제한 & 확인 가이드 }
+
+Unity를 처음 사용할 때, **FPS(Frame Per Second, 초당 프레임 수)**가 지나치게 높게 나와서 (예: 800 FPS 이상) PC 성능을 불필요하게 소모하는 경우가 있습니다.
+
+게임 개발에서는 **적당한 FPS 제한**을 걸어두는 것이 중요합니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380793/notion-blog/_/_/_FPS_/image.png)
+
+---
+
+## 1. FPS가 너무 높으면 왜 문제가 될까?
+
+- **PC 과부하 발생** → CPU/GPU가 계속 최대 성능으로 작동
+- **전력 낭비** → 노트북이라면 배터리 급속 소모
+- **소음 발생** → 팬이 계속 돌아가며 발열 증가
+- **실제 게임 품질에 무관** → 모니터 주사율(예: 60Hz, 144Hz) 이상은 체감 불가
+
+👉 따라서 개발 단계에서는 **FPS 제한을 걸어두고, 필요한 경우 FPS를 확인**하는 습관이 필요합니다.
+
+---
+
+## 2. Scene 뷰 FPS 제한하기 (에디터에서만 적용)
+
+유니티 **Scene 뷰**는 기본적으로 무제한 FPS로 실행됩니다.
+
+이걸 제한해서 PC 자원을 아낄 수 있습니다.
+
+### ✅ 방법 1: Unity Preferences 설정 (권장)
+
+1. 상단 메뉴에서 **Edit → Preferences** 클릭
+2. 좌측 탭에서 **General** 선택
+3. **Interaction Mode** 항목에서 → `Monitor Refresh Rate` (예: 16ms = 60fps) 선택
+
+이렇게 하면 Scene 뷰가 모니터 주사율에 맞게 동작합니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380793/notion-blog/_/_/_FPS_/image_1.png)
+
+---
+
+## 3. Scene 뷰 FPS 확인하기
+
+Scene 뷰에는 기본적으로 FPS 표시가 없기 때문에, 직접 스크립트를 만들어 확인할 수 있습니다.
+
+### ⚡ 준비 단계
+
+1. **Editor 폴더 만들기**
+   - Project 창 → `Assets` 우클릭 → **Create → Folder**
+   - 폴더 이름을 반드시 **Editor** 로 지정
+
+   ```
+   Assets/
+     └── Editor/
+   ```
+
+2. **스크립트 만들기**
+   - Editor 폴더 안에서 우클릭 → **Create → C# Script**
+   - 이름: `SceneViewFPSDisplay`
+
+## `Editor` 폴더의 의미
+
+1. **에디터 전용 코드만 실행**
+   - `Editor` 폴더 안에 있는 스크립트는 **게임 실행 시 빌드에 포함되지 않고**, **Unity Editor 안에서만 실행**됩니다.
+   - 즉, Scene 뷰용 FPS 표시 같은 **개발 편의 기능**을 만들 때 유용합니다.
+2. **빌드에 포함되지 않음 (용량 절약)**
+   - 만약 `SceneViewFPSDisplay.cs` 같은 스크립트가 빌드에 들어간다면, 실제 게임 실행 시에도 동작하려고 해서 오류가 생기거나 불필요한 리소스를 차지하게 됩니다.
+   - `Editor` 폴더 안에 두면 Unity가 알아서 빌드 시 제외시켜 줍니다.
+3. **UnityEditor 네임스페이스 사용 가능**
+   - `using UnityEditor;` 같은 코드는 **에디터 환경 전용 API**인데, 이건 빌드된 게임에서는 사용할 수 없습니다.
+   - 따라서 이런 API를 쓰는 스크립트는 반드시 `Editor` 폴더 안에 있어야 정상 동작합니다.
+
+---
+
+### 📝 코드 작성
+
+생성된 스크립트의 코드를 전부 지우고, 아래 코드를 붙여넣습니다:
+
+```csharp
+using UnityEditor;
+using UnityEngine;
+
+[InitializeOnLoad]
+public class SceneViewFPSDisplay
+{
+    private static float deltaTime = 0.0f;
+    private static double lastUpdateTime = 0;
+
+    static SceneViewFPSDisplay()
+    {
+        SceneView.duringSceneGui += OnSceneGUI;
+        EditorApplication.update += UpdateDeltaTime;
+    }
+
+    static void UpdateDeltaTime()
+    {
+        double currentTime = EditorApplication.timeSinceStartup;
+        deltaTime = (float)(currentTime - lastUpdateTime);
+        lastUpdateTime = currentTime;
+    }
+
+    static void OnSceneGUI(SceneView sceneView)
+    {
+        Handles.BeginGUI();
+
+        // FPS 계산
+        float fps = deltaTime > 0 ? 1.0f / deltaTime : 0;
+
+        // 텍스트 스타일
+        GUIStyle style = new GUIStyle();
+        style.fontSize = 18;
+        style.normal.textColor = Color.yellow;
+        style.fontStyle = FontStyle.Bold;
+
+        // 표시 위치
+        Rect rect = new Rect(10, 10, 150, 30);
+        string text = string.Format("Scene FPS: {0:0}", fps);
+
+        // 반투명 배경 박스
+        GUI.color = new Color(0, 0, 0, 0.5f);
+        GUI.Box(rect, "");
+        GUI.color = Color.white;
+
+        // FPS 텍스트 출력
+        GUI.Label(rect, text, style);
+
+        Handles.EndGUI();
+
+        sceneView.Repaint();
+    }
+}
+```
+
+💡 저장 후 Scene 뷰를 보면 왼쪽 상단에 **Scene FPS**가 표시됩니다.
+
+---
+
+## 4. Game 뷰 FPS 제한하기
+
+**Game 뷰**는 실제 게임 플레이 환경과 동일합니다.
+
+여기서는 **VSync(수직동기화)**를 사용해 FPS를 제한할 수 있습니다.
+
+### ✅ VSync 켜기
+
+1. 상단 메뉴에서 **Edit → Project Settings** 클릭
+2. **Quality** 항목 선택
+3. **VSync Count** 설정
+   - **Don't Sync** → 제한 없음
+   - **Every V Blank** → 모니터 주사율(60Hz → 60FPS)
+   - **Every Second V Blank** → 절반 주사율(30FPS)
+
+💡 보통 `Every V Blank`로 설정하면 60Hz 모니터에서는 60FPS로 제한됩니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380793/notion-blog/_/_/_FPS_/image_2.png)
+
+```csharp
+이 방법이 더 간단하고 확실한듯
+```
+
+---
+
+## 5. Game 뷰 FPS 확인하기
+
+Game 뷰에서는 별도의 코드 없이도 FPS를 확인할 수 있습니다.
+
+1. Game 뷰 상단 메뉴에서 **Stats** 버튼 클릭
+2. 우측 상단에 **FPS 표시** 확인 가능
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380793/notion-blog/_/_/_FPS_/image_3.png)
+
+---
+
+# ✅ 정리
+
+- **Scene 뷰**
+  - FPS 제한: Preferences → General → Monitor Refresh Rate
+  - FPS 확인: Editor 스크립트 작성 (SceneViewFPSDisplay.cs)
+- **Game 뷰**
+  - FPS 제한: Project Settings → Quality → VSync
+  - FPS 확인: Game 뷰 Stats 창에서 확인
+
+---
+
+👉 이 가이드를 따르면, **Scene 뷰와 Game 뷰 모두에서 FPS를 적절히 제한하고 확인**할 수 있습니다.
+
+이제 PC 자원을 아끼면서 효율적으로 개발할 수 있습니다 🚀

@@ -1,0 +1,634 @@
+---
+title: '13단원: 추가적인 Audio Bus를 이용한 서브믹싱'
+date: '2026-09-02'
+category: '게임 개발/WWISE'
+tags: ['게임 개발', 'WWISE']
+draft: false
+summary: ''
+---
+
+# { 🎧 13단원: 추가적인 Audio Bus를 이용한 서브믹싱 }
+
+이번 단원에서는 **Wwise의 Master-Mixer Hierarchy** 안에서
+
+**추가적인 Audio Bus를 생성하고**, 이를 통해 **서브믹싱(Submixing)** 을 구현하는 과정을 배웁니다.
+
+즉, **효과음(SFX)** 과 **음악(BGM)** 을 개별 버스로 분리하여
+
+각각 독립적으로 **볼륨 조절**, **이펙트 적용**, **믹싱 관리**를 가능하게 만드는 방법을 익히게 됩니다.
+
+---
+
+## 📋 목차
+
+1. [오디오 버스(Audio Bus) 개념 이해하기](https://www.notion.so/12-Master-Audio-Bus-288e683f737e807083a9fc7387a72a1c?p=288e683f737e80cc9366fccb9e7670fa&showMoveTo=true#%EC%98%A4%EB%94%94%EC%98%A4-%EB%B2%84%EC%8A%A4audio-bus-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [새로운 버스 생성하기](https://www.notion.so/12-Master-Audio-Bus-288e683f737e807083a9fc7387a72a1c?p=288e683f737e80cc9366fccb9e7670fa&showMoveTo=true#%EC%83%88%EB%A1%9C%EC%9A%B4-%EB%B2%84%EC%8A%A4-%EC%83%9D%EC%84%B1%ED%95%98%EA%B8%B0)
+3. [오브젝트를 버스로 라우팅하기](https://www.notion.so/12-Master-Audio-Bus-288e683f737e807083a9fc7387a72a1c?p=288e683f737e80cc9366fccb9e7670fa&showMoveTo=true#%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8%EB%A5%BC-%EB%B2%84%EC%8A%A4%EB%A1%9C-%EB%9D%BC%EC%9A%B0%ED%8C%85%ED%95%98%EA%B8%B0)
+4. [Multi Editor 사용하기](https://www.notion.so/12-Master-Audio-Bus-288e683f737e807083a9fc7387a72a1c?p=288e683f737e80cc9366fccb9e7670fa&showMoveTo=true#multi-editor-%EC%82%AC%EC%9A%A9%ED%95%98%EA%B8%B0)
+5. [상위 출력 버스 오버라이드하기](https://www.notion.so/12-Master-Audio-Bus-288e683f737e807083a9fc7387a72a1c?p=288e683f737e80cc9366fccb9e7670fa&showMoveTo=true#%EC%83%81%EC%9C%84-%EC%B6%9C%EB%A0%A5-%EB%B2%84%EC%8A%A4-%EC%98%A4%EB%B2%84%EB%9D%BC%EC%9D%B4%EB%93%9C%ED%95%98%EA%B8%B0)
+6. [Schematic View로 구조 시각화하기](https://www.notion.so/12-Master-Audio-Bus-288e683f737e807083a9fc7387a72a1c?p=288e683f737e80cc9366fccb9e7670fa&showMoveTo=true#schematic-view%EB%A1%9C-%EA%B5%AC%EC%A1%B0-%EC%8B%9C%EA%B0%81%ED%99%94%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. 오디오 버스(Audio Bus) 개념 이해하기
+
+- **Audio Bus(오디오 버스)** 는 오디오 신호의 **믹싱과 라우팅을 관리하는 가상의 통로**입니다.
+- 모든 사운드는 Wwise에서 **Master Audio Bus** 를 거쳐 최종 출력으로 전달됩니다.
+- 버스를 여러 개로 나누면, 각 그룹별로 **볼륨**, **이펙트**, **믹싱 처리**를 개별적으로 조절할 수 있습니다.
+
+### 예시 구조
+
+```
+Master Audio Bus
+├── Environment Bus (환경 사운드)
+└── Music Bus (배경음악)
+```
+
+이런 구조를 통해
+
+- **Environment Bus**: 리버브(Reverb) 같은 공간감 효과를 적용
+- **Music Bus**: 전체 음악 볼륨 조절 또는 필터 효과 적용
+
+등을 **서로 간섭 없이** 관리할 수 있습니다.
+
+---
+
+## 2. 새로운 버스 생성하기
+
+시작 프로젝트에는 **기본 Master Audio Bus** 하나만 존재합니다.
+
+여기에 **새로운 하위 버스**를 두 개 추가합니다.
+
+### 생성 단계
+
+1. **Master-Mixer Hierarchy** 창 열기
+2. **Master Audio Bus** 선택
+3. 우클릭 → **New Child → Audio Bus** 선택
+
+### 생성할 버스
+
+- `Environment Bus` → 대부분의 **효과음(SFX)** 이 라우팅될 버스
+- `Music Bus` → **배경 음악(BGM)** 이 라우팅될 버스
+
+이제 **Master Audio Bus** 아래에 두 개의 하위 버스가 생성됩니다.
+
+---
+
+## 3. 오브젝트를 버스로 라우팅하기
+
+이제 Actor-Mixer Hierarchy 안의 **각 오브젝트(사운드)** 를
+
+해당하는 버스로 연결(라우팅)해야 합니다.
+
+### 라우팅 방법
+
+1. **라우팅할 사운드 오브젝트 선택**
+2. **Property Editor** (속성 창)에서
+   - **Output Bus** 항목 클릭
+   - 원하는 버스(`Environment Bus` 또는 `Music Bus`) 선택
+
+### 예시
+
+- 효과음(SFX) → **Environment Bus**
+- 배경음악(BGM) → **Music Bus**
+
+이렇게 라우팅하면 사운드가 개별 버스로 전달되어
+
+서로 독립적인 볼륨 조절 및 이펙트 처리가 가능해집니다.
+
+---
+
+## 4. Multi Editor 사용하기
+
+- **Multi Editor** 는 여러 개의 오브젝트를 한 번에 수정할 수 있는 기능입니다.
+- 다수의 사운드 오브젝트가 같은 버스로 라우팅되어야 할 때 매우 효율적입니다.
+
+### 사용 방법
+
+1. Actor-Mixer Hierarchy에서 여러 오브젝트를 **Shift + 클릭** 또는 **Ctrl + 클릭**으로 다중 선택
+2. **F3** (Multi Editor 단축키) 눌러 Multi Editor 창 열기
+3. **Output Bus** 항목을 한 번에 변경 가능
+
+이 기능을 사용하면 수십 개의 SFX를 한 번에 **Environment Bus**로 보낼 수 있습니다.
+
+---
+
+## 5. 상위 출력 버스 오버라이드하기
+
+기본적으로 모든 사운드는 상위 오브젝트의 버스를 **상속**받습니다.
+
+그러나 특정 오브젝트만 **다른 버스로 출력**하고 싶을 때,
+
+**“Override parent”** 옵션을 사용합니다.
+
+### 설정 방법
+
+1. 사운드 오브젝트 선택
+2. **Output Bus** 항목 옆에 있는 **Override parent** 체크박스 활성화
+3. 원하는 다른 버스를 지정
+
+이 기능을 사용하면
+
+예를 들어, 모든 효과음은 Environment Bus로 가지만
+
+**특정 효과음 하나만 별도의 버스**로 분리할 수도 있습니다.
+
+---
+
+## 6. Schematic View로 구조 시각화하기
+
+- **Schematic View** 는 오디오 신호 흐름을 **시각적으로** 보여주는 창입니다.
+- 버스 간의 연결 관계, 라우팅 방향, 이펙트 삽입 등을 한눈에 확인할 수 있습니다.
+
+### 사용 방법
+
+1. 메뉴에서 **Views → Schematic View** 열기
+2. Master-Mixer Hierarchy를 시각적으로 표시
+3. 각 Bus와 Actor-Mixer 오브젝트 간의 연결 상태 확인
+
+이를 통해, **서브믹싱 구조가 올바르게 설정되었는지**
+
+직관적으로 점검할 수 있습니다.
+
+---
+
+## 🎯 이번 단원을 통해 익히는 핵심 기술
+
+| 기술 항목                         | 설명                                                 |
+| --------------------------------- | ---------------------------------------------------- |
+| **오디오 버스 생성하기**          | Master Audio Bus 하위에 Environment / Music Bus 생성 |
+| **오브젝트 라우팅하기**           | 각 사운드 오브젝트를 해당 버스로 출력 경로 지정      |
+| **Multi Editor 사용하기**         | 여러 오브젝트의 Output Bus를 한 번에 수정            |
+| **상위 출력 버스 오버라이드하기** | 부모 버스 상속 대신 개별 라우팅 설정                 |
+| **Schematic View 사용하기**       | 전체 오디오 신호 흐름 구조를 시각적으로 확인         |
+
+---
+
+✅ **요약 정리**
+
+- 오디오 버스는 **사운드 그룹별 믹싱 제어**를 위한 핵심 도구
+- **Environment Bus** → SFX용, 리버브 등 공간 효과 적용
+- **Music Bus** → 음악용, 볼륨 조절 및 필터 적용
+- **Multi Editor** 와 **Override 기능**으로 라우팅 효율화
+- **Schematic View** 로 전체 오디오 플로우 시각적으로 확인
+
+---
+
+# { 🎧 버스 생성하기 }
+
+이번 강의는 **Wwise에서 사운드를 체계적으로 관리하기 위해 ‘오디오 버스(Audio Bus)’를 생성하고 구성하는 방법**을 배우는 내용입니다.
+
+총 세 개의 버스를 만들어 **환경 사운드, 음악, 효과음(SFX)** 을 구분하여 관리하게 됩니다.
+
+---
+
+## 📋 목차
+
+1. [오디오 버스(Audio Bus) 개념 이해하기](https://www.notion.so/13-Audio-Bus-288e683f737e80cc9366fccb9e7670fa#%EC%98%A4%EB%94%94%EC%98%A4-%EB%B2%84%EC%8A%A4audio-bus-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [환경 사운드용 버스(Environmental) 생성하기](https://www.notion.so/13-Audio-Bus-288e683f737e80cc9366fccb9e7670fa#%ED%99%98%EA%B2%BD-%EC%82%AC%EC%9A%B4%EB%93%9C%EC%9A%A9-%EB%B2%84%EC%8A%A4environmental-%EC%83%9D%EC%84%B1%ED%95%98%EA%B8%B0)
+3. [음악용 버스(Music) 생성하기](https://www.notion.so/13-Audio-Bus-288e683f737e80cc9366fccb9e7670fa#%EC%9D%8C%EC%95%85%EC%9A%A9-%EB%B2%84%EC%8A%A4music-%EC%83%9D%EC%84%B1%ED%95%98%EA%B8%B0)
+4. [효과음용 버스(SFX) 생성하기](https://www.notion.so/13-Audio-Bus-288e683f737e80cc9366fccb9e7670fa#%ED%9A%A8%EA%B3%BC%EC%9D%8C%EC%9A%A9-%EB%B2%84%EC%8A%A4sfx-%EC%83%9D%EC%84%B1%ED%95%98%EA%B8%B0)
+5. [버스 구조의 장점과 활용](https://www.notion.so/13-Audio-Bus-288e683f737e80cc9366fccb9e7670fa#%EB%B2%84%EC%8A%A4-%EA%B5%AC%EC%A1%B0%EC%9D%98-%EC%9E%A5%EC%A0%90%EA%B3%BC-%ED%99%9C%EC%9A%A9)
+
+---
+
+## 1. 오디오 버스(Audio Bus) 개념 이해하기
+
+- **오디오 버스(Audio Bus)**
+  - 여러 오디오 신호(사운드 이벤트들)를 한 경로로 모아 **믹싱(Mixing)** 과 **효과(Effect)** 처리를 할 수 있도록 하는 “가상 오디오 경로”입니다.
+  - 실제 오디오 믹서(Mixer)의 채널 개념과 비슷하며, 사운드를 **논리적으로 그룹화**해 제어할 수 있습니다.
+- **Master Audio Bus**
+  - Wwise에서 모든 사운드 신호가 최종적으로 모이는 **최상위 버스**입니다.
+  - 모든 하위 버스와 사운드들이 이 마스터 버스를 통해 최종 출력으로 전달됩니다.
+- **버스를 사용하는 이유**
+  1. **사운드 그룹별 볼륨 제어**
+
+     → 예: 음악만 줄이거나, 효과음만 크게 조정 가능.
+
+  2. **효과(Effect) 개별 적용 가능**
+
+     → 환경 사운드에는 리버브(Reverb)를, 음악에는 EQ 필터 등 각각 다르게 적용 가능.
+
+  3. **게임 사운드의 조직적 관리**
+
+     → 수많은 사운드를 효율적으로 제어하고 최적화할 수 있음.
+
+---
+
+## 2. 환경 사운드용 버스(Environmental) 생성하기
+
+1. **Wwise 실행 및 프로젝트 파일 열기**
+   - `Module 13` 프로젝트 파일을 엽니다.
+2. **Project Explorer 열기**
+   - 왼쪽 패널에서
+     `Master-Mixer Hierarchy > Default Work Unit` 경로를 확장합니다.
+   - 그 아래에 있는 **Master Audio Bus** 를 선택합니다.
+3. **새 오디오 버스 생성**
+   - 상단의 **Create new ‘Audio Bus’** 버튼 클릭.
+   - 새로 생성된 버스의 이름을 **Environmental** 로 지정합니다.
+
+🔹 **결과:**
+
+Master Audio Bus
+
+└── Environmental
+
+이 버스는 **자연 소리, 바람, 새소리, 비 소리** 등
+
+게임 내 환경적 배경음을 처리하기 위한 전용 경로가 됩니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380543/notion-blog/_/WWISE/Wwise_/13_Audio_Bus_/image.png)
+
+---
+
+## 3. 음악용 버스(Music) 생성하기
+
+1. 다시 **Master Audio Bus** 를 선택합니다.
+2. **Create new ‘Audio Bus’** 버튼 클릭.
+3. 새 버스의 이름을 **Music** 으로 지정합니다.
+
+🔹 **결과:**
+
+Master Audio Bus
+
+├── Environmental
+
+└── Music
+
+이제 환경 사운드와 음악이 분리되어 있습니다.
+
+### 💡 개념 포인트
+
+- 만약 **Environmental 버스에 리버브(Reverb)** 같은 공간 효과를 적용하더라도,
+  Music 버스에는 영향을 주지 않습니다.
+- 플레이어가 **음악 볼륨을 낮춰도** 다른 사운드 (예: 효과음, 환경음)는 그대로 유지됩니다.
+
+---
+
+## 4. 효과음용 버스(SFX) 생성하기
+
+1. 이번에는 **Environmental 버스** 를 선택합니다.
+2. **Create new ‘Audio Bus’** 버튼 클릭.
+3. 새 버스의 이름을 **SFX** 로 지정합니다.
+
+🔹 **결과:**
+
+Master Audio Bus
+
+├── Environmental
+
+│ └── SFX
+
+└── Music
+
+### 💡 개념 포인트
+
+- **SFX 버스(Sound Effects Bus)** 는 폭발음, 버튼 클릭음, 발자국, 무기 효과음 등 **효과음** 전용입니다.
+- SFX를 Environmental 아래에 두는 이유:
+  - 환경 사운드 구조 안에서 **효과음만 별도로 제어**할 수 있도록 하기 위함입니다.
+  - 플레이어가 SFX 볼륨을 조절하더라도 **음악이나 대사(Voice)** 에는 영향을 주지 않게 됩니다.
+  - 예를 들어, **대사(Voice)가 중요한 컷신 상황**에서도 효과음이 방해하지 않도록 조절할 수 있습니다.
+
+---
+
+## 5. 버스 구조의 장점과 활용
+
+| 구분    | 버스 이름        | 역할                      | 특징                                   |
+| ------- | ---------------- | ------------------------- | -------------------------------------- |
+| 🎚️ 상위 | Master Audio Bus | 전체 사운드의 최상위 출력 | 모든 소리가 이 경로를 거쳐 출력됨      |
+| 🌳 중간 | Environmental    | 환경적 사운드 전용        | 리버브나 공간감 효과 적용 가능         |
+| 🎵 중간 | Music            | 배경 음악 전용            | 환경 효과 영향 X                       |
+| 💥 하위 | SFX              | 효과음 전용               | 환경 사운드 그룹 안에서 별도 제어 가능 |
+
+### ✅ 이런 구조의 이점
+
+- **사운드 밸런스 관리 용이**
+  → 전체, 그룹, 개별 단위로 단계별 볼륨 조절 가능
+- **효과 적용의 자유도 증가**
+  → 특정 버스에만 EQ, 리버브, 필터 등 선택적으로 적용
+- **게임 설정 메뉴와의 연동 용이**
+  → 플레이어 옵션에서 “음악 볼륨”, “효과음 볼륨”, “환경음 볼륨”을 따로 조정 가능
+
+---
+
+## 📘 정리
+
+이번 강의에서는 Wwise에서 **3개의 오디오 버스**를 생성하여
+
+사운드를 구조적으로 관리하는 방법을 배웠습니다.
+
+**최종 구조**
+
+```
+Master Audio Bus
+├── Environmental
+│   └── SFX
+└── Music
+```
+
+이 구조를 통해
+
+- 환경 사운드,
+- 음악,
+- 효과음을 각각 독립적으로 제어할 수 있으며,
+- 나중에 효과나 볼륨 조정을 유연하게 할 수 있게 됩니다.
+
+---
+
+# 🚀 오브젝트를 버스에 할당하기
+
+이번 강의는 **Wwise에서 오브젝트(사운드)를 적절한 오디오 버스(Bus)** 로 라우팅하는 과정을 다룹니다.
+
+즉, 프로젝트의 **사운드 구조를 체계적으로 정리**하고, **각 오브젝트가 어떤 버스로 출력을 보낼지 설정**하는 과정입니다.
+
+---
+
+## 📋 목차
+
+1. [오디오 버스(Audio Bus) 개념 이해하기](https://www.notion.so/13-Audio-Bus-288e683f737e80cc9366fccb9e7670fa#%EC%98%A4%EB%94%94%EC%98%A4-%EB%B2%84%EC%8A%A4audio-bus-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Cube_Main_Theme 오브젝트를 Music Bus로 라우팅하기](https://www.notion.so/13-Audio-Bus-288e683f737e80cc9366fccb9e7670fa#cube_main_theme-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8%EB%A5%BC-music-bus%EB%A1%9C-%EB%9D%BC%EC%9A%B0%ED%8C%85%ED%95%98%EA%B8%B0)
+3. [환경 사운드를 SFX Bus로 일괄 라우팅하기 (Multi Editor 활용)](https://www.notion.so/13-Audio-Bus-288e683f737e80cc9366fccb9e7670fa#%ED%99%98%EA%B2%BD-%EC%82%AC%EC%9A%B4%EB%93%9C%EB%A5%BC-sfx-bus%EB%A1%9C-%EC%9D%BC%EA%B4%84-%EB%9D%BC%EC%9A%B0%ED%8C%85%ED%95%98%EA%B8%B0-multi-editor-%ED%99%9C%EC%9A%A9)
+4. [Heartbeat 사운드의 라우팅 재설정 및 Override Parent 사용](https://www.notion.so/13-Audio-Bus-288e683f737e80cc9366fccb9e7670fa#heartbeat-%EC%82%AC%EC%9A%B4%EB%93%9C%EC%9D%98-%EB%9D%BC%EC%9A%B0%ED%8C%85-%EC%9E%AC%EC%84%A4%EC%A0%95-%EB%B0%8F-override-parent-%EC%82%AC%EC%9A%A9)
+
+---
+
+## 1. 오디오 버스(Audio Bus) 개념 이해하기
+
+- **Audio Bus (오디오 버스)**
+  : 여러 사운드 오브젝트의 출력을 한 곳으로 모아주는 **오디오 신호의 경로**.
+  쉽게 말해, **사운드를 그룹화하고 관리할 수 있는 “믹서 채널”** 같은 개념입니다.
+- **Master Audio Bus**
+  : 모든 사운드가 최종적으로 거쳐가는 **최상위 버스**입니다.
+  처음에는 모든 오브젝트가 기본적으로 이 버스에 직접 연결되어 있습니다.
+- **서브 버스(Sub Bus)**
+  : Master Audio Bus 아래에 존재하며, 특정 용도의 사운드 그룹을 담당합니다.
+  예를 들어,
+  - `Music Bus` → 배경 음악
+  - `SFX Bus` → 효과음(환경음, 버튼 클릭, 충돌음 등)
+  - `Dialogue Bus` → 음성 대사
+
+이렇게 나누면 **효과(Effect) 적용**, **볼륨 조절**, **믹싱 관리**가 훨씬 용이해집니다.
+
+---
+
+## 2. Cube_Main_Theme 오브젝트를 Music Bus로 라우팅하기
+
+🎯 **목표:**
+
+배경 음악인 `Cube_Main_Theme`을 **Music 버스**로 보냅니다.
+
+### 단계별 절차
+
+1. **Project Explorer**에서 `Cube_Main_Theme` 오브젝트를 선택합니다.
+2. **Property Editor**에서 **Routing 탭**을 선택합니다.
+3. `Set Output Bus` 버튼을 클릭합니다.
+4. **Project Explorer - Browser** 창이 열리면
+   - `Default Work Unit > Master Audio Bus`를 확장
+   - 그 아래의 `Music` 버스를 선택
+   - **OK** 클릭
+5. 이제 Cube_Main_Theme 오브젝트의 Output Bus는 `Music Bus`로 변경되었습니다.
+
+💡 **Tip:**
+
+- `Project Explorer`에서 버스 오브젝트를 직접 **드래그하여 Output Bus 칸에 놓는 방법**도 있습니다.
+  (더 빠르고 직관적인 설정 방법)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380542/notion-blog/_/WWISE/Wwise_/13_Audio_Bus_/image_1.png)
+
+---
+
+## 3. 환경 사운드를 SFX Bus로 일괄 라우팅하기 (Multi Editor 활용)
+
+🎯 **목표:**
+
+플레이어 환경 사운드(즉, 효과음)들은 모두 **SFX Bus**로 보냅니다.
+
+이때 여러 오브젝트를 **한 번에 변경**하기 위해 **Multi Editor**를 사용합니다.
+
+### 개념 요약
+
+- **Actor-Mixer Hierarchy** :
+  오브젝트들이 트리 구조로 그룹화되어 있는 영역.
+  상위 Actor-Mixer의 설정을 바꾸면, 그 하위 오브젝트들도 같은 Output Bus를 따릅니다.
+- **Multi Editor** :
+  서로 다른 위치에 있는 여러 오브젝트의 속성을 **동시에 수정**할 수 있는 도구.
+  → 여러 Actor-Mixer를 한 번에 편집 가능.
+
+### 단계별 절차
+
+1. **Shift 키를 누른 채**로 4개의 Actor-Mixer를 모두 선택합니다.
+2. 선택된 오브젝트 중 하나를 **우클릭 → Show in Multi Editor (Ctrl+M)** 클릭.
+3. Multi Editor 창이 열리면
+   - **Routing > Output Bus** 항목을 확장
+   - 현재 `Master Audio Bus`를 우클릭 → **Browse** 선택
+4. **Project Explorer - Browser** 창이 열리면
+   - `Default Work Unit > Master Audio Bus > Environmental` 경로로 이동
+   - `SFX` 버스를 선택 → **OK 클릭**
+5. Multi Editor 창을 닫습니다.
+
+✅ **결과:**
+
+이제 `Cube_Main_Theme`을 제외한 모든 Actor-Mixer 오브젝트가 **SFX Bus**에 연결되었습니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380542/notion-blog/_/WWISE/Wwise_/13_Audio_Bus_/image_2.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380542/notion-blog/_/WWISE/Wwise_/13_Audio_Bus_/image_3.png)
+
+---
+
+## 4. Heartbeat 사운드의 라우팅 재설정 및 Override Parent 사용
+
+🎯 **상황 설명:**
+
+- `Heartbeat` 사운드는 플레이어의 심장 소리이므로 **Environmental Bus에 리버브 효과**가 걸리면 어색합니다.
+- 그러나 이 사운드는 **Main Character Actor-Mixer** 안에 포함되어 있어,
+  단순히 이동시키면 **계층 구조가 흐트러집니다.**
+
+→ 해결책: **Override Parent** 기능을 사용!
+
+### Override Parent 개념
+
+- 기본적으로 하위 오브젝트는 상위 Actor-Mixer의 Output Bus를 **자동 상속**합니다.
+- **Override Parent 옵션을 체크하면**,
+  상위 설정을 무시하고 해당 오브젝트에 **개별 Output Bus를 직접 지정**할 수 있습니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380542/notion-blog/_/WWISE/Wwise_/13_Audio_Bus_/image_4.png)
+
+### 단계별 절차
+
+1. **Project Explorer**에서 `Main Character Actor-Mixer`를 확장합니다.
+2. 하위에 있는 `Heartbeat Sound SFX` 오브젝트를 선택합니다.
+3. **Property Editor → Routing 탭**으로 이동합니다.
+4. **Override Parent** 체크 상자를 선택합니다.
+5. Heartbeat 오브젝트의 Output Bus가 기본값인 **Master Audio Bus**로 돌아갑니다.
+
+✅ **결과:**
+
+- `Heartbeat` 사운드는 이제 **Environmental Bus를 거치지 않고**,
+  **리버브가 적용되지 않은 Master Audio Bus로 직접 출력**됩니다.
+- 동시에 Actor-Mixer 계층 구조는 그대로 유지됩니다.
+
+---
+
+## 💡 정리
+
+| 오브젝트                       | Output Bus       | 비고                              |
+| ------------------------------ | ---------------- | --------------------------------- |
+| Cube_Main_Theme                | Music Bus        | 배경 음악                         |
+| 환경 사운드(4개의 Actor-Mixer) | SFX Bus          | 리버브 적용 예정                  |
+| Heartbeat Sound SFX            | Master Audio Bus | 리버브 제외, Override Parent 사용 |
+
+---
+
+## 🧠 핵심 개념 요약
+
+- **Audio Bus** : 사운드 출력 경로를 정의하는 믹서 단위.
+- **Master Audio Bus** : 모든 사운드의 최종 출력 버스.
+- **Routing 설정** : 사운드를 적절한 버스로 라우팅해 관리와 믹싱을 효율화.
+- **Multi Editor** : 여러 오브젝트의 속성을 동시에 편집하는 도구.
+- **Override Parent** : 상위 Actor-Mixer의 Output Bus 설정을 무시하고, 개별 오브젝트에 직접 버스를 지정하는 옵션.
+
+---
+
+# { 🎧 Schematic View 사용하기 }
+
+이번 강의는 **Wwise에서 Output Bus 연결 구조를 시각적으로 확인하고, Schematic View를 통해 오디오 라우팅과 속성 조정을 직접 수행하는 방법**을 배웁니다.
+
+---
+
+## 📋 목차
+
+1. [Schematic View 개념 이해하기](https://www.notion.so/13-Audio-Bus-288e683f737e80cc9366fccb9e7670fa#schematic-view-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Schematic View 열기](https://www.notion.so/13-Audio-Bus-288e683f737e80cc9366fccb9e7670fa#schematic-view-%EC%97%B4%EA%B8%B0)
+3. [Master Audio Bus 구조 살펴보기](https://www.notion.so/13-Audio-Bus-288e683f737e80cc9366fccb9e7670fa#master-audio-bus-%EA%B5%AC%EC%A1%B0-%EC%82%B4%ED%8E%B4%EB%B3%B4%EA%B8%B0)
+4. [Bus 연결과 라우팅 관계 확인하기](https://www.notion.so/13-Audio-Bus-288e683f737e80cc9366fccb9e7670fa#bus-%EC%97%B0%EA%B2%B0%EA%B3%BC-%EB%9D%BC%EC%9A%B0%ED%8C%85-%EA%B4%80%EA%B3%84-%ED%99%95%EC%9D%B8%ED%95%98%EA%B8%B0)
+5. [Schematic View에서 사운드 재생하기](https://www.notion.so/13-Audio-Bus-288e683f737e80cc9366fccb9e7670fa#schematic-view%EC%97%90%EC%84%9C-%EC%82%AC%EC%9A%B4%EB%93%9C-%EC%9E%AC%EC%83%9D%ED%95%98%EA%B8%B0)
+6. [Schematic View에서 속성 표시 및 조정하기](https://www.notion.so/13-Audio-Bus-288e683f737e80cc9366fccb9e7670fa#schematic-view%EC%97%90%EC%84%9C-%EC%86%8D%EC%84%B1-%ED%91%9C%EC%8B%9C-%EB%B0%8F-%EC%A1%B0%EC%A0%95%ED%95%98%EA%B8%B0)
+7. [Designer 레이아웃으로 돌아가기](https://www.notion.so/13-Audio-Bus-288e683f737e80cc9366fccb9e7670fa#designer-%EB%A0%88%EC%9D%B4%EC%95%84%EC%9B%83%EC%9C%BC%EB%A1%9C-%EB%8F%8C%EC%95%84%EA%B0%80%EA%B8%B0)
+8. [학습 정리](https://www.notion.so/13-Audio-Bus-288e683f737e80cc9366fccb9e7670fa#%ED%95%99%EC%8A%B5-%EC%A0%95%EB%A6%AC)
+
+---
+
+## 1. Schematic View 개념 이해하기
+
+- **Schematic View**는 Wwise 프로젝트의 **오디오 신호 흐름 구조를 시각적으로 표시하는 뷰**입니다.
+- 즉, **Actor-Mixer Hierarchy**와 **Master-Mixer Hierarchy**가 **Output Bus**를 통해 어떻게 연결되는지를 한눈에 볼 수 있습니다.
+- 이 뷰를 사용하면 **오디오 객체 간의 관계(연결, 라우팅, 덮어쓰기 등)**를 직관적으로 파악할 수 있습니다.
+
+---
+
+## 2. Schematic View 열기
+
+- **메뉴 바에서 `Layouts > Schematic (F9)`** 을 클릭합니다.
+- 이렇게 하면 **Schematic 레이아웃**이 열리고, **Schematic View**가 중앙에 표시됩니다.
+
+🧭 **기본 표시 내용**
+
+- 처음 열면 **Wwise 신호 흐름 구조의 가장 높은 단계**, 즉 **Master Audio Bus**가 표시됩니다.
+
+---
+
+## 3. Master Audio Bus 구조 살펴보기
+
+1. **Master Audio Bus의 플러스(＋) 기호**를 클릭해 확장합니다.
+2. **Music**, **Environmental**, **SFX** 버스가 하위에 나타납니다.
+   - 각각은 게임 내 주요 오디오 카테고리를 담당하는 **서브 버스(Sub-Bus)**입니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380542/notion-blog/_/WWISE/Wwise_/13_Audio_Bus_/image_5.png)
+
+---
+
+## 4. Bus 연결과 라우팅 관계 확인하기
+
+Schematic View에서는 두 가지 종류의 선을 통해 오디오 구조를 표현합니다:
+
+| 선의 종류     | 의미                                                              |
+| ------------- | ----------------------------------------------------------------- |
+| **굵은 실선** | Project Explorer에서 정의된 **객체 간의 계층적 연결 관계**를 표시 |
+| **짧은 점선** | **오디오 라우팅 관계 (Output Bus 연결)** 을 표시                  |
+
+### 🔎 라우팅 예시
+
+- **Cube_Main_Theme Sound SFX 오브젝트**는 **Music Bus**로 라우팅되어 있습니다.
+  - Project Explorer에서는 이 관계를 명확히 보기 어렵지만,
+    Schematic View에서는 점선을 통해 쉽게 확인할 수 있습니다.
+
+### ⚙️ 출력 덮어쓰기 예시
+
+- **Heartbeat 사운드**에서 나오는 **긴 점선**은
+  → 이 오브젝트가 상위 Actor-Mixer의 출력을 **덮어쓰고(override)** 있음을 의미합니다.
+  - 즉, Heartbeat는 **Main Character Actor-Mixer** 내부에 있지만,
+    상위 출력 대신 **SFX Bus로 라우팅**되어 **Master Audio Bus**로 직접 연결됩니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380543/notion-blog/_/WWISE/Wwise_/13_Audio_Bus_/image_6.png)
+
+---
+
+## 5. Schematic View에서 사운드 재생하기
+
+1. **Main Character Actor-Mixer**를 펼칩니다.
+2. 그 안에서 **Defeated Random Container**를 확장하고,
+3. **Defeated1 Sound SFX 오브젝트**를 펼칩니다.
+4. 이제 **SFX → Defeated1 음원 파일**까지의 전체 경로가 오른쪽에서 왼쪽으로 표시됩니다.
+   - 즉, **Defeated1 Sound SFX → SFX Bus → Master Audio Bus**의 신호 흐름을 시각적으로 추적 가능.
+5. **Defeated1 Sound SFX 오브젝트를 선택한 뒤 Spacebar**를 눌러 재생합니다.
+
+---
+
+## 6. Schematic View에서 속성 표시 및 조정하기
+
+사운드를 재생하면서 동시에 속성을 조정하고 싶다면,
+
+Schematic View 오른쪽 상단의 **View Settings 버튼**을 사용합니다.
+
+### 설정 단계
+
+1. **View Settings 버튼 클릭**
+2. 대화 상자에서 아래 항목을 선택:
+   - `Mute/Solo`
+   - `Bus Volume`
+   - `Voice Volume`
+   - `Voice Pitch`
+   - `Voice LPF (Low Pass Filter)`
+3. **OK 클릭**
+
+✅ 선택한 속성들이 각 오브젝트 아래에 표시됩니다.
+
+→ 이제 **Schematic View를 떠나지 않고** 직접 속성 값을 조정할 수 있습니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380543/notion-blog/_/WWISE/Wwise_/13_Audio_Bus_/image_7.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380543/notion-blog/_/WWISE/Wwise_/13_Audio_Bus_/image_8.png)
+
+---
+
+## 7. Designer 레이아웃으로 돌아가기
+
+작업을 마친 후,
+
+**메뉴 바에서 `Layouts > Designer (F5)`** 를 클릭하여 기본 디자인 화면으로 돌아갑니다.
+
+---
+
+## 8. 학습 정리
+
+| 학습 내용                     | 설명                                                                               |
+| ----------------------------- | ---------------------------------------------------------------------------------- |
+| **Output Bus 연결 구조 확인** | Actor-Mixer와 Master-Mixer가 어떻게 연결되는지 Schematic View에서 시각적으로 확인  |
+| **신호 흐름 파악**            | 오디오 객체 → Bus → Master Audio Bus의 전체 경로를 시각적으로 추적 가능            |
+| **라우팅 관계 이해**          | 점선과 실선을 통해 오브젝트 간 구조 및 라우팅 관계를 명확히 식별                   |
+| **출력 덮어쓰기(Override)**   | 특정 사운드가 상위 Bus 출력을 무시하고 별도 Bus로 연결되는 경우를 확인 가능        |
+| **속성 조정 기능**            | Mute/Solo, Volume, Pitch, LPF 등의 오디오 속성을 Schematic View에서 바로 제어 가능 |
+| **레이아웃 전환**             | Schematic(F9) ↔ Designer(F5) 간 전환으로 효율적인 워크플로우 유지                 |
+
+---
+
+### 🚀 요약
+
+> 이번 단원에서는 Schematic View를 통해 오디오 신호 흐름을 시각적으로 이해하고,
+>
+> **Output Bus 연결 및 라우팅 구조를 직접 확인**했습니다.
+>
+> 또한, **Schematic View 내에서 사운드를 재생하고 속성을 실시간으로 수정하는 방법**까지 배워
+>
+> 오디오 믹싱 및 구조 분석 능력을 한 단계 업그레이드했습니다.

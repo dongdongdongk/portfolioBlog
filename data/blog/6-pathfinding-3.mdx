@@ -1,0 +1,2579 @@
+---
+title: '섹션 6: Pathfinding - 3'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+# { 🔍 A\* 경로 탐색 알고리즘 구현하기 (1부) }
+
+이번 강의는 A\* 경로 탐색 알고리즘의 핵심 구조를 구현하고, 열린 목록과 닫힌 목록을 관리하며, 이웃 노드를 탐색하는 과정을 다룹니다.
+
+---
+
+## 📋 목차
+
+1. [A\* 알고리즘 기본 구조 설정하기](https://claude.ai/chat/49a990d9-79ac-4c87-8620-38a1307467a9#1-a-%EC%95%8C%EA%B3%A0%EB%A6%AC%EC%A6%98-%EA%B8%B0%EB%B3%B8-%EA%B5%AC%EC%A1%B0-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+2. [열린 목록과 닫힌 목록 초기화하기](https://claude.ai/chat/49a990d9-79ac-4c87-8620-38a1307467a9#2-%EC%97%B4%EB%A6%B0-%EB%AA%A9%EB%A1%9D%EA%B3%BC-%EB%8B%AB%ED%9E%8C-%EB%AA%A9%EB%A1%9D-%EC%B4%88%EA%B8%B0%ED%99%94%ED%95%98%EA%B8%B0)
+3. [노드 초기화 시스템 구현하기](https://claude.ai/chat/49a990d9-79ac-4c87-8620-38a1307467a9#3-%EB%85%B8%EB%93%9C-%EC%B4%88%EA%B8%B0%ED%99%94-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+4. [이동 비용 상수 정의하기](https://claude.ai/chat/49a990d9-79ac-4c87-8620-38a1307467a9#4-%EC%9D%B4%EB%8F%99-%EB%B9%84%EC%9A%A9-%EC%83%81%EC%88%98-%EC%A0%95%EC%9D%98%ED%95%98%EA%B8%B0)
+5. [거리 계산 함수 구현하기](https://claude.ai/chat/49a990d9-79ac-4c87-8620-38a1307467a9#5-%EA%B1%B0%EB%A6%AC-%EA%B3%84%EC%82%B0-%ED%95%A8%EC%88%98-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+6. [시작 노드 비용 설정하기](https://claude.ai/chat/49a990d9-79ac-4c87-8620-38a1307467a9#6-%EC%8B%9C%EC%9E%91-%EB%85%B8%EB%93%9C-%EB%B9%84%EC%9A%A9-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+7. [최저 F 비용 노드 찾기](https://claude.ai/chat/49a990d9-79ac-4c87-8620-38a1307467a9#7-%EC%B5%9C%EC%A0%80-f-%EB%B9%84%EC%9A%A9-%EB%85%B8%EB%93%9C-%EC%B0%BE%EA%B8%B0)
+8. [메인 탐색 루프 구조 만들기](https://claude.ai/chat/49a990d9-79ac-4c87-8620-38a1307467a9#8-%EB%A9%94%EC%9D%B8-%ED%83%90%EC%83%89-%EB%A3%A8%ED%94%84-%EA%B5%AC%EC%A1%B0-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+9. [이웃 노드 탐색 시스템 구현하기](https://claude.ai/chat/49a990d9-79ac-4c87-8620-38a1307467a9#9-%EC%9D%B4%EC%9B%83-%EB%85%B8%EB%93%9C-%ED%83%90%EC%83%89-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+10. [대각선 이동 처리하기](https://claude.ai/chat/49a990d9-79ac-4c87-8620-38a1307467a9#10-%EB%8C%80%EA%B0%81%EC%84%A0-%EC%9D%B4%EB%8F%99-%EC%B2%98%EB%A6%AC%ED%95%98%EA%B8%B0)
+11. [경계 검사로 유효성 확인하기](https://claude.ai/chat/49a990d9-79ac-4c87-8620-38a1307467a9#11-%EA%B2%BD%EA%B3%84-%EA%B2%80%EC%82%AC%EB%A1%9C-%EC%9C%A0%ED%9A%A8%EC%84%B1-%ED%99%95%EC%9D%B8%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. A\* 알고리즘 기본 구조 설정하기
+
+### FindPath 함수 생성
+
+A\* 알고리즘의 메인 함수를 만듭니다. 이 함수는 시작 위치에서 목표 위치까지의 경로를 계산합니다.
+
+```csharp
+// 경로를 찾는 메인 함수
+// 시작 그리드 위치와 끝 그리드 위치를 받아서 경로(GridPosition 리스트)를 반환
+public List<GridPosition> FindPath(GridPosition startGridPosition, GridPosition endGridPosition)
+{
+    // 여기에 A* 알고리즘 로직이 들어갑니다
+
+    // 경로 계산이 완료되면 전체 경로를 반환
+    return completePath;
+}
+```
+
+**개념 설명:**
+
+- **FindPath** : A\* 알고리즘의 진입점 함수
+- **GridPosition** : 그리드 상의 x, z 좌표를 나타내는 구조체
+- **반환값** : 시작점부터 목표점까지의 GridPosition 리스트 (경로)
+
+---
+
+## 2. 열린 목록과 닫힌 목록 초기화하기
+
+### 두 가지 핵심 리스트 생성
+
+A\* 알고리즘은 두 개의 리스트를 사용하여 노드를 관리합니다.
+
+```csharp
+public List<GridPosition> FindPath(GridPosition startGridPosition, GridPosition endGridPosition)
+{
+    // 열린 목록: 검색 대기 중인 노드들을 저장
+    List<PathNode> openList = new List<PathNode>();
+
+    // 닫힌 목록: 이미 검색이 완료된 노드들을 저장
+    List<PathNode> closedList = new List<PathNode>();
+```
+
+**개념 설명:**
+
+- **열린 목록 (Open List)** :
+  - 아직 탐색하지 않았지만, 탐색 대상으로 등록된 노드들
+  - 다음에 검색할 후보 노드들이 들어있음
+  - 이 중에서 가장 유망한(F 비용이 낮은) 노드를 선택해 탐색
+- **닫힌 목록 (Closed List)** :
+  - 이미 탐색이 완료된 노드들
+  - 다시 탐색할 필요가 없는 노드들
+  - 중복 탐색을 방지하는 역할
+
+### 시작 노드를 열린 목록에 추가
+
+```csharp
+    // 시작 위치의 PathNode 객체를 그리드 시스템에서 가져옴
+    PathNode startNode = gridSystem.GetGridObject(startGridPosition);
+
+    // 끝 위치의 PathNode 객체도 미리 가져옴 (나중에 비교용)
+    PathNode endNode = gridSystem.GetGridObject(endGridPosition);
+
+    // 알고리즘 시작: 시작 노드를 열린 목록에 추가
+    openList.Add(startNode);
+```
+
+**개념 설명:**
+
+- A\* 알고리즘은 시작 노드에서 출발하므로, 가장 먼저 시작 노드를 열린 목록에 추가
+- `gridSystem.GetGridObject()` : 특정 그리드 위치의 PathNode 객체를 가져오는 함수
+
+---
+
+## 3. 노드 초기화 시스템 구현하기
+
+### 모든 노드의 비용 초기화
+
+경로 탐색을 시작하기 전에 그리드의 모든 노드를 초기 상태로 리셋해야 합니다.
+
+```csharp
+    // 그리드의 모든 노드를 순회하며 초기화
+    for (int x = 0; x < gridSystem.GetWidth(); x++)
+    {
+        for (int z = 0; z < gridSystem.GetHeight(); z++)
+        {
+            // 현재 위치의 GridPosition 생성
+            GridPosition gridPosition = new GridPosition(x, z);
+
+            // 해당 위치의 PathNode 객체 가져오기
+            PathNode pathNode = gridSystem.GetGridObject(gridPosition);
+
+            // G 비용을 무한대로 초기화 (아직 도달하지 않은 상태)
+            pathNode.SetGCost(int.MaxValue);
+
+            // H 비용을 0으로 초기화
+            pathNode.SetHCost(0);
+
+            // F 비용 계산 (F = G + H)
+            pathNode.CalculateFCost();
+
+            // 이전 노드 참조 초기화
+            pathNode.ResetCameFromPathNode();
+        }
+    }
+```
+
+**개념 설명:**
+
+**G 비용 (G Cost):**
+
+- 시작 노드에서 현재 노드까지 실제로 이동하는 데 드는 비용
+- 초기화 시 `int.MaxValue` (무한대)로 설정하는 이유:
+  - 아직 어떤 노드에도 도달하지 않은 상태를 표현
+  - 나중에 실제 경로가 발견되면 정확한 값으로 업데이트됨
+
+**H 비용 (H Cost):**
+
+- 현재 노드에서 목표 노드까지의 추정 비용 (휴리스틱)
+- 초기화 시 0으로 설정 (나중에 계산)
+
+**F 비용 (F Cost):**
+
+- 총 비용 = G 비용 + H 비용
+- A\* 알고리즘은 F 비용이 가장 낮은 노드를 우선적으로 탐색
+
+### PathNode 클래스에 비용 설정 함수 추가
+
+```csharp
+// PathNode.cs
+
+// G 비용을 설정하는 함수
+public void SetGCost(int gCost)
+{
+    this.gCost = gCost;
+}
+
+// H 비용을 설정하는 함수
+public void SetHCost(int hCost)
+{
+    this.hCost = hCost;
+}
+
+// F 비용을 계산하는 함수 (F = G + H)
+public void CalculateFCost()
+{
+    fCost = gCost + hCost;
+}
+
+// 이전 노드 참조를 초기화하는 함수
+public void ResetCameFromPathNode()
+{
+    cameFromPathNode = null;
+}
+
+// 그리드 위치를 반환하는 함수
+public GridPosition GetGridPosition()
+{
+    return gridPosition;
+}
+```
+
+**개념 설명:**
+
+- **SetGCost / SetHCost** : G 비용과 H 비용을 외부에서 설정
+- **CalculateFCost** : F 비용은 자동으로 계산 (수동 설정 불필요)
+- **ResetCameFromPathNode** : 경로 역추적용 참조를 초기화
+- **GetGridPosition** : 노드의 그리드 위치 정보 반환
+
+---
+
+## 4. 이동 비용 상수 정의하기
+
+### 직선 이동과 대각선 이동 비용
+
+A\* 알고리즘에서 이동 비용을 정의합니다.
+
+```csharp
+// Pathfinding.cs 클래스 상단
+
+// 직선 이동 비용 (상하좌우)
+private const int MOVE_STRAIGHT_COST = 10;
+
+// 대각선 이동 비용
+private const int MOVE_DIAGONAL_COST = 14;
+```
+
+**개념 설명:**
+
+**왜 10과 14인가?**
+
+- 실제로는 1과 1.4가 되어야 하지만, 정수 연산을 위해 10배 확대
+- **1.4** 는 √2 (루트 2)의 근사값
+  - 대각선 이동 = 수평 1칸 + 수직 1칸 = √(1² + 1²) = √2 ≈ 1.414...
+  - 정수로 표현하기 위해 14 사용
+
+**이동 비용 개념:**
+
+```
+[A] → [B]  (직선 이동)     비용 = 10
+[A] ↘ [C]  (대각선 이동)   비용 = 14
+```
+
+- 대각선 이동이 직선 이동보다 약간 더 비용이 높음
+- 이는 실제 거리 차이를 반영한 것
+
+---
+
+## 5. 거리 계산 함수 구현하기
+
+### 맨해튼 거리 계산
+
+두 그리드 위치 사이의 거리를 계산하는 함수입니다.
+
+```csharp
+// 두 그리드 위치 사이의 거리를 계산 (휴리스틱용)
+public int CalculateDistance(GridPosition gridPositionA, GridPosition gridPositionB)
+{
+    // 두 위치의 차이를 계산 (벡터 연산)
+    GridPosition gridPositionDistance = gridPositionA - gridPositionB;
+
+    // 맨해튼 거리 계산: |x차이| + |z차이|
+    int distance = Mathf.Abs(gridPositionDistance.x) + Mathf.Abs(gridPositionDistance.z);
+
+    // 그리드 거리를 실제 이동 비용으로 변환
+    return distance * MOVE_STRAIGHT_COST;
+}
+```
+
+**개념 설명:**
+
+**맨해튼 거리 (Manhattan Distance):**
+
+- 그리드에서 직선으로만 이동할 때의 거리
+- 대각선을 고려하지 않은 순수 직선 거리의 합
+
+```
+예시: (0,0)에서 (3,2)까지
+맨해튼 거리 = |3-0| + |2-0| = 3 + 2 = 5
+실제 비용 = 5 × 10 = 50
+```
+
+**왜 이 방식을 사용하는가?**
+
+- 휴리스틱 함수(H 비용)는 "추정값"이므로 정확할 필요는 없음
+- 간단하고 빠른 계산 방법
+- 실제 최단 거리보다 절대 크지 않음 (Admissible Heuristic)
+
+**계산 과정:**
+
+1. `gridPositionA - gridPositionB` : 두 위치의 차이 벡터 계산
+2. `Mathf.Abs()` : 절대값으로 변환 (음수 제거)
+3. x 차이 + z 차이 = 맨해튼 거리
+4. `× MOVE_STRAIGHT_COST` : 그리드 단위를 비용 단위로 변환
+
+---
+
+## 6. 시작 노드 비용 설정하기
+
+### 시작 노드 초기화
+
+알고리즘을 시작하기 전에 시작 노드의 비용을 정확히 설정합니다.
+
+```csharp
+    // 시작 노드의 G 비용 설정
+    // 시작 노드는 자기 자신이므로 G 비용 = 0
+    startNode.SetGCost(0);
+
+    // 시작 노드의 H 비용 설정
+    // 시작 위치에서 목표 위치까지의 추정 거리 계산
+    startNode.SetHCost(CalculateDistance(startGridPosition, endGridPosition));
+
+    // F 비용 계산 (F = G + H = 0 + H)
+    startNode.CalculateFCost();
+```
+
+**개념 설명:**
+
+**시작 노드의 G 비용 = 0:**
+
+- G 비용은 "시작점부터 현재 노드까지의 실제 이동 비용"
+- 시작 노드는 시작점 자체이므로 이동 거리 = 0
+
+**시작 노드의 H 비용:**
+
+- 시작 위치에서 목표까지의 직선 거리 (추정값)
+- `CalculateDistance()` 함수로 계산
+
+**시작 노드의 F 비용:**
+
+- F = 0 (G) + H (추정 거리)
+- 이 값이 탐색의 초기 기준이 됨
+
+---
+
+## 7. 최저 F 비용 노드 찾기
+
+### 열린 목록에서 가장 유망한 노드 선택
+
+A\* 알고리즘의 핵심: F 비용이 가장 낮은 노드를 우선 탐색합니다.
+
+```csharp
+// 열린 목록에서 F 비용이 가장 낮은 노드를 찾는 함수
+private PathNode GetLowestFCostPathNode(List<PathNode> pathNodeList)
+{
+    // 첫 번째 노드를 기준으로 설정
+    PathNode lowestFCostPathNode = pathNodeList[0];
+
+    // 리스트의 모든 노드를 순회
+    for (int i = 0; i < pathNodeList.Count; i++)
+    {
+        // 현재 검사 중인 노드의 F 비용이 더 낮으면
+        if (pathNodeList[i].GetFCost() < lowestFCostPathNode.GetFCost())
+        {
+            // 이 노드를 새로운 최저 비용 노드로 설정
+            lowestFCostPathNode = pathNodeList[i];
+        }
+    }
+
+    // 가장 낮은 F 비용을 가진 노드 반환
+    return lowestFCostPathNode;
+}
+```
+
+**개념 설명:**
+
+**왜 최저 F 비용 노드를 선택하는가?**
+
+- F 비용 = G(실제 비용) + H(추정 비용)
+- F가 낮다 = 총 비용이 적게 들 것으로 예상됨
+- 가장 효율적인 경로를 찾기 위해 우선 탐색
+
+**알고리즘:**
+
+1. 리스트의 첫 번째 노드를 임시 최저값으로 설정
+2. 모든 노드를 순회하며 비교
+3. 더 낮은 F 비용을 가진 노드 발견 시 업데이트
+4. 최종 최저값 반환
+
+---
+
+## 8. 메인 탐색 루프 구조 만들기
+
+### While 루프로 반복 탐색
+
+경로를 찾을 때까지 계속 탐색합니다.
+
+```csharp
+    // 열린 목록에 노드가 남아있는 동안 계속 탐색
+    while (openList.Count > 0)
+    {
+        // 1. 열린 목록에서 F 비용이 가장 낮은 노드 선택
+        PathNode currentNode = GetLowestFCostPathNode(openList);
+
+        // 2. 목표 노드에 도달했는지 확인
+        if (currentNode == endNode)
+        {
+            // 경로 완성! 경로를 계산하여 반환
+            return CalculatePath(endNode);
+        }
+
+        // 3. 현재 노드를 열린 목록에서 제거
+        openList.Remove(currentNode);
+
+        // 4. 현재 노드를 닫힌 목록에 추가 (탐색 완료 표시)
+        closedList.Add(currentNode);
+
+        // 5. 이웃 노드들을 탐색 (다음 섹션에서 구현)
+    }
+```
+
+**개념 설명:**
+
+**While 루프 조건: `openList.Count > 0`**
+
+- 열린 목록에 노드가 있다 = 아직 탐색할 노드가 남아있다
+- 열린 목록이 비었다 = 더 이상 탐색할 노드가 없다 (경로 없음)
+
+**탐색 과정:**
+
+1. **선택**: 가장 유망한 노드(최저 F 비용) 선택
+2. **확인**: 목표 도달 여부 체크
+3. **제거**: 열린 목록에서 제거 (더 이상 후보가 아님)
+4. **추가**: 닫힌 목록에 추가 (탐색 완료 표시)
+5. **확장**: 이웃 노드들 탐색 (다음 단계)
+
+**목표 도달 확인:**
+
+```csharp
+if (currentNode == endNode)
+{
+    return CalculatePath(endNode);
+}
+```
+
+- 현재 탐색 중인 노드가 목표 노드면 탐색 종료
+- `CalculatePath()` : 역추적하여 최종 경로 생성 (다음 부에서 구현)
+
+---
+
+## 9. 이웃 노드 탐색 시스템 구현하기
+
+### GetNode 헬퍼 함수
+
+특정 x, z 좌표의 노드를 가져오는 유틸리티 함수입니다.
+
+```csharp
+// x, z 좌표로 PathNode를 가져오는 헬퍼 함수
+private PathNode GetNode(int x, int z)
+{
+    // GridPosition 생성 후 gridSystem에서 해당 노드 반환
+    return gridSystem.GetGridObject(new GridPosition(x, z));
+}
+```
+
+**개념 설명:**
+
+- 매번 `new GridPosition(x, z)`를 작성하지 않고 간편하게 노드를 가져옴
+- 코드 가독성 향상
+
+### GetNeighbourList 함수 시작
+
+현재 노드 주변의 모든 이웃 노드를 찾는 함수입니다.
+
+```csharp
+// 현재 노드의 모든 이웃 노드를 찾아 리스트로 반환
+private List<PathNode> GetNeighbourList(PathNode currentNode)
+{
+    // 이웃 노드를 저장할 리스트 생성
+    List<PathNode> neighbourList = new List<PathNode>();
+
+    // 현재 노드의 그리드 위치 가져오기
+    GridPosition gridPosition = currentNode.GetGridPosition();
+```
+
+**개념 설명:**
+
+- 이웃 노드 = 현재 노드에서 한 칸 이동으로 갈 수 있는 노드
+- 8방향 (상하좌우 + 대각선 4방향) 또는 4방향 (상하좌우만)
+
+### 좌측 이웃 노드 추가
+
+```csharp
+    // 왼쪽 경계 체크: x-1이 0 이상인지 확인
+    if (gridPosition.x - 1 >= 0)
+    {
+        // 왼쪽 노드 추가 (x-1, z+0)
+        neighbourList.Add(GetNode(gridPosition.x - 1, gridPosition.z + 0));
+    }
+```
+
+**개념 설명:**
+
+**경계 검사의 필요성:**
+
+```
+그리드가 (0,0) ~ (9,9)일 때
+현재 위치가 (0, 5)라면
+왼쪽 (x-1 = -1, 5)는 그리드 밖이므로 오류 발생!
+```
+
+**검사 방법:**
+
+- `gridPosition.x - 1 >= 0` : 왼쪽으로 이동해도 그리드 안에 있는지 확인
+- 조건이 참일 때만 이웃 노드로 추가
+
+### 우측 이웃 노드 추가
+
+```csharp
+    // 오른쪽 경계 체크: x+1이 그리드 너비보다 작은지 확인
+    if (gridPosition.x + 1 < gridSystem.GetWidth())
+    {
+        // 오른쪽 노드 추가 (x+1, z+0)
+        neighbourList.Add(GetNode(gridPosition.x + 1, gridPosition.z + 0));
+    }
+```
+
+**개념 설명:**
+
+- `< gridSystem.GetWidth()` : 그리드의 너비를 넘지 않는지 확인
+- 예: 너비가 10이면 유효한 x는 0~9 → x+1 < 10이어야 함
+
+### 하단 이웃 노드 추가
+
+```csharp
+    // 아래쪽 경계 체크: z-1이 0 이상인지 확인
+    if (gridPosition.z - 1 >= 0)
+    {
+        // 아래쪽 노드 추가 (x+0, z-1)
+        neighbourList.Add(GetNode(gridPosition.x + 0, gridPosition.z - 1));
+    }
+```
+
+### 상단 이웃 노드 추가
+
+```csharp
+    // 위쪽 경계 체크: z+1이 그리드 높이보다 작은지 확인
+    if (gridPosition.z + 1 < gridSystem.GetHeight())
+    {
+        // 위쪽 노드 추가 (x+0, z+1)
+        neighbourList.Add(GetNode(gridPosition.x + 0, gridPosition.z + 1));
+    }
+```
+
+**개념 설명:**
+
+- `x + 0`을 명시적으로 작성: 코드 패턴의 일관성 유지
+- 가독성 향상: 어떤 방향인지 명확히 알 수 있음
+
+---
+
+## 10. 대각선 이동 처리하기
+
+### 좌하단 이웃 노드
+
+```csharp
+    // 왼쪽 경계 체크
+    if (gridPosition.x - 1 >= 0)
+    {
+        // 왼쪽 노드 추가 (이미 추가됨)
+        neighbourList.Add(GetNode(gridPosition.x - 1, gridPosition.z + 0));
+
+        // 좌하단 대각선 체크: 왼쪽 + 아래쪽 모두 유효한지 확인
+        if (gridPosition.z - 1 >= 0)
+        {
+            // 좌하단 노드 추가 (x-1, z-1)
+            neighbourList.Add(GetNode(gridPosition.x - 1, gridPosition.z - 1));
+        }
+
+        // 좌상단 대각선 체크: 왼쪽 + 위쪽 모두 유효한지 확인
+        if (gridPosition.z + 1 < gridSystem.GetHeight())
+        {
+            // 좌상단 노드 추가 (x-1, z+1)
+            neighbourList.Add(GetNode(gridPosition.x - 1, gridPosition.z + 1));
+        }
+    }
+```
+
+**개념 설명:**
+
+**대각선 이동의 특징:**
+
+- 두 방향을 동시에 체크해야 함
+- 좌하단 = 왼쪽 가능 AND 아래 가능
+- 중첩된 if문으로 양쪽 조건 확인
+
+**왜 중첩 if를 사용하는가?**
+
+```
+현재 위치: (0, 5)
+왼쪽 (x-1 = -1): 불가능
+→ 좌하단, 좌상단도 자동으로 불가능
+→ 중첩 if로 불필요한 검사 방지
+```
+
+### 우측 대각선 이웃 노드
+
+```csharp
+    // 오른쪽 경계 체크
+    if (gridPosition.x + 1 < gridSystem.GetWidth())
+    {
+        // 오른쪽 노드 추가 (이미 추가됨)
+        neighbourList.Add(GetNode(gridPosition.x + 1, gridPosition.z + 0));
+
+        // 우하단 대각선 체크
+        if (gridPosition.z - 1 >= 0)
+        {
+            // 우하단 노드 추가 (x+1, z-1)
+            neighbourList.Add(GetNode(gridPosition.x + 1, gridPosition.z - 1));
+        }
+
+        // 우상단 대각선 체크
+        if (gridPosition.z + 1 < gridSystem.GetHeight())
+        {
+            // 우상단 노드 추가 (x+1, z+1)
+            neighbourList.Add(GetNode(gridPosition.x + 1, gridPosition.z + 1));
+        }
+    }
+```
+
+**8방향 이웃 노드 완성:**
+
+```
+[좌상] [상] [우상]
+[좌]  [현재] [우]
+[좌하] [하] [우하]
+```
+
+---
+
+## 11. 경계 검사로 유효성 확인하기
+
+### 전체 이웃 노드 탐색 코드 (경계 검사 포함)
+
+```csharp
+private List<PathNode> GetNeighbourList(PathNode currentNode)
+{
+    List<PathNode> neighbourList = new List<PathNode>();
+    GridPosition gridPosition = currentNode.GetGridPosition();
+
+    // === 왼쪽 방향 검사 ===
+    if (gridPosition.x - 1 >= 0)  // 왼쪽 경계 안에 있는가?
+    {
+        // 왼쪽 (x-1, z+0)
+        neighbourList.Add(GetNode(gridPosition.x - 1, gridPosition.z + 0));
+
+        if (gridPosition.z - 1 >= 0)  // 아래쪽도 가능한가?
+        {
+            // 좌하단 (x-1, z-1)
+            neighbourList.Add(GetNode(gridPosition.x - 1, gridPosition.z - 1));
+        }
+
+        if (gridPosition.z + 1 < gridSystem.GetHeight())  // 위쪽도 가능한가?
+        {
+            // 좌상단 (x-1, z+1)
+            neighbourList.Add(GetNode(gridPosition.x - 1, gridPosition.z + 1));
+        }
+    }
+
+    // === 오른쪽 방향 검사 ===
+    if (gridPosition.x + 1 < gridSystem.GetWidth())  // 오른쪽 경계 안에 있는가?
+    {
+        // 오른쪽 (x+1, z+0)
+        neighbourList.Add(GetNode(gridPosition.x + 1, gridPosition.z + 0));
+
+        if (gridPosition.z - 1 >= 0)  // 아래쪽도 가능한가?
+        {
+            // 우하단 (x+1, z-1)
+            neighbourList.Add(GetNode(gridPosition.x + 1, gridPosition.z - 1));
+        }
+
+        if (gridPosition.z + 1 < gridSystem.GetHeight())  // 위쪽도 가능한가?
+        {
+            // 우상단 (x+1, z+1)
+            neighbourList.Add(GetNode(gridPosition.x + 1, gridPosition.z + 1));
+        }
+    }
+
+    // === 아래 방향 검사 ===
+    if (gridPosition.z - 1 >= 0)  // 아래쪽 경계 안에 있는가?
+    {
+        // 아래 (x+0, z-1)
+        neighbourList.Add(GetNode(gridPosition.x + 0, gridPosition.z - 1));
+    }
+
+    // === 위 방향 검사 ===
+    if (gridPosition.z + 1 < gridSystem.GetHeight())  // 위쪽 경계 안에 있는가?
+    {
+        // 위 (x+0, z+1)
+        neighbourList.Add(GetNode(gridPosition.x + 0, gridPosition.z + 1));
+    }
+
+    // 모든 유효한 이웃 노드 반환
+    return neighbourList;
+}
+```
+
+**개념 설명:**
+
+**경계 검사의 4가지 패턴:**
+
+1. **왼쪽 검사**: `x - 1 >= 0` (0보다 작아지지 않는가?)
+2. **오른쪽 검사**: `x + 1 < width` (너비를 넘지 않는가?)
+3. **아래 검사**: `z - 1 >= 0` (0보다 작아지지 않는가?)
+4. **위 검사**: `z + 1 < height` (높이를 넘지 않는가?)
+
+**검사 순서의 중요성:**
+
+```
+예시: (0, 0) 위치에서 좌하단 검사
+
+1. x-1 >= 0? → -1 >= 0? → 거짓
+   → 좌하단 검사 자체를 건너뜀
+   → 불필요한 z 검사 방지
+```
+
+**대각선 이동 활성화/비활성화:**
+
+- 대각선을 허용하지 않으려면: 대각선 부분만 제거
+- 4방향만 허용하려면: 중첩 if문 제거하고 상하좌우만 추가
+
+```csharp
+// 4방향만 허용하는 경우 (대각선 제외)
+if (gridPosition.x - 1 >= 0)
+    neighbourList.Add(GetNode(gridPosition.x - 1, gridPosition.z));
+if (gridPosition.x + 1 < gridSystem.GetWidth())
+    neighbourList.Add(GetNode(gridPosition.x + 1, gridPosition.z));
+if (gridPosition.z - 1 >= 0)
+    neighbourList.Add(GetNode(gridPosition.x, gridPosition.z - 1));
+if (gridPosition.z + 1 < gridSystem.GetHeight())
+    neighbourList.Add(GetNode(gridPosition.x, gridPosition.z + 1));
+```
+
+**이웃 노드 수:**
+
+- 그리드 중앙: 8개 이웃 (대각선 포함) 또는 4개 (직선만)
+- 그리드 가장자리: 5개 이웃 (대각선 포함)
+- 그리드 모서리: 3개 이웃 (대각선 포함)
+
+---
+
+## ✅ 1부 요약
+
+이번 강의에서 구현한 내용:
+
+1. _A 알고리즘 기본 구조_- FindPath 함수 생성
+2. **열린/닫힌 목록 시스템** - 노드 관리 메커니즘
+3. **노드 초기화** - G, H, F 비용 설정
+4. **이동 비용 상수** - 직선(10), 대각선(14)
+5. **거리 계산 함수** - 맨해튼 거리 휴리스틱
+6. **시작 노드 설정** - 초기 비용 계산
+7. **최저 F 비용 노드 선택** - 우선순위 탐색
+8. **메인 탐색 루프** - While 반복문 구조
+9. **이웃 노드 탐색** - 8방향 이동 지원
+10. **경계 검사** - 유효한 노드만 추가
+
+**다음 강의(2부)에서 계속:**
+
+- 이웃 노드의 비용 계산
+- 더 나은 경로 발견 시 업데이트
+- 최종 경로 역추적 (CalculatePath)
+- A\* 알고리즘 완성
+
+# { 🔍 A\* 경로 탐색 알고리즘 구현하기 (2부) }
+
+이번 강의는 A\* 경로 찾기 알고리즘의 핵심 로직을 완성하고, 시각적으로 경로를 확인하는 방법을 다룹니다.
+
+---
+
+## 📋 목차
+
+1. [이웃 노드 순회 및 처리](https://claude.ai/chat/624241e7-ea60-4c71-87ef-1a5a5fed80e0#1-%EC%9D%B4%EC%9B%83-%EB%85%B8%EB%93%9C-%EC%88%9C%ED%9A%8C-%EB%B0%8F-%EC%B2%98%EB%A6%AC)
+2. [대각선 이동 비용 계산 개선](https://claude.ai/chat/624241e7-ea60-4c71-87ef-1a5a5fed80e0#2-%EB%8C%80%EA%B0%81%EC%84%A0-%EC%9D%B4%EB%8F%99-%EB%B9%84%EC%9A%A9-%EA%B3%84%EC%82%B0-%EA%B0%9C%EC%84%A0)
+3. [임시 G 비용과 노드 업데이트](https://claude.ai/chat/624241e7-ea60-4c71-87ef-1a5a5fed80e0#3-%EC%9E%84%EC%8B%9C-g-%EB%B9%84%EC%9A%A9%EA%B3%BC-%EB%85%B8%EB%93%9C-%EC%97%85%EB%8D%B0%EC%9D%B4%ED%8A%B8)
+4. [경로 역추적 함수 구현](https://claude.ai/chat/624241e7-ea60-4c71-87ef-1a5a5fed80e0#4-%EA%B2%BD%EB%A1%9C-%EC%97%AD%EC%B6%94%EC%A0%81-%ED%95%A8%EC%88%98-%EA%B5%AC%ED%98%84)
+5. [싱글톤 패턴 적용](https://claude.ai/chat/624241e7-ea60-4c71-87ef-1a5a5fed80e0#5-%EC%8B%B1%EA%B8%80%ED%86%A4-%ED%8C%A8%ED%84%B4-%EC%A0%81%EC%9A%A9)
+6. [경로 시각화 디버그 시스템](https://claude.ai/chat/624241e7-ea60-4c71-87ef-1a5a5fed80e0#6-%EA%B2%BD%EB%A1%9C-%EC%8B%9C%EA%B0%81%ED%99%94-%EB%94%94%EB%B2%84%EA%B7%B8-%EC%8B%9C%EC%8A%A4%ED%85%9C)
+7. [기즈모 설정 및 테스트](https://claude.ai/chat/624241e7-ea60-4c71-87ef-1a5a5fed80e0#7-%EA%B8%B0%EC%A6%88%EB%AA%A8-%EC%84%A4%EC%A0%95-%EB%B0%8F-%ED%85%8C%EC%8A%A4%ED%8A%B8)
+8. [A\* 알고리즘 동작 원리 확인](https://claude.ai/chat/624241e7-ea60-4c71-87ef-1a5a5fed80e0#8-a-%EC%95%8C%EA%B3%A0%EB%A6%AC%EC%A6%98-%EB%8F%99%EC%9E%91-%EC%9B%90%EB%A6%AC-%ED%99%95%EC%9D%B8)
+
+---
+
+## 1. 이웃 노드 순회 및 처리
+
+### 이웃 노드 리스트 순회 시작
+
+```csharp
+// 현재 노드의 모든 이웃 노드를 순회
+foreach (PathNode neighbourNode in GetNeighbourList(currentNode))
+{
+    // 각 이웃 노드에 대한 처리 시작
+}
+```
+
+**개념 설명:**
+
+- `GetNeighbourList(currentNode)`: 현재 노드 주변의 8방향(상하좌우 + 대각선 4방향) 이웃 노드를 반환
+- `foreach` 문으로 각 이웃 노드를 하나씩 검사
+
+### 이미 검색한 노드 건너뛰기
+
+```csharp
+// 이웃 노드가 이미 closedList에 있는지 확인
+if (closedList.Contains(neighbourNode))
+{
+    continue;  // 이미 검색 완료한 노드는 건너뜀
+}
+```
+
+**개념 설명:**
+
+- **closedList**: 이미 검색이 완료된 노드들의 리스트
+- 이미 검색한 노드는 다시 검사할 필요가 없으므로 `continue`로 건너뜀
+- 불필요한 계산을 방지하여 알고리즘 효율성 향상
+
+---
+
+## 2. 대각선 이동 비용 계산 개선
+
+### 기존 거리 계산의 문제점
+
+```csharp
+// 기존 방식 (문제 있음)
+int distance = Vector3.Distance(currentNode.GetPosition(), neighbourNode.GetPosition());
+```
+
+**문제점:**
+
+- 단순 직선 거리만 계산
+- 대각선 이동 비용(14)과 직선 이동 비용(10)의 차이를 반영하지 못함
+
+### 개선된 거리 계산 함수
+
+```csharp
+public int CalculateDistance(GridPosition gridPositionA, GridPosition gridPositionB)
+{
+    // 1. 두 위치의 차이를 계산
+    GridPosition gridPositionDistance = gridPositionA - gridPositionB;
+
+    // 2. X축과 Z축의 절대 거리 구하기
+    int xDistance = Mathf.Abs(gridPositionDistance.x);
+    int zDistance = Mathf.Abs(gridPositionDistance.z);
+
+    // 3. 남은 직선 이동 거리 계산
+    int remaining = Mathf.Abs(xDistance - zDistance);
+
+    // 4. 최종 비용 계산
+    return MOVE_DIAGONAL_COST * Mathf.Min(xDistance, zDistance) + MOVE_STRAIGHT_COST * remaining;
+}
+```
+
+**각 단계 상세 설명:**
+
+**1단계: 위치 차이 계산**
+
+```csharp
+GridPosition gridPositionDistance = gridPositionA - gridPositionB;
+// 예: (3, 5) - (0, 2) = (3, 3)
+```
+
+**2단계: 절대 거리 계산**
+
+```csharp
+int xDistance = Mathf.Abs(gridPositionDistance.x);  // X축 이동 칸 수
+int zDistance = Mathf.Abs(gridPositionDistance.z);  // Z축 이동 칸 수
+// 예: xDistance = 3, zDistance = 3
+```
+
+**3단계: 대각선 이동 횟수 계산**
+
+```csharp
+// Mathf.Min(xDistance, zDistance): 대각선으로 이동 가능한 최대 횟수
+// 예: Min(3, 3) = 3 → 대각선으로 3칸 이동 가능
+```
+
+**4단계: 남은 직선 이동 계산**
+
+```csharp
+int remaining = Mathf.Abs(xDistance - zDistance);
+// 예: |3 - 3| = 0 → 남은 직선 이동 없음
+```
+
+**5단계: 최종 비용**
+
+```csharp
+return MOVE_DIAGONAL_COST * Mathf.Min(xDistance, zDistance) + MOVE_STRAIGHT_COST * remaining;
+// 14 * 3 + 10 * 0 = 42
+```
+
+### 계산 예시
+
+**예시 1: 완전 대각선 이동 (1, 1)**
+
+- xDistance = 1, zDistance = 1
+- 대각선 이동: Min(1, 1) = 1회
+- 남은 직선: |1 - 1| = 0회
+- 총 비용: 14 _ 1 + 10 _ 0 = **14**
+
+**예시 2: 대각선 + 직선 이동 (2, 1)**
+
+- xDistance = 2, zDistance = 1
+- 대각선 이동: Min(2, 1) = 1회
+- 남은 직선: |2 - 1| = 1회
+- 총 비용: 14 _ 1 + 10 _ 1 = **24**
+
+**예시 3: 완전 직선 이동 (2, 0)**
+
+- xDistance = 2, zDistance = 0
+- 대각선 이동: Min(2, 0) = 0회
+- 남은 직선: |2 - 0| = 2회
+- 총 비용: 14 _ 0 + 10 _ 2 = **20**
+
+---
+
+## 3. 임시 G 비용과 노드 업데이트
+
+### 임시 G 비용 계산
+
+```csharp
+// 현재 노드를 거쳐 이웃 노드로 가는 비용 계산
+int tentativeGCost =
+    currentNode.GetGCost() +  // 시작점에서 현재 노드까지의 비용
+    CalculateDistance(currentNode.GetGridPosition(), neighbourNode.GetGridPosition());  // 현재→이웃 비용
+```
+
+**개념 설명:**
+
+- **tentativeGCost (임시 G 비용)**: 현재 노드를 경유하여 이웃 노드에 도달하는 총 비용
+- 이미 알고 있는 이웃 노드의 G 비용과 비교하여 더 나은 경로인지 판단
+
+### 더 나은 경로 발견 시 업데이트
+
+```csharp
+// 임시 G 비용이 이웃 노드의 기존 G 비용보다 작으면
+if (tentativeGCost < neighbourNode.GetGCost())
+{
+    // 1. 이웃 노드의 부모 노드를 현재 노드로 설정
+    neighbourNode.SetCameFromPathNode(currentNode);
+
+    // 2. G 비용 업데이트
+    neighbourNode.SetGCost(tentativeGCost);
+
+    // 3. H 비용 계산 (이웃 노드에서 목표까지의 추정 거리)
+    neighbourNode.SetHCost(CalculateDistance(neighbourNode.GetGridPosition(), endGridPosition));
+
+    // 4. F 비용 재계산 (F = G + H)
+    neighbourNode.CalculateFCost();
+
+    // 5. openList에 없으면 추가
+    if (!openList.Contains(neighbourNode))
+    {
+        openList.Add(neighbourNode);
+    }
+}
+```
+
+**각 단계 상세 설명:**
+
+**1. 부모 노드 설정**
+
+```csharp
+public void SetCameFromPathNode(PathNode pathNode)
+{
+    cameFromPathNode = pathNode;  // 이 노드로 오게 된 이전 노드를 저장
+}
+```
+
+- 나중에 경로를 역추적할 때 사용
+- "어느 노드에서 왔는지" 정보를 저장
+
+**2. G 비용 업데이트**
+
+- 시작 노드에서 이 노드까지의 실제 이동 비용
+- 더 짧은 경로를 발견하면 업데이트
+
+**3. H 비용 계산**
+
+- 이 노드에서 목표 노드까지의 예상 거리
+- 휴리스틱(Heuristic) 값
+
+**4. F 비용 재계산**
+
+```csharp
+public void CalculateFCost()
+{
+    fCost = gCost + hCost;  // F = G + H
+}
+```
+
+- A\* 알고리즘의 핵심 공식
+- F 비용이 낮을수록 우선적으로 탐색
+
+**5. openList 추가**
+
+- 아직 검사하지 않은 노드만 openList에 추가
+- 중복 추가 방지
+
+---
+
+## 4. 경로 역추적 함수 구현
+
+### CalculatePath 함수 전체 구조
+
+```csharp
+private List<GridPosition> CalculatePath(PathNode endNode)
+{
+    // 1. PathNode 리스트 생성 및 종료 노드 추가
+    List<PathNode> pathNodeList = new List<PathNode>();
+    pathNodeList.Add(endNode);
+
+    // 2. 역방향으로 경로 추적
+    PathNode currentNode = endNode;
+    while (currentNode.GetCameFromPathNode() != null)
+    {
+        pathNodeList.Add(currentNode.GetCameFromPathNode());
+        currentNode = currentNode.GetCameFromPathNode();
+    }
+
+    // 3. 리스트 뒤집기 (시작→끝 순서로)
+    pathNodeList.Reverse();
+
+    // 4. PathNode를 GridPosition으로 변환
+    List<GridPosition> gridPositionList = new List<GridPosition>();
+    foreach (PathNode pathNode in pathNodeList)
+    {
+        gridPositionList.Add(pathNode.GetGridPosition());
+    }
+
+    return gridPositionList;
+}
+```
+
+### 각 단계 상세 설명
+
+**1단계: 리스트 생성 및 종료 노드 추가**
+
+```csharp
+List<PathNode> pathNodeList = new List<PathNode>();
+pathNodeList.Add(endNode);  // 목표 노드부터 시작
+```
+
+- 경로를 저장할 빈 리스트 생성
+- 목표 지점부터 거꾸로 추적 시작
+
+**2단계: 부모 노드를 따라 역추적**
+
+```csharp
+PathNode currentNode = endNode;
+while (currentNode.GetCameFromPathNode() != null)
+{
+    pathNodeList.Add(currentNode.GetCameFromPathNode());
+    currentNode = currentNode.GetCameFromPathNode();
+}
+```
+
+**동작 예시:**
+
+```
+목표(5,5) ← (4,4) ← (3,3) ← (2,2) ← (1,1) ← 시작(0,0)
+
+역추적 과정:
+1. currentNode = (5,5), 부모 = (4,4) → 리스트에 (4,4) 추가
+2. currentNode = (4,4), 부모 = (3,3) → 리스트에 (3,3) 추가
+3. currentNode = (3,3), 부모 = (2,2) → 리스트에 (2,2) 추가
+4. currentNode = (2,2), 부모 = (1,1) → 리스트에 (1,1) 추가
+5. currentNode = (1,1), 부모 = (0,0) → 리스트에 (0,0) 추가
+6. currentNode = (0,0), 부모 = null → 종료
+
+리스트 상태: [(5,5), (4,4), (3,3), (2,2), (1,1), (0,0)]
+```
+
+**3단계: 리스트 뒤집기**
+
+```csharp
+pathNodeList.Reverse();
+// 결과: [(0,0), (1,1), (2,2), (3,3), (4,4), (5,5)]
+```
+
+- 역추적했으므로 순서가 반대
+- `Reverse()`로 시작→끝 순서로 변경
+
+**4단계: GridPosition으로 변환**
+
+```csharp
+List<GridPosition> gridPositionList = new List<GridPosition>();
+foreach (PathNode pathNode in pathNodeList)
+{
+    gridPositionList.Add(pathNode.GetGridPosition());
+}
+```
+
+- PathNode 객체에서 GridPosition만 추출
+- 실제 이동에 필요한 좌표 정보만 반환
+
+### GetCameFromPathNode 함수
+
+```csharp
+public PathNode GetCameFromPathNode()
+{
+    return cameFromPathNode;  // 이 노드로 오게 된 이전 노드 반환
+}
+```
+
+---
+
+## 5. 싱글톤 패턴 적용
+
+### 싱글톤 패턴이란?
+
+**개념:**
+
+- 클래스의 인스턴스가 오직 하나만 존재하도록 보장하는 디자인 패턴
+- 게임 내 어디서든 `Pathfinding.Instance`로 접근 가능
+
+### Pathfinding 싱글톤 구현
+
+```csharp
+public class Pathfinding : MonoBehaviour
+{
+    // static: 모든 인스턴스가 공유하는 변수
+    public static Pathfinding Instance { get; private set; }
+
+    private void Awake()
+    {
+        // 이미 인스턴스가 존재하는지 확인
+        if (Instance != null)
+        {
+            // 중복 인스턴스 발견 시 에러 로그
+            Debug.LogError("There is more than one Pathfinding! " + transform + " - " + Instance);
+            Destroy(gameObject);  // 이 오브젝트 삭제
+            return;
+        }
+
+        // 인스턴스가 없으면 이 오브젝트를 인스턴스로 설정
+        Instance = this;
+
+        // GridSystem 초기화
+        gridSystem = new GridSystem<PathNode>(10, 10, 2f,
+            (GridSystem<PathNode> g, GridPosition gridPosition) => new PathNode(gridPosition));
+
+        // 디버그 오브젝트 생성
+        gridSystem.CreateDebugObjects(gridDebugObjectPrefab);
+    }
+}
+```
+
+**동작 원리:**
+
+1. 게임 시작 시 첫 번째 Pathfinding 오브젝트가 `Instance`에 자신을 할당
+2. 두 번째 Pathfinding 오브젝트가 생성되면 `Instance != null`이 true
+3. 중복된 오브젝트는 자동으로 삭제됨
+4. 항상 하나의 인스턴스만 존재 보장
+
+### 싱글톤 사용 예시
+
+```csharp
+// 어디서든 Pathfinding 인스턴스에 접근 가능
+List<GridPosition> path = Pathfinding.Instance.FindPath(start, end);
+```
+
+---
+
+## 6. 경로 시각화 디버그 시스템
+
+### Testing 클래스 구현
+
+```csharp
+public class Testing : MonoBehaviour
+{
+    [SerializeField] private Unit unit;  // Inspector에서 할당할 유닛
+
+    private void Update()
+    {
+        // T 키를 눌렀을 때 경로 찾기 테스트
+        if (Input.GetKeyDown(KeyCode.T))
+        {
+            // 1. 마우스 위치를 그리드 좌표로 변환
+            GridPosition mouseGridPosition = LevelGrid.Instance.GetGridPosition(MouseWorld.GetPosition());
+
+            // 2. 시작 위치 설정 (0, 0)
+            GridPosition startGridPosition = new GridPosition(0, 0);
+
+            // 3. 경로 찾기 실행
+            List<GridPosition> gridPositionList = Pathfinding.Instance.FindPath(startGridPosition, mouseGridPosition);
+
+            // 4. 경로를 선으로 시각화
+            for (int i = 0; i < gridPositionList.Count - 1; i++)
+            {
+                Debug.DrawLine(
+                    LevelGrid.Instance.GetWorldPosition(gridPositionList[i]),      // 시작점
+                    LevelGrid.Instance.GetWorldPosition(gridPositionList[i + 1]),  // 끝점
+                    Color.white,  // 선 색상
+                    10            // 지속 시간 (초)
+                );
+            }
+        }
+    }
+}
+```
+
+### 각 단계 상세 설명
+
+**1. 마우스 위치를 그리드 좌표로 변환**
+
+```csharp
+GridPosition mouseGridPosition = LevelGrid.Instance.GetGridPosition(MouseWorld.GetPosition());
+```
+
+- `MouseWorld.GetPosition()`: 마우스의 3D 월드 좌표 얻기
+- `GetGridPosition()`: 월드 좌표를 그리드 좌표로 변환
+- 예: 월드 (5.3f, 0f, 7.8f) → 그리드 (2, 3)
+
+**2. 시작 위치 설정**
+
+```csharp
+GridPosition startGridPosition = new GridPosition(0, 0);
+```
+
+- 항상 (0, 0)에서 시작
+- 테스트 목적으로 고정된 시작점 사용
+
+**3. 경로 찾기 실행**
+
+```csharp
+List<GridPosition> gridPositionList = Pathfinding.Instance.FindPath(startGridPosition, mouseGridPosition);
+```
+
+- A\* 알고리즘 실행
+- 시작점부터 마우스 위치까지의 최적 경로 반환
+
+**4. 경로 선으로 그리기**
+
+```csharp
+for (int i = 0; i < gridPositionList.Count - 1; i++)
+{
+    Debug.DrawLine(
+        LevelGrid.Instance.GetWorldPosition(gridPositionList[i]),      // 현재 위치
+        LevelGrid.Instance.GetWorldPosition(gridPositionList[i + 1]),  // 다음 위치
+        Color.white,
+        10
+    );
+}
+```
+
+**반복문 동작:**
+
+```
+경로: [(0,0), (1,1), (2,2), (3,2), (3,3)]
+
+i=0: (0,0) → (1,1) 선 그리기
+i=1: (1,1) → (2,2) 선 그리기
+i=2: (2,2) → (3,2) 선 그리기
+i=3: (3,2) → (3,3) 선 그리기
+i=4: 종료 (i < Count - 1 = 4이므로)
+```
+
+**왜 `Count - 1`까지만?**
+
+- 마지막 인덱스는 `i + 1`로 접근하므로
+- 범위 초과 에러 방지
+
+---
+
+## 7. 기즈모 설정 및 테스트
+
+### Scene 뷰 기즈모 활성화
+
+**1. 기즈모 버튼 켜기**
+
+```
+Unity Editor 우측 상단 → Gizmos 버튼 클릭
+```
+
+- `Debug.DrawLine()`으로 그린 선은 기즈모로 표시됨
+- 기즈모가 꺼져있으면 선이 보이지 않음
+
+**2. 3D 아이콘 체크**
+
+```
+Gizmos 옆 작은 화살표 클릭 → "3D Icons" 체크
+```
+
+- Scene 뷰에서 아이콘 표시 활성화
+
+**3. 아이콘 크기 조절**
+
+```
+Gizmos 드롭다운 → 슬라이더를 최소값으로
+```
+
+- 그리드 텍스트 오브젝트가 너무 크면 경로가 가려짐
+- 아이콜 크기를 최소로 줄여서 경로 선만 보이게 함
+
+### Canvas 기즈모 숨기기
+
+**Canvas 선 제거:**
+
+```
+Gizmos 드롭다운 → 검색창에 "Canvas" 입력 → Canvas 체크 해제
+```
+
+- Canvas의 외곽선이 경로와 겹칠 수 있음
+- Canvas 기즈모를 숨겨서 경로만 명확히 보이게 함
+
+### 테스트 실행
+
+**실행 순서:**
+
+1. Play 모드 실행
+2. Scene 뷰로 전환
+3. 마우스를 원하는 위치에 놓기
+4. T 키 누르기
+5. (0, 0)에서 마우스 위치까지 흰색 선으로 경로 표시됨
+
+**테스트 예시:**
+
+```
+마우스 위치: (3, 3)
+결과: (0,0) → (1,1) → (2,2) → (3,3) 대각선 경로
+```
+
+---
+
+## 8. A\* 알고리즘 동작 원리 확인
+
+### 그리드 디버그 오브젝트의 비용 표시
+
+각 그리드 셀은 3가지 비용을 표시:
+
+```
+┌─────────────┐
+│ G: 14       │  ← 좌측 상단: G 비용 (시작점에서의 실제 거리)
+│             │
+│      F: 38  │  ← 중앙: F 비용 (G + H)
+│             │
+│         H: 24 │ ← 우측 하단: H 비용 (목표까지의 추정 거리)
+└─────────────┘
+```
+
+### 비용 계산 예시 분석
+
+**시나리오: (0,0)에서 (3,3)으로 이동**
+
+**노드 (0,0) - 시작점:**
+
+```
+G: 0   (시작점이므로 0)
+H: 42  (목표까지 대각선 3칸 = 14*3)
+F: 42  (0 + 42)
+```
+
+**노드 (1,1) - 대각선 1칸:**
+
+```
+G: 14  (시작점에서 대각선 1칸 = 14)
+H: 28  (목표까지 대각선 2칸 = 14*2)
+F: 42  (14 + 28)
+```
+
+**노드 (2,2) - 대각선 2칸:**
+
+```
+G: 28  (시작점에서 대각선 2칸 = 14*2)
+H: 14  (목표까지 대각선 1칸 = 14)
+F: 42  (28 + 14)
+```
+
+**노드 (3,3) - 목표점:**
+
+```
+G: 42  (시작점에서 대각선 3칸 = 14*3)
+H: 0   (목표에 도착했으므로 0)
+F: 42  (42 + 0)
+```
+
+### F 비용의 의미
+
+```
+F = G + H
+
+G (실제 비용): 시작점부터 현재 위치까지 실제로 이동한 거리
+H (휴리스틱): 현재 위치부터 목표까지의 예상 거리
+F (총 예상 비용): 이 경로로 갈 때의 총 예상 비용
+```
+
+**직선 경로 예시:**
+
+```
+(0,0) → (1,0) → (2,0) → (3,0) → (3,1) → (3,2) → (3,3)
+
+각 노드의 비용:
+(1,0): G=10, H=44, F=54
+(2,0): G=20, H=34, F=54
+(3,0): G=30, H=30, F=60
+```
+
+**대각선 경로 예시:**
+
+```
+(0,0) → (1,1) → (2,2) → (3,3)
+
+각 노드의 비용:
+(1,1): G=14, H=28, F=42
+(2,2): G=28, H=14, F=42
+(3,3): G=42, H=0, F=42
+```
+
+**결과:**
+
+- 대각선 경로의 F 비용(42)이 직선 경로의 F 비용(54)보다 낮음
+- A\* 알고리즘은 F 비용이 낮은 대각선 경로를 선택
+
+### 장애물이 없을 때의 특징
+
+```
+장애물 없음 → H 비용과 실제 남은 거리가 정확히 일치
+
+노드 (2,2)에서:
+- H 비용: 14 (목표까지 대각선 1칸 예상)
+- 실제 거리: 14 (실제로 대각선 1칸)
+→ 완벽하게 일치!
+```
+
+**일치하는 이유:**
+
+- 직선으로 갈 수 있으므로 휴리스틱 예상이 정확
+- 장애물이 있으면 H 비용과 실제 경로가 달라질 수 있음
+
+---
+
+## 📚 전체 정리
+
+### A\* 알고리즘 완성된 전체 흐름
+
+```
+1. 초기화
+   ├─ openList에 시작 노드 추가
+   ├─ 모든 노드의 G 비용을 무한대로 설정
+   └─ 시작 노드의 G 비용을 0으로 설정
+
+2. 메인 루프 (openList가 빌 때까지)
+   ├─ openList에서 F 비용이 가장 낮은 노드 선택
+   ├─ 목표 노드에 도착했는가?
+   │  └─ Yes → 경로 역추적 후 반환
+   ├─ 현재 노드를 closedList에 추가
+   └─ 현재 노드의 모든 이웃 검사
+      ├─ 이미 closedList에 있는가? → Skip
+      ├─ 임시 G 비용 계산 (현재 G + 이동 거리)
+      ├─ 임시 G 비용 < 기존 G 비용?
+      │  ├─ Yes → 노드 업데이트
+      │  │  ├─ 부모 노드 설정
+      │  │  ├─ G 비용 업데이트
+      │  │  ├─ H 비용 계산
+      │  │  ├─ F 비용 재계산
+      │  │  └─ openList에 추가 (없으면)
+      │  └─ No → 다음 이웃으로
+
+3. 경로 못 찾음
+   └─ openList가 비었는데 목표 미도달 → null 반환
+```
+
+### 핵심 개념 요약
+
+**1. 대각선/직선 이동 비용**
+
+- 직선 이동: 10
+- 대각선 이동: 14 (√2 ≈ 1.414의 근사값)
+- 정확한 계산으로 최적 경로 보장
+
+**2. 세 가지 비용**
+
+- **G 비용**: 시작점에서 현재까지의 실제 이동 비용
+- **H 비용**: 현재에서 목표까지의 휴리스틱(예상) 거리
+- **F 비용**: G + H, 경로 선택의 기준
+
+**3. 경로 역추적**
+
+- 목표 노드에서 시작
+- 각 노드의 `cameFromPathNode`를 따라 거꾸로 이동
+- 시작 노드까지 도달하면 리스트 뒤집기
+
+**4. 시각화 디버깅**
+
+- `Debug.DrawLine()`으로 경로를 선으로 표시
+- 기즈모 설정으로 Scene 뷰에서 확인
+- 각 노드의 G, H, F 비용을 실시간으로 확인 가능
+
+### 다음 단계
+
+현재 구현된 A\* 알고리즘은 **장애물이 없는 빈 그리드**에서 작동합니다.
+
+**다음 강의 예고:**
+
+- 일부 노드를 "이동 불가능(Walkable = false)"으로 설정
+- 장애물을 우회하는 경로 찾기
+- 실제 게임에서 사용 가능한 완전한 경로 찾기 시스템 완성
+
+### 초보자를 위한 핵심 포인트
+
+\*A 알고리즘의 핵심:\*\*
+
+```
+"가장 유망해 보이는 노드를 우선적으로 탐색한다"
+
+F 비용 = 지금까지 온 거리(G) + 남은 예상 거리(H)
+→ 총 예상 비용이 가장 낮은 노드를 선택
+```
+
+**왜 효율적인가?**
+
+- 목표와 멀어지는 방향은 탐색하지 않음
+- 휴리스틱으로 방향성을 가진 탐색
+- BFS나 Dijkstra보다 탐색 노드 수가 적음
+
+**실제 활용:**
+
+- RTS 게임의 유닛 이동
+- RPG의 NPC 경로 찾기
+- 타워 디펜스의 적 이동 경로
+- 내비게이션 시스템
+
+이제 A\* 알고리즘의 기본 구현이 완성되었고, 시각적으로 경로를 확인할 수 있습니다!
+
+# { 🎮 A\* 경로 찾기 알고리즘 - 초보자를 위한 완벽 가이드 }
+
+## 🤔 A\* 알고리즘이 뭔가요?
+
+**게임에서 캐릭터가 목적지까지 가는 최단 경로를 자동으로 찾아주는 기술입니다.**
+
+예를 들어:
+
+- 롤(LOL)에서 마우스로 클릭한 곳으로 챔피언이 알아서 가는 것
+- 스타크래프트에서 유닛이 장애물을 피해서 이동하는 것
+- 내비게이션이 최단 경로를 찾아주는 것
+
+이 모든 게 A\* 알고리즘을 사용합니다!
+
+---
+
+## 🗺️ 기본 개념: 게임 맵을 격자로 나눈다
+
+```
+게임 맵을 체스판처럼 격자(Grid)로 나눕니다:
+
+┌───┬───┬───┬───┬───┐
+│0,4│1,4│2,4│3,4│4,4│
+├───┼───┼───┼───┼───┤
+│0,3│1,3│2,3│3,3│4,3│
+├───┼───┼───┼───┼───┤
+│0,2│1,2│2,2│3,2│4,2│
+├───┼───┼───┼───┼───┤
+│0,1│1,1│2,1│3,1│4,1│
+├───┼───┼───┼───┼───┤
+│ S │1,0│2,0│3,0│ E │  ← S: 시작점, E: 목표점
+└───┴───┴───┴───┴───┘
+
+```
+
+**각 칸을 "노드(Node)"라고 부릅니다.**
+
+---
+
+## 💰 세 가지 비용 이해하기
+
+A\* 알고리즘은 세 가지 숫자로 각 칸의 "점수"를 매깁니다:
+
+### 1. G 비용 (실제로 걸어온 거리)
+
+```
+"시작점에서 여기까지 실제로 걸어온 거리"
+
+S → → → 현재 위치
+0   10  20  30
+
+G 비용 = 30 (실제로 30만큼 이동함)
+```
+
+### 2. H 비용 (예상 남은 거리)
+
+```
+"여기서 목표까지 예상되는 거리"
+(장애물이 없다고 가정)
+
+현재 위치 - - - → E
+         30    0
+
+H 비용 = 30 (대충 30만큼 남음)
+```
+
+### 3. F 비용 (총점)
+
+```
+F = G + H
+
+"이 경로로 가면 총 얼마나 걸릴까?"
+
+F = 30 + 30 = 60
+```
+
+\*중요: A 알고리즘은 F 비용이 가장 낮은 칸을 우선적으로 선택합니다!\*\*
+
+---
+
+## 🎯 A\* 알고리즘 동작 원리 (쉬운 버전)
+
+### 비유: 보물찾기 게임
+
+```
+당신은 보물을 찾고 있습니다.
+각 장소마다 "여기가 얼마나 좋은 선택인지" 점수가 있습니다.
+
+점수가 낮을수록 = 보물에 가까울 가능성이 높음
+점수가 높을수록 = 돌아가는 길일 가능성이 높음
+```
+
+### Step 1: 준비 단계
+
+```
+1. 두 개의 목록을 만듭니다:
+
+📋 openList (확인할 장소 목록)
+   - "아직 안 가본 곳들"
+   - 처음에는 시작점만 들어있음
+
+📋 closedList (이미 확인한 장소 목록)
+   - "이미 가본 곳들"
+   - 처음에는 비어있음
+```
+
+### Step 2: 메인 반복 (계속 반복하는 부분)
+
+```
+┌─────────────────────────────────────┐
+│  openList에 장소가 남아있는 동안:  │
+└─────────────────────────────────────┘
+           ↓
+   ┌───────────────────┐
+   │ F 비용이 가장     │
+   │ 낮은 장소 선택    │ ← "가장 유망한 곳 선택!"
+   └───────────────────┘
+           ↓
+   ┌───────────────────┐
+   │ 목표에 도착?      │
+   └───────────────────┘
+      YES ↓      ↓ NO
+    ┌─────┐   ┌──────────────┐
+    │완료!│   │주변 8곳 검사 │
+    └─────┘   └──────────────┘
+                     ↓
+              ┌──────────────┐
+              │ 더 좋은 경로 │
+              │ 발견하면 업데이트 │
+              └──────────────┘
+
+```
+
+### Step 3: 주변 탐색 상세
+
+```
+현재 위치에서 8방향을 확인합니다:
+
+  ↖  ↑  ↗
+   \ | /
+  ← 현재 →
+   / | \
+  ↙  ↓  ↘
+
+각 방향마다:
+1. 이미 가본 곳(closedList)인가? → 무시
+2. 안 가본 곳이면:
+   - 이 경로로 가는 비용 계산
+   - 더 좋은 경로면 정보 업데이트
+   - openList에 추가
+
+```
+
+---
+
+## 📊 실제 예시로 이해하기
+
+### 상황: (0,0)에서 (3,3)으로 가기
+
+```
+초기 상태:
+
+┌───┬───┬───┬───┐
+│   │   │   │ E │ ← 목표 (3,3)
+├───┼───┼───┼───┤
+│   │   │   │   │
+├───┼───┼───┼───┤
+│   │   │   │   │
+├───┼───┼───┼───┤
+│ S │   │   │   │ ← 시작 (0,0)
+└───┴───┴───┴───┘
+
+```
+
+### 1단계: 시작점 (0,0) 검사
+
+```
+현재 위치: (0,0)
+
+┌───┬───┬───┬───┐
+│   │   │   │ E │
+├───┼───┼───┼───┤
+│   │   │   │   │
+├───┼───┼───┼───┤
+│   │ 2 │   │   │ ← 2번 검사
+├───┼───┼───┼───┤
+│ 현재│ 1 │   │   │ ← 1번 검사
+└───┴───┴───┴───┘
+
+주변 8곳 확인:
+1. (1,0) - 오른쪽
+2. (1,1) - 대각선 우상향
+... (총 8방향)
+
+```
+
+**각 칸의 비용 계산:**
+
+```
+(1,0) - 오른쪽 칸:
+├─ G 비용: 0 + 10 = 10 (직선 이동 비용)
+├─ H 비용: 42 (목표까지 예상 거리)
+└─ F 비용: 10 + 42 = 52
+
+(1,1) - 대각선 칸:
+├─ G 비용: 0 + 14 = 14 (대각선 이동 비용)
+├─ H 비용: 28 (목표까지 예상 거리)
+└─ F 비용: 14 + 28 = 42 ← 더 낮음! 이게 더 좋은 선택!
+
+```
+
+**왜 대각선이 더 좋나?**
+
+```
+오른쪽으로만: (0,0) → (1,0) → (2,0) → (3,0) → (3,1) → (3,2) → (3,3)
+              = 6칸 이동 = 60 비용
+
+대각선으로: (0,0) → (1,1) → (2,2) → (3,3)
+           = 3칸 이동 = 42 비용
+
+→ 대각선이 더 빠름!
+
+```
+
+### 2단계: 다음으로 가장 좋은 칸 선택
+
+```
+openList에서 F 비용이 가장 낮은 칸 선택:
+
+openList:
+├─ (1,0): F=52
+├─ (1,1): F=42 ← 가장 낮음! 이것 선택
+└─ (0,1): F=52
+
+→ (1,1) 선택하고 주변 검사
+
+```
+
+### 3단계: 계속 반복
+
+```
+(1,1)에서 주변 검사:
+
+┌───┬───┬───┬───┐
+│   │   │   │ E │
+├───┼───┼───┼───┤
+│   │   │ 3 │   │
+├───┼───┼───┼───┤
+│ X │현재│ 2 │   │ ← X = 이미 검사함 (closedList)
+├───┼───┼───┼───┤
+│ X │ X │   │   │
+└───┴───┴───┴───┘
+
+(2,2) 검사:
+├─ G 비용: 14 + 14 = 28
+├─ H 비용: 14
+└─ F 비용: 42
+
+계속 진행...
+
+```
+
+### 4단계: 목표 도착!
+
+```
+최종 경로:
+
+┌───┬───┬───┬───┐
+│   │   │   │ 4 │ ← 도착!
+├───┼───┼───┼───┤
+│   │   │ 3 │   │
+├───┼───┼───┼───┤
+│   │ 2 │   │   │
+├───┼───┼───┼───┤
+│ 1 │   │   │   │ ← 시작
+└───┴───┴───┴───┘
+
+경로: (0,0) → (1,1) → (2,2) → (3,3)
+
+```
+
+---
+
+## 🔢 이동 비용 이해하기
+
+### 왜 직선은 10, 대각선은 14인가?
+
+```
+수학적 이유:
+
+직선 이동:
+┌───┬───┐
+│ A │ B │  A→B = 1칸 = 1.0
+└───┴───┘
+
+대각선 이동:
+┌───┬───┐
+│ A │   │  A→C = √(1² + 1²) = √2 ≈ 1.414
+├───┼───┤
+│   │ C │
+└───┴───┘
+
+10을 곱하면:
+├─ 직선: 1.0 × 10 = 10
+└─ 대각선: 1.414 × 10 = 14.14 ≈ 14
+
+```
+
+### 거리 계산 예시
+
+```
+(0,0)에서 (3,2)까지:
+
+┌───┬───┬───┬───┐
+│   │   │   │ E │ ← (3,2)
+├───┼───┼───┼───┤
+│   │   │   │   │
+├───┼───┼───┼───┤
+│ S │   │   │   │ ← (0,0)
+└───┴───┴───┴───┘
+
+X 차이: 3칸
+Z 차이: 2칸
+
+계산:
+1. 대각선으로 최대한: min(3, 2) = 2번
+   → 14 × 2 = 28
+2. 남은 직선: |3 - 2| = 1번
+   → 10 × 1 = 10
+3. 총합: 28 + 10 = 38
+
+```
+
+---
+
+## 🔄 경로 역추적 이해하기
+
+### 개념: 빵 부스러기 따라가기
+
+```
+동화 "헨젤과 그레텔"처럼 돌아갈 때 빵 부스러기를 따라갑니다.
+
+각 칸마다 "어느 칸에서 왔는지" 기록해둡니다:
+```
+
+### 예시
+
+```
+이동 과정:
+
+┌───┬───┬───┬───┐
+│   │   │   │ E │ ← 4번째: "3번 칸에서 왔어"
+├───┼───┼───┼───┤
+│   │   │ 3 │   │ ← 3번째: "2번 칸에서 왔어"
+├───┼───┼───┼───┤
+│   │ 2 │   │   │ ← 2번째: "1번 칸에서 왔어"
+├───┼───┼───┼───┤
+│ 1 │   │   │   │ ← 1번째: 시작점
+└───┴───┴───┴───┘
+
+역추적 (거꾸로 따라가기):
+E: "3번 칸에서 왔어" → 3번으로
+3: "2번 칸에서 왔어" → 2번으로
+2: "1번 칸에서 왔어" → 1번으로
+1: 시작점!
+
+결과: [E, 3, 2, 1]
+뒤집기: [1, 2, 3, E] ← 정방향 경로!
+
+```
+
+---
+
+## 🎨 Unity에서 시각화하기
+
+### 디버그 선 그리기
+
+```csharp
+// 경로의 각 구간을 선으로 연결
+
+for (int i = 0; i < 경로.Count - 1; i++)
+{
+    현재칸 = 경로[i];
+    다음칸 = 경로[i + 1];
+
+    선_그리기(현재칸, 다음칸);
+}
+
+```
+
+**결과:**
+
+```
+┌───┬───┬───┬───┐
+│   │   │   │ E │
+├───┼───┼───╱───┤
+│   │   │ ╱ │   │
+├───┼───╱───┼───┤
+│   │ ╱ │   │   │
+├───╱───┼───┼───┤
+│ ╱ │   │   │   │
+└───┴───┴───┴───┘
+
+흰색 선으로 경로 표시!
+
+```
+
+---
+
+## 🧩 전체 과정 한눈에 보기
+
+```
+┌─────────────┐
+│  게임 시작  │
+└──────┬──────┘
+       ↓
+┌──────────────────┐
+│ 맵을 격자로 나눔 │
+│ (10×10 그리드)   │
+└──────┬───────────┘
+       ↓
+┌──────────────────┐
+│ T 키 누름        │
+│ 마우스 위치 확인 │
+└──────┬───────────┘
+       ↓
+┌─────────────────────────┐
+│ A* 알고리즘 실행:       │
+│                         │
+│ 1. openList에 시작점 추가│
+│ 2. 가장 좋은 칸 선택    │
+│ 3. 주변 8방향 검사      │
+│ 4. 더 좋은 경로면 업데이트│
+│ 5. 목표 도착까지 반복   │
+└──────┬──────────────────┘
+       ↓
+┌──────────────────┐
+│ 경로 역추적      │
+│ (목표→시작 거꾸로)│
+└──────┬───────────┘
+       ↓
+┌──────────────────┐
+│ 리스트 뒤집기    │
+│ (시작→목표 정방향)│
+└──────┬───────────┘
+       ↓
+┌──────────────────┐
+│ 화면에 흰색 선으로│
+│ 경로 표시        │
+└──────────────────┘
+
+```
+
+---
+
+## 💡 핵심 요점 정리
+
+### 1. A\*는 "똑똑한 탐색"
+
+```
+❌ 모든 칸을 다 확인 (비효율)
+✅ 목표에 가까운 칸 우선 확인 (효율적)
+```
+
+### 2. 세 가지 비용만 기억하기
+
+```
+G = 지금까지 온 거리 (실제)
+H = 남은 거리 (예상)
+F = G + H (총점)
+
+→ F가 낮을수록 좋은 선택!
+```
+
+### 3. 두 개의 목록
+
+```
+openList: 갈 수 있는 곳 (후보지)
+closedList: 이미 간 곳 (제외)
+```
+
+### 4. 동작 순서
+
+```
+1. F가 가장 낮은 칸 선택
+2. 목표면 종료, 아니면 주변 검사
+3. 더 좋은 경로면 업데이트
+4. 반복
+```
+
+---
+
+## 🎓 비유로 이해하기
+
+### A\* = 내비게이션
+
+```
+내비게이션이 길 찾는 방법과 똑같습니다:
+
+1. 목적지 설정 (목표 노드)
+2. 현재 위치 확인 (시작 노드)
+3. 여러 경로 비교
+   - 고속도로: 빠르지만 돌아감 (직선)
+   - 지름길: 느리지만 가까움 (대각선)
+4. 최단 시간 경로 선택 (F 비용 최소)
+5. 안내 시작!
+
+```
+
+### 실생활 예시
+
+```
+학교에서 집까지 가는 길:
+
+경로 A: 큰길로 → 20분 소요
+경로 B: 골목길 → 15분 소요 ← A* 선택!
+
+A*는 여러 경로를 비교해서
+가장 빠른 길을 자동으로 찾아줍니다.
+
+```
+
+---
+
+## 🚀 다음 단계
+
+현재는 **장애물이 없는 빈 맵**입니다.
+
+**다음에 배울 것:**
+
+```
+┌───┬───┬───┬───┐
+│ S │   │ ■ │   │  ■ = 벽 (못 가는 곳)
+├───┼───┼───┼───┤
+│   │ ■ │ ■ │   │
+├───┼───┼───┼───┤
+│   │   │   │   │
+├───┼───┼───┼───┤
+│   │   │   │ E │
+└───┴───┴───┴───┘
+
+장애물을 피해서 가는 경로 찾기!
+
+```
+
+---
+
+## ✅ 최종 정리
+
+\*A 알고리즘 = 게임 캐릭터가 목적지까지 최단 경로로 이동하게 만드는 기술\*\*
+
+**핵심 3줄 요약:**
+
+1. 맵을 격자로 나누고 각 칸의 "점수"를 계산
+2. 점수가 낮은 칸부터 우선적으로 탐색
+3. 목표에 도착하면 경로를 거꾸로 추적해서 반환
+
+**이렇게 기억하세요:**
+
+```
+"가장 유망한 칸을 선택하면서 목표를 찾아가는 알고리즘"
+```
+
+이제 A\* 알고리즘의 기본을 이해했습니다! 🎉
+
+# { 🎯 A\* 알고리즘 동작 과정 }
+
+네, 정확히 이해하셨어요! 하나씩 아주 자세하게 설명해드릴게요.
+
+---
+
+## 📍 Step 0: 시작 전 준비
+
+```
+상황 설정:
+┌───┬───┬───┬───┐
+│   │   │   │ E │ ← 목표 (3,3)
+├───┼───┼───┼───┤
+│   │   │   │   │
+├───┼───┼───┼───┤
+│   │   │   │   │
+├───┼───┼───┼───┤
+│ S │   │   │   │ ← 시작 (0,0)
+└───┴───┴───┴───┘
+
+준비물:
+📋 openList = [시작점]  ← 확인할 칸들
+📋 closedList = []      ← 확인 완료한 칸들
+
+```
+
+**이 시점에서:**
+
+- openList에는 시작점(0,0)만 들어있음
+- closedList는 비어있음
+
+---
+
+## 🔄 Step 1: 첫 번째 반복 - 시작점 검사
+
+### 1-1. openList에서 F가 가장 낮은 칸 선택
+
+```
+현재 openList:
+├─ (0,0) F=42  ← 이것밖에 없으니 이걸 선택!
+
+선택한 칸: (0,0)
+```
+
+### 1-2. 목표인가 확인
+
+```
+질문: (0,0)이 목표 (3,3)인가?
+답: 아니요!
+
+→ 주변을 검사해야 함
+```
+
+### 1-3. 선택한 칸을 closedList로 이동
+
+```
+(0,0)을 확인했으니:
+
+openList: []           ← (0,0) 제거
+closedList: [(0,0)]    ← (0,0) 추가
+
+```
+
+### 1-4. 주변 8방향 검사 시작!
+
+```
+(0,0)의 주변 8방향:
+
+  ↖  ↑  ↗
+   \ | /
+  ← (0,0) →
+   / | \
+  ↙  ↓  ↘
+
+실제 좌표:
+┌───┬───┬───┐
+│X,X│0,1│X,X│  X = 맵 밖 (검사 안함)
+├───┼───┼───┤
+│X,X│0,0│1,0│
+└───┴───┴───┘
+     ↑
+   현재위치
+
+가능한 이웃:
+1. (1,0) - 오른쪽
+2. (0,1) - 위쪽
+3. (1,1) - 대각선 우상향
+
+※ 왼쪽, 아래쪽은 맵 밖이라 없음
+
+```
+
+### 1-5. 각 이웃 칸 검사
+
+**이웃 1: (1,0) - 오른쪽 칸**
+
+```
+┌───┬───┬───┬───┐
+│   │   │   │ E │
+├───┼───┼───┼───┤
+│   │   │   │   │
+├───┼───┼───┼───┤
+│   │   │   │   │
+├───┼───┼───┼───┤
+│현재│검사│   │   │
+└───┴───┴───┴───┘
+
+질문1: (1,0)이 closedList에 있나?
+답: 아니요 → 계속 진행
+
+계산:
+├─ G비용: 0 (시작점의 G) + 10 (직선 이동) = 10
+├─ H비용: (1,0)에서 (3,3)까지 거리 = 42
+└─ F비용: 10 + 42 = 52
+
+기록:
+├─ (1,0)의 G비용 = 10
+├─ (1,0)의 H비용 = 42
+├─ (1,0)의 F비용 = 52
+└─ (1,0)의 부모 = (0,0)  ← "어디서 왔는지" 기록
+
+openList에 추가!
+```
+
+**이웃 2: (0,1) - 위쪽 칸**
+
+```
+┌───┬───┬───┬───┐
+│   │   │   │ E │
+├───┼───┼───┼───┤
+│   │   │   │   │
+├───┼───┼───┼───┤
+│검사│   │   │   │
+├───┼───┼───┼───┤
+│현재│   │   │   │
+└───┴───┴───┴───┘
+
+질문1: (0,1)이 closedList에 있나?
+답: 아니요 → 계속 진행
+
+계산:
+├─ G비용: 0 + 10 = 10 (직선 이동)
+├─ H비용: 42
+└─ F비용: 52
+
+기록 및 openList에 추가!
+```
+
+**이웃 3: (1,1) - 대각선 칸**
+
+```
+┌───┬───┬───┬───┐
+│   │   │   │ E │
+├───┼───┼───┼───┤
+│   │   │   │   │
+├───┼───┼───┼───┤
+│   │검사│   │   │
+├───┼───┼───┼───┤
+│현재│   │   │   │
+└───┴───┴───┴───┘
+
+질문1: (1,1)이 closedList에 있나?
+답: 아니요 → 계속 진행
+
+계산:
+├─ G비용: 0 + 14 = 14 (대각선 이동)
+├─ H비용: 28
+└─ F비용: 42  ← 제일 낮음!
+
+기록 및 openList에 추가!
+```
+
+### 1-6. 첫 번째 반복 종료
+
+```
+현재 상태:
+
+openList:
+├─ (1,0) F=52
+├─ (0,1) F=52
+└─ (1,1) F=42  ← F가 가장 낮음!
+
+closedList:
+└─ (0,0)  ← 이미 검사 완료
+```
+
+---
+
+## 🔄 Step 2: 두 번째 반복 - (1,1) 검사
+
+### 2-1. openList에서 F가 가장 낮은 칸 선택
+
+```
+openList 중에서 선택:
+├─ (1,0) F=52
+├─ (0,1) F=52
+└─ (1,1) F=42  ← 가장 낮음! 선택!
+
+```
+
+### 2-2. 목표인가 확인
+
+```
+질문: (1,1)이 목표 (3,3)인가?
+답: 아니요!
+
+→ 주변을 검사해야 함
+```
+
+### 2-3. closedList로 이동
+
+```
+openList:
+├─ (1,0) F=52
+└─ (0,1) F=52
+
+closedList:
+├─ (0,0)
+└─ (1,1)  ← 추가됨
+```
+
+### 2-4. (1,1)의 주변 8방향 검사
+
+```
+┌───┬───┬───┬───┐
+│   │   │   │ E │
+├───┼───┼───┼───┤
+│   │   │   │   │
+├───┼───┼───┼───┤
+│ 1 │ 2 │ 3 │   │
+├───┼───┼───┼───┤
+│ 4 │현재│ 5 │   │
+└───┴───┴───┴───┘
+
+8방향 이웃:
+1. (0,2) - 좌상
+2. (1,2) - 상
+3. (2,2) - 우상
+4. (0,1) - 좌
+5. (2,1) - 우
+6. (0,0) - 좌하 ← closedList에 있음!
+7. (1,0) - 하
+8. (2,0) - 우하
+
+```
+
+**중요한 부분 - (0,0) 검사:**
+
+```
+이웃: (0,0)
+
+질문1: (0,0)이 closedList에 있나?
+답: 예! 이미 검사했음
+
+→ continue (건너뜀)
+```
+
+**새로운 칸 - (2,2) 검사:**
+
+```
+이웃: (2,2)
+
+질문1: closedList에 있나?
+답: 아니요 → 계속
+
+계산:
+├─ G비용: 14 (현재 G) + 14 (대각선) = 28
+├─ H비용: 14
+└─ F비용: 42
+
+질문2: (2,2)가 openList에 이미 있나?
+답: 아니요 → openList에 추가!
+
+```
+
+**이미 있는 칸 - (1,0) 검사:**
+
+```
+이웃: (1,0)
+
+질문1: closedList에 있나?
+답: 아니요 → 계속
+
+현재 (1,0)의 상태:
+├─ G비용: 10 (이전에 계산됨)
+└─ 부모: (0,0)
+
+새로운 경로로 계산:
+├─ 임시 G비용: 14 + 10 = 24
+└─ 기존 G비용: 10
+
+질문2: 24 < 10 인가?
+답: 아니요! (24가 더 큼)
+
+→ 업데이트 안함 (기존 경로가 더 좋음)
+
+```
+
+---
+
+## 📊 "더 좋은 경로" 업데이트 예시
+
+### 상황: 더 좋은 경로를 발견한 경우
+
+```
+예시 상황:
+
+┌───┬───┬───┬───┐
+│   │ ? │   │ E │
+├───┼───┼───┼───┤
+│ A │ B │ C │   │
+├───┼───┼───┼───┤
+│   │   │   │   │
+├───┼───┼───┼───┤
+│ S │   │   │   │
+└───┴───┴───┴───┘
+
+경로1: S → A → B → ? (비용: 10+10+10 = 30)
+경로2: S → C → ? (비용: 14+10 = 24) ← 더 좋음!
+
+```
+
+**?칸을 검사할 때:**
+
+```
+첫 번째 발견 (A→B→? 경로):
+├─ ?칸의 G비용 = 30
+└─ 부모 = B
+
+두 번째 발견 (C→? 경로):
+├─ 임시 G비용 = 24
+├─ 기존 G비용 = 30
+
+질문: 24 < 30?
+답: 예!
+
+→ 업데이트!
+├─ ?칸의 G비용 = 24 (변경)
+├─ 부모 = C (변경)
+└─ F비용 재계산
+
+```
+
+---
+
+## 🎯 계속 반복...
+
+### Step 3: 세 번째 반복 - (2,2) 검사
+
+```
+openList에서 F가 가장 낮은 칸:
+└─ (2,2) F=42 선택!
+
+목표인가? 아니요!
+
+주변 8방향 검사...
+
+새로 발견:
+└─ (3,3) 추가! ← 목표 발견!
+
+```
+
+### Step 4: 네 번째 반복 - 목표 도착!
+
+```
+openList에서 F가 가장 낮은 칸:
+└─ (3,3) 선택!
+
+질문: (3,3)이 목표인가?
+답: 예!!!
+
+→ 경로 역추적 시작!
+
+```
+
+---
+
+## 🔙 경로 역추적
+
+```
+(3,3)부터 거꾸로:
+
+(3,3): 부모 = (2,2)
+(2,2): 부모 = (1,1)
+(1,1): 부모 = (0,0)
+(0,0): 부모 = null (시작점)
+
+역순 리스트: [(3,3), (2,2), (1,1), (0,0)]
+뒤집기: [(0,0), (1,1), (2,2), (3,3)]
+
+완성! 🎉
+
+```
+
+---
+
+## 📌 핵심 정리
+
+### 질문에 대한 답변
+
+**Q: 처음에 시작점에서 8방향을 확인하는거야?**
+
+**A: 네! 정확합니다!**
+
+```
+전체 흐름:
+
+1. 시작점 (0,0)을 openList에 넣음
+
+2. openList에서 F가 가장 낮은 칸 선택 (처음엔 시작점뿐)
+
+3. 목표인가?
+   ├─ 예 → 종료
+   └─ 아니오 → 4번으로
+
+4. 선택한 칸을 closedList로 이동
+
+5. 선택한 칸의 주변 8방향 확인
+   ├─ 각 이웃이 closedList에 있나?
+   │  └─ 예 → 건너뜀 (이미 검사함)
+   │
+   ├─ 더 좋은 경로인가?
+   │  ├─ 예 → 정보 업데이트
+   │  └─ 아니오 → 그대로 둠
+   │
+   └─ openList에 추가 (아직 없으면)
+
+6. 2번으로 돌아가서 반복
+
+목표를 찾을 때까지 계속!
+
+```
+
+---
+
+## 🎬 애니메이션처럼 이해하기
+
+```
+반복 1:
+┌───┬───┬───┬───┐
+│   │ + │   │ E │  + = openList에 추가됨
+├───┼───┼───┼───┤
+│   │ + │   │   │
+├───┼───┼───┼───┤
+│   │   │   │   │
+├───┼───┼───┼───┤
+│ X │ + │   │   │  X = 현재 검사중 (0,0)
+└───┴───┴───┴───┘
+
+반복 2:
+┌───┬───┬───┬───┐
+│   │   │ + │ E │
+├───┼───┼───┼───┤
+│ + │ X │ + │   │  X = 현재 검사중 (1,1)
+├───┼───┼───┼───┤
+│   │ + │   │   │
+├───┼───┼───┼───┤
+│ ■ │   │   │   │  ■ = 이미 검사함
+└───┴───┴───┴───┘
+
+반복 3:
+┌───┬───┬───┬───┐
+│   │ + │ + │ E │
+├───┼───┼───┼───┤
+│   │ ■ │ X │ + │  X = 현재 검사중 (2,2)
+├───┼───┼───┼───┤
+│   │   │ + │   │
+├───┼───┼───┼───┤
+│ ■ │   │   │   │
+└───┴───┴───┴───┘
+
+반복 4:
+┌───┬───┬───┬───┐
+│   │   │   │ X │  X = 목표 도착! (3,3)
+├───┼───┼───┼───┤
+│   │ ■ │ ■ │   │
+├───┼───┼───┼───┤
+│   │   │   │   │
+├───┼───┼───┼───┤
+│ ■ │   │   │   │
+└───┴───┴───┴───┘
+
+완료!
+
+```
+
+---
+
+## ✅ 마지막 요약
+
+\*A 알고리즘의 진짜 동작:\*\*
+
+1. **시작점만 openList에 넣고 시작**
+2. **openList에서 가장 좋은(F가 낮은) 칸 하나 선택**
+3. **선택한 칸의 주변 8방향 확인**
+   - 이미 검사한 곳(closedList)은 무시
+   - 새로운 곳이나 더 좋은 경로면 openList에 추가/업데이트
+4. **2번으로 돌아가서 반복**
+5. **목표를 찾을 때까지 계속!**
+
+이제 이해되셨나요? 😊

@@ -1,0 +1,2584 @@
+---
+title: '섹션 6: Collision Essentials - 1'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 🎯 언리얼 엔진 콜리전(충돌) 시스템 기초 }
+
+## 📌 이 강의의 목표
+
+언리얼 엔진의 충돌 시스템을 처음부터 이해하고 게임에서 활용할 수 있도록 학습합니다.
+
+- 충돌이란 무엇인가
+- 충돌이 어떻게 작동하는가
+- 충돌 설정을 어떻게 관리하는가
+
+---
+
+## 🔍 충돌(Collision)이란?
+
+### 기본 개념
+
+```
+게임 속 물체들이 서로 부딪히거나 겹치는 것
+  ↓
+예시: 캐릭터가 벽에 막히는 것
+      총알이 적에게 맞는 것
+      발판 위에 서는 것
+```
+
+---
+
+## 🧩 프리미티브 컴포넌트 (Primitive Component)
+
+### 충돌의 시작점
+
+**프리미티브 컴포넌트**: 충돌 데이터를 가질 수 있는 컴포넌트
+
+- 게임 속 물체들이 충돌하려면 반드시 프리미티브 컴포넌트여야 함
+- 씬 컴포넌트(Scene Component)는 충돌 불가능
+
+### 프리미티브 컴포넌트 종류
+
+```
+프리미티브 컴포넌트
+  ├─ Static Mesh Component (3D 모델)
+  ├─ Sphere Component (구 모양)
+  ├─ Box Component (상자 모양)
+  ├─ Capsule Component (캡슐 모양)
+  └─ 기타 셰이프 컴포넌트들
+```
+
+**중요**: 액터(Actor) 자체가 충돌하는 것이 아니라, 액터 안의 컴포넌트가 충돌합니다.
+
+---
+
+## 🎭 충돌의 두 가지 종류
+
+### 1. 충돌 (Collision)
+
+```
+물체끼리 실제로 부딪히는 것
+  ↓
+예시: 캐릭터가 벽을 통과하지 못함
+      공이 바닥에 떨어짐
+```
+
+### 2. 쿼리 (Query)
+
+```
+"충돌이 있는지 확인하는 검사"
+  ↓
+종류
+  ├─ Line Trace (선 쏘기)
+  │   └─ 보이지 않는 선을 쏴서 뭔가 맞는지 확인
+  │
+  ├─ Shape Sweep (도형 밀기)
+  │   └─ 보이지 않는 도형을 밀어서 뭔가 걸리는지 확인
+  │
+  └─ Overlap (겹침 확인)
+      └─ 특정 영역에 뭔가 있는지 확인
+```
+
+**예시**:
+
+- Line Trace: 총을 쏠 때 총알이 맞는지 확인
+- Shape Sweep: 캐릭터가 이동할 수 있는지 미리 확인
+- Overlap: 문 앞에 플레이어가 있는지 확인
+
+---
+
+## 📦 충돌 데이터의 구성
+
+```
+충돌 데이터
+  ├─ 충돌 지오메트리 (모양)
+  └─ 충돌 세팅 (설정)
+```
+
+### 충돌 지오메트리 (Collision Geometry)
+
+**물체의 충돌 판정 모양**
+
+### 1. Complex Collision (복잡한 충돌)
+
+```
+실제로 보이는 메시 그대로 사용
+  ├─ 장점: 정확함
+  └─ 단점: 계산이 느림
+```
+
+### 2. Simple Collision (단순한 충돌)
+
+```
+보이지 않는 단순한 도형 사용
+  ├─ 종류: 상자, 구, 캡슐 등
+  ├─ 장점: 계산이 빠름
+  └─ 단점: 덜 정확함
+```
+
+**권장**: 성능을 위해 Simple Collision 사용
+
+### 3. Shape Components (셰이프 컴포넌트)
+
+```
+별도로 추가하는 충돌용 도형
+  ├─ Sphere Component (구)
+  ├─ Box Component (상자)
+  └─ Capsule Component (캡슐)
+```
+
+---
+
+## ⚙️ 충돌 세팅 (Collision Settings)
+
+### 3가지 핵심 설정
+
+```
+충돌 세팅
+  ├─ 1. Collision Enabled (충돌 활성화)
+  ├─ 2. Object Type (오브젝트 타입)
+  └─ 3. Collision Responses (충돌 반응)
+```
+
+---
+
+## 🔧 1. Collision Enabled (충돌 활성화)
+
+**"이 물체를 어떤 용도로 쓸 것인가?"**
+
+### 옵션 설명
+
+### No Collision (충돌 없음)
+
+```
+충돌 계산 안 함
+  └─ 용도: 장식용 물체
+```
+
+### Query Only (쿼리만)
+
+```
+검사만 가능 (Line Trace 등)
+물리 충돌 불가능
+  ├─ 할 수 있는 것
+  │   ├─ Line Trace에 감지됨
+  │   ├─ Overlap 이벤트 발생
+  │   └─ Shape Sweep에 걸림
+  │
+  └─ 할 수 없는 것
+      ├─ 물리 시뮬레이션 불가
+      ├─ 힘 적용 불가
+      └─ 물리적으로 막히지 않음
+```
+
+### Physics Only (물리만)
+
+```
+물리 충돌만 가능
+쿼리 불가능
+  ├─ 할 수 있는 것
+  │   ├─ 물리 시뮬레이션 가능
+  │   ├─ 힘 적용 가능
+  │   └─ 물리적으로 막힘
+  │
+  └─ 할 수 없는 것
+      ├─ Line Trace 무시됨
+      ├─ Overlap 이벤트 없음
+      └─ Shape Sweep 무시됨
+```
+
+### Collision Enabled (쿼리 + 물리)
+
+```
+쿼리와 물리 모두 가능
+  ├─ 장점: 모든 기능 사용 가능
+  └─ 단점: 계산량이 가장 많음 (무거움)
+```
+
+### Probe (쿼리 + 충돌 감지)
+
+```
+쿼리 가능 + 충돌 감지만
+힘은 전달되지 않음
+  ├─ 할 수 있는 것
+  │   ├─ 쿼리 감지
+  │   └─ 충돌 감지 (Hit 이벤트)
+  │
+  └─ 할 수 없는 것
+      └─ 충돌 시 힘 전달 안 됨 (막히지 않음)
+```
+
+### Query and Probe (쿼리 + 충돌 감지)
+
+```
+Probe와 동일 (쿼리 + 충돌 감지)
+힘은 전달되지 않음
+```
+
+### 선택 가이드
+
+```
+용도별 추천 설정
+  ├─ 장식용 소품
+  │   └─ No Collision
+  │
+  ├─ 트리거 영역
+  │   └─ Query Only
+  │
+  ├─ 물리 시뮬레이션 물체
+  │   └─ Physics Only
+  │
+  ├─ 캐릭터/중요 물체
+  │   └─ Collision Enabled
+  │
+  └─ 충돌 감지만 필요
+      └─ Probe
+```
+
+---
+
+## 🏷️ 2. Object Type (오브젝트 타입)
+
+**"이 물체는 충돌 시스템에서 어떤 종류인가?"**
+
+### Collision Channel (충돌 채널)
+
+```
+충돌 채널의 두 가지 종류
+  ├─ Trace Channel (트레이스 채널)
+  │   └─ Line Trace/Shape Sweep용
+  │       └─ 오브젝트에 할당 불가능
+  │
+  └─ Object Channel (오브젝트 채널)
+      └─ 물체 분류용
+          └─ 오브젝트에 할당 가능
+```
+
+### 기본 제공 오브젝트 채널
+
+```
+기본 오브젝트 채널
+  ├─ WorldStatic (고정된 세계 물체)
+  │   └─ 예: 벽, 바닥, 건물
+  │
+  ├─ WorldDynamic (움직이는 세계 물체)
+  │   └─ 예: 움직이는 플랫폼, 문
+  │
+  ├─ Pawn (캐릭터)
+  │   └─ 예: 플레이어, AI
+  │
+  ├─ PhysicsBody (물리 물체)
+  │   └─ 예: 떨어지는 상자, 공
+  │
+  ├─ Vehicle (탈것)
+  └─ Destructible (부서지는 물체)
+```
+
+### 커스텀 채널 생성
+
+```
+프로젝트 설정에서 새 채널 추가 가능
+  ├─ 주의: 제한된 개수만 생성 가능
+  └─ 팁: 너무 많이 만들지 말 것
+```
+
+---
+
+## 🔀 3. Collision Responses (충돌 반응)
+
+**"각 채널의 물체와 어떻게 반응할 것인가?"**
+
+### 세 가지 반응
+
+### Ignore (무시)
+
+```
+충돌 없음
+  ├─ 서로 통과함
+  ├─ 이벤트 없음
+  └─ 예: 유령처럼 통과
+```
+
+### Overlap (겹침)
+
+```
+통과하지만 감지됨
+  ├─ 서로 통과함
+  ├─ Overlap 이벤트 발생
+  └─ 예: 트리거 영역 진입
+```
+
+### Block (차단)
+
+```
+충돌하여 막힘
+  ├─ 서로 통과 못함
+  ├─ Hit 이벤트 발생
+  └─ 예: 벽에 막힘
+```
+
+### 충돌 반응 설정 예시
+
+```
+플레이어 캐릭터 설정
+  ├─ WorldStatic → Block (벽에 막힘)
+  ├─ WorldDynamic → Block (움직이는 물체에 막힘)
+  ├─ Pawn → Block (다른 캐릭터와 부딪힘)
+  ├─ PhysicsBody → Overlap (물리 물체 통과하며 감지)
+  └─ Projectile → Ignore (총알 무시)
+```
+
+---
+
+## 📋 Collision Preset (충돌 프리셋)
+
+**미리 만들어진 충돌 설정 묶음**
+
+### 프리셋의 구성
+
+```
+Collision Preset
+  ├─ Collision Enabled (충돌 활성화)
+  ├─ Object Type (오브젝트 타입)
+  └─ Collision Responses (충돌 반응들)
+```
+
+### 프리셋 사용
+
+```
+컴포넌트 Details 패널
+  └─ Collision Preset 선택
+      ├─ 프리셋 선택 시
+      │   └─ 모든 설정 자동 적용 (수정 불가)
+      │
+      └─ Custom 선택 시
+          └─ 개별 설정 직접 조정 가능
+```
+
+### 기본 제공 프리셋 예시
+
+```
+주요 프리셋
+  ├─ NoCollision
+  │   └─ 충돌 없음
+  │
+  ├─ BlockAll
+  │   └─ 모든 것 차단
+  │
+  ├─ OverlapAll
+  │   └─ 모든 것 겹침
+  │
+  ├─ BlockAllDynamic
+  │   └─ 움직이는 것만 차단
+  │
+  └─ PhysicsActor
+      └─ 물리 물체용 설정
+```
+
+### 커스텀 프리셋 생성
+
+```
+프로젝트 설정에서 생성
+  ├─ 제한 없음 (많이 만들어도 됨)
+  ├─ 장점: 한 번 설정으로 여러 곳 적용
+  └─ 예: "Wall" 프리셋을 모든 벽에 적용
+```
+
+---
+
+## 🔍 Collision Filtering (충돌 필터링)
+
+**"두 물체가 만났을 때 어떤 반응이 일어날까?"**
+
+### 충돌 판정 규칙
+
+```
+충돌 상호작용 결정 과정
+  ↓
+1. 물체 A의 Object Type 확인
+2. 물체 B의 A 타입에 대한 Response 확인
+3. 물체 B의 Object Type 확인
+4. 물체 A의 B 타입에 대한 Response 확인
+  ↓
+5. 두 Response 비교
+  ↓
+6. 더 약한 반응 선택
+```
+
+### 반응 강도 순서
+
+```
+약함 ←―――――――――――――――→ 강함
+Ignore  <  Overlap  <  Block
+```
+
+**핵심 규칙**: 두 물체의 반응이 다르면 더 약한 쪽 선택
+
+### 예시 1: Overlap 결과
+
+```
+물체 A
+  ├─ Object Type: Pawn
+  └─ Responses
+      ├─ WorldStatic → Block
+      └─ Pawn → Ignore
+
+물체 B
+  ├─ Object Type: WorldStatic
+  └─ Responses
+      ├─ WorldStatic → Block
+      └─ Pawn → Overlap
+
+물체 A와 B가 만나면
+  ├─ A의 B에 대한 반응: Block (B는 WorldStatic)
+  ├─ B의 A에 대한 반응: Overlap (A는 Pawn)
+  └─ 결과: Overlap (더 약한 반응)
+```
+
+### 예시 2: Block 결과
+
+```
+물체 C
+  ├─ Object Type: Pawn
+  └─ Responses
+      ├─ WorldStatic → Block
+      └─ Pawn → Block
+
+물체 D
+  ├─ Object Type: WorldStatic
+  └─ Responses
+      ├─ WorldStatic → Block
+      └─ Pawn → Block
+
+물체 C와 D가 만나면
+  ├─ C의 D에 대한 반응: Block (D는 WorldStatic)
+  ├─ D의 C에 대한 반응: Block (C는 Pawn)
+  └─ 결과: Block (둘 다 Block)
+```
+
+**중요**: Block을 얻으려면 **양쪽 모두** Block이어야 함
+
+---
+
+## 📞 Collision Callbacks (충돌 콜백)
+
+**충돌 발생 시 실행되는 이벤트**
+
+### Overlap 콜백
+
+```
+Overlap 발생 시 실행
+  ├─ OnComponentBeginOverlap
+  ├─ OnComponentEndOverlap
+  ├─ OnActorBeginOverlap
+  └─ OnActorEndOverlap
+
+조건
+  ├─ 충돌 반응이 Overlap이어야 함
+  └─ 양쪽 모두 "Generate Overlap Events" 체크
+```
+
+**Generate Overlap Events**: Details 패널의 체크박스
+
+### Hit 콜백
+
+```
+Block 발생 시 실행
+  └─ OnComponentHit
+
+조건 - 물리 충돌인 경우
+  └─ "Simulation Generates Hit Events" 체크
+
+조건 - 비물리 충돌인 경우
+  └─ Sweep으로 이동했어야 함
+```
+
+**주의**: Sweep 없이 이동하면 Block이어도 Hit 콜백 없음
+
+---
+
+## 🚀 물체 이동 방식
+
+**이동 방식에 따라 충돌 결과가 달라짐**
+
+### 1. 위치 직접 설정
+
+```
+함수 예시
+  ├─ SetActorLocation
+  └─ AddActorWorldOffset
+
+Sweep 옵션
+  ├─ Sweep = True
+  │   └─ 경로에 Block 물체 있으면 멈춤
+  │
+  └─ Sweep = False
+      └─ Block 물체 무시하고 통과
+```
+
+**Sweep**: 이동 경로를 검사하여 막히는 물체 확인
+
+### 2. 물리 시스템
+
+```
+물리 시뮬레이션 사용
+  ├─ AddForce (힘 추가)
+  ├─ AddImpulse (충격 추가)
+  └─ 물리 엔진이 자동으로 충돌 처리
+```
+
+### 3. Movement Component
+
+### Projectile Movement Component
+
+```
+발사체 이동용
+  ├─ 물리 ON → 힘 적용 후 물리에 맡김
+  └─ 물리 OFF → Sweep으로 위치 업데이트
+```
+
+### Character Movement Component
+
+```
+캐릭터 이동용
+  ├─ 쿼리 시스템 사용 (Sweep)
+  └─ 물리 물체에 힘 전달 가능
+  └─ 계산량 많음 (쿼리 + 물리)
+```
+
+---
+
+## ⚠️ 주의사항
+
+### Sweep의 중요성
+
+```
+Sweep 없이 이동하면
+  ├─ Block 설정이어도 통과 가능
+  ├─ Hit 콜백 발생 안 함
+  └─ 물체가 겹쳐질 수 있음
+```
+
+### 성능 고려사항
+
+```
+계산량 비교 (가벼움 → 무거움)
+  ├─ No Collision
+  ├─ Query Only / Physics Only
+  ├─ Collision Enabled (Query + Physics)
+  └─ 복잡한 Collision Geometry
+```
+
+**권장**: 필요한 것만 활성화
+
+### 채널 관리
+
+```
+Collision Channel
+  ├─ 제한된 개수만 생성 가능
+  ├─ 새 채널 추가 시 모든 물체가 반응 설정해야 함
+  └─ 최소한으로 사용 권장
+
+Collision Preset
+  ├─ 무제한 생성 가능
+  └─ 많이 사용 권장
+```
+
+---
+
+## 📝 핵심 정리
+
+### 충돌 시스템의 기본
+
+```
+충돌 = 프리미티브 컴포넌트 간 상호작용
+  ├─ 충돌 지오메트리 (모양)
+  └─ 충돌 세팅 (설정)
+```
+
+### 충돌 세팅 3요소
+
+```
+1. Collision Enabled
+   └─ 이 물체의 용도는?
+
+2. Object Type
+   └─ 이 물체의 종류는?
+
+3. Collision Responses
+   └─ 각 종류에 어떻게 반응?
+```
+
+### 충돌 판정 규칙
+
+```
+두 물체가 만나면
+  ↓
+각자의 Object Type과 Responses 비교
+  ↓
+더 약한 반응 선택
+  ↓
+Ignore < Overlap < Block
+```
+
+### 이동 방식의 영향
+
+```
+Sweep 사용
+  └─ 경로 검사 + 충돌 처리 + Hit 콜백
+
+Sweep 미사용
+  └─ 즉시 이동 + 충돌 무시
+
+물리 시뮬레이션
+  └─ 물리 엔진 자동 처리
+```
+
+---
+
+## 💡 학습 팁
+
+### 실습 방법
+
+```
+1. 충돌 예제 프로젝트 사용
+   └─ 강의 자료 다운로드
+
+2. 다양한 설정 테스트
+   ├─ Collision Enabled 변경
+   ├─ Object Type 변경
+   └─ Responses 변경
+
+3. 이동 방식 비교
+   ├─ Sweep On/Off 비교
+   ├─ 물리 시뮬레이션 테스트
+   └─ Movement Component 사용
+
+4. 결과 관찰
+   └─ 각 설정에 따른 동작 확인
+```
+
+### 복습 권장
+
+```
+이 강의는 개념이 많으므로
+  ├─ 실습 후 다시 보기
+  └─ 경험 쌓은 후 재시청
+```
+
+---
+
+## 🎓 다음 단계
+
+실제 프로젝트에서 충돌 설정 적용 연습
+
+```
+연습 과제
+  ├─ 캐릭터 충돌 설정
+  ├─ 발사체 충돌 설정
+  ├─ 트리거 영역 만들기
+  └─ 커스텀 프리셋 생성
+```
+
+---
+
+## 📚 용어 정리
+
+| 용어                | 설명                                   |
+| ------------------- | -------------------------------------- |
+| Primitive Component | 충돌 데이터를 가질 수 있는 컴포넌트    |
+| Collision Geometry  | 충돌 판정에 사용되는 모양              |
+| Simple Collision    | 단순한 도형으로 만든 충돌 모양 (빠름)  |
+| Complex Collision   | 실제 메시 모양 그대로 사용 (정확)      |
+| Query               | 충돌 검사 (Line Trace, Sweep, Overlap) |
+| Physics             | 물리 시뮬레이션 (힘, 중력 등)          |
+| Sweep               | 이동 경로를 검사하여 충돌 처리         |
+| Collision Channel   | 물체 분류용 채널                       |
+| Collision Preset    | 미리 만든 충돌 설정 묶음               |
+| Collision Callback  | 충돌 시 실행되는 이벤트                |
+
+# { 🎯 충돌 복잡도 (Collision Complexity) }
+
+## 📌 이 강의의 목표
+
+스태틱 메시의 충돌 지오메트리 종류를 이해하고 성능에 맞게 설정하는 방법을 학습합니다.
+
+- Complex Collision과 Simple Collision의 차이
+- 충돌 복잡도 설정 방법
+- 성능 최적화 방법
+
+---
+
+## 📦 충돌 지오메트리의 두 가지 종류
+
+### 기본 개념
+
+```
+스태틱 메시의 충돌 지오메트리
+  ├─ Complex Collision (복잡한 충돌)
+  └─ Simple Collision (단순한 충돌)
+```
+
+---
+
+## 🔺 Complex Collision (복잡한 충돌)
+
+### 정의
+
+```
+삼각형 메시 그대로 사용하는 충돌
+  ↓
+= 눈에 보이는 메시 모양 그대로
+```
+
+**Triangle Mesh**: 수많은 삼각형으로 구성된 3D 모델
+
+### 특징
+
+```
+장점
+  └─ 정확한 충돌 판정
+
+단점
+  ├─ 계산량 매우 많음 (느림)
+  ├─ 삼각형 개수만큼 계산 필요
+  └─ 성능 저하
+```
+
+### 확인 방법
+
+```
+Static Mesh Editor에서
+  ↓
+Show → Simple Collision 체크
+  ↓
+삼각형 선들이 보임
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380727/notion-blog/_/_/_5_/_6_Collision_Essentials_-_1/image.png)
+
+---
+
+## 📦 Simple Collision (단순한 충돌)
+
+### 정의
+
+```
+단순한 도형으로 만든 충돌
+  ↓
+보이지 않는 간단한 모양
+```
+
+**Collision Hull**: 충돌 선체라고도 부름
+
+### 종류
+
+```
+Simple Collision 도형
+  ├─ Box (상자)
+  ├─ Sphere (구)
+  ├─ Capsule (캡슐)
+  ├─ Convex Hull (볼록 선체)
+  └─ 기타 단순 도형
+```
+
+### 특징
+
+```
+장점
+  ├─ 계산량 적음 (빠름)
+  ├─ 성능 우수
+  └─ 권장 방식
+
+단점
+  └─ 덜 정확함
+
+```
+
+### 추가 방법
+
+```
+Static Mesh Editor
+  ↓
+Collision 메뉴
+  ├─ Add Box Simplified Collision
+  ├─ Add Sphere Simplified Collision
+  ├─ Add Capsule Simplified Collision
+  └─ 기타 옵션들
+
+```
+
+**주의**: 한 메시에 여러 개의 Simple Collision 추가 가능
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380723/notion-blog/_/_/_5_/_6_Collision_Essentials_-_1/image_1.png)
+
+---
+
+## 🛠️ 실습: 원뿔 메시 만들기
+
+### 1. 모델링 모드 진입
+
+```
+Modeling Mode 활성화
+  ↓
+Create → Cone 선택
+```
+
+### 2. 폴더 구조 설정
+
+```
+Content Drawer
+  └─ Global
+      └─ Meshes
+          └─ Cone (새 폴더)
+```
+
+### 3. 원뿔 생성
+
+```
+설정
+  └─ Height: 150
+
+저장 위치
+  └─ Current Folder 선택
+      └─ Cone 폴더로 자동 저장
+```
+
+### 4. 이름 변경
+
+```
+명명 규칙
+  └─ SM_Cone (Static Mesh의 SM)
+```
+
+---
+
+## ⚙️ Collision Complexity 설정
+
+### 위치
+
+```
+Static Mesh Editor
+  ↓
+Details Panel
+  ↓
+Collision Complexity 속성
+```
+
+### 3가지 옵션
+
+### 1. Use Complex Collision As Simple
+
+```
+복잡한 충돌을 단순한 것처럼 사용
+  ↓
+기본 설정값
+  ├─ Simple Collision이 없어도 작동
+  ├─ Triangle Mesh 사용
+  └─ 성능 나쁨 (권장 안 함)
+```
+
+**상황**:
+
+- Simple Collision을 만들지 않은 경우
+- Complex를 Simple처럼 사용
+
+### 2. Use Simple Collision As Complex
+
+```
+단순한 충돌만 사용
+  ↓
+권장 설정
+  ├─ Simple Collision만 사용
+  ├─ Triangle Mesh 사용 안 함
+  └─ 성능 좋음 (권장)
+```
+
+**효과**:
+
+```
+모든 충돌 계산에 Simple Collision 사용
+  ├─ 물리 충돌
+  └─ 쿼리 (Line Trace 등)
+```
+
+### 3. Use Simple And Complex
+
+```
+상황에 따라 선택 사용
+  ↓
+물리 = Simple Collision
+쿼리 = Complex/Simple 선택 가능
+```
+
+**용도**:
+
+- 물리는 빠르게 (Simple)
+- 정확한 검사 필요 시 Complex 선택 가능
+- 다음 강의에서 자세히 설명
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380725/notion-blog/_/_/_5_/_6_Collision_Essentials_-_1/image_2.png)
+
+---
+
+## 🎮 테스트: 구 떨어뜨리기
+
+### 1. 구 배치
+
+```
+Content Drawer
+  └─ Global → Meshes → Sphere
+      └─ SM_Sphere30 드래그
+          └─ 원뿔 위에 배치
+```
+
+### 2. 물리 시뮬레이션 활성화
+
+```
+SM_Sphere30 선택
+  ↓
+Details Panel
+  └─ Static Mesh Component 선택
+      └─ Physics 섹션
+          ├─ Simulate Physics ✓
+          └─ Enable Gravity ✓ (기본값)
+```
+
+**Simulate Physics**: 물리 법칙 적용 (중력, 충돌 등)
+**Enable Gravity**: 중력 적용
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380725/notion-blog/_/_/_5_/_6_Collision_Essentials_-_1/image_3.png)
+
+### 3. 테스트 결과
+
+### Use Complex As Simple인 경우
+
+```
+Play 실행
+  ↓
+구가 원뿔의 Triangle Mesh에 충돌
+  ↓
+정확한 충돌이지만 성능 낮음
+```
+
+### Use Simple As Complex로 변경 후
+
+```
+Play 실행
+  ↓
+구가 Box Collision에 충돌
+  ↓
+부정확해 보이지만 성능 좋음
+```
+
+---
+
+## 👁️ 충돌 시각화
+
+### Show Collision 명령어
+
+```
+게임 플레이 중
+  ↓
+~ 키 (물결표) 누르기
+  ↓
+"show collision" 입력
+  ↓
+충돌 볼륨이 보임
+```
+
+**효과**: 실제 사용 중인 충돌 모양 확인 가능
+
+### Static Mesh Editor에서 보기
+
+```
+Show 메뉴
+  └─ Simple Collision 체크
+      └─ 녹색 선/면으로 표시
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380725/notion-blog/_/_/_5_/_6_Collision_Essentials_-_1/image_4.png)
+
+---
+
+## 🎨 배경 설정 조정 (선택사항)
+
+### 더 보기 쉽게 만들기
+
+```
+Static Mesh Editor
+  ↓
+Window → Preview Scene Settings
+  ↓
+Environment
+  ├─ Show Environment ✓ 해제
+  ├─ Environment Color 조정
+  └─ Show Floor ✓ 해제 (선택)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380725/notion-blog/_/_/_5_/_6_Collision_Essentials_-_1/image_5.png)
+
+---
+
+## 📊 설정별 비교
+
+### Complex As Simple
+
+```
+사용 충돌: Complex (Triangle Mesh)
+  ├─ 장점: 정확함
+  └─ 단점: 느림
+
+언제 사용?
+  └─ 사용 안 함 (권장 안 함)
+```
+
+### Simple As Complex (권장)
+
+```
+사용 충돌: Simple (Box/Sphere 등)
+  ├─ 장점: 빠름
+  └─ 단점: 덜 정확함
+
+언제 사용?
+  └─ 대부분의 경우 (권장)
+```
+
+### Simple And Complex
+
+```
+물리: Simple Collision
+쿼리: Simple 또는 Complex 선택 가능
+  ├─ 장점: 유연함
+  └─ 단점: 설정 복잡
+
+언제 사용?
+  └─ 정밀한 쿼리 필요 시
+```
+
+---
+
+## ⚠️ 주의사항
+
+### Simple Collision 크기
+
+```
+원뿔에 Box 추가했을 때
+  └─ 크기가 안 맞음
+      ├─ 일부러 차이 보여주기 위함
+      └─ 실제로는 적절한 크기로 조정 필요
+```
+
+### 여러 개의 Simple Collision
+
+```
+한 메시에 여러 개 추가 가능
+  └─ 복잡한 모양을 여러 단순 도형으로 표현
+      └─ 예: 캐릭터 = Capsule 여러 개 조합
+```
+
+### 성능 고려
+
+```
+Triangle Mesh 충돌
+  ├─ 삼각형 개수 × 계산량
+  └─ CPU 부담 큼
+
+Simple Collision
+  ├─ 도형 하나 = 계산 적음
+  └─ 성능 우수
+```
+
+---
+
+## 💡 권장 워크플로우
+
+### 일반적인 메시
+
+```
+1. 메시 생성/임포트
+   ↓
+2. Simple Collision 추가
+   └─ Collision 메뉴에서 적절한 도형 선택
+   ↓
+3. Collision Complexity 설정
+   └─ Use Simple As Complex 선택
+   ↓
+4. 테스트
+   └─ Show Collision으로 확인
+```
+
+### Simple Collision 선택 가이드
+
+```
+메시 모양에 따라
+  ├─ 구형 → Sphere
+  ├─ 상자형 → Box
+  ├─ 캐릭터 → Capsule
+  └─ 복잡한 형태 → 여러 개 조합 또는 Convex Hull
+```
+
+---
+
+## 📝 핵심 정리
+
+### 두 가지 충돌 타입
+
+```
+Complex Collision
+  ├─ Triangle Mesh 사용
+  ├─ 정확하지만 느림
+  └─ 게임에서 권장 안 함
+
+Simple Collision
+  ├─ 단순 도형 사용
+  ├─ 빠르지만 덜 정확함
+  └─ 게임에서 권장
+```
+
+### Collision Complexity 설정
+
+```
+Use Simple As Complex (권장)
+  └─ 모든 충돌에 Simple 사용
+
+Use Simple And Complex
+  └─ 물리는 Simple, 쿼리는 선택 가능
+      └─ 다음 강의에서 자세히
+```
+
+### 충돌 확인 방법
+
+```
+게임 중
+  └─ show collision 명령어
+
+에디터
+  └─ Show → Simple Collision
+```
+
+---
+
+## 🎓 다음 단계
+
+쿼리(Query) 개념 학습
+
+```
+Simple And Complex 설정에서
+  └─ 쿼리에서 Complex 사용하는 방법
+      ├─ Line Trace
+      ├─ Shape Sweep
+      └─ Overlap Query
+```
+
+---
+
+## 📚 용어 정리
+
+| 용어                 | 설명                                    |
+| -------------------- | --------------------------------------- |
+| Complex Collision    | 삼각형 메시 그대로 사용하는 충돌 (느림) |
+| Simple Collision     | 단순한 도형으로 만든 충돌 (빠름)        |
+| Triangle Mesh        | 삼각형들로 구성된 3D 모델               |
+| Collision Hull       | 충돌 선체, Simple Collision의 다른 이름 |
+| Collision Complexity | 어떤 충돌 타입을 사용할지 결정하는 설정 |
+| Simulate Physics     | 물리 법칙 적용 설정                     |
+| Show Collision       | 충돌 볼륨을 시각화하는 명령어           |
+
+---
+
+## 🔧 실습 체크리스트
+
+```
+✅ 원뿔 메시 생성
+✅ Simple Collision 추가 (Box)
+✅ Collision Complexity 변경
+✅ 구 떨어뜨려서 테스트
+✅ Show Collision으로 확인
+✅ 각 설정별 차이 비교
+```
+
+# { 🎯 쿼리와 Trace Complex 설정 }
+
+## 📌 이 강의의 목표
+
+Line Trace(라인 트레이스) 쿼리를 이해하고 Simple/Complex Collision을 선택적으로 사용하는 방법을 학습합니다.
+
+- Query(쿼리)란 무엇인가
+- Line Trace 사용 방법
+- Trace Complex 옵션의 역할
+- Project Settings의 Default Shape Complexity
+
+---
+
+## 🔍 Query (쿼리)란?
+
+### 기본 개념
+
+```
+Query = "질문하기"
+  ↓
+"이 경로에 뭔가 있나요?"
+"이 영역에 물체가 있나요?"
+```
+
+**쿼리**: 충돌이 있는지 검사하는 기능
+
+### 쿼리의 종류
+
+```
+Query 종류
+  ├─ Line Trace (선 추적)
+  │   └─ 보이지 않는 선을 쏴서 충돌 확인
+  │
+  ├─ Shape Sweep (도형 밀기)
+  │   └─ 보이지 않는 도형을 밀어서 충돌 확인
+  │
+  └─ Overlap Query (겹침 확인)
+      └─ 특정 영역에 물체가 있는지 확인
+```
+
+---
+
+## 📏 Line Trace (라인 트레이스)
+
+### 정의
+
+```
+보이지 않는 광선을 우주로 쏘기
+  ↓
+무언가에 부딪히는지 확인
+  ↓
+Hit Result 반환
+```
+
+**Line Trace**: 가장 기본적인 쿼리 방식
+
+### 사용 예시
+
+```
+게임에서 활용
+  ├─ 총 쏘기 (총알이 맞는지 확인)
+  ├─ 시선 체크 (플레이어가 보고 있는 물체)
+  ├─ 거리 측정
+  └─ 장애물 감지
+```
+
+---
+
+## 🎮 실습: BP_LineTraceActor
+
+### 블루프린트 위치
+
+```
+Content Drawer
+  └─ Blueprints
+      └─ QueryActors
+          └─ BP_LineTraceActor
+```
+
+### 구조
+
+```
+Components
+  └─ StaticMeshSphere (구 모양 컴포넌트)
+```
+
+---
+
+## 🔧 Line Trace 노드 구조
+
+### Event Graph 로직
+
+```
+Event BeginPlay
+  ↓
+LineTraceSingle (채널별 라인 트레이스)
+  ├─ Start: 시작 위치
+  ├─ End: 종료 위치
+  ├─ TraceChannel: 추적 채널
+  ├─ bTraceComplex: Complex 추적 여부
+  └─ DrawDebugType: 디버그 표시
+  ↓
+Hit Result (충돌 결과)
+```
+
+---
+
+## 📐 Start/End 위치 계산
+
+### Start 위치
+
+```
+Get Actor Location
+  └─ 액터의 현재 위치
+```
+
+### End 위치 계산
+
+```
+Get Actor Location (액터 위치)
+  ↓
+Add (+)
+  ↓
+Get Actor Forward Vector × 200
+  ↓
+= 앞쪽으로 200 유닛 떨어진 위치
+```
+
+**벡터 수학**:
+
+```
+Forward Vector × 200
+  └─ 앞 방향으로 200만큼 확장
+
+Actor Location + (Forward × 200)
+  └─ 현재 위치에서 앞으로 200 유닛
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380727/notion-blog/_/_/_5_/_6_Collision_Essentials_-_1/image_6.png)
+
+---
+
+## 🎨 Line Trace 파라미터 설명
+
+### TraceChannel
+
+```
+TraceChannel: Visibility
+  └─ 가시성 채널로 추적
+      └─ Visibility를 Block하는 물체만 감지
+```
+
+**Trace Channel**: Line Trace용 특수 채널
+
+### bTraceComplex
+
+```
+True
+  └─ Complex Collision 추적 (Triangle Mesh)
+      └─ 정확하지만 느림
+
+False (기본값)
+  └─ Simple Collision 추적
+      └─ 빠르지만 덜 정확
+```
+
+**핵심 옵션**: Simple과 Complex 중 선택
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380727/notion-blog/_/_/_5_/_6_Collision_Essentials_-_1/image_7.png)
+
+### DrawDebugType
+
+```
+ForDuration
+  └─ 지정된 시간 동안 디버그 표시
+      └─ DrawTime: 60초 (기본 5초에서 변경)
+```
+
+### 디버그 시각화
+
+```
+디버그 요소
+  ├─ Red Line: 충돌 전 경로
+  ├─ Green Line: 충돌 후 경로
+  └─ Red Square: 충돌 지점
+```
+
+---
+
+## 🧪 테스트 1: Simple Collision
+
+### 설정
+
+```
+SM_Cone
+  ├─ Collision Complexity: Use Simple And Complex
+  └─ Simple Collision: Box
+
+BP_LineTraceActor
+  └─ bTraceComplex: False (Simple 추적)
+```
+
+### 결과
+
+```
+Play 실행
+  ↓
+Line Trace가 Box Collision에 충돌
+  ↓
+Simple Collision 표면에 Hit Point 표시
+```
+
+### 확인 방법
+
+```
+게임 플레이 중
+  ↓
+~ 키 (물결표)
+  ↓
+"show collision" 입력
+  ↓
+Box Collision이 보임
+```
+
+---
+
+## 🧪 테스트 2: Complex Collision
+
+### 설정 변경
+
+```
+BP_LineTraceActor
+  └─ bTraceComplex: True (Complex 추적)
+```
+
+### 결과
+
+```
+Play 실행
+  ↓
+Line Trace가 Triangle Mesh에 충돌
+  ↓
+정확한 폴리곤 표면에 Hit Point 표시
+```
+
+**차이점**:
+
+```
+Simple Collision 우회
+  ↓
+Triangle Mesh 기준으로 추적
+  ↓
+더 정확하지만 훨씬 느림
+```
+
+---
+
+## 💡 Simple And Complex의 의미
+
+### 물리 vs 쿼리
+
+```
+Use Simple And Complex 설정 시
+  ├─ 물리 충돌 → Simple Collision 사용
+  └─ 쿼리 → Simple 또는 Complex 선택 가능
+```
+
+### 선택 방법
+
+```
+bTraceComplex = False
+  └─ Simple Collision만 추적
+
+bTraceComplex = True
+  └─ Complex Collision 추적
+```
+
+### 동시 사용 가능
+
+```
+같은 메시에서
+  ├─ 물리 시뮬레이션 구 → Simple에서 튕김
+  └─ Line Trace → Complex로 정확히 감지
+```
+
+**장점**: 성능(물리)과 정확도(쿼리) 모두 확보
+
+---
+
+## ⚙️ Project Settings: Default Shape Complexity
+
+### 위치
+
+```
+Edit → Project Settings
+  ↓
+검색: "Default Shape Complexity"
+  ↓
+Physics 섹션
+```
+
+### 역할
+
+```
+Collision Complexity = Project Default일 때
+  ↓
+이 설정값 사용
+```
+
+**기본값**: Use Simple And Complex (가장 다용도)
+
+### 옵션별 효과
+
+### Use Simple And Complex (기본값)
+
+```
+가장 유연함
+  ├─ 물리: Simple 사용
+  └─ 쿼리: Simple/Complex 선택 가능
+```
+
+### Use Simple As Complex
+
+```
+항상 Simple만 사용
+  ├─ bTraceComplex = True여도
+  └─ Simple Collision만 추적
+  └─ 성능 최고, 정확도 낮음
+```
+
+### Use Complex As Simple
+
+```
+항상 Complex 사용
+  └─ 성능 최저 (권장 안 함)
+```
+
+---
+
+## 🔄 Collision Complexity 우선순위
+
+### 개별 메시 설정 우선
+
+```
+Static Mesh의 Collision Complexity
+  ├─ Project Default → 프로젝트 설정 따름
+  └─ 다른 값 → 개별 설정 우선
+```
+
+**중요**: 개별 설정이 프로젝트 설정보다 우선
+
+---
+
+## 🛠️ Collision Hull 생성 방법
+
+### 기본 도형들
+
+```
+Collision 메뉴
+  ├─ Add Box Simplified Collision
+  ├─ Add Sphere Simplified Collision
+  ├─ Add Capsule Simplified Collision
+  ├─ Add 10DOP-X (X방향 테이퍼)
+  ├─ Add 10DOP-Y (Y방향 테이퍼)
+  └─ Add 10DOP-Z (Z방향 테이퍼)
+```
+
+**10DOP**: 한쪽 방향으로 가늘어지는 상자 형태
+
+### Convex Decomposition (볼록 분해)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380727/notion-blog/_/_/_5_/_6_Collision_Essentials_-_1/image_8.png)
+
+```
+Window → Convex Decomposition
+  ↓
+설정
+  ├─ Hull Count (선체 개수)
+  ├─ Max Hull Verts (최대 정점 수)
+  └─ Hull Precision (정밀도)
+  ↓
+Apply 클릭
+  ↓
+자동으로 최적화된 Collision Hull 생성
+```
+
+**Convex Decomposition**: 복잡한 모양을 여러 볼록 도형으로 분해
+
+### 권장 설정 (원뿔 예시)
+
+```
+Max Hull Verts: 16
+  └─ 적절한 정확도와 성능 균형
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380727/notion-blog/_/_/_5_/_6_Collision_Essentials_-_1/image_9.png)
+
+### Hull 제거
+
+```
+Collision → Remove Collision
+  └─ 모든 Simple Collision 삭제
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380724/notion-blog/_/_/_5_/_6_Collision_Essentials_-_1/image_10.png)
+
+---
+
+## 🎨 디버그 구 추가 (옵션)
+
+### Blueprint에서
+
+```
+LineTraceSingle 실행 후
+  ↓
+Draw Debug Sphere
+  ├─ Center: Hit Result → Impact Point
+  ├─ Radius: 8
+  └─ Duration: 60초
+```
+
+**용도**: Hit Point를 더 명확하게 표시
+
+---
+
+## ⚠️ 주의사항
+
+### Modeling Mode로 만든 메시
+
+```
+기본 설정
+  └─ Use Complex As Simple
+      └─ Simple Collision 없음
+      └─ 성능 나쁨!
+
+권장 조치
+  ├─ Simple Collision 추가
+  └─ Use Simple And Complex로 변경
+```
+
+### Complex As Simple의 문제점
+
+```
+물리 시뮬레이션 불가능
+  ├─ Simulate Physics 체크해도
+  └─ 작동 안 함
+  └─ 경고 메시지 출력
+
+해결
+  └─ Use Simple And Complex로 변경
+```
+
+### 성능 고려
+
+```
+Complex Collision 추적
+  └─ 정확하지만 매우 느림
+      └─ 실제 게임에서 거의 사용 안 함
+
+Simple Collision 추적 (권장)
+  └─ 충분히 정확하고 빠름
+```
+
+---
+
+## 📊 Collision Complexity 비교표
+
+| 설정                   | 물리    | 쿼리      | 성능 | 용도          |
+| ---------------------- | ------- | --------- | ---- | ------------- |
+| Use Complex As Simple  | Complex | Complex   | 최저 | 사용 안 함    |
+| Use Simple As Complex  | Simple  | Simple    | 최고 | 빠른 게임     |
+| Use Simple And Complex | Simple  | 선택 가능 | 중간 | 권장 (유연함) |
+
+---
+
+## 💡 실전 활용 가이드
+
+### 일반적인 게임 오브젝트
+
+```
+1. Convex Decomposition으로 Collision Hull 생성
+   └─ Max Hull Verts: 8~16
+
+2. Collision Complexity
+   └─ Use Simple And Complex
+
+3. 쿼리 사용 시
+   └─ bTraceComplex: False (Simple)
+```
+
+### 정밀한 검사가 필요한 경우
+
+```
+특수 상황에만 Complex 사용
+  └─ 예: 스나이퍼 조준 정밀 감지
+      └─ bTraceComplex: True
+```
+
+### 단순한 프롭
+
+```
+1. 단순 도형 Collision만 추가
+   └─ Box, Sphere, Capsule
+
+2. Use Simple As Complex
+   └─ 쿼리도 Simple만 사용
+```
+
+---
+
+## 🔧 BP_LineTraceActor 노드 요약
+
+### 전체 흐름
+
+```
+Event BeginPlay
+  ↓
+[Get Actor Location] → Start
+  ↓
+[Get Actor Location] + ([Get Actor Forward Vector] × 200) → End
+  ↓
+[LineTraceSingle]
+  ├─ TraceChannel: Visibility
+  ├─ bTraceComplex: True/False
+  └─ DrawDebugType: ForDuration
+  ↓
+Hit Result
+```
+
+### 주요 노드
+
+**Get Actor Location**
+
+- 현재 액터의 위치 가져오기
+
+**Get Actor Forward Vector**
+
+- 액터가 향하는 방향 벡터
+
+**Multiply (×)**
+
+- Forward Vector × 200
+- 앞으로 200 유닛 확장
+
+**Add (+)**
+
+- Actor Location + (Forward × 200)
+- 최종 End 위치 계산
+
+**LineTraceSingle**
+
+- 실제 Line Trace 수행
+- Hit 여부와 Hit Result 반환
+
+---
+
+## 📝 핵심 정리
+
+### Query의 개념
+
+```
+Query = 충돌 검사
+  └─ Line Trace가 가장 기본
+      └─ 보이지 않는 선으로 충돌 감지
+```
+
+### bTraceComplex 옵션
+
+```
+False (기본)
+  └─ Simple Collision 추적
+      └─ 빠르고 충분히 정확
+
+True
+  └─ Complex Collision 추적
+      └─ 정확하지만 매우 느림
+```
+
+### Simple And Complex 의미
+
+```
+Use Simple And Complex
+  ├─ 물리 → 항상 Simple
+  └─ 쿼리 → bTraceComplex로 선택
+      ├─ False → Simple
+      └─ True → Complex
+```
+
+### Project Settings
+
+```
+Default Shape Complexity
+  └─ 개별 메시가 Project Default일 때 적용
+      └─ 기본값: Use Simple And Complex
+```
+
+---
+
+## 🎓 다음 단계
+
+더 복잡한 쿼리 방식 학습
+
+```
+앞으로 배울 내용
+  ├─ Shape Sweep (도형으로 추적)
+  ├─ Multi Line Trace (여러 물체 감지)
+  └─ Overlap Query (영역 검사)
+```
+
+---
+
+## 📚 용어 정리
+
+| 용어                 | 설명                               |
+| -------------------- | ---------------------------------- |
+| Query                | 충돌이 있는지 검사하는 기능        |
+| Line Trace           | 보이지 않는 선을 쏴서 충돌 확인    |
+| Hit Result           | 충돌 결과 정보를 담은 구조체       |
+| Trace Channel        | Line Trace용 특수 충돌 채널        |
+| bTraceComplex        | Complex/Simple 중 선택하는 옵션    |
+| Forward Vector       | 액터가 향하는 방향의 단위 벡터     |
+| DrawDebugType        | 디버그 표시 방식 설정              |
+| Convex Decomposition | 복잡한 모양을 볼록 도형들로 분해   |
+| 10DOP                | 한쪽 방향으로 가늘어지는 충돌 도형 |
+
+---
+
+## 🔧 실습 체크리스트
+
+```
+✅ BP_LineTraceActor 열기
+✅ Event Graph에서 Line Trace 로직 확인
+✅ bTraceComplex = False로 테스트
+✅ show collision으로 Simple 확인
+✅ bTraceComplex = True로 변경
+✅ Complex Collision 추적 확인
+✅ Convex Decomposition 사용해보기
+✅ Max Hull Verts 조정하며 테스트
+```
+
+# { 🎯 Add Actor World Offset과 Sweep }
+
+## 📌 이 강의의 목표
+
+물체를 이동시키는 방법과 Sweep 옵션의 중요성을 이해합니다.
+
+- Add Actor World Offset 노드 사용법
+- Sweep 옵션이 충돌에 미치는 영향
+- Collision Preset 재정의 방법
+
+---
+
+## 🎮 데모 구조
+
+### 테스트 씬
+
+```
+두 개의 공이 서로를 향해 이동
+  ├─ BP_Ball_AddActorWorldOffset
+  ├─ 매 프레임마다 앞으로 이동
+  └─ Sweep 옵션 테스트
+```
+
+---
+
+## 🏗️ BP_Ball 구조
+
+### 부모 클래스: BP_Ball
+
+```
+Components
+  ├─ BallMesh (Static Mesh Component)
+  │   └─ SM_Sphere30
+  ├─ Arrow (방향 표시)
+  └─ Widget (UI 표시)
+```
+
+**Arrow Component**: 액터가 앞으로 향하는 방향 표시
+**Widget Component**: 플레이 시 액터 위에 UI 표시
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380724/notion-blog/_/_/_5_/_6_Collision_Essentials_-_1/image_11.png)
+
+---
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380724/notion-blog/_/_/_5_/_6_Collision_Essentials_-_1/image_12.png)
+
+## 📋 BP_Ball Event Graph
+
+### Event BeginPlay 로직
+
+```
+Event BeginPlay
+  ↓
+위젯 설정
+  ↓
+IsMovingBall 확인
+  ↓
+Delay (1.5초)
+  ↓
+StartMoving 호출
+  └─ ShouldMove = True
+```
+
+**Delay**: Instance Editable (인스턴스별 수정 가능)
+
+- 기본값: 1.5초
+- 각 액터마다 다르게 설정 가능
+
+**StartMoving**: ShouldMove를 True로 설정하는 함수
+
+---
+
+## 🔄 자식 클래스: BP_Ball_AddActorWorldOffset_Tick
+
+### Event Tick 로직
+
+```
+Event Tick
+  ↓
+Parent Tick 호출 (부모 클래스 틱)
+  ↓
+ShouldMove 확인
+  ↓
+True이면
+  ↓
+Add Actor World Offset
+```
+
+**Parent Tick**: 부모 클래스의 Tick 이벤트 실행 ( Ball 에는 틱이 없다? )
+
+정확한 지적입니다! 다시 확인해보니 제가 잘못 설명했네요.
+
+강의 내용을 다시 보면:
+
+```
+BP_Ball에는 Event Tick이 없습니다
+  └─ BeginPlay만 있음
+```
+
+**BP_Ball_AddActorWorldOffset_Tick**의 Event Graph:
+
+```
+Event Tick
+  ↓
+Parent Tick 호출
+  ↓
+ShouldMove 확인
+  ↓
+True이면
+  ↓
+Add Actor World Offset
+```
+
+여기서 **Parent Tick**은:
+
+- BP_Ball의 Tick이 아니라
+- **Actor 클래스**의 기본 Tick을 호출하는 것입니다
+
+```
+상속 구조
+  ↓
+Actor (언리얼 기본 클래스)
+  └─ BP_Ball (부모)
+      └─ BP_Ball_AddActorWorldOffset_Tick (자식)
+```
+
+**Parent Tick 호출의 의미**:
+
+```
+"부모 클래스의 Tick 버전 호출"
+  ↓
+BP_Ball에 Event Tick이 없으면
+  ↓
+Actor 클래스의 기본 Tick 실행
+  ↓
+(아무 동작 없음, 단순히 표준 절차)
+```
+
+**실제로는**:
+
+- Parent Tick은 그냥 형식적인 호출
+- BP_Ball에 Tick 로직이 없으므로 실질적으로 아무 일도 안 함
+- 진짜 중요한 건 그 다음의 **ShouldMove 확인**과 **Add Actor World Offset**
+
+정정해주셔서 감사합니다! 제 설명이 혼란을 드렸네요.
+
+---
+
+## 🚀 Add Actor World Offset 노드
+
+### 기본 개념
+
+```
+액터의 위치를 오프셋만큼 이동
+  ↓
+현재 위치 + Delta Location
+```
+
+**Delta Location**: 이동할 거리 (벡터)
+
+### 파라미터 설명
+
+### DeltaLocation 계산
+
+```
+Get Actor Forward Vector
+  ↓
+× (Get World Delta Seconds × Speed)
+  ↓
+= 이동할 벡터
+```
+
+**계산 과정**:
+
+```
+World Delta Seconds (프레임 간 시간)
+  ×
+Speed (100)
+  =
+초당 이동 거리
+
+이것을 Forward Vector에 곱함
+  =
+앞 방향으로 초당 100 유닛 이동
+```
+
+**World Delta Seconds**: 이전 프레임과 현재 프레임 사이의 시간 (초 단위)
+**Speed**: 초당 이동 속도 (100 유닛/초)
+
+### bSweep (중요!)
+
+```
+bSweep 파라미터
+  ├─ True → 경로 검사, 충돌 시 멈춤
+  └─ False → 충돌 무시, 통과
+```
+
+**Sweep**: 이동 경로를 검사하여 막히는 물체가 있으면 멈추는 기능
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380724/notion-blog/_/_/_5_/_6_Collision_Essentials_-_1/image_13.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380724/notion-blog/_/_/_5_/_6_Collision_Essentials_-_1/image_14.png)
+
+### bTeleport
+
+```
+물리 상태 유지 여부
+  ├─ True → 속도 변경 안 함
+  └─ False → 속도 업데이트
+```
+
+---
+
+## ⚙️ 변수 설명
+
+### BP_Ball의 주요 변수
+
+```
+변수들 (모두 Instance Editable)
+  ├─ Speed: 100 (이동 속도)
+  ├─ ShouldMove: False (이동 여부)
+  ├─ ShouldSweep: False (스윕 사용 여부)
+  └─ Delay: 1.5 (시작 지연 시간)
+```
+
+**Instance Editable**: 레벨의 각 인스턴스마다 값을 다르게 설정 가능
+
+---
+
+## 🎨 Collision Preset 재정의
+
+### 3단계 설정 구조
+
+```
+1. Static Mesh 에셋 자체
+   └─ SM_Sphere30의 기본 Collision Preset
+       └─ BlockAll
+
+2. Actor Blueprint
+   └─ BP_Ball의 BallMesh 컴포넌트
+       └─ Default (에셋 설정 따름)
+       또는
+       └─ BlockAllDynamic (재정의)
+
+3. Level Instance
+   └─ 레벨에 배치된 개별 액터
+       └─ Default (블루프린트 설정 따름)
+       또는
+       └─ Custom (인스턴스별 재정의)
+```
+
+### SM_Sphere30 기본 설정
+
+```
+Static Mesh Editor
+  └─ Collision Preset: BlockAll
+      ├─ Collision Enabled: Query and Physics
+      ├─ Object Type: WorldStatic
+      └─ Collision Responses: Block (모든 채널)
+```
+
+### Actor에서 재정의
+
+```
+BP_Ball → BallMesh 선택
+  └─ Collision 섹션
+      └─ Collision Preset
+          ├─ Default → 에셋 설정 사용
+          └─ BlockAllDynamic → 재정의
+              └─ Object Type: WorldDynamic
+```
+
+### 레벨 인스턴스에서 재정의
+
+```
+레벨의 액터 선택 → BallMesh 선택
+  └─ Collision Preset
+      ├─ Default → 블루프린트 설정 사용
+      └─ BlockAllDynamic → 인스턴스별 재정의
+```
+
+---
+
+## 🔍 Object Type의 의미
+
+### WorldStatic vs WorldDynamic
+
+```
+Object Type은 단순한 분류
+  ├─ 엔진이 정해놓은 의미 없음
+  └─ 게임 프로젝트에서 정의
+
+중요한 것은
+  └─ Collision Responses (충돌 반응)
+```
+
+**핵심**: Object Type 자체는 라벨일 뿐, 실제 상호작용은 Collision Responses로 결정
+
+## WorldStatic vs WorldDynamic ??
+
+## 🏷️ 간단 정리
+
+### 이름표일 뿐!
+
+```
+Object Type = 물체 종류 이름표
+  ├─ WorldStatic = "고정 물체"
+  └─ WorldDynamic = "움직이는 물체"
+```
+
+---
+
+## 💡 핵심
+
+### Object Type 자체는 아무것도 안 함
+
+```
+❌ WorldStatic이라고 자동으로 충돌하는 게 아님
+✅ 단순히 "나는 고정 물체야" 라고 알려주는 라벨
+```
+
+### 실제 충돌은 Collision Responses가 결정
+
+```
+벽 (WorldStatic)
+  └─ Collision Responses
+      └─ Pawn → Block ✅ 이게 진짜 중요!
+
+캐릭터 (Pawn)
+  └─ Collision Responses
+      └─ WorldStatic → Block ✅ 이게 진짜 중요!
+```
+
+---
+
+## 🎯 사용 이유
+
+### 편의성
+
+```
+모든 벽 = WorldStatic으로 설정
+  ↓
+새 물체 만들 때
+  ↓
+"WorldStatic 막을까?" 만 정하면 됨
+```
+
+### 권장 용도
+
+```
+WorldStatic
+  └─ 벽, 바닥, 건물 (안 움직임)
+
+WorldDynamic
+  └─ 문, 상자, 플랫폼 (움직일 수 있음)
+
+Pawn
+  └─ 플레이어, 적 캐릭터
+
+PhysicsBody
+  └─ 떨어지는 물체, 공
+```
+
+---
+
+## 📝 결론
+
+```
+Object Type = 이름표 (분류용)
+Collision Responses = 실제 행동 결정
+
+둘 다 있어야 충돌 작동!
+```
+
+---
+
+## ⚠️ 중요한 혼동 포인트
+
+### Collision Preset 우선순위
+
+```
+Instance > Blueprint > Static Mesh Asset
+```
+
+**주의**: 블루프린트가 Default여도 인스턴스가 재정의할 수 있음!
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380725/notion-blog/_/_/_5_/_6_Collision_Essentials_-_1/image_15.png)
+
+### 확인 방법
+
+```
+혼란스러울 때
+  ↓
+1. Static Mesh 에셋 확인
+2. Actor Blueprint 확인
+3. Level Instance 확인
+  ↓
+가장 하위 레벨 설정이 적용됨
+```
+
+---
+
+## 🧪 테스트 1: Sweep 없이 이동
+
+### 설정
+
+```
+두 공 모두
+  ├─ ShouldSweep: False
+  └─ Collision Preset: Default (BlockAll)
+      ├─ Object Type: WorldStatic
+      └─ WorldStatic → Block
+```
+
+### 결과
+
+```
+Play 실행
+  ↓
+공들이 서로를 향해 이동
+  ↓
+서로 통과! 😱
+```
+
+### 왜 통과하는가?
+
+```
+Add Actor World Offset (Sweep = False)
+  ↓
+위치를 직접 설정
+  ↓
+충돌 검사 안 함
+  ↓
+겹쳐도 상관없이 이동
+```
+
+**핵심**: Sweep 없이는 Block 설정이어도 통과함!
+
+---
+
+## 🧪 테스트 2: Sweep으로 이동
+
+### 설정 변경
+
+```
+두 공 모두
+  └─ ShouldSweep: True (체크)
+```
+
+### 결과
+
+```
+Play 실행
+  ↓
+공들이 서로를 향해 이동
+  ↓
+서로 막힘! ✅
+```
+
+### 왜 막히는가?
+
+```
+Add Actor World Offset (Sweep = True)
+  ↓
+이동 경로 검사 (쿼리 시스템 사용)
+  ↓
+Block 물체 감지
+  ↓
+이동 멈춤
+```
+
+---
+
+## 🔧 쿼리 시스템 vs 물리 시스템
+
+### Sweep은 쿼리 시스템 사용
+
+```
+Sweep = True
+  ↓
+Query System 사용
+  ↓
+물리 시스템 필요 없음
+```
+
+### 테스트: Collision Enabled 변경
+
+```
+SM_Sphere30 → Collision Preset: Custom
+  ↓
+Collision Enabled
+  └─ Query and Physics → Query Only
+```
+
+**Query Only**: 물리 시뮬레이션 불가, 쿼리만 가능
+
+### 결과
+
+```
+Play 실행
+  ↓
+여전히 서로 막힘 ✅
+  ↓
+Sweep은 Query만 사용하므로 작동
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Sweep의 역할
+
+```
+Sweep = Query System 사용
+  ↓
+이동 경로에 Block 물체 있는지 검사
+  ↓
+있으면 → 멈춤
+없으면 → 계속 이동
+```
+
+### 물리 vs 쿼리
+
+```
+물리 시스템
+  └─ Physics Collision
+      └─ 힘, 중력, 물리 시뮬레이션
+
+쿼리 시스템
+  └─ Query
+      ├─ Line Trace
+      ├─ Sweep
+      └─ Overlap
+```
+
+**Sweep은 쿼리 시스템의 일종**
+
+---
+
+## 📊 Sweep 비교표
+
+| 설정         | Sweep = False  | Sweep = True      |
+| ------------ | -------------- | ----------------- |
+| 이동 방식    | 위치 직접 설정 | 경로 검사 후 이동 |
+| 충돌 검사    | 안 함          | 쿼리로 검사       |
+| Block 물체   | 통과           | 멈춤              |
+| 시스템       | 없음           | Query System      |
+| Hit Callback | 발생 안 함     | 발생 가능         |
+
+---
+
+## ⚙️ Collision Enabled 비교
+
+| 설정              | 물리 | 쿼리 | Sweep 작동 |
+| ----------------- | ---- | ---- | ---------- |
+| No Collision      | ❌   | ❌   | ❌         |
+| Query Only        | ❌   | ✅   | ✅         |
+| Physics Only      | ✅   | ❌   | ❌         |
+| Query and Physics | ✅   | ✅   | ✅         |
+
+**Sweep 작동 조건**: Query System 활성화 필요
+
+---
+
+## 🎯 실전 활용
+
+### 캐릭터 이동
+
+```
+AddActorWorldOffset 사용 시
+  └─ bSweep = True 필수
+      └─ 벽 통과 방지
+```
+
+### 텔레포트
+
+```
+순간 이동 구현
+  └─ bSweep = False
+      └─ 충돌 무시하고 이동
+```
+
+### 물리 물체
+
+```
+물리 시뮬레이션 물체는
+  └─ AddForce 사용 권장
+      └─ AddActorWorldOffset 사용 안 함
+```
+
+---
+
+## ⚠️ 주의사항
+
+### Sweep 없이는 차단 안 됨
+
+```
+Block 설정이어도
+  ↓
+Sweep = False면
+  ↓
+통과함!
+```
+
+### 레벨 인스턴스 재정의
+
+```
+블루프린트 설정과
+레벨 인스턴스 설정이
+다를 수 있음!
+  ↓
+혼란 주의
+```
+
+### Collision Enabled
+
+```
+Query Only로 설정해도
+  ↓
+Sweep 작동
+  ↓
+물리 시뮬레이션만 불가
+```
+
+---
+
+## 📝 핵심 정리
+
+### Add Actor World Offset
+
+```
+매 프레임 위치 업데이트
+  ├─ DeltaLocation: 이동 벡터
+  ├─ bSweep: 충돌 검사 여부
+  └─ bTeleport: 물리 상태 유지
+```
+
+### Sweep의 중요성
+
+```
+Sweep = True
+  └─ 쿼리로 경로 검사
+      └─ Block 물체에 막힘
+
+Sweep = False
+  └─ 검사 안 함
+      └─ 모든 것 통과
+```
+
+### Collision Preset 재정의
+
+```
+3단계 설정
+  ├─ Static Mesh Asset (기본)
+  ├─ Actor Blueprint (재정의 가능)
+  └─ Level Instance (최종 재정의)
+```
+
+---
+
+## 🎓 다음 단계
+
+Set Actor Location 노드 학습
+
+```
+AddActorWorldOffset와 비교
+  └─ 절대 위치 설정 vs 상대 위치 변경
+      └─ 다음 강의에서
+```
+
+---
+
+## 📚 용어 정리
+
+| 용어                   | 설명                                     |
+| ---------------------- | ---------------------------------------- |
+| Add Actor World Offset | 액터 위치를 상대적으로 이동시키는 노드   |
+| Delta Location         | 이동할 벡터 (변화량)                     |
+| bSweep                 | 이동 경로 검사 여부 옵션                 |
+| World Delta Seconds    | 프레임 간 경과 시간 (초)                 |
+| Instance Editable      | 레벨의 각 인스턴스마다 값 수정 가능      |
+| Parent Tick            | 부모 클래스의 Tick 이벤트 호출           |
+| Query System           | 충돌 검사 시스템 (Trace, Sweep, Overlap) |
+| Physics System         | 물리 시뮬레이션 시스템 (힘, 중력 등)     |
+
+---
+
+## 🔧 Blueprint 노드 요약
+
+### BP_Ball Event Graph
+
+```
+Event BeginPlay
+  ↓
+위젯 설정
+  ↓
+Delay (1.5초)
+  ↓
+StartMoving
+  └─ ShouldMove = True
+```
+
+### BP_Ball_AddActorWorldOffset_Tick
+
+```
+Event Tick
+  ↓
+Parent Tick
+  ↓
+Branch (ShouldMove?)
+  ↓ True
+Add Actor World Offset
+  ├─ DeltaLocation
+  │   └─ Forward Vector × (Delta Seconds × Speed)
+  └─ bSweep
+      └─ ShouldSweep 변수
+```
+
+**주요 노드**:
+
+- **Get Actor Forward Vector**: 앞 방향 벡터
+- **Get World Delta Seconds**: 프레임 간 시간
+- **Multiply**: 벡터 × 스칼라
+- **Add Actor World Offset**: 위치 이동
+
+---
+
+## 🔍 실습 체크리스트
+
+```
+✅ BP_Ball 구조 확인
+✅ Event Graph 로직 이해
+✅ Add Actor World Offset 노드 분석
+✅ ShouldSweep = False 테스트 (통과)
+✅ ShouldSweep = True 테스트 (막힘)
+✅ Collision Preset 재정의 연습
+✅ Collision Enabled = Query Only 테스트
+✅ show collision으로 확인
+```

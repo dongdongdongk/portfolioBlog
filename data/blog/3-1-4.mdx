@@ -1,0 +1,558 @@
+---
+title: '섹션 3: 프로젝트 1 - 메뉴작업'
+date: '2026-09-02'
+category: '풀스택/Electron'
+tags: ['풀스택', 'Electron']
+draft: false
+summary: ''
+---
+
+# { Electron의 메뉴 시스템 이해하기 }
+
+```jsx
+Electron에서 메뉴(Menu) 는 애플리케이션의 기능을 보다 쉽게 사용할 수 있도록 하는
+
+중요한 UI 요소입니다. Mac, Windows, Linux 등의 운영체제에 따라 메뉴의 동작 방식이 다를 수 있으며,
+
+Electron은 이를 원활하게 처리할 수 있도록 메뉴 API 를 제공합니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381246/notion-blog/_/Electron/Electron_From_Scratch_JavaScript_/_3_1_-_/image.png)
+
+## 1. 메뉴 생성의 기본 개념
+
+```jsx
+Electron에서 메뉴를 생성하려면 Menu 모듈을 사용해야 합니다.
+
+const { Menu } = require('electron');
+```
+
+```jsx
+Electron의 메뉴는 메뉴 템플릿 (Template) 을 기반으로 만들어집니다.
+
+템플릿은 배열(Array) 형식으로 구성되며, 각 항목은 객체(Object) 형태로 이루어져 있습니다.
+
+기본 구조는 다음과 같습니다.
+
+여기서 submenu 는 해당 메뉴의 하위 항목을 나타냅니다.
+
+즉, "파일"이라는 상위 메뉴 아래에 "종료"라는 하위 메뉴가 존재합니다.
+```
+
+```jsx
+const menuTemplate = [
+  {
+    label: '파일', // 메뉴의 이름
+    submenu: [
+      {
+        label: '종료', // 하위 메뉴의 이름
+        click: () => {
+          app.quit()
+        }, // 클릭 시 실행할 동작
+      },
+    ],
+  },
+]
+```
+
+## 2. `Menu.buildFromTemplate()`를 사용하여 메뉴 생성
+
+```jsx
+템플릿을 생성한 후에는 Menu.buildFromTemplate() 함수를 사용하여 실제 메뉴 객체를 만들고,
+
+이를 Menu.setApplicationMenu()를 통해 애플리케이션의 메뉴로 설정할 수 있습니다.
+
+위 코드가 실행되면, 메뉴가 애플리케이션에 추가됩니다.
+```
+
+```jsx
+const mainMenu = Menu.buildFromTemplate(menuTemplate)
+Menu.setApplicationMenu(mainMenu)
+```
+
+## `app.on('ready', ...)`에서 메뉴 적용
+
+```jsx
+메뉴는 앱이 준비(ready 이벤트 발생)된 후 설정해야 합니다.
+```
+
+```jsx
+app.on('ready', () => {
+  createMainWindow()
+
+  const mainMenu = Menu.buildFromTemplate(menuTemplate)
+  Menu.setApplicationMenu(mainMenu)
+})
+```
+
+```jsx
+위 코드는 앱이 실행되면:
+
+1. createMainWindow()를 호출하여 메인 창을 생성하고
+
+2. Menu.buildFromTemplate(menuTemplate)를 사용해 메뉴를 생성
+
+3. Menu.setApplicationMenu(mainMenu)를 사용해 메뉴를 애플리케이션에 설정합니다.
+```
+
+## 3. Mac과 Windows의 메뉴 차이점 해결
+
+```jsx
+Mac과 Windows에서는 메뉴가 표시되는 방식이 다릅니다.
+
+		Windows/Linux: 메뉴가 정상적으로 표시됨
+
+		Mac: 기본적으로 메뉴가 표시되지 않으며, 앱 이름이 자동으로 표시됨
+
+이를 해결하기 위해, Mac에서는 앱 메뉴(appMenu) 를 추가해야 합니다.
+```
+
+### Mac 전용 메뉴 추가 코드
+
+```jsx
+const isMac = process.platform === 'darwin'
+
+const menuTemplate = [
+  ...(isMac ? [{ role: 'appMenu' }] : []), // Mac에서는 기본 앱 메뉴 추가
+  {
+    label: '파일',
+    submenu: [
+      {
+        label: '종료',
+        click: () => {
+          app.quit()
+        },
+      },
+    ],
+  },
+]
+```
+
+```jsx
+isMac 변수를 사용하여 운영체제가 Mac인지 확인합니다.
+
+Mac에서는 role: 'appMenu'를 추가하여 기본적인 앱 메뉴
+
+(예: "Electron" -> "정보" 등) 를 제공하도록 합니다.
+```
+
+## 창이 닫힐 때 메모리 해제
+
+```jsx
+창이 닫혔을 때 mainWindow 변수를 null로 설정해 메모리 누수를 방지할 수 있습니다.
+
+이렇게 하면 창이 닫힌 후 해당 변수가 더 이상 참조되지 않아 메모리가 해제됩니다.
+```
+
+```jsx
+mainWindow.on('closed', () => (mainWindow = null))
+```
+
+# { Electron에서 단축키(Shortcut) 설정하기 }
+
+```jsx
+Electron에서는 메뉴 단축키(Menu Shortcut) 와 전역 단축키(Global Shortcut) 를 설정할 수 있습니다.
+
+이번 강의에서는 이 두 가지 단축키를 어떻게 설정하는지 설명합니다.
+```
+
+## 1. 메뉴 단축키(Menu Shortcut)
+
+```jsx
+메뉴 단축키는 메뉴 항목을 선택할 때 사용할 수 있는 키 조합입니다.
+
+✅ accelerator 속성을 이용한 단축키 설정
+
+		메뉴 단축키를 설정하려면 accelerator 속성을 추가하면 됩니다.
+
+		예를 들어, Command + W (Mac) 또는 Ctrl + W (Windows)
+
+		단축키를 사용하여 앱을 종료하는 기능을 추가해보겠습니다.
+```
+
+### 방법 1: `isMac` 변수를 사용한 설정
+
+```jsx
+const menu = [
+  {
+    label: 'File',
+    submenu: [
+      {
+        label: 'Quit',
+        accelerator: isMac ? 'Command+W' : 'Ctrl+W',
+        click: () => app.quit(),
+      },
+    ],
+  },
+]
+```
+
+```jsx
+Mac에서는 Command+W
+
+Windows에서는 Ctrl+W
+
+를 눌렀을 때 앱이 종료됩니다.
+```
+
+### 방법 2: `CmdOrCtrl` 키워드 사용
+
+```jsx
+위의 방법보다 간단하게 설정할 수도 있습니다.
+```
+
+```jsx
+const menu = [
+  {
+    label: 'File',
+    submenu: [
+      {
+        label: 'Quit',
+        accelerator: 'CmdOrCtrl+W',
+        click: () => app.quit(),
+      },
+    ],
+  },
+]
+```
+
+```jsx
+CmdOrCtrl을 사용하면 Mac에서는 Command, **Windows에서는 Ctrl**이 자동으로 적용됩니다.
+
+Or 로 연결
+```
+
+## 2. 전역 단축키(Global Shortcut)
+
+```jsx
+전역 단축키는 앱 메뉴에 포함되지 않더라도 특정 키 조합을 눌렀을 때 동작하는 단축키입니다.
+
+✅ globalShortcut.register() 함수 사용
+
+		전역 단축키를 등록하려면 globalShortcut.register() 함수를 사용합니다.
+```
+
+### `CmdOrCtrl+R` 단축키로 창 새로고침하기
+
+```jsx
+Command+R (Mac) 또는 Ctrl+R (Windows)를 누르면 창이 새로고침됩니다.
+```
+
+```jsx
+globalShortcut.register('CmdOrCtrl+R', () => mainWindow.reload())
+```
+
+### `CmdOrCtrl+Shift+I` 단축키로 개발자 도구 열기
+
+```jsx
+Mac에서는 Command+Option+I
+
+Windows에서는 Ctrl+Shift+C 를 누르면 개발자 도구(DevTools) 가 열립니다.
+```
+
+```jsx
+globalShortcut.register(isMac ? 'Command+Alt+I' : 'Ctrl+Shift+C', () => mainWindow.toggleDevTools())
+```
+
+## 3. 전체 코드 정리
+
+```jsx
+const { app, BrowserWindow, Menu, globalShortcut } = require('electron')
+
+process.env.NODE_ENV = 'development'
+
+const isDev = process.env.NODE_ENV !== 'production'
+const isMac = process.platform === 'darwin'
+
+let mainWindow
+
+function createMainWindow() {
+  mainWindow = new BrowserWindow({
+    title: 'ImageShrink',
+    width: 500,
+    height: 600,
+    icon: './assets/Icon_256x256.png',
+    resizable: isDev,
+    backgroundColor: 'gray',
+  })
+
+  mainWindow.loadFile('./app/index.html')
+}
+
+app.on('ready', () => {
+  createMainWindow()
+
+  const mainMenu = Menu.buildFromTemplate(menu)
+  Menu.setApplicationMenu(mainMenu)
+
+  // 전역 단축키 등록
+  globalShortcut.register('CmdOrCtrl+R', () => mainWindow.reload())
+  globalShortcut.register(isMac ? 'Command+Alt+I' : 'Ctrl+Shift+C', () =>
+    mainWindow.toggleDevTools()
+  )
+
+  mainWindow.on('closed', () => (mainWindow = null))
+})
+
+const menu = [
+  ...(isMac ? [{ role: 'appMenu' }] : []),
+  {
+    label: 'File',
+    submenu: [
+      {
+        label: 'Quit',
+        accelerator: 'CmdOrCtrl+W',
+        click: () => app.quit(),
+      },
+    ],
+  },
+]
+
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createMainWindow()
+  }
+})
+
+app.on('window-all-closed', () => {
+  if (!isMac) {
+    app.quit()
+  }
+})
+```
+
+```jsx
+메뉴 단축키는 Menu의 accelerator 속성을 사용하여 설정한다.
+
+		CmdOrCtrl+W → app.quit()
+
+전역 단축키는 globalShortcut.register()를 사용하여 설정한다.
+
+		CmdOrCtrl+R → mainWindow.reload()
+
+		CmdOrCtrl+Shift+I → mainWindow.toggleDevTools()
+```
+
+# { Electron 메뉴 템플릿 사용하기 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381246/notion-blog/_/Electron/Electron_From_Scratch_JavaScript_/_3_1_-_/image_1.png)
+
+## 1. 기본 파일 메뉴 추가 (`role: 'fileMenu'`)
+
+```jsx
+이렇게 직접 메뉴를 작성할 수도 있지만,
+
+Electron에서는 기본 파일 메뉴 역할을 제공하므로 직접
+
+작성할 필요 없이 role: 'fileMenu'를 사용하면 자동으로 생성됩니다.
+```
+
+### 기존 방식 (직접 메뉴를 작성하는 방법)
+
+```jsx
+{
+  label: 'File',
+  submenu: [
+    {
+      label: 'Quit',
+      click: () => app.quit()
+    }
+  ]
+}
+```
+
+### 개선된 방식 (`role` 사용)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381246/notion-blog/_/Electron/Electron_From_Scratch_JavaScript_/_3_1_-_/image_2.png)
+
+```jsx
+const menu = [
+  ...(isMac ? [{ role: 'appMenu' }] : []),
+  {
+    role: 'fileMenu',
+  },
+  ...(isDev
+    ? [
+        {
+          label: 'Developer',
+          submenu: [
+            { role: 'reload' },
+            { type: 'separator' },
+            { role: 'forcereload' },
+            { type: 'separator' },
+            { role: 'toggledevtools' },
+          ],
+        },
+      ]
+    : []),
+]
+```
+
+```jsx
+이렇게 하면 Windows, Mac, Linux에서 자동으로 적절한 File 메뉴가 추가됩니다.
+
+예를 들어, Mac에서는 Close Window (Cmd+W)가 기본으로 들어가요.
+```
+
+## 2. 개발자(Developer) 메뉴 추가 (개발 환경에서만 표시되도록 설정)
+
+### 개발 모드(`isDev`) 확인
+
+```jsx
+우리가 NODE_ENV 환경 변수를 통해 개발 모드인지 확인할 수 있어요.
+
+이 변수를 이용해서 개발 환경에서만 메뉴를 표시하도록 할 수 있습니다.
+```
+
+```jsx
+const isDev = process.env.NODE_ENV !== 'production' ? true : false
+```
+
+### 개발자 메뉴 추가 코드
+
+```jsx
+...(isDev
+  ? [
+      {
+        label: 'Developer',
+        submenu: [
+          { role: 'reload' }, // 새로고침
+          { role: 'forcereload' }, // 강제 새로고침
+          { type: 'separator' }, // 구분선 추가
+          { role: 'toggledevtools' } // 개발자 도구 열기/닫기
+        ]
+      }
+  ] : [])
+```
+
+# { Electron 애플리케이션에 커스텀 "About" 창 추가하기 }
+
+```jsx
+이 강의에서는 Electron 애플리케이션의 기본 "About" 창을 커스텀하는 방법을 배웁니다.
+
+기본적으로 Mac에서는 애플리케이션 메뉴에 Electron > About 옵션이 있지만,
+
+이를 직접 커스텀한 창으로 변경하는 것이 목표입니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381246/notion-blog/_/Electron/Electron_From_Scratch_JavaScript_/_3_1_-_/image_3.png)
+
+## 1. 새로운 창(`About Window`) 생성하기
+
+```jsx
+기본 애플리케이션 창을 생성한 것과 동일한 방식으로 새로운 "About" 창을 생성해야 합니다.
+
+이를 위해 createAboutWindow 함수를 추가합니다.
+```
+
+### `createAboutWindow` 함수 생성
+
+```jsx
+function createAboutWindow() {
+  aboutWindow = new BrowserWindow({
+    title: 'About ImageShrink',
+    width: 300,
+    height: 300,
+    icon: './assets/Icon_256x256.png',
+    resizable: false, // 크기 조정 불가능
+    backgroundColor: 'white',
+  })
+  aboutWindow.loadFile('./app/about.html') // about.html 로드
+}
+```
+
+```jsx
+창 크기를 300x300으로 지정하여 기존 창보다 작게 만듦.
+
+resizable: false로 설정하여 크기 조정을 비활성화.
+
+about.html을 로드하도록 설정.
+```
+
+## 2. "About" 메뉴를 직접 추가하기
+
+### Mac용 메뉴 수정
+
+```jsx
+Mac에서는 app.name을 사용하여 애플리케이션 이름을 메뉴로 설정하고, 하위 메뉴로 About을 추가합니다.
+```
+
+```jsx
+...(isMac
+    ? [
+      {
+        label: app.name,  // Mac에서는 애플리케이션 이름이 메뉴에 표시됨
+        submenu: [
+          {
+            label: 'About',
+            click: createAboutWindow,  // 클릭 시 about 창 열기
+          }
+        ]
+      }] : []),
+```
+
+### Windows 및 Linux용 메뉴 추가
+
+```jsx
+Windows 및 Linux에서는 "Help" 메뉴 아래 "About" 옵션을 추가합니다.
+```
+
+```jsx
+...(!isMac
+    ? [
+        {
+          label: 'Help',  // Windows 및 Linux에서는 Help 메뉴를 사용
+          submenu: [
+            {
+              label: 'About',
+              click: createAboutWindow  // 클릭 시 about 창 열기
+            },
+          ],
+        },
+      ]
+      : []),
+```
+
+```jsx
+isMac이 false인 경우(즉, Windows 또는 Linux)에는 "Help"라는 메뉴가 추가되며, 하위 메뉴로 "About" 버튼이 생성됨.
+```
+
+## 3. `about.html` 파일 추가하기
+
+```jsx
+이제 about.html 파일을 생성하여 내용이 표시되도록 합니다.
+```
+
+### `about.html` 파일 예제
+
+```jsx
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About</title>
+</head>
+<body>
+    <h1>About ImageShrink</h1>
+    <p>ImageShrink is a simple image compression tool.</p>
+</body>
+</html>
+```
+
+## `main.js`에서 불필요한 코드 정리
+
+```jsx
+이제 globalShortcut을 통해 등록된 단축키를 제거할 수 있습니다.
+
+Mac에서는 개발자 메뉴(Developer 메뉴)에 포함된 toggledevtools 옵션이 이미 존재하기 때문입니다.
+```
+
+```jsx
+globalShortcut.register('CmdOrCtrl+R', () => mainWindow.reload())
+globalShortcut.register(isMac ? 'Command+Alt+I' : 'Ctrl+Shift+C', () => mainWindow.toggleDevTools())
+```
+
+```jsx
+위의 코드 제거
+```

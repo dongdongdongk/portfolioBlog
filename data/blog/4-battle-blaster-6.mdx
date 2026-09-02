@@ -1,0 +1,1359 @@
+---
+title: '섹션 4: Battle Blaster - 6'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 언리얼 엔진 C++ - Game Mode에서 사망 처리 핵심 정리 }
+
+## 📌 이번 강의의 목표
+
+**게임 로직의 중심인 Game Mode에서 사망을 관리하기!**
+
+- 타워 죽으면 → 타워 수 감소 → 0되면 승리!
+- 탱크 죽으면 → 게임 오버!
+
+---
+
+## 🎯 왜 Game Mode에서 처리하나요?
+
+### 잘못된 방식 ❌
+
+```cpp
+// Health Component에서 직접 처리
+void OnDamageTaken(...)
+{
+    if (Health <= 0)
+    {
+        GetOwner()->Destroy();  // 그냥 파괴만 함
+        // 게임 승리/패배 체크 불가능!
+    }
+}
+```
+
+### 올바른 방식 ✅
+
+```cpp
+// Health Component → Game Mode로 알림
+void OnDamageTaken(...)
+{
+    if (Health <= 0)
+    {
+        GameMode->ActorDied(DamagedActor);  // 게임 모드에 알림
+        // Game Mode가 게임 로직 처리!
+    }
+}
+```
+
+---
+
+## 🎮 Game Mode의 역할
+
+```
+Game Mode = 게임의 심판/관리자
+
+역할:
+├─ 타워 수 추적
+├─ 승리 조건 체크
+├─ 패배 조건 체크
+├─ 게임 시작/종료 관리
+└─ 전체 게임 흐름 통제
+```
+
+---
+
+## 🔄 전체 시스템 흐름
+
+```
+1. 발사체 충돌
+   ↓
+2. ApplyDamage() 호출
+   ↓
+3. Health Component의 OnDamageTaken() 실행
+   ↓
+4. Health <= 0?
+   ↓
+5. GameMode->ActorDied(죽은 액터) 호출
+   ↓
+6. Game Mode가 액터 타입 확인
+   ├─ 탱크? → 게임 오버 처리
+   └─ 타워? → 타워 수 감소
+       ↓
+       TowerCount == 0? → 승리!
+```
+
+---
+
+## 📝 코드 단계별 완벽 분석
+
+### 1단계: Game Mode에 ActorDied 함수 생성
+
+### GameMode.h
+
+```cpp
+UCLASS()
+class ABattleBlasterGameMode : public AGameModeBase
+{
+    GENERATED_BODY()
+
+public:
+    ATank* Tank;          // 플레이어 탱크 참조
+    int32 TowerCount;     // 남은 타워 수
+
+    void ActorDied(AActor* DeadActor);  // 사망 처리 함수
+};
+```
+
+---
+
+### 2단계: Health Component에서 Game Mode 가져오기
+
+### HealthComponent.h
+
+```cpp
+class UHealthComponent : public UActorComponent
+{
+    GENERATED_BODY()
+
+public:
+    ABattleBlasterGameMode* BattleBlasterGameMode;  // 게임 모드 참조
+
+    UFUNCTION()
+    void OnDamageTaken(...);
+};
+```
+
+### HealthComponent.cpp - BeginPlay
+
+```cpp
+void UHealthComponent::BeginPlay()
+{
+    Super::BeginPlay();
+
+    Health = MaxHealth;
+
+    // 델리게이트 연결
+    GetOwner()->OnTakeAnyDamage.AddDynamic(this, &UHealthComponent::OnDamageTaken);
+
+    // 게임 모드 가져오기 (한 번만!)
+    AGameModeBase* GameMode = UGameplayStatics::GetGameMode(GetWorld());
+    if (GameMode)
+    {
+        // 커스텀 게임 모드로 캐스팅
+        BattleBlasterGameMode = Cast<ABattleBlasterGameMode>(GameMode);
+    }
+}
+```
+
+### 왜 BeginPlay에서 한 번만 가져오나요?
+
+```
+❌ 나쁜 방식: 매번 가져오기
+void OnDamageTaken(...)
+{
+    GetGameMode() → 매번 호출
+    Cast<>() → 매번 캐스팅
+    // 비효율적!
+}
+
+✅ 좋은 방식: 한 번만 가져와서 저장
+void BeginPlay()
+{
+    GameMode = GetGameMode()  // 1번만 호출
+    BattleBlasterGameMode = Cast<>()  // 1번만 캐스팅
+}
+
+void OnDamageTaken(...)
+{
+    BattleBlasterGameMode->ActorDied()  // 저장된 것 사용
+    // 효율적!
+}
+```
+
+---
+
+### 3단계: OnDamageTaken에서 Game Mode 호출
+
+```cpp
+void UHealthComponent::OnDamageTaken(
+    AActor* DamagedActor,
+    float Damage,
+    const UDamageType* DamageType,
+    AController* InstigatedBy,
+    AActor* DamageCauser
+)
+{
+    if (Damage > 0.0f)
+    {
+        // 체력 감소
+        Health -= Damage;
+
+        if (Health <= 0.0f)
+        {
+            // Game Mode에 알림
+            if (BattleBlasterGameMode)
+            {
+                BattleBlasterGameMode->ActorDied(DamagedActor);
+            }
+        }
+    }
+}
+```
+
+### 코드 해부
+
+```cpp
+if (BattleBlasterGameMode)  // 게임 모드 유효성 체크
+{
+    BattleBlasterGameMode->ActorDied(DamagedActor);
+    // 죽은 액터를 게임 모드에 전달
+}
+```
+
+---
+
+### 4단계: Game Mode에서 ActorDied 구현
+
+```cpp
+void ABattleBlasterGameMode::ActorDied(AActor* DeadActor)
+{
+    // 1. 탱크가 죽었는지 확인
+    if (DeadActor == Tank)
+    {
+        // 플레이어 패배 처리
+        UE_LOG(LogTemp, Display, TEXT("Tank died - DEFEAT"));
+        // 다음 강의: Tank->HandleDestruction();
+    }
+    else  // 2. 탱크가 아니면 타워
+    {
+        // 타워로 캐스팅
+        ATower* DeadTower = Cast<ATower>(DeadActor);
+
+        if (DeadTower)
+        {
+            UE_LOG(LogTemp, Display, TEXT("A tower just died"));
+
+            // 타워 파괴
+            DeadTower->Destroy();
+
+            // 타워 수 감소
+            TowerCount--;
+
+            // 승리 조건 체크
+            if (TowerCount == 0)
+            {
+                UE_LOG(LogTemp, Display, TEXT("All towers dead - VICTORY!"));
+            }
+        }
+    }
+}
+```
+
+---
+
+## 💡 핵심 개념 상세 설명
+
+### 1️⃣ GetGameMode() 함수
+
+```cpp
+AGameModeBase* GameMode = UGameplayStatics::GetGameMode(GetWorld());
+```
+
+**무슨 일을 하나요?**
+
+- 현재 레벨의 Game Mode를 가져옴
+- 모든 레벨에는 Game Mode가 하나만 존재
+- 게임의 "관리자"를 찾는 것
+
+---
+
+### 2️⃣ Cast (캐스팅)
+
+```cpp
+BattleBlasterGameMode = Cast<ABattleBlasterGameMode>(GameMode);
+```
+
+### 왜 캐스팅이 필요한가요?
+
+```
+GetGameMode()가 반환하는 타입:
+AGameModeBase* (기본 게임 모드)
+
+우리가 만든 타입:
+ABattleBlasterGameMode* (커스텀 게임 모드)
+
+문제:
+AGameModeBase에는 ActorDied() 함수가 없음!
+ABattleBlasterGameMode에만 있음!
+
+해결:
+Cast로 타입 변환
+→ ActorDied() 함수 사용 가능!
+```
+
+### 캐스팅 비유
+
+```
+기본 자동차 (GameModeBase)
+  ↓ Cast (개조)
+스포츠카 (BattleBlasterGameMode)
+
+기본 자동차: 달리기만 가능
+스포츠카: 달리기 + 부스터 + 우리가 추가한 기능들!
+```
+
+---
+
+### 3️⃣ 타워 수 감소 연산자
+
+```cpp
+TowerCount--;  // 1 감소
+```
+
+### 다양한 방법들
+
+```cpp
+// 방법 1: 긴 버전
+TowerCount = TowerCount - 1;
+
+// 방법 2: 축약 버전
+TowerCount -= 1;
+
+// 방법 3: 감소 연산자 (가장 짧음!)
+TowerCount--;
+
+// 모두 같은 의미: TowerCount를 1 감소
+```
+
+---
+
+## 🎮 실전 시나리오
+
+### 시나리오 1: 타워 파괴
+
+```
+초기 상태:
+- TowerCount = 3
+- 타워들: Tower_0, Tower_1, Tower_2
+
+[Tower_0 파괴]
+1. 발사체 충돌
+2. ApplyDamage(Tower_0, 25, ...)
+3. Health Component: Health = 50 - 25 = 25
+   (아직 살아있음)
+
+[Tower_0 다시 맞음]
+1. ApplyDamage(Tower_0, 25, ...)
+2. Health = 25 - 25 = 0
+3. GameMode->ActorDied(Tower_0)
+   ↓
+4. Game Mode 체크:
+   - Tower_0 == Tank? 아니오
+   - Tower로 캐스팅 성공!
+   - Tower_0->Destroy()
+   - TowerCount = 3 - 1 = 2
+   - TowerCount == 0? 아니오 (계속 플레이)
+
+[모든 타워 파괴 후]
+- TowerCount = 0
+- "All towers dead - VICTORY!" 출력
+```
+
+---
+
+### 시나리오 2: 탱크 파괴
+
+```
+[탱크가 4번 맞음]
+1. Health = 100 → 75 → 50 → 25 → 0
+2. GameMode->ActorDied(Tank)
+   ↓
+3. Game Mode 체크:
+   - DeadActor == Tank? 예! ✅
+   - "Tank died - DEFEAT" 출력
+   - (다음 강의: 게임 오버 처리)
+```
+
+---
+
+## 🔍 코드 개선 포인트
+
+### 매번 가져오기 vs 한 번만 가져오기
+
+### ❌ 비효율적 (매번 가져오기)
+
+```cpp
+void OnDamageTaken(...)
+{
+    if (Health <= 0)
+    {
+        // 매번 호출!
+        AGameModeBase* GM = UGameplayStatics::GetGameMode(GetWorld());
+        ABattleBlasterGameMode* BBGM = Cast<ABattleBlasterGameMode>(GM);
+        BBGM->ActorDied(DamagedActor);
+    }
+}
+```
+
+**문제점:**
+
+- 죽을 때마다 GetGameMode() 호출
+- 죽을 때마다 Cast 수행
+- 불필요한 연산 반복
+
+---
+
+### ✅ 효율적 (한 번만 가져오기)
+
+```cpp
+// BeginPlay에서 한 번만
+void BeginPlay()
+{
+    BattleBlasterGameMode = Cast<ABattleBlasterGameMode>(
+        UGameplayStatics::GetGameMode(GetWorld())
+    );
+}
+
+// 사용할 때는 저장된 것 사용
+void OnDamageTaken(...)
+{
+    if (Health <= 0 && BattleBlasterGameMode)
+    {
+        BattleBlasterGameMode->ActorDied(DamagedActor);
+    }
+}
+```
+
+**장점:**
+
+- 게임 시작 시 1번만 호출
+- 멤버 변수에 저장해서 재사용
+- 빠르고 효율적!
+
+---
+
+## 🎓 초보자 Q&A
+
+### Q1: 왜 탱크는 바로 비교하고 타워는 캐스팅하나요?
+
+```cpp
+// 탱크
+if (DeadActor == Tank)  // 직접 비교
+
+// 타워
+ATower* DeadTower = Cast<ATower>(DeadActor);  // 캐스팅 필요
+```
+
+**이유:**
+
+```
+탱크:
+- Game Mode가 이미 Tank 포인터를 가지고 있음
+- BeginPlay에서 찾아서 저장해둠
+- 그냥 비교만 하면 됨! ✅
+
+타워:
+- 타워가 여러 개 (Tower_0, Tower_1, Tower_2...)
+- Game Mode는 "어떤 타워"인지 모름
+- 캐스팅해서 타워 타입인지 확인 필요
+```
+
+---
+
+### Q2: else만 써도 되는 이유는?
+
+```cpp
+if (DeadActor == Tank)
+{
+    // 탱크 처리
+}
+else  // 탱크가 아니면 무조건 타워!
+{
+    // 타워 처리
+}
+```
+
+**이 게임의 경우:**
+
+- Health Component를 가진 액터 = 탱크 or 타워만 존재
+- 탱크가 아니면 → 100% 타워
+- 따라서 `else`만으로 충분!
+
+**다른 액터가 더 있다면:**
+
+```cpp
+if (DeadActor == Tank)
+{
+    // 탱크
+}
+else if (Cast<ATower>(DeadActor))
+{
+    // 타워
+}
+else if (Cast<ACrate>(DeadActor))
+{
+    // 상자
+}
+```
+
+---
+
+### Q3: 왜 DeadActor를 전달하나요? Owner면 안 되나요?
+
+```cpp
+BattleBlasterGameMode->ActorDied(DamagedActor);
+```
+
+**DamagedActor vs GetOwner():**
+
+```cpp
+void OnDamageTaken(AActor* DamagedActor, ...)
+{
+    // 둘 다 같은 액터를 가리킴!
+    DamagedActor == GetOwner()  // true
+
+    // 하지만 DamagedActor 사용 이유:
+    // 1. 이미 매개변수로 받았으니 바로 사용 (효율적)
+    // 2. GetOwner() 호출 불필요
+}
+```
+
+---
+
+## 🎯 핵심 요약
+
+### 기억할 6가지
+
+1. **Game Mode** - 게임 전체 로직의 중심
+2. **GetGameMode()** - 게임 모드 가져오기 (한 번만!)
+3. **Cast** - 기본 타입을 커스텀 타입으로 변환
+4. **ActorDied()** - 사망 처리를 Game Mode로 위임
+5. **TowerCount--** - 타워 수 감소 및 승리 체크
+6. **효율성** - BeginPlay에서 한 번만 가져와서 재사용
+
+---
+
+## 📋 전체 코드 흐름 템플릿
+
+```cpp
+// 1. Game Mode 헤더
+class AMyGameMode : public AGameModeBase
+{
+    void ActorDied(AActor* DeadActor);
+};
+
+// 2. Health Component BeginPlay
+void BeginPlay()
+{
+    // 한 번만 가져오기
+    GameMode = Cast<AMyGameMode>(
+        UGameplayStatics::GetGameMode(GetWorld())
+    );
+}
+
+// 3. Health Component OnDamageTaken
+void OnDamageTaken(...)
+{
+    if (Health <= 0 && GameMode)
+    {
+        GameMode->ActorDied(DamagedActor);
+    }
+}
+
+// 4. Game Mode ActorDied
+void ActorDied(AActor* DeadActor)
+{
+    if (DeadActor == Player)
+    {
+        // 패배 처리
+    }
+    else
+    {
+        // 적 처리
+        EnemyCount--;
+        if (EnemyCount == 0)
+        {
+            // 승리!
+        }
+    }
+}
+```
+
+---
+
+## 🚀 다음 강의 예고
+
+현재 상태:
+
+- ✅ 타워 죽으면 파괴됨
+- ✅ 탱크 죽으면 로그만 출력
+- ❌ 탱크 죽어도 게임 계속됨
+
+**다음에 할 일:**
+
+- HandleDestruction() 함수 구현
+- 탱크 파괴 시 카메라 유지
+- 입력 비활성화
+- 게임 오버 UI
+
+**완전한 게임 완성 직전!** 🎮✨
+
+# { 언리얼 엔진 C++ - Super 키워드와 HandleDestruction 핵심 정리 }
+
+## 📌 이번 강의의 목표
+
+**부모-자식 클래스에서 같은 함수를 만들고 `Super` 키워드로 연결하기!**
+
+- 공통 기능 = 부모(BasePawn)에서 처리
+- 특수 기능 = 자식(Tank/Tower)에서 처리
+
+---
+
+## 🎯 Super 키워드란?
+
+### 간단한 비유
+
+```
+가족 구조:
+부모(BasePawn) → "파괴될 때 폭발 효과 재생"
+  ↓ 상속
+자식(Tank)     → "파괴될 때 카메라 유지 + 부모 기능도 실행"
+자식(Tower)    → "파괴될 때 액터 제거 + 부모 기능도 실행"
+```
+
+**Super = "부모님께 먼저 여쭤보기"**
+
+---
+
+## 🔄 전체 시스템 구조
+
+```
+BasePawn (부모)
+├─ HandleDestruction()
+│  └─ 공통: 폭발 효과, 사운드 재생
+│
+├─ Tank (자식)
+│  └─ HandleDestruction()
+│     ├─ Super::HandleDestruction() ← 부모 기능 실행
+│     └─ 탱크 전용: 입력 비활성화, 안 보이게
+│
+└─ Tower (자식)
+   └─ HandleDestruction()
+      ├─ Super::HandleDestruction() ← 부모 기능 실행
+      └─ 타워 전용: Destroy() 호출
+```
+
+---
+
+## 📝 코드 단계별 완벽 분석
+
+### 1단계: 부모 클래스(BasePawn)에 함수 생성
+
+### BasePawn.h
+
+```cpp
+class ABasePawn : public APawn
+{
+    GENERATED_BODY()
+
+public:
+    void HandleDestruction();  // 파괴 처리 함수
+};
+```
+
+### BasePawn.cpp
+
+```cpp
+void ABasePawn::HandleDestruction()
+{
+    // 공통 기능 (모든 자식이 실행할 내용)
+    UE_LOG(LogTemp, Display, TEXT("Base Pawn Destruction"));
+
+    // 나중에 추가할 것:
+    // - 폭발 이펙트 재생
+    // - 파괴 사운드 재생
+}
+```
+
+---
+
+### 2단계: 자식 클래스(Tank)에 같은 함수 생성
+
+### Tank.h
+
+```cpp
+class ATank : public ABasePawn
+{
+    GENERATED_BODY()
+
+public:
+    void HandleDestruction();  // ⚠️ 부모와 같은 이름!
+};
+```
+
+### Tank.cpp
+
+```cpp
+void ATank::HandleDestruction()
+{
+    // 1. 먼저 부모 함수 호출 (Super 키워드)
+    Super::HandleDestruction();
+
+    // 2. 그 다음 탱크 전용 처리
+    UE_LOG(LogTemp, Display, TEXT("Tank Destruction"));
+
+    // 나중에 추가할 것:
+    // - SetActorHiddenInGame(true)
+    // - DisableInput(PlayerController)
+}
+```
+
+---
+
+### 3단계: 자식 클래스(Tower)에도 같은 함수 생성
+
+### Tower.h
+
+```cpp
+class ATower : public ABasePawn
+{
+    GENERATED_BODY()
+
+public:
+    void HandleDestruction();
+};
+```
+
+### Tower.cpp
+
+```cpp
+void ATower::HandleDestruction()
+{
+    // 1. 먼저 부모 함수 호출
+    Super::HandleDestruction();
+
+    // 2. 타워 전용 처리
+    Destroy();  // 타워는 완전히 파괴!
+}
+```
+
+---
+
+### 4단계: Game Mode에서 호출
+
+### BattleBlasterGameMode.cpp
+
+```cpp
+void ABattleBlasterGameMode::ActorDied(AActor* DeadActor)
+{
+    if (DeadActor == Tank)
+    {
+        // 탱크 파괴 처리
+        Tank->HandleDestruction();
+    }
+    else
+    {
+        ATower* DeadTower = Cast<ATower>(DeadActor);
+        if (DeadTower)
+        {
+            // 타워 파괴 처리
+            DeadTower->HandleDestruction();
+
+            TowerCount--;
+            if (TowerCount == 0)
+            {
+                UE_LOG(LogTemp, Display, TEXT("All towers dead!"));
+            }
+        }
+    }
+}
+```
+
+---
+
+## 💡 Super 키워드 완벽 이해
+
+### Super가 뭔가요?
+
+```cpp
+Super::HandleDestruction();
+```
+
+**= "부모 클래스의 HandleDestruction() 함수를 호출해줘!"**
+
+---
+
+### 실행 순서 완벽 분석
+
+```
+Tank->HandleDestruction() 호출
+    ↓
+1. Tank::HandleDestruction() 시작
+    ↓
+2. Super::HandleDestruction() 만남
+    ↓
+3. BasePawn::HandleDestruction() 실행
+   "Base Pawn Destruction" 출력
+    ↓
+4. BasePawn 함수 끝
+    ↓
+5. Tank 함수로 돌아옴
+    ↓
+6. "Tank Destruction" 출력
+    ↓
+7. Tank::HandleDestruction() 끝
+```
+
+---
+
+## 🎮 실전 시나리오
+
+### 시나리오 1: 탱크 파괴
+
+```
+[게임 중 탱크가 4번 맞음]
+
+1. Health Component
+   Health = 0
+   ↓
+2. GameMode->ActorDied(Tank)
+   ↓
+3. Tank->HandleDestruction() 호출
+   ↓
+4. Tank::HandleDestruction() 실행
+   ├─ Super::HandleDestruction()
+   │  └─ BasePawn::HandleDestruction() 실행
+   │     └─ "Base Pawn Destruction" 출력 ✅
+   │
+   └─ "Tank Destruction" 출력 ✅
+
+출력 결과:
+> Base Pawn Destruction
+> Tank Destruction
+```
+
+---
+
+### 시나리오 2: 타워 파괴
+
+```
+[타워가 2번 맞음]
+
+1. Health Component
+   Health = 0
+   ↓
+2. GameMode->ActorDied(Tower_2)
+   ↓
+3. Tower->HandleDestruction() 호출
+   ↓
+4. Tower::HandleDestruction() 실행
+   ├─ Super::HandleDestruction()
+   │  └─ BasePawn::HandleDestruction() 실행
+   │     └─ "Base Pawn Destruction" 출력 ✅
+   │
+   └─ Destroy() 호출
+      └─ 타워 완전히 사라짐 💥
+
+출력 결과:
+> Base Pawn Destruction
+(타워 로그는 없음 - 없어도 됨)
+```
+
+---
+
+## 🔍 핵심 개념 상세 설명
+
+### 1️⃣ 함수 오버라이드 (Override)
+
+```cpp
+// 부모 클래스
+class ABasePawn
+{
+    void HandleDestruction() { }
+};
+
+// 자식 클래스
+class ATank : public ABasePawn
+{
+    void HandleDestruction() { }  // ← 같은 이름으로 재정의!
+};
+```
+
+**오버라이드 = 부모 함수를 자식에서 다시 정의**
+
+---
+
+### 2️⃣ Super vs this
+
+| 키워드    | 의미                | 예시                 |
+| --------- | ------------------- | -------------------- |
+| **this**  | 현재 객체 (나 자신) | `this->Health`       |
+| **Super** | 부모 클래스         | `Super::BeginPlay()` |
+
+```cpp
+void ATank::HandleDestruction()
+{
+    Super::HandleDestruction();  // 부모의 HandleDestruction
+    this->SetActorHidden(true);  // 내(Tank)의 함수
+}
+```
+
+---
+
+### 3️⃣ 호출 순서의 중요성
+
+### ✅ 올바른 순서
+
+```cpp
+void ATower::HandleDestruction()
+{
+    Super::HandleDestruction();  // 1. 부모 먼저
+    Destroy();                   // 2. 그 다음 파괴
+}
+```
+
+**이유:** 부모 기능(폭발 효과) 실행 → 그 다음 파괴
+
+---
+
+### ❌ 잘못된 순서
+
+```cpp
+void ATower::HandleDestruction()
+{
+    Destroy();                   // 1. 먼저 파괴!
+    Super::HandleDestruction();  // 2. 이미 없는 객체의 함수 호출 ❌
+}
+```
+
+**문제:** 타워가 이미 파괴되어 부모 함수 실행 불가!
+
+---
+
+## 🎓 초보자 Q&A
+
+### Q1: 왜 같은 이름으로 만드나요?
+
+```cpp
+// BasePawn
+void HandleDestruction() { }
+
+// Tank
+void HandleDestruction() { }  // 왜 같은 이름?
+```
+
+**이유: 다형성(Polymorphism)**
+
+```cpp
+// Game Mode에서
+ABasePawn* Pawn = GetRandomPawn();
+
+// Pawn이 Tank든 Tower든 상관없이 호출 가능!
+Pawn->HandleDestruction();
+
+// Tank면 → Tank::HandleDestruction() 실행
+// Tower면 → Tower::HandleDestruction() 실행
+```
+
+같은 이름 덕분에 코드 재사용과 유연성 확보!
+
+---
+
+### Q2: Super를 안 쓰면 어떻게 되나요?
+
+```cpp
+void ATank::HandleDestruction()
+{
+    // Super::HandleDestruction();  ← 주석 처리!
+    UE_LOG(LogTemp, Display, TEXT("Tank Destruction"));
+}
+```
+
+**결과:**
+
+- Tank 로그만 출력
+- BasePawn의 공통 기능(폭발 효과) 실행 안됨!
+- 부모 기능이 필요 없으면 Super 생략 가능
+
+---
+
+### Q3: Super는 언제 써야 하나요?
+
+```
+✅ Super 사용 (부모 기능 + 추가 기능)
+void BeginPlay()
+{
+    Super::BeginPlay();  // 부모 초기화 필수!
+    // 내 초기화
+}
+
+✅ Super 사용 (공통 기능 필요)
+void HandleDestruction()
+{
+    Super::HandleDestruction();  // 공통 이펙트
+    // 특수 처리
+}
+
+❌ Super 안 써도 됨 (완전히 새로 작성)
+void CustomFunction()
+{
+    // 부모에 없는 새 기능
+}
+```
+
+**원칙: 부모 기능이 필요하면 Super, 아니면 생략**
+
+---
+
+## 📋 전체 시스템 정리
+
+### 코드 구조
+
+```cpp
+// 1. BasePawn (부모)
+class ABasePawn
+{
+    void HandleDestruction()
+    {
+        // 공통 기능
+    }
+};
+
+// 2. Tank (자식)
+class ATank : public ABasePawn
+{
+    void HandleDestruction()
+    {
+        Super::HandleDestruction();  // 부모 호출
+        // Tank 전용
+    }
+};
+
+// 3. Tower (자식)
+class ATower : public ABasePawn
+{
+    void HandleDestruction()
+    {
+        Super::HandleDestruction();  // 부모 호출
+        // Tower 전용
+    }
+};
+
+// 4. Game Mode (사용)
+void ActorDied(AActor* DeadActor)
+{
+    if (Tank == DeadActor)
+        Tank->HandleDestruction();
+    else
+        Tower->HandleDestruction();
+}
+```
+
+---
+
+### 실행 흐름
+
+```
+Game Mode
+    ↓ ActorDied(Tank)
+Tank::HandleDestruction()
+    ↓ Super::HandleDestruction()
+BasePawn::HandleDestruction()
+    ↓ "Base Pawn Destruction"
+Tank (돌아옴)
+    ↓ "Tank Destruction"
+완료!
+```
+
+---
+
+## 🎯 핵심 요약
+
+### 기억할 5가지
+
+1. **Super** - 부모 클래스의 함수 호출
+2. **오버라이드** - 같은 이름으로 함수 재정의
+3. **호출 순서** - Super 먼저, 그 다음 자식 처리
+4. **공통 기능** - 부모에 작성해서 중복 제거
+5. **특수 기능** - 자식에 작성해서 개별 처리
+
+---
+
+### Super 패턴 템플릿
+
+```cpp
+// 부모 클래스
+class Parent
+{
+    void Function()
+    {
+        // 공통 기능
+    }
+};
+
+// 자식 클래스
+class Child : public Parent
+{
+    void Function()
+    {
+        Super::Function();  // 1. 부모 먼저
+        // 2. 자식 전용 처리
+    }
+};
+```
+
+---
+
+## 🚀 다음 강의 예고
+
+현재 상태:
+
+- ✅ HandleDestruction 구조 완성
+- ✅ Super 키워드로 연결
+- ❌ 실제 이펙트/사운드 없음
+- ❌ 탱크 입력 비활성화 안됨
+
+**다음에 할 일:**
+
+- BasePawn: 폭발 이펙트, 사운드 추가
+- Tank: 입력 비활성화, 안 보이게 처리
+- 게임 오버 UI 표시
+
+**게임 완성 마지막 단계!** 🎮✨
+
+# { 탱크 파괴 시스템 구현 }
+
+이 강의는 탱크가 체력을 모두 잃었을 때 어떻게 처리할지를 구현하는 내용입니다.
+
+---
+
+## 🎯 구현 목표
+
+**기존 상황:**
+
+- 타워는 파괴되면 완전히 사라짐 (`Destroy()` 호출)
+- 탱크도 파괴되면? → 카메라도 같이 사라져서 문제 발생!
+
+**해결 방법:**
+탱크는 완전히 제거하지 않고 "무력화" 시키기
+
+1. 화면에서 보이지 않게 하기
+2. 움직임/사격 등 입력 비활성화
+3. 다른 객체들에게 죽었다고 알리기
+
+---
+
+## 📝 구현 단계
+
+### 1단계: 탱크를 보이지 않게 만들기
+
+```cpp
+void ATank::HandleDestruction()
+{
+    Super::HnadleDestruction();
+
+    // 1. 액터를 화면에서 숨기기
+    SetActorHiddenInGame(true);  // true = 숨김, false = 보임
+}
+```
+
+**테스트 결과:** 탱크가 투명해지지만 여전히 움직이고 쏠 수 있음 ❌
+
+---
+
+### 2단계: Tick 함수 비활성화
+
+```cpp
+void ATank::HandleDestruction()
+{
+    Super::HnadleDestruction();
+
+    SetActorHiddenInGame(true);
+
+    // 2. Tick 함수 끄기 (매 프레임 실행되는 함수)
+    SetActorTickEnabled(false);  // 포탑 회전 등이 멈춤
+}
+```
+
+**Tick이 꺼지면:**
+
+- 포탑이 마우스를 따라 회전하지 않음
+- 하지만 여전히 WASD 키로 움직이고 발사 가능 ❌
+
+---
+
+### 3단계: 플레이어 입력 완전히 끄기
+
+먼저 `PlayerController`를 멤버 변수로 만들기:
+
+**Tank.h (헤더 파일):**
+
+```cpp
+class ATank : public ABasePawn
+{
+    // ...
+
+    APlayerController* PlayerController;  // 멤버 변수로 선언
+
+    void SetPlayerEnabled(bool Enable);   // 새로운 함수
+};
+```
+
+**Tank.cpp:**
+
+```cpp
+void ATank::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // PlayerController를 BeginPlay에서 한 번만 가져오기
+    PlayerController = Cast<APlayerController>(GetController());
+    // ... 입력 설정 코드
+}
+
+// 입력을 켜고 끄는 함수
+void ATank::SetPlayerEnabled(bool Enabled)
+{
+    if (PlayerController)
+    {
+        if (Enabled)
+        {
+            EnableInput(PlayerController);   // 입력 활성화
+        }
+        else
+        {
+            DisableInput(PlayerController);  // 입력 비활성화
+        }
+    }
+}
+
+void ATank::HandleDestruction()
+{
+    Super::HnadleDestruction();
+
+    SetActorHiddenInGame(true);
+    SetActorTickEnabled(false);
+
+    // 3. 플레이어 입력 끄기
+    SetPlayerEnabled(false);
+}
+```
+
+**테스트 결과:** 이제 움직임도 사격도 불가능! ✅
+하지만 타워가 계속 죽은 탱크를 공격함 ❌
+
+---
+
+### 4단계: 생존 여부를 알리는 변수 추가
+
+**Tank.h:**
+
+```cpp
+class ATank : public ABasePawn
+{
+    // ...
+
+    bool IsAlive = true;  // 기본값: 살아있음
+};
+```
+
+**Tank.cpp:**
+
+```cpp
+void ATank::HandleDestruction()
+{
+    Super::HnadleDestruction();
+
+    SetActorHiddenInGame(true);
+    SetActorTickEnabled(false);
+    SetPlayerEnabled(false);
+
+    // 4. 죽었다고 표시
+    IsAlive = false;
+}
+```
+
+---
+
+### 5단계: 타워가 죽은 탱크는 공격하지 않도록 수정
+
+**Tower.cpp:**
+
+```cpp
+void ATower::CheckFireCondition()
+{
+    // 발사 조건 체크:
+    // 1. Tank 포인터가 유효한가?
+    // 2. Tank가 살아있는가? (새로 추가!)
+    // 3. Tank가 사거리 안에 있는가?
+    if (Tank && Tank->IsAlive && IsInFireRange())
+    {
+        Fire();
+    }
+}
+```
+
+---
+
+## 🔍 전체 흐름 정리
+
+```
+1. 탱크가 피해를 받아 체력이 0이 됨
+   ↓
+2. GameMode가 ActorDied() 호출
+   ↓
+3. Tank->HandleDestruction() 실행:
+   - SetActorHiddenInGame(true)      → 화면에서 사라짐
+   - SetActorTickEnabled(false)       → 포탑 회전 멈춤
+   - SetPlayerEnabled(false)          → 입력 완전 차단
+   - IsAlive = false                  → 죽음 표시
+   ↓
+4. Tower의 CheckFireCondition()에서
+   Tank->IsAlive를 체크하여 더 이상 공격하지 않음
+```
+
+---
+
+## 💡 핵심 개념
+
+### PlayerController란?
+
+- 플레이어의 입력을 관리하는 객체
+- `EnableInput()`: 입력 받기 시작
+- `DisableInput()`: 입력 무시
+
+### 멤버 변수로 만드는 이유
+
+- BeginPlay, Tick, HandleDestruction 등 여러 함수에서 사용
+- 매번 새로 가져올 필요 없이 한 번 저장해두면 편함
+
+### 왜 Destroy()를 안 쓰나?
+
+- Destroy()를 쓰면 탱크와 연결된 **카메라도 같이 사라짐**
+- 게임 화면이 이상해지므로 "숨기기" 방식 사용
+
+---
+
+## 🐛 코드에서 발견된 오타
+
+```cpp
+// 오타 있음! (HnadleDestruction → HandleDestruction)
+Super::HnadleDestruction();  // ❌
+
+// 올바른 코드:
+Super::HandleDestruction();   // ✅
+```
+
+---
+
+## ✅ 최종 결과
+
+- 탱크가 파괴되면 보이지 않게 됨
+- 어떤 입력도 받지 않음 (움직임, 회전, 사격 불가)
+- 타워도 더 이상 공격하지 않음
+- 카메라는 정상 작동 (게임 화면 유지)
+
+이제 탱크 파괴 시스템이 완성되었습니다! 🎉

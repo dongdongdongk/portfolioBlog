@@ -2,22 +2,18 @@ import Link from '@/components/Link'
 
 export default function NotFound() {
   return (
-    <div className="flex flex-col items-start justify-start md:mt-24 md:flex-row md:items-center md:justify-center md:space-x-6">
-      <div className="space-x-2 pt-6 pb-8 md:space-y-5">
-        <h1 className="text-6xl leading-9 font-extrabold tracking-tight text-gray-900 md:border-r-2 md:px-6 md:text-8xl md:leading-14 dark:text-gray-100">
-          404
-        </h1>
-      </div>
-      <div className="max-w-md">
-        <p className="mb-4 text-xl leading-normal font-bold md:text-2xl">
-          Sorry we couldn't find this page.
+    <div className="min-h-screen bg-white">
+      <div className="mx-auto flex max-w-5xl flex-col items-center justify-center px-6 py-32 sm:px-8 lg:px-12">
+        <p className="text-sm font-semibold tracking-widest text-slate-400 uppercase">404</p>
+        <h1 className="mt-4 text-4xl font-bold text-slate-900">페이지를 찾을 수 없습니다</h1>
+        <p className="mt-4 text-sm leading-relaxed text-slate-500">
+          요청하신 페이지가 존재하지 않거나 이동되었습니다.
         </p>
-        <p className="mb-8">But dont worry, you can find plenty of other things on our homepage.</p>
         <Link
           href="/"
-          className="focus:shadow-outline-blue inline rounded-lg border border-transparent bg-blue-600 px-4 py-2 text-sm leading-5 font-medium text-white shadow-xs transition-colors duration-150 hover:bg-blue-700 focus:outline-hidden dark:hover:bg-blue-500"
+          className="mt-8 flex h-10 items-center rounded-full border-2 border-slate-900 px-6 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-900 hover:text-white"
         >
-          Back to homepage
+          홈으로 돌아가기
         </Link>
       </div>
     </div>

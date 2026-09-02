@@ -1,0 +1,3359 @@
+---
+title: '섹션 8: 제트팩 저니 - 제트팩을 이용한 3D 플랫폼 게임 - 8'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 🔗 클래스 의존성(Class Dependency) 이해하기 }
+
+## 🎯 이번 강의 목표
+
+**좋은 코딩 습관**을 위한 **클래스 의존성(Class Dependency)** 개념을 이해합니다.
+
+- 클래스 의존성이란 무엇인가
+- 순환 의존성의 문제점
+- 느슨한 결합(Loose Coupling)의 중요성
+- 인터페이스의 진정한 가치
+
+---
+
+## 💡 핵심 개념: 클래스 의존성
+
+### 의존성(Dependency)이란?
+
+```
+의존성 (Dependency)
+  ↓
+한 클래스가 다른 클래스를 "사용"하는 관계
+  ├─ A 클래스가 B 클래스를 사용하면
+  └─ "A는 B에 의존한다" (A depends on B)
+
+예시:
+  BP_KixPlayerController가 Character 클래스를 사용
+    ↓
+  BP_KixPlayerController는 Character에 의존
+```
+
+### 실생활 비유
+
+```
+자동차와 연료:
+  ├─ 자동차는 연료에 의존함
+  ├─ 연료 없으면 자동차 작동 안 됨
+  └─ 하지만 연료는 자동차 몰라도 됨
+
+프로그래밍:
+  ├─ PlayerController는 Character에 의존
+  ├─ Character 없으면 제어 불가능
+  └─ Character는 PlayerController 몰라도 됨
+```
+
+---
+
+## 🔍 의존성이 생기는 경우
+
+### 1. 변수로 타입 사용
+
+```
+BP_KixPlayerController
+  ↓
+변수: Controlled Character (Character 타입)
+  ↓
+의존성: Character 클래스에 의존
+```
+
+**노드로 표현:**
+
+```
+Get Controlled Pawn
+  ↓
+Cast to Character
+  ↓
+Set Controlled Character (Character 타입 변수)
+```
+
+### 2. 캐스팅(Casting)
+
+```
+Cast to Character
+  ↓
+Character 클래스를 "알아야" 함
+  ↓
+의존성 발생
+```
+
+### 3. 함수 파라미터
+
+```
+함수: Do Something
+  ├─ Input: Character 타입
+  └─ 의존성: Character에 의존
+```
+
+---
+
+## ⚠️ 순환 의존성 (Circular Dependency)
+
+### 순환 의존성이란?
+
+```
+Circular Dependency (순환 의존성)
+  ↓
+두 클래스가 서로를 의존하는 상황
+  ├─ A가 B에 의존
+  └─ B가 A에 의존
+       ↓
+     서로 얽힘!
+```
+
+### 문제 상황 예시
+
+```
+나쁜 설계:
+  BP_KixPlayerController
+    ├─ BP_Kix에 의존 (Cast to BP_Kix)
+    └─ "BP_Kix 필요해!"
+         ↓
+       BP_Kix
+         ├─ BP_KixPlayerController에 의존
+         └─ "BP_KixPlayerController 필요해!"
+              ↓
+            서로 의존! (순환)
+```
+
+**문제점:**
+
+```
+1. 분리 불가능
+   ├─ BP_Kix 없이 PlayerController 사용 불가
+   └─ PlayerController 없이 BP_Kix 사용 불가
+
+2. 재사용 불가능
+   ├─ 다른 프로젝트에 이식 어려움
+   └─ 항상 두 개를 함께 가져가야 함
+
+3. 유연성 상실
+   ├─ 새 캐릭터 추가 어려움
+   └─ 변경 시 두 클래스 모두 수정 필요
+
+4. 테스트 어려움
+   └─ 한 클래스만 테스트 불가능
+```
+
+---
+
+## ✅ 좋은 설계: 단방향 의존성
+
+### 단방향 의존성 (One-Way Dependency)
+
+```
+One-Way Dependency (단방향 의존성)
+  ↓
+한쪽만 다른 쪽을 의존
+  ├─ A → B (A는 B에 의존)
+  └─ B는 A를 모름
+       ↓
+     느슨한 결합 (Loose Coupling)
+```
+
+### 현재 프로젝트 구조
+
+```
+좋은 설계:
+  BP_KixPlayerController
+    ├─ Character에 의존 (엔진 클래스)
+    └─ BP_Kix에 의존 안 함!
+         ↓
+       BP_Kix
+         ├─ Character에서 상속
+         ├─ PlayerController 모름
+         └─ 독립적!
+```
+
+**장점:**
+
+```
+1. 분리 가능
+   └─ PlayerController와 BP_Kix 독립적 사용
+
+2. 재사용 가능
+   └─ BP_Kix를 다른 프로젝트에 이식 쉬움
+
+3. 유연성
+   ├─ BP_Torque (새 캐릭터) 추가 가능
+   └─ PlayerController 수정 불필요
+
+4. 테스트 용이
+   └─ 각 클래스 독립적으로 테스트
+```
+
+---
+
+## 🎨 느슨한 결합 vs 강한 결합
+
+### 강한 결합 (Tight Coupling)
+
+```
+Tight Coupling
+  ↓
+클래스들이 서로 강하게 연결됨
+  ├─ 순환 의존성
+  ├─ 직접적인 참조
+  └─ 구체적인 클래스에 의존
+
+예시:
+  BP_JetFuel
+    ↓
+  Cast to BP_Kix
+    ↓
+  직접 변수 접근
+    ↓
+  강하게 결합됨
+```
+
+**문제:**
+
+```
+BP_Torque (새 캐릭터) 추가 시:
+  BP_JetFuel 코드 수정 필요
+    ├─ Cast to BP_Kix 실패
+    ├─ Cast to BP_Torque 추가
+    └─ 캐릭터 추가할 때마다 수정!
+         ↓
+       유지보수 악몽
+```
+
+### 느슨한 결합 (Loose Coupling)
+
+```
+Loose Coupling
+  ↓
+클래스들이 약하게 연결됨
+  ├─ 단방향 의존성
+  ├─ 인터페이스를 통한 통신
+  └─ 추상화에 의존
+
+예시:
+  BP_JetFuel
+    ↓
+  Does Implement Interface? (BPI_Jetpack)
+    ↓
+  Handle Refill Fuel (인터페이스 함수)
+    ↓
+  느슨하게 결합됨
+```
+
+**장점:**
+
+```
+BP_Torque (새 캐릭터) 추가 시:
+  1. BP_Torque에 BPI_Jetpack 구현
+  2. Handle Refill Fuel 구현
+  3. 끝!
+       ↓
+     BP_JetFuel 수정 불필요 ✅
+       ↓
+     유지보수 쉬움
+```
+
+---
+
+## 🎯 인터페이스의 진정한 가치
+
+### 왜 인터페이스를 사용하는가?
+
+```
+초보자의 생각:
+  "Cast 하면 더 쉬운데 왜 인터페이스?"
+    ├─ Cast to BP_Kix
+    ├─ 직접 변수 접근
+    └─ 간단하잖아!
+
+하지만 문제:
+  └─ 새 캐릭터마다 코드 수정
+       ↓
+     확장 불가능
+```
+
+### 인터페이스의 장점
+
+```
+Interface 사용:
+  ├─ 구체적인 클래스에 의존 안 함
+  ├─ 새 클래스 추가 시 기존 코드 수정 불필요
+  └─ "계약(Contract)"만 지키면 됨
+
+예시:
+  BPI_Jetpack 인터페이스
+    ├─ Handle Refill Fuel (계약)
+    └─ 구현:
+         ├─ BP_Kix의 방식
+         ├─ BP_Torque의 방식
+         └─ 각자 자유롭게!
+```
+
+---
+
+## 📊 프로젝트 구조 분석
+
+### 현재 의존성 그래프
+
+```
+BP_KixPlayerController
+  ├─ → Character (엔진 클래스) ✅
+  ├─ → BPI_Jetpack (인터페이스) ✅
+  └─ ✗ BP_Kix (구체 클래스) ❌
+
+BP_Kix
+  ├─ → Character (상속) ✅
+  ├─ → BPI_Jetpack (구현) ✅
+  └─ ✗ BP_KixPlayerController ❌
+
+BP_JetFuel (픽업)
+  ├─ → BPI_Jetpack (인터페이스) ✅
+  └─ ✗ BP_Kix ❌
+  └─ ✗ BP_KixPlayerController ❌
+
+결과:
+  └─ 모두 단방향 의존성! ✅
+```
+
+### 왜 이렇게 설계했나?
+
+```
+1. PlayerController
+   ├─ Character만 알면 됨
+   └─ 어떤 Character든 제어 가능
+        (BP_Kix, BP_Torque, BP_Human 등)
+
+2. BP_Kix
+   ├─ Character에서 상속
+   ├─ BPI_Jetpack 구현
+   └─ PlayerController 몰라도 됨
+
+3. BP_JetFuel
+   ├─ BPI_Jetpack만 알면 됨
+   └─ 어떤 캐릭터든 연료 보충 가능
+```
+
+---
+
+## 🚨 현재 문제 상황
+
+### 연료 보충 시 UI 업데이트 안 됨
+
+```
+문제:
+  BP_JetFuel (픽업)
+    ↓
+  BP_Kix → Handle Refill Fuel
+    ├─ 연료 증가 ✅
+    └─ UI 업데이트? ❌
+         ↓
+       PlayerController가 모름!
+```
+
+### 왜 업데이트 안 되나?
+
+```
+현재 흐름:
+  1. BP_JetFuel이 BP_Kix에게만 알림
+  2. BP_Kix는 연료만 증가
+  3. PlayerController는 모름
+  4. UI 업데이트 안 됨
+
+필요한 것:
+  BP_Kix → PlayerController에게 알림
+    ↓
+  하지만... 의존성 문제!
+```
+
+---
+
+## 🤔 나쁜 해결 방법들
+
+### 방법 1: 직접 의존성 추가
+
+```
+BP_Kix
+  ↓
+Get Player Controller
+  ↓
+Cast to BP_KixPlayerController
+  ↓
+Get Overlay Widget
+  ↓
+Update Fuel Percent
+
+문제:
+  └─ 순환 의존성 발생! ❌
+       ├─ PlayerController → Character
+       └─ BP_Kix → BP_KixPlayerController
+            ↓
+          순환!
+```
+
+### 방법 2: BP_JetFuel이 직접 업데이트
+
+```
+BP_JetFuel
+  ↓
+Cast to BP_Kix
+  ↓
+연료 증가
+  ↓
+Cast to BP_KixPlayerController
+  ↓
+UI 업데이트
+
+문제:
+  └─ 모든 것을 알아야 함! ❌
+       ├─ BP_Kix
+       ├─ BP_KixPlayerController
+       └─ WBP_Overlay
+            ↓
+          강한 결합
+```
+
+---
+
+## ✅ 좋은 해결 방법 힌트
+
+### 다음 강의 예고
+
+```
+필요한 것:
+  BP_Kix가 PlayerController에게
+  "연료 변했어!"라고 알리기
+    ↓
+  하지만 직접 의존 없이!
+    ↓
+  어떻게???
+
+해결책 (다음 강의):
+  └─ Event Dispatcher (이벤트 디스패처)
+       ├─ "방송" 시스템
+       ├─ 의존성 없이 알림
+       └─ Observer Pattern
+```
+
+---
+
+## 📝 핵심 용어 정리
+
+### Dependency (의존성)
+
+```
+의존성
+  ↓
+한 클래스가 다른 클래스를 사용하는 관계
+  ├─ "알아야 한다"
+  └─ "필요하다"
+```
+
+### Circular Dependency (순환 의존성)
+
+```
+순환 의존성
+  ↓
+두 클래스가 서로를 의존
+  ├─ A → B
+  └─ B → A
+       ↓
+     나쁜 설계!
+```
+
+### Loose Coupling (느슨한 결합)
+
+```
+느슨한 결합
+  ↓
+클래스들이 약하게 연결됨
+  ├─ 단방향 의존성
+  ├─ 인터페이스 사용
+  └─ 독립적으로 변경 가능
+       ↓
+     좋은 설계!
+```
+
+### Tight Coupling (강한 결합)
+
+```
+강한 결합
+  ↓
+클래스들이 강하게 연결됨
+  ├─ 순환 의존성
+  ├─ 직접 참조
+  └─ 함께 변경 필요
+       ↓
+     나쁜 설계!
+```
+
+---
+
+## 🎓 코딩 원칙
+
+### SOLID 원칙 중 일부
+
+### Dependency Inversion Principle
+
+```
+의존성 역전 원칙
+  ↓
+구체적인 것이 아닌 추상적인 것에 의존
+  ├─ BP_Kix (구체) ❌
+  └─ BPI_Jetpack (추상) ✅
+
+예시:
+  PlayerController → BPI_Jetpack
+    └─ 인터페이스에 의존 (추상)
+```
+
+### Open/Closed Principle
+
+```
+개방/폐쇄 원칙
+  ↓
+확장에는 열려있고, 수정에는 닫혀있어야 함
+  ├─ 새 캐릭터 추가: 가능 (확장)
+  └─ 기존 코드 수정: 불필요 (폐쇄)
+
+인터페이스 사용 시:
+  └─ 이 원칙 자동으로 달성 ✅
+```
+
+---
+
+## 🔍 실전 비교
+
+### Cast vs Interface
+
+### Cast 사용 (나쁜 예)
+
+```
+BP_JetFuel
+  ↓
+Cast to BP_Kix
+  ├─ 성공: 연료 보충
+  └─ 실패: 무시
+
+BP_Torque 추가 시:
+  ├─ Cast to BP_Kix → 실패
+  ├─ Cast to BP_Torque 추가 필요
+  └─ 캐릭터마다 코드 수정!
+
+5개 캐릭터:
+  └─ 5개 Cast 필요 ❌
+```
+
+### Interface 사용 (좋은 예)
+
+```
+BP_JetFuel
+  ↓
+Does Implement Interface? (BPI_Jetpack)
+  ├─ Yes: Handle Refill Fuel
+  └─ No: 무시
+
+BP_Torque 추가 시:
+  ├─ BP_Torque에 BPI_Jetpack 구현
+  └─ BP_JetFuel 수정 불필요 ✅
+
+100개 캐릭터:
+  └─ 코드 수정 0번 ✅
+```
+
+---
+
+## ⚠️ 초보자 함정
+
+### "지금은 간단한데 왜 복잡하게?"
+
+```
+초보자:
+  "Cast하면 바로 되는데 왜 인터페이스?"
+    ↓
+  당장은 쉬워 보임
+    ↓
+  하지만...
+
+2주 후:
+  ├─ 캐릭터 3개 추가
+  ├─ 코드 곳곳에 Cast
+  └─ 변경할 곳이 수십 군데
+       ↓
+     유지보수 악몽 ❌
+```
+
+### "설계는 나중에..."
+
+```
+초보자:
+  "일단 돌아가게 만들고 나중에 정리"
+    ↓
+  "나중"은 오지 않음
+    ↓
+  기술 부채(Technical Debt) 누적
+
+결과:
+  ├─ 코드가 스파게티처럼 얽힘
+  ├─ 버그 수정 시 다른 버그 발생
+  └─ 결국 전체 재작성
+       ↓
+     처음부터 잘 설계하는 게 빠름 ✅
+```
+
+---
+
+## 💡 핵심 요약
+
+```
+클래스 의존성
+  ↓
+한 클래스가 다른 클래스를 사용하는 관계
+  ↓
+  ├─ 단방향: 좋음 ✅
+  │    └─ A → B (B는 A 모름)
+  │
+  └─ 순환: 나쁨 ❌
+       └─ A ⇄ B (서로 알아야 함)
+
+해결책:
+  └─ 인터페이스 사용
+       ├─ 구체 클래스 대신 추상화
+       ├─ 느슨한 결합 유지
+       └─ 확장 가능한 설계
+```
+
+**이번 강의의 핵심:**
+
+- 의존성은 피할 수 없지만 관리해야 함
+- 순환 의존성은 피해야 함
+- 단방향 의존성이 좋은 설계
+- 인터페이스는 느슨한 결합의 핵심
+- 구체보다 추상에 의존
+- 당장 복잡해 보여도 장기적으로 이득
+
+**다음 강의:**
+
+- 연료 보충 시 UI 업데이트 문제 해결
+- Event Dispatcher (이벤트 디스패처)
+- 의존성 없이 알림 보내기
+- Observer Pattern 구현
+
+# { 🔔 연료 보충 시 UI 업데이트 구현하기 }
+
+## 🎯 이번 강의 목표
+
+연료를 **보충할 때도** Progress Bar가 업데이트되도록 구현합니다.
+
+- BP_Kix에서 PlayerController 참조 얻기
+- 연료 변경 시 PlayerController에게 알리기
+- PlayerController에서 UI 업데이트 함수 호출
+- 의존성을 최소화하는 설계
+
+---
+
+## 🔍 문제 상황 재확인
+
+### 현재 동작
+
+```
+연료 소모 (제트팩 사용):
+  PlayerController → Drain Jet Fuel
+    ↓
+  Update Fuel Percent 호출
+    ↓
+  Progress Bar 업데이트 ✅
+
+연료 보충 (픽업):
+  BP_JetFuel → BP_Kix → Handle Refill Fuel
+    ↓
+  연료 증가
+    ↓
+  하지만... PlayerController 모름
+    ↓
+  Progress Bar 업데이트 안 됨 ❌
+```
+
+### 왜 업데이트 안 되나?
+
+```
+문제 원인:
+  BP_Kix
+    ├─ Handle Refill Fuel 실행
+    ├─ Jet Fuel 변수만 증가
+    └─ PlayerController에게 알리지 않음
+         ↓
+       PlayerController가 변화를 모름
+         ↓
+       UI 업데이트 안 됨
+```
+
+---
+
+## 💡 해결 전략
+
+### 필요한 것
+
+```
+BP_Kix가 PlayerController에게 알려야 함
+  ↓
+"연료가 바뀌었어! UI 업데이트해줘!"
+  ↓
+PlayerController가 UI 업데이트
+```
+
+### 의존성 추가
+
+```
+이전:
+  BP_Kix → PlayerController 모름 (독립적)
+
+이후:
+  BP_Kix → PlayerController 참조 필요
+    ├─ 의존성 추가
+    └─ 하지만 단방향 유지!
+```
+
+**단방향 의존성 유지:**
+
+```
+BP_Kix → PlayerController
+  ├─ BP_Kix가 PlayerController 알음
+  └─ PlayerController는 BP_Kix 몰라도 됨
+       (Character 타입만 알면 됨)
+       ↓
+     여전히 단방향! ✅
+```
+
+---
+
+## 🔧 1단계: PlayerController 참조 얻기
+
+### Event BeginPlay에서 저장
+
+```
+BP_Kix Event Graph
+  ↓
+Event BeginPlay
+  ↓
+Get Controller
+  └─ 이 Pawn을 제어하는 Controller 반환
+```
+
+**Get Controller 노드:**
+
+```
+Get Controller
+  ├─ Target: Self (BP_Kix)
+  └─ Return: Controller (Object Reference)
+       ├─ 타입: Controller (기본 클래스)
+       └─ 우리 필요: BP_KixPlayerController
+
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380776/notion-blog/_/_/_5_/_8_-_3D_-_8/image.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380770/notion-blog/_/_/_5_/_8_-_3D_-_8/image_1.png)
+
+### Cast to BP_KixPlayerController
+
+```
+Get Controller
+  ↓
+Cast to BP_KixPlayerController
+  ├─ Controller를 구체적인 타입으로 변환
+  └─ Return: BP_KixPlayerController
+       ↓
+     이제 우리 PlayerController 타입!
+```
+
+**왜 Cast가 필요한가?**
+
+```
+Get Controller는 일반적인 Controller 반환
+  ↓
+우리는 BP_KixPlayerController의
+특정 함수/변수 필요
+  ↓
+Cast로 타입 변환 필수
+```
+
+### 변수에 저장
+
+```
+Cast to BP_KixPlayerController
+  ↓
+우클릭 → Promote to Variable
+  ↓
+Name: KixPlayerController
+  ├─ Type: BP_KixPlayerController Object Reference
+  └─ Category: Essential
+```
+
+---
+
+## 📦 함수로 캡슐화
+
+### Store Essential Variables 함수
+
+```
+노드 선택
+  ↓
+우클릭 → Collapse to Function
+  ↓
+Name: Store Essential Variables
+  └─ Category: Essential
+```
+
+**함수 내용:**
+
+```
+Store Essential Variables
+  ├─ Get Controller
+  ├─ Cast to BP_KixPlayerController
+  └─ Set KixPlayerController
+```
+
+**왜 함수로 만드나?**
+
+```
+장점:
+  ├─ 코드 정리 (깔끔함)
+  ├─ 재사용 가능
+  ├─ 의미 명확 ("필수 변수 저장")
+  └─ BeginPlay가 복잡해지지 않음
+```
+
+### Event BeginPlay 최종
+
+```
+Event BeginPlay
+  ↓
+Store Essential Variables
+  ↓
+(다른 초기화 작업들...)
+```
+
+---
+
+## 🎨 2단계: BP_KixPlayerController에 함수 추가
+
+### Update Fuel Bar 함수 생성
+
+```
+BP_KixPlayerController
+  ↓
+Functions → + 버튼
+  ↓
+Name: Update Fuel Bar
+```
+
+### 입력 파라미터 추가
+
+```
+Update Fuel Bar 함수 선택
+  ↓
+Details → Inputs → + 버튼
+  ├─ Name: Fuel Bar Percent
+  └─ Type: Float
+```
+
+### 함수 구현
+
+```
+Update Fuel Bar (Function)
+  ├─ Input: Fuel Bar Percent
+  └─ Logic:
+       Get Overlay Widget
+         ↓
+       Validated Get (유효성 검사)
+         ├─ Valid → Update Fuel Percent
+         └─ Not Valid → 아무것도 안 함
+```
+
+**노드 구성 상세:**
+
+```
+1. Overlay Widget 가져오기
+   Get Overlay Widget (변수)
+     └─ Return: WBP_Overlay Object Reference
+
+2. 유효성 검사
+   Validated Get
+     ├─ Is Valid → 계속 진행
+     └─ Is Not Valid → 종료
+          (위젯 없으면 업데이트 불가)
+
+3. 위젯 업데이트 호출
+   Update Fuel Percent (WBP_Overlay 함수)
+     ├─ Target: Overlay Widget
+     └─ Fuel Percent: Fuel Bar Percent (입력)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380773/notion-blog/_/_/_5_/_8_-_3D_-_8/image_2.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380775/notion-blog/_/_/_5_/_8_-_3D_-_8/image_3.png)
+
+---
+
+## 🔗 3단계: BP_Kix에서 호출
+
+### Handle Refill Fuel 수정
+
+```
+Handle Refill Fuel (Function)
+  ↓
+기존 로직:
+  ├─ Jet Fuel 증가
+  └─ Clamp 및 Set Jet Fuel
+
+추가 로직:
+  └─ PlayerController에게 알리기!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380775/notion-blog/_/_/_5_/_8_-_3D_-_8/image_4.png)
+
+### 노드 구성
+
+```
+1. Jet Fuel 업데이트 (기존)
+   Set Jet Fuel
+     ↓
+   연료 값 변경 완료
+
+2. PlayerController 가져오기
+   Get KixPlayerController
+     ↓
+   Validated Get
+     ├─ Valid → 계속
+     └─ Not Valid → 종료
+
+3. 연료 퍼센트 계산
+   Get Fuel Percent (Pure Function)
+     ↓
+   Return: 현재 연료 백분율
+
+4. UI 업데이트 요청
+   Update Fuel Bar
+     ├─ Target: KixPlayerController
+     └─ Fuel Bar Percent: Get Fuel Percent 결과
+
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380775/notion-blog/_/_/_5_/_8_-_3D_-_8/image_5.png)
+
+**전체 흐름:**
+
+```
+Handle Refill Fuel 실행
+  ↓
+Jet Fuel 증가 (기존 로직)
+  ↓
+Get KixPlayerController
+  ↓
+Is Valid?
+  ├─ Yes:
+  │    Get Fuel Percent
+  │      ↓
+  │    Update Fuel Bar
+  │      ↓
+  │    PlayerController → UI 업데이트
+  │
+  └─ No:
+       아무것도 안 함 (안전)
+```
+
+---
+
+## 📊 시스템 전체 흐름
+
+### 연료 보충 시 전체 과정
+
+```
+1. 픽업과 충돌
+   BP_JetFuel
+     └─ Event ActorBeginOverlap
+
+2. 인터페이스 호출
+   Does Implement Interface? (BPI_Jetpack)
+     ↓
+   Handle Refill Fuel (Interface Message)
+     └─ Target: Other Actor (BP_Kix)
+
+3. BP_Kix 처리
+   Handle Refill Fuel (Interface Implementation)
+     ├─ Jet Fuel 증가
+     └─ KixPlayerController에게 알림
+          ↓
+        Update Fuel Bar 호출
+
+4. PlayerController 처리
+   Update Fuel Bar
+     └─ Overlay Widget에게 알림
+          ↓
+        Update Fuel Percent 호출
+
+5. WBP_Overlay 처리
+   Update Fuel Percent
+     └─ ProgressBar_Fuel에게 알림
+          ↓
+        Set Percent
+          ↓
+        UI 업데이트 완료! ✅
+```
+
+---
+
+## 🎨 데이터 흐름 다이어그램
+
+```
+BP_JetFuel (픽업)
+  ↓ Interface Call
+BP_Kix (캐릭터)
+  ├─ Jet Fuel 변수 업데이트
+  └─ ↓ Direct Call
+    BP_KixPlayerController
+      └─ ↓ Direct Call
+        WBP_Overlay
+          └─ ↓ Direct Call
+            ProgressBar_Fuel
+              └─ Set Percent (UI 업데이트)
+```
+
+**레이어 구조:**
+
+```
+Layer 1: Gameplay (BP_JetFuel, BP_Kix)
+  ↓ 느슨한 결합 (Interface)
+
+Layer 2: Control (BP_KixPlayerController)
+  ↓ 직접 소유 (Has-A 관계)
+
+Layer 3: UI (WBP_Overlay)
+  ↓ 캡슐화 (함수 인터페이스)
+
+Layer 4: Widget (ProgressBar_Fuel)
+```
+
+---
+
+## ✅ 테스트
+
+### 테스트 시나리오 1: 부분 보충
+
+```
+1. 초기 상태
+   Jet Fuel: 50 (만땅)
+
+2. 제트팩 사용
+   Jet Fuel: 25 정도까지 소모
+     ↓
+   Progress Bar: 50% 표시 ✅
+
+3. 픽업 획득 (Refill Amount: 25)
+   Jet Fuel: 25 + 25 = 50
+     ↓
+   Progress Bar: 100% 표시 ✅
+```
+
+### 테스트 시나리오 2: 완전 고갈 후 보충
+
+```
+1. 제트팩으로 연료 완전 소모
+   Jet Fuel: 0
+     ↓
+   Progress Bar: 0% ✅
+
+2. 첫 번째 픽업 (25)
+   Jet Fuel: 0 + 25 = 25
+     ↓
+   Progress Bar: 50% ✅
+
+3. 두 번째 픽업 (25)
+   Jet Fuel: 25 + 25 = 50
+     ↓
+   Progress Bar: 100% ✅
+```
+
+### 레벨 배치
+
+```
+제트 연료 픽업 복제:
+  ├─ 픽업 선택
+  ├─ Alt + 드래그 (복제)
+  └─ 여러 개 배치
+       ↓
+     테스트 편의성 증가
+```
+
+---
+
+## 🎓 설계 원칙 분석
+
+### 레이어드 아키텍처 (Layered Architecture)
+
+```
+각 레이어는 바로 아래 레이어만 알면 됨:
+
+BP_Kix (게임플레이)
+  ├─ 알아야 함: PlayerController
+  └─ 몰라도 됨: WBP_Overlay, ProgressBar
+
+BP_KixPlayerController (제어)
+  ├─ 알아야 함: WBP_Overlay
+  └─ 몰라도 됨: ProgressBar_Fuel
+
+WBP_Overlay (UI 컨테이너)
+  ├─ 알아야 함: ProgressBar_Fuel
+  └─ 몰라도 됨: 누가 호출하는지
+```
+
+### 캡슐화 (Encapsulation)
+
+```
+각 레이어가 내부 구현 숨김:
+
+BP_Kix:
+  └─ "Update Fuel Bar" 호출
+       (내부에서 뭘 하는지 몰라도 됨)
+
+PlayerController:
+  └─ "Update Fuel Percent" 호출
+       (Progress Bar인지 뭔지 몰라도 됨)
+
+WBP_Overlay:
+  └─ "Set Percent" 호출
+       (어떻게 그려지는지 몰라도 됨)
+```
+
+### 책임의 분리 (Separation of Concerns)
+
+```
+각 클래스의 책임:
+
+BP_Kix:
+  └─ 연료 데이터 관리
+
+BP_KixPlayerController:
+  └─ UI 관리 및 업데이트 조정
+
+WBP_Overlay:
+  └─ 위젯 표시 관리
+
+ProgressBar_Fuel:
+  └─ 실제 그래픽 렌더링
+```
+
+---
+
+## 📝 핵심 노드 정리
+
+### Get Controller
+
+```
+Get Controller
+  ├─ Target: Pawn (Self)
+  └─ Return: Controller
+       └─ 이 Pawn을 제어하는 Controller
+
+용도:
+  Pawn이 자신의 Controller 참조 필요할 때
+```
+
+### Validated Get
+
+```
+Validated Get
+  ├─ 변수 가져오기 + 유효성 검사
+  ├─ Is Valid: 값이 유효함 (null 아님)
+  └─ Is Not Valid: 값이 null
+       ↓
+     안전한 접근
+```
+
+**일반 Get vs Validated Get:**
+
+```
+Get (일반):
+  └─ 값 가져오기만 함
+       null이면 에러 발생 가능
+
+Validated Get:
+  └─ 값 가져오기 + null 체크
+       null이면 Is Not Valid 경로로
+       ↓
+     크래시 방지 ✅
+```
+
+---
+
+## ⚠️ 주의사항
+
+```
+1. Cast 순서
+   ├─ Get Controller 먼저
+   └─ Cast to 특정 타입
+        (Controller → BP_KixPlayerController)
+
+2. Validated Get 사용
+   ├─ 위젯/Controller 접근 시 항상 사용
+   └─ null 참조 방지
+
+3. 함수 호출 순서
+   ├─ 데이터 변경 먼저 (Set Jet Fuel)
+   └─ UI 업데이트 나중 (Update Fuel Bar)
+
+4. 의존성 주의
+   ├─ BP_Kix → PlayerController (필요)
+   ├─ 하지만 WBP_Overlay는 모름 (좋음)
+   └─ 레이어 건너뛰지 않기
+
+5. BeginPlay 타이밍
+   ├─ Controller는 BeginPlay에 이미 설정됨
+   └─ 안전하게 Get Controller 가능
+```
+
+---
+
+## 🔍 문제 해결 (Troubleshooting)
+
+### UI가 업데이트 안 될 때
+
+```
+체크리스트:
+
+1. KixPlayerController 변수 설정됐나?
+   └─ BeginPlay → Store Essential Variables
+
+2. Validated Get에서 Is Valid 경로 가나?
+   └─ Print String으로 확인
+
+3. Get Fuel Percent 제대로 계산되나?
+   └─ Return Value를 Print로 확인
+
+4. Update Fuel Bar 호출되나?
+   └─ 함수 입구에 Print String
+
+5. WBP_Overlay 컴파일했나?
+   └─ 함수 추가 후 컴파일 필수
+```
+
+---
+
+## 💡 핵심 요약
+
+```
+연료 보충 시 UI 업데이트
+  ↓
+3단계 구현:
+
+1. BP_Kix → PlayerController 참조
+   ├─ Get Controller
+   ├─ Cast to BP_KixPlayerController
+   └─ 변수에 저장
+
+2. PlayerController → Update Fuel Bar 함수
+   ├─ Input: Fuel Bar Percent
+   └─ Overlay Widget → Update Fuel Percent
+
+3. BP_Kix → Handle Refill Fuel 수정
+   ├─ Jet Fuel 업데이트
+   ├─ Get Fuel Percent
+   └─ Update Fuel Bar 호출
+```
+
+**전체 흐름:**
+
+```
+픽업 충돌
+  ↓
+BP_Kix → Jet Fuel 증가
+  ↓
+PlayerController → Update Fuel Bar
+  ↓
+WBP_Overlay → Update Fuel Percent
+  ↓
+ProgressBar → Set Percent
+  ↓
+화면에 반영 ✅
+```
+
+**이번 강의의 핵심:**
+
+- Get Controller로 PlayerController 참조
+- Cast로 구체 타입 변환
+- Validated Get으로 안전한 접근
+- 레이어드 아키텍처 유지
+- 각 레이어는 바로 아래만 알면 됨
+- 캡슐화로 내부 구현 숨김
+- 함수 인터페이스로 결합도 낮춤
+
+**다음 단계:**
+
+- 완성된 연료 시스템 활용
+- 추가 UI 요소 (텍스트 표시 등)
+- 다른 HUD 요소 추가
+- 스타일링 및 폴리싱
+
+# { 🎯 Casting의 비용과 최적화 - 메모리 관리 고급 }
+
+## 🎯 이번 강의 목표
+
+- \*Casting(형변환)**의 **숨겨진 비용**을 이해하고 **최적화 기법\*\*을 배웁니다.
+- Casting의 내부 동작 원리
+- Hard Reference와 메모리 문제
+- Size Map으로 Blueprint 크기 분석
+- Parent Class를 이용한 최적화
+- Polymorphism(다형성) 개념 이해
+
+---
+
+## ⚠️ Casting에 대한 오해와 진실
+
+### 흔한 오해
+
+```
+"Casting은 무조건 나쁘다"
+"절대 Cast 쓰지 마라"
+
+❌ 잘못된 조언!
+  ↓
+왜 나쁜지도 모르고 피하는 것은 위험
+```
+
+### 진실
+
+```
+Casting 자체는 도구일 뿐
+  ├─ 잘 쓰면: 유용 ✅
+  └─ 잘못 쓰면: 문제 ❌
+
+중요한 것:
+  └─ "왜 문제가 되는지" 이해하기
+       ↓
+     그래야 적절히 사용 가능
+```
+
+---
+
+## 🔍 Casting의 내부 동작 원리
+
+### Casting은 어떻게 작동하나?
+
+```
+Cast to BP_KixPlayerController
+  ├─ 입력: Controller (일반 타입)
+  └─ 확인 과정:
+       1. 이 객체가 BP_KixPlayerController인가?
+       2. 아니면 그 부모인가?
+       3. 아니면 그 부모의 부모인가?
+       4. ...계속 올라감
+       5. 찾거나 or 끝까지 가면 중단
+```
+
+### 상속 계층 구조 확인
+
+```
+BP_KixPlayerController (우리 클래스)
+  ↓ 상속
+PlayerController (엔진 클래스)
+  ↓ 상속
+Controller (엔진 클래스)
+  ↓ 상속
+Actor (엔진 클래스)
+  ↓ 상속
+UObject (기본 클래스)
+  ↓ 상속
+UObjectBaseUtility
+  ↓ 상속
+UObjectBase (최상위)
+```
+
+**Casting 과정:**
+
+```
+Controller 객체를 받음
+  ↓
+1. BP_KixPlayerController인가?
+   └─ Yes → 성공! ✅
+
+만약 No라면:
+2. 부모(PlayerController)인가?
+3. 그 부모(Controller)인가?
+4. 계속 올라가며 확인...
+```
+
+---
+
+## ⏱️ 성능 비용 (Performance Cost)
+
+### CPU 시간
+
+```
+계층 구조를 올라가며 타입 체크
+  ├─ 각 단계마다 비교 연산
+  └─ 계층이 깊을수록 느림
+
+하지만:
+  └─ 보통 매우 빠름 (나노초 단위)
+       ├─ C++: 거의 무시 가능
+       └─ Blueprint: 약간 느림
+```
+
+### 언제 문제가 되나?
+
+```
+✅ 괜찮은 경우:
+  ├─ BeginPlay (한 번만)
+  ├─ 버튼 클릭 (가끔)
+  └─ 일회성 이벤트
+
+❌ 피해야 할 경우:
+  └─ Event Tick (매 프레임!)
+       ↓
+     초당 60~120회 실행
+       ↓
+     누적되면 성능 저하
+```
+
+**예시:**
+
+```
+Event Tick
+  ↓
+Cast to BP_Kix (매 프레임)
+  ↓
+초당 60회 × 타입 체크
+  ↓
+불필요한 CPU 낭비 ❌
+```
+
+---
+
+## 💾 메모리 비용 - 핵심 문제!
+
+### Hard Reference란?
+
+```
+Hard Reference (하드 레퍼런스)
+  ↓
+"강한 참조" = 반드시 함께 로드
+  ├─ A가 B를 Cast하면
+  └─ A 로드 시 B도 자동 로드
+       ↓
+     메모리에 함께 존재
+```
+
+**실생활 비유:**
+
+```
+하드 레퍼런스 = 짐에 붙어있는 무거운 돌
+  ├─ 짐(Blueprint) 들 때
+  └─ 돌(Referenced Asset)도 함께 들어야 함
+       ↓
+     짐이 무거워짐!
+```
+
+### 현재 상황 분석
+
+```
+BP_Kix
+  ↓
+Cast to BP_KixPlayerController
+  ↓
+Hard Reference 생성
+  ↓
+BP_Kix 로드 시
+  └─ BP_KixPlayerController도 함께 로드
+       ↓
+     BP_Kix 메모리 크기 증가!
+```
+
+---
+
+## 📊 Size Map - 메모리 분석 도구
+
+### Size Map 열기
+
+```
+Blueprint 우클릭
+  ↓
+Size Map
+  ↓
+크기 분석 창 열림
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380775/notion-blog/_/_/_5_/_8_-_3D_-_8/image_6.png)
+
+### Size Map 보는 법
+
+```
+Size Map 창:
+  ├─ 큰 박스: 큰 용량
+  ├─ 작은 박스: 작은 용량
+  └─ 색상: 다양한 Asset 타입
+
+설정 변경:
+  └─ Display Size → Memory Size
+       (실제 메모리 사용량)
+```
+
+### BP_Kix Size Map 분석
+
+```
+Total Size: 15.9 MB
+
+구성:
+  ├─ SK_Kix (Skeletal Mesh): 대부분 (큼)
+  ├─ ABP_Locomotion (Anim BP): 중간
+  ├─ Niagara Systems: 작음
+  └─ BP_KixPlayerController: 96 KB (작음)
+       ↓
+     PlayerController는 작아서 괜찮음
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380775/notion-blog/_/_/_5_/_8_-_3D_-_8/image_7.png)
+
+---
+
+## 🚨 문제 상황 시뮬레이션
+
+### BP_JetFuel이 BP_Kix에 Cast한다면?
+
+```
+나쁜 예시:
+
+BP_JetFuel (픽업)
+  ↓
+Event ActorBeginOverlap
+  ↓
+Cast to BP_Kix (나쁜 설계!)
+  ↓
+Hard Reference 생성
+```
+
+**결과:**
+
+```
+BP_JetFuel Size Map:
+  ├─ Before: 81.4 MB
+  └─ After: 97.3 MB (+15.9 MB!)
+       ↓
+     BP_Kix 전체가 포함됨
+       ↓
+     픽업이 너무 무거움! ❌
+```
+
+**왜 문제인가?**
+
+```
+픽업은 작아야 함:
+  ├─ 레벨에 많이 배치
+  ├─ 100개 배치 시: 9.7 GB!
+  └─ 메모리 낭비 심각
+
+Interface 사용 시:
+  ├─ BP_JetFuel: 81.4 MB 유지
+  └─ 100개 배치: 8.1 GB
+       ↓
+     1.6 GB 절약! ✅
+```
+
+---
+
+## 🔧 최적화 방법 1: Interface 사용
+
+### 왜 Interface는 괜찮은가?
+
+```
+Interface는 Hard Reference 생성 안 함!
+  ↓
+BPI_Jetpack
+  ├─ 메모리: 거의 0 KB
+  └─ 함수 선언만 있음 (데이터 없음)
+
+BP_JetFuel
+  ├─ BPI_Jetpack 사용
+  └─ BP_Kix 참조 안 함
+       ↓
+     작게 유지 ✅
+```
+
+---
+
+## 🔧 최적화 방법 2: Base Class Pattern
+
+### 문제 상황
+
+```
+BP_Kix가 BP_KixPlayerController 필요
+  ↓
+Cast to BP_KixPlayerController
+  ↓
+Hard Reference 생성
+  ↓
+하지만... PlayerController는 작음 (96 KB)
+  └─ 지금은 괜찮음
+
+만약 PlayerController가 커진다면?
+  예: Static Mesh 변수 추가 (큰 에셋)
+    ↓
+  BP_KixPlayerController: 96 MB
+    ↓
+  BP_Kix도 함께 커짐!
+```
+
+### 해결: Base Class 생성
+
+```
+새 Blueprint 생성:
+  ├─ Parent: PlayerController
+  ├─ Name: BP_PlayerControllerBase
+  └─ 내용: 비어있음 (가벼움)
+```
+
+**구조 변경:**
+
+```
+Before:
+  BP_KixPlayerController
+    └─ Parent: PlayerController
+
+After:
+  BP_PlayerControllerBase (새로 생성)
+    └─ Parent: PlayerController
+         ↓
+       BP_KixPlayerController
+         └─ Parent: BP_PlayerControllerBase
+```
+
+---
+
+## 🎨 Base Class Pattern 구현
+
+### 1단계: Base Class 생성
+
+```
+BP_KixPlayerController 우클릭
+  ↓
+Create Child Blueprint Class
+  ↓
+Name: BP_PlayerControllerBase
+  └─ 실제로는 부모가 되어야 하는데
+       일단 자식으로 만들고 나중에 관계 변경
+```
+
+**올바른 방법:**
+
+```
+Blueprints/Player 폴더
+  ↓
+우클릭 → Blueprint Class
+  ↓
+Parent: PlayerController
+  ↓
+Name: BP_PlayerControllerBase
+```
+
+### 2단계: 부모 관계 변경
+
+```
+BP_KixPlayerController 열기
+  ↓
+Class Settings → Parent Class
+  ↓
+변경:
+  ├─ Before: PlayerController
+  └─ After: BP_PlayerControllerBase
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380776/notion-blog/_/_/_5_/_8_-_3D_-_8/image_8.png)
+
+**결과:**
+
+```
+계층 구조:
+  PlayerController
+    ↓
+  BP_PlayerControllerBase (우리가 만든 부모)
+    ↓
+  BP_KixPlayerController (자식)
+```
+
+### 3단계: Cast 변경
+
+```
+BP_Kix → Store Essential Variables
+  ↓
+Before:
+  Cast to BP_KixPlayerController
+    └─ Hard Reference: 96 KB
+
+After:
+  Cast to BP_PlayerControllerBase
+    └─ Hard Reference: 3.5 KB!
+         ↓
+       훨씬 가벼움 ✅
+```
+
+### 4단계: 함수 이동
+
+```
+BP_PlayerControllerBase에 함수 추가:
+  ├─ Name: Fuel Update
+  ├─ Input: Fuel Percent (Float)
+  └─ Implementation: 비어있음!
+       (자식이 Override할 예정)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380776/notion-blog/_/_/_5_/_8_-_3D_-_8/image_9.png)
+
+**왜 비어있나?**
+
+```
+Base Class의 역할:
+  └─ 함수 "선언"만 제공
+       ├─ Interface와 비슷
+       └─ 자식이 "구현"
+
+Interface와 차이:
+  ├─ Interface: 완전히 별도 클래스
+  └─ Base Class: 상속 관계
+```
+
+---
+
+## 🔄 Function Override (함수 재정의)
+
+### BP_KixPlayerController에서 Override
+
+```
+BP_KixPlayerController
+  ↓
+Functions → Override 드롭다운
+  ↓
+Fuel Update 선택
+  ↓
+Override 함수 생성됨
+
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380770/notion-blog/_/_/_5_/_8_-_3D_-_8/image_10.png)
+
+**Override된 함수:**
+
+```
+Fuel Update (Override)
+  ├─ Parent: Fuel Update 호출 (선택사항)
+  │    └─ 부모 구현 실행 (지금은 비어있음)
+  │
+  └─ 우리 구현:
+       Get Overlay Widget
+         ↓
+       Update Fuel Percent
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380772/notion-blog/_/_/_5_/_8_-_3D_-_8/image_11.png)
+
+### 기존 함수 제거
+
+```
+Update Fuel Bar (기존 함수)
+  ↓
+더 이상 필요 없음
+  ↓
+삭제 ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380772/notion-blog/_/_/_5_/_8_-_3D_-_8/image_12.png)
+
+```csharp
+새로운 Kix 에서 구현
+```
+
+---
+
+## 🎯 Polymorphism (다형성) - 고급 개념
+
+### 다형성이란?
+
+```
+Polymorphism (다형성)
+  ↓
+"같은 이름, 다른 동작"
+  ├─ 부모 타입으로 저장
+  └─ 자식 구현 실행
+```
+
+**실제 동작:**
+
+```
+BP_Kix에서:
+  ├─ 변수 타입: BP_PlayerControllerBase
+  ├─ 실제 객체: BP_KixPlayerController
+  └─ Fuel Update 호출
+       ↓
+     어느 구현 실행?
+       ↓
+     자식 구현! (Override된 버전)
+```
+
+### 왜 작동하나?
+
+```
+변수에 저장된 것:
+  └─ BP_PlayerControllerBase 타입
+
+하지만 실제 객체:
+  └─ BP_KixPlayerController 인스턴스
+
+함수 호출 시:
+  ├─ "런타임"에 실제 타입 확인
+  └─ 자식의 Override 버전 실행
+       ↓
+     다형성! ✅
+```
+
+**코드로 비유:**
+
+```
+Parent parent = new Child();
+  ├─ 변수 타입: Parent
+  └─ 실제 객체: Child
+
+parent.doSomething();
+  └─ Child의 doSomething() 실행!
+```
+
+---
+
+## 📊 최적화 효과 비교
+
+### Before (직접 Cast)
+
+```
+BP_Kix
+  ↓
+Cast to BP_KixPlayerController
+  ↓
+Hard Reference: BP_KixPlayerController 전체
+  ├─ 현재: 96 KB (작음)
+  └─ 나중에 큰 에셋 추가 시: 수십 MB
+       ↓
+     BP_Kix도 함께 커짐 ❌
+```
+
+### After (Base Class)
+
+```
+BP_Kix
+  ↓
+Cast to BP_PlayerControllerBase
+  ↓
+Hard Reference: BP_PlayerControllerBase만
+  ├─ 3.5 KB (매우 작음!)
+  └─ BP_KixPlayerController가 커져도 영향 없음
+       ↓
+     BP_Kix 크기 안정적 ✅
+```
+
+**Size Map 확인:**
+
+```
+BP_Kix Size Map:
+  ├─ Before: 15.9 MB
+  └─ After: 15.8 MB
+       ↓
+     PlayerController 참조가 거의 안 보임
+       (너무 작아서)
+```
+
+---
+
+## 🎓 Pattern 비교 정리
+
+### Interface vs Base Class
+
+```
+Interface (BPI_Jetpack):
+  ├─ Hard Reference: 없음 ✅
+  ├─ 유연성: 매우 높음
+  ├─ 관계: 독립적
+  └─ 사용: 완전히 다른 클래스 간
+
+Base Class (BP_PlayerControllerBase):
+  ├─ Hard Reference: 최소화 ✅
+  ├─ 유연성: 높음
+  ├─ 관계: 상속
+  └─ 사용: 같은 계열의 클래스
+```
+
+### 언제 무엇을 쓰나?
+
+```
+Interface 사용:
+  ├─ 완전히 다른 종류 (픽업 ↔ 캐릭터)
+  ├─ 여러 클래스가 구현
+  └─ Hard Reference 제거 필요
+
+Base Class 사용:
+  ├─ 같은 계열 (PlayerController 변형들)
+  ├─ 상속 관계 유지 필요
+  └─ Hard Reference 최소화 필요
+
+둘 다 사용:
+  └─ 상황에 맞게 조합 가능!
+```
+
+---
+
+## 📝 핵심 정리
+
+### Casting의 두 가지 비용
+
+```
+1. CPU 비용 (Performance)
+   ├─ 타입 체크에 시간 소요
+   ├─ 보통 무시 가능
+   └─ Event Tick에서만 주의
+
+2. 메모리 비용 (Memory) ← 더 중요!
+   ├─ Hard Reference 생성
+   ├─ Blueprint 크기 증가
+   └─ 신중한 설계 필요
+```
+
+### 최적화 기법
+
+```
+1. Interface 사용
+   └─ Hard Reference 제거
+
+2. Base Class Pattern
+   └─ Hard Reference 최소화
+
+3. Size Map 활용
+   └─ 메모리 사용량 확인
+
+4. Polymorphism 활용
+   └─ 유연한 설계 유지
+```
+
+---
+
+## ⚠️ 주의사항
+
+```
+1. BeginPlay Cast는 대부분 괜찮음
+   └─ CPU: 한 번만, 문제없음
+   └─ 메모리: Size Map으로 확인
+
+2. Event Tick Cast는 피하기
+   └─ CPU: 매 프레임 낭비
+   └─ 대안: 변수에 저장 후 재사용
+
+3. Size Map 정기 확인
+   └─ Blueprint 크기 모니터링
+   └─ 불필요한 Reference 제거
+
+4. Base Class는 가볍게
+   └─ 큰 에셋 참조 금지
+   └─ 함수 선언만 포함
+
+5. Polymorphism 이해 필요
+   └─ 부모 타입으로 저장
+   └─ 자식 구현 실행
+   └─ 런타임에 결정
+```
+
+---
+
+## 💡 핵심 요약
+
+```
+Casting의 진짜 문제:
+  └─ Hard Reference → 메모리 증가
+       ↓
+     Blueprint가 함께 로드됨
+
+해결책:
+  1. Interface 사용
+     └─ Reference 없음
+
+  2. Base Class Pattern
+     ├─ 가벼운 부모 생성
+     ├─ 자식에서 Override
+     └─ Polymorphism 활용
+
+Size Map으로 확인:
+  └─ 메모리 사용량 모니터링
+```
+
+**이번 강의의 핵심:**
+
+- Casting은 Hard Reference 생성
+- Hard Reference는 메모리 증가 원인
+- Interface는 Reference 없음
+- Base Class는 Reference 최소화
+- Polymorphism으로 유연성 유지
+- Size Map으로 메모리 분석
+- BeginPlay Cast는 대부분 괜찮음
+- Event Tick Cast는 피하기
+
+**다음 강의 예고:**
+
+- Hard Reference 더 자세히
+- Soft Reference 개념
+- Asset Loading 최적화
+
+# { 🎮 텍스처 압축으로 게임 용량 줄이기 }
+
+## 🎯 목표
+
+게임 캐릭터와 오브젝트에 사용되는 텍스처(이미지)를 압축해서 메모리 사용량을 줄이는 방법을 배웁니다.
+
+---
+
+## 📊 시작 전 확인: Size Map
+
+### Size Map이란?
+
+**메모리에서 차지하는 용량을 시각적으로 보여주는 도구**
+
+```
+Blueprint 우클릭 → Size Map 선택
+  ↓
+사각형 크기 = 메모리 사용량
+  ├─ 큰 사각형 = 메모리 많이 차지
+  └─ 작은 사각형 = 메모리 적게 차지
+```
+
+### 예시: BP_Kick 분석
+
+```
+전체 크기: 15.8MB
+  ├─ SKM_Kick (스켈레탈 메시): 대부분
+  │   └─ Material (머티리얼): 대부분
+  │       └─ Textures (텍스처들): 메모리의 주범
+  └─ 기타
+```
+
+**핵심**: 사각형이 클수록 메모리를 많이 먹는 것
+
+---
+
+## 📐 텍스처 크기 이해하기
+
+### 기본 개념
+
+**텍스처 크기 표기법**
+
+- 2048 x 2048 = 4K 텍스처
+- 4096 x 4096 = 4K보다 큰 텍스처
+- 1024 x 1024 = 2K 텍스처
+- 512 x 512 = 하프 K 텍스처
+
+**크기별 용량**
+
+```
+4096 x 4096 → 가장 큼 (22.4MB 정도)
+2048 x 2048 → 4K (5.6MB 정도)
+1024 x 1024 → 2K (1.4MB 정도)
+512 x 512   → 하프K (0.3MB 정도)
+```
+
+### Kick 캐릭터 텍스처 확인
+
+**경로**
+
+```
+Assets → Kick → Materials → Textures
+```
+
+**주요 텍스처 종류**
+
+1. **T_Kick_D (Diffuse - 기본 색상)**
+   - 크기: 2048 x 2048 (4K)
+   - 역할: 캐릭터의 기본 색상
+2. **T_Kick_E (Emissive - 발광)**
+   - 크기: 2048 x 2048 (4K)
+   - 역할: 빛나는 부분 (거의 검은색)
+3. **T_Kick_N (Normal Map)**
+   - 크기: 2048 x 2048 (4K)
+   - 용량: 5.6MB (가장 큼)
+   - 역할: 표면의 울퉁불퉁한 디테일
+4. **T_Kick_ORM (Occlusion/Roughness/Metallic)**
+   - 크기: 2048 x 2048 (4K)
+   - 역할: 3가지 정보를 각 채널에 저장
+     - R채널: 금속성
+     - G채널: 거칠기
+     - B채널: 주변 음영
+
+---
+
+## 🔍 언제 4K가 필요한가?
+
+### 필요한 경우
+
+```
+플레이어 캐릭터 + 카메라 가까이
+  ├─ Spring Arm Length: 250 (가까움)
+  ├─ 화면에 크게 보임
+  └─ 디테일이 중요함
+  ✅ 4K 사용 권장
+```
+
+### 필요없는 경우
+
+```
+배경 오브젝트 or 카메라 멀리
+  ├─ Spring Arm Length: 600 (멀리)
+  ├─ 화면에 작게 보임
+  └─ 디테일 잘 안 보임
+  ⚠️ 4K 불필요 → 압축 가능
+```
+
+**Spring Arm Length란?**
+
+- 카메라와 캐릭터 사이 거리
+- 250 = 가까운 3인칭 시점
+- 600 = 먼 3인칭 시점 (탑다운 느낌)
+
+---
+
+## 🔧 텍스처 압축하기 (기본)
+
+### 1단계: 텍스처 열기
+
+```
+텍스처 더블클릭
+  ↓
+Details 패널 확인
+  └─ Size: 2048 x 2048 표시
+```
+
+### 2단계: 압축 설정
+
+```
+검색창에 "Compression" 입력
+  ↓
+Max Texture Size 찾기
+  ├─ 0 = 압축 없음 (원본 크기 사용)
+  ├─ 1024 = 절반 크기로 압축
+  ├─ 512 = 4분의 1 크기로 압축
+  └─ 256 = 8분의 1 크기로 압축
+```
+
+**주의**: 항상 2의 배수 사용 (2048, 1024, 512, 256, 128...)
+
+### 3단계: 결과 확인
+
+```
+저장 후 Size Map 다시 열기
+  ├─ 크기 맵 닫기
+  ├─ Blueprint 우클릭
+  └─ Size Map 다시 선택
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380772/notion-blog/_/_/_5_/_8_-_3D_-_8/image_13.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380772/notion-blog/_/_/_5_/_8_-_3D_-_8/image_14.png)
+
+```csharp
+메모리 보기로 설정해 줘야함
+```
+
+---
+
+## 💡 실전 예시 1: Normal Map 압축
+
+### Before
+
+```
+T_Kick_N (Normal Map)
+  ├─ 크기: 2048 x 2048
+  ├─ 용량: 5.6MB
+  └─ BP_Kick 전체의 1/3 차지
+```
+
+### 압축 적용
+
+```
+Max Texture Size: 1024 설정
+  ↓
+2048 → 1024 (절반으로 압축)
+```
+
+### After
+
+```
+T_Kick_N (Normal Map)
+  ├─ 크기: 1024 x 1024
+  ├─ 용량: 1.4MB
+  └─ BP_Kick 전체의 1/10 차지
+
+BP_Kick 전체
+  Before: 15.8MB
+  After: 11.6MB
+```
+
+### 게임 내 확인
+
+```
+플레이 테스트
+  ├─ Spring Arm 250 (가까이)
+  └─ Spring Arm 600 (멀리)
+
+결과: 육안으로 차이 구분 안 됨
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380772/notion-blog/_/_/_5_/_8_-_3D_-_8/image_15.png)
+
+---
+
+## ⚠️ 과도한 압축 예시
+
+### 모든 텍스처를 512로 압축
+
+```
+설정
+  ├─ T_Kick_D: 512
+  ├─ T_Kick_E: 512
+  ├─ T_Kick_N: 512
+  └─ T_Kick_ORM: 512
+
+결과
+  ├─ 머리카락 픽셀화 보임
+  ├─ 가까이서 흐릿함
+  └─ 멀리서는 괜찮음
+```
+
+### 결론
+
+```
+카메라 가까이 (250)
+  └─ ❌ 512는 너무 압축됨
+
+카메라 멀리 (600)
+  └─ ✅ 512도 괜찮음
+```
+
+---
+
+## 🎮 실전 예시 2: Jet Fuel Pickup 최적화
+
+### 문제 상황
+
+```
+Size Map 확인
+  ├─ BP_JetFuel: 81.5MB
+  └─ BP_Kick: 15.8MB
+
+⚠️ 배경 오브젝트가 주인공보다 5배 큼!
+```
+
+### 원인 분석
+
+```
+BP_JetFuel
+  └─ Static Mesh (정적 메시)
+      └─ Materials (3개)
+          ├─ JetFuel
+          ├─ Plastic
+          └─ Metal
+
+모든 머티리얼이 참조
+  └─ M_TileMaster (마스터 머티리얼)
+      └─ 4K~4096 텍스처 다수
+```
+
+**Material Instance란?**
+
+- 부모 머티리얼(M_TileMaster)의 복사본
+- 설정만 다르게 변경 가능
+- 원본 텍스처는 공유
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380773/notion-blog/_/_/_5_/_8_-_3D_-_8/image_16.png)
+
+---
+
+## 🔍 마스터 머티리얼의 텍스처 찾기
+
+### Reference Viewer 사용
+
+```
+M_TileMaster 우클릭
+  ↓
+Reference Viewer 선택
+  ↓
+Dependencies (종속성) 확인
+  ├─ 이 머티리얼이 사용하는 텍스처
+  └─ 이 머티리얼을 사용하는 인스턴스
+```
+
+### 텍스처 찾기 과정
+
+```
+Reference Viewer에서 텍스처 발견
+  ↓
+우클릭 → Browse to Asset
+  ↓
+Content Browser에서 텍스처 위치 확인
+  └─ Stacko Bot 폴더 (Engine Content 아님)
+```
+
+**Engine Content vs Project Content**
+
+- Engine Content: 엔진 기본 파일 (수정 비권장)
+- Project Content: 프로젝트 파일 (수정 가능)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380773/notion-blog/_/_/_5_/_8_-_3D_-_8/image_17.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380773/notion-blog/_/_/_5_/_8_-_3D_-_8/image_18.png)
+
+---
+
+## 🛠️ Jet Fuel 최적화 과정
+
+### 1단계: T_Wind 압축
+
+```
+Before
+  ├─ 크기: 2048 x 2048 (4K)
+  └─ 용량: 22.4MB
+
+압축
+  └─ Max Texture Size: 512
+
+After
+  ├─ 크기: 512 x 512
+  └─ 용량: 1.4MB
+```
+
+### 2단계: T_MetalPaint 압축
+
+```
+Before
+  ├─ 크기: 4096 x 4096
+  └─ 용량: 22.4MB
+
+압축
+  └─ Max Texture Size: 1024
+
+After
+  ├─ 크기: 1024 x 1024
+  └─ 용량: 1.4MB
+
+BP_JetFuel: 81.5MB → 39.6MB
+```
+
+### 3단계: T_ConcreteTileable 압축
+
+```
+압축
+  └─ Max Texture Size: 1024
+
+BP_JetFuel: 39.6MB → 18.6MB
+```
+
+### 4단계: T_Sand_Tileable 압축
+
+```
+Before
+  └─ 크기: 4096 x 4096
+
+압축
+  └─ Max Texture Size: 1024
+
+BP_JetFuel: 18.6MB → 8.1MB
+```
+
+---
+
+## 🎯 추가 최적화 (Time-lapse 작업)
+
+### 전략
+
+```
+Size Map에서 큰 사각형 찾기
+  ↓
+현재 크기의 절반으로 압축
+  ↓
+결과 확인
+```
+
+### 압축한 텍스처들
+
+```
+✅ T_Wind: 2048 → 512
+✅ T_Sand_Tileable: 4096 → 1024
+✅ T_MetalPaint: 4096 → 1024
+✅ T_Grunge: 압축
+✅ T_ConcreteTileable_N: 압축
+✅ T_ConcreteTileable_M: 1024 → 256
+```
+
+### 주의사항
+
+```
+❌ Default_Diffuse는 제외
+   └─ Engine Content라서 수정 안 함
+```
+
+### 최종 결과
+
+```
+BP_JetFuel
+  Before: 81.5MB
+  After: 3.1MB
+
+감소율: 약 26배 감소!
+
+비교
+  ├─ BP_Kick: 15.8MB
+  └─ BP_JetFuel: 3.1MB (Kick의 1/5)
+```
+
+---
+
+## 👀 시각적 품질 비교
+
+### 게임 내 테스트
+
+```
+압축 전후 비교
+  ├─ 가까이: 약간 흐릿함 (하지만 눈에 잘 안 띔)
+  ├─ 멀리: 차이 거의 없음
+  └─ F11 전체화면: 여전히 좋아 보임
+```
+
+### 결론
+
+```
+배경 오브젝트는
+  ├─ 플레이어가 멀리서 봄
+  ├─ 디테일 덜 중요
+  └─ 압축해도 품질 문제 없음
+```
+
+---
+
+## 📋 압축 가이드라인
+
+### 플레이어 캐릭터
+
+```
+BP_Kick 같은 주인공
+  ├─ 카메라 가까이
+  ├─ 항상 화면에 큼
+  └─ Max Texture Size: 0 (압축 안 함)
+
+✅ 메모리를 더 써도 괜찮음
+```
+
+### 배경 오브젝트
+
+```
+BP_JetFuel 같은 픽업 아이템
+  ├─ 카메라에서 멀리
+  ├─ 화면에 작게 보임
+  └─ Max Texture Size: 512~1024
+
+✅ 적극적으로 압축 가능
+```
+
+### 압축 수준 선택
+
+```
+원본 크기의 절반부터 시작
+  ↓
+게임에서 테스트
+  ↓
+품질 괜찮으면 더 압축
+  ↓
+품질 나쁘면 압축 줄이기
+```
+
+---
+
+## ⚠️ 텍스처 스트리밍 풀 경고
+
+### 경고 메시지
+
+```
+"Texture Streaming Pool Over Budget"
+  ↓
+의미: 텍스처가 너무 많은 메모리 사용
+  ↓
+해결: 텍스처 압축
+```
+
+### 해결 방법
+
+```
+1. Size Map으로 큰 텍스처 찾기
+2. 덜 중요한 것부터 압축
+3. 경고 사라질 때까지 반복
+```
+
+---
+
+## 🎓 핵심 정리
+
+### 텍스처 압축 원리
+
+```
+Max Texture Size 설정
+  ├─ 0 = 압축 없음 (원본)
+  ├─ 1024 = 최대 1024x1024
+  └─ 512 = 최대 512x512
+
+효과
+  ├─ 메모리 사용량 감소
+  ├─ 게임 용량 감소
+  └─ 화질 약간 저하
+```
+
+### 압축 전략
+
+```
+1. Size Map으로 메모리 사용량 확인
+2. 카메라 거리 고려
+   ├─ 가까움 → 적게 압축
+   └─ 멀리 → 많이 압축
+3. 압축 후 게임 내 테스트
+4. 품질과 용량 균형 맞추기
+```
+
+### 압축 수치 기억하기
+
+```
+2의 배수 사용
+  4096 (4K 이상)
+    ↓
+  2048 (4K)
+    ↓
+  1024 (2K)
+    ↓
+  512 (하프K)
+    ↓
+  256 (쿼터K)
+```
+
+### 실전 팁
+
+```
+✅ 플레이어 캐릭터: 압축 최소화
+✅ 배경 오브젝트: 적극 압축
+✅ Engine Content: 수정 안 함
+✅ 항상 게임 내 테스트
+✅ Size Map 수시로 확인
+```
+
+---
+
+## 🚀 다음 단계
+
+다음 영상에서는 BP_JetFuel을 3.1MB에서 2MB로 더 줄이는 방법을 다룹니다.
+
+```
+추가 최적화 방법
+  ├─ 불필요한 텍스처 제거
+  ├─ 머티리얼 최적화
+  └─ 메시 최적화
+```
+
+# { 🚀 지연 로딩으로 메모리 더 줄이기 }
+
+## 🎯 목표
+
+필요할 때만 에셋을 로드하는 **지연 로딩(Lazy Loading)** 기법으로 BP_JetFuel을 3.1MB에서 2.7MB로 더 줄입니다.
+
+---
+
+## 📊 현재 상황 복습
+
+### 지난 영상에서 한 일
+
+```
+BP_JetFuel 최적화
+  ├─ 텍스처 압축
+  │   ├─ Before: 81.5MB
+  │   └─ After: 3.1MB
+  └─ 여전히 큰 부분: Niagara System (0.88MB)
+```
+
+### Engine Content 관리
+
+```
+Settings → Show Engine Content 체크 해제
+  ↓
+엔진 폴더가 숨겨짐
+  └─ 실수로 엔진 파일 수정 방지
+```
+
+**Engine Content란?**
+
+- 언리얼 엔진 기본 제공 파일
+- 수정하면 다른 프로젝트에도 영향
+- 가급적 건드리지 않음
+
+---
+
+## 🔍 추가 최적화 대상 찾기
+
+### Size Map 분석
+
+```
+BP_JetFuel (3.1MB)
+  ├─ Static Mesh: 2.7MB (빨간색 사각형)
+  │   └─ 텍스처는 최대한 압축함
+  └─ NS_FuelPickup: 0.88MB (보라색 사각형)
+      └─ Niagara System (파티클 효과)
+```
+
+### 문제점
+
+```
+Niagara System이 메모리 차지
+  ├─ 게임 시작하자마자 로드됨
+  ├─ 하지만 바로 필요하지 않음
+  └─ 연료 픽업을 먹을 때만 필요
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380773/notion-blog/_/_/_5_/_8_-_3D_-_8/image_19.png)
+
+---
+
+## 💡 지연 로딩 개념
+
+### 지연 로딩(Lazy Loading)이란?
+
+**필요할 때까지 기다렸다가 로드하는 방식**
+
+```
+일반 로딩 (지금 상태)
+  게임 시작
+    ↓
+  BP_JetFuel 로드
+    ↓
+  Niagara System도 즉시 로드 ❌
+    └─ 사용 안 해도 메모리 차지
+
+지연 로딩 (목표)
+  게임 시작
+    ↓
+  BP_JetFuel 로드
+    ↓
+  Niagara System은 아직 로드 안 함 ✅
+    ↓
+  플레이어가 연료 픽업과 충돌
+    ↓
+  그때 Niagara System 로드
+```
+
+### 실제 사례
+
+```
+30분 동안 제트팩 안 쓰는 경우
+  ├─ 연료 픽업을 볼 일 없음
+  ├─ Niagara 효과 필요 없음
+  └─ 메모리 낭비!
+
+지연 로딩 적용 시
+  └─ 30분 동안 0.88MB 절약
+```
+
+---
+
+## 🔧 하드 레퍼런스 vs 소프트 레퍼런스
+
+### 현재 상태: Hard Reference
+
+```
+BP_JetFuel → HandlePickup 함수
+  └─ Spawn System at Location
+      └─ System Template: NS_FuelPickup
+          (직접 선택됨 = 하드 레퍼런스)
+```
+
+**하드 레퍼런스 특징**
+
+```
+에셋을 직접 선택
+  ↓
+Blueprint 로드될 때
+  ↓
+선택된 에셋도 즉시 로드
+  └─ 메모리에 항상 존재
+```
+
+### 목표: Soft Object Reference
+
+**파일 경로만 저장, 실제 로드는 나중에**
+
+```
+Soft Object Reference
+  ├─ 실제 에셋이 아님
+  ├─ 파일 경로만 저장
+  └─ 필요할 때 경로로 찾아서 로드
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380774/notion-blog/_/_/_5_/_8_-_3D_-_8/image_20.png)
+
+---
+
+## 🛠️ 소프트 레퍼런스로 변경하기
+
+### 1단계: 변수로 승격
+
+```
+HandlePickup 함수 열기
+  ↓
+Spawn System at Location 노드의
+System Template 입력 우클릭
+  ↓
+Promote to Variable (변수로 승격)
+  ↓
+변수 이름: PickupEffect
+```
+
+**Promote to Variable이란?**
+
+- 직접 연결된 값을 변수로 만드는 기능
+- 나중에 타입 변경 가능
+
+### 2단계: Soft Object Reference로 변경
+
+```
+Variables 패널에서 PickupEffect 선택
+  ↓
+Details → Variable Type 드롭다운
+  ↓
+하단의 "Change to" 섹션
+  ├─ Object Reference (현재 - 파란색)
+  ├─ Class Reference (보라색)
+  ├─ Soft Object Reference ✅ (하늘색)
+  └─ Soft Class Reference (하늘색)
+
+Soft Object Reference 선택
+```
+
+### 타입별 색상
+
+```
+파란색 = Object Reference (일반)
+보라색 = Class Reference (클래스용)
+하늘색 = Soft Reference (지연 로딩용)
+```
+
+### 3단계: 연결 끊어짐 처리
+
+```
+경고: "연결이 끊어질 수 있음"
+  ├─ 데이터 타입이 달라짐
+  └─ Spawn System 노드와 호환 안 됨
+
+OK 클릭
+  ↓
+PickupEffect 변수가 하늘색으로 변경
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380774/notion-blog/_/_/_5_/_8_-_3D_-_8/image_21.png)
+
+---
+
+## 🔄 타입 변환 노드
+
+### 변환이 필요한 이유
+
+```
+Spawn System at Location 노드
+  ├─ 필요: Object Reference (파란색)
+  └─ 현재: Soft Object Reference (하늘색)
+  ⚠️ 직접 연결 불가능
+```
+
+### 변환 노드 만들기
+
+```
+PickupEffect 변수 드래그
+  ↓
+Spawn System 노드에 연결 시도
+  ↓
+자동 생성: Convert 노드
+  └─ 정식 이름: "Soft Object Reference to Object Reference"
+```
+
+**Convert 노드 기능**
+
+```
+입력: Soft Object Reference (파일 경로)
+  ↓
+확인: 에셋이 메모리에 있는지?
+  ├─ 로드됨 → Object Reference 반환
+  └─ 안 로드됨 → null (아무것도 없음)
+```
+
+---
+
+## ⚠️ 문제 확인
+
+### 테스트 1: 에디터 재시작 전
+
+```
+Play 버튼
+  ↓
+연료 픽업과 충돌
+  ↓
+효과 정상 작동 ✅
+  └─ 이유: 에디터가 이미 메모리에 로드함
+```
+
+### 테스트 2: 에디터 재시작 후
+
+```
+프로젝트 닫기 → 다시 열기
+  ↓
+Play 버튼
+  ↓
+연료 픽업과 충돌
+  ↓
+효과 안 나옴 ❌
+  └─ 이유: Niagara가 메모리에 없음!
+```
+
+### 원인 분석
+
+```
+Soft Object Reference는
+  ├─ 파일 경로만 저장
+  └─ 자동으로 로드하지 않음
+
+Convert 노드는
+  ├─ 이미 로드된 것만 변환
+  └─ 안 로드된 건 null 반환
+
+해결책
+  └─ 수동으로 로드해야 함!
+```
+
+---
+
+## 🔧 해결 방법 1: Load Asset (Blocking)
+
+### 블로킹 로드란?
+
+**에셋을 로드할 때까지 게임이 멈춤**
+
+```
+Blocking Call (차단 호출)
+  ├─ 로딩 시작
+  ├─ 로딩 완료될 때까지 대기
+  ├─ 게임이 일시 정지 (freeze)
+  └─ 로딩 완료 후 계속 진행
+```
+
+### 구현 방법
+
+```
+HandlePickup 함수
+
+Is Valid 노드 추가
+  ├─ Input: PickupEffect (Convert 후)
+  ├─ Is Valid: 이미 로드됨 → 시스템 스폰
+  └─ Is Not Valid: 아직 안 로드됨
+      ↓
+      Load Asset (Blocking) 노드
+        ├─ Input: PickupEffect (Soft Reference)
+        ├─ Return: Object Reference
+        └─ 로딩 완료될 때까지 대기
+      ↓
+      Convert 노드 (다시)
+      ↓
+      Spawn System at Location
+```
+
+**Is Valid 노드란?**
+
+- 값이 유효한지(존재하는지) 확인
+- 두 개의 실행 핀
+  - Is Valid: 값 있음
+  - Is Not Valid: null (값 없음)
+
+### 실행 흐름
+
+```
+첫 번째 충돌
+  ├─ Is Valid 체크 → Not Valid
+  ├─ Load Asset (Blocking) 실행
+  │   └─ 게임 일시 정지 (짧게)
+  ├─ Niagara 로드 완료
+  └─ 효과 스폰
+
+두 번째 충돌
+  ├─ Is Valid 체크 → Valid
+  ├─ 이미 로드됨
+  └─ 바로 효과 스폰
+```
+
+### 장단점
+
+```
+✅ 장점
+  ├─ 구현 간단
+  └─ 확실하게 로드됨
+
+❌ 단점
+  ├─ 게임이 잠깐 멈춤 (hitching)
+  └─ 중요한 순간에 사용 시 문제
+```
+
+### 사용 적합한 경우
+
+```
+로딩 화면 있을 때
+  ├─ "Loading..." 표시
+  ├─ 로딩 바 표시
+  └─ 사용자가 대기 예상
+
+게임 중에는 비추천
+  └─ 끊김 현상 발생
+```
+
+---
+
+## 🚀 해결 방법 2: Async Load Asset (비동기)
+
+### 비동기 로딩이란?
+
+**백그라운드에서 로드하면서 게임은 계속 진행**
+
+```
+Async Call (비차단 호출)
+  ├─ 로딩 시작
+  ├─ 다른 스레드에서 로딩
+  ├─ 게임은 계속 진행 ✅
+  └─ 로딩 완료되면 알림
+```
+
+**스레드(Thread)란?**
+
+- CPU가 작업을 처리하는 통로
+- 여러 스레드 = 여러 작업 동시 진행
+- 메인 스레드: 게임 실행
+- 로딩 스레드: 에셋 로드
+
+### 함수에서 사용 불가
+
+```
+⚠️ Async Load Asset은 Latent 노드
+  ├─ 시간이 걸리는 작업
+  ├─ 완료 핀이 있음
+  └─ 함수에서 사용 불가
+
+함수는
+  ├─ 즉시 완료되어야 함
+  └─ Delay, Timeline 등도 사용 불가
+
+해결책
+  └─ Custom Event로 만들기
+```
+
+### 1단계: Custom Event 만들기
+
+```
+Event Graph (이벤트 그래프)
+  ↓
+우클릭 → Add Custom Event
+  ↓
+이름: LoadPickupEffect
+```
+
+**Custom Event란?**
+
+- 직접 만드는 이벤트
+- Call 노드로 어디서든 호출 가능
+- Latent 노드 사용 가능
+
+### 2단계: Async Load Asset 노드
+
+```
+PickupEffect 변수 드래그
+  ↓
+검색: "async load"
+  ↓
+Async Load Asset 선택
+```
+
+**노드 구조**
+
+```
+Async Load Asset
+  ├─ 입력
+  │   └─ Asset (Soft Object Reference)
+  ├─ 출력 실행 핀 (2개)
+  │   ├─ [빈 핀]: 즉시 실행 (로딩 시작)
+  │   └─ Completed: 로딩 완료 후 실행
+  └─ 출력 값
+      └─ Loaded Object
+```
+
+### 3단계: 완료 후 스폰
+
+```
+Completed 핀
+  ↓
+PickupEffect 변수 → Resolve Soft Object Reference
+  ↓
+Spawn System at Location
+  ├─ System Template: (연결)
+  ├─ Location: GetActorLocation
+  └─ Rotation: (0,0,0)
+```
+
+**Resolve Soft Object Reference란?**
+
+- Convert와 같은 기능
+- Soft → Object Reference 변환
+- 하지만 이름이 다름
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380774/notion-blog/_/_/_5_/_8_-_3D_-_8/image_22.png)
+
+### 4단계: HandlePickup에서 호출
+
+```
+HandlePickup 함수
+
+Is Valid
+  ├─ Is Valid → 기존 로직 (스폰)
+  └─ Is Not Valid
+      ↓
+      LoadPickupEffect (Custom Event 호출)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380774/notion-blog/_/_/_5_/_8_-_3D_-_8/image_23.png)
+
+---
+
+## 📊 실행 흐름 비교
+
+### Blocking 방식
+
+```
+연료 충돌
+  ↓
+Is Not Valid
+  ↓
+Load Asset (Blocking) 시작
+  ↓
+⏸️ 게임 일시 정지
+  ↓
+로딩 완료 (0.1초?)
+  ↓
+▶️ 게임 재개
+  ↓
+효과 스폰
+```
+
+### Async 방식
+
+```
+연료 충돌
+  ↓
+Is Not Valid
+  ↓
+LoadPickupEffect 호출
+  ↓
+Async Load Asset 시작
+  ├─ [빈 핀] 즉시 실행 (아무것도 안 함)
+  └─ 백그라운드 로딩 시작
+
+▶️ 게임 계속 진행 (플레이어 조작 가능)
+
+(0.1초 후)
+Completed 핀 실행
+  ↓
+효과 스폰
+```
+
+### 실제 체감
+
+```
+Blocking
+  └─ 충돌 → (짧은 멈춤) → 효과
+
+Async
+  └─ 충돌 → (약간 늦게) → 효과
+      └─ 멈춤 없음!
+```
+
+---
+
+## 🎮 완성된 코드 구조
+
+### HandlePickup 함수
+
+```
+Event → HandlePickup 함수 시작
+  ↓
+PickupEffect → Convert → Is Valid
+  ├─ Is Valid (이미 로드됨)
+  │   ├─ Print String: "Already Loaded"
+  │   ├─ Resolve Soft Reference
+  │   └─ Spawn System at Location
+  │
+  └─ Is Not Valid (아직 안 로드됨)
+      └─ LoadPickupEffect (호출)
+```
+
+### LoadPickupEffect Event
+
+```
+Event → LoadPickupEffect
+  ↓
+Async Load Asset
+  ├─ Asset: PickupEffect
+  ├─ [빈 핀]: (사용 안 함)
+  └─ Completed
+      ↓
+      Resolve Soft Reference
+      ↓
+      Spawn System at Location
+```
+
+---
+
+## 🧪 테스트
+
+### 준비
+
+```
+1. 모든 것 저장
+2. 에디터 닫기
+3. 프로젝트 다시 열기
+   └─ 메모리 완전히 비우기
+```
+
+### 첫 번째 충돌
+
+```
+Play → 연료 픽업 충돌
+  ├─ Is Not Valid 실행
+  ├─ Async Load 시작
+  ├─ 게임 계속 진행 ✅
+  └─ 약간의 지연 후 효과 표시
+      └─ 지연 거의 눈에 안 띔
+```
+
+### 두 번째 충돌
+
+```
+다른 연료 픽업 충돌
+  ├─ "Already Loaded" 메시지 표시
+  ├─ Is Valid 실행
+  └─ 즉시 효과 표시
+```
+
+---
+
+## 📊 최종 결과
+
+### Size Map 확인
+
+```
+BP_JetFuel
+  Before: 3.1MB
+    ├─ Static Mesh: 2.7MB
+    └─ Niagara: 0.88MB
+
+  After: 2.7MB
+    └─ Static Mesh: 2.7MB
+    └─ Niagara: 사라짐! ✅
+```
+
+### Niagara가 사라진 이유
+
+```
+Size Map은
+  └─ "현재 메모리에 있는 것"만 표시
+
+Soft Reference는
+  ├─ 파일 경로만 저장
+  └─ 메모리에 없음
+
+충돌 시에만
+  └─ 동적으로 로드됨
+```
+
+### 전체 최적화 과정
+
+```
+원본: 81.5MB
+  ↓ (텍스처 압축)
+중간: 3.1MB
+  ↓ (지연 로딩)
+최종: 2.7MB
+
+총 감소: 약 30배! 🎉
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380774/notion-blog/_/_/_5_/_8_-_3D_-_8/image_24.png)
+
+---
+
+## 💡 추가 최적화 가능
+
+### MetaSound도 지연 로딩 가능
+
+```
+HandlePickup에서
+  └─ Play Sound (37kB)
+      └─ Soft Reference로 변경 가능
+
+하지만
+  └─ 37kB는 매우 작음
+  └─ 선택 사항
+```
+
+---
+
+## 🎓 핵심 정리
+
+### Hard Reference vs Soft Reference
+
+```
+Hard Reference (일반)
+  ├─ Blueprint 로드 시 즉시 로드
+  ├─ 메모리 항상 차지
+  ├─ 사용: 자주 쓰는 에셋
+  └─ 색상: 파란색
+
+Soft Object Reference (지연)
+  ├─ 파일 경로만 저장
+  ├─ 필요할 때 수동 로드
+  ├─ 사용: 가끔 쓰는 에셋
+  └─ 색상: 하늘색
+```
+
+### 로딩 방식 비교
+
+```
+Load Asset (Blocking)
+  ✅ 간단함
+  ✅ 확실함
+  ❌ 게임 멈춤
+  사용: 로딩 화면
+
+Async Load Asset
+  ✅ 게임 안 멈춤
+  ✅ 자연스러움
+  ❌ 약간 복잡
+  ❌ Event Graph 필요
+  사용: 게임 중
+```
+
+### 변환 노드들
+
+```
+Convert (자동 생성)
+  └─ Soft → Object 변환
+  └─ 안 로드된 건 null
+
+Resolve Soft Reference (수동)
+  └─ Soft → Object 변환
+  └─ 이름만 다름
+```
+
+### 최적화 전략
+
+```
+1. Size Map으로 큰 에셋 찾기
+2. 자주 안 쓰는 에셋 확인
+3. Soft Reference로 변경
+4. Async Load로 지연 로딩
+5. 첫 사용 시에만 로드
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 함수 vs Event Graph
+
+```
+❌ 함수에서는
+  └─ Latent 노드 사용 불가
+      ├─ Async Load
+      ├─ Delay
+      └─ Timeline
+
+✅ Event Graph에서만
+  └─ Latent 노드 사용 가능
+```
+
+### 언제 지연 로딩?
+
+```
+적합한 경우
+  ├─ 가끔 사용하는 에셋
+  ├─ 큰 에셋 (1MB+)
+  ├─ 선택적 기능
+  └─ 나중에 필요한 것
+
+부적합한 경우
+  ├─ 항상 사용
+  ├─ 매우 작은 에셋 (<100KB)
+  ├─ 즉시 필요
+  └─ 게임 시작 필수
+```
+
+### 테스트 필수
+
+```
+반드시 확인
+  ├─ 에디터 재시작 후 테스트
+  ├─ 첫 로딩 지연 확인
+  ├─ 두 번째부터 즉시 작동 확인
+  └─ 게임 멈춤 없는지 확인
+```
+
+---
+
+## 🚀 다음 단계
+
+이번 영상에서 배운 고급 기법:
+
+- ✅ Soft Object Reference
+- ✅ Async Load Asset
+- ✅ Custom Event 활용
+- ✅ 지연 로딩 최적화
+
+**이것은 고급 주제입니다!**
+
+- 초보자가 완전히 이해 못 해도 괜찮음
+- 나중에 필요할 때 다시 보기
+- 개념만 알아두기
+
+---
+
+## 📝 실습 체크리스트
+
+```
+□ Hard Reference를 Soft로 변경
+□ Custom Event 생성
+□ Async Load Asset 노드 사용
+□ Is Valid로 로드 여부 확인
+□ 에디터 재시작 후 테스트
+□ Size Map에서 결과 확인
+□ 첫/두 번째 충돌 차이 확인
+```
+
+수고하셨습니다! 🎉
+
+\

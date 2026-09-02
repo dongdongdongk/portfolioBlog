@@ -1,0 +1,676 @@
+---
+title: '섹션 3: Game Architecture Overview & 섹션 4: Project Setup'
+date: '2026-09-02'
+category: '게임 개발/2D 로그라이크 던전 슈팅 게임'
+tags: ['게임 개발', '2D 로그라이크 던전 슈팅 게임']
+draft: false
+summary: ''
+---
+
+# { 게임 아키텍처 개요 }
+
+```csharp
+1. 게임 아키텍처 및 코스 개요
+
+		전체 강의 흐름 및 섹션별 목표 설명
+
+		던전 구조, 플레이어/적, UI, 시스템 등을 나누어 모듈화
+
+2. 던전 룸 편집기 개발
+
+		커스텀 에디터 창에서 노드를 생성하고 연결
+
+		노드 기반 던전 그래프 생성 및 ScriptableObject로 저장
+
+		각 노드는 방의 역할(시작방, 보스방 등)을 담당
+
+3. 메인 씬 구성
+
+		메인 게임 장면을 구성하고 카메라(Cinemachine) 설정
+
+		픽셀 퍼펙트 설정을 통해 복고풍 픽셀아트 유지
+
+		메인 카메라, 플레이어, UI 등 핵심 구성요소 배치
+
+4. 던전 방 템플릿 제작
+
+		타일맵과 팔레트를 사용하여 다양한 방 디자인
+
+		방의 유형과 설정을 ScriptableObject로 정의
+
+		몬스터 스폰 위치, 문 위치 등 포함
+
+5. 던전 생성 시스템 구현
+
+		던전 그래프에 따라 실제 타일맵 방들을 배치
+
+		룸 프리팹을 불러와 씬에 배치
+
+		무작위성(Randomness)과 고정 시드 사용 가능
+
+6. 플레이어 캐릭터 구현
+
+		이동, 회피, 무기 장착, 애니메이션 처리
+
+		Rigidbody2D 및 Input System 기반
+
+		능력치를 ScriptableObject로 분리하여 관리
+
+7. 문과 조명 시스템
+
+		방 입장 시 자동으로 문이 닫히고 클리어 시 열림
+
+		라이트 2D 시스템을 이용해 분위기 있는 조명 구현
+
+		미탐색 지역 어둡게 처리
+
+8. 오브젝트 풀링 시스템
+
+		탄환, 피격 이펙트 등 반복 생성되는 오브젝트를 풀링
+
+		성능 최적화를 위한 재사용 메커니즘 구현
+
+9. 무기 및 탄약 시스템
+
+		무기와 탄약을 ScriptableObject로 정의
+
+		발사 속도, 탄환 속도, 재장전 시간 등 속성 설정
+
+		UI에 현재 탄약 수 표시
+
+10. 사운드 시스템 구현
+
+		효과음(AudioClip)을 ScriptableObject로 관리
+
+		무기 발사, 적 피격, 문 열림 등 다양한 상황에 연결
+
+		사운드 매니저를 통해 재생 제어
+
+11. 미니맵 시스템
+
+		별도의 미니맵 카메라로 맵 일부를 RenderTexture에 렌더링
+
+		플레이어 위치와 탐색 방 표시
+
+		미탐색 영역은 숨김 처리
+
+12. 무기 이펙트
+
+		탄환 발사 시 입자 시스템 사용
+
+		적 피격 시 피격 이펙트 발생
+
+		특수 탄환 이펙트 구현 가능
+
+13. 적 캐릭터 및 AI 구현
+
+		다양한 적 캐릭터의 이동/공격 방식 구현
+
+		구성 요소 기반 패턴 설정
+
+		애니메이션, 무기 장착 등 플레이어 구조 재사용
+
+14. 길찾기 알고리즘 (A*)
+
+		타일맵 기반 A* 경로 탐색 구현
+
+		장애물 회피 및 최단 경로 계산
+
+		우선 순위 큐와 노드 비용 기반
+
+15. 전투 룸 제어 시스템
+
+		플레이어가 방에 진입 시 문을 닫고 적 생성
+
+		모든 적 처치 시 문 열기
+
+		적 생성 시 셰이더를 활용한 등장 연출
+
+16. 적 무기/탄약
+
+		플레이어 무기 시스템을 활용해 적 무기 구현
+
+		탄환 패턴 커스터마이징 가능 (예: 원형, 지그재그 등)
+
+		적 공격도 풀링 시스템 적용
+
+17. 체력 및 데미지 처리
+
+		플레이어와 적 모두에 체력 시스템 적용
+
+		무기/충돌 시 데미지 계산
+
+		회피 중 무적 프레임 구현
+
+18. 던전 탐험 및 보스방 구조
+
+		룸을 하나씩 클리어하며 보스방으로 이동
+
+		보스 처치 시 게임 클리어 및 다음 레벨 진입
+
+		난이도 조정 기능 포함
+
+19. 던전 꾸미기 요소
+
+		불꽃, 상자, 배경 오브젝트 등 추가
+
+		파괴 가능한 오브젝트 구현
+
+		셰이더를 이용한 불꽃 애니메이션
+
+20. 보상 상자 시스템
+
+		적 제거 후 확률 또는 조건에 따라 상자 생성
+
+		상자에서 무기, 탄약, 체력 등 드랍
+
+		자동 생성 위치 설정 가능
+
+21. 던전 전체 맵 구현
+
+		전체 던전 구조를 확인할 수 있는 맵 화면
+
+		미니맵에서 키 입력 시 전체 맵으로 전환
+
+		클릭 이동 기능으로 빠른 룸 이동 가능
+
+22. 음악 시스템
+
+		상황(전투/비전투/보스)에 따라 음악 변경
+
+		AudioMixer Snapshot을 사용해 부드러운 전환
+
+		BGM도 ScriptableObject로 관리
+
+23. 일시정지 메뉴
+
+		ESC 키를 눌러 게임을 일시정지
+
+		설정창에서 볼륨 조절, 게임 재시작 가능
+
+		설정 저장 기능 포함
+
+24. 메인 메뉴 시스템
+
+		캐릭터 선택, 최고 점수 확인, 게임 방법 안내
+
+		저장된 데이터를 불러와 게임 시작
+
+		종료 및 설정 메뉴 포함
+
+```
+
+# { 초기 프로젝트 생성 및 설정 }
+
+```csharp
+이 강의는 유니티(Unity)에서 새로운 프로젝트를 설정하고, 필요한 패키지를 설치하며, 프로젝트 환경을 구성하는 과정을 다룹니다.
+```
+
+## 1. 새 프로젝트 생성
+
+```csharp
+Unity Hub에서 시작:
+
+		Unity Hub에서 New 버튼을 클릭하여 새 프로젝트를 생성.
+
+		사용 중인 유니티 버전 확인 (강의에서는 2021.1.7f1 사용).
+
+		템플릿 선택: 2D 템플릿 선택 (Universal Render Pipeline(URP)은 나중에 수동으로 추가).
+
+		프로젝트 이름 설정 (예: Dungeon Gunner) 및 저장 위치 선택 후 Create 클릭.
+
+개념:
+
+		Unity Hub: 유니티 프로젝트와 버전을 관리하는 도구.
+
+		2D 템플릿: 2D 게임 개발에 최적화된 기본 설정 제공.
+
+		URP(Universal Render Pipeline): 유니티의 최신 렌더링 파이프라인으로, 성능 최적화와 다양한 플랫폼 지원.
+```
+
+## 2. 패키지 관리
+
+```csharp
+패키지 관리자(Package Manager):
+
+		Window > Package Manager로 이동.
+
+		프로젝트에 설치된 패키지 확인 및 관리.
+
+
+		불필요한 패키지 제거:
+
+				2D Animation, 2D Pixel Perfect (URP와 호환 안 됨), 2D PSD Importer, 2D Sprite Shape, Timeline,
+
+				Unity Collaborate, Visual Studio Code Editor, Test Framework 제거.
+
+
+		필요한 패키지 유지:
+
+				2D Sprite, 2D Tilemap Editor, TextMeshPro, Unity UI, Visual Studio Editor.
+
+
+		새 패키지 추가:
+
+				2D Tilemap Extras: 타일맵에 추가 기능(예: 랜덤 브러시) 제공.
+
+				Cinemachine: 카메라 제어 및 애니메이션 도구.
+
+				Universal Render Pipeline (URP): 성능 최적화 및 2D 라이트 기능 제공. ( 최근에는 기본적으로 이걸 사용 )
+
+개념:
+
+		패키지 관리자: 유니티에서 외부 라이브러리와 도구를 설치/제거하는 도구.
+
+		Cinemachine: 카메라 움직임을 부드럽게 제어하며, 2D/3D 게임에서 유용.
+
+		2D Tilemap Extras: 타일맵 편집을 위한 추가 도구(랜덤 브러시 등).
+```
+
+## 3. URP 설정
+
+```csharp
+무엇을 하는 건가요?
+
+		유니티 프로젝트에서 **URP(Universal Render Pipeline)**를 사용하려면,
+
+		렌더링 설정을 저장하는 특별한 파일(자산)을 만들어야 합니다.
+
+		이 과정은 유니티가 게임의 그래픽을 어떻게 그릴지(렌더링) 결정하는 기반을 마련합니다.
+
+
+URP 자산 생성:
+
+		Assets 폴더에 Rendering 하위 폴더 생성.
+
+		Create > Rendering > Universal Render Pipeline > Pipeline Asset (2D Renderer) 선택.
+
+		생성된 URP 자산과 2D Renderer Data 확인.
+
+설정 변경:
+
+		무엇을 하는 건가요?
+
+		생성한 URP 자산의 설정을 조정해 2D 게임에 맞게 최적화합니다.
+
+		이 설정은 게임의 시각적 표현(스프라이트 순서, 그림자, 효과 등)을 결정합니다.
+
+단계별 설명:
+
+		1. Cast Shadows 비활성화:
+
+				Cast Shadows는 물체가 그림자를 만드는 기능입니다.
+
+				2D 게임에서는 그림자가 필요 없는 경우가 많아 비활성화하여 성능을 절약합니다.
+
+				예: 2D 캐릭터가 그림자를 드리우지 않아도 게임플레이에 문제없다면 꺼놓는 게 좋습니다.
+
+
+		2. Transparency Sort Mode를 Custom Axis로 변경 (X=0, Y=1, Z=0):
+
+				Transparency Sort Mode는 2D 게임에서 스프라이트(이미지)의 그려지는 순서를 결정합니다.
+
+				기본 설정에서는 스프라이트가 이상한 순서로 겹쳐질 수 있습니다(예: 캐릭터가 배경 뒤로 숨음).
+
+				**Custom Axis (Y축 기준)**로 변경하면, 화면 아래쪽(Y값이 낮은) 스프라이트가 위에, 위쪽(Y값이 높은) 스프라이트가 뒤에 그려집니다.
+
+				예: 캐릭터가 맵 아래쪽에 있을 때 항상 앞에 보이게 됩니다.
+
+
+		3. Post Processing 활성화:
+
+				Post Processing은 게임 화면에 추가적인 시각 효과(예: 블룸, 색 보정)를 적용하는 기능입니다.
+
+				2D 게임에서 분위기를 더 멋지게 만들기 위해 사용합니다(예: 빛이 퍼지는 효과).
+
+
+		Project Settings > Graphics에서 생성한 URP 자산을 Scriptable Render Pipeline Settings에 드래그하여 설정.
+
+개념:
+
+		URP 자산: 렌더링 파이프라인 설정을 저장하는 파일.
+
+		Transparency Sort Mode: 2D 게임에서 스프라이트의 렌더링 순서를 결정 (Y축 정렬로 화면 위쪽 스프라이트가 뒤로, 아래쪽이 앞으로).
+
+		Post Processing: 화면에 후처리 효과(블룸, 색 보정 등)를 추가하는 기능.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380405/notion-blog/_/2D_/_3_Game_Architecture_Overview_4_Project_Set/image.png)
+
+```csharp
+URP 를 설치해준다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380402/notion-blog/_/2D_/_3_Game_Architecture_Overview_4_Project_Set/image_1.png)
+
+```csharp
+새로운 에셋을 만들어준다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380403/notion-blog/_/2D_/_3_Game_Architecture_Overview_4_Project_Set/image_2.png)
+
+```csharp
+Cast Shadows 옵션은 필요없으니 꺼준다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380404/notion-blog/_/2D_/_3_Game_Architecture_Overview_4_Project_Set/image_3.png)
+
+```csharp
+또 다른 옵션 설정
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380404/notion-blog/_/2D_/_3_Game_Architecture_Overview_4_Project_Set/image_4.png)
+
+```csharp
+프로젝트 셋팅으로 가서 방금 설정한 에셋을 넣어준다 Renderer 말고
+```
+
+## 4. 코스 자산 가져오기
+
+```csharp
+자산 패키지 임포트:
+
+		CourseAssets.unitypackage 파일 다운로드 및 압축 해제.
+
+		Assets > Import Package > Custom Package로 이동하여 패키지 선택.
+
+		모든 자산 선택 후 Import 클릭.
+
+		임포트 후 Assets > CourseAssets 폴더에서 하위 폴더 확인 (다음 강의에서 세부 내용 다룸).
+
+개념:
+
+		Unitypackage: 유니티 프로젝트에서 자산(스프라이트, 스크립트 등)을 묶어 배포하는 파일 형식.
+
+		자산 관리: 프로젝트 내 자산은 폴더 구조로 관리되며, 체계적인 정리 중요.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380404/notion-blog/_/2D_/_3_Game_Architecture_Overview_4_Project_Set/image_5.png)
+
+```csharp
+에셋 패키지 임포트
+```
+
+## 5. 에디터 레이아웃 설정
+
+```csharp
+추천 레이아웃:
+
+		Hierarchy, Project, Inspector, Tile Palette, Console, Game View, Scene View 창 배치.
+
+		Project 창을 One Column Layout으로 변경 (폴더와 내용을 한 열로 보기).
+
+		Alt + 클릭으로 폴더 전체 확장/축소 가능.
+
+		레이아웃 저장: Window > Layouts > Save Layout에서 Course Layout으로 저장.
+
+개념:
+
+		에디터 레이아웃: 유니티 에디터의 창 배치를 사용자 맞춤으로 설정해 작업 효율성 증대.
+
+		One Column Layout: 프로젝트 창에서 폴더와 파일을 한 열로 간결하게 표시.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380404/notion-blog/_/2D_/_3_Game_Architecture_Overview_4_Project_Set/image_6.png)
+
+```csharp
+추천 하는 레이아웃 형태
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380404/notion-blog/_/2D_/_3_Game_Architecture_Overview_4_Project_Set/image_7.png)
+
+```csharp
+레이아웃 저장: Window > Layouts > Save Layout에서 Course Layout으로 저장.
+
+myLayout 으로 나는 저장했음
+```
+
+# { 코스 자산(Course Assets) }
+
+```csharp
+코스 자산은 Unity 게임 개발을 위해 제공되는 필수 리소스로, 게임 제작 과정에서 필요한 다양한 파일과 설정을 포함한다.
+
+자산 사용 시 라이선스를 확인해야 하며, 이는 과정 리소스에서 다운로드 가능하다.
+
+주요 개념:
+
+		코스 자산은 게임 개발에 필요한 템플릿, 설정, 리소스(애니메이션, 텍스처, 타일맵 등)를 제공하여 개발 효율성을 높인다.
+
+		자산은 Unity 프로젝트의 Assets 폴더에 저장되며, 각 폴더는 특정 기능을 담당한다.
+
+```
+
+## 자산 폴더별 정리
+
+### (1) Layers 폴더
+
+```csharp
+(1) Layers 폴더
+
+		내용: Tag Manager Preset(태그 매니저 사전 설정) 포함.
+
+		주요 파일: 레이어, 정렬 레이어(Sorting Layers), 태그(Tags) 설정.
+
+사용 목적:
+
+		레이어(Layers): 게임 오브젝트를 분리하여 처리.
+
+				예: 물리 시스템(2D Physics)에서 충돌 제어.
+
+				예: 카메라가 특정 레이어만 렌더링하도록 설정.
+
+		정렬 레이어(Sorting Layers): 스프라이트와 타일맵의 렌더링 순서를 결정.
+
+				목록 하단의 레이어가 상단에 렌더링됨.
+
+		태그(Tags): 게임 오브젝트를 식별(예: 특정 타일맵 레이어 식별).
+
+활용 방법:
+
+		Unity의 Inspector > Layer Dropdown > Edit Layers에서 확인/설정.
+
+		Tag Manager Preset을 적용해 레이어와 태그를 빠르게 설정, 오타 방지.
+
+개념 정리:
+
+		레이어: 물리, 렌더링, 카메라 등을 관리하기 위한 분류 체계.
+
+		정렬 레이어: 2D 게임에서 오브젝트의 전/후방 렌더링 순서 제어.
+
+		태그: 특정 오브젝트를 코드나 장면에서 식별하는 라벨.
+```
+
+### (2) Animations 폴더
+
+```csharp
+내용: 애니메이터 컨트롤러(Animator Controller)와 애니메이션 클립(Animation Clips).
+
+주요 파일: 예: Skull Face 애니메이터 컨트롤러와 관련 클립.
+
+사용 목적:
+
+		애니메이터 컨트롤러: 애니메이션 상태 전환 및 재생 관리.
+
+		애니메이션 클립: 특정 동작(예: 이동, 대기)을 정의.
+
+활용 방법:
+
+		**더미 게임 오브젝트(Dummy GameObject)**를 만들어 애니메이션 테스트.
+
+				예: Skull Face 오브젝트에 애니메이터 컴포넌트 추가.
+
+				애니메이터 창에서 상태와 클립 확인.
+
+		계층 구조: 애니메이션 클립이 기대하는 게임 오브젝트 계층(예: Hand, Weapon)을 맞춰야 함.
+
+		YAML 파일: 애니메이션 클립의 구조와 속성을 확인(예: Visual Studio로 열기).
+
+주의점:
+
+		스프라이트 렌더러(Sprite Renderer)와 2D 조명(Global Light 2D)이 없으면 애니메이션이 검정색으로 표시됨.
+
+		더미 오브젝트는 테스트 후 삭제.
+
+개념 정리:
+
+		애니메이터 컨트롤러: 애니메이션 상태 전환 로직을 관리.
+
+		애니메이션 클립: 특정 동작의 애니메이션 데이터.
+
+		Mechanim Animation System: Unity의 통합 애니메이션 시스템.
+```
+
+### (3) Fonts 폴더
+
+```csharp
+내용: Deluxe Font(픽셀 스타일, 오픈 소스 글꼴).
+
+사용 목적: 게임 내 텍스트 표시(예: UI, 대화).
+
+활용 방법: Unity의 TextMeshPro나 UI 시스템에 적용.
+
+개념 정리:
+
+		폰트: 게임의 시각적 스타일을 강화하는 텍스트 자산.
+```
+
+### (4) Materials 폴더
+
+```csharp
+내용: 스프라이트 렌더링에 사용되는 재료(Material).
+
+사용 목적:
+
+		**셰이더(Shader)**를 기반으로 텍스처와 스프라이트의 렌더링 효과 생성.
+
+		**Universal Render Pipeline(URP)**용 셰이더 그래프 활용.
+
+활용 방법: 스프라이트 렌더러에 재료 적용.
+
+개념 정리:
+
+		재료: 셰이더와 텍스처를 결합해 렌더링 효과를 정의.
+
+		셰이더: 렌더링 방식을 제어하는 프로그램.
+```
+
+### (5) Audio 폴더
+
+```csharp
+내용: 게임의 음악과 음향 효과.
+
+사용 목적: 게임 분위기와 상호작용 강화.
+
+활용 방법: Unity에서 오디오 파일 클릭 후 재생 버튼으로 미리보기.
+
+개념 정리:
+
+		오디오: 게임의 몰입감을 높이는 사운드 자산.
+```
+
+### (6) Textures 폴더
+
+```csharp
+내용: 게임의 스프라이트 텍스처(예: Skull Face 스프라이트).
+
+설정:
+
+		픽셀 단위(Pixels Per Unit): 16 (1 Unity 유닛 = 16픽셀).
+
+		필터 모드: 없음(앤티앨리어싱 비활성화, 픽셀 아트 선명도 유지).
+
+		압축: 비활성화(스프라이트 품질 유지).
+
+		스프라이트 모드:
+
+				단일 스프라이트: 1 텍스처 = 1 스프라이트.
+
+				다중 스프라이트: 1 텍스처에서 여러 스프라이트 분리(스프라이트 편집기 사용).
+
+스프라이트 아틀라스(Sprite Atlas):
+
+		여러 스프라이트를 하나의 텍스처로 묶어 드로우 콜(Draw Call) 감소.
+
+		생성: Create > 2D > Sprite Atlas, 스프라이트 폴더 추가 후 Pack Preview 확인.
+
+
+		**드로우 콜(Draw Call)**이란
+
+				게임 엔진(예: Unity)이 GPU에게 "이 오브젝트를 그려!"라고 명령하는 작업을 말합니다.
+
+				각 스프라이트나 텍스처를 렌더링할 때마다 드로우 콜이 발생하는데, 드로우 콜이 많아지면 성능이 저하될 수 있습니다.
+
+				스프라이트 아틀라스로 여러 스프라이트를 하나의 텍스처로 묶으면, 개
+
+개념 정리:
+
+		스프라이트: 2D 그래픽 자산.
+
+		스프라이트 아틀라스: 렌더링 효율성을 높이는 텍스처 묶음.
+```
+
+### (7) Tilemaps 폴더
+
+```csharp
+내용: 타일맵, 타일 자산, 타일 팔레트, 사용자 지정 브러시 스크립트(좌표 브러시).
+
+사용 목적:
+
+		타일맵: 2D 환경 구성(예: 바닥, 벽).
+
+		타일 팔레트: 타일 자산을 정리해 타일맵 편집.
+
+		좌표 브러시: 타일맵 내 위치 표시(유니티 제공, GitHub 출처).
+
+활용 방법:
+
+		타일 팔레트 탭에서 기존 팔레트 확인.
+
+		새 팔레트 생성: Tile Palette > Create New Palette, 스프라이트 추가.
+
+개념 정리:
+
+		타일맵: 타일을 격자에 배치해 2D 환경 구성.
+
+		타일 팔레트: 타일 자산을 관리하는 도구.
+```
+
+## 애니메이션 경로 맞춰서 출력하기 맛보기 실
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380406/notion-blog/_/2D_/_3_Game_Architecture_Overview_4_Project_Set/image_8.png)
+
+```csharp
+애니메이터에서 무브에 더블클릭해서 들어가면 나옴
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380406/notion-blog/_/2D_/_3_Game_Architecture_Overview_4_Project_Set/image_9.png)
+
+```csharp
+애니메이션으로 가서 클릭해보면 노란색으로 오브젝트를 찾지 못했다고 뜬다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380403/notion-blog/_/2D_/_3_Game_Architecture_Overview_4_Project_Set/image_10.png)
+
+```csharp
+anim 파일을 열어보면 경로가 어떻게 되어있는지 확인 가능하다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380403/notion-blog/_/2D_/_3_Game_Architecture_Overview_4_Project_Set/image_11.png)
+
+```csharp
+위의 열어본 파일을 체크하면서 경로에 맞게 ( WeaponRotationPoin 는 파일에만 적혀 있다 )
+
+구조를 만들어준다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380403/notion-blog/_/2D_/_3_Game_Architecture_Overview_4_Project_Set/image_12.png)
+
+```csharp
+2D 라이트를 추가해준다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380403/notion-blog/_/2D_/_3_Game_Architecture_Overview_4_Project_Set/image_13.png)
+
+```csharp
+정상적으로 출력되는 캐릭터의 움직임 ( 프리뷰 밑의 상태를 수정하면서 다른것도 확인 )
+```

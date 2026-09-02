@@ -1,0 +1,1162 @@
+---
+title: '섹션 14: Collectables & Traps (함정, 수집품) - 2 -'
+date: '2026-09-02'
+category: '게임 개발/Game Development in JS TS - The Complete Guide (w_'
+tags: ['게임 개발', 'Game Development in JS TS - The Complete Guide (w_']
+draft: false
+summary: ''
+---
+
+# { Phaser에서 객체의 속성 추출 및 적용 }
+
+```jsx
+이번 강의에서는 Phaser에서 객체(Object)의 속성을 추출하고 적용하는 방법을 배웁니다.
+
+이전 강의에서 레이어의 속성(Properties) 을 다룬 것처럼, 이번에는 게임 오브젝트(예: 다이아몬드)에도 속성을 적용하는 방법을 설명합니다.
+```
+
+## 1. 객체의 속성이란?
+
+```jsx
+Phaser에서 게임 오브젝트는 추가적인 정보(속성, Properties)를 가질 수 있습니다.
+
+예를 들어, 다이아몬드 아이템이 있을 때 각 다이아몬드마다 점수(Score)를 다르게 설정할 수 있습니다.
+```
+
+### ✅ 예제: Tiled 맵에서 다이아몬드에 점수 설정
+
+```jsx
+1. Tiled 에디터에서 다이아몬드 오브젝트를 선택합니다.
+
+2. Properties(속성) 창에서 새로운 속성을 추가합니다.
+
+		score 속성 추가 (값: 5)
+
+		다른 다이아몬드의 score 속성 추가 (값: 10)
+
+3. Integer(정수) 타입으로 설정합니다.
+
+이제 Phaser에서 이 정보를 가져와 적용해 봅시다.
+```
+
+## 2. 객체의 속성 읽어오기
+
+```jsx
+Phaser에서 맵에 배치된 객체들의 속성을 읽고 활용하는 방법을 배워봅니다.
+
+🔹 Collectables 클래스에서 속성 적용
+
+		Collectables 클래스는 여러 개의 Collectable 객체(즉, 다이아몬드)를 관리합니다.
+
+		mapProperties() 메서드를 이용하여 속성을 읽습니다.
+
+		기본 점수(defaultScore)를 설정하고, 개별 오브젝트의 점수를 덮어씁니다.
+```
+
+```jsx
+import Phaser from 'phaser'
+import Collectable from '../collectables/Collectable'
+
+class Collectables extends Phaser.Physics.Arcade.StaticGroup {
+  constructor(scene) {
+    super(scene.physics.world, scene)
+
+    this.createFromConfig({
+      classType: Collectable,
+    })
+  }
+
+  addFromLayer(layer) {
+    // 1. 레이어에서 기본 속성 추출 (예: 기본 점수)
+    const { score: defaultScore, type } = this.mapProperties(layer.properties)
+
+    // 2. 레이어의 모든 오브젝트를 순회하며 속성 적용
+    layer.objects.forEach((collectable0) => {
+      const collectable = this.get(collectable0.x, collectable0.y, type)
+
+      // 3. 개별 오브젝트 속성 가져오기
+      const props = this.mapProperties(collectable0.properties)
+
+      // 4. 개별 속성이 있으면 적용, 없으면 기본 점수 사용
+      collectable.score = props.score || defaultScore
+    })
+
+    // 디버깅 코드: 모든 다이아몬드의 점수를 확인
+    const a = this.getChildren().map((diamond) => diamond.score)
+    debugger
+  }
+
+  // 속성 리스트를 객체로 변환하는 함수
+  mapProperties(propertiesList) {
+    if (!propertiesList || propertiesList.length === 0) {
+      return {} // 속성이 없으면 빈 객체 반환
+    }
+    return propertiesList.reduce((map, obj) => {
+      map[obj.name] = obj.value
+      return map
+    }, {})
+  }
+}
+
+export default Collectables
+```
+
+![image.png](<%EC%84%B9%EC%85%98%2014%20Collectables%20&%20Traps%20(%ED%95%A8%EC%A0%95,%20%EC%88%98%EC%A7%91%ED%92%88)%20-%202%20-/image.png>)
+
+## 3. `Collectable` 클래스에서 속성 적용
+
+```jsx
+각 개별 Collectable(다이아몬드) 객체는 기본적으로 score 값을 1로 가지며,
+
+특정 속성을 읽어와 점수를 조정할 수 있습니다.
+```
+
+```jsx
+class Collectable extends Phaser.Physics.Arcade.Sprite {
+  constructor(scene, x, y, key) {
+    super(scene, x, y, key)
+
+    scene.add.existing(this)
+
+    this.score = 1 // 기본 점수 설정
+
+    this.setOrigin(0, 1) // 좌측 하단을 기준으로 위치 설정
+
+    // 부드러운 애니메이션 적용 (상하로 약간 움직이는 효과)
+    scene.tweens.add({
+      targets: this,
+      y: this.y - 3,
+      duration: Phaser.Math.Between(1500, 2500),
+      repeat: -1,
+      ease: 'Linear',
+      yoyo: true,
+    })
+  }
+}
+```
+
+## 4. 디버깅 및 점수 확인
+
+```jsx
+만약 특정 다이아몬드의 속성이 없으면 defaultScore가 적용됩니다.
+```
+
+```jsx
+const a = this.getChildren().map((diamond) => diamond.score)
+console.log(a) // 모든 다이아몬드의 점수를 출력
+```
+
+## 5. 객체의 크기 조정 (점수에 따라 크기 변경)
+
+```jsx
+점수가 높은 다이아몬드는 크기를 더 크게 만들 수도 있습니다.
+```
+
+```jsx
+collectable.setScale(collectable.score / 10)
+```
+
+## 6. 오브젝트의 원점 (Origin) 조정
+
+```jsx
+Phaser에서는 기본적으로 스프라이트의 중심이 (0.5, 0.5) 로 설정됩니다.
+
+하지만 Tiled 맵의 타일과 일치시키려면 setOrigin(0, 1)을 사용하여 좌측 하단을 기준점으로 변경합니다.
+
+이렇게 하면 Tiled에서 배치한 위치와 Phaser에서의 실제 위치가 정확히 일치하게 됩니다.
+```
+
+```jsx
+this.setOrigin(0, 1)
+```
+
+# { 점수 시스템 구현 }
+
+```jsx
+이번 강의에서는 점수(score) 시스템을 구현하는 방법을 배웁니다.
+
+플레이어가 아이템(collectables)을 획득할 때 점수를 증가시키고, 이를 콘솔에 출력하는 과정을 단계별로 설명합니다.
+```
+
+## 1. 점수를 저장할 변수 생성
+
+```jsx
+먼저, 점수를 저장할 변수를 멤버 변수로 만들어야 합니다.
+
+이렇게 하면 씬(Scene) 내 어디서든 this.score를 사용하여 점수를 관리할 수 있습니다.
+```
+
+```jsx
+class Play extends Phaser.Scene {
+    constructor(config) {
+        super("PlayScene");
+        this.config = config;
+
+        // 🏆 점수 초기화
+        this.score = 0;
+    }
+```
+
+## 2. 아이템을 먹으면 점수 증가시키기
+
+```jsx
+플레이어가 collectables(수집 가능한 아이템)과 충돌했을 때 점수를 증가시켜야 합니다.
+
+이를 위해 onCollect 함수를 수정합니다.
+```
+
+### 기존 코드
+
+```jsx
+onCollect(entity, collectable) {
+    this.score += collectable.score;
+    console.log(this.score);
+    collectable.disableBody(true, true);
+    collectable.destroy();
+}
+```
+
+```jsx
+this.score가 정상적으로 참조되지 않을 가능성이 있음
+
+this가 PlayScene을 가리키지 않는 문제 발생 가능
+```
+
+## 3. `this`의 컨텍스트 문제 해결 ( `context`를 전달하여 `this` 유지하기 )
+
+```jsx
+addOverlap 또는 addCollider는 콜백 함수의
+
+this가 자동으로 현재 씬이 아니라 콜백이 호출된 객체로 바뀌는 문제가 있습니다.
+
+이를 해결하려면 컨텍스트를 명확히 지정해야 합니다.
+
+이제 onCollect을 사용할 때 this 컨텍스트가 올바르게 유지되도록 설정합니다.
+
+this.onCollect을 실행할 때 this가 **현재 씬(Scene)**이 되도록 this를 추가로 전달합니다.
+
+이를 통해 onCollect 내부에서 this.score를 올바르게 참조할 수 있습니다.
+```
+
+### 코드 수정
+
+```jsx
+createPlayerColliders(player, { colliders }) {
+    player
+        .addColliders(colliders.platformsColliders)
+        .addColliders(colliders.projectiles, this.onWeaponHit)
+        .addOverlap(colliders.collectables, this.onCollect, this);  // 🎯 this(씬)를 컨텍스트로 전달
+}
+```
+
+## `this` 컨텍스트 유지 문제 해결하기
+
+```jsx
+문제점:
+
+this.score를 onCollect에서 사용하려 했지만, this가 기대한 컨텍스트(즉, 현재 씬)가 아님
+
+this가 콜백 함수 내에서 달라질 수 있음
+```
+
+```jsx
+해결 방법:
+
+콜라이더와 오버랩 설정에서 context를 명시적으로 전달
+
+콜백 함수가 this를 올바르게 참조하도록 보장
+```
+
+```jsx
+export default {
+  // 다른 게임 오브젝트와 충돌 감지를 추가하는 함수
+  addColliders(otherGameObject, callback, context) {
+    // 현재 객체(this)와 otherGameObject 간의 충돌 감지를 추가
+    // 충돌 시 callback 함수가 실행됨
+    // context를 지정하지 않으면 기본적으로 this(현재 객체)를 사용
+    this.scene.physics.add.collider(this, otherGameObject, callback, null, context || this)
+
+    // 메서드 체이닝을 위해 this(현재 객체) 반환
+    return this
+  },
+
+  // 다른 게임 오브젝트와 겹침(overlap) 감지를 추가하는 함수
+  addOverlap(otherGameObject, callback, context) {
+    // 현재 객체(this)와 otherGameObject 간의 겹침(overlap) 감지를 추가
+    // 겹칠 때 callback 함수가 실행됨
+    // context를 지정하지 않으면 기본적으로 this(현재 객체)를 사용
+    this.scene.physics.add.overlap(this, otherGameObject, callback, null, context || this)
+
+    // 메서드 체이닝을 위해 this(현재 객체) 반환
+    return this
+  },
+}
+```
+
+```jsx
+context || this를 사용하여 콜백 함수가 실행될 때 this가 유지되도록 보장합니다.
+
+context가 명시적으로 전달되지 않으면, 기본적으로 this(현재 객체)를 사용합니다.
+```
+
+## 4. `onCollect` 함수에서 점수 증가 및 출력
+
+```jsx
+이제 onCollect에서 this.score를 안전하게 사용할 수 있습니다.
+```
+
+### ✅ 최종 수정된 코드
+
+```jsx
+onCollect(entity, collectable) {
+    this.score += collectable.score;  // 🏆 점수 증가
+    console.log("현재 점수:", this.score);  // 🎯 콘솔에 출력
+
+    collectable.disableBody(true, true); // 🧹 아이템 제거
+    collectable.destroy();
+}
+```
+
+```jsx
+✅ this.score += collectable.score;
+
+		아이템의 점수를 더하여 총 점수 업데이트
+
+✅ console.log("현재 점수:", this.score);
+
+		콘솔에서 실시간으로 점수 확인 가능
+```
+
+![image.png](<%EC%84%B9%EC%85%98%2014%20Collectables%20&%20Traps%20(%ED%95%A8%EC%A0%95,%20%EC%88%98%EC%A7%91%ED%92%88)%20-%202%20-/image%201.png>)
+
+## 정리
+
+```jsx
+this.score = 0; 으로 점수 초기화
+
+onCollect()에서 점수 증가 후 콘솔에 출력
+
+addOverlap()에서 this 컨텍스트 명확히 설정하여 this.score를 정상적으로 참조
+```
+
+# { HUD 컨테이너를 사용하여 점수 표시하기 }
+
+![image.png](<%EC%84%B9%EC%85%98%2014%20Collectables%20&%20Traps%20(%ED%95%A8%EC%A0%95,%20%EC%88%98%EC%A7%91%ED%92%88)%20-%202%20-/image%202.png>)
+
+## 1. HUD 개념 이해
+
+```jsx
+게임 화면 오른쪽 상단에 점수를 표시하는 UI 요소를 추가한다.
+
+점수를 표시할 텍스트를 만들고 컨테이너에 포함시킨다.
+
+컨테이너를 사용하면 내부 요소들이 컨테이너를 따라 움직이므로, UI 요소를 쉽게 배치할 수 있다.
+```
+
+## 2. HUD 컨테이너 생성
+
+### HUD 클래스 구현 (`Hud.js`)
+
+```jsx
+import Phaser from 'phaser' // Phaser 라이브러리 불러오기
+
+// HUD (Head-Up Display) 클래스: 게임 화면 상단에 점수를 표시하는 UI 요소
+class Hud extends Phaser.GameObjects.Container {
+  /**
+   * HUD 생성자
+   * @param {Phaser.Scene} scene - HUD가 추가될 씬
+   * @param {number} x - HUD의 초기 X 좌표 (사용하지 않음)
+   * @param {number} y - HUD의 초기 Y 좌표 (사용하지 않음)
+   */
+  constructor(scene, x, y) {
+    super(scene, x, y) // Phaser 컨테이너 객체 생성
+    scene.add.existing(this) // 현재 씬(scene)에 이 컨테이너를 추가
+
+    // 씬의 설정 정보에서 오른쪽 상단 좌표(rightTopCorner) 가져오기
+    const { rightTopCorner } = scene.config
+
+    // HUD 위치 조정: 화면 오른쪽 상단에서 약간 왼쪽(-50)과 아래(+5)로 이동
+    this.setPosition(rightTopCorner.x - 50, rightTopCorner.y + 5)
+
+    // HUD는 카메라 이동에 영향을 받지 않도록 설정 (고정 UI 역할)
+    this.setScrollFactor(0)
+
+    // HUD 내부에 점수 표시용 텍스트 요소 추가
+    this.setupList()
+  }
+
+  /**
+   * HUD 내부 UI 요소 설정 (점수 텍스트 추가)
+   */
+  setupList() {
+    this.fontSize = 20 // 폰트 크기 설정
+
+    // Phaser의 text 객체를 사용하여 점수 텍스트 생성
+    const scoreBoard = this.scene.add.text(
+      0, // 컨테이너 내부에서의 X 좌표 (기본값: 0, 컨테이너 기준)
+      0, // 컨테이너 내부에서의 Y 좌표 (기본값: 0, 컨테이너 기준)
+      '0', // 초기 점수 (기본값: 0)
+      {
+        fontSize: `${this.fontSize}px`, // 텍스트 크기 설정
+        fill: '#fff', // 텍스트 색상 (흰색)
+      }
+    )
+
+    // 생성한 점수 텍스트를 컨테이너에 추가
+    this.add(scoreBoard)
+  }
+}
+
+export default Hud // Hud 클래스를 외부에서 사용할 수 있도록 내보내기
+```
+
+```jsx
+Hud 클래스는 Phaser.GameObjects.Container를 확장하여 사용.
+
+rightTopCorner 좌표를 가져와 HUD 위치를 설정.
+
+setScrollFactor(0)을 사용해 카메라 이동 시 HUD가 고정되도록 설정.
+
+setupList()에서 점수 표시용 Text 객체를 생성하여 컨테이너에 추가.
+
+```
+
+## 3. `Play` 씬에서 HUD 추가하기
+
+### Play.js 수정 (`Play.js`)
+
+```jsx
+import Phaser from 'phaser'
+import Hud from '../hud'
+
+class Play extends Phaser.Scene {
+  constructor(config) {
+    super('PlayScene')
+    this.config = config
+  }
+
+  create() {
+    this.score = 0
+    const map = this.createMap()
+    const layers = this.createLayers(map)
+    const playerZones = this.getPlayerZones(layers.playerZones)
+    const player = this.createPlayer(playerZones.start)
+
+    new Hud(this, 0, 0) // HUD 추가
+  }
+}
+```
+
+```jsx
+Play 씬에서 new Hud(this, 0, 0);를 호출하여 HUD를 생성.
+
+HUD는 Phaser.Scene의 config 정보를 이용해 화면 오른쪽 상단에 배치됨.
+```
+
+## HUD 컨테이너 위치 조정
+
+```jsx
+rightTopCorner.x - 50: 컨테이너를 왼쪽으로 이동.
+
+rightTopCorner.y + 5: 컨테이너를 아래로 약간 이동.
+
+setScrollFactor(0): 화면 스크롤에 영향을 받지 않도록 설정.
+```
+
+# { `Container` 내부에 여러 개의 `Text` 객체(점수판)를 추가하는 방법 }
+
+```jsx
+여기서는 Phaser를 사용하여 Container 내부에 여러 개의 Text 객체(점수판)를 추가하는 방법을 배우게 됩니다.
+```
+
+![image.png](<%EC%84%B9%EC%85%98%2014%20Collectables%20&%20Traps%20(%ED%95%A8%EC%A0%95,%20%EC%88%98%EC%A7%91%ED%92%88)%20-%202%20-/image%203.png>)
+
+## 설명
+
+```jsx
+1. Hud 클래스는 Phaser의 Container를 상속받아 UI 요소들을 그룹으로 관리하는 역할을 합니다.
+
+2. setupList() 메서드는 여러 개의 점수판(scoreBoard)을 생성하고, 한 줄씩 아래로 배치하는 기능을 합니다.
+
+3. this.list.forEach(...)를 사용하여 각 항목을 적절한 위치에 배치합니다.
+```
+
+```jsx
+import Phaser from 'phaser'
+
+// Phaser의 컨테이너 클래스를 상속받아 Hud(점수판 UI)를 생성하는 클래스
+class Hud extends Phaser.GameObjects.Container {
+  constructor(scene, x, y) {
+    super(scene, x, y) // 부모 클래스(Container) 생성자 호출
+
+    scene.add.existing(this) // 현재 컨테이너를 Phaser 씬에 추가
+
+    // 게임 씬의 설정 값에서 우측 상단 모서리 위치를 가져옴
+    const { rightTopCorner } = scene.config
+
+    // HUD의 초기 위치를 우측 상단 모서리 기준으로 설정
+    this.setPosition(rightTopCorner.x - 75, rightTopCorner.y + 5)
+    this.setScrollFactor(0) // 스크롤 시 HUD가 움직이지 않도록 고정
+
+    this.setupList() // 점수판 리스트를 설정하는 함수 호출
+  }
+
+  setupList() {
+    this.fontSize = 20 // 폰트 크기 설정
+
+    // 첫 번째 점수판: 기본 점수 0
+    const scoreBoard = this.scene.add.text(0, 0, '0', {
+      fontSize: `${this.fontSize}px`,
+      fill: '#fff',
+    })
+
+    // 두 번째 점수판: 'Hello' 텍스트 추가
+    const scoreBoard2 = this.scene.add.text(0, 0, 'Hello', {
+      fontSize: `${this.fontSize}px`,
+      fill: '#fff',
+    })
+
+    // 세 번째 점수판: 'Hello' 텍스트 추가
+    const scoreBoard3 = this.scene.add.text(0, 0, 'Hello', {
+      fontSize: `${this.fontSize}px`,
+      fill: '#fff',
+    })
+
+    // 점수판들을 컨테이너에 추가
+    this.add([scoreBoard, scoreBoard2, scoreBoard3])
+
+    // 줄 간격을 설정하는 변수
+    let lineHeight = 0
+
+    // 컨테이너 내부의 모든 요소들을 순회하며 Y 좌표를 조정
+    this.list.forEach((item) => {
+      item.setPosition(item.x, item.y + lineHeight) // 현재 아이템의 위치 조정
+      lineHeight += 20 // 다음 아이템을 현재 아이템 아래에 배치 (20px 간격)
+    })
+  }
+}
+
+export default Hud
+```
+
+```jsx
+✅ Phaser.Container
+
+		여러 개의 GameObject(텍스트, 이미지 등)를 그룹화하여 관리할 수 있는 클래스입니다.
+
+		this.add([...])을 사용하면 여러 개의 요소를 한 번에 추가할 수 있습니다.
+
+✅ Phaser.Text
+
+		scene.add.text(x, y, text, style)을 사용하여 화면에 텍스트를 추가합니다.
+
+		setPosition(x, y)을 호출하여 텍스트의 위치를 변경할 수 있습니다.
+
+✅ 리스트 순회 (this.list.forEach)
+
+		컨테이너 내에 있는 모든 요소를 순회하면서 각각의 Y 좌표를 20px씩 증가시켜 아래로 배치합니다.
+
+✅ 스크롤 고정 (setScrollFactor(0))
+
+		HUD가 카메라의 움직임에 따라 이동하지 않도록 고정하는 역할을 합니다.
+```
+
+# { 스코어보드 생성 및 이미지 추가 }
+
+![image.png](<%EC%84%B9%EC%85%98%2014%20Collectables%20&%20Traps%20(%ED%95%A8%EC%A0%95,%20%EC%88%98%EC%A7%91%ED%92%88)%20-%202%20-/image%204.png>)
+
+```jsx
+목표: 스코어보드를 별도의 함수로 분리하고, 다이아몬드 이미지와 점수를 함께 표시하는 기능을 구현
+```
+
+## 1️⃣ 스코어보드를 별도의 함수로 분리
+
+```jsx
+기존에는 setupList 함수에서 직접 점수를 생성했지만,
+
+이를 별도의 createScoreBoard 함수로 분리하여 관리하기 쉽게 변경함.
+```
+
+```jsx
+createScoreBoard() {
+    const scoreText = this.scene.add.text(0, 0, '0', {fontSize: `${this.fontSize}px`, fill: '#fff'})
+    return scoreText;
+}
+```
+
+```jsx
+scene.add.text(0, 0, '0', {fontSize: ${this.fontSize}px, fill: '#fff'}) → 좌표 (0,0) 위치에 점수(0)를 생성
+
+이후 setupList에서 this.add([scoreBoard]);를 통해 컨테이너에 추가함
+```
+
+## 2️⃣ 점수 옆에 다이아몬드 이미지 추가
+
+```jsx
+점수만 표시하는 것이 아니라 다이아몬드 이미지를 추가하여 직관적으로 보이도록 개선함.
+```
+
+```jsx
+createScoreBoard() {
+    const scoreText = this.scene.add.text(0, 0, '0', {fontSize: `${this.fontSize}px`, fill: '#fff'})
+
+    // 다이아몬드 이미지 추가 (텍스트 오른쪽에 배치)
+    const scoreImage = this.scene.add.image(scoreText.width + 5, 0, 'diamond')
+        .setOrigin(0) // 기준점을 좌측 상단으로 설정
+        .setScale(1.3); // 이미지를 1.3배 확대
+
+    // 컨테이너로 그룹화하여 하나의 요소처럼 관리
+    const scoreBoard = this.scene.add.container(0, 0, [scoreText, scoreImage]);
+
+    return scoreBoard;
+}
+```
+
+```jsx
+scoreImage는 scoreText.width + 5 위치에 추가하여 점수 텍스트 오른쪽에 배치
+
+.setOrigin(0) → 이미지의 기준점을 왼쪽 상단으로 설정
+
+.setScale(1.3) → 이미지 크기를 1.3배로 키움
+
+Phaser.Container를 사용하여 점수 + 이미지를 하나의 그룹으로 묶음
+```
+
+## 3️⃣ 컨테이너를 이용한 정렬
+
+```jsx
+텍스트와 이미지를 함께 배치하기 위해 Phaser의 container 를 사용함.
+
+이를 통해 하나의 요소처럼 관리할 수 있음.
+```
+
+```jsx
+const scoreBoard = this.scene.add.container(0, 0, [scoreText, scoreImage])
+```
+
+```jsx
+컨테이너를 사용하는 이유
+
+		점수와 이미지를 하나의 그룹으로 묶어서 관리할 수 있음
+
+		컨테이너 위치를 조정하면 내부 요소들도 함께 이동
+
+		추후 기능 추가가 용이함 (예: 점수 변경, 애니메이션 효과 추가 등)
+```
+
+```jsx
+import Phaser from 'phaser'
+
+class Hud extends Phaser.GameObjects.Container {
+  constructor(scene, x, y) {
+    super(scene, x, y)
+
+    scene.add.existing(this)
+
+    const { rightTopCorner } = scene.config
+    this.containerWidth = 70
+    this.setPosition(rightTopCorner.x - this.containerWidth, rightTopCorner.y + 10)
+    this.setScrollFactor(0)
+
+    this.fontSize = 20
+    this.setupList()
+  }
+
+  setupList() {
+    const scoreBoard = this.createScoreBoard()
+    // const scoreBoard2 = this.scene.add.text(0, 0, 'Hello', {fontSize: `${this.fontSize}px`, fill: '#fff'})
+    // const scoreBoard3 = this.scene.add.text(0, 0, 'Hello', {fontSize: `${this.fontSize}px`, fill: '#fff'})
+
+    this.add([scoreBoard])
+
+    let lineHeight = 0
+    this.list.forEach((item) => {
+      item.setPosition(item.x, item.y + lineHeight)
+      lineHeight += 20
+    })
+  }
+
+  createScoreBoard() {
+    const scoreText = this.scene.add.text(0, 0, '0', {
+      fontSize: `${this.fontSize}px`,
+      fill: '#fff',
+    })
+    const scoreImage = this.scene.add
+      .image(scoreText.width + 5, 0, 'diamond')
+      .setOrigin(0)
+      .setScale(1.3)
+
+    const scoreBoard = this.scene.add.container(0, 0, [scoreText, scoreImage])
+    return scoreBoard
+  }
+}
+
+export default Hud
+```
+
+# { 점수판(Scoreboard) 업데이트 기능 구현 }
+
+```jsx
+이 강의에서는 점수판을 생성하고,
+
+플레이어가 다이아몬드를 수집할 때 점수가 증가하도록 구현하는 방법을 설명합니다.
+
+또한, 점수 텍스트가 길어질 때 점수 이미지(다이아몬드 아이콘)가 겹치지 않도록 조정하는 방법도 다룹니다.
+```
+
+![image.png](<%EC%84%B9%EC%85%98%2014%20Collectables%20&%20Traps%20(%ED%95%A8%EC%A0%95,%20%EC%88%98%EC%A7%91%ED%92%88)%20-%202%20-/image%205.png>)
+
+## 1. 점수판(Scoreboard) 생성하기
+
+```jsx
+점수판은 Hud 클래스에서 생성됩니다.
+
+이 클래스는 Phaser.GameObjects.Container를 상속받아 UI 요소를 관리합니다.
+```
+
+```jsx
+class Hud extends Phaser.GameObjects.Container {
+  constructor(scene, x, y) {
+    super(scene, x, y)
+
+    scene.add.existing(this)
+
+    const { rightTopCorner } = scene.config
+    this.containerWidth = 70
+    this.setPosition(rightTopCorner.x - this.containerWidth, rightTopCorner.y + 10)
+    this.setScrollFactor(0)
+
+    this.fontSize = 20
+    this.setupList()
+  }
+
+  setupList() {
+    const scoreBoard = this.createScoreBoard()
+    this.add([scoreBoard])
+
+    let lineHeight = 0
+    this.list.forEach((item) => {
+      item.setPosition(item.x, item.y + lineHeight)
+      lineHeight += 20
+    })
+  }
+
+  createScoreBoard() {
+    // 점수 텍스트 추가
+    const scoreText = this.scene.add.text(0, 0, '0', {
+      fontSize: `${this.fontSize}px`,
+      fill: '#fff',
+    })
+
+    // 다이아몬드 아이콘 추가 (텍스트 오른쪽에 위치)
+    const scoreImage = this.scene.add
+      .image(scoreText.width + 5, 0, 'diamond')
+      .setOrigin(0)
+      .setScale(1.3)
+
+    // 텍스트와 이미지를 하나의 컨테이너에 추가
+    const scoreBoard = this.scene.add.container(0, 0, [scoreText, scoreImage])
+    scoreBoard.setName('scoreBoard') // 컨테이너에 이름 설정 (나중에 접근하기 위해)
+
+    return scoreBoard
+  }
+}
+```
+
+```jsx
+점수 텍스트 (scoreText): 초기 값 '0'으로 설정된 텍스트 객체.
+
+점수 이미지 (scoreImage): 다이아몬드 아이콘 추가.
+
+컨테이너 (scoreBoard): scoreText와 scoreImage를 하나의 그룹으로 묶음.
+
+컨테이너 이름 설정: setName('scoreBoard')를 사용하여 나중에 쉽게 접근 가능하도록 함.
+```
+
+## 2. 점수 업데이트 기능 추가
+
+```jsx
+플레이어가 다이아몬드를 수집할 때 점수를 업데이트하는 기능을 추가합니다.
+```
+
+```jsx
+updateScoreboard(score) {
+    // 'scoreBoard' 컨테이너에서 텍스트와 이미지를 가져옴
+    const [scoreText, scoreImage] = this.getByName('scoreBoard').list;
+
+    // 점수 업데이트
+    scoreText.setText(score);
+
+    // 점수 텍스트 길이에 맞춰 다이아몬드 아이콘 위치 조정
+    scoreImage.setX(scoreText.width + 3);
+}
+
+```
+
+```jsx
+컨테이너에서 점수 텍스트와 이미지 가져오기
+
+		getByName('scoreBoard')를 사용하여 점수판 컨테이너를 찾음.
+
+		.list를 이용해 컨테이너 내부 요소를 배열 형태로 가져옴.
+
+		첫 번째 요소가 scoreText, 두 번째 요소가 scoreImage.
+
+점수 업데이트
+
+		scoreText.setText(score);를 사용해 텍스트 값 변경.
+
+아이콘 위치 조정
+
+		텍스트 길이가 늘어나면 다이아몬드 아이콘이 겹칠 수 있으므로,
+
+		setX(scoreText.width + 3)로 위치를 조정.
+```
+
+## 3. 플레이어가 다이아몬드를 수집할 때 점수 증가
+
+```jsx
+이제 플레이어가 다이아몬드를 수집할 때 점수를 증가시키도록 Play 씬에서 설정합니다.
+```
+
+```jsx
+onCollect(entity, collectable) {
+    this.score += collectable.score; // 점수 증가
+    this.hud.updateScoreboard(this.score); // 점수판 업데이트
+
+    collectable.disableBody(true, true); // 다이아몬드 비활성화
+    collectable.destroy(); // 다이아몬드 제거
+}
+
+```
+
+### `Play` 씬에서 점수 시스템 추가
+
+```jsx
+게임이 실행될 때 Hud(점수판)를 생성해야 합니다.
+
+Play 클래스의 create() 함수에서 점수판을 추가했습니다.
+```
+
+```jsx
+create() {
+    // 점수를 0으로 초기화
+    this.score = 0;
+
+    // Hud (점수판) 생성 및 추가
+    this.hud = new Hud(this, 0, 0).setDepth(1);
+}
+```
+
+# { Phaser로 함정(traps) 추가하기 }
+
+![image.png](<%EC%84%B9%EC%85%98%2014%20Collectables%20&%20Traps%20(%ED%95%A8%EC%A0%95,%20%EC%88%98%EC%A7%91%ED%92%88)%20-%202%20-/image%206.png>)
+
+```jsx
+이번 강의에서는 Phaser 게임에 함정을 추가하는 방법을 배웁니다.
+
+함정은 플레이어가 밟으면 피해를 입는 장애물입니다.
+
+우리는 타일 맵(Tilemap)에 함정 레이어를 추가하고, 이를 충돌 대상으로 설정한 후, 플레이어가 함정과 충돌하면 로그를 출력하도록 만들 것입니다.
+```
+
+## 1. 타일 맵(Tilemap)에 함정 추가하기
+
+![image.png](<%EC%84%B9%EC%85%98%2014%20Collectables%20&%20Traps%20(%ED%95%A8%EC%A0%95,%20%EC%88%98%EC%A7%91%ED%92%88)%20-%202%20-/image%207.png>)
+
+### 1-1. Tiled에서 새로운 레이어 생성
+
+```jsx
+1. Tiled(타일맵 편집기)를 엽니다.
+
+2. 새로운 타일 레이어를 추가합니다.
+
+3. 레이어의 이름을 **"traps"**로 설정합니다.
+
+4. 타일 세트에서 스파이크(가시) 같은 함정을 찾아서 적절한 위치에 배치합니다.
+
+5. 각 함정에 **"damage"**라는 속성을 추가하고, 값을 10으로 설정합니다.
+
+6. 맵을 저장(Save) 합니다.
+```
+
+## 2. 코드에서 함정 레이어 추가하기
+
+### 2-1. `createLayers` 함수에서 함정 레이어 추가
+
+```jsx
+createLayers(map) {
+    const tileset = map.getTileset("main_lev_build_1");
+    const platformsColliders = map.createStaticLayer("platforms_colliders", tileset);
+    const environment = map.createStaticLayer("environment", tileset);
+    const platforms = map.createStaticLayer("platforms", tileset);
+
+    const playerZones = map.getObjectLayer("player_zones");
+    const enemySpawns = map.getObjectLayer("enemy_spawns");
+    const collectables = map.getObjectLayer("collectables");
+
+    // 함정 레이어 추가
+    const traps = map.createStaticLayer("traps", tileset);
+    traps.setCollisionByExclusion(-1, true); // -1을 제외한 모든 타일을 충돌 대상으로 설정
+
+    return { environment, platforms, platformsColliders, playerZones, enemySpawns, collectables, traps };
+}
+
+```
+
+```jsx
+traps 레이어를 추가하고 setCollisionByExclusion(-1, true)을 호출하여 충돌을 설정합니다.
+
+-1은 빈 타일을 의미하며, 빈 타일을 제외한 모든 타일과 충돌하도록 설정합니다.
+```
+
+## 3. 플레이어가 함정과 충돌하도록 설정하기
+
+### 3-1. `createPlayerColliders` 함수에서 충돌 설정
+
+```jsx
+createPlayerColliders(player, { colliders }) {
+    player
+        .addColliders(colliders.platformsColliders)
+        .addColliders(colliders.projectiles, this.onWeaponHit)
+        .addOverlap(colliders.collectables, this.onCollect, this)
+        .addColliders(colliders.traps, () => { console.log('We got hit!') }); // 함정과 충돌 시 로그 출력
+}
+```
+
+```jsx
+addColliders(colliders.traps, () => { console.log('We got hit!'); })를 추가하여,
+
+플레이어가 함정과 충돌하면 "We got hit!"이라는 메시지가 출력됩니다.
+```
+
+# **{ 플레이어 피격 처리 및 트랩 충돌 로직 개선 }**
+
+## **1. `onHit` 함수의 이름 변경**
+
+```jsx
+기존에는 무기와 충돌했을 때 호출되는 onWeaponHit 함수를 사용하고 있었지만,
+
+더 일반적인 개념으로 변경하기 위해 onHit으로 함수명을 변경함.
+
+이렇게 하면 무기뿐만 아니라 트랩과의 충돌에서도 같은 onHit 함수를 재사용할 수 있음.
+```
+
+```jsx
+player.addColliders(colliders.projectiles, this.onHit).addColliders(colliders.traps, this.onHit)
+```
+
+## **2. `source.deliversHit` 오류 해결**
+
+```jsx
+트랩과 충돌 시 source.deliversHit가 정의되지 않아 오류가 발생함
+```
+
+### **문제:**
+
+```jsx
+트랩은 deliversHit 메서드를 가지고 있지 않으므로,
+
+source.deliversHit(this); 실행 시 오류 발생.
+```
+
+### **해결 방법:**
+
+```jsx
+source.deliversHit가 존재하는지 확인한 후 실행하도록 수정.
+```
+
+```jsx
+    takesHit(source) {
+        if (this.hasBeenHit) {
+            return;
+        }
+        console.log("player got hit");
+        this.hasBeenHit = true;
+        this.bounceOff();
+        const hitAim = this.playDamageTween();
+
+        debugger;
+        this.health -= source.damage || source.properties.damage || 0;
+        this.hp.decrease(this.health);
+        debugger;
+        source.deliversHit && source.deliversHit(this); // source.deliversHit가 존재하는지 확인한 후 실행하도록
+
+        // 일정 시간(1초) 후 다시 피격 가능하도록 설정
+        this.scene.time.delayedCall(800, () => {
+            this.hasBeenHit = false;
+            hitAim.stop();
+            this.clearTint();
+        });
+    }
+```
+
+## **3. 트랩에 적절한 피해 값 적용**
+
+### 문제: 트랩의 피해 값이 `undefined`로 적용됨
+
+![image.png](<%EC%84%B9%EC%85%98%2014%20Collectables%20&%20Traps%20(%ED%95%A8%EC%A0%95,%20%EC%88%98%EC%A7%91%ED%92%88)%20-%202%20-/image%208.png>)
+
+```jsx
+현재 트랩과 충돌할 때,
+
+트랩의 피해 값이 undefined이므로 플레이어의 체력이 비정상적으로 감소하는 문제가 발생함.
+
+이는 source.damage 값을 읽을 때, 해당 값이 설정되지 않기 때문임.
+```
+
+### 해결 방법: `damage` 값을 `Tiled`에서 개별 타일 속성으로 추가
+
+```jsx
+1. Tiled에서 트랩 타일에 damage 속성 추가
+
+		Tiled에서 타일셋을 열고, 트랩으로 사용할 타일을 선택함.
+
+		속성(Properties) 창에서 새 속성 추가 버튼을 클릭.
+
+		속성 이름: damage
+
+		속성 타입: Integer
+
+		속성 값: 10 (트랩이 플레이어에게 줄 피해 값)
+
+		같은 방식으로 트랩 타일마다 damage 속성을 설정하고 저장.
+
+2. 코드에서 damage 값을 올바르게 가져오도록 수정
+
+		takesHit(source) 함수에서 source.damage 값을 가져오도록 설정.
+
+		만약 source.damage 값이 undefined라면,
+
+		source.properties.damage에서 값을 가져오도록 수정.
+```
+
+```jsx
+this.health -= source.damage || source.properties.damage || 0
+```
+
+```jsx
+3. 적용 결과 확인
+
+		트랩과 충돌 시 damage 값이 올바르게 적용되는지 확인.
+
+		플레이어가 30의 체력을 가질 때,
+
+		트랩이 10의 피해를 주도록 설정했다면 3번 부딪히면 체력이 0이 되어야 함.
+
+		적과의 충돌에서도 동일한 로직이 적용됨.
+```
+
+![image.png](<%EC%84%B9%EC%85%98%2014%20Collectables%20&%20Traps%20(%ED%95%A8%EC%A0%95,%20%EC%88%98%EC%A7%91%ED%92%88)%20-%202%20-/image%209.png>)
+
+![image.png](<%EC%84%B9%EC%85%98%2014%20Collectables%20&%20Traps%20(%ED%95%A8%EC%A0%95,%20%EC%88%98%EC%A7%91%ED%92%88)%20-%202%20-/image%2010.png>)
+
+![image.png](<%EC%84%B9%EC%85%98%2014%20Collectables%20&%20Traps%20(%ED%95%A8%EC%A0%95,%20%EC%88%98%EC%A7%91%ED%92%88)%20-%202%20-/image%2011.png>)
+
+```jsx
+이제 트랩과 충돌할 때 올바른 damage 값이 적용되며,
+
+Tiled에서 설정한 값을 기반으로 자동으로 피해를 계산할 수 있음.
+
+* 사실 새로운 클래스를 만들어서 구현하는게 제일 좋지만 이런 방법도 가능하다
+```
+
+# { 트랩 충돌 시 반동(bounce off) 수정하기 }
+
+## 1. **문제점: 트랩 충돌 시 반동 방향이 잘못됨**
+
+```jsx
+현재 플레이어가 트랩과 충돌했을 때 반동하는
+
+방식이 적과 무기와 충돌할 때의 방식과 동일하게 동작하고 있습니다.
+
+하지만, 타일(tile)과 충돌하는 경우에는 다른 속성이 필요합니다.
+```
+
+## 2. **기존 코드의 문제점**
+
+```jsx
+1. 적(enemy)이나 무기(weapon)과 충돌할 때는 touching 속성을 사용하여 충돌 방향을 판별합니다.
+
+2. 하지만, 타일(tile) 과 충돌할 때는 touching 속성이 아니라 blocked 속성을 사용해야 합니다.
+
+3. 현재 코드에서는 이 차이를 고려하지 않아, 타일과 충돌할 때 반동이 올바르게 적용되지 않는 문제가 발생했습니다.
+```
+
+## 3. **수정 방법**
+
+```jsx
+1. bounceOff(source) 함수에서 소스(source)에 body가 있는지 확인합니다.
+
+2. 만약 body가 존재한다면, 기존처럼 touching.right을 사용하여 반동합니다.
+
+   body가 없다면 (즉, 타일과 충돌한 경우), blocked.right 속성을 사용하여 반동합니다.
+
+3. 일정 시간 후 Y축 방향으로도 반동을 적용하여 트랩에서 튕겨 나가도록 설정합니다.
+```
+
+## `touching` vs `blocked` 차이점
+
+```jsx
+Phaser에서 객체가 다른 물체와 충돌할 때, 충돌이 감지되는 방식은 두 가지가 있습니다.
+
+바로 touching 속성과 blocked 속성입니다.
+```
+
+### `touching` 속성 (Moving Object vs Moving Object)
+
+```jsx
+움직이는 객체끼리(Moving Objects) 충돌할 때 사용
+
+예를 들어, 플레이어가 적(enemy)이나 무기(weapon)와 충돌할 때 사용됨.
+
+충돌 후에도 상대 객체(예: 적, 무기)가 움직일 수 있음.
+
+touching은 충돌한 순간에만 true가 되고, 그 이후에는 false로 초기화됨.
+```
+
+### `blocked` 속성 (Moving Object vs Static Object)
+
+```jsx
+움직이는 객체가 고정된 객체(Static Object)와 충돌할 때 사용
+
+예를 들어, 플레이어가 벽이나 타일에 부딪힐 때 사용됨.
+
+벽이나 타일은 움직이지 않지만, 플레이어는 멈추거나 반동(bounce)할 수 있음.
+
+플레이어가 벽에 막혀서 더 이상 이동할 수 없을 때 해당 방향의 blocked 값이 true가 됨.
+```
+
+![image.png](<%EC%84%B9%EC%85%98%2014%20Collectables%20&%20Traps%20(%ED%95%A8%EC%A0%95,%20%EC%88%98%EC%A7%91%ED%92%88)%20-%202%20-/image%2012.png>)
+
+## 4. **수정된 코드 설명**
+
+```jsx
+bounceOff(source) {
+    if (source.body) {
+        // 적(enemy)이나 무기(weapon)와 충돌한 경우 -> touching 사용
+        this.body.touching.right
+            ? this.setVelocity(-this.bounceVelocity, -this.bounceVelocity) // 왼쪽으로 튕김
+            : this.setVelocity(this.bounceVelocity, -this.bounceVelocity);  // 오른쪽으로 튕김
+    } else {
+        // 타일(tile)과 충돌한 경우 -> blocked 사용
+        this.body.blocked.right
+            ? this.setVelocity(-this.bounceVelocity, -this.bounceVelocity)
+            : this.setVelocity(this.bounceVelocity, -this.bounceVelocity);
+    }
+
+    // 일정 시간 후 Y축 방향 반동 추가
+    setTimeout(() => this.setVelocityY(-this.bounceVelocity), 0);
+}
+
+```
+
+## 5. **테스트 및 결과**
+
+```jsx
+트랩을 오른쪽에서 부딪히면 → 왼쪽으로 튕김
+
+왼쪽에서 부딪히면 → 오른쪽으로 튕김
+
+위에서 떨어질 경우 → 위로 반동
+```

@@ -1,0 +1,850 @@
+---
+title: '16단원: Mixing Desk 구성하기'
+date: '2026-09-02'
+category: '게임 개발/WWISE'
+tags: ['게임 개발', 'WWISE']
+draft: false
+summary: ''
+---
+
+# { 🎚 16단원: Mixing Desk 사용하기 }
+
+이번 강의는 **Mixing Desk를 이용해 Wwise에서 실시간 믹싱을 제어하는 방법**을 배우는 단원입니다.
+
+이전 단원(15단원 Soundcaster 사용하기)에서 익힌 **사운드 이벤트 테스트 및 밸런스 감각**을 한 단계 발전시켜, **다양한 오브젝트의 볼륨·이펙트·라우팅을 한 화면에서 조정**하는 법을 학습합니다.
+
+---
+
+## 📋 목차
+
+1. [Mixing Desk 개념 이해하기](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#mixing-desk-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Mixing Desk 세션 만들기](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#mixing-desk-%EC%84%B8%EC%85%98-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+3. [오브젝트 추가 및 속성 제어](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%EC%B6%94%EA%B0%80-%EB%B0%8F-%EC%86%8D%EC%84%B1-%EC%A0%9C%EC%96%B4)
+4. [버스 더킹(Ducking) 설정하기](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#%EB%B2%84%EC%8A%A4-%EB%8D%94%ED%82%B9ducking-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+5. [State 활용하여 동적 믹싱 구현하기](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#state-%ED%99%9C%EC%9A%A9%ED%95%98%EC%97%AC-%EB%8F%99%EC%A0%81-%EB%AF%B9%EC%8B%B1-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. Mixing Desk 개념 이해하기
+
+- **Mixing Desk란?**
+  Mixing Desk는 **게임 오디오 믹스를 실시간으로 조절**하기 위한 도구입니다.
+  여러 오디오 오브젝트(Actor-Mixer, Bus, Event 등)의 **볼륨, 피치, 이펙트, 라우팅** 같은 속성을 **한 화면에서 조정**할 수 있습니다.
+- **Soundcaster와의 차이점**
+  | 구분 | Soundcaster | Mixing Desk |
+  | ------------ | --------------------------------------- | ----------------------------------------------- |
+  | 역할 | 사운드 이벤트 테스트 및 재생 시뮬레이션 | 여러 사운드와 버스의 볼륨/이펙트 등 실시간 제어 |
+  | 초점 | “이벤트 단위”의 트리거 테스트 | “믹스 단위”의 전체 밸런스 조정 |
+  | 주 사용 단계 | 사운드 설계/테스트 | 게임 환경에 맞춘 믹스 조정 |
+- **Mixing Desk의 장점**
+  - 여러 오브젝트의 **볼륨/이펙트/라우팅**을 동시에 관리 가능
+  - **State나 RTPC**를 이용해 상황별 믹스 자동화 가능
+  - **Ducking, Attenuation, Effect 곡선** 등을 실시간 시각화
+  - **Soundcaster와 병행 사용** 가능 → 이벤트 재생하면서 바로 믹싱 조정
+
+---
+
+## 2. Mixing Desk 세션 만들기
+
+### 🎯 목표
+
+“Cube 게임”의 **불 보석(Fire Gem)** 사운드에 초점을 맞춘 **맞춤형 Mixing Desk** 세션을 만들어봅니다.
+
+### 🧭 단계별 과정
+
+1. **새 Mixing Desk 세션 만들기**
+   - 상단 메뉴에서
+     `Layout → Mixing Desk` 선택
+   - Mixing Desk 뷰가 열리면, `[>>]` 버튼을 클릭하고 **New** 선택
+   - 세션 이름을 입력 → 예: `Fire Gem Mix`
+2. **Mixing Desk 뷰 구조**
+   - 좌측: **오브젝트 목록(추가된 사운드들)**
+   - 중앙: **페이더(Fader)** 및 속성 조절 슬라이더
+   - 우측 상단: **세션 저장/불러오기 및 설정**
+   - 하단: **Property 영역 (Effect, RTPC, Ducking 등 상세 속성 표시)**
+3. **목적**
+   - 불 보석 관련 사운드들의 **볼륨·리버브·이펙트 밸런스 조정**을 직관적으로 테스트하기 위함.
+
+---
+
+## 3. 오브젝트 추가 및 속성 제어
+
+### 🔹 오브젝트 추가하기
+
+1. **Project Explorer에서 Fire Gem 관련 오브젝트 검색**
+   - 예: `player_fire_gem_throw`, `player_fire_gem_explode` 등
+2. 드래그 앤 드롭으로 Mixing Desk에 추가
+   - 각 오브젝트가 **하나의 페이더 스트립**으로 생성됨.
+3. 필요 시 **Bus나 Actor-Mixer**도 함께 추가 가능
+   - 예: `Player_Master_Bus`, `Environment_Bus` 등
+
+---
+
+### 🔹 각 오브젝트의 속성 제어
+
+| 속성            | 설명                                                               |
+| --------------- | ------------------------------------------------------------------ |
+| **Volume**      | 오브젝트 또는 버스의 전체 볼륨을 조정                              |
+| **Mute / Solo** | 개별 사운드를 단독으로 듣거나 음소거                               |
+| **Effect (FX)** | 삽입된 이펙트의 On/Off, Wet Level 조정                             |
+| **Attenuation** | 거리 기반 볼륨 변화(감쇠) 곡선 시각 확인                           |
+| **Routing**     | 현재 오디오가 어느 버스로 출력되는지 표시                          |
+| **RTPC**        | 특정 파라미터(예: 거리, 체력 등)에 따라 볼륨/이펙트 자동 변화 설정 |
+
+💡 **Tip**
+
+Mixing Desk에서는 오브젝트 속성을 **직접 조정하면 곧바로 사운드가 반영**되므로, Soundcaster 세션에서 이벤트를 재생하며 **동시 테스트** 가능.
+
+---
+
+## 4. 버스 더킹(Ducking) 설정하기
+
+### 🔸 Ducking이란?
+
+특정 사운드가 재생될 때 **다른 사운드의 볼륨을 자동으로 낮추는 기능**.
+
+예를 들어, **플레이어가 Fire Gem을 던질 때** 배경음악 볼륨을 순간적으로 줄이는 식으로 사용합니다.
+
+### 🔧 설정 방법
+
+1. Mixing Desk에서 **BGM 버스(Bus)** 선택
+2. 해당 버스의 **Ducking 설정** 열기
+3. **Trigger Source**로 Fire Gem 관련 오브젝트(또는 Event) 선택
+4. **Duck Amount** 조절
+   - 예: -6dB → Fire Gem 사운드 발생 시 BGM이 6dB 낮아짐
+5. Attack / Release Time 조정
+   - Attack: Ducking이 시작되는 속도
+   - Release: Ducking이 원래 볼륨으로 복귀하는 속도
+
+🎧 결과:
+
+Fire Gem 사운드가 재생될 때만 배경음이 자연스럽게 줄어들며, **중요한 효과음이 잘 들리도록 밸런스 확보**.
+
+---
+
+## 5. State 활용하여 동적 믹싱 구현하기
+
+### 🔸 State란?
+
+State는 **게임의 상황(전투 중 / 탐험 중 / 보스전 등)** 에 따라 오디오 속성을 자동으로 바꾸는 시스템입니다.
+
+### 🧩 Mixing Desk에서의 활용
+
+1. Mixing Desk의 상단 메뉴에서 **State Group** 추가
+   - 예: `GamePhase` → `Exploration`, `Battle`, `Boss`
+2. 각 State에 따라 속성 값 조정
+   - Exploration: 배경음 약하게 (-4dB)
+   - Battle: 효과음 강하게 (+3dB), 리버브 감소
+   - Boss: 전체 믹스 다이내믹 강조 (BGM +5dB)
+3. **Soundcaster 세션과 함께 테스트**
+   - State 전환 시 실시간으로 믹싱 변화 확인 가능
+
+🎯 핵심 개념:
+
+State 시스템을 활용하면 **상황별 믹스 자동화**가 가능하며, 플레이어의 몰입도를 높이는 데 효과적임.
+
+---
+
+## 🎬 정리
+
+| 핵심 포인트                   | 설명                                        |
+| ----------------------------- | ------------------------------------------- |
+| **Mixing Desk**               | 여러 사운드 속성을 한 화면에서 통합 조정    |
+| **Soundcaster + Mixing Desk** | 재생 테스트와 믹싱 조정을 동시에 수행       |
+| **Ducking**                   | 중요한 사운드가 있을 때 다른 소리 자동 감소 |
+| **State 활용**                | 게임 상황별 믹싱 자동화 구현                |
+
+---
+
+## 🚀 이번 단원으로 익히는 기술 요약
+
+- ✅ Mixing Desk 세션 생성 및 구성 방법
+- ✅ 오브젝트/버스 속성 추가 및 조정
+- ✅ Ducking을 통한 사운드 밸런스 제어
+- ✅ State 시스템을 이용한 동적 믹싱 설정
+- ✅ Soundcaster와 병행하여 실시간 테스트 수행
+
+---
+
+# { 🎧 Mixing Desk 만들기 }
+
+이번 강의에서는 **Mixing Desk(믹싱 데스크)** 를 사용하여
+
+게임 오디오의 전체 밸런스를 시각적으로 조정하고,
+
+Soundcaster에서 만든 세션(Fire Gem)을 실제 믹싱 환경에서 제어하는 방법을 배웁니다.
+
+---
+
+## 📋 목차
+
+1. [Mixing Desk 개념 이해하기](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#mixing-desk-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Mixer 레이아웃 열기](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#mixer-%EB%A0%88%EC%9D%B4%EC%95%84%EC%9B%83-%EC%97%B4%EA%B8%B0)
+3. [Soundcaster 세션 불러오기](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#soundcaster-%EC%84%B8%EC%85%98-%EB%B6%88%EB%9F%AC%EC%98%A4%EA%B8%B0)
+4. [새 Mixing Desk 세션 만들기](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#%EC%83%88-mixing-desk-%EC%84%B8%EC%85%98-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+5. [Mixing Desk 구성 및 속성 이해하기](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#mixing-desk-%EA%B5%AC%EC%84%B1-%EB%B0%8F-%EC%86%8D%EC%84%B1-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. Mixing Desk 개념 이해하기
+
+- **Mixing Desk(믹싱 데스크)** 는
+  게임의 다양한 사운드를 하나의 뷰에 그룹화하여
+  **전체적인 오디오 밸런스와 믹스를 조정하는 도구**입니다.
+- 즉,
+  여러 사운드(예: 캐릭터 효과음, 배경음, UI 사운드 등)를 동시에 보면서
+  **볼륨, 피치, 버스 라우팅, 리버브 센드 등**을 한눈에 관리할 수 있습니다.
+- **Soundcaster**가 “이벤트를 테스트하는 실험실”이라면,
+  **Mixing Desk**는 “오디오 믹스를 조율하는 조정실”이라고 할 수 있습니다.
+- Mixing Desk에서는 사운드의 **세부 속성(Property)** 을 조정할 수 있으며,
+  각 속성은 실시간으로 게임에 반영되어 테스트 가능합니다.
+
+---
+
+## 2. Mixer 레이아웃 열기
+
+1. **Wwise 실행 및 프로젝트 열기**
+   - Wwise를 시작하고, 제공된 **Module 16** 프로젝트 파일을 엽니다.
+     (이전 단원인 *15단원: Soundcaster 사용하기*에서 만든 프로젝트입니다.)
+2. **Mixer 레이아웃으로 전환**
+   - 상단 메뉴에서 **Layouts > Mixer (단축키 F8)** 을 클릭합니다.
+   - 이제 화면 구성이 “Mixer 레이아웃”으로 전환됩니다.
+3. **Mixer 레이아웃 구성**
+   - 상단 중앙: **Mixing Desk 뷰**
+     (믹서 채널들이 가로로 나열된 패널 형태)
+   - 하단: **Soundcaster 뷰**
+     (이벤트를 트리거하거나 테스트할 수 있는 창)
+   - 왼쪽: **Project Explorer**
+   - 오른쪽: **Event Viewer**
+
+👉 즉, **Mixing Desk와 Soundcaster가 동시에 표시되는 환경**이 준비됩니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380553/notion-blog/_/WWISE/Wwise_/16_Mixing_Desk_/image.png)
+
+---
+
+## 3. Soundcaster 세션 불러오기
+
+1. **Soundcaster 세션 선택**
+   - Soundcaster 뷰 왼쪽 상단의 **[>>] 선택 버튼**을 클릭합니다.
+   - 목록에서 **Fire Gem**을 선택합니다.
+2. **Fire Gem 세션 로드**
+   - 이전 단원(15단원)에서 만든 **Fire Gem Soundcaster Session**이 열립니다.
+   - 여기에는 “Fire Gem”과 관련된 여러 이벤트(던지기, 맞기, 폭발 등)가 포함되어 있습니다.
+
+💡 **참고:**
+
+Soundcaster는 다양한 이벤트를 빠르게 재생·비교하며 테스트하는 데 사용됩니다.
+
+Mixing Desk는 이 Soundcaster 세션을 바탕으로 실제 믹싱을 수행하게 됩니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380548/notion-blog/_/WWISE/Wwise_/16_Mixing_Desk_/image_1.png)
+
+---
+
+## 4. 새 Mixing Desk 세션 만들기
+
+1. **새 세션 생성**
+   - Mixing Desk 상단의 **[>>] 선택 버튼**을 클릭합니다.
+   - 메뉴에서 **New**를 클릭합니다.
+2. **세션 이름 지정**
+   - 새로운 Mixing Desk 세션의 이름을 **Fire Gem**으로 지정합니다.
+   - **OK**를 클릭하면 새로운 세션이 생성됩니다.
+3. **결과 확인**
+   - 새로운 빈 Mixing Desk가 화면에 표시됩니다.
+   - 이곳에 오브젝트(Actor-Mixer, Bus, 또는 Event)를 추가할 수 있습니다.
+
+💡 **Mixing Desk 세션**은 일종의 프리셋처럼 작동합니다.
+
+특정 사운드 그룹을 지정된 채널에 배치하고, 그들의 속성을 빠르게 조정할 수 있습니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380550/notion-blog/_/WWISE/Wwise_/16_Mixing_Desk_/image_2.png)
+
+---
+
+## 5. Mixing Desk 구성 및 속성 이해하기
+
+Mixing Desk가 준비되면, 이제 각 채널 스트립(Channel Strip)에 오브젝트를 추가하여
+
+믹싱 속성을 제어할 수 있습니다.
+
+### 🎚 Mixing Desk의 기본 구조
+
+| 구성 요소                       | 설명                                                    |
+| ------------------------------- | ------------------------------------------------------- |
+| **채널 스트립 (Channel Strip)** | 오브젝트(예: 사운드, 버스 등)를 나타내는 개별 세로 패널 |
+| **페이더 (Fader)**              | 볼륨(Volume)을 조정                                     |
+| **Pan 컨트롤**                  | 좌우 밸런스 조절                                        |
+| **Mute / Solo 버튼**            | 특정 채널을 음소거하거나 단독 청취                      |
+| **Send 컨트롤**                 | Auxiliary Bus(보조 버스)로의 리버브나 이펙트 양 조절    |
+| **Property 리스트**             | 선택한 오브젝트의 세부 조정 가능한 파라미터 목록 표시   |
+
+### ⚙ 조정 가능한 주요 속성
+
+Mixing Desk는 Soundcaster보다 훨씬 더 많은 속성을 제공합니다.
+
+예를 들어 다음과 같은 항목을 조정할 수 있습니다.
+
+| 속성                                     | 설명                                           |
+| ---------------------------------------- | ---------------------------------------------- |
+| **Volume (볼륨)**                        | 사운드의 크기를 조절                           |
+| **Pitch (피치)**                         | 소리의 높낮이 조정                             |
+| **LPF / HPF (로우패스 / 하이패스 필터)** | 특정 주파수 대역의 차단 필터                   |
+| **Bus Routing**                          | 사운드를 어떤 오디오 버스로 보낼지 지정        |
+| **Aux Send Level**                       | 리버브, 딜레이 등의 보조 이펙트로 보내는 양    |
+| **Voice Limiting / Priority**            | 여러 사운드가 동시에 재생될 때의 우선순위 설정 |
+
+💡 **중요 포인트:**
+
+Mixing Desk는 단순히 볼륨만 조절하는 도구가 아니라,
+
+**프로젝트 전체의 오디오 밸런스, 공간감, 주파수 영역까지 통합적으로 관리**하는 툴입니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380550/notion-blog/_/WWISE/Wwise_/16_Mixing_Desk_/image_3.png)
+
+---
+
+## 🧩 정리
+
+| 구분          | Soundcaster             | Mixing Desk                    |
+| ------------- | ----------------------- | ------------------------------ |
+| **목적**      | 이벤트 트리거 및 테스트 | 전체 오디오 밸런스와 속성 조정 |
+| **형태**      | 이벤트 기반 세션        | 채널 기반 믹싱 패널            |
+| **주요 기능** | 사운드 재생/비교        | 볼륨, 피치, 필터, 센드 등 제어 |
+| **활용 시점** | 개별 사운드 검증        | 실제 게임 믹스 제작 및 튜닝    |
+
+---
+
+## 🎯 이번 강의 핵심 요약
+
+- Mixing Desk는 **여러 사운드 오브젝트의 속성을 한눈에 보고 조정**할 수 있는 도구이다.
+- Mixer 레이아웃(F8)을 열면 Mixing Desk와 Soundcaster를 함께 사용할 수 있다.
+- Soundcaster에서 **Fire Gem** 세션을 불러와 Mixing Desk에서 실시간으로 믹싱한다.
+- Mixing Desk는 **Soundcaster보다 훨씬 많은 속성**을 제공하며, 실제 게임 사운드 밸런싱의 중심 역할을 한다.
+
+---
+
+# { 🎚 Mixing Desk에 오브젝트 추가하기 }
+
+이번 강의에서는 **Wwise의 Mixing Desk**를 사용하여
+
+사운드 오브젝트들을 실제 믹서처럼 제어하고,
+
+버스(Bus)를 통해 오디오 신호 흐름을 시각적으로 확인하는 방법을 배웁니다.
+
+---
+
+## 📋 목차
+
+1. [Mixing Desk 개념 이해하기](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#mixing-desk-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Mixing Desk에 오브젝트 추가하기](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#mixing-desk%EC%97%90-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+3. [Mixing Desk에 Audio Bus 추가하기](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#mixing-desk%EC%97%90-audio-bus-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+4. [믹서 스트립 재배치하기](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#%EB%AF%B9%EC%84%9C-%EC%8A%A4%ED%8A%B8%EB%A6%BD-%EC%9E%AC%EB%B0%B0%EC%B9%98%ED%95%98%EA%B8%B0)
+5. [사운드 재생 및 Activity 확인하기](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#%EC%82%AC%EC%9A%B4%EB%93%9C-%EC%9E%AC%EC%83%9D-%EB%B0%8F-activity-%ED%99%95%EC%9D%B8%ED%95%98%EA%B8%B0)
+6. [속성 조정 및 다중 제어 방법](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#%EC%86%8D%EC%84%B1-%EC%A1%B0%EC%A0%95-%EB%B0%8F-%EB%8B%A4%EC%A4%91-%EC%A0%9C%EC%96%B4-%EB%B0%A9%EB%B2%95)
+
+---
+
+## 1. 🎧 Mixing Desk 개념 이해하기
+
+- **Mixing Desk란?**
+  - 게임 오디오에서 **믹싱을 시각적으로 제어할 수 있는 뷰(View)**입니다.
+  - 일반적인 오디오 믹서 콘솔처럼 **수직형 채널 스트립(Vertical Channel Strip)** 형태로 구성됩니다.
+  - 여러 사운드 오브젝트의 속성을 **한 화면에서 그룹화하여 조절**할 수 있습니다.
+- **특징**
+  - 실시간으로 **사운드 레벨, 볼륨, 덕킹(Ducking)** 등을 확인할 수 있습니다.
+  - Soundcaster와 연동되어, 실제 게임에서 발생할 상황을 **시뮬레이션하면서 믹싱 테스트**가 가능합니다.
+- **Mixing Desk에 추가 가능한 오브젝트**
+  - **사운드 재생에 직접 영향을 주는 오브젝트만** 추가할 수 있습니다.
+  - ❌ Event 오브젝트는 추가할 수 없습니다.
+    (이유: Event는 단순히 재생을 “트리거”하는 역할만 하며, 실제 사운드를 내는 오브젝트가 아니기 때문입니다.)
+
+---
+
+## 2. 🎛 Mixing Desk에 오브젝트 추가하기
+
+1. **Project Explorer 열기**
+   - `Actor-Mixer Hierarchy` 탭으로 이동합니다.
+2. **오브젝트 선택**
+   - 아래 4개의 오브젝트를 선택합니다:
+     - 🔥 FireGem Magic
+     - 💥 FireGem Blast
+     - 💣 FireGem Explode
+     - 🪶 FireGem_Flight
+3. **Mixing Desk로 드래그**
+   - 선택한 4개 오브젝트를 **Mixing Desk 뷰**로 **드래그 앤 드롭**합니다.
+4. **결과**
+   - 각 오브젝트가 **채널 스트립(믹서 스트립)** 형태로 표시됩니다.
+   - 각 스트립에는 다음과 같은 기본 속성들이 포함됩니다:
+     - Volume (볼륨)
+     - Mute / Solo 버튼
+     - Voice Pitch
+     - LPF (Low-Pass Filter) / HPF (High-Pass Filter)
+     - RTPC 컨트롤 값 (있는 경우)
+5. **속성 보기 확장**
+   - Mixing Desk 창을 아래로 스크롤하면 **더 많은 속성**을 볼 수 있습니다.
+   - 각 오브젝트별로 현재 사운드 설정 상태를 한눈에 파악할 수 있습니다.
+
+> 💡 Tip:
+>
+> 오른쪽 상단의 **View Settings (눈 모양 버튼)** 을 클릭하면,
+>
+> 표시할 속성들을 직접 선택해 커스터마이징할 수 있습니다.
+>
+> → 예를 들어, Volume과 LPF만 표시하도록 설정할 수 있습니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380550/notion-blog/_/WWISE/Wwise_/16_Mixing_Desk_/image_4.png)
+
+---
+
+## 3. 🔊 Mixing Desk에 Audio Bus 추가하기
+
+이제 오디오 신호의 흐름을 제어할 수 있도록 **버스(Bus)** 오브젝트를 추가합니다.
+
+1. **Project Explorer에서 Master-Mixer Hierarchy 선택**
+   - 아래 오브젝트들을 찾습니다:
+     - Master Audio Bus
+     - Environmental (환경용 버스)
+2. **Mixing Desk로 드래그**
+   - 두 버스를 Mixing Desk 뷰로 드래그합니다.
+   - 추가된 버스도 **믹서 스트립 형태**로 나타납니다.
+3. **역할 이해**
+   - Master Audio Bus : 전체 사운드의 최종 출력(마스터 채널).
+   - Environmental Bus : 환경 사운드(리버브 등)를 처리하는 중간 채널.
+
+이제 Mixing Desk에서 **FireGem 오브젝트들의 신호가 어떤 경로로 Master까지 전달되는지**
+
+시각적으로 확인할 수 있습니다.
+
+---
+
+## 4. 🧩 믹서 스트립 재배치하기
+
+일반 오디오 콘솔처럼 **믹서 스트립의 순서**를 바꿀 수 있습니다.
+
+- 예시:
+  - 최종 출력인 **Master Audio Bus**를 맨 오른쪽으로 옮기기.
+- 방법:
+  - Mixing Desk에서
+    `Master Audio Bus` 헤더를 **Environmental Bus의 오른쪽으로 드래그**합니다.
+- 결과:
+  - 오른쪽 끝에 Master 버스가 배치되어 실제 믹서와 유사한 구조가 완성됩니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380551/notion-blog/_/WWISE/Wwise_/16_Mixing_Desk_/image_5.png)
+
+---
+
+## 5. 🎬 사운드 재생 및 Activity 확인하기
+
+Mixing Desk에서 실시간으로 사운드 흐름을 확인할 수 있습니다.
+
+1. **Soundcaster 열기**
+   - 이전 강의에서 만든 Soundcaster Session을 엽니다.
+2. **캡처 세션 시작**
+   - Mixing Desk 상단의 **Start Capture 버튼 (단축키: Alt+C / macOS는 Option+C)** 클릭.
+   - → 오디오 신호의 실시간 상태를 시각적으로 기록하기 시작합니다.
+3. **FireGem 사운드 재생**
+   - Soundcaster에서 **Fire_FireGem_Player Event**를 재생합니다.
+   - 불 보석의 사운드가 재생되는 동안,
+     **Mixing Desk에서 Master Audio Bus의 미터(레벨 표시기)** 가 움직이는 걸 확인합니다.
+
+> ⚠️ Note:
+>
+> `End_FireGem_Player Event`를 재생할 때까지 불 보석이 날아가는 사운드는 계속 재생됩니다.
+
+1. **Activity 아이콘 확인**
+   - 사운드가 재생 중일 때 각 채널 스트립에 있는 **Activity 아이콘(🎧 헤드폰 모양)** 이 **주황색**으로 변합니다.
+   - 이 기능은 **디버깅에 매우 유용**합니다.
+     → “어떤 오브젝트가 실제로 소리를 내고 있는가?”
+     → “어떤 버스에서 신호가 끊기는가?”를 한눈에 파악할 수 있습니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380551/notion-blog/_/WWISE/Wwise_/16_Mixing_Desk_/image_6.png)
+
+---
+
+## 6. ⚙️ 속성 조정 및 다중 제어 방법
+
+Mixing Desk는 사운드 조정과 비교 실험을 매우 빠르게 수행할 수 있습니다.
+
+1. **개별 속성 변경**
+   - 볼륨, 피치, 필터, RTPC 값 등을 마우스로 조절합니다.
+   - 즉시 Soundcaster 재생 중에도 적용되어 결과를 들을 수 있습니다.
+2. **여러 오브젝트 동시에 조정**
+   - Shift나 Ctrl 키로 여러 채널을 선택한 후 슬라이더를 조정하면
+     → 모든 선택된 오브젝트에 **동일한 절대값**이 적용됩니다.
+   - 예: 여러 오브젝트를 동시에 -3dB로 조정.
+3. **상대값 조정 (Alt 키 활용)**
+   - Alt 키(맥은 Option 키)를 누른 채 슬라이더를 드래그하면
+     → 선택된 오브젝트 각각의 값이 **비율대로 상쇄 조정**됩니다.
+   - 예: 하나는 -2dB, 다른 하나는 -6dB였을 때,
+     Alt 드래그로 전체를 상대적으로 ±조정 가능.
+
+> 💡 이 기능을 활용하면 여러 사운드를 한 번에 미세하게 밸런싱할 수 있습니다.
+
+---
+
+## 🧠 핵심 요약
+
+| 개념                     | 설명                                                                     |
+| ------------------------ | ------------------------------------------------------------------------ |
+| **Mixing Desk**          | 여러 사운드 오브젝트의 믹싱 속성을 한눈에 보고 조절하는 뷰               |
+| **추가 가능한 오브젝트** | Actor-Mixer Hierarchy의 실제 사운드 오브젝트 및 Audio Bus (Event는 제외) |
+| **캡처 모드**            | 재생 중인 사운드의 흐름과 덕킹 상태를 시각적으로 표시                    |
+| **Activity 아이콘**      | 어떤 오브젝트가 현재 활성화되어 있는지 표시 (주황색 헤드폰)              |
+| **다중 속성 조정**       | 여러 오브젝트의 값을 동시에 변경 가능 (Alt키로 상대값 조정)              |
+
+---
+
+## 🎯 이번 강의의 핵심 목표
+
+> Mixing Desk를 통해
+>
+> 🔹 사운드의 신호 흐름을 시각적으로 파악하고,
+>
+> 🔹 오디오 밸런스를 빠르게 조정하며,
+>
+> 🔹 Soundcaster와 함께 **실시간 믹싱 실험**을 수행할 수 있게 되는 것입니다.
+
+---
+
+# { 🎧 더킹(Ducking) 설정하기 }
+
+이번 강의에서는 **게임 내 사운드 간의 볼륨 관계를 자동으로 조절하는 “덕킹(Ducking)” 기능**을 설정합니다.
+
+덕킹은 게임에서 **환경 사운드(예: 바람, 불, 효과음 등)** 와 **음악(배경음)** 이 서로 균형 있게 들리도록 만들어줍니다.
+
+---
+
+## 📋 목차
+
+1. [덕킹(Ducking) 개념 이해하기](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#%EB%8D%95%ED%82%B9ducking-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [덕킹을 위한 오디오 버스(Audio Bus) 구조](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#%EB%8D%95%ED%82%B9%EC%9D%84-%EC%9C%84%ED%95%9C-%EC%98%A4%EB%94%94%EC%98%A4-%EB%B2%84%EC%8A%A4audio-bus-%EA%B5%AC%EC%A1%B0)
+3. [Designer 레이아웃으로 전환하기](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#designer-%EB%A0%88%EC%9D%B4%EC%95%84%EC%9B%83%EC%9C%BC%EB%A1%9C-%EC%A0%84%ED%99%98%ED%95%98%EA%B8%B0)
+4. [Environmental Bus 선택 및 Auto-Ducking 설정하기](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#environmental-bus-%EC%84%A0%ED%83%9D-%EB%B0%8F-auto-ducking-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+5. [Music Bus 추가 및 볼륨 변화 설정하기](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#music-bus-%EC%B6%94%EA%B0%80-%EB%B0%8F-%EB%B3%BC%EB%A5%A8-%EB%B3%80%ED%99%94-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+6. [Fade In / Fade Out 및 Target 옵션 이해하기](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#fade-in--fade-out-%EB%B0%8F-target-%EC%98%B5%EC%85%98-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. 🎚 덕킹(Ducking) 개념 이해하기
+
+- **덕킹(Ducking)** 은 한 오디오 신호의 볼륨이 다른 오디오 신호의 세기에 따라 자동으로 조절되는 기능입니다.
+- 쉽게 말해, “A 소리가 나면 B 소리의 볼륨을 줄인다”라는 관계를 만드는 것입니다.
+
+### 🔊 대표적인 예시 – 라디오 DJ
+
+- DJ가 마이크로 말을 하면 → 마이크 신호가 감지됨.
+- 그 순간 **배경음악(Music)** 볼륨이 자동으로 줄어듭니다.
+- DJ가 말을 멈추면 → 음악 볼륨이 원래대로 다시 올라갑니다.
+
+🎮 **게임에서의 활용**
+
+- 플레이어 주변에서 **환경 사운드(Environmental)** 가 커질 때,
+  **배경 음악(Music)** 의 볼륨을 자동으로 줄여서 플레이어가 상황음을 더 명확히 들을 수 있게 합니다.
+- 반대로 플레이어가 조용히 있을 때(환경 소리 거의 없음), 음악의 볼륨이 자연스럽게 올라갑니다.
+
+---
+
+## 2. 🧱 덕킹을 위한 오디오 버스(Audio Bus) 구조
+
+덕킹을 설정하려면, 먼저 **오디오 버스(Audio Bus)** 구조를 이해해야 합니다.
+
+- **Audio Bus** : 비슷한 성격의 사운드들을 묶어 관리하는 통로입니다.
+  예를 들어,
+  - `Music Bus` → 게임 배경음악
+  - `Environmental Bus` → 바람, 물소리, 불, 주변 소리 등
+  - `SFX Bus` → 효과음 (공격, 버튼 클릭 등)
+
+👉 각각의 버스는 서로 독립적이지만, 덕킹을 통해 **서로 영향을 주는 관계**를 만들 수 있습니다.
+
+즉,
+
+> Environmental Bus가 활성화되면 → Music Bus의 볼륨이 자동으로 줄어듭니다.
+
+---
+
+## 3. 🧭 Designer 레이아웃으로 전환하기
+
+1. 메뉴 바에서 **`Layouts > Designer (F5)`** 를 선택합니다.
+   - 이 레이아웃은 오디오 자산과 관련된 디자인 작업을 하기 위한 전용 화면입니다.
+   - **Master-Mixer Hierarchy** 창이 함께 보이게 됩니다.
+
+---
+
+## 4. 🌲 Environmental Bus 선택 및 Auto-Ducking 설정하기
+
+1. **Master-Mixer Hierarchy** 에서
+
+   `Environmental Bus` 를 선택합니다.
+   - 이 버스는 “환경 소리”를 담당합니다.
+   - 이제 이 버스가 다른 버스(Music)를 제어하도록 설정할 것입니다.
+
+2. 기본 편집기 하단에서 **`Auto-Ducking` 탭** 을 클릭합니다.
+   - Auto-Ducking은 특정 버스의 볼륨을 자동으로 조절하는 기능을 설정하는 곳입니다.
+3. **“Add Bus to Ducking List”** 버튼을 클릭합니다.
+   - 이 버튼은 “내가 제어하고 싶은 버스”를 목록에 추가하는 기능입니다.
+4. 그러면 **Project Explorer - Browser 창** 이 열립니다.
+   - 여기서 어떤 버스의 볼륨을 줄일지 선택할 수 있습니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380551/notion-blog/_/WWISE/Wwise_/16_Mixing_Desk_/image_7.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380551/notion-blog/_/WWISE/Wwise_/16_Mixing_Desk_/image_8.png)
+
+---
+
+## 5. 🎵 Music Bus 추가 및 볼륨 변화 설정하기
+
+1. **Master Audio Bus** 를 펼칩니다.
+2. 그 아래에 있는 **`Music` 버스** 를 선택합니다.
+3. **OK** 를 클릭합니다.
+
+→ 이제 **Environmental Bus** 가 **Music Bus의 볼륨을 제어**하도록 연결되었습니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380551/notion-blog/_/WWISE/Wwise_/16_Mixing_Desk_/image_9.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380548/notion-blog/_/WWISE/Wwise_/16_Mixing_Desk_/image_10.png)
+
+---
+
+### 🔧 볼륨(Volume) 변화값 설정
+
+- 기본값은 **6 dB** 로 되어 있습니다.
+  즉, Environmental Bus에 신호가 감지되면 Music Bus의 볼륨이 6dB 줄어듭니다.
+- 강의에서는 이 효과를 더 명확히 느끼기 위해 **9 dB** 로 변경합니다.
+  - 🎯 설정: **Volume = -9 dB**
+  - 이렇게 하면 Environmental 사운드가 커질 때 음악이 더 크게 줄어듭니다.
+
+---
+
+## 6. ⏱ Fade In / Fade Out 및 Target 옵션 이해하기
+
+### 🔄 Fade In / Fade Out
+
+- **Fade In**: 버스 신호가 감지되기 시작한 후 볼륨이 서서히 줄어드는 데 걸리는 시간
+- **Fade Out**: 버스 신호가 사라진 후 볼륨이 서서히 원래대로 복귀하는 데 걸리는 시간
+
+이 값들을 조절하면 덕킹 효과가 **더 자연스럽게 이어지도록** 만들 수 있습니다.
+
+예를 들어, 갑작스럽게 음악이 꺼지는 대신 부드럽게 줄어들게 됩니다.
+
+---
+
+### 🎯 Target (적용 대상)
+
+- 기본 설정은 **Voice Volume** 입니다.
+  → Music 버스 안에 있는 각각의 **사운드 오브젝트(Voice)** 의 볼륨이 개별적으로 줄어듭니다.
+- 만약 Target을 **Bus Volume** 으로 변경하면,
+  → Music 버스 전체의 레벨(전체 사운드 그룹 볼륨)이 동시에 줄어듭니다.
+
+이 차이를 통해 덕킹의 적용 범위를 세밀하게 제어할 수 있습니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380549/notion-blog/_/WWISE/Wwise_/16_Mixing_Desk_/image_11.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380549/notion-blog/_/WWISE/Wwise_/16_Mixing_Desk_/image_12.png)
+
+```csharp
+테스트를 통해서 음악이 나오는동안 Voice 버스를 실행하면 음악이 작아지게 해봤다
+```
+
+---
+
+## ✅ 정리
+
+| 항목              | 설명                                                                   |
+| ----------------- | ---------------------------------------------------------------------- |
+| **덕킹(Ducking)** | 한 오디오 신호가 다른 신호의 볼륨을 자동으로 줄이는 기능               |
+| **활용 예시**     | 라디오 DJ 말할 때 음악이 줄어듦 / 게임 내 환경음이 클 때 음악이 줄어듦 |
+| **제어 구조**     | Environmental Bus → Music Bus                                          |
+| **Volume 설정**   | 기본 -6dB → 강의에서는 -9dB로 변경                                     |
+| **Fade In / Out** | 볼륨 변화가 시작되고 끝나는 데 걸리는 시간 제어                        |
+| **Target 옵션**   | Voice Volume(개별 오브젝트) / Bus Volume(버스 전체) 선택 가능          |
+
+---
+
+## 🧠 개념 요약
+
+덕킹은 **사운드의 위계와 공간감을 자연스럽게 유지하는 핵심 믹싱 기술**입니다.
+
+특히 게임에서는 플레이어가 집중해야 하는 소리를 돋보이게 하며,
+
+환경 변화에 따라 배경음의 존재감을 자동으로 조절해줍니다.
+
+---
+
+# { 🚀 Mixing Desk와 State를 이용한 오디오 믹스 제어하기 }
+
+이번 강의에서는 **Mixing Desk를 활용하여 게임 State(상태)** 에 따라
+
+서로 다른 **오디오 믹스(Mix)** 를 만들고 제어하는 방법을 배웁니다.
+
+예를 들어,
+
+플레이어가 **패배(Defeated)** 했을 때는 음악은 그대로 두되,
+
+**환경음(Environmental Sound)** 만 작고 먹먹하게 들리도록 믹스를 설정하는 방법을 다룹니다.
+
+---
+
+## 📋 목차
+
+1. [Mixing Desk 개념 이해하기](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#mixing-desk-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Editing States 영역 살펴보기](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#editing-states-%EC%98%81%EC%97%AD-%EC%82%B4%ED%8E%B4%EB%B3%B4%EA%B8%B0)
+3. [Environmental Bus에 State Group 추가하기](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#environmental-bus%EC%97%90-state-group-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+4. [State에 따른 믹스 값 설정하기](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#state%EC%97%90-%EB%94%B0%EB%A5%B8-%EB%AF%B9%EC%8A%A4-%EA%B0%92-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+5. [Push States / Follow States 옵션 이해하기](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#push-states--follow-states-%EC%98%B5%EC%85%98-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+6. [사운드 테스트 및 결과 확인](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#%EC%82%AC%EC%9A%B4%EB%93%9C-%ED%85%8C%EC%8A%A4%ED%8A%B8-%EB%B0%8F-%EA%B2%B0%EA%B3%BC-%ED%99%95%EC%9D%B8)
+7. [단원 요약](https://www.notion.so/16-Mixing-Desk-289e683f737e803183d0f254d6123062#%EB%8B%A8%EC%9B%90-%EC%9A%94%EC%95%BD)
+
+---
+
+## 1. Mixing Desk 개념 이해하기
+
+- **Mixing Desk**
+  - 여러 **Audio Bus** 의 믹스 속성(볼륨, 필터, 이펙트 등)을 한눈에 보고 조정할 수 있는 도구.
+  - 게임 전체 오디오를 통합적으로 관리하며, **상태(State)** 에 따라 다르게 들리도록 설정 가능.
+- **이번 실습의 목표**
+  - 플레이어가 **패배(Defeated)** 했을 때만 환경음이 작고 먹먹하게 들리게 만들기.
+  - 배경 음악은 그대로 유지.
+
+---
+
+## 2. Editing States 영역 살펴보기
+
+- Mixing Desk의 **맨 위 영역**에는 **Editing States 영역**이 있습니다.
+- 기본 상태에서는 이 영역이 **비어 있음** →
+  즉, 현재 Mixing Desk에 있는 오브젝트들이 **아직 State 값 변화에 의해 제어되지 않는 상태**임을 의미.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380549/notion-blog/_/WWISE/Wwise_/16_Mixing_Desk_/image_13.png)
+
+---
+
+## 3. Environmental Bus에 State Group 추가하기
+
+1. **Environmental 믹서 스트립의 머리글(Header)** 을 **더블 클릭**합니다.
+
+   → 해당 오브젝트의 세부 설정창(이동식 오브젝트 탭)이 열립니다.
+
+2. **States 탭**을 선택합니다.
+
+   → 오브젝트에 State Group을 추가할 수 있는 영역이 표시됩니다.
+
+3. **Add State Group >> 버튼** 클릭 →
+
+   **PlayerLife** State Group을 선택합니다.
+
+4. 이제 **Environmental Bus 오브젝트**에
+   - State Group: PlayerLife
+   - States: Alive / Defeated
+     가 추가된 것을 확인할 수 있습니다.
+5. 속성값을 직접 탭에서 수정하지 않고,
+
+   **Mixing Desk에서 바로 제어**할 예정입니다.
+
+6. 오브젝트 탭 창을 닫습니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380549/notion-blog/_/WWISE/Wwise_/16_Mixing_Desk_/image_14.png)
+
+---
+
+## 4. State에 따른 믹스 값 설정하기
+
+1. Mixing Desk 위의 **Editing States 영역**을 다시 보면
+
+   → PlayerLife State Group이 추가된 것을 확인할 수 있습니다.
+
+2. 드롭다운을 통해 현재 State 값을 **Alive / Defeated** 중에서 선택할 수 있게 됩니다.
+3. **현재 PlayerLife = Alive** 상태에서는
+   - 기본 믹스(원래 설정 값)가 유지됩니다.
+4. PlayerLife를 **Defeated** 로 변경합니다.
+
+   → 이제 “플레이어가 패배한 상황”일 때 적용될 믹스 값을 설정할 수 있습니다.
+
+5. **아래로 스크롤하여 다음 값을 조정합니다:**
+   - **Bus Volume**: `8`
+   - **Voice LPF (Low Pass Filter)**: `65`
+
+   > 🧠 의미:
+   >
+   > - **Bus Volume -8** → Environmental 사운드의 전체 볼륨이 줄어듦
+   > - **Voice LPF 65** → 소리가 고음이 줄고, 먹먹하게 들리도록 필터링됨
+
+6. 방금 설정한 값은 **PlayerLife가 Defeated일 때만 적용되는 State 상쇄값**입니다.
+7. 다시 **PlayerLife = Alive** 로 변경하면
+   - Bus Volume과 LPF가 원래(Alive 상태의 기본값)로 되돌아갑니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380549/notion-blog/_/WWISE/Wwise_/16_Mixing_Desk_/image_15.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380550/notion-blog/_/WWISE/Wwise_/16_Mixing_Desk_/image_16.png)
+
+---
+
+## 5. Push States / Follow States 옵션 이해하기
+
+Mixing Desk 상단에는 두 가지 중요한 옵션이 있습니다.
+
+### ▶ Push States
+
+- 활성화하면, Mixing Desk에서 선택한 State 값이
+  **Soundcaster** 및 **Transport Control**에 그대로 반영됩니다.
+- 즉, 실제 게임이 아닌 Wwise 편집 환경에서도
+  “현재 State가 Defeated인 상황”을 **강제로 시뮬레이션**할 수 있습니다.
+
+> 💡 Tip:
+>
+> - Wwise가 게임과 연결된 상태라면, Push States가 켜진 동안
+>   실제 게임에도 동일한 State 명령을 전송합니다.
+> - 예를 들어, 실제 게임에서 패배하지 않았더라도
+>   “Defeated 상태처럼” 들리도록 테스트할 수 있습니다.
+
+### ▶ Follow States
+
+- 이 옵션이 활성화되어 있으면,
+  Wwise의 State 값이 **게임 내 실제 State 변화에 따라 자동으로 바뀝니다.**
+- 즉, 게임이 PlayerLife = Alive → Defeated로 전환되면
+  Mixing Desk도 그에 맞춰 자동으로 State를 바꿉니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380550/notion-blog/_/WWISE/Wwise_/16_Mixing_Desk_/image_17.png)
+
+---
+
+## 6. 사운드 테스트 및 결과 확인
+
+1. **Soundcaster**를 엽니다.
+2. `Fire_FireGem_Player` Event의 **Play 버튼**을 클릭합니다.
+   - 현재 PlayerLife State가 **Alive**로 설정되어 있다면,
+     → 사운드가 크고 선명하게 들립니다.
+3. Mixing Desk 위쪽에서 **PlayerLife State를 Defeated**로 변경합니다.
+   - 이제 사운드의 **볼륨이 작아지고**,
+     **선명도가 떨어지며 먹먹한 소리**로 변합니다.
+4. 차이를 확인한 후,
+
+   **Soundcaster에서 Fire_FireGem_Player Event를 정지**합니다.
+
+---
+
+## 7. 단원 요약
+
+| 구분                     | 내용                                                            |
+| ------------------------ | --------------------------------------------------------------- |
+| **핵심 개념**            | Mixing Desk를 사용해 State에 따른 오디오 믹스를 시각적으로 제어 |
+| **State 추가 대상**      | Environmental Bus (환경음 오디오 버스)                          |
+| **State Group**          | PlayerLife (Alive / Defeated)                                   |
+| **Defeated 상태 설정값** | Bus Volume = -8, Voice LPF = 65                                 |
+| **Alive 상태 설정값**    | 기본값 유지                                                     |
+| **Push States**          | 현재 선택한 State를 Soundcaster 및 게임에 적용                  |
+| **Follow States**        | 게임 내 State 변화를 Wwise가 자동으로 반영                      |
+| **결과**                 | 플레이어가 패배했을 때 환경음만 조용하고 먹먹하게 들림          |
+
+---
+
+🎉 **정리하자면**
+
+이번 단원에서는 **Mixing Desk를 통해 오디오의 상태 기반 믹스를 설계하는 방법**을 배웠습니다.
+
+이를 통해 게임의 **플레이 상황(Alive / Defeated 등)** 에 따라
+
+자연스럽고 몰입감 있는 사운드 변화를 구현할 수 있습니다.
+
+다음 단원에서는 **Designer Layout(F5)** 으로 돌아가
+
+다른 오디오 설계 과정을 이어갑니다.

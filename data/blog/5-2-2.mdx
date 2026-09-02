@@ -1,0 +1,3016 @@
+---
+title: '섹션 5: 폰과 향상된 입력 - 2'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 언리얼 엔진 - 마우스로 카메라 회전 구현 }
+
+## 🎯 학습 목표
+
+마우스 입력으로 카메라 회전 구현
+
+- Axis 2D Input Action
+- Controller 회전
+- Spring Arm 설정
+- Negate Modifier
+
+---
+
+## 🖱️ 마우스 입력의 특징
+
+### Digital vs Axis
+
+**IA_Fire (이전)**
+
+```
+Value Type: Digital (Bool)
+  ├─ True: 누름
+  └─ False: 안 누름
+  ↓
+2가지 상태만
+```
+
+**마우스 회전 (지금)**
+
+```
+Value Type: Axis 2D
+  ├─ X축: 좌우 이동
+  └─ Y축: 위아래 이동
+  ↓
+연속적인 값 (-1 ~ 1)
+```
+
+---
+
+## 📁 폴더 정리
+
+### Input Actions 폴더 생성
+
+```
+Content/Blueprints/Input/
+  └─ Input Actions/ (새 폴더)
+      ├─ IA_Fire (이동)
+      └─ IA_Look (새로 생성)
+```
+
+**이동 시 주의!**
+
+```
+우클릭 → Move Here ✓
+  (이동)
+
+Copy Here ✗
+  (복사 - 중복 생성됨)
+```
+
+---
+
+## 🎮 IA_Look 생성
+
+### Input Action 만들기
+
+```
+Input Actions 폴더
+  ↓
+우클릭 → Input → Input Action
+  ↓
+이름: IA_Look
+```
+
+### Value Type 설정
+
+```
+IA_Look 열기
+  ↓
+Value Type: Axis 2D (Vector 2D)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380723/notion-blog/_/_/_5_/_5_-_2/image.png)
+
+### Axis 2D 이해
+
+```
+Vector 2D = 2차원 벡터
+  ├─ X: 좌우 (Left/Right)
+  └─ Y: 위아래 (Up/Down)
+  ↓
+3D Vector (X, Y, Z)에서
+  └─ Z 제거한 것
+```
+
+**값 범위**
+
+```
+X축:
+  ├─ -1: 왼쪽으로 빠르게
+  ├─  0: 움직임 없음
+  └─ +1: 오른쪽으로 빠르게
+
+Y축:
+  ├─ -1: 아래로 빠르게
+  ├─  0: 움직임 없음
+  └─ +1: 위로 빠르게
+```
+
+---
+
+## 🗺️ IMC에 매핑
+
+### IA_Look 연결
+
+```
+IMC_Bot 열기
+  ↓
+Mappings → + 버튼
+  ↓
+Input Action: IA_Look 선택
+  ↓
+삼각형 확장
+  ↓
+Key: Mouse → Mouse XY 2D-Axis
+```
+
+### Mouse XY 2D-Axis란?
+
+```
+마우스 움직임 추적
+  ├─ X: 좌우 이동량
+  └─ Y: 위아래 이동량
+  ↓
+마우스 움직이는 동안
+  └─ 매 프레임 Triggered
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380720/notion-blog/_/_/_5_/_5_-_2/image_1.png)
+
+---
+
+## 🎯 Event 사용
+
+### IA_Look Event 추가
+
+```
+Event Graph 우클릭
+  ↓
+"IA_Look" 검색
+  ↓
+Event IA_Look 선택
+```
+
+### Action Value 분석
+
+```
+Event IA_Look
+  ↓
+Action Value: Vector 2D
+  ├─ Type: Struct (구조체)
+  └─ 내용: X, Y 값
+```
+
+---
+
+## 🔨 Break Vector 2D
+
+### 구조체 분해
+
+```
+Action Value 드래그
+  ↓
+"Break Vector 2D" 검색
+  ↓
+노드 생성
+```
+
+**결과**
+
+```
+Break Vector 2D
+  ├─ X (Float)
+  └─ Y (Float)
+  ↓
+각각 사용 가능
+```
+
+### Struct (구조체)란?
+
+```
+여러 값을 묶은 것
+
+예:
+  Hit Result
+    ├─ Location
+    ├─ Normal
+    └─ Component
+
+  Vector 2D
+    ├─ X
+    └─ Y
+  ↓
+Break로 풀어서 사용
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380722/notion-blog/_/_/_5_/_5_-_2/image_2.png)
+
+---
+
+## 🎮 Controller 회전
+
+### 왜 Controller인가?
+
+**초보자 생각**
+
+```
+Spring Arm 회전?
+Bot Mesh 회전?
+Camera 회전?
+  ↓
+보이는 것 회전하면 되지 않나?
+```
+
+**올바른 방법**
+
+```
+Controller 회전!
+  ↓
+보이지 않지만
+  ↓
+다른 Component들이 따라감
+  ↓
+더 깔끔하고 전문적
+```
+
+### Controller의 장점
+
+```
+Controller = 기준점
+  ├─ 회전 정보 저장
+  ├─ Component들이 따라감
+  └─ 중앙 집중 제어
+  ↓
+Spring Arm → Controller 따라감
+  ↓
+Camera → Spring Arm 따라감
+  ↓
+체계적인 구조!
+```
+
+---
+
+## 🔄 Add Controller Yaw Input
+
+### Yaw (요) - 좌우 회전
+
+```
+IA_Look Event → Triggered
+  ↓
+Add Controller Yaw Input
+  ├─ Val: X (좌우 마우스)
+```
+
+### Yaw/Pitch/Roll 복습
+
+```
+Yaw (요):
+  좌우 회전 (←→)
+  예: 고개 좌우로 돌리기
+
+Pitch (피치):
+  위아래 회전 (↑↓)
+  예: 고개 위아래로 끄덕이기
+
+Roll (롤):
+  회전 (원형)
+  예: 고개 좌우로 기울이기
+```
+
+### Add Controller Yaw Input
+
+```
+매 프레임:
+  마우스 X 이동량
+    ↓
+  Controller의 Yaw에 추가
+    ↓
+  누적되어 회전
+```
+
+---
+
+## 🌸 Spring Arm 설정
+
+### Use Pawn Control Rotation
+
+```
+BP_Bot_Pawn
+  ↓
+Spring Arm 선택
+  ↓
+Details Panel
+  ↓
+검색: "control"
+  ↓
+Use Pawn Control Rotation: ✓
+```
+
+### 옵션 의미
+
+```
+Use Pawn Control Rotation:
+  ✓ 체크
+  → Controller 회전 따라감
+
+  ✗ 체크 안 함
+  → 독립적으로 동작
+
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380722/notion-blog/_/_/_5_/_5_-_2/image_3.png)
+
+---
+
+## 🧪 테스트 1 - Yaw만
+
+### 결과
+
+```
+Play
+  ↓
+마우스 좌우 이동
+  ↓
+카메라 좌우 회전 ✓
+  ↓
+마우스 위아래 이동
+  ↓
+아무 일 없음 (아직 미구현)
+```
+
+**관찰**
+
+```
+앞으로 회전하면
+  ↓
+Mesh가 보임
+  ↓
+Mesh는 회전 안 함
+  ↓
+Controller만 회전
+```
+
+---
+
+## 🔼 Add Controller Pitch Input
+
+### Pitch (피치) - 위아래 회전
+
+```
+IA_Look Event → Triggered
+  ↓
+Add Controller Pitch Input
+  ├─ Val: Y (위아래 마우스)
+```
+
+### 연결
+
+```
+Triggered
+  ├─ Add Controller Yaw Input (X)
+  └─ Add Controller Pitch Input (Y)
+```
+
+---
+
+## 🧪 테스트 2 - Yaw + Pitch
+
+### 결과
+
+```
+마우스 좌우
+  → 좌우 회전 ✓
+
+마우스 위아래
+  → 위아래 회전 ✓
+```
+
+### 문제 발견!
+
+```
+마우스 위로 이동
+  → 아래를 봄 ✗
+
+마우스 아래로 이동
+  → 위를 봄 ✗
+  ↓
+반대로 작동!
+```
+
+---
+
+## 🔄 해결 방법 2가지
+
+### 방법 1: Multiply -1 (권장 안 함)
+
+```
+Break Vector 2D → Y
+  ↓
+Multiply
+  ├─ Y
+  └─ -1
+  ↓
+Add Controller Pitch Input
+```
+
+**문제**
+
+```
+Blueprint에서 처리
+  ↓
+매 프레임 계산
+  ↓
+비효율적
+```
+
+### 방법 2: Negate Modifier (추천!)
+
+```
+IA_Look 설정에서
+  ↓
+Modifiers에 추가
+  ↓
+Input Action 자체에서 처리
+  ↓
+효율적! ✓
+```
+
+---
+
+## ⚙️ Negate Modifier 설정
+
+### 추가
+
+```
+IA_Look 열기
+  ↓
+Modifiers 배열 → + 버튼
+  ↓
+Negate 선택
+```
+
+### Negate란?
+
+```
+Negate = 부정, 반전
+  ├─ 값의 부호 바꾸기
+  ├─ + → -
+  └─ - → +
+```
+
+### 옵션 설정
+
+```
+Negate 확장
+  ├─ X: ✗ (체크 안 함)
+  │   └─ 좌우는 정상
+  │
+  ├─ Y: ✓ (체크)
+  │   └─ 위아래 반전
+  │
+  └─ Z: (없음, 2D라서)
+```
+
+### 작동 원리
+
+```
+마우스 위로 이동
+  ↓
+원래: Y = +1
+  ↓
+Negate 적용: Y = -1
+  ↓
+위를 봄 ✓
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380722/notion-blog/_/_/_5_/_5_-_2/image_4.png)
+
+---
+
+## 🎮 최종 결과
+
+### 테스트
+
+```
+Play
+  ↓
+마우스 좌우 → 좌우 회전 ✓
+마우스 위 → 위를 봄 ✓
+마우스 아래 → 아래를 봄 ✓
+  ↓
+완벽한 FPS 카메라! 🎯
+```
+
+---
+
+## 📊 전체 구조 정리
+
+### IA_Look 설정
+
+```
+Value Type: Axis 2D (Vector 2D)
+  ↓
+Modifiers:
+  └─ Negate
+      ├─ X: ✗
+      └─ Y: ✓
+```
+
+### IMC_Bot 매핑
+
+```
+Mappings:
+  ├─ IA_Fire
+  │   └─ Mouse Left, F
+  │
+  └─ IA_Look
+      └─ Mouse XY 2D-Axis
+```
+
+### Event Graph
+
+```
+IA_Look Event → Triggered
+  ↓
+Break Vector 2D
+  ├─ X → Add Controller Yaw Input
+  └─ Y → Add Controller Pitch Input
+```
+
+### Component 설정
+
+```
+Spring Arm
+  └─ Use Pawn Control Rotation: ✓
+      ↓
+      Controller 회전 따라감
+      ↓
+      Camera도 따라감
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Axis 2D vs Digital
+
+```
+Digital (Bool):
+  ├─ 2가지 상태
+  └─ 버튼용
+
+Axis 2D (Vector 2D):
+  ├─ 연속적 값
+  └─ 마우스, 조이스틱용
+```
+
+### Controller의 역할
+
+```
+보이지 않지만
+  ├─ 회전 정보 저장
+  ├─ Component들이 따라감
+  └─ 중앙 제어 역할
+  ↓
+깔끔한 구조!
+```
+
+### Modifier의 장점
+
+```
+Blueprint에서 처리:
+  매 프레임 계산 ✗
+
+Input Action에서 처리:
+  시스템 레벨 처리 ✓
+  ↓
+더 효율적!
+```
+
+---
+
+## 🎓 Modifier 종류
+
+### Negate (부정)
+
+```
+값의 부호 반전
+  ├─ 축별로 선택 가능
+  └─ 반전된 조작감
+```
+
+### Dead Zone (데드존)
+
+```
+작은 입력 무시
+  ├─ 조이스틱 드리프트 방지
+  └─ 민감도 조절
+```
+
+### Scalar (스케일)
+
+```
+값 증폭/감소
+  ├─ 민감도 조절
+  └─ 배수 적용
+```
+
+### Smooth (스무스)
+
+```
+급격한 변화 완화
+  ├─ 부드러운 입력
+  └─ 가속도 느낌
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 1. Controller vs Component
+
+```
+Component 직접 회전 ✗
+  └─ 복잡하고 관리 어려움
+
+Controller 회전 ✓
+  └─ 깔끔하고 전문적
+```
+
+### 2. Use Pawn Control Rotation
+
+```
+체크 안 하면
+  ↓
+Spring Arm이 안 따라감
+  ↓
+카메라 고정됨
+```
+
+### 3. Negate 축 선택
+
+```
+X, Y, Z 개별 선택
+  ↓
+필요한 축만 반전
+  ↓
+Axis 2D는 Z 없음
+```
+
+---
+
+## 🎮 실전 활용
+
+### FPS 카메라
+
+```
+Yaw + Pitch
+  └─ 완벽한 1인칭 시점
+```
+
+### 3인칭 카메라
+
+```
+Spring Arm + Controller
+  └─ 자동 추적 카메라
+```
+
+### 탑다운 카메라
+
+```
+Yaw만 사용
+  └─ 회전 카메라
+```
+
+---
+
+## 🎯 핵심 정리
+
+```
+IA_Look (Axis 2D)
+  ├─ Value Type: Vector 2D
+  ├─ Modifier: Negate Y
+  └─ Mapping: Mouse XY
+  ↓
+Event Graph
+  ├─ Break Vector 2D
+  ├─ X → Add Controller Yaw
+  └─ Y → Add Controller Pitch
+  ↓
+Spring Arm
+  └─ Use Pawn Control Rotation: ✓
+  ↓
+결과: 완벽한 FPS 카메라! 🎮
+
+핵심 기억:
+  Controller 회전 = 기준점
+  Component = 따라감
+  Negate = 반전
+```
+
+# { 언리얼 엔진 - WASD 이동 시스템 구현 }
+
+## 🎯 학습 목표
+
+WASD 키로 Pawn 이동 구현
+
+- Mesh 회전 동기화
+- IA_Move 생성 및 설정
+- Floating Pawn Movement
+- Swizzle Input Axis 이해
+
+---
+
+## 🔄 Mesh 회전 동기화
+
+### 문제
+
+```
+현재:
+  Spring Arm → Controller 따라감 ✓
+  Mesh → 따라가지 않음 ✗
+  ↓
+Mesh는 고정됨
+```
+
+### Static Mesh Component 한계
+
+```
+Spring Arm:
+  Use Pawn Control Rotation ✓
+  └─ Controller 자동 추적
+
+Static Mesh:
+  그런 옵션 없음 ✗
+  └─ 수동으로 구현 필요
+```
+
+---
+
+## 🔧 Mesh 회전 구현
+
+### Event Tick 사용
+
+```
+Event Tick
+  ↓
+Get Control Rotation
+  ↓
+Set World Rotation
+  └─ Target: Bot Mesh
+```
+
+**Get Control Rotation이란?**
+
+```
+Controller의 현재 회전값
+  ├─ Controller가 바라보는 방향
+  └─ Yaw, Pitch, Roll 포함
+```
+
+### 작동 원리
+
+```
+매 프레임:
+  Controller 회전값 가져오기
+    ↓
+  Mesh에 적용
+    ↓
+  Mesh가 Controller 따라감
+```
+
+### 테스트
+
+```
+Play
+  ↓
+마우스 움직임
+  ↓
+Mesh도 함께 회전 ✓
+  ↓
+Blaster Beam 발사 방향도 정확!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380722/notion-blog/_/_/_5_/_5_-_2/image_5.png)
+
+---
+
+## 🌸 Spring Arm의 충돌 처리
+
+### 자동 줌 기능
+
+```
+위를 보다가
+  ↓
+카메라가 바닥에 부딪힘
+  ↓
+Spring Arm 자동 축소
+  ↓
+카메라 당겨짐 ✓
+  ↓
+뚫고 나가지 않음!
+```
+
+**Spring Arm의 장점**
+
+```
+자동 충돌 감지
+  ├─ Target Arm Length 자동 조절
+  ├─ 벽 관통 방지
+  └─ 부드러운 전환
+```
+
+---
+
+## 🎮 IA_Move 생성
+
+### Input Action 만들기
+
+```
+Input Actions 폴더
+  ↓
+우클릭 → Input Action
+  ↓
+이름: IA_Move
+  ↓
+Value Type: Axis 2D
+```
+
+### Axis 2D 이유
+
+```
+이동 = 2차원
+  ├─ 좌우 (X축)
+  └─ 전후 (Y축)
+  ↓
+Axis 2D 사용
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380722/notion-blog/_/_/_5_/_5_-_2/image_6.png)
+
+---
+
+## ⌨️ WASD 매핑 설정
+
+### IMC_Bot에 추가
+
+```
+IMC_Bot 열기
+  ↓
+Mappings → + 버튼
+  ↓
+Input Action: IA_Move
+```
+
+### 4개 키 추가
+
+```
+키보드 아이콘 클릭 → W
+  ↓
++ 버튼 → 키보드 아이콘 → A
+  ↓
++ 버튼 → 키보드 아이콘 → S
+  ↓
++ 버튼 → 키보드 아이콘 → D
+```
+
+**결과**
+
+```
+IA_Move
+  ├─ W
+  ├─ A
+  ├─ S
+  └─ D
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380723/notion-blog/_/_/_5_/_5_-_2/image_7.png)
+
+---
+
+## ❌ 첫 번째 문제: 모두 X축
+
+### 테스트 결과
+
+```
+Print String (X 값)
+  ↓
+W 누름 → 1
+A 누름 → 1
+S 누름 → 1
+D 누름 → 1
+  ↓
+모두 같음! ✗
+```
+
+### 왜 이런가?
+
+```
+기본값:
+  모든 키 → X축으로 입력
+  ↓
+구분 불가능
+  ↓
+Modifier로 해결 필요
+```
+
+---
+
+## 🔄 A키: Negate Modifier
+
+### A는 왼쪽 (-1)
+
+```
+IMC_Bot
+  ↓
+A 키 → Modifiers → + 버튼
+  ↓
+Negate 선택
+  ├─ X: ✓ (체크)
+  ├─ Y: ✗
+  └─ Z: ✗
+```
+
+### 결과
+
+```
+D 누름 → X = +1 (오른쪽)
+A 누름 → X = -1 (왼쪽)
+  ↓
+구분 가능! ✓
+```
+
+---
+
+## 🔀 W/S키: Swizzle Modifier
+
+### 문제
+
+```
+W와 S도 X축으로 입력됨
+  ↓
+전후 이동 불가
+  ↓
+Y축으로 바꿔야 함
+```
+
+### Swizzle Input Axis Values
+
+```
+축의 순서를 바꿈
+
+기본: X, Y, Z
+  ↓
+Swizzle: Y, X, Z
+  ↓
+첫 번째 값이 Y축으로!
+```
+
+### W키 설정
+
+```
+W → Modifiers → + 버튼
+  ↓
+Swizzle Input Axis Values
+  ↓
+Order: YXZ
+```
+
+**의미**
+
+```
+W 누름
+  ↓
+원래: X = 1
+  ↓
+Swizzle 후: Y = 1
+  ↓
+전진! ✓
+```
+
+### S키 설정 (2개 Modifier!)
+
+```
+S → Modifiers
+  ├─ 1. Swizzle (YXZ)
+  │   └─ Y축으로 변경
+  │
+  └─ 2. Negate
+      ├─ X: ✗
+      ├─ Y: ✓ (체크)
+      └─ Z: ✗
+```
+
+**왜 2개?**
+
+```
+1. Swizzle: Y축으로 변경
+2. Negate: 음수로 변경
+  ↓
+S 누름 → Y = -1 (후진)
+```
+
+# 왜 Swizzle로 순서를 바꾸나?
+
+## 💡 이유
+
+키보드 키를 누르면 **무조건 첫 번째 칸(X축)에만** 값이 들어가는데, 우리는 W키는 "앞으로(Y축)", D키는 "오른쪽으로(X축)" 가게 하고 싶잖아요? 그래서 **W키에만 "첫 번째 칸을 Y로 바꿔!"**라고 Swizzle로 순서를 뒤집어버리는 거예요. 마치 우편 배달부한테 "이 편지는 1번 우편함 말고 2번 우편함에 넣어주세요!"라고 특별 지시하는 것처럼요. 그러면 W는 Y칸(앞), D는 X칸(오른쪽)으로 각각 다른 방향으로 움직일 수 있게 됩니다!
+
+---
+
+## 🎯 한 줄 요약
+
+**모든 키가 기본적으로 X칸(오른쪽)에만 들어가니까, W키만 특별히 Y칸(앞)으로 바꿔서 다른 방향으로 움직이게 하려고!**
+
+---
+
+## 📊 최종 키 설정 요약
+
+```
+W:
+  └─ Swizzle (YXZ)
+  → Y = +1 (전진)
+
+A:
+  └─ Negate (X)
+  → X = -1 (왼쪽)
+
+S:
+  ├─ Swizzle (YXZ)
+  └─ Negate (Y)
+  → Y = -1 (후진)
+
+D:
+  └─ (없음)
+  → X = +1 (오른쪽)
+```
+
+---
+
+## 🚁 Floating Pawn Movement
+
+### Component 추가
+
+```
+BP_Bot_Pawn
+  ↓
+Add Component
+  ↓
+검색: Floating Pawn Movement
+  ↓
+추가
+```
+
+### Floating Pawn Movement란?
+
+```
+사용자 입력 기반 이동
+  ├─ Physics 없음
+  ├─ 부드러운 이동
+  └─ Pawn 전용
+
+비교:
+  Projectile Movement
+    └─ 발사체용 (자동)
+
+  Floating Pawn Movement
+    └─ Pawn용 (입력)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380723/notion-blog/_/_/_5_/_5_-_2/image_8.png)
+
+---
+
+## ➡️ 좌우 이동 구현
+
+### Add Input Vector
+
+```
+IA_Move Event → Triggered
+  ↓
+Floating Pawn Movement
+  ↓
+Add Input Vector
+  └─ World Vector: 이동 방향
+```
+
+### Get Right Vector
+
+```
+Get Control Rotation
+  ↓
+Get Right Vector
+  ├─ Controller의 오른쪽 방향
+  └─ Vector 반환
+```
+
+**Right Vector란?**
+
+```
+현재 바라보는 방향 기준
+  ↓
+오른쪽 방향의 단위 벡터
+
+예:
+  북쪽 바라봄 → Right = 동쪽
+  동쪽 바라봄 → Right = 남쪽
+```
+
+### Scale (곱하기)
+
+```
+Get Right Vector
+  ↓
+Multiply (×)
+  ├─ Right Vector
+  └─ X (Float 변환)
+  ↓
+Add Input Vector
+```
+
+**왜 곱하나?**
+
+```
+D (X = +1):
+  Right Vector × 1 = 오른쪽
+
+A (X = -1):
+  Right Vector × -1 = 왼쪽
+  ↓
+반대 방향!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380723/notion-blog/_/_/_5_/_5_-_2/image_9.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380720/notion-blog/_/_/_5_/_5_-_2/image_10.png)
+
+---
+
+## ⬆️ 전후 이동 구현
+
+### Get Forward Vector
+
+```
+Get Control Rotation
+  ↓
+Get Forward Vector
+  ├─ Controller의 앞 방향
+  └─ Vector 반환
+```
+
+### 구조
+
+```
+Floating Pawn Movement
+  ↓
+Add Input Vector
+  ├─ World Vector:
+  │   Get Forward Vector × Y
+```
+
+**완전한 흐름**
+
+```
+W (Y = +1):
+  Forward Vector × 1 = 앞
+
+S (Y = -1):
+  Forward Vector × -1 = 뒤
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380720/notion-blog/_/_/_5_/_5_-_2/image_11.png)
+
+---
+
+## 🧪 테스트
+
+```
+Play
+  ↓
+W → 전진 ✓
+S → 후진 ✓
+A → 좌로 ✓
+D → 우로 ✓
+  ↓
+완벽한 WASD 이동! 🎮
+```
+
+---
+
+## 🤔 왜 X가 좌우, Y가 전후?
+
+### 의문
+
+```
+언리얼에서:
+  X = 전후
+  Y = 좌우
+
+그런데 왜 반대?
+```
+
+### 답변
+
+```
+2D 좌표계 (수학):
+  X = 좌우 (가로)
+  Y = 위아래 (세로)
+
+3D 좌표계 (언리얼):
+  X = 전후
+  Y = 좌우
+  Z = 위아래
+  ↓
+IA_Move는 Axis 2D
+  ↓
+2D 규칙 따름!
+```
+
+**원하면 바꿔도 됨**
+
+```
+W/S에 Swizzle 제거
+A/D에 Swizzle 추가
+  ↓
+자유롭게 선택!
+```
+
+---
+
+## 🎨 Enhanced Input Action Value
+
+### Pure Function 활용
+
+```
+기존:
+  IA_Move Event
+  ↓
+  Action Value
+  ↓
+  Break Vector 2D
+
+개선:
+  Enhanced Input Action Value (Pure)
+  ↓
+  IA_Move
+  ↓
+  Break Vector 2D
+```
+
+**장점**
+
+```
+실행 핀 없음
+  ↓
+와이어 정리
+  ↓
+더 깔끔!
+```
+
+---
+
+## 🧹 Blueprint 정리
+
+### 함수로 축소
+
+### 1. Get Right Input Vector
+
+```
+노드 선택:
+  ├─ Enhanced Input Action Value
+  ├─ Break Vector 2D
+  ├─ Get Right Vector
+  └─ Multiply
+  ↓
+우클릭 → Collapse to Function
+  ↓
+이름: Get Right Input Vector
+  ↓
+Pure: ✓
+```
+
+### 2. Get Forward Input Vector
+
+```
+노드 선택:
+  ├─ Enhanced Input Action Value
+  ├─ Break Vector 2D
+  ├─ Get Forward Vector
+  └─ Multiply
+  ↓
+Collapse to Function
+  ↓
+이름: Get Forward Input Vector
+  ↓
+Pure: ✓
+```
+
+### 3. Handle Floating Pawn Movement
+
+```
+노드 선택:
+  ├─ Floating Pawn Movement
+  ├─ Add Input Vector ×2
+  ↓
+Collapse to Function
+  ↓
+이름: Handle Floating Pawn Movement
+```
+
+### 4. Handle Look Input
+
+```
+노드 선택:
+  ├─ Break Vector 2D
+  ├─ Add Controller Yaw
+  └─ Add Controller Pitch
+  ↓
+Collapse to Function
+  ↓
+이름: Handle Look Input
+```
+
+### 5. Rotate Mesh to Controller
+
+```
+노드 선택:
+  ├─ Get Control Rotation
+  └─ Set World Rotation
+  ↓
+Collapse to Function
+  ↓
+이름: Rotate Mesh to Controller
+```
+
+### 6. Add Input Mapping Context
+
+```
+노드 선택:
+  (Begin Play 관련)
+  ↓
+Collapse to Function
+  ↓
+이름: Add Input Mapping Context
+  ↓
+Comment 유지
+  └─ Show Bubble: ✓
+```
+
+---
+
+## 📊 정리된 Event Graph
+
+### 최종 모습
+
+```
+Event Begin Play
+  └─ Add Input Mapping Context
+
+Event Tick
+  └─ Rotate Mesh to Controller
+
+IA_Fire Event → Started
+  └─ Fire Rifle
+
+IA_Look Event → Triggered
+  └─ Handle Look Input
+
+IA_Move Event → Triggered
+  └─ Handle Floating Pawn Movement
+      ├─ Get Right Input Vector
+      └─ Get Forward Input Vector
+```
+
+**깔끔!** ✨
+
+---
+
+## ⚠️ Blueprint 정리 팁
+
+### 왜 정리?
+
+```
+정리 안 하면:
+  ├─ 노드 스파게티
+  ├─ 유지보수 어려움
+  └─ 협업 불가능
+  ↓
+항상 정리하자!
+```
+
+### 정리 방법
+
+```
+1. 함수로 축소
+   └─ 관련 노드 묶기
+
+2. Comment 추가
+   └─ 설명 붙이기
+
+3. Reroute Node
+   └─ 와이어 정리
+
+4. 테스트
+   └─ 정리 후 항상 확인!
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Modifier 종류
+
+```
+Negate:
+  부호 반전 (+/-)
+
+Swizzle:
+  축 순서 변경
+
+Dead Zone:
+  작은 입력 무시
+
+Scalar:
+  값 증폭/감소
+```
+
+### 이동 System
+
+```
+1. Input Action (IA_Move)
+2. Mapping Context (WASD + Modifiers)
+3. Movement Component (Floating Pawn)
+4. Add Input Vector (방향 + 크기)
+```
+
+### Vector 함수
+
+```
+Get Right Vector:
+  오른쪽 방향
+
+Get Forward Vector:
+  앞 방향
+
+Get Up Vector:
+  위 방향
+```
+
+---
+
+## 🎓 학습 요약
+
+### 새로 배운 것
+
+```
+1. Swizzle Modifier
+   축 순서 변경
+
+2. Floating Pawn Movement
+   입력 기반 이동 Component
+
+3. Add Input Vector
+   방향 벡터로 이동
+
+4. Enhanced Input Action Value
+   Pure Function 사용
+
+5. Blueprint 정리 기법
+   함수 축소
+```
+
+### 구현한 시스템
+
+```
+완전한 FPS 컨트롤
+  ├─ 마우스 회전 ✓
+  ├─ WASD 이동 ✓
+  ├─ 발사 ✓
+  └─ Mesh 동기화 ✓
+```
+
+---
+
+## 📝 다음 단계
+
+```
+현재:
+  기본 이동 완성 ✓
+
+가능한 개선:
+  ├─ 속도 조절
+  ├─ 가속도 추가
+  ├─ 점프 구현
+  └─ 충돌 처리
+```
+
+---
+
+## 🎯 핵심 정리
+
+```
+Mesh 회전 동기화
+  Event Tick
+  └─ Get Control Rotation → Set World Rotation
+  ↓
+WASD 매핑
+  W: Swizzle (YXZ)
+  A: Negate (X)
+  S: Swizzle + Negate (Y)
+  D: (기본)
+  ↓
+Floating Pawn Movement
+  Add Input Vector
+  ├─ Right Vector × X (좌우)
+  └─ Forward Vector × Y (전후)
+  ↓
+Blueprint 정리
+  함수로 축소 → 깔끔한 구조
+  ↓
+결과: 전문적인 FPS 컨트롤! 🎮
+
+중요 포인트:
+  1. Swizzle = 축 순서 변경
+  2. 2D는 X=좌우, Y=전후
+  3. 항상 Blueprint 정리!
+```
+
+# { 언리얼 엔진 - 위아래 이동 및 Camera Lag 추가 }
+
+## 🎯 학습 목표
+
+상하 이동 추가 및 카메라 효과 개선
+
+- Axis 3D로 업그레이드
+- Space 키로 위로 이동
+- Camera Lag 효과
+- Blueprint 정리
+
+---
+
+## ⬆️ 문제: 위아래로 못 움직임
+
+### 현재 상황
+
+```
+Default Pawn:
+  위아래 이동 가능 ✓
+
+우리 Pawn:
+  좌우, 전후만 가능 ✗
+  위아래 불가능 ✗
+```
+
+### 이유
+
+```
+IA_Move: Axis 2D
+  ├─ X: 좌우
+  └─ Y: 전후
+  ↓
+Z축 없음!
+  ↓
+위아래 이동 불가
+```
+
+---
+
+## 🔄 Axis 2D → Axis 3D 변경
+
+### Value Type 변경
+
+```
+IA_Move 열기
+  ↓
+Value Type: Axis 3D (Vector)
+  ↓
+저장
+```
+
+### Vector vs Vector 2D
+
+```
+Vector 2D:
+  ├─ X (좌우)
+  └─ Y (전후)
+
+Vector (3D):
+  ├─ X (좌우)
+  ├─ Y (전후)
+  └─ Z (위아래) ← 추가!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380722/notion-blog/_/_/_5_/_5_-_2/image_12.png)
+
+---
+
+## 🧪 기존 동작 확인
+
+### 테스트
+
+```
+Play
+  ↓
+WASD로 이동
+  ↓
+여전히 작동 ✓
+```
+
+**왜 그런가?**
+
+```
+Vector 2D → Vector 3D
+  ├─ X, Y는 동일
+  └─ Z만 추가됨
+  ↓
+기존 동작 유지!
+```
+
+---
+
+## 🔑 Space 키 추가
+
+### IMC_Bot 설정
+
+```
+IMC_Bot 열기
+  ↓
+IA_Move → Mappings
+  ↓
+맨 아래 + 버튼
+  ↓
+키보드 아이콘 → Space
+```
+
+### 문제 발견
+
+```
+Space 누름
+  ↓
+기본: X축으로 입력
+  ↓
+오른쪽으로 이동 ✗
+```
+
+---
+
+## 🔀 Space에 Swizzle 적용
+
+### Swizzle 설정
+
+```
+Space 키
+  ↓
+Modifiers → + 버튼
+  ↓
+Swizzle Input Axis Values
+  ↓
+Order: ZXY
+```
+
+### Order 이해
+
+```
+기본 (XYZ):
+  Space → 첫 번째 칸(X)
+
+ZXY:
+  Space → 첫 번째 칸이 Z!
+  ↓
+Z축으로 입력됨 ✓
+```
+
+**왜 ZXY인가?**
+
+```
+Z를 맨 앞에!
+  ↓
+첫 번째 값 → Z축
+  ↓
+위로 이동
+```
+
+---
+
+## 🔧 Blueprint 수정
+
+### Break Vector 2D → Break Vector
+
+### Get Right Input Vector 함수
+
+**문제**
+
+```
+함수 열기
+  ↓
+Break Vector 2D 사용 중
+  ↓
+하지만 이제 Vector (3D)!
+  ↓
+이상함
+```
+
+**수정**
+
+```
+Break Vector 2D 삭제
+  ↓
+Enhanced Input Action Value
+  ↓
+Break Vector
+  ├─ X
+  ├─ Y
+  └─ Z
+  ↓
+X만 사용
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380721/notion-blog/_/_/_5_/_5_-_2/image_13.png)
+
+### Get Forward Input Vector 함수
+
+**같은 방법**
+
+```
+Break Vector 2D → Break Vector
+  ↓
+Y만 사용
+```
+
+---
+
+## ⬆️ Get Up Input Vector 함수 생성
+
+### 목표
+
+```
+Space 누름
+  ↓
+Z축 값
+  ↓
+위로 이동
+```
+
+### 노드 구성
+
+### 1. Get Control Rotation
+
+```
+Get Control Rotation
+  ↓
+Controller의 현재 회전값
+```
+
+**왜 필요한가?**
+
+```
+"위"는 절대적 아님
+  ↓
+바라보는 방향에 따라 달라짐
+  ↓
+Controller 기준 필요
+```
+
+### 2. Get Up Vector
+
+```
+Get Control Rotation
+  ↓
+Get Up Vector
+  ↓
+현재 회전 기준 위 방향
+```
+
+**Get Up Vector란?**
+
+```
+회전값을 입력받아
+  ↓
+그 회전 기준으로
+  ↓
+위쪽 방향 벡터 반환
+
+예:
+  정면 보고 있음 → 위 = 하늘
+  옆으로 누움 → 위 = 옆
+```
+
+### 3. Enhanced Input Action Value
+
+```
+IA_Move
+  ↓
+Enhanced Input Action Value
+  ↓
+Vector 반환 (X, Y, Z)
+```
+
+### 4. Break Vector
+
+```
+Vector
+  ↓
+Break Vector
+  ├─ X
+  ├─ Y
+  └─ Z ← 필요한 것!
+```
+
+### 5. Multiply (곱하기)
+
+```
+Get Up Vector (방향)
+  ×
+Z (크기)
+  ↓
+최종 이동 벡터
+```
+
+**왜 곱하나?**
+
+```
+Up Vector = 방향만 (크기 1)
+  ↓
+Z값 곱하기 = 크기 조절
+
+Space 누름 (Z = +1):
+  Up Vector × 1 = 위로
+
+나중에 아래 키 추가 (Z = -1):
+  Up Vector × -1 = 아래로
+```
+
+### 전체 흐름
+
+```
+Get Control Rotation
+  ↓
+Get Up Vector (위 방향)
+  ×
+Z값 (Space = 1)
+  ↓
+Add Input Vector
+  ↓
+위로 이동! ✓
+
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380721/notion-blog/_/_/_5_/_5_-_2/image_14.png)
+
+---
+
+## 📊 Handle Floating Pawn Movement 업데이트
+
+### Add Input Vector 3번 호출
+
+```
+Handle Floating Pawn Movement
+  ├─ 1. Add Input Vector (Right)
+  ├─ 2. Add Input Vector (Forward)
+  └─ 3. Add Input Vector (Up) ← 새로 추가!
+```
+
+### 최종 구조
+
+```
+IA_Move Triggered
+  ↓
+Handle Floating Pawn Movement
+  ├─ Get Right Input Vector
+  │   └─ Right Vector × X
+  │
+  ├─ Get Forward Input Vector
+  │   └─ Forward Vector × Y
+  │
+  └─ Get Up Input Vector (새로!)
+      └─ Up Vector × Z
+  ↓
+Floating Pawn Movement
+  └─ 3방향 합쳐서 이동!
+```
+
+---
+
+## 🧪 테스트
+
+```
+Play
+  ↓
+WASD: 평면 이동 ✓
+Space: 위로 상승 ✓
+  ↓
+완벽! 🚁
+```
+
+---
+
+## 📉 아래로 이동 추가 (선택사항)
+
+### 방법
+
+```
+IMC_Bot
+  ↓
+IA_Move → + 버튼
+  ↓
+키: Left Ctrl (예시)
+  ↓
+Modifiers:
+  ├─ Swizzle (ZXY)
+  └─ Negate (Z: ✓)
+  ↓
+Ctrl = Z축 음수
+  ↓
+아래로 이동
+```
+
+---
+
+## 🎥 Camera Lag (카메라 지연)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380721/notion-blog/_/_/_5_/_5_-_2/image_15.png)
+
+### 효과
+
+```
+Pawn이 움직임
+  ↓
+Camera가 약간 늦게 따라옴
+  ↓
+부드럽고 자연스러운 느낌!
+```
+
+### 설정
+
+```
+BP_Bot_Pawn
+  ↓
+Spring Arm 선택
+  ↓
+Details Panel
+  ↓
+검색: "lag"
+```
+
+---
+
+## ⚙️ Camera Lag 옵션
+
+### Enable Camera Lag
+
+```
+Camera → Camera Settings
+  ↓
+Enable Camera Lag: ✓
+```
+
+**효과**
+
+```
+체크 전:
+  Pawn 이동 = Camera 즉시 따라감
+
+체크 후:
+  Pawn 이동 → Camera 천천히 따라감
+  ↓
+부드러운 느낌! ✨
+```
+
+### Camera Lag Speed
+
+```
+Lag → Camera Lag Speed: 20
+  (기본값: 10)
+```
+
+**의미**
+
+```
+숫자가 클수록:
+  └─ Camera가 빨리 따라잡음
+
+숫자가 작을수록:
+  └─ Camera가 천천히 따라잡음
+```
+
+**값 비교**
+
+```
+5: 매우 느린 추적 (과한 지연)
+10: 적당한 추적 (기본)
+20: 빠른 추적 (권장) ✓
+50: 거의 즉시 (지연 미미)
+```
+
+### Camera Lag Max Distance
+
+```
+Lag → Camera Lag Max Distance: 0
+  (기본값: 0 = 제한 없음)
+```
+
+**의미**
+
+```
+0: 제한 없음
+  └─ 얼마든지 멀어질 수 있음
+
+값 설정 (예: 100):
+  └─ 100 이상 안 멀어짐
+  └─ 그 이상은 즉시 따라감
+```
+
+---
+
+## 🎨 Camera Lag 효과 비교
+
+### Lag 없을 때
+
+```
+Pawn 이동
+  ↓
+Camera 즉시 따라감
+  ↓
+딱딱한 느낌
+  ↓
+뭔가 부족함
+```
+
+### Lag 있을 때
+
+```
+Pawn 이동
+  ↓
+Camera 약간 늦게 따라감
+  ↓
+부드러운 느낌 ✨
+  ↓
+"쥬스(Juice)" 효과
+  ↓
+전문적인 느낌!
+```
+
+---
+
+## 💡 "Juice" 개념
+
+### Juice란?
+
+```
+게임에 생동감 주는 작은 효과들
+
+예:
+  ├─ Camera Lag
+  ├─ Screen Shake
+  ├─ Particle Effects
+  └─ Sound Effects
+  ↓
+있으면: 좋다! ✨
+없으면: 뭔가 부족...
+```
+
+**Camera Lag = Juice의 예**
+
+```
+미묘하지만
+  ↓
+게임 느낌을 크게 바꿈
+  ↓
+프로페셔널한 차이
+```
+
+---
+
+## 📊 최종 시스템 정리
+
+### IA_Move (Axis 3D)
+
+```
+Value Type: Vector (3D)
+  ├─ X: 좌우
+  ├─ Y: 전후
+  └─ Z: 위아래
+```
+
+### IMC_Bot 매핑
+
+```
+IA_Move:
+  ├─ W: Swizzle (YXZ)
+  ├─ A: Negate (X)
+  ├─ S: Swizzle (YXZ) + Negate (Y)
+  ├─ D: (기본)
+  └─ Space: Swizzle (ZXY)
+```
+
+### Blueprint 함수
+
+```
+Handle Floating Pawn Movement
+  ├─ Get Right Input Vector
+  │   └─ Right × X
+  │
+  ├─ Get Forward Input Vector
+  │   └─ Forward × Y
+  │
+  └─ Get Up Input Vector
+      └─ Up × Z
+```
+
+### Spring Arm 설정
+
+```
+Camera Settings:
+  ├─ Use Pawn Control Rotation: ✓
+  └─ Enable Camera Lag: ✓
+
+Lag:
+  ├─ Camera Lag Speed: 20
+  └─ Camera Lag Max Distance: 0
+```
+
+---
+
+## 🎓 핵심 개념 정리
+
+### Vector 차원
+
+```
+2D (Vector 2D):
+  평면 이동만
+
+3D (Vector):
+  3차원 자유 이동
+  ↓
+드론, 비행기에 적합!
+```
+
+### Get Up Vector
+
+```
+회전 기준 위 방향
+  ├─ 절대 좌표 아님
+  ├─ 회전에 따라 변함
+  └─ Controller 기준
+```
+
+### Camera Lag
+
+```
+즉각 반응 → 딱딱함
+지연 반응 → 부드러움
+  ↓
+Speed로 조절
+```
+
+---
+
+## 💡 원리 이해
+
+### Add Input Vector 작동 원리
+
+```
+3번 호출:
+  1. Right Vector × X
+  2. Forward Vector × Y
+  3. Up Vector × Z
+  ↓
+Floating Pawn Movement가 합침
+  ↓
+최종 이동 방향 = 1 + 2 + 3
+  ↓
+부드럽게 이동!
+```
+
+**예시**
+
+```
+W + D + Space 동시 누름:
+  ├─ Forward (Y = 1)
+  ├─ Right (X = 1)
+  └─ Up (Z = 1)
+  ↓
+대각선 위로 이동!
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 1. Break Vector 2D → Vector
+
+```
+Axis 3D로 변경 후
+  ↓
+Break Vector 2D 안 맞음
+  ↓
+Break Vector로 변경 필수!
+
+```
+
+### 2. Swizzle 순서
+
+```
+Space: ZXY
+  └─ Z가 첫 번째여야 함!
+
+XYZ면 안 됨
+  └─ X축으로 가버림
+
+```
+
+### 3. Camera Lag Speed
+
+```
+너무 낮으면: 멀미 유발
+너무 높으면: 효과 미미
+  ↓
+10~20 권장
+
+```
+
+---
+
+## 🎯 최종 정리
+
+```
+Axis 3D 업그레이드
+  └─ Z축 추가 (위아래)
+  ↓
+Space 키 매핑
+  └─ Swizzle (ZXY)
+  ↓
+Get Up Input Vector
+  └─ Up Vector × Z
+  ↓
+Camera Lag
+  ├─ Enable: ✓
+  └─ Speed: 20
+  ↓
+결과:
+  ├─ 완전한 3D 이동 ✓
+  └─ 부드러운 카메라 ✓
+  ↓
+전문적인 FPS 컨트롤 완성! 🎮
+
+```
+
+# { Enhanced Input System 최종 완벽 정리 }
+
+## 🎯 전체 시스템 한눈에 보기
+
+```
+1. Input Action (IA)
+   "무엇을 할 건지"
+   ↓
+2. Input Mapping Context (IMC)
+   "어떤 키로 할 건지"
+   ↓
+3. Pawn에 연결
+   "누가 받을 건지"
+   ↓
+4. Event로 반응
+   "실제로 뭘 할 건지"
+```
+
+---
+
+## 📦 1단계: Input Action (무엇을)
+
+### Input Action이란?
+
+**쉬운 비유**
+
+```
+동작 메뉴판
+
+메뉴:
+  ├─ 발사하기
+  ├─ 둘러보기
+  └─ 이동하기
+
+손님: "발사 1개요!"
+  ↓
+Input Action = 메뉴 항목
+```
+
+### 우리가 만든 것
+
+```
+IA_Fire (발사)
+  └─ Value Type: Digital (Bool)
+      └─ 눌림/안 눌림
+
+IA_Look (둘러보기)
+  └─ Value Type: Axis 2D
+      └─ 마우스 X, Y
+
+IA_Move (이동)
+  └─ Value Type: Axis 3D
+      └─ X, Y, Z 방향
+```
+
+---
+
+## 🎮 Value Type 이해
+
+### Digital (Bool) - 버튼용
+
+```
+상태: 2가지만
+  ├─ True (눌림)
+  └─ False (안 눌림)
+
+예: IA_Fire
+  클릭 → True
+  뗌 → False
+```
+
+**언제 사용?**
+
+```
+단순 버튼 동작
+  ├─ 발사
+  ├─ 점프
+  └─ 상호작용
+```
+
+### Axis 2D - 평면 이동용
+
+```
+상태: 2개 값
+  ├─ X축 (-1 ~ +1)
+  └─ Y축 (-1 ~ +1)
+
+예: IA_Look
+  마우스 좌우 → X
+  마우스 위아래 → Y
+```
+
+**언제 사용?**
+
+```
+2방향 입력
+  ├─ 마우스 이동
+  ├─ 조이스틱
+  └─ WASD (평면만)
+```
+
+### Axis 3D - 3차원 이동용
+
+```
+상태: 3개 값
+  ├─ X축 (-1 ~ +1)
+  ├─ Y축 (-1 ~ +1)
+  └─ Z축 (-1 ~ +1)
+
+예: IA_Move
+  D/A → X (좌우)
+  W/S → Y (전후)
+  Space → Z (위아래)
+```
+
+**언제 사용?**
+
+```
+3방향 입력
+  ├─ 비행 (드론)
+  ├─ 수영
+  └─ 우주선
+```
+
+---
+
+## 🗺️ 2단계: Input Mapping Context (어떤 키로)
+
+### IMC란?
+
+**쉬운 비유**
+
+```
+리모컨 설정
+
+메뉴(IA)와 버튼 연결:
+  ├─ 발사 → 빨간 버튼
+  ├─ 둘러보기 → 조이스틱
+  └─ 이동 → 방향키
+
+IMC = 리모컨 버튼 배치
+```
+
+### 우리가 만든 것
+
+```
+IMC_Bot
+  ├─ IA_Fire → Mouse Left, F
+  ├─ IA_Look → Mouse XY
+  └─ IA_Move → W, A, S, D, Space
+```
+
+---
+
+## 🔧 Modifier (수정자) 이해
+
+### Modifier란?
+
+**쉬운 비유**
+
+```
+우편함 스티커
+
+기본: 모든 편지 → 1번 우편함
+스티커: "이 편지는 2번으로!"
+
+Modifier = 특별 지시 스티커
+```
+
+### 종류와 역할
+
+### 1. Negate (부정/반전)
+
+```
+역할: 부호 바꾸기
+  +1 → -1
+  -1 → +1
+
+예: A키
+  기본: X = +1 (오른쪽)
+  Negate: X = -1 (왼쪽)
+```
+
+**설정**
+
+```
+A키 → Modifiers
+  └─ Negate
+      ├─ X: ✓ (반전)
+      ├─ Y: ✗
+      └─ Z: ✗
+```
+
+### 2. Swizzle (순서 변경)
+
+```
+역할: 값이 들어갈 칸 바꾸기
+
+기본 순서: X, Y, Z
+  └─ 값 → 첫 번째(X)
+
+Swizzle: Y, X, Z
+  └─ 값 → 첫 번째(Y)
+```
+
+**예: W키**
+
+```
+기본:
+  W 누름 → X = 1 (오른쪽) ✗
+
+Swizzle (YXZ):
+  W 누름 → Y = 1 (앞) ✓
+```
+
+**설정**
+
+```
+W키 → Modifiers
+  └─ Swizzle Input Axis Values
+      └─ Order: YXZ
+```
+
+### 최종 키 설정 정리
+
+```
+W: Swizzle (YXZ)
+  → Y축 = 전진
+
+A: Negate (X)
+  → X축 = 왼쪽
+
+S: Swizzle (YXZ) + Negate (Y)
+  → Y축 음수 = 후진
+
+D: (없음)
+  → X축 = 오른쪽
+
+Space: Swizzle (ZXY)
+  → Z축 = 위
+```
+
+---
+
+## 🔌 3단계: Pawn에 연결
+
+### Event Begin Play에서
+
+```
+┌─────────────────────────────────┐
+│     Event Begin Play            │
+└────────┬────────────────────────┘
+         ↓
+┌─────────────────────────────────┐
+│     Get Controller              │
+│  이 Pawn의 컨트롤러 가져오기      │
+└────────┬────────────────────────┘
+         ↓
+┌─────────────────────────────────┐
+│  Cast to Player Controller      │
+│  타입 변환 (Controller → PC)     │
+└────────┬────────────────────────┘
+         ↓
+┌─────────────────────────────────┐
+│Get Enhanced Input Subsystem     │
+│  입력 시스템 관리자 가져오기       │
+└────────┬────────────────────────┘
+         ↓
+┌─────────────────────────────────┐
+│  Add Mapping Context (IMC_Bot)  │
+│  우리 키 설정 등록하기            │
+└─────────────────────────────────┘
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380721/notion-blog/_/_/_5_/_5_-_2/image_16.png)
+
+### 각 노드 설명
+
+### Get Controller
+
+```
+역할: 이 Pawn을 조종하는 컨트롤러
+
+비유:
+  Pawn = 자동차
+  Controller = 운전자
+
+"이 차의 운전자 누구?"
+```
+
+### Cast to Player Controller
+
+```
+역할: 타입 변환
+
+왜 필요?
+  Get Controller → Controller (부모)
+  필요한 것 → Player Controller (자식)
+
+비유:
+  "운전자"를 "사람 운전자"로 확인
+```
+
+### Get Enhanced Input Subsystem
+
+```
+역할: 입력 시스템 관리자
+
+비유:
+  우편 시스템 관리자
+  "리모컨 설정 등록하러 왔어요"
+```
+
+### Add Mapping Context
+
+```
+역할: 우리 키 설정 등록
+
+파라미터:
+  ├─ Mapping Context: IMC_Bot
+  └─ Priority: 0 (우선순위)
+
+비유:
+  "이 리모컨 설정 사용할게요!"
+```
+
+---
+
+## 🎮 4단계: Event로 반응
+
+### Input Action Event
+
+```
+Event Graph 우클릭
+  ↓
+"IA_Fire" 검색
+  ↓
+Event IA_Fire
+```
+
+### Event 실행 핀들
+
+```
+┌─────────────────────────┐
+│    Event IA_Fire        │
+├─────────────────────────┤
+│  Started ────→          │  버튼 누르는 순간 (1회)
+│  Triggered ──→          │  누르고 있는 동안 (매 프레임)
+│  Ongoing ────→          │  (고급, 보통 안 씀)
+│  Canceled ───→          │  (고급, 보통 안 씀)
+│  Completed ──→          │  버튼 떼는 순간 (1회)
+└─────────────────────────┘
+```
+
+### 실행 핀 사용법
+
+**Started (시작)**
+
+```
+언제: 버튼 누르는 순간 1회
+
+용도:
+  ├─ 점프 시작
+  ├─ 발사 (1발만)
+  └─ 상호작용
+
+예:
+  Click → Started → Fire Rifle
+```
+
+**Triggered (트리거)**
+
+```
+언제: 버튼 누르고 있는 동안 매 프레임
+
+용도:
+  ├─ 연사
+  ├─ 이동
+  └─ 회전
+
+예:
+  Hold → Triggered (계속) → Move
+```
+
+**Completed (완료)**
+
+```
+언제: 버튼 떼는 순간 1회
+
+용도:
+  ├─ 차징 완료
+  ├─ 점프 끝
+  └─ 종료 처리
+
+예:
+  Release → Completed → Stop Fire
+```
+
+---
+
+## 🎯 실제 사용 예시
+
+### 1. IA_Fire (발사)
+
+### Input Action
+
+```
+Value Type: Digital (Bool)
+  └─ True/False만
+```
+
+### IMC 매핑
+
+```
+IA_Fire
+  ├─ Mouse Left Button
+  └─ F
+```
+
+### Trigger
+
+```
+Pulse (연사 제어)
+  ├─ Interval: 0.15초
+  └─ Trigger on Start: ✓
+```
+
+### Event
+
+```
+IA_Fire → Started
+  ↓
+FlipFlop
+  ├─ A → Fire Rifle (Left: True)
+  └─ B → Fire Rifle (Left: False)
+  ↑
+  Is A → Left Rifle
+```
+
+**흐름**
+
+```
+1. 마우스 클릭
+2. IA_Fire Triggered (0.15초마다)
+3. Started → FlipFlop
+4. A/B 교대 → Fire Rifle
+5. 좌우 소총 교대 발사
+```
+
+---
+
+### 2. IA_Look (둘러보기)
+
+### Input Action
+
+```
+Value Type: Axis 2D
+  ├─ X (마우스 좌우)
+  └─ Y (마우스 위아래)
+```
+
+### IMC 매핑
+
+```
+IA_Look
+  └─ Mouse XY 2D-Axis
+```
+
+### Modifier
+
+```
+Negate
+  ├─ X: ✗
+  └─ Y: ✓ (위아래 반전)
+```
+
+### Event
+
+```
+IA_Look → Triggered
+  ↓
+Break Vector 2D
+  ├─ X → Add Controller Yaw
+  └─ Y → Add Controller Pitch
+```
+
+**흐름**
+
+```
+1. 마우스 이동
+2. IA_Look Triggered (매 프레임)
+3. X값 → Controller Yaw (좌우)
+4. Y값 → Controller Pitch (위아래)
+5. Controller 회전
+6. Spring Arm/Mesh 따라감
+```
+
+---
+
+### 3. IA_Move (이동)
+
+### Input Action
+
+```
+Value Type: Axis 3D
+  ├─ X (좌우)
+  ├─ Y (전후)
+  └─ Z (위아래)
+```
+
+### IMC 매핑
+
+```
+IA_Move
+  ├─ W: Swizzle (YXZ)
+  ├─ A: Negate (X)
+  ├─ S: Swizzle + Negate
+  ├─ D: (기본)
+  └─ Space: Swizzle (ZXY)
+```
+
+### Event
+
+```
+IA_Move → Triggered
+  ↓
+Handle Floating Pawn Movement
+  ├─ Get Right Input Vector
+  │   └─ Right × X → Add Input Vector
+  │
+  ├─ Get Forward Input Vector
+  │   └─ Forward × Y → Add Input Vector
+  │
+  └─ Get Up Input Vector
+      └─ Up × Z → Add Input Vector
+```
+
+**흐름**
+
+```
+1. W 누름 → Y = 1
+2. Break Vector → Y 추출
+3. Get Forward Vector (앞 방향)
+4. Forward × Y = 앞 벡터
+5. Add Input Vector
+6. Floating Pawn Movement가 이동
+```
+
+---
+
+## 🔄 전체 동작 원리
+
+### 큰 그림
+
+```
+┌─────────────────┐
+│  키보드/마우스   │
+└────────┬────────┘
+         ↓
+┌─────────────────┐
+│      IMC        │  키 → Input Action 매핑
+│   (리모컨 설정)  │  + Modifier 적용
+└────────┬────────┘
+         ↓
+┌─────────────────┐
+│  Input Action   │  값 생성 (Bool/Vector)
+│   (메뉴 항목)    │
+└────────┬────────┘
+         ↓
+┌─────────────────┐
+│  Input Event    │  Started/Triggered/Completed
+│   (실행 핀)      │
+└────────┬────────┘
+         ↓
+┌─────────────────┐
+│  Blueprint      │  실제 동작 실행
+│   (게임 로직)    │
+└─────────────────┘
+```
+
+---
+
+## 🎓 핵심 노드 정리
+
+### Input 관련
+
+```
+Get Controller
+  └─ Pawn의 컨트롤러
+
+Cast to Player Controller
+  └─ 타입 변환
+
+Get Enhanced Input Subsystem
+  └─ 입력 시스템 관리자
+
+Add Mapping Context
+  └─ 키 설정 등록
+
+Enhanced Input Action Value (Pure)
+  └─ Input Action 값 가져오기
+```
+
+### Controller 관련
+
+```
+Get Control Rotation
+  └─ Controller 회전값
+
+Add Controller Yaw Input
+  └─ 좌우 회전
+
+Add Controller Pitch Input
+  └─ 위아래 회전
+
+Get Right Vector
+  └─ 오른쪽 방향
+
+Get Forward Vector
+  └─ 앞 방향
+
+Get Up Vector
+  └─ 위 방향
+```
+
+### Movement 관련
+
+```
+Floating Pawn Movement (Component)
+  └─ 입력 기반 이동
+
+Add Input Vector
+  └─ 이동 방향 추가
+
+Set World Rotation
+  └─ 회전 설정
+```
+
+### 데이터 처리
+
+```
+Break Vector 2D
+  └─ X, Y 분해
+
+Break Vector
+  └─ X, Y, Z 분해
+
+Multiply
+  └─ 벡터 × 스칼라
+```
+
+---
+
+## 💡 자주 하는 실수
+
+### 1. IMC를 Add 안 함
+
+```
+✗ Input Action만 만듦
+✗ IMC만 설정함
+✗ Begin Play에서 Add 안 함
+  ↓
+작동 안 함!
+
+✓ Begin Play에서 Add Mapping Context 필수!
+```
+
+### 2. Generate Overlap Events
+
+```
+아, 이건 Collision용이지만...
+
+Enhanced Input과 헷갈림:
+  ├─ Overlap ≠ Input
+  └─ 다른 시스템!
+```
+
+### 3. Modifier 순서
+
+```
+Swizzle + Negate:
+  ✓ Swizzle 먼저 → Negate 나중
+
+Negate + Swizzle:
+  ✗ 이상한 결과!
+```
+
+### 4. Context Sensitive
+
+```
+✗ IA_Fire 검색 안 나옴
+  ↓
+✓ Context Sensitive 체크 해제
+```
+
+---
+
+## 🎯 최종 정리
+
+### 4단계 기억법
+
+```
+1. Input Action 만들기
+   "메뉴판 작성"
+
+2. IMC에서 키 연결
+   "리모컨 버튼 배치"
+
+3. Begin Play에서 Add
+   "시스템에 등록"
+
+4. Event로 반응
+   "실제 동작 만들기"
+```
+
+### 핵심 원리
+
+```
+키 누름
+  ↓
+Modifier 적용 (Swizzle, Negate)
+  ↓
+Input Action 값 생성
+  ↓
+Event 실행 핀 트리거
+  ↓
+Blueprint 로직 실행
+  ↓
+게임 반응!
+```
+
+### 우리가 만든 것
+
+```
+3개 Input Action:
+  ├─ IA_Fire (Digital)
+  ├─ IA_Look (Axis 2D)
+  └─ IA_Move (Axis 3D)
+
+1개 IMC:
+  └─ IMC_Bot (모든 키 설정)
+
+3개 Event:
+  ├─ Fire → Started → FlipFlop
+  ├─ Look → Triggered → Controller 회전
+  └─ Move → Triggered → 이동
+```
+
+**완벽한 FPS 컨트롤 시스템!** 🎮

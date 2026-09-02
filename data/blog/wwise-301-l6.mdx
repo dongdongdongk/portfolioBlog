@@ -1,0 +1,773 @@
+---
+title: 'Wwise 301 L6'
+date: '2026-09-02'
+category: '게임 개발/WWISE'
+tags: ['게임 개발', 'WWISE']
+draft: false
+summary: ''
+---
+
+# { 🎧 지역에 Effect 사용하기 }
+
+**(Wwise Unity Integration – 환경 효과(Aux Environment) 설정하기)**
+
+---
+
+## 📋 목차
+
+1. [개념 이해하기](https://www.notion.so/28be683f737e800dafa9cca4a35a539d#%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Aux Environment의 원리](https://www.notion.so/28be683f737e800dafa9cca4a35a539d#aux-environment%EC%9D%98-%EC%9B%90%EB%A6%AC)
+3. [Trigger에 AkEnvironment 추가하기](https://www.notion.so/28be683f737e800dafa9cca4a35a539d#trigger%EC%97%90-akenvironment-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+4. [보조 버스(Aux Bus) 연결하기](https://www.notion.so/28be683f737e800dafa9cca4a35a539d#%EB%B3%B4%EC%A1%B0-%EB%B2%84%EC%8A%A4aux-bus-%EC%97%B0%EA%B2%B0%ED%95%98%EA%B8%B0)
+5. [Profiler로 확인하기](https://www.notion.so/28be683f737e800dafa9cca4a35a539d#profiler%EB%A1%9C-%ED%99%95%EC%9D%B8%ED%95%98%EA%B8%B0)
+6. [비교 실험: 효과가 없는 지역](https://www.notion.so/28be683f737e800dafa9cca4a35a539d#%EB%B9%84%EA%B5%90-%EC%8B%A4%ED%97%98-%ED%9A%A8%EA%B3%BC%EA%B0%80-%EC%97%86%EB%8A%94-%EC%A7%80%EC%97%AD)
+7. [정리 및 핵심 포인트](https://www.notion.so/28be683f737e800dafa9cca4a35a539d#%EC%A0%95%EB%A6%AC-%EB%B0%8F-%ED%95%B5%EC%8B%AC-%ED%8F%AC%EC%9D%B8%ED%8A%B8)
+
+---
+
+## 1. 개념 이해하기
+
+### 🎯 이번 강의 목표
+
+- 게임 내 **특정 지역에 음향 효과(리버브, 룸 에코 등)** 를 설정하는 방법을 이해한다.
+- Unity와 Wwise가 연동된 상태에서 **Trigger와 AkEnvironment 스크립트를 이용해**
+  어떤 사운드가 어떤 지역 효과를 받을지를 제어한다.
+
+---
+
+## 2. Aux Environment의 원리
+
+### 💡 핵심 개념
+
+| 개념                           | 설명                                                                                                                      |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| **Effect (효과)**              | 리버브, 에코, 공간감 등 사운드에 적용되는 음향 처리.                                                                      |
+| **Auxiliary Bus (보조 버스)**  | Effect를 적용하는 경로. 사운드를 Aux Bus로 “보내면(Send)” 그 버스의 효과가 적용됨.                                        |
+| **AkEnvironment 스크립트**     | Unity 오브젝트(Trigger)에 붙여서, 그 영역에 들어온 사운드 오브젝트에게 특정 보조 버스를 할당해주는 스크립트.              |
+| **Environment Aware 오브젝트** | AkGameObj 컴포넌트가 있고, “Use game-defined auxiliary sends”가 활성화된 오브젝트. 즉, 환경 효과를 받을 수 있는 오브젝트. |
+
+---
+
+### 🔁 작동 흐름
+
+1. **Trigger 영역** 안에 AkEnvironment 스크립트가 붙어 있음.
+2. 어떤 **오브젝트(AkGameObj)** 가 이 영역 안으로 들어옴.
+3. AkEnvironment가 그 오브젝트가 환경 인식(Use game-defined auxiliary sends 설정)되어 있는지 확인.
+4. 설정되어 있다면, 그 오브젝트의 사운드가 **AkEnvironment에서 지정한 보조 버스**로 라우팅됨.
+5. 결과적으로 **지역 기반의 음향 효과**가 적용된다.
+
+---
+
+## 3. Trigger에 AkEnvironment 추가하기
+
+### 🧱 1단계: 지역(Trigger) 준비
+
+- 이미 “Training Area”라는 지역이 있음 (게임 시작 지점).
+- 이 지역에는 **Mesh Collider** 형태의 Trigger가 존재함.
+- 반투명한 Mesh Renderer가 활성화되어 있어, Trigger의 모양을 시각적으로 확인할 수 있음.
+
+> 이 Trigger는 플레이어가 그 안으로 들어오는지 감지하는 공간 영역 정의용.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380533/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L6/image.png)
+
+---
+
+### 🧩 2단계: AkEnvironment 스크립트 추가
+
+1. **Hierarchy** 창에서 `AUX Environment` 오브젝트를 펼치고
+
+   `Training` 게임 오브젝트를 선택한다.
+
+2. **Inspector**에서 `Add Component` 클릭 → `AkEnvironment` 검색 후 추가.
+3. 이제 이 게임 오브젝트에는 다음 컴포넌트들이 있음:
+   - Collider (Trigger 역할)
+   - AkEnvironment (보조 버스 할당 관리)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380528/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L6/image_1.png)
+
+---
+
+### ⚙️ 작동 방식
+
+- 콜라이더 안으로 **AkGameObj가 붙은 사운드 오브젝트**가 들어올 때,
+  AkEnvironment는 그 오브젝트가 환경 인식 설정을 가지고 있는지 확인.
+- 있다면, 지정된 **Auxiliary Bus**로 자동 연결된다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380531/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L6/image_2.png)
+
+---
+
+## 4. 보조 버스(Aux Bus) 연결하기
+
+### 🎚️ 1단계: 보조 버스 선택
+
+- `AkEnvironment` 컴포넌트의 **AuxBus Name** 필드에서 다음 경로로 이동:
+  ```
+  Wwise 301 > Auxiliary Busses > Default Work Unit >
+  Master Audio Bus > World > AUX > Region_Village
+  ```
+- 그 안의 **Training** 보조 버스를 선택한다.
+
+### 🧩 2단계: Audio 오브젝트 설정 확인
+
+- 이 효과가 적용되려면, 해당 오브젝트의 Wwise 설정에서
+  ✅ **Use game-defined auxiliary sends** 가 활성화되어 있어야 함.
+
+> 이 설정이 켜져 있어야 게임이 보조 버스 라우팅을 제어할 수 있다.
+>
+> (즉, Wwise가 “이 사운드는 Unity에서 어떤 환경에 있는지”를 인식할 수 있음.)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380531/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L6/image_3.png)
+
+---
+
+## 5. Profiler로 확인하기
+
+### 🧭 1단계: Profiler 세팅
+
+1. Wwise에서 **Profiler 레이아웃**으로 전환한다.
+2. **Advanced Profiler → Voices Graph** 열기.
+3. 오른쪽 상단의 **Browse For Object(...)** 클릭.
+4. 다음 경로로 이동:
+
+   ```
+   Master-Mixer Hierarchy > Default Work Unit >
+   Master Audio Bus > World > AUX > Region_Village
+   ```
+
+5. `Training` 보조 버스를 선택 후 OK 클릭.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380531/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L6/image_4.png)
+
+---
+
+### 🧭 2단계: Unity와 연결
+
+- Wwise Profiler가 준비되었으면 Unity 게임을 실행한다.
+- **Wwise와 Unity를 나란히 배치**해 Profiler와 Game 뷰를 동시에 확인한다.
+- Profiler의 상단에서
+  “Wwise Adventure Game (Editor)”를 **Remote Connect** 상태로 만든다.
+
+---
+
+### 🧪 3단계: 효과 테스트
+
+- Unity에서 **Scene Play**.
+- Training Area로 들어가 **바위로 뛰어가 공격**.
+- Profiler의 **Advanced Profiler > Voices Graph**에서 확인.
+
+👉 현재 `Player_WeaponSwing` Event에서 트리거된 모든 Wwise 오브젝트가
+
+`Training` 보조 버스로 라우팅되어, **RoomVerb Effect**가 적용됨을 확인할 수 있다.
+
+---
+
+## 6. 비교 실험: 효과가 없는 지역
+
+### 🧱 Village 지역 테스트
+
+- 이번에는 **Village Trigger**의 `AkEnvironment` 컴포넌트를 제거한다.
+- 동일한 방식으로 바위를 공격한다.
+
+> 결과:
+>
+> Village 지역에서는 보조 버스가 연결되지 않았기 때문에
+>
+> 효과(RoomVerb)가 적용되지 않은 “건조한” 소리가 재생된다.
+
+이를 통해 **AkEnvironment의 유무에 따라 지역별 사운드가 달라진다**는 것을 확인할 수 있다.
+
+---
+
+## 7. 정리 및 핵심 포인트
+
+### 🎓 요약 정리
+
+| 항목              | 설명                                                                                   |
+| ----------------- | -------------------------------------------------------------------------------------- |
+| **목적**          | 지역에 따라 다른 음향 효과(리버브 등)를 적용하기 위함                                  |
+| **핵심 구성요소** | AkEnvironment (Trigger에 추가), Auxiliary Bus (효과 적용), AkGameObj (사운드 오브젝트) |
+| **필수 설정**     | Wwise의 오브젝트에서 “Use game-defined auxiliary sends” 활성화                         |
+| **작동 원리**     | Trigger 영역 진입 시 AkEnvironment가 해당 오브젝트를 감지 → 지정된 Aux Bus로 라우팅    |
+| **검증 방법**     | Wwise Profiler의 Voices Graph에서 실제 라우팅 및 이펙트 적용 확인                      |
+| **결과**          | Training 지역에서는 RoomVerb Effect 적용, Village 지역에서는 무효                      |
+
+---
+
+### 🧠 핵심 개념 정리
+
+- AkEnvironment는 **지역 단위의 효과 제어 핵심 스크립트**.
+- 보조 버스(Aux Bus)는 **효과를 적용하는 라우팅 경로**.
+- 오브젝트의 Use game-defined auxiliary sends가 활성화되어야
+  Wwise가 해당 오브젝트를 환경 인식 대상으로 추적할 수 있음.
+- Profiler를 활용하면 실제 사운드의 라우팅 결과와 이펙트 적용을 실시간으로 검증 가능.
+
+---
+
+### ✅ 다음 학습 예고
+
+이제 AkEnvironment를 **직접 처음부터 만드는 방법**을 배운다.
+
+이번에는 미리 준비된 Trigger가 아니라,
+
+새로운 지역을 정의하고 AkEnvironment를 수동으로 구성하는 과정을 다룬다.
+
+---
+
+# { 🎧 Aux Environment 만들기 }
+
+(aka Reverb Zone / 보조 버스 환경 설정)
+
+## 📋 목차
+
+1. [Aux Environment 개념 이해하기](https://www.notion.so/Wwise-301-L6-28be683f737e800dafa9cca4a35a539d#aux-environment-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Aux Environment 구성 요소 3가지](https://www.notion.so/Wwise-301-L6-28be683f737e800dafa9cca4a35a539d#aux-environment-%EA%B5%AC%EC%84%B1-%EC%9A%94%EC%86%8C-3%EA%B0%80%EC%A7%80)
+3. [Woodlands 트리거 만들기](https://www.notion.so/Wwise-301-L6-28be683f737e800dafa9cca4a35a539d#woodlands-%ED%8A%B8%EB%A6%AC%EA%B1%B0-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+4. [Collider, Rigidbody, AkEnvironment 설정하기](https://www.notion.so/Wwise-301-L6-28be683f737e800dafa9cca4a35a539d#collider-rigidbody-akenvironment-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+5. [Aux Bus 지정하기](https://www.notion.so/Wwise-301-L6-28be683f737e800dafa9cca4a35a539d#aux-bus-%EC%A7%80%EC%A0%95%ED%95%98%EA%B8%B0)
+6. [AkGameObj 추가 및 환경 인식 설정](https://www.notion.so/Wwise-301-L6-28be683f737e800dafa9cca4a35a539d#akgameobj-%EC%B6%94%EA%B0%80-%EB%B0%8F-%ED%99%98%EA%B2%BD-%EC%9D%B8%EC%8B%9D-%EC%84%A4%EC%A0%95)
+7. [Profiler로 테스트하기](https://www.notion.so/Wwise-301-L6-28be683f737e800dafa9cca4a35a539d#profiler%EB%A1%9C-%ED%85%8C%EC%8A%A4%ED%8A%B8%ED%95%98%EA%B8%B0)
+8. [정리 및 핵심 개념 요약](https://www.notion.so/Wwise-301-L6-28be683f737e800dafa9cca4a35a539d#%EC%A0%95%EB%A6%AC-%EB%B0%8F-%ED%95%B5%EC%8B%AC-%EA%B0%9C%EB%85%90-%EC%9A%94%EC%95%BD)
+
+---
+
+## 1️⃣ Aux Environment 개념 이해하기
+
+### 💡 정의
+
+- \*Aux Environment (보조 환경)\*\*는
+  게임 안의 **특정 구역(zone)** 안에서
+  **보조 버스(Auxiliary Bus)**의 **Effect(예: Reverb, Echo)**를
+  자동으로 적용하도록 하는 시스템이다.
+
+즉,
+
+> “플레이어가 이 구역 안에 들어오면,
+>
+> 그 안의 모든 소리가 ‘지정된 Aux Bus의 이펙트’를 받는다.”
+
+---
+
+### 🎯 예시
+
+- **Woodlands 구역**에 들어가면
+  → 모든 소리(발소리, 칼 휘두르기, 주변 환경음 등)가
+  → “Woodlands Aux Bus”를 통해
+  → **Wwise RoomVerb 효과(Reverb)**를 받는다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380532/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L6/image_5.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380532/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L6/image_6.png)
+
+---
+
+### 🧠 핵심 요약
+
+| 요소                          | 설명                                                                  |
+| ----------------------------- | --------------------------------------------------------------------- |
+| **Aux Bus**                   | Wwise에서 만든 보조 오디오 경로. 이펙트(Reverb 등)를 적용함           |
+| **Aux Environment**           | Unity 안에서 특정 공간(Zone)을 정의하고, 해당 공간에 Aux Bus를 연결함 |
+| **Trigger(Trigger Collider)** | 플레이어가 이 구역 안에 들어왔는지 감지                               |
+| **AkGameObj**                 | 게임 오브젝트의 위치와 상태를 Wwise에 보고                            |
+| **Rigidbody**                 | Trigger가 충돌/교차를 인식하게 하는 물리 컴포넌트                     |
+
+---
+
+## 2️⃣ Aux Environment 구성 요소 3가지
+
+| 구성 요소                | 역할                                                             |
+| ------------------------ | ---------------------------------------------------------------- |
+| **① AkEnvironment**      | 보조 버스를 연결하는 핵심 스크립트. 어떤 Aux Bus를 적용할지 결정 |
+| **② Collider (Trigger)** | “이 영역 안에 들어오면 적용한다”를 정의                          |
+| **③ Rigidbody**          | Unity 물리 엔진이 Trigger 간 교차를 감지할 수 있게 함            |
+
+> ⚠️ Rigidbody는 Trigger가 있는 오브젝트 중 하나에만 필요하지만,
+>
+> Scene의 Rigidbody 개수를 줄이기 위해
+>
+> 일반적으로 **AkEnvironment 오브젝트에만 추가**하는 것이 좋다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380532/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L6/image_7.png)
+
+---
+
+## 3️⃣ Woodlands 트리거 만들기
+
+### 🧱 1단계. Cube 생성
+
+- 메뉴: **GameObject → 3D Object → Cube**
+- Cube가 **Hierarchy**에 인스턴스화됨.
+
+### 🏷️ 2단계. 이름 변경
+
+- Cube 우클릭 → **Rename** → “`Woodlands`”
+
+### 📦 3단계. 계층 구조 정리
+
+- `Woodlands` 오브젝트를
+  `AUX Environments` 폴더(게임 오브젝트) 안으로 드래그.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380532/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L6/image_8.png)
+
+---
+
+## 4️⃣ Collider, Rigidbody, AkEnvironment 설정하기
+
+### ✏️ Collider 설정 (Trigger Zone 만들기)
+
+1. **Box Collider** 선택.
+2. **Is Trigger** 체크 활성화.
+
+   → 이로써 플레이어가 Collider 안으로 “들어올 수 있음”.
+
+3. **Mesh Renderer 비활성화**
+   - 플레이 중엔 이 Collider가 보여선 안 됨.
+   - `Mesh Renderer` 컴포넌트의 체크 해제.
+
+---
+
+### 📐 위치 맞추기
+
+- `Move`, `Rotate`, `Scale` 툴을 사용해
+  Woodlands 중심부(폭포, 식물, 플레이어 이동 경로 주변)를 감싸도록
+  **Collider 영역을 조정**한다.
+
+> 참고: Woodlands는 “Road to Woodlands”와 “Road to Pine Forest”로 나뉘지만
+>
+> 두 구역 모두 자연스러운 하나의 리버브 존으로 묶을 수 있음.
+
+---
+
+### 🎛️ AkEnvironment 컴포넌트 추가
+
+1. **Add Component → AkEnvironment** 검색 후 선택.
+2. AkEnvironment에는 아래 속성이 있음 👇
+
+| 속성               | 설명                                                                           |
+| ------------------ | ------------------------------------------------------------------------------ |
+| **Priority**       | 다른 Aux Environment와 겹칠 때 우선순위. 값이 낮을수록 우선됨. (0이 최고 우선) |
+| **Default**        | 다른 어떤 Aux Environment도 없을 때 적용됨                                     |
+| **Exclude Others** | 다른 Aux Environment와 겹칠 경우, 이 영역이 다른 효과를 무시하고 단독 적용됨   |
+| **Aux Bus**        | 이 영역에서 사용할 보조 버스 선택 (예: Region_Woodlands)                       |
+
+---
+
+### ⚙️ Rigidbody 추가
+
+- AkEnvironment를 추가하면 **“Rigidbody가 없습니다”** 경고 표시가 뜸.
+- 메시지 아래의 **Add Rigidbody 버튼** 클릭.
+  → 자동으로 Rigidbody 컴포넌트가 추가됨.
+
+> 💡 Wwise Adventure Game의 권장 설정
+>
+> - Rigidbody는 AkEnvironment 오브젝트에만 추가하기
+> - 물리 계산 최소화로 **성능 최적화**
+
+---
+
+## 5️⃣ Aux Bus 지정하기
+
+1. AkEnvironment의 **Aux Bus Name** 클릭
+2. Wwise 경로를 따라가며 선택:
+
+   ```
+   Auxiliary Buses → Default Work Unit → Master Audio Bus → World → AUX → Region_Woodlands
+   ```
+
+3. **OK** 클릭.
+
+→ 이제 “Woodlands” 영역에 들어온 오브젝트는
+
+“Region_Woodlands Aux Bus”의 리버브 효과를 받음.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380532/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L6/image_9.png)
+
+---
+
+## 6️⃣ AkGameObj 추가 및 환경 인식 설정
+
+### 🎮 왜 필요한가?
+
+- **AkGameObj**는 Unity 오브젝트의 **위치, Game Sync, Environment 정보**를
+  **Wwise에 전달**하는 역할을 함.
+- Wwise가 “플레이어가 어느 환경에 있는지”를
+  실시간으로 판단하려면,
+  **플레이어 오브젝트에 AkGameObj가 꼭 필요함.**
+
+---
+
+### ⚡ 자동 추가되는 경우
+
+- AkEvent, AkAmbient 컴포넌트 추가 시
+  AkGameObj는 자동으로 생김.
+- 하지만 Player처럼 직접 사운드를 게시(post)하는 오브젝트에는
+  **직접 AkGameObj를 추가해야 함.**
+
+---
+
+### 🧩 Player에 AkGameObj 추가하기
+
+1. Hierarchy에서 **Player 오브젝트 선택**
+2. Inspector에서 **Add Component → AkGameObj** 추가
+3. “**Environment Aware**” 옵션이 활성화되어 있는지 확인
+
+→ 이제 Player가 게시하는 모든 사운드는
+
+자신이 속한 Aux Environment의 이펙트를 자동으로 받음.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380529/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L6/image_10.png)
+
+---
+
+## 7️⃣ Profiler로 테스트하기
+
+### 🔍 단계별 실행
+
+1. **Wwise에서 Layouts → Profiler** 선택
+2. **Advanced Profiler → Voices Graph Object Filter** 열기
+3. 경로 선택:
+
+   ```
+   Master-Mixer Hierarchy
+   → Default Work Unit
+   → Master Audio Bus
+   → World → AUX → Region_Woodlands
+   ```
+
+   → `Woodlands` Aux Bus 선택 후 OK 클릭
+
+4. Unity에서 게임 실행 (Play Mode)
+5. 플레이어를 **Woodlands 구역으로 이동**
+
+---
+
+### 🎧 확인 방법
+
+- Wwise의 **Advanced Profiler → Voices Graph**에서
+  `Ambient_Waterfall`, `Ambient_Region_Woodlands`,
+  `Player_WeaponSwing`, `EvilSpitPlant_ShootBullet` 등의 Event가
+  **모두 “Woodlands Aux Bus”를 통과하는지 확인**한다.
+
+→ 모두 Region_Woodlands를 통해 재생되고 있다면 성공 ✅
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380529/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L6/image_11.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380529/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L6/image_12.png)
+
+```csharp
+RoomVerb 가 생겼다
+```
+
+---
+
+## 8️⃣ 정리 및 핵심 개념 요약
+
+| 단계 | 작업 내용               | 핵심 포인트                                  |
+| ---- | ----------------------- | -------------------------------------------- |
+| 1    | Cube 생성 및 이름 변경  | Trigger Zone으로 사용할 영역 준비            |
+| 2    | Box Collider 설정       | Is Trigger 활성화 필수                       |
+| 3    | Mesh Renderer 비활성화  | 플레이어에게 보이지 않게 설정                |
+| 4    | AkEnvironment 추가      | 보조 버스 연결, 우선순위 및 배타 옵션 설정   |
+| 5    | Rigidbody 추가          | Trigger 감지를 위해 필수                     |
+| 6    | Aux Bus 지정            | Region_Woodlands 선택                        |
+| 7    | Player에 AkGameObj 추가 | Environment 인식 가능하게                    |
+| 8    | Profiler 확인           | 모든 사운드가 Aux Bus를 통해 전달되는지 검사 |
+
+---
+
+### 🧭 개념 총정리
+
+| 용어                   | 의미                                                       |
+| ---------------------- | ---------------------------------------------------------- |
+| **Aux Bus**            | 사운드를 보조 경로로 보내서 이펙트를 적용하는 Wwise의 버스 |
+| **AkEnvironment**      | Unity에서 특정 공간에 Aux Bus를 연결하는 스크립트          |
+| **Collider (Trigger)** | 플레이어가 해당 구역에 진입했는지 감지                     |
+| **Rigidbody**          | Trigger 간의 교차를 감지하도록 물리 엔진에 등록            |
+| **AkGameObj**          | 게임 오브젝트의 위치, 상태, 환경 정보를 Wwise로 전송       |
+| **Environment Aware**  | 해당 오브젝트가 Aux Environment의 영향을 받도록 설정       |
+
+---
+
+✅ **결론 요약**
+
+> Aux Environment = “Trigger + Rigidbody + AkEnvironment + (환경 인식된 AkGameObj)”
+>
+> 플레이어가 트리거에 들어오면 →
+>
+> 해당 오브젝트의 모든 사운드가 →
+>
+> 지정된 Aux Bus(예: Region_Woodlands)로 라우팅되어 →
+>
+> 리버브 등 공간 효과가 적용된다.
+
+---
+
+# { 🚪 환경 안의 환경 (Environments inside Environments) }
+
+> Woodlands Cabin 안의 사운드를 독립적으로 제어하기 위한 Aux Environment 설정하기
+
+---
+
+## 📋 목차
+
+1. [개념 이해하기: 환경 안의 환경](https://www.notion.so/Wwise-301-L6-28be683f737e800dafa9cca4a35a539d#1-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0-%ED%99%98%EA%B2%BD-%EC%95%88%EC%9D%98-%ED%99%98%EA%B2%BD)
+2. [새로운 Aux Environment 생성하기](https://www.notion.so/Wwise-301-L6-28be683f737e800dafa9cca4a35a539d#2-%EC%83%88%EB%A1%9C%EC%9A%B4-aux-environment-%EC%83%9D%EC%84%B1%ED%95%98%EA%B8%B0)
+3. [Cabin 위치 맞추기](https://www.notion.so/Wwise-301-L6-28be683f737e800dafa9cca4a35a539d#3-cabin-%EC%9C%84%EC%B9%98-%EB%A7%9E%EC%B6%94%EA%B8%B0)
+4. [크기 조정 및 시각 표시 제거하기](https://www.notion.so/Wwise-301-L6-28be683f737e800dafa9cca4a35a539d#4-%ED%81%AC%EA%B8%B0-%EC%A1%B0%EC%A0%95-%EB%B0%8F-%EC%8B%9C%EA%B0%81-%ED%91%9C%EC%8B%9C-%EC%A0%9C%EA%B1%B0%ED%95%98%EA%B8%B0)
+5. [AkEnvironment와 Rigidbody 추가하기](https://www.notion.so/Wwise-301-L6-28be683f737e800dafa9cca4a35a539d#5-akenvironment%EC%99%80-rigidbody-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+6. [Aux Bus 지정하기](https://www.notion.so/Wwise-301-L6-28be683f737e800dafa9cca4a35a539d#6-aux-bus-%EC%A7%80%EC%A0%95%ED%95%98%EA%B8%B0)
+7. [Profiler로 사운드 라우팅 확인하기](https://www.notion.so/Wwise-301-L6-28be683f737e800dafa9cca4a35a539d#7-profiler%EB%A1%9C-%EC%82%AC%EC%9A%B4%EB%93%9C-%EB%9D%BC%EC%9A%B0%ED%8C%85-%ED%99%95%EC%9D%B8%ED%95%98%EA%B8%B0)
+8. [Exclude Others로 중복 라우팅 방지하기](https://www.notion.so/Wwise-301-L6-28be683f737e800dafa9cca4a35a539d#8-exclude-others%EB%A1%9C-%EC%A4%91%EB%B3%B5-%EB%9D%BC%EC%9A%B0%ED%8C%85-%EB%B0%A9%EC%A7%80%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. 개념 이해하기: 환경 안의 환경
+
+### 🎯 핵심 개념
+
+- **Aux Environment(보조 환경)** 는 Wwise에서 **특정 지역의 음향 효과(리버브, 반향 등)** 를 적용하는 공간 단위입니다.
+- **여러 개의 Aux Environment가 겹칠 경우**, 하나의 사운드가 여러 보조 버스로 동시에 라우팅될 수 있습니다.
+  - 예:
+    - 플레이어가 **Woodlands(숲)** 환경에 있으면서
+    - 그 안의 **Cabin(오두막)** 안으로 들어간 경우
+  - 이때 사운드는 `Woodlands Reverb` + `Cabin Reverb` 두 가지가 동시에 적용될 수 있습니다.
+
+### ⚠️ 문제점
+
+- 이렇게 되면 현실적으로 맞지 않은 음향 효과(예: 숲속의 넓은 리버브와 실내의 좁은 리버브가 동시에 적용)가 발생합니다.
+- 따라서 **상대적 중요도를 제어하거나, 특정 환경 안에서는 다른 환경의 효과를 제외(Exclude)해야** 합니다.
+
+---
+
+## 2. 새로운 Aux Environment 생성하기
+
+### 🧱 단계별 절차
+
+1. Unity 메뉴에서
+
+   `Audiokinetic > Certification > 301 > Lesson 6 > Environments inside Environments` 선택.
+
+   → 이번 실습용 씬이 열림.
+
+2. **Hierarchy**에서
+
+   `Aux Environments`를 우클릭 →
+
+   `3D Object > Cube` 선택.
+
+   → 새 정육면체 오브젝트가 생성됨.
+
+3. 생성된 **Cube**를 우클릭 →
+
+   `Rename` 선택 →
+
+   이름을 **Woodlands Cabin** 으로 변경.
+
+4. **Inspector**에서
+   - `Box Collider`의 **Is Trigger** 체크박스를 활성화.
+     → 캐릭터가 이 구역에 들어오면 이벤트(환경 변화)가 트리거됨.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380529/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L6/image_13.png)
+
+---
+
+## 3. Cabin 위치 맞추기
+
+### 🎯 목적
+
+Woodlands Cabin 오브젝트를 실제 게임의 오두막(Cabin in the Woods) 위치와 정확히 일치시켜야 합니다.
+
+### 📌 방법
+
+1. **Hierarchy** 검색창에
+
+   `Cabin in the Woods` 입력 → 해당 오브젝트 선택.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380529/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L6/image_14.png)
+
+1. **Inspector**의 **Transform 컴포넌트**에서
+
+   오른쪽의 **세 개의 점(⋮)** 아이콘 클릭 →
+
+   `Copy > Position` 선택.
+
+   → Cabin의 좌표 복사 완료.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380530/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L6/image_15.png)
+
+1. 다시 **Woodlands Cabin** 선택 →
+
+   같은 위치 아이콘에서 `Paste > Position` 선택.
+
+   → 위치가 정확히 Cabin 위치로 복사됨.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380530/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L6/image_16.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380530/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L6/image_17.png)
+
+1. Scene 뷰에서 Cabin이 보이지 않으면,
+
+   `Woodlands Cabin`을 선택한 상태에서 **Scene 뷰에서 F 키**를 눌러 포커싱.
+
+---
+
+## 4. 크기 조정 및 시각 표시 제거하기
+
+### 🧭 단계
+
+1. **Move, Rotate, Scale 툴**을 이용해
+
+   `Woodlands Cabin`의 크기와 회전을 실제 Cabin Mesh를 감싸도록 조정.
+
+   → 이 트리거가 Cabin의 내부 공간을 정확히 덮도록 설정.
+
+2. **Inspector**에서
+
+   `Mesh Renderer` 컴포넌트를 찾아 **비활성화(체크 해제)**.
+
+   → 장면에서는 더 이상 Cube가 보이지 않지만, 트리거 기능은 유지됨.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380530/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L6/image_18.png)
+
+---
+
+## 5. AkEnvironment와 Rigidbody 추가하기
+
+### 🧩 구성
+
+1. **Add Component** 버튼 클릭 →
+
+   `AkEnvironment` 검색 → 추가.
+
+2. `AkEnvironment` 컴포넌트 안의 **Add Rigidbody** 버튼 클릭.
+
+   → 물리 충돌 감지를 위해 Rigidbody 자동 추가.
+
+✅ Rigidbody는 “Trigger로 감지되는 충돌”을 위해 필요함.
+
+---
+
+## 6. Aux Bus 지정하기
+
+### 🎚️ 설정 절차
+
+1. AkEnvironment 컴포넌트에서
+
+   **AuxBus Name** 항목 옆의 “...” 버튼 클릭.
+
+2. 경로 선택:
+
+   ```
+   Auxiliary Busses
+   └─ Default Work Unit
+      └─ Master Audio Bus
+         └─ World
+            └─ AUX
+               └─ Region_PineForest
+                     └─ PineForest_Hut
+
+   ```
+
+3. `PineForest_Hut` 선택 후 **OK 클릭**.
+
+> 💡 이 보조 버스는 오두막 내부의 리버브 환경과 유사하게 설계된 버스입니다.
+>
+> 즉, Cabin 내부의 음향 공간을 PineForest_Hut 버스가 대신합니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380530/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L6/image_19.png)
+
+---
+
+## 7. Profiler로 사운드 라우팅 확인하기
+
+### 🔍 테스트 절차
+
+1. **Wwise**에서
+
+   상단 메뉴 `Layouts > Profiler` 선택.
+
+2. 사운드 필터링:
+   - **Advanced Profiler** 창에서
+     `Browse For Object(...)` 클릭 →
+     경로 이동:
+
+     ```
+     Actor-Mixer Hierarchy
+     └─ Default Work Unit
+        └─ World
+           └─ Player
+
+     ```
+
+   - `Player` 선택 후 **OK 클릭**.
+     → Player 관련 사운드만 모니터링하도록 설정.
+
+3. Unity에서 **Remote Connect**로 게임 연결.
+4. 씬을 **Play**하고,
+
+   Player를 Cabin 안으로 이동시킨 후 **상자를 공격**.
+
+   (→ Player_WeaponImpact Event 발생)
+
+5. **Advanced Profiler** 확인:
+   - `Player_WeaponImpact`가
+     **Woodlands 보조 버스**와 **PineForest_Hut 보조 버스**
+     양쪽으로 라우팅되는 것이 보임.
+     → 현재 두 환경이 동시에 적용된 상태.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380531/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L6/image_20.png)
+
+---
+
+## 8. Exclude Others로 중복 라우팅 방지하기
+
+### 🚫 문제 해결
+
+이제 Cabin 안의 사운드는 **실내 리버브(PineForest_Hut)** 만 적용되도록 만들어야 합니다.
+
+### ✅ 절차
+
+1. **Unity**로 돌아와 Play 모드 종료:
+
+   `ESC` → `WAG 메뉴` → `Play` 클릭하여 종료.
+
+2. **Woodlands Cabin 오브젝트 선택** →
+
+   **Inspector > AkEnvironment** 컴포넌트 안에서
+
+   `Exclude Others` 체크박스 활성화.
+
+3. 다시 **Play 모드 시작** →
+
+   Wwise에서 **Reconnect** 클릭 →
+
+   Cabin 안으로 들어가서 다시 상자 공격.
+
+4. **Advanced Profiler** 확인:
+   - `Player_WeaponImpact` Event가 이제
+     **PineForest_Hut 보조 버스**로만 라우팅되는 것 확인 가능.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380531/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L6/image_21.png)
+
+---
+
+## 🧠 개념 요약
+
+| 개념                          | 설명                                                                         |
+| ----------------------------- | ---------------------------------------------------------------------------- |
+| **Aux Environment**           | 게임 내 특정 구역의 리버브/효과를 제어하는 공간 단위.                        |
+| **Trigger Zone (Is Trigger)** | 플레이어가 영역에 들어올 때 사운드 환경 전환을 감지하는 영역.                |
+| **AkEnvironment 컴포넌트**    | Unity 오브젝트를 Wwise 환경 구역으로 지정하는 컴포넌트.                      |
+| **Aux Bus**                   | 실제 리버브, 이펙트 등의 사운드 처리를 담당하는 Wwise의 오디오 경로.         |
+| **Exclude Others**            | 해당 환경 안의 사운드가 다른 환경의 보조 버스로 동시에 라우팅되는 것을 방지. |
+| **Profiler**                  | 실시간으로 사운드 이벤트의 라우팅 및 버스 흐름을 모니터링하는 도구.          |
+
+---
+
+## 🎯 정리
+
+- Woodlands처럼 큰 환경 안에 Cabin 같은 작은 환경이 있을 경우,
+  사운드가 여러 **Aux Bus**로 라우팅될 수 있습니다.
+- 이때 **Exclude Others**를 사용하면,
+  “내부 환경(Cabin)”의 사운드만 선택적으로 적용되도록 설정할 수 있습니다.
+- 결과적으로 **더 자연스럽고 현실적인 음향 공간**을 구현할 수 있습니다.

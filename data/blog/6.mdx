@@ -1,0 +1,564 @@
+---
+title: '6'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 🎮 Rear Landing Gear (뒷바퀴) 구현하기 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380608/notion-blog/_/_/BG/6/image.png)
+
+## 🎯 목표
+
+뒷바퀴 착륙 장치 구현
+
+- Rear Door 3개
+- Rear Chassis (복잡한 회전)
+- 3축 동시 제어
+
+---
+
+## 🔧 1단계: Rear Door 구현 (복사 & 붙여넣기)
+
+### 노드 복제
+
+```
+Front Door 노드 3개 복사
+  ↓
+Bone만 변경:
+  ├─ rear_door_1_jnt
+  ├─ rear_door_2_jnt
+  └─ rear_door_3_jnt
+```
+
+### 방향 반전 필요!
+
+```
+문제:
+  도어가 바깥쪽으로 열림 ❌
+
+해결:
+  양수 → 음수
+  음수 → 양수
+  ↓
+  올바른 방향 회전 ✅
+```
+
+---
+
+## 🔧 2단계: Rear Chassis (복잡!)
+
+### 문제점
+
+```
+Front Chassis:
+  - 2개 뼈대
+  - Y축(Pitch)만 회전
+
+Rear Chassis:
+  - 1개 뼈대
+  - X, Y, Z 모두 회전 필요! 🔥
+```
+
+---
+
+## 🔧 3단계: 3축 회전값 찾기 (핵심 기법!)
+
+### Promote to Variable 활용
+
+```
+Transform (Modify) Bone 노드:
+  ↓
+Rotation X, Y, Z 각각:
+  우클릭 → Promote to Variable
+  ↓
+임시 변수 3개 생성:
+  - Rotation X Variable
+  - Rotation Y Variable
+  - Rotation Z Variable
+```
+
+### Anim Preview Editor로 조정
+
+```
+3개 변수 슬라이더 조절:
+  ↓
+실시간으로 회전 확인
+  ↓
+최적값 발견:
+  - X (Roll): -119
+  - Y (Pitch): 15
+  - Z (Yaw): -9
+```
+
+**이 방법의 장점:**
+
+```
+✅ 실시간 확인
+✅ 컴파일 반복 불필요
+✅ 빠른 최적값 발견
+✅ 여러 축 동시 조정
+```
+
+---
+
+## 🔧 4단계: Gear 변수로 대체
+
+### 최종 연결
+
+```
+[GET] Gear
+  ├─ [Multiply] × -119 → Rotation X
+  ├─ [Multiply] × 15 → Rotation Y
+  └─ [Multiply] × -9 → Rotation Z
+```
+
+### 임시 변수 제거
+
+```
+최적값 발견 후:
+  ↓
+임시 변수 삭제
+  ↓
+Gear 변수로 통합 ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380605/notion-blog/_/_/BG/6/image_1.png)
+
+---
+
+## 📝 핵심 정리
+
+### Rear Landing Gear 구조
+
+```
+REAR GEARS:
+  ├─ Rear Doors (3개)
+  │    - Rotation X 사용
+  │    - 양/음수 반전 필요
+  │
+  └─ Rear Chassis (1개)
+       - 3축 동시 회전 🔥
+       - X: -119, Y: 15, Z: -9
+```
+
+---
+
+## 💡 핵심 기법: Promote to Variable
+
+### 사용 시기
+
+```
+복잡한 값 찾을 때:
+  ↓
+1. Promote to Variable
+2. Slider로 실시간 조정
+3. 최적값 발견
+4. 상수로 대체
+5. 임시 변수 삭제
+
+개발 시간 대폭 단축! ✅
+```
+
+---
+
+# { 🎮 Landing Gear 입력 제어 구현하기 }
+
+## 🎯 목표
+
+G 키로 착륙 장치 제어
+
+- Timeline으로 순차 작동
+- 먼저 Gear 접기 → 그 다음 Door 닫기
+- 역방향도 가능
+
+---
+
+## 💡 핵심 개념
+
+### Gear 변수 의미
+
+```
+Gear = 0: 바퀴 펼쳐짐 (Down)
+Gear = 1: 바퀴 접힘 (Up) ✅
+
+Gear_Door = 0: 도어 열림 (Open)
+Gear_Door = 1: 도어 닫힘 (Close) ✅
+```
+
+---
+
+## 🔧 1단계: Input Action 생성
+
+### IA_Gears 생성
+
+```
+Input 폴더 → Input Action
+  ↓
+이름: IA_Gears
+Value Type: Digital (Boolean)
+```
+
+### IMC 매핑
+
+```
+IMC_FighterJet → + Mapping
+  ↓
+IA_Gears → G 키
+```
+
+---
+
+## 🔧 2단계: 상태 추적 변수
+
+### Is_Gear_Open 변수
+
+```
+BP_F18 → Variables
+  ↓
+이름: Is_Gear_Open?
+타입: Boolean
+기본값: True (펼쳐진 상태)
+```
+
+**왜 Boolean인가?**
+
+```
+두 가지 상태만 존재:
+  - True: 펼쳐짐 (Open)
+  - False: 접혀짐 (Close)
+  ↓
+Boolean이 적합 ✅
+```
+
+---
+
+## 🔧 3단계: Gears_Timeline 생성 (핵심!)
+
+### Timeline 생성
+
+```
+[IA_Gears] Started
+  ↓
+Add Timeline
+  ↓
+이름: Gears_Timeline
+Length: 3.0초
+```
+
+---
+
+## 🔧 4단계: Timeline Track 설정
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380605/notion-blog/_/_/BG/6/image_2.png)
+
+### Track 1: Gears (바퀴)
+
+```
++ Float Track
+  ↓
+이름: Gears
+  ↓
+키프레임:
+  ├─ 0초: 0.0 (펼침)
+  └─ 1.5초: 1.0 (접힘)
+```
+
+### Track 2: Gears_Door (도어)
+
+```
++ Float Track
+  ↓
+이름: Gears_Door
+  ↓
+키프레임:
+  ├─ 1.5초: 0.0 (열림)
+  └─ 3.0초: 1.0 (닫힘)
+```
+
+**Timeline 구조:**
+
+```
+시간축:
+  0초───────1.5초────────3.0초
+  ↓         ↓           ↓
+Gears:
+  0.0 → → → 1.0 (계속 1.0)
+
+Gears_Door:
+  (계속 0.0) 0.0 → → → 1.0
+```
+
+**작동 순서:**
+
+```
+0~1.5초:
+  - Gear 접기 시작
+  - Door는 열린 상태 유지
+
+1.5~3.0초:
+  - Gear 완전히 접힘
+  - Door 닫기 시작
+
+결과:
+  자연스러운 순차 작동! ✅
+```
+
+---
+
+## 🔧 5단계: Timeline 출력 처리
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380605/notion-blog/_/_/BG/6/image_3.png)
+
+### Promote to Variable
+
+```
+[Gears_Timeline] Update
+  ↓
+Gears 출력:
+  우클릭 → Promote to Variable
+  ↓
+  이름: Gears (BP_F18의 변수)
+
+Gears_Door 출력:
+  우클릭 → Promote to Variable
+  ↓
+  이름: Gears_Door (BP_F18의 변수)
+```
+
+**매 프레임 업데이트:**
+
+```
+Timeline Update (매 프레임):
+  ↓
+Gears 값 → SET Gears 변수
+Gears_Door 값 → SET Gears_Door 변수
+  ↓
+실시간 변화 ✅
+```
+
+---
+
+## 🔧 6단계: Branch 로직
+
+### 노드 구성
+
+```
+[IA_Gears] Started
+  ↓
+[GET] Is_Gear_Open?
+  ↓
+[Branch]
+  ├─ True (펼쳐진 상태):
+  │    [Gears_Timeline] Play
+  │    → 접기 시작
+  │
+  └─ False (접혀진 상태):
+       [Gears_Timeline] Reverse
+       → 펼치기 시작
+```
+
+**작동 원리:**
+
+```
+G 키 누름:
+  ↓
+Is_Gear_Open 확인
+  ↓
+True (펼쳐짐):
+  Play → 0에서 1로 (접기)
+
+False (접혀짐):
+  Reverse → 1에서 0으로 (펼치기)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380606/notion-blog/_/_/BG/6/image_4.png)
+
+---
+
+## 🔧 7단계: ABP_F18 연동
+
+### Event Graph 수정
+
+```
+[Event Blueprint Update Animation]
+  ↓
+기존 Is Valid 체크 후
+  ↓
+[GET] BP_F18
+  ├─ [Get Gears] → [SET] Gear
+  └─ [Get Gears_Door] → [SET] Gear_Door
+```
+
+**데이터 흐름:**
+
+```
+BP_F18 (Timeline):
+  Gears 변수 (0~1)
+  Gears_Door 변수 (0~1)
+  ↓
+매 프레임 복사
+  ↓
+ABP_F18:
+  Gear 변수
+  Gear_Door 변수
+  ↓
+AnimGraph에서 사용
+  ↓
+바퀴와 도어 움직임
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380608/notion-blog/_/_/BG/6/image_5.png)
+
+---
+
+## ✅ 첫 번째 테스트
+
+### 결과
+
+```
+G 키 누름:
+  ✅ Gear 접힘
+  ✅ Door 닫힘
+  ✅ 순차 작동
+
+다시 G 키:
+  ❌ 아무 일도 안 일어남!
+```
+
+---
+
+## ⚠️ 발견된 버그
+
+### 버그 1: 초기값 문제 (해결됨)
+
+```
+문제:
+  Is_Gear_Open 기본값 = False
+  ↓
+  게임 시작 시 Branch가 Reverse 실행
+  ↓
+  아무 일도 안 일어남
+
+해결:
+  Is_Gear_Open 기본값 = True ✅
+  ↓
+  게임 시작 = Gear 펼쳐진 상태
+```
+
+### 버그 2: 역방향 작동 안 됨 (미해결!)
+
+```
+문제:
+  G 키 첫 번째: 작동 ✅
+  G 키 두 번째: 작동 안 함 ❌
+  ↓
+  무엇이 문제일까?
+```
+
+---
+
+## 📝 현재 구조 정리
+
+### BP_F18
+
+```
+Variables:
+  - Is_Gear_Open (Boolean)
+  - Gears (Float, 0~1)
+  - Gears_Door (Float, 0~1)
+
+Timeline:
+  Gears_Timeline (3초)
+    ├─ Gears: 0→1 (0~1.5초)
+    └─ Gears_Door: 0→1 (1.5~3초)
+
+Logic:
+  [IA_Gears] Started
+    ↓
+  [Branch] Is_Gear_Open?
+    ├─ True: Play
+    └─ False: Reverse
+```
+
+### ABP_F18
+
+```
+Event Graph:
+  Get Gears → SET Gear
+  Get Gears_Door → SET Gear_Door
+
+AnimGraph:
+  Gear 사용 (Chassis 제어)
+  Gear_Door 사용 (Door 제어)
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Timeline의 순차 제어
+
+```
+장점:
+  - 자연스러운 순서
+  - 타이밍 완벽 제어
+  - 복잡한 로직 불필요 ✅
+
+구현:
+  트랙별 시작 시간 다르게
+  (Gears: 0초, Door: 1.5초)
+```
+
+### Play vs Reverse
+
+```
+Play:
+  - 0초 → 3초 방향
+  - 접기
+
+Reverse:
+  - 3초 → 0초 방향
+  - 펼치기
+
+하나의 Timeline으로:
+  양방향 제어 가능! ✅
+```
+
+### Promote to Variable의 활용
+
+```
+Timeline 출력:
+  - 실시간 값 생성
+  - 매 프레임 변화
+
+Promote to Variable:
+  - 값을 변수에 저장
+  - 다른 곳에서 사용 ✅
+```
+
+---
+
+## 🎯 핵심 요약
+
+**구현 완료:**
+
+```
+✅ IA_Gears (G 키)
+✅ Gears_Timeline (순차 제어)
+✅ BP_F18 → ABP_F18 연동
+✅ 접기 작동 (한 번)
+```
+
+**미해결:**
+
+```
+❌ 펼치기 작동 안 함
+❌ Is_Gear_Open 업데이트?
+❌ 다음 강의에서 해결
+```
+
+Landing Gear 제어가 **거의 완성**! (버그만 고치면 됨) 🛩️

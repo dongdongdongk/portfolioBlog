@@ -1,0 +1,2119 @@
+---
+title: '섹션 4: Battle Blaster - 4'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { BasePawn 클래스 - **발사체 스폰 준비** }
+
+## 📋 전체 코드 구조
+
+```cpp
+#include "BasePawn.h"
+
+// 생성자
+ABasePawn::ABasePawn()
+{
+    PrimaryActorTick.bCanEverTick = true;
+
+    // 컴포넌트 생성
+    CapsuleComp = CreateDefaultSubobject<UCapsuleComponent>(TEXT("CapsuleComp"));
+    SetRootComponent(CapsuleComp);
+
+    BaseMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BaseMesh"));
+    BaseMesh->SetupAttachment(CapsuleComp);
+
+    TurretMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TurretMesh"));
+    TurretMesh->SetupAttachment(BaseMesh);
+
+    ProjectileSpawnPoint = CreateDefaultSubobject<USceneComponent>(TEXT("ProjectileSpawnPoint"));
+    ProjectileSpawnPoint->SetupAttachment(TurretMesh);
+}
+
+// 포탑 회전 함수
+void ABasePawn::RotateTurret(FVector LookAtTarget)
+{
+    FVector VectorToTarget = LookAtTarget - TurretMesh->GetComponentLocation();
+    FRotator LookAtRotation = FRotator(0.f, VectorToTarget.Rotation().Yaw, 0.f);
+    FRotator InterpolatedRotation = FMath::RInterpTo(
+        TurretMesh->GetComponentRotation(),
+        LookAtRotation,
+        GetWorld()->GetDeltaSeconds(),
+        25.0f
+    );
+    TurretMesh->SetWorldRotation(InterpolatedRotation);
+}
+
+// 발사 함수
+void ABasePawn::Fire()
+{
+    FVector SpawnLocation = ProjectileSpawnPoint->GetComponentLocation();
+    FRotator SpawnRotation = ProjectileSpawnPoint->GetComponentRotation()
+}
+```
+
+---
+
+## 🎯 이 코드가 하는 일
+
+- \*"탱크와 타워가 공통으로 사용하는 기본 기능"\*\*을 구현한 클래스입니다.
+- 컴포넌트 구조 설정
+- 포탑 회전 기능
+- **발사체 스폰 준비** (아직 미완성)
+
+---
+
+## 🏗️ 생성자(Constructor) - 컴포넌트 조립
+
+### **컴포넌트 계층 구조**
+
+```
+CapsuleComp (루트)
+    └── BaseMesh (탱크 몸체)
+            └── TurretMesh (회전하는 포탑)
+                    └── ProjectileSpawnPoint (발사 위치)
+
+```
+
+### **1. 캡슐 컴포넌트 (루트)**
+
+```cpp
+CapsuleComp = CreateDefaultSubobject<UCapsuleComponent>(TEXT("CapsuleComp"));
+SetRootComponent(CapsuleComp);
+```
+
+- 전체 구조의 **기초**가 되는 컴포넌트
+- 충돌 감지에 사용
+- 이것이 움직이면 전체가 움직입니다
+
+---
+
+### **2. 베이스 메시 (탱크 몸체)**
+
+```cpp
+BaseMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BaseMesh"));
+BaseMesh->SetupAttachment(CapsuleComp);
+```
+
+- 탱크의 **몸체** 부분
+- CapsuleComp에 부착 → 캡슐이 움직이면 같이 움직임
+
+---
+
+### **3. 터렛 메시 (회전하는 포탑)**
+
+```cpp
+TurretMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TurretMesh"));
+TurretMesh->SetupAttachment(BaseMesh);
+```
+
+- 탱크의 **포탑** 부분
+- BaseMesh에 부착
+- **독립적으로 회전 가능** → 몸체는 그대로, 포탑만 돌아감
+
+---
+
+### **4. 발사체 스폰 포인트 (발사 위치) ⭐**
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380635/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_4/image.png)
+
+```cpp
+ProjectileSpawnPoint = CreateDefaultSubobject<USceneComponent>(TEXT("ProjectileSpawnPoint"));
+ProjectileSpawnPoint->SetupAttachment(TurretMesh);
+```
+
+**왜 USceneComponent를 사용하나요?**
+
+- **보이지 않는** 컴포넌트입니다 (메시가 없음)
+- 하지만 **위치, 회전, 크기 정보**는 가지고 있습니다
+- 단순히 "여기서 발사체가 나올 거야"라는 **마커 역할**만 합니다
+
+**왜 TurretMesh에 부착하나요?**
+
+```
+포탑이 이쪽 방향 →  [발사 지점도 이쪽]
+포탑이 저쪽 방향 →  [발사 지점도 저쪽]
+```
+
+- 포탑이 회전하면 발사 위치도 **자동으로 같이 회전**합니다
+- 포탑이 바라보는 방향으로 발사체가 나갑니다
+
+---
+
+## 🔄 RotateTurret 함수 (포탑 회전)
+
+이미 이전 강의에서 배운 내용이므로 간단히 정리:
+
+```cpp
+void ABasePawn::RotateTurret(FVector LookAtTarget)
+{
+    // 1. 목표 방향 계산
+    FVector VectorToTarget = LookAtTarget - TurretMesh->GetComponentLocation();
+
+    // 2. 회전값 생성 (Yaw만 사용)
+    FRotator LookAtRotation = FRotator(0.f, VectorToTarget.Rotation().Yaw, 0.f);
+
+    // 3. 부드럽게 회전 (보간)
+    FRotator InterpolatedRotation = FMath::RInterpTo(
+        TurretMesh->GetComponentRotation(),  // 현재 회전
+        LookAtRotation,                       // 목표 회전
+        GetWorld()->GetDeltaSeconds(),        // 델타 타임
+        25.0f                                 // 회전 속도
+    );
+
+    // 4. 회전 적용
+    TurretMesh->SetWorldRotation(InterpolatedRotation);
+}
+```
+
+---
+
+## 🚀 Fire 함수 (발사 기능 - 미완성)
+
+```cpp
+void ABasePawn::Fire()
+{
+    FVector SpawnLocation = ProjectileSpawnPoint->GetComponentLocation();
+    FRotator SpawnRotation = ProjectileSpawnPoint->GetComponentRotation()
+}
+
+```
+
+###
+
+```cpp
+void ABasePawn::Fire()
+{
+    FVector SpawnLocation = ProjectileSpawnPoint->GetComponentLocation();   // 위치
+    FRotator SpawnRotation = ProjectileSpawnPoint->GetComponentRotation(); // 회전
+
+    // 나중에 여기서 발사체를 스폰할 예정
+    // SpawnProjectile(SpawnLocation, SpawnRotation);
+}
+
+```
+
+---
+
+## 🎮 실제 동작 흐름
+
+### **1. 게임 시작 시**
+
+```
+생성자 실행
+  ↓
+컴포넌트들이 계층 구조로 조립됨
+  ↓
+ProjectileSpawnPoint가 포탑 앞쪽에 배치됨
+
+```
+
+### **2. 포탑 회전 시**
+
+```
+RotateTurret 호출
+  ↓
+포탑이 목표를 향해 회전
+  ↓
+ProjectileSpawnPoint도 자동으로 같이 회전 (부착되어 있으므로)
+
+```
+
+### **3. 발사 시 (완성되면)**
+
+```
+Fire 함수 호출
+  ↓
+SpawnLocation: 발사 지점의 위치 획득
+SpawnRotation: 발사 지점의 회전 획득
+  ↓
+이 위치와 회전값으로 발사체 생성
+
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### **1. 왜 BasePawn에 Fire 함수를 만들었나요?**
+
+```
+BasePawn (부모 클래스)
+    ├── Tank (플레이어)      → Fire 함수 사용
+    └── Tower (적)           → Fire 함수 사용
+
+```
+
+- 탱크와 타워 **둘 다** 발사 기능이 필요합니다
+- 같은 코드를 두 번 작성하지 않고, **부모 클래스에 한 번만** 작성합니다
+- 이것을 **코드 재사용**이라고 합니다
+
+---
+
+### **2. USceneComponent의 역할**
+
+**일반 컴포넌트:**
+
+```
+UStaticMeshComponent → 3D 모델 표시 + 위치 정보
+
+```
+
+**씬 컴포넌트:**
+
+```
+USceneComponent → 위치 정보만 (보이지 않음)
+
+```
+
+**언제 사용하나요?**
+
+- "이 위치에서 뭔가를 생성하고 싶은데, 눈에 보일 필요는 없을 때"
+- 발사 지점, 스폰 지점, 체크포인트 등에 사용
+
+---
+
+### **3. 부착(Attachment)의 중요성**
+
+```cpp
+ProjectileSpawnPoint->SetupAttachment(TurretMesh);
+
+```
+
+**부착하지 않으면:**
+
+- 포탑이 회전해도 발사 지점은 그대로
+- 발사체가 엉뚱한 방향으로 날아감
+
+**부착하면:**
+
+- 포탑이 회전하면 발사 지점도 자동으로 회전
+- 발사체가 항상 포탑이 향하는 방향으로 날아감
+
+---
+
+## 🎓 초보자를 위한 비유
+
+### **컴포넌트 계층 구조 = 장난감 로봇**
+
+```
+몸통 (CapsuleComp)
+  └── 하체 (BaseMesh) - 나사로 고정
+        └── 상체 (TurretMesh) - 회전 가능한 관절
+              └── 손끝 (ProjectileSpawnPoint) - 총알 나가는 곳
+
+```
+
+- 하체를 움직이면 → 전체가 움직임
+- 상체만 돌리면 → 손끝도 같이 돌아감
+- 손끝은 눈에 보이지 않지만, **총알이 나갈 위치를 표시**
+
+---
+
+### **Fire 함수 = 총 발사 준비**
+
+현재 상태:
+
+```
+1. 총알 나갈 위치 확인 ✅
+2. 총알 나갈 방향 확인 ✅
+3. 총알 발사 ⏳ (아직 안 만듦)
+```
+
+다음 강의에서:
+
+```
+실제 발사체(Projectile) 클래스를 만들고
+이 위치와 방향으로 발사체를 스폰할 예정
+```
+
+---
+
+# { Tower 클래스 - 타이머 시스템 }
+
+## 📋 전체 코드 구조
+
+```cpp
+#include "Tower.h"
+
+void ATower::BeginPlay()
+{
+    Super::BeginPlay();
+    FTimerHandle FireTimerHandle;
+    GetWorldTimerManager().SetTimer(FireTimerHandle, this, &ATower::CheckFireCondition, FireRate, true);
+}
+
+void ATower::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+    if (IsInFireRange())
+    {
+        RotateTurret(Tank->GetActorLocation());
+    }
+}
+
+void ATower::CheckFireCondition()
+{
+    if (Tank && IsInFireRange())
+    {
+        Fire();
+    }
+}
+
+bool ATower::IsInFireRange()
+{
+    bool Result = false;
+    if (Tank)
+    {
+        float DistanceToTank = FVector::Dist(GetActorLocation(), Tank->GetActorLocation());
+        Result = (DistanceToTank <= FireRange);
+    }
+    return Result;
+}
+```
+
+---
+
+## 🎯 이 코드가 하는 일
+
+- \*"적 타워가 2초마다 자동으로 플레이어를 향해 발사하는 AI 시스템"\*\*입니다.
+
+핵심 기능:
+
+- ⏱️ 타이머를 사용한 자동 발사
+- 🎯 거리 체크 후 사격 여부 결정
+- 🔄 매 프레임 포탑 회전
+
+---
+
+## 📖 함수별 상세 설명
+
+### 1. **BeginPlay() - 게임 시작 시 타이머 설정**
+
+```cpp
+void ATower::BeginPlay()
+{
+    Super::BeginPlay();
+
+    FTimerHandle FireTimerHandle;
+    GetWorldTimerManager().SetTimer(
+        FireTimerHandle,              // 타이머 식별자
+        this,                         // 이 타워 객체
+        &ATower::CheckFireCondition,  // 호출할 함수
+        FireRate,                     // 시간 간격 (2초)
+        true                          // 반복 여부
+    );
+}
+```
+
+### **타이머 파라미터 상세 분석:**
+
+**1) FTimerHandle FireTimerHandle**
+
+```cpp
+FTimerHandle FireTimerHandle;
+```
+
+- 타이머를 구분하는 **ID 카드** 같은 역할
+- 나중에 이 타이머를 멈추거나 수정할 때 사용
+- 예: "FireTimerHandle이라는 타이머를 멈춰줘"
+
+**2) this 키워드**
+
+```cpp
+this  // 현재 Tower 객체를 가리키는 포인터
+```
+
+- "이 타워" 객체를 의미
+- Tank 클래스에서 사용하면 → `ATank*` 포인터
+- Tower 클래스에서 사용하면 → `ATower*` 포인터
+
+**3) &ATower::CheckFireCondition**
+
+```cpp
+&ATower::CheckFireCondition  // 함수 주소
+```
+
+- 타이머가 호출할 함수의 **주소**
+- `&` = "주소를 가져와"
+- "2초마다 CheckFireCondition 함수를 실행해줘"
+
+**4) FireRate (2초)**
+
+```cpp
+FireRate  // 2.0f (2초)
+```
+
+- 타이머가 기다리는 시간
+- 2초마다 함수가 호출됩니다
+
+**5) true (반복 설정)**
+
+```cpp
+true  // 계속 반복
+```
+
+- `true` → 함수 실행 후 타이머 재시작 (무한 반복)
+- `false` → 한 번만 실행하고 멈춤
+
+---
+
+### 2. **Tick() - 매 프레임 포탑 회전**
+
+```cpp
+void ATower::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    if (IsInFireRange())  // 사거리 안에 있으면
+    {
+        RotateTurret(Tank->GetActorLocation());  // 포탑 회전
+    }
+}
+```
+
+**이전 코드와 비교:**
+
+```cpp
+// ❌ 이전 코드 (중복된 로직)
+if (Tank)
+{
+    float DistanceToTank = FVector::Dist(GetActorLocation(), Tank->GetActorLocation());
+    if (DistanceToTank <= FireRange)
+    {
+        RotateTurret(Tank->GetActorLocation());
+    }
+}
+
+// ✅ 개선된 코드 (함수로 분리)
+if (IsInFireRange())
+{
+    RotateTurret(Tank->GetActorLocation());
+}
+```
+
+**개선 포인트:**
+
+- 거리 체크 로직을 `IsInFireRange()` 함수로 분리
+- 코드가 간결하고 읽기 쉬워짐
+- 같은 로직을 여러 곳에서 재사용 가능
+
+---
+
+### 3. **CheckFireCondition() - 발사 조건 확인**
+
+```cpp
+void ATower::CheckFireCondition()
+{
+    if (Tank && IsInFireRange())  // 탱크 존재 & 사거리 안
+    {
+        Fire();  // 발사!
+    }
+}
+```
+
+**동작 순서:**
+
+```
+2초마다 이 함수 호출
+    ↓
+Tank가 존재하나요? (Tank != nullptr)
+    ↓ 예
+사거리 안에 있나요? (IsInFireRange())
+    ↓ 예
+Fire() 함수 호출 → 발사!
+```
+
+**조건 체크:**
+
+```cpp
+if (Tank && IsInFireRange())
+```
+
+- `Tank` → 탱크가 파괴되지 않았는지 확인
+- `&&` → AND 연산자 (둘 다 참이어야 함)
+- `IsInFireRange()` → 거리 체크
+
+---
+
+### 4. **IsInFireRange() - 사거리 체크 (핵심 함수) ⭐**
+
+```cpp
+bool ATower::IsInFireRange()
+{
+    bool Result = false;  // 기본값: 거짓
+
+    if (Tank)  // 탱크가 존재하면
+    {
+        // 거리 계산
+        float DistanceToTank = FVector::Dist(
+            GetActorLocation(),        // 타워 위치
+            Tank->GetActorLocation()   // 탱크 위치
+        );
+
+        // 거리 비교
+        Result = (DistanceToTank <= FireRange);
+    }
+
+    return Result;
+}
+```
+
+### **단계별 분석:**
+
+**1단계: 기본값 설정**
+
+```cpp
+bool Result = false;
+```
+
+- 일단 "사거리 밖"으로 가정
+- 조건을 만족하면 `true`로 변경
+
+**2단계: 탱크 존재 확인**
+
+```cpp
+if (Tank)
+```
+
+- 탱크가 없으면 → `false` 반환
+- 탱크가 있으면 → 거리 계산 진행
+
+**3단계: 거리 계산**
+
+```cpp
+float DistanceToTank = FVector::Dist(
+    GetActorLocation(),        // 타워: (100, 200, 50)
+    Tank->GetActorLocation()   // 탱크: (500, 300, 50)
+);
+```
+
+**예시:**
+
+```
+타워 위치: (100, 200, 50)
+탱크 위치: (500, 300, 50)
+계산된 거리: 412cm
+```
+
+**4단계: 거리 비교**
+
+```cpp
+Result = (DistanceToTank <= FireRange);
+```
+
+**조건식 평가:**
+
+```cpp
+// FireRange = 700 인 경우
+DistanceToTank = 412
+Result = (412 <= 700)  // true
+
+// FireRange = 700 인 경우
+DistanceToTank = 850
+Result = (850 <= 700)  // false
+```
+
+**5단계: 결과 반환**
+
+```cpp
+return Result;  // true 또는 false
+```
+
+---
+
+## 🔄 전체 동작 흐름
+
+### **시간 순서대로 보기:**
+
+```
+게임 시작
+    ↓
+BeginPlay() 실행
+    ↓
+타이머 설정 (2초마다 CheckFireCondition 호출)
+    ↓
+───────────────────────────────────
+매 프레임 (Tick)
+    ↓
+사거리 안? → 예 → 포탑 회전
+           → 아니오 → 아무것도 안 함
+───────────────────────────────────
+2초 경과 (타이머 작동)
+    ↓
+CheckFireCondition() 호출
+    ↓
+탱크 존재 & 사거리 안? → 예 → Fire() 발사!
+                      → 아니오 → 다음 타이머 대기
+───────────────────────────────────
+2초 후 다시 반복...
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### **1. 타이머를 사용하는 이유**
+
+**플레이어와 적의 차이:**
+
+```
+플레이어:
+  마우스 클릭 → 발사 ✅
+
+적 타워:
+  입력 없음 → 자동 발사 필요 ⚙️
+```
+
+**타이머의 역할:**
+
+- 일정 시간마다 자동으로 함수 실행
+- 게임에서 **자동화된 행동**에 필수적
+- 예: AI 패턴, 자동 스폰, 쿨다운 등
+
+---
+
+### **2. 코드 중복 제거의 중요성**
+
+**문제 상황:**
+
+```cpp
+// Tick 함수에서
+if (Tank)
+{
+    float Distance = FVector::Dist(...);
+    if (Distance <= FireRange) { ... }
+}
+
+// CheckFireCondition에서 또
+if (Tank)
+{
+    float Distance = FVector::Dist(...);
+    if (Distance <= FireRange) { ... }
+}
+```
+
+**해결 방법:**
+
+```cpp
+// IsInFireRange() 함수로 분리
+bool IsInFireRange()
+{
+    // 거리 체크 로직 한 곳에만 작성
+}
+
+// 여러 곳에서 재사용
+if (IsInFireRange()) { ... }
+```
+
+**장점:**
+
+- 코드 수정 시 한 곳만 변경
+- 버그 발생 가능성 감소
+- 가독성 향상
+
+---
+
+### **3. this 키워드의 의미**
+
+```cpp
+GetWorldTimerManager().SetTimer(..., this, ...);
+```
+
+**this가 없으면:**
+
+```
+타이머: "어떤 타워의 CheckFireCondition을 호출하지?"
+       → 알 수 없음 ❌
+```
+
+**this를 사용하면:**
+
+```
+타이머: "이 Tower 객체의 CheckFireCondition을 호출!"
+       → 명확함 ✅
+```
+
+---
+
+## 🔧 코드 개선 전후 비교
+
+### **개선 전 (중복 코드)**
+
+```cpp
+// Tick 함수
+void ATower::Tick(float DeltaTime)
+{
+    if (Tank)
+    {
+        float DistanceToTank = FVector::Dist(GetActorLocation(), Tank->GetActorLocation());
+        if (DistanceToTank <= FireRange)
+        {
+            RotateTurret(Tank->GetActorLocation());
+        }
+    }
+}
+
+// CheckFireCondition 함수
+void ATower::CheckFireCondition()
+{
+    if (Tank)
+    {
+        float DistanceToTank = FVector::Dist(GetActorLocation(), Tank->GetActorLocation());
+        if (DistanceToTank <= FireRange)
+        {
+            Fire();
+        }
+    }
+}
+```
+
+**문제점:**
+
+- 같은 거리 체크 코드가 두 곳에 중복
+- 수정 시 두 곳 다 변경해야 함
+- 실수로 한 곳만 수정하면 버그 발생
+
+---
+
+### **개선 후 (함수 분리)**
+
+```cpp
+// 거리 체크 로직을 별도 함수로
+bool ATower::IsInFireRange()
+{
+    bool Result = false;
+    if (Tank)
+    {
+        float DistanceToTank = FVector::Dist(GetActorLocation(), Tank->GetActorLocation());
+        Result = (DistanceToTank <= FireRange);
+    }
+    return Result;
+}
+
+// Tick - 간결해짐
+void ATower::Tick(float DeltaTime)
+{
+    if (IsInFireRange())
+    {
+        RotateTurret(Tank->GetActorLocation());
+    }
+}
+
+// CheckFireCondition - 간결해짐
+void ATower::CheckFireCondition()
+{
+    if (Tank && IsInFireRange())
+    {
+        Fire();
+    }
+}
+```
+
+**장점:**
+
+- ✅ 거리 체크 로직이 한 곳에만 있음
+- ✅ 수정 시 IsInFireRange()만 변경
+- ✅ 코드 가독성 향상
+- ✅ 유지보수 용이
+
+---
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380634/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_4/image_1.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380634/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_4/image_2.png)
+
+# { BasePawn & Projectile 클래스 - 발사체 생성 시스템 }
+
+## 📋 전체 코드 구조
+
+### **BasePawn.cpp (발사 로직)**
+
+```cpp
+#include "BasePawn.h"
+
+ABasePawn::ABasePawn()
+{
+    PrimaryActorTick.bCanEverTick = true;
+
+    CapsuleComp = CreateDefaultSubobject<UCapsuleComponent>(TEXT("CapsuleComp"));
+    SetRootComponent(CapsuleComp);
+
+    BaseMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BaseMesh"));
+    BaseMesh->SetupAttachment(CapsuleComp);
+
+    TurretMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TurretMesh"));
+    TurretMesh->SetupAttachment(BaseMesh);
+
+    ProjectileSpawnPoint = CreateDefaultSubobject<USceneComponent>(TEXT("ProjectileSpawnPoint"));
+    ProjectileSpawnPoint->SetupAttachment(TurretMesh);
+}
+
+void ABasePawn::RotateTurret(FVector LookAtTarget)
+{
+    FVector VectorToTarget = LookAtTarget - TurretMesh->GetComponentLocation();
+    FRotator LookAtRotation = FRotator(0.f, VectorToTarget.Rotation().Yaw, 0.f);
+    FRotator InterpolatedRotation = FMath::RInterpTo(
+        TurretMesh->GetComponentRotation(),
+        LookAtRotation,
+        GetWorld()->GetDeltaSeconds(),
+        25.0f
+    );
+    TurretMesh->SetWorldRotation(InterpolatedRotation);
+}
+
+void ABasePawn::Fire()
+{
+    FVector SpawnLocation = ProjectileSpawnPoint->GetComponentLocation();
+    FRotator SpawnRotation = ProjectileSpawnPoint->GetComponentRotation();
+
+    DrawDebugSphere(GetWorld(), SpawnLocation, 25.0f, 12, FColor::Red, false, 3.0f);
+
+    GetWorld()->SpawnActor<AProjectile>(ProjectileClass, SpawnLocation, SpawnRotation);
+}
+```
+
+### **Projectile.cpp (발사체 클래스)**
+
+```cpp
+#include "Projectile.h"
+
+AProjectile::AProjectile()
+{
+    PrimaryActorTick.bCanEverTick = true;
+
+    ProjectileMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ProjectileMesh"));
+    SetRootComponent(ProjectileMesh);
+}
+
+void AProjectile::BeginPlay()
+{
+    Super::BeginPlay();
+}
+
+void AProjectile::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+}
+
+```
+
+---
+
+## 🎯 이 코드가 하는 일
+
+- \*"실제 발사체 객체를 게임 월드에 생성하는 시스템"\*\*입니다.
+
+핵심 기능:
+
+- 🎨 Projectile 클래스 생성 (발사체 설계도)
+- 🏭 SpawnActor로 발사체 생성
+- 📍 정확한 위치와 회전으로 스폰
+
+---
+
+## 📖 단계별 상세 설명
+
+### **1. Projectile 클래스 생성**
+
+```cpp
+AProjectile::AProjectile()
+{
+    PrimaryActorTick.bCanEverTick = true;
+
+    ProjectileMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ProjectileMesh"));
+    SetRootComponent(ProjectileMesh);
+}
+```
+
+### **컴포넌트 구조**
+
+```
+AProjectile (액터)
+    └── ProjectileMesh (루트) - 발사체의 3D 모델
+```
+
+**왜 간단한가요?**
+
+- 발사체는 복잡한 구조가 필요 없습니다
+- 단순히 **3D 모델 하나**만 있으면 됩니다
+- 나중에 물리 기능을 추가할 예정
+
+---
+
+### **2. Fire() 함수 - 발사체 생성 ⭐**
+
+```cpp
+void ABasePawn::Fire()
+{
+    // 1. 스폰 위치 가져오기
+    FVector SpawnLocation = ProjectileSpawnPoint->GetComponentLocation();
+
+    // 2. 스폰 회전 가져오기
+    FRotator SpawnRotation = ProjectileSpawnPoint->GetComponentRotation();
+
+    // 3. 디버그 구체 그리기 (시각화용)
+    DrawDebugSphere(GetWorld(), SpawnLocation, 25.0f, 12, FColor::Red, false, 3.0f);
+
+    // 4. 발사체 생성!
+    GetWorld()->SpawnActor<AProjectile>(ProjectileClass, SpawnLocation, SpawnRotation);
+}
+```
+
+---
+
+## 🔍 SpawnActor 함수 완전 분석
+
+### **기본 구조**
+
+```cpp
+GetWorld()->SpawnActor<AProjectile>(ProjectileClass, SpawnLocation, SpawnRotation);
+```
+
+이것을 나눠서 이해해봅시다:
+
+---
+
+### **1) GetWorld()**
+
+```cpp
+GetWorld()
+```
+
+**무엇인가요?**
+
+- 현재 게임 월드(레벨)를 가져옵니다
+- 게임 세계의 **관리자** 역할
+
+**비유:**
+
+```
+GetWorld() = 게임판
+게임판 위에 말(액터)을 올려놓습니다
+```
+
+---
+
+### **2) SpawnActor<>() - 템플릿 함수**
+
+```cpp
+SpawnActor<AProjectile>()
+```
+
+**템플릿이란?**
+
+```cpp
+SpawnActor<만들고_싶은_클래스>()
+```
+
+**예시:**
+
+```cpp
+SpawnActor<AProjectile>()  // 발사체 생성
+SpawnActor<AEnemy>()       // 적 생성
+SpawnActor<APickup>()      // 아이템 생성
+```
+
+**왜 템플릿을 사용하나요?**
+
+- **타입 안정성** 제공
+- 컴파일러가 올바른 타입인지 확인
+- 실수로 잘못된 클래스를 넣으면 에러 발생
+
+---
+
+### **3) 파라미터 분석**
+
+```cpp
+SpawnActor<AProjectile>(
+    ProjectileClass,    // 1️⃣ 어떤 클래스를 생성할지
+    SpawnLocation,      // 2️⃣ 어디에 생성할지 (위치)
+    SpawnRotation       // 3️⃣ 어떤 방향으로 생성할지 (회전)
+);
+```
+
+---
+
+### **파라미터 1: ProjectileClass (핵심!) 🔑**
+
+```cpp
+TSubclassOf<AProjectile> ProjectileClass;
+```
+
+**이것이 필요한 이유:**
+
+```
+C++ 코드                블루프린트
+    │                       │
+    │                   BP_Projectile
+    │                   (메시, 머티리얼 등)
+    │                       │
+    └───── 연결 필요 ────────┘
+```
+
+**문제:**
+
+- C++ 코드에서는 **블루프린트에 직접 접근할 수 없습니다**
+- 블루프린트는 에디터에서 만들어지기 때문
+
+**해결:**
+
+- `TSubclassOf<AProjectile>` 변수를 만듭니다
+- 에디터에서 이 변수에 블루프린트를 **할당**합니다
+
+---
+
+**TSubclassOf 상세 분석:**
+
+```cpp
+TSubclassOf<AProjectile> ProjectileClass;
+```
+
+**일반 포인터와의 차이:**
+
+```cpp
+// ❌ 일반 클래스 포인터
+UClass* ProjectileClass;  // 어떤 클래스든 넣을 수 있음 (위험!)
+
+// ✅ TSubclassOf
+TSubclassOf<AProjectile> ProjectileClass;  // AProjectile만 가능 (안전!)
+```
+
+**타입 안정성 예시:**
+
+```cpp
+// ✅ 올바른 사용
+ProjectileClass = AProjectile::StaticClass();        // OK
+ProjectileClass = BP_Projectile_C::StaticClass();    // OK (AProjectile 상속)
+
+// ❌ 잘못된 사용 (컴파일 에러!)
+ProjectileClass = ATank::StaticClass();              // ERROR! Tank는 Projectile이 아님
+```
+
+---
+
+**Header 파일에서의 선언:**
+
+```cpp
+// BasePawn.h
+#include "Projectile.h"  // ⭐ 중요!
+
+UPROPERTY(EditAnywhere)
+TSubclassOf<AProjectile> ProjectileClass;
+```
+
+**왜 헤더에 include?**
+
+- `TSubclassOf<AProjectile>`을 사용하려면 `AProjectile`이 무엇인지 알아야 함
+- 전방 선언만으로는 부족합니다
+
+---
+
+### **파라미터 2: SpawnLocation (위치)**
+
+```cpp
+FVector SpawnLocation = ProjectileSpawnPoint->GetComponentLocation();
+```
+
+**좌표 예시:**
+
+```
+SpawnLocation = (500, 300, 100)
+               (X,   Y,   Z)
+
+게임 월드에서:
+  X: 앞/뒤
+  Y: 좌/우
+  Z: 위/아래
+```
+
+---
+
+### **파라미터 3: SpawnRotation (회전)**
+
+```cpp
+FRotator SpawnRotation = ProjectileSpawnPoint->GetComponentRotation();
+```
+
+**회전 예시:**
+
+```
+SpawnRotation = (Pitch: 0, Yaw: 90, Roll: 0)
+                (위아래  좌우회전  기울기)
+
+Yaw 90도 = 오른쪽을 향함
+포탑이 오른쪽을 보면 → 발사체도 오른쪽으로 날아감
+```
+
+---
+
+## 🎮 실제 동작 흐름
+
+### **전체 프로세스:**
+
+```
+1. 마우스 클릭 또는 타이머 실행
+    ↓
+2. Fire() 함수 호출
+    ↓
+3. SpawnLocation = ProjectileSpawnPoint 위치
+   SpawnRotation = ProjectileSpawnPoint 회전
+    ↓
+4. GetWorld()->SpawnActor<AProjectile>() 호출
+    ↓
+5. 새로운 AProjectile 객체 생성
+    ↓
+6. 지정된 위치와 회전으로 월드에 배치
+    ↓
+7. BeginPlay() 자동 호출
+    ↓
+8. 게임에 발사체가 나타남! ✅
+```
+
+---
+
+### **코드 실행 순서 상세:**
+
+```cpp
+void ABasePawn::Fire()
+{
+    // ─── STEP 1: 위치 계산 ───
+    FVector SpawnLocation = ProjectileSpawnPoint->GetComponentLocation();
+    // 결과: (500, 300, 100)
+
+    // ─── STEP 2: 회전 계산 ───
+    FRotator SpawnRotation = ProjectileSpawnPoint->GetComponentRotation();
+    // 결과: (0, 90, 0)
+
+    // ─── STEP 3: 디버그 구체 (선택적) ───
+    DrawDebugSphere(GetWorld(), SpawnLocation, 25.0f, 12, FColor::Red, false, 3.0f);
+    // 빨간 구체를 3초간 표시
+
+    // ─── STEP 4: 발사체 생성! ───
+    GetWorld()->SpawnActor<AProjectile>(
+        ProjectileClass,   // BP_Projectile 블루프린트
+        SpawnLocation,     // (500, 300, 100)
+        SpawnRotation      // (0, 90, 0)
+    );
+    // 새로운 발사체가 월드에 생성됨!
+}
+```
+
+---
+
+## 🔧 BlueProject 설정 과정
+
+### **1. C++ 클래스 생성**
+
+```cpp
+// Projectile.h
+class TOONTANKS_API AProjectile : public AActor
+{
+    UPROPERTY(VisibleAnywhere)
+    UStaticMeshComponent* ProjectileMesh;
+};
+```
+
+---
+
+### **2. 블루프린트 생성 (에디터)**
+
+```
+Content Browser
+    └── Blueprints 폴더
+        └── 우클릭 → Blueprint Class
+            └── Parent Class: Projectile 선택
+                └── 이름: BP_Projectile
+```
+
+---
+
+### **3. 블루프린트 설정**
+
+```
+BP_Projectile 더블클릭
+    ↓
+Components 패널
+    └── ProjectileMesh 선택
+        └── Static Mesh: "SM_Projectile" 할당
+        └── Collision Presets: "Block All" 설정
+```
+
+---
+
+### **4. BasePawn에 블루프린트 연결**
+
+```
+BP_Tank 또는 BP_Tower 열기
+    ↓
+Details 패널
+    └── Projectile Class 검색
+        └── BP_Projectile 선택 ✅
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### **1. SpawnActor의 역할**
+
+```cpp
+GetWorld()->SpawnActor<>()
+```
+
+**게임 개발의 핵심 기능:**
+
+- 런타임에 동적으로 객체 생성
+- 총알, 적, 아이템, 이펙트 등 생성
+- 게임의 **동적인 요소**를 만드는 필수 함수
+
+---
+
+### **2. TSubclassOf의 중요성**
+
+**타입 안정성 제공:**
+
+```cpp
+// ❌ 위험한 코드
+UClass* SomeClass = ATank::StaticClass();
+SpawnActor(SomeClass, ...);  // Projectile을 기대했는데 Tank를 생성할 수 있음!
+
+// ✅ 안전한 코드
+TSubclassOf<AProjectile> ProjectileClass = BP_Projectile;
+SpawnActor<AProjectile>(ProjectileClass, ...);  // Projectile만 생성 가능
+```
+
+---
+
+### **3. C++와 블루프린트의 협업**
+
+```
+C++ (로직)                  블루프린트 (데이터)
+    │                           │
+발사체 생성 로직 ────연결────→ 발사체 모양/소리/이펙트
+타이머 시스템                   메시 할당
+충돌 처리                       머티리얼 설정
+
+```
+
+**장점:**
+
+- C++: 복잡한 로직, 성능이 중요한 부분
+- 블루프린트: 비주얼 요소, 빠른 반복 작업
+
+---
+
+## 🎓 초보자를 위한 비유
+
+### **SpawnActor = 3D 프린터**
+
+```
+SpawnActor<AProjectile>(설계도, 위치, 회전)
+    │
+    ├─ 설계도: ProjectileClass (BP_Projectile)
+    │         "이런 모양으로 만들어줘"
+    │
+    ├─ 위치: (500, 300, 100)
+    │       "여기에 놓아줘"
+    │
+    └─ 회전: (0, 90, 0)
+            "이 방향으로 향하게 해줘"
+
+결과: 짠! 🎯 발사체 완성
+```
+
+---
+
+### **TSubclassOf = 안전 장치**
+
+```
+TSubclassOf<AProjectile> = "발사체 전용 슬롯"
+
+✅ BP_Projectile 넣기 → OK! (발사체임)
+✅ BP_Missile 넣기 → OK! (발사체 상속)
+❌ BP_Tank 넣기 → ERROR! (발사체 아님)
+
+→ 실수로 엉뚱한 것을 생성하는 것을 방지!
+```
+
+---
+
+## 🔄 코드 개선 과정
+
+### **개선 전 (디버그 구체만)**
+
+```cpp
+void ABasePawn::Fire()
+{
+    FVector SpawnLocation = ProjectileSpawnPoint->GetComponentLocation();
+    FRotator SpawnRotation = ProjectileSpawnPoint->GetComponentRotation();
+
+    // 시각화만 가능
+    DrawDebugSphere(GetWorld(), SpawnLocation, 25.0f, 12, FColor::Red, false, 3.0f);
+}
+```
+
+**문제:**
+
+- 빨간 구체만 보임
+- 실제 발사체는 없음
+
+---
+
+### **개선 후 (실제 발사체 생성)**
+
+```cpp
+void ABasePawn::Fire()
+{
+    FVector SpawnLocation = ProjectileSpawnPoint->GetComponentLocation();
+    FRotator SpawnRotation = ProjectileSpawnPoint->GetComponentRotation();
+
+    // 디버그 (선택적)
+    DrawDebugSphere(GetWorld(), SpawnLocation, 25.0f, 12, FColor::Red, false, 3.0f);
+
+    // 실제 발사체 생성!
+    GetWorld()->SpawnActor<AProjectile>(ProjectileClass, SpawnLocation, SpawnRotation);
+}
+```
+
+**개선점:**
+
+- ✅ 실제 3D 발사체 생성
+- ✅ 충돌 가능
+- ✅ 나중에 물리/이펙트 추가 가능
+
+---
+
+## 📊 전체 시스템 다이어그램
+
+```
+┌─────────────────────────────────────────────────┐
+│                  게임 시작                       │
+└────────────────┬────────────────────────────────┘
+                 │
+    ┌────────────┴───────────┐
+    │                        │
+┌───▼─────┐            ┌────▼─────┐
+│  Tank   │            │  Tower   │
+│(플레이어)│            │  (적AI)  │
+└───┬─────┘            └────┬─────┘
+    │                       │
+    │ 마우스 클릭             │ 타이머 (2초마다)
+    │                       │
+    └────────┬──────────────┘
+             │
+        ┌────▼─────┐
+        │ Fire()   │ ← BasePawn의 공통 함수
+        └────┬─────┘
+             │
+             ├─ SpawnLocation 계산
+             ├─ SpawnRotation 계산
+             │
+        ┌────▼──────────────────────┐
+        │ GetWorld()->SpawnActor<>()│
+        └────┬──────────────────────┘
+             │
+        ┌────▼─────────┐
+        │ AProjectile  │ 새로 생성!
+        │ 객체 생성    │
+        └──────────────┘
+
+```
+
+---
+
+이 코드는 **동적 객체 생성 시스템**의 핵심입니다. SpawnActor는 게임 개발에서 가장 자주 사용되는 함수 중 하나이며, 이를 이해하면 다양한 게임 요소를 만들 수 있습니다!
+
+# { Projectile 클래스 - 발사체 움직임 시스템 정리 }
+
+## 📋 전체 코드 구조
+
+### **Projectile.h (헤더 파일)**
+
+```cpp
+#pragma once
+#include "CoreMinimal.h"
+#include "GameFramework/Actor.h"
+#include "GameFramework/ProjectileMovementComponent.h"  // ⭐ 핵심!
+#include "Projectile.generated.h"
+
+UCLASS()
+class BATTLEBLASTER_API AProjectile : public AActor
+{
+    GENERATED_BODY()
+
+public:
+    AProjectile();
+
+protected:
+    virtual void BeginPlay() override;
+
+public:
+    virtual void Tick(float DeltaTime) override;
+
+    UPROPERTY(VisibleAnywhere)
+    UStaticMeshComponent* ProjectileMesh;
+
+    UPROPERTY(VisibleAnywhere)
+    UProjectileMovementComponent* ProjectileMovementComp;  // ⭐ 새로 추가!
+};
+```
+
+### **Projectile.cpp (구현 파일)**
+
+```cpp
+#include "Projectile.h"
+
+AProjectile::AProjectile()
+{
+    PrimaryActorTick.bCanEverTick = true;
+
+    // 발사체 메시 생성 (모양)
+    ProjectileMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ProjectileMesh"));
+    SetRootComponent(ProjectileMesh);
+
+    // 발사체 움직임 컴포넌트 생성 (물리) ⭐
+    ProjectileMovementComp = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovementComp"));
+}
+
+void AProjectile::BeginPlay()
+{
+    Super::BeginPlay();
+}
+
+void AProjectile::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+}
+```
+
+---
+
+## 🎯 이 코드가 하는 일
+
+- \*"발사체가 실제로 날아가도록 만드는 물리 시스템"\*\*입니다.
+
+**변화:**
+
+```
+이전: 발사체가 공중에 멈춰 있음 ❌
+이후: 발사체가 날아가고, 중력을 받고, 충돌함 ✅
+```
+
+---
+
+## 🚀 ProjectileMovementComponent란?
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380635/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_4/image_3.png)
+
+### **마법 같은 컴포넌트**
+
+```cpp
+UProjectileMovementComponent* ProjectileMovementComp;
+```
+
+**이것 하나로 모든 물리가 해결됩니다!**
+
+언리얼 엔진이 제공하는 **특수 컴포넌트**로, 발사체의 움직임을 자동으로 처리합니다.
+
+---
+
+### **자동으로 해주는 것들:**
+
+```
+✅ 앞으로 날아가기 (초기 속도)
+✅ 중력 적용 (포물선 궤적)
+✅ 최대 속도 제한
+✅ 반동 (Bounce)
+✅ 충돌 시 멈춤
+✅ 속도 감소 (마찰)
+```
+
+**우리가 할 일:**
+
+```
+속도만 설정하면 끝! 😎
+```
+
+---
+
+## 📖 단계별 코드 분석
+
+### **1. 헤더 파일 포함**
+
+```cpp
+#include "GameFramework/ProjectileMovementComponent.h"
+```
+
+**이 헤더를 찾는 방법:**
+
+**방법 1: 언리얼 문서 검색**
+
+```
+1. 구글에 "Unreal ProjectileMovementComponent C++" 검색
+2. 언리얼 문서 페이지 찾기
+3. 헤더 파일 경로 복사
+```
+
+**방법 2: 언리얼 API 문서에서 직접 검색**
+
+```
+1. docs.unrealengine.com 접속
+2. 검색창에 "UProjectileMovementComponent" 입력
+3. 클래스 페이지에서 "Header" 항목 확인
+```
+
+**방법 3: 클래스 이름 예측**
+
+```
+언리얼 명명 규칙:
+  U + 컴포넌트이름 + Component
+  → UProjectileMovementComponent
+```
+
+---
+
+### **2. 컴포넌트 선언**
+
+```cpp
+UPROPERTY(VisibleAnywhere)
+UProjectileMovementComponent* ProjectileMovementComp;
+```
+
+**UPROPERTY(VisibleAnywhere)의 의미:**
+
+- 에디터에서 **볼 수만** 있음
+- 값을 **변경할 수는 없음**
+- 컴포넌트가 제대로 생성되었는지 확인용
+
+---
+
+### **3. 컴포넌트 생성**
+
+```cpp
+ProjectileMovementComp = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovementComp"));
+```
+
+**왜 Attach하지 않나요?**
+
+```cpp
+// ❌ 이렇게 안 함
+ProjectileMovementComp->SetupAttachment(ProjectileMesh);
+
+// ✅ 그냥 생성만 하면 됨
+ProjectileMovementComp = CreateDefaultSubobject<...>();
+```
+
+**이유:**
+
+```
+UStaticMeshComponent (씬 컴포넌트)
+  → 위치가 있음 (3D 공간에 존재)
+  → 부착 필요 ✅
+
+UProjectileMovementComponent (액터 컴포넌트)
+  → 위치가 없음 (기능만 제공)
+  → 부착 불필요 ❌
+```
+
+---
+
+## 🔍 컴포넌트 타입 비교
+
+### **Scene Component vs Actor Component**
+
+| 특징          | Scene Component                         | Actor Component                                  |
+| ------------- | --------------------------------------- | ------------------------------------------------ |
+| **예시**      | UStaticMeshComponent<br>USceneComponent | UProjectileMovementComponent<br>UHealthComponent |
+| **위치 정보** | ✅ 있음 (Transform)                     | ❌ 없음                                          |
+| **부착 가능** | ✅ 다른 컴포넌트에 부착                 | ❌ 부착 불가                                     |
+| **3D 공간**   | ✅ 공간에 배치됨                        | ❌ 추상적 기능만                                 |
+| **역할**      | 시각적 요소, 위치 기반                  | 로직, 기능 제공                                  |
+
+---
+
+### **시각적 비교**
+
+```
+Scene Component 계열:
+┌─────────────────────┐
+│  CapsuleComponent   │ ← 루트 (위치: 0,0,0)
+│  (위치 있음)         │
+└──────────┬──────────┘
+           │ 부착
+    ┌──────▼──────┐
+    │  BaseMesh   │ ← 자식 (위치: 상대적)
+    │ (위치 있음)  │
+    └─────────────┘
+
+Actor Component:
+┌─────────────────────────┐
+│ ProjectileMovementComp  │ ← 독립적 (위치 없음)
+│ (기능만 제공)            │
+│ "날아가는 능력"         │
+└─────────────────────────┘
+```
+
+---
+
+## ⚙️ 속도 설정 방법
+
+### **방법 1: 블루프린트에서 설정 (추천)**
+
+```
+BP_Projectile 열기
+  ↓
+Details 패널
+  ↓
+ProjectileMovementComp 선택
+  ↓
+Initial Speed: 1000
+Max Speed: 1000
+```
+
+**장점:**
+
+- 게임 실행 중 바로 테스트 가능
+- 컴파일 없이 값 조정
+- 빠른 반복 작업
+
+---
+
+### **방법 2: C++ 코드에서 설정**
+
+```cpp
+AProjectile::AProjectile()
+{
+    ProjectileMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ProjectileMesh"));
+    SetRootComponent(ProjectileMesh);
+
+    ProjectileMovementComp = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovementComp"));
+
+    // 속도 설정
+    ProjectileMovementComp->InitialSpeed = 1000.0f;
+    ProjectileMovementComp->MaxSpeed = 1000.0f;
+}
+```
+
+**주의사항:**
+
+```
+C++ 기본값 설정      블루프린트 값 설정
+      1000      →         1500
+
+                      블루프린트가 우선! ✅
+                      (최종 값: 1500)
+```
+
+---
+
+## 🎮 속도 값의 의미
+
+### **InitialSpeed vs MaxSpeed**
+
+```cpp
+InitialSpeed = 1000.0f;  // 시작 속도
+MaxSpeed = 1000.0f;      // 최대 속도
+```
+
+**시나리오 1: InitialSpeed = MaxSpeed**
+
+```
+발사 순간: 1000
+0.1초 후: 1000  (일정)
+0.5초 후: 1000  (일정)
+1.0초 후: 1000  (일정)
+
+→ 계속 같은 속도로 날아감
+```
+
+**시나리오 2: InitialSpeed < MaxSpeed**
+
+```
+발사 순간: 500
+0.1초 후: 700  (가속)
+0.5초 후: 900  (가속)
+1.0초 후: 1000 (최대 속도 도달)
+
+→ 로켓처럼 점점 빨라짐
+```
+
+**시나리오 3: InitialSpeed > MaxSpeed**
+
+```
+발사 순간: 1500
+0.1초 후: 1300 (감속)
+0.5초 후: 1100 (감속)
+1.0초 후: 1000 (최대 속도까지 감속)
+
+→ 마찰로 느려짐
+```
+
+---
+
+---
+
+## 💡 ProjectileMovementComponent 주요 속성
+
+### **기본 속성들**
+
+```cpp
+// 속도 관련
+InitialSpeed = 1000.0f;      // 시작 속도
+MaxSpeed = 1000.0f;          // 최대 속도
+
+// 중력 관련
+ProjectileGravityScale = 1.0f;  // 1.0 = 정상 중력
+                                 // 0.0 = 무중력
+                                 // 2.0 = 2배 중력
+
+// 반동 관련
+Bounciness = 0.3f;           // 반동 정도 (0~1)
+                             // 0 = 반동 없음
+                             // 1 = 완전 반동
+
+// 회전 관련
+bRotationFollowsVelocity = true;  // 날아가는 방향으로 회전
+```
+
+---
+
+## 🎮 실제 동작 시나리오
+
+### **시나리오 1: 발사 직후**
+
+```
+Fire() 호출
+    ↓
+SpawnActor<AProjectile>()
+    ↓
+발사체 생성 (위치: 포탑 앞)
+    ↓
+ProjectileMovementComp 자동 활성화
+    ↓
+InitialSpeed(1000)로 앞으로 발사! 🚀
+
+```
+
+---
+
+### **시나리오 2: 비행 중**
+
+```
+매 프레임:
+  ├─ 앞으로 이동 (속도: 1000)
+  ├─ 중력 적용 (아래로 당김)
+  └─ 포물선 궤적 형성
+
+결과: 🎯 포물선으로 날아감
+
+```
+
+---
+
+### **시나리오 3: 충돌 시**
+
+```
+벽에 충돌
+    ↓
+충돌 감지
+    ↓
+ProjectileMovementComp 자동 정지
+    ↓
+공중에 멈춤 (나중에 폭발 이펙트 추가 예정)
+
+```
+
+---
+
+## 🔧 코드 진화 과정
+
+### **버전 1: 정적 발사체 (이전)**
+
+```cpp
+AProjectile::AProjectile()
+{
+    ProjectileMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ProjectileMesh"));
+    SetRootComponent(ProjectileMesh);
+
+    // 움직임 없음 ❌
+}
+
+결과: 공중에 떠 있기만 함
+
+```
+
+---
+
+### **버전 2: 움직이는 발사체 (현재)**
+
+```cpp
+AProjectile::AProjectile()
+{
+    ProjectileMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ProjectileMesh"));
+    SetRootComponent(ProjectileMesh);
+
+    // 움직임 추가! ✅
+    ProjectileMovementComp = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovementComp"));
+}
+
+결과: 날아가고, 중력 받고, 충돌함!
+```
+
+---
+
+## 🎓 초보자를 위한 비유
+
+### **ProjectileMovementComponent = 자동차 엔진**
+
+```
+발사체 (자동차)
+    ├─ ProjectileMesh (차체) - 보이는 부분
+    └─ ProjectileMovementComp (엔진) - 움직이게 하는 부분
+
+엔진만 설치하면:
+  ✅ 앞으로 가기
+  ✅ 중력 받기
+  ✅ 속도 조절
+  자동으로 다 해줌!
+```
+
+---
+
+### **Scene Component vs Actor Component**
+
+```
+Scene Component = 레고 블록
+  🧱 서로 연결할 수 있음
+  🧱 위치가 있음
+  🧱 쌓을 수 있음
+
+Actor Component = 특수 능력 카드
+  🎴 연결 불가
+  🎴 위치 없음
+  🎴 기능만 제공
+```
+
+---
+
+## 📊 컴포넌트 계층 구조
+
+```
+AProjectile (액터)
+    │
+    ├─ ProjectileMesh (Scene Component)
+    │     └─ 루트 컴포넌트
+    │         - 위치: (100, 200, 50)
+    │         - 회전: (0, 90, 0)
+    │         - 3D 모델 표시
+    │
+    └─ ProjectileMovementComp (Actor Component)
+          └─ 독립적으로 존재
+              - 위치 정보 없음
+              - "날아가는 능력"만 제공
+              - ProjectileMesh를 자동으로 움직임
+```
+
+---
+
+## 🚀 실전 팁
+
+### **1. 속도 조절 가이드**
+
+```
+게임 타입별 추천 속도:
+
+아케이드 슈팅: 1500~2000 (빠름)
+전략 게임: 800~1000 (보통)
+시뮬레이션: 500~700 (느림)
+```
+
+---
+
+### **2. 중력 조절**
+
+```cpp
+// 블루프린트에서 조절
+ProjectileMovementComp -> Projectile Gravity Scale
+
+0.0: 우주선 레이저 (직선)
+0.5: 가벼운 발사체 (완만한 포물선)
+1.0: 일반 발사체 (기본)
+2.0: 무거운 발사체 (급격한 낙하)
+```
+
+---
+
+### **3. 디버깅 팁**
+
+```cpp
+// 발사체가 너무 빨라 안 보일 때
+InitialSpeed = 300.0f;  // 느리게 설정
+
+// 발사체가 날아가지 않을 때
+체크 사항:
+  ✅ ProjectileMovementComp 생성했는지
+  ✅ InitialSpeed > 0 인지
+  ✅ 블루프린트에서 속도 설정했는지
+```
+
+---
+
+## 💻 완성된 코드 체크리스트
+
+```cpp
+// ✅ 헤더 파일
+#include "GameFramework/ProjectileMovementComponent.h"
+
+// ✅ 변수 선언
+UPROPERTY(VisibleAnywhere)
+UProjectileMovementComponent* ProjectileMovementComp;
+
+// ✅ 컴포넌트 생성
+ProjectileMovementComp = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovementComp"));
+
+// ✅ 속도 설정 (선택사항 - 블루프린트에서도 가능)
+ProjectileMovementComp->InitialSpeed = 1000.0f;
+ProjectileMovementComp->MaxSpeed = 1000.0f;
+
+```
+
+---
+
+이 코드는 **언리얼의 강력한 컴포넌트 시스템**을 보여주는 완벽한 예시입니다. ProjectileMovementComponent 하나로 복잡한 발사체 물리를 간단하게 구현할 수 있습니다! 🚀
+
+# { 언리얼 엔진 C++ - Projectile Owner 설정 핵심 정리 }
+
+## 📌 이 코드가 하는 일
+
+발사체(Projectile)를 쏠 때 **"누가 쐈는지"** 기록하는 코드입니다.
+
+---
+
+## 🎯 핵심 개념: `this` 키워드
+
+```cpp
+Projectile->SetOwner(this);
+```
+
+### `this`가 뭔가요?
+
+- \*"나 자신"\*\*을 가리키는 포인터
+- 이 코드가 실행되는 **그 객체**를 의미
+
+### 예시로 이해하기
+
+**상황 1: 플레이어 탱크가 발사**
+
+- `this` = 플레이어 탱크
+- 발사체의 주인 = 플레이어 탱크
+
+**상황 2: 적 타워가 발사**
+
+- `this` = 적 타워
+- 발사체의 주인 = 적 타워
+
+→ **같은 코드인데 누가 실행하느냐에 따라 달라집니다!**
+
+---
+
+## 📝 코드 단계별 설명
+
+### 1단계: 발사체 생성
+
+```cpp
+AProjectile* Projectile = GetWorld()->SpawnActor<AProjectile>(
+    ProjectileClass,
+    SpawnLocation,
+    SpawnRotation
+);
+```
+
+- 월드에 발사체를 생성
+- 반환값을 `Projectile` 변수에 저장
+
+### 2단계: 주인 설정
+
+```cpp
+if (Projectile)  // 발사체가 제대로 생성되었는지 확인
+{
+    Projectile->SetOwner(this);  // 주인을 "나"로 설정
+}
+```
+
+---
+
+## 🤔 왜 주인을 설정하나요?
+
+### 나중에 데미지 계산할 때 필요
+
+```
+발사체가 적에게 맞았다!
+→ "누가 쏜 발사체인가?" 확인
+→ 플레이어가 쐈으면 → 플레이어 점수 증가
+→ 적이 쐈으면 → 플레이어 체력 감소
+```
+
+---
+
+## 💡 강의에서 한 테스트
+
+### 주인의 이름 출력하기
+
+```cpp
+// 주인 가져오기
+AActor* ProjectileOwner = Projectile->GetOwner();
+
+// 이름 출력
+if (ProjectileOwner)
+{
+    UE_LOG(LogTemp, Warning, TEXT("발사체 주인: %s"),
+           *ProjectileOwner->GetActorNameOrLabel());
+}
+```
+
+**결과:**
+
+- 탱크가 쏘면 → "BP_Tank_0"
+- 타워2가 쏘면 → "BP_Tower_2"
+
+---
+
+## 🎓 초보자를 위한 핵심 정리
+
+| 개념            | 설명                                       |
+| --------------- | ------------------------------------------ |
+| **SetOwner()**  | 소유자 설정하는 함수 (Actor 클래스 제공)   |
+| **GetOwner()**  | 소유자 가져오는 함수                       |
+| **this**        | 현재 이 코드를 실행하는 객체 자신          |
+| **포인터 체크** | `if (Projectile)` - 안전하게 코딩하는 습관 |
+
+### 기억할 것
+
+1. **발사체 생성 직후** 주인을 설정해야 함
+2. **this = 나 자신** (코드를 실행하는 그 객체)
+3. 나중에 **데미지/점수 계산**에 필수적
+4. 포인터는 **항상 유효성 체크** 하기
+
+---
+
+## 🔄 전체 흐름
+
+```
+1. Fire() 함수 호출
+   ↓
+2. 발사 위치/회전 계산
+   ↓
+3. 발사체 생성 (SpawnActor)
+   ↓
+4. 생성 확인 (if문)
+   ↓
+5. 주인 설정 (SetOwner(this))
+   ↓
+6. 발사체가 날아감 (주인 정보 포함)
+```
+
+이제 발사체마다 "누가 쐈는지" 추적할 수 있습니다! 🎯

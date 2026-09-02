@@ -1,0 +1,1473 @@
+---
+title: '섹션 4: 백엔드: 인증 기능 - 3 -'
+date: '2026-09-02'
+category: '풀스택/React를 사용한 Node 풀스택 웹 애플리케이션 빌드 및 배포'
+tags: ['풀스택', 'React를 사용한 Node 풀스택 웹 애플리케이션 빌드 및 배포']
+draft: false
+summary: ''
+---
+
+# { 기본 메시지 큐 }
+
+```jsx
+이 강의에서는 **큐(queue)**와 작업자(worker) 설정에 대해 설명합니다. 강의에서 설명한 큐는 MongoDB에 데이터를 저장할 때 사용됩니다.
+
+데이터가 Redis 캐시에 저장될 때는 바로 저장하면 되지만, MongoDB와 같은 데이터베이스에 저장할 때는 큐를 사용하여 데이터를 처리하게 됩니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381345/notion-blog/_/React_Node_/_4_-_3_-/image.png)
+
+```jsx
+bull 을 설치해준다
+
+npm i bull
+
+npm i -D @types/bull
+```
+
+## 1. **Bull이란?**
+
+```jsx
+Bull은 작업 큐를 관리하는 라이브러리입니다. 서버에서 발생하는 여러 작업을 순서대로 처리하고,
+
+서버 부하를 줄이는 데 유용합니다. 특히, 작업을 큐에 넣고 작업자(worker)가 해당 작업을 하나씩 처리하는 방식으로 작동합니다.
+
+큐(Queue): 처리해야 할 작업을 대기 목록에 넣고, 작업자를 통해 하나씩 처리하는 방식.
+
+워커(Worker): 큐에 담긴 작업을 실제로 처리하는 역할을 하는 프로그램.
+
+* 자세한 내용은 공식 문서를 참고해서 사용법을 익히자
+```
+
+## 2. **왜 큐를 사용하나요?**
+
+```jsx
+MongoDB에 데이터를 직접 저장할 수도 있지만, 이렇게 하면 데이터 저장 시 딜레이가 발생할 수 있습니다.
+
+보통 서버는 많은 요청을 받지만, 한 번에 모든 요청을 처리하기 어렵습니다.
+
+이때 큐에 요청을 넣고, 요청을 하나씩 처리하도록 하면 서버가 과부하에 걸리지 않고 안정적으로 작동합니다.
+```
+
+## 3. **필요한 모듈 설치**
+
+```jsx
+먼저, 큐와 작업자를 만들기 위해 필요한 패키지를 설치해야 합니다.
+
+		Bull: Bull은 Redis 기반의 큐 시스템으로, Node.js에서 사용하기 쉽고, CPU 부담이 적어 효율적입니다.
+
+
+		@types/bull: TypeScript를 사용할 경우 Bull의 타입 정의를 위해 설치해야 하는 패키지입니다.
+
+
+		Bull Dashboard: 큐의 상태를 모니터링할 수 있는 웹 대시보드를 제공합니다.
+
+		이를 통해 현재 큐에 몇 개의 작업이 있는지, 처리 중인 작업은 무엇인지 등을 쉽게 확인할 수 있습니다.
+```
+
+```jsx
+npm install bull
+
+npm install @types/bull
+
+npm install @bull-board/express @bull-board/ui
+```
+
+## Bull을 사용하여 큐 생성하기
+
+```jsx
+이제 Bull을 이용해 큐를 생성해 보겠습니다. 큐는 새로운 작업을 담아두는 공간입니다.
+
+큐를 생성할 때 Redis라는 데이터베이스에 연결해 큐를 관리할 수 있습니다.
+```
+
+```jsx
+import Queue, { Job } from 'bull';  // Bull에서 Queue와 Job을 가져옵니다. Job은 작업 큐에 들어가는 하나의 작업(task)을 의미합니다. Queue는 여러 작업을 관리하는 큐이고, 그 큐 안에 있는 각 작업이 Job 객체로 표현됩니다.
+import Logger from 'bunyan';  // bunyan을 이용해 로그를 기록할 수 있습니다.
+import { config } from '@root/config';  // 설정 파일에서 Redis 정보를 가져옵니다.
+
+export abstract class BaseQueue {  // 다른 큐들이 상속받을 추상 클래스입니다.
+  queue: Queue.Queue;  // Queue.Queue는 bull 라이브러리에서 작업 큐(Queue)를 정의하는 타입입니다. 이 타입은 큐에 여러 작업을 담고 관리하는 역할을 합니다.
+
+  log: Logger;  // 로그를 남기기 위한 변수
+
+  constructor(queueName: string) {
+    // 큐 생성: queueName과 Redis 서버 주소를 이용해 큐를 생성합니다.
+    this.queue = new Queue(queueName, `${config.REDIS_HOST}`);
+
+    // 로그 생성: 큐 이름을 로그에 기록합니다.
+    this.log = config.createLogger(`${queueName}Queue`);
+
+    // 작업이 완료되었을 때의 이벤트 리스너 (작업이 끝나면 해당 작업을 큐에서 삭제)
+    this.queue.on('completed', (job: Job) => { // on() 메서드는 특정 **이벤트(event)**를 감지하고, 그 이벤트가 발생했을 때 콜백 함수를 실행합니다. on은 **이벤트 리스너(event listener)**를 설정하는 메서드
+      job.remove();  // 작업이 완료되면 큐에서 제거
+    });
+
+    // 모든 작업 완료 시 로그 남기기
+    this.queue.on('global:completed', (jobId: string) => {
+      this.log.info(`Job ${jobId} completed`);
+    });
+
+    // 작업이 중단된 경우 로그 남기기
+    this.queue.on('global:stalled', (jobId: string) => {
+      this.log.info(`Job ${jobId} is stalled`);
+    });
+  }
+}
+```
+
+```jsx
+큐 생성: new Queue(queueName, Redis 주소) 명령어를 통해 큐를 생성합니다. Redis는 작업 큐의 상태를 관리해 줍니다.
+
+이벤트 리스너: 작업이 완료되거나 중단되었을 때 실행될 코드를 queue.on으로 등록할 수 있습니다.
+```
+
+## BullBoard 대시보드 설정
+
+```jsx
+Bull을 사용하면 작업이 어떻게 진행되고 있는지 확인하기 위해 BullBoard라는 대시보드를 추가할 수 있습니다.
+
+이를 통해 웹에서 작업 큐의 상태를 시각적으로 확인할 수 있습니다.
+
+BullBoard는 큐에 있는 작업의 진행 상황을 보여주며, 이를 통해 작업이 얼마나 진행되었는지 쉽게 파악할 수 있습니다.
+```
+
+```jsx
+import { createBullBoard } from '@bull-board/api';  // BullBoard 생성 API
+import { BullAdapter } from '@bull-board/api/bullAdapter';  // BullBoard와 Bull 큐 연결
+import { ExpressAdapter } from '@bull-board/express';  // Express를 통한 대시보드 연결
+
+let bullAdapter: BullAdapter[] = [];  // Bull 어댑터 목록 (큐를 연결하기 위해 필요)
+export let serverAdapter: ExpressAdapter;  // Express 어댑터 (서버에서 대시보드를 확인하기 위한 설정)
+
+export abstract class BaseQueue {
+  constructor(queueName: string) {
+    // Bull 큐 생성 코드 (위와 동일)
+    this.queue = new Queue(queueName, `${config.REDIS_HOST}`);
+
+    // BullBoard 어댑터에 큐 추가
+    bullAdapter.push(new BullAdapter(this.queue));
+    bullAdapter = [...new Set(bullAdapter)];  // 중복된 큐 제거 (중복 방지) Set은 JavaScript의 내장 객체로, 중복을 허용하지 않는 값들의 집합입니다. 즉, Set은 같은 값을 여러 번 포함할 수 없기 때문에, 배열처럼 중복된 요소가 있으면 자동으로 중복을 제거해 줍니다.
+
+    // Express 어댑터 설정 (대시보드 경로 지정)
+    serverAdapter = new ExpressAdapter();
+    serverAdapter.setBasePath('/queues');  // /queues 경로에서 대시보드 확인 가능
+
+    // BullBoard 생성 (큐 목록과 어댑터 연결)
+    createBullBoard({
+      queues: bullAdapter,  // 현재 큐 목록
+      serverAdapter  // Express 서버 어댑터
+    });
+  }
+}
+```
+
+## 큐 이벤트 리스너
+
+```jsx
+Bull은 작업이 완료되거나, 실패하거나, 중단되었을 때 이를 감지하는 이벤트 리스너 기능을 제공합니다.
+
+이를 통해 특정 작업이 끝났을 때 자동으로 처리할 작업을 정의할 수 있습니다.
+```
+
+```jsx
+completed 이벤트: 작업이 완료되면 자동으로 해당 작업을 큐에서 제거.
+
+global:completed
+이벤트: 작업이 글로벌 수준에서 완료되었을 때 로그를 기록.
+
+global:stalled
+이벤트: 작업이 중단되었을 때 로그를 기록.
+```
+
+## 전체 코드
+
+```jsx
+// Bull 라이브러리에서 Queue와 Job을 가져옵니다. Queue는 작업 큐를 의미하고, Job은 각 작업을 나타냅니다.
+import Queue, { Job } from 'bull';
+
+// bunyan 라이브러리를 통해 로그를 기록하기 위한 Logger를 가져옵니다.
+import Logger from 'bunyan';
+
+// BullBoard API를 사용해 큐의 상태를 확인할 수 있는 대시보드를 생성합니다.
+import { createBullBoard } from '@bull-board/api';
+
+// Bull 작업 큐와 BullBoard 대시보드를 연결하기 위해 BullAdapter를 가져옵니다.
+import { BullAdapter } from '@bull-board/api/bullAdapter';
+
+// Express 서버와 BullBoard를 연결하기 위해 ExpressAdapter를 가져옵니다.
+import { ExpressAdapter } from '@bull-board/express';
+
+// config 파일에서 Redis 서버의 설정 정보를 가져옵니다.
+import { config } from '@root/config';
+
+// Bull 큐를 BullBoard에 연결하기 위한 어댑터 목록입니다.
+let bullAdapter: BullAdapter[] = [];
+
+// 서버에서 BullBoard 대시보드를 사용할 수 있도록 Express 어댑터를 생성할 변수를 선언합니다.
+export let serverAdapter: ExpressAdapter;
+
+/**
+ * BaseQueue 클래스: 각 작업 큐를 생성하고 관리하는 기본 클래스입니다.
+ * 이 클래스를 상속받아 각기 다른 작업 큐를 만들 수 있습니다.
+ */
+export abstract class BaseQueue {
+  queue: Queue.Queue; // 작업 큐를 담는 변수
+  log: Logger;        // 로그를 남기기 위한 Logger
+
+  /**
+   * 생성자 함수: 큐의 이름을 받아 해당 큐를 생성하고, 큐를 BullBoard에 연결합니다.
+   * @param queueName - 큐의 이름 (각 큐를 구분할 때 사용)
+   */
+  constructor(queueName: string) {
+    // 큐 생성: queueName과 Redis 서버 주소를 이용해 새로운 Bull 큐를 생성합니다.
+    this.queue = new Queue(queueName, `${config.REDIS_HOST}`);
+
+    // Bull 큐를 BullBoard에 추가합니다.
+    bullAdapter.push(new BullAdapter(this.queue));
+
+    // 중복된 큐가 추가되지 않도록, Set을 사용해 큐 목록을 중복 없이 만듭니다.
+    bullAdapter = [...new Set(bullAdapter)];
+
+    // Express 어댑터 생성: /queues 경로에서 BullBoard 대시보드를 확인할 수 있도록 설정합니다. serverAdapter라는 변수를 만들고, Express.js 서버가 BullBoard의 대시보드를 쉽게 연결할 수 있게 해주는 역할을 합니다. 이렇게 하면 BullBoard의 대시보드를 Express.js 서버에 띄워 사용자들이 작업 큐의 상태를 확인하거나 관리할 수 있게 됩니다
+    serverAdapter = new ExpressAdapter(); //
+    serverAdapter.setBasePath('/queues'); // /queues 경로로 대시보드 접근 가능
+
+    // BullBoard 생성: Bull 큐 목록과 Express 서버 어댑터를 사용해 대시보드를 초기화합니다.
+    createBullBoard({
+      queues: bullAdapter, // 현재 큐 목록
+      serverAdapter        // Express 서버 어댑터
+    });
+
+    // 큐에 대한 로그를 기록하는 Logger를 생성합니다. 로그에 큐 이름을 포함시킵니다.
+    this.log = config.createLogger(`${queueName}Queue`);
+
+    // 작업 완료 시 이벤트: 작업(Job)이 완료되면 해당 작업을 큐에서 제거합니다.
+    this.queue.on('completed', (job: Job) => {
+      job.remove(); // 작업 완료 후 큐에서 해당 작업 제거
+    });
+
+    // 모든 작업이 완료될 때 로그를 남기는 이벤트 리스너 설정
+    this.queue.on('global:completed', (jobId: string) => {
+      this.log.info(`Job ${jobId} completed`); // 작업 완료 로그 기록
+    });
+
+    // 작업이 중단되었을 때 로그를 남기는 이벤트 리스너 설정
+    this.queue.on('global:stalled', (jobId: string) => {
+      this.log.info(`Job ${jobId} is stalled`); // 작업 중단 로그 기록
+    });
+  }
+}
+
+```
+
+# { 기본 큐 추가 작업 방법 }
+
+```jsx
+작업 큐(queue)를 설정하고, 작업을 추가하고 처리하는 방법을 설명합니다.
+
+주로 Bull 라이브러리를 이용하여 Redis를 기반으로 작업 큐를 만들고 관리하는 구조로,
+
+백엔드 작업을 비동기적으로 처리하기 위한 중요한 기능입니다.
+```
+
+## 1. **작업 큐의 기본 개념**
+
+```jsx
+작업 큐(queue)는 여러 작업(job)을 순서대로 처리하기 위한 구조입니다.
+
+작업 큐의 대표적인 사용 예는, 사용자가 데이터를 제출했을 때 바로 처리하지 않고 큐에 넣어서 비동기적으로 처리하는 방식입니다.
+
+예를 들어, 이미지 업로드나 이메일 전송 같은 시간이 오래 걸리는 작업을 큐에 넣고,
+
+이를 백그라운드에서 처리함으로써 빠른 응답을 제공할 수 있습니다.
+```
+
+## 2. **BaseQueue 클래스 내용 추가 (**addJob, processJob) **(`base.queue.ts`)**
+
+```jsx
+addJob과 processJob 메서드는 Bull 큐를 사용하는 작업 처리에서 매우 중요한 역할을 합니다.
+
+이 두 메서드는 작업을 큐에 추가하고,
+
+큐에 있는 작업을 처리하는 기능을 제공합니다. 각각의 역할과 작동 방식에 대해 더 자세히 설명하겠습니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381344/notion-blog/_/React_Node_/_4_-_3_-/image_1.png)
+
+### 1. **`addJob` 메서드**
+
+```jsx
+type IBaseJobData = IAuthJob;
+
+protected addJob(name: string, data: IBaseJobData): void {
+    this.queue.add(name, data, { attempts: 3, backoff: { type: 'fixed', delay: 5000 } });
+}
+```
+
+```jsx
+기능 설명:
+
+		작업을 큐에 추가하는 메서드입니다. 이 메서드는 작업이 큐에 들어가게 되며, 나중에 작업이 처리될 수 있도록 준비합니다.
+
+
+		name: 작업의 이름을 나타냅니다. 이 이름을 사용하여 어떤 작업인지를 구분합니다.
+
+					예를 들어, 사용자를 데이터베이스에 추가하는 작업이면 "addUserToDB"라는 이름을 사용할 수 있습니다.
+
+
+		data: 작업에 필요한 데이터입니다. 이 데이터는 작업을 처리할 때 사용됩니다. 예를 들어, 사용자의 정보가 담긴 객체일 수 있습니다.
+
+
+		attempts: 작업이 실패했을 때 몇 번 재시도할지를 나타냅니다. 예를 들어,
+
+							여기서 attempts: 3으로 설정되었으므로, 작업이 실패하면 최대 3번까지 재시도합니다.
+
+
+		backoff: 작업이 실패했을 때 얼마나 대기한 후 재시도할지를 설정합니다.
+
+					   여기서는 delay: 5000으로 설정되어 있어, 작업이 실패할 경우 5초 후에 다시 시도하게 됩니다.
+
+IBaseJobData 타입 명시
+
+		**IBaseJobData**는 이 메서드에서 받을 데이터의 타입을 명시한 것입니다.
+
+		여기서는 **IAuthJob**이라는 타입만을 사용하고 있습니다. 이 말은, addJob 메서드를 사용할 때 **IAuthJob**에 정의된 데이터 구조만 사용할 수 있다는 뜻입니다.
+
+		**IAuthJob**은 인증 관련 작업의 데이터를 정의한 타입입니다. 예를 들어, 사용자 인증 정보나 회원가입 데이터를 나타낼 수 있습니다.
+
+
+export interface IAuthJob {
+	 value?: string | IAuthDocument | IUserDocument;
+}
+
+auth 인터페이스의 IAuthJob
+```
+
+### 2. **`processJob` 메서드**
+
+```jsx
+protected processJob(name: string, concurrency: number, callback: ProcessCallbackFunction<void>): void {
+  this.queue.process(name, concurrency, callback);
+}
+```
+
+```jsx
+기능 설명:
+
+큐에 추가된 작업을 처리하는 메서드입니다. 큐에 들어간 작업들이 순차적으로 실행되며, callback을 통해 실제로 작업을 처리하는 로직을 정의합니다.
+
+name: 처리할 작업의 이름입니다. addJob 메서드에서 정의한 작업 이름과 일치해야 합니다. 이 이름을 통해 특정 작업을 처리할 수 있습니다.
+
+concurrency: 동시 처리할 작업의 수를 나타냅니다. 예를 들어, concurrency: 5로 설정하면, 최대 5개의 작업을 동시에 처리할 수 있습니다.
+
+				     이는 시스템 성능에 따라 설정할 수 있습니다.
+
+callback: 큐에 쌓인 작업을 처리하는 실제 로직입니다. 각 작업은 callback 함수에서 처리되며, 작업에 전달된 data가 사용됩니다.
+```
+
+## 전체 코드
+
+```jsx
+// Bull 관련 라이브러리와, 로깅을 위한 bunyan, Bull Dashboard 등을 임포트
+import Queue, { Job, ProcessCallbackFunction } from 'bull';
+import Logger from 'bunyan'; // 로그를 기록하기 위한 라이브러리
+import { createBullBoard } from '@bull-board/api'; // Bull Board를 만들기 위한 API
+import { BullAdapter } from '@bull-board/api/bullAdapter'; // Bull을 BullBoard에 연결하기 위한 어댑터
+import { ExpressAdapter } from '@bull-board/express'; // Express 서버와 BullBoard를 연결하기 위한 어댑터
+import { config } from '@root/config'; // 설정 파일에서 환경 변수나 설정 정보를 가져옴
+import { IAuthJob } from '@auth/interfaces/auth.interface'; // 인증 작업에 필요한 인터페이스
+
+// 모든 작업 데이터의 기본 타입 정의 (이 경우, 인증 작업 데이터만 있음)
+type IBaseJobData =  IAuthJob;
+
+// Bull Adapter 배열을 초기화 (BullBoard에 여러 큐를 등록하기 위함)
+let bullAdapter: BullAdapter[] = [];
+
+// 서버 어댑터 선언 (ExpressAdapter를 나중에 설정)
+export let serverAdapter: ExpressAdapter;
+
+// BaseQueue라는 추상 클래스 정의 (다른 작업 큐들이 이 클래스를 상속받아서 사용)
+export abstract class BaseQueue {
+  // Queue 타입을 정의 (Bull에서 사용하는 작업 큐)
+  queue: Queue.Queue;
+  // Logger 타입을 정의 (작업 상태를 기록하기 위한 로거)
+  log: Logger;
+
+  // 생성자: 큐 이름을 받아서 새로운 큐를 생성하고, 로그와 큐 이벤트 설정
+  constructor(queueName: string) {
+    // Bull에서 제공하는 Queue를 생성 (queueName으로 큐 이름 설정)
+    this.queue = new Queue(queueName, `${config.REDIS_HOST}`); // Redis 연결
+
+    // BullAdapter에 새로 생성한 큐를 추가하여 BullBoard에서 사용
+    bullAdapter.push(new BullAdapter(this.queue));
+
+    // bullAdapter에 중복된 큐가 없도록 배열을 업데이트
+    bullAdapter = [...new Set(bullAdapter)];
+
+    // ExpressAdapter를 생성하고 BullBoard 경로를 '/queues'로 설정
+    serverAdapter = new ExpressAdapter();
+    serverAdapter.setBasePath('/queues'); // 대시보드 경로 설정
+
+    // BullBoard 생성: 등록된 큐들과 ExpressAdapter를 사용하여 대시보드 초기화
+    createBullBoard({
+      queues: bullAdapter, // Bull에 등록된 큐들
+      serverAdapter // Express와 연결된 서버 어댑터
+    });
+
+    // 큐에 대한 로거 생성 (큐 이름으로 구분되는 로그 생성)
+    this.log = config.createLogger(`${queueName}Queue`);
+
+    // 작업 완료 이벤트: 작업이 완료되면 해당 작업을 큐에서 삭제
+    this.queue.on('completed', (job: Job) => {
+      job.remove(); // 작업 완료 시 제거
+    });
+
+    // 전역 완료 이벤트: 작업이 완료되면 로그에 기록
+    this.queue.on('global:completed', (jobId: string) => {
+      this.log.info(`Job ${jobId} completed`); // 완료된 작업 로그 기록
+    });
+
+    // 전역 지연(stalled) 이벤트: 작업이 지연되면 로그에 기록
+    this.queue.on('global:stalled', (jobId: string) => {
+      this.log.info(`Job ${jobId} is stalled`); // 지연된 작업 로그 기록
+    });
+  }
+
+  // 큐에 작업을 추가하는 메서드
+  // 작업 이름(name)과 데이터(data)를 받아서 큐에 추가
+  protected addJob(name: string, data: IBaseJobData): void {
+    // 큐에 작업을 추가하고, 실패 시 3번까지 재시도, 5초 대기 후 다시 시도
+    this.queue.add(name, data, { attempts: 3, backoff: { type: 'fixed', delay: 5000 }});
+  }
+
+  // 큐의 작업을 처리하는 메서드
+  // 처리할 작업의 이름(name), 동시에 처리할 작업 수(concurrency), 그리고 처리할 작업의 콜백 함수(callback)를 받음
+  protected processJob(name: string, concurrency: number, callback: ProcessCallbackFunction<void>): void {
+    // 지정된 작업 이름과 동시 처리 개수로 작업 처리 시작
+    this.queue.process(name, concurrency, callback);
+  }
+}
+
+```
+
+## 3. **라우터에 큐 경로 추가하기 (`router.ts`)**
+
+```jsx
+import { authRoutes } from '@auth/routes/authRoutes'; // 인증(로그인/회원가입 등) 관련 경로 설정을 위한 모듈을 가져옴
+import { serverAdapter } from '@service/queues/base.queue'; // 작업 큐 대시보드를 위한 어댑터를 가져옴 (Bull 작업 큐 관리 대시보드)
+import { Application } from 'express'; // Express 애플리케이션 타입을 가져옴
+
+const BASE_PATH = '/api/v1'; // API의 기본 경로 설정. 모든 인증 관련 경로는 이 경로를 기반으로 설정됨
+
+// Express 애플리케이션에 라우팅 설정을 추가하는 함수
+export default (app: Application) => {
+  const routes = () => {
+    // 큐 대시보드 라우팅 설정
+    // '/queues' 경로에 대해 Bull 작업 큐 대시보드를 제공
+    // 이 대시보드는 작업 큐의 상태를 실시간으로 확인하고, 작업을 관리하는 GUI 제공
+    app.use('/queues', serverAdapter.getRouter());
+
+    // 인증 관련 라우팅 설정
+    // '/api/v1' 경로를 기본으로 모든 인증 관련 요청(authRoutes)을 처리함
+    // 예: 회원가입, 로그인, 로그아웃 등과 관련된 경로
+    app.use(BASE_PATH, authRoutes.routes());
+  };
+
+  // 라우팅 설정을 호출해서 실제로 적용
+  routes();
+};
+
+```
+
+```jsx
+'/queues' 경로에 큐의 대시보드(GUI)를 설정합니다. 이를 통해 큐에 있는 작업들을 시각적으로 관리할 수 있습니다.
+
+주소에 localhost/queues 를 하면 대시보드로 이동 가능하다
+```
+
+## 4. **인증 큐 설정 (`auth.queue.ts`)**
+
+```jsx
+이 코드는 AuthQueue라는 클래스를 정의하고, 해당 클래스는 인증 관련 작업을 Bull 큐에 추가하는 기능을 제공합니다.
+
+AuthQueue 클래스는 BaseQueue라는 기본 큐 클래스를 상속받아 재사용하며,
+
+주로 회원가입이나 로그인 작업을 비동기적으로 처리하는 데 사용할 수 있습니다
+```
+
+```jsx
+// IAuthJob 인터페이스를 불러옴. 이 인터페이스는 인증 관련 작업의 데이터 구조를 정의함
+import { IAuthJob } from '@auth/interfaces/auth.interface';
+
+// BaseQueue 클래스를 불러옴. BaseQueue는 큐의 기본 기능을 제공하는 추상 클래스.
+import { BaseQueue } from '@service/queues/base.queue';
+
+// AuthQueue 클래스 정의. 이 클래스는 인증과 관련된 작업을 처리하는 큐 역할을 함.
+class AuthQueue extends BaseQueue {
+  // 생성자: 'auth'라는 이름으로 큐를 생성하고 BaseQueue의 기능을 상속받음.
+  constructor() {
+    super('auth'); // 'auth'라는 이름으로 BaseQueue 생성자를 호출하여 큐를 초기화
+  }
+
+  // 인증 관련 작업을 큐에 추가하는 메서드
+  // 작업의 이름(name)과 작업에 필요한 데이터(data)를 받아서 큐에 추가함
+  public addAuthUserJob(name: string, data: IAuthJob): void {
+    this.addJob(name, data); // BaseQueue에서 제공하는 addJob 메서드를 사용하여 작업을 큐에 추가
+  }
+}
+
+// AuthQueue 클래스의 인스턴스를 생성하여 export
+// 이를 통해 다른 파일에서 authQueue를 import하여 사용할 수 있음
+export const authQueue: AuthQueue = new AuthQueue();
+
+```
+
+```jsx
+주요 개념 및 설명:
+
+IAuthJob 인터페이스:
+
+		**IAuthJob**은 인증 관련 작업에서 사용되는 데이터를 정의하는 인터페이스입니다.
+
+		예를 들어, 회원가입 시 필요한 사용자 ID, 이메일, 비밀번호 등의 정보를 포함할 수 있습니다.
+
+		이 인터페이스는 인증 작업에서 사용되는 데이터의 형식을 명시적으로 정의해 줍니다.
+
+		이를 통해 데이터의 구조가 올바른지 TypeScript에서 컴파일 타임에 확인할 수 있습니다.
+
+BaseQueue 클래스:
+
+		**BaseQueue**는 작업 큐의 기본 기능을 제공하는 추상 클래스입니다.
+
+		큐에 작업을 추가하고 처리하는 등의 기본적인 기능을 상속받아 사용할 수 있습니다.
+
+		이 클래스는 Redis를 사용하는 Bull 큐 라이브러리를 활용하여 작업을 관리합니다. AuthQueue는 BaseQueue를 상속받아 이를 재사용합니다.
+
+AuthQueue 클래스:
+
+		**AuthQueue**는 BaseQueue를 상속받아, 인증 작업(회원가입, 로그인, 비밀번호 재설정 등)을 관리하는 큐입니다.
+
+		생성자에서 **'auth'**라는 이름을 사용하여 큐를 생성합니다. 이 이름은 Bull 큐에서 작업을 구분하는데 사용됩니다.
+
+		addAuthUserJob 메서드는 작업 이름과 데이터를 받아 인증 작업을 큐에 추가합니다.
+
+		이 메서드는 BaseQueue에서 상속받은 addJob 메서드를 호출하여 작업을 큐에 넣습니다.
+
+authQueue 인스턴스:
+
+		**authQueue**는 AuthQueue 클래스의 인스턴스로, 이를 통해 다른 파일에서 인증 작업 큐에 작업을 추가할 수 있습니다.
+
+		다른 파일에서 authQueue.addAuthUserJob()을 호출하여 인증 작업을 큐에 넣을 수 있습니다.
+```
+
+## 6. **회원가입 처리와 큐 추가 (`signup.ts`)**
+
+```jsx
+import { omit } from 'lodash'; // lodash 라이브러리에서 'omit' 함수를 가져옴
+import { authQueue } from '@service/queues/auth.queue'; // 인증 작업을 처리하는 큐를 가져옴
+
+// 유저 데이터 객체 - 실제 코드에서는 이 객체가 사용자 정보를 담고 있음
+const userDataForCache = { ... }; // 예시: { uId: '12345', username: 'john_doe', email: 'john@example.com', ... }
+
+// 불필요한 속성 제거
+// 'omit'은 객체에서 특정 속성을 제외하는 함수로, 여기서는 데이터베이스에 저장할 필요 없는 속성을 제거함
+omit(userDataForCache, ['uId', 'username', 'email', 'avatarColor', 'password']);
+
+// 큐에 작업 추가 - 'addAuthUserToDB'라는 작업 이름으로 큐에 추가
+// 이 작업은 비동기적으로 처리되며, 데이터는 'userDataForCache'로 전달됨
+authQueue.addAuthUserJob('addAuthUserToDB', { value: userDataForCache });
+```
+
+```jsx
+import { omit } from 'lodash';
+
+		lodash는 JavaScript 유틸리티 라이브러리로, 객체나 배열을 쉽게 조작할 수 있는 함수들을 제공합니다.
+
+		omit 함수는 특정 속성을 객체에서 제외한 새 객체를 반환합니다. 여기서는 사용자 정보에서 특정 속성을 제거하는 데 사용됩니다.
+
+userDataForCache 객체
+
+		userDataForCache는 사용자 정보를 담고 있는 객체입니다. 예를 들어,
+
+		회원가입을 할 때 사용자로부터 받은 ID, 이메일, 비밀번호, 프로필 이미지 색상 등의 정보가 포함될 수 있습니다.
+
+
+omit(userDataForCache, [...]);
+
+		omit 함수는 주어진 객체에서 특정 속성을 제외하고 나머지 속성만으로 새로운 객체를 만듭니다.
+
+		여기서 제외된 속성은 ['uId', 'username', 'email', 'avatarColor', 'password']입니다.
+
+		이는 데이터베이스에 저장할 필요가 없는 정보이거나, 보안상의 이유로 제거해야 할 정보입니다.
+
+		즉, 이 과정은 보안과 최적화를 위해 불필요한 정보를 데이터베이스에 저장하지 않도록 합니다.
+
+
+authQueue.addAuthUserJob('addAuthUserToDB', { value: userDataForCache });
+
+		**authQueue**는 작업 큐입니다. 여기서 작업은 비동기적으로 처리됩니다.
+
+		이는 서버가 곧바로 응답할 수 있게 하고, 백그라운드에서 시간이 걸리는 작업(예: 데이터베이스 저장)이 진행될 수 있도록 도와줍니다.
+
+		addAuthUserJob 메서드는 인증 관련 작업을 큐에 추가하는 함수입니다. 여기서 'addAuthUserToDB'는 작업의 이름으로,
+
+		작업이 무엇을 하는지 명확히 나타냅니다. 즉, '사용자를 데이터베이스에 추가하는 작업'입니다.
+
+		{ value: userDataForCache }: 이 부분은 작업에 전달될 데이터로, 앞서 불필요한 속성을 제거한 후의 사용자 데이터를 담고 있습니다.
+
+		큐에 추가된 작업이 실행될 때 이 데이터를 사용하여 데이터베이스에 사용자를 추가하는 작업을 처리하게 됩니다.
+```
+
+```jsx
+import { Request, Response } from 'express';
+import { joiValidation } from '@global/decorators/joi-validation.decorator';
+import { signupSchema } from '@auth/schemes/signup';
+import { IAuthDocument, ISignUpData } from '@auth/interfaces/auth.interface';
+import { authService } from '@service/db/auth.service';
+import { BadRequestError } from '@global/helpers/error-handler';
+import { Helpers } from '@global/helpers/heplers';
+import { UploadApiResponse } from 'cloudinary';
+import { upload } from '@global/helpers/cloudinary-upload';
+import { ObjectId } from 'mongodb';
+import HTTP_STATUS from 'http-status-codes';
+import { UserCache } from '@service/redis/user.cache';
+import { IUserDocument } from '@user/interfaces/user.interface';
+import { omit } from 'lodash';
+import { authQueue } from '@service/queues/auth.queue';
+
+const userCache: UserCache = new UserCache();
+
+export class SignUp {
+  @joiValidation(signupSchema)
+  public async create(req: Request, res: Response): Promise<void> {
+    const { username, email, password, avatarColor, avatarImage } = req.body;
+    const checkIfUserExit: IAuthDocument = await authService.getUserByUsernameOrEamil(username, email);
+    if (checkIfUserExit) {
+      throw new BadRequestError('Invalid credentials');
+    }
+
+    const authObjectId: ObjectId = new ObjectId();
+    const userObjectId: ObjectId = new ObjectId();
+    const uId = `${Helpers.generateRandomIntegers(12)}`;
+    const authDate: IAuthDocument = SignUp.prototype.signupData({
+      _id: authObjectId,
+      uId,
+      username,
+      email,
+      password,
+      avatarColor
+    });
+
+    const result: UploadApiResponse = (await upload(avatarImage, `${userObjectId}`, true, true)) as UploadApiResponse;
+    // https://res.cloudinary.com/123/23reiqej
+    // https://res.cloudinary.com/123/439fjemfm
+    console.log(result);
+    if (!result?.public_id) {
+      throw new BadRequestError('File upload Error accurred. Try again');
+    }
+
+    //Add to redis cache
+    const userDataForCache: IUserDocument = SignUp.prototype.userData(authDate, userObjectId);
+    userDataForCache.profilePicture = `https://res/cloudinary.com/dhk9309/image/upload/v${result.version}/${userObjectId}`;
+    await userCache.saveUserToCache(`${userObjectId}`, uId, userDataForCache);
+
+    // Add to database
+    omit(userDataForCache, ['uId', 'username', 'email', 'avatarColor', 'password']);
+    authQueue.addAuthUserJob('addAuthUserToDB', { value: userDataForCache});
+
+    res.status(HTTP_STATUS.CREATED).json({ message: 'User created successfully', authDate });
+  }
+
+  private signupData(data: ISignUpData): IAuthDocument {
+    const { _id, username, email, uId, password, avatarColor } = data;
+    return {
+      _id,
+      uId,
+      username: Helpers.firstletterUppercase(username),
+      email: Helpers.lowerCase(email),
+      password,
+      avatarColor,
+      createdAt: new Date()
+    } as IAuthDocument;
+  }
+
+  private userData(data: IAuthDocument, userObjectId: ObjectId): IUserDocument {
+    const { _id, username, email, uId, password, avatarColor } = data;
+    return {
+      _id: userObjectId,
+      authId: _id,
+      uId,
+      username: Helpers.firstletterUppercase(username),
+      email,
+      password,
+      avatarColor,
+      profilePicture: '',
+      blocked: [],
+      blockedBy: [],
+      work: '',
+      location: '',
+      school: '',
+      quote: '',
+      bgImageVersion: '',
+      bgImageId: '',
+      followersCount: 0,
+      followingCount: 0,
+      notifications: {
+        messages: true,
+        reactions: true,
+        comments: true,
+        follows: true
+      },
+      social: {
+        facebook: '',
+        instagram: '',
+        twitter: '',
+        youtube: ''
+      }
+    } as unknown as IUserDocument;
+  }
+}
+
+```
+
+## 7. **전체 동작 요약**
+
+```jsx
+큐 설정: BaseQueue 클래스를 확장하여 큐를 설정하고, 인증 작업을 처리할 큐(AuthQueue)를 만듭니다.
+
+데이터 추가: 회원가입 시 데이터에서 필요 없는 속성을 제거한 후, 큐에 작업으로 추가합니다.
+
+작업 처리: 대기 중인 작업은 설정된 동시 작업 수에 따라 처리되고, 실패할 경우 최대 3번까지 재시도합니다.
+
+이제 큐 대시보드를 통해 작업이 어떻게 처리되는지 실시간으로 모니터링할 수 있습니다. http://localhost:5000/queues에서 확인 가능합니다.
+```
+
+# { 큐와 워커를 이용한 비동기 작업 처리 및 데이터베이스 저장: 회원가입 예제 }
+
+```jsx
+이 강의는 백엔드 개발에서 **큐(queue)**와 **워커(worker)**를 사용해,
+
+비동기 작업을 처리하고 이를 데이터베이스에 저장하는 방법을 설명하고 있습니다.
+```
+
+```jsx
+요약: 회원가입 시 처리되는 두 가지 정보
+
+		인증 정보 (Authentication Data):
+
+				이메일, 비밀번호, 사용자 ID 등 로그인 및 인증에 필요한 정보.
+
+				authWorker와 authService가 이 정보를 데이터베이스에 저장.
+
+
+		사용자 정보 (User Profile Data):
+
+				사용자 프로필, 팔로워 수, 위치, 사진 등 사용자의 활동 및 프로필에 대한 정보.
+
+				userWorker와 userService가 이 정보를 데이터베이스에 저장.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381344/notion-blog/_/React_Node_/_4_-_3_-/image_2.png)
+
+## `auth.worker.ts` 작성
+
+```jsx
+워커 생성 및 설정
+
+이 파일에서는 인증 작업을 처리하는 AuthWorker라는 클래스를 생성합니다.
+
+이 워커는 큐에서 작업을 받아서 사용자 인증 정보를 데이터베이스에 추가하는 일을 합니다.
+```
+
+```jsx
+import { DoneCallback, Job } from 'bull';
+// 'bull' 라이브러리에서 제공하는 Job과 DoneCallback 타입을 가져옵니다.
+// Job은 큐에서 전달되는 작업(job)의 타입이고, DoneCallback은 작업이 완료되었을 때 호출하는 콜백 함수입니다.
+
+import Logger from 'bunyan';
+// 'bunyan'은 애플리케이션의 로그를 남기기 위한 로깅 라이브러리입니다.
+// 로그를 사용하면 개발 중 발생하는 에러나 시스템 동작 상태를 쉽게 추적할 수 있습니다.
+
+import { config } from '@root/config';
+// 설정 파일(config)을 가져옵니다. 여기서는 로깅과 같은 설정 정보가 담겨 있습니다.
+
+import { authService } from '@service/db/auth.service';
+// 데이터베이스와 관련된 인증 서비스(authService)를 가져옵니다.
+// 이 서비스는 실제로 데이터베이스에 사용자를 추가하는 역할을 합니다.
+
+// 'authWorker'라는 로거(logger)를 생성합니다. 이 로거는 작업 처리 중 발생한 로그를 기록하는 데 사용됩니다.
+const log: Logger = config.createLogger('authWorker');
+
+// AuthWorker 클래스는 'addAuthUserToDB'라는 메서드를 통해 인증 정보를 데이터베이스에 추가하는 작업을 처리하는 워커입니다.
+class AuthWorker {
+
+  // 이 메서드는 Bull 큐에서 작업(job)을 받아서 처리합니다.
+  // job: 큐에 들어온 작업 데이터를 포함하는 객체
+  // done: 작업이 완료되었을 때 호출되는 콜백 함수
+  async addAuthUserToDB(job: Job, done: DoneCallback): Promise<void> {
+    try {
+      // job.data는 큐에서 전달된 작업 데이터를 포함하고 있습니다.
+      // 여기서 우리는 데이터 안에 있는 value 속성을 가져옵니다.
+      const { value } = job.data;
+
+      // authService를 통해 데이터베이스에 새로운 인증 사용자(auth user)를 생성합니다.
+      // 이 부분은 비동기로 실행되며, 완료될 때까지 대기합니다.
+      await authService.createAuthUser(value);
+
+      // 작업의 진행 상황을 100%로 설정합니다. (작업이 완료되었다는 뜻)
+      job.progress(100);
+
+      // 작업이 성공적으로 끝났음을 알리기 위해 done 콜백을 호출합니다.
+      // 첫 번째 인자는 에러(null이면 에러가 없다는 뜻), 두 번째 인자는 작업 결과입니다.
+      done(null, job.data);
+    } catch (error) {
+      // 만약 작업 중 에러가 발생하면, 그 에러를 로깅합니다.
+      log.error(error);
+
+      // 작업이 실패했음을 알리기 위해 done 콜백을 호출합니다.
+      // 에러 객체를 첫 번째 인자로 전달하면 Bull은 작업이 실패했다고 인식합니다.
+      done(error as Error);
+    }
+  }
+}
+
+// AuthWorker 클래스의 인스턴스를 생성해서 내보냅니다.
+// 이렇게 하면 다른 파일에서 'authWorker'를 불러와 사용할 수 있습니다.
+export const authWorker: AuthWorker = new AuthWorker();
+
+```
+
+## `auth.service.ts`에서 사용자 데이터베이스 추가
+
+```jsx
+이 코드는 AuthService라는 인증 서비스를 정의한 파일로, 여기에는 사용자 데이터를 데이터베이스에 저장하거나,
+
+사용자 정보를 검색하는 두 가지 주요 메서드가 포함되어 있습니다.
+
+이 서비스는 MongoDB를 사용하여 데이터를 처리하며,
+
+데이터베이스와 상호작용하는 로직을 담고 있습니다.
+```
+
+### 추가
+
+```jsx
+public async createAuthUser(data: IAuthDocument): Promise<void> {
+  await AuthModel.create(data);  // 사용자 데이터를 MongoDB 모델을 사용해 저장
+}
+```
+
+### `auth.service.ts`전체 코드
+
+```jsx
+import { IAuthDocument } from '@auth/interfaces/auth.interface';
+// IAuthDocument는 인증과 관련된 데이터의 타입을 정의하는 인터페이스입니다.
+// 이 인터페이스는 사용자 데이터가 어떤 형태로 구성되어 있는지를 명확히 해줍니다.
+
+import { AuthModel } from '@auth/models/auth.schema';
+// AuthModel은 MongoDB의 사용자 인증 정보를 처리하는 모델입니다.
+// 이 모델을 통해 데이터베이스와 상호작용하며, 사용자 데이터를 저장하거나 조회할 수 있습니다.
+
+import { Helpers } from '@global/helpers/heplers';
+// Helpers는 대소문자를 변환하는 등의 유틸리티 함수들을 제공합니다.
+// 이를 통해 입력된 데이터를 일관성 있게 처리할 수 있습니다. 예를 들어, 이메일을 소문자로 변환하거나, 첫 글자를 대문자로 변경하는 등의 작업을 수행합니다.
+
+class AuthService {
+
+  // createAuthUser 메서드는 새로운 인증 사용자 데이터를 데이터베이스에 추가하는 역할을 합니다.
+  // 이 메서드는 IAuthDocument 타입의 데이터를 받아 MongoDB에 저장합니다.
+  public async createAuthUser(data: IAuthDocument): Promise<void> {
+    await AuthModel.create(data);  // MongoDB AuthModel을 사용해 데이터를 생성하고 저장합니다.
+  }
+
+  // getUserByUsernameOrEmail 메서드는 주어진 사용자 이름 또는 이메일로 사용자 정보를 검색하는 역할을 합니다.
+  // 이 메서드는 데이터베이스에서 해당 사용자가 존재하는지 확인할 때 주로 사용됩니다.
+  public async getUserByUsernameOrEamil(username: string, email: string): Promise<IAuthDocument> {
+    // $or 연산자를 사용하여 MongoDB에서 username 또는 email로 사용자 정보를 검색합니다.
+    const query = {
+      $or: [
+        { username: Helpers.firstletterUppercase(username) },  // 입력된 사용자 이름의 첫 글자를 대문자로 변환하여 검색
+        { email: Helpers.lowerCase(email) }  // 이메일을 소문자로 변환하여 일관된 형식으로 검색
+      ]
+    };
+
+    // findOne을 사용하여 데이터베이스에서 해당 조건에 맞는 한 명의 사용자를 검색합니다.
+    // exec() 메서드는 쿼리를 실행하고, 결과를 IAuthDocument로 반환합니다.
+    const user: IAuthDocument = await AuthModel.findOne(query).exec() as IAuthDocument;
+
+    // 검색된 사용자 정보를 반환합니다. 만약 사용자가 없다면 'undefined'를 반환할 수 있습니다.
+    return user;
+  }
+}
+
+// AuthService의 인스턴스를 생성하고, 다른 파일에서 사용할 수 있도록 내보냅니다.
+export const authService: AuthService = new AuthService();
+
+```
+
+## `auth.queue.ts`에서 큐 생성
+
+```jsx
+이 코드는 AuthQueue라는 클래스를 정의하여 인증 작업을 큐(queue)에 추가하고,
+
+이를 처리하는 **워커(worker)**와 연결하는 역할을 합니다.
+
+BaseQueue를 확장하여 사용하며, 특정 작업이 큐에 추가되면, 워커가 그 작업을 처리하게 됩니다.
+```
+
+```jsx
+import { BaseQueue } from '@service/queues/base.queue';
+// 기본 큐 클래스(BaseQueue)를 임포트합니다.
+// BaseQueue는 작업을 큐에 추가하고, 큐에서 처리할 작업을 관리하는 기능을 제공합니다.
+
+import { authWorker } from '@worker/auth.worker';
+// AuthWorker를 임포트합니다.
+// AuthWorker는 큐에 추가된 인증 작업을 실제로 처리하는 역할을 합니다.
+
+// AuthQueue 클래스는 인증 관련 작업을 관리하는 큐입니다.
+// BaseQueue를 상속받아, 큐에 작업을 추가하거나 처리하는 메서드를 제공합니다.
+class AuthQueue extends BaseQueue {
+
+  // 생성자 메서드는 AuthQueue 객체가 생성될 때 실행됩니다.
+  constructor() {
+    // 'auth'라는 이름으로 큐를 생성합니다. BaseQueue의 생성자를 호출하여 큐의 이름을 설정합니다.
+    super('auth');
+
+    // 큐에 추가된 'addAuthUserToDB' 작업을 처리하도록 설정합니다.
+    // 5개의 작업을 동시에 처리(concurrency)할 수 있게 설정하며,
+    // 각 작업은 authWorker의 addAuthUserToDB 메서드를 통해 처리됩니다.
+    this.processJob('addAuthUserToDB', 5, authWorker.addAuthUserToDB);
+  }
+
+  // addAuthUserJob 메서드는 큐에 새로운 작업을 추가하는 역할을 합니다.
+  // name: 작업의 이름 (여기서는 'addAuthUserToDB'와 같은 작업명)
+  // data: 작업에 포함될 데이터 (IAuthJob 타입, 인증 관련 데이터를 포함)
+  public addAuthUserJob(name: string, data: IAuthJob): void {
+    // BaseQueue에 정의된 addJob 메서드를 사용하여 작업을 큐에 추가합니다.
+    // name과 data는 작업의 이름과 데이터를 의미합니다.
+    this.addJob(name, data);
+  }
+}
+
+// AuthQueue의 인스턴스를 생성하여 외부에서 사용할 수 있도록 내보냅니다.
+// 다른 파일에서 authQueue를 임포트하여 큐에 작업을 추가하거나 큐를 관리할 수 있습니다.
+export const authQueue: AuthQueue = new AuthQueue();
+
+```
+
+## 사용자 데이터 처리
+
+## `user.worker.ts` 작성
+
+```jsx
+이 코드는 UserWorker라는 클래스를 정의하여 사용자 데이터를 데이터베이스에 추가하는 작업을 처리하는 워커(worker)를 구현한 것입니다.
+
+ Bull 라이브러리에서 제공하는 작업(job)을 처리하며, 작업의 성공 여부에 따라 콜백(done)을 호출합니다. ( 인증 워커와 비슷한 구조 )
+```
+
+```jsx
+import { userService } from '@service/db/user.service';
+// 사용자 데이터를 처리하는 서비스(userService)를 임포트합니다.
+// 이 서비스는 데이터베이스와 상호작용하여 사용자 정보를 저장하는 역할을 합니다.
+
+class UserWorker {
+  // 이 메서드는 Bull 큐에서 작업(job)을 받아 처리하는 함수입니다.
+  // job: 큐에서 전달되는 작업 데이터가 포함된 객체
+  // done: 작업이 완료되거나 에러가 발생할 때 호출하는 콜백 함수
+  async addUserToDB(job: Job, done: DoneCallback): Promise<void> {
+    try {
+      // job.data는 큐에 추가된 작업의 데이터를 포함합니다.
+      // 그 중 'value' 속성을 구조 분해 할당으로 가져옵니다. 이 'value'에는 사용자 데이터가 들어 있습니다.
+      const { value } = job.data;
+
+      // userService를 호출하여 데이터베이스에 사용자 데이터를 추가합니다.
+      // 이 부분은 비동기로 실행되며, 데이터베이스 저장이 완료될 때까지 기다립니다.
+      await userService.addUserData(value);
+
+      // 작업 진행 상황을 100%로 설정합니다. 이는 작업이 완료되었음을 나타냅니다.
+      job.progress(100);
+
+      // 작업이 성공적으로 완료되었음을 알리기 위해 'done' 콜백을 호출합니다.
+      // 첫 번째 인자(null)는 에러가 없음을 의미하고, 두 번째 인자는 작업 데이터를 반환합니다.
+      done(null, job.data);
+    } catch (error) {
+      // 작업 도중 에러가 발생하면, 에러 로그를 남깁니다.
+      log.error(error);
+
+      // 작업이 실패했음을 알리기 위해 'done' 콜백을 호출합니다.
+      // 첫 번째 인자로 에러 객체를 전달하면 Bull이 작업이 실패했다고 인식합니다.
+      done(error as Error);
+    }
+  }
+}
+
+// UserWorker 클래스의 인스턴스를 생성하고 이를 내보냅니다.
+// 다른 파일에서 'userWorker'를 임포트하여 사용할 수 있습니다.
+export const userWorker: UserWorker = new UserWorker();
+
+```
+
+## `user.service.ts`에서 사용자 데이터베이스 추가
+
+```jsx
+이 코드는 UserService 클래스를 정의하여 사용자 데이터를 데이터베이스에 추가하는 기능을 구현한 것입니다.
+
+이 클래스는 MongoDB와 상호작용하여 사용자 데이터를 저장하는 역할을 합니다
+```
+
+```jsx
+import { IUserDocument } from '@user/interfaces/user.interface';
+// IUserDocument는 사용자 데이터의 타입을 정의하는 인터페이스입니다.
+// 이 인터페이스는 사용자 데이터가 어떤 구조를 가져야 하는지 정의합니다.
+// 예를 들어, 사용자 이름, 이메일, 팔로워 수 등의 정보를 포함할 수 있습니다.
+
+import { UserModel } from '@user/models/user.schema';
+// UserModel은 MongoDB에서 사용자 데이터를 저장하고 관리하는 스키마입니다.
+// Mongoose를 사용하여 MongoDB와 상호작용하며, 데이터베이스에 데이터를 저장하거나 조회하는 기능을 제공합니다.
+
+class UserService {
+
+  // addUserData 메서드는 주어진 사용자 데이터를 데이터베이스에 추가하는 역할을 합니다.
+  // data: IUserDocument 타입의 사용자 데이터를 받아서 처리합니다.
+  public async addUserData(data: IUserDocument): Promise<void> {
+    // UserModel.create()는 MongoDB에 새로운 사용자 데이터를 저장하는 Mongoose 메서드입니다.
+    // 비동기 작업이므로 작업이 완료될 때까지 대기(await)합니다.
+    await UserModel.create(data);
+  }
+}
+
+// UserService 클래스의 인스턴스를 생성하고 이를 내보냅니다.
+// 다른 파일에서 userService를 임포트하여 사용할 수 있습니다.
+export const userService: UserService = new UserService();
+
+```
+
+## `user.queue.ts`에서 사용자 큐 생성
+
+```jsx
+이 코드는 UserQueue라는 클래스를 정의하여 사용자 작업을 큐(queue)에 추가하고 이를 처리하는 **워커(worker)**와 연결하는 역할을 합니다.
+
+BaseQueue를 확장하여 사용자 데이터를 처리하는 작업을 큐에 추가하고, 큐에 있는 작업을 처리하는 구조입니다.
+```
+
+```jsx
+class UserQueue extends BaseQueue {
+  // 생성자 메서드는 UserQueue 인스턴스가 생성될 때 호출됩니다.
+  constructor() {
+    // 'user'라는 이름으로 큐를 생성합니다.
+    // 'user'는 이 큐를 식별하는 이름으로, BaseQueue의 생성자를 통해 설정됩니다.
+    super('user');
+
+    // 'addUserToDB' 작업을 처리하도록 큐에 설정합니다.
+    // 5개의 작업을 동시에 병렬로 처리할 수 있도록 설정합니다.
+    // 큐에 추가된 작업은 userWorker의 addUserToDB 메서드를 통해 처리됩니다.
+    this.processJob('addUserToDB', 5, userWorker.addUserToDB);
+  }
+
+  // addUserJob 메서드는 큐에 새로운 사용자 작업을 추가하는 역할을 합니다.
+  // name: 작업의 이름 (예: 'addUserToDB')
+  // data: 작업에 포함될 데이터 (IAuthJob 타입, 인증 관련 데이터나 사용자 데이터를 포함)
+  public addUserJob(name: string, data: IAuthJob): void {
+    // BaseQueue 클래스에서 상속받은 addJob 메서드를 사용하여 작업을 큐에 추가합니다.
+    // name은 작업의 이름, data는 작업에 필요한 데이터를 의미합니다.
+    this.addJob(name, data);
+  }
+}
+
+// UserQueue의 인스턴스를 생성하고 이를 내보냅니다.
+// 다른 파일에서 userQueue를 임포트하여 사용자 작업을 큐에 추가하거나 관리할 수 있습니다.
+export const userQueue: UserQueue = new UserQueue();
+
+```
+
+## 4. 회원가입 로직 (`signup.ts`)
+
+```jsx
+큐 작업을 추가해준다
+```
+
+```jsx
+// 인증 정보를 처리하는 작업을 큐에 추가합니다.
+// 'addAuthUserToDB'라는 작업 이름으로 큐에 작업을 추가하고, 사용자 데이터를 함께 전달합니다.
+// 이 작업은 비동기적으로 처리되며, authWorker가 이 작업을 받아서 사용자 인증 정보를 데이터베이스에 저장합니다.
+authQueue.addAuthUserJob('addAuthUserToDB', { value: userDataForCache })
+
+// 사용자 정보를 처리하는 작업을 큐에 추가합니다.
+// 'addUserToDB'라는 작업 이름으로 큐에 작업을 추가하고, 사용자 데이터를 함께 전달합니다.
+// 이 작업도 비동기적으로 처리되며, userWorker가 이 작업을 받아서 사용자 데이터를 데이터베이스에 저장합니다.
+userQueue.addUserJob('addUserToDB', { value: userDataForCache })
+```
+
+### 전체 코드
+
+```jsx
+import { Request, Response } from 'express'; // Express.js에서 요청(Request)과 응답(Response)을 가져옵니다.
+import { joiValidation } from '@global/decorators/joi-validation.decorator'; // Joi로 스키마 검증을 위한 커스텀 데코레이터를 가져옵니다.
+import { signupSchema } from '@auth/schemes/signup'; // 회원가입 요청에 대한 Joi 스키마를 가져옵니다.
+import { IAuthDocument, ISignUpData } from '@auth/interfaces/auth.interface'; // 인증(Auth)와 관련된 인터페이스를 가져옵니다.
+import { authService } from '@service/db/auth.service'; // 인증 관련 DB 작업을 처리하는 서비스입니다.
+import { BadRequestError } from '@global/helpers/error-handler'; // 클라이언트 측에서 잘못된 요청이 있을 때 발생하는 오류 클래스입니다.
+import { Helpers } from '@global/helpers/heplers'; // 다양한 헬퍼 함수들을 포함하고 있습니다.
+import { UploadApiResponse } from 'cloudinary'; // Cloudinary의 파일 업로드 응답 형식을 가져옵니다.
+import { upload } from '@global/helpers/cloudinary-upload'; // Cloudinary로 이미지를 업로드하는 헬퍼 함수입니다.
+import { ObjectId } from 'mongodb'; // MongoDB의 ObjectId를 사용하여 유니크한 식별자를 생성합니다.
+import HTTP_STATUS from 'http-status-codes'; // HTTP 상태 코드를 쉽게 사용하기 위한 상수 모음입니다.
+import { UserCache } from '@service/redis/user.cache'; // Redis에 사용자 데이터를 캐싱하기 위한 클래스입니다.
+import { IUserDocument } from '@user/interfaces/user.interface'; // 사용자(User)와 관련된 인터페이스입니다.
+import { omit } from 'lodash'; // Lodash의 omit 함수를 사용하여 객체에서 특정 필드를 제거합니다.
+import { authQueue } from '@service/queues/auth.queue'; // 인증 관련 작업을 큐에 추가하는 서비스입니다.
+import { userQueue } from '@service/queues/user.queue'; // 사용자 관련 작업을 큐에 추가하는 서비스입니다.
+
+const userCache: UserCache = new UserCache(); // Redis 캐시에 사용자 데이터를 저장하기 위한 인스턴스를 생성합니다.
+
+export class SignUp {
+  // Joi 스키마를 사용해 회원가입 데이터 검증
+  @joiValidation(signupSchema)
+  public async create(req: Request, res: Response): Promise<void> {
+    // 요청에서 필요한 데이터를 추출 (유저명, 이메일, 비밀번호, 아바타 색상, 이미지)
+    const { username, email, password, avatarColor, avatarImage } = req.body;
+
+    // 주어진 유저명이나 이메일로 이미 가입된 유저가 있는지 확인
+    const checkIfUserExit: IAuthDocument = await authService.getUserByUsernameOrEamil(username, email);
+    if (checkIfUserExit) {
+      // 유저가 이미 존재하면 예외 발생
+      throw new BadRequestError('Invalid credentials');
+    }
+
+    // 새로운 ObjectId를 생성하여 각각 인증 객체와 사용자 객체에 할당
+    const authObjectId: ObjectId = new ObjectId();
+    const userObjectId: ObjectId = new ObjectId();
+
+    // 무작위로 12자리의 uId 생성
+    const uId = `${Helpers.generateRandomIntegers(12)}`;
+
+    // 회원가입 데이터를 준비하는 함수 호출
+    const authDate: IAuthDocument = SignUp.prototype.signupData({
+      _id: authObjectId,
+      uId,
+      username,
+      email,
+      password,
+      avatarColor
+    });
+
+    // Cloudinary에 아바타 이미지를 업로드
+    const result: UploadApiResponse = (await upload(avatarImage, `${userObjectId}`, true, true)) as UploadApiResponse;
+    console.log(result); // 업로드 결과를 확인하기 위해 콘솔에 출력
+    if (!result?.public_id) {
+      // 업로드 중 문제가 발생하면 예외 처리
+      throw new BadRequestError('File upload Error occurred. Try again');
+    }
+
+    // Redis 캐시에 유저 데이터를 저장
+    const userDataForCache: IUserDocument = SignUp.prototype.userData(authDate, userObjectId);
+    // 프로필 사진의 Cloudinary URL을 저장
+    userDataForCache.profilePicture = `https://res/cloudinary.com/dhk9309/image/upload/v${result.version}/${userObjectId}`;
+    await userCache.saveUserToCache(`${userObjectId}`, uId, userDataForCache);
+
+    // DB에 저장할 때는 일부 불필요한 필드를 제외하고 저장
+    omit(userDataForCache, ['uId', 'username', 'email', 'avatarColor', 'password']);
+
+    // 인증 큐와 사용자 큐에 각각 DB 저장 작업을 추가
+    authQueue.addAuthUserJob('addAuthUserToDB', { value: userDataForCache });
+    userQueue.addUserJob('addUserToDB', { value: userDataForCache });
+
+    // HTTP 상태 코드를 201(CREATED)로 응답하며 사용자 생성 성공 메시지를 반환
+    res.status(HTTP_STATUS.CREATED).json({ message: 'User created successfully', authDate });
+  }
+
+  // 회원가입 데이터를 생성하는 함수 (회원 정보를 정리하여 반환)
+  private signupData(data: ISignUpData): IAuthDocument {
+    const { _id, username, email, uId, password, avatarColor } = data;
+    return {
+      _id,
+      uId,
+      username: Helpers.firstletterUppercase(username), // 유저명 첫 글자를 대문자로 변환
+      email: Helpers.lowerCase(email), // 이메일을 소문자로 변환
+      password,
+      avatarColor,
+      createdAt: new Date() // 계정 생성 날짜 추가
+    } as IAuthDocument;
+  }
+
+  // 사용자 데이터를 생성하는 함수 (기본 사용자 정보를 정리하여 반환)
+  private userData(data: IAuthDocument, userObjectId: ObjectId): IUserDocument {
+    const { _id, username, email, uId, password, avatarColor } = data;
+    return {
+      _id: userObjectId, // 새로운 사용자 ObjectId 할당
+      authId: _id, // 인증 정보의 ObjectId와 연결
+      uId,
+      username: Helpers.firstletterUppercase(username), // 유저명 첫 글자를 대문자로 변환
+      email,
+      password,
+      avatarColor,
+      profilePicture: '', // 프로필 사진은 나중에 추가
+      blocked: [], // 차단된 사용자 목록
+      blockedBy: [], // 나를 차단한 사용자 목록
+      work: '', // 직장 정보
+      location: '', // 위치 정보
+      school: '', // 학교 정보
+      quote: '', // 사용자 소개 또는 명언
+      bgImageVersion: '', // 배경 이미지 버전
+      bgImageId: '', // 배경 이미지 ID
+      followersCount: 0, // 팔로워 수
+      followingCount: 0, // 팔로잉 수
+      notifications: {
+        messages: true, // 메시지 알림 설정
+        reactions: true, // 반응(좋아요 등) 알림 설정
+        comments: true, // 댓글 알림 설정
+        follows: true // 팔로우 알림 설정
+      },
+      social: {
+        facebook: '', // 페이스북 계정
+        instagram: '', // 인스타그램 계정
+        twitter: '', // 트위터 계정
+        youtube: '' // 유튜브 계정
+      }
+    } as unknown as IUserDocument; // 인터페이스에 맞추어 반환
+  }
+}
+
+```
+
+# { 세션에 JWT 추가 }
+
+```jsx
+사용자가 로그인 시 JWT(Json Web Token)를 생성하고,
+
+이를 세션에 추가하여 사용자의 상태를 관리합니다.
+
+JWT는 서버가 사용자 세션을 관리할 때 유용하며, 로그인한 사용자를 식별할 수 있게 해줍니다.
+
+* 보통 JWT 토큰은 세션에 저장하지 않는다 이는 JWT 토큰의 장점을 상쇄시키는 효과다
+
+	후에 수정을 할것이다
+```
+
+## JWT 라이브러리 설치 및 import
+
+```jsx
+먼저, jsonwebtoken 라이브러리를 설치하고 파일에 import합니다.
+```
+
+```jsx
+// JWT 설치 (터미널에서 실행)
+// npm install jsonwebtoken
+
+// TypeScript 파일에서 JWT 라이브러리 import
+import JWT from 'jsonwebtoken'
+```
+
+## JWT 토큰 생성 메서드 작성
+
+```jsx
+JWT 토큰을 생성하는 메서드를 만들어줍니다. 이 메서드는 사용자 데이터를 받아 JWT 토큰을 생성하며,
+
+토큰에는 인증에 필요한 최소한의 정보(예: userId, email, username 등)를 포함시킵니다.
+```
+
+```jsx
+private signupToken(data: IAuthDocument, userObjectId: ObjectId): string {
+  return JWT.sign(
+    {
+      userId: userObjectId, // MongoDB의 유저 Object ID
+      uId: data.uId, // 사용자 고유 ID
+      email: data.email, // 사용자 이메일
+      username: data.username, // 사용자 이름
+      avatarColor: data.avatarColor // 아바타 색상
+    },
+    config.JWT_TOKEN! // JWT 토큰 서명을 위한 비밀 키
+  );
+}
+
+```
+
+## 사용자 등록 시 JWT 토큰 생성 및 세션에 저장
+
+```jsx
+사용자가 회원가입을 완료하면 JWT 토큰을 생성하여 세션에 추가합니다.
+
+아래는 signupToken 메서드를 호출하여 토큰을 생성하고 세션에 저장하는 코드입니다.
+```
+
+```jsx
+// 유저 저장 전에 JWT 토큰 생성
+const userJwt: string = SignUp.prototype.signupToken(authData, userObjectId);
+
+// 세션에 JWT 저장
+req.session = { jwt: userJwt };
+```
+
+## 클라이언트에 응답할 때 유저 캐시와 토큰 반환
+
+```jsx
+서버는 사용자가 성공적으로 생성되었음을 클라이언트에 알려주기 위해 응답을 보내며,
+
+생성된 사용자 캐시 데이터(userDataForCache)와 함께 JWT 토큰도 반환합니다.
+```
+
+```jsx
+res.status(HTTP_STATUS.CREATED).json({
+  message: 'User created successfully',
+  user: userDataForCache,
+  token: userJwt,
+})
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381344/notion-blog/_/React_Node_/_4_-_3_-/image_3.png)
+
+## 전체 코드
+
+```jsx
+// 필요한 모듈 및 의존성 불러오기
+import { Request, Response } from 'express';
+import { joiValidation } from '@global/decorators/joi-validation.decorator';
+import { signupSchema } from '@auth/schemes/signup';
+import { IAuthDocument, ISignUpData } from '@auth/interfaces/auth.interface';
+import { authService } from '@service/db/auth.service';
+import { BadRequestError } from '@global/helpers/error-handler';
+import { Helpers } from '@global/helpers/heplers';
+import { UploadApiResponse } from 'cloudinary';
+import { upload } from '@global/helpers/cloudinary-upload';
+import { ObjectId } from 'mongodb';
+import HTTP_STATUS from 'http-status-codes';
+import { UserCache } from '@service/redis/user.cache';
+import { IUserDocument } from '@user/interfaces/user.interface';
+import { omit } from 'lodash';
+import JWT from 'jsonwebtoken';
+import { authQueue } from '@service/queues/auth.queue';
+import { userQueue } from '@service/queues/user.queue';
+import { config } from '@root/config';
+
+// Redis 캐시를 위한 UserCache 인스턴스 생성
+const userCache: UserCache = new UserCache();
+
+export class SignUp {
+  // 회원가입 데이터의 유효성을 Joi를 사용해 검사하는 데코레이터 추가
+  @joiValidation(signupSchema)
+  public async create(req: Request, res: Response): Promise<void> {
+    // 요청 본문에서 사용자 정보를 가져옴
+    const { username, email, password, avatarColor, avatarImage } = req.body;
+
+    // 동일한 사용자 이름이나 이메일이 존재하는지 확인
+    const checkIfUserExit: IAuthDocument = await authService.getUserByUsernameOrEamil(username, email);
+    if (checkIfUserExit) {
+      throw new BadRequestError('Invalid credentials');
+    }
+
+    // 사용자와 인증 객체에 대한 ObjectId 생성
+    const authObjectId: ObjectId = new ObjectId();
+    const userObjectId: ObjectId = new ObjectId();
+    const uId = `${Helpers.generateRandomIntegers(12)}`; // 랜덤 uId 생성
+    const authDate: IAuthDocument = SignUp.prototype.signupData({
+      _id: authObjectId,
+      uId,
+      username,
+      email,
+      password,
+      avatarColor
+    });
+
+    // Cloudinary에 이미지 업로드 및 에러 처리
+    const result: UploadApiResponse = (await upload(avatarImage, `${userObjectId}`, true, true)) as UploadApiResponse;
+    if (!result?.public_id) {
+      throw new BadRequestError('File upload Error accurred. Try again');
+    }
+
+    // Redis 캐시에 저장할 사용자 데이터 생성
+    const userDataForCache: IUserDocument = SignUp.prototype.userData(authDate, userObjectId);
+    userDataForCache.profilePicture = `https://res/cloudinary.com/dhk9309/image/upload/v${result.version}/${userObjectId}`;
+    await userCache.saveUserToCache(`${userObjectId}`, uId, userDataForCache);
+
+    // 데이터베이스에 사용자 정보 추가 (비밀번호와 민감한 정보 생략)
+    omit(userDataForCache, ['uId', 'username', 'email', 'avatarColor', 'password']);
+    authQueue.addAuthUserJob('addAuthUserToDB', { value: userDataForCache });
+    userQueue.addUserJob('addUserToDB', { value: userDataForCache });
+
+    // 사용자 JWT 생성 및 세션에 저장
+    const userJwt: string = SignUp.prototype.signupToken(authDate, userObjectId);
+    req.session = { jwt: userJwt };
+
+    // 응답 전송
+    res.status(HTTP_STATUS.CREATED).json({ message: 'User created successfully', user: userDataForCache, token: userJwt });
+  }
+
+  // JWT 토큰을 생성하는 메서드
+  private signupToken(data: IAuthDocument, userObjectId: ObjectId): string {
+    return JWT.sign(
+      {
+        // 토큰에 포함할 사용자 정보 (payload)
+        userId: userObjectId,        // MongoDB의 사용자 ObjectId
+        uId: data.uId,               // 사용자 고유 식별 번호
+        email: data.email,           // 사용자 이메일
+        username: data.username,     // 사용자 이름
+        avatarColor: data.avatarColor // 사용자 아바타 색상
+      },
+      config.JWT_TOKEN! // 비밀키를 사용하여 JWT 서명 ! 해당 값이 null 또는 undefined가 아님을 컴파일러에 명시적으로 알리는 역할
+    );
+  }
+
+  // 회원가입 데이터 생성 메서드
+  private signupData(data: ISignUpData): IAuthDocument {
+    const { _id, username, email, uId, password, avatarColor } = data;
+    return {
+      _id,
+      uId,
+      username: Helpers.firstletterUppercase(username),
+      email: Helpers.lowerCase(email),
+      password,
+      avatarColor,
+      createdAt: new Date()
+    } as IAuthDocument;
+  }
+
+  // 사용자 데이터 생성 메서드
+  private userData(data: IAuthDocument, userObjectId: ObjectId): IUserDocument {
+    const { _id, username, email, uId, password, avatarColor } = data;
+    return {
+      _id: userObjectId,
+      authId: _id,
+      uId,
+      username: Helpers.firstletterUppercase(username),
+      email,
+      password,
+      avatarColor,
+      profilePicture: '',
+      blocked: [],
+      blockedBy: [],
+      work: '',
+      location: '',
+      school: '',
+      quote: '',
+      bgImageVersion: '',
+      bgImageId: '',
+      followersCount: 0,
+      followingCount: 0,
+      notifications: {
+        messages: true,
+        reactions: true,
+        comments: true,
+        follows: true
+      },
+      social: {
+        facebook: '',
+        instagram: '',
+        twitter: '',
+        youtube: ''
+      }
+    } as unknown as IUserDocument;
+  }
+}
+
+```
+
+# { 콤파스 사용하기 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381345/notion-blog/_/React_Node_/_4_-_3_-/image_4.png)
+
+```jsx
+뉴 커넥션을 클릭하고 몽고DB 의 url 을 붙여넣어주면 연결이 완료된다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381345/notion-blog/_/React_Node_/_4_-_3_-/image_5.png)

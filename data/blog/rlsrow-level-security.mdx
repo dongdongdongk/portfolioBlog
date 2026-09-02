@@ -1,0 +1,494 @@
+---
+title: 'RLS(Row Level Security)란?'
+date: '2026-09-02'
+category: '풀스택/Supabase'
+tags: ['풀스택', 'Supabase']
+draft: false
+summary: ''
+---
+
+# RLS(Row Level Security)란?
+
+```jsx
+**RLS(Row Level Security, 행 수준 보안)**는 Supabase(또는 PostgreSQL)에서 데이터베이스 테이블의
+
+데이터에 대한 접근을 제어하는 보안 기능입니다.
+
+쉽게 말해, 특정 사용자가 테이블의 특정 행(row)만 읽거나 수정할 수 있도록 제한하는 방법입니다.
+
+테이블 전체에 대한 접근 권한을 주는 대신, 각 사용자마다 볼 수 있는 데이터나 수정할 수 있는 데이터를 세밀하게 관리할 수 있습니다.
+
+예를 들어, 채팅 앱에서 사용자 A와 B가 채팅을 하고 있다면,
+
+A와 B만 그들의 채팅 데이터를 볼 수 있도록 설정하는 것이 RLS입니다. 다른 사용자 C가 이 데이터를 볼 수 없도록 막을 수 있습니다.
+```
+
+# 초보자를 위한 RLS 개념 설명
+
+## RLS의 핵심 아이디어
+
+```jsx
+누가(Who): 현재 로그인한 사용자(Supabase에서는 auth.uid()로 확인).
+
+무엇을(What): 테이블의 특정 행(row)만 읽기(SELECT), 쓰기(INSERT), 수정(UPDATE), 삭제(DELETE) 가능.
+
+어떻게(How): 조건(USING 또는 WITH CHECK)을 설정해 접근을 제어.
+```
+
+## 왜 RLS를 사용할까?
+
+```jsx
+보안: 민감한 데이터를 보호. 예: 사용자의 개인 채팅이나 프로필 정보를 다른 사용자가 못 보게 함.
+
+간편함: 서버 코드 없이 데이터베이스에서 바로 보안 규칙 설정.
+
+유연성: 사용자마다 다른 데이터 접근 권한을 줄 수 있음.
+```
+
+# RLS의 기본 문법
+
+```jsx
+RLS는 PostgreSQL의 정책(Policy)을 사용해 설정합니다.
+
+Supabase 대시보드 또는 SQL Editor에서 설정할 수 있습니다. 기본 문법은 다음과 같습니다:
+```
+
+```jsx
+-- 1. 테이블에 RLS 활성화
+ALTER TABLE 테이블이름 ENABLE ROW LEVEL SECURITY;
+
+-- 2. 특정 작업에 대한 정책 생성
+CREATE POLICY 정책이름 ON 테이블이름
+FOR { SELECT | INSERT | UPDATE | DELETE }
+USING (조건식)
+[WITH CHECK (조건식)]; -- INSERT, UPDATE에 사용
+```
+
+```jsx
+정책 이름: 정책을 구분하기 위한 이름 (예: "Allow users to read their chats")
+
+작업: SELECT(읽기), INSERT(생성), UPDATE(수정), DELETE(삭제)
+
+USING: 읽기(SELECT) 또는 수정/삭제 시 조건을 정의
+
+WITH CHECK: 데이터 추가(INSERT) 또는 수정(UPDATE) 시 데이터가 만족해야 하는 조건
+```
+
+# 초보자를 위한 RLS 예제
+
+## 예제 시나리오: 채팅 앱
+
+```jsx
+상황: chats 테이블에 사용자 간 채팅 데이터가 저장되어 있음.
+
+목표: 로그인한 사용자가 자신과 관련된 채팅만 볼 수 있도록 설정.
+
+테이블 구조 (이전 질문에서 제공된 스키마 참고):
+```
+
+```jsx
+CREATE TABLE public.chats (
+  id text NOT NULL,
+  sender_id text NOT NULL, -- 채팅을 시작한 사용자 ID
+  receiver_id text NOT NULL, -- 채팅을 받은 사용자 ID
+  type text NOT NULL DEFAULT 'PRIVATE'::text,
+  last_message text,
+  last_message_at timestamp,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at timestamp NOT NULL,
+  CONSTRAINT chats_pkey PRIMARY KEY (id),
+  CONSTRAINT chats_sender_id_fkey FOREIGN KEY (sender_id) REFERENCES public.profiles(id),
+  CONSTRAINT chats_receiver_id_fkey FOREIGN KEY (receiver_id) REFERENCES public.profiles(id)
+);
+```
+
+### RLS 설정 단계
+
+### 1. RLS 활성화:
+
+```jsx
+테이블에 RLS를 켜야 합니다. 기본적으로 Supabase에서는 새 테이블 생성 시 RLS가 꺼져 있을 수 있음.
+
+이 명령은 chats 테이블에 RLS를 활성화하여, 정책이 없으면 아무도 데이터에 접근할 수 없도록 만듭니다.
+```
+
+```jsx
+ALTER TABLE public.chats ENABLE ROW LEVEL SECURITY;
+```
+
+### 2. 읽기 권한 정책 (SELECT)
+
+```jsx
+로그인한 사용자가 자신이 보낸(sender_id) 또는 받은(receiver_id) 채팅만 볼 수 있도록 설정.
+```
+
+```jsx
+-- 정책을 생성하는 명령어. 'CREATE POLICY'는 데이터베이스 테이블에 특정 보안 규칙을 정의합니다.
+CREATE POLICY "Allow users to read their chats" -- 정책 이름. 사람이 읽기 쉽게 설명적인 이름을 사용 (예: "사용자가 자신의 채팅을 읽도록 허용").
+ON public.chats -- 정책이 적용될 테이블. 여기서는 'public' 스키마의 'chats' 테이블에 적용.
+FOR SELECT -- 이 정책이 적용되는 작업. 'SELECT'는 데이터 조회(읽기)를 의미. 다른 작업으로는 INSERT, UPDATE, DELETE가 있음.
+USING ( -- 조건식을 정의. 이 조건이 참일 때만 사용자가 데이터를 조회할 수 있음.
+  auth.uid() = sender_id -- 현재 로그인한 사용자의 ID(auth.uid())가 chats 테이블의 sender_id와 일치하거나,
+  OR -- 논리 연산자 '또는'. 두 조건 중 하나라도 참이면 허용.
+  auth.uid() = receiver_id -- 현재 로그인한 사용자의 ID가 chats 테이블의 receiver_id와 일치해야 함.
+); -- 쿼리 종료.
+```
+
+```jsx
+auth.uid(): Supabase에서 현재 로그인한 사용자의 ID를 반환.
+
+USING (auth.uid() = sender_id OR auth.uid() = receiver_id): 현재 사용자의 ID가 sender_id 또는 receiver_id와 일치하는 행만 조회 가능.
+
+예: 사용자 A(auth.uid() = '1234')가 로그인하면, sender_id = '1234' 또는 receiver_id = '1234'인 채팅만 볼 수 있음.
+```
+
+### 3. 쓰기 권한 정책 (INSERT)
+
+```jsx
+사용자가 새로운 채팅을 생성할 때, 자신이 sender_id로 설정된 채팅만 추가할 수 있도록 설정.
+```
+
+```jsx
+CREATE POLICY "Allow users to create chats" ON public.chats
+FOR INSERT
+WITH CHECK (auth.uid() = sender_id);
+```
+
+```jsx
+WITH CHECK (auth.uid() = sender_id): 새로운 채팅을 추가할 때 sender_id가 현재 로그인한 사용자의 ID와 같아야 함.
+
+예: 사용자 A(auth.uid() = '1234')가 채팅을 생성하려면 sender_id를 '1234'로 설정해야 함.
+```
+
+### 4. 수정 권한 정책 (UPDATE):
+
+```jsx
+사용자가 자신이 보낸 채팅의 last_message 등을 수정할 수 있도록 설정.
+```
+
+```jsx
+-- 정책을 생성하는 명령어. 'CREATE POLICY'는 데이터베이스 테이블에 특정 보안 규칙을 정의합니다.
+CREATE POLICY "Allow users to update their chats" -- 정책 이름. 사용자가 자신의 채팅을 수정할 수 있도록 허용한다는 의미.
+ON public.chats -- 정책이 적용될 테이블. 'public' 스키마의 'chats' 테이블에 적용.
+FOR UPDATE -- 이 정책이 적용되는 작업. 'UPDATE'는 데이터 수정(예: last_message 변경)을 의미.
+USING ( -- 수정하려는 행을 선택할 때 적용되는 조건. 이 조건이 참인 행만 수정 가능.
+  auth.uid() = sender_id -- 현재 로그인한 사용자의 ID(auth.uid())가 chats 테이블의 sender_id와 일치해야 함.
+)
+WITH CHECK ( -- 수정 후 데이터가 만족해야 하는 조건. 수정된 데이터도 이 조건을 충족해야 함.
+  auth.uid() = sender_id -- 수정 후에도 sender_id가 현재 로그인한 사용자의 ID와 일치해야 함.
+); -- 쿼리 종료.
+```
+
+```jsx
+USING: 수정하려는 행의 sender_id가 현재 사용자와 일치해야 함.
+
+WITH CHECK: 수정 후 데이터도 여전히 sender_id가 현재 사용자와 일치해야 함.
+```
+
+### 5. 삭제 권한 정책 (DELETE)
+
+```jsx
+사용자가 자신이 보낸 채팅만 삭제할 수 있도록 설정.
+```
+
+```jsx
+CREATE POLICY "Allow users to delete their chats" ON public.chats
+FOR DELETE
+USING (auth.uid() = sender_id);
+```
+
+```jsx
+설명: 사용자 A가 sender_id = '1234'인 채팅만 삭제 가능.
+```
+
+### 클라이언트 코드와 연동
+
+```jsx
+Supabase 클라이언트(JavaScript)를 사용해 데이터를 조회하거나 수정할 때, RLS 정책이 자동으로 적용됩니다. 예:
+```
+
+```jsx
+// Supabase JavaScript 클라이언트를 가져옴. '@supabase/supabase-js'는 Supabase와 상호작용하기 위한 라이브러리.
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase 클라이언트를 초기화. 프로젝트 URL과 공개 API 키(anon key)를 사용해 데이터베이스에 연결.
+const supabase = createClient('https://your-project.supabase.co', 'your_anon_key')
+// - 'https://your-project.supabase.co': Supabase 프로젝트의 고유 URL (Supabase 대시보드 > Settings > API에서 확인).
+// - 'your_anon_key': 공개 API 키. 익명 사용자를 위한 키로, 클라이언트에서 사용됨.
+
+// 로그인한 사용자가 자신의 채팅 데이터를 조회하는 비동기 함수.
+async function getMyChats() {
+  // Supabase 쿼리를 실행해 'chats' 테이블에서 데이터를 조회.
+  const { data, error } = await supabase
+    .from('chats') // 조회할 테이블 지정. 여기서는 'chats' 테이블.
+    .select('*') // 모든 컬럼(id, sender_id, receiver_id 등)을 선택.
+    .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`) // OR 조건: sender_id 또는 receiver_id가 userId와 일치하는 행 조회.
+  // - .or(): Supabase의 OR 연산자로, 여러 조건 중 하나라도 참인 데이터를 반환.
+  // - `sender_id.eq.${userId}`: sender_id가 userId와 같은 데이터.
+  // - `receiver_id.eq.${userId}`: receiver_id가 userId와 같은 데이터.
+  // - userId: 현재 로그인한 사용자의 ID로, 외부에서 정의되어야 함(예: auth.uid()).
+
+  // 쿼리 실행 후 에러가 있는지 확인.
+  if (error) {
+    console.error('Error:', error) // 에러 발생 시 콘솔에 출력 (예: RLS 정책 위반, 네트워크 오류 등).
+    return // 에러가 있으면 함수 종료.
+  }
+
+  // 쿼리가 성공하면 조회된 데이터를 콘솔에 출력.
+  console.log('My chats:', data) // data는 조회된 채팅 데이터 배열 (예: [{ id, sender_id, receiver_id, ... }, ...]).
+}
+```
+
+```jsx
+중요: 위 코드에서 userId는 auth.uid()와 일치해야 하며, RLS 정책에 따라 sender_id 또는 receiver_id가 userId인 데이터만 반환됩니다.
+```
+
+# 초보자를 위한 추가 예제
+
+## 예제 1: 프로필 테이블
+
+```jsx
+상황: profiles 테이블에서 사용자가 자신의 프로필만 수정할 수 있도록 설정.
+```
+
+### 스키마 (제공된 스키마 참고)
+
+```jsx
+CREATE TABLE public.profiles (
+  id text NOT NULL,
+  display_name text,
+  username text,
+  email text,
+  bio text,
+  created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at timestamp NOT NULL,
+  CONSTRAINT profiles_pkey PRIMARY KEY (id)
+);
+```
+
+### RLS 설정:
+
+```jsx
+-- RLS 활성화: 'profiles' 테이블에 행 수준 보안(Row Level Security)을 켭니다.
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+-- - ALTER TABLE: 테이블의 속성을 변경하는 SQL 명령.
+-- - public.profiles: 'public' 스키마의 'profiles' 테이블을 대상으로 함.
+-- - ENABLE ROW LEVEL SECURITY: RLS를 활성화하여, 정책이 정의되지 않으면 아무도 테이블 데이터에 접근할 수 없음.
+-- - 효과: RLS가 켜지면, 명시적인 정책이 없으면 모든 조회/수정 요청이 차단되어 보안이 강화됨.
+
+-- 자신의 프로필만 읽기: 사용자가 자신의 프로필 데이터만 조회할 수 있도록 정책을 생성.
+CREATE POLICY "Allow users to read own profile" ON public.profiles
+-- - CREATE POLICY: 새로운 RLS 정책을 생성.
+-- - "Allow users to read own profile": 정책 이름. 사용자가 자신의 프로필만 읽을 수 있음을 나타냄.
+-- - ON public.profiles: 정책이 적용될 테이블 ('profiles').
+FOR SELECT
+-- - FOR SELECT: 이 정책은 데이터 조회(읽기) 작업에 적용됨.
+USING (auth.uid() = id);
+-- - USING: 조회를 허용하는 조건을 정의.
+-- - auth.uid(): Supabase 인증 시스템에서 현재 로그인한 사용자의 고유 ID(UUID)를 반환.
+-- - id: 'profiles' 테이블의 기본 키(primary key) 컬럼.
+-- - auth.uid() = id: 현재 로그인한 사용자의 ID가 'profiles' 테이블의 'id' 컬럼과 일치해야 함.
+-- - 효과: 사용자는 자신의 ID와 일치하는 프로필 데이터만 조회 가능. 예: user1은 id='user1'인 행만 볼 수 있음.
+
+-- 자신의 프로필만 수정: 사용자가 자신의 프로필 데이터만 수정할 수 있도록 정책을 생성.
+CREATE POLICY "Allow users to update own profile" ON public.profiles
+-- - "Allow users to update own profile": 정책 이름. 사용자가 자신의 프로필만 수정할 수 있음을 나타냄.
+FOR UPDATE
+-- - FOR UPDATE: 이 정책은 데이터 수정(예: bio, display_name 변경) 작업에 적용됨.
+USING (auth.uid() = id)
+-- - USING: 수정하려는 행을 선택할 때 적용되는 조건.
+-- - auth.uid() = id: 수정하려는 행의 'id'가 현재 로그인한 사용자의 ID와 일치해야 함.
+WITH CHECK (auth.uid() = id);
+-- - WITH CHECK: 수정 후 데이터가 만족해야 하는 조건.
+-- - auth.uid() = id: 수정된 행의 'id'가 여전히 현재 로그인한 사용자의 ID와 일치해야 함.
+-- - 효과: 사용자는 자신의 ID와 일치하는 프로필만 수정 가능하며, 'id' 값을 다른 사용자의 ID로 변경하는 것은 불가능.
+```
+
+### 클라이언트 코드:
+
+```jsx
+// 사용자의 프로필 bio를 업데이트하는 비동기 함수. newBio는 새로운 bio 값.
+async function updateMyProfile(newBio) {
+  // Supabase 쿼리를 실행해 'profiles' 테이블에서 데이터를 수정.
+  const { data, error } = await supabase
+    .from('profiles') // 수정할 테이블 지정. 여기서는 'profiles' 테이블.
+    .update({ bio: newBio }) // 업데이트할 데이터. bio 컬럼을 newBio 값으로 변경.
+    // - { bio: newBio }: JSON 객체로, 업데이트할 컬럼과 값을 지정.
+    // - newBio: 함수의 매개변수로, 호출자가 전달한 새로운 bio 문자열.
+    .eq('id', userId) // 조건: id 컬럼이 userId와 일치하는 행만 수정.
+  // - .eq(컬럼, 값): 'id' 컬럼 값이 userId와 같은 행을 필터링.
+  // - userId: 현재 로그인한 사용자의 ID로, auth.uid()와 동일해야 함(외부에서 정의됨).
+
+  // 쿼리 실행 후 에러가 있는지 확인.
+  if (error) {
+    console.error('Error:', error) // 에러 발생 시 콘솔에 출력 (예: RLS 정책 위반, 잘못된 userId 등).
+    // - error: Supabase에서 반환한 에러 객체 (예: { code: '42501', message: 'permission denied' }).
+  } else {
+    console.log('Updated profile:', data) // 성공 시 수정된 프로필 데이터를 콘솔에 출력.
+    // - data: 수정된 행의 데이터 배열. Supabase는 업데이트된 행을 반환 (설정에 따라 다를 수 있음).
+  }
+}
+```
+
+## 예제 2: 메시지 테이블
+
+```jsx
+상황: messages 테이블에서 사용자가 자신이 보낸 메시지만 볼 수 있도록 설정.
+```
+
+### 스키마 (제공된 스키마 참고):
+
+```jsx
+CREATE TABLE public.messages (
+  id text NOT NULL,
+  chat_id text NOT NULL,
+  sender_id text NOT NULL,
+  content text NOT NULL,
+  type text NOT NULL DEFAULT 'TEXT'::text,
+  created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT messages_pkey PRIMARY KEY (id),
+  CONSTRAINT messages_chat_id_fkey FOREIGN KEY (chat_id) REFERENCES public.chats(id),
+  CONSTRAINT messages_sender_id_fkey FOREIGN KEY (sender_id) REFERENCES public.profiles(id)
+);
+```
+
+### RLS 설정:
+
+```jsx
+-- RLS 활성화
+ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
+
+-- 자신이 보낸 메시지 읽기
+CREATE POLICY "Allow users to read own messages" ON public.messages
+FOR SELECT
+USING (auth.uid() = sender_id);
+
+-- 메시지 생성
+CREATE POLICY "Allow users to send messages" ON public.messages
+FOR INSERT
+WITH CHECK (auth.uid() = sender_id);
+```
+
+### 클라이언트 코드:
+
+```jsx
+async function sendMessage(chatId, content) {
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({ chat_id: chatId, sender_id: userId, content })
+  if (error) console.error('Error:', error)
+  else console.log('Message sent:', data)
+}
+```
+
+# 오류와 RLS (질문과 연관)
+
+```jsx
+당신의 오류(permission denied for schema public)는 chats 테이블에 접근하려 했지만 RLS 정책 때문에 실패한 것입니다.
+
+질문에서 사용된 쿼리:
+```
+
+```jsx
+GET .../chats?select=*&or=(and(user1_id.eq.<UUID1>,user2_id.eq.<UUID2>),...)
+```
+
+```jsx
+문제 1: user1_id, user2_id는 chats 테이블에 없고, 대신 sender_id, receiver_id를 사용해야 함.
+
+문제 2: RLS 정책이 없거나, auth.uid()가 sender_id 또는 receiver_id와 일치하지 않음.
+```
+
+## 수정된 RLS 정책 예시
+
+```jsx
+-- RLS 활성화
+ALTER TABLE public.chats ENABLE ROW LEVEL SECURITY;
+
+-- 사용자가 자신의 채팅 읽기 허용
+CREATE POLICY "Allow users to read their chats" ON public.chats
+FOR SELECT
+USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
+```
+
+## 수정된 클라이언트 코드
+
+```jsx
+async function getChat(user1Id, user2Id) {
+  const { data, error } = await supabase
+    .from('chats')
+    .select('*')
+    .or(
+      `and(sender_id.eq.${user1Id},receiver_id.eq.${user2Id}),and(sender_id.eq.${user2Id},receiver_id.eq.${user1Id})`
+    )
+    .eq('type', 'PRIVATE') // 스키마에서 기본값이 'PRIVATE'이므로
+    .limit(1)
+  if (error) {
+    console.error('Error:', error)
+    return null
+  }
+  return data
+}
+```
+
+# 초보자를 위한 RLS 설정 팁
+
+## 1. Supabase 대시보드 사용:
+
+```jsx
+SQL 쿼리를 직접 작성하는 대신, Supabase 대시보드의 Authentication → Policies에서 정책을 추가할 수 있습니다.
+
+예: chats 테이블 선택 → "New Policy" → "For SELECT" → 조건 입력: auth.uid() = sender_id OR auth.uid() = receiver_id
+```
+
+## 2. RLS 비활성화로 테스트:
+
+```jsx
+오류를 디버깅하려면 개발 환경에서 RLS를 잠시 꺼보세요
+
+RLS를 끄면 모든 사용자가 테이블에 접근 가능하므로, 오류가 사라지면 RLS 정책이 문제임을 확인할 수 있습니다.
+```
+
+```jsx
+ALTER TABLE public.chats DISABLE ROW LEVEL SECURITY;
+```
+
+## 3. 로그 확인:
+
+```jsx
+Supabase 대시보드의 Logs → API에서 어떤 요청이 실패했는지 확인하세요.
+
+오류 메시지와 함께 요청한 사용자의 auth.uid()를 확인할 수 있습니다.
+```
+
+## 4. 인증 확인:
+
+```jsx
+Supabase 클라이언트로 사용자 인증 상태를 확인:
+```
+
+```jsx
+const {
+  data: { user },
+} = await supabase.auth.getUser()
+console.log('Current user:', user?.id)
+```
+
+# 요약
+
+```jsx
+RLS란: 테이블의 특정 행에 대한 접근을 사용자별로 제한하는 보안 기능.
+
+핵심 문법:
+
+		ALTER TABLE ... ENABLE ROW LEVEL SECURITY
+
+		CREATE POLICY ... FOR SELECT/INSERT/UPDATE/DELETE USING (...)
+
+예제: chats 테이블에서 사용자가 자신과 관련된 채팅만 볼 수 있도록 설정.
+
+오류 해결: 질문의 오류는 chats 테이블의 RLS 정책이 없거나, 잘못된 컬럼(user1_id, user2_id) 사용,
+
+또는 인증 문제로 발생. 위 예시를 따라 RLS 정책을 추가하고 코드를 수정하세요.
+```

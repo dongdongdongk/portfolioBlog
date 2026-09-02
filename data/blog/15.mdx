@@ -1,0 +1,1059 @@
+---
+title: '섹션 15: 사운드 효과 + 더 많은 장면'
+date: '2026-09-02'
+category: '게임 개발/Game Development in JS TS - The Complete Guide (w_'
+tags: ['게임 개발', 'Game Development in JS TS - The Complete Guide (w_']
+draft: false
+summary: ''
+---
+
+# { "PLAYER_LOOSE" 이벤트 처리 }
+
+## 1. EventEmitter 클래스
+
+```jsx
+Phaser.Events.EventEmitter를 상속받아 이벤트를 관리하는 클래스를 만들었다.
+
+이벤트 시스템을 활용하면 게임 내에서
+
+특정 상황이 발생했을 때(예: 플레이어가 체력이 0이 되어 패배함)
+
+다른 곳에서 해당 이벤트를 감지하고 반응할 수 있다.
+```
+
+```jsx
+import Phaser from 'phaser'
+
+class EventEmitter extends Phaser.Events.EventEmitter {
+  constructor() {
+    super()
+  }
+}
+
+export default new EventEmitter()
+```
+
+```jsx
+Phaser.Events.EventEmitter 클래스를 상속받아 새로운 EventEmitter 클래스를 정의함.
+
+생성자에서 super();를 호출하여 Phaser.Events.EventEmitter의 기능을 그대로 가져옴.
+
+new EventEmitter()를 생성하여
+
+이벤트 관리 객체를 export함 → 어디서든 이 객체를 불러와서 이벤트를 발생시키거나 감지할 수 있음.
+```
+
+## 2. 플레이어가 피격되는 로직 (`takesHit` 메서드)
+
+```jsx
+플레이어가 적의 공격을 받았을 때 체력이 줄어들고, 체력이 0이 되면 게임 오버 이벤트를 발생시킨다.
+```
+
+```jsx
+takesHit(source) {
+    if (this.hasBeenHit) {
+        return;
+    }
+
+    this.health -= source.damage || source.properties.damage || 0;
+    if(this.health <= 0) { // EventEmitter.emit("PLAYER_LOOSE")를 호출
+        EventEmitter.emit("PLAYER_LOOSE");
+        return;
+    }
+
+    console.log("player got hit");
+    this.hasBeenHit = true;
+    this.bounceOff(source);
+    const hitAim = this.playDamageTween();
+
+    this.hp.decrease(this.health);
+
+    source.deliversHit && source.deliversHit(this);
+
+    // 일정 시간(800ms) 후 다시 피격 가능하도록 설정
+    this.scene.time.delayedCall(800, () => {
+        this.hasBeenHit = false;
+        hitAim.stop();
+        this.clearTint();
+    });
+}
+
+```
+
+```jsx
+체력이 0 이하가 되면 EventEmitter.emit("PLAYER_LOOSE")를 호출하여 "PLAYER_LOOSE" 이벤트 발생 → 게임이 종료됨.
+```
+
+### `emit`을 사용하는 이유
+
+```jsx
+1. 코드를 더 깔끔하게 관리 가능
+
+		게임 내 여러 곳에서 "게임 오버" 이벤트를 감지할 수 있음.
+
+		예를 들어, UI 업데이트, 배경음악 정지, 결과 창 표시 등을 한 곳에서 관리 가능.
+
+2. 느슨한 결합 (Loose Coupling)
+
+		플레이어가 죽었을 때,
+
+		UI나 사운드 시스템과 직접적으로 연결할 필요 없이 "PLAYER_LOOSE" 이벤트만 발생시키면 됨.
+
+		UI나 사운드 시스템은 "PLAYER_LOOSE" 이벤트를 감지해서 필요한 작업을 수행.
+```
+
+### `emit`과 `on`의 관계
+
+```jsx
+emit("이벤트_이름") → 이벤트 발생
+
+on("이벤트_이름", 함수) → 이벤트 감지 후 실행할 함수 등록
+
+1. 이벤트 발생 (emit)
+
+		EventEmitter.emit("PLAYER_LOOSE");
+
+				"PLAYER_LOOSE"라는 이벤트를 발생시킴.
+
+				이 이벤트를 감지하는 코드가 있다면 실행됨.
+
+
+
+2. 이벤트 감지 (on)
+
+		EventEmitter.on("PLAYER_LOOSE", () => {
+		    alert("You lost! Click OK to restart the game.");
+		});
+
+
+			"PLAYER_LOOSE" 이벤트가 발생하면 콜백 함수 실행.
+
+		  이 경우, 게임 오버 메시지를 띄우는 alert 창이 나타남.
+```
+
+### 언제 이벤트를 사용하고, 언제 직접 호출할까?
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380490/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_15_/image.png)
+
+## `this.createGameEvents()`를 통해 이벤트 시스템을 초기화
+
+```jsx
+create() {
+    this.score = 0;
+    this.hud = new Hud(this, 0, 0).setDepth(1)
+
+    const map = this.createMap();
+    initAnims(this.anims);
+    const layers = this.createLayers(map);
+    const playerZones = this.getPlayerZones(layers.playerZones);
+    const player = this.createPlayer(playerZones.start);
+
+    const enemies = this.createEnemies(layers.enemySpawns, layers.platformsColliders);
+    const collectables = this.createCollectables(layers.collectables);
+
+    this.createPlayerColliders(player, {
+        colliders: {
+            platformsColliders: layers.platformsColliders,
+            projectiles: enemies.getProjectiles(),
+            collectables,
+            traps: layers.traps,
+        },
+    });
+
+
+    this.createEnemyColliders(enemies, {
+        colliders: {
+            platformsColliders: layers.platformsColliders,
+            player,
+        },
+    });
+
+    this.createGameEvents(); // 이벤트 시스템을 초기화
+    this.createEndOfLevel(playerZones.end, player);
+    this.setupFollowupCameraOn(player);
+}
+
+```
+
+```jsx
+게임 시작 시 필요한 요소들을 생성하고 초기화.
+
+맵, 플레이어, 적, 수집 아이템 등을 설정하며, 충돌 처리도 설정한다.
+
+this.createGameEvents()를 통해 이벤트 시스템을 초기화한다.
+```
+
+## 4. **게임 오버 이벤트 처리 (`createGameEvents` 메서드)**
+
+```jsx
+createGameEvents() {
+    EventEmitter.on("PLAYER_LOOSE", () => {
+        alert("You lost! Click OK to restart the game.");
+    });
+}
+```
+
+```jsx
+"PLAYER_LOOSE" 이벤트가 발생하면 게임 오버 메시지를 표시하는 alert 창을 띄운다.
+```
+
+# { 게임 씬 재시작 오류 해결 및 최적화 }
+
+## 1. **문제 발생: 씬을 재시작할 때 오류 발생**
+
+```jsx
+    createGameEvents() {
+        EventEmitter.on("PLAYER_LOOSE", () => {
+            console.log('player loose')
+            this.scene.restart({gameStatus: 'PLAYER_LOOSE'});
+        })
+    }
+```
+
+### 오류 1: "Cannot read property 'onFloor' of undefined”
+
+```jsx
+현상:
+
+		플레이어가 죽으면 씬을 재시작하는데,
+
+		콘솔에서 "Cannot read property 'onFloor' of undefined" 오류가 발생합니다.
+
+원인:
+
+		씬이 재시작될 때 update 함수가 계속 실행되는데,
+
+		이때 이미 플레이어 객체가 삭제되어 body가 존재하지 않음.
+```
+
+```jsx
+해결 방법:
+
+		update 함수에서 객체가 존재하는지 확인한 후 ( !this.body ) 로직을 실행하도록 변경.
+```
+
+```jsx
+update() {
+    if (this.hasBeenHit || this.isSliding || !this.body) {
+        return;
+    }
+}
+```
+
+### 오류 2: "Cannot read property 'velocity' of undefined”
+
+```jsx
+현상:
+
+		Snaky 적이 존재할 때 씬을 재시작하면 "Cannot read property 'velocity' of undefined" 오류 발생.
+
+원인:
+
+		적(Snaky) 객체가 이미 삭제되었음에도 불구하고, update 함수에서 body.velocity를 참조하려고 시도.
+
+
+해결 방법:
+
+		update 함수에서 객체가 활성 상태(active)인지 확인한 후 로직 실행. !this.active
+```
+
+```jsx
+update(time, delta) {
+    super.update(time, delta);
+    if (!this.active) {
+        return;
+    }
+
+    if (this.body.velocity.x > 0) {
+        this.lastDirection = Phaser.Physics.Arcade.FACING_RIGHT;
+    } else {
+        this.lastDirection = Phaser.Physics.Arcade.FACING_LEFT;
+    }
+}
+```
+
+## 2. **게임 씬을 여러 번 재시작하면 실행 속도가 느려지는 문제**
+
+### 현상: 게임을 계속 재시작하면 점점 느려짐
+
+```jsx
+원인:
+씬이 재시작될 때마다 createGameEvents() 함수가 여러 번 실행되며 이벤트가 중복 등록됨.
+
+예를 들어:
+
+1번째 재시작 → 1번 실행
+
+2번째 재시작 → 2번 실행
+
+3번째 재시작 → 4번 실행
+
+4번째 재시작 → 8번 실행
+
+→ 계속 배수로 증가하여 성능 저하 발생.
+
+1. 씬이 시작될 때 createGameEvents() 실행됨
+
+		createGameEvents() 함수에서 "PLAYER_LOOSE" 이벤트를 감지하도록 설정함.
+
+		처음 한 번 실행되므로 이벤트 리스너가 1개 등록됨.
+
+2. 게임 오버 시 this.scene.restart() 실행됨
+
+		씬이 재시작되면서 create() 함수가 다시 실행됨.
+
+		그리고 createGameEvents()도 다시 실행됨.
+
+		"PLAYER_LOOSE" 이벤트에 대한 새로운 리스너가 추가됨.
+
+		기존 리스너는 삭제되지 않음.
+
+		따라서 이제 이벤트가 2번 실행됨.
+
+3. 재시작을 반복하면?
+
+		씬이 재시작될 때마다 createGameEvents()가 실행됨.
+
+		"PLAYER_LOOSE" 이벤트 리스너가 또 추가됨.
+
+		기존 리스너들이 제거되지 않아서 중복 실행이 계속 늘어남.
+
+		실행 횟수: 1 → 2 → 4 → 8 → 16 → 32 ... 이런 식으로 배수 증가.
+```
+
+### ✅ **해결 방법: 중복 이벤트 등록 방지**
+
+```jsx
+씬을 재시작할 때 createGameEvents()가 다시 실행되지 않도록
+
+gameStatus를 체크하여 이미 구독된 이벤트라면 재등록하지 않음.
+```
+
+```jsx
+create(gameStatus) {
+    this.score = 0;
+    this.hud = new Hud(this, 0, 0).setDepth(1);
+
+    const map = this.createMap();
+    initAnims(this.anims);
+    const layers = this.createLayers(map);
+    const playerZones = this.getPlayerZones(layers.playerZones);
+    const player = this.createPlayer(playerZones.start);
+    const enemies = this.createEnemies(layers.enemySpawns, layers.platformsColliders);
+    const collectables = this.createCollectables(layers.collectables);
+
+    this.createPlayerColliders(player, {
+        colliders: {
+            platformsColliders: layers.platformsColliders,
+            projectiles: enemies.getProjectiles(),
+            collectables,
+            traps: layers.traps,
+        },
+    });
+
+    this.createEnemyColliders(enemies, {
+        colliders: {
+            platformsColliders: layers.platformsColliders,
+            player,
+        },
+    });
+
+    this.createEndOfLevel(playerZones.end, player);
+    this.setupFollowupCameraOn(player);
+
+    // ⚠️ 게임이 재시작된 경우, 이벤트 중복 등록 방지
+    if (gameStatus === "PLAYER_LOOSE") {
+        return;
+    }
+
+    this.createGameEvents();
+}
+
+```
+
+```jsx
+gameStatus 를 매개변수로 받고 아래 if 에서 체크
+```
+
+# { 게임에서 화면 밖으로 떨어졌을 때 게임 재시작 구현 }
+
+## 1. **게임 오버 조건 추가**
+
+```jsx
+플레이어가 화면 아래로 떨어지면 게임을 재시작하도록 update() 함수에서 조건을 추가합니다.
+```
+
+### 기존 `update()` 함수에서 추가된 부분
+
+```jsx
+if (this.getBounds().top > this.scene.config.height + 100) {
+  EventEmitter.emit('PLAYER_LOOSE')
+  return
+}
+```
+
+```jsx
+this.getBounds().top : 플레이어의 최상단 좌표를 가져옵니다.
+
+this.scene.config.height + 100 : 화면 높이보다 100px 아래에 있을 경우 게임을 종료합니다.
+
+EventEmitter.emit("PLAYER_LOOSE") : "PLAYER_LOOSE" 이벤트를 발생시켜 게임 재시작을 트리거합니다.
+
+return; : 이후 코드를 실행하지 않도록 함수 종료.
+```
+
+## 2. **높이를 조정하여 자연스러운 게임 오버 처리**
+
+```jsx
+this.getBounds().top > this.scene.config.height + 100
+```
+
+```jsx
++100을 조정하여 플레이어가 완전히 화면 아래로 사라지고 나서 게임을 재시작할 수 있습니다.
+
++200으로 설정하면 더 오래 기다린 후 게임이 종료됩니다
+```
+
+## 3. **최종 코드**
+
+```jsx
+update() {
+    if (this.hasBeenHit || this.isSliding || !this.body) {
+        return;
+    }
+
+    // 화면 아래로 떨어지면 게임 오버 이벤트 발생
+    if (this.getBounds().top > this.scene.config.height + 100) {
+        EventEmitter.emit("PLAYER_LOOSE");
+        return;
+    }
+
+    const { left, right, space } = this.cursors;
+    const isSpaceJustDown = Phaser.Input.Keyboard.JustDown(space);
+    const onFloor = this.body.onFloor();
+
+    if (left.isDown) {
+        this.lastDirection = Phaser.Physics.Arcade.FACING_LEFT;
+        this.setVelocityX(-this.playerSpeed);
+        this.setFlipX(true);
+    } else if (right.isDown) {
+        this.lastDirection = Phaser.Physics.Arcade.FACING_RIGHT;
+        this.setVelocityX(this.playerSpeed);
+        this.setFlipX(false);
+    } else {
+        this.setVelocityX(0);
+    }
+
+    if (isSpaceJustDown && (onFloor || this.jumpCount < this.consecutiveJumps)) {
+        this.setVelocityY(this.jumpSpeed);
+        this.jumpCount++;
+    }
+
+    if (onFloor) {
+        this.jumpCount = 0;
+    }
+
+    if (this.isPlayingAnims("throw") || this.isPlayingAnims("slide")) {
+        return;
+    }
+
+    onFloor
+        ? this.body.velocity.x !== 0
+            ? this.play("run", true)
+            : this.play("idle", true)
+        : this.play("jump", true);
+}
+
+```
+
+# { 배경 이미지 추가하기 }
+
+```jsx
+이 강의에서는 게임에 배경 이미지를 추가하는 방법을 배웠습니다.
+
+배경 이미지를 단순히 한 번만 표시하는 것이 아니라 타일 스프라이트(TileSprite) 를 사용하여
+
+반복적으로 표시하고, 또한 카메라 스크롤과 연동 시켜 자연스럽게 보이도록 설정합니다.
+```
+
+## 1. 배경 이미지 로드하기 (Preload)
+
+```jsx
+게임에서 사용할 배경 이미지를 preload 단계에서 로드해야 합니다.
+
+📌 파일 이름을 간략하게 변경
+
+		강의에서는 "background_03_super_dark.png"을 "bg_spikes_dark.png"로 이름을 변경하여 사용했습니다.
+
+📌 이미지 로드 코드
+
+		this.load.image("bg-spikes-dark", "assets/bg_spikes_dark.png");
+
+
+이렇게 하면 "bg-spikes-dark"라는 키(key)로 이미지를 사용할 수 있습니다.
+```
+
+## 2. Tiled에서 배경용 오브젝트 레이어 추가하기
+
+```jsx
+게임의 배경을 정확한 위치에 배치하기 위해, Tiled 에디터에서 오브젝트 레이어를 새로 추가합니다.
+
+📌 Tiled에서의 설정 과정
+
+		1. 새 오브젝트 레이어 추가:
+
+				이름을 "distance_bg"로 설정 (배경이므로 distance_bg로 명명)
+
+
+		2. 배경 이미지 삽입:
+
+				"bg_spikes_dark.png" 이미지를 가져와 추가
+
+				원하는 위치에 배치
+
+
+		3. 파일 저장
+
+				이제 게임 코드에서 "distance_bg" 레이어에 접근하여 배경을 표시할 수 있습니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380489/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_15_/image_1.png)
+
+## 3. 배경 이미지 표시하기 (TileSprite 사용)
+
+```jsx
+배경을 게임에 표시할 때, 일반적인 이미지(this.add.image)가 아니라 TileSprite를 사용합니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380489/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_15_/image_2.png)
+
+### TileSprite란?
+
+```jsx
+배경처럼 반복적으로 출력해야 하는 이미지에 사용
+
+일반 이미지보다 더 효율적으로 스크롤 효과 적용 가능
+```
+
+### 배경 생성 함수 (`createBG`)
+
+```jsx
+createBG(map) {
+    // 1. "distance_bg"라는 이름의 오브젝트 레이어에서 첫 번째 오브젝트를 가져온다.
+    //    Tiled에서 배경을 추가할 때 distance_bg 레이어에 배경 이미지를 오브젝트로 삽입했기 때문에
+    //    해당 오브젝트의 위치와 크기를 가져와서 Phaser에서 배경으로 활용한다.
+    const bgObject = map.getObjectLayer("distance_bg").objects[0];
+
+    // 2. Phaser의 tileSprite를 이용하여 배경을 생성한다.
+    //    tileSprite는 이미지가 반복되는 구조를 만들 수 있는 스프라이트 객체다.
+    //    우리는 단순한 이미지가 아니라, 화면이 넓어질 때 계속 배경이 이어지는 효과를 원하므로 tileSprite를 사용한다.
+    this.add.tileSprite(
+        bgObject.x,  // 배경의 X 좌표 (Tiled에서 설정한 오브젝트의 X 위치)
+        bgObject.y,  // 배경의 Y 좌표 (Tiled에서 설정한 오브젝트의 Y 위치)
+        this.config.width,  // 배경의 가로 길이 (게임 화면의 전체 너비와 동일하게 설정)
+        bgObject.height,  // 배경의 세로 길이 (Tiled에서 설정한 오브젝트의 높이)
+        "bg-spikes-dark"  // 미리 로드된 배경 이미지의 키 (preload에서 설정한 키값)
+    )
+    .setOrigin(0, 1)   // 원점을 (0,1)로 설정하여 배경의 왼쪽 아래를 기준점으로 삼는다.
+                       // 기본적으로 Phaser의 스프라이트 원점은 (0.5,0.5) 즉, 정중앙이므로
+                       // 배경이 정확한 위치에 배치되도록 조정한다.
+
+    .setDepth(-10)     // 배경이 맨 뒤쪽에 위치하도록 깊이 값을 -10으로 설정.
+                       // Phaser에서는 Depth 값이 클수록 화면의 앞쪽에 배치되고, 작을수록 뒤쪽에 배치됨.
+                       // 즉, 플레이어나 다른 오브젝트보다 배경이 뒤에 있도록 설정한다.
+
+    .setScrollFactor(0, 1); // 배경의 스크롤 속도를 조정한다.
+                            // X축(가로 방향) 스크롤은 0으로 설정하여 배경이 고정된 느낌을 주고,
+                            // Y축(세로 방향) 스크롤은 1로 설정하여 카메라가 위아래로 움직일 때 배경도 같이 움직이도록 한다.
+}
+
+```
+
+### 배경 설정 코드 분석
+
+```jsx
+1. Tiled에서 만든 distance_bg 레이어에서 오브젝트 가져오기
+
+		const bgObject = map.getObjectLayer("distance_bg").objects[0];
+
+
+Tiled에서 추가한 "distance_bg" 오브젝트 레이어에서 첫 번째 오브젝트를 가져옴.
+
+이 오브젝트의 위치(x, y) 및 크기(width, height)를 배경 이미지에 반영.
+```
+
+```jsx
+2. 배경 이미지를 TileSprite로 추가
+
+		this.add.tileSprite(bgObject.x, bgObject.y, this.config.width, bgObject.height, "bg-spikes-dark")
+
+
+TileSprite를 사용하여 배경을 가로로 반복 가능하도록 설정
+
+this.config.width를 사용하여 화면 전체를 덮도록 배경을 확장
+
+bgObject.height를 사용하여 Tiled에서 지정한 높이를 반영
+```
+
+```jsx
+3. 배경의 원점(origin) 설정
+
+		.setOrigin(0, 1)
+
+
+setOrigin(0,1) → 왼쪽 아래(좌측 하단) 를 기준점으로 설정
+
+이렇게 하면 배경이 y 좌표를 기준으로 정렬됨
+```
+
+```jsx
+4. 배경을 맨 뒤에 배치
+
+		.setDepth(-10)
+
+깊이(depth) 값을 -10으로 설정하여, 게임의 다른 요소들보다 뒤쪽에 배치
+```
+
+```jsx
+5. 스크롤 동작 설정
+
+		.setScrollFactor(0, 1);
+
+
+setScrollFactor(0,1) →
+
+		X축 스크롤 비활성화(0): 배경이 가로로 움직이지 않음
+
+		Y축 스크롤 활성화(1): 플레이어가 점프하면 배경도 같이 움직임
+```
+
+## 4. 배경을 생성하는 함수 실행하기
+
+```jsx
+배경을 표시하려면 create() 함수에서 createBG(map)을 호출해야 합니다.
+
+이렇게 하면 map 정보를 이용해 배경이 표시됩니다.
+```
+
+### Play.js 파일에서 `createBG` 실행
+
+```jsx
+this.createBG(map)
+```
+
+# { 하늘 배경 및 백 그라운트 추가 타일맵을 설정하는 과정 }
+
+```jsx
+강의에서는 Phaser를 사용하여 게임의 배경을 설정하는 방법을 설명하고 있습니다.
+
+특히, Tiled라는 타일맵 편집기를 사용하여 맵을 생성하고, Phaser에서 불러오는 과정까지 다룹니다.
+```
+
+## 하늘 추가
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380489/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_15_/image_3.png)
+
+### 이미지 로드 (Preload Scene)
+
+```jsx
+class Preload extends Phaser.Scene {
+  constructor() {
+    super('PreloadScene')
+  }
+
+  preload() {
+    // 타일맵 로드
+    this.load.tilemapTiledJSON('map', './assets/crystal_world_map.json')
+
+    // 타일 이미지 로드
+    this.load.image('tiles-1', './assets/main_lev_build_1.png')
+    this.load.image('tiles-2', './assets/main_lev_build_2.png')
+
+    // 배경 이미지 로드
+    this.load.image('bg-spikes-dark', './assets/bg_spikes_dark.png')
+    this.load.image('sky-play', './assets/sky_play.png')
+    this.load.image('bg_spikes_tileset', './assets/bg_spikes_tileset.png')
+  }
+}
+```
+
+```jsx
+this.load.image("sky-play", "./assets/sky_play.png");
+
+sky_play.png 이미지를 "sky-play"라는 키로 로드했습니다.
+
+나중에 이 키를 사용하여 배경을 추가할 수 있습니다.
+```
+
+### 배경을 추가하는 함수 (`createBG`)
+
+```jsx
+createBG(map) {
+    // 먼 배경 추가
+    const bgObject = map.getObjectLayer("distance_bg").objects[0];
+    this.add.tileSprite(bgObject.x, bgObject.y, this.config.width, bgObject.height, "bg-spikes-dark")
+        .setOrigin(0, 1)  // 왼쪽 아래를 기준점으로 설정
+        .setDepth(-10)     // 다른 요소보다 뒤에 배치
+        .setScrollFactor(0, 1);  // X축 고정, Y축 스크롤 반영
+
+    // 하늘 배경 추가
+    this.add.tileSprite(0, 0, this.config.width, 180, "sky-play")
+        .setOrigin(0, 0)  // 왼쪽 위를 기준점으로 설정
+        .setDepth(-11)     // 더욱 뒤쪽으로 배치
+        .setScale(1.1)    // 크기 확대 (공백 채우기)
+        .setScrollFactor(0, 1);  // X축 고정, Y축 스크롤 반영
+}
+```
+
+```jsx
+bg-spikes-dark (먼 배경):
+
+		tileSprite를 사용하여 배경을 추가합니다.
+
+		setOrigin(0, 1): 좌표 (0, 1)은 왼쪽 아래를 기준점으로 설정한다는 의미입니다.
+
+		setDepth(-10): 다른 게임 요소들보다 뒤에 배치됩니다.
+
+		setScrollFactor(0, 1): X축 이동 없음, Y축 스크롤 적용 (멀리 있는 배경이 고정되도록 설정).
+
+sky-play (하늘 배경):
+
+		하늘 배경을 추가합니다.
+
+		setOrigin(0, 0): 좌표 (0, 0)은 왼쪽 위를 기준점으로 설정.
+
+		setDepth(-11): 더 먼 배경이므로 더욱 뒤쪽에 배치.
+
+		setScale(1.1): 원본보다 조금 더 크게 표시하여 빈 공간을 채웁니다.
+
+		setScrollFactor(0, 1): 하늘도 고정되도록 설정.
+```
+
+### 배경 이미지 크기 조정
+
+```jsx
+배경이 화면을 완전히 덮도록 크기를 조정할 수도 있습니다
+
+180 * 2 → 높이를 2배로 설정하여 공백을 채움.
+
+setScale(1.1) → 배경을 약간 확대하여 더 자연스럽게 표시.
+```
+
+```jsx
+this.add.tileSprite(0, 0, this.config.width, 180 * 2, 'sky-play').setScale(1.1)
+```
+
+## `bg_spikes_tileset` 구현
+
+```jsx
+해당 이미지는 배경을 채우는 패턴 형태의 이미지
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380489/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_15_/image_4.png)
+
+### 타일셋 이미지 준비
+
+```jsx
+assets 폴더 내에 bg_spikes_tileset.png 이미지가 있어야 합니다.
+
+해당 이미지는 배경을 채우는 패턴 형태의 이미지로, 특정 색상이나 텍스처로 구성될 수 있습니다.
+```
+
+### Tileset의 두 가지 유형: Based on Tileset Image vs. Collection of Images
+
+```jsx
+Tiled에서 **타일셋(Tileset)**을 추가할 때 두 가지 옵션이 있습니다:
+
+Based on Tileset Image (타일셋 이미지 기반)
+
+Collection of Images (개별 이미지 모음)
+
+1. Based on Tileset Image (타일셋 이미지 기반)
+		🔹 하나의 큰 이미지(Sprite Sheet)에서 타일을 잘라 사용하는 방식
+		🔹 보통 정해진 크기의 타일들(예: 16x16, 32x32) 로 구성됨
+		🔹 격자(Grid) 형태로 배치되어 있어야 함
+		🔹 빠른 렌더링과 성능 최적화에 유리
+
+
+2. Collection of Images (개별 이미지 모음)
+		🔹 여러 개의 개별 이미지를 모아서 타일셋을 구성하는 방식
+		🔹 각 타일이 서로 다른 크기를 가질 수 있음
+		🔹 격자(Grid) 형태가 아닌 비정형적인 배치 가능
+		🔹 개별 오브젝트나 애니메이션 타일을 사용할 때 유용
+
+
+
+* Based on Tileset Image로 추가 했어야 했는데 다른걸로 해서 고생 했다..........
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380489/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_15_/image_5.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380490/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_15_/image_6.png)
+
+### Tiled에서 타일셋 추가하기
+
+```jsx
+Tiled를 실행하여 기존 crystal_world_map.json 맵을 엽니다.
+
+Tilesets 패널에서 새 타일셋 추가 버튼을 클릭합니다.
+
+Based on Tileset Image 옵션을 선택합니다.
+
+Name: bg_spikes_tileset (이름 설정)
+
+Tile Width: 16px, Tile Height: 16px (타일 크기 설정)
+
+Image: assets/bg_spikes_tileset.png (이미지 선택)
+
+확인(OK) 버튼을 눌러 타일셋을 추가합니다.
+```
+
+### 타일셋을 맵에 적용하기
+
+```jsx
+Layers 패널에서 새 타일 레이어(Distance Layer) 를 추가합니다.
+
+해당 레이어를 선택한 후, bg_spikes_tileset의 타일을 맵의 원하는 영역에 배치합니다.
+
+파일 → 저장(Ctrl+S)을 눌러 변경 사항을 저장합니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380490/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_15_/image_7.png)
+
+## **Phaser에서 `bg_spikes_tileset`을 로드하고 적용하기**
+
+### (1) `PreloadScene`에서 타일셋 로드하기
+
+```jsx
+this.load.image("bg_spikes_tileset", "./assets/bg_spikes_tileset.png");
+
+이 코드를 추가하면 bg_spikes_tileset을 Phaser가 사용할 수 있도록 메모리에 로드합니다.
+```
+
+```jsx
+class Preload extends Phaser.Scene {
+  constructor() {
+    super('PreloadScene')
+  }
+
+  preload() {
+    // 기존 맵 로드
+    this.load.tilemapTiledJSON('map', './assets/crystal_world_map.json')
+
+    // 타일셋 이미지 로드
+    this.load.image('tiles-1', './assets/main_lev_build_1.png')
+    this.load.image('tiles-2', './assets/main_lev_build_2.png')
+
+    // 배경 관련 타일셋 추가
+    this.load.image('bg-spikes-dark', './assets/bg_spikes_dark.png')
+    this.load.image('sky-play', './assets/sky_play.png')
+    this.load.image('bg_spikes_tileset', './assets/bg_spikes_tileset.png') // 추가된 타일셋
+  }
+}
+```
+
+### (2) `PlayScene`에서 타일셋 추가 및 배경 생성
+
+```jsx
+map.addTilesetImage("bg_spikes_tileset", "bg_spikes_tileset");
+
+Tiled에서 설정한 타일셋 이름과 Phaser에서 로드한 이미지 키를 연결합니다.
+```
+
+```jsx
+createMap() {
+    // 맵 데이터 로드
+    const map = this.make.tilemap({ key: "map" });
+
+    // 기존 타일셋 추가
+    map.addTilesetImage("main_lev_build_1", "tiles-1");
+
+    // bg_spikes_tileset 추가
+    console.log("All tilesets:", map.tilesets);
+    console.log("Finding tileset:", map.getTileset("bg_spikes_tileset"));
+    map.addTilesetImage("bg_spikes_tileset", "bg_spikes_tileset");
+
+    return map;
+}
+
+```
+
+### (3) 타일셋을 이용해 레이어 추가 및 배경 생성
+
+```jsx
+createLayers(map) {
+    const tileset = map.getTileset("main_lev_build_1");
+    const tilesetBg = map.getTileset("bg_spikes_tileset"); // 배경 타일셋 불러오기
+
+    // 배경 레이어 생성 (setDepth를 낮춰서 배경으로 설정)
+    map.createStaticLayer("distance", tilesetBg).setDepth(-12);
+
+    // 기존 레이어들 추가
+    const platformsColliders = map.createStaticLayer("platforms_colliders", tileset);
+    const environment = map.createStaticLayer("environment", tileset);
+    const platforms = map.createStaticLayer("platforms", tileset);
+
+    const playerZones = map.getObjectLayer("player_zones");
+    const enemySpawns = map.getObjectLayer("enemy_spawns");
+    const collectables = map.getObjectLayer("collectables");
+
+    const traps = map.createStaticLayer("traps", tileset);
+    traps.setCollisionByExclusion(-1, true);
+    platformsColliders.setCollisionByExclusion(-1, true);
+
+    return { environment, platforms, platformsColliders, playerZones, enemySpawns, collectables, traps };
+}
+
+```
+
+```jsx
+map.createStaticLayer("distance", tilesetBg).setDepth(-12);
+
+이 부분에서 distance 레이어를 생성하여 bg_spikes_tileset을 사용합니다.
+
+📌 setDepth(-12) : 다른 타일셋보다 더 뒤쪽에 배치하여 배경처럼 보이게 설정합니다.
+```
+
+# { 패럴랙스(Parallax) 효과 구현하기 }
+
+```jsx
+이번 강의에서는 게임의 배경을 더 생동감 있게 보이도록 하는 패럴랙스 효과(Parallax Effect) 를 구현할 것입니다.
+
+패럴랙스 효과는 배경이 플레이어보다 더 천천히 움직여서 깊이감을 주는 기술입니다.
+
+이 기능을 추가하면 게임의 시각적 경험이 훨씬 더 풍부해질 것입니다.
+```
+
+## 1. 패럴랙스 효과란?
+
+```jsx
+패럴랙스 효과란, 카메라(또는 플레이어)가 이동할 때 배경이 다른 속도로 움직이도록 하는 기술 입니다.
+
+일반적으로 전경(Foreground)은 빠르게, 배경(Background)은 느리게 움직이게 합니다.
+
+이렇게 하면 원근감이 생기고 게임의 깊이감이 증가합니다.
+
+예를 들어, 실제로 우리가 창밖을 보면서 움직일 때 가까운 사물은 빠르게 지나가고
+
+먼 배경(하늘이나 산)은 천천히 움직이는 것과 같은 원리입니다.
+```
+
+## 2. 기존 코드에서 패럴랙스 효과 적용
+
+```jsx
+Phaser에서는 tileSprite를 사용하여 반복되는 배경을 쉽게 만들 수 있습니다.
+
+우리는 update() 함수에서 tileSprite.tilePositionX 값을 조정하여 패럴랙스 효과를 적용할 것입니다.
+```
+
+## 3. 배경 이미지 생성하기 (`createBG` 함수)
+
+```jsx
+우선, 배경 이미지를 생성하는 함수를 살펴보겠습니다.
+```
+
+```jsx
+createBG(map) {
+    const bgObject = map.getObjectLayer("distance_bg").objects[0];
+
+    // 가시 이미지 (Spikes Image) - 배경 중간 부분
+    this.spikesImage = this.add.tileSprite(
+        bgObject.x, bgObject.y,
+        this.config.width, bgObject.height,
+        "bg-spikes-dark"
+    )
+    .setOrigin(0, 1)   // 왼쪽 하단을 기준점으로 설정
+    .setDepth(-10)     // 깊이 값 설정 (앞쪽 요소보다 뒤에 배치)
+    .setScrollFactor(0, 1);  // 카메라 움직임에 영향을 주지 않음
+
+    // 하늘 이미지 (Sky Image) - 가장 뒤쪽
+    this.skyImage = this.add.tileSprite(
+        0, 0,
+        this.config.width, 180,
+        "sky-play"
+    )
+    .setOrigin(0, 0)   // 왼쪽 상단을 기준점으로 설정
+    .setDepth(-11)     // 깊이 값 설정 (스파이크보다 더 뒤에 배치)
+    .setScale(1.1)     // 이미지 크기 확대
+    .setScrollFactor(0, 1);  // 카메라 움직임에 영향을 주지 않음
+}
+
+```
+
+## 4. 배경 이미지 움직이게 하기 (`update` 함수)
+
+```jsx
+배경을 움직이려면 update() 함수에서 tilePositionX 값을 조정해야 합니다.
+```
+
+```jsx
+update() {
+    // 스파이크 이미지의 X 좌표를 카메라 이동값 * 0.3 만큼 이동
+    this.spikesImage.tilePositionX = this.cameras.main.scrollX * 0.3;
+
+    // 하늘 이미지의 X 좌표를 카메라 이동값 * 0.1 만큼 이동
+    this.skyImage.tilePositionX = this.cameras.main.scrollX * 0.1;
+}
+```
+
+### tilePositionX란?
+
+```jsx
+tilePositionX는 배경 이미지가 얼마나 왼쪽 또는 오른쪽으로 이동하는지를 결정하는 값이야.
+
+Phaser에서 tilePositionX를 변경하면 배경이 움직이는 것처럼 보이게 할 수 있어
+
+즉
+
+this.spikesImage.tilePositionX를 this.cameras.main.scrollX와 같게 하면 배경이 플레이어와 같은 속도로 움직여 패럴랙스 효과가 없어져.
+
+하지만 this.cameras.main.scrollX * 0.3처럼 0.3을 곱해주면 배경이 30% 속도로 움직이면서 더
+
+느리게 보여서 깊이감이 생겨! 숫자를 작게 할수록 배경이 더 천천히 움직여 멀리 있는 것처럼 보이게 만들 수 있어
+```
+
+### 어떻게 동작하나요?
+
+```jsx
+this.cameras.main.scrollX → 현재 카메라의 X 위치
+
+이를 특정 배율(0.3 또는 0.1)로 곱해서 tilePositionX 값으로 설정
+
+결과적으로, 카메라가 오른쪽으로 이동하면 배경도 천천히 오른쪽으로 이동하게 됨
+
+이 코드는 플레이어가 움직일 때 배경이 자연스럽게 따라오도록 만드는 역할을 합니다.
+
+this.cameras.main.scrollX는 카메라가 얼마나 이동했는지를 나타내는데,
+
+이 값을 그대로 사용하면 배경이 플레이어와 같은 속도로 움직여서 입체감이 사라집니다.
+
+그래서 배경마다 곱하는 숫자를 다르게 해서 이동 속도를 조절합니다.
+
+예를 들어, this.spikesImage.tilePositionX = this.cameras.main.scrollX * 0.3;은
+
+스파이크 배경이 카메라 이동 속도의 30% 속도로 움직이도록 해서 플레이어보다 천천히 움직이게 합니다.
+
+마찬가지로 this.skyImage.tilePositionX = this.cameras.main.scrollX * 0.1;은 하늘 배경이 10% 속도로 더 천천히 움직이도록 해서
+
+멀리 있는 배경처럼 보이게 합니다.
+
+이렇게 하면 플레이어가 앞으로 갈 때 배경이 천천히 따라와서 깊이감 있는 화면 효과(패럴랙스 효과)가 만들어집니다!
+```
+
+## 5. 패럴랙스 효과가 적용되는 모습
+
+```jsx
+✅ 패럴랙스 없이 (잘못된 예)
+
+만약 tilePositionX = this.cameras.main.scrollX; 처럼 그대로 적용하면 배경이 플레이어와 같은 속도로 이동합니다.
+
+이 경우 배경과 플레이어가 따로 움직이는 효과가 전혀 없어집니다.
+
+✅ 패럴랙스 적용 후 (올바른 예)
+
+spikesImage.tilePositionX = this.cameras.main.scrollX * 0.3;
+
+skyImage.tilePositionX = this.cameras.main.scrollX * 0.1;
+
+이렇게 하면 배경이 느리게 이동하면서 자연스러운 깊이감이 생깁니다!
+```

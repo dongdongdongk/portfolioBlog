@@ -1,0 +1,304 @@
+---
+title: '오라클 CONNECT BY'
+date: '2026-09-02'
+category: '백엔드/Database'
+tags: ['백엔드', 'Database']
+draft: false
+summary: ''
+---
+
+# 개념(계층형 구조)
+
+```sql
+테이블에 계층형 구조 즉, 수직적 구조가 존재할 때 이를 조회하기 위한 쿼리이다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380958/notion-blog/_/Database/SQL_/_/_CONNECT_BY/Untitled.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380955/notion-blog/_/Database/SQL_/_/_CONNECT_BY/Untitled_1.png)
+
+```sql
+회사'는 최상위계층이고, 회사를 중심으로 개발부, 경영지원부, 영업부 세 부서로 나뉜다.
+
+계속해서 부서를 중심으로 하위 계층이 생성되어 있다고 가정하자.
+
+이를 테이블로 나타내면 아래와 같다.
+
+이런 구조를 "계층형 구조" 라고 한다
+```
+
+# CONNECT BY 기본 문법
+
+```java
+
+START WITH : 트리 구조의 최상위 행을 지정합니다.
+
+CONNECT BY : 부모, 자식의 관계를 지정합니다.
+
+PRIOR : CONNECT BY 절에서 부모-자식 관계를 정의하는 데 사용
+
+CONNECT BY PRIOR 자식 컬럼 = 부모 컬럼 : 부모 → 자식 순방향 전개
+
+CONNECT BY PRIOR 부모 컬럼 = 자식 컬럼 : 자식 → 부모 역방향 전개
+
+ORDER SIBLINGS : 계층형 쿼리에서 정렬을 수행합니다.
+
+CONNECT BY LEVEL: LEVEL을 사용하여 계층 쿼리의 레벨을 정의하는 데 사용
+```
+
+# 사용법
+
+## **START WITH**
+
+```sql
+- 계층의 루트로 사용될 행을 지정한다.
+
+- 서브 쿼리를 사용할 수 있다.
+
+- 어떤 레코드를 최상위 레코드로 정할지 결정한다.
+```
+
+```sql
+SELECT *
+  FROM EMP_TB
+ START WITH 부서번호 IS NULL;
+
+부서번호가 NULL인 '회사'를 최상위 계층으로 정할 것이기 때문에 이렇게 코드가 짜여지게 된다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380955/notion-blog/_/Database/SQL_/_/_CONNECT_BY/Untitled_1.png)
+
+## **CONNECT BY**
+
+```sql
+- 연결고리를 만든다.
+
+- PRIOR 연산자로 계층구조를 표현할 수 있다.
+
+- 서브쿼리를 사용할 수 없다.
+```
+
+```sql
+앞서 START WITH을 통해 최상위 행을 가져왔다.
+
+이제 최상위 행을 관리자로 갖는 다음 계층의 데이터를 가져와야한다.
+
+최상위 행인 '회사' 데이터를 기준으로 생각하자.
+
+'회사'데이터의 '부서 번호'가 '상위 부서 번호'와 일치하는 데이터를 가져오면 된다.
+
+따라서,
+
+CONNECT BY PRIOR 부서번호 = 상위부서번호
+
+이렇게 표현할 수 있다.
+
+만약, 반대로 PRIOR를 반대로 선언하면 어떻게 될까?
+
+CONNECT BY PRIOR '상위부서번호' = '부서번호'
+
+이렇게 선언하게 되면 '회사'데이터의 상위부서번호가 NULL 값이고,
+
+NULL값을 부서번호로 갖는 데이터는 없기 때문에 출력결과가 나오지 않게 된다.
+
+***CONNECT BY NOCYCLE PRIOR: NOCYCLE파라미터를 이용하여 무한 루프 방지
+
+```
+
+## **LEVEL**
+
+```sql
+- 계층 구조 쿼리에서 수행 결과의 Depth를 표현하는 의사컬럼.
+
+무슨 뜻이냐면
+
+**현재 행이 계층의 몇번째 레벨인지 표시해주는 값**이라는거다.
+
+또 계층형 쿼리에서만 존재하는 **모조 컬럼** 이다.
+
+최상위 계층이 1이고 그 아래로 2,3,4,5... 이어진다.
+```
+
+```sql
+SELECT 부서번호, LEVEL, LPAD(' ' , 4*(LEVEL-1)) || 부서이름 AS CONNECT
+  FROM EMP_TB
+START WITH 상위번호 IS NULL
+ CONNECT BY PRIOR 부서번호 = 상위부서번호;
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380955/notion-blog/_/Database/SQL_/_/_CONNECT_BY/Untitled_2.png)
+
+# 실습
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380957/notion-blog/_/Database/SQL_/_/_CONNECT_BY/Untitled_3.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380957/notion-blog/_/Database/SQL_/_/_CONNECT_BY/Untitled_4.png)
+
+```sql
+최종 완성형태다
+```
+
+## 1) 먼저 대상이 되는 리스트를 결정합니다.
+
+```sql
+우리는 EMP 전체에 대해서 계층형쿼리를 작성할 것이기 때문에 WHERE 조건절 없이 쿼리를 작성해 줍니다.
+```
+
+```sql
+SELECT *
+  FROM EMP
+```
+
+## 2) 최초 시작행을 정합니다.
+
+```sql
+START WITH라는 명령어를 사용하면 됩니다.
+
+우리는 관리자가 없는(최상위 관리자)부터 시작할 것이기때문에
+
+'MGR IS NULL'인 행을 시작점으로 합니다.
+```
+
+```sql
+SELECT *
+  FROM EMP
+ START WITH MGR IS NULL
+```
+
+```sql
+이 쿼리는 MGR이 NULL인 KING을 시작행으로 가져옵니다.
+
+단, 이 쿼리는 실행되지 않습니다.
+
+CONNECT BY 절이 필수절이기 때문입니다.
+
+의외로 START WITH 절은 없어도 됩니다.
+```
+
+## 3)최초행 이후 다음행을 어떤 조건으로 가져올 것인지를 정합니다.
+
+```sql
+CONNECT BY 절을 이용하면 됩니다.
+```
+
+```sql
+SELECT EMPNO, ENAME, MGR
+  FROM EMP
+ START WITH MGR IS NULL
+CONNECT BY PRIOR EMPNO = MGR
+```
+
+```java
+CONNECT BY PRIOR EMPNO = MGR
+
+이 절은 이전행의 EMPNO와 현재행의 MGR이 같은 행을 가져오라는 뜻입니다.
+
+
+
+이렇게 해서 쿼리를 실행해보면 아래와 같은 결과가 나옵니다.
+
+LEVEL은 CONNECT BY 절을 쓰면 오라클이 제공해주는 컬럼입니다.
+
+LEVEL 1이 제일 상위값입니다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380957/notion-blog/_/Database/SQL_/_/_CONNECT_BY/Untitled_5.png)
+
+```java
+결과를 보면
+
+첫행은 START WITH 절로 MGR 값이 NULL인 KING을 가져왔고,
+
+두번째행은 1번행의 EMPNO값 7839와 MRG값이 같은 JONES 값을 가져왔습니다.
+
+세번째행은 2번째행의 EMPNO값 7566과 MGR값이 같은 SCOTT을 가져왔습니다.
+
+이런식으로 마지막 값까지 찾은 후 더 이상 하위계층이 없으면 상위로 올라가서 하위계층값을 찾습니다.
+
+이것을 최종적으로 모든 행이 찾아질때까지 반복합니다.
+
+
+
+위 결과에 대해 LPAD등을 이용해 약간만 작업을 해주면 최종결과를 얻을 수 있습니다.
+```
+
+```java
+SELECT LPAD(' ',(LEVEL-1)*5)||ENAME   // 레벨 -1 을 하여서 ex) 레벨 2 이면 2-1 = 1 * 5 를 하여서 왼쪽에 공백이 5칸 생긴다.
+   FROM EMP
+  START WITH MGR IS NULL
+CONNECT BY PRIOR EMPNO = MGR
+```
+
+```java
+레벨에 따라 들여쓰기를 한 쿼리입니다.
+
+1레벨이면 좌측에 0개의 빈공백이 생성되고
+
+2레벨이면 좌측에 5개,
+
+3레벨이면 좌측에 10개의 빈공백이 생성됩니다.
+
+
+
+
+
+위 내용을 트리로 구성해보면 아래와 같습니다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380957/notion-blog/_/Database/SQL_/_/_CONNECT_BY/Untitled_6.png)
+
+```java
+최하위단까지 찾아가면 상위로 올라가서 하위단을 찾아갑니다.
+
+ADAMS를 찾은 후 SCOTT으로 이동하여 하위계층이 있는 지 찾아봅니다.
+
+SCOTT에게 더 이상 하위계층이 없으면, JONES로 이동하여 하위단이 있는지 찾아봅니다.
+
+FORD가 발견되었고, 하위단 SMITH까지 찾아갑니다.
+
+위의 방식을 모든 대상을 찾을때까지 계속합니다.
+
+
+
+
+
+마지막으로 정렬에 대해 말씀드리겠습니다.
+
+CONNECT BY 쿼리에 아래와 같이 ORDER BY를 적용해 보겠습니다.
+```
+
+```java
+SELECT LPAD(' ',(LEVEL-1)*5)||ENAME AS CATEGORY
+   FROM EMP
+  START WITH MGR IS NULL
+CONNECT BY PRIOR EMPNO = MGR
+ORDER BY ENAME
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380957/notion-blog/_/Database/SQL_/_/_CONNECT_BY/Untitled_7.png)
+
+```java
+생각과 전혀 다른 결과입니다.
+
+계층별로 정렬을 하기 위해서는 SIBLINGS 라는 명령어를 사용하면 됩니다.
+
+참고로 SIBLING은 '형제'라는 뜻으로, 형제 레벨끼리 정렬을 하라는 의미입니다.
+
+쿼리를 바꿔보면
+```
+
+```java
+SELECT LPAD(' ',(LEVEL-1)*5)||ENAME AS CATEGORY
+   FROM EMP
+  START WITH MGR IS NULL
+CONNECT BY PRIOR EMPNO = MGR
+ORDER SIBLINGS BY ENAME
+
+* ORDER BY 사이에 SIBLINGS를 넣어줍니다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380958/notion-blog/_/Database/SQL_/_/_CONNECT_BY/Untitled_8.png)
+
+```java
+같은 레벨끼리 ORDER BY가 된것을 확인할 수 있습니다.
+```

@@ -1,0 +1,130 @@
+---
+title: '절차적 충돌 사운드 시스템 기획서'
+date: '2026-09-02'
+category: '기타, 사용 적음/기획서'
+tags: ['기타, 사용 적음', '기획서']
+draft: false
+summary: ''
+---
+
+# 🎧 절차적 충돌 사운드 시스템 기획서
+
+## 1. 🎯 목적
+
+게임 내에서 서로 다른 재질과 질량을 가진 오브젝트들이 충돌할 때,
+
+현실감 있고 다이내믹한 사운드를 **자동으로 생성**하여 몰입감을 극대화하는 시스템.
+
+- **목표:** 사운드 파일 폭발 방지, 유지보수 용이, 실시간 동적 사운드 구현
+- **응용 가능성:** 나무, 금속, 돌, 유리 등 다양한 오브젝트 충돌, 발소리, 총격 등 확장 가능
+
+---
+
+## 2. 🧩 핵심 아이디어
+
+- **기본 개념:** “두 물체 재질 각각의 사운드 → 실시간 블렌딩”
+- **이점:**
+  - 경우의 수 폭발 방지 (모든 조합 미리 생성 불필요)
+  - 질량·충돌 강도·재질 특성에 따라 자연스러운 소리 생성
+  - Wwise의 RTPC, Switch, Blend Container로 구현 가능
+
+---
+
+## 3. ⚙️ 구성 요소
+
+### 3-1. 재질(Material) 시스템
+
+| 재질  | 특징                   | 예시 오브젝트     | 흡수율 (0~1) |
+| ----- | ---------------------- | ----------------- | ------------ |
+| Wood  | 둔탁, 중저음           | 나무 상자, 문     | 0.4          |
+| Metal | 날카로움, 고음         | 금속 상자, 파이프 | 0.1          |
+| Stone | 묵직, 저음             | 바위, 콘크리트    | 0.3          |
+| Soil  | 부드럽게 흡수          | 흙, 모래          | 0.8          |
+| Glass | 높은 피치, 깨지는 소리 | 유리, 병          | 0.2          |
+
+---
+
+### 3-2. 물리 데이터 처리
+
+- **Mass**: 오브젝트 질량 (kg)
+- **Velocity**: 충돌 상대 속도 (m/s)
+- **ImpactForce**: 충돌 강도 계산 → `(mass * velocity)`
+- **Absorption**: 재질별 충격 흡수율 (0~1)
+
+---
+
+### 3-3. 사운드 비율 계산
+
+- 두 재질이 충돌했을 때, 각 사운드의 볼륨 비율을 **물리 기반 공식으로 자동 계산**
+
+```
+MaterialAWeight = (MassA / (MassA + MassB)) * (1 - AbsorptionB)
+MaterialBWeight = (MassB / (MassA + MassB)) * (1 - AbsorptionA)
+
+```
+
+- **예시:**
+  | 상황 | MaterialAWeight | MaterialBWeight | 최종 느낌 |
+  | -------------------- | --------------- | --------------- | ----------------- |
+  | 나무(가벼움) vs 흙 | 0.02 | 0.6 | 둔탁하고 부드러움 |
+  | 나무(무거움) vs 나무 | 0.4 | 0.2 | 묵직한 울림 |
+  | 철(가벼움) vs 돌 | 0.013 | 0.88 | 날카롭고 단단 |
+
+---
+
+## 4. 🔊 사운드 구현 흐름 (게임 엔진 + Wwise)
+
+1. **충돌 이벤트 감지**
+   - 엔진: `OnCollisionEnter` 또는 `Impact`
+   - 속도, 질량, 재질 정보 수집
+2. **물리 기반 가중치 계산**
+   - 공식에 따라 MaterialA / MaterialB 비율 결정
+3. **Wwise로 전달**
+
+```csharp
+AkSoundEngine.SetSwitch("MaterialA", "Wood", gameObject);
+AkSoundEngine.SetSwitch("MaterialB", "Soil", gameObject);
+AkSoundEngine.SetRTPCValue("MaterialA_Weight", weightA * 100, gameObject);
+AkSoundEngine.SetRTPCValue("MaterialB_Weight", weightB * 100, gameObject);
+AkSoundEngine.PostEvent("Play_Collision", gameObject);
+
+```
+
+1. **Wwise 내부 처리**
+
+- **Switch Container**: 재질별 Base Sound 선택
+- **Blend Container**: MaterialA/MaterialB 소리 볼륨 RTPC로 조절
+- **Random Container**: 반복감 제거
+- **Effect**: 공간감, 리버브, 피치 조정
+
+1. **최종 출력**
+
+- 두 재질의 특성을 반영한 자연스러운 충돌음 재생
+- 충돌 강도, 질량, 흡수율, 속도 등 모든 물리적 요소 반영
+
+---
+
+## 5. 📊 예시 시나리오
+
+| 상황                 | 재질1 | 재질2 | 충돌 강도 | 최종 사운드 느낌 |
+| -------------------- | ----- | ----- | --------- | ---------------- |
+| 나무(가벼움) vs 흙   | Wood  | Soil  | 약함      | 부드럽고 둔탁    |
+| 나무(무거움) vs 나무 | Wood  | Wood  | 중간      | 묵직한 울림      |
+| 철(가벼움) vs 돌     | Metal | Stone | 강함      | 날카롭고 단단    |
+
+---
+
+## 6. 🧠 기술적 참고
+
+- **게리모드(Source Engine)**: SurfaceProp 기반 충돌음 블렌딩
+- **Unity/Unreal + Wwise**: RTPC, Blend Container, Switch Container 활용
+- **자동화 원리**: 사람 손으로 일일이 조합하지 않고, 물리값 기반 가중치로 실시간 믹싱
+
+---
+
+## 7. ✅ 기대 효과
+
+- 모든 재질·충돌 강도 조합을 실시간으로 생성 가능 → **수천 가지 경우 자동 처리**
+- 몰입감 높은 사운드 → 플레이어 경험 향상
+- 포트폴리오 가치 높음: **사운드 + 프로그래밍 융합**
+- 확장성: 발소리, 총격, 차량 등 다른 물리 기반 사운드에 재활용 가능

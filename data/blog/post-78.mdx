@@ -1,0 +1,131 @@
+---
+title: '컨테이너에 등록된 모든 빈 조회'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381135/notion-blog/_/_/_-_/_/Untitled.png)
+
+```java
+class ApplicationContextInfoTest {
+
+    AnnotationConfigApplicationContext ac = new AnnotationConfigApplicationContext(AppConfig.class);
+
+    @Test
+    @DisplayName("모든 빈 출력하기")
+    void findAllBean() {
+        // 스프링 컨테이너에 등록된 모든 빈의 이름 조회
+        String[] beanDefinitionNames = ac.getBeanDefinitionNames();
+        for (String beanDefinitionName : beanDefinitionNames) {
+            // 빈 이름(key)로 빈(value) 얻기
+            Object bean = ac.getBean(beanDefinitionName);
+            System.out.println("bean = " + beanDefinitionName + " object = " + bean);
+        }
+    }
+    @Test
+    @DisplayName("애플리케이션 빈 출력하기")
+    void findApplicationBean() {
+        // 스프링 컨테이너에 등록된 모든 빈의 이름 조회
+        String[] beanDefinitionNames = ac.getBeanDefinitionNames();
+        for (String beanDefinitionName : beanDefinitionNames) {
+            // 빈에 대한 메타데이터 정보
+            BeanDefinition beanDefinition = ac.getBeanDefinition(beanDefinitionName);
+
+            // ROLE_APPLICATION : 일반적으로 사용자가 정의한 빈
+            // ROLE_INFRASTRUCTURE : 스프링이 내부에서 사용하는 빈
+            if (beanDefinition.getRole() == BeanDefinition.ROLE_APPLICATION) {
+                // 빈 이름(key)로 빈(value) 얻기
+                Object bean = ac.getBean(beanDefinitionName);
+                System.out.println("bean = " + beanDefinitionName + " object = " + bean);
+            }
+        }
+    }
+}
+
+* 자바 버전에 따라 클래스나 메서드 앞에 public 을 명시하지않아도 자동으로 public 처리됨
+```
+
+# **컨테이너에 등록된 모든 빈 조회**
+
+```jsx
+스프링 컨테이너에 다 빈으로 등록되는지 확인해본다
+
+이를 test코드로 작성해보자
+```
+
+```jsx
+모든 빈 출력하기 부분에서는 내가 생성한 빈 뿐만 아니라 스프링이 내부적으로 생성하는 빈까지 모두 확인해볼 수 있다.
+
+애플리케이션 빈 출력하기는 내가 생성한 빈들만 확인할 수 있다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381133/notion-blog/_/_/_-_/_/Untitled_1.png)
+
+```java
+1. ac.getBeanDefinitionNames() 으로 스프링에 등록된 모든 빈의 이름을 리스트 형식으로 받아온다
+
+2. for 문을 사용하여 ac.getBeanDefinition(beanDefinitionName) 을 통하여 Bean에 대한 meta data(예: 범위, 클래스 이름) 정보들을 반환한다.
+
+3. 출력
+
+● ac.getBeanDefinitionNames(): 스프링에 등록된 모든 빈 이름을 조회
+
+● ac.getBean(빈이름): 빈 이름으로 빈 객체(인스턴스) 조회
+```
+
+## **1) 스프링 내부에서 기본으로 생성된 빈**
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381134/notion-blog/_/_/_-_/_/Untitled_2.png)
+
+## **2) AppConfig 정보를 통해 등록한 스프링 빈**
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381134/notion-blog/_/_/_-_/_/Untitled_3.png)
+
+# **애플리케이션 빈 출력하기**
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381134/notion-blog/_/_/_-_/_/Untitled_4.png)
+
+```java
+스프링 내부에서 사용하는 빈은 제외하고 내가 등록한 빈만 출력한다.
+```
+
+```java
+● ac.getBeanDefinition(빈 이름): 빈 이름으로 빈의 메타데이터 조회
+
+● beanDefinition.getRole(): 빈 구분하기
+
+- ROLE_APPLICATION : 일반적으로 사용자가 정의한 빈
+
+- ROLE_INFRASTRUCTURE : 스프링이 내부에서 사용하는 빈
+```
+
+```java
+1. String[] beanDefinitionNames = ac.getBeanDefinitionNames();
+
+(ac)에 등록된 모든 빈의 이름을 포함하는 문자열 배열인 beanDefinitionNames를 가져옴.
+
+2. for (String beanDefinitionName : beanDefinitionNames) {
+
+beanDefinitionNames 배열의 각 빈 정의 이름을 반복하는 for-each 루프를 시작
+
+3. BeanDefinition beanDefinition = ac.getBeanDefinition(beanDefinitionName);
+
+루프 내부에서 이 줄은 현재 빈의 이름을 사용하여 해당 빈에 대한 메타데이터 정보를 가져옵니다. BeanDefinition 객체는 빈에 대한 정보를 포함하며 클래스, 스코프 및 기타 구성 세부 정보를 포함합니다.
+
+4. if (beanDefinition.getRole() == BeanDefinition.ROLE_APPLICATION) {
+
+현재 빈 정의의 역할이 ROLE_APPLICATION인지 확인합니다. Spring Framework에서 빈은 다양한 역할을 가질 수 있으며, ROLE_APPLICATION은 일반적으로 사용자가 정의한 빈을 나타냅니다. 내부 인프라 빈과는 구분됩니다.
+
+5. Object bean = ac.getBean(beanDefinitionName);
+
+현재 빈 정의의 역할이 ROLE_APPLICATION인 경우, 이 줄은 빈의 실제 인스턴스를 Spring 애플리케이션 컨텍스트에서 이름을 사용하여 가져옵니다.
+
+6. 출력
+```
+
+## **1) AppConfig 정보를 통해 등록한 스프링 빈**
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381134/notion-blog/_/_/_-_/_/Untitled_5.png)

@@ -1,0 +1,2090 @@
+---
+title: '섹션 7: Polish - 4'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+# { 🎮 C# 인터페이스(Interface)로 상호작용 시스템 확장하기 }
+
+이번 강의는 C# 인터페이스를 활용하여 문(Door)뿐만 아니라 다양한 오브젝트(구체, 상자, 버튼 등)와 상호작용할 수 있도록 코드를 리팩토링하는 방법을 다룹니다. 인터페이스를 사용하면 코드 중복 없이 확장 가능한 시스템을 구축할 수 있습니다.
+
+## 📋 목차
+
+1. [기존 시스템의 문제점 파악하기](https://claude.ai/chat/9163a704-4e5f-4872-84bd-59c76ed4a535#1-%EA%B8%B0%EC%A1%B4-%EC%8B%9C%EC%8A%A4%ED%85%9C%EC%9D%98-%EB%AC%B8%EC%A0%9C%EC%A0%90-%ED%8C%8C%EC%95%85%ED%95%98%EA%B8%B0)
+2. [테스트용 InteractSphere 오브젝트 만들기](https://claude.ai/chat/9163a704-4e5f-4872-84bd-59c76ed4a535#2-%ED%85%8C%EC%8A%A4%ED%8A%B8%EC%9A%A9-interactsphere-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+3. [C# 인터페이스 개념 이해하기](https://claude.ai/chat/9163a704-4e5f-4872-84bd-59c76ed4a535#3-c-%EC%9D%B8%ED%84%B0%ED%8E%98%EC%9D%B4%EC%8A%A4-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+4. [IInteractable 인터페이스 정의하기](https://claude.ai/chat/9163a704-4e5f-4872-84bd-59c76ed4a535#4-iinteractable-%EC%9D%B8%ED%84%B0%ED%8E%98%EC%9D%B4%EC%8A%A4-%EC%A0%95%EC%9D%98%ED%95%98%EA%B8%B0)
+5. [Door 클래스에 인터페이스 적용하기](https://claude.ai/chat/9163a704-4e5f-4872-84bd-59c76ed4a535#5-door-%ED%81%B4%EB%9E%98%EC%8A%A4%EC%97%90-%EC%9D%B8%ED%84%B0%ED%8E%98%EC%9D%B4%EC%8A%A4-%EC%A0%81%EC%9A%A9%ED%95%98%EA%B8%B0)
+6. [InteractSphere 클래스 구현하기](https://claude.ai/chat/9163a704-4e5f-4872-84bd-59c76ed4a535#6-interactsphere-%ED%81%B4%EB%9E%98%EC%8A%A4-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+7. [InteractAction을 제네릭하게 리팩토링하기](https://claude.ai/chat/9163a704-4e5f-4872-84bd-59c76ed4a535#7-interactaction%EC%9D%84-%EC%A0%9C%EB%84%A4%EB%A6%AD%ED%95%98%EA%B2%8C-%EB%A6%AC%ED%8C%A9%ED%86%A0%EB%A7%81%ED%95%98%EA%B8%B0)
+8. [LevelGrid와 GridObject 리팩토링하기](https://claude.ai/chat/9163a704-4e5f-4872-84bd-59c76ed4a535#8-levelgrid%EC%99%80-gridobject-%EB%A6%AC%ED%8C%A9%ED%86%A0%EB%A7%81%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. 기존 시스템의 문제점 파악하기
+
+### 현재 상황
+
+- 게임에는 Door 오브젝트가 있고, 플레이어가 가까이 가서 Interact 액션을 사용하면 문을 열고 닫을 수 있음
+- 상호작용 시스템이 **Door 타입에만 특화**되어 작동함
+
+### 문제점
+
+```csharp
+// InteractAction의 기존 코드 (문제가 있는 부분)
+Door door = LevelGrid.Instance.GetDoorAtGridPosition(testGridPosition);
+if (door == null) {
+    continue; // Door가 없으면 스킵
+}
+```
+
+- 만약 보물상자(TreasureChest), 버튼(Button) 등 다른 상호작용 오브젝트를 추가하려면?
+- **각 타입마다 별도의 검증 로직**이 필요함
+- **GridObject에도 각 타입별 필드**를 추가해야 함
+- 코드 중복이 심해지고 확장성이 떨어짐
+
+### 해결 방법
+
+- \*인터페이스(Interface)\*\*를 사용하여 모든 상호작용 가능한 오브젝트가 공통으로 따를 규칙을 정의
+- 특정 타입(Door, Sphere 등) 대신 **인터페이스 타입**으로 작업
+
+---
+
+## 2. 테스트용 InteractSphere 오브젝트 만들기
+
+### 게임 오브젝트 생성
+
+**1단계: 빈 게임 오브젝트 생성**
+
+- Hierarchy에서 우클릭 → Create Empty
+- 이름: `InteractSphere`
+
+**2단계: 3D Sphere 자식 오브젝트 추가**
+
+- InteractSphere 우클릭 → 3D Object → Sphere
+- Transform 설정:
+  - Scale: 조금 작게 조정 (예: 0.8, 0.8, 0.8)
+  - Position Y: 1 (바닥에서 살짝 띄우기)
+- Sphere Collider는 제거 (불필요)
+
+**3단계: 위치 설정**
+
+- InteractSphere Position: (8, 0, 4)
+
+### 머티리얼(Material) 준비
+
+**Green Material 만들기**
+
+```
+1. Assets 폴더에서 우클릭 → Create → Material
+2. 이름: "Green"
+3. Inspector에서:
+   - Emission 체크박스 활성화
+   - Emission Color: 밝은 녹색 선택
+   - Emission 강도: 높게 설정하여 빛나는 효과
+
+```
+
+**Red Material 만들기**
+
+```
+1. 동일한 방법으로 "Red" Material 생성
+2. Inspector에서:
+   - Emission 체크박스 활성화
+   - Emission Color: 밝은 빨간색 선택
+   - Emission 강도: 높게 설정
+
+```
+
+> Emission이란? 오브젝트가 스스로 빛을 발산하는 효과. 게임에서 빛나는 물체를 표현할 때 사용.
+
+---
+
+## 3. C# 인터페이스 개념 이해하기
+
+### 인터페이스(Interface)란?
+
+**정의**
+
+- 인터페이스는 **계약서(Contract)**와 같음
+- 함수의 **시그니처(이름, 반환 타입, 파라미터)**만 정의하고, 실제 구현은 하지 않음
+- 어떤 클래스가 인터페이스를 구현(implement)하면, 그 클래스는 **반드시 인터페이스에 정의된 모든 함수를 구현해야 함**
+
+**추상 함수와의 유사성**
+
+- 이전에 배운 `BaseAction`의 추상 함수와 비슷한 개념:
+
+```csharp
+// BaseAction의 추상 함수 예시
+public abstract class BaseAction : MonoBehaviour
+{
+    public abstract string GetActionName(); // 자식 클래스가 반드시 구현해야 함
+    public abstract void TakeAction(GridPosition gridPosition, Action onActionComplete);
+}
+```
+
+**차이점**
+
+- 추상 클래스: 일부 구현된 기능 + 추상 함수 포함 가능
+- 인터페이스: 오직 함수 시그니처만 정의 (구현 없음)
+
+### 인터페이스의 장점
+
+**1. 코드의 일반화(Generalization)**
+
+```csharp
+// 나쁜 예: 특정 타입에 의존
+Door door = GetDoor();
+door.Interact();
+
+TreasureChest chest = GetChest();
+chest.Interact();
+
+// 좋은 예: 인터페이스 사용
+IInteractable interactable = GetInteractable(); // Door든 Chest든 상관없음
+interactable.Interact(); // 어떤 타입이든 Interact 함수가 있음을 보장
+
+```
+
+**2. 확장성**
+
+- 새로운 상호작용 오브젝트를 추가할 때 기존 코드 수정 불필요
+- 1000개의 다른 오브젝트를 만들어도 InteractAction 코드는 그대로 사용 가능
+
+**3. 타입 안정성**
+
+- 인터페이스를 구현한 오브젝트는 **반드시 해당 함수를 가지고 있음을 컴파일러가 보장**
+
+---
+
+## 4. IInteractable 인터페이스 정의하기
+
+### 인터페이스 파일 생성
+
+**1단계: 새 스크립트 생성**
+
+- Scripts 폴더에서 우클릭 → Create → C# Script
+- 이름: `IInteractable`
+
+> 명명 규칙: 인터페이스 이름은 대문자 'I'로 시작하는 것이 관례입니다.
+
+**2단계: 인터페이스 정의**
+
+```csharp
+using System; // Action 타입 사용을 위해 필요
+
+// MonoBehaviour를 상속하지 않음!
+// Start, Update 같은 Unity 생명주기 함수도 없음
+public interface IInteractable
+{
+    // 접근 제한자(public, private)를 쓰지 않음
+    // 인터페이스의 모든 함수는 기본적으로 public이어야 하므로
+
+    // 반환 타입: void (아무것도 반환하지 않음)
+    // 함수 이름: Interact
+    // 파라미터: Action 타입의 콜백 함수
+    void Interact(Action onInteractionComplete);
+
+    // 세미콜론으로 끝남 (중괄호 {} 없음)
+    // 실제 구현 코드는 작성하지 않음
+}
+```
+
+### 코드 설명
+
+**Action 타입이란?**
+
+```csharp
+// Action은 C#에 내장된 델리게이트(Delegate) 타입
+// 파라미터가 없고 반환값도 없는 함수를 가리킬 수 있음
+
+// 예시:
+void MyFunction() {
+    Debug.Log("완료!");
+}
+
+Action callback = MyFunction; // 함수를 변수처럼 저장
+callback(); // 나중에 실행 → "완료!" 출력
+```
+
+**onInteractionComplete 파라미터의 역할**
+
+- 상호작용이 완료되었을 때 호출할 함수를 받음
+- 예: 문이 완전히 열린 후, 또는 타이머가 끝난 후 호출
+- 이를 통해 InteractAction이 상호작용 완료를 감지할 수 있음
+
+---
+
+## 5. Door 클래스에 인터페이스 적용하기
+
+### 인터페이스 구현 선언
+
+```csharp
+// 기존 코드
+public class Door : MonoBehaviour
+{
+    // ...
+}
+
+// 인터페이스 구현 추가
+public class Door : MonoBehaviour, IInteractable
+{
+    // MonoBehaviour를 상속받으면서 동시에
+    // IInteractable 인터페이스를 구현한다고 선언
+    // ...
+}
+```
+
+### 문법 설명
+
+**다중 상속 제한**
+
+- C#에서는 **클래스는 하나만 상속** 가능
+- 하지만 **인터페이스는 여러 개 구현** 가능
+
+```csharp
+// 가능한 예시
+public class Door : MonoBehaviour, IInteractable, IDamageable, IClickable
+{
+    // MonoBehaviour 클래스를 상속받고
+    // 동시에 3개의 인터페이스를 구현
+}
+```
+
+### 기존 코드가 이미 충족함
+
+Door 클래스는 이미 Interact 함수를 가지고 있었음:
+
+```csharp
+public void Interact(Action onInteractComplete)
+{
+    this.onInteractComplete = onInteractComplete; // 콜백 저장
+    isActive = true; // 타이머 활성화
+    timer = .5f; // 0.5초 대기
+
+    if (isOpen)
+    {
+        CloseDoor(); // 열려있으면 닫기
+    }
+    else
+    {
+        OpenDoor(); // 닫혀있으면 열기
+    }
+}
+```
+
+**이미 인터페이스 요구사항을 만족하므로 에러가 발생하지 않음!**
+
+---
+
+## 6. InteractSphere 클래스 구현하기
+
+### 스크립트 생성 및 기본 설정
+
+```csharp
+using System;
+using UnityEngine;
+
+public class InteractSphere : MonoBehaviour, IInteractable
+{
+    // Inspector에서 설정할 필드들
+    [SerializeField] private Material greenMaterial;
+    [SerializeField] private Material redMaterial;
+    [SerializeField] private MeshRenderer meshRenderer; // Sphere 자식 오브젝트의 Renderer
+
+    // 내부 상태 관리 변수들
+    private GridPosition gridPosition; // 그리드 상의 위치
+    private bool isGreen; // 현재 색상이 녹색인지 확인
+
+    // 타이머 시스템 (Door와 동일한 패턴)
+    private Action onInteractionComplete; // 완료 시 호출할 콜백
+    private bool isActive; // 타이머 활성 상태
+    private float timer; // 남은 시간
+```
+
+### Start 함수 - 초기화
+
+```csharp
+private void Start()
+{
+    // 1. 현재 위치를 그리드 좌표로 변환
+    gridPosition = LevelGrid.Instance.GetGridPosition(transform.position);
+
+    // 2. LevelGrid에 이 오브젝트를 등록
+    // 다른 시스템(InteractAction 등)이 이 위치의 상호작용 오브젝트를 찾을 수 있게 함
+    LevelGrid.Instance.SetInteractableAtGridPosition(gridPosition, this);
+
+    // 3. 초기 색상을 녹색으로 설정
+    SetColorGreen();
+}
+```
+
+### Update 함수 - 타이머 처리
+
+```csharp
+private void Update()
+{
+    // 타이머가 비활성 상태면 아무것도 하지 않음
+    if (!isActive)
+    {
+        return;
+    }
+
+    // 매 프레임마다 시간 감소 (deltaTime = 이전 프레임과의 시간 차이)
+    timer -= Time.deltaTime;
+
+    // 시간이 다 되면
+    if (timer <= 0f)
+    {
+        isActive = false; // 타이머 비활성화
+        onInteractionComplete(); // 완료 콜백 실행
+    }
+}
+```
+
+### 색상 변경 함수들
+
+```csharp
+private void SetColorGreen()
+{
+    isGreen = true; // 상태 업데이트
+    meshRenderer.material = greenMaterial; // Material 교체
+}
+
+private void SetColorRed()
+{
+    isGreen = false; // 상태 업데이트
+    meshRenderer.material = redMaterial; // Material 교체
+}
+```
+
+> MeshRenderer.material 속성: 오브젝트의 외형을 결정하는 Material을 가져오거나 설정합니다.
+
+### Interact 함수 - 인터페이스 구현
+
+```csharp
+public void Interact(Action onInteractionComplete)
+{
+    // 1. 콜백 함수 저장
+    this.onInteractionComplete = onInteractionComplete;
+
+    // 2. 타이머 시작
+    isActive = true;
+    timer = .5f; // 0.5초 대기
+
+    // 3. 색상 토글 (현재 색상에 따라 반대 색으로 변경)
+    if (isGreen)
+    {
+        SetColorRed(); // 녹색이면 빨강으로
+    }
+    else
+    {
+        SetColorGreen(); // 빨강이면 녹색으로
+    }
+}
+```
+
+### Inspector 설정
+
+Unity 에디터에서 InteractSphere 오브젝트 선택 후:
+
+1. **Green Material** 슬롯에 Green Material 드래그
+2. **Red Material** 슬롯에 Red Material 드래그
+3. **Mesh Renderer** 슬롯에 자식 Sphere 오브젝트의 MeshRenderer 컴포넌트 드래그
+
+---
+
+## 7. InteractAction을 제네릭하게 리팩토링하기
+
+### 기존 코드의 문제점
+
+```csharp
+// 기존: Door 타입에만 작동하는 코드
+public override List<GridPosition> GetValidActionGridPositionList()
+{
+    // ...
+    Door door = LevelGrid.Instance.GetDoorAtGridPosition(testGridPosition);
+
+    if (door == null)
+    {
+        continue; // Door가 없으면 스킵
+    }
+    // ...
+}
+
+public override void TakeAction(GridPosition gridPosition, Action onActionComplete)
+{
+    Door door = LevelGrid.Instance.GetDoorAtGridPosition(gridPosition);
+    door.Interact(OnInteractComplete);
+    ActionStart(onActionComplete);
+}
+```
+
+### 리팩토링된 코드
+
+```csharp
+public override List<GridPosition> GetValidActionGridPositionList()
+{
+    List<GridPosition> validGridPositionList = new List<GridPosition>();
+    GridPosition unitGridPosition = unit.GetGridPosition();
+
+    // 주변 1칸 범위를 검사
+    for (int x = -maxInteractDistance; x <= maxInteractDistance; x++)
+    {
+        for (int z = -maxInteractDistance; z <= maxInteractDistance; z++)
+        {
+            GridPosition offsetGridPosition = new GridPosition(x, z);
+            GridPosition testGridPosition = unitGridPosition + offsetGridPosition;
+
+            // 유효한 그리드 위치인지 확인
+            if (!LevelGrid.Instance.IsValidGridPosition(testGridPosition))
+            {
+                continue;
+            }
+
+            // ★ 핵심 변경: Door 대신 IInteractable 타입 사용
+            IInteractable interactable = LevelGrid.Instance.GetInteractableAtGridPosition(testGridPosition);
+
+            // 상호작용 가능한 오브젝트가 없으면 스킵
+            if (interactable == null)
+            {
+                continue;
+            }
+
+            // 유효한 위치에 추가
+            validGridPositionList.Add(testGridPosition);
+        }
+    }
+
+    return validGridPositionList;
+}
+```
+
+### TakeAction 함수 리팩토링
+
+```csharp
+public override void TakeAction(GridPosition gridPosition, Action onActionComplete)
+{
+    // ★ IInteractable 타입으로 받음 (Door든 Sphere든 상관없음)
+    IInteractable interactable = LevelGrid.Instance.GetInteractableAtGridPosition(gridPosition);
+
+    // ★ 인터페이스 함수 호출 - 실제 타입이 무엇이든 작동함
+    interactable.Interact(OnInteractComplete);
+
+    // 액션 시작 처리
+    ActionStart(onActionComplete);
+}
+
+// 상호작용 완료 시 호출되는 콜백
+private void OnInteractComplete()
+{
+    ActionComplete(); // 액션 시스템에 완료 알림
+}
+```
+
+### 코드의 강력함
+
+```csharp
+// 이 코드는 다음을 전혀 신경쓰지 않음:
+// - 상호작용 대상이 Door인지, Sphere인지, Chest인지
+// - 각 오브젝트가 내부적으로 어떻게 작동하는지
+
+// 단지 이것만 알면 됨:
+// 1. 이 오브젝트는 IInteractable 인터페이스를 구현함
+// 2. 따라서 Interact() 함수가 반드시 존재함
+
+// 1000개의 새로운 상호작용 오브젝트를 추가해도
+// 이 코드는 수정할 필요가 없음!
+```
+
+---
+
+## 8. LevelGrid와 GridObject 리팩토링하기
+
+### GridObject 클래스 수정
+
+**기존 코드 (Door 전용)**
+
+```csharp
+public class GridObject
+{
+    private Door door; // Door 타입 전용 필드
+
+    public Door GetDoor()
+    {
+        return door;
+    }
+
+    public void SetDoor(Door door)
+    {
+        this.door = door;
+    }
+}
+```
+
+**리팩토링된 코드 (모든 상호작용 오브젝트 지원)**
+
+```csharp
+public class GridObject
+{
+    private GridSystem<GridObject> gridSystem;
+    private GridPosition gridPosition;
+    private List<Unit> unitList;
+
+    // ★ Door 대신 IInteractable 인터페이스 타입 사용
+    private IInteractable interactable;
+
+    public GridObject(GridSystem<GridObject> gridSystem, GridPosition gridPosition)
+    {
+        this.gridSystem = gridSystem;
+        this.gridPosition = gridPosition;
+        unitList = new List<Unit>();
+    }
+
+    // ★ IInteractable 타입 반환
+    public IInteractable GetInteractable()
+    {
+        return interactable;
+    }
+
+    // ★ IInteractable 타입 받음
+    // Door, InteractSphere, TreasureChest 등 무엇이든 저장 가능
+    public void SetInteractable(IInteractable interactable)
+    {
+        this.interactable = interactable;
+    }
+
+    // ... 다른 함수들 (Unit 관련 등)
+}
+
+```
+
+### LevelGrid 클래스 수정
+
+**기존 코드 (Door 전용 함수들)**
+
+```csharp
+public Door GetDoorAtGridPosition(GridPosition gridPosition)
+{
+    GridObject gridObject = gridSystem.GetGridObject(gridPosition);
+    return gridObject.GetDoor();
+}
+
+public void SetDoorAtGridPosition(GridPosition gridPosition, Door door)
+{
+    GridObject gridObject = gridSystem.GetGridObject(gridPosition);
+    gridObject.SetDoor(door);
+}
+
+```
+
+**리팩토링된 코드 (제네릭 함수들)**
+
+```csharp
+// ★ IInteractable 타입으로 작동하는 함수들
+public IInteractable GetInteractableAtGridPosition(GridPosition gridPosition)
+{
+    GridObject gridObject = gridSystem.GetGridObject(gridPosition);
+    return gridObject.GetInteractable();
+    // Door 오브젝트든 InteractSphere든 자동으로 IInteractable로 변환됨
+}
+
+public void SetInteractableAtGridPosition(GridPosition gridPosition, IInteractable interactable)
+{
+    GridObject gridObject = gridSystem.GetGridObject(gridPosition);
+    gridObject.SetInteractable(interactable);
+    // 어떤 상호작용 오브젝트든 저장 가능
+}
+
+```
+
+### 타입 변환의 마법
+
+```csharp
+// Door는 IInteractable을 구현하므로:
+Door door = new Door();
+IInteractable interactable = door; // 자동 변환 (업캐스팅)
+
+// 사용 시:
+LevelGrid.Instance.SetInteractableAtGridPosition(pos, door);
+// door가 자동으로 IInteractable 타입으로 변환되어 저장됨
+
+// 나중에 가져올 때:
+IInteractable obj = LevelGrid.Instance.GetInteractableAtGridPosition(pos);
+obj.Interact(callback); // Door의 Interact 함수가 실행됨
+
+```
+
+### Door 클래스의 Start 함수 수정
+
+```csharp
+private void Start()
+{
+    gridPosition = LevelGrid.Instance.GetGridPosition(transform.position);
+
+    // ★ 함수 이름 변경: SetDoorAtGridPosition → SetInteractableAtGridPosition
+    LevelGrid.Instance.SetInteractableAtGridPosition(gridPosition, this);
+    // 'this'는 현재 Door 인스턴스를 의미
+    // Door는 IInteractable을 구현하므로 자동으로 변환됨
+
+    if (isOpen)
+    {
+        OpenDoor();
+    }
+    else
+    {
+        CloseDoor();
+    }
+}
+```
+
+---
+
+## 🎯 최종 테스트 및 결과
+
+### 게임 실행 후 확인사항
+
+**1. Door 상호작용**
+
+- 문 근처로 이동
+- Interact 액션 선택 가능한지 확인
+- 클릭 시 문이 열리고 닫히는지 확인
+
+**2. InteractSphere 상호작용**
+
+- Sphere 근처로 이동
+- Interact 액션 선택 가능한지 확인
+- 클릭 시 색상이 녹색 ↔ 빨강 토글되는지 확인
+
+**3. 시스템의 확장성 확인**
+
+```csharp
+// 새로운 상호작용 오브젝트 추가 시:
+
+// 1. IInteractable 인터페이스 구현
+public class TreasureChest : MonoBehaviour, IInteractable
+{
+    public void Interact(Action onInteractionComplete)
+    {
+        // 보물 상자 열기 로직
+        OpenChest();
+        onInteractionComplete();
+    }
+}
+
+// 2. LevelGrid에 등록
+LevelGrid.Instance.SetInteractableAtGridPosition(gridPosition, this);
+
+// 3. 끝! InteractAction 코드는 수정 불필요
+
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### 인터페이스의 3가지 핵심
+
+**1. 계약(Contract)**
+
+- 인터페이스를 구현하는 클래스는 반드시 모든 함수를 구현해야 함
+- 컴파일러가 이를 강제함
+
+**2. 추상화(Abstraction)**
+
+- 구체적인 타입(Door, Sphere) 대신 인터페이스 타입으로 작업
+- "어떻게"가 아닌 "무엇을" 할 수 있는지에 집중
+
+**3. 다형성(Polymorphism)**
+
+- 같은 인터페이스 타입으로 다양한 구현체를 다룰 수 있음
+
+```csharp
+IInteractable obj1 = new Door(); // Door의 Interact 실행
+IInteractable obj2 = new Sphere(); // Sphere의 Interact 실행
+IInteractable obj3 = new Chest(); // Chest의 Interact 실행
+
+// 모두 같은 방식으로 호출
+obj1.Interact(callback);
+obj2.Interact(callback);
+obj3.Interact(callback);
+
+```
+
+### 확장 가능한 시스템의 조건
+
+✅ **새 기능 추가 시 기존 코드 수정 불필요** (Open-Closed Principle)
+
+✅ **각 클래스는 자신의 책임만 가짐** (Single Responsibility)
+
+✅ **인터페이스를 통한 느슨한 결합** (Loose Coupling)
+
+---
+
+## 🔧 추가 학습 제안
+
+강의에서 언급된 것처럼, 동일한 패턴을 파괴 가능한 오브젝트에도 적용할 수 있습니다:
+
+```csharp
+// IDestructible 인터페이스 정의
+public interface IDestructible
+{
+    void Destroy();
+}
+
+// 다양한 파괴 가능 오브젝트 구현
+public class DestructibleCrate : MonoBehaviour, IDestructible
+{
+    public void Destroy()
+    {
+        // 상자 파괴 로직
+    }
+}
+
+public class DestructibleWall : MonoBehaviour, IDestructible
+{
+    public void Destroy()
+    {
+        // 벽 파괴 로직
+    }
+}
+
+// Grenade 액션에서 사용
+IDestructible destructible = GetDestructibleAtPosition(position);
+destructible.Destroy(); // 타입과 무관하게 작동
+
+```
+
+이처럼 인터페이스는 게임 시스템을 확장 가능하고 유지보수하기 쉽게 만드는 강력한 도구입니다!
+
+## 🎯 쉽게 비유하면
+
+```
+         IInteractable (상호작용 가능한 것들의 상위 개념)
+              ↑
+    ┌─────────┼─────────┬─────────┐
+    │         │         │         │
+   Door    Sphere    Chest    Button
+
+```
+
+**기존 방식 (나쁜 예)**
+
+```csharp
+// 각 타입마다 별도로 처리 = 코드 중복 지옥
+if (타입이 Door면) {
+    Door door = GetDoor();
+    door.Interact();
+}
+else if (타입이 Sphere면) {
+    Sphere sphere = GetSphere();
+    sphere.Interact();
+}
+else if (타입이 Chest면) {
+    Chest chest = GetChest();
+    chest.Interact();
+}
+// 새 타입 추가할 때마다 코드 수정 필요 😫
+```
+
+**인터페이스 방식 (좋은 예)**
+
+```csharp
+// 모든 타입을 IInteractable로 통일 = 한 줄로 끝
+IInteractable interactable = GetInteractable();
+interactable.Interact(); // 끝! 😎
+
+// Door든, Sphere든, Chest든 상관없이 작동
+// 새 타입 100개 추가해도 이 코드는 수정 안 해도 됨!
+```
+
+## 📦 현실 비유
+
+**택배 시스템으로 비유하면:**
+
+- **기존 방식**: "이건 책이니까 책 배송 시스템, 이건 옷이니까 옷 배송 시스템, 이건 가전제품이니까..."
+- **인터페이스 방식**: "포장 가능한 것(IPackable)이면 뭐든 배송!"
+
+```csharp
+// 모든 상품이 "포장 가능"이라는 공통점만 있으면 됨
+IPackable item = GetItem();
+item.Package(); // 책이든 옷이든 가전이든 다 포장 가능!
+DeliverItem(item); // 배송 시스템은 수정 불필요
+```
+
+## 💡 핵심은 "업캐스팅"
+
+네, 맞습니다! **업캐스팅(Upcasting)**이라고 부르는 개념이에요:
+
+```csharp
+// Door는 구체적인 타입 (자식)
+Door door = new Door();
+
+// IInteractable은 추상적인 타입 (부모)
+IInteractable interactable = door; // ✅ 자동 업캐스팅
+
+// 이제 door의 "상호작용 가능" 특성만 사용
+interactable.Interact();
+```
+
+**왜 이게 좋으냐면:**
+
+- InteractAction은 "Door가 뭔지" 몰라도 됨
+- "상호작용 가능한 뭔가"라는 것만 알면 됨
+- 나중에 새로운 타입 추가해도 InteractAction 코드는 건드릴 필요 없음!
+
+---
+
+정리하면: **"인터페이스 = 여러 타입을 하나의 상위 개념으로 묶어서 코드를 단순하고 확장 가능하게 만드는 도구"**입니다! 🎯
+
+# { 🎮 Input Manager 리팩토링 - 입력 시스템 통합 관리하기 }
+
+이번 강의는 흩어진 입력 코드를 InputManager 클래스 하나로 모아서 관리하고, 나중에 새로운 입력 시스템으로 쉽게 전환할 수 있도록 준비하는 과정입니다.
+
+---
+
+## 📋 목차
+
+1. [리팩토링의 필요성과 InputManager 생성](https://claude.ai/chat/c807143b-abdc-4d9b-a25b-c11a4ddcd500#1-%EB%A6%AC%ED%8C%A9%ED%86%A0%EB%A7%81%EC%9D%98-%ED%95%84%EC%9A%94%EC%84%B1%EA%B3%BC-inputmanager-%EC%83%9D%EC%84%B1)
+2. [마우스 위치 입력 통합하기](https://claude.ai/chat/c807143b-abdc-4d9b-a25b-c11a4ddcd500#2-%EB%A7%88%EC%9A%B0%EC%8A%A4-%EC%9C%84%EC%B9%98-%EC%9E%85%EB%A0%A5-%ED%86%B5%ED%95%A9%ED%95%98%EA%B8%B0)
+3. [마우스 클릭 입력 통합하기](https://claude.ai/chat/c807143b-abdc-4d9b-a25b-c11a4ddcd500#3-%EB%A7%88%EC%9A%B0%EC%8A%A4-%ED%81%B4%EB%A6%AD-%EC%9E%85%EB%A0%A5-%ED%86%B5%ED%95%A9%ED%95%98%EA%B8%B0)
+4. [카메라 이동 입력 통합하기](https://claude.ai/chat/c807143b-abdc-4d9b-a25b-c11a4ddcd500#4-%EC%B9%B4%EB%A9%94%EB%9D%BC-%EC%9D%B4%EB%8F%99-%EC%9E%85%EB%A0%A5-%ED%86%B5%ED%95%A9%ED%95%98%EA%B8%B0)
+5. [카메라 회전 입력 통합하기](https://claude.ai/chat/c807143b-abdc-4d9b-a25b-c11a4ddcd500#5-%EC%B9%B4%EB%A9%94%EB%9D%BC-%ED%9A%8C%EC%A0%84-%EC%9E%85%EB%A0%A5-%ED%86%B5%ED%95%A9%ED%95%98%EA%B8%B0)
+6. [카메라 줌 입력 통합하기](https://claude.ai/chat/c807143b-abdc-4d9b-a25b-c11a4ddcd500#6-%EC%B9%B4%EB%A9%94%EB%9D%BC-%EC%A4%8C-%EC%9E%85%EB%A0%A5-%ED%86%B5%ED%95%A9%ED%95%98%EA%B8%B0)
+7. [리팩토링 검증 및 테스트](https://claude.ai/chat/c807143b-abdc-4d9b-a25b-c11a4ddcd500#7-%EB%A6%AC%ED%8C%A9%ED%86%A0%EB%A7%81-%EA%B2%80%EC%A6%9D-%EB%B0%8F-%ED%85%8C%EC%8A%A4%ED%8A%B8)
+
+---
+
+## 1. 리팩토링의 필요성과 InputManager 생성
+
+### 왜 리팩토링이 필요한가?
+
+현재 프로젝트는 **Legacy Input Manager(레거시 입력 관리자)**를 사용하고 있습니다.
+
+- **Legacy Input Manager의 특징**:
+  - 빠르게 프로토타입을 만들 때 유용
+  - 사용법이 간단함
+  - `Input.GetKey()`, `Input.mousePosition` 같은 직접적인 접근 방식
+- **문제점**:
+  - 입력 코드가 여러 클래스에 흩어져 있음
+  - 나중에 **새로운 입력 시스템(New Input System)**으로 전환하기 어려움
+  - 입력 방식을 바꾸려면 모든 클래스를 수정해야 함
+- **새로운 입력 시스템의 장점**:
+  - 더 많은 기능 제공
+  - 게임을 정식 출시할 때 권장됨
+  - 복잡하지만 더 강력함
+
+### InputManager 클래스 생성
+
+**목표**: 모든 입력 관련 코드를 하나의 클래스에 모아서 관리
+
+```csharp
+public class InputManager : MonoBehaviour
+{
+    // Singleton 패턴 - 어디서든 접근 가능한 단일 인스턴스
+    public static InputManager Instance { get; private set; }
+
+    private void Awake()
+    {
+        // 이미 다른 InputManager가 존재하는지 확인
+        if (Instance != null)
+        {
+            Debug.LogError("There is more than one InputManager! " + transform + " - " + Instance);
+            Destroy(gameObject);
+            return;
+        }
+        // 이 객체를 유일한 인스턴스로 설정
+        Instance = this;
+    }
+}
+```
+
+**Singleton 패턴 설명**:
+
+- `Instance`라는 static 변수에 자기 자신을 저장
+- 다른 클래스에서 `InputManager.Instance`로 접근 가능
+- 게임에 InputManager가 하나만 존재하도록 보장
+
+**게임 오브젝트 생성**:
+
+1. Hierarchy에서 빈 게임 오브젝트 생성 (우클릭 → Create Empty)
+2. 이름을 "InputManager"로 변경
+3. InputManager 스크립트 컴포넌트로 추가
+4. Transform 리셋 (Position 0,0,0)
+
+---
+
+## 2. 마우스 위치 입력 통합하기
+
+### 기존 코드 찾기
+
+Visual Studio의 유용한 기능을 활용합니다:
+
+1. `Input` 키워드에 커서를 놓고 우클릭
+2. **"Find All References"(모든 참조 찾기)** 선택
+3. 왼쪽 창에 Input을 사용하는 모든 위치가 표시됨
+
+### MouseWorld 클래스의 입력 코드
+
+**기존 코드**:
+
+```csharp
+public static Vector3 GetPosition()
+{
+    // 직접 Input.mousePosition을 사용
+    Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+    Physics.Raycast(ray, out RaycastHit raycastHit, float.MaxValue, instance.mousePlaneLayerMask);
+    return raycastHit.point;
+}
+```
+
+**문제점**: `Input.mousePosition`을 직접 호출하고 있음
+
+### InputManager에 함수 추가
+
+```csharp
+// 마우스의 화면 좌표를 반환하는 함수
+public Vector2 GetMouseScreenPostion()
+{
+    // 현재는 레거시 입력 시스템 사용
+    // 나중에 새 입력 시스템으로 바꿀 때 이 함수만 수정하면 됨
+    return Input.mousePosition;
+}
+```
+
+**반환 타입이 Vector2인 이유**:
+
+- 화면 좌표는 2D (x, y)만 필요
+- z 값은 사용하지 않음
+
+### MouseWorld 코드 수정
+
+**수정된 코드**:
+
+```csharp
+public static Vector3 GetPosition()
+{
+    // InputManager를 통해 마우스 위치 가져오기
+    Ray ray = Camera.main.ScreenPointToRay(InputManager.Instance.GetMouseScreenPostion());
+    Physics.Raycast(ray, out RaycastHit raycastHit, float.MaxValue, instance.mousePlaneLayerMask);
+    return raycastHit.point;
+}
+```
+
+**변경 사항**:
+
+- `Input.mousePosition` → `InputManager.Instance.GetMouseScreenPostion()`
+- 이제 InputManager를 거쳐서 마우스 위치를 받아옴
+
+---
+
+## 3. 마우스 클릭 입력 통합하기
+
+### UnitActionsSystem의 클릭 감지
+
+**기존 코드들**:
+
+```csharp
+// 여러 곳에서 마우스 클릭 체크
+if (Input.GetMouseButtonDown(0))  // 0은 왼쪽 마우스 버튼
+{
+    // 클릭 처리 코드
+}
+```
+
+### InputManager에 함수 추가
+
+```csharp
+// 마우스 왼쪽 버튼 클릭 여부 반환
+public bool IsMouseButtonDown()
+{
+    // GetMouseButtonDown(0) : 왼쪽 마우스 버튼이 이번 프레임에 눌렸는지 확인
+    // 0 = 왼쪽 버튼, 1 = 오른쪽 버튼, 2 = 휠 버튼
+    return Input.GetMouseButtonDown(0);
+}
+```
+
+**GetMouseButtonDown의 특징**:
+
+- 버튼을 누른 **그 순간** 한 번만 true 반환
+- 계속 누르고 있어도 다음 프레임부터는 false
+- 클릭 동작 감지에 적합
+
+### UnitActionsSystem 코드 수정
+
+**HandleSelectedAction 함수**:
+
+```csharp
+private void HandleSelectedAction()
+{
+    // InputManager를 통해 클릭 확인
+    if (InputManager.Instance.IsMouseButtonDown())
+    {
+        GridPosition mouseGridPosition = LevelGrid.Instance.GetGridPosition(MouseWorld.GetPosition());
+
+        // 유효한 행동 위치인지 확인
+        if (!selectedAction.IsValidActionGridPosition(mouseGridPosition))
+        {
+            return;
+        }
+
+        // 행동 포인트를 소비할 수 있는지 확인
+        if (!selectedUnit.TrySpendActionPointsToTakeAction(selectedAction))
+        {
+            return;
+        }
+
+        SetBusy();
+        selectedAction.TakeAction(mouseGridPosition, ClearBusy);
+        OnActionStarted?.Invoke(this, EventArgs.Empty);
+    }
+}
+```
+
+**TryHandleUnitSelection 함수**:
+
+```csharp
+private bool TryHnadleUnitSelection()
+{
+    // InputManager를 통해 클릭 확인
+    if (InputManager.Instance.IsMouseButtonDown())
+    {
+        // 마우스 위치에서 레이캐스트 발사
+        Ray ray = Camera.main.ScreenPointToRay(InputManager.Instance.GetMouseScreenPostion());
+
+        // 유닛 레이어만 감지
+        if (Physics.Raycast(ray, out RaycastHit raycastHit, float.MaxValue, unitLayerMask))
+        {
+            // 클릭한 오브젝트가 Unit 컴포넌트를 가지고 있는지 확인
+            if (raycastHit.transform.TryGetComponent<Unit>(out Unit unit))
+            {
+                if (unit == selectedUnit)
+                {
+                    return false;  // 이미 선택된 유닛
+                }
+
+                if (unit.IsEnemy())
+                {
+                    return false;  // 적 유닛은 선택 불가
+                }
+
+                SetSelectedUnit(unit);
+                return true;
+            }
+        }
+    }
+    return false;
+}
+```
+
+---
+
+## 4. 카메라 이동 입력 통합하기
+
+### CameraController의 이동 코드
+
+**기존 코드**:
+
+```csharp
+// WASD 키로 카메라 이동
+Vector3 inputMoveDir = new Vector3(0, 0, 0);
+
+if (Input.GetKey(KeyCode.W))
+{
+    inputMoveDir.z = +1;
+}
+if (Input.GetKey(KeyCode.S))
+{
+    inputMoveDir.z = -1;
+}
+if (Input.GetKey(KeyCode.A))
+{
+    inputMoveDir.x = -1;
+}
+if (Input.GetKey(KeyCode.D))
+{
+    inputMoveDir.x = +1;
+}
+```
+
+**문제점**: Vector3의 z축을 사용하여 입력 처리
+
+### InputManager에 함수 추가
+
+```csharp
+// 카메라 이동 방향 벡터 반환
+public Vector2 GetCameraMoveVector()
+{
+    // 입력은 2D로 처리 (x, y)
+    Vector2 inputMoveDir = new Vector2(0, 0);
+
+    // W 키 - 앞으로 이동
+    if (Input.GetKey(KeyCode.W))
+    {
+        inputMoveDir.y = +1;  // y축을 앞/뒤로 사용
+    }
+    // S 키 - 뒤로 이동
+    if (Input.GetKey(KeyCode.S))
+    {
+        inputMoveDir.y = -1;
+    }
+    // A 키 - 왼쪽으로 이동
+    if (Input.GetKey(KeyCode.A))
+    {
+        inputMoveDir.x = -1;
+    }
+    // D 키 - 오른쪽으로 이동
+    if (Input.GetKey(KeyCode.D))
+    {
+        inputMoveDir.x = +1;
+    }
+
+    return inputMoveDir;
+}
+```
+
+**Vector2를 사용하는 이유**:
+
+- 입력은 본질적으로 2D (x축, y축만 있음)
+- Vector3를 사용하면 불필요한 z 축이 포함됨
+- 입력 단계에서는 2D로 처리하고, 실제 이동 시 3D로 변환하는 것이 올바름
+
+### CameraController 코드 수정
+
+```csharp
+private void HandleMovement()
+{
+    // InputManager에서 2D 입력 벡터 받기
+    Vector2 inputMoveDir = InputManager.Instance.GetCameraMoveVector();
+
+    float moveSpeed = 10f;
+
+    // 2D 입력을 3D 이동으로 변환
+    // transform.forward : 카메라가 바라보는 앞 방향
+    // transform.right : 카메라의 오른쪽 방향
+    // inputMoveDir.y는 앞/뒤, inputMoveDir.x는 좌/우
+    Vector3 moveVector = transform.forward * inputMoveDir.y + transform.right * inputMoveDir.x;
+
+    // 실제 위치 이동
+    transform.position += moveVector * moveSpeed * Time.deltaTime;
+}
+```
+
+**코드 설명**:
+
+- `inputMoveDir.y`: 입력의 y 값 (W/S 키, 앞뒤 방향)
+- `inputMoveDir.x`: 입력의 x 값 (A/D 키, 좌우 방향)
+- `transform.forward * inputMoveDir.y`: 카메라의 앞 방향으로 이동
+- `transform.right * inputMoveDir.x`: 카메라의 오른쪽 방향으로 이동
+- `Time.deltaTime`: 프레임 독립적인 이동 (프레임레이트가 달라도 같은 속도)
+
+---
+
+## 5. 카메라 회전 입력 통합하기
+
+### CameraController의 회전 코드
+
+**기존 코드**:
+
+```csharp
+Vector3 rotationVector = new Vector3(0, 0, 0);
+
+if (Input.GetKey(KeyCode.Q))
+{
+    rotationVector.y = +1;
+}
+if (Input.GetKey(KeyCode.E))
+{
+    rotationVector.y = -1;
+}
+```
+
+**특징**: +1 또는 -1의 단순한 값만 필요
+
+### InputManager에 함수 추가
+
+```csharp
+// 카메라 회전량 반환 (+1, 0, -1)
+public float GetCameraRotateAmount()
+{
+    // 기본값은 회전 없음
+    float rotateAmount = 0f;
+
+    // Q 키 - 왼쪽으로 회전 (반시계방향)
+    if (Input.GetKey(KeyCode.Q))
+    {
+        rotateAmount = +1f;
+    }
+    // E 키 - 오른쪽으로 회전 (시계방향)
+    if (Input.GetKey(KeyCode.E))
+    {
+        rotateAmount = -1f;
+    }
+
+    return rotateAmount;
+}
+
+```
+
+**반환값 설명**:
+
+- `+1f`: 왼쪽으로 회전
+- `1f`: 오른쪽으로 회전
+- `0f`: 회전 없음
+
+**변수 사용 vs 직접 반환**:
+
+```csharp
+// 현재 방식 (변수 사용)
+float rotateAmount = 0f;
+if (Input.GetKey(KeyCode.Q))
+{
+    rotateAmount = +1f;
+}
+return rotateAmount;
+
+// 대안 (직접 반환) - 가능하지만 위 방식이 더 명확
+if (Input.GetKey(KeyCode.Q))
+{
+    return +1f;
+}
+```
+
+### CameraController 코드 수정
+
+```csharp
+private void HandleRotation()
+{
+    Vector3 rotationVector = new Vector3(0, 0, 0);
+
+    // InputManager에서 회전량 받기
+    rotationVector.y = InputManager.Instance.GetCameraRotateAmount();
+
+    // 입력이 있을 때만 회전
+    if (rotationVector != Vector3.zero)
+    {
+        float rotationSpeed = 100f;
+        // eulerAngles: 오일러 각도로 회전 적용 (도 단위)
+        transform.eulerAngles += rotationVector * rotationSpeed * Time.deltaTime;
+    }
+}
+```
+
+**eulerAngles 설명**:
+
+- 3D 회전을 각도(도)로 표현하는 방식
+- x, y, z 축 각각의 회전 각도
+- `rotationVector.y`: y축 회전 (좌우 회전)
+
+---
+
+## 6. 카메라 줌 입력 통합하기
+
+### CameraController의 줌 코드
+
+**기존 코드**:
+
+```csharp
+// 마우스 휠로 줌 조절
+if (Input.mouseScrollDelta.y > 0)
+{
+    targetFollowOffset.y += -1f;  // 줌 인
+}
+if (Input.mouseScrollDelta.y < 0)
+{
+    targetFollowOffset.y += +1f;  // 줌 아웃
+}
+```
+
+**mouseScrollDelta 설명**:
+
+- 마우스 휠의 스크롤 양을 나타내는 Vector2
+- `y > 0`: 휠을 위로 스크롤 (줌 인)
+- `y < 0`: 휠을 아래로 스크롤 (줌 아웃)
+- x 값은 일반 마우스에서는 사용 안 함 (트랙패드 등에서만)
+
+### InputManager에 함수 추가
+
+```csharp
+// 카메라 줌 양 반환 (+1, 0, -1)
+public float GetCameraZoomAmount()
+{
+    float zoomAmount = 0f;
+
+    // 마우스 휠을 위로 스크롤 - 줌 인 (카메라 가까워짐)
+    if (Input.mouseScrollDelta.y > 0)
+    {
+        zoomAmount = -1f;  // 음수 = 높이 감소 = 줌 인
+    }
+    // 마우스 휠을 아래로 스크롤 - 줌 아웃 (카메라 멀어짐)
+    if (Input.mouseScrollDelta.y < 0)
+    {
+        zoomAmount = +1f;  // 양수 = 높이 증가 = 줌 아웃
+    }
+
+    return zoomAmount;
+}
+```
+
+### CameraController 코드 수정
+
+```csharp
+private void HandleZoom()
+{
+    float zoomIncreaseAmount = 1f;  // 줌 민감도 조절 값
+
+    // InputManager에서 줌 양 받아서 목표 높이에 적용
+    targetFollowOffset.y += InputManager.Instance.GetCameraZoomAmount() * zoomIncreaseAmount;
+
+    // 줌 범위 제한 (너무 가깝거나 멀어지지 않도록)
+    targetFollowOffset.y = Mathf.Clamp(targetFollowOffset.y, MIN_FOLLOW_OFFSET_Y, MAX_FOLLOW_OFFSET_Y);
+
+    float zoomSpeed = 5f;
+
+    // 부드러운 줌 효과를 위해 Lerp 사용
+    // 현재 위치에서 목표 위치로 서서히 이동
+    cinemachineTransposer.m_FollowOffset = Vector3.Lerp(
+        cinemachineTransposer.m_FollowOffset,  // 현재 위치
+        targetFollowOffset,                     // 목표 위치
+        Time.deltaTime * zoomSpeed              // 보간 속도
+    );
+
+    // 목표에 거의 도달하면 정확히 맞춤 (미세한 떨림 방지)
+    float threshold = 0.01f;
+    if (Vector3.Distance(cinemachineTransposer.m_FollowOffset, targetFollowOffset) < threshold)
+    {
+        cinemachineTransposer.m_FollowOffset = targetFollowOffset;
+    }
+}
+```
+
+**Vector3.Lerp 설명**:
+
+- Linear Interpolation (선형 보간)
+- 두 점 사이를 부드럽게 이동
+- `Lerp(a, b, t)`: a에서 b로 t 비율만큼 이동
+- t가 0이면 a, t가 1이면 b, t가 0.5면 중간
+
+**Mathf.Clamp 설명**:
+
+- 값을 최소/최대 범위 내로 제한
+- `Clamp(value, min, max)`
+- value가 min보다 작으면 min 반환
+- value가 max보다 크면 max 반환
+- 그 사이면 value 그대로 반환
+
+---
+
+## 7. 리팩토링 검증 및 테스트
+
+### Visual Studio로 확인하기
+
+**모든 Input 참조 찾기**:
+
+1. InputManager 클래스의 `Input` 키워드에 커서
+2. 우클릭 → "Find All References"
+3. 확인 결과:
+   - InputManager 클래스 내부에만 Input 참조 존재
+   - Testing 스크립트에 하나 있음 (의도적으로 남김)
+   - 다른 모든 클래스에서는 제거됨
+
+**리팩토링 성공 확인**:
+
+- 모든 입력 관련 코드가 InputManager에 집중됨
+- 다른 클래스들은 InputManager를 통해서만 입력을 받음
+
+### 게임 실행 테스트
+
+**테스트 항목**:
+
+1. **유닛 선택**:
+   - 클릭으로 다른 유닛 선택 → ✅ 작동
+   - `InputManager.Instance.IsMouseButtonDown()` 사용
+2. **유닛 이동**:
+   - 클릭으로 이동 명령 → ✅ 작동
+   - `InputManager.Instance.IsMouseButtonDown()` 사용
+3. **상호작용**:
+   - 문 열기 등의 액션 → ✅ 작동
+   - `InputManager.Instance.IsMouseButtonDown()` 사용
+4. **카메라 이동** (WASD):
+   - 앞/뒤/좌/우 이동 → ✅ 작동
+   - `InputManager.Instance.GetCameraMoveVector()` 사용
+5. **카메라 회전** (Q/E):
+   - 좌/우 회전 → ✅ 작동
+   - `InputManager.Instance.GetCameraRotateAmount()` 사용
+6. **카메라 줌** (마우스 휠):
+   - 줌 인/아웃 → ✅ 작동
+   - `InputManager.Instance.GetCameraZoomAmount()` 사용
+
+**결과**: 모든 기능이 이전과 동일하게 작동함
+
+---
+
+## 📝 핵심 개념 정리
+
+### 1. 리팩토링(Refactoring)이란?
+
+- **정의**: 코드의 동작은 그대로 유지하면서 내부 구조를 개선하는 작업
+- **목적**:
+  - 코드 유지보수성 향상
+  - 미래 변경사항에 대비
+  - 코드 중복 제거
+  - 책임 분리
+
+### 2. Singleton 패턴
+
+```csharp
+public static InputManager Instance { get; private set; }
+
+private void Awake()
+{
+    if (Instance != null)
+    {
+        Destroy(gameObject);
+        return;
+    }
+    Instance = this;
+}
+```
+
+- **장점**:
+  - 어디서든 `InputManager.Instance`로 접근 가능
+  - 한 개의 인스턴스만 존재 보장
+  - 전역 접근점 제공
+- **단점**:
+  - 테스트하기 어려울 수 있음
+  - 과도한 사용은 결합도 증가
+  - 하지만 InputManager 같은 경우에는 적합
+
+### 3. 입력 처리의 계층화
+
+**Before (분산)**:
+
+```
+CameraController → Input.GetKey()
+MouseWorld → Input.mousePosition
+UnitActionsSystem → Input.GetMouseButtonDown()
+
+```
+
+**After (중앙집중)**:
+
+```
+CameraController ↘
+MouseWorld → InputManager → Input 클래스
+UnitActionsSystem ↗
+
+```
+
+### 4. Vector2 vs Vector3 선택
+
+- **Vector2 사용**:
+  - 화면 좌표 (x, y)
+  - 2D 입력 (방향키, WASD)
+  - 불필요한 z 축 제거
+- **Vector3 사용**:
+  - 3D 월드 좌표
+  - 실제 게임 오브젝트 위치
+  - 회전 벡터 (x, y, z 모두 필요)
+
+### 5. 리팩토링 체크리스트
+
+✅ **코드 동작 불변**: 기능이 완전히 동일하게 작동
+✅ **단일 책임**: InputManager가 모든 입력 처리
+✅ **쉬운 변경**: 새 입력 시스템 전환 시 InputManager만 수정
+✅ **테스트 완료**: 모든 기능이 정상 작동 확인
+
+### 6. 다음 단계 준비
+
+이번 리팩토링으로:
+
+- 새로운 입력 시스템으로 전환 준비 완료
+- InputManager 내부만 수정하면 됨
+- 다른 클래스들은 변경 불필요
+- 깔끔한 코드 구조 확립
+
+# { 🎮 Unity New Input System으로 전환하기 }
+
+이번 강의는 기존 Legacy Input Manager를 New Input System Package로 전환하는 방법을 다룹니다. 두 시스템을 모두 활성화하여 개발 중에는 Legacy를 사용하고, 완성 단계에서 New Input System으로 전환하는 실용적인 접근법을 배웁니다.
+
+---
+
+## 📋 목차
+
+1. [New Input System Package 설치하기](https://claude.ai/chat/f6bb3995-c465-4012-bf9d-c201b8cf7a96#1-new-input-system-package-%EC%84%A4%EC%B9%98%ED%95%98%EA%B8%B0)
+2. [Both 모드 활성화하기](https://claude.ai/chat/f6bb3995-c465-4012-bf9d-c201b8cf7a96#2-both-%EB%AA%A8%EB%93%9C-%ED%99%9C%EC%84%B1%ED%99%94%ED%95%98%EA%B8%B0)
+3. [Preprocessor Directive 개념과 활용](https://claude.ai/chat/f6bb3995-c465-4012-bf9d-c201b8cf7a96#3-preprocessor-directive-%EA%B0%9C%EB%85%90%EA%B3%BC-%ED%99%9C%EC%9A%A9)
+4. [Input Actions Asset 생성 및 설정](https://claude.ai/chat/f6bb3995-c465-4012-bf9d-c201b8cf7a96#4-input-actions-asset-%EC%83%9D%EC%84%B1-%EB%B0%8F-%EC%84%A4%EC%A0%95)
+5. [C# Class 자동 생성 및 초기화](https://claude.ai/chat/f6bb3995-c465-4012-bf9d-c201b8cf7a96#5-c-class-%EC%9E%90%EB%8F%99-%EC%83%9D%EC%84%B1-%EB%B0%8F-%EC%B4%88%EA%B8%B0%ED%99%94)
+6. [각 입력 기능별 전환 작업](https://claude.ai/chat/f6bb3995-c465-4012-bf9d-c201b8cf7a96#6-%EA%B0%81-%EC%9E%85%EB%A0%A5-%EA%B8%B0%EB%8A%A5%EB%B3%84-%EC%A0%84%ED%99%98-%EC%9E%91%EC%97%85)
+7. [Processors를 이용한 입력값 보정](https://claude.ai/chat/f6bb3995-c465-4012-bf9d-c201b8cf7a96#7-processors%EB%A5%BC-%EC%9D%B4%EC%9A%A9%ED%95%9C-%EC%9E%85%EB%A0%A5%EA%B0%92-%EB%B3%B4%EC%A0%95)
+8. [최종 테스트 및 완성](https://claude.ai/chat/f6bb3995-c465-4012-bf9d-c201b8cf7a96#8-%EC%B5%9C%EC%A2%85-%ED%85%8C%EC%8A%A4%ED%8A%B8-%EB%B0%8F-%EC%99%84%EC%84%B1)
+
+---
+
+## 1. New Input System Package 설치하기
+
+### Package Manager를 통한 설치
+
+- **Window → Package Manager** 열기
+- **Unity Registry** 선택
+- **Input System** 패키지 찾아서 **Install** 클릭
+
+### 설치 시 나타나는 질문 처리
+
+설치 시 "Input System을 활성화하고 Legacy를 비활성화하시겠습니까?" 질문이 나타납니다.
+
+**강사의 권장사항:**
+
+- **No** 선택 (두 시스템을 모두 사용할 예정)
+- 개발 중에는 Legacy가 빠른 테스트에 유용함
+- 완성 단계에서만 New Input System으로 전환하는 것이 효율적
+
+---
+
+## 2. Both 모드 활성화하기
+
+### Project Settings에서 설정
+
+1. **Edit → Project Settings** 열기
+2. **Player** 탭 선택
+3. **Other Settings** 섹션 펼치기
+4. **Active Input Handling** 찾기
+
+### Both 옵션 선택
+
+**드롭다운 선택지:**
+
+- Input Manager (Old): Legacy만
+- Input System Package (New): New만
+- **Both**: 두 시스템 모두 사용 ✅
+
+**Both 선택 후:**
+
+- "The editor must be restarted" 메시지 표시
+- **Apply** 클릭
+- Unity 에디터 재시작
+- 재시작 후 설정이 Both로 되어있는지 확인
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380481/notion-blog/_/3D_/_/_7_Polish_-_4/image.png)
+
+---
+
+## 3. Preprocessor Directive 개념과 활용
+
+### Preprocessor Directive란?
+
+**컴파일타임 vs 런타임 차이:**
+
+- **런타임 if문**: 게임 실행 중에 매번 조건 체크
+- **컴파일타임 #if**: 코드 빌드 시 한 번만 결정
+
+```csharp
+// 런타임 - 게임 실행 중 매번 체크
+if (someCondition) { DoSomething(); }
+
+// 컴파일타임 - 빌드 시 한 번만 결정
+#if USE_NEW_INPUT_SYSTEM
+    DoSomethingNewWay();
+#else
+    DoSomethingOldWay();
+#endif
+```
+
+### 심볼 정의와 사용법
+
+**파일 최상단에 심볼 정의:**
+
+```csharp
+#define USE_NEW_INPUT_SYSTEM  // 새 입력 시스템 사용
+```
+
+**Preprocessor 기본 구조:**
+
+```csharp
+#if USE_NEW_INPUT_SYSTEM
+    // 심볼이 정의되어 있을 때 컴파일되는 코드
+    return Mouse.current.position.ReadValue();
+#else
+    // 심볼이 정의되어 있지 않을 때 컴파일되는 코드
+    return Input.mousePosition;
+#endif  // if문 종료 (필수!)
+```
+
+**장점:**
+
+- 두 시스템 코드를 모두 유지 가능
+- `#define` 주석 처리만으로 즉시 전환
+- 사용하지 않는 코드는 컴파일에서 제외되어 성능 영향 없음
+
+### InputManager 클래스 상단 구조
+
+```csharp
+#define USE_NEW_INPUT_SYSTEM  // 새 입력 시스템 사용 선언
+
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.InputSystem;  // New Input System용 네임스페이스
+
+public class InputManager : MonoBehaviour
+{
+    // 클래스 내용...
+}
+```
+
+---
+
+## 4. Input Actions Asset 생성 및 설정
+
+### Input Actions Asset 생성
+
+1. Project 창에서 적절한 위치 선택
+2. **우클릭 → Create → Input Actions**
+3. 이름: **PlayerInputActions**
+4. 더블클릭 또는 Inspector의 **Edit Asset** 버튼으로 열기
+
+### Action Map 생성
+
+- 왼쪽 패널의 **+ 아이콘** 클릭
+- 이름: **Player**
+- 모든 플레이어 입력 액션을 여기에 추가
+
+### Camera Movement Action 설정
+
+**Action 생성:**
+
+- Player Action Map에서 **+ 아이콘** 클릭
+- 이름: **CameraMovement**
+
+**Action Properties:**
+
+- **Action Type: Value** (연속적인 값 읽기)
+- **Control Type: Vector2** (X, Y 축 이동)
+
+**WASD Binding 설정:**
+
+1. CameraMovement 확장 (왼쪽 화살표)
+2. CameraMovement 선택 후 **+ 아이콘 → Add Up/Down/Left/Right Composite**
+3. 각 방향 키 할당:
+   - **Up**: Listen 버튼 클릭 후 **W** 키 누르기
+   - **Down**: **S** 키
+   - **Left**: **A** 키
+   - **Right**: **D** 키
+
+**⚠️ 중요: 항상 저장!**
+
+- 창 제목에 **별표(\*)** 가 있으면 미저장 상태
+- **Save Asset** 버튼 반드시 클릭
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380479/notion-blog/_/3D_/_/_7_Polish_-_4/image_1.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380479/notion-blog/_/3D_/_/_7_Polish_-_4/image_2.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380480/notion-blog/_/3D_/_/_7_Polish_-_4/image_3.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380480/notion-blog/_/3D_/_/_7_Polish_-_4/image_4.png)
+
+---
+
+## 5. C# Class 자동 생성 및 초기화
+
+### C# Class 생성 방식 선택
+
+**Player Input Component 방식 (사용 안 함):**
+
+- GameObject에 Player Input 컴포넌트 추가하는 방식
+- 유연성이 떨어짐
+
+**C# Class 자동 생성 방식 (채택):**
+
+- 더 유연한 제어 가능
+- 코드에서 직접 접근
+- 타입 안전성 보장
+
+### 자동 생성 방법
+
+1. **PlayerInputActions Asset** 선택
+2. Inspector에서 **Generate C# Class** 체크
+3. 기본 설정 유지
+4. **Apply** 클릭
+5. Project 창에 **PlayerInputActions.cs** 파일 자동 생성됨
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380480/notion-blog/_/3D_/_/_7_Polish_-_4/image_5.png)
+
+### InputManager에서 초기화
+
+**using 추가:**
+
+```csharp
+using UnityEngine.InputSystem;  // New Input System
+
+```
+
+**인스턴스 생성 및 활성화:**
+
+```csharp
+private PlayerInputActions playerInputAction;  // 변수 선언
+
+private void Awake()
+{
+    // Singleton 패턴 (기존 코드)
+    if (Instance != null)
+    {
+        Debug.LogError("There is more than one InputManager!");
+        Destroy(gameObject);
+        return;
+    }
+    Instance = this;
+
+    // PlayerInputActions 생성 및 활성화
+    playerInputAction = new PlayerInputActions();
+    playerInputAction.Player.Enable();  // 활성화 필수!
+}
+```
+
+**Enable()의 중요성:**
+
+- 활성화하지 않으면 입력이 작동하지 않음
+- 반드시 호출해야 함
+
+---
+
+## 6. 각 입력 기능별 전환 작업
+
+### GetMouseScreenPosition() 전환
+
+```csharp
+public Vector2 GetMouseScreenPostion()
+{
+    #if USE_NEW_INPUT_SYSTEM
+        // Mouse.current로 현재 마우스 접근
+        // position.ReadValue()로 Vector2 값 읽기
+        return Mouse.current.position.ReadValue();
+    #else
+        return Input.mousePosition;
+    #endif
+}
+```
+
+### GetCameraMoveVector() 전환
+
+```csharp
+public Vector2 GetCameraMoveVector()
+{
+    #if USE_NEW_INPUT_SYSTEM
+        // CameraMovement 액션에서 Vector2 값 읽기
+        // WASD 입력을 자동으로 Vector2로 변환
+        return playerInputAction.Player.CameraMovement.ReadValue<Vector2>();
+    #else
+        Vector2 inputMoveDir = new Vector2(0, 0);
+        if (Input.GetKey(KeyCode.W)) { inputMoveDir.y = +1; }
+        if (Input.GetKey(KeyCode.S)) { inputMoveDir.y = -1; }
+        if (Input.GetKey(KeyCode.A)) { inputMoveDir.x = -1; }
+        if (Input.GetKey(KeyCode.D)) { inputMoveDir.x = +1; }
+        return inputMoveDir;
+    #endif
+}
+
+```
+
+### CameraRotate Action 추가
+
+**Input Actions 설정:**
+
+1. 새 Action 생성: **CameraRotate**
+2. Action Type: **Value**
+3. Control Type: **Axis** (좌우 회전만 필요)
+4. **Add Positive/Negative Binding** 선택
+5. Negative: **E** 키 / Positive: **Q** 키
+6. **Save Asset**
+
+**코드 전환:**
+
+```csharp
+public float GetCameraRotateAmount()
+{
+    #if USE_NEW_INPUT_SYSTEM
+        // float 값으로 회전량 읽기
+        return playerInputAction.Player.CameraRotate.ReadValue<float>();
+    #else
+        float rotateAmount = 0f;
+        if (Input.GetKey(KeyCode.Q)) { rotateAmount = +1f; }
+        if (Input.GetKey(KeyCode.E)) { rotateAmount = -1f; }
+        return rotateAmount;
+    #endif
+}
+```
+
+### CameraZoom Action 추가 (1차)
+
+**Input Actions 설정:**
+
+1. 새 Action: **CameraZoom**
+2. Action Type: **Value**
+3. Control Type: **Axis**
+4. Path: **Mouse → Scroll → Y** 선택
+5. **Save Asset**
+
+**코드 전환:**
+
+```csharp
+public float GetCameraZoomAmount()
+{
+    #if USE_NEW_INPUT_SYSTEM
+        return playerInputAction.Player.CameraZoom.ReadValue<float>();
+    #else
+        float zoomAmount = 0f;
+        if (Input.mouseScrollDelta.y > 0) { zoomAmount = -1f; }
+        if (Input.mouseScrollDelta.y < 0) { zoomAmount = +1f; }
+        return zoomAmount;
+    #endif
+}
+```
+
+**문제 발생:**
+
+- 줌이 너무 빠름 (한 번에 최대/최소)
+- 방향이 반대로 작동
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380480/notion-blog/_/3D_/_/_7_Polish_-_4/image_6.png)
+
+---
+
+## 7. Processors를 이용한 입력값 보정
+
+### 문제 원인 분석
+
+**Debug.Log로 값 확인:**
+
+- 기본값: `0`
+- 휠 앞으로: `120` (너무 큰 값!)
+- 휠 뒤로: `120`
+
+**Legacy와의 차이:**
+
+- Legacy: `1`, `0`, `1` 정규화된 값
+- New Input System: `120`, `120` 원시 값
+
+### Processors란?
+
+**역할:**
+
+- 입력값이 코드로 전달되기 전에 자동 처리/변환
+- 코드 수정 없이 Input Actions에서만 설정
+
+**주요 Processor:**
+
+- **Clamp**: 값을 특정 범위로 제한
+- **Invert**: 값의 부호 반전 (양수↔음수)
+
+### Clamp Processor 적용
+
+1. CameraZoom의 Binding 선택 (Mouse → Scroll → Y)
+2. Processors에서 **+ 아이콘 → Clamp** 선택
+3. **Min: -1 / Max: 1** 설정
+
+**결과:**
+
+- `120` → `1`
+- `120` → `1`
+
+### Invert Processor 적용
+
+1. 같은 Processors에서 **+ 아이콘 → Invert** 선택
+
+**처리 순서:**
+
+- 휠 앞으로: `120` → `1` (Clamp) → `1` (Invert)
+- 휠 뒤로: `120` → `1` (Clamp) → `1` (Invert)
+
+**저장 및 테스트:**
+
+- **Save Asset** 클릭
+- 코드 수정 없이 정상 작동!
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380480/notion-blog/_/3D_/_/_7_Polish_-_4/image_7.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380481/notion-blog/_/3D_/_/_7_Polish_-_4/image_8.png)
+
+---
+
+## 8. 최종 테스트 및 완성
+
+### Click Action 추가
+
+**Input Actions 설정:**
+
+1. 새 Action: **Click**
+2. Action Type: **Button** (클릭 감지)
+3. Path: **Mouse → Left Button**
+4. **Save Asset**
+
+### IsMouseButtonDownThisFrame() 전환
+
+**함수 이름 변경:**
+
+- 기존: `IsMouseButtonDown()`
+- 변경: `IsMouseButtonDownThisFrame()`
+- 우클릭 → **Rename Symbol**로 모든 참조 자동 변경
+
+**코드:**
+
+```csharp
+public bool IsMouseButtonDownThisFrame()
+{
+    #if USE_NEW_INPUT_SYSTEM
+        // 이번 프레임에만 true, 다음 프레임부터 false
+        return playerInputAction.Player.Click.WasPressedThisFrame();
+    #else
+        return Input.GetMouseButtonDown(0);
+    #endif
+}
+```
+
+### 전체 기능 테스트
+
+**테스트 항목:**
+
+1. ✅ **카메라 이동 (WASD)**: 정상 작동
+2. ✅ **카메라 회전 (QE)**: 정상 작동
+3. ✅ **카메라 줌 (마우스 휠)**: 천천히 부드럽게 작동
+4. ✅ **유닛 선택/이동 (클릭)**: 정상 작동
+
+**최종 결과:**
+
+- 모든 입력이 New Input System으로 전환 완료
+- Legacy 코드도 보존되어 `#define` 주석만으로 즉시 전환 가능
+
+---
+
+## 💡 핵심 개념 정리
+
+### Preprocessor Directive
+
+| 구분      | Runtime If   | Compile Time #if |
+| --------- | ------------ | ---------------- |
+| 실행 시점 | 게임 실행 중 | 코드 컴파일 시   |
+| 성능      | 매번 체크    | 영향 없음        |
+| 용도      | 게임 로직    | 플랫폼/버전 분기 |
+
+### New Input System 구조
+
+```
+PlayerInputActions
+└── Player (Action Map)
+    ├── CameraMovement (Vector2)
+    ├── CameraRotate (Axis)
+    ├── CameraZoom (Axis + Processors)
+    └── Click (Button)
+
+```
+
+### Action Types
+
+- **Button**: 눌림/안눌림 (클릭, 점프)
+- **Value**: 연속 값 (이동, 조준)
+  - Axis: 1D (회전, 가속)
+  - Vector2: 2D (WASD 이동)
+
+### Processors 활용
+
+```
+원시 입력 → Processor 1 → Processor 2 → 최종값
+  120    →  Clamp(-1,1) →    Invert    →  -1
+
+```
+
+---
+
+## 📝 최종 코드 구조
+
+```csharp
+#define USE_NEW_INPUT_SYSTEM  // 주석 처리하면 Legacy로 전환
+
+using UnityEngine;
+using UnityEngine.InputSystem;
+
+public class InputManager : MonoBehaviour
+{
+    public static InputManager Instance { get; private set; }
+    private PlayerInputActions playerInputAction;
+
+    private void Awake()
+    {
+        if (Instance != null)
+        {
+            Debug.LogError("There is more than one InputManager!");
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+
+        playerInputAction = new PlayerInputActions();
+        playerInputAction.Player.Enable();  // 필수!
+    }
+
+    public Vector2 GetMouseScreenPostion()
+    {
+        #if USE_NEW_INPUT_SYSTEM
+            return Mouse.current.position.ReadValue();
+        #else
+            return Input.mousePosition;
+        #endif
+    }
+
+    public bool IsMouseButtonDownThisFrame()
+    {
+        #if USE_NEW_INPUT_SYSTEM
+            return playerInputAction.Player.Click.WasPressedThisFrame();
+        #else
+            return Input.GetMouseButtonDown(0);
+        #endif
+    }
+
+    public Vector2 GetCameraMoveVector()
+    {
+        #if USE_NEW_INPUT_SYSTEM
+            return playerInputAction.Player.CameraMovement.ReadValue<Vector2>();
+        #else
+            Vector2 inputMoveDir = new Vector2(0, 0);
+            if (Input.GetKey(KeyCode.W)) inputMoveDir.y = +1;
+            if (Input.GetKey(KeyCode.S)) inputMoveDir.y = -1;
+            if (Input.GetKey(KeyCode.A)) inputMoveDir.x = -1;
+            if (Input.GetKey(KeyCode.D)) inputMoveDir.x = +1;
+            return inputMoveDir;
+        #endif
+    }
+
+    public float GetCameraRotateAmount()
+    {
+        #if USE_NEW_INPUT_SYSTEM
+            return playerInputAction.Player.CameraRotate.ReadValue<float>();
+        #else
+            float rotateAmount = 0f;
+            if (Input.GetKey(KeyCode.Q)) rotateAmount = +1f;
+            if (Input.GetKey(KeyCode.E)) rotateAmount = -1f;
+            return rotateAmount;
+        #endif
+    }
+
+    public float GetCameraZoomAmount()
+    {
+        #if USE_NEW_INPUT_SYSTEM
+            // Processors가 자동으로 값 보정
+            return playerInputAction.Player.CameraZoom.ReadValue<float>();
+        #else
+            float zoomAmount = 0f;
+            if (Input.mouseScrollDelta.y > 0) zoomAmount = -1f;
+            if (Input.mouseScrollDelta.y < 0) zoomAmount = +1f;
+            return zoomAmount;
+        #endif
+    }
+}
+
+```
+
+이제 New Input System 전환이 완료되었습니다! 🎮

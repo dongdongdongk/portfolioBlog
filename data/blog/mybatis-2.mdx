@@ -1,0 +1,438 @@
+---
+title: 'MyBatis  쿼리 문법 정리'
+date: '2026-09-02'
+category: '백엔드/Database'
+tags: ['백엔드', 'Database']
+draft: false
+summary: ''
+---
+
+# **<sql>, <include>**
+
+```xml
+<sql> 태그는 다른 구문에서 재사용가능한 SQL구문을 정의할 때 사용
+
+사용방법은 <sql>태그 id속성 추가 및 id속성 값을 부여 해준 후 태그 내에 사용할 쿼리를 작성하면 끝
+
+* 주의점은 재사용할 쿼리의 상단에 선언되어야 한다
+```
+
+```xml
+  	<sql id="id값">
+
+        -- 사용할 쿼리
+
+    </sql>
+```
+
+```xml
+<include> 같은 파일 내에 정의해둔 <sql> 태그 내의 쿼리들을 불러올 수 있게 해 줌
+
+refid속성을 추가 해준 뒤 속성 값으로 불러오고자 하는 <sql> 태그의 id속성 값을 삽입해주면 끝
+```
+
+```xml
+<sql id="t1">
+	where bno = #{bno}
+</sql>
+
+<select id="getTitle" resultType="String">
+
+	select title from tbl_board
+
+    <include refid="t1"></include>
+
+</select>
+```
+
+# **동적 SQL 개념**
+
+```jsx
+MyBatis의 강력한 기능중 하나는 동적 SQL를 처리하는 방법이다.
+
+동적 SQL이란 상황에 따라 분기 처리를 통해 SQL문을 동적으로 만드는 것
+```
+
+# **조건문(if, choose, when, otherwise)**
+
+## **단일 조건 : <if>**
+
+```jsx
+<if test="조건">조건이 참일 때 추가될 문장</if>
+```
+
+```jsx
+// 학생 ID로 학생 정보 조회
+<select id="getStudentInfo" parameterType="String" resultType="hashMap">
+  SELECT * FROM STUDENT WHERE USE_YN = 'Y'
+  <if test='studentId != null and studentId != ""'>AND STUDENT_ID = #{studentId}</if>
+</select>
+```
+
+## **다중 조건 : <choose>, <when>, <otherwise>**
+
+```jsx
+<choose>
+  <when test="조건1">조건1이 참일 때 추가될 문장</when>
+  <when test="조건2">조건1이 거짓이고, 조건2가 참일 때 추가될 문장</when>
+  <otherwise>조건1, 조건2 모두 거짓일 때 실행할 문장</otherwise>
+</choose>
+```
+
+```jsx
+// 검색 기준에 따른 값으로 게시판 정보 조회
+<select id="getStudentInfo" parameterType="hashMap" resultType="hashMap">
+  SELECT * FROM BOARD WHERE USE_YN = 'Y'
+  <choose>
+    <when test='"writer".equals(searchType)'>AND WRITER = #{searchValue}</when>
+    <when test='"content".equals(searchType)'>AND CONTENT = #{searchValue}</when>
+    <otherwise>AND TITLE = #{searchValue}</otherwise>
+  </choose>
+</select>
+```
+
+# **조건 특화 엘리먼트**
+
+## **동적 SQL : <where>**
+
+```jsx
+ · where 조건을 동적으로 추가하는 문법
+
+ · <where> 내부에는 조건을 표현할 수 있는 <if>나 <choose>가 사용될 수 있습니다.
+
+ · <where> 내부 코드가 추가되는 경우 동적으로 WHERE 키워드를 붙이고, **가장 앞에 해당되는 "AND"나 "OR"를 지워줍니다.**
+```
+
+```jsx
+SELECT *
+(
+  <WHERE>
+    <if test="조건">AND 컬럼명 = #{변수}</if>
+    <if test="조건">AND 컬럼명 = #{변수}</if>
+  </WHERE>
+)
+```
+
+```jsx
+<select id="getStudentInfo" parameterType="hashMap" resultType="hashMap">
+    SELECT *
+    FROM BOARD
+    <where>
+        <if test='title != null and title != ""'>
+            AND TITLE = #{title}
+        </if>
+        <if test='writer != null and writer != ""'>
+            AND WRITER = #{writer}
+        </if>
+        <if test='reportingDate != null and reportingDate != ""'>
+            AND REPORTING_DATE = #{reportingDate}
+        </if>
+    </where>
+</select>
+
+예제 결과)
+
+title 파라미터가 "Sample Title"이고 writer 파라미터가 "John Doe"인 경우
+
+SELECT *
+FROM BOARD
+WHERE TITLE = 'Sample Title'
+AND WRITER = 'John Doe'
+```
+
+## **동적 SQL : <set>**
+
+```jsx
+동적으로 SET 키워드를 붙이고 필요없는 콤마를 제거합니다.
+```
+
+```jsx
+UPDATE 테이블명
+<set>
+    <if test="조건">
+        컬럼명 = #{변수},
+    </if>
+    <if test="조건">
+        컬럼명 = #{변수},
+    </if>
+</set>
+```
+
+```jsx
+<update id="updateStudentInfo">
+    UPDATE
+        STUDENT
+    <set>
+        <if test='age != null age != ""'>
+            AGE = #{age},
+        </if>
+        <if test='name != null name != ""'>
+            NAME = #{name},
+        </if>
+        <if test='phoneNumber != null phoneNumber != ""'>
+            PHONE_NUMBER = #{phoneNumber},
+        </if>
+    </set>
+</update>
+
+예제)
+
+age 파라미터가 25이고 name 파라미터가 "John Smith"이며 phoneNumber 파라미터가 "555-555-5555"인 경우
+
+UPDATE STUDENT
+SET AGE = 25, NAME = 'John Smith', PHONE_NUMBER = '555-555-5555'
+```
+
+## **동적 SQL : <trim>**
+
+```jsx
+ · 접두사, 접미사를 추가하거나 오버라이딩하여 커스텀하게 동적 쿼리를 만들 수 있습니다.
+
+
+ · prefix : 실행될 쿼리의 가장 앞에 문자를 추가합니다.
+
+ · prefixOverrides : 실행될 쿼리의 가장 앞에 해당하는 문자가 있는 경우 지워줍니다.
+
+ · suffix : 실행될 쿼리의 가장 뒤에 문자를 추가합니다.
+
+ · suffixOverrides : 실행될 쿼리의 가장 뒤에 해당하는 문자가 있는 경우 지워줍니다.
+```
+
+```jsx
+<trim prefix="문자열" prefixOverrides="문자열" suffix="문자열" suffixOverrides="문자열">
+  실행될 쿼리
+</trim>
+```
+
+```jsx
+// 동적 SQL : <where> 사용
+// ﻿동적으로 WHERE 키워드를 붙이고, 가장 앞에 해당되는 "AND"나 "OR"를 지워줍니다.
+<select id="getStudentInfo" parameterType="hashMap" resultType="hashMap">
+    SELECT *
+    FROM BOARD
+    <trim prefix="WHERE" prefixOverrides="AND|OR">
+        <if test='title != null and title != ""'>
+            AND TITLE = #{title}
+        </if>
+        <if test='writer != null and writer != ""'>
+            AND WRITER = #{writer}
+        </if>
+        <if test='reportingDate != null and reportingDate != ""'>
+            AND REPORTING_DATE = #{reportingDate}
+        </if>
+    </trim>
+</select>
+
+예제 결과)
+
+파라미터 값: title = "Sample Title", writer = "", reportingDate = null
+
+SELECT *
+FROM BOARD
+WHERE TITLE = 'Sample Title'
+
+// 동적 SQL : <set> 사용
+// ﻿동적으로 SET 키워드를 붙이고 필요없는 콤마를 제거합니다.
+<update id="updateStudentInfo">
+    UPDATE
+        STUDENT
+    <trim prefix="SET" prefixOverrides="," suffixOverrides=",">
+        <if test='age != null age != ""'>
+            AGE = #{age},
+        </if>
+        <if test='name != null name != ""'>
+            NAME = #{name},
+        </if>
+        <if test='phoneNumber != null phoneNumber != ""'>
+            PHONE_NUMBER = #{phoneNumber},
+        </if>
+    </trim>
+</update>
+
+예제 결과)
+
+파라미터 값: age = 25, name = "", phoneNumber = "555-555-5555"`
+
+UPDATE STUDENT
+SET AGE = 25, PHONE_NUMBER = '555-555-5555'  //PHONNUMBER 의 ,가 지워졌다
+```
+
+# **반복문(foreach)**
+
+## **반복문 : <foreach>**
+
+```jsx
+ · List,배열 객체가 파라미터로 넘어올 경우 반복하여 처리할 수 있음
+
+
+· collection : 컬렉션 파라미터(Map, List, Set, 배열, .. 등 반복가능한 객체)
+
+ · item : 현재 반복되는 값을 저장할 변수
+
+ · index : 현재 반복되는 인덱스 값을 저장할 변수
+
+ · open : 쿼리가 실행될 때 앞에 추가될 접두사(시작문자열)
+
+ · close : 쿼리가 실행될 때 끝에 추가될 접미사(종료문자열)
+
+ · separator : 컬렉션이 반복될 때 추가될 문자(구분자 문자열)
+
+```
+
+```jsx
+<foreach
+  collection="컬렉션 변수"
+  item="항목"
+  index="인덱스"
+  open="시작문자열"
+  close="종료문자열"
+  separator="구분자"
+>
+  #{item}
+</foreach>
+```
+
+```xml
+// List<HashMap<String, Object> params = new ArrayList<HashMap<String, Object>();
+// HashMap<String, Object>에는 studentId 키값으로 존재
+<select id="getStudentInfoList" parameterType="hashMap" resultType="hashMap">
+    SELECT *
+    FROM STUDENT
+    WHERE STUDENT_ID IN
+    <foreach collection="params" item="item" open="(" separator="," close="")>
+        #{item.studentId}
+    </foreach>
+</select>
+
+예제 결과)
+List<HashMap<String, Object>> params = new ArrayList<HashMap<String, Object>>();
+HashMap<String, Object> param1 = new HashMap<>();
+param1.put("studentId", 1);
+HashMap<String, Object> param2 = new HashMap<>();
+param2.put("studentId", 2);
+params.add(param1);
+params.add(param2);
+
+SELECT *
+FROM STUDENT
+WHERE STUDENT_ID IN (1, 2)
+
+// List<String> params = new ArrayList<String>();
+<select id="getStudentInfoList" parameterType="hashMap" resultType="hashMap">
+    SELECT *
+    FROM STUDENT
+    WHERE STUDENT_ID IN
+    <foreach collection="params" item="item" open="(" separator="," close=")">
+        #{item}
+    </foreach>
+</select>
+
+예제 결과)
+
+List<String> params = new ArrayList<String>();
+params.add("1");
+params.add("2");
+
+SELECT *
+FROM STUDENT
+WHERE STUDENT_ID IN (1, 2)
+```
+
+# **다중 쿼리(selectKey)**
+
+## **다중 쿼리 : <selectKey>**
+
+```jsx
+ · MyBatis 쿼리문을 실행하기전 <selectKey> 태그안에 쿼리를 먼저 수행하여 해당 조회된 결과를 파라미터로 사용할 수 있습니다.
+
+
+ · <selectKey>의 결과로 나오는 데이터의 row 수는 1개여야 합니다.
+
+ · resultType : 결과의 타입
+
+ · keyProperty : selectKey 구문의 결과가 세팅될 대상 프로퍼티
+
+ · keyColumn : 리턴되는 결과셋의 컬럼명은 프로퍼티에 일치, 여러개의 컬럼을 사용하는 경우 콤마를 사용해서 구분
+
+ · order : 쿼리 수행 순서(BEFORE, AFTER)
+```
+
+```jsx
+// 1. 단일 프로퍼티(BEFORE)
+// #{프로퍼티명} 으로 바인드 변수 사용할 수 있음
+<selectKey keyProperty="프로퍼티명" resultType="string" order="BEFORE">
+    SELECT 컬럼명
+    FROM 테이블명
+    WHERE 조건
+</selectKey>
+
+// 1. 단일 프로퍼티(AFTER)
+// JAVA단에서 AFTER로 보낸 값을 사용할 수 있음, 바인드변수 불가
+<selectKey keyProperty="프로퍼티명" resultType="string" order="AFTER">
+    SELECT 컬럼명
+    FROM 테이블명
+    WHERE 조건
+</selectKey>
+
+// 2. 다중 프로퍼티
+<selectKey keyColumn="컬럼명, 컬럼명" keyProperty="변수명, 변수명" resultType="hashMap" order="BEFORE">
+    SELECT 컬럼명, 컬럼명
+    FROM 테이블명
+    WHERE 조건
+</selectKey>
+```
+
+```jsx
+// 입력하기전 특정키값을 조회하여 처리
+<insert id="insert">
+    <selectKey keyProperty="boardId" resultType="string" order="BEFORE">
+        SELECT MAX(BOARD_ID) + 1 AS boardId
+        FROM BOARD
+    </selectKey>
+    INSERT INTO BOARD (
+        BOARD_ID,
+        TITLE,
+        CONTENT
+    ) VALUES (
+        #{boardId},
+        #{title},
+        #{content}
+    )
+</insert>
+
+// 방금 입력한 값의 특정값 리턴
+<insert id="insertSurveyInfo" parameterType="Board">
+    INSERT INTO BOARD (
+        BOARD_ID,
+        TITLE,
+        CONTENT
+    ) VALUES (
+        #{boardId},
+        #{title},
+        #{content}
+    )
+    <selectKey keyProperty="boardId" resultType="string" order="AFTER">
+        SELECT LAST_INSERT_ID()
+    </selectKey>
+</insert>
+
+// selectKey 여러개 사용
+<insert id="insert">
+    <selectKey keyColumn="boardId, seq" keyProperty="boardId, seq" resultType="hashMap" order="BEFORE">
+        SELECT MAX(BOARD_ID) + 1 AS boardId,
+               boardSeq.NEXTVAL AS seq
+        FROM BOARD
+    </selectKey>
+    INSERT INTO BOARD (
+        SEQ,
+        BOARD_ID,
+        TITLE,
+        CONTENT
+    ) VALUES (
+        #{seq},
+        #{boardId},
+        #{title},
+        #{content}
+    )
+</insert>
+```

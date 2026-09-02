@@ -1,0 +1,469 @@
+---
+title: '4단원: Switch 사용하기'
+date: '2026-09-02'
+category: '게임 개발/WWISE'
+tags: ['게임 개발', 'WWISE']
+draft: false
+summary: ''
+---
+
+# { 🎵 4단원: Switch 사용하기 정리 }
+
+## 1. 개념 (왜 필요한가?)
+
+- 지금까지는 **Event**라는 게임 호출(Game Call)을 사용했음.
+  → “특정 순간에 소리를 재생하라”는 명령 (예: Wwizard가 얼음 보석을 발사할 때).
+- 이번 단원부터는 **Game Syncs**라는 또 다른 형태의 게임 호출을 배움.
+  → 이벤트보다 더 많은 **상태 정보**를 전달할 수 있음.
+  → 예시:
+  - 플레이어가 걷는 표면의 종류(돌, 풀, 나무, 물 등)
+  - 플레이어의 체력 상태
+  - 캐릭터가 살아 있는지 / 죽었는지
+
+즉, **Game Syncs = 게임 내 조건(상황)을 소리에 반영할 수 있는 시스템**
+
+그중 이번 단원에서는 **Switch**를 사용해 상황별 사운드 변화를 구현함.
+
+---
+
+## 2. 예시 상황 (게임과 연결)
+
+- Cube 게임에서 Wwizard는 계속 뛰어다님.
+- 플레이어의 시점에서는 발은 보이지 않지만, 발밑의 지형은 계속 바뀜 (돌길, 흙길, 나무 바닥 등).
+- 이때 **Switch**를 사용하면, 같은 “발자국 소리”라도 **표면에 따라 자동으로 다른 소리**가 재생되도록 만들 수 있음.
+  → 돌 위를 걸으면 딱딱한 “딱딱” 소리
+  → 풀밭 위를 걸으면 “바스락” 소리
+  → 나무 위를 걸으면 “쿵쿵” 소리
+
+---
+
+## 3. 이 단원에서 배우는 기술 (목표)
+
+1. **하위 폴더가 포함된 WAV 파일 가져오기**
+
+   → 예: `Footsteps` 폴더 안에 `Stone`, `Grass`, `Wood` 폴더가 각각 존재하는 구조
+
+   → 이렇게 가져오면 Switch를 만들 때 자동으로 정리하기 쉬움.
+
+2. **Switch Groups 만들기**
+   - Switch Group = “조건의 종류” (예: Surface_Type)
+   - Switch = “조건의 세부 항목” (예: Stone, Grass, Wood)
+   - 게임 엔진이 “현재 표면은 Grass야”라는 정보를 전달하면 → Wwise가 알아서 해당 발자국 소리를 재생함.
+3. **Transport Control에서 Switch Groups 들어보기**
+   - 실제 게임을 실행하지 않고도, Wwise 내에서 Switch 상태를 바꿔가며 미리 들어볼 수 있음.
+   - 예: Transport Control에서 Switch를 Stone → Grass → Wood로 바꾸면 발자국 소리도 즉시 바뀜.
+
+---
+
+## 4. 결과
+
+- 발자국 소리를 단순히 하나만 쓰는 게 아니라, 표면 상황에 맞게 **자동으로 다양하게 바뀌는 오디오** 구현 가능.
+- 플레이어 입장에서는 실제로 발밑 환경이 달라졌다는 사실을 **귀로 체감**하게 됨 → 더 깊은 몰입감 제공.
+
+---
+
+## 5. 응용/이유
+
+- **Switch**는 발자국뿐만 아니라 다양한 곳에 활용 가능:
+  - 무기 소리가 표면(금속/나무/돌)에 따라 달라짐
+  - 캐릭터의 목소리가 체력 상태에 따라 숨이 차거나 정상적으로 들림
+  - 배경음악이 지역에 따라 바뀜 (마을/던전/보스 방 등)
+
+즉, Switch는 게임 속 **조건별 오디오 변환의 핵심 도구**라고 할 수 있음.
+
+---
+
+👉 요약하면:
+
+- **Event**는 "지금 재생해!"라는 단순 호출
+- **Switch**는 "지금 상황이 이런데, 그에 맞는 소리를 골라 재생해!"라는 스마트 호출
+
+---
+
+# { 🎵 Switch Group 만들기 정리 }
+
+## 1. 개념 (Switch Group이란?)
+
+- **Switch Group** = 게임 내 특정 조건(상태)을 관리하는 “카테고리”
+- 그 안에는 **Switch**라는 세부 항목들이 들어감
+  → 예: Switch Group: **Material**
+  → Switches: **Stone, Grass, Wood, Water**
+- 게임 엔진은 현재 상황(조건)을 Switch로 알려주고, Wwise는 그에 맞는 소리를 자동으로 재생함.
+- 따라서, 발자국 소리를 표면별로 다르게 표현할 수 있음.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380566/notion-blog/_/WWISE/Wwise_/4_Switch_/image.png)
+
+---
+
+## 2. 단계 (Switch Group 생성하기)
+
+1. **Cube 실행하기**
+   - Cube를 실행 → Wwise와 Cube가 연결될 수 있도록 준비.
+2. **Wwise 프로젝트 열기**
+   - Wwise 실행 → `Module 4` 프로젝트 파일 열기.
+3. **Cube와 연결하기**
+   - Cube와 Wwise를 연결 → 게임 속 사운드 변경 사항을 실시간 테스트 가능.
+4. **Game Syncs 탭 선택하기**
+   - `Project Explorer` → `Game Syncs` 탭 클릭.
+   - 여기에는 여러 Game Sync 유형(States, Switches, RTPC 등)이 있음.
+   - 지금 필요한 건 “발자국 소리 조건” → **Switches** 사용.
+5. **Switch Group 생성하기**
+   - `Switches` 폴더 → `Default Work Unit` 선택.
+   - 상단에서 **Create new 'Switch Group' 아이콘** 클릭.
+6. **이름 지정하기**
+   - 새로 만들어진 Switch Group의 이름을 `Material`로 변경.
+   - 이 이름은 게임 코드와 반드시 일치해야 함 (Cube에서는 이미 `Material`로 사용됨).
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380564/notion-blog/_/WWISE/Wwise_/4_Switch_/image_1.png)
+
+---
+
+## 3. 결과
+
+- 이제 **Switch Group: Material** 이 준비됨.
+- 앞으로 이 안에 `Stone`, `Grass`, `Wood` 같은 Switch들을 만들어 → 발자국 소리를 표면에 맞게 매핑할 수 있음.
+- 단순히 “발자국 소리 재생”이 아니라 → “어떤 표면에서의 발자국 소리”인지 구분 가능.
+
+---
+
+## 4. 응용 포인트
+
+- Switch Group은 발자국 소리 외에도 다양한 곳에 활용 가능:
+  - 보석이 떨어지는 소리 (금속 위 / 나무 위 / 돌 위)
+  - 무기 타격음 (적의 갑옷이 가죽인지, 금속인지에 따라 다른 소리)
+  - 환경 사운드 (실내/실외, 물속/지상 등)
+
+즉, **Switch Group = 게임 상황을 오디오에 반영하는 핵심 구조물**.
+
+---
+
+# { 🎵 Switch Group 내에서 옵션 정의하기 }
+
+## 1. 개념 (Switch 옵션이란?)
+
+- **Switch Group** = 카테고리 (예: `Material`)
+- **Switch** = 그 안에 들어가는 구체적인 선택지 (예: `Concrete`, `Grass`, `Wood` 등)
+- 게임 엔진은 상황에 맞게 특정 Switch를 활성화시켜 Wwise에 전달.
+  → Wwise는 활성화된 Switch에 맞는 사운드를 자동으로 재생.
+- 따라서 Switch 이름은 반드시 **게임 엔진 코드와 동일하게** 해야 하며, 프로그래머와 합의된 이름을 사용해야 함.
+
+---
+
+## 2. 단계 (Switch 옵션 정의하기)
+
+1. **Switch Group 선택**
+   - `Project Explorer` → `Game Syncs 탭` → `Switches` → `Material Switch Group` 선택.
+2. **새 Switch 추가**
+   - 상단에서 **Create new 'Switch' 아이콘** 클릭.
+   - 첫 번째 Switch가 생성됨 → 이름을 `Concrete` 로 변경.
+3. **나머지 표면 Switch 추가**
+   - Cube 게임에서는 총 9가지 표면이 있음 → 따라서 Switch도 9개 필요.
+   - `Concrete`를 만든 후:
+     - `Ctrl + C` (복사) → `Ctrl + V` (붙여넣기) 8번 반복 → 총 9개의 Switch 생성.
+     - 각 Switch 이름을 차례대로 변경 (Tab 키 활용하면 빠르게 이름 변경 가능).
+   - 예시 이름 (Cube 기준):
+     - Concrete
+     - Dirt
+     - Grass
+     - Gravel
+     - Metal
+     - Snow
+     - Water
+     - Wood
+     - Carpet
+
+---
+
+## 3. 결과
+
+- `Material Switch Group` 안에 9개의 Switch가 들어감.
+- 이제 게임 엔진에서 플레이어가 특정 표면 위에 있다고 신호를 보내면, Wwise가 해당 Switch에 연결된 사운드를 자동으로 선택해 재생할 수 있음.
+- 즉, 플레이어가 **눈 위**를 걸을 때는 `Snow` 사운드, **금속 바닥 위**를 걸을 때는 `Metal` 사운드가 나오도록 할 수 있음.
+
+---
+
+## 4. 응용 포인트
+
+- Switch 옵션은 발자국 소리 외에도 다양한 맥락에서 활용 가능:
+  - 무기의 타격 대상이 무엇인지 (갑옷, 살, 나무, 돌 등)
+  - 날씨나 환경 변화 (맑음, 비, 눈, 폭풍 등)
+  - 캐릭터 상태 (건강, 부상, 죽음 등)
+
+즉, **Switch 옵션을 잘 정의하는 것 = 게임 내 상황을 오디오적으로 다양하게 표현할 수 있는 기본 토대**.
+
+---
+
+# { 🎚️ Switch Container 만들기 }
+
+## 1) 개념 요약 — 왜 Switch Container를 만드는가?
+
+- **Switch Container** 는 게임에서 전달되는 **Switch 값(예: 바닥 재질)** 에 따라 내부에 있는 여러 소리 집합(또는 컨테이너) 중에서 **어떤 소리를 재생할지 선택**해 주는 오브젝트입니다.
+- 발자국 구현의 경우: 각 표면 유형마다 발자국 사운드 집합을 만들고, 게임에서 현재 표면(예: Concrete, Grass)을 알려주면 Wwise가 적절한 사운드를 골라 재생합니다.
+- 장점: 게임 상태(표면)에 따른 자동 분기, 오디오 자원 관리 용이, 유지보수 편리.
+
+---
+
+## 2) 준비사항
+
+- Wwise에서 **Module 4 프로젝트**가 열려 있어야 함.
+- **Cube**(테스트 게임) 실행 및 Wwise와 연결 가능 상태 권장(실시간 테스트용).
+- 파일 위치: `Module 4\Audio files for Module 4\Footsteps` 폴더(하위 폴더 포함)가 준비되어 있음.
+
+---
+
+## 3) 단계별 작업
+
+1. **Audio 탭 선택**
+   - `Project Explorer`에서 **Audio** 탭을 클릭.
+2. **Actor-Mixer Hierarchy 위치 선택**
+   - Actor-Mixer Hierarchy에서 **Default Work Unit**(혹은 원하는 Work Unit)을 우클릭.
+3. **Import Audio Files 선택**
+   - 우클릭 메뉴에서 **Import Audio Files** 클릭 → **Audio File Importer** 대화상자 열림.
+4. **폴더 추가**
+   - `Add Folders` 버튼 클릭.
+   - 파일 탐색기에서 `Module 4\Audio files for Module 4` 폴더 아래의 **Footsteps** 폴더 선택 → **Select Folder** 클릭.
+
+   > 팁: 개별 파일을 하나하나 가져오는 것보다 폴더를 가져오는 것이 Wwise가 오브젝트(폴더→컨테이너 등)를 자동으로 정리해 주기 때문에 훨씬 편함.
+
+5. **Object Type/Action 설정 (루트 폴더)**
+   - Audio File Importer에서 **Footsteps**(루트) 항목의 **Object Type/Action** 을 **Switch Container** 로 변경.
+   - (이렇게 하면 루트가 Switch Container로 들어가고, 그 안의 하위 폴더들은 자동으로 적절한 오브젝트 타입으로 매핑됨.)
+6. **하위 항목 자동 설정 확인**
+   - Import 창 설명: 각 하위 폴더는 **자동으로 Random Container** 로 설정되고, 그 안의 개별 WAV들은 **Sound SFX** 오브젝트로 설정됩니다.
+   - (즉, 폴더 구조 → Random Container(사운드 집합) → Sound SFX(실제 파일) 구조가 자동 생성됨.)
+7. **Import 실행**
+   - **Import** 버튼 클릭.
+8. **결과 확인**
+   - Actor-Mixer Hierarchy에 **새 Switch Container: Footsteps** 가 생성됨.
+   - Footsteps 계층을 확장하면 하위에 여러 Random Container(또는 Sound SFX 그룹)가 있고, 그 안에 각 WAV 파일별 Sound SFX 오브젝트들이 생성된 것을 볼 수 있음.
+9. **마무리(축소)**
+   - 진행하기 전에 `Footsteps` Switch Container를 접어 놓음(collapse) — 다음 작업(매핑 등)을 깔끔하게 진행하기 위함.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380564/notion-blog/_/WWISE/Wwise_/4_Switch_/image_2.png)
+
+---
+
+## 4) 확인 포인트 (실수하기 쉬운 부분)
+
+- **루트 폴더(=Footsteps)를 반드시 Switch Container로 설정**해야 이후 게임의 Switch 값과 매핑할 때 올바르게 동작합니다.
+- 하위 폴더가 자동으로 Random Container로 되었는지, WAV 파일들이 Sound SFX로 들어갔는지 확인하세요.
+- 폴더/파일 이름이 **나중에 Switch 이름과 연동할 때 헷갈리지 않도록 일관된 네이밍**(예: `Stone`, `Grass`, `Wood` 등)을 유지하면 매핑 작업이 훨씬 수월합니다.
+
+---
+
+## 5) 왜 하위 폴더가 4개뿐인가? (설명)
+
+- 프로젝트에서 정의한 Switch(표면)는 9개였지만, 실제로 준비된 소리 세트가 4개뿐인 경우가 자주 있습니다.
+- 이 상황에서는 **같은 소리 세트를 여러 Switch에 재사용**하거나(예: `Carpet`과 `Carpet2`가 동일한 사운드 사용), 부족한 표면은 추후 리소스 추가로 보완할 수 있습니다.
+- 즉, 모든 Switch에 고유한 소리가 반드시 있어야 하는 건 아니며, 리소스 상황에 따라 합리적으로 재사용/매핑하면 됨.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380564/notion-blog/_/WWISE/Wwise_/4_Switch_/image_3.png)
+
+---
+
+## 6) 다음 단계(권장)
+
+- 다음으로는 **이 Switch Container의 각 자식(Random Container / SFX)** 를 **Game Syncs → Material Switch Group** 의 각 Switch 값(Concrete, Dirt, Grass 등)에 **매핑(mapping)** 하는 작업이 필요합니다.
+  - 예: `Material:Concrete` → `Footsteps` 안의 `Concrete` Random Container(또는 특정 SFX 집합)를 연결.
+- 매핑이 완료되면 Transport Control이나 Cube에서 Switch를 변경해 가며 바로 소리가 바뀌는지 테스트하세요.
+
+---
+
+## 7) 추가 팁
+
+- 폴더 구조 설계 권장:
+  - `Footsteps/Concrete/…wav`
+  - `Footsteps/Grass/…wav`
+  - 이런 식으로 폴더-네임이 Switch 이름과 매칭되면 임포트 후 매핑 및 관리가 쉬움.
+- 각 Random Container 안에서 **피치/볼륨 랜덤화**, **Limit Repetition**, **Shuffle** 등 앞서 배운 기법을 적용하면 같은 표면에서도 더 자연스럽고 다양한 발자국 소리를 만들 수 있습니다.
+
+---
+
+# { Switch와 Switch Container 연결하기 }
+
+## 1. 왜 Switch와 Switch Container가 필요한가?
+
+게임에서는 상황(조건)에 따라 같은 행동이라도 **다른 소리**가 나야 할 때가 많습니다.
+
+예를 들어:
+
+- **콘크리트 바닥** 위를 걸을 때 → 딱딱한 발자국 소리
+- **잔디** 위를 걸을 때 → 푹신한 발자국 소리
+- **물** 위를 걸을 때 → 첨벙 소리
+
+이렇게 "상황"에 따라 "다른 소리"가 나오게 만드는 장치가 바로:
+
+- **Switch Group**: 상황(조건)을 정의 → “이건 잔디야”, “이건 콘크리트야” 같은 정보
+- **Switch Container**: 그 상황에 맞는 소리를 저장 → 잔디 발자국, 콘크리트 발자국 등
+
+👉 정리하면:
+
+게임이 "조건"을 알려주면, Switch Container가 그에 맞는 소리를 꺼내서 재생하는 구조입니다.
+
+---
+
+## 2. Switch Container와 Switch Group 연결하기
+
+1. **Footsteps 오브젝트 선택**
+
+   → 이게 발자국 소리를 담당하는 Switch Container.
+
+2. **Switch Group 지정**
+   - Property Editor에서 `Switch Group or State Group` 항목을 열고,
+   - 아까 만든 **Material** Switch Group(Concrete, Grass 등 포함)을 연결.
+     → 이제 Footsteps는 "어떤 표면인지" 정보를 받을 준비 완료!
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380565/notion-blog/_/WWISE/Wwise_/4_Switch_/image_4.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380565/notion-blog/_/WWISE/Wwise_/4_Switch_/image_5.png)
+
+```jsx
+아까 만든 Material 연결 기본값 설정
+```
+
+---
+
+## 3. 기본값(Default Switch) 설정
+
+문제: 만약 게임이 "지금은 어떤 표면인지" 정보를 못 준다면?
+
+- 그냥 소리가 안 나면 게임 몰입감이 깨짐.
+- 그래서 기본값(예: Concrete)을 지정해 둡니다.
+  👉 이렇게 하면 **정보가 없어도 최소한 발자국 소리는 항상 나옴**.
+
+---
+
+## 4. 표면과 사운드 매핑하기
+
+이제 실제로 각 표면에 소리를 연결해야 합니다.
+
+- Concrete Switch → Concrete 발자국 소리
+- Grass Switch → Dirt 발자국 소리(임시 연결)
+- 나머지 표면들도 각각 매핑
+
+⚡ 중요한 점:
+
+- 모든 표면을 반드시 매핑해둬야 함 → 그래야 게임 중에 **무음 구간**이 생기지 않음.
+- 실제 소리가 없을 때는 비슷한 소리로 임시 연결 후, 나중에 교체 가능.
+- 하나의 표면에 여러 소리를 연결하면 → 동시에 재생 가능 (더 풍부한 효과).
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380565/notion-blog/_/WWISE/Wwise_/4_Switch_/image_6.png)
+
+```jsx
+표면과 매핑
+```
+
+---
+
+## 5. 핵심 이해 포인트
+
+- **Switch Group = 상황(조건) 전달 장치**
+- **Switch Container = 조건에 따라 소리 꺼내는 보관함**
+- **Default Switch = 안전망**
+- **모든 표면에 사운드 매핑 = 무음 방지**
+
+---
+
+## 6. 이번 강의로 얻은 것
+
+- 게임 상황(표면 종류)에 따라 소리를 다르게 재생하는 방법을 알게 됨.
+- 게임에 필요한 **조건(정보)와 소리**를 연결하는 구조 이해.
+- 준비되지 않은 소리도 임시로 매핑해두는 실무적인 팁 학습.
+
+👉 한마디로:
+
+"이제 플레이어가 걷는 표면이 바뀔 때마다, 그에 맞는 발자국 소리가 나도록 시스템을 완성했다!"
+
+---
+
+# { 🎵 Event 만들기 & Switch 전환 시뮬레이션 정리 }
+
+## 1. 왜 Event를 만들어야 할까? (개념)
+
+- 게임에서 **소리를 재생할 타이밍**을 정확하게 잡아야 해요.
+  예를 들어, 플레이어 캐릭터가 발을 디딜 때마다 발자국 소리가 나야겠죠.
+- 이 "타이밍 신호"를 **게임 → Wwise**로 전달하는 역할을 하는 게 바로 **Event**예요.
+- 즉, **Event = 게임에서 사운드를 실행시키는 명령어**라고 생각하면 이해하기 쉽습니다.
+
+---
+
+## 2. Switch 시스템과 Event의 연결
+
+- 이미 발자국 소리가 어떤 **표면(Surface)**에서 나느냐에 따라 달라지도록 **Switch 시스템**을 만들어 놓았습니다.
+- 하지만, 단순히 Switch만 있다고 소리가 나는 건 아니에요.
+- 게임에서 캐릭터가 실제로 "발을 디뎠다"는 신호가 와야 소리를 낼 수 있습니다.
+- 이 신호를 주는 것이 바로 우리가 만드는 **Foot_Player Event**입니다.
+
+---
+
+## 3. Wwise에서 Event 만들기
+
+1. **Project Explorer**에서 `Footsteps Switch Container`를 **우클릭** → `New Event > Play` 선택
+
+   → 자동으로 `Play_Footsteps` Event 생성됨.
+
+2. 이름을 게임에서 쓰는 것과 맞추기 위해 **Foot_Player**로 변경
+
+   (게임 코드와 Wwise 이름이 같아야 연결이 쉬워요).
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380565/notion-blog/_/WWISE/Wwise_/4_Switch_/image_7.png)
+
+```jsx
+새로운 이벤트 만들기
+```
+
+---
+
+## 4. Wwise에서 미리 들어보기 (Cube에서 실행하기 전)
+
+- **Transport Control**(재생창)에서 Event를 재생해볼 수 있습니다.
+- 스페이스바 = Play 버튼 → 발자국 소리 랜덤 재생
+- 기본적으로 **콘크리트 소리**가 들림
+
+👉 하지만, 우리는 다양한 표면을 시험해봐야겠죠?
+
+1. Transport Control에서 **Display Switches 버튼** 클릭
+2. 드롭다운 메뉴에서 **Gravel** 선택 후 재생 → 자갈 발자국 소리 재생됨
+3. 다른 표면도 선택해서 들어볼 수 있음
+4. `Reset All` 버튼으로 모든 Switch를 초기화 가능
+
+즉, **게임에서 실제로 달리거나 걷지 않아도, Wwise 내에서 다양한 상황을 가상으로 테스트할 수 있는 기능**이에요.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380565/notion-blog/_/WWISE/Wwise_/4_Switch_/image_8.png)
+
+```jsx
+만들어진 이벤트
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380566/notion-blog/_/WWISE/Wwise_/4_Switch_/image_9.png)
+
+```jsx
+**이벤트를 선택하고 Display Switches 를 클릭하고 바로 소리를 테스트 가능**
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380564/notion-blog/_/WWISE/Wwise_/4_Switch_/image_10.png)
+
+```jsx
+리셋을 통해서 모든 Switch를 초기화 가능
+```
+
+---
+
+## 5. Cube에서 실제 실행해보기
+
+1. Cube 실행 → 캐릭터(Wwizard)를 움직임
+2. 발자국 소리가 실제로 들리고, 표면이 바뀌면 발자국 소리도 바뀜
+
+   (예: 콘크리트 → 자갈 → 나무)
+
+3. 게임 종료 = `Esc` → 방향키로 **quit** 선택 → `Enter`
+
+---
+
+# 📌 핵심 요약
+
+- **Event = 게임에서 소리를 실행하는 명령어**
+- **Switch = 상황(예: 표면 종류)에 따라 소리를 바꿔주는 시스템**
+- Event와 Switch를 연결하면,
+  → 플레이어가 특정 타이밍(발 디딤) + 특정 상황(표면 종류)에 따라 다른 소리를 재생 가능
+- Wwise에서 미리 테스트(시뮬레이션) 가능 → 실제 Cube 실행 전에 사운드 확인 가능

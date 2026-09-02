@@ -1,0 +1,546 @@
+---
+title: '6단원: State 사용하기'
+date: '2026-09-02'
+category: '게임 개발/WWISE'
+tags: ['게임 개발', 'WWISE']
+draft: false
+summary: ''
+---
+
+# { 🎵 State 사용과 오디오 반응 시스템 이해하기 }
+
+## 📋 목차
+
+1. [State란 무엇인가?](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#state%EB%9E%80-%EB%AC%B4%EC%97%87%EC%9D%B8%EA%B0%80)
+2. [State Group 만들기](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#state-group-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+3. [State의 전환(Transition) 이해하기](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#state%EC%9D%98-%EC%A0%84%ED%99%98transition-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+4. [State를 활용한 사운드 제어](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#state%EB%A5%BC-%ED%99%9C%EC%9A%A9%ED%95%9C-%EC%82%AC%EC%9A%B4%EB%93%9C-%EC%A0%9C%EC%96%B4)
+5. [Transport Control에서 State Group 테스트하기](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#transport-control%EC%97%90%EC%84%9C-state-group-%ED%85%8C%EC%8A%A4%ED%8A%B8%ED%95%98%EA%B8%B0)
+6. [레벨 시작 시 사운드 트리거하기](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#%EB%A0%88%EB%B2%A8-%EC%8B%9C%EC%9E%91-%EC%8B%9C-%EC%82%AC%EC%9A%B4%EB%93%9C-%ED%8A%B8%EB%A6%AC%EA%B1%B0%ED%95%98%EA%B8%B0)
+7. [State와 다른 Game Sync 비교](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#state%EC%99%80-%EB%8B%A4%EB%A5%B8-game-sync-%EB%B9%84%EA%B5%90)
+8. [실전 예시: 심장 박동 멈추게 하기](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#%EC%8B%A4%EC%A0%84-%EC%98%88%EC%8B%9C-%EC%8B%AC%EC%9E%A5-%EB%B0%95%EB%8F%99-%EB%A9%88%EC%B6%94%EA%B2%8C-%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. State란 무엇인가?
+
+- **정의**:
+  State는 **게임의 전역적 상태를 나타내는 오디오 동기화(Game Sync)** 방식입니다.
+  특정 이벤트(예: 플레이어가 죽음, 물 속에 들어감, 보스전 시작 등)에 따라 **게임 전체의 사운드 환경**을 바꾸는 데 사용됩니다.
+- **특징**:
+  - 단순히 값이 변하는 RTPC와 달리, State는 **불연속적인 상태 전환**을 다룹니다.
+  - 예:
+    - Alive ↔ Dead
+    - Normal ↔ Underwater
+    - SafeZone ↔ BattleZone
+- **활용 예시**:
+  - 플레이어가 죽었을 때 **모든 사운드를 로우패스 처리** → 흐릿하게 들리게 만들기.
+  - 전투가 시작되면 **음악 트랙을 바꾸기**.
+  - 심장 박동 소리를 **플레이어가 살아있을 때만 반복**하다가, 죽으면 멈추도록 하기.
+
+---
+
+## 2. State Group 만들기
+
+- **개념**:
+  State는 항상 **State Group(상태 그룹)** 안에 속합니다.
+  그룹은 “상태의 집합”이며, 각 그룹에는 최소 두 개 이상의 상태가 있어야 합니다.
+- **예시**:
+  - State Group: `PlayerCondition`
+    - State 1: Alive
+    - State 2: Dead
+- **만드는 방법(Wwise 내부)**:
+  1. **Project Explorer → Game Syncs → States** 경로에서 `Default Work Unit` 선택.
+  2. **Create New State Group** 클릭.
+  3. 이름 지정: 예) `PlayerCondition`.
+  4. 그 안에 상태 추가: `Alive`, `Dead`.
+
+---
+
+## 3. State의 전환(Transition) 이해하기
+
+- **Transition**이란?
+  하나의 State에서 다른 State로 넘어갈 때, **오디오 효과가 바뀌는 데 걸리는 시간**을 지정하는 기능.
+- **옵션들**:
+  - **Instant(즉시)**: 바로 전환됨.
+  - **Fade(페이드)**: 부드럽게 전환됨 (값을 서서히 변화시킴).
+  - **Custom Curve**: 사용자가 정의한 곡선을 따라 점진적으로 전환.
+- **예시**:
+  - Alive → Dead로 넘어갈 때 1초 동안 볼륨이 줄어들고 로우패스 필터가 점점 적용됨.
+
+---
+
+## 4. State를 활용한 사운드 제어
+
+- **State는 오브젝트 속성(Property)에 영향을 줌**.
+- 적용할 수 있는 대표 속성:
+  - **Volume**: 소리 크기
+  - **Low-Pass Filter (LPF)**: 소리가 탁하게 변함
+  - **High-Pass Filter (HPF)**: 저음이 깎이고 고음만 남음
+  - **Pitch**: 소리의 높낮이
+  - **Bus Routing**: 특정 오디오 버스로 신호를 보낼지 결정
+- **예시**:
+  - Alive 상태 → 심장 박동 소리 활성화, Volume 100%
+  - Dead 상태 → 심장 박동 소리 중지, 전체 사운드에 LPF 적용
+
+---
+
+## 5. Transport Control에서 State Group 테스트하기
+
+- **Transport Control**: Wwise에서 사운드를 테스트하는 창.
+- **State Group 테스트 방법**:
+  1. Transport Control 열기.
+  2. `Display States` 버튼 클릭.
+  3. 만든 State Group (`PlayerCondition`)이 표시됨.
+  4. Alive ↔ Dead를 전환하면서 심장 박동 사운드 변화를 들어봄.
+
+---
+
+## 6. 레벨 시작 시 사운드 트리거하기
+
+- **목적**: 게임에서 특정 레벨이 시작될 때 자동으로 특정 사운드를 재생하도록 설정.
+- **방법**:
+  - Event를 생성 → 레벨 시작 시 호출되도록 스크립트에 연결.
+  - Event 안에서 특정 State를 **초기 상태로 설정** 가능.
+- **예시**:
+  - 레벨 시작 시 → Alive State 활성화 + 심장 박동 소리 실행.
+  - 플레이어가 죽는 순간 → Dead State로 전환 + 심장 박동 소리 멈춤.
+
+---
+
+## 7. State와 다른 Game Sync 비교
+
+| 구분      | RTPC                  | Switch                     | State                  |
+| --------- | --------------------- | -------------------------- | ---------------------- |
+| 변화 방식 | 연속 값(슬라이더)     | 선택적, 특정 오브젝트 한정 | 전역적, 게임 전체 상태 |
+| 예시      | 체력(0~100)           | 무기 종류 (총, 칼)         | 플레이어 생존 상태     |
+| 사용처    | 볼륨·피치 점진적 변화 | 개별 사운드 교체           | 전체 사운드 환경 전환  |
+
+---
+
+## 8. 실전 예시: 심장 박동 멈추게 하기
+
+- **상황**: 플레이어가 살아 있을 때 → 심장 박동이 반복 재생.
+- **변화 조건**: 플레이어가 Dead 상태에 들어가면 → 심장 박동 정지.
+- **구현 단계**:
+  1. `PlayerCondition` State Group 생성.
+  2. Alive / Dead 상태 추가.
+  3. Alive 상태에서 → 심장 박동 소리 활성화.
+  4. Dead 상태에서 → 심장 박동 소리 중단.
+  5. 전환 시 LPF(저음 필터) 추가하여 “죽은 듯한” 효과 강조.
+
+---
+
+# { 🎮 State Group 만들기와 게임 상태 관리 }
+
+## 📋 목차
+
+1. [State와 State Group 개념 이해하기](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#state%EC%99%80-state-group-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Cube 실행 및 연결하기](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#cube-%EC%8B%A4%ED%96%89-%EB%B0%8F-%EC%97%B0%EA%B2%B0%ED%95%98%EA%B8%B0)
+3. [State Group 생성하기](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#state-group-%EC%83%9D%EC%84%B1%ED%95%98%EA%B8%B0)
+4. [State 생성 및 관리하기](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#state-%EC%83%9D%EC%84%B1-%EB%B0%8F-%EA%B4%80%EB%A6%AC%ED%95%98%EA%B8%B0)
+5. [State 활용 예시 (Alive / Defeated)](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#state-%ED%99%9C%EC%9A%A9-%EC%98%88%EC%8B%9C-alive--defeated)
+6. [게임 디자인에서의 협업 포인트](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#%EA%B2%8C%EC%9E%84-%EB%94%94%EC%9E%90%EC%9D%B8%EC%97%90%EC%84%9C%EC%9D%98-%ED%98%91%EC%97%85-%ED%8F%AC%EC%9D%B8%ED%8A%B8)
+7. [State Group 관련 주요 옵션](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#state-group-%EA%B4%80%EB%A0%A8-%EC%A3%BC%EC%9A%94-%EC%98%B5%EC%85%98)
+
+---
+
+## 1. State와 State Group 개념 이해하기
+
+- **State Group**
+  - 여러 개의 **State(상태)**를 묶어 관리하는 컨테이너.
+  - 게임 내에서 특정 상황에 따라 오디오를 다르게 재생할 때 사용.
+  - 예: 플레이어 생존 여부, 날씨 상태, 게임 난이도 등.
+- **State**
+  - State Group 안에 들어가는 개별 상태.
+  - 게임이 현재 어떤 상태인지 나타냄.
+  - 예: PlayerLife 그룹 안의 `Alive`(살아있음), `Defeated`(패배).
+
+👉 **핵심**: State Group은 "상태 카테고리", State는 "그 안의 실제 상태"라고 생각하면 됨.
+
+---
+
+## 2. Cube 실행 및 연결하기
+
+- **Cube 실행 이유**
+  - Cube는 학습용 샘플 게임으로, 실제 게임 환경에서 오디오 동작을 테스트하기 위함.
+  - 우리가 만든 **State 변경**이 Cube에서 즉시 반영되는지 확인 가능.
+- **연결 방법**
+  1. Cube 실행.
+  2. Wwise 실행 후 프로젝트 파일(Module 6) 열기.
+  3. Wwise와 Cube를 연결(Connect)하여 실시간 테스트 가능하게 설정.
+
+---
+
+## 3. State Group 생성하기
+
+- **위치**: `Project Explorer → Game Syncs 탭 → States 폴더 → Default Work Unit`
+- **생성 방법**
+  1. `Create new 'State Group'` 아이콘 클릭.
+  2. 새 Group 이름을 `PlayerLife`로 지정.
+
+👉 **중요 포인트**:
+
+- 게임 코드에서 이 이름(`PlayerLife`)을 그대로 사용하므로 정확히 입력해야 함.
+- 잘못된 이름 사용 시, 게임과 Wwise 간 동기화 불가.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380570/notion-blog/_/WWISE/Wwise_/6_State_/image.png)
+
+---
+
+## 4. State 생성 및 관리하기
+
+- **생성 방법**
+  1. `PlayerLife` State Group 선택.
+  2. `Create new 'State'` 버튼 클릭.
+  3. 첫 번째 State 이름: `Alive`
+  4. 두 번째 State 이름: `Defeated`
+- **State 특징**
+  - 같은 그룹 안에서는 항상 **하나의 State만 활성화** 가능.
+  - 즉, `Alive` 상태일 때는 `Defeated`가 꺼지고, 반대도 마찬가지.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380568/notion-blog/_/WWISE/Wwise_/6_State_/image_1.png)
+
+---
+
+## 5. State 활용 예시 (Alive / Defeated)
+
+- `Alive` State → 플레이어가 살아 있을 때의 오디오 설정 (예: 배경 음악 정상 재생, 심장 박동 소리 유지).
+- `Defeated` State → 플레이어가 죽었을 때의 오디오 설정 (예: 음악 정지, 사운드 이펙트 "죽음 효과음" 실행).
+
+👉 이렇게 하면, **게임 상황에 따라 오디오가 자동 전환**됨.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380569/notion-blog/_/WWISE/Wwise_/6_State_/image_2.png)
+
+---
+
+## 6. 게임 디자인에서의 협업 포인트
+
+- **사운드 디자이너 ↔ 게임 프로그래머 협업**
+  - State Group과 State 이름은 반드시 **합의된 명칭**을 사용해야 함.
+  - 예: 사운드팀에서 `Alive`라고 했는데, 개발팀에서 `Living`으로 코드를 작성하면 동기화 실패.
+  - 즉, 이름은 단순 텍스트 기반 매칭이므로 오타/불일치에 매우 민감.
+
+👉 실제 프로젝트에서는 문서화된 **State 정의서**를 작성하고 공유하는 게 일반적임.
+
+---
+
+✅ 정리:
+
+이번 단원에서는 **State Group(PlayerLife)**을 만들고, 그 안에 두 개의 **State(Alive, Defeated)**를 추가했습니다.
+
+- State Group은 "상태 카테고리", State는 "구체적인 상황".
+- 게임과 사운드를 연결할 때 이름 일치가 중요.
+- 옵션(Initial State, Transition 등)을 활용하면 더 자연스러운 오디오 제어 가능
+
+---
+
+# { 🎚️ State 전환 효과 만들기 }
+
+## 📋 목차
+
+1. [State 전환의 개념 이해하기](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#state-%EC%A0%84%ED%99%98%EC%9D%98-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [State Transition Time(전환 시간) 기능](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#state-transition-time%EC%A0%84%ED%99%98-%EC%8B%9C%EA%B0%84-%EA%B8%B0%EB%8A%A5)
+3. [예시: 물속/물밖 효과](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#%EC%98%88%EC%8B%9C-%EB%AC%BC%EC%86%8D%EB%AC%BC%EB%B0%96-%ED%9A%A8%EA%B3%BC)
+4. [실습: Alive → Defeated 전환 설정](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#%EC%8B%A4%EC%8A%B5-alive--defeated-%EC%A0%84%ED%99%98-%EC%84%A4%EC%A0%95)
+5. [Custom Transition Time 옵션](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#custom-transition-time-%EC%98%B5%EC%85%98)
+
+---
+
+## 1. State 전환의 개념 이해하기
+
+- **State**: 게임 내 전역적인 변화에 반응하는 *Game Sync*의 한 종류.
+- **전환 효과**: 단순히 “즉시 전환”하는 것이 아니라, 일정 시간 동안 점진적으로 사운드 속성(볼륨, 필터, 이펙트 등)을 바꿀 수 있음.
+- 이렇게 하면 플레이어의 체감이 더욱 자연스럽고 몰입감 있는 오디오 경험을 제공.
+
+---
+
+## 2. State Transition Time(전환 시간) 기능
+
+- **정의된 시간 동안** 오브젝트 속성 변화가 *부드럽게 적용*되도록 함.
+- 효과:
+  - 갑작스러운 변화(ON/OFF 느낌) → 부드러운 변화(자연스러운 Fade-in/out).
+  - 플레이 상황을 더 사실적으로 반영할 수 있음.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380569/notion-blog/_/WWISE/Wwise_/6_State_/image_3.png)
+
+---
+
+## 3. 예시: 물속/물밖 효과
+
+- 상황: 배 위에서 플레이하다가 **물에 빠질 때**.
+- 적용 방법:
+  - 물에 빠지는 순간 → **즉시 로우패스 필터 적용** (고주파수 차단 → 물속 소리 느낌).
+  - 물에서 나올 때 → **몇 초 동안 점진적으로 원래 소리로 복귀**.
+- 결과:
+  - 플레이어 귀에 물이 빠져나오는 듯한 효과 연출.
+  - 사운드가 다시 전체 주파수로 서서히 회복됨.
+
+---
+
+## 4. 실습: Alive → Defeated 전환 설정
+
+1. **Project Explorer** 열기 → **Game Syncs 탭** 선택.
+2. **PlayerLife State Group** 선택.
+3. 기본 편집기(프로퍼티 창)에서 **Insert** 클릭.
+4. **Custom Transition Time** 창이 열림.
+   - From 목록: **Alive** 선택.
+   - To 목록: **Defeated** 선택.
+   - Transition Time: **5초** 입력.
+5. 저장 후, Cube 게임과 연결해 테스트하면 Alive 상태에서 Defeated 상태로 바뀔 때 **5초 동안 점진적으로 변화**가 일어남.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380569/notion-blog/_/WWISE/Wwise_/6_State_/image_4.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380569/notion-blog/_/WWISE/Wwise_/6_State_/image_5.png)
+
+---
+
+## 5. Custom Transition Time 옵션
+
+- **From**: 전환이 시작되는 State (현재 상태).
+- **To**: 전환이 도착하는 State (목표 상태).
+- **Transition Time**: 전환이 걸리는 시간(초 단위).
+  - 0초 → 즉시 전환.
+  - n초 → n초 동안 점진적으로 변화.
+
+---
+
+👉 요약:
+
+이번 단원은 **State 전환을 점진적으로 적용하는 기능**을 배우는 내용이었어요.
+
+특히, **Alive → Defeated** 전환을 5초에 걸쳐 일어나게 하면서, 실제 게임 내 상황(예: 물속/물밖)을 더 자연스럽게 표현하는 방법을 익혔습니다.
+
+---
+
+# { 🎚 State 변경 값 설정하기 }
+
+## 📋 목차
+
+1. [State와 속성(Property) 연결하기](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#state%EC%99%80-%EC%86%8D%EC%84%B1property-%EC%97%B0%EA%B2%B0%ED%95%98%EA%B8%B0)
+2. [Heartbeat 오브젝트 선택하기](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#heartbeat-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%EC%84%A0%ED%83%9D%ED%95%98%EA%B8%B0)
+3. [States 탭 활용하기](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#states-%ED%83%AD-%ED%99%9C%EC%9A%A9%ED%95%98%EA%B8%B0)
+4. [State Group 추가하기](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#state-group-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+5. [Alive State 설정](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#alive-state-%EC%84%A4%EC%A0%95)
+6. [Defeated State 설정](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#defeated-state-%EC%84%A4%EC%A0%95)
+7. [Properties 버튼으로 추가 속성 연결하기](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#properties-%EB%B2%84%ED%8A%BC%EC%9C%BC%EB%A1%9C-%EC%B6%94%EA%B0%80-%EC%86%8D%EC%84%B1-%EC%97%B0%EA%B2%B0%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. State와 속성(Property) 연결하기
+
+- **개념**:
+  - State는 게임의 전역적인 상태 변화를 의미합니다. (예: Alive, Defeated)
+  - 오디오 오브젝트의 다양한 **속성(Properties)** 과 연결하여, 특정 상태일 때 어떤 소리 변화를 줄지 정의할 수 있습니다.
+  - 즉, State는 "조건", 속성(Property)은 "조건에 따른 변화"라고 볼 수 있습니다.
+- **핵심**:
+  - 단순히 소리를 켜고 끄는 것이 아니라, **볼륨, 필터, 피치 등 다양한 오디오 속성**을 제어할 수 있다는 점이 중요합니다.
+
+---
+
+## 2. Heartbeat 오브젝트 선택하기
+
+- **경로**:
+  Project Explorer → **Audio 탭** → Actor-Mixer Hierarchy → Default Work Unit → **Heartbeat 오브젝트 선택**
+- **이유**:
+  - Heartbeat 사운드가 플레이어의 상태(State)에 따라 반응해야 하기 때문에, 해당 오브젝트에서 설정을 진행합니다.
+
+---
+
+## 3. States 탭 활용하기
+
+- **위치**: Heartbeat 오브젝트 선택 후, 기본 편집기에서 **States 탭**을 클릭합니다.
+- **역할**:
+  - 특정 오브젝트(여기서는 Heartbeat)가 어떤 State의 영향을 받을지 지정하는 공간입니다.
+  - 이후 State Group을 연결하고, 각 State별로 어떤 속성이 어떻게 변할지 조절할 수 있습니다.
+
+---
+
+## 4. State Group 추가하기
+
+- **방법**:
+  - `Add State Group >>` 클릭 → **PlayerLife** 선택
+- **결과**:
+  - PlayerLife State Group이 States 탭에 나타나고, 그 안에 정의된 모든 State(Alive, Defeated 등)가 표시됩니다.
+- **개념**:
+  - 하나의 오브젝트가 여러 State Group을 가질 수도 있으며, 각 State별로 다른 속성값을 지정할 수 있습니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380569/notion-blog/_/WWISE/Wwise_/6_State_/image_6.png)
+
+---
+
+## 5. Alive State 설정
+
+- **설정 내용**:
+  - Alive 상태는 그대로 두며 **아무 속성도 변경하지 않습니다.**
+- **이유**:
+  - 플레이어가 정상 상태일 때는 기존 Heartbeat 사운드를 그대로 유지하기 위함입니다.
+
+---
+
+## 6. Defeated State 설정
+
+- **설정 옵션**:
+  - **Voice Volume** → `96 dB` (완전히 꺼지는 효과)
+  - **Voice LPF** → `100` (저역 통과 필터: 거의 아무 소리도 통과하지 않음)
+- **개념적 의미**:
+  - 플레이어가 패배했을 때, 심장 박동 소리가 점점 사라지고, 마치 물리적으로 차단된 듯한 효과를 줍니다.
+  - Volume = "소리 크기 조절" / LPF(Low Pass Filter) = "소리의 주파수 차단"
+
+---
+
+## 7. Properties 버튼으로 추가 속성 연결하기
+
+- **위치**: States 탭 → **Properties 버튼 클릭**
+- **역할**:
+  - Voice Volume, LPF 외에도 다양한 속성을 State에 연결할 수 있습니다.
+- **예시 속성들**:
+  - **Pitch** (재생 속도/높낮이)
+  - **High-pass Filter (HPF)** (저주파 차단, 고주파만 남김)
+  - **Bus Volume** (믹싱 단계에서 볼륨 조절)
+  - **Effect Send** (리버브나 에코 같은 이펙트 적용 강도)
+- **활용 포인트**:
+  - 단순히 소리를 줄이는 것 외에도, 게임 상황에 따라 소리를 왜곡시키거나 공간감을 주는 등 다양한 연출이 가능함.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380570/notion-blog/_/WWISE/Wwise_/6_State_/image_7.png)
+
+```csharp
+이 옵션에서 서서히 작아지는 전환 효과를 만드는게 아니고 이 옵션은 말 그대로 그 상태에 대한
+
+속성을 설정 ( 서서히 변화는 위의 State Transition Time 에서 조절 )
+```
+
+---
+
+✅ **정리**:
+
+이번 강의에서는 **State 변경 시 오디오 오브젝트가 어떤 속성을 어떻게 조절할 수 있는지**를 배웠습니다. 핵심은 단순히 "소리를 껐다 켠다"가 아니라, **볼륨, 필터, 피치 등 다양한 속성을 State와 연결해 상태별로 점진적/즉각적 변화를 줄 수 있다**는 점입니다.
+
+---
+
+# { 🫀 심장 박동 Event 만들기와 관리하기 }
+
+## 📋 목차
+
+1. [Event 개념 이해하기](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#event-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Heartbeat 재생 Event 생성하기](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#heartbeat-%EC%9E%AC%EC%83%9D-event-%EC%83%9D%EC%84%B1%ED%95%98%EA%B8%B0)
+3. [Map_Loaded Event와 이름 변경](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#map_loaded-event%EC%99%80-%EC%9D%B4%EB%A6%84-%EB%B3%80%EA%B2%BD)
+4. [중복 재생 문제와 해결 방법](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#%EC%A4%91%EB%B3%B5-%EC%9E%AC%EC%83%9D-%EB%AC%B8%EC%A0%9C%EC%99%80-%ED%95%B4%EA%B2%B0-%EB%B0%A9%EB%B2%95)
+5. [Stop과 Play 동작 순서 이해하기](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#stop%EA%B3%BC-play-%EB%8F%99%EC%9E%91-%EC%88%9C%EC%84%9C-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+6. [Cube에서 Event 테스트하기](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#cube%EC%97%90%EC%84%9C-event-%ED%85%8C%EC%8A%A4%ED%8A%B8%ED%95%98%EA%B8%B0)
+7. [State와 Event의 연동](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#state%EC%99%80-event%EC%9D%98-%EC%97%B0%EB%8F%99)
+8. [추가 Event로 State 제어하기](https://www.notion.so/Section6-271e683f737e804e8a12d6e942307ec1#%EC%B6%94%EA%B0%80-event%EB%A1%9C-state-%EC%A0%9C%EC%96%B4%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. Event 개념 이해하기
+
+- **Event란?**
+  게임 내에서 발생하는 특정 상황을 Wwise가 감지하고, 사운드 재생/정지/상태 변화 같은 **오디오 동작을 실행하도록 연결하는 트리거**.
+- **이번 단원에서 필요한 Event**:
+  - 게임 시작 또는 맵 로드 시 심장 박동 사운드가 자동으로 시작되도록 하는 Event.
+
+---
+
+## 2. Heartbeat 재생 Event 생성하기
+
+- **Heartbeat 오브젝트에서 Event 만들기**
+  1. Property Editor에서 **Heartbeat 오브젝트** 우클릭.
+  2. **New Event > Play** 선택.
+- 이렇게 하면 `Play_Heartbeat`라는 이름의 Event가 자동 생성됨.
+- 기본 동작: 이 Event가 호출되면 Heartbeat 사운드가 재생됨.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380570/notion-blog/_/WWISE/Wwise_/6_State_/image_8.png)
+
+---
+
+## 3. Map_Loaded Event와 이름 변경
+
+- 게임에는 "게임 시작" 또는 "맵 로드" 시 발생하는 **게임 호출(Game Call)** 이 이미 존재.
+- Wwise에서 Event 이름을 **Map_Loaded**로 변경 → 이 호출과 매핑됨.
+- 결과: 맵이 로드될 때마다 심장 박동 소리가 시작됨.
+
+---
+
+## 4. 중복 재생 문제와 해결 방법
+
+- **문제 상황**:
+  - 맵이 다시 로드될 때마다 `Map_Loaded` Event가 실행 → 새로운 심장 박동이 계속 겹쳐서 재생됨.
+  - 플레이어 체력이 꽉 찬 상태라면 들리지 않아서 눈치채기 어려움.
+- **해결 방법**:
+  - `Map_Loaded` Event에 **두 가지 동작(Action)** 추가:
+    1. **Stop**: 이미 재생 중일 수 있는 Heartbeat 멈추기.
+    2. **Play**: Heartbeat 다시 시작하기.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380570/notion-blog/_/WWISE/Wwise_/6_State_/image_9.png)
+
+```csharp
+실제 프로젝트에서는 stopAll 을 하고 그다음 Play 를 실행시키고 있다.
+```
+
+---
+
+## 5. Stop과 Play 동작 순서 이해하기
+
+- Event 안에서 여러 동작이 있으면 **작성된 순서대로 실행**됨.
+- 따라서:
+  - 먼저 Stop → 기존 Heartbeat 종료.
+  - 이어서 Play → 새로운 Heartbeat 시작.
+- 결과: 맵 로드 시 **중복 재생 없이 항상 하나의 Heartbeat만 유지**.
+
+---
+
+## 6. Cube에서 Event 테스트하기
+
+- Cube 게임 내에서 Event 동작 확인 가능.
+- 테스트 절차:
+  1. `Esc` → 메뉴 열기 → `load map` 선택 → 원하는 맵 선택 후 Enter.
+  2. 같은 레벨이 다시 로드됨.
+  3. 체력은 가득 차 있으므로 Heartbeat는 들리지 않음.
+  4. 적에게 피해를 받아 체력이 줄면 Heartbeat 소리가 점점 **크고 선명하게** 들림.
+
+---
+
+## 7. State와 Event의 연동
+
+- **문제**:
+  Cube는 PlayerLife State를 직접 설정하지 않음 → 플레이어가 패배해도 Heartbeat는 계속 재생됨.
+- **해결**:
+  Event를 활용하여 State를 간접적으로 제어 가능.
+  - 즉, Event → State 변경 → 사운드 속성 변화.
+
+---
+
+## 8. 추가 Event로 State 제어하기
+
+- 플레이어 패배 & 부활 시 상태(State) 자동 전환을 위해 Event 생성.
+
+1. **Defeated_Player Event**
+   - Action Type: `Set State`
+   - Target: `PlayerLife\Defeated`
+   - 효과: 패배 시 Heartbeat가 **서서히 사라짐**.
+2. **Spawn_Player Event**
+   - Action Type: `Set State`
+   - Target: `PlayerLife\Alive`
+   - 효과: 플레이어가 부활하면 Heartbeat가 다시 정상적으로 작동.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380568/notion-blog/_/WWISE/Wwise_/6_State_/image_10.png)
+
+```csharp
+**Spawn_Player Event**
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380568/notion-blog/_/WWISE/Wwise_/6_State_/image_11.png)
+
+```csharp
+**Defeated_Player Event**
+```
+
+---
+
+✅ **정리 포인트**
+
+- Event는 게임 내 상황을 오디오 엔진에 연결하는 핵심 장치.
+- 동일 Event 안에서 **Stop → Play** 순서로 설정해 중복 재생 방지.
+- Cube에서는 State가 직접 연동되지 않으므로, Event로 State를 제어하는 개념을 학습.
+- 추가 Event를 활용해 플레이어 생존 여부에 따라 심장 박동을 자연스럽게 On/Off 처리 가능.

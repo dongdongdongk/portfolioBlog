@@ -1,0 +1,134 @@
+---
+title: '스프링 Bean 등록 방법'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# **빈(Bean) 등록**
+
+```java
+* 스프링에서 사용할 객체를 "빈"이라고 부른다. 이 객체들은 스프링 컨테이너에 등록된다.
+
+* 빈을 등록하려면 XML, Java Config, 혹은 어노테이션을 사용하여 스프링 설정 파일에 빈의 정보를 추가한다.
+```
+
+## 예를 들어, XML 파일에서 빈을 등록하는 경우:
+
+```java
+<bean id="myBean" class="com.example.MyClass" />
+```
+
+# **빈(Bean) 사용**
+
+```java
+* 빈을 사용하려면 해당 빈을 스프링 컨테이너에서 가져와서 활용한다.
+
+* 스프링은 이러한 빈들을 관리하고, 필요한 곳에서 빈을 주입하거나 가져와서 사용할 수 있게 해준다.
+```
+
+```java
+// 빈 가져오기
+MyClass myBean = applicationContext.getBean("myBean", MyClass.class);
+
+// 빈 사용
+myBean.doSomething();
+```
+
+# 예제
+
+## **어노테이션을 사용한 빈 등록 및 사용**
+
+### **빈(Bean) 등록:**
+
+```java
+클래스에 @Component 어노테이션을 사용하여 빈을 자동으로 스캔하도록 설정
+```
+
+```java
+import org.springframework.stereotype.Component;
+
+@Component
+public class MyBean {
+    public void doSomething() {
+        System.out.println("Hello from MyBean!");
+    }
+}
+```
+
+### **빈(Bean) 사용:**
+
+```java
+@Autowired 어노테이션을 사용하여 빈을 주입받고 사용
+```
+
+```java
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
+public class MyService {
+    private final MyBean myBean;
+
+    @Autowired
+    public MyService(MyBean myBean) {
+        this.myBean = myBean;
+    }
+
+    public void useMyBean() {
+        myBean.doSomething();
+    }
+}
+```
+
+## **XML을 사용한 빈 등록 및 사용:**
+
+### **빈(Bean) 등록:**
+
+```java
+스프링 설정 파일(XML)에 빈을 등록
+```
+
+```java
+<!-- 스프링 설정 파일 applicationContext.xml -->
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+         http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <!-- 빈 등록 -->
+    <bean id="myBean" class="com.example.MyBean" />
+    <bean id="myService" class="com.example.MyService">
+        <property name="myBean" ref="myBean" />
+    </bean>
+</beans>
+```
+
+### **빈(Bean) 사용:**
+
+```java
+Java 코드에서 스프링 컨테이너를 생성하고 빈을 가져와서 사용
+```
+
+```java
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
+
+public class MainApp {
+    public static void main(String[] args) {
+        // 스프링 설정 파일을 로드하여 ApplicationContext 생성
+        ApplicationContext context = new ClassPathXmlApplicationContext("applicationContext.xml");
+
+        // 빈 가져오기
+        MyService myService = context.getBean("myService", MyService.class);
+
+        // 빈 사용
+        myService.useMyBean();
+
+        // 스프링 컨테이너 닫기 (선택 사항)
+        ((ClassPathXmlApplicationContext) context).close();
+    }
+}
+```

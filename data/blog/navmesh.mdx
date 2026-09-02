@@ -1,0 +1,714 @@
+---
+title: '유니티 NavMesh와 애니메이션'
+date: '2026-09-02'
+category: '게임 개발/유니티 개인 정리'
+tags: ['게임 개발', '유니티 개인 정리']
+draft: false
+summary: ''
+---
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380795/notion-blog/_/_/_NavMesh_/image.png)
+
+# 🎮 유니티 NavMesh와 캐릭터 이동 시스템
+
+이번 가이드는 NavMesh를 활용한 캐릭터 자동 이동과 애니메이션 연동에 대한 완전한 이해를 목표로 합니다.
+
+---
+
+## 📋 목차
+
+1. [NavMesh 시스템 개념 이해하기](https://claude.ai/chat/5d173037-0bd8-4c02-a24c-b142fc7e6943#1-navmesh-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [NavMesh 베이크(Bake) 설정하기](https://claude.ai/chat/5d173037-0bd8-4c02-a24c-b142fc7e6943#2-navmesh-%EB%B2%A0%EC%9D%B4%ED%81%ACbake-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+3. [NavMeshAgent 컴포넌트 설정하기](https://claude.ai/chat/5d173037-0bd8-4c02-a24c-b142fc7e6943#3-navmeshagent-%EC%BB%B4%ED%8F%AC%EB%84%8C%ED%8A%B8-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+4. [이동 스크립트 작성하기](https://claude.ai/chat/5d173037-0bd8-4c02-a24c-b142fc7e6943#4-%EC%9D%B4%EB%8F%99-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%9E%91%EC%84%B1%ED%95%98%EA%B8%B0)
+5. [Animator Controller 설정하기](https://claude.ai/chat/5d173037-0bd8-4c02-a24c-b142fc7e6943#5-animator-controller-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+6. [애니메이션 전환 최적화하기](https://claude.ai/chat/5d173037-0bd8-4c02-a24c-b142fc7e6943#6-%EC%95%A0%EB%8B%88%EB%A9%94%EC%9D%B4%EC%85%98-%EC%A0%84%ED%99%98-%EC%B5%9C%EC%A0%81%ED%99%94%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. NavMesh 시스템 개념 이해하기
+
+### 📌 NavMesh란?
+
+**NavMesh(Navigation Mesh)** 는 캐릭터가 걸어다닐 수 있는 영역을 정의한 3D 메쉬입니다.
+
+- **핵심 개념:**
+  - 게임 월드에서 "여기는 걸어갈 수 있어" 라고 표시된 영역
+  - 자동으로 장애물을 피해가는 경로 계산
+  - Scene 뷰에서 **파란색 영역**으로 표시됨
+- **주요 구성 요소:**
+  1. **Walkable Surface(걸을 수 있는 표면)** : 바닥, 플랫폼 등
+  2. **Obstacles(장애물)** : 벽, 상자 등 피해야 할 오브젝트
+  3. **NavMeshAgent** : 실제로 NavMesh를 따라 움직이는 컴포넌트
+
+### 📌 NavMeshSurface vs 기본 Navigation
+
+- **기본 Navigation (구버전):**
+  - Static 체크 필요
+  - Window > AI > Navigation에서 베이크
+  - 전역적으로 하나의 NavMesh만 생성
+- **NavMeshSurface (권장):**
+  - Static 체크 불필요
+  - 오브젝트별로 독립적인 NavMesh 생성 가능
+  - AI Navigation 패키지 설치 필요
+  - 런타임 중에도 베이크 가능
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380793/notion-blog/_/_/_NavMesh_/image_1.png)
+
+---
+
+## 2. NavMesh 베이크(Bake) 설정하기
+
+### 📌 AI Navigation 패키지 설치
+
+```
+필수 단계:
+1. Window > Package Manager
+2. 좌측 상단: Packages > Unity Registry 선택
+3. 검색창에 "AI Navigation" 입력
+4. Install 버튼 클릭
+```
+
+**왜 필요한가?**
+
+- Unity 2022.2 이상부터 NavMeshSurface는 별도 패키지
+- 설치하지 않으면 NavMeshSurface 컴포넌트 사용 불가
+
+### 📌 바닥 오브젝트 준비
+
+```
+1. GameObject > 3D Object > Plane 생성
+2. 이름 변경: "Ground"
+3. Transform 설정:
+   - Position: (0, 0, 0)
+   - Scale: (10, 1, 10) - 넓은 바닥 만들기
+```
+
+**중요 체크사항:**
+
+- ✅ Mesh Renderer 컴포넌트가 활성화되어 있어야 함
+- ✅ Collider가 있어야 함 (Plane은 기본 제공)
+
+### 📌 NavMeshSurface 컴포넌트 추가
+
+```
+1. Ground 오브젝트 선택 (또는 빈 GameObject 생성)
+2. Inspector > Add Component
+3. "NavMesh Surface" 검색 후 추가
+```
+
+### 📌 NavMeshSurface 주요 설정
+
+### **Agent Type**
+
+```
+옵션: Humanoid (기본값)
+설명: 어떤 종류의 캐릭터가 사용할지 정의
+- Humanoid: 사람 크기 캐릭터
+- 필요시 여러 Agent Type 생성 가능 (큰 몬스터용, 작은 유닛용 등)
+```
+
+### **Collect Objects**
+
+```
+옵션:
+- All Game Objects (권장) : 씬의 모든 오브젝트 검사
+- Children : 현재 오브젝트의 자식들만
+- Volume : 특정 영역만
+
+설명: 어떤 오브젝트들을 NavMesh 생성 대상으로 할지 선택
+추천: All Game Objects - 가장 확실하게 모든 바닥을 잡아냄
+```
+
+### **Include Layers**
+
+```
+설정: Everything 체크 (또는 바닥이 있는 레이어만 선택)
+
+설명: 어떤 레이어의 오브젝트를 포함할지
+- 특정 레이어만 바닥으로 인식시키고 싶을 때 조절
+- 기본적으로 Everything 선택 권장
+```
+
+### **Use Geometry**
+
+```
+☑ Render Meshes : Mesh Renderer가 있는 오브젝트 포함
+☑ Physics Colliders : Collider가 있는 오브젝트 포함
+
+설명: 어떤 기하학적 데이터를 사용할지
+- Render Meshes: 보이는 메쉬 기준
+- Physics Colliders: 충돌 박스 기준
+- 둘 다 체크 권장
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380794/notion-blog/_/_/_NavMesh_/image_2.png)
+
+### 📌 Bake 실행
+
+```
+1. NavMeshSurface 컴포넌트 하단의 "Bake" 버튼 클릭
+2. 처리 중 잠시 대기
+3. Scene 뷰에서 바닥이 파란색으로 변하면 성공!
+```
+
+**베이크 결과 확인:**
+
+- ✅ Scene 뷰에서 파란색 메쉬가 보임
+- ✅ 걸어갈 수 있는 모든 바닥이 파란색으로 표시됨
+- ❌ 파란색이 안 보이면 Scene 뷰 > 기즈모 > NavMesh 체크 확인
+
+---
+
+## 3. NavMeshAgent 컴포넌트 설정하기
+
+### 📌 NavMeshAgent 추가
+
+```
+1. 이동시킬 캐릭터 오브젝트 선택
+2. Inspector > Add Component
+3. "Nav Mesh Agent" 검색 후 추가
+```
+
+### 📌 주요 설정 파라미터
+
+### **Steering (조종 관련)**
+
+**Speed**
+
+```
+기본값: 3.5
+권장값: 3.5 ~ 5
+설명: 캐릭터의 최대 이동 속도
+- 너무 낮으면: 느려보임
+- 너무 높으면: 부자연스럽게 빠름
+```
+
+**Angular Speed**
+
+```
+기본값: 120
+권장값: 360 ~ 500
+설명: 회전 속도 (도/초)
+- 낮으면: 천천히 방향 전환 (탱크같은 느낌)
+- 높으면: 빠르게 방향 전환 (민첩한 느낌)
+- 즉각 반응을 원하면 높게 설정
+```
+
+**Acceleration**
+
+```
+기본값: 8
+권장값: 15 ~ 20
+설명: 가속도 - 정지 상태에서 최대 속도까지 도달하는 속도
+
+⭐ 매우 중요!
+- 8 (기본값): 천천히 가속 → 애니메이션 전환이 늦게 느껴짐
+- 20: 빠르게 가속 → 즉시 달리는 느낌
+- 애니메이션 반응 속도에 직접적인 영향
+```
+
+### **Obstacle Avoidance (장애물 회피)**
+
+**Radius**
+
+```
+기본값: 0.5
+설명: 캐릭터의 반지름
+- 캐릭터가 얼마나 "두꺼운지" 정의
+- 다른 Agent와의 최소 거리
+```
+
+**Height**
+
+```
+기본값: 2
+설명: 캐릭터의 높이
+- 통과할 수 있는 공간의 높이 판단
+```
+
+### **Path Finding (경로 찾기)**
+
+**Stopping Distance**
+
+```
+기본값: 0
+권장값: 0.5 ~ 1
+설명: 목표 지점 앞에서 얼마나 멀리서 멈출지
+- 0: 정확히 목표 지점까지 이동
+- 1: 목표 지점 1m 앞에서 멈춤
+- NPC 대화 등에 유용
+```
+
+**Auto Braking**
+
+```
+☑ 체크 (기본값)
+설명: 목표 지점 근처에서 자동 감속
+- 체크: 자연스럽게 멈춤
+- 해제: 목표 지점에서 급정거
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380794/notion-blog/_/_/_NavMesh_/image_3.png)
+
+---
+
+## 4. 이동 스크립트 작성하기
+
+### 📌 기본 이동 스크립트
+
+```csharp
+using UnityEngine;
+using UnityEngine.AI;
+
+public class SimpleNavMeshMovement : MonoBehaviour
+{
+    // 컴포넌트 참조
+    private NavMeshAgent agent;
+    private Animator animator;
+
+    // Inspector에서 설정
+    public Transform targetPosition;
+
+    void Start()
+    {
+        // 컴포넌트 가져오기
+        agent = GetComponent<NavMeshAgent>();
+        animator = GetComponent<Animator>();
+
+        // 목표 지점이 설정되어 있으면 이동 시작
+        if (targetPosition != null)
+        {
+            agent.SetDestination(targetPosition.position);
+        }
+    }
+
+    void Update()
+    {
+        UpdateAnimation();
+    }
+
+    void UpdateAnimation()
+    {
+        // NavMeshAgent의 현재 속도 계산
+        float speed = agent.velocity.magnitude;
+
+        // 애니메이터 파라미터 업데이트
+        animator.SetFloat("Speed", speed);
+
+        // Bool 방식 (0.1보다 빠르면 움직이는 중)
+        if (speed > 0.1f)
+        {
+            animator.SetBool("IsRunning", true);
+        }
+        else
+        {
+            animator.SetBool("IsRunning", false);
+        }
+    }
+
+    // 외부에서 호출 가능한 이동 함수
+    public void MoveTo(Vector3 destination)
+    {
+        agent.SetDestination(destination);
+    }
+}
+```
+
+### 📌 코드 개념 설명
+
+### **agent.velocity.magnitude**
+
+```
+의미: NavMeshAgent의 현재 이동 속도 (벡터의 크기)
+- velocity: 속도 벡터 (방향 + 크기)
+- magnitude: 벡터의 크기만 (스칼라 값)
+
+예시:
+- 정지: magnitude = 0
+- 천천히 이동: magnitude = 1.5
+- 빠르게 이동: magnitude = 4.0
+```
+
+### **agent.SetDestination()**
+
+```
+기능: 목표 지점 설정
+- NavMesh 위의 좌표를 자동으로 찾아감
+- 장애물이 있으면 자동으로 우회
+- 경로가 없으면 false 반환
+
+사용법:
+agent.SetDestination(targetPosition.position);
+```
+
+### **속도 임계값 (Threshold)**
+
+```
+if (speed > 0.1f)
+
+이유:
+- 0.1: 거의 정지 상태 (미세한 움직임 무시)
+- 완전히 0이면 미세한 떨림도 감지됨
+- 0.1 이상이면 "의미있는 움직임"으로 간주
+```
+
+---
+
+## 5. Animator Controller 설정하기
+
+### 📌 Animator Controller 생성
+
+```
+1. Project 창 우클릭
+2. Create > Animator Controller
+3. 이름: "CharacterAnimator"
+4. 캐릭터 오브젝트 선택
+5. Animator 컴포넌트의 Controller에 할당
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380794/notion-blog/_/_/_NavMesh_/image_4.png)
+
+### 📌 Parameters 추가
+
+### **Step 1: Parameters 탭 열기**
+
+```
+Animator 창 (Controller 더블클릭):
+- 좌측 상단 "Parameters" 탭 클릭
+```
+
+### **Step 2: Bool Parameter 추가**
+
+```
+1. Parameters 창에서 "+" 버튼 클릭
+2. "Bool" 선택
+3. 이름 입력: "IsRunning" (또는 "Armature_move")
+4. Enter로 확정
+
+결과:
+Parameters
+└─ IsRunning (Bool) ☐
+```
+
+### **Step 3: Float Parameter 추가 (선택)**
+
+```
+1. "+" 버튼 클릭
+2. "Float" 선택
+3. 이름 입력: "Speed"
+
+사용 목적: Blend Tree에서 부드러운 전환
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380794/notion-blog/_/_/_NavMesh_/image_5.png)
+
+### 📌 Animation States 생성
+
+### **Idle State**
+
+```
+1. Animator 창 우클릭
+2. Create State > Empty
+3. 이름 변경: "Idle"
+4. State 선택 > Inspector
+5. Motion: Idle 애니메이션 클립 할당
+```
+
+### **Run State**
+
+```
+1. 우클릭 > Create State > Empty
+2. 이름 변경: "Run"
+3. Motion: Run 애니메이션 클립 할당
+```
+
+### 📌 Transitions 생성
+
+### **Idle → Run Transition**
+
+```
+1. Idle State 우클릭
+2. "Make Transition" 선택
+3. Run State로 화살표 연결
+4. 화살표(Transition) 클릭
+```
+
+### **Run → Idle Transition**
+
+```
+1. Run State 우클릭
+2. "Make Transition" 선택
+3. Idle State로 화살표 연결
+```
+
+---
+
+## 6. 애니메이션 전환 최적화하기
+
+### 📌 Transition 설정 (Idle → Run)
+
+### **Has Exit Time**
+
+```
+위치: Inspector 상단
+현재: ☑ Has Exit Time
+변경: ☐ Has Exit Time (체크 해제!)
+
+⭐ 가장 중요한 설정!
+
+개념:
+- ☑ 체크: 현재 애니메이션이 일정 부분(Exit Time) 재생된 후 전환
+- ☐ 해제: 조건만 만족하면 즉시 전환
+
+Exit Time 값:
+- 0.75 = 애니메이션의 75% 재생 후 전환 가능
+- Idle이 75% 재생될 때까지 기다림 → 느리게 느껴짐
+
+왜 해제해야 하나:
+- 게임에서는 즉각 반응이 중요
+- 달리기 입력 → 바로 달려야 자연스러움
+- Exit Time은 컷신 같은 연출용
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380794/notion-blog/_/_/_NavMesh_/image_6.png)
+
+### **Settings (펼치기)**
+
+**Transition Duration**
+
+```
+기본값: 0.25 (초)
+권장값: 0.1 ~ 0.15
+
+개념:
+- 한 애니메이션에서 다른 애니메이션으로 블렌딩되는 시간
+- "섞이는" 시간
+
+값에 따른 차이:
+- 0: 즉시 전환 (뚝뚝 끊김)
+- 0.1: 빠르게 부드럽게 전환 (권장)
+- 0.25: 천천히 전환 (자연스럽지만 반응이 느림)
+- 0.5: 너무 느림 (답답함)
+
+시각적 이해:
+┌────────────┬────────────┐
+│  Idle 100% │  Run   0%  │ ← 시작
+├────────────┼────────────┤
+│  Idle  50% │  Run  50%  │ ← Duration의 절반
+├────────────┼────────────┤
+│  Idle   0% │  Run 100%  │ ← 완료
+└────────────┴────────────┘
+```
+
+**Transition Offset**
+
+```
+기본값: 0
+권장값: 0 (유지)
+
+개념:
+- 다음 애니메이션을 어디서부터 시작할지
+- 0 = 처음부터
+- 0.5 = 중간부터
+```
+
+**Interruption Source**
+
+```
+기본값: None
+권장값: Current State
+
+개념:
+- 전환 중에 다른 전환이 발생하면 어떻게 할지
+- Current State: 현재 전환을 중단하고 새 전환 시작
+- 더 반응성이 좋아짐
+```
+
+### **Conditions (조건)**
+
+```
+위치: Inspector 하단
+
+설정:
+1. Conditions 섹션 찾기
+2. "+" 버튼 클릭
+3. 첫 번째 드롭다운: IsRunning 선택
+4. 두 번째 드롭다운: true 선택
+
+결과:
+Conditions
+└─ IsRunning | true
+
+의미:
+- "IsRunning 파라미터가 true일 때 이 전환 실행"
+- 코드에서 SetBool("IsRunning", true) 호출 시 전환
+```
+
+### 📌 Transition 설정 (Run → Idle)
+
+```
+동일한 방식으로 설정:
+
+☐ Has Exit Time (해제)
+Transition Duration: 0.1
+
+Conditions:
+└─ IsRunning | false
+
+의미:
+- IsRunning이 false가 되면 Idle로 복귀
+```
+
+### 📌 최적화된 전체 설정 요약
+
+### **Idle → Run**
+
+```
+☐ Has Exit Time: 해제
+Transition Duration: 0.1
+Conditions: IsRunning equals true
+```
+
+### **Run → Idle**
+
+```
+☐ Has Exit Time: 해제
+Transition Duration: 0.1
+Conditions: IsRunning equals false
+```
+
+### **NavMeshAgent**
+
+```
+Speed: 3.5 ~ 5
+Acceleration: 20 ⭐ 중요!
+Angular Speed: 360
+Stopping Distance: 0.5
+```
+
+### 📌 동작 흐름도
+
+```
+[게임 시작]
+    ↓
+[agent.SetDestination() 호출]
+    ↓
+[NavMeshAgent 경로 계산]
+    ↓
+[Acceleration으로 빠르게 가속]
+    ↓
+[speed > 0.1f 조건 만족]
+    ↓
+[animator.SetBool("IsRunning", true)]
+    ↓
+[Animator: IsRunning == true 감지]
+    ↓
+[Has Exit Time 해제 → 즉시 전환]
+    ↓
+[Duration 0.1초 동안 블렌딩]
+    ↓
+[Run 애니메이션 재생]
+```
+
+---
+
+## 🎯 최종 체크리스트
+
+### **NavMesh 설정**
+
+```
+☐ AI Navigation 패키지 설치됨
+☐ Plane(바닥) 생성됨
+☐ NavMeshSurface 컴포넌트 추가됨
+☐ Collect Objects: All Game Objects
+☐ Include Layers: Everything
+☐ Bake 버튼 클릭 완료
+☐ Scene 뷰에서 파란색 메쉬 확인
+```
+
+### **캐릭터 설정**
+
+```
+☐ NavMeshAgent 컴포넌트 추가됨
+☐ Speed: 3.5 이상
+☐ Acceleration: 20
+☐ Angular Speed: 360
+☐ Animator 컴포넌트 있음
+☐ Animator Controller 할당됨
+```
+
+### **Animator 설정**
+
+```
+☐ Parameters에 IsRunning (Bool) 추가됨
+☐ Idle State 생성 및 클립 할당
+☐ Run State 생성 및 클립 할당
+☐ Idle → Run Transition 생성
+☐ Run → Idle Transition 생성
+```
+
+### **Transition 최적화**
+
+```
+☐ Idle → Run: Has Exit Time 해제
+☐ Idle → Run: Duration 0.1
+☐ Idle → Run: Condition IsRunning = true
+☐ Run → Idle: Has Exit Time 해제
+☐ Run → Idle: Duration 0.1
+☐ Run → Idle: Condition IsRunning = false
+```
+
+### **스크립트 설정**
+
+```
+☐ 이동 스크립트 작성 완료
+☐ 캐릭터에 스크립트 추가됨
+☐ Target Position 할당됨
+☐ 파라미터 이름이 Animator와 일치
+```
+
+---
+
+## 🔧 문제 해결 가이드
+
+### **파란색 NavMesh가 안 보여요**
+
+```
+1. Scene 뷰 기즈모에서 NavMesh 체크 확인
+2. AI Navigation 패키지 설치 확인
+3. Collect Objects: All로 변경
+4. Use Geometry 둘 다 체크
+5. Bake 버튼 다시 클릭
+```
+
+### **캐릭터가 움직이지 않아요**
+
+```
+1. NavMesh가 베이크되었는지 확인
+2. Target Position이 NavMesh 위에 있는지 확인
+3. NavMeshAgent의 Speed 값 확인
+4. Console 에러 메시지 확인
+```
+
+### **애니메이션이 늦게 바뀌어요**
+
+```
+1. Has Exit Time 해제 확인 (가장 중요!)
+2. Acceleration을 20으로 증가
+3. Transition Duration을 0.1로 감소
+4. 코드의 속도 임계값 확인 (0.1f)
+```
+
+### **애니메이션이 재생 안 돼요**
+
+```
+1. Animator Controller 할당 확인
+2. Parameter 이름 일치 확인 (대소문자 포함)
+3. Animation 클립이 State에 할당되었는지 확인
+4. Transition Conditions 설정 확인
+```
+
+---
+
+이 가이드를 따라하면 NavMesh 기반 캐릭터 이동과 애니메이션 시스템을 완벽하게 구현할 수 있습니다!

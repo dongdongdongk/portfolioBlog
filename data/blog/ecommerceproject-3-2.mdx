@@ -1,0 +1,1810 @@
+---
+title: 'EcommerceProject -3-2'
+date: '2026-09-02'
+category: '풀스택/프로젝트 정리'
+tags: ['풀스택', '프로젝트 정리']
+draft: false
+summary: ''
+---
+
+# Header.jsx 수정
+
+```jsx
+더미 데이터를 지우고 동적으로 DB에 데이터를 검색해서 출력한다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381461/notion-blog/_/_/EcommerceProject/EcommerceProject_-3-2/Untitled.png)
+
+```jsx
+import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import styles from "../../styles/styles";
+import { categoriesData, productData } from "../../static/data";
+import {
+  AiOutlineHeart,
+  AiOutlineSearch,
+  AiOutlineShoppingCart,
+} from "react-icons/ai";
+import { RxCross1 } from "react-icons/rx";
+import { CgProfile } from "react-icons/cg";
+import { IoIosArrowDown, IoIosArrowForward } from "react-icons/io";
+import { BiMenuAltLeft } from "react-icons/bi";
+import DropDown from "./DropDown";
+import Navbar from "./Navbar";
+import Cart from "../Cart/Cart";
+import { useSelector } from "react-redux";
+import Wishlist from "../Wishlist/Wishlist";
+
+const Header = ({ activeHeading }) => {
+  // Redux에서 사용자 및 제품 상태 가져오기
+  const { isAuthenticated, user } = useSelector((state) => state.user);
+  const { allProducts } = useSelector((state) => state.product);
+
+  // 검색어 및 검색 결과 상태 관리
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchData, setSearchData] = useState(null);
+
+  // 활성화된 상태 및 드롭다운 상태 관리
+  const [active, setActive] = useState(false);
+  const [dropDown, setDropDown] = useState(false);
+
+  // 장바구니 및 위시리스트 팝업 상태 관리
+  const [openCart, setOpenCart] = useState(false);
+  const [openWishlist, setOpenWishlist] = useState(false);
+
+  // 모바일 헤더의 사이드바 상태 관리
+  const [open, setOpen] = useState(false);
+
+  // 검색어 입력 시 상태 업데이트 및 검색 결과 필터링
+  const handleSearchChange = (e) => {
+    const term = e.target.value;
+    setSearchTerm(term);
+
+    // 제품 데이터에서 검색어에 일치하는 결과 필터링
+    const filteredProducts = allProducts && allProducts.filter((product) =>
+      product.name.toLowerCase().includes(term.toLowerCase())
+    );
+    setSearchData(filteredProducts);
+  };
+
+  // 스크롤 이벤트 등록하여 활성화된 상태 업데이트
+  window.addEventListener("scroll", () => {
+    if (window.scrollY > 70) {
+      setActive(true);
+    } else {
+      setActive(false);
+    }
+  });
+
+  return (
+    <>
+      {/* 데스크탑 화면 헤더 */}
+      <div className={`${styles.section}`}>
+        <div className="hidden 800px:h-[50px] 800px:my-[20px] 800px:flex items-center justify-between">
+          {/* 로고 */}
+          <div>
+            <Link to="/">
+              <img
+                src={`http://localhost:5000/images/QuickDealMarketFix.jpg`}
+                alt=""
+              />
+            </Link>
+          </div>
+          {/* 검색창 */}
+          <div className="w-[50%] relative">
+            <input
+              type="text"
+              placeholder="Search Product..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+              className="h-[40px] w-full px-2 border-[#e3bb8b] border-[2px] rounded-md"
+            />
+            <AiOutlineSearch
+              size={30}
+              className="absolute right-2 top-1.5 cursor-pointer"
+            />
+            {/* 검색 결과 팝업 */}
+            {searchData && searchData.length !== 0 ? (
+              <div className="absolute min-h-[30vh] bg-slate-50 shadow-sm-2 z-[9] p-4">
+                {searchData &&
+                  searchData.map((i, index) => {
+                    const d = i.name;
+
+                    const Product_name = d.replace(/\s+/g, "-");
+                    return (
+                      <Link to={`/product/${Product_name}`}>
+                        <div className="w-full flex items-start-py-3">
+                          <img
+                            src={`http://localhost:5000/${i.images[0]}`}
+                            alt=""
+                            className="w-[40px] h-[40px] mr-[10px]"
+                          />
+                          <h1>{i.name}</h1>
+                        </div>
+                      </Link>
+                    );
+                  })}
+              </div>
+            ) : null}
+          </div>
+          {/* 판매자 등록 버튼 */}
+          <div className={`${styles.button}`}>
+            <Link to="/shop-create">
+              <h1 className="text-[#fff] flex items-center">
+                판매자 등록 <IoIosArrowForward className="ml-1" />
+              </h1>
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* 데스크탑 화면 스크롤 시 고정되는 헤더 */}
+      <div
+        className={`${
+          active === true ? "shadow-sm fixed top-0 left-0 z-10" : null
+        } transition hidden 800px:flex items-center justify-between w-full bg-[#e3bb8b] h-[70px]`}
+      >
+        <div
+          className={`${styles.section} relative ${styles.noramlFlex} justify-between`}
+        >
+          {/* 카테고리 드롭다운 */}
+          <div onClick={() => setDropDown(!dropDown)}>
+            <div className="relative h-[60px] mt-[10px] w-[270px] hidden 1000px:block">
+              <BiMenuAltLeft size={30} className="absolute top-3 left-2" />
+              <button
+                className={`h-[100%] w-full flex justify-between items-center pl-10 bg-white font-sans text-lg font-[500] select-none rounded-t-md`}
+              >
+                All Categories
+              </button>
+              <IoIosArrowDown
+                size={20}
+                className="absolute right-2 top-4 cursor-pointer"
+                onClick={() => setDropDown(!dropDown)}
+              />
+              {/* 카테고리 드롭다운 컴포넌트 */}
+              {dropDown ? (
+                <DropDown
+                  categoriesData={categoriesData}
+                  setDropDown={setDropDown}
+                />
+              ) : null}
+            </div>
+          </div>
+          {/* 네비게이션 바 */}
+          <div className={`${styles.noramlFlex}`}>
+            <Navbar active={activeHeading} />
+          </div>
+          {/* 위시리스트, 장바구니, 프로필 아이콘 */}
+          <div className="flex">
+            <div className={`${styles.noramlFlex}`}>
+              <div
+                className="relative cursor-pointer mr-[15px]"
+                onClick={() => setOpenWishlist(true)}
+              >
+                <AiOutlineHeart size={30} color="rgb(255 255 255 / 83%)" />
+                <span className="absolute right-0 top-0 rounded-full bg-[#3bc177] w-4 h-4 top right p-0 m-0 text-white font-mono text-[12px] leading-tight text-center">
+                  0
+                </span>
+              </div>
+            </div>
+            <div className={`${styles.noramlFlex}`}>
+              <div
+                className="relative cursor-pointer mr-[15px]"
+                onClick={() => setOpenCart(true)}
+              >
+                <AiOutlineShoppingCart
+                  size={30}
+                  color="rgb(255 255 255 / 83%)"
+                />
+                <span className="absolute right-0 top-0 rounded-full bg-[#3bc177] w-4 h-4 top right p-0 m-0 text-white font-mono text-[12px] leading-tight text-center">
+                  1
+                </span>
+              </div>
+            </div>
+            <div className={`${styles.noramlFlex}`}>
+              <div className="relative cursor-pointer mr-[15px]">
+                {/* 인증된 사용자인 경우 프로필 이미지, 그렇지 않은 경우 로그인 페이지로 이동 */}
+                {isAuthenticated ? (
+                  <Link to="/profile">
+                    <img
+                      src={`http://localhost:5000/${user.avatar}`}
+                      className="w-[35px] h-[35px] rounded-full"
+                      alt=""
+                    />
+                  </Link>
+                ) : (
+                  <Link to="/login">
+                    <CgProfile size={30} color="rgb(255 255 255 / 83%)" />
+                  </Link>
+                )}
+              </div>
+            </div>
+            {/* 장바구니 팝업 */}
+            {openCart ? <Cart setOpenCart={setOpenCart} /> : null}
+            {/* 위시리스트 팝업 */}
+            {openWishlist ? (
+              <Wishlist setOpenWishlist={setOpenWishlist} />
+            ) : null}
+          </div>
+        </div>
+      </div>
+```
+
+```jsx
+      {/* 모바일 화면 헤더 */}
+      <div
+        className={`${
+          active === true ? "shadow-sm fixed top-0 left-0 z-10" : null
+        }
+      w-full h-[60px] bg-[#fff] z-50 top-0 left-0 shadow-sm 800px:hidden`}
+      >
+        <div className="w-full flex items-center justify-between">
+          {/* 모바일 사이드바 열기 버튼 */}
+          <div>
+            <BiMenuAltLeft
+              size={40}
+              className="ml-4"
+              onClick={() => setOpen(true)}
+            />
+          </div>
+          {/* 모바일 로고 */}
+          <div>
+            <Link to="/">
+              <img
+                src={`http://localhost:5000/images/QuickDealMarketFix.jpg`}
+                alt=""
+                className="mt-3 cursor-pointer"
+              />
+            </Link>
+          </div>
+          {/* 모바일 장바구니 아이콘 */}
+          <div>
+            <div className="relative mr-[20px]">
+              <AiOutlineShoppingCart size={30} />
+              <span class="absolute right-0 top-0 rounded-full bg-[#3bc177] w-4 h-4 top right p-0 m-0 text-white font-mono text-[12px]  leading-tight text-center">
+                1
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* 모바일 사이드바 */}
+        {open && (
+          <div
+            className={`fixed w-full bg-[#0000005f] z-20 h-full top-0 left-0`}
+          >
+            <div className="fixed w-[60%] bg-[#fff] h-screen top-0 left-0 z-10 overflow-y-scroll">
+              <div className="w-full justify-between flex pr-3">
+                {/* 위시리스트 아이콘 */}
+                <div>
+                  <div className="relative mr-[15px]">
+                    <AiOutlineHeart size={30} className="mt-5 ml-3" />
+                    <span class="absolute right-0 top-0 rounded-full bg-[#3bc177] w-4 h-4 top right p-0 m-0 text-white font-mono text-[12px]  leading-tight text-center">
+                      0
+                    </span>
+                  </div>
+                </div>
+                {/* 모바일 사이드바 닫기 버튼 */}
+                <RxCross1
+                  size={30}
+                  className="ml-4 mt-5"
+                  onClick={() => setOpen(false)}
+                />
+              </div>
+
+              {/* 모바일 검색창 */}
+              <div className="my-8 w-[92%] m-auto h-[40px relative]">
+                <input
+                  type="search"
+                  placeholder="Search Product..."
+                  className="h-[40px] w-full px-2 border-[#3957db] border-[2px] rounded-md"
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                />
+                {/* 모바일 검색 결과 팝업 */}
+                {searchData && (
+                  <div className="absolute bg-[#fff] z-10 shadow w-full left-0 p-3">
+                    {searchData.map((i) => {
+                      const d = i.name;
+
+                      const Product_name = d.replace(/\s+/g, "-");
+                      return (
+                        <Link to={`/product/${Product_name}`}>
+                          <div className="flex items-center">
+                            <img
+                              src={`http://localhost:5000/${i.images[0]}`}
+                              alt=""
+                              className="w-[50px] mr-2"
+                            />
+                            <h5>{i.name}</h5>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* 모바일 네비게이션 바 */}
+              <Navbar active={activeHeading} />
+
+              {/* 판매자 등록 버튼 */}
+              <div className={`${styles.button} ml-4 !rounded-[4px]`}>
+                <Link to="/shop-create">
+                  <h1 className="text-[#fff] flex items-center">
+                    Become Seller <IoIosArrowForward className="ml-1" />
+                  </h1>
+                </Link>
+              </div>
+              <br />
+              <br />
+              <br />
+
+              {/* 로그인/회원가입 또는 프로필 아이콘 */}
+              <div className="flex w-full justify-center">
+                {isAuthenticated ? (
+                  <div>
+                    <Link to="/profile">
+                      <img
+                        src={`http://localhost:5000/${user.avatar}`}
+                        alt=""
+                        className="w-[60px] h-[60px] rounded-full border-[3px] border-[#0eae88]"
+                      />
+                    </Link>
+                  </div>
+                ) : (
+                  <>
+                    <Link
+                      to="/login"
+                      className="text-[18px] pr-[10px] text-[#000000b7]"
+                    >
+                      Login /
+                    </Link>
+                    <Link
+                      to="/sign-up"
+                      className="text-[18px] text-[#000000b7]"
+                    >
+                      Sign up
+                    </Link>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+};
+
+export default Header;
+```
+
+```jsx
+{
+  searchData && searchData.length !== 0 ? (
+    <div className="shadow-sm-2 absolute z-[9] min-h-[30vh] bg-slate-50 p-4">
+      {searchData &&
+        searchData.map((i, index) => {
+          const d = i.name
+          const Product_name = d.replace(/\s+/g, '-')
+          return (
+            <Link to={`/product/${Product_name}`}>
+              <div className="items-start-py-3 flex w-full">
+                <img
+                  src={`http://localhost:5000/${i.images[0]}`}
+                  alt=""
+                  className="mr-[10px] h-[40px] w-[40px]"
+                />
+                <h1>{i.name}</h1>
+              </div>
+            </Link>
+          )
+        })}
+    </div>
+  ) : null
+}
+```
+
+```jsx
+검색 결과가 있을 경우, <div> 태그 내에 검색 결과를 표시하는 부분이 있다.
+
+이 부분은 절대 위치로 고정된 크기의 박스로 설정되어 있다. (absolute min-h-[30vh] bg-slate-50 shadow-sm-2 z-[9] p-4)
+
+각 제품에 대한 정보는 Link 컴포넌트를 사용하여 제품 상세 페이지로 연결됨
+
+이미지는 제품의 첫 번째 이미지를 사용하며, 제품 이름과 함께 화면에 표시됨
+```
+
+헤더 만들기
+
+# ProductsPage.jsx 페이지 수정
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381461/notion-blog/_/_/EcommerceProject/EcommerceProject_-3-2/Untitled_1.png)
+
+```jsx
+import React, { useEffect, useState } from 'react'
+import { useSelector } from 'react-redux'
+import { useSearchParams } from 'react-router-dom'
+import Footer from '../components/Layout/Footer'
+import Header from '../components/Layout/Header'
+import ProductCard from '../components/Route/ProductCard'
+// import { productData } from "../static/data";
+import styles from '../styles/styles'
+import Lottie from 'lottie-react'
+import NoData from '../Lottie/NoData.json'
+import Loader from '../components/Layout/Loader'
+
+const ProductsPage = () => {
+  // useSearchParams를 사용하여 현재 URL의 쿼리 파라미터를 가져옴
+  const [searchParams] = useSearchParams()
+  // category 쿼리 파라미터를 추출
+  const categoryData = searchParams.get('category')
+  // Redux store에서 제품 목록 및 로딩 상태 가져오기
+  const { allProducts, isLoading } = useSelector((state) => state.product)
+  // 화면에 렌더링할 데이터를 관리하기 위한 state
+  const [data, setData] = useState([])
+
+  // 카테고리 변경이 일어날 때마다 useEffect가 실행됨
+  useEffect(() => {
+    if (categoryData === null) {
+      // 카테고리가 없을 경우 모든 제품을 데이터로 설정
+      const d = allProducts
+      setData(d)
+    } else {
+      // 특정 카테고리가 선택된 경우 해당 카테고리에 속하는 제품만 데이터로 설정
+      const d = allProducts && allProducts.filter((i) => i.category === categoryData)
+      setData(d)
+    }
+    // window.scrollTo(0,0); // 페이지를 맨 위로 스크롤하는 코드 (현재 주석 처리됨)
+  }, [categoryData])
+
+  return (
+    <>
+      {isLoading ? ( // 로딩 중일 경우 Loader 컴포넌트를 화면에 표시
+        <Loader />
+      ) : (
+        <div>
+          {/* 헤더 컴포넌트를 렌더링하고, activeHeading prop으로 현재 활성화된 메뉴를 지정 */}
+          <Header activeHeading={3} />
+          <br />
+          <br />
+          <div className={`${styles.section}`}>
+            {/* 그리드 레이아웃을 사용하여 제품 카드들을 표시 */}
+            <div className="mb-12 grid grid-cols-1 gap-[20px] md:grid-cols-2 md:gap-[25px] lg:grid-cols-4 lg:gap-[25px] xl:grid-cols-5 xl:gap-[30px]">
+              {data && data.map((i, index) => <ProductCard data={i} key={index} />)}
+            </div>
+            {/* 만약 데이터가 없을 경우 NoData 애니메이션과 메시지를 화면에 표시 */}
+            {data && data.length === 0 ? (
+              <h1 className="flex w-full flex-col items-center justify-center pt-[40px] pb-[100px] text-center text-[20px]">
+                <Lottie animationData={NoData} style={{ width: '600px', height: '600px' }} />
+                상품이 없습니다!
+              </h1>
+            ) : null}
+          </div>
+          {/* 푸터 컴포넌트를 렌더링 */}
+          <Footer />
+        </div>
+      )}
+    </>
+  )
+}
+
+export default ProductsPage
+```
+
+## ProductCard.jsx 컴포넌트 수정
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381461/notion-blog/_/_/EcommerceProject/EcommerceProject_-3-2/Untitled_2.png)
+
+```jsx
+import React, { useState } from 'react'
+import {
+  AiFillHeart,
+  AiFillStar,
+  AiOutlineEye,
+  AiOutlineHeart,
+  AiOutlineShoppingCart,
+  AiOutlineStar,
+} from 'react-icons/ai'
+import { Link } from 'react-router-dom'
+import styles from '../../styles/styles'
+import ProductDetailsCard from './ProductDetailCard'
+
+const ProductCard = ({ data }) => {
+  // useState 훅을 사용하여 클릭 상태와 모달창 열림 상태를 관리
+  const [click, setClick] = useState(false)
+  const [open, setOpen] = useState(false)
+
+  // 제품 이름을 URL 친화적으로 변환
+  const d = data.name
+  const product_name = d.replace(/\s+/g, '-')
+
+  return (
+    <>
+      {/* 제품 카드 영역 */}
+      <div className="relative h-[370px] w-full cursor-pointer rounded-lg bg-white p-3 shadow-sm">
+        {/* 제품 이미지 링크 */}
+        <Link to={`/product/${product_name}`}>
+          <img
+            // src={data.image_Url[0].url}
+            src={`http://localhost:5000/${data.images && data.images[0]}`}
+            alt=""
+            className="h-[170px] w-full object-contain"
+          />
+        </Link>
+
+        {/* 상점 이름 링크 */}
+        <Link to="/">
+          <h5 className={`${styles.shop_name}`}>{data.shop.name}</h5>
+        </Link>
+
+        {/* 제품 제목 링크 */}
+        <Link to={`/product/${product_name}`}>
+          <h4 className="pb-3 font-[500]">
+            {/* 제품 이름이 40자 이상이면 일부만 표시하고 나머지는 생략 */}
+            {data.name.length > 40 ? data.name.slice(0, 40) + '...' : data.name}
+          </h4>
+
+          {/* 별점 표시 */}
+          <div className="flex">
+            <AiFillStar className="mr-2 cursor-pointer" size={20} color="#F6BA00" />
+            <AiFillStar className="mr-2 cursor-pointer" size={20} color="#F6BA00" />
+            <AiFillStar className="mr-2 cursor-pointer" size={20} color="#F6BA00" />
+            <AiFillStar className="mr-2 cursor-pointer" color="#F6BA00" size={20} />
+            <AiOutlineStar size={20} className="mr-2 cursor-pointer" color="#F6BA00" />
+          </div>
+
+          {/* 가격 및 판매량 표시 */}
+          <div className="flex items-center justify-between py-2">
+            <div className="flex">
+              <h5 className={`${styles.productDiscountPrice}`}>
+                {/* 할인 가격이 0이면 원래 가격을 표시, 그렇지 않으면 할인 가격을 표시 */}
+                {data.originalPrice === 0 ? data.originalPrice : data.discountPrice}$
+              </h5>
+              <h4 className={`${styles.price}`}>
+                {/* 원래 가격이 0이 아니면 원래 가격을 표시 */}
+                {data.originalPrice ? data.originalPrice + ' $' : null}
+              </h4>
+            </div>
+            <span className="text-[17px] font-[400] text-[#68d284]">
+              {/* 판매된 제품 수를 표시 */}
+              50 sold
+            </span>
+          </div>
+        </Link>
+
+        {/* 제품 옵션 아이콘 영역 */}
+        <div>
+          {/* 위시리스트 아이콘 (클릭 상태에 따라 하트 색상 변경) */}
+          {click ? (
+            <AiFillHeart
+              size={22}
+              className="absolute top-5 right-2 cursor-pointer"
+              onClick={() => setClick(!click)}
+              color={click ? 'red' : '#333'}
+              title="Remove from wishlist"
+            />
+          ) : (
+            <AiOutlineHeart
+              size={22}
+              className="absolute top-5 right-2 cursor-pointer"
+              onClick={() => setClick(!click)}
+              color={click ? 'red' : '#333'}
+              title="Add to wishlist"
+            />
+          )}
+
+          {/* 빠른 뷰 아이콘 */}
+          <AiOutlineEye
+            size={22}
+            className="absolute top-14 right-2 cursor-pointer"
+            onClick={() => setOpen(!open)}
+            color="#333"
+            title="Quick view"
+          />
+
+          {/* 장바구니 아이콘 */}
+          <AiOutlineShoppingCart
+            size={25}
+            className="absolute top-24 right-2 cursor-pointer"
+            onClick={() => setOpen(!open)}
+            color="#444"
+            title="Add to cart"
+          />
+
+          {/* 모달이 열려있을 경우 제품 상세 모달 컴포넌트를 렌더링 */}
+          {open ? <ProductDetailsCard setOpen={setOpen} data={data} /> : null}
+        </div>
+      </div>
+    </>
+  )
+}
+
+export default ProductCard
+```
+
+```jsx
+할인 부분을 동적으로 표현하고 있다 할인가격이 0이면 원래 가격을 표시 할인 가격이 있다면 할인 가격을 표시하고
+
+옆에 원래 가격을 표시한다
+```
+
+## ProductDetailsCard.jsx 컴포넌트 수정
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381461/notion-blog/_/_/EcommerceProject/EcommerceProject_-3-2/Untitled_3.png)
+
+```jsx
+import React, { useState } from 'react'
+import { Link } from 'react-router-dom'
+import {
+  AiFillHeart,
+  AiOutlineHeart,
+  AiOutlineMessage,
+  AiOutlineShoppingCart,
+} from 'react-icons/ai'
+import { RxCross1 } from 'react-icons/rx'
+import styles from '../../styles/styles'
+
+const ProductDetailsCard = ({ setOpen, data }) => {
+  // 제품 수량 상태와 위시리스트 클릭 상태를 관리하는 state
+  const [count, setCount] = useState(1)
+  const [click, setClick] = useState(false)
+
+  // 메시지 전송 함수 (아직 구현되지 않음)
+  const handleMessageSubmit = () => {}
+
+  // 수량 감소 함수
+  const decrementCount = () => {
+    if (count > 1) {
+      setCount(count - 1)
+    }
+  }
+
+  // 수량 증가 함수
+  const incrementCount = () => {
+    setCount(count + 1)
+  }
+
+  return (
+    <div className="bg-[#fff]">
+      {data ? (
+        // 모달 컨테이너
+        <div className="fixed top-0 left-0 z-40 flex h-screen w-full items-center justify-center bg-[#00000030]">
+          {/* 모달 내용 */}
+          <div className="800px:w-[60%] 800px:h-[75vh] relative h-[90vh] w-[90%] overflow-y-scroll rounded-md bg-white p-4 shadow-sm">
+            {/* 모달 닫기 버튼 */}
+            <RxCross1
+              size={30}
+              className="absolute top-3 right-3 z-50"
+              onClick={() => setOpen(false)}
+            />
+
+            {/* 모달 내용 */}
+            <div className="800px:flex block w-full">
+              {/* 제품 이미지 및 상점 정보 */}
+              <div className="800px:w-[50%] w-full">
+                <img
+                  // src={data.image_Url[0].url}
+                  src={`http://localhost:5000/${data.images && data.images[0]}`}
+                  alt=""
+                />
+                <div className="flex">
+                  {/* 상점 링크 및 상점 로고 */}
+                  <Link to={`/shop/preview/${data.shop._id}`} className="flex">
+                    <img
+                      // src={data.shop.shop_avatar.url}
+                      src={`http://localhost:5000/${data?.shop?.avatar}`}
+                      alt=""
+                      className="mr-2 h-[50px] w-[50px] rounded-full"
+                    />
+                    <div>
+                      <h3 className={`${styles.shop_name}`}>{data.shop.name}</h3>
+                      <h5 className="pb-3 text-[15px]">
+                        {/* ({data.shop.ratings}) Ratings */}
+                        (4.5) Ratings
+                      </h5>
+                    </div>
+                  </Link>
+                </div>
+
+                {/* 메시지 전송 버튼 */}
+                <div
+                  className={`${styles.button} mt-4 h-11 rounded-[4px] bg-[#000]`}
+                  onClick={handleMessageSubmit}
+                >
+                  <span className="flex items-center text-[#fff]">
+                    Send Message <AiOutlineMessage className="ml-1" />
+                  </span>
+                </div>
+
+                {/* 판매량 표시 */}
+                <h5 className="mt-5 text-[16px] text-[red]">(50) Sold out</h5>
+              </div>
+
+              {/* 제품 정보 */}
+              <div className="800px:w-[50%] w-full pt-5 pr-[5px] pl-[5px]">
+                <h1 className={`${styles.productTitle} text-[20px]`}>{data.name}</h1>
+                <p>{data.description}</p>
+
+                {/* 제품 가격 정보 */}
+                <div className="flex pt-3">
+                  <h4 className={`${styles.productDiscountPrice}`}>
+                    {/* 할인 가격 */}
+                    {data.discountPrice}$
+                  </h4>
+                  <h3 className={`${styles.price}`}>
+                    {/* 원래 가격이 0이 아니면 원래 가격 */}
+                    {data.originalPrice ? data.originalPrice + '$' : null}
+                  </h3>
+                </div>
+
+                {/* 수량 조절 버튼 및 위시리스트 아이콘 */}
+                <div className="mt-12 flex items-center justify-between pr-3">
+                  <div>
+                    {/* 수량 감소 버튼 */}
+                    <button
+                      className="rounded-l bg-gradient-to-r from-teal-400 to-teal-500 px-4 py-2 font-bold text-white shadow-lg transition duration-300 ease-in-out hover:opacity-75"
+                      onClick={decrementCount}
+                    >
+                      -
+                    </button>
+                    {/* 수량 표시 */}
+                    <span className="bg-gray-200 px-4 py-[11px] font-medium text-gray-800">
+                      {count}
+                    </span>
+                    {/* 수량 증가 버튼 */}
+                    <button
+                      className="rounded-l bg-gradient-to-r from-teal-400 to-teal-500 px-4 py-2 font-bold text-white shadow-lg transition duration-300 ease-in-out hover:opacity-75"
+                      onClick={incrementCount}
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div>
+                    {/* 위시리스트 아이콘 (클릭 상태에 따라 하트 색상 변경) */}
+                    {click ? (
+                      <AiFillHeart
+                        size={30}
+                        className="cursor-pointer"
+                        onClick={() => setClick(!click)}
+                        color={click ? 'red' : '#333'}
+                        title="Remove from wishlist"
+                      />
+                    ) : (
+                      <AiOutlineHeart
+                        size={30}
+                        className="cursor-pointer"
+                        onClick={() => setClick(!click)}
+                        color={click ? 'red' : '#333'}
+                        title="Add to wishlist"
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* 장바구니 추가 버튼 */}
+                <div className={`${styles.button} mt-6 flex h-11 items-center rounded-[4px]`}>
+                  <span className="flex items-center text-[#fff]">
+                    Add to cart <AiOutlineShoppingCart className="ml-1" />
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+export default ProductDetailsCard
+```
+
+```jsx
+특별한 부분은 없는 상품 미리보기 부분이다
+```
+
+# BestSellingPage.jsx 페이지 수정
+
+```jsx
+ Redux 상태에서 제품 데이터를 가져와 판매량에 따라 정렬하여 최다 판매 상품을 표시하는 페이지 컴포넌트
+```
+
+```jsx
+import React, { useEffect, useState } from 'react'
+import { useSelector } from 'react-redux'
+import { useSearchParams } from 'react-router-dom'
+import Header from '../components/Layout/Header'
+import Loader from '../components/Layout/Loader'
+import ProductCard from '../components/Route/ProductCard'
+import styles from '../styles/styles'
+import Footer from '../components/Layout/Footer'
+
+const BestSellingPage = () => {
+  // 제품 데이터 및 로딩 상태를 Redux Store에서 가져옴
+  const { allProducts, isLoading } = useSelector((state) => state.product)
+
+  // 제품 데이터를 정렬하여 표시할 상태 선언
+  const [data, setData] = useState([])
+
+  // 페이지가 로드될 때 또는 allProducts가 변경될 때 실행되는 useEffect
+  useEffect(() => {
+    // allProducts 데이터가 존재하면 복사하여 allProductsData에 할당
+    const allProductsData = allProducts ? [...allProducts] : []
+
+    // 제품을 판매량에 따라 내림차순으로 정렬
+    const sortedData = allProductsData?.sort((a, b) => b.sold_out - a.sold_out)
+
+    // 정렬된 데이터를 상태에 업데이트
+    setData(sortedData)
+  }, [allProducts])
+
+  return (
+    <>
+      {/* 로딩 중인지 확인하고 로딩 중이면 Loader 컴포넌트를 표시 */}
+      {isLoading ? (
+        <Loader />
+      ) : (
+        // 로딩이 완료되면 페이지 컨텐츠 표시
+        <div>
+          {/* 페이지 헤더 컴포넌트 (activeHeading은 현재 선택된 메뉴의 표시를 제어) */}
+          <Header activeHeading={2} />
+          <br />
+          <br />
+          {/* 제품 목록을 표시할 섹션 */}
+          <div className={`${styles.section}`}>
+            {/* 그리드 레이아웃으로 제품 목록 표시 */}
+            <div className="mb-12 grid grid-cols-1 gap-[20px] md:grid-cols-2 md:gap-[25px] lg:grid-cols-4 lg:gap-[25px] xl:grid-cols-5 xl:gap-[30px]">
+              {/* 데이터가 존재하면 각 제품에 대한 ProductCard 컴포넌트를 매핑하여 표시 */}
+              {data && data.map((i, index) => <ProductCard data={i} key={index} />)}
+            </div>
+          </div>
+          {/* 페이지 푸터 컴포넌트 */}
+          <Footer />
+        </div>
+      )}
+    </>
+  )
+}
+
+export default BestSellingPage
+```
+
+```jsx
+useEffect(() => {
+  const d = productData && productData.sort((a, b) => b.total_sell - a.total_sell);
+  const firstFive = d.slice(0, 5);
+  setData(firstFive);
+}, []);
+
+a와 b는 비교되는 두 요소이다.
+
+(b.total_sell - a.total_sell): 내림차순으로 정렬하기 위해 두 요소의 판매량(total_sell)을 비교한다.
+
+만약 b.total_sell - a.total_sell가 양수면 b가 a보다 크다고 간주되어 내림차순으로 정렬된다.
+
+만약 음수나 0이면 a가 b보다 크거나 같다고 간주되어 정렬되지 않거나 오름차순으로 정렬된다.
+
+예를 들어, 판매량이 각각 10, 5, 8인 상품이 있다면, 내림차순 정렬 결과는 [10, 8, 5]가 된다.
+
+slice(0, 5):
+
+slice 메서드는 첫 번째 매개변수부터 두 번째 매개변수 직전까지의 요소를 포함하는 부분 배열을 반환한다.
+
+즉, 첫 번째 인덱스(0)부터 다섯 번째 인덱스(5 직전)까지의 요소를 추출한다.
+
+( 이는 5개의 상품만 출력하는 부분이다 )
+
+-----------------------------------------------------------------------------------------------------
+
+{data && data.map((i, index) => <ProductCard data={i} key={index} />)}
+
+{data && data.map(...)}: 이는 data가 존재하는지 확인하고, 데이터가 있을 경우에만 map 함수를 실행
+
+data.map((i, index) => ... ): map 함수를 사용하여 배열의 각 항목을 순회하면서 JSX를 생성한다. i는 배열의 각 항목을 나타낸다
+```
+
+## BestDeals.jsx 컴포넌트 수정 ( 홈페이지에 출력되는 부분 )
+
+```jsx
+import React, { useEffect, useState } from 'react'
+import { useSelector } from 'react-redux'
+import styles from '../../styles/styles'
+import ProductCard from './ProductCard'
+
+const BestDeals = () => {
+  // Redux 상태에서 모든 제품 데이터를 가져옴
+  const { allProducts } = useSelector((state) => state.product)
+
+  // 최다 판매 상품을 저장할 상태 선언
+  const [data, setData] = useState([])
+
+  // 페이지가 로드될 때 또는 allProducts가 변경될 때 실행되는 useEffect
+  useEffect(() => {
+    // allProducts 데이터가 존재하면 첫 다섯 개의 상품을 가져와서 firstFive에 할당
+    const firstFive = allProducts && allProducts.slice(0, 5)
+
+    // firstFive 데이터를 상태에 업데이트
+    setData(firstFive)
+  }, [allProducts])
+
+  return (
+    <div>
+      {/* 섹션을 나타내는 div */}
+      <div className={`${styles.section}`}>
+        {/* 섹션 제목을 나타내는 div */}
+        <div className={`${styles.heading}`}>
+          <h1>최다 판매</h1>
+        </div>
+
+        {/* 그리드 레이아웃으로 최다 판매 상품을 나타내는 div */}
+        <div className="mb-12 grid grid-cols-1 gap-[20px] border-0 md:grid-cols-2 md:gap-[25px] lg:grid-cols-4 lg:gap-[25px] xl:grid-cols-5 xl:gap-[30px]">
+          {/* 데이터가 존재하면 각 최다 판매 상품에 대한 ProductCard 컴포넌트를 매핑하여 표시 */}
+          {data && data.map((i, index) => <ProductCard data={i} key={index} />)}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default BestDeals
+```
+
+```jsx
+ Redux 상태에서 가져온 모든 제품 데이터 중에서 최다 판매 상품을 선택하여 표시하는 컴포넌트
+
+이건 홈페이지에서 사용한다 ( 홈페이지 하단 부분에서 )
+```
+
+## FeaturedProduct.jsx 컴포넌트 수정 ( 홈페이지에 출력되는 부분 )
+
+```jsx
+import React, { useEffect } from 'react'
+import { useSelector } from 'react-redux'
+import styles from '../../styles/styles'
+import ProductCard from './ProductCard'
+
+const FeaturedProduct = () => {
+  // Redux 상태에서 모든 제품 데이터를 가져옴
+  const { allProducts } = useSelector((state) => state.product)
+
+  return (
+    <div>
+      {/* 섹션을 나타내는 div */}
+      <div className={`${styles.section}`}>
+        {/* 섹션 제목을 나타내는 div */}
+        <div className={`${styles.heading}`}>
+          <h1>특별 상품</h1>
+        </div>
+
+        {/* 그리드 레이아웃으로 특별 상품을 나타내는 div */}
+        <div className="mb-12 grid grid-cols-1 gap-[20px] border-0 md:grid-cols-2 md:gap-[25px] lg:grid-cols-4 lg:gap-[25px] xl:grid-cols-5 xl:gap-[30px]">
+          {/* Redux에서 가져온 제품 데이터를 매핑하여 각 상품에 대한 ProductCard 컴포넌트를 표시 */}
+          {allProducts && allProducts.map((i, index) => <ProductCard data={i} key={index} />)}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default FeaturedProduct
+```
+
+```jsx
+Redux 상태에서 가져온 모든 제품 데이터를 사용하여 "특별 상품"을 표시하는 컴포넌트
+```
+
+# ProductDetailsPage.jsx 페이지 수정
+
+```jsx
+상품의 상세 정보를 표시하는 페이지 대표 이미지와
+
+아래에 추가적으로 첨부된 이미지가 출력된다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381461/notion-blog/_/_/EcommerceProject/EcommerceProject_-3-2/Untitled_4.png)
+
+```jsx
+import React, { useEffect, useState } from 'react'
+import { useParams } from 'react-router-dom'
+import Footer from '../components/Layout/Footer'
+import Header from '../components/Layout/Header'
+import ProductDetails from '../components/Products/ProductDetails'
+import { productData } from '../static/data'
+import { useSelector } from 'react-redux'
+import SuggestedProduct from '../components/Products/SuggestedProduct'
+
+const ProductDetailsPage = () => {
+  // React Router에서 현재 URL의 파라미터를 가져오기 위해 useParams 훅 사용
+  const { name } = useParams()
+
+  // Redux 상태에서 모든 제품 데이터를 가져옴
+  const { allProducts } = useSelector((state) => state.product)
+
+  // 상세 페이지에서 표시할 제품 데이터를 담을 상태 변수
+  const [data, setData] = useState(null)
+
+  // URL에서 얻은 제품 이름에 대응하는 데이터를 찾아 상태 변수에 설정
+  useEffect(() => {
+    // 기존의 정적 데이터를 사용하는 코드
+    // const data = productData.find((i) => i.name === productName);
+
+    // Redux에서 가져온 데이터를 사용하여 해당하는 제품을 찾음
+    const data = allProducts && allProducts.find((i) => i.name === productName)
+
+    // 상태 변수에 찾은 제품 데이터 설정
+    setData(data)
+  }, [])
+
+  return (
+    <div>
+      {/* 공통 레이아웃을 포함한 페이지 상단의 헤더 */}
+      <Header />
+
+      {/* 제품 상세 정보를 표시하는 컴포넌트에 현재 제품 데이터를 전달 */}
+      <ProductDetails data={data} />
+
+      {/* 제안된 제품을 표시하는 컴포넌트에 현재 제품 데이터를 전달 */}
+      {data && <SuggestedProduct data={data} />}
+
+      {/* 페이지 하단에 위치한 푸터 */}
+      <Footer />
+    </div>
+  )
+}
+
+export default ProductDetailsPage
+```
+
+## ProductDetails.jsx 컴포넌트 수정
+
+```jsx
+import React, { useEffect, useState } from "react";
+import {
+  AiFillHeart,
+  AiOutlineHeart,
+  AiOutlineMessage,
+  AiOutlineShoppingCart,
+} from "react-icons/ai";
+import { Link, useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { getAllProductsShop } from "../../redux/product/productAction";
+import styles from "../../styles/styles";
+
+const ProductDetails = ({ data }) => {
+  const [count, setCount] = useState(1);
+  const [click, setClick] = useState(false);
+  const [select, setSelect] = useState(0);
+  const navigate = useNavigate();
+
+  // Redux에서 제품과 관련된 상태 및 액션을 사용하기 위한 훅
+  const { products } = useSelector((state) => state.product);
+  const dispatch = useDispatch();
+
+  // 컴포넌트가 마운트될 때 제품 상점의 모든 제품을 가져오는 액션을 호출
+  useEffect(() => {
+    dispatch(getAllProductsShop(data && data.shop._id));
+  }, [dispatch, data]);
+
+  // 수량을 증가시키는 함수
+  const incrementCount = () => {
+    setCount(count + 1);
+  };
+
+  // 수량을 감소시키는 함수
+  const decrementCount = () => {
+    if (count > 1) {
+      setCount(count - 1);
+    }
+  };
+
+  // 메시지를 보내는 함수
+  const handleMessageSubmit = () => {
+    // 대화 상자 페이지로 이동하는 React Router의 navigate 함수 사용
+    navigate("/inbox?conversation=507ebjver884ehfdjeriv84");
+  };
+
+  return (
+    <div className="bg-white">
+      {data ? (
+        <div className={`${styles.section} w-[90%] 800px:w-[80%]`}>
+          <div className="w-full py-5">
+            <div className="block w-full 800px:flex">
+              <div className="w-full 800px:w-[50%]">
+                {/* 제품 이미지 및 선택된 이미지 표시 */}
+                <img
+                  src={`http://localhost:5000/${data && data.images[select]}`}
+                  alt=""
+                  className="w-[80%]"
+                />
+                <div className="w-full flex">
+                  {/* 다중 이미지 선택 기능 */}
+                  {data &&
+                    data.images.map((i, index) => (
+                      <div
+                        className={`${
+                          select === index ? "border" : "null"
+                        } cursor-pointer`}
+                      >
+                        <img
+                          src={`http://localhost:5000/${i}`}
+                          alt=""
+                          className="h-[200px] overflow-hidden mr-3 mt-3"
+                          onClick={() => setSelect(index)}
+                        />
+                      </div>
+                    ))}
+                </div>
+              </div>
+              <div className="w-full 800px:w-[50%] pt-5">
+                {/* 제품 정보 및 구매 관련 내용 표시 */}
+                <h1 className={`${styles.productTitle}`}>{data.name}</h1>
+                <p>{data.description}</p>
+                <div className="flex pt-3">
+                  <h4 className={`${styles.productDiscountPrice}`}>
+                    {data.discountPrice}$
+                  </h4>
+                  <h3 className={`${styles.price}`}>
+                    {data.originalPrice ? data.originalPrice + "$" : null}
+                  </h3>
+                </div>
+
+                <div className="flex items-center mt-12 justify-between pr-3">
+                  {/* 제품 수량 조절 버튼 */}
+                  <div>
+                    <button
+                      className="bg-gradient-to-r from-teal-400 to-teal-500 text-white font-bold rounded-l px-4 py-2 shadow-lg hover:opacity-75 transition duration-300 ease-in-out"
+                      onClick={decrementCount}
+                    >
+                      -
+                    </button>
+                    <span className="bg-gray-200 text-gray-800 font-medium px-4 py-[11px]">
+                      {count}
+                    </span>
+                    <button
+                      className="bg-gradient-to-r from-teal-400 to-teal-500 text-white font-bold rounded-l px-4 py-2 shadow-lg hover:opacity-75 transition duration-300 ease-in-out"
+                      onClick={incrementCount}
+                    >
+                      +
+                    </button>
+                  </div>
+                  {/* 위시리스트 관리 아이콘 */}
+                  <div>
+                    {click ? (
+                      <AiFillHeart
+                        size={30}
+                        className="cursor-pointer"
+                        onClick={() => setClick(!click)}
+                        color={click ? "red" : "#333"}
+                        title="Remove from wishlist"
+                      />
+                    ) : (
+                      <AiOutlineHeart
+                        size={30}
+                        className="cursor-pointer"
+                        onClick={() => setClick(!click)}
+                        color={click ? "red" : "#333"}
+                        title="Add to wishlist"
+                      />
+                    )}
+                  </div>
+                </div>
+                {/* 카트에 추가 버튼 */}
+                <div
+                  className={`${styles.button} !mt-6 !rounded !h-11 flex items-center`}
+                >
+                  <span className="text-white flex items-center">
+                    Add to cart <AiOutlineShoppingCart className="ml-1" />
+                  </span>
+                </div>
+                {/* 판매자 정보 및 메시지 전송 버튼 */}
+                <div className="flex items-center pt-8">
+                  <img
+                    src={`http://localhost:5000/${data?.shop?.avatar}`}
+                    alt=""
+                    className="w-[50px] h-[50px] rounded-full mr-2"
+                  />
+                  <div className="pr-8">
+                    <h3 className={`${styles.shop_name} pb-1 pt-1`}>
+                      {data.shop.name}
+                    </h3>
+                    <h5 className="pb-3 text-[15px]">
+                      (4/5) Ratings
+                    </h5>
+                  </div>
+                  <div
+                    className={`${styles.button} bg-[#6443d1] mt-4 !rounded !h-11`}
+                    onClick={handleMessageSubmit}
+                  >
+                    <span className="text-white flex items-center">
+                      Send Message <AiOutlineMessage className="ml-1" />
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* 제품 상세 정보, 리뷰, 판매자 정보를 탭 형태로 표시하는 하단 부분 */}
+          <ProductDetailsInfo data={data} products={products} />
+          <br />
+          <br />
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
+// 제품 상세 정보, 리뷰, 판매자 정보를 탭 형태로 표시하는 컴포넌트
+const ProductDetailsInfo = ({ data, products }) => {
+  const [active, setActive] = useState(1);
+
+```
+
+```jsx
+  return (
+    <div className="bg-[#f5f6fb] px-3 800px:px-10 py-2 rounded">
+      {/* 탭 메뉴 부분 */}
+      <div className="w-full flex justify-between border-b pt-10 pb-2">
+        <div className="relative">
+          {/* 제품 상세 정보 탭 */}
+          <h5
+            className={
+              "text-[#000] text-[18px] px-1 leading-5 font-[600] cursor-pointer 800px:text-[20px]"
+            }
+            onClick={() => setActive(1)}
+          >
+            Product Details
+          </h5>
+          {active === 1 ? (
+            <div className={`${styles.active_indicator}`} />
+          ) : null}
+        </div>
+        <div className="relative">
+          {/* 제품 리뷰 탭 */}
+          <h5
+            className={
+              "text-[#000] text-[18px] px-1 leading-5 font-[600] cursor-pointer 800px:text-[20px]"
+            }
+            onClick={() => setActive(2)}
+          >
+            Product Reviews
+          </h5>
+          {active === 2 ? (
+            <div className={`${styles.active_indicator}`} />
+          ) : null}
+        </div>
+        <div className="relative">
+          {/* 판매자 정보 탭 */}
+          <h5
+            className={
+              "text-[#000] text-[18px] px-1 leading-5 font-[600] cursor-pointer 800px:text-[20px]"
+            }
+            onClick={() => setActive(3)}
+          >
+            Seller Information
+          </h5>
+          {active === 3 ? (
+            <div className={`${styles.active_indicator}`} />
+          ) : null}
+        </div>
+      </div>
+      {/* 각 탭에 대응하는 컨텐츠 표시 */}
+      {active === 1 ? (
+        <>
+          {/* 제품 상세 정보 */}
+          <p className="py-2 text-[18px] leading-8 pb-10 whitespace-pre-line">
+            {data.description}
+          </p>
+        </>
+      ) : null}
+
+      {active === 2 ? (
+        <div className="w-full justify-center min-h-[40vh] flex items-center">
+          {/* 리뷰 부분 - 현재 No Reviews 메시지만 표시 */}
+          <p>No Reviews yet!</p>
+        </div>
+      ) : null}
+
+      {active === 3 && (
+        <div className="w-full block 800px:flex p-5">
+          {/* 판매자 정보 부분 */}
+          <div className="w-full 800px:w-[50%]">
+            {/* 판매자 상점으로 이동하는 링크 */}
+            <Link to={`/shop/preview/${data.shop._id}`}>
+              <div className="flex items-center">
+                <img
+                  src={`http://localhost:5000/${data?.shop?.avatar}`}
+                  className="w-[50px] h-[50px] rounded-full"
+                  alt=""
+                />
+                <div className="pl-3">
+                  <h3 className={`${styles.shop_name}`}>{data.shop.name}</h3>
+                  <h5 className="pb-2 text-[15px]">
+                    (4/5) Ratings
+                  </h5>
+                </div>
+              </div>
+            </Link>
+            <p className="pt-2">{data.shop.description}</p>
+          </div>
+          {/* 판매자 정보의 추가적인 상세 정보 */}
+          <div className="w-full 800px:w-[50%] mt-5 800px:mt-0 800px:flex flex-col items-end">
+            <div className="text-left">
+              <h5 className="font-[600]">
+                Joined on:{" "}
+                <span className="font-[500]">
+                  {data.shop?.createdAt?.slice(0, 10)}
+                </span>
+              </h5>
+              <h5 className="font-[600] pt-3">
+                Total Products:{" "}
+                <span className="font-[500]">
+                  {products && products.length}
+                </span>
+              </h5>
+              <h5 className="font-[600] pt-3">
+                Total Reviews: <span className="font-[500]">324</span>
+              </h5>
+              {/* 판매자 상점으로 이동하는 링크 */}
+              <Link to="/">
+                <div
+                  className={`${styles.button} !rounded-[4px] !h-[39.5px] mt-3`}
+                >
+                  <h4 className="text-white">Visit Shop</h4>
+                </div>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ProductDetails;
+```
+
+```jsx
+
+                <img
+                  src={`http://localhost:5000/${data?.shop?.avatar}`}
+                  className="w-[50px] h-[50px] rounded-full"
+                  alt=""
+                />
+
+?는 Optional Chaining이라는 JavaScript의 문법이다.
+
+이는 객체의 속성을 안전하게 접근하기 위한 것으로, 속성이나 메서드가 존재하는 경우에만 접근하고 그렇지 않은 경우 undefined를 반환한다.
+
+따라서 위의 코드에서는 data가 존재하고, data.shop도 존재하는 경우에만 avatar 속성에 접근하고 그 값을 사용한다.
+
+만약 data나 data.shop이 존재하지 않으면 undefined가 반환되고, 에러가 발생하지 않는다.
+```
+
+## SuggestedProduct.jsx 컴포넌트 수정
+
+```jsx
+import React, { useEffect, useState } from 'react'
+import { productData } from '../../static/data' // 정적인 상품 데이터 불러오기
+import { useSelector } from 'react-redux' // Redux의 상태를 가져오기
+import styles from '../../styles/styles' // 컴포넌트에 사용될 스타일
+import ProductCard from '../Route/ProductCard' // 상품 카드 컴포넌트
+
+const SuggestedProduct = ({ data }) => {
+  // 부모 컴포넌트에서 전달받은 상품 데이터
+  const { allProducts } = useSelector((state) => state.product) // Redux의 전체 상품 데이터 가져오기
+  const [productData, setProductData] = useState() // 추천 상품 데이터 상태
+
+  useEffect(() => {
+    // 컴포넌트가 마운트될 때 실행되는 효과
+    const d = allProducts && allProducts.filter((i) => i.category === data.category) // 전체 상품 데이터 중 현재 상품과 동일한 카테고리의 상품 필터링
+    setProductData(d) // 추천 상품 데이터 업데이트
+  }, [data, allProducts]) // 부모 컴포넌트로부터 전달받은 상품 데이터와 Redux의 전체 상품 데이터가 변경될 때마다 실행
+
+  return (
+    <div>
+      {data ? ( // 전달받은 상품 데이터가 존재하는 경우에만 렌더링
+        <div className={`p-4 ${styles.section}`}>
+          {/* 추천 상품 섹션 */}
+          <h2 className={`${styles.heading} mb-5 border-b text-[25px] font-[500]`}>
+            Related Product
+          </h2>
+          <div className="mb-12 grid grid-cols-1 gap-[20px] md:grid-cols-2 md:gap-[25px] lg:grid-cols-4 lg:gap-[25px] xl:grid-cols-5 xl:gap-[30px]">
+            {/* 추천 상품 목록 */}
+            {productData &&
+              productData.map((i, index) => (
+                <ProductCard data={i} key={index} /> // 추천 상품 카드 컴포넌트에 상품 데이터 전달
+              ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+export default SuggestedProduct
+```
+
+```jsx
+동일한 카테고리 목록에서 상품을 출력해준다
+
+( 하단에 표시해주는 부분 )
+```
+
+# Redux 수정 + 추가
+
+```jsx
+data 를 axios 를 통해서 받아와서 event 인지 events 인지 정확하게 확인하고 반환하자 ( 실수로 시간을 많이 버렸다 )
+```
+
+## eventAction.js
+
+```jsx
+import axios from 'axios'
+import { createAsyncThunk } from '@reduxjs/toolkit'
+
+// 이벤트 생성
+export const createEvent = createAsyncThunk('event/createEvent', async (newForm) => {
+  try {
+    // 이미지를 업로드할 때 'multipart/form-data'로 설정하는 헤더를 가진 POST 요청을 보냄
+    const config = { headers: { 'Content-Type': 'multipart/form-data' } }
+
+    // 서버에 새 이벤트 데이터를 POST 요청하여 생성
+    const { data } = await axios.post(
+      `http://localhost:5000/api/v2/event/create-event`,
+      newForm,
+      config
+    )
+
+    // 생성된 이벤트 데이터를 반환
+    return data.event
+  } catch (error) {
+    // 오류 발생 시 서버에서 받은 메시지를 던짐
+    throw error.response.data.message
+  }
+})
+
+// 샵 모든 이벤트
+export const getAllEventsShop = createAsyncThunk('event/getAllEventsShop', async (id) => {
+  try {
+    // 특정 상점의 모든 이벤트 데이터를 가져오는 GET 요청을 보냄
+    const { data } = await axios.get(`http://localhost:5000/api/v2/event/get-all-events/${id}`)
+
+    // 가져온 이벤트 데이터를 반환
+    return data.events
+  } catch (error) {
+    // 오류 발생 시 서버에서 받은 메시지를 던짐
+    throw error.response.data.message
+  }
+})
+
+// 모든 이벤트
+export const getAllEvents = createAsyncThunk('event/getAllEvents', async () => {
+  try {
+    // 모든 이벤트 데이터를 가져오는 GET 요청을 보냄
+    const { data } = await axios.get(`http://localhost:5000/api/v2/event/get-all-events`)
+
+    // 가져온 이벤트 데이터를 반환
+    return data.events
+  } catch (error) {
+    // 오류 발생 시 서버에서 받은 메시지를 던짐
+    throw error.response.data.message
+  }
+})
+
+// 삭제 이벤트
+export const deleteEvent = createAsyncThunk('event/deleteEvent', async (id) => {
+  try {
+    // 특정 이벤트를 삭제하는 DELETE 요청을 보냄
+    const { data } = await axios.delete(
+      `http://localhost:5000/api/v2/event/delete-shop-event/${id}`,
+      { withCredentials: true }
+    )
+
+    // 서버에서 받은 메시지를 반환
+    return data.message
+  } catch (error) {
+    // 오류 발생 시 서버에서 받은 메시지를 던짐
+    throw error.response.data.message
+  }
+})
+```
+
+```jsx
+// 모든 이벤트
+export const getAllEvents = createAsyncThunk(
+    "event/getAllEvents",
+    async() => {
+        try {
+            // 모든 이벤트 데이터를 가져오는 GET 요청을 보냄
+            const { data } = await axios.get(`http://localhost:5000/api/v2/event/get-all-events`);
+
+            // 가져온 이벤트 데이터를 반환
+            return data.events;
+        } catch (error) {
+            // 오류 발생 시 서버에서 받은 메시지를 던짐
+            throw error.response.data.message;
+        }
+    }
+);
+
+createAsyncThunk: Redux Toolkit에서 제공하는 비동기 액션을 처리하는 유틸리티 함수를 사용하여 Thunk 액션을 생성한다.
+
+"event/getAllEvents": 이 부분은 Redux 액션의 유형(type)을 정의하는 문자열이다.
+
+Redux 상태를 변경하는데 사용되는 액션의 고유한 식별자로 사용된다.
+
+여기서는 이벤트 관련 액션 중 모든 이벤트를 가져오는 액션의 타입을 지정하는 것이다.
+
+* 예제
+
+const mapDispatchToProps = dispatch => ({
+  getAllEvents: () => dispatch({ type: "event/getAllEvents" }),
+});
+
+* 예제2
+  const handleDelete = (id) => {
+    dispatch(deleteEvent(id));
+    window.location.reload();
+  }
+
+dispatch 함수를 사용하여 액션을 디스패치할 때에는 type 필드를 직접 명시해줄 필요가 없다.
+
+Redux는 액션을 식별하기 위해 type 필드를 사용하며, 이는 각 액션 생성자에서 정의된다.
+
+따라서 액션 생성자를 호출하면 자동으로 해당 액션의 type이 할당되게 된다
+
+async() => { ... }: 비동기 작업을 수행할 함수를 정의한다.
+
+try { ... }: 비동기 작업이 수행되는 부분으로, 서버로의 GET 요청을 시도한다.
+
+const { data } = await axios.get(...): Axios를 사용하여 서버의 특정 엔드포인트로 GET 요청을 보낸다. 응답 데이터는 data 객체에 할당된다.
+
+return data.events;: 이 액션을 디스패치(dispatch)하면 Redux 상태에 data.events에 해당하는 값이 저장되게 된다.
+
+catch (error) { ... }: 요청이 실패하면 발생하는 오류를 처리한다.
+
+throw error.response.data.message;: 서버에서 받은 에러 응답 메시지를 던진다.
+```
+
+```jsx
+action.payload 등을 할때 정확하게 Slice 의 어떤값에 넣어줄지 잘 선택하자
+
+event 인지 events 인지 allEvents 인지 사용하는 곳을 잘 확인하고 잘 맞춰서 사용할것 ( 실수해서 시간을 많이 버렸다 )
+```
+
+## eventReducer.js
+
+```jsx
+import { createSlice } from '@reduxjs/toolkit'
+import { createEvent, getAllEventsShop, deleteEvent, getAllEvents } from './eventAction'
+
+const eventSlice = createSlice({
+  name: 'event',
+  initialState: {
+    isLoading: true,
+    success: false,
+    events: [],
+    allEvents: [],
+    event: null,
+    error: null,
+  },
+  extraReducers: (builder) => {
+    builder
+      // 이벤트 생성
+      .addCase(createEvent.pending, (state) => {
+        state.isLoading = true
+      })
+      .addCase(createEvent.fulfilled, (state, action) => {
+        state.isLoading = false
+        state.event = action.payload
+        state.success = true
+      })
+      .addCase(createEvent.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.error.message
+        state.success = false
+      })
+      // 샵 모든 이벤트 조회
+      .addCase(getAllEventsShop.pending, (state) => {
+        state.isLoading = true
+      })
+      .addCase(getAllEventsShop.fulfilled, (state, action) => {
+        state.isLoading = false
+        state.events = action.payload
+      })
+      .addCase(getAllEventsShop.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.payload
+      })
+
+      // 이벤트 삭제
+      .addCase(deleteEvent.pending, (state) => {
+        state.isLoading = true
+      })
+      .addCase(deleteEvent.fulfilled, (state, action) => {
+        state.isLoading = false
+        state.message = action.payload
+      })
+      .addCase(deleteEvent.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.payload
+      })
+
+      // 모든 이벤트 조회
+      .addCase(getAllEvents.pending, (state, action) => {
+        state.isLoading = true
+      })
+      .addCase(getAllEvents.fulfilled, (state, action) => {
+        state.isLoading = false
+        state.allEvents = action.payload
+      })
+      .addCase(getAllEvents.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.payload
+      })
+  },
+})
+
+export default eventSlice.reducer
+
+//   clearErrors: (state) => {
+//     state.error = null;
+//   },
+```
+
+## productAction.js
+
+```jsx
+import { createAsyncThunk } from '@reduxjs/toolkit'
+import axios from 'axios'
+
+// 에러 클리어 액션 생성자
+export const clearErrors = createAsyncThunk('product/clearErrors', async () => {
+  return null
+})
+
+// 제품 생성 액션 생성자
+export const createProduct = createAsyncThunk('product/createProduct', async (newForm) => {
+  try {
+    // API 요청 헤더 설정
+    const config = { headers: { 'Content-Type': 'multipart/form-data' } }
+    // 제품 생성 API 호출
+    const { data } = await axios.post(
+      `http://localhost:5000/api/v2/product/create-product`,
+      newForm,
+      config
+    )
+    return data.product // 생성된 제품 반환
+  } catch (error) {
+    throw error.response.data.message // 에러 발생 시 에러 메시지 반환
+  }
+})
+
+// 샵의 모든 제품 조회 액션 생성자
+export const getAllProductsShop = createAsyncThunk('product/getAllProductsShop', async (id) => {
+  try {
+    // 샵의 모든 제품 조회 API 호출
+    const { data } = await axios.get(
+      `http://localhost:5000/api/v2/product/get-all-products-shop/${id}`
+    )
+    return data.products // 조회된 샵의 제품 목록 반환
+  } catch (error) {
+    throw error.response.data.message // 에러 발생 시 에러 메시지 반환
+  }
+})
+
+// 모든 제품 조회 액션 생성자
+export const getAllProducts = createAsyncThunk('product/getAllProducts', async () => {
+  try {
+    // 모든 제품 조회 API 호출
+    const { data } = await axios.get(`http://localhost:5000/api/v2/product/get-all-products`)
+    return data.products // 조회된 모든 제품 목록 반환
+  } catch (error) {
+    throw error.response.data.message // 에러 발생 시 에러 메시지 반환
+  }
+})
+
+// 제품 삭제 액션 생성자
+export const deleteProduct = createAsyncThunk('product/deleteProduct', async (id) => {
+  try {
+    // 제품 삭제 API 호출
+    const { data } = await axios.delete(
+      `http://localhost:5000/api/v2/product/delete-shop-product/${id}`,
+      { withCredentials: true }
+    )
+    return data.message // 삭제 성공 메시지 반환
+  } catch (error) {
+    throw error.response.data.message // 에러 발생 시 에러 메시지 반환
+  }
+})
+```
+
+## productReducer.js
+
+```jsx
+// Redux Toolkit을 사용하여 동기 액션들을 처리하는 슬라이스 및 리듀서 생성
+
+import { createSlice } from '@reduxjs/toolkit'
+import { createProduct, getAllProductsShop, deleteProduct, getAllProducts } from './productAction'
+// 슬라이스 생성
+const productSlice = createSlice({
+  name: 'product',
+  initialState: {
+    isLoading: true,
+    product: null,
+    success: false,
+    products: [],
+    message: null,
+    allProducts: [],
+    error: null,
+  },
+  // 리듀서 및 비동기 액션 핸들링
+  reducers: {
+    clearErrors: (state) => {
+      state.error = null
+      state.success = false
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      // createProduct 비동기 액션 핸들링
+      .addCase(createProduct.pending, (state) => {
+        state.isLoading = true
+        state.success = false
+        state.error = null
+      })
+      .addCase(createProduct.fulfilled, (state, action) => {
+        state.isLoading = false
+        state.product = action.payload
+        state.success = true
+      })
+      .addCase(createProduct.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.error.message
+        state.success = false
+      })
+      // getAllProductsShop 비동기 액션 핸들링
+      .addCase(getAllProductsShop.pending, (state) => {
+        state.isLoading = true
+        state.error = null
+      })
+      .addCase(getAllProductsShop.fulfilled, (state, action) => {
+        state.isLoading = false
+        state.products = action.payload
+      })
+      .addCase(getAllProductsShop.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.error.message
+      })
+      .addCase(deleteProduct.pending, (state) => {
+        state.isLoading = true
+      })
+      .addCase(deleteProduct.fulfilled, (state, action) => {
+        state.isLoading = false
+        state.error = action.payload
+      })
+      .addCase(deleteProduct.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.payload
+      })
+      // getAllProducts
+      .addCase(getAllProducts.pending, (state) => {
+        state.isLoading = true
+      })
+      .addCase(getAllProducts.fulfilled, (state, action) => {
+        state.isLoading = false
+        state.allProducts = action.payload
+      })
+      .addCase(getAllProducts.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.error.message
+      })
+  },
+})
+
+export const { clearErrors } = productSlice.actions
+
+export default productSlice.reducer
+```

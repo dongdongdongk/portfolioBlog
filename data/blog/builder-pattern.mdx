@@ -1,0 +1,245 @@
+---
+title: '빌더 패턴(Builder pattern)'
+date: '2026-09-02'
+category: '백엔드/JAVA'
+tags: ['백엔드', 'JAVA']
+draft: false
+summary: ''
+---
+
+# **빌더 패턴(Builder pattern)이란?**
+
+```java
+객체를 정의하고 그 객체를 생성할 때 보통 생성자를 통해 생성하는 것을 생각한다.
+
+Bag bag = new Bag("name", 1000, "memo");
+```
+
+```java
+하지만 생성자를 통해 객체를 생성하는데 몇 가지 단점이 있어 객체를 생성하는 별도 builder를 두는 방법이 있다. 이를 빌더 패턴이라고 한다.
+
+Bag bag = Bag.builder()
+					.name("name")
+        	.money(1000)
+        	.memo("memo")
+        	.build();
+```
+
+```java
+객체를 생성할 수 있는 빌더를 builder() 함수를 통해 얻고 거기에 셋팅하고자 하는 값을 셋팅하고 마지막에 build()를 통해 빌더를 작동 시켜 객체를 생성한다.
+```
+
+# **빌더를 써야하는 이유**
+
+```java
+객체를 생성하는 방법이 생성자말고 빌더를 통하는 것이 있다는 것을 알게 되었다.
+
+그렇다면 이미 생성자라는 것이 있는데 빌더 패턴은 왜 생겼고 빌더 패턴을 왜 사용하는 것일까?
+```
+
+## **1. 생성자 파라미터가 많을 경우 가독성이 좋지 않다.**
+
+```java
+위에 예시에서 Bag 클래스는 생성자 파라미터를 3개만 받는다. 3개까지는 괜찮다. 하지만 생성자 파라미터로 받아야하는 값이 수업이 많아진다면?
+
+각 값들이 어떤 값을 의미하는지 이해하기 힘들 것이다.
+
+Bag bag = new Bag("name", 1000, "memo", "abc", "what", "is", "it", "?");
+```
+
+```java
+하지만 이를 빌더 패턴으로 구현하면 각 값들은 빌더의 각 값들의 이름 함수로 셋팅이 되지 각각 무슨 값을 의미하는지 파악하기 쉽다.
+
+따라서 생성자로 설정해야하는 값이 많을 경우 빌더를 쓰는 것이 생성자보다 가독성이 좋다. 이는 같은 타입의 다른 변수의 값을 서로 바꿔 넣는 것을 방지할 수도 있다.
+
+Bag bag = Bag.builder()
+					.name("name")
+        	.money(1000)
+        	.memo("memo")
+            	.letter("This is the letter")
+            	.box("This is the box")
+        	.build();
+```
+
+## **2. 어떤 값을 먼저 설정하던 상관 없다**
+
+```java
+생성자의 경우는 정해진 파라미터 순서대로 꼭 값을 넣어줘야한다. 순서를 무시하고 값을 넣으면 에러가 발생하거나 엉뚱한데 값이 들어갈 수 있다.
+
+public Bag(String name, int money, String memo) {
+			this.name = name;
+    	this.money = money;
+    	this.memo = memo;
+}
+```
+
+```java
+하지만 빌더 패턴은 빌더의 필드 이름으로 값을 설정하기 때문에 순서에 종속적이지 않다.
+
+그냥 쓰이는 곳에서 어떤 필드를 먼저 설정해야하는지 굳이 순서를 생각할 필요 없이 편하게 설정하면 된다.
+
+Bag bag = Bag.builder()
+					.name("name")
+        	.memo("memo")	// memo를 money 대신 먼저!
+        	.money(1000)
+        	.build();
+```
+
+# **@Builder 구현법**
+
+```java
+위와 같은 이유로 생성자 대신 빌더를 사용하곤 하는데 그렇다면 빌더는 어떻게 구현해야하나?
+
+우선 코드로 빌더를 만들고 그 안에서 멤버 필드별로 값을 설정하고 빌더를 반환하는 함수를 만들면 된다.
+
+하지만 이 방법은 멤버 필드 별로 함수를 생성해야하는 등 생성자보다 더 번거롭고 해당 클래스에 들어갔을 때 빌더로만 몇십줄을 차지해서
+
+코드 읽기도 불편하다. 그래서 나온 것인 @Builder 어노테이션이다.
+```
+
+## @Builder는 룸북의 어노테이션
+
+```java
+@Builder는 룸북의 어노테이션이다
+
+@Builder 어노테이션의 javadoc을 보면 이 어노테이션은 아래와 같이 멤버 필드들에 대해 빌더를 만들어준다.
+
+만일 이 어노테이션이 없었다면 After 부분을 일일이 직접 구현해줘야했다.
+```
+
+## 빌더 사용 전 ⇒ 후
+
+```java
+// 롬복 사용
+   @Builder
+   class Example<T> {
+   	private T foo;
+   	private final String bar;
+   }
+
+// 롬복 사용 x
+   class Example<T> {
+   	private T foo;
+   	private final String bar;
+
+   	private Example(T foo, String bar) {
+   		this.foo = foo;
+   		this.bar = bar;
+   	}
+
+   	public static <T> ExampleBuilder<T> builder() {
+   		return new ExampleBuilder<T>();
+   	}
+
+   	public static class ExampleBuilder<T> {
+   		private T foo;
+   		private String bar;
+
+   		private ExampleBuilder() {}
+
+   		public ExampleBuilder foo(T foo) {
+   			this.foo = foo;
+   			return this;
+   		}
+
+   		public ExampleBuilder bar(String bar) {
+   			this.bar = bar;
+   			return this;
+   		}
+
+   		@java.lang.Override public String toString() {
+   			return "ExampleBuilder(foo = " + foo + ", bar = " + bar + ")";
+   		}
+
+   		public Example build() {
+   			return new Example(foo, bar);
+   		}
+   	}
+   }
+```
+
+## @Builder 사용법
+
+```java
+사용법은 아주 간단하다. 빌더 패턴을 적용할 객체에 @Builder 어노테이션을 달기만 하면된다.
+
+@Builder
+public class Bag {
+	private String name;
+        private int money;
+        private String memo;
+}
+
+어노테이션만 달면 빌더가 생기고 위에 썼던 것과 같이 빌더를 통해 객체를 생성할 수 있다.
+
+Bag bag = Bag.builder()
+					.name("name")
+        	.money(1000)
+        	.memo("memo")
+        	.build();
+```
+
+# `@NoArgsConstructor`와 `@AllArgsConstructor`
+
+## **@NoArgsConstructor 어노테이션 (기본 생성자 생성):**
+
+```java
+* @NoArgsConstructor는 클래스에 매개변수를 받지 않는 기본 생성자를 자동으로 생성해준다
+
+	( 기본 생성자가 생성되지 않으므로 클래스를 사용하는 개발자는 명시적으로 필요한 매개변수를 가진 생성자를 사용해야 한다.
+
+	이로써 객체 초기화 시 필요한 데이터를 누락하지 않도록 도와준다.)
+
+* Builder 패턴에서, 객체를 생성하고 필드를 설정하기 위해 기본 생성자는 필요하다.
+
+	이 생성자는 빈 객체를 만들고, 빌더 패턴을 통해 필드를 하나씩 설정할 때 사용된다.
+
+* 매개변수 없이 객체를 생성할 수 있으므로 가독성이 향상된다.
+```
+
+## **@AllArgsConstructor 어노테이션 (모든 필드를 포함한 생성자 생성):**
+
+```java
+* @AllArgsConstructor는 클래스에 모든 필드를 포함한 생성자를 자동으로 생성해준다.
+
+( 이는 모든 필드를 한 번에 설정하는 생성자를 의미하며, 객체를 완전한 상태로 초기화하는 데 도움을 준다 )
+
+* Builder 패턴에서, 객체를 생성하면서 모든 필드를 한 번에 설정하는 생성자가 필요합니다.
+
+	이 생성자는 빌더 패턴의 마지막 단계에서 모든 필드를 설정할 때 사용됩니다.
+
+* 모든 필드에 대한 생성자를 자동으로 생성하므로 코드 작성량을 줄이고 실수를 방지할 수 있습니다.
+
+* 필드를 추가하거나 변경할 때, @AllArgsConstructor 어노테이션은 자동으로 생성된 생성자를 업데이트하므로 일관성을 유지하고 버그 발생 가능성을 줄여준다.
+```
+
+## 요약
+
+```java
+한마디로 **@NoArgsConstructor** 를 사용하여 빈 생성자를 만든뒤 **@AllArgsConstructor** 를 사용하여 모든 필드를 포함한 생성자를 생성한다 (객체 초기화를 간단하게 해결)
+```
+
+## 추가: **@RequiredArgsConstructor**
+
+```java
+* final로 선언된 필드를 기반으로 생성자를 자동으로 생성
+
+* 의존성 주입 편의성: Spring Framework에서 @Autowired나 @Inject 어노테이션을 사용하여 의존성을 주입할 때,
+
+	필드를 초기화하는 생성자가 필요하다. @RequiredArgsConstructor를 사용하면 이 생성자를 자동으로 생성해주어,
+
+	의존성 주입이 더 간단하고 코드가 간결해진다.
+```
+
+```java
+@Service
+@RequiredArgsConstructor
+public class MyService {
+    private final MyRepository repository;
+}
+
+//
+
+@Autowired
+private final MyRepository repository;
+```

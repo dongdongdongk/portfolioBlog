@@ -1,0 +1,125 @@
+---
+title: '문제 해결'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+# { 씬뷰에 포스트 프로레싱 적용 x }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380458/notion-blog/_/3D_/_/image.png)
+
+# { 파티클 빨간 입자 강조선 보이는 경우 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380458/notion-blog/_/3D_/_/image_1.png)
+
+# { Unity 문(Door) 애니메이션 초기 상태 문제 해결 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380458/notion-blog/_/3D_/_/image_2.png)
+
+## 문제 상황
+
+게임 시작 시 문이 닫혀있어야 하는데, **닫히는 애니메이션이 재생**되는 문제
+
+```
+게임 시작 → Idle 상태 → Close 애니메이션 재생 → 닫힌 상태
+```
+
+우리가 원하는 건: **처음부터 이미 닫혀있는 상태**
+
+---
+
+## 해결 방법: Transition Offset 활용
+
+### Animator Controller 설정
+
+**1. 상태(State) 구조**
+
+```
+DoorIdle (시작 상태)
+   ↓
+DoorClose (닫힌 상태)
+   ↓
+DoorOpen (열린 상태)
+```
+
+**2. Transition 설정**
+
+- `DoorIdle → DoorClose`
+  - Condition: `IsOpen` == false
+  - **Transition Offset: 1** ← 핵심!
+- `DoorIdle → DoorOpen`
+  - Condition: `IsOpen` == true
+  - **Transition Offset: 1** ← 핵심!
+
+---
+
+## Transition Offset이 뭔가요?
+
+애니메이션의 **어느 시점부터 시작할지** 결정하는 값입니다.
+
+- **Offset = 0**: 애니메이션 시작 지점 (0%)
+- **Offset = 0.5**: 애니메이션 중간 지점 (50%)
+- **Offset = 1**: 애니메이션 끝 지점 (100%) ✨
+
+### 시각적 설명
+
+```
+Close 애니메이션: [열림 → 닫히는중 → 닫힘]
+                   0%      50%       100%
+
+Offset = 0 → 애니메이션 재생됨 (열림에서 시작)
+Offset = 1 → 이미 닫혀있음 (끝에서 시작)
+```
+
+---
+
+## 왜 이 방법이 작동하나요?
+
+**Offset = 1**로 설정하면:
+
+1. Transition이 시작될 때
+2. 애니메이션의 **마지막 프레임(100%)**에서 시작
+3. 결과: 애니메이션이 **재생되지 않고** 최종 결과만 표시됨
+
+```
+일반 (Offset = 0):
+게임 시작 → 문 열림 → 닫히는 애니메이션 재생 → 닫힘 ❌
+
+Offset = 1:
+게임 시작 → 이미 닫혀있음 ✅
+```
+
+---
+
+## 코드는 그대로!
+
+```csharp
+private void Start()
+{
+    // 코드 변경 없음
+    if (isOpen)
+    {
+        OpenDoor();
+    }
+    else
+    {
+        CloseDoor();  // Offset=1 덕분에 애니메이션 재생 안됨
+    }
+}
+
+```
+
+---
+
+## 정리
+
+| 방법                  | 장점                                               | 단점                                 |
+| --------------------- | -------------------------------------------------- | ------------------------------------ |
+| **Transition Offset** | • 코드 변경 불필요<br>• Bool 방식 유지<br>• 직관적 | • Animator 설정 필요                 |
+| Trigger 방식          | • 명확한 제어<br>• 일회성 액션에 적합              | • 코드 수정 필요<br>• 상태 추적 복잡 |
+| animator.Play()       | • 즉시 적용                                        | • 코드가 복잡해짐                    |
+
+**결론**: 초기 상태 문제는 **Transition Offset = 1**로 해결하는 게 가장 간단하고 깔끔합니다! 👍

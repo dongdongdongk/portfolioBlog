@@ -1,0 +1,340 @@
+---
+title: '섹션 1. 네이버 웹 크롤링 실습'
+date: '2026-09-02'
+category: '기타, 사용 적음/크롤링 & 파이썬'
+tags: ['기타, 사용 적음', '크롤링 & 파이썬']
+draft: false
+summary: ''
+---
+
+# 네이버 view탭 검색 결과 크롤링
+
+## baseUrl 만들어주기
+
+```python
+천번째로 baseUrl 을 만들어준다
+
+원하는 주소로 들어가서 검색을 하고 검색어 쿼리 부분을 찾아준다
+
+https://search.naver.com/search.naver?where=nexearch&sm=top_hty&fbm=0&ie=utf8&query=joris+de+man+
+
+내가 검색한 부분은 joris+de+man+ 부분이다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380929/notion-blog/_/_/_/_1_/Untitled.png)
+
+```python
+import requests
+from bs4 import BeautifulSoup
+
+baseUrl = "https://search.naver.com/search.naver?where=nexearch&sm=top_hty&fbm=0&ie=utf8&query="
+
+keyword = input("검색어를 입력하세요 : ")
+
+url = baseUrl + keyword;
+
+print(url)
+
+headers = {
+    "User-Agent" : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+}
+
+req = requests.get(url, headers=headers);
+
+html = req.text;
+
+soup = BeautifulSoup(html, "html.parser");
+```
+
+```python
+baseUrl 에 쿼리 부분에 input 으로 입력을 받아서 넣도록 해준다
+
+그리고 완성된 url 을 출력하고 클릭해보면 원하는 검색 결과창으로 이동된다.
+```
+
+# 클래스로 제목 가져오기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380923/notion-blog/_/_/_/_1_/Untitled_1.png)
+
+```python
+원하는 사이트에서 대상의 class 를 가져온다
+
+* 클래스는 빈칸이 있을 수 없다 여러개 합쳐져 있는 class 는 꼭 전부 . 을 앞에 붙여 분리해주자
+```
+
+```python
+import requests
+from bs4 import BeautifulSoup
+
+baseUrl = "https://search.naver.com/search.naver?where=nexearch&sm=top_hty&fbm=0&ie=utf8&query="
+
+keyword = input("검색어를 입력하세요 : ")
+
+url = baseUrl + keyword;
+
+print(url)
+
+headers = {
+    "User-Agent" : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+}
+
+req = requests.get(url, headers=headers);
+
+html = req.text;
+
+soup = BeautifulSoup(html, "html.parser");
+
+# title_link
+
+result = soup.select(".title_link")
+
+print(result)
+
+print("타입은??????????????",type(result))
+```
+
+```python
+위와 같이 result = soup.select(".title_link") 가져온 결과를 result 에 넣고 찍어보면 원하는 데이터를 select 로 전부 가져왔고 one 이랑 다르게
+
+타입을 찍어보면 ( 타입을 찍어보는 습관을 가지가 중요하다 )
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380924/notion-blog/_/_/_/_1_/Untitled_2.png)
+
+```python
+<class 'bs4.element.ResultSet'> 라는 soup 에서 만들어준 형식으로 되어있다.
+```
+
+# 형식 리스트로 변환하기
+
+```python
+현재 형식을 list 로 바꿔지는지 확인하고 반복문을 사용하려고 한다
+
+이떄 list() 함수를 사용한다
+
+list() 함수는 다양한 객체를 리스트로 변환하는 함수. list() 함수를 사용하여 문자열, 튜플, 집합 등의 객체를 리스트로 변환할 수 있다.
+
+<class 'bs4.element.ResultSet'> 가 list 형식으로 변환이 된다면 반복문을 사용 가능하다는 것이다
+```
+
+```python
+req = requests.get(url, headers=headers);
+
+html = req.text;
+
+soup = BeautifulSoup(html, "html.parser");
+
+# title_link
+
+result = soup.select(".title_link")
+
+# print(result)
+
+# print("타입은??????????????",type(result))
+
+print(list(result)) # 가져온 데이터를 리스트로 변환 성공적으로 변환된다
+```
+
+# 반복문으로 출력하기
+
+```python
+
+req = requests.get(url, headers=headers);
+
+html = req.text;
+
+soup = BeautifulSoup(html, "html.parser");
+
+# title_link
+
+results = soup.select(".title_link")
+
+for result in results:
+    print(result)
+    print("")
+```
+
+```python
+list() 로 변환 가능한것을 확인했으니 반복문을 사용 가능하다는걸 알았다
+
+이제 반복문을 통해서 결과를 출력해본다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380924/notion-blog/_/_/_/_1_/Untitled_3.png)
+
+```python
+soup = BeautifulSoup(html, "html.parser");
+
+# title_link
+
+results = soup.select(".title_link")
+
+for result in results:
+    print("주소",result['href'])
+    print(result.text)
+    print("")
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380924/notion-blog/_/_/_/_1_/Untitled_4.png)
+
+```python
+이제 조금더 응용해서 href 속성과 텍스트를 가져와서 출력해봤다
+```
+
+# 키 에러 발생
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380924/notion-blog/_/_/_/_1_/Untitled_5.png)
+
+```python
+만약 없는 속성을 가져오려고 하면 key 에러가 발생한다
+
+이럴때는
+
+for result in results:
+    print("주소",result['href'])
+    print(result.get('없는속성'))
+    print(result.text)
+    print("")
+
+
+이런식으로 get 을 붙여서 사용해주면 된다 그럼 없어도 에러없이 none 이 나온다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380924/notion-blog/_/_/_/_1_/Untitled_6.png)
+
+# zip 을 활용해서 출력하기 ( 비추천 )
+
+```python
+zip 함수를 활용해서 주소와 유저명 두개를 함께 출력한다
+
+두개의 이터레이터 에서 같은 인덱스를 가진걸 묶어서 (튜플로) 함께 출력하는것이다
+```
+
+```python
+import requests
+from bs4 import BeautifulSoup
+
+baseUrl = "https://search.naver.com/search.naver?where=nexearch&sm=top_hty&fbm=0&ie=utf8&query="
+
+keyword = input("검색어를 입력하세요 : ")
+
+url = baseUrl + keyword;
+
+# print(url)
+
+headers = {
+    "User-Agent" : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+}
+
+req = requests.get(url, headers=headers);
+
+html = req.text;
+
+soup = BeautifulSoup(html, "html.parser");
+
+# title_link
+
+results = soup.select(".title_link")
+
+name = soup.select(".user_info")
+
+for result, user_info in zip (results,name):
+    print("주소",result['href'])
+    print("유저명",user_info.text)
+    # print(result.text)
+    print("")
+```
+
+```python
+zip() 함수는 두 개 이상의 순차적인(iterable) 객체를 병렬로 묶어주는 역할을 한다.
+
+각각의 객체에서 동일한 위치에 있는 요소들끼리 튜플로 묶어서 새로운 이터레이터(iterator)를 만들어 반환
+
+numbers = [1, 2, 3]
+letters = ['a', 'b', 'c']
+
+zipped = zip(numbers, letters)
+
+for item in zipped:
+    print(item)
+
+
+간단한 예제로 설명하자면, 예를 들어 zip() 함수를 사용하여 두 개의 리스트를 묶으면 각 리스트에서
+
+동일한 인덱스에 있는 요소들을 순서대로 묶어서 튜플로 반환
+```
+
+# 상위 클래스를 선택해서 출력하기
+
+```python
+import requests
+from bs4 import BeautifulSoup
+
+baseUrl = "https://search.naver.com/search.naver?where=nexearch&sm=top_hty&fbm=0&ie=utf8&query="
+
+keyword = input("검색어를 입력하세요 : ")
+
+url = baseUrl + keyword;
+
+# print(url)
+
+headers = {
+    "User-Agent" : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+}
+
+req = requests.get(url, headers=headers);
+
+html = req.text;
+
+soup = BeautifulSoup(html, "html.parser");
+
+total_area = soup.select(".view_wrap")
+
+timeline_area = soup.select(".timeline_area")
+
+# 만약 어떤 페이지에는 있는데 어떤 페이지에는 없다면 두개를 이렇게 찾게 해준다
+if total_area:
+    areas = total_area
+elif timeline_area:
+    areas = timeline_area
+else:
+    print("확인요망")
+
+for area in areas:
+    title = area.select_one(".title_link")
+    name = area.select_one(".user_info")
+    print(title.text)
+    print(name.text)
+```
+
+```python
+상위 클래스를 선택하여 그 클래스에 하위 내용들을 함께 출력한다
+
+이 방법이 더 쉽고 선호되며
+
+추가적으로 만약 이 페이지에는 있지만 다른 페이지에는 이름이 다르게 클래스가 되어 있을 수 있는데
+
+이럴때는 if 문을 사용해서 선택해서 출력하도록 한다
+```
+
+# 여러가지 페이지에서 클래스를 한번에 선택하기
+
+```python
+위의 방법이 틀린것은 아니다
+
+그러나 직접 쿼리에 글자를 입력해서 넘어가면 페이지가 또 달라질수도 있고 ( 검색창에 입력해서 나오는 페이지랑 다를 수 있다 )
+
+검색 단어에 따라서 또 달라질수도 있다
+
+그럴때는 페이지 마다 달라지더라도 같은 상위 클래스를 가지고 있는 부분을 찾거나 해서 선택해주면 더욱 쉽게 크롤링을 진행할 수 있다
+
+ex) total_warp api_ani_send 라는 클래스가 공통적으로 나온다면 페이지가 달라져도 api_ani_send 가 같게 나온다면 이것만 선택해서 선택할 수 있는것
+
+그러나 위에 사용한 방법이 틀렸다고도 할 수 었다 그러니 알맞은 방법을 잘 찾아서 사용하도록
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380929/notion-blog/_/_/_/_1_/Untitled_7.png)
+
+```python
+강의에서 사용한 더 상위 클래스를 선택해서 랭크와 제목 글쓴이를 불러오는 코드
+```

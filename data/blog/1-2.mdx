@@ -1,0 +1,975 @@
+---
+title: '문제 해결 - 1'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+# { 🤖 적 AI 이동 버그 해결하기: 벽 너머 왔다갔다 문제 }
+
+이번 문제는 적 AI가 벽 너머에 있는 플레이어를 향해 비효율적으로 이동하면서 벽 쪽으로 갔다가 다시 돌아오기를 반복하는 버그를 해결하는 과정입니다.
+
+---
+
+## 📋 목차
+
+1. [문제 상황 이해하기](https://claude.ai/chat/1fe41e3f-8205-4c92-8467-74afc521ab48#1-%EB%AC%B8%EC%A0%9C-%EC%83%81%ED%99%A9-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [첫 번째 시도: 경로 거리 반영](https://claude.ai/chat/1fe41e3f-8205-4c92-8467-74afc521ab48#2-%EC%B2%AB-%EB%B2%88%EC%A7%B8-%EC%8B%9C%EB%8F%84-%EA%B2%BD%EB%A1%9C-%EA%B1%B0%EB%A6%AC-%EB%B0%98%EC%98%81)
+3. [두 번째 발견: 모든 점수가 음수](https://claude.ai/chat/1fe41e3f-8205-4c92-8467-74afc521ab48#3-%EB%91%90-%EB%B2%88%EC%A7%B8-%EB%B0%9C%EA%B2%AC-%EB%AA%A8%EB%93%A0-%EC%A0%90%EC%88%98%EA%B0%80-%EC%9D%8C%EC%88%98)
+4. [세 번째 발견: 직선거리 vs 경로거리](https://claude.ai/chat/1fe41e3f-8205-4c92-8467-74afc521ab48#4-%EC%84%B8-%EB%B2%88%EC%A7%B8-%EB%B0%9C%EA%B2%AC-%EC%A7%81%EC%84%A0%EA%B1%B0%EB%A6%AC-vs-%EA%B2%BD%EB%A1%9C%EA%B1%B0%EB%A6%AC)
+5. [네 번째 발견: 음수 필터링 문제](https://claude.ai/chat/1fe41e3f-8205-4c92-8467-74afc521ab48#5-%EB%84%A4-%EB%B2%88%EC%A7%B8-%EB%B0%9C%EA%B2%AC-%EC%9D%8C%EC%88%98-%ED%95%84%ED%84%B0%EB%A7%81-%EB%AC%B8%EC%A0%9C)
+6. [최종 발견: 액션 포인트와 평가 순서](https://claude.ai/chat/1fe41e3f-8205-4c92-8467-74afc521ab48#6-%EC%B5%9C%EC%A2%85-%EB%B0%9C%EA%B2%AC-%EC%95%A1%EC%85%98-%ED%8F%AC%EC%9D%B8%ED%8A%B8%EC%99%80-%ED%8F%89%EA%B0%80-%EC%88%9C%EC%84%9C)
+7. [최종 해결책 정리](https://claude.ai/chat/1fe41e3f-8205-4c92-8467-74afc521ab48#7-%EC%B5%9C%EC%A2%85-%ED%95%B4%EA%B2%B0%EC%B1%85-%EC%A0%95%EB%A6%AC)
+
+---
+
+## 1. 문제 상황 이해하기
+
+### 🎯 증상
+
+- 적이 벽 너머에 플레이어가 있을 때
+- 벽 쪽으로 다가갔다가 → 다시 멀어졌다가 → 다시 벽 쪽으로... 반복
+
+### 🔍 원인 분석
+
+게임에서 AI가 행동을 결정하는 과정:
+
+```
+1. 이동 가능한 모든 위치 찾기
+2. 각 위치에 점수 매기기 (높을수록 좋음)
+3. 가장 높은 점수의 위치로 이동
+```
+
+**초기 MoveAction의 점수 계산:**
+
+```csharp
+public override EnemyAIAction GetEnemyAIAction(GridPosition gridPosition)
+{
+    // 그 위치에서 사격 가능한 타겟 수만 체크
+    int targetCountAtGridPosition = unit.GetAction<ShootAction>().GetTargetCountAtPosition(gridPosition);
+
+    return new EnemyAIAction
+    {
+        gridPosition = gridPosition,
+        actionValue = targetCountAtGridPosition * 10,  // 타겟 1개당 10점
+    };
+}
+```
+
+**문제점:**
+
+- 벽 바로 옆: 타겟 1개 보임 → 10점 ✓
+- 실제로는 벽을 **멀리 돌아가야** 하는데 이 정보가 점수에 반영 안 됨!
+- 매 턴마다 "벽 쪽이 좋아 보이네!" 하고 다가갔다가, 다음 턴에 "어? 반대편이 더 가까워졌네?" 반복
+
+---
+
+## 2. 첫 번째 시도: 경로 거리 반영
+
+### 💡 아이디어
+
+"이동하는 데 걸리는 실제 경로 길이를 점수에 반영하자!"
+
+```csharp
+public override EnemyAIAction GetEnemyAIAction(GridPosition gridPosition)
+{
+    int targetCountAtGridPosition = unit.GetAction<ShootAction>().GetTargetCountAtPosition(gridPosition);
+
+    // 현재 위치에서 목표 위치까지의 실제 경로 길이
+    int pathLength = Pathfinding.Instance.GetPathLength(unit.GetGridPosition(), gridPosition);
+
+    // 타겟 가치 - 이동 비용
+    int actionValue = targetCountAtGridPosition * 100 - pathLength;
+
+    return new EnemyAIAction
+    {
+        gridPosition = gridPosition,
+        actionValue = actionValue,
+    };
+}
+```
+
+**개념 설명:**
+
+- `GetPathLength`: A\*길찾기 알고리즘으로 계산한 **실제 걸어가야 하는 거리**
+- 타겟이 있으면 100점 시작
+- 경로가 길수록 점수 감소
+
+**예시:**
+
+```
+벽 쪽 위치: 타겟 1개(100점) - 경로 50칸 = 50점
+직접 접근: 타겟 1개(100점) - 경로 20칸 = 80점 ✓ (더 높음)
+```
+
+### ❌ 왜 안 됐나?
+
+- 로그를 확인해보니 **모든 위치의 `Targets`가 0**이었음
+- 즉, 사격 가능한 위치가 하나도 없는 상황
+
+---
+
+## 3. 두 번째 발견: 모든 점수가 음수
+
+### 📊 로그 분석
+
+```
+Position: x: 1; z: 9, Targets: 0, PathLength: 10, Score: -10
+Position: x: 2; z: 8, Targets: 0, PathLength: 10, Score: -10
+Position: x: 0; z: 11, Targets: 0, PathLength: 28, Score: -28
+```
+
+**문제 발견:**
+
+1. 모든 위치에서 `Targets: 0` (사격 불가능)
+2. 따라서 모든 점수가 `0 * 100 - pathLength = 음수`
+3. 음수 중에서 **가장 덜 나쁜 것**(-10)을 선택
+4. 10짜리가 여러 개 → C#의 정렬이 **불안정(unstable)** → 매번 순서 바뀜
+5. 턴마다 다른 -10 위치 선택 → **왔다갔다!**
+
+### 💡 해결 시도 1: 음수 필터링
+
+```csharp
+// BaseAction.cs
+public EnemyAIAction GetBestEnemyAIAction()
+{
+    List<EnemyAIAction> enemyAIActionList = new List<EnemyAIAction>();
+
+    foreach(GridPosition gridPosition in GetValidActionGridPositionList())
+    {
+        EnemyAIAction enemyAIAction = GetEnemyAIAction(gridPosition);
+
+        // 양수 점수만 추가 (의미 있는 액션만)
+        if (enemyAIAction.actionValue > 0)
+        {
+            enemyAIActionList.Add(enemyAIAction);
+        }
+    }
+
+    if (enemyAIActionList.Count > 0)
+    {
+        enemyAIActionList.Sort((a, b) => b.actionValue - a.actionValue);
+        return enemyAIActionList[0];
+    }
+    else
+    {
+        return null;  // 의미 있는 액션이 없으면 null
+    }
+}
+```
+
+### ❌ 새로운 문제
+
+- 적이 아예 움직이지 않음!
+- 왜? ShootAction도 사거리 밖이라 점수 0 → 모든 액션이 필터링됨
+
+---
+
+## 4. 세 번째 발견: 직선거리 vs 경로거리
+
+### 💡 해결 시도 2: 플레이어 방향으로 접근
+
+"사격 불가능하면 플레이어에게 계속 접근하도록 하자!"
+
+**첫 번째 잘못된 시도 (직선거리):**
+
+```csharp
+// 사격 불가능할 때
+float closestDistance = float.MaxValue;
+foreach (Unit playerUnit in playerUnitList)
+{
+    // Vector3.Distance = 공중 직선거리! (벽 무시)
+    float distance = Vector3.Distance(
+        LevelGrid.Instance.GetWorldPosition(gridPosition),
+        playerUnit.GetWorldPosition()
+    );
+    if (distance < closestDistance)
+    {
+        closestDistance = distance;
+    }
+}
+
+// 가까울수록 높은 점수
+int proximityScore = Mathf.Max(0, 50 - Mathf.RoundToInt(closestDistance));
+```
+
+**문제점:**
+
+```
+적 위치: (0, 0)
+플레이어: (10, 0)
+벽: x=5에 수직
+
+위치A (4, 0) - 벽 바로 옆:
+  직선거리: 6 (가까워 보임!) ← 벽을 무시한 거리
+
+위치B (0, 3) - 열린 공간:
+  직선거리: 10
+
+→ 위치A가 더 높은 점수 → 계속 벽 쪽으로!
+```
+
+### ✅ 올바른 해결책 (경로거리)
+
+```csharp
+public override EnemyAIAction GetEnemyAIAction(GridPosition gridPosition)
+{
+    int targetCountAtGridPosition = unit.GetAction<ShootAction>().GetTargetCountAtPosition(gridPosition);
+    int pathLength = Pathfinding.Instance.GetPathLength(unit.GetGridPosition(), gridPosition);
+
+    // 사격 가능하면 높은 점수
+    if (targetCountAtGridPosition > 0)
+    {
+        return new EnemyAIAction
+        {
+            gridPosition = gridPosition,
+            actionValue = 1000 - pathLength,  // 1000점대
+        };
+    }
+
+    // 사격 불가능하면 플레이어까지의 '실제 경로 거리'로 평가
+    List<Unit> playerUnitList = UnitManager.Instance.GetFriendlyUnitList();
+
+    int shortestPathToPlayer = int.MaxValue;
+
+    foreach (Unit playerUnit in playerUnitList)
+    {
+        GridPosition playerGridPosition = playerUnit.GetGridPosition();
+
+        // 이 위치에서 플레이어까지의 실제 경로 길이
+        if (Pathfinding.Instance.HasPath(gridPosition, playerGridPosition))
+        {
+            int pathToPlayer = Pathfinding.Instance.GetPathLength(gridPosition, playerGridPosition);
+            if (pathToPlayer < shortestPathToPlayer)
+            {
+                shortestPathToPlayer = pathToPlayer;
+            }
+        }
+    }
+
+    if (shortestPathToPlayer == int.MaxValue)
+    {
+        return new EnemyAIAction
+        {
+            gridPosition = gridPosition,
+            actionValue = 0,
+        };
+    }
+
+    // 플레이어까지 경로가 짧을수록 높은 점수
+    int actionValue = 500 - shortestPathToPlayer;
+
+    return new EnemyAIAction
+    {
+        gridPosition = gridPosition,
+        actionValue = Mathf.Max(actionValue, 1),
+    };
+}
+
+```
+
+**핵심 개념:**
+
+- `HasPath`: 해당 위치에서 목표까지 경로가 존재하는지 확인
+- `GetPathLength`: A\* 알고리즘으로 **벽을 우회한 실제 경로 길이** 계산
+
+**예시:**
+
+```
+위치A (4, 0) - 벽 바로 옆:
+  실제 경로: 50칸 (멀리 돌아가야 함)
+  점수: 500 - 50 = 450점
+
+위치B (0, 3) - 열린 공간:
+  실제 경로: 30칸
+  점수: 500 - 30 = 470점 ✓ (더 높음!)
+
+```
+
+---
+
+## 5. 네 번째 발견: 음수 필터링 문제
+
+### 📊 로그 재분석
+
+```
+[APPROACH] Pos:x: 0; z: 11, PathToPos:28, PathToPlayer:202, Score:-102
+[APPROACH] Pos:x: 0; z: 10, PathToPos:24, PathToPlayer:206, Score:-106
+```
+
+**문제:**
+
+- 플레이어까지 거리가 200칸 이상
+- `500 - 202 = -102` (여전히 음수!)
+- 앞서 추가한 `if (actionValue > 0)` 필터 때문에 모든 액션이 걸러짐
+
+### ✅ 해결: 필터 제거 + 점수 범위 조정
+
+```csharp
+// BaseAction.cs - 필터 제거
+public EnemyAIAction GetBestEnemyAIAction()
+{
+    List<EnemyAIAction> enemyAIActionList = new List<EnemyAIAction>();
+
+    foreach(GridPosition gridPosition in GetValidActionGridPositionList())
+    {
+        EnemyAIAction enemyAIAction = GetEnemyAIAction(gridPosition);
+        enemyAIActionList.Add(enemyAIAction);  // 모두 추가 (필터 제거)
+    }
+
+    if (enemyAIActionList.Count > 0)
+    {
+        enemyAIActionList.Sort((a, b) => b.actionValue - a.actionValue);
+        return enemyAIActionList[0];
+    }
+    return null;
+}
+```
+
+```csharp
+// MoveAction.cs - 점수 범위 상향
+// 500점에서 시작 → 음수 가능성
+// 1000점에서 시작 → 양수 보장 (경로가 1000칸 이상일 일은 없음)
+
+if (targetCountAtGridPosition > 0)
+{
+    return new EnemyAIAction
+    {
+        gridPosition = gridPosition,
+        actionValue = 1000 - pathLength,  // 사격 가능: 1000점대
+    };
+}
+
+// ...플레이어 접근...
+int actionValue = 500 - shortestPathToPlayer;  // 플레이어 접근: 1~500점대
+return new EnemyAIAction
+{
+    gridPosition = gridPosition,
+    actionValue = Mathf.Max(actionValue, 1),
+};
+```
+
+---
+
+## 6. 최종 발견: 액션 포인트와 평가 순서
+
+### 🎯 마지막 문제: 사격을 안 함
+
+**로그:**
+
+```
+[UnitEnemy (1)] Move - BestScore: 990        ← Move가 먼저 평가됨
+[UnitEnemy (1)] Shoot - Not enough action points  ← Shoot은 포인트 부족
+[UnitEnemy (1)] === FINAL DECISION: Move with score 990 ===
+```
+
+**문제 분석:**
+
+1. Move는 1 액션 포인트 소모
+2. Shoot는 2 액션 포인트 소모
+3. 적이 총 2 포인트 가지고 있을 때:
+   - Move(990점) 먼저 평가 → 선택 (1 포인트 소모)
+   - Shoot 차례 → 남은 포인트 1개 → 실행 불가
+4. **Move의 "사격 가능 위치"란 "그 위치로 이동하면 사격 가능"이란 뜻**
+   - 하지만 이동 후엔 포인트가 부족해서 사격 못 함!
+
+### ✅ 최종 해결책 1: 액션 비용 순 정렬
+
+```csharp
+// EnemyAI.cs
+private bool TryTakeEnemyAIAction(Unit enemyUnit, Action onEnemyAIActionComplete)
+{
+    EnemyAIAction bestEnemyAIAction = null;
+    BaseAction bestBaseAction = null;
+
+    // 액션을 비용이 높은 순으로 정렬 (Shoot 먼저 평가)
+    BaseAction[] actions = enemyUnit.GetBaseActionArray();
+    System.Array.Sort(actions, (a, b) =>
+        b.GetActionPointCost().CompareTo(a.GetActionPointCost())
+    );
+
+    foreach (BaseAction baseAction in actions)
+    {
+        if (!enemyUnit.CanSpendActionPointsToTakeAction(baseAction))
+        {
+            continue;
+        }
+
+        EnemyAIAction testEnemyAIAction = baseAction.GetBestEnemyAIAction();
+
+        if (bestEnemyAIAction == null)
+        {
+            bestEnemyAIAction = testEnemyAIAction;
+            bestBaseAction = baseAction;
+        }
+        else if (testEnemyAIAction != null &&
+                 testEnemyAIAction.actionValue > bestEnemyAIAction.actionValue)
+        {
+            bestEnemyAIAction = testEnemyAIAction;
+            bestBaseAction = baseAction;
+        }
+    }
+
+    if (bestEnemyAIAction != null &&
+        enemyUnit.TrySpendActionPointsToTakeAction(bestBaseAction))
+    {
+        bestBaseAction.TakeAction(bestEnemyAIAction.gridPosition, onEnemyAIActionComplete);
+        return true;
+    }
+
+    return false;
+}
+
+```
+
+**정렬 설명:**
+
+```csharp
+System.Array.Sort(actions, (a, b) =>
+    b.GetActionPointCost().CompareTo(a.GetActionPointCost())
+);
+
+```
+
+- `(a, b) =>`: 두 액션을 비교하는 함수
+- `b.GetActionPointCost().CompareTo(a.GetActionPointCost())`:
+  - b가 a보다 크면 양수 반환 → b가 앞으로
+  - 결과: 비용이 높은 것부터 정렬
+
+**효과:**
+
+```
+정렬 전: [Move(1점), Spin(1점), Shoot(2점)]
+정렬 후: [Shoot(2점), Move(1점), Spin(1점)]
+
+→ Shoot를 먼저 평가
+→ 사격 가능하면 Shoot 선택 (10000점)
+→ 불가능하면 Move로 접근 (1000점대)
+
+```
+
+### ✅ 최종 해결책 2: ShootAction 점수 대폭 상향
+
+```csharp
+// ShootAction.cs
+public override EnemyAIAction GetEnemyAIAction(GridPosition gridPosition)
+{
+    Unit targetUnit = LevelGrid.Instance.GetUnitAtGridPosition(gridPosition);
+
+    // 사격 가능하면 압도적으로 높은 점수
+    int score = 10000 + Mathf.RoundToInt((1 - targetUnit.GetHealthNormalized()) * 100f);
+
+    return new EnemyAIAction
+    {
+        gridPosition = gridPosition,
+        actionValue = score,
+    };
+}
+
+```
+
+**점수 설명:**
+
+- 기본 10000점 (압도적으로 높음)
+- `GetHealthNormalized()`: 0.0 (사망) ~ 1.0 (만피)
+- `1 - GetHealthNormalized()`: 체력이 낮을수록 높은 값
+- 체력 100% → 10000점
+- 체력 50% → 10050점
+- 체력 10% → 10090점
+- **체력 낮은 적 우선 공격**
+
+---
+
+## 7. 최종 해결책 정리
+
+### 🎯 완성된 코드
+
+**MoveAction.cs (이동 점수 계산)**
+
+```csharp
+public override EnemyAIAction GetEnemyAIAction(GridPosition gridPosition)
+{
+    // 1. 그 위치에서 사격 가능한 타겟 수 확인
+    int targetCountAtGridPosition = unit.GetAction<ShootAction>().GetTargetCountAtPosition(gridPosition);
+
+    // 2. 현재 위치에서 목표 위치까지 경로 길이
+    int pathLength = Pathfinding.Instance.GetPathLength(unit.GetGridPosition(), gridPosition);
+
+    // 3. 사격 가능한 위치면 높은 점수 (1000점대)
+    if (targetCountAtGridPosition > 0)
+    {
+        return new EnemyAIAction
+        {
+            gridPosition = gridPosition,
+            actionValue = 1000 - pathLength,  // 경로 짧을수록 높음
+        };
+    }
+
+    // 4. 사격 불가능하면 플레이어에게 접근 (1~500점대)
+    List<Unit> playerUnitList = UnitManager.Instance.GetFriendlyUnitList();
+
+    if (playerUnitList.Count == 0)
+    {
+        return new EnemyAIAction
+        {
+            gridPosition = gridPosition,
+            actionValue = 0,
+        };
+    }
+
+    // 5. 그 위치에서 가장 가까운 플레이어까지의 실제 경로 거리
+    int shortestPathToPlayer = int.MaxValue;
+
+    foreach (Unit playerUnit in playerUnitList)
+    {
+        GridPosition playerGridPosition = playerUnit.GetGridPosition();
+
+        if (Pathfinding.Instance.HasPath(gridPosition, playerGridPosition))
+        {
+            int pathToPlayer = Pathfinding.Instance.GetPathLength(gridPosition, playerGridPosition);
+            if (pathToPlayer < shortestPathToPlayer)
+            {
+                shortestPathToPlayer = pathToPlayer;
+            }
+        }
+    }
+
+    if (shortestPathToPlayer == int.MaxValue)
+    {
+        return new EnemyAIAction
+        {
+            gridPosition = gridPosition,
+            actionValue = 0,
+        };
+    }
+
+    // 6. 플레이어까지 경로가 짧을수록 높은 점수
+    int actionValue = 500 - shortestPathToPlayer;
+
+    return new EnemyAIAction
+    {
+        gridPosition = gridPosition,
+        actionValue = Mathf.Max(actionValue, 1),  // 최소 1점
+    };
+}
+
+```
+
+**ShootAction.cs (사격 점수 계산)**
+
+```csharp
+public override EnemyAIAction GetEnemyAIAction(GridPosition gridPosition)
+{
+    // 사격 대상 유닛
+    Unit targetUnit = LevelGrid.Instance.GetUnitAtGridPosition(gridPosition);
+
+    // 압도적으로 높은 점수 + 체력 낮을수록 추가 점수
+    int score = 10000 + Mathf.RoundToInt((1 - targetUnit.GetHealthNormalized()) * 100f);
+
+    return new EnemyAIAction
+    {
+        gridPosition = gridPosition,
+        actionValue = score,
+    };
+}
+```
+
+**EnemyAI.cs (액션 선택 로직)**
+
+```csharp
+private bool TryTakeEnemyAIAction(Unit enemyUnit, Action onEnemyAIActionComplete)
+{
+    EnemyAIAction bestEnemyAIAction = null;
+    BaseAction bestBaseAction = null;
+
+    // 액션 포인트 비용이 높은 순서로 정렬 (Shoot 먼저 평가)
+    BaseAction[] actions = enemyUnit.GetBaseActionArray();
+    System.Array.Sort(actions, (a, b) =>
+        b.GetActionPointCost().CompareTo(a.GetActionPointCost())
+    );
+
+    // 각 액션의 최고 점수 비교
+    foreach (BaseAction baseAction in actions)
+    {
+        // 액션 포인트 부족하면 스킵
+        if (!enemyUnit.CanSpendActionPointsToTakeAction(baseAction))
+        {
+            continue;
+        }
+
+        // 해당 액션의 최고 점수 얻기
+        EnemyAIAction testEnemyAIAction = baseAction.GetBestEnemyAIAction();
+
+        // 최고 점수 갱신
+        if (bestEnemyAIAction == null)
+        {
+            bestEnemyAIAction = testEnemyAIAction;
+            bestBaseAction = baseAction;
+        }
+        else if (testEnemyAIAction != null &&
+                 testEnemyAIAction.actionValue > bestEnemyAIAction.actionValue)
+        {
+            bestEnemyAIAction = testEnemyAIAction;
+            bestBaseAction = baseAction;
+        }
+    }
+
+    // 최고 점수 액션 실행
+    if (bestEnemyAIAction != null &&
+        enemyUnit.TrySpendActionPointsToTakeAction(bestBaseAction))
+    {
+        bestBaseAction.TakeAction(bestEnemyAIAction.gridPosition, onEnemyAIActionComplete);
+        return true;
+    }
+
+    return false;
+}
+```
+
+### 📊 점수 체계 요약
+
+| 상황                      | 점수 범위       | 우선순위      |
+| ------------------------- | --------------- | ------------- |
+| **사격 가능**             | 10,000~10,100점 | ⭐⭐⭐ 최우선 |
+| **사격 가능 위치로 이동** | 900~1,000점     | ⭐⭐ 높음     |
+| **플레이어에게 접근**     | 1~500점         | ⭐ 기본       |
+| **경로 없음**             | 0점             | ❌ 선택 안 됨 |
+
+### 🎮 AI 행동 흐름
+
+```
+적 턴 시작
+  ↓
+[1단계] 액션 비용 순으로 정렬
+  - Shoot (2 포인트)
+  - Move (1 포인트)
+  ↓
+[2단계] Shoot 먼저 평가
+  ├─ 사거리 내 적 있음?
+  │   ├─ YES → Shoot 실행 (10000점)
+  │   └─ NO → 다음 액션으로
+  ↓
+[3단계] Move 평가
+  ├─ 사격 가능한 위치로 이동?
+  │   ├─ YES → Move 실행 (1000점대)
+  │   └─ NO → 플레이어에게 접근 (500점대)
+  ↓
+액션 완료
+
+```
+
+### ✅ 해결된 문제들
+
+1. **벽 너머 왔다갔다** → 실제 경로 거리로 평가
+2. **직선거리의 함정** → A\* 경로 거리 사용
+3. **음수 점수 필터링** → 필터 제거 + 점수 범위 상향
+4. **사격 안 함** → 비용 높은 액션 먼저 평가 + 점수 대폭 상향
+
+### 🎯 핵심 개념 정리
+
+**1. 경로 거리 (Path Length)**
+
+- 직선거리 ❌: 벽을 무시한 공중 거리
+- 경로거리 ✅: A\* 알고리즘으로 벽을 우회한 실제 거리
+
+**2. 점수 체계 (Scoring System)**
+
+- 높은 점수 = 우선순위 높음
+- 점수 범위를 계층화해서 우선순위 명확히
+
+**3. 액션 포인트 관리**
+
+- 비용 높은 액션부터 평가
+- 포인트 부족한 액션은 평가하지 않음
+
+**4. AI 의사결정**
+
+```
+사격 가능? → 즉시 사격
+  ↓ NO
+이동하면 사격 가능? → 그쪽으로 이동
+  ↓ NO
+플레이어에게 접근 → 경로 짧은 쪽으로
+```
+
+이제 적 AI가 벽을 제대로 인식하고, 효율적인 경로로 플레이어에게 접근하며, 사격 가능할 때 제대로 사격합니다! 🎉
+
+# { ❌ 수류탄 경로에 물체가 있으면 폭발 시키기 }
+
+## 핵심 아이디어
+
+수류탄이 **"이전 위치"에서 "현재 위치"로 이동할 때, 그 사이에 뭔가 있는지 체크**하는 겁니다.
+
+---
+
+## 1. 매 프레임마다 일어나는 일
+
+```csharp
+// 이전 프레임에서의 위치
+previousPosition = (10, 5, 10)
+
+// 이번 프레임에서 계산된 새 위치
+newPosition = (12, 6, 12)
+```
+
+수류탄이 A 지점에서 B 지점으로 순간이동하는 것처럼 보이죠?
+
+---
+
+## 2. SphereCast가 하는 일
+
+```csharp
+Physics.SphereCast(
+    previousPosition,              // 시작점: (10, 5, 10)
+    0.2f,                          // 구의 반지름: 0.2미터 크기의 공
+    moveDirection.normalized,      // 방향: 어디로 날아가는지
+    out RaycastHit hit,           // 부딪힌 정보 저장
+    moveDistance,                  // 거리: 얼마나 이동했는지
+    obstacleLayerMask             // 어떤 레이어만 체크할지
+)
+```
+
+**쉽게 말하면:**
+
+- 이전 위치에서 현재 위치까지 **공 모양의 센서**를 굴려봅니다
+- 그 경로에 뭔가 부딪히면 true 반환, 아니면 false 반환
+
+---
+
+## 3. 시각적 예시
+
+```
+프레임 1: 수류탄 위치 ●
+                        (벽 없음)
+
+프레임 2: 수류탄이 여기로 이동하려고 함 ●
+
+SphereCast: ●-------● (이 사이에 뭐 있어?)
+           시작    끝
+
+만약 벽이 있다면:
+SphereCast: ●----█--●
+           시작  벽  끝
+
+           ↓
+           벽을 발견! hit.point에 충돌 지점 저장
+
+```
+
+---
+
+## 4. 코드 흐름
+
+```csharp
+// 1단계: 새 위치 계산
+Vector3 newPosition = new Vector3(positionXZ.x, positionY, positionXZ.z);
+
+// 2단계: 이동 방향과 거리 계산
+Vector3 moveDirection = newPosition - previousPosition;  // 벡터: 이전→현재
+float moveDistance = moveDirection.magnitude;            // 거리: 몇 미터?
+
+// 3단계: 그 경로에 장애물 있나 체크
+if (Physics.SphereCast(...))
+{
+    // 뭔가 부딪혔다!
+    Explode(hit.point);  // 부딪힌 지점에서 폭발
+    return;              // Update 종료 (더 이상 이동 안 함)
+}
+
+// 4단계: 아무것도 없으면 정상 이동
+transform.position = newPosition;
+previousPosition = newPosition;  // 다음 프레임을 위해 현재 위치 저장
+
+```
+
+---
+
+## 5. 왜 이렇게 하나요?
+
+만약 SphereCast 없이 그냥 이동만 하면:
+
+```
+프레임 1: 수류탄 ●          벽█
+프레임 2: 수류탄           ●█  (벽 뚫고 지나감!)
+```
+
+수류탄이 너무 빨라서 벽을 "점프"해서 넘어가버립니다.
+
+**SphereCast를 쓰면:**
+
+```
+프레임 1: 수류탄 ●          벽█
+체크: ●-------█ "앗, 벽 발견!"
+결과: 벽 앞에서 폭발 💥
+```
+
+---
+
+## 핵심 요약
+
+1. **previousPosition**: 지난 프레임 위치 기억
+2. **newPosition**: 이번 프레임 새 위치 계산
+3. **SphereCast**: 그 사이 경로에 뭔가 있나 체크
+4. **있으면**: 그 자리에서 폭발 💥
+5. **없으면**: 정상 이동하고 previousPosition 업데이트
+
+이렇게 매 프레임마다 "이동하기 전에 경로 체크"를 반복하는 겁니다!
+
+더 상세하게 설명
+
+---
+
+## 🎯 전체 흐름 (한눈에 보기)
+
+```
+매 프레임마다:
+1. 새로운 위치 계산
+2. 이전 위치 → 새 위치 사이에 장애물 있나 체크
+3. 있으면 폭발, 없으면 이동
+```
+
+---
+
+## 📍 1단계: 위치 계산
+
+```csharp
+Vector3 moveDir = (targetPostion - positionXZ).normalized;
+positionXZ += moveDir * moveSpeed * Time.deltaTime;
+
+float positionY = arcYAnimationCurve.Evaluate(...) * maxHeight;
+Vector3 newPosition = new Vector3(positionXZ.x, positionY, positionXZ.z);
+```
+
+**무슨 뜻?**
+
+- `positionXZ`: 수류탄의 XZ 평면상 위치 (바닥 기준)
+- `positionY`: 포물선 높이 (위아래)
+- `newPosition`: 최종 3D 위치 (X, Y, Z 합친 것)
+
+**예시:**
+
+```
+시작: (0, 0, 0)
+목표: (10, 0, 10)
+
+프레임 1: positionXZ = (0.3, 0, 0.3), positionY = 1.2
+         → newPosition = (0.3, 1.2, 0.3)
+
+프레임 2: positionXZ = (0.6, 0, 0.6), positionY = 2.1
+         → newPosition = (0.6, 2.1, 0.6)
+```
+
+---
+
+## 🔍 2단계: 경로 체크 준비
+
+```csharp
+Vector3 moveDirection = newPosition - previousPosition;
+float moveDistance = moveDirection.magnitude;
+```
+
+**무슨 뜻?**
+
+- `moveDirection`: 이동 방향 벡터 (화살표)
+- `moveDistance`: 실제 이동한 거리 (숫자)
+
+**예시:**
+
+```
+previousPosition = (0, 0, 0)
+newPosition = (3, 4, 0)
+
+moveDirection = (3, 4, 0) - (0, 0, 0) = (3, 4, 0)  ← 벡터
+moveDistance = √(3² + 4²) = 5  ← 거리 (피타고라스)
+```
+
+---
+
+## 🎾 3단계: SphereCast로 장애물 감지
+
+```csharp
+if (Physics.SphereCast(
+    previousPosition,           // 출발점
+    0.2f,                       // 구 반지름
+    moveDirection.normalized,   // 방향 (단위벡터)
+    out RaycastHit hit,        // 충돌 정보 저장소
+    moveDistance,              // 검사 거리
+    obstacleLayerMask))        // 체크할 레이어
+```
+
+**각 파라미터 의미:**
+
+1. **previousPosition**: 여기서부터 시작
+2. **0.2f**: 반지름 0.2m짜리 공으로 체크
+3. **moveDirection.normalized**: 이 방향으로 (크기=1로 정규화)
+4. **out RaycastHit hit**: 부딪힌 정보 여기 저장해줘
+5. **moveDistance**: 이 거리만큼만 체크
+6. **obstacleLayerMask**: 이 레이어만 감지
+
+**시각화:**
+
+```
+previousPosition ●        newPosition ●
+                  \      /
+    반지름 0.2m → (●)---(●)---(●) ← 이렇게 구를 굴려가며 체크
+                   \  /
+                    벽█ ← 여기서 감지!
+
+```
+
+---
+
+## ⚡ 4단계: 결과 처리
+
+```csharp
+if (Physics.SphereCast(...))  // true = 뭔가 부딪힘
+{
+    Explode(hit.point);  // hit.point = 충돌한 정확한 좌표
+    return;              // 함수 종료 (아래 코드 실행 안 함)
+}
+
+// 여기는 충돌 없을 때만 실행됨
+transform.position = newPosition;    // 실제로 이동
+previousPosition = newPosition;      // 다음 프레임을 위해 저장
+```
+
+**분기 처리:**
+
+```
+충돌 O → Explode() 실행 → return으로 종료
+충돌 X → 이동 → previousPosition 업데이트
+```
+
+---
+
+## 🎬 실제 시나리오
+
+```
+프레임 1:
+  previousPosition = (0, 0, 0)
+  newPosition = (1, 2, 1)
+  SphereCast: (0,0,0) → (1,2,1) 체크
+  결과: 충돌 없음 ✓
+  → 이동 완료, previousPosition = (1, 2, 1)
+
+프레임 2:
+  previousPosition = (1, 2, 1)
+  newPosition = (2, 3, 2)
+  SphereCast: (1,2,1) → (2,3,2) 체크
+  결과: 벽 발견! hit.point = (1.5, 2.5, 1.5)
+  → Explode(1.5, 2.5, 1.5) 실행 💥
+  → return으로 종료 (이동 안 함)
+
+```
+
+---
+
+## 💡 핵심 개념 3가지
+
+1. **previousPosition**: GPS 기록처럼 "방금 어디 있었는지" 기억
+2. **SphereCast**: 순간이동 사이에 "중간에 뭐 없었나" 체크
+3. **return**: 충돌 시 즉시 종료해서 벽 뚫고 못 가게 막기
+
+이게 매 프레임마다 반복되면서 장애물 감지가 작동하는 거예요!

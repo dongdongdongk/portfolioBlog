@@ -1,0 +1,1645 @@
+---
+title: '섹션 5: Shooter Sam - 10'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { C++에서 Blackboard 키 설정하기 }
+
+## 🎯 이번에 할 것
+
+**C++ 코드로 Blackboard 값 동적으로 설정!**
+
+```
+기존: Blackboard에서 수동 설정
+    ↓
+개선: C++ 코드로 자동 설정
+    ↓
+플레이어 위치 실시간 반영! 🎮
+```
+
+---
+
+## 🤔 왜 C++에서 설정하나요?
+
+### 현재 문제점
+
+**Blackboard 기본값 사용:**
+
+```
+Blackboard:
+  MoveToLocation (Vector)
+    Default Value: (100, 200, 300)
+    ↓
+모든 AI가 같은 위치로 이동
+    ↓
+플레이어 위치가 아님! ❌
+```
+
+---
+
+### 해결 방법
+
+**C++에서 동적으로 설정:**
+
+```
+C++ 코드:
+  플레이어 위치 가져오기
+    ↓
+  Blackboard에 저장
+    ↓
+  AI가 플레이어 위치로 이동! ✅
+```
+
+---
+
+## 📝 Step 1: Blackboard Key 이름 변경
+
+### 1-1: 기존 Key 수정
+
+**BB_EnemyAI 열기:**
+
+```
+1. MoveToLocation 선택
+2. 이름 변경: "PlayerLocation"
+3. Default Value 체크 해제
+   (C++에서 설정할 거라서!)
+4. Save
+```
+
+**왜 이름 변경?**
+
+```
+MoveToLocation: 애매함
+  → 어디로 이동?
+
+PlayerLocation: 명확함
+  → 플레이어 위치로!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380642/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_10/image.png)
+
+---
+
+### 1-2: Behavior Tree 업데이트
+
+**BT_EnemyAI:**
+
+```
+1. Move To 노드 선택
+2. Details 패널
+3. Blackboard Key
+4. "PlayerLocation" 선택 ✅
+5. Save
+```
+
+**안 하면?**
+
+```
+Move To → 잘못된 Key 참조
+    ↓
+  AI가 안 움직임! ❌
+```
+
+---
+
+## 💻 Step 2: Blackboard Component 가져오기
+
+### 2-1: Include 추가
+
+**ShooterAI.cpp:**
+
+```cpp
+#include "ShooterAI.h"
+#include "Kismet/GameplayStatics.h"
+#include "BehaviorTree/BlackboardComponent.h"  // 👈 추가!
+```
+
+**BlackboardComponent란?**
+
+```
+Blackboard의 데이터를 관리하는 컴포넌트
+→ 값 읽기/쓰기
+→ AI Controller가 자동으로 가짐
+```
+
+---
+
+### 2-2: GetBlackboardComponent
+
+**StartBehaviorTree 함수:**
+
+```cpp
+void AShooterAI::StartBehaviorTree(AShooterSamCharacter* Player)
+{
+    if (EnemyAIBehaviorTree)
+    {
+        MyCharacter = Cast<AShooterSamCharacter>(GetPawn());
+        if (Player)
+        {
+            PlayerCharacter = Player;
+        }
+
+        RunBehaviorTree(EnemyAIBehaviorTree);
+
+        // ===== Blackboard Component 가져오기 =====
+        UBlackboardComponent* MyBlackboard = GetBlackboardComponent();
+    }
+}
+```
+
+---
+
+### GetBlackboardComponent 설명
+
+```cpp
+UBlackboardComponent* MyBlackboard = GetBlackboardComponent();
+```
+
+**반환값:**
+
+```
+UBlackboardComponent*
+  ↓
+현재 AI의 Blackboard Component 포인터
+```
+
+**언제 호출?**
+
+```
+RunBehaviorTree 이후!
+  ↓
+Behavior Tree가 실행되면
+  ↓
+Blackboard도 초기화됨
+  ↓
+그때 가져올 수 있음
+```
+
+---
+
+## 🔧 Step 3: Blackboard 값 설정
+
+### 3-1: SetValueAsVector
+
+**전체 코드:**
+
+```cpp
+void AShooterAI::StartBehaviorTree(AShooterSamCharacter* Player)
+{
+    if (EnemyAIBehaviorTree)
+    {
+        MyCharacter = Cast<AShooterSamCharacter>(GetPawn());
+        if (Player)
+        {
+            PlayerCharacter = Player;
+        }
+
+        RunBehaviorTree(EnemyAIBehaviorTree);
+
+        // ===== Blackboard 설정 =====
+        UBlackboardComponent* MyBlackboard = GetBlackboardComponent();
+
+        if (MyBlackboard && PlayerCharacter && MyCharacter)
+        {
+            // 플레이어 위치 저장
+            MyBlackboard->SetValueAsVector(
+                "PlayerLocation",
+                PlayerCharacter->GetActorLocation()
+            );
+
+            // 시작 위치 저장
+            MyBlackboard->SetValueAsVector(
+                "StartLocation",
+                MyCharacter->GetActorLocation()
+            );
+        }
+    }
+}
+```
+
+---
+
+### 3-2: SetValueAsVector 분석
+
+**함수 시그니처:**
+
+```cpp
+void SetValueAsVector(
+    FName KeyName,      // Key 이름
+    FVector VectorValue // 저장할 Vector
+);
+```
+
+---
+
+**파라미터 1: KeyName**
+
+```cpp
+"PlayerLocation"
+```
+
+**타입: FName**
+
+```
+FName = 언리얼의 이름 타입
+→ 문자열을 넣으면 자동 변환
+→ "PlayerLocation" OK ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380642/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_10/image_1.png)
+
+**주의사항:**
+
+```
+Blackboard의 Key 이름과
+완전히 똑같아야 함!
+
+Blackboard: "PlayerLocation"
+코드:       "PlayerLocation" ✅
+
+Blackboard: "PlayerLocation"
+코드:       "playerlocation" ❌ (대소문자 다름)
+코드:       "PlayerLoc"      ❌ (이름 다름)
+```
+
+---
+
+**파라미터 2: VectorValue**
+
+```cpp
+PlayerCharacter->GetActorLocation()
+```
+
+**GetActorLocation():**
+
+```cpp
+FVector GetActorLocation() const;
+```
+
+- Actor의 현재 월드 위치 반환
+- FVector 타입 (X, Y, Z)
+
+**예시:**
+
+```cpp
+FVector Loc = PlayerCharacter->GetActorLocation();
+// Loc = (100.5, 200.3, 50.0)
+```
+
+---
+
+### 3-3: 유효성 확인
+
+```cpp
+if (MyBlackboard && PlayerCharacter && MyCharacter)
+{
+    // 모두 유효할 때만 실행
+}
+```
+
+**왜 3개 다 확인?**
+
+**1. MyBlackboard**
+
+```
+GetBlackboardComponent() 실패 가능
+→ nullptr 반환 가능
+```
+
+**2. PlayerCharacter**
+
+```
+StartBehaviorTree(Player)에서 전달
+→ 하지만 nullptr일 수 있음
+```
+
+**3. MyCharacter**
+
+```
+Cast<AShooterSamCharacter>(GetPawn())
+→ 실패하면 nullptr
+```
+
+**하나라도 nullptr이면:**
+
+```
+nullptr->함수()
+  ↓
+크래시! 💥
+```
+
+---
+
+## 🎯 SetValue 함수들
+
+### 다양한 타입별 함수
+
+**Blackboard에는 여러 타입 존재:**
+
+```cpp
+// Bool 타입
+MyBlackboard->SetValueAsBool("IsAlive", true);
+
+// Int 타입
+MyBlackboard->SetValueAsInt("Health", 100);
+
+// Float 타입
+MyBlackboard->SetValueAsFloat("Speed", 600.0f);
+
+// Vector 타입
+MyBlackboard->SetValueAsVector("Location", FVector(0, 0, 0));
+
+// Object 타입 (Actor 등)
+MyBlackboard->SetValueAsObject("Target", PlayerCharacter);
+
+// Class 타입
+MyBlackboard->SetValueAsClass("EnemyType", AEnemy::StaticClass());
+
+// String 타입
+MyBlackboard->SetValueAsString("Name", "Enemy_01");
+```
+
+---
+
+### Key 타입 맞추기
+
+**Blackboard Key 타입과 함수 맞춰야 함!**
+
+```cpp
+// ✅ 올바른 예
+Blackboard Key: Vector
+코드: SetValueAsVector(...)
+
+// ❌ 틀린 예
+Blackboard Key: Vector
+코드: SetValueAsInt(...)  // 타입 안 맞음!
+```
+
+---
+
+## 🏃 Step 4: 시작 위치 저장
+
+### 왜 시작 위치를 저장하나요?
+
+**AI 행동 패턴:**
+
+```
+1. 시작 위치에서 대기
+    ↓
+2. 플레이어 발견
+    ↓
+3. 플레이어 추적
+    ↓
+4. 플레이어 놓침
+    ↓
+5. 3초 대기
+    ↓
+6. 시작 위치로 복귀 ← 이때 필요!
+```
+
+---
+
+### Blackboard Key 추가
+
+**BB_EnemyAI:**
+
+```
+1. New Key 클릭
+2. "Vector" 선택
+3. 이름: "StartLocation"
+4. Save
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380642/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_10/image_2.png)
+
+---
+
+### C++ 코드 추가
+
+**이미 작성됨!**
+
+```cpp
+MyBlackboard->SetValueAsVector(
+    "StartLocation",
+    MyCharacter->GetActorLocation()
+);
+```
+
+**의미:**
+
+```
+적 캐릭터의 현재 위치
+  ↓
+StartLocation에 저장
+  ↓
+나중에 돌아갈 위치!
+```
+
+---
+
+## 🔍 전체 흐름 정리
+
+```
+[Blackboard 설정 전체 과정]
+
+1. GameMode::BeginPlay
+    ↓
+2. for문으로 각 AI 순회
+    ↓
+3. AI->StartBehaviorTree(Player)
+    ↓
+4. MyCharacter = GetPawn() + Cast
+    ↓
+5. PlayerCharacter = Player 저장
+    ↓
+6. RunBehaviorTree(BT) 실행
+    ↓
+7. MyBlackboard = GetBlackboardComponent()
+    ↓
+8. 유효성 확인 (3개 모두)
+    ↓
+9. PlayerLocation = Player 위치 설정
+    ↓
+10. StartLocation = AI 위치 설정
+    ↓
+11. Behavior Tree가 값 읽기
+    ↓
+12. Move To → PlayerLocation으로 이동!
+```
+
+---
+
+## ✅ 테스트하기
+
+### 1. Behavior Tree 확인
+
+**BT_EnemyAI:**
+
+```
+Move To 노드:
+  Blackboard Key: PlayerLocation ✅
+```
+
+---
+
+### 2. Play
+
+**게임 실행:**
+
+```
+1. Play 버튼
+2. BT_EnemyAI 창 열어두기
+3. Blackboard 탭 확인
+```
+
+---
+
+### 3. Blackboard 값 확인
+
+**Play 중 Blackboard:**
+
+```
+PlayerLocation: (1234.5, 5678.9, 123.4)
+  → 플레이어 시작 위치 ✅
+
+StartLocation: (100.0, 200.0, 50.0)
+  → AI_0 시작 위치
+
+StartLocation: (300.0, 400.0, 50.0)
+  → AI_1 시작 위치 (다름!)
+```
+
+---
+
+### 4. AI 이동 확인
+
+```
+모든 적이:
+  → Player Start 위치로 이동 ✅
+  → 각자 다른 StartLocation 가짐 ✅
+```
+
+---
+
+## 💡 실전 활용
+
+### 예제 1: 체력 저장
+
+**Blackboard:**
+
+```
+Key: Health (Float)
+```
+
+**C++:**
+
+```cpp
+MyBlackboard->SetValueAsFloat("Health", 100.0f);
+```
+
+---
+
+### 예제 2: 타겟 저장
+
+**Blackboard:**
+
+```
+Key: Target (Object)
+```
+
+**C++:**
+
+```cpp
+MyBlackboard->SetValueAsObject("Target", PlayerCharacter);
+```
+
+---
+
+### 예제 3: 상태 저장
+
+**Blackboard:**
+
+```
+Key: IsPatrolling (Bool)
+```
+
+**C++:**
+
+```cpp
+MyBlackboard->SetValueAsBool("IsPatrolling", true);
+```
+
+---
+
+### 예제 4: 순찰 지점들
+
+**Blackboard:**
+
+```
+Key: PatrolPoint1 (Vector)
+Key: PatrolPoint2 (Vector)
+Key: PatrolPoint3 (Vector)
+```
+
+**C++:**
+
+```cpp
+MyBlackboard->SetValueAsVector("PatrolPoint1", FVector(100, 200, 0));
+MyBlackboard->SetValueAsVector("PatrolPoint2", FVector(300, 400, 0));
+MyBlackboard->SetValueAsVector("PatrolPoint3", FVector(500, 600, 0));
+```
+
+---
+
+## 📚 핵심 개념 정리
+
+### Blackboard Component
+
+AI 데이터 관리
+
+```cpp
+UBlackboardComponent* BB = GetBlackboardComponent();
+```
+
+### SetValueAsVector
+
+Vector 값 저장
+
+```cpp
+BB->SetValueAsVector("KeyName", FVector);
+```
+
+### GetActorLocation
+
+Actor 위치
+
+```cpp
+FVector Loc = Actor->GetActorLocation();
+```
+
+### Key 이름 일치
+
+```
+Blackboard Key = 코드 문자열
+완전히 똑같아야 함!
+```
+
+### 유효성 확인
+
+```cpp
+if (BB && Character)
+```
+
+---
+
+## 🐛 문제 해결
+
+### AI가 안 움직여요!
+
+**체크리스트:**
+
+```
+1. Key 이름 확인
+   Blackboard: "PlayerLocation"
+   코드:       "PlayerLocation" (똑같나?)
+
+2. Move To 노드 확인
+   Blackboard Key: PlayerLocation 선택됐나?
+
+3. 값 설정 확인
+   if (MyBlackboard) 안에 들어가나?
+
+4. RunBehaviorTree 순서
+   RunBehaviorTree 먼저 → 그 다음 SetValue
+```
+
+---
+
+### Key를 찾을 수 없대요!
+
+**원인:**
+
+```
+Blackboard에 해당 Key 없음
+```
+
+**해결:**
+
+```
+1. BB_EnemyAI 열기
+2. Keys 패널 확인
+3. "PlayerLocation" 있나?
+4. 없으면 추가!
+```
+
+---
+
+### Blackboard가 nullptr이에요!
+
+**원인:**
+
+```
+RunBehaviorTree 전에 호출
+```
+
+**해결:**
+
+```cpp
+// ❌ 틀린 순서
+GetBlackboardComponent();  // nullptr!
+RunBehaviorTree(BT);
+
+// ✅ 올바른 순서
+RunBehaviorTree(BT);
+GetBlackboardComponent();  // OK!
+```
+
+---
+
+### 값이 안 바뀌어요!
+
+**확인:**
+
+```cpp
+// Play 중 Blackboard 탭에서 실시간 확인
+PlayerLocation: (???, ???, ???)
+
+값이 업데이트 안 되면:
+  → SetValueAsVector 호출 안 됨
+  → if문 조건 확인
+```
+
+---
+
+## 🚀 다음 단계
+
+**지금까지 완성한 것:**
+
+```
+✅ Blackboard Key 생성
+✅ C++에서 값 설정
+✅ 플레이어 위치 저장
+✅ AI 시작 위치 저장
+✅ AI가 플레이어로 이동
+```
+
+**다음 강의:**
+
+```
+1. Selector 노드 배우기
+2. 조건 분기 (Decorator)
+3. 플레이어 추적 로직
+4. 시야 체크
+5. 시작 위치로 복귀
+```
+
+---
+
+## 💡 추가 팁
+
+### GetValue 함수들
+
+**값 읽어오기:**
+
+```cpp
+// Vector 읽기
+FVector Loc = MyBlackboard->GetValueAsVector("PlayerLocation");
+
+// Bool 읽기
+bool IsAlive = MyBlackboard->GetValueAsBool("IsAlive");
+
+// Object 읽기
+AActor* Target = Cast<AActor>(
+    MyBlackboard->GetValueAsObject("Target")
+);
+```
+
+---
+
+### 값 초기화
+
+```cpp
+// Vector를 (0,0,0)으로
+MyBlackboard->ClearValue("PlayerLocation");
+
+// 또는
+MyBlackboard->SetValueAsVector("PlayerLocation", FVector::ZeroVector);
+```
+
+---
+
+### 디버그 로그
+
+```cpp
+FVector Loc = PlayerCharacter->GetActorLocation();
+UE_LOG(LogTemp, Warning, TEXT("Player at: %s"), *Loc.ToString());
+
+MyBlackboard->SetValueAsVector("PlayerLocation", Loc);
+```
+
+---
+
+# { 범위 기반 for 루프 (Range-based for loop) }
+
+## 🎯 핵심 요약
+
+**같은 기능, 더 짧은 코드!**
+
+```cpp
+// 기존 for 루프 (길다)
+for (int32 i = 0; i < Array.Num(); i++)
+{
+    AActor* Actor = Array[i];
+}
+
+// 범위 기반 for 루프 (짧다!)
+for (AActor* Actor : Array)
+{
+    // Actor 바로 사용!
+}
+```
+
+---
+
+## 📝 문법
+
+### 기본 형태
+
+```cpp
+for (타입 변수명 : 배열)
+{
+    // 변수 사용
+}
+```
+
+---
+
+### 실제 예제
+
+**우리 코드:**
+
+```cpp
+// 기존 방식 (주석 처리)
+/*
+for (int32 LoopIndex = 0; LoopIndex < ShooterAIActors.Num(); LoopIndex++)
+{
+    AActor* ShooterAIActor = ShooterAIActors[LoopIndex];
+    AShooterAI* ShooterAI = Cast<AShooterAI>(ShooterAIActor);
+    if (ShooterAI)
+    {
+        ShooterAI->StartBehaviorTree(Player);
+    }
+}
+*/
+
+// 범위 기반 방식 (더 짧음!)
+for (AActor* ShooterAIActor : ShooterAIActors)
+{
+    AShooterAI* ShooterAI = Cast<AShooterAI>(ShooterAIActor);
+    if (ShooterAI)
+    {
+        ShooterAI->StartBehaviorTree(Player);
+    }
+}
+```
+
+---
+
+## 🔍 차이점 비교
+
+### 기존 for 루프
+
+```cpp
+for (int32 i = 0; i < ShooterAIActors.Num(); i++)
+{
+    AActor* Actor = ShooterAIActors[i];
+    // ↑ 인덱스로 직접 접근
+}
+```
+
+**필요한 것:**
+
+```
+✓ 인덱스 변수 (i)
+✓ 조건 (i < Num())
+✓ 증가 (i++)
+✓ 배열 인덱싱 [i]
+```
+
+---
+
+### 범위 기반 for 루프
+
+```cpp
+for (AActor* Actor : ShooterAIActors)
+{
+    // Actor 바로 사용!
+}
+```
+
+**자동으로 처리:**
+
+```
+✓ 인덱스 (숨김)
+✓ 조건 (자동)
+✓ 증가 (자동)
+✓ 인덱싱 (자동)
+```
+
+---
+
+## 💡 장단점
+
+### 장점 ✅
+
+```
+1. 코드가 짧음
+2. 읽기 쉬움
+3. 실수 적음 (인덱스 오류 없음)
+4. 타이핑 적음
+```
+
+---
+
+### 단점 ❌
+
+```
+1. 인덱스 없음
+   → i 값 필요하면 못 씀
+
+2. 거꾸로 못 돌림
+   → 역순 불가
+
+3. 2개씩 건너뛰기 못 함
+   → i += 2 불가
+
+4. 유연성 낮음
+   → 처음부터 끝까지만 가능
+```
+
+---
+
+## 🎯 언제 뭘 쓸까?
+
+### 범위 기반 사용 ✅
+
+```cpp
+// 모든 요소 순회
+for (AActor* Actor : Actors)
+{
+    // 처음부터 끝까지
+}
+
+// 배열 출력
+for (int32 Number : Numbers)
+{
+    UE_LOG(LogTemp, Display, TEXT("%d"), Number);
+}
+```
+
+---
+
+### 기존 for 사용 ✅
+
+```cpp
+// 인덱스 필요
+for (int32 i = 0; i < Num; i++)
+{
+    UE_LOG(LogTemp, Display, TEXT("Index: %d"), i);
+}
+
+// 역순
+for (int32 i = Num - 1; i >= 0; i--)
+{
+    // 뒤에서부터
+}
+
+// 2개씩 건너뛰기
+for (int32 i = 0; i < Num; i += 2)
+{
+    // 0, 2, 4, 6...
+}
+```
+
+---
+
+## 📚 다양한 예제
+
+### TArray
+
+```cpp
+TArray<int32> Numbers = {1, 2, 3, 4, 5};
+
+for (int32 Num : Numbers)
+{
+    UE_LOG(LogTemp, Display, TEXT("%d"), Num);
+}
+```
+
+---
+
+### TArray<FString>
+
+```cpp
+TArray<FString> Names = {"Alice", "Bob", "Charlie"};
+
+for (FString Name : Names)
+{
+    UE_LOG(LogTemp, Display, TEXT("Name: %s"), *Name);
+}
+```
+
+---
+
+### TArray<AActor\*>
+
+```cpp
+TArray<AActor*> Actors;
+GetAllActorsOfClass(World, AActor::StaticClass(), Actors);
+
+for (AActor* Actor : Actors)
+{
+    Actor->Destroy();
+}
+```
+
+---
+
+## 🔧 실전 팁
+
+### const 참조 (성능 최적화)
+
+```cpp
+// ❌ 복사 (느림)
+for (FString Name : Names)
+
+// ✅ 참조 (빠름)
+for (const FString& Name : Names)
+```
+
+**언제 사용?**
+
+```
+값 타입 (FVector, FString 등):
+  → const 참조 사용
+
+포인터 (AActor* 등):
+  → 그냥 사용 (이미 포인터라 빠름)
+```
+
+---
+
+### auto 키워드
+
+```cpp
+// 타입 자동 추론
+for (auto Actor : Actors)
+{
+    // Actor의 타입 자동 결정
+}
+
+// const 참조 + auto
+for (const auto& Item : Items)
+{
+    // 빠르고 안전
+}
+```
+
+---
+
+## ✅ 요약
+
+**범위 기반 for 루프 = 짧고 간단한 for 루프**
+
+```cpp
+// 기존
+for (int32 i = 0; i < Array.Num(); i++)
+{
+    Type Item = Array[i];
+}
+
+// 범위 기반
+for (Type Item : Array)
+{
+    // 끝!
+}
+```
+
+**사용 가이드:**
+
+```
+모든 요소 순회 → 범위 기반 ✅
+특수한 순회 → 기존 for ✅
+```
+
+---
+
+간단하죠? 대부분의 경우 범위 기반 for 루프가 더 편합니다! 🚀
+
+# { Sequence 노드와 Wait Task }
+
+## 🎯 이번에 할 것
+
+**AI가 왔다갔다 반복하게 만들기!**
+
+```
+시작 위치
+    ↓
+플레이어 위치로 이동
+    ↓
+3초 대기
+    ↓
+시작 위치로 복귀
+    ↓
+3초 대기
+    ↓
+반복! 🔄
+```
+
+---
+
+## 🎨 Behavior Tree 노드 종류
+
+### 2가지 주요 타입
+
+**1. Composite Nodes (복합 노드) - 회색**
+
+```
+흐름 제어
+→ 어떤 순서로?
+→ 어떤 조건으로?
+
+종류:
+  - Sequence (순차)
+  - Selector (선택)
+  - Simple Parallel (병렬)
+```
+
+**역할:**
+
+```
+직접 행동 X
+자식 노드들을 제어만 함
+→ 감독자 역할
+```
+
+---
+
+**2. Task Nodes (작업 노드) - 보라색**
+
+```
+실제 행동
+→ 이동하기
+→ 쏘기
+→ 대기하기
+
+예시:
+  - Move To
+  - Wait
+  - Play Sound
+  - Play Animation
+```
+
+**역할:**
+
+```
+실제로 뭔가 함
+→ 일꾼 역할
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380642/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_10/image_3.png)
+
+---
+
+## 🔄 Sequence 노드 상세
+
+### Sequence란?
+
+**"순서대로 하나씩 실행"**
+
+```
+Sequence
+  ├─ Task 1
+  ├─ Task 2
+  └─ Task 3
+
+실행 순서:
+  1 → 2 → 3
+```
+
+---
+
+### 실행 규칙
+
+**1. 왼쪽에서 오른쪽으로**
+
+```
+Sequence
+  ├─ 1️⃣ Move To Player
+  ├─ 2️⃣ Wait
+  ├─ 3️⃣ Move To Start
+  └─ 4️⃣ Wait
+
+순서대로 실행!
+```
+
+**노드 번호:**
+
+```
+각 노드 위 동그라미 안 숫자
+→ 실행 순서 표시
+→ 1, 2, 3, 4...
+```
+
+---
+
+**2. 실패하면 중단**
+
+```
+Sequence
+  ├─ Task 1 → 성공 ✅
+  ├─ Task 2 → 실패 ❌
+  ├─ Task 3 (실행 안 됨)
+  └─ Task 4 (실행 안 됨)
+
+Task 2 실패
+  ↓
+Sequence 중단
+  ↓
+Root로 복귀
+  ↓
+처음부터 다시 시작
+```
+
+---
+
+**3. 모두 성공해야 성공**
+
+```
+Sequence
+  ├─ Task 1 → 성공 ✅
+  ├─ Task 2 → 성공 ✅
+  ├─ Task 3 → 성공 ✅
+  └─ Task 4 → 성공 ✅
+
+모두 성공!
+  ↓
+Sequence 성공 ✅
+  ↓
+Root로 복귀
+  ↓
+다음 프레임에 다시 시작
+```
+
+---
+
+## ⏱️ Wait Task
+
+### Wait 노드란?
+
+**"지정된 시간만큼 대기"**
+
+```
+Wait (3초)
+  ↓
+3초 동안 멈춤
+  ↓
+완료 (성공) ✅
+```
+
+---
+
+### Wait 노드 설정
+
+**생성:**
+
+```
+1. 우클릭
+2. Tasks 섹션
+3. "Wait" 선택
+```
+
+**설정:**
+
+```
+Details 패널:
+  Wait Time: 3.0 (초 단위)
+
+  Random Deviation: 0.0
+    → 랜덤 시간 추가 (선택)
+    → 0.5면 ±0.5초 랜덤
+```
+
+---
+
+### 예시
+
+**3초 대기:**
+
+```
+Wait Time: 3.0
+  ↓
+항상 정확히 3초
+```
+
+**2~4초 랜덤 대기:**
+
+```
+Wait Time: 3.0
+Random Deviation: 1.0
+  ↓
+3 ± 1초 = 2~4초 랜덤
+```
+
+---
+
+## 🏗️ Step 1: 기본 구조 만들기
+
+### 현재 구조
+
+```
+Root
+  ↓
+Sequence
+  ↓
+Move To (PlayerLocation)
+```
+
+**문제:**
+
+```
+플레이어 위치로 이동
+  ↓
+끝
+  ↓
+다시 시작
+  ↓
+또 플레이어 위치로
+  ↓
+무한 반복 (제자리)
+```
+
+---
+
+## 🎮 Step 2: 완전한 사이클 만들기
+
+### 목표 구조
+
+```
+Root
+  ↓
+Sequence
+  ├─ 1️⃣ Move To (PlayerLocation)
+  ├─ 2️⃣ Wait (3초)
+  ├─ 3️⃣ Move To (StartLocation)
+  └─ 4️⃣ Wait (3초)
+```
+
+---
+
+### 2-1: Wait 추가
+
+**첫 번째 Wait:**
+
+```
+1. Sequence에 우클릭
+2. Add Task → Wait
+3. Move To 옆에 배치
+4. Details:
+   - Wait Time: 3.0
+```
+
+---
+
+### 2-2: Move To (Start) 추가
+
+**시작 위치로 이동:**
+
+```
+1. Sequence에 우클릭
+2. Add Task → Move To
+3. Wait 옆에 배치
+4. Details:
+   - Blackboard Key: StartLocation ✅
+```
+
+---
+
+### 2-3: 두 번째 Wait 추가
+
+**또 대기:**
+
+```
+1. Sequence에 우클릭
+2. Add Task → Wait
+3. Move To (Start) 옆에 배치
+4. Details:
+   - Wait Time: 3.0
+```
+
+---
+
+### 최종 구조 확인
+
+```
+Sequence (회색)
+  ├─ 1️⃣ Move To (PlayerLocation) - 보라색
+  ├─ 2️⃣ Wait (3.0) - 보라색
+  ├─ 3️⃣ Move To (StartLocation) - 보라색
+  └─ 4️⃣ Wait (3.0) - 보라색
+
+노드 번호 확인:
+  각 동그라미 안에 1, 2, 3, 4
+```
+
+---
+
+## 🔍 실행 흐름 상세
+
+### 완전한 1사이클
+
+```
+[프레임 1~100]
+Root 실행
+  ↓
+Sequence 시작
+  ↓
+1️⃣ Move To PlayerLocation
+  - AI가 플레이어 위치로 이동
+  - NavMesh 경로 찾기
+  - 걸어서 이동
+  - 도착하면: 성공 ✅
+
+[프레임 101~280]
+2️⃣ Wait (3초)
+  - 제자리에서 멈춤
+  - 3초 대기
+  - 완료되면: 성공 ✅
+
+[프레임 281~400]
+3️⃣ Move To StartLocation
+  - 시작 위치로 이동
+  - NavMesh 경로 찾기
+  - 걸어서 복귀
+  - 도착하면: 성공 ✅
+
+[프레임 401~580]
+4️⃣ Wait (3초)
+  - 제자리에서 멈춤
+  - 3초 대기
+  - 완료되면: 성공 ✅
+
+[프레임 581]
+Sequence 성공! ✅
+  ↓
+Root로 복귀
+  ↓
+다음 프레임에 Sequence 다시 시작
+  ↓
+1️⃣부터 다시!
+```
+
+---
+
+### 실패 시나리오
+
+**만약 3번에서 실패하면?**
+
+```
+1️⃣ Move To PlayerLocation → 성공 ✅
+2️⃣ Wait → 성공 ✅
+3️⃣ Move To StartLocation → 실패 ❌
+  (예: NavMesh 밖)
+  ↓
+Sequence 즉시 중단! ❌
+4️⃣ Wait 실행 안 됨
+  ↓
+Root로 복귀
+  ↓
+다음 프레임에 1️⃣부터 다시 시도
+```
+
+---
+
+## 📚 핵심 개념 정리
+
+### Root 노드
+
+```
+시작점
+→ 매 프레임 실행
+→ 자식은 1개만 (항상 Composite)
+```
+
+### Sequence 노드
+
+```
+순차 실행
+→ 왼쪽에서 오른쪽
+→ 실패하면 중단
+→ 모두 성공해야 성공
+```
+
+### Task 노드
+
+```
+실제 행동
+→ Move To: 이동
+→ Wait: 대기
+→ 성공/실패 반환
+```
+
+### 성공/실패
+
+```
+성공 ✅: 다음 Task로
+실패 ❌: Sequence 중단
+```
+
+---
+
+## 💡 실전 팁
+
+### Sequence 자식 순서 변경
+
+**드래그로 순서 조정:**
+
+```
+Task를 좌우로 드래그
+  ↓
+순서 바뀜
+  ↓
+번호도 자동 업데이트
+```
+
+---
+
+### Wait 활용
+
+**전투 대기:**
+
+```
+공격
+  ↓
+Wait (1초)
+  ↓
+다음 공격
+```
+
+**순찰 대기:**
+
+```
+순찰 지점 도착
+  ↓
+Wait (5초)
+  ↓
+다음 순찰 지점
+```
+
+---
+
+### Sequence vs Selector
+
+**Sequence (AND):**
+
+```
+모두 성공해야 함
+→ Task1 AND Task2 AND Task3
+→ 순차적 행동
+```
+
+**Selector (OR) - 다음 강의:**
+
+```
+하나만 성공하면 됨
+→ Task1 OR Task2 OR Task3
+→ 선택적 행동
+```
+
+---
+
+## ✅ 테스트
+
+### 1. Blackboard 확인
+
+**BB_EnemyAI:**
+
+```
+✅ PlayerLocation (Vector)
+✅ StartLocation (Vector)
+```
+
+---
+
+### 2. Behavior Tree 확인
+
+**BT_EnemyAI:**
+
+```
+Root
+  ↓
+Sequence
+  ├─ 1️⃣ Move To (PlayerLocation) ✅
+  ├─ 2️⃣ Wait (3.0) ✅
+  ├─ 3️⃣ Move To (StartLocation) ✅
+  └─ 4️⃣ Wait (3.0) ✅
+```
+
+---
+
+### 3. Play
+
+**결과:**
+
+```
+1. AI가 플레이어 위치로 이동
+2. 3초 대기
+3. 시작 위치로 복귀
+4. 3초 대기
+5. 1번부터 반복! 🔄
+```
+
+---
+
+### 4. 실시간 디버깅
+
+**BT 창 띄워두고 Play:**
+
+```
+노드 색깔 변화 관찰:
+  회색: 대기
+  노란색: 실행 중
+  초록색: 성공
+  빨간색: 실패
+
+Blackboard 탭:
+  PlayerLocation 값 확인
+  StartLocation 값 확인
+```
+
+---
+
+## 🎯 요약
+
+**Sequence = 순서대로 모두 실행**
+
+```
+특징:
+  ✓ 왼쪽 → 오른쪽
+  ✓ 하나 실패 → 전체 실패
+  ✓ 모두 성공 → 성공
+
+Wait = 시간 대기
+  ✓ 지정된 시간만큼 멈춤
+  ✓ 완료되면 성공
+
+조합:
+  Move → Wait → Move → Wait
+  → 왔다갔다 반복!
+```
+
+---

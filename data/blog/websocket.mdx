@@ -1,0 +1,491 @@
+---
+title: 'Websocket(알림기능)'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# 1.알림 기능 만들기
+
+## 1.종속성 추가
+
+```java
+웹 소켓을 사용하기 위한 dependency 를 추가해준다.
+```
+
+```java
+<dependency>
+	<groupId>org.springframework</groupId>
+	<artifactId>spring-websocket</artifactId>
+	<version>5.3.18</version>
+</dependency>
+
+<dependency>
+	<groupId>org.webjars</groupId>
+	<artifactId>webjars-locator-core</artifactId>
+</dependency>
+
+<dependency>
+	<groupId>org.webjars</groupId>
+	<artifactId>sockjs-client</artifactId>
+	<version>1.0.2</version>
+</dependency>
+
+<dependency>
+	<groupId>org.webjars</groupId>
+	<artifactId>stomp-websocket</artifactId>
+	<version>2.3.3</version>
+</dependency>
+```
+
+## 2.WebSocketConfig 생성
+
+```java
+웹 소켓 설정을 위한 class
+
+보낼 대상 설정과 메세지를 처리할 컨트롤러 url 등을 설정해준다
+```
+
+```java
+@Configuration
+@EnableWebSocketMessageBroker
+public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+    @Override
+    public void configureMessageBroker(MessageBrokerRegistry config) {
+        config.enableSimpleBroker("/all","/specific"); // all 로 시작하는 대상에게 메세지 전송 (모두) /specific 로 시작하는 대상에게 메시지 전송 (변경 가능하다)
+        config.setApplicationDestinationPrefixes("/app"); // 어떤 컨트롤러에서 메세지가 처리될지 지정하는것
+    }
+
+    @Override
+    public void registerStompEndpoints(StompEndpointRegistry registry) {
+        registry.addEndpoint("/ws");
+        registry.addEndpoint("/ws").withSockJS(); //웹소켓을 지원하지 않는 브라우저에 대비
+    }
+}
+```
+
+```java
+@Configuration
+@EnableWebSocketMessageBroker             // WebSocket 메시지 처리를 활성화
+public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {     // 메시지 처리를 구성하기 위해 WebSocketMessageBrokerConfigurer 인터페이스를 구현 (인터페이스에서 정의된 메소드의 구현)
+
+    @Override
+    public void configureMessageBroker(final MessageBrokerRegistry registry) {   // 매개변수 registry 를 사용해서 메시지 브로커의 동작을 구성
+        registry.enableSimpleBroker("/topic"); //  서버가 /topic 이라는 주제로 메세지를 보내면 /topic 을 구독한 클라이언트 에게 브로커가 이를 전달한다.
+        registry.setApplicationDestinationPrefixes("/ws");  // @MessageMapping으로 주석이 달린 메소드에 바인딩(주어진 주소 또는 경로와 특정 메소드를 연결하는 과정)되는 메시지의 접두사를 설정  (클라이언트가 "/ws/some-address"로 메시지를 보내면, 해당 메시지는 @MessageMapping("/some-address")로 주석이 달린 메소드와 연결되어 실행됨)
+    }
+
+    @Override
+    public void registerStompEndpoints(final StompEndpointRegistry registry) {     // 인터페이스에서 정의된 메소드의 구현
+        registry.addEndpoint("/our-websocket").withSockJS();  // /our-websocket"이라는 경로로 클라이언트가 연결할 수 있는 엔드포인트(url)를 등록하는 메소드 이 경로를 통해 서버와 WebSocket 연결을 설정할 수 있다.
+    }
+}
+```
+
+## 3.Message class 생성
+
+![Untitled](<Websocket(%EC%95%8C%EB%A6%BC%EA%B8%B0%EB%8A%A5)/Untitled.png>)
+
+```java
+보낼 메세지, 받아서 출력할 메세지를 프론트에 표시하기 위한 Message, ResponseMessage 클래스를 만들고 getter,setter을 만들어준다
+```
+
+### 보낸 메시지
+
+```java
+public class Message {
+    private String messageContent;
+
+    public String getMessageContent() {
+        return messageContent;
+    }
+
+    public void setMessageContent(String messageContent) {
+        this.messageContent = messageContent;
+    }
+}
+```
+
+### 받아서 출력 메시지
+
+```java
+public class ResponseMessage {
+    private String content;
+
+    public ResponseMessage() {
+    }
+
+    public ResponseMessage(String content) {
+        this.content = content;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
+}
+```
+
+## 4.MessageController 추가
+
+```java
+@Controller
+public class MessageController {
+
+    @MessageMapping("/message")  // 특정 대상(이 경우 "/message")이 있는 수신 WebSocket 메시지를 이 메서드에 매핑
+    @SendTo("/topic/messages")  // 메서드의 반환 값이 전송될 대상을 지정 , 이 경우 응답 메시지는 "/topic/messages" 주제의 모든 구독자에게 전송
+    public ResponseMessage getMessage(final Message message) throws InterruptedException {
+        Thread.sleep(1000);
+        return new ResponseMessage(HtmlUtils.htmlEscape(message.getMessageContent()));  // 메시지 내용을 가져오고 문자를 HTML 표현으로 변환한 다음 내용을 응답 메시지의 내용으로 설정
+    }
+
+}
+```
+
+## 5.WebSocket.js 를 추가
+
+```jsx
+페이지 로딩 시 WebSocket 서버에 연결하고, 버튼을 클릭하여 메시지를 전송하고, 서버로부터 받은 메시지를 화면에 표시하는 기능을 구현한 JavaScript 코드
+```
+
+```jsx
+let stompClient = null // WebSocket 클라이언트 개체를 저장하는 데 사용
+
+$(document).ready(function () {
+  console.log('Index page is ready')
+  connect() // WebSocket 연결을 설정하는 connect() 함수를 호출
+
+  $('#send').click(function () {
+    // ID가 "send"인 요소에 클릭 이벤트 핸들러를 연결
+    sendMessage() // 결과적으로 "send" 요소를 클릭할 때 sendMessage() 함수를 호출
+  })
+})
+
+function connect() {
+  // connect() 함수의 정의를 시작
+  let socket = new SockJS('/our-websocket') // WebSocket 엔드포인트(이 경우 "/our-websocket")을 나타내는 새 SockJS 개체를 만듬
+  stompClient = Stomp.over(socket) // Stomp.over() 메서드를 사용하여 socket 객체를 매개변수로 전달하여 Stomp 클라이언트 객체를 생성
+  stompClient.connect({}, function (frame) {
+    // stompClient 개체의 connect() 메서드를 사용하여 WebSocket 서버에 대한 연결을 시작
+    console.log('Connected: ' + frame)
+    stompClient.subscribe('/topic/messages', function (message) {
+      // stompClient 개체의 subscribe() 메서드를 사용하여 "/topic/messages" 대상을 구독
+      showMessage(JSON.parse(message.body).content) // 수신된 메시지에서 JSON 형식을 오브젝트로 변환, 메시지 콘텐츠에 포함된 'content' 속성을 추출 , showMessage() 함수를 호출하여 추출된 메시지 내용을 인수로 전달
+    })
+  })
+}
+
+function showMessage(message) {
+  $('#messages').append('<tr><td>' + message + '</td></tr>') // ID가 "messages"인 요소로. 수신된 message 콘텐츠를 포함하는 테이블 셀(<td>)을 추가
+}
+
+function sendMessage() {
+  console.log('sending message')
+  stompClient.send('/ws/message', {}, JSON.stringify({ messageContent: $('#message').val() })) // 사용자가 입력한 메시지 내용을 포함하여 "/ws/message" 대상으로 메시지를 보냄. 메시지는 JSON 문자열로 준비되며 stompClient 개체의 send() 메서드를 사용하여 전송됨
+}
+```
+
+## 6.웹 소켓을 사용하기 위해 script 추가
+
+```jsx
+상단에 웹 소켓을 사용하기 위해 scrpit 를 추가해준다
+```
+
+```jsx
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="/webjars/sockjs-client/sockjs.min.js"></script>
+<script src="/webjars/stomp-websocket/stomp.min.js"></script>
+<script src="/js/webSocket.js"></script>
+```
+
+## 7.출력, 발송 jsp
+
+```jsx
+//발송
+        <div class="row">
+            <div class="col-md-12">
+                <form class="form-inline">
+                    <div class="form-group">
+                        <label for="message">Message</label>
+                        <input type="text" id="message" class="form-control" placeholder="Enter your message here...">
+                    </div>
+                    <button id="send" class="btn btn-default" type="button">Send</button>
+                </form>
+            </div>
+        </div>
+```
+
+```jsx
+//출력
+<div class="row">
+  <div class="col-md-12">
+    <table id="message-history" class="table-striped table">
+      <thead>
+        <tr>
+          <th>Messages</th>
+        </tr>
+      </thead>
+      <tbody id="messages"></tbody>
+    </table>
+  </div>
+</div>
+```
+
+## 다른 방법 (RestController 와 SimpMessagingTemplate 사용)
+
+![Untitled](<Websocket(%EC%95%8C%EB%A6%BC%EA%B8%B0%EB%8A%A5)/Untitled%201.png>)
+
+```jsx
+웹 소켓을 사용하는 다른 방법을 알아본다.
+```
+
+## 1.WSService 추가
+
+```jsx
+WebSocket을 사용하여 연결된 클라이언트에 메시지를 보낼 수 있는 'WSService' 클래스를 정의
+
+메시지는 ResponseMessage라는 특정 형식으로 변환. 그런 다음 이 변환된 메시지는 메시지 수신을 신청한 클라이언트를 나타내는 /topic/messages라는 대상으로 전송
+```
+
+```jsx
+@Service
+public class WSService {
+
+    private final SimpMessagingTemplate messagingTemplate;   // 서버가 WebSocket 프로토콜을 사용하여 연결된 클라이언트에 메시지를 보낼 수 있도록 하는 도구 또는 템플릿 역할을 함
+
+    @Autowired
+    public WSService(SimpMessagingTemplate messagingTemplate) {
+        this.messagingTemplate = messagingTemplate;
+    }
+
+    public void notifyFrontend(final String message) {
+        ResponseMessage response = new ResponseMessage(message); // message 매개변수를 사용하여 새로운 ResponseMessage 객체를 생성
+
+        messagingTemplate.convertAndSend("/topic/messages", response);  // 메시징 템플릿(messagingTemplate)을 통해 메시지가 전송될 곳을 지정, 클라이언트가 "/topic/messages" 주소에 연결되어 있다면, 서버에서 전송하는 메시지를 수신할 수 있게 됨
+																																			  // 즉 "/topic/messages"는 서버와 클라이언트 간의 양방향 통신을 위한 메시지 전송 경로를 나타내는 것
+    }
+
+}
+```
+
+## 2.WSController 추가
+
+```jsx
+이 컨트롤러를 사용하면 클라이언트가 /send-message 엔드 포인트 에 POST 요청을 만들어 메시지를 보낼 수 있다.
+
+메시지 콘텐츠는 요청에서 추출되어 WebSocket을 통해 연결된 클라이언트에 메시지를 보내는 실제 프로세스를 처리하는 'WSService' 클래스로 전달됨
+```
+
+```jsx
+@RestController
+public class WSController {
+
+    @Autowired
+    private WSService service;
+
+    @PostMapping("/send-message") // HTTP POST 요청을 통해 메시지를 보내는 엔드포인트(url 경로) 즉 요청 메시지에서 내용을 추출하고, 추출한 내용을 WSService 클래스의 notifyFrontend() 메서드에 전달하여 메시지를 전달합
+    public void sendMessage(@RequestBody final Message message) {
+        service.notifyFrontend(message.getMessageContent()); // sendMessage() 메서드가 호출되면. 요청 메세지에서 콘텐츠를 추출하고 메시지를 보내는 작업을 WSService 클래스의 notifyFrontend() 메서드에 위임
+    }
+}
+```
+
+# 알림 사용자 식별 기능 추가
+
+## 1.임의 사용자 id만들기 (시큐리티가 없을때 사용하기 위해서) \*필수는 아님
+
+```jsx
+예제에서는 시큐리티를 적용하기 전이여서 임의로 사용자 id 를 만들어 보내기 위해서 아래와 같은 임의의 유저를 만들어주는 기능을 추가하였다
+```
+
+```jsx
+import com.sun.security.auth.UserPrincipal;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.server.ServerHttpRequest;
+import org.springframework.web.socket.WebSocketHandler;
+import org.springframework.web.socket.server.support.DefaultHandshakeHandler;
+
+import java.security.Principal;
+import java.util.Map;
+import java.util.UUID;
+
+public class UserHandshakeHandler extends DefaultHandshakeHandler {   // WebSocket 라이브러리의 일부인 DefaultHandshakeHandler 클래스를 상속
+    private final Logger LOG = LoggerFactory.getLogger(UserHandshakeHandler.class); // Logger 은 로그 메세지를 작성하는데 사용되는 클래스다
+    // LoggerFactory 클래스의 getLogger 메서드를 사용하여 UserHandshakeHandler 클래스에 대한 로거를 만듬
+
+    @Override
+    protected Principal determineUser(ServerHttpRequest request, WebSocketHandler wsHandler, Map<String, Object> attributes) {  // DefaultHandshakeHandler의 메서드를 재정의함을 의미. 'determineUser' 메서드는 WebSocket 핸드셰이크와 관련된 사용자를 결정
+        final String randomId = UUID.randomUUID().toString();  // UUID.randomUUID() 메서드를 사용하여 임의의 ID 생성, ID는 toString() 메서드를 사용하여 문자열로 변환
+        LOG.info("User with ID '{}' opened the page", randomId); // 여기서 '{}'는 randomId 값으로 대체될 자리 표시자
+
+        return new UserPrincipal(randomId);
+    }
+}
+```
+
+## 2.MessageController 수정
+
+```java
+@Controller
+public class MessageController {
+
+    @MessageMapping("/message") // 클라이언트로부터 "/message" 주소로 메시지가 도착했을 때 이 메서드가 실행
+    @SendTo("/topic/messages") // 클라이언트가 "/topic/messages" 주소를 구독하고 있다면, 해당 메시지를 수신할 수 있음
+    public ResponseMessage getMessage(final Message message) throws InterruptedException {
+        Thread.sleep(1000);
+        return new ResponseMessage(HtmlUtils.htmlEscape(message.getMessageContent()));
+    }
+
+    @MessageMapping("/private-message")  // 클라이언트로부터 "/private-message" 주소로 프라이빗 메시지가 도착했을 때 이 메서드가 실행
+    @SendToUser("/topic/private-messages")  // 이 메서드에서 반환되는 값을 해당 사용자의 "/topic/private-messages" 주소로 보냄   SendToUser 이 어노테이션은 메시지를 특정 사용자에게 전송하는 역할
+    public ResponseMessage getPrivateMessage(final Message message,
+                                             final Principal principal) throws InterruptedException {
+        Thread.sleep(1000);
+        return new ResponseMessage(HtmlUtils.htmlEscape( // htmlEscape 메시지 내용을 HTML 이스케이프(escape)하여 특수문자를 변환하는 역할을 함. 이 함수는 보안과 데이터의 무결성을 위해 사용, 메시지 내용에 HTML 태그가 포함되어 있으면 태그를 제거하거나 변환하여 악성 스크립트의 실행을 방지하고, 메시지를 안전하게 표시
+                "Sending private message to user " + principal.getName() + ": " // 프라이빗 메시지 내용을 생성하는 부분
+                        + message.getMessageContent())
+        );
+    }
+}
+```
+
+## 3.WebSocket.js
+
+```java
+수정 페이지 로딩 시 WebSocket 서버에 연결하고, 버튼을 클릭하여 메시지를 전송하고, 서버로부터 받은 메시지를 화면에 표시하는 기능을 구현한 JavaScript 코드
+```
+
+```jsx
+let stompClient = null
+
+$(document).ready(function () {
+  console.log('Index page is ready')
+  connect()
+
+  $('#send').click(function () {
+    sendMessage()
+  })
+
+  $('#send-private').click(function () {
+    // #send-private 버튼을 클릭했을 때 이벤트가 발생하도록 추가
+    sendPrivateMessage()
+  })
+})
+
+function connect() {
+  let socket = new SockJS('/our-websocket')
+  stompClient = Stomp.over(socket)
+  stompClient.connect({}, function (frame) {
+    console.log('Connected: ' + frame)
+
+    stompClient.subscribe('/topic/messages', function (message) {
+      // stompClient 개체의 subscribe() 메서드를 사용하여 "/topic/messages" 을 클라이언트가 구독
+      showMessage(JSON.parse(message.body).content)
+    })
+
+    stompClient.subscribe('/user/topic/private-messages', function (message) {
+      // stompClient 개체의 subscribe() 메서드를 사용하여 "/topic/private-messages" 을 클라이언트가 구독  (앞의 /user/ 은 유저를 대상으로 전달하기 때문에 붙여준다
+      showMessage(JSON.parse(message.body).content)
+    })
+  })
+}
+
+function showMessage(message) {
+  $('#messages').append('<tr><td>' + message + '</td></tr>')
+}
+
+function sendMessage() {
+  console.log('sending message')
+  stompClient.send('/ws/message', {}, JSON.stringify({ messageContent: $('#message').val() }))
+}
+
+function sendPrivateMessage() {
+  // 프라이빗 메시지를 서버로 보내는 함수, stompClient 객체를 사용하여 "/ws/private-message" 주소로 메시지를 전송
+  console.log('sending private message')
+  stompClient.send(
+    '/ws/private-message',
+    {},
+    JSON.stringify({ messageContent: $('#private-message').val() })
+  )
+}
+```
+
+## 4.jsp 추가
+
+```jsx
+        <div class="row">
+            <div class="col-md-12">
+                <form class="form-inline">
+                    <div class="form-group">
+                        <label for="message">Message</label>
+                        <input type="text" id="message" class="form-control" placeholder="Enter your message here...">
+                    </div>
+                    <button id="send" class="btn btn-default" type="button">Send</button>
+                </form>
+            </div>
+        </div>
+        <div class="row" style="margin-top: 10px">
+            <div class="col-md-12">
+                <form class="form-inline">
+                    <div class="form-group">
+                        <label for="private-message">Private Message</label>
+                        <input type="text" id="private-message" class="form-control" placeholder="Enter your message here...">
+                    </div>
+                    <button id="send-private" class="btn btn-default" type="button">Send Private Message</button>
+                </form>
+            </div>
+        </div>
+```
+
+## 5.WSController 수정
+
+```java
+@RestController
+public class WSController {
+
+    @Autowired
+    private WSService service;
+
+    @PostMapping("/send-message")
+    public void sendMessage(@RequestBody final Message message) {
+        service.notifyFrontend(message.getMessageContent());
+    }
+
+    @PostMapping("/send-private-message/{id}")  // {id}는 경로 변수 자리 표시자로서 id의 값이 URL 자체에서 추출됨을 의미, URL이 /send-private-message/123인 경우 id 값은 "123"이 됨
+    public void sendPrivateMessage(@PathVariable final String id, // @PathVariable은 URL의 {id} 값을 메소드의 id 매개변수에 바인딩하는 데 사용되는 주석 (바인딩은 url 또는 값을 매개 변수에 연결)
+                                   @RequestBody final Message message) {
+        service.notifyUser(id, message.getMessageContent());
+    }
+}
+```
+
+## 6.WSService 수정
+
+```java
+@Service
+public class WSService {
+
+    private final SimpMessagingTemplate messagingTemplate;
+
+    @Autowired
+    public WSService(SimpMessagingTemplate messagingTemplate) {
+        this.messagingTemplate = messagingTemplate;
+    }
+
+    public void notifyFrontend(final String message) {
+        ResponseMessage response = new ResponseMessage(message);
+        messagingTemplate.convertAndSend("/topic/messages", response);
+    }
+
+    public void notifyUser(final String id, final String message) {
+        ResponseMessage response = new ResponseMessage(message);
+	        messagingTemplate.convertAndSendToUser(id, "/topic/private-messages", response);
+    }
+}
+```

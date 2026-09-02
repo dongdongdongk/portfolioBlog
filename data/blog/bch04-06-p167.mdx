@@ -1,0 +1,345 @@
+---
+title: 'BCh04 06 p167 목록 데이터처리'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# Service 등록 테스트
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381210/notion-blog/_/_/_/_/BCh04_06_p167_/Untitled.png)
+
+```java
+package org.zerock.guestbook.service;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.zerock.guestbook.dto.GuestbookDTO;
+
+@SpringBootTest
+public class GuestbookServiceTests {
+
+    @Autowired
+    GuestbookService service;
+
+    @Test
+    public void testRegister() {
+
+        GuestbookDTO guestbookDTO = GuestbookDTO.builder()
+                .title("Sample Title........")
+                .content("Sample Content........")
+                .writer("user0")
+                .build();
+        System.out.println(service.register(guestbookDTO));
+    }
+
+}
+```
+
+```java
+Guestbook 등록 테스트를 진행한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381207/notion-blog/_/_/_/_/BCh04_06_p167_/Untitled_1.png)
+
+# 목록 처리
+
+```java
+* 화면에서 필요한 목록 데이터에 대한 DTO 생성
+
+* DTO를 Pageable 타입으로 전환
+
+* Page<Entity> 를 화면에서 사용하기 쉬운 DTO의 리스트 등으로 변환
+
+* 화면에 필요한 페이지 번호 처리
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381209/notion-blog/_/_/_/_/BCh04_06_p167_/Untitled_2.png)
+
+## 목록을 처리하는 DTO
+
+```java
+레파지토리에서 결과는 Entity 타입으로 나온다 이를 화면단에 사용하기 위해 DTO 로 변환해야한다
+
+그리고 화면단에서 DTO 타입으로 파라미터를 받을것인데
+
+이를 레파지토리로 전달할땐 Pageable 타입으로 전달하기 위해서 DTO 를 Entity 타입으로 바꿔줘야 한다
+```
+
+## 페이지 요청 처리 DTO(PageRequestDTO)
+
+```java
+Page<Guestbook> 을 GuestBookDTO 타입으로 변환 시켜줘야한다
+
+페이지 번호 검색 조건등의 처리는 PageRequestDTO 라는 별도의 DTO 를 작성해서 처리한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381209/notion-blog/_/_/_/_/BCh04_06_p167_/Untitled_3.png)
+
+```java
+package org.zerock.guestbook.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+
+@Builder
+@AllArgsConstructor
+@Data
+public class PageRequestDTO {
+
+    private int page;
+    private  int size;
+
+    public PageRequestDTO() {
+        this.page = 1;
+        this.size = 10;
+    }
+
+    public Pageable getPageable(Sort sort) { // 정렬은 다양한 상황에 쓰기 위해 별도의 파라미터를 받아서 사용하도록 설계
+
+        return PageRequest.of(page -1, size, sort); // 0 부터 시작하기 때문에 Page -1 로 설계
+
+    }
+}
+```
+
+```java
+(Controller에서 Service로 전달할 때 사용)
+
+PageRequestDTO 는 화면에 전달되는 page 라는 파라미터와 size 라는 파라미터를 수집하는 역할을 한다
+
+그리고 나중에 서비스에서 PageRequest.of 를 하여 정렬을 해줘야 하기 때문에 정렬 조건을 만들어서(sort) 넣어서 보내주도록 만들었다
+
+(정렬 조건은 나중에 다시 설정할수도 있으니까)
+
+PageRequestDTO 의 진짜 목적은 JPA 쪽에서 사용하는 Pageable 타입의 객체를 생성하는 것이다. (위에 마지막에 생성자가 있는거 보이나?)
+
+( 페이지 번호등은 기본값을 가지는 것이 좋기 때문에 1과 10이 라는 값을 이용한다
+
+나중에 수정의 여지가 있기는하지만(페이지 번호에 음수)
+
+JPA를 이용하는 경우 페이지 번호가 0 부터 시작한다는 점을 감안해 page -1 을 하는 형태로 작성한다
+
+정렬은 나중에 다양한 상황에서 쓰기 위해서 별도의 파라미터로 받도록 설계 되어있다 )
+```
+
+## 페이지 결과 처리 DTO(PageResultDTO)
+
+```java
+JPA를 이용하는 Repository 에서는 페이지 처리 결과를 Page<Entity> 타입으로 반환하게 된다
+
+따라서 서비스 계층에서 이를 처리하기 위해서는(DTO 를 사용하기 때문에) 별도의 클래스를 만들어서 처리 해야한다
+
+(뒤에서(레포지터리에서) 화면단으로 이동할 때 사용)
+
+* Page<Entity> 의 엔티티 객체들을 DTO 객체로 변환해서 자료 구조로 담아 주어야 한다
+
+* 화면 출력에 필요한 페이지 정보들을 구성해 주어야 한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381209/notion-blog/_/_/_/_/BCh04_06_p167_/Untitled_4.png)
+
+```java
+package org.zerock.guestbook.dto;
+
+import lombok.Data;
+import org.springframework.data.domain.Page;
+
+import java.util.List;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+@Data
+public class PageResultDTO<DTO, EN> { // 제네릭 클래스이다. <DTO, EN>는 두 개의 제네릭 타입 매개변수를 가지며, PageResultDTO 클래스를 사용할 때 실제 DTO 및 EN 유형을 지정할 수 있다
+
+    private List<DTO> dtoList; // DTO 목록을 저장하는 필드 이 필드는 엔티티를 변환하여 저장하는데 사용
+
+    public PageResultDTO(Page<EN> result, Function<EN, DTO> fn) { // Page<En> result 는 JPA 레파지토리에서 나온 결과이고 Function <EN, DTO> fn 는 로직을 전달하는거다 (Entity에서 DTO 로 변환하는)
+
+        dtoList = result.stream().map(fn).collect(Collectors.toList());
+
+				// 위에서 전달받은 함수를 (fn) 를 이용해서 (Entity -> DTO) 결과를 매핑해주고 collect 로 모아서 dtoList로 처리
+
+				// result.stream(): 페이지의 엔티티 목록을 스트림으로 변환
+				// map(fn): Function<EN, DTO> fn 함수를 사용하여 각 엔티티를 DTO로 매핑
+				// collect(Collectors.toList()): 스트림을 리스트로 수집하여 DTO 목록을 생성
+
+    }
+}
+```
+
+```java
+PageResultDTO 클래스는 다양한 곳에서 사용할 수 있도록 제네릭 타입을 이용해서 DTO 와 EN 이라는 타입을 지정한다 (DTO 와 EN 은 임의로 지은거일 뿐 어떤것이든 가능하다 <aaa,kkk>
+
+제네릭 클래스는 어떤 타입이든 받을 수 있다 단지 여기서는 DTO, EN 으로 임의로 이름만 지정해준것)
+
+(말 그대로 DTO 와 Entity 타입을 의미한다)
+
+PageResultDTO 는 Page<Entity> 타입을 이용해서 생성할 수 있도록 생성자로 작성한다
+
+이때 특별한 Function<EN,DTO> 는 엔티티 객체들을 DTO 로 변환해 주는 기능이다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381209/notion-blog/_/_/_/_/BCh04_06_p167_/Untitled_5.png)
+
+```java
+위와 같은 구조를 이용하면 나중에 어떤 종류의 Page<E> 타입이 생성 되더라도 PageResultDTO 를 이용해서 처리할 수 있다는 장점이 있다
+
+다양한 상황에서 사용하기 위해서 타입은 제네릭으로 처리하고 java.util.Function 을 이용해서 유연한 구조로 처리한다
+```
+
+제네릭 클래스
+
+[[Java 8 함수형 인터페이스](https://bcp0109.tistory.com/313)](../../../JAVA/%EC%9E%90%EB%B0%94/Java%208%20%ED%95%A8%EC%88%98%ED%98%95%20%EC%9D%B8%ED%84%B0%ED%8E%98%EC%9D%B4%EC%8A%A4%20da7b9b9f040049ac97560a7ca2c2ec2f.md)
+
+## 서비스 계층에서 목록 처리
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381210/notion-blog/_/_/_/_/BCh04_06_p167_/Untitled_6.png)
+
+```java
+package org.zerock.guestbook.service;
+
+import org.zerock.guestbook.dto.GuestbookDTO;
+import org.zerock.guestbook.dto.PageRequestDTO;
+import org.zerock.guestbook.dto.PageResultDTO;
+import org.zerock.guestbook.entity.Guestbook;
+
+public interface GuestbookService {
+    Long register(GuestbookDTO dto);
+
+    PageResultDTO<GuestbookDTO, Guestbook> getList(PageRequestDTO requestDTO);
+
+
+	 default Guestbook dtoToEntity(GuestbookDTO dto) {
+        Guestbook entity = Guestbook.builder()
+                .gno(dto.getGno())
+                .title(dto.getTitle())
+                .content(dto.getContent())
+                .writer(dto.getWriter())
+                .build();
+        return entity;
+    }
+
+    default GuestbookDTO entityToDto(Guestbook entity) {
+        GuestbookDTO dto = GuestbookDTO.builder()
+                .gno(entity.getGno())
+                .title(entity.getTitle())
+                .content(entity.getContent())
+                .writer(entity.getWriter())
+                .regDate(entity.getRegDate())
+                .modDate(entity.getModDate())
+                .build();
+        return dto;
+    }
+}
+```
+
+```java
+
+```
+
+## 이 책에서 DTO 변환 방식
+
+```java
+PageResultDTO 는 List<DTO> 타입으로 DTO 객체들을 보관한다
+
+그렇다면 Page<Entity>의 내용물중에서 엔티티 객체를 DTO로 변환하는 기능이 필요하다
+
+가장 일반적인 형태는 추상 클래스를 이용해서 처리하는 방식이지만 이 경우 매번 새로운 클래스가 필요하다는 단점이 있다
+
+이 책에서 엔티티 객체의 DTO 변환은 서비스 인터페이스에 정의한 entityToDTO() 와 별도의 Function 객체를 만들어서 처리한다
+```
+
+## 서비스 계층에서는 목록 처리
+
+```java
+서비스 계층에서는 PageRequestDTO 를 파라미터로 , PageResultDTO를 리턴 타입으로
+
+사용하는 getList() 메서드를 설계하고
+
+엔티티 객체를 DTO 객체로 변환하는 entityToDto() 를 정의한다
+```
+
+# 지금까지 흐름 한번 정리
+
+## 1. Test로 PageRequestDTO 내용 입력
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381210/notion-blog/_/_/_/_/BCh04_06_p167_/Untitled_7.png)
+
+```java
+PageRequestDTO 는 페이지 목록을 요청할 때 쓰는 객체로 페이지 번호, 목록 개수, 검색 조건 등이 들어가 있다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381210/notion-blog/_/_/_/_/BCh04_06_p167_/Untitled_8.png)
+
+```java
+PageRequestDTO 객체를 만들고 ( PageRequestDTO pageRequestDTO = PageRequestDTO.builder().page(1).size(10).build(); )
+
+방금 만든 DTO 객체를 PageResultDTO 에 파라미터로 넣어줘 resultDTO 를 만들어 준다 (서비스 호출 부분은 아래에서 계속)
+```
+
+## 2. pageRequestDTO 객체를 이용하여 PageResultDTO 객체 생성 (서비스 호출)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381210/notion-blog/_/_/_/_/BCh04_06_p167_/Untitled_9.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381208/notion-blog/_/_/_/_/BCh04_06_p167_/Untitled_10.png)
+
+```java
+PageResultDTO 는 제네릭 클래스로 만들어졌으며 <DTO, EN> DTO 와 Entity 타입 두개의 매개변수를 가기며
+
+클래스를 사용할 떄 DTO 및 EN 유형을 지정할 수 있다( PageResultDTO<GuestbookDTO,Guestbook )
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381208/notion-blog/_/_/_/_/BCh04_06_p167_/Untitled_11.png)
+
+```java
+위의 테스트에서 service 를 호출하고 getList 메서드를 사용한다
+
+서비스(인터페이스) 에서는 Function 에서 사용할 메서드를 작성해놨다 getList 를 오버라이딩 해서 서비스 Impl 에서 사용한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381208/notion-blog/_/_/_/_/BCh04_06_p167_/Untitled_12.png)
+
+```java
+
+* Pageable pageable = requestDTO.getPageable(Sort.by("gno").descending());
+
+	Pageable 객체 생성
+
+	PageRequestDTO 객체 requestDTO를 사용하여 페이지 요청 정보를 처리
+
+	getPageable 메서드는 페이지 번호, 페이지 크기, 정렬 방식을 설정한 Pageable 객체를 생성
+
+* Page<Guestbook> result = repository.findAll(pageable);
+
+	Pageable 객체를 사용하여 게시물 목록을 조회한다.
+
+	repository에서 findAll(pageable)을 호출하면 페이지 요청에 맞는 게시물 목록이 조회되어 Page<Guestbook> 객체로 반환
+
+* Function<Guestbook, GuestbookDTO> fn = (entity -> entityToDto(entity));
+
+	Function<Guestbook, GuestbookDTO>는 Guestbook 타입의 입력을 받아 GuestbookDTO 타입의 출력을 생성하는 함수를 정의
+
+	entityToDto(entity) 부분은 함수의 본문으로( = 해서 이후 내용이란거)
+
+	, entity라는 입력(Gestbook 타입) 을 entityToDto 메서드를 호출하여(인터페이스에서)  GuestbookDTO로 변환
+
+* new PageResultDTO<>(result, fn)
+
+	 new PageResultDTO<>(result, fn)를 호출하여 PageResultDTO 객체를 생성 (생성자 코드 확인해봐라 )
+
+	 생성자에 전달된 result와 fn이 객체 내부 필드에 할당 ( 아래 코드를 참고) 그리고 dtoList를 생성한다 (result 는 Page<Guestbook> fn 은 Stream 의 map 에 사용되서 엔티티를 DTO 로 바꿔준다 )
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381208/notion-blog/_/_/_/_/BCh04_06_p167_/Untitled_13.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381208/notion-blog/_/_/_/_/BCh04_06_p167_/Untitled_14.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381209/notion-blog/_/_/_/_/BCh04_06_p167_/Untitled_15.png)

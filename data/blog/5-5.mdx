@@ -1,0 +1,1946 @@
+---
+title: '5'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 🎮 Yaw (요) 제어 구현하기 }
+
+## 🎯 목표
+
+전투기 좌우 회전(Yaw) 조종 구현
+
+- E 키: 오른쪽 회전
+- Q 키: 왼쪽 회전
+- Rudder(방향타) 사용
+
+---
+
+## 💡 핵심 개념: Yaw란?
+
+### 3가지 회전축 완성
+
+```
+Pitch (Y축): 상하 회전 ✅
+Roll (X축): 굴림 회전 ✅
+Yaw (Z축): 좌우 회전 ✅ (이번 강의)
+```
+
+**Yaw 비유:**
+
+```
+비행기를 위에서 봤을 때
+  ↓
+기수가 왼쪽/오른쪽으로 회전
+  ↓
+헬리콥터의 꼬리 로터와 유사
+```
+
+---
+
+## 🔧 1단계: Rudder(방향타) 확인
+
+### Skeletal Mesh에서 찾기
+
+```
+F18_Skeletal_Mesh 열기
+  ↓
+검색: "rudder"
+  ↓
+발견: Rudder 뼈대
+  ↓
+Z축 회전 테스트 (파란색 축)
+```
+
+**Rudder란?**
+
+```
+위치: 꼬리 수직 날개
+역할: 좌우 회전 제어
+회전축: Z축 (Yaw) ✅
+```
+
+---
+
+## 🔧 2단계: Input Action 생성
+
+### IA_Yaw 생성
+
+```
+Input 폴더 → 우클릭
+  ↓
+Input → Input Action
+  ↓
+이름: IA_Yaw
+```
+
+### Value Type 설정
+
+```
+IA_Yaw 더블클릭
+  ↓
+Value Type: Axis1D
+  ↓
+저장 & 닫기
+```
+
+---
+
+## 🔧 3단계: IMC 매핑
+
+### E 키 매핑
+
+```
+IMC_FighterJet 열기
+  ↓
++ Mapping → IA_Yaw
+  ↓
+키: E
+  ↓
+기본값: 1.0 (오른쪽 회전)
+```
+
+### Q 키 매핑 (음수)
+
+```
++ 버튼으로 추가 매핑
+  ↓
+키: Q
+  ↓
+Modifiers → + Add → Negate
+  ↓
+값: -1.0 (왼쪽 회전)
+```
+
+---
+
+## 🔧 4단계: Blueprint 구성
+
+### Triggered 이벤트
+
+```
+[IA_Yaw] Triggered
+  ↓
+[Set Yaw Input]
+  ├─ Target: Vehicle Movement Component
+  └─ Yaw: Action Value
+```
+
+### 첫 번째 테스트
+
+```
+게임 실행 → 이륙
+  ↓
+E 키 누름:
+  오른쪽으로 회전 ✅
+  ↓
+하지만 E 떼도:
+  계속 회전 ❌
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380605/notion-blog/_/_/BG/5/image.png)
+
+---
+
+## 🔧 5단계: Completed 이벤트 추가
+
+### 중립 복귀
+
+```
+[IA_Yaw] Completed
+  ↓
+[Set Yaw Input]
+  ├─ Target: Vehicle Movement Component
+  └─ Yaw: 0.0
+```
+
+---
+
+## ⚠️ 발견된 문제
+
+### Rudder가 움직이지 않음
+
+```
+E/Q 입력:
+  비행기는 회전함 ✅
+  ↓
+하지만:
+  Rudder는 정지 상태 ❌
+  ↓
+시각적 피드백 없음
+```
+
+---
+
+## 📝 현재 상태 정리
+
+### 구현 완료
+
+```
+✅ IA_Yaw 생성
+✅ E/Q 키 매핑
+✅ Set Yaw Input
+✅ Completed로 중립 복귀
+✅ 좌우 회전 작동
+```
+
+### 미완성
+
+```
+⏳ Rudder 애니메이션 없음
+⏳ 부드러운 변화 없음 (스냅)
+⏳ FInterp To 미적용
+⏳ Timeline 미적용
+```
+
+---
+
+## 💡 Pitch/Roll/Yaw 비교
+
+### 완전히 동일한 패턴!
+
+```
+공통 구조:
+  1. Input Action (Axis1D)
+  2. IMC 매핑 (하나는 Negate)
+  3. Set Input (Triggered)
+  4. 0으로 복귀 (Completed)
+
+차이점:
+  - Pitch: W/S, Set Pitch Input
+  - Roll: A/D, Set Roll Input
+  - Yaw: E/Q, Set Yaw Input ✅
+```
+
+---
+
+## 🎯 핵심 요약
+
+**Yaw 기본 구현 완료:**
+
+```
+✅ IA_Yaw (Axis1D)
+✅ E: +1.0 / Q: -1.0
+✅ Set Yaw Input
+✅ Completed 중립 복귀
+✅ 좌우 회전 가능
+```
+
+**다음 단계:**
+
+```
+1. Yaw_Value 변수 추가
+2. Rudder 애니메이션
+3. FInterp To (부드럽게)
+4. Timeline (중립 복귀)
+```
+
+기본 **Yaw 제어 작동** 완료! (시각화만 남음) 🛩️
+
+# { 🎮 Rudder(방향타) 애니메이션 구현하기 }
+
+## 🎯 목표
+
+Yaw 조작 시 Rudder가 실제로 움직이도록 구현
+
+- 좌우 Rudder 회전
+- Rotation Z (Yaw) 축 사용
+- 적절한 각도 조정
+
+---
+
+## 🔧 1단계: BP_F18에 Yaw_Value 변수 생성
+
+### 변수 생성 및 저장
+
+```
+BP_F18 → Variables
+  ↓
++ 버튼
+  ↓
+이름: Yaw_Value
+타입: Float
+```
+
+### IA_Yaw에 연결
+
+```
+[IA_Yaw] Triggered
+  ↓
+Action Value
+  ├────────────────────┐
+  ↓                    ↓
+[SET] Yaw_Value     [Set Yaw Input]
+  (Alt 드래그)        (엔진 제어)
+
+[IA_Yaw] Completed
+  ↓
+[SET] Yaw_Value: 0.0
+  ↓
+[Set Yaw Input]: 0.0
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380602/notion-blog/_/_/BG/5/image_1.png)
+
+---
+
+## 🔧 2단계: ABP_F18 Event Graph에서 가져오기
+
+### Update Animation에 추가
+
+```
+[Event Blueprint Update Animation]
+  ↓
+[Is Valid] 체크 후
+  ↓
+[GET] BP_F18
+  ├─ [Get Pitch Value] → [SET] Pitch_Value
+  ├─ [Get Roll Value] → [SET] Roll_Value
+  └─ [Get Yaw Value] → [SET] Yaw_Value (추가!)
+```
+
+**Promote to Variable:**
+
+```
+Get Yaw Value 우클릭
+  ↓
+Promote to Variable
+  ↓
+이름: Yaw_Value (ABP_F18의 변수)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380603/notion-blog/_/_/BG/5/image_2.png)
+
+---
+
+## 🔧 3단계: AnimGraph에 주석 추가 (정리)
+
+### 기존 노드에 주석
+
+```
+Pitch 노드들 선택
+  ↓
+C 키 누르기
+  ↓
+이름: "PITCH"
+
+Roll 노드들 선택
+  ↓
+C 키 누르기
+  ↓
+이름: "ROLL"
+```
+
+**주석 단축키:**
+
+```
+노드 선택 → C 키
+  ↓
+빠른 주석 생성 ✅
+
+관리하기 쉬워짐!
+```
+
+---
+
+## 🔧 4단계: Rudder 노드 추가
+
+### 노드 복제
+
+```
+기존 노드 2개 선택
+  ↓
+Ctrl + C → Ctrl + V
+  ↓
+연결:
+  이전 노드 → 새 Rudder 노드들 → Output
+```
+
+### Bone 설정
+
+**왼쪽 Rudder:**
+
+```
+Transform (Modify) Bone
+  ├─ Bone: lf_rudder_jnt
+  └─ Rotation Z (Yaw): ? (설정 예정)
+```
+
+**오른쪽 Rudder:**
+
+```
+Transform (Modify) Bone
+  ├─ Bone: rt_rudder_jnt
+  └─ Rotation Z (Yaw): ? (설정 예정)
+```
+
+**왜 Rotation Z인가?**
+
+```
+Pitch: Rotation Y (상하)
+Roll: Rotation Y (Elevator/Aileron)
+Yaw: Rotation Z (좌우) ✅
+
+Z축 = 파란색 축
+  ↓
+Rudder의 올바른 회전축
+```
+
+---
+
+## 🔧 5단계: Yaw_Value 연결 및 각도 조정
+
+### 첫 번째 시도 (× 50)
+
+```
+[GET] Yaw_Value
+  ↓
+[Multiply] × 50
+  ↓
+양쪽 Rudder의 Rotation Z에 연결
+```
+
+### Anim Preview Editor에서 테스트
+
+```
+Window → Anim Preview Editor
+  ↓
+Yaw_Value 슬라이더 조절
+  ↓
+Rudder 움직임 확인
+  ↓
+좌우로 회전 ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380603/notion-blog/_/_/BG/5/image_3.png)
+
+---
+
+## 🔧 6단계: 게임 테스트 및 방향 수정
+
+### 첫 번째 테스트
+
+```
+게임 실행 → 이륙
+  ↓
+E 키 누름
+  ↓
+결과: Rudder 움직임 확인
+  ↓
+하지만 방향이 반대일 수 있음 ❌
+```
+
+### 방향 반전 (× -50)
+
+```
+문제:
+  E 키 누름 → Rudder가 반대 방향
+
+해결:
+  × 50 → × -50 (음수로 변경)
+  ↓
+  방향 반전 ✅
+```
+
+---
+
+## 🔧 7단계: 각도 미세 조정
+
+### 50은 너무 큼
+
+```
+× -50:
+  너무 과도한 회전
+  ↓
+  비현실적
+
+× -25:
+  조금 작음
+  ↓
+  테스트 필요
+
+× -30:
+  적당함 ✅
+  ↓
+  최종 선택
+```
+
+### 최종 설정
+
+```
+양쪽 Rudder:
+  [Yaw_Value] × -30
+  ↓
+  [Transform (Modify) Bone]
+    └─ Rotation Z (Yaw)
+```
+
+**각도 선택 기준:**
+
+```
+너무 작으면:
+  - 움직임이 잘 안 보임
+  - 효과 미미
+
+너무 크면:
+  - 과도한 회전
+  - 비현실적
+
+적당히 (30도 내외):
+  - 명확한 움직임 ✅
+  - 현실적
+```
+
+---
+
+## 📝 최종 AnimGraph 구조
+
+### 전체 노드 배치
+
+```
+Wheel Controller
+  ↓
+PITCH (주석):
+  6개 Transform (Modify) Bone
+  └─ Pitch_Value 사용
+
+ROLL (주석):
+  6개 Transform (Modify) Bone
+  └─ Roll_Value 사용
+
+YAW (주석):
+  2개 Transform (Modify) Bone
+  ├─ lf_rudder_jnt
+  └─ rt_rudder_jnt
+  └─ Yaw_Value × -30 사용
+  ↓
+Component To Local
+  ↓
+Output Pose
+```
+
+---
+
+## ✅ 테스트 결과
+
+### 모든 조종면 작동
+
+```
+W/S (Pitch):
+  Elevator + Aileron 움직임 ✅
+
+A/D (Roll):
+  Elevator + Aileron 반대 회전 ✅
+
+E/Q (Yaw):
+  Rudder 좌우 회전 ✅
+
+모든 조종면 시각화 완료!
+```
+
+---
+
+## ⚠️ 남은 문제
+
+### 스냅 현상
+
+```
+E/Q 누름:
+  Rudder가 즉시 회전 ❌
+  ↓
+부드럽지 않음
+  ↓
+FInterp To + Timeline 필요
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Rotation 축 정리
+
+```
+Elevator/Aileron:
+  - Rotation Y (Pitch)
+  - 상하 움직임
+
+Rudder:
+  - Rotation Z (Yaw) ✅
+  - 좌우 움직임
+
+각 조종면마다 올바른 축 사용!
+```
+
+### 좌우 Rudder 동일한 값?
+
+```
+Elevator/Aileron (Roll):
+  - 좌우 반대 (× 10, × -10)
+  - 양력 차이 생성
+
+Rudder (Yaw):
+  - 좌우 동일 (× -30, × -30)
+  - 같은 방향 회전
+  ↓
+  역할이 다름!
+```
+
+### 각도 조정의 자유
+
+```
+× -20: 작은 움직임
+× -30: 적당 ✅
+× -40: 큰 움직임
+× -50: 과도함
+
+비행기 종류나
+개인 취향에 따라 조정 가능
+```
+
+---
+
+## 🎯 핵심 요약
+
+**Rudder 애니메이션 완성:**
+
+```
+✅ Yaw_Value 변수 생성
+✅ ABP_F18로 전달
+✅ Transform (Modify) Bone 2개
+✅ Rotation Z (Yaw) 사용
+✅ × -30 각도 적용
+✅ 좌우 회전 시각화
+```
+
+**남은 작업:**
+
+```
+⏳ FInterp To 추가
+⏳ Timeline 추가
+⏳ 부드러운 회전 구현
+```
+
+모든 조종면이 **시각적으로 작동**합니다! (부드럽게 만들기만 남음) 🛩️✨
+
+# { 🎮 부드러운 Yaw 애니메이션 구현하기 }
+
+## 🎯 목표
+
+Yaw를 FInterp To + Timeline으로 부드럽게 만들기
+
+- Pitch, Roll과 동일한 패턴 적용
+- 즉시 완성 가능
+
+---
+
+## 🔧 1단계: Triggered에 FInterp To
+
+### 노드 구성
+
+```
+[IA_Yaw] Triggered
+  ↓
+[FInterp To]
+  ├─ Current: Yaw_Value
+  ├─ Target: Action Value
+  ├─ Delta Time: Get World Delta Seconds
+  └─ Interp Speed: 5.0
+  ↓
+[SET] Yaw_Value + [Set Yaw Input]
+```
+
+---
+
+## 🔧 2단계: Timeline 생성
+
+### YawToZero Timeline
+
+```
+Add Timeline
+  ↓
+이름: YawToZero
+  ↓
+Length: 2.0초
+  ↓
+Track 없음
+```
+
+---
+
+## 🔧 3단계: Completed와 Started 연결
+
+### Completed 이벤트
+
+```
+[IA_Yaw] Completed
+  ↓
+[YawToZero] Play from Start
+  ↓
+[Update] 핀
+  ↓
+[FInterp To]
+  ├─ Current: Yaw_Value
+  ├─ Target: 0.0
+  └─ Speed: 5.0
+  ↓
+[SET] Yaw_Value + [Set Yaw Input]
+```
+
+### Started 이벤트
+
+```
+[IA_Yaw] Started
+  ↓
+[YawToZero] Stop
+  ↓
+기존 노드들...
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380603/notion-blog/_/_/BG/5/image_4.png)
+
+---
+
+## ✅ 최종 테스트
+
+### 완벽한 동작
+
+```
+E 누름: 부드럽게 오른쪽 회전 ✅
+E 떼기: 부드럽게 중립 복귀 ✅
+Q 누름: 부드럽게 왼쪽 회전 ✅
+빠른 전환: Timeline 정지로 충돌 없음 ✅
+
+모든 조종면:
+  - Elevator ✅
+  - Aileron ✅
+  - Rudder ✅
+  - 완벽하게 작동!
+```
+
+---
+
+## 🎉 3축 제어 완성!
+
+### 구현 완료
+
+```
+Pitch (W/S): 상하 조종 ✅
+Roll (A/D): 좌우 굴림 ✅
+Yaw (E/Q): 좌우 회전 ✅
+
+모든 조종면 부드럽게 작동!
+```
+
+---
+
+# { 🎮 Landing Gear (착륙 장치) 애니메이션 시작하기 }
+
+## 🎯 목표
+
+비행기 바퀴를 접고 펼치는 기능 구현
+
+- 앞쪽 착륙 장치(Front Landing Gear) 먼저
+- Transform (Modify) Bone으로 회전 제어
+- Gear 변수로 0~1 범위 제어
+
+---
+
+## 💡 핵심 개념
+
+### Landing Gear란?
+
+```
+착륙 장치 = 비행기 바퀴 시스템
+  ↓
+지상:
+  - 바퀴 펼침 (Gear Down)
+  - 착륙/이륙 가능
+
+비행 중:
+  - 바퀴 접음 (Gear Up)
+  - 공기 저항 감소
+  - 속도 향상
+```
+
+---
+
+## 🔧 1단계: Skeletal Mesh에서 확인
+
+### 앞쪽 Chassis 뼈대 찾기
+
+```
+F18_Skeletal_Mesh 열기
+  ↓
+Skeleton 탭 → 검색: "front"
+  ↓
+발견:
+  ├─ front_chassis_0_jnt (섀시 메인)
+  └─ front_chassis_rail_jnt (섀시 레일)
+```
+
+### 회전 테스트
+
+```
+front_chassis_0_jnt 선택
+  ↓
+Rotation Y (Pitch): 100도
+  ↓
+결과: 안쪽으로 접힘 ✅
+
+front_chassis_rail_jnt 선택
+  ↓
+Rotation Y (Pitch): 30도
+  ↓
+결과: 레일도 접힘 ✅
+```
+
+**왜 Pitch(Y축) 회전인가?**
+
+```
+바퀴를 접으려면:
+  앞뒤로 회전 (Pitch)
+  ↓
+좌우 회전(Yaw): 의미 없음
+굴림 회전(Roll): 의미 없음
+  ↓
+Pitch가 올바름 ✅
+```
+
+---
+
+## ⚠️ 중요한 주의사항
+
+### Skeletal Mesh에서 변경해도 게임에 적용 안 됨!
+
+```
+Skeletal Mesh 에디터:
+  - 테스트/확인 용도만
+  - 저장해도 게임에 반영 안 됨 ❌
+
+실제 적용:
+  - Animation Blueprint 필요 ✅
+  - Transform (Modify) Bone 사용
+```
+
+---
+
+## 🔧 2단계: AnimGraph에 노드 추가
+
+### 주석 추가 (정리)
+
+```
+기존 Rudder 노드들 선택
+  ↓
+C 키 누르기
+  ↓
+이름: "YAW"
+```
+
+### Transform (Modify) Bone 복제
+
+```
+기존 노드 2개 선택
+  ↓
+Ctrl + C → Ctrl + V
+  ↓
+연결:
+  이전 노드 → 새 Gear 노드들 → Output
+```
+
+---
+
+## 🔧 3단계: Bone 설정
+
+### 첫 번째 노드
+
+```
+Transform (Modify) Bone
+  ├─ Bone: front_chassis_0_jnt
+  └─ Rotation Y (Pitch): 100
+```
+
+### 두 번째 노드
+
+```
+Transform (Modify) Bone
+  ├─ Bone: front_chassis_rail_jnt
+  └─ Rotation Y (Pitch): 30
+```
+
+### 테스트
+
+```
+Pitch 100 입력 → 컴파일
+  ↓
+첫 번째 뼈대 접힘 확인 ✅
+
+Pitch 30 입력 → 컴파일
+  ↓
+두 번째 뼈대도 접힘 ✅
+```
+
+**미세 조정:**
+
+```
+front_chassis_0_jnt:
+  100도 → 104도 (더 완전히 접힘)
+
+front_chassis_rail_jnt:
+  30도 → 34도 (레일도 맞춤)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380604/notion-blog/_/_/BG/5/image_5.png)
+
+---
+
+## 🔧 4단계: Gear 변수 생성
+
+### 변수 생성
+
+```
+ABP_F18 → Variables
+  ↓
++ 버튼
+  ↓
+이름: Gear
+타입: Float
+기본값: 0.0
+```
+
+**왜 0~1 범위인가?**
+
+```
+0.0 = Gear Down (펼침, 착륙 가능)
+1.0 = Gear Up (접음, 비행 중)
+  ↓
+명확하고 직관적
+  ↓
+보간(Interpolation) 쉬움
+```
+
+---
+
+## 🔧 5단계: Gear 변수로 제어
+
+### 첫 번째 Chassis
+
+```
+[GET] Gear
+  ↓
+[Multiply] × 104
+  ↓
+[Transform (Modify) Bone] Rotation Y (Pitch)
+  └─ front_chassis_0_jnt
+```
+
+**작동 원리:**
+
+```
+Gear = 0.0:
+  0 × 104 = 0도 (펼침)
+
+Gear = 0.5:
+  0.5 × 104 = 52도 (중간)
+
+Gear = 1.0:
+  1.0 × 104 = 104도 (완전히 접힘)
+```
+
+### 두 번째 Chassis
+
+```
+[GET] Gear
+  ↓
+[Multiply] × 34
+  ↓
+[Transform (Modify) Bone] Rotation Y (Pitch)
+  └─ front_chassis_rail_jnt
+```
+
+---
+
+## 🔧 6단계: Slider Range 설정 (편의성)
+
+### Details 패널 설정
+
+```
+Gear 변수 선택
+  ↓
+Details 패널 → Slider Range
+  ↓
+Min: 0.0
+Max: 1.0
+  ↓
+Use Slider: ✅
+```
+
+**왜 Slider Range를 설정하나?**
+
+```
+설정 전:
+  - 값 직접 입력
+  - 0.5 같은 값 입력 번거로움
+
+설정 후:
+  - 슬라이더로 조절
+  - 0~1 사이 쉽게 테스트 ✅
+  - 실시간 확인 편리
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380604/notion-blog/_/_/BG/5/image_6.png)
+
+---
+
+## 🔧 7단계: Anim Preview Editor로 테스트
+
+### 테스트 방법
+
+```
+Window → Anim Preview Editor
+  ↓
+Gear 슬라이더 표시
+  ↓
+0 → 1로 조절
+  ↓
+바퀴가 서서히 접히는 것 확인 ✅
+```
+
+---
+
+## ⚠️ 발견된 문제
+
+### 유압 장치 연결 끊김
+
+```
+현실 비행기:
+  - 유압 장치(Hydraulic)로 연결
+  - 섀시가 움직여도 연결 유지 ✅
+
+현재 구현:
+  - 두 뼈대만 회전
+  - 유압 장치 따라가지 못함 ❌
+  - 연결 끊어진 것처럼 보임
+```
+
+**왜 끊어지나?**
+
+```
+front_chassis_0_jnt: 104도 회전
+front_chassis_rail_jnt: 34도 회전
+  ↓
+유압 장치 뼈대: 회전 안 함
+  ↓
+연결이 어색해 보임 ❌
+```
+
+---
+
+## 📝 현재 상태 정리
+
+### 구현 완료
+
+```
+✅ front_chassis_0_jnt 제어
+✅ front_chassis_rail_jnt 제어
+✅ Gear 변수 (0~1)
+✅ Slider Range 설정
+✅ 기본 접기/펼치기 작동
+```
+
+### 미완성
+
+```
+⏳ 유압 장치 연결 문제
+⏳ 뒷바퀴 미구현
+⏳ Blueprint 입력 연동
+⏳ FInterp To (부드러운 변화)
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### 0~1 범위의 장점
+
+```
+장점:
+  - 직관적 (0 = 꺼짐, 1 = 켜짐)
+  - 보간 쉬움
+  - 퍼센트처럼 사용
+  - UI 슬라이더에 적합
+
+다른 범위도 가능:
+  - 0~100 (퍼센트)
+  - 0~360 (각도)
+  - 하지만 0~1이 가장 범용적 ✅
+```
+
+### Transform (Modify) Bone의 유연성
+
+```
+같은 노드로:
+  - Elevator/Aileron (Pitch)
+  - Rudder (Yaw)
+  - Landing Gear (Pitch)
+  모두 제어 가능!
+
+핵심: 올바른 축 선택
+```
+
+### Slider Range의 중요성
+
+```
+개발 편의성:
+  - 빠른 테스트
+  - 실시간 확인
+  - 직관적 조작
+
+없어도 작동하지만:
+  - 개발 속도 차이
+  - 미세 조정 어려움
+```
+
+---
+
+## 🔜 다음 단계
+
+### 유압 장치 연결 해결
+
+```
+문제:
+  섀시가 움직여도
+  유압 장치가 따라가지 못함
+
+해결 예정:
+  - Two Bone IK (Inverse Kinematics)
+  - 또는 추가 Transform (Modify) Bone
+  - 자연스러운 연결 유지
+```
+
+앞쪽 착륙 장치 **기본 작동** 완료! (연결 문제만 해결하면 됨) 🛩️
+
+# { 🎮 유압 장치(Hydraulic) 연결 문제 해결하기 }
+
+## 🎯 목표
+
+착륙 장치가 접힐 때 유압 장치도 함께 움직이도록 수정
+
+- Translation(위치) 변경
+- X축 방향 이동
+- 자연스러운 연결 유지
+
+---
+
+## 💡 핵심 개념
+
+### 문제 상황 이해
+
+```
+Chassis가 회전:
+  - front_chassis_0_jnt: 104도
+  - front_chassis_rail_jnt: 34도
+  ↓
+하지만:
+  - 유압 장치는 고정 위치 ❌
+  ↓
+결과:
+  연결 끊어진 것처럼 보임
+```
+
+**실제 비행기:**
+
+```
+유압 장치 = Hydraulic Cylinder
+  ↓
+섀시가 움직이면:
+  - 유압 장치도 늘어나거나 줄어듦
+  - 항상 연결 유지 ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380604/notion-blog/_/_/BG/5/image_7.png)
+
+---
+
+## 🔧 해결 방법: Translation 제어
+
+### Skeletal Mesh에서 확인
+
+```
+front_chassis 회전 시:
+  ↓
+유압 장치 위치 수동 조정 (X축)
+  ↓
+연결 유지 확인 ✅
+```
+
+**Translation이란?**
+
+```
+Rotation (회전):
+  - 제자리에서 돌아감
+  - 각도 변경
+
+Translation (이동):
+  - 위치 자체가 변경 ✅
+  - X, Y, Z 축 이동
+
+이번: X축 방향 이동 사용
+```
+
+---
+
+## 🔧 1단계: Transform (Modify) Bone 추가
+
+### 새 노드 추가
+
+```
+기존 노드에서 드래그
+  ↓
+검색: Transform Modify Bone
+  ↓
+연결:
+  이전 노드 → 새 노드 → Output
+```
+
+---
+
+## 🔧 2단계: Bone 설정
+
+### 유압 장치 선택
+
+```
+Transform (Modify) Bone
+  ↓
+Bone to Modify 검색: "front"
+  ↓
+선택: front_chassis_hydr_jnt
+  (hydraulic = 유압 장치)
+```
+
+---
+
+## 🔧 3단계: 불필요한 핀 숨기기
+
+### Rotation 숨기기
+
+```
+Details 패널 → Rotation
+  ↓
+핀 아이콘 클릭 (Expose as Pin 해제)
+  ↓
+Rotation 핀 사라짐 ✅
+```
+
+### Scale 숨기기
+
+```
+Details 패널 → Scale
+  ↓
+핀 아이콘 클릭 (Expose as Pin 해제)
+  ↓
+Scale 핀 사라짐 ✅
+```
+
+**왜 숨기나?**
+
+```
+필요한 것: Translation만
+불필요: Rotation, Scale
+  ↓
+깔끔한 노드 ✅
+실수 방지
+```
+
+---
+
+## 🔧 4단계: Translation 분리
+
+### Split Struct Pin
+
+```
+Translation 핀 우클릭
+  ↓
+Split Struct Pin
+  ↓
+3개로 분리:
+  ├─ Translation X ✅ (사용)
+  ├─ Translation Y (미사용)
+  └─ Translation Z (미사용)
+```
+
+**왜 X축만?**
+
+```
+Skeletal Mesh 확인 결과:
+  - X축 방향으로 이동 필요
+  - Y, Z는 변경 불필요
+  ↓
+X만 제어 ✅
+```
+
+---
+
+## 🔧 5단계: Gear 변수 연결
+
+### 첫 번째 시도 (× 10)
+
+```
+[GET] Gear
+  ↓
+[Multiply] × 10
+  ↓
+[Transform (Modify) Bone] Translation X
+  ↓
+컴파일 → 테스트
+  ↓
+결과: 조금 움직임, 부족 ❌
+```
+
+### 배수 증가 테스트
+
+```
+× 50: 여전히 부족
+× 100: 거의 됨
+× 110: 완벽! ✅
+```
+
+### 최종 설정
+
+```
+[GET] Gear
+  ↓
+[Multiply] × 110
+  ↓
+[Transform (Modify) Bone]
+  └─ Translation X
+```
+
+**작동 원리:**
+
+```
+Gear = 0.0:
+  Translation X = 0 (원래 위치)
+  ↓
+  유압 장치 펼쳐짐
+
+Gear = 1.0:
+  Translation X = 110 (110 유닛 이동)
+  ↓
+  유압 장치 접혀짐 ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380604/notion-blog/_/_/BG/5/image_8.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380604/notion-blog/_/_/BG/5/image_9.png)
+
+## 이동 모드 (Translation Mode) 쉽게 이해하기
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380603/notion-blog/_/_/BG/5/image_10.png)
+
+---
+
+## 먼저 상황을 상상해봐요
+
+캐릭터가 **오른쪽으로 10만큼 이동하는 애니메이션**이 이미 있어요.
+여기에 "오른쪽으로 5 더 이동해!" 라는 새 명령을 추가한다고 할 때...
+
+---
+
+## 세 가지 모드
+
+### 🚫 Ignore (무시)
+
+> "몰라, 신경 안 써"
+
+새 명령이 있어도 **완전히 무시**해버려요.
+캐릭터는 원래대로 10만 이동해요.
+
+```
+원래: 10 → 결과: 10 (변화 없음)
+```
+
+---
+
+### 🔄 Replace Existing (교체)
+
+> "기존 건 지우고 새 걸로 써"
+
+원래 있던 이동 값을 **완전히 덮어써요.**
+오른쪽 10이었는데, 새 값 5로 바꿔치기돼요.
+
+```
+원래: 10 → 결과: 5 (교체됨)
+```
+
+💡 **언제 쓰냐면?** 특정 상황에서 캐릭터 위치를 "이 지점으로 고정!" 할 때
+
+---
+
+### ➕ Add to Existing (합산)
+
+> "기존 값에 새 값을 더해"
+
+원래 이동 값에 새 값을 **더해서** 움직여요.
+10 + 5 = 15만큼 이동하게 돼요.
+
+```
+원래: 10 → 결과: 15 (합산됨)
+```
+
+💡 **언제 쓰냐면?** 걷기 애니메이션 위에 "비틀거림" 같은 **보조 움직임을 얹을 때**
+
+---
+
+## 한 줄 요약
+
+| 모드    | 핵심         | 결과 |
+| ------- | ------------ | ---- |
+| Ignore  | 새 명령 무시 | 10   |
+| Replace | 새 걸로 교체 | 5    |
+| Add     | 기존 + 새 값 | 15   |
+
+> 🎮 게임에서 가장 자주 쓰는 건 **Add** — 기본 애니메이션은 유지하면서 추가 효과를 얹는 방식이 많거든요!
+
+---
+
+## ✅ 테스트 결과
+
+### Anim Preview Editor
+
+```
+Gear 슬라이더 조절:
+  ↓
+0 → 1로 변경
+  ↓
+결과 확인:
+  - Chassis 회전 ✅
+  - 유압 장치 위치 이동 ✅
+  - 자연스러운 연결 유지 ✅
+```
+
+**완벽한 동작:**
+
+```
+Gear = 0:
+  모든 부품 펼쳐짐
+  연결 유지 ✅
+
+Gear = 1:
+  모든 부품 접힘
+  연결 유지 ✅
+
+중간값:
+  부드럽게 움직임
+  항상 연결 ✅
+```
+
+---
+
+## 📝 최종 노드 구조
+
+### Front Landing Gear 전체
+
+```
+[GET] Gear (0~1)
+  ↓
+├─ [Multiply] × 104
+│    ↓
+│  [Transform (Modify) Bone]
+│    Bone: front_chassis_0_jnt
+│    Rotation Y (Pitch)
+│
+├─ [Multiply] × 34
+│    ↓
+│  [Transform (Modify) Bone]
+│    Bone: front_chassis_rail_jnt
+│    Rotation Y (Pitch)
+│
+└─ [Multiply] × 110
+     ↓
+   [Transform (Modify) Bone]
+     Bone: front_chassis_hydr_jnt
+     Translation X
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Rotation vs Translation
+
+```
+Rotation (회전):
+  - 제자리 회전
+  - Pitch, Yaw, Roll
+  - 이번: Chassis 접기
+
+Translation (이동):
+  - 위치 변경
+  - X, Y, Z 축 이동
+  - 이번: 유압 장치 따라가기 ✅
+
+조합:
+  자연스러운 움직임 완성!
+```
+
+### 하나의 Gear 변수로 통합 제어
+
+```
+장점:
+  - 모든 부품이 동기화
+  - 관리 편리
+  - 일관된 움직임 ✅
+
+구조:
+  Gear 변수 (0~1)
+    ├─ Chassis 회전 (× 104, × 34)
+    └─ 유압 장치 이동 (× 110)
+```
+
+### 배수 값 찾기 (Trial and Error)
+
+```
+× 10: 너무 작음
+× 50: 부족
+× 100: 거의 됨
+× 110: 완벽! ✅
+  ↓
+실제 테스트로 최적값 발견
+```
+
+---
+
+## 🎯 핵심 요약
+
+**문제 해결 완료:**
+
+```
+✅ 유압 장치 Translation X
+✅ Gear 변수로 통합 제어
+✅ × 110 배수 적용
+✅ 자연스러운 연결 유지
+✅ 부드러운 접기/펼치기
+```
+
+**구현 방법:**
+
+```
+1. Transform (Modify) Bone 추가
+2. front_chassis_hydr_jnt 선택
+3. Translation X만 노출
+4. Gear × 110 연결
+5. 완벽한 작동! ✅
+```
+
+착륙 장치가 **완벽하게 연결되어** 움직입니다! 🛩️✨
+
+# { 🎮 Landing Gear 도어(문) 애니메이션 구현하기 }
+
+## 🎯 목표
+
+착륙 장치를 접을 때 도어도 함께 닫히도록 구현
+
+- 3개 도어 제어
+- Rotation X (Roll) 축 사용
+- Gear_Door 변수로 통합 관리
+
+---
+
+## 💡 핵심 개념
+
+### Landing Gear Door란?
+
+```
+착륙 장치 도어 = 바퀴 구멍을 덮는 문
+  ↓
+Gear Down (펼침):
+  - 도어 열림
+  - 바퀴 노출
+
+Gear Up (접음):
+  - 도어 닫힘
+  - 깔끔한 외관 ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380603/notion-blog/_/_/BG/5/image_11.png)
+
+---
+
+## 🔧 1단계: Skeletal Mesh에서 도어 확인
+
+### 도어 뼈대 찾기
+
+```
+F18_Skeletal_Mesh 열기
+  ↓
+검색: "door"
+  ↓
+발견:
+  ├─ lf_door_1_jnt (왼쪽 도어 1)
+  ├─ lf_door_2_jnt (왼쪽 도어 2)
+  └─ rt_door_jnt (오른쪽 도어)
+```
+
+### 회전축 확인
+
+```
+E 키 누르기 (회전 도구)
+  ↓
+빨간색 축 = X축
+  ↓
+Rotation X (Roll)로 도어 닫힘 ✅
+```
+
+**왜 Rotation X인가?**
+
+```
+X축 = Roll 축 (빨간색)
+  ↓
+도어를 접는 방향
+  ↓
+안쪽으로 회전 ✅
+
+Y축(Pitch)이나 Z축(Yaw):
+  - 잘못된 방향 회전 ❌
+```
+
+---
+
+## 🔧 2단계: Transform (Modify) Bone 3개 추가
+
+### 노드 복제
+
+```
+기존 노드 3개 선택
+  ↓
+Ctrl + C → Ctrl + V
+  ↓
+연결:
+  이전 노드 → 도어 노드들 → Output
+```
+
+---
+
+## 🔧 3단계: Bone 설정
+
+### 각 도어에 할당
+
+```
+첫 번째 노드:
+  Bone: lf_door_2_jnt
+
+두 번째 노드:
+  Bone: lf_door_1_jnt
+
+세 번째 노드:
+  Bone: rt_door_jnt
+```
+
+---
+
+## 🔧 4단계: Gear_Door 변수 생성
+
+### 변수 생성
+
+```
+ABP_F18 → Variables
+  ↓
++ 버튼
+  ↓
+이름: Gear_Door
+타입: Float
+기본값: 0.0
+```
+
+### Slider Range 설정
+
+```
+Details 패널 → Slider Range
+  ↓
+Min: 0.0
+Max: 1.0
+  ↓
+Use Slider: ✅
+```
+
+**왜 별도 변수인가?**
+
+```
+Gear 변수:
+  - 바퀴 접기/펼치기
+  - 0~1 범위
+
+Gear_Door 변수:
+  - 도어 열기/닫기
+  - 0~1 범위
+
+분리 이유:
+  - 독립적 제어 가능
+  - 타이밍 조절 가능 ✅
+  - 나중에 시퀀스 구현 용이
+```
+
+---
+
+## 🔧 5단계: 각 도어 각도 조정
+
+### lf_door_2_jnt (왼쪽 도어 2)
+
+**테스트 과정:**
+
+```
+× 15: 너무 작음
+× 100: 조금 많음
+× 95: 완벽! ✅
+```
+
+**최종:**
+
+```
+[GET] Gear_Door
+  ↓
+[Multiply] × 100 (또는 95)
+  ↓
+[Transform (Modify) Bone]
+  └─ Rotation X (Roll)
+```
+
+### lf_door_1_jnt (왼쪽 도어 1)
+
+**방향 문제 발견:**
+
+```
+× 50: 바깥쪽으로 회전 ❌
+  ↓
+반대 방향!
+  ↓
+음수 필요
+```
+
+**해결:**
+
+```
+[GET] Gear_Door
+  ↓
+[Multiply] × -70 (음수!)
+  ↓
+[Transform (Modify) Bone]
+  └─ Rotation X (Roll)
+```
+
+**왜 음수인가?**
+
+```
+도어마다 회전 방향이 다름:
+  ↓
+lf_door_2_jnt:
+  - 양수 회전 = 안쪽으로 ✅
+
+lf_door_1_jnt:
+  - 양수 회전 = 바깥쪽으로 ❌
+  - 음수 회전 = 안쪽으로 ✅
+
+rt_door_jnt:
+  - 양수 회전 = 안쪽으로 ✅
+```
+
+### rt_door_jnt (오른쪽 도어)
+
+**최종:**
+
+```
+[GET] Gear_Door
+  ↓
+[Multiply] × 70
+  ↓
+[Transform (Modify) Bone]
+  └─ Rotation X (Roll)
+```
+
+---
+
+## 🔧 6단계: 미세 조정
+
+### 바퀴 노출 문제
+
+```
+문제:
+  도어 닫혀도 바퀴 일부 보임 ❌
+
+원인:
+  Chassis가 완전히 안쪽에 안 들어감
+
+해결:
+  front_chassis_0_jnt의 각도 증가
+  × 104 → × 105
+```
+
+---
+
+## 📝 최종 노드 구조
+
+### Front Landing Gear 전체
+
+```
+[GET] Gear (0~1)
+  ↓
+├─ Chassis 회전 (3개 노드)
+│    ├─ × 105 → front_chassis_0_jnt
+│    ├─ × 34 → front_chassis_rail_jnt
+│    └─ × 110 → front_chassis_hydr_jnt (Translation X)
+│
+└─ [GET] Gear_Door (0~1)
+     ↓
+     Door 회전 (3개 노드)
+       ├─ × 100 → lf_door_2_jnt
+       ├─ × -70 → lf_door_1_jnt
+       └─ × 70 → rt_door_jnt
+```
+
+---
+
+## ✅ 테스트 결과
+
+### Anim Preview Editor
+
+```
+Gear = 0, Gear_Door = 0:
+  - 바퀴 펼쳐짐
+  - 도어 열림 ✅
+
+Gear = 1, Gear_Door = 0:
+  - 바퀴 접힘
+  - 도어 여전히 열림
+
+Gear = 1, Gear_Door = 1:
+  - 바퀴 접힘
+  - 도어 닫힘 ✅
+  - 깔끔한 외관!
+```
+
+**시퀀스 확인:**
+
+```
+1. Gear 0 → 1 (바퀴 접기)
+2. Gear_Door 0 → 1 (도어 닫기)
+   ↓
+자연스러운 순서 ✅
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Rotation X (Roll)의 활용
+
+```
+이전:
+  - Elevator/Aileron: Rotation Y (Pitch)
+  - Rudder: Rotation Z (Yaw)
+
+이번:
+  - Landing Gear Door: Rotation X (Roll) ✅
+
+모든 축 활용!
+```
+
+### 음수 곱하기의 필요성
+
+```
+같은 방향 회전:
+  × 양수
+
+반대 방향 회전:
+  × 음수 ✅
+
+각 뼈대마다:
+  회전 방향 확인 필요
+```
+
+### 독립 변수의 장점
+
+```
+Gear vs Gear_Door 분리:
+  ↓
+장점:
+  - 타이밍 조절 가능
+  - 시퀀스 구현 용이
+  - 독립적 제어
+
+나중에:
+  Timeline으로 자동 순서 구현 가능
+```
+
+---
+
+## 🔧 주석 추가 (정리)
+
+### Front Gears 주석
+
+```
+모든 Front Landing Gear 노드 선택
+  ↓
+C 키 누르기
+  ↓
+이름: "FRONT GEARS"
+```
+
+**포함 내용:**
+
+```
+- Chassis 회전 3개
+- 유압 장치 이동 1개
+- Door 회전 3개
+= 총 7개 노드
+```
+
+---
+
+## 🔜 다음 단계
+
+### Rear Landing Gear 구현
+
+```
+앞쪽 완성 ✅
+  ↓
+다음:
+  뒷쪽 착륙 장치 (Rear Gear)
+
+예상 작업:
+  - 뒷바퀴 Chassis 찾기
+  - 동일한 방식 적용
+  - 도어도 추가
+  - 완전한 Landing Gear 시스템
+```
+
+---
+
+## 🎯 핵심 요약
+
+**Front Gears 완성:**
+
+```
+✅ Chassis 회전 (3개)
+✅ 유압 장치 이동 (1개)
+✅ Door 회전 (3개)
+✅ Gear 변수 (0~1)
+✅ Gear_Door 변수 (0~1)
+✅ 자연스러운 접기/펼치기
+✅ 깔끔한 외관
+```
+
+**구현 패턴:**
+
+```
+1. Skeletal Mesh에서 뼈대 찾기
+2. 회전축 확인 (X, Y, Z)
+3. Transform (Modify) Bone 추가
+4. 변수로 제어
+5. 배수 조정 (테스트)
+6. 완성! ✅
+```
+
+앞쪽 착륙 장치가 **완벽하게 작동**합니다! 🛩️✨

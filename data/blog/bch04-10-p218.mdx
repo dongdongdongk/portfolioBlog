@@ -1,0 +1,306 @@
+---
+title: 'BCh04 10 p218 검색처리마무리'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# 검색 처리
+
+```java
+목록 같은걸 처리하다 보면 검색 처럼 한꺼번에 많은 것들을 담아서 주고받을 상황이 생긴다 이때 파라미터를 여러개 만드는것보다는 하나의 객체(PageRequestDTO) 를 만들어서 활용하는게 바람직하다  (PageRequestDTO 를 이용하는데 사실 이 DTO 를 만든 진짜 이유는 검색을 처리하기 위해서다)
+
+* 컨트롤러
+
+키워드와 검색타입(제목,글쓴이,내용)을 반영하도록 설계
+
+* 서비스
+
+Repository 에서는 Querydsl 을 이용해서 다양한 상황에 맞는 JPQL 을 생성한다
+
+* 화면 처리
+
+기본적인 검색 기능과 조회 화면/수정 화면 등 모든 화면에서 목록으로 갈 때 검색 조건과 키워드 유지
+```
+
+## PageRequestDTO 에 새로운 멤버 변수 추가
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381216/notion-blog/_/_/_/_/BCh04_10_p218_/Untitled.png)
+
+```java
+type 과 keyword 를 검색을 위해서 새로 추가해준다
+```
+
+## QuerydslPredicateExecutor<>추가
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381214/notion-blog/_/_/_/_/BCh04_10_p218_/Untitled_1.png)
+
+```java
+Querydsl 을 사용하기 위해서 Repository 에 QuerydslPredicateExecutor<엔티티> 를 추가해준다
+```
+
+## 서비스 수정
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381215/notion-blog/_/_/_/_/BCh04_10_p218_/Untitled_2.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381215/notion-blog/_/_/_/_/BCh04_10_p218_/Untitled_3.png)
+
+```java
+public PageResultDTO<GuestbookDTO, Guestbook> getList(PageRequestDTO requestDTO) {
+        Pageable pageable = requestDTO.getPageable(Sort.by("gno").descending());
+
+        BooleanBuilder booleanBuilder = getSearch(requestDTO); // 검색 조건 처리 ( 아래 getSearch 메서드 사용 )
+
+        Page<Guestbook> result = repository.findAll(pageable);
+
+        Function<Guestbook, GuestbookDTO> fn = (entity ->
+                entityToDto(entity));
+
+        return new PageResultDTO<>(result, fn);
+    }
+```
+
+```java
+서비스의 PageResultDTO 는 엔티티를 DTO로 변환 뒤 페이지 정보를 담아서 보내면 끝이였지만
+
+추가적으로 BooleanBuilder 객체를 만들어서 검색 조건을 처리해줘야 한다
+```
+
+## 타입 , 키워드 BooleanBuilder 에 담아주기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381215/notion-blog/_/_/_/_/BCh04_10_p218_/Untitled_4.png)
+
+```java
+여기서는 한꺼번에 두가지 빌더를 사용한다 타입 정보 & 검색 조건 그리고 BooleanBuilder 을 리턴 해준다
+```
+
+```java
+ private BooleanBuilder getSearch(PageRequestDTO requestDTO) {
+
+        String type = requestDTO.getType(); // 타입 정보 얻어오기 (제목,작성자,내용)
+
+        BooleanBuilder booleanBuilder = new BooleanBuilder(); // 불리언 빌더 생성
+
+        if(type == null || type.trim().length() == 0) { // 검색 조건이 없는 경우 끝
+            return booleanBuilder;
+        }
+
+        QGuestbook qGuestbook = QGuestbook.guestbook; // Q도메인 객체
+
+        String keyword = requestDTO.getKeyword(); // 키워드 받아오기
+
+        BooleanExpression expression = qGuestbook.gno.gt(0L); // gno > 0 조건만 생성
+
+        booleanBuilder.and(expression); // booleanBuilder 에 조건 추가
+
+        // 검색 조건 작성하기
+        BooleanBuilder conditionBuilder = new BooleanBuilder();
+
+        if (type.contains("t")) {
+            conditionBuilder.or(qGuestbook.title.contains(keyword)); // or or 로 계속 추가중
+        }
+        if (type.contains("c")) {
+            conditionBuilder.or(qGuestbook.content.contains(keyword));
+        }
+        if (type.contains("w")) {
+            conditionBuilder.or(qGuestbook.writer.contains(keyword));
+        }
+
+        // 모든 조건 통합
+        booleanBuilder.and(conditionBuilder);
+
+        return booleanBuilder;
+    }
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381215/notion-blog/_/_/_/_/BCh04_10_p218_/Untitled_5.png)
+
+```java
+위의 getSearch 를 사용하면 BooleanBuilder 가 나올거고
+
+Page<Guestbook> result = repository.findAll(booleanBuilder,pageable); 에 booleanBuilder 를 이용해서 Querydsl 을 사용한다
+```
+
+## 쿼리 스트링 테스트
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381216/notion-blog/_/_/_/_/BCh04_10_p218_/Untitled_6.png)
+
+```java
+쿼리 스트링으로 type = t (제목) keyword = 10 키워드 10 입력하여 테스트를 진행한다
+
+이렇게 화면을 구성하기 전에 테스트를 한번 해줘야한다
+```
+
+## 검색 처리 화면 생성
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381216/notion-blog/_/_/_/_/BCh04_10_p218_/Untitled_7.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381216/notion-blog/_/_/_/_/BCh04_10_p218_/Untitled_8.png)
+
+```java
+검색어를 입력하고 보낼 form 을 list 에 작성해준다
+
+th:selected 는  th:selected="${pageRequestDTO.type == 't'}"
+
+type 의 값이t일때 페이지 렌더링 때 자동으로 선택해준다
+```
+
+```java
+<!--검색 처리-->
+        <form action="/guestbook/list" method="get" id="searchForm">
+            <div class="input-group">
+                <input type="hidden" name="page" th:value="1">
+                <div class="input-group-prepend">
+                    <select class="custom-select" name="type">
+                        <option th:selected="${pageRequestDTO.type == null}">------</option>
+                        <option value="t" th:selected="${pageRequestDTO.type == 't'}">제목</option>
+                        <option value="c" th:selected="${pageRequestDTO.type == 'c'}">내용</option>
+                        <option value="w" th:selected="${pageRequestDTO.type == 'w'}">작성자</option>
+                        <option value="tc" th:selected="${pageRequestDTO.type == 'tc'}">제목 + 내용</option>
+                        <option value="tcw" th:selected="${pageRequestDTO.type == 'tcw'}">제목 + 내용 + 작성자</option>
+                    </select>
+                </div>
+                <input class="form-control" name="keyword" th:value="${pageRequestDTO.keyword}">
+                <div class="input-group-append" id="button-addon4">
+                    <button class="btn btn-outline-secondary btn-search" type="button">Search</button>
+                    <button class="btn-outline-secondary btn-clear" type="button">Clear</button>
+                </div>
+            </div>
+        </form>
+```
+
+## 검색 기능 js
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381216/notion-blog/_/_/_/_/BCh04_10_p218_/Untitled_9.png)
+
+```java
+/*검색 기능*/
+                const searchForm = document.querySelector("#searchForm");
+                const btnSearch = document.querySelector(".btn-search");
+                const btnClear = document.querySelector(".btn-clear");
+                const inputSearch = document.querySelector("input[name='keyword']");
+                btnSearch.addEventListener("click", function (){
+                   searchForm.submit();
+                });
+
+                btnClear.addEventListener("click",function (){
+                    inputSearch.value = "";
+                    searchForm.submit();
+                });
+```
+
+```java
+검색 기능의 버튼들이 작동하도록 (서치, 클리어) js 를 작성해준다
+```
+
+## 마무리 검색 기능 수정
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381214/notion-blog/_/_/_/_/BCh04_10_p218_/Untitled_10.png)
+
+```java
+<!--페이저-->
+        <ul class="pagination h-100 justify-content-center align-items-center">
+            <li class="page-item" th:if="${result.prev}">
+                <a class="page-link" th:href="@{/guestbook/list(page = ${result.start - 1}, type = ${pageRequestDTO.type},keyword =${pageRequestDTO.keyword})}" tabindex="-1">Previous</a>
+            </li>
+            <li th:class="'page-item' +' '+ ${result.page == page ? 'active':''}" th:each="page : ${result.pageList}">
+                <a class="page-link" th:href="@{/guestbook/list(page = ${page}, type = ${pageRequestDTO.type},keyword =${pageRequestDTO.keyword})}">
+                    [[${page}]]
+                </a>
+            </li>
+            <li class="page-item" th:if="${result.next}">
+                <a class="page-link" th:href="@{/guestbook/list(page = ${result.end + 1}, type = ${pageRequestDTO.type},keyword =${pageRequestDTO.keyword})}">Next</a>
+            </li>
+        </ul>
+```
+
+```java
+페이저에 type = ${pageRequestDTO.type},keyword =${pageRequestDTO.keyword} 를 추가해서
+
+페이저가 이동할 때 keyword 와 type 을 전달 하도록 한다
+
+이게 없으면 검색후 페이저가 제대로 동작하지 않는다
+```
+
+## 게시글 상세 페이지 에서 list 로 돌아가는 버튼 (keyword, type 추가 )
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381214/notion-blog/_/_/_/_/BCh04_10_p218_/Untitled_11.png)
+
+```java
+게시글 상세로 들어가는데 type 값과 keyword 값을 함께 보내주도록 추가해준다
+```
+
+## 게시글 상세에서 리스트로 돌아가기 + 수정버튼에 type,keyword 값 추가
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381214/notion-blog/_/_/_/_/BCh04_10_p218_/Untitled_12.png)
+
+```java
+    <a th:href="@{/guestbook/modify(gno = ${dto.gno}, page=${requestDTO.page},type = ${requestDTO.type},keyword =${requestDTO.keyword})}">
+      <button type="button" class="btn btn-primary">Modify</button>
+    </a>
+
+    <a th:href="@{/guestbook/list(page=${requestDTO.page},type = ${requestDTO.type},keyword =${requestDTO.keyword})}">
+      <button type="button" class="btn btn-info">List</button>
+    </a>
+```
+
+```java
+주의할 점은 Controller 에서 @ModelAttribue 로 ("requestDTO") 로 해놨기 때문에  ${requestDTO.type} 으로 해줘야 한다
+```
+
+## 수정 페이지에서 list 로 type과 keyword 유지 시켜주기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381214/notion-blog/_/_/_/_/BCh04_10_p218_/Untitled_13.png)
+
+```java
+숨겨둔 page 값과 같이 type과 keyword 도 숨겨서 값을 보존한다
+```
+
+## js 를 수정해서 form 에 type, keyword 값 보내주기
+
+```java
+<script th:inline="javascript">
+      const removeBtn = document.querySelector(".removeBtn");
+      const actionForm = document.querySelector("form");
+      const modifyBtn = document.querySelector(".modifyBtn");
+      const pageInfo = document.querySelector("input[name='page']");
+      const typeInfo = document.querySelector("input[name='type']");
+      const keywordInfo = document.querySelector("input[name='keyword']");
+      const listBtn = document.querySelector(".listBtn");
+      removeBtn.addEventListener('click', function (){
+        actionForm.setAttribute("action","/guestbook/remove")
+        actionForm.method = "post";
+        actionForm.submit();
+      });
+
+      modifyBtn.addEventListener('click', function (){
+        if(!confirm("수정하시겠습니까?")){
+          return;
+        }
+        actionForm.setAttribute("action", "/guestbook/modify")
+        actionForm.method = "post"
+        actionForm.submit();
+      });
+
+      listBtn.addEventListener("click", function (){
+        actionForm.innerHTML=""; //form 태그의 내용 삭제
+        actionForm.append(pageInfo); // 목록에 필요한 페이지 값 추가
+        actionForm.append(typeInfo); // 목록에 필요한 타입 값 추가
+        actionForm.append(keywordInfo); // 목록에 필요한 키워드 값 추가
+        actionForm.setAttribute("action", "/guestbook/list")
+        actionForm.method = "get";
+        actionForm.submit();
+      });
+
+    </script>
+```
+
+## modity 컨트롤러에 page,type,keyword 추가해주기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381215/notion-blog/_/_/_/_/BCh04_10_p218_/Untitled_14.png)
+
+```java
+수정 후 리스트로 이동할 때 값이 필요하기 때문에 추가해준다
+```

@@ -1,0 +1,281 @@
+---
+title: '섹션 6: 프로젝트 #1: Selenium(Amazon Audible Bot)을 사용하여 여러 페이지 처리하기'
+date: '2026-09-02'
+category: '기타, 사용 적음/크롤링 & 파이썬'
+tags: ['기타, 사용 적음', '크롤링 & 파이썬']
+draft: false
+summary: ''
+---
+
+```jsx
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import pandas as pd
+import time
+
+# 사용자 에이전트(User-Agent)를 설정합니다
+user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+
+# Chrome 옵션 객체를 생성합니다
+options = Options()
+
+# (선택 사항) 브라우저를 닫지 않고 유지할 수 있는 옵션입니다
+# options.add_experimental_option("detach", True)
+
+# 사용자 에이전트를 설정합니다
+options.add_argument(f"user-agent={user_agent}")
+
+# 브라우저 창 크기를 설정합니다
+options.add_argument("window-size=1920x1080")
+
+# 브라우저가 자동화된 환경에서 실행되고 있음을 감지하지 못하도록 합니다
+options.add_argument("--disable-blink-features=AutomationControlled")
+
+# 서드 파티 쿠키 단계적 폐지 옵션 추가
+options.add_argument("--test-third-party-cookie-phaseout")
+
+# 크롤링할 웹사이트 URL을 설정합니다
+website = 'https://www.audible.com/search'
+
+# Chrome WebDriver를 생성합니다
+driver = webdriver.Chrome(options=options)
+
+# 설정된 웹사이트를 엽니다
+driver.get(website)
+
+# 페이지 네이션 요소를 찾습니다
+pagination = driver.find_element(By.XPATH, '//ul[contains(@class,"pagingElements")]')
+# 페이지 네이션에서 페이지 번호를 나타내는 'li' 태그 요소들을 찾습니다
+pages = pagination.find_elements(By.TAG_NAME, 'li')
+# 마지막 페이지 번호를 가져옵니다 (마지막 'li' 요소의 바로 전 요소)
+lastPage = int(pages[-2].text)
+
+# 현재 페이지 번호를 설정합니다
+currentPage = 1
+# 각 항목별로 데이터를 저장할 리스트를 초기화합니다
+book_title = []
+book_author = []
+book_length = []
+
+# 현재 페이지가 마지막 페이지 이하인 동안 루프를 실행합니다
+while currentPage <= lastPage:
+    # 'tr' 요소가 나타날 때까지 최대 10초 대기합니다
+    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, '.adbl-impression-container ')))
+
+    # 상품 컨테이너 요소를 찾습니다
+    container = driver.find_element(By.CSS_SELECTOR, '.adbl-impression-container ')
+
+    # 각 상품 리스트 요소를 찾습니다
+    products = container.find_elements(By.CSS_SELECTOR, '.bc-list-item.productListItem')
+
+    # 각 상품에서 제목, 작가, 길이를 추출하여 리스트에 추가합니다
+    for product in products:
+        book_title.append(product.find_element(By.XPATH, './/h3[contains(@class,"bc-heading")]').text)
+        book_author.append(product.find_element(By.XPATH, './/li[contains(@class,"authorLabel")]').text)
+        book_length.append(product.find_element(By.XPATH, './/li[contains(@class,"runtimeLabel")]').text)
+
+    # 다음 페이지로 이동하기 위해 현재 페이지 번호를 증가시킵니다
+    currentPage = currentPage + 1
+
+    try:
+        # 다음 페이지 버튼 요소를 찾고 클릭합니다
+        nextPage = driver.find_element(By.XPATH, '//span[contains(@class,"nextButton")]')
+        nextPage.click()
+    except:
+        # 다음 페이지 버튼을 찾지 못하면 루프를 종료합니다
+        pass
+
+# 수집한 데이터를 판다스 데이터프레임으로 변환합니다
+df_book = pd.DataFrame({'제목': book_title, '글쓴이': book_author, '시간': book_length})
+
+# 데이터프레임을 CSV 파일로 저장합니다
+df_book.to_csv('booksHeadless.csv', index=False)
+```
+
+# Headless Mode 이슈
+
+```python
+HeadlessMode 를 사용하면
+
+Blocked third-party cookie. Learn more in the Issues tab
+
+위와 같은 오류가 발생하였다
+
+아직은 해결법을 찾지 못하였고 Headless Mode 를 꺼주자
+```
+
+# 페이지 네이션 추가 ( Handling Pagination )
+
+## 페이지 네이션 설정 과정
+
+### 1. 페이지 네이션 요소 찾기
+
+![Untitled](<%EC%84%B9%EC%85%98%206%20%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%20#1%20Selenium(Amazon%20Audible%20Bot)%EC%9D%84%20%EC%82%AC%EC%9A%A9%ED%95%98%EC%97%AC%20%EC%97%AC%EB%9F%AC/Untitled.png>)
+
+```python
+Audible 웹사이트의 페이지 네이션 요소를 찾는다.
+
+이 요소는 ul 태그로 되어 있으며, 클래스 이름에 "pagingElements"를 포함된다.
+
+pagination = driver.find_element(By.XPATH, '//ul[contains(@class,"pagingElements")]')
+```
+
+### 2. 페이지 번호 요소들 가져오기
+
+![Untitled](<%EC%84%B9%EC%85%98%206%20%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%20#1%20Selenium(Amazon%20Audible%20Bot)%EC%9D%84%20%EC%82%AC%EC%9A%A9%ED%95%98%EC%97%AC%20%EC%97%AC%EB%9F%AC/Untitled%201.png>)
+
+```python
+페이지 네이션 요소 내에서 페이지 번호를 나타내는 li 태그들을 찾는다
+
+pages = pagination.find_elements(By.TAG_NAME, 'li')
+```
+
+### 3. 마지막 페이지 번호 추출
+
+```python
+li 태그들 중 마지막 페이지 번호는 마지막 li 요소의 바로 전 요소에 위치한다. ( 다음 버튼 바로 전에 )
+
+따라서 이 요소의 텍스트를 정수로 변환하여 마지막 페이지 번호를 추출합니다.
+
+lastPage = int(pages[-2].text)
+```
+
+## 페이지 네이션을 이용한 데이터 수집 과정
+
+### **1. 현재 페이지 번호 초기화**
+
+```python
+현재 페이지 번호를 1로 초기화
+
+currentPage = 1
+```
+
+### 2. 데이터 수집 루프 설정
+
+```python
+현재 페이지 번호가 마지막 페이지 번호 이하인 동안 루프를 실행
+
+while currentPage <= lastPage:
+```
+
+### 3. 상품 리스트 요소 찾기
+
+```python
+현재 페이지에서 상품 리스트를 포함하는 컨테이너 요소를 찾는다
+
+container = driver.find_element(By.CSS_SELECTOR, '.adbl-impression-container')
+```
+
+### 4. 각 상품의 정보 추출
+
+```python
+각 상품 리스트 아이템을 찾고, 제목, 작가, 길이를 추출하여 리스트에 추가
+
+products = container.find_elements(By.CSS_SELECTOR, '.bc-list-item.productListItem')
+
+for product in products:
+    book_title.append(product.find_element(By.XPATH, './/h3[contains(@class,"bc-heading")]').text)
+    book_author.append(product.find_element(By.XPATH, './/li[contains(@class,"authorLabel")]').text)
+    book_length.append(product.find_element(By.XPATH, './/li[contains(@class,"runtimeLabel")]').text)
+```
+
+### 5. 다음 페이지로 이동
+
+```python
+현재 페이지 번호를 1 증가시키고, 다음 페이지 버튼을 찾아 클릭한다. 예외가 발생하면(다음 페이지 버튼을 찾지 못하면) 루프를 종료
+
+currentPage = currentPage + 1
+
+try:
+    nextPage = driver.find_element(By.XPATH, '//span[contains(@class,"nextButton")]')
+    nextPage.click()
+except:
+    pass
+```
+
+# 암묵적 대기 vs 명시적 대기 ( Implicit vs Explicit Waits )
+
+## 웹 스크래핑 시 기다림이 필요한 이유
+
+```python
+JavaScript로 구동되는 웹사이트의 데이터는 동적으로 로드되기 때문에, 모든 데이터가 올바르게 표시되는 데 시간이 걸릴 수 있다.
+
+이로 인해 웹 스크래핑 시 요소를 찾지 못해 ElementNotVisibleException이 발생할 수 있다.
+
+따라서, 원하는 데이터를 완전히 로드할 때까지 드라이버가 기다리도록 설정해야 한다.
+```
+
+## 암묵적 대기 (Implicit Wait)
+
+```python
+암묵적 대기는 WebDriver에게 요소를 찾을 때 일정 시간 동안 기다리도록 지시한다.
+
+Python에서 time 라이브러리를 사용하여 time.sleep으로 암묵적 대기를 설정할 수 있다.
+```
+
+```python
+import time
+time.sleep(2)
+```
+
+## 명시적 대기 (Explicit Wait)
+
+```python
+명시적 대기는 특정 조건이 충족될 때까지 WebDriver가 기다리도록 한다.
+
+Python에서 명시적 대기를 사용하려면 세 가지 라이브러리를 임포트해야 한다: WebDriverWait, By, EC (expected_conditions).
+
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+```
+
+### 명시적 대기 문법
+
+```python
+WebDriverWait 객체를 생성한다
+
+WebDriverWait(driver, 10)
+
+* 10 초 대기하게 만든다
+```
+
+### `.until` 메서드를 사용하여 조건을 설정
+
+```python
+WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'classname')))
+
+EC.presence_of_element_located: 요소가 존재할 때까지 대기
+
+By.CLASS_NAME: 요소를 찾는 방법 (클래스 이름 사용)
+```
+
+```python
+# 명시적 대기를 사용하여 요소를 기다림
+WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'classname')))
+```
+
+## 암묵적 대기 vs 명시적 대기
+
+```python
+암묵적 대기:
+
+장점: 짧고 간단하여 코드 디버깅 시 유용함
+
+단점: 모든 요소에 동일한 대기 시간을 적용하여 비효율적일 수 있음
+
+명시적 대기:
+
+장점: 특정 조건이 충족될 때까지 대기하여 코드가 더 효율적임
+
+단점: 문법이 길고 복잡할 수 있음
+
+권장 사용 시기:
+
+암묵적 대기: 스크립트를 테스트하고 디버깅할 때
+
+명시적 대기: 스크립트를 완료하고 더 효율적으로 만들고자 할 때
+```

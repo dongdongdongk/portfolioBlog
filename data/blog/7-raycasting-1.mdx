@@ -1,0 +1,891 @@
+---
+title: '섹션 7: Raycasting - 1 -'
+date: '2026-09-02'
+category: '게임 개발/Game Development in JS TS - The Complete Guide (w_'
+tags: ['게임 개발', 'Game Development in JS TS - The Complete Guide (w_']
+draft: false
+summary: ''
+---
+
+# { Phaser에서 Raycasting 개념과 선 그리기 구현하기 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380511/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_7_Raycasting_-_1_-/image.png)
+
+## 1. 개요
+
+```jsx
+Phaser에서 Raycasting(광선 투사) 을 구현하기 위해,
+
+먼저 마우스 드래그로 선을 그리는 기능을 만들면서 기본 개념을 익힙니다.
+
+이 기능을 만들면 이후에 적들이 이동할 때
+
+바닥이 끝나는 지점을 감지하여 방향을 바꾸는 로직을 쉽게 적용할 수 있습니다.
+```
+
+## 2. Phaser에서 선을 그리는 방법
+
+```jsx
+Phaser에서는 Phaser.Geom.Line을 사용하여 선을 정의하고, ( 충돌 감지를 위한 가상의 레이(Ray)"를 정의하는 것 )
+
+( line은 단순한 선이 아니라, 적이 앞을 감지하는 보이지 않는 레이(Ray) )
+
+Phaser.GameObjects.Graphics를 사용해 화면에 그릴 수 있습니다.
+```
+
+### Phaser에서 선을 그리는 기본 원리
+
+```jsx
+1. Phaser.Geom.Line 객체를 생성하여 선의 시작점과 끝점을 저장합니다.
+
+2. this.add.graphics()를 사용하여 그래픽 객체를 생성합니다.
+
+3. graphics.lineStyle(굵기, 색상)으로 선의 스타일을 설정합니다.
+
+4. graphics.strokeLineShape(line)을 호출하여 선을 그립니다.
+```
+
+## 3. 마우스로 선을 그리는 기능 구현
+
+```jsx
+🔹 1) 마우스 입력을 감지하는 방법
+
+		Phaser에서는 마우스 클릭 이벤트를 this.input.on('pointerdown', callback)으로 감지할 수 있습니다.
+
+🔹 2) 마우스를 눌렀을 때 (시작점 설정)
+
+		마우스를 클릭하면 pointerdown 이벤트가 발생합니다.
+
+		마우스가 클릭된 위치(pointer.worldX, pointer.worldY)를 선의 시작점(x1, y1)으로 설정합니다.
+
+🔹 3) 마우스를 뗐을 때 (끝점 설정 후 선 그리기)
+
+		마우스를 떼면 pointerup 이벤트가 발생합니다.
+
+		이때 pointer.worldX, pointer.worldY 값을 선의 끝점(x2, y2)으로 설정합니다.
+
+		strokeLineShape(line)을 호출하여 선을 그립니다.
+```
+
+```jsx
+import Phaser from 'phaser'
+
+class Play extends Phaser.Scene {
+  constructor(config) {
+    super('PlayScene')
+    this.config = config
+  }
+
+  create() {
+    // 그래픽 객체 생성
+    this.graphics = this.add.graphics()
+    this.graphics.lineStyle(2, 0x00ff00) // 선 스타일: 두께 2, 초록색
+
+    // 선 객체 생성 (초기값은 0, 0)
+    this.line = new Phaser.Geom.Line()
+
+    // 마우스 입력 이벤트 등록
+    this.input.on('pointerdown', this.startDrawing, this)
+    this.input.on('pointerup', this.finishDrawing, this)
+  }
+
+  // 선 그리기 시작 (마우스를 눌렀을 때)
+  startDrawing(pointer) {
+    console.log('선 그리기 시작!')
+    this.line.x1 = pointer.worldX
+    this.line.y1 = pointer.worldY
+  }
+
+  // 선 그리기 완료 (마우스를 뗐을 때)
+  finishDrawing(pointer) {
+    console.log('선 그리기 완료!')
+    this.line.x2 = pointer.worldX
+    this.line.y2 = pointer.worldY
+
+    // 선을 화면에 그리기
+    this.graphics.strokeLineShape(this.line)
+  }
+}
+
+export default Play
+```
+
+# { Phaser에서 마우스 드래그로 실시간 선 그리기 }
+
+```jsx
+이 강의에서는 Phaser를 사용하여 마우스 버튼을 누르고 있는 동안
+
+실시간으로 선을 그리는 기능을 구현하는 방법을 배웁니다.
+
+이를 위해 update() 함수를 활용하여 마우스의 현재 위치를 지속적으로 반영하고,
+
+선이 그려지는 조건을 설정하여 불필요한 선이 생성되지 않도록 개선합니다.
+```
+
+## 1. update() 함수 활용하여 실시간 선 그리기
+
+### 기본 개념
+
+```jsx
+Phaser의 update() 함수는 매 프레임마다 호출됩니다.
+
+따라서, 마우스 버튼을 누른 동안(pointerdown)
+
+현재 위치를 지속적으로 업데이트하여 선을 그릴 수 있습니다.
+```
+
+### 1.1 update() 함수 추가
+
+```jsx
+Phaser에서는 기본적으로 update() 함수가 존재하지 않으므로, 직접 추가해야 합니다.
+```
+
+```jsx
+update() {
+    if (this.platting) {  // platting이 true일 때만 실행
+        const pointer = this.input.activePointer;  // 현재 마우스 위치 가져오기
+
+        this.line.x2 = pointer.worldX;  // 마우스 x 좌표 업데이트
+        this.line.y2 = pointer.worldY;  // 마우스 y 좌표 업데이트
+
+        this.graphics.clear();  // 기존 선 지우기
+        this.graphics.strokeLineShape(this.line);  // 새로운 선 그리기
+    }
+}
+```
+
+```jsx
+this.platting이 true일 때만 마우스 위치를 반영하여 선을 그림
+
+activePointer를 이용해 마우스의 현재 위치(worldX, worldY)를 가져옴
+
+graphics.clear()를 호출해 기존 선을 삭제한 후, strokeLineShape()를 사용해 새로운 선을 그림
+```
+
+## 2. 마우스 클릭 시 선 그리기 시작 & 종료
+
+### 2.1 마우스 클릭 시 선 그리기 시작
+
+```jsx
+마우스를 클릭하면(pointerdown) 선을 그리기 위한 시작점을 저장하고
+
+platting 변수를 true로 변경합니다.
+```
+
+```jsx
+startDrawing(pointer) {
+    console.log("시작");
+    this.line.x1 = pointer.worldX;  // 선 시작점 x 좌표
+    this.line.y1 = pointer.worldY;  // 선 시작점 y 좌표
+    this.platting = true;  // 선을 그리고 있음을 표시
+}
+```
+
+### 2.2 마우스를 떼면 선 그리기 종료
+
+```jsx
+마우스를 떼면(pointerup) 선의 끝점을 저장하고,
+
+이전에 그린 선을 유지한 채 새로운 선을 그릴 준비를 합니다.
+```
+
+```jsx
+finishDrawing(pointer) {
+    console.log("끝");
+    this.line.x2 = pointer.worldX;
+    this.line.y2 = pointer.worldY;
+
+    this.graphics.clear();  // 이전 선 삭제
+    this.graphics.strokeLineShape(this.line);  // 최종 선 그리기
+    this.platting = false;  // 선 그리기 종료
+}
+```
+
+```jsx
+pointerdown 시 x1, y1 좌표를 저장하고 platting을 true로 설정
+
+pointerup 시 x2, y2 좌표를 저장하고 선을 최종적으로 그림
+
+graphics.clear()로 기존 선을 삭제 후 strokeLineShape()로 최종 선을 생성
+```
+
+## 전체 코드 정리
+
+```jsx
+import Phaser from 'phaser' // Phaser 라이브러리를 가져옴
+
+// Play라는 이름의 씬(Scene) 클래스 생성
+class Play extends Phaser.Scene {
+  constructor(config) {
+    super('PlayScene') // Phaser.Scene을 상속받아 "PlayScene"이라는 씬을 생성
+    this.config = config // 전달된 설정(config)을 저장
+  }
+
+  create() {
+    // 선을 그리고 있는지 여부를 나타내는 플래그 (기본값: false)
+    this.platting = false
+
+    // 그래픽 객체 생성 (게임 내에서 선, 도형 등을 그릴 때 사용)
+    this.graphics = this.add.graphics()
+
+    // Phaser에서 제공하는 선(Line) 객체 생성 (기본값은 0, 0에서 시작)
+    this.line = new Phaser.Geom.Line() // Phaser.Geom.Line은 기하학적인 도형을 다룰 때 사용하는 클래스(Phaser.Geom 네임스페이스 아래에 있음).
+
+    // 선의 스타일 설정 (두께: 1, 색상: 녹색(0x00ff00))
+    this.graphics.lineStyle(1, 0x00ff00)
+
+    // 마우스를 눌렀을 때(startDrawing 메서드 실행)
+    this.input.on('pointerdown', this.startDrawing, this)
+
+    // 마우스를 뗐을 때(finishDrawing 메서드 실행)
+    this.input.on('pointerup', this.finishDrawing, this)
+  }
+
+  // 선 그리기를 시작하는 함수
+  startDrawing(pointer) {
+    console.log('시작') // 콘솔에 "시작" 출력
+
+    // 마우스를 누른 위치를 선의 시작점으로 설정
+    this.line.x1 = pointer.worldX
+    this.line.y1 = pointer.worldY
+
+    // 선을 그리고 있다고 표시
+    this.platting = true
+  }
+
+  // 선 그리기를 마치는 함수
+  finishDrawing(pointer) {
+    console.log('끝') // 콘솔에 "끝" 출력
+
+    // 마우스를 뗀 위치를 선의 끝점으로 설정
+    this.line.x2 = pointer.worldX
+    this.line.y2 = pointer.worldY
+
+    // 기존 그래픽을 지우고 새로 선을 그림
+    this.graphics.clear()
+    this.graphics.strokeLineShape(this.line) // strokeLineShape()는 Phaser.GameObjects.Graphics의 메서드로, Phaser.Geom.Line을 인자로 받아 선을 그림.
+
+    // 선 그리기 종료
+    this.platting = false
+  }
+
+  // 프레임마다 실행되는 업데이트 함수
+  update() {
+    if (this.platting) {
+      // 선을 그리고 있는 중이라면
+      const pointer = this.input.activePointer // 현재 마우스 위치 가져오기
+
+      // 선의 끝점을 현재 마우스 위치로 업데이트
+      this.line.x2 = pointer.worldX
+      this.line.y2 = pointer.worldY
+
+      // 기존 선을 지우고 새로운 위치에 다시 그림
+      this.graphics.clear()
+      this.graphics.strokeLineShape(this.line)
+    }
+  }
+}
+
+export default Play // Play 클래스를 외부에서 사용할 수 있도록 내보냄
+```
+
+```jsx
+이번 강의에서는 Phaser에서 마우스를 드래그하여 선을 실시간으로 그리는 기능을 구현했습니다.
+
+pointerdown으로 선 그리기 시작 (platting = true)
+
+pointerup으로 선 그리기 종료 (platting = false)
+
+update()에서 마우스의 현재 위치를 반영하여 선을 지속적으로 업데이트
+
+clear()를 활용하여 불필요한 선 중첩 방지
+```
+
+# { 실시간 선 그리기 및 충돌 감지 개념 정리 }
+
+```jsx
+이 강의에서는 Phaser 3를 사용하여 실시간으로 선을 그리고,
+
+특정 레이어(예: 플랫폼)와 충돌을 감지하는 방법을 배웁니다.
+
+충돌을 감지하는 방식과 타일이 존재하는지 확인하는 과정을 단계별로 설명합니다.
+```
+
+## 1. 선과 레이어 충돌 개념
+
+```jsx
+게임에서 선을 그리고 특정 레이어(예: platforms)와 충돌했는지 확인하는 것이 목표입니다.
+
+이를 위해 타일 맵 레이어와 충돌 감지 로직을 활용합니다.
+```
+
+```jsx
+1. 선을 그리는 과정
+
+		1. 마우스를 누르면 선의 시작점이 설정됩니다. (pointerdown)
+
+		2. 마우스를 움직이면 실시간으로 선이 연장됩니다.
+
+		3. 마우스를 떼면 선의 끝점이 설정되고, 충돌 감지를 수행합니다. (pointerup)
+
+2. 레이어와 충돌 감지 과정
+
+		1. finishDrawing(pointer, layer) 함수에서 선이 완성된 후 getTilesWithinShape(line)을 사용하여 선이 지나간 부분의 타일 정보를 가져옵니다.
+
+		2. 가져온 타일 정보에서 타일의 인덱스가 -1이 아닌 경우를 필터링합니다.
+
+				-1이면 실제 타일이 없는 공간입니다.
+
+				0보다 크면 해당 위치에 타일(예: 플랫폼)이 존재합니다.
+
+		3. 충돌한 타일이 있다면 콘솔에 메시지를 출력하여 확인할 수 있습니다.
+
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380510/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_7_Raycasting_-_1_-/image_1.png)
+
+```jsx
+* 왜 전부 0으로 되어있는가?
+
+-1 → 타일 없음 (완전히 빈 공간)
+
+0 → 타일이 없음 또는 특정한 빈 타일(예: 배경)
+
+1 이상 → 타일이 있음 (예: 플랫폼, 벽 등)
+```
+
+## 2. 주요 코드 설명
+
+### 선을 그리는 과정
+
+```jsx
+startDrawing(pointer) {
+    console.log('시작');
+    this.line.x1 = pointer.worldX;
+    this.line.y1 = pointer.worldY;
+    this.platting = true;
+}
+```
+
+```jsx
+pointerdown 이벤트가 발생하면 선의 시작점(x1, y1)을 저장합니다.
+
+platting = true로 설정하여 선을 계속 그릴 수 있도록 합니다.
+```
+
+```jsx
+update() {
+    if (this.platting) {
+        const pointer = this.input.activePointer;
+        this.line.x2 = pointer.worldX;
+        this.line.y2 = pointer.worldY;
+        this.graphics.clear();
+        this.graphics.strokeLineShape(this.line);
+    }
+}
+```
+
+```jsx
+update() 함수에서는 마우스가 움직이는 동안 실시간으로 선을 업데이트합니다.
+```
+
+### 선과 타일 충돌 감지
+
+```jsx
+finishDrawing(pointer, layer) {
+    console.log('끝');
+    this.line.x2 = pointer.worldX;
+    this.line.y2 = pointer.worldY;
+
+    this.graphics.clear();
+    this.graphics.strokeLineShape(this.line);
+
+    // 선과 겹치는 타일 가져오기
+    this.tileHits = layer.getTilesWithinShape(this.line);
+
+    // 충돌 감지
+    if (this.tileHits.length > 0) {
+        this.tileHits.forEach(tile => {
+            if (tile.index !== -1) {
+                console.log('타일이 있습니다.', tile);
+            }
+        });
+    }
+
+    this.platting = false;
+}
+
+```
+
+```jsx
+getTilesWithinShape(this.line)를 통해 선이 통과한 영역에 있는 타일을 가져옵니다.
+
+가져온 tileHits 리스트에서 실제 타일(타일 인덱스가 -1이 아닌 것)만 검사합니다.
+
+타일이 존재하면 "타일이 있습니다."라는 메시지를 출력하여 충돌 여부를 확인할 수 있습니다.
+```
+
+## 3. 최적화된 코드 (조건문 단순화)
+
+```jsx
+this.tileHits.forEach((tile) => {
+  tile.index !== -1 && console.log('타일이 있습니다.', tile)
+})
+```
+
+```jsx
+if 문을 삼항 연산자 방식으로 단순화하여 가독성을 높였습니다.
+```
+
+# { Phaser에서 충돌 감지를 시각적으로 표시하는 방법 }
+
+```jsx
+이번 강의에서는 Phaser에서 타일과 충돌이 감지되는 부분을 시각적으로 표시하는 방법을 배웁니다.
+
+충돌이 발생한 타일을 주황색으로 표시하여,
+
+플레이어나 적이 충돌할 수 있는 영역을 쉽게 확인할 수 있도록 구현할 것입니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380510/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_7_Raycasting_-_1_-/image_2.png)
+
+## 1. 충돌이 감지된 타일을 '충돌 가능' 상태로 설정
+
+```jsx
+우선, 라인이 지나가면서 충돌하는 타일을 감지하고,
+
+해당 타일을 충돌 가능(collidable)한 상태로 설정해야 합니다.
+
+이전에는 console.log()로 출력했지만, 이번에는 실제로 충돌 속성을 변경합니다.
+```
+
+### 1-1. 충돌 감지한 타일을 '충돌 가능' 상태로 변경
+
+```jsx
+if (this.tileHits.length > 0) {
+  this.tileHits.forEach((tile) => {
+    tile.index !== -1 && tile.setCollision(true)
+  })
+}
+```
+
+```jsx
+layer.getTilesWithinShape(this.line)을 사용하여, 현재 라인과 충돌한 타일들을 가져옵니다.
+
+가져온 tileHits 배열의 각 타일에 대해 tile.setCollision(true)를 호출하여 충돌 가능 상태로 변경합니다.
+
+tile.index !== -1 조건을 추가하여, 빈 타일(= 타일이 없는 경우)을 제외하고 충돌 가능하게 만듭니다.
+```
+
+## 2. 충돌한 타일을 '주황색'으로 표시
+
+```jsx
+이제 충돌한 타일이 어디인지 시각적으로 확인할 수 있도록 타일을 주황색으로 표시하는 기능을 추가합니다.
+```
+
+### 2-1. `drawDebug()` 함수 구현
+
+```jsx
+drawDebug(layer) {
+    const collidingTileColor = new Phaser.Display.Color(243, 134, 48, 200);
+    layer.renderDebug(this.graphics, {
+        tileColor: null,  // 기본 타일 색상 없음
+        collidingTileColor
+    });
+}
+```
+
+```jsx
+Phaser.Display.Color(243, 134, 48, 200)을 사용하여 주황색(Orange) 색상을 설정합니다.
+
+		(R: 243, G: 134, B: 48, Alpha: 200)
+
+layer.renderDebug(this.graphics, { tileColor: null, collidingTileColor })
+
+		tileColor: null → 기본 타일 색상을 유지
+
+		collidingTileColor → 충돌된 타일을 주황색으로 표시
+
+이제 충돌이 발생한 타일이 눈에 보이도록 표시됩니다!
+```
+
+## 3. 이전 충돌한 타일을 초기화하여 새로 그리기
+
+```jsx
+현재 코드는 충돌한 타일이 계속 표시됩니다.
+
+새로운 선을 그릴 때, 이전 충돌한 타일들을 원래 상태로 되돌려야 합니다.
+```
+
+### 3-1. 이전 타일의 충돌 상태를 제거
+
+```jsx
+if (this.tileHits && this.tileHits.length > 0) {
+  this.tileHits.forEach((tile) => {
+    tile.index !== -1 && tile.setCollision(false)
+  })
+}
+```
+
+```jsx
+새로운 선을 그릴 때(startDrawing() 실행 시),
+
+이전에 충돌했던 타일들을 원래 상태로 복구해야 합니다.
+
+tile.setCollision(false)를 호출하여,
+
+기존에 충돌 가능(true)로 설정된 타일을 다시 충돌 불가능(false) 상태로 변경합니다.
+```
+
+## 4. 전체 코드 흐름 정리
+
+```jsx
+1. 플레이어가 선을 그리기 시작하면:
+
+		이전 충돌했던 타일을 초기화
+
+		새로운 라인의 시작 좌표를 설정
+
+		platting = true (선을 그리고 있다는 상태를 저장)
+
+2. 선을 그리는 동안:
+
+		update()에서 현재 마우스 위치까지 실시간으로 선을 그림
+
+3. 선을 그리기 종료하면:
+
+		충돌한 타일을 감지하여 충돌 가능(true)로 변경
+
+		drawDebug()를 호출하여 충돌한 타일을 주황색으로 표시
+```
+
+## 5. 예제 코드 (중요 부분 포함)
+
+```jsx
+finishDrawing(pointer, layer) {
+    console.log('끝')
+    this.line.x2 = pointer.worldX;
+    this.line.y2 = pointer.worldY;
+
+    this.graphics.clear();
+    this.graphics.strokeLineShape(this.line);
+
+    this.tileHits = layer.getTilesWithinShape(this.line);
+
+    if ( this.tileHits.length > 0 ) {
+        this.tileHits.forEach(tile => {
+            tile.index !== -1 && tile.setCollision(true)
+        })
+    }
+
+    this.drawDebug(layer);
+    this.platting = false;
+}
+
+```
+
+```jsx
+getTilesWithinShape(this.line) → 라인이 지나간 타일을 가져옴
+
+tile.setCollision(true) → 충돌 가능 상태로 변경
+
+drawDebug(layer) → 충돌된 타일을 주황색으로 표시
+```
+
+# { 레이캐스팅(Raycasting) 개념 및 구현 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380510/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_7_Raycasting_-_1_-/image_3.png)
+
+```jsx
+이번 강의에서는 적(Enemy) 캐릭터가 바닥과 충돌하는지 감지하기 위해 레이캐스팅(Raycasting) 기법을 적용하는 과정을 다루었습니다.
+```
+
+## 1. 레이캐스팅이란?
+
+```jsx
+레이캐스팅(Raycasting)은 한 지점에서 특정 방향으로 선(광선)을 그려서 충돌 여부를 감지하는 기법입니다.
+
+우리는 이를 활용하여 적 캐릭터가 땅을 감지하고 방향을 전환하도록 만들 것입니다.
+
+💡 우리가 만들 기능
+
+		적이 이동할 때 바닥을 감지하도록 레이(Ray)를 생성
+
+		바닥이 없다면 방향을 전환
+```
+
+## 2. 레이캐스팅을 위한 준비
+
+```jsx
+우리는 Enemy 클래스 내부에서 레이캐스팅을 구현할 것입니다.
+
+📌 필요한 것
+
+		1. 적 캐릭터의 위치 → this.body
+
+		2. 레이(광선)를 그릴 그래픽 객체 → this.rayGraphics
+
+		3. 레이를 계산하는 함수 → raycast()
+
+		4. 매 프레임마다 레이를 갱신 → update()
+```
+
+## 3. 그래픽 객체 생성하기
+
+```jsx
+Phaser에서 선을 그리려면 Graphics 객체가 필요합니다.
+
+따라서 init() 메서드에서 그래픽 객체를 생성합니다.
+```
+
+```jsx
+this.rayGraphics = this.scene.add.graphics({
+  lineStyle: {
+    width: 2, // 선의 두께 (2px)
+    color: 0xaa00aa, // 보라색 (Hex 색상 코드)
+  },
+})
+```
+
+```jsx
+이제 rayGraphics 객체를 이용해서 레이를 화면에 표시할 수 있습니다.
+```
+
+## 4. 레이캐스팅 함수 구현
+
+```jsx
+📌 raycast(body, raylength=30) 함수
+
+적 캐릭터의 위치를 기준으로 30픽셀짜리 선(광선)을 생성하는 함수입니다.
+```
+
+```jsx
+raycast(body, raylength=30) {
+    const { x, y, width, halfHeight } = body; // 적의 위치 정보 가져오기
+    const line = new Phaser.Geom.Line();
+
+    line.x1 = x + width;  // 시작점 X 좌표 (적의 오른쪽 끝)
+    line.y1 = y + halfHeight;  // 시작점 Y 좌표 (적의 중심)
+    line.x2 = line.x1 + raylength; // 끝점 X (오른쪽으로 30px)
+    line.y2 = line.y1 + raylength; // 끝점 Y (아래쪽으로 30px)
+
+    return { ray: line };  // 생성한 선(광선) 반환
+}
+```
+
+```jsx
+x1, y1 → 적의 오른쪽 끝 중앙을 시작점으로 설정
+
+x2, y2 → 시작점에서 30픽셀 오른쪽 아래로 이동한 점을 끝점으로 설정
+
+이를 통해 적 캐릭터 아래쪽에 광선을 쏘게 됨
+```
+
+## 5. 레이 업데이트 (update)
+
+```jsx
+이제 update() 함수에서 매 프레임마다 레이를 갱신해야 합니다.
+```
+
+```jsx
+update(time, delta) {
+    this.setVelocityX(30);  // 적이 오른쪽으로 이동
+
+    this.rayGraphics.clear();  // 이전 프레임의 레이 삭제
+    const { ray } = this.raycast(this.body);  // 새로운 레이 생성
+    this.rayGraphics.strokeLineShape(ray);  // 레이를 화면에 그림
+}
+```
+
+```jsx
+💡 동작 과정
+
+		이전 프레임의 레이 삭제 → this.rayGraphics.clear()
+
+		현재 적 캐릭터의 위치에서 새로운 레이 생성 → this.raycast(this.body)
+
+		레이를 화면에 그림 → this.rayGraphics.strokeLineShape(ray)
+```
+
+## 6. 실행 결과
+
+```jsx
+이제 실행하면 적이 이동하면서 바닥을 향해 레이를 발사하는 것처럼 보입니다.
+
+적의 아래쪽에 보라색 선이 표시됨
+
+이후 바닥이 없을 경우 방향 전환 기능을 추가할 수 있음
+```
+
+# { Phaser에서 Raycast를 활용한 충돌 감지 기능 구현 상세 정리 }
+
+```jsx
+이 강의에서는 Phaser의 Raycast(광선 캐스팅) 기능을 활용하여 적(Enemy)이 플랫폼과 충돌하는지 감지하는 방법을 설명합니다.
+
+적이 이동하면서 바닥을 감지하고, 바닥이 끝나면 방향을 바꿀 수 있도록 구현하는 것이 목표입니다.
+```
+
+## 1. Raycast(광선 캐스팅)란?
+
+```jsx
+Raycast는 게임에서 객체(예: 적)가 특정 방향으로 광선을 발사하여 충돌 여부를 감지하는 기법입니다.
+
+		적 캐릭터가 앞으로 이동하면서 바닥을 감지하도록 Ray(광선)를 발사합니다.
+
+		Ray가 타일(layer) 과 충돌하면 true, 그렇지 않으면 false를 반환합니다.
+
+		이를 활용하여 적이 끝에 도달하면 방향을 바꾸도록 설정할 수 있습니다.
+```
+
+## 2. 구현 과정 및 코드 분석
+
+### 1. `Enemy` 클래스에서 Raycast 기능 추가
+
+```jsx
+적이 움직이면서 바닥을 감지하는 기능을 추가합니다.
+```
+
+```jsx
+update(time, delta) {
+    this.setVelocityX(30); // 오른쪽으로 계속 이동
+
+    // Raycast 실행하여 충돌 여부 확인
+    const { ray, hasHit } = this.raycast(this.body, this.platformCollidersLayer);
+
+    if (hasHit) {
+        console.log("hitting the platform");
+    }
+
+    // Ray의 시각적 표현 (디버깅용)
+    this.rayGraphics.clear();
+    this.rayGraphics.strokeLineShape(ray);
+}
+
+```
+
+```jsx
+raycast() 함수가 ray(광선)과 hasHit(충돌 여부)를 반환하며, hasHit가 true면 바닥을 감지한 것입니다.
+```
+
+### 2. Raycast 함수 구현
+
+```jsx
+적의 앞쪽 바닥을 감지하는 로직을 작성합니다.
+```
+
+```jsx
+raycast(body, layer, raylength = 40) {
+    const { x, y, width, halfHeight } = body;
+    const line = new Phaser.Geom.Line();
+    let hasHit = false; // 기본값은 false (바닥 감지 X)
+
+    // Ray의 시작점 설정 (적의 오른쪽 아래 부분)
+    line.x1 = x + width;
+    line.y1 = y + halfHeight;
+
+    // Ray의 끝점 설정 (오른쪽 아래 방향으로 40px 길이)
+    line.x2 = line.x1 + raylength;
+    line.y2 = line.y1 + raylength;
+
+    // Ray가 겹치는 타일 감지
+    const hits = layer.getTilesWithinShape(line);
+
+    // 충돌 여부 판단
+    if (hits.length > 0) {
+        hasHit = hits.some(hit => hit.index !== -1);
+    }
+
+    return { ray: line, hasHit };
+}
+
+```
+
+```jsx
+**Phaser.Geom.Line()**을 사용해 광선의 시작점과 끝점을 설정하고,
+
+getTilesWithinShape(line)을 이용하여 타일 충돌 여부를 확인합니다.
+```
+
+### 3. 적에게 충돌 감지용 플랫폼 레이어 전달
+
+```jsx
+적이 플랫폼 타일과 충돌을 감지하려면, 이를 위한 플랫폼 레이어 정보를 적에게 전달해야 합니다.
+```
+
+### 1) `Play` 씬에서 `createEnemies()` 함수 수정
+
+```jsx
+적을 생성할 때, platformsColliders(충돌 감지할 타일 레이어) 정보를 함께 전달합니다.
+```
+
+```jsx
+createEnemies(spawnLayer, platformsColliders) {
+    const enemies = new Enemies(this);
+    const enemyTypes = enemies.getTypes();
+
+    spawnLayer.objects.forEach((spawnPoint, i) => {
+        if (i === 1) {
+            return;
+        }
+
+        // 적을 생성하면서 충돌 감지 레이어 전달
+        const enemy = new enemyTypes[spawnPoint.type](this, spawnPoint.x, spawnPoint.y);
+        enemy.setPlatformColliders(platformsColliders);
+        enemies.add(enemy);
+    });
+
+    return enemies;
+}
+
+```
+
+```jsx
+적을 생성할 때 setPlatformColliders()를 호출하여 적이 플랫폼과의 충돌을 감지할 수 있도록 설정합니다.
+```
+
+### 2) `Enemy` 클래스에서 `setPlatformColliders()` 함수 구현
+
+```jsx
+이 함수는 전달받은 충돌 감지 레이어를 Enemy 객체에 저장하는 역할을 합니다.
+```
+
+```jsx
+setPlatformColliders(platformCollidersLayer) {
+    this.platformCollidersLayer = platformCollidersLayer;
+}
+```
+
+```jsx
+ 이제 Enemy 클래스 내부에서 this.platformCollidersLayer를 사용하여 충돌 감지를 수행할 수 있습니다.
+```
+
+## 3. Raycast 충돌 감지 결과 활용
+
+```jsx
+앞서 만든 update()에서 raycast()를 호출하면,
+
+hasHit 값으로 바닥이 있는지 없는지를 확인할 수 있습니다.
+```
+
+```jsx
+update(time, delta) {
+    this.setVelocityX(30); // 계속 이동
+
+    // Raycast 실행하여 충돌 여부 확인
+    const { ray, hasHit } = this.raycast(this.body, this.platformCollidersLayer);
+
+    if (hasHit) {
+        console.log("Hitting the platform");
+    }
+
+    this.rayGraphics.clear();
+    this.rayGraphics.strokeLineShape(ray);
+}
+
+```
+
+```jsx
+hasHit 값이 true면 바닥을 감지한 것이고, false면 바닥이 없는 상태입니다.
+
+이후 바닥이 없을 때 방향을 바꾸는 기능을 추가할 수 있습니다.
+```

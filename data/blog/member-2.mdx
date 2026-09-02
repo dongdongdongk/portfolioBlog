@@ -1,0 +1,289 @@
+---
+title: 'Member'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# Member-Login
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381051/notion-blog/_/_/Spring_/Member/Untitled.png)
+
+```java
+0. @Controller 어테뉴 에이션과
+
+@RequestMapping 을 사용하여 /member/memberLogin 으로 value 값을 적어줄것을 줄일 수 있게
+
+사전 설정해준다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381049/notion-blog/_/_/Spring_/Member/Untitled_1.png)
+
+```java
+0.Controller에 사용하는 어테뉴에이션 @RequestMapping 과 (value 받은 url 정보 method를 설정
+
+해준
+
+1.Controller 에서 MemberLogin GET 메소드를 만들어준다.
+
+2.ModelAndView 객체를 생성해주고 setViewName 을 사용하여 memberLogin.JSP 로 이동시켜준다
+
+그리고 getMemberLogin POST 에서 memberService 에서 getMemberLogin 메서드를 호출한다
+
+*Controller 에서 Method 가 GET 과 POST 로 나눠지는데 이유는 redirect 때문이다
+
+Form 까지의 이동은 GET 으로 이동하지만 Form 에서 이동은 Post 를 사용한다.(Post 는 DB로 이동
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381051/notion-blog/_/_/Spring_/Member/Untitled_2.png)
+
+```java
+3.MemberLogin.JSP 에서 ID 값과 Password 파라미터를 받아 <form> 태그를 사용하여 memberLogin
+
+POST 메서드에 다시 접근해 준다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381051/notion-blog/_/_/Spring_/Member/Untitled_3.png)
+
+```java
+4.멤버 정보를 받아올 MemberDTO 와 Session 을 받을 HTTPServletRequest 를 매개변수로 설정한다
+
+5.memberDTO 에 memberService 의 getMemberLogin 매서드를 호출한다. (JSP에서 받은 ID,PW 를
+
+담을 memberDTO 를 매개변수로 사용)
+
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381051/notion-blog/_/_/Spring_/Member/Untitled_4.png)
+
+```java
+Service
+
+6.getMemberLogin 에서 memberDAO 의 getMemberLogin 메서드를 호출한다.
+
+이후 이 결과를 MemberDTO 의 result 에 저장한다.(id,pw 대조결과 멤버 정보)
+
+(ID와 PW memberDTO에 담겨 DAO 로 계속이동)
+
+6.5 result 가 null 이 아니고
+
+&& memberDTO 의 패스워드 getPw , result 의 getPw  .equals 를 통해 같은지 확인한다
+
+맞다면 memberDTO 의 pw 에 null 을넣고 반환
+
+아니라면 null 을 반환한다
+
+* 이는 pw를 노출시키지 않기 위한 보안과 관련된 절차이다
+
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381051/notion-blog/_/_/Spring_/Member/Untitled_5.png)
+
+```java
+DAO
+
+7.sqlSession 에 selectOne(id 와 pw 를 대조해 나오는 멤버는 하나기 때문)
+
+NAMESPACE + id(getMemberLogin)와 memberDTO 를 담아 MemberMapper 를 찾아가서 값을 받아온다.
+
+, memberDTO 는 받아온 파라미터(id와pw를 담은 매개변수다)
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381051/notion-blog/_/_/Spring_/Member/Untitled_6.png)
+
+```java
+8. MemberMapper.XML 에서 SQL문을 이용해서 MemberDTO 의 id 와 DB컬럼의 ID 를 비교하여 값을
+
+반환한다(id와 pw 대조한 멤버의 모든 정보) ID = id  Pw = pw 라는것 (#{} 빼고 쉽게 쿼리문 생각)
+
+이때 id 는 NAMESAPCE 가 서치에 사용하는 것 이고
+
+parameterType 은 DAO 에서 받아온 memberDTO 의 타입인 MemberDTO 이며
+
+resultType 은 결과 값을 담을 타입인 MemberDTO 이다 ( 결과가 int이든 뭐든 MemberDTO에 담아준다)
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381051/notion-blog/_/_/Spring_/Member/Untitled_7.png)
+
+```java
+
+9. memberDTO 가 null이 아니라면 ( 일치하는 id와 pw 멤버가 있었다는것)
+
+10. 매개변수의 HttpServletRequest session 에 request.getSession 으로 현제 세션 객체를
+
+반환받아 request 에 받고 이를 session 에 저장한다
+
+11.session 에 setAttribute 메소드를 사용하여 "member" 이라는 이름으로 (마음대로 설정가능, 여러개 설정가능))
+
+memberDTO 의 정보를 저장한다 (이는 어디서든지 접근 가능함) (setAttribute 는 이름 과 value로
+
+설정)
+
+12.mv.setViewName으로 리다이렉트 해줘 메인으로 돌아간다
+
+```
+
+---
+
+# Member-Logout
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381051/notion-blog/_/_/Spring_/Member/Untitled_8.png)
+
+```java
+1. Login 을 할때 이미 request.getSession 을 했기 때문에 다시 반복할 필요없이 메개변수로
+
+HttpSession session 만 하면 된다.
+
+2.View(리다이렉트) 로 이동하기 위해 ModelAndView 객체를 생성해준다
+
+3. session.invalidate(); 를 사용하여 세션을 삭제해준다(invalidate 세션삭제 메소드)
+
+4.mv.setViewName 으로 리다이렉트
+
+*세션을 지우고 리다이렉트를 하는 기능이기 때문에 여기서 끝이다.
+```
+
+---
+
+# Member-Page
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381052/notion-blog/_/_/Spring_/Member/Untitled_9.png)
+
+```java
+1.Controller 에서 getMemberPage 메소드를 만들고 매개변수로 HttpSession session 으로 받는다.
+
+(이미 위에서 request.getSession 을 했기때문에 자동으로 스프링이 만들어줌)
+
+(매개변수가 session 인 이유는 Login 을 하면서 세션에 memberDTO 로 멤버 정보를 넣어줬기 때문에
+
+이걸 꺼내서 쓰려고)
+
+2.MemberDTO 의 memberDTO 변수에 session.getAttribute 를 사용하여 Login때 저장한 이름 "member"
+
+의 memberDTO(멤버의 정보) 를 불러온뒤 넣어준다.
+
+( get.Attribute 로 가져올 때 객체 타입이 object로 변하므로 형변환 (MemberDTO) 를 해준다.
+
+3.memberService 의 getMemberPage 메서드를 호출하고 매개변수는 (memberDTO로 준다 )
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381049/notion-blog/_/_/Spring_/Member/Untitled_10.png)
+
+```java
+Service
+
+4.memberDAO 의 getMemberLogin 메서드를 호출한다.
+
+(memberDTO 에는 멤버의 정보가 담겨있다.)
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381049/notion-blog/_/_/Spring_/Member/Untitled_11.png)
+
+```java
+DAO
+
+5.sqlSession 에 selectOne(id 와 pw 를 대조해 나오는 멤버는 하나기 때문)
+
+NAMESPACE + id(getMemberLogin)와 memberDTO 를 담아 MemberMapper 를 찾아가서 값을 받아온다.
+
+, memberDTO 는 받아온 파라미터(id와pw를 담은 매개변수다)
+
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381051/notion-blog/_/_/Spring_/Member/Untitled_6.png)
+
+```java
+6. MemberMapper.XML 에서 SQL문을 이용해서 MemberDTO 의 id 와 DB컬럼의 ID 를 비교하여 값을
+
+반환한다(id와 pw 대조한 멤버의 모든 정보) ID = id  Pw = pw 라는것 (#{} 빼고 쉽게 쿼리문 생각)
+
+이때 id 는 NAMESAPCE 가 서치에 사용하는 것 이고
+
+parameterType 은 DAO 에서 받아온 memberDTO 의 타입인 MemberDTO 이며
+
+resultType 은 결과 값을 담을 타입인 MemberDTO 이다 ( 결과가 int이든 뭐든 MemberDTO에 담아준다)
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381052/notion-blog/_/_/Spring_/Member/Untitled_9.png)
+
+```java
+7. addObject 를 이용하여 ("이름",값) 을 mv 에 저장해준다
+
+8.setViewName 을 이용하여 memberPage로 이동해준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381049/notion-blog/_/_/Spring_/Member/Untitled_12.png)
+
+```java
+memberPage.jsp
+
+9. mv,addObjet 로 저장한 ("dto",memberDTO) 를 사용하여 출력문을 만들어준다.
+
+(dto.name 으로 memberDTO 에 담겨있던 멤버의 모든정보중 name 정보를 get해오고 나머지도 불러오기
+```
+
+---
+
+# Member-Update
+
+---
+
+# Member-Join
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381050/notion-blog/_/_/Spring_/Member/Untitled_13.png)
+
+```sql
+Controller
+
+1.setMemberAdd 메서드를 생성한 뒤 ModelAndView 객체를 생성한다
+
+2.setViewName 메서드를 사용하여 View 의 memberJoin.jsp 로 이동한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381050/notion-blog/_/_/Spring_/Member/Untitled_14.png)
+
+```sql
+3. 회원 정보인 id, pw, name, phone, email 을 입력받고
+
+<form>을 통해 memberjoin.jsp post 메서드로 파라미터 값을 보내준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381050/notion-blog/_/_/Spring_/Member/Untitled_15.png)
+
+```sql
+* post 메서드로 이동
+
+4.ModelAndView 객체를 생성한 뒤
+
+5. memberService 의 setMemberAdd 메서드를 호출한다 (매개변수 memberDTO 에는
+
+jsp 에서 받아온 회원정보가 들어있다.) 결과(성공1 실패0) 를 받아 int result에 저장한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381050/notion-blog/_/_/Spring_/Member/Untitled_16.png)
+
+```java
+6. memberDAO.setMemberAdd 메서드를 호출하여 결과 (성공 1 실패 0) 을 result 에 저장한다.
+
+7. memberDAO.setMemberRoleAdd 메서드를 호출하여 회원의 권한을 설정해주고 결과를
+
+result 에 저장해준다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381050/notion-blog/_/_/Spring_/Member/Untitled_17.png)
+
+```java
+8. MemberMapper 로 이동뒤 받아온 회원의 정보를 데이터 베이스에 넣어준 뒤 결과값 0,1를 받는다.
+
+* RoleAdd 는 id 와 일괄적으로 MEMBER 권한 부여
+
+* 결과값이 INSERT 는 0,1 이기 때문에 result Type = 이 필요가 없다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381050/notion-blog/_/_/Spring_/Member/Untitled_15.png)
+
+```java
+9. mv.setViewName("redirect:../"); 로 사용자를 메인페이지로 보낼 기능 저장후 return
+```

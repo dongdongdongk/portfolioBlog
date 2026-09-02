@@ -1,0 +1,2645 @@
+---
+title: '배드 봇 - 드론 비행 슈팅 게임 - 7'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 언리얼 엔진 - 구체 수집 시스템 구현 }
+
+## 🎯 학습 목표
+
+플레이어가 구체에 닿으면 수집되는 시스템 구현
+
+- Sphere Collision Component 추가
+- Overlap Event 이해 및 구현
+- Collision 설정 이해
+- 중복 실행 방지 로직
+
+---
+
+## ⚙️ 사전 조정
+
+### Lifetime & Spawn Time 변경
+
+```
+BP_Small_Sphere
+  └─ Lifetime: 2 → 4초
+      (더 오래 존재)
+
+BP_Sphere_Spawner
+  └─ Spawn Time: 2 → 2.5초
+      (조금 더 여유있게 생성)
+```
+
+**이유**
+
+```
+플레이어가 수집할 시간 필요
+  ↓
+너무 빨리 사라지면 수집 불가
+  ↓
+4초면 충분한 시간
+```
+
+---
+
+## 🔘 Sphere Collision Component 추가
+
+### 왜 필요한가?
+
+```
+현재:
+  Sphere_Mesh만 존재
+  ↓
+  메시는 시각적 표현용
+  ↓
+  Overlap 감지 전용 컴포넌트 필요
+
+해결:
+  Sphere Collision 추가
+  ↓
+  Overlap 전용으로 사용
+```
+
+### Mesh vs Collision Component
+
+**Mesh (메시)**
+
+```
+용도: 보이는 것
+역할: 시각적 표현
+충돌: 설정 가능하지만 복잡
+```
+
+**Collision Component**
+
+```
+용도: 충돌/겹침 감지
+역할: 보이지 않는 판정 영역
+충돌: 이것만의 목적
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380705/notion-blog/_/_/_5_/_-_-_7/image.png)
+
+---
+
+## 🏗️ Component 구조 재구성
+
+### 문제 상황
+
+**초기 구조**
+
+```
+Sphere_Mesh (Root)
+  └─ Sphere Collision 추가 시도
+```
+
+**문제**
+
+```
+Sphere_Mesh를 Scale 조정 (Timeline)
+  ↓
+자식인 Sphere Collision도 함께 Scale
+  ↓
+Collision 크기 변함 (원하지 않음!)
+```
+
+**비유**
+
+```
+부모가 몸 키우면
+  ↓
+자식도 따라서 커짐
+  ↓
+자식은 그대로 크기 유지하고 싶은데!
+```
+
+### 해결: Scene Root 추가
+
+**최종 구조**
+
+```
+Scene Root (새로 추가)
+  ├─ Sphere_Mesh
+  └─ Sphere Collision
+```
+
+### 구현 단계
+
+### 1. Scene Component 추가
+
+```
+Components 패널
+  ↓
+Add Component
+  ↓
+Scene (검색)
+  ↓
+Scene Component
+  ↓
+이름: Scene Root
+```
+
+### 2. Sphere Collision 추가
+
+```
+Scene Root 선택
+  ↓
+Add Component
+  ↓
+Sphere Collision (검색)
+  ↓
+이름: Sphere Volume
+```
+
+**주의: Sphere 아님!**
+
+```
+❌ Sphere (Static Mesh)
+  → "No mesh" 툴팁
+  → 메시용
+
+✓ Sphere Collision
+  → 충돌/겹침 전용
+```
+
+### 3. Sphere_Mesh 재배치
+
+```
+Sphere_Mesh를 Scene Root로 드래그
+  ↓
+"Attach to Scene Root?" 선택
+  ↓
+계층 구조 변경
+```
+
+**최종 계층**
+
+```
+Scene Root
+  ├─ Sphere_Mesh (Scale 변화 O)
+  └─ Sphere Volume (Scale 변화 X)
+```
+
+### 4. Scene Root를 Root로 설정
+
+```
+Scene Root를 DefaultSceneRoot로 드래그
+  ↓
+"Set as new root?" → Yes
+```
+
+---
+
+## 🎨 Sphere Volume 설정
+
+### Hidden in Game 이해
+
+```
+Viewport에서:
+  ✓ 항상 보임 (개발용)
+
+Game에서 (Play 시):
+  ✓ Hidden in Game 체크
+    → 보이지 않음 (기본값)
+
+  ✗ 체크 해제
+    → 보임 (디버그용)
+```
+
+### 디버그로 확인
+
+```
+Sphere Volume 선택
+  ↓
+Details Panel → Rendering
+  ↓
+Hidden in Game: ✗ (체크 해제)
+  ↓
+Play → 구체 볼륨 보임
+```
+
+**확인 사항**
+
+```
+Sphere_Mesh Scale 변화
+  ↓
+Sphere Volume은 그대로
+  ↓
+원하는 동작! ✓
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380701/notion-blog/_/_/_5_/_-_-_7/image_1.png)
+
+### 크기 조정
+
+**Scale vs Sphere Radius**
+
+```
+❌ Transform → Scale 변경
+  → 컴포넌트 전체 스케일
+  → 권장하지 않음
+
+✓ Shape → Sphere Radius 변경
+  → 반지름만 변경
+  → 이 방법 사용!
+```
+
+**설정**
+
+```
+Sphere Volume 선택
+  ↓
+Details → Shape
+  ↓
+Sphere Radius: 500
+  ↓
+큰 감지 영역
+```
+
+**이유**
+
+```
+반경 500 = 멀리서도 감지
+  ↓
+플레이어가 가까이 오면
+  ↓
+일찍 Overlap 발생
+  ↓
+Wink Out 시작 시간 확보
+```
+
+---
+
+## 🔧 Collision 설정 이해
+
+### Sphere_Mesh Collision
+
+**현재 문제**
+
+```
+Play 시
+  ↓
+구체 메시가 플레이어를 막음
+  ↓
+통과 불가
+  ↓
+원하지 않는 동작
+```
+
+**해결**
+
+```
+Sphere_Mesh 선택
+  ↓
+Details → Collision
+  ↓
+Collision Presets: No Collision
+```
+
+**No Collision 의미**
+
+```
+아무것도 막지 않음
+  ├─ Block 안 함
+  ├─ Overlap 생성 안 함
+  └─ 완전 무시
+  ↓
+플레이어가 통과 가능
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380703/notion-blog/_/_/_5_/_-_-_7/image_2.png)
+
+### Sphere Volume Collision
+
+**설정**
+
+```
+Sphere Volume 선택
+  ↓
+Details → Collision
+  ↓
+Collision Presets: Overlap All Dynamic
+```
+
+**Overlap All Dynamic 의미**
+
+```
+모든 움직이는 것과 Overlap
+  ├─ 플레이어 (Pawn)
+  ├─ 다른 구체
+  └─ 움직이는 Actor들
+```
+
+### Generate Overlap Events
+
+```
+Sphere Volume 선택
+  ↓
+Details → Collision
+  ↓
+Generate Overlap Events: ✓ 필수!
+```
+
+**체크 안 하면**
+
+```
+Overlap 발생해도
+  ↓
+Event 생성 안 됨
+  ↓
+코드 실행 안 됨
+  ↓
+수집 안 됨!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380703/notion-blog/_/_/_5_/_-_-_7/image_3.png)
+
+---
+
+## 📡 Overlap Event 구현
+
+### Delegate란?
+
+**간단히**
+
+```
+Delegate = 이벤트 알림 시스템
+
+예:
+  구체가 겹침
+    ↓
+  Delegate가 "겹쳤어!" 브로드캐스트
+    ↓
+  등록된 Event들 실행
+```
+
+### Event 등록 방법 3가지
+
+### 1. Assign (자동 생성)
+
+```
+Sphere Volume 드래그
+  ↓
+"On Component Begin Overlap" 검색
+  ↓
+Assign 선택
+  ↓
+자동으로 Custom Event 생성
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380703/notion-blog/_/_/_5_/_-_-_7/image_4.png)
+
+**결과**
+
+```
+1. Bind 노드 (파란색)
+2. OnComponentBeginOverlap_Event (빨간색)
+   자동 생성됨
+```
+
+### 2. Bind (수동 연결)
+
+```
+Sphere Volume 드래그
+  ↓
+"On Component Begin Overlap" 검색
+  ↓
+Bind 선택
+  ↓
+파란색 Bind 노드만 생성
+  ↓
+Custom Event는 직접 만들어서 연결
+
+```
+
+**단점**
+
+```
+Custom Event를
+  ├─ 같은 파라미터로
+  └─ 직접 만들어야 함
+  ↓
+번거로움
+```
+
+### 3. 기타
+
+```
+Unbind Event: 연결 해제
+Unbind All Events: 전부 해제
+```
+
+### Assign 사용 (권장)
+
+```
+Event Begin Play
+  ↓
+Bind (파란색 노드)
+  └─ On Component Begin Overlap
+
+OnComponentBeginOverlap_Event
+  ↓
+[여기서 처리]
+```
+
+**왜 Begin Play에서 Bind?**
+
+```
+게임 시작 시 1회 등록
+  ↓
+이후 Overlap 발생하면
+  ↓
+자동으로 Event 실행
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380704/notion-blog/_/_/_5_/_-_-_7/image_5.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380704/notion-blog/_/_/_5_/_-_-_7/image_6.png)
+
+---
+
+## 🎯 Overlap 처리 로직
+
+### 출력 파라미터 이해
+
+```
+OnComponentBeginOverlap_Event
+  ├─ Overlapped Component: Sphere Volume
+  ├─ Other Actor: 겹친 대상
+  ├─ Other Comp: 대상의 컴포넌트
+  └─ 기타 정보들
+```
+
+### 1. 디버그 테스트
+
+```
+OnComponentBeginOverlap_Event
+  ↓
+Get Object Name
+  └─ Target: Other Actor
+  ↓
+Print String
+```
+
+**결과**
+
+```
+구체에 닿으면
+  ↓
+"Default Pawn" 출력
+  ↓
+Overlap 작동 확인 ✓
+```
+
+### 2. Pawn인지 확인
+
+**문제**
+
+```
+구체끼리도 Overlap 발생
+  ↓
+모든 Overlap에 반응하면 안 됨
+  ↓
+플레이어만 반응해야 함
+```
+
+**해결: Cast to Pawn**
+
+```
+Other Actor 드래그
+  ↓
+"Cast to Pawn" 검색
+  ↓
+Cast to Pawn 노드
+```
+
+**Cast 이해**
+
+```
+Cast = 타입 확인 + 변환
+
+Cast to Pawn:
+  "이 Actor가 Pawn이야?"
+
+  Yes (Pawn) → Success 핀 실행
+  No (Actor) → Failure 핀 (무시)
+```
+
+**비유**
+
+```
+"너 학생이야?"
+
+학생증 있음 (Cast 성공)
+  → 학생 입장 가능
+
+학생증 없음 (Cast 실패)
+  → 입장 불가
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380704/notion-blog/_/_/_5_/_-_-_7/image_7.png)
+
+# Is A vs Cast to - 차이점 정리 \* 추가
+
+난 다른 노드를 사용했다 cast 가 아니라 Is A
+
+## 🔍 두 노드 비교
+
+### Cast to Pawn
+
+```
+입력: Object (Actor)
+  ↓
+출력 1: Success/Failure 핀 (실행)
+출력 2: As Pawn (변환된 Pawn 참조)
+
+특징:
+  ├─ 타입 확인 + 변환
+  ├─ 실행 핀 있음 (흰색)
+  └─ 변환된 객체 사용 가능
+```
+
+### Is A
+
+```
+입력: Object (Actor)
+  ↓
+출력: Boolean (True/False)
+
+특징:
+  ├─ 타입 확인만
+  ├─ 실행 핀 없음 (Pure Function)
+  └─ True/False만 반환
+```
+
+---
+
+## 🎯 언제 뭘 쓰나?
+
+### Is A 사용 (당신이 쓴 것)
+
+```
+OnComponentBeginOverlap_Event
+  ↓
+Is A (Pawn)
+  ├─ Object: Other Actor
+  └─ Return: Boolean
+  ↓
+Branch
+  ├─ Condition: Is A 결과
+  ├─ True → Wink Out
+  └─ False → 무시
+```
+
+**장점:**
+
+- 간단하고 직관적
+- Pawn 참조 필요 없을 때 완벽
+- Pure Function (어디서든 사용)
+
+### Cast to Pawn 사용 (강의 방법)
+
+```
+OnComponentBeginOverlap_Event
+  ↓
+Cast to Pawn
+  ├─ Object: Other Actor
+  ├─ Success → Wink Out
+  └─ Failure → (무시)
+```
+
+**장점:**
+
+- 실행 핀으로 바로 분기
+- Branch 노드 불필요
+- 변환된 Pawn 참조 사용 가능
+
+---
+
+## 💡 핵심 차이
+
+```
+Is A = "Pawn이야?"
+  → Yes/No 대답만
+  → Branch 필요
+
+Cast = "Pawn이면 이거 해"
+  → Success/Failure로 바로 분기
+  → Branch 불필요
+```
+
+---
+
+## ✅ 결론
+
+**당신의 방법 (Is A + Branch):**
+
+```
+Is A → Branch → Wink Out
+정확히 작동함! ✓
+```
+
+**강의 방법 (Cast to):**
+
+```
+Cast to Pawn → Success → Wink Out
+조금 더 간결함
+```
+
+**둘 다 정답!** 현재 상황에서는 결과가 같습니다. 나중에 Pawn의 함수를 호출하거나 변수에 접근해야 할 때는 Cast가 필수지만, 지금처럼 타입만 확인하면 되는 경우는 **Is A가 오히려 더 깔끔**합니다!
+
+### 3. Wink Out 호출
+
+```
+OnComponentBeginOverlap_Event
+  ↓
+Cast to Pawn
+  ├─ Object: Other Actor
+  └─ Success → Call Wink Out
+```
+
+**현재까지 흐름**
+
+```
+플레이어가 구체에 닿음
+  ↓
+Overlap Event 발생
+  ↓
+Cast to Pawn 성공
+  ↓
+Wink Out 호출
+  ↓
+구체 축소 시작
+```
+
+---
+
+## 🚫 중복 실행 방지
+
+### 문제 상황
+
+```
+경우 1: Lifetime 끝남
+  → Wink Out 호출
+
+경우 2: 플레이어 충돌
+  → Wink Out 호출
+
+만약 동시에?
+  → Wink Out이 2번 실행
+  → Timeline이 2번 시작
+  → 불안정한 애니메이션
+```
+
+### 해결: Winking 플래그
+
+### 1. 변수 생성
+
+```
+Variables 패널
+  ↓
++ 버튼
+  ↓
+이름: Winking
+  ├─ Type: Boolean
+  ├─ Default: False
+  └─ Private (체크 안 함)
+```
+
+**의미**
+
+```
+Winking = False: 아직 안 사라짐
+Winking = True: 이미 사라지는 중
+```
+
+### 2. 로직 구현
+
+```
+Wink Out (Event)
+  ↓
+Branch
+  ├─ Condition: Winking (Get)
+  │
+  ├─ True → 아무것도 안 함 (이미 실행 중)
+  │
+  └─ False
+      ↓
+      Set Winking = True
+      ↓
+      Wink Out Timeline → Play
+```
+
+### 작동 원리
+
+**첫 번째 호출**
+
+```
+Winking = False (초기값)
+  ↓
+Branch False 실행
+  ↓
+Winking = True 설정
+  ↓
+Timeline 시작
+```
+
+**두 번째 호출 (중복)**
+
+```
+Winking = True (이미 설정됨)
+  ↓
+Branch True 실행
+  ↓
+아무것도 안 함
+  ↓
+Timeline 중복 시작 방지 ✓
+```
+
+### 시각화
+
+```
+Timeline 진행 중
+  ├─ Winking = True
+  ├─ 다시 Wink Out 호출해도
+  └─ Branch에서 막힘
+  ↓
+안전!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380704/notion-blog/_/_/_5_/_-_-_7/image_8.png)
+
+---
+
+## 🧪 최종 테스트
+
+### 테스트 시나리오
+
+**케이스 1: 정상 수집**
+
+```
+플레이어가 구체에 닿음
+  ↓
+Overlap 발생
+  ↓
+Wink Out 시작
+  ↓
+0.1초 동안 축소
+  ↓
+Destroy Actor
+```
+
+**케이스 2: 시간 초과**
+
+```
+4초 경과 (Lifetime)
+  ↓
+Wink Out 시작
+  ↓
+축소 후 파괴
+```
+
+**케이스 3: 중복 방지**
+
+```
+이미 Wink Out 중
+  ↓
+플레이어가 닿음
+  ↓
+Branch에서 차단
+  ↓
+Timeline 중복 실행 안 됨 ✓
+```
+
+---
+
+## 📊 최종 구조
+
+### BP_Small_Sphere Components
+
+```
+Scene Root
+  ├─ Sphere_Mesh
+  │   ├─ Collision: No Collision
+  │   └─ Timeline으로 Scale 변경
+  │
+  └─ Sphere Volume
+      ├─ Collision: Overlap All Dynamic
+      ├─ Generate Overlap Events: ✓
+      ├─ Sphere Radius: 500
+      └─ Hidden in Game: ✓
+```
+
+### Event Graph
+
+```
+Event Begin Play
+  ├─ Wink In
+  ├─ Initialize Delta Rotation
+  ├─ Set Timer (Wink Out)
+  └─ Bind On Component Begin Overlap
+
+Event Tick
+  ├─ Update Location
+  └─ Update Rotation
+
+OnComponentBeginOverlap_Event
+  ↓
+Cast to Pawn
+  └─ Success → Call Wink Out
+
+Wink Out (Custom Event)
+  ↓
+Branch (Winking?)
+  ├─ True → Return (중복 방지)
+  └─ False
+      ↓
+      Set Winking = True
+      ↓
+      Wink Out Timeline → Play
+        ↓
+        Scale Sphere
+        ↓
+        Destroy Actor
+```
+
+### Variables
+
+```
+Movement 카테고리
+  ├─ Speed: 100
+  ├─ Delta Rotation: (Rotator)
+  └─ Rotation Scale: 0.05
+
+Lifecycle
+  ├─ Lifetime: 4.0
+  └─ Winking: False (Boolean)
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Collision vs Overlap
+
+```
+Collision (충돌):
+  Block - 막음
+  예: 벽, 바닥
+
+Overlap (겹침):
+  Ignore - 통과 가능
+  but Event 생성
+  예: 아이템, 트리거
+```
+
+### Component 계층의 중요성
+
+```
+부모 변화 → 자식도 변화
+  ↓
+Timeline으로 부모 Scale 변경
+  ↓
+자식 Collision도 커짐 (문제!)
+
+해결:
+  공통 부모 (Scene Root) 생성
+  ↓
+  Mesh, Collision 분리
+```
+
+### Cast의 역할
+
+```
+Actor가 특정 타입인지 확인
+  ↓
+맞으면 Success
+틀리면 Failure
+  ↓
+타입 안전성 보장
+```
+
+### 플래그 변수 패턴
+
+```
+Boolean 플래그로
+  ├─ 상태 추적
+  └─ 중복 실행 방지
+  ↓
+일회성 이벤트에 유용
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 1. Collision Preset
+
+```
+Mesh: No Collision
+  → 통과 가능
+
+Volume: Overlap All Dynamic
+  → Overlap만 감지
+```
+
+### 2. Generate Overlap Events
+
+```
+체크 안 하면
+  ↓
+Overlap 발생해도
+  ↓
+Event 안 생김!
+```
+
+### 3. Scale vs Radius
+
+```
+Sphere Collision은
+  ↓
+Transform Scale 말고
+  ↓
+Shape → Sphere Radius 사용
+```
+
+### 4. Bind 위치
+
+```
+Begin Play에서 Bind
+  ↓
+안 하면 Event 등록 안 됨
+  ↓
+Overlap해도 실행 안 됨
+```
+
+### 5. Winking 플래그
+
+```
+절대 False로 되돌리지 않음
+  ↓
+한 번 True면 끝까지 True
+  ↓
+Actor가 파괴될 거니까
+```
+
+---
+
+## 🎓 학습 요약
+
+### 새로 배운 기능
+
+```
+1. Sphere Collision Component
+   Overlap 전용 컴포넌트
+
+2. Overlap Event & Delegate
+   이벤트 등록 시스템
+
+3. Cast to Class
+   타입 확인 및 변환
+
+4. Collision Preset
+   충돌 동작 설정
+
+5. Generate Overlap Events
+   Event 생성 설정
+
+6. 플래그 변수 패턴
+   중복 실행 방지
+```
+
+### 구현한 시스템
+
+```
+구체 수집 시스템
+  ├─ 플레이어 감지 (Overlap)
+  ├─ Pawn만 반응 (Cast)
+  ├─ Wink Out 실행
+  ├─ 중복 방지 (플래그)
+  └─ 자동 파괴
+```
+
+## 🎯 핵심 정리
+
+```
+Overlap 시스템 = 보이지 않는 감지 영역
+  ├─ Sphere Collision으로 구현
+  ├─ Overlap Event로 감지
+  └─ Cast로 대상 확인
+  ↓
+중복 방지 = Boolean 플래그
+  ├─ 첫 실행: False → True
+  ├─ 재실행: True라서 차단
+  └─ 안전한 1회 실행
+  ↓
+Component 분리 = 독립적 제어
+  ├─ Mesh: 시각 (Scale 변화)
+  ├─ Collision: 감지 (고정)
+  └─ Scene Root: 공통 부모
+  ↓
+결과: 완성된 수집 시스템
+```
+
+# { 언리얼 엔진 - Game Mode와 점수 시스템 구현 }
+
+## 🎯 학습 목표
+
+Game Mode를 사용한 점수 추적 시스템 구현
+
+- Game Mode 개념 이해
+- Game Mode Blueprint 생성
+- Cast 개념 이해 (중요!)
+- 점수 증가 시스템 구현
+
+---
+
+## 🎮 Game Mode란?
+
+### 개념
+
+```
+Game Mode = 게임의 규칙 담당자
+
+역할:
+  ├─ 승리/패배 조건
+  ├─ 점수 관리
+  ├─ 스폰할 Pawn 결정
+  └─ 게임 전체 규칙
+```
+
+**비유**
+
+```
+게임 = 축구 경기
+Game Mode = 심판 + 규칙
+
+심판이:
+  ├─ 점수 기록
+  ├─ 승부 판정
+  └─ 규칙 적용
+```
+
+### World Settings에서 확인
+
+```
+Window → World Settings
+  ↓
+Game Mode 섹션
+  ├─ Game Mode Override: None (기본)
+  └─ 드롭다운으로 선택 가능
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380704/notion-blog/_/_/_5_/_-_-_7/image_9.png)
+
+---
+
+## 🏗️ BP_BadBotGameMode 생성
+
+### 1. 폴더 구조
+
+```
+Content/Blueprints/
+  └─ Game/ (새 폴더)
+      └─ BP_BadBotGameMode
+```
+
+### 2. Blueprint 생성
+
+```
+Game 폴더에서 우클릭
+  ↓
+Blueprint Class
+  ↓
+⚠️ Actor 말고!
+  ↓
+Game Mode Base 선택
+  ↓
+이름: BP_BadBotGameMode
+```
+
+**왜 Actor가 아닌가?**
+
+```
+지금까지: 항상 Actor 선택
+
+이번에: Game Mode Base
+  ├─ Actor를 상속받지만
+  ├─ 게임 관리 전용
+  └─ 특수한 역할
+```
+
+### 3. Game Mode Base 특징
+
+```
+설명:
+"게임 모드는 플레이 중인 게임,
+규칙, 점수, 게임의 다른 측면을 정의"
+
+특징:
+  ├─ 레벨 전체에서 유지
+  ├─ Actor 기반 (상속)
+  └─ 게임 규칙 담당
+```
+
+---
+
+## ⚙️ Game Mode 설정
+
+### Default Pawn Class 확인
+
+```
+BP_BadBotGameMode 열기
+  ↓
+Details Panel → Classes
+  ↓
+Default Pawn Class: Default Pawn
+```
+
+**의미**
+
+```
+Play 누르면
+  ↓
+Default Pawn 스폰
+  ↓
+회색 구체, 날아다님
+  ↓
+Game Mode가 결정함!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380701/notion-blog/_/_/_5_/_-_-_7/image_10.png)
+
+---
+
+## 🗺️ Game Mode 적용 방법
+
+### 방법 1: 레벨별 설정
+
+```
+World Settings
+  ↓
+Game Mode Override
+  ↓
+BP_BadBotGameMode 선택
+```
+
+**특징**
+
+```
+이 레벨에만 적용
+  ↓
+다른 레벨은 다른 Game Mode 가능
+```
+
+### 방법 2: 프로젝트 기본값
+
+```
+Edit → Project Settings
+  ↓
+Maps & Modes
+  ↓
+Default Game Mode: BP_BadBotGameMode
+```
+
+**특징**
+
+```
+모든 레벨에 적용
+  ↓
+단, World Settings에서
+  ↓
+Override 안 한 레벨만
+```
+
+### Override 시스템
+
+```
+Project Settings (기본)
+  ↓
+World Settings (우선)
+  ↓
+World Settings이 이김!
+```
+
+**Reset to Default**
+
+```
+World Settings
+  ↓
+Game Mode Override 옆
+  ↓
+곡선 화살표 클릭
+  ↓
+None으로 리셋
+  ↓
+Project Settings 따름
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380701/notion-blog/_/_/_5_/_-_-_7/image_11.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380702/notion-blog/_/_/_5_/_-_-_7/image_12.png)
+
+---
+
+## 📊 점수 시스템 구현
+
+### 1. Player Score 변수
+
+```
+BP_BadBotGameMode
+  ↓
+Variables → + 버튼
+  ↓
+이름: Player Score
+  ├─ Type: Integer (정수)
+  ├─ Default: 0
+  └─ Category: (기본)
+```
+
+**왜 Integer인가?**
+
+```
+점수 = 정수 (1, 2, 3...)
+  ↓
+Float 불필요 (1.5점?)
+  ↓
+Integer 사용
+```
+
+---
+
+## 🔧 Increment Score 함수
+
+### 함수 생성
+
+```
+Functions → + 버튼
+  ↓
+이름: IncrementScore
+```
+
+### 방법 1: 기본 방식
+
+```
+Get Player Score
+  ↓
+Add (+ 1)
+  ↓
+Set Player Score
+```
+
+**흐름**
+
+```
+현재 점수 가져오기 (예: 5)
+  ↓
+1 더하기 (5 + 1 = 6)
+  ↓
+6으로 설정
+```
+
+### 방법 2: Increment (++)
+
+```
+Player Score 드래그
+  ↓
+"++" 검색
+  ↓
+Increment Integer
+```
+
+**비교**
+
+```
+방법 1: 3개 노드
+  Get → Add → Set
+
+방법 2: 2개 노드 (더 간결!)
+  Get → Increment
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380702/notion-blog/_/_/_5_/_-_-_7/image_13.png)
+
+**둘 다 같은 결과!**
+
+---
+
+## 🖨️ 점수 출력
+
+### Print String으로 표시
+
+```
+Increment Integer
+  ↓
+Append (String)
+  ├─ A: "Score: "
+  └─ B: Player Score (→ To String)
+  ↓
+Print String
+```
+
+**Append 이해**
+
+```
+"Score: " + "5"
+  ↓
+"Score: 5"
+  ↓
+문자열 합치기
+```
+
+---
+
+## 🎯 구체 수집 시 점수 증가
+
+### 목표
+
+```
+구체와 충돌
+  ↓
+점수 1 증가
+  ↓
+화면에 표시
+```
+
+### 어디서 호출?
+
+```
+BP_Small_Sphere
+  └─ Wink Out Timeline → Finished
+      ↓
+      Destroy Actor 전에
+      ↓
+      점수 증가 호출
+```
+
+---
+
+## 🔑 Get Game Mode
+
+### 노드 사용
+
+```
+BP_Small_Sphere Event Graph
+  ↓
+우클릭 → "Get Game Mode"
+  ↓
+Get Game Mode 노드
+```
+
+**반환값**
+
+```
+Return Value: Game Mode Base
+  ↓
+현재 게임 모드 반환
+```
+
+### 문제 발생!
+
+```
+Get Game Mode 드래그
+  ↓
+"Increment Score" 검색
+  ↓
+❌ 아무것도 안 보임!
+```
+
+**왜?**
+
+```
+Context Sensitive ✓
+  ↓
+Game Mode Base에서 검색
+  ↓
+Increment Score는
+  ↓
+BP_BadBotGameMode에만 있음!
+  ↓
+찾을 수 없음
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380702/notion-blog/_/_/_5_/_-_-_7/image_14.png)
+
+---
+
+## 🎭 상속 관계 이해
+
+### Class 계층
+
+```
+Game Mode Base (부모)
+  └─ BP_BadBotGameMode (자식)
+      └─ IncrementScore 함수
+```
+
+**관계**
+
+```
+✓ BP_BadBotGameMode는 Game Mode Base다
+  (자식은 부모의 특성 가짐)
+
+✗ Game Mode Base는 BP_BadBotGameMode가 아니다
+  (부모는 자식의 특성 모름)
+```
+
+**비유**
+
+```
+"모든 자동차는 탈것이다" ✓
+"모든 탈것은 자동차다" ✗
+
+자동차 = BP_BadBotGameMode
+탈것 = Game Mode Base
+```
+
+---
+
+## 🔄 Cast 개념 (핵심!)
+
+### 문제 상황
+
+```
+Get Game Mode
+  ↓
+Game Mode Base 타입 반환
+  ↓
+IncrementScore는
+  ↓
+BP_BadBotGameMode에만 있음
+  ↓
+연결 불가!
+```
+
+### Cast란?
+
+```
+Cast = 타입 변환 + 확인
+
+"이거 진짜 BP_BadBotGameMode야?"
+  ↓
+Yes (Success) → 변환된 객체 반환
+No (Failure) → 실패 핀 실행
+```
+
+**비유 - 신분 확인**
+
+```
+문지기: "학생증 보여주세요"
+
+학생증 있음 (Cast 성공)
+  → 학생으로 인정
+  → 도서관 입장 가능
+
+학생증 없음 (Cast 실패)
+  → 학생 아님
+  → 입장 불가
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380702/notion-blog/_/_/_5_/_-_-_7/image_15.png)
+
+---
+
+## 🎬 Cast to BP_BadBotGameMode
+
+### 노드 생성
+
+```
+Get Game Mode 출력 드래그
+  ↓
+"Cast to BP" 검색
+  ↓
+Cast to BP_BadBotGameMode
+```
+
+**⚠️ 주의!**
+
+```
+❌ BP_BadBotGameMode (Class)
+✓ BP_BadBotGameMode (일반)
+```
+
+### Cast 노드 구조
+
+```
+Cast to BP_BadBotGameMode
+  ├─ 입력
+  │   ├─ Execute (실행 핀)
+  │   └─ Object (변환할 객체)
+  │
+  └─ 출력
+      ├─ Success (성공 시 실행)
+      ├─ Cast Failed (실패 시 실행)
+      └─ As BP_BadBotGameMode (변환된 객체)
+```
+
+---
+
+## 💡 Cast 작동 원리
+
+### 성공 케이스
+
+```
+Get Game Mode (실제로 BP_BadBotGameMode)
+  ↓
+Cast to BP_BadBotGameMode
+  ↓
+✓ 맞음! 실제로 BP_BadBotGameMode임
+  ↓
+Success 핀 실행
+  +
+As BP_BadBotGameMode 출력
+  (변환된 객체)
+```
+
+### 실패 케이스 (예시)
+
+```
+Get Self (BP_Small_Sphere)
+  ↓
+Cast to BP_BadBotGameMode
+  ↓
+✗ 틀림! Small Sphere는 Game Mode 아님
+  ↓
+Cast Failed 핀 실행
+```
+
+**우리 상황**
+
+```
+프로젝트가 BP_BadBotGameMode 사용
+  ↓
+Get Game Mode는 항상 BP_BadBotGameMode
+  ↓
+Cast는 항상 성공!
+
+```
+
+---
+
+## 🔌 연결 완료
+
+### 최종 구조
+
+```
+Wink Out Timeline → Finished
+  ↓
+Get Game Mode
+  ↓
+Cast to BP_BadBotGameMode
+  ├─ Object: Game Mode
+  │
+  └─ Success
+      ↓
+      IncrementScore
+      ├─ Target: As BP_BadBotGameMode ← 여기!
+      └─ Then → Destroy Actor
+```
+
+---
+
+## 🤔 헷갈리는 부분 해설
+
+### "As BP_BadBotGameMode → Target" 이해
+
+**문제**
+
+```
+IncrementScore는 누구의 함수?
+  ↓
+BP_BadBotGameMode의 함수
+  ↓
+호출하려면 BP_BadBotGameMode 객체 필요
+```
+
+**Target 핀의 의미**
+
+```
+Target = "누구의" 함수를 호출할 건지
+
+예:
+  A라는 사람의 전화번호 누르기
+  B라는 사람의 전화번호 누르기
+
+  Target = A? B?
+```
+
+### Cast의 출력
+
+```
+Cast to BP_BadBotGameMode
+  └─ As BP_BadBotGameMode
+      (변환된 게임 모드 객체)
+```
+
+**이 객체는:**
+
+```
+✓ BP_BadBotGameMode 타입
+✓ IncrementScore 함수 있음
+✓ Target에 연결 가능!
+```
+
+### 시각적 흐름
+
+```
+1. Get Game Mode
+   "게임 모드 주세요"
+   → Game Mode Base 타입으로 줌
+
+2. Cast to BP_BadBotGameMode
+   "이거 BP_BadBotGameMode 맞죠?"
+   → 맞음! 변환 성공
+   → As BP_BadBotGameMode로 출력
+
+3. IncrementScore
+   "누구의 IncrementScore 호출?"
+   → Target: As BP_BadBotGameMode
+   → 이 게임 모드의 함수 호출!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380702/notion-blog/_/_/_5_/_-_-_7/image_16.png)
+
+---
+
+## 🎨 정리 및 테스트
+
+### Comment 추가
+
+```
+Overlap 관련 노드들 선택
+  ↓
+C 키
+  ↓
+Comment: Handle Overlap
+  ↓
+색상: 진한 빨간색
+  ↓
+Show Bubble: ✓
+```
+
+### 테스트
+
+```
+Play
+  ↓
+구체 수집
+  ↓
+"Score: 1" 출력 ✓
+  ↓
+또 수집
+  ↓
+"Score: 2" 출력 ✓
+```
+
+---
+
+## 📊 최종 구조
+
+### BP_BadBotGameMode
+
+```
+Variables:
+  └─ Player Score (Integer)
+
+Functions:
+  └─ IncrementScore
+      ├─ Player Score ++
+      └─ Print String "Score: X"
+```
+
+### BP_Small_Sphere
+
+```
+OnComponentBeginOverlap
+  ↓
+Is A (Pawn)
+  └─ True → Wink Out
+
+Wink Out Timeline → Finished
+  ↓
+Get Game Mode
+  ↓
+Cast to BP_BadBotGameMode
+  └─ Success
+      ↓
+      IncrementScore
+      ├─ Target: As BP_BadBotGameMode
+      └─ Then → Destroy Actor
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Game Mode
+
+```
+게임 전체의 규칙 담당
+  ├─ 점수 관리
+  ├─ 승패 조건
+  └─ 스폰 제어
+  ↓
+레벨 전체에서 유지
+```
+
+### Cast (형변환)
+
+```
+목적: 타입 변환
+
+Cast to X:
+  "이 객체가 X 타입이 맞나요?"
+
+  맞음 → Success, As X (변환된 객체)
+  틀림 → Cast Failed
+```
+
+### 상속과 Cast
+
+```
+자식은 부모다 ✓
+  → BP_BadBotGameMode는 Game Mode Base
+
+부모는 자식 아니다 ✗
+  → Game Mode Base는 BP_BadBotGameMode 아님
+
+Cast 필요:
+  부모 타입을 자식 타입으로 변환
+  ↓
+  자식의 특수 기능 사용 가능
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 1. Cast는 확인 + 변환
+
+```
+단순 확인: Is A
+변환 필요: Cast to
+```
+
+### 2. Target 핀
+
+```
+함수 호출 시
+  ↓
+누구의 함수?
+  ↓
+Target에 객체 연결 필수
+```
+
+### 3. 상속 방향
+
+```
+자식 → 부모: 자동 (Upcast)
+부모 → 자식: Cast 필요 (Downcast)
+```
+
+### 4. Cast 실패 가능성
+
+```
+우리 경우: 항상 성공
+  (프로젝트가 BP_BadBotGameMode 사용)
+
+일반적으로:
+  실패 가능성 있음
+  Cast Failed 핀 처리 권장
+```
+
+---
+
+## 🎓 학습 요약
+
+### 새로 배운 기능
+
+```
+1. Game Mode Base
+   게임 규칙 관리 클래스
+
+2. Get Game Mode
+   현재 게임 모드 가져오기
+
+3. Cast to Class
+   타입 변환 및 확인
+
+4. Integer Increment (++)
+   값 1씩 증가
+
+5. Append String
+   문자열 합치기
+```
+
+### 구현한 시스템
+
+```
+점수 추적 시스템
+  ├─ Game Mode에 점수 저장
+  ├─ 구체 수집 시 증가
+  ├─ Cast로 접근
+  └─ 화면에 표시
+```
+
+---
+
+## 🤔 Cast 이해를 위한 추가 예시
+
+### 예시 1: 동물원
+
+```
+동물 (부모)
+  ├─ 사자 (자식)
+  └─ 코끼리 (자식)
+
+"포효하기"는 사자만 가능
+  ↓
+동물 → Cast to 사자
+  ↓
+성공 시 "포효하기" 가능
+```
+
+### 예시 2: 차량
+
+```
+차량 (부모)
+  ├─ 자동차 (자식)
+  └─ 비행기 (자식)
+
+"날기"는 비행기만 가능
+  ↓
+차량 → Cast to 비행기
+  ↓
+성공 시 "날기" 가능
+```
+
+### 우리 경우
+
+```
+Game Mode Base (부모)
+  └─ BP_BadBotGameMode (자식)
+
+"IncrementScore"는 자식만 가능
+  ↓
+Game Mode Base → Cast to BP_BadBotGameMode
+  ↓
+성공 시 "IncrementScore" 호출 가능
+
+```
+
+---
+
+## 📝 다음 단계
+
+현재까지:
+
+- ✅ 구체 생성/수집
+- ✅ 점수 시스템
+
+**다음 구현:**
+
+- UI로 점수 표시
+- 게임 승리 조건
+- 재시작 기능
+
+---
+
+## 🎯 핵심 정리
+
+```
+Game Mode = 게임 관리자
+  ├─ 규칙 담당
+  ├─ 점수 저장
+  └─ 레벨 전체 유지
+  ↓
+Get Game Mode = 관리자 불러오기
+  ├─ Game Mode Base 타입
+  └─ 기본 기능만 접근 가능
+  ↓
+Cast = 신분 확인 + 변환
+  ├─ "진짜 BP_BadBotGameMode?"
+  ├─ 맞으면 변환 (As BP_BadBotGameMode)
+  └─ 특수 기능 (IncrementScore) 사용 가능
+  ↓
+Target = 누구의 함수?
+  ├─ As BP_BadBotGameMode 연결
+  └─ 그 게임 모드의 IncrementScore 호출
+
+```
+
+# { 언리얼 엔진 - Bad Bot 게임 최종 완성 }
+
+## 🎯 학습 목표
+
+프로젝트 최종 통합 및 완성
+
+- Level Sphere 제작
+- 드론 이동 추가
+- Collision 설정 (중요!)
+- 최종 테스트 및 마무리
+
+---
+
+## 🌍 레벨 구성
+
+### Bot Level로 이동
+
+```
+현재: Test_Level
+  ↓
+이동: Bot_Level
+  ↓
+드론이 있는 실제 레벨
+```
+
+### 기존 객체 정리
+
+```
+삭제:
+  ├─ Floor (바닥)
+  ├─ Ceiling (천장)
+  └─ Sky (하늘)
+
+남김:
+  └─ BP_Bot (드론)
+```
+
+---
+
+## 🔮 Level Sphere 제작
+
+### 1. Modeling Mode로 Sphere 생성
+
+```
+Shift + 5 (Modeling Mode)
+  ↓
+Create → Sphere
+  ↓
+Radius: 1000
+```
+
+### 2. Pivot Point 설정
+
+**중요!**
+
+```
+Pivot Location: Center
+  ↓
+구의 중심에 피벗
+  ↓
+회전/이동 자연스러움
+```
+
+**왜 Center인가?**
+
+```
+Base (기본):
+  구의 바닥에 피벗
+  ↓
+  이동 기즈모가 바닥에
+
+Center:
+  구의 중심에 피벗
+  ↓
+  이동 기즈모가 중앙에 ✓
+```
+
+### 3. 저장 위치 설정
+
+```
+New Asset Location
+  ↓
+Use Current Folder 체크 해제
+  ↓
+Content/Assets/LevelSphere/ (새 폴더)
+  ↓
+이름: SM_Level_Sphere
+```
+
+---
+
+## 🎨 Level Sphere Material
+
+### 1. Material 생성
+
+```
+LevelSphere 폴더에서
+  ↓
+우클릭 → Material
+  ↓
+이름: M_Level_Sphere
+```
+
+### 2. 기본 색상 설정
+
+```
+3 키 + 클릭
+  ↓
+Vector3 (색상)
+  ├─ 파란색, 어두운 색 등
+  └─ 원하는 색 선택
+  ↓
+Base Color에 연결
+```
+
+### 3. 메탈릭/러프니스 (선택사항)
+
+```
+Metallic: 1 (금속성)
+  ├─ 반사 효과
+  └─ 0.0 ~ 1.0
+
+Roughness: 0.9
+  ├─ 표면 거칠기
+  └─ 0 = 거울, 1 = 매트
+
+Specular: 0.1
+  └─ 반사광 강도
+```
+
+---
+
+## 🔄 Two Sided (양면) 설정
+
+### 문제 상황
+
+```
+현재:
+  구 안에 있음
+  ↓
+  검은색만 보임
+  ↓
+  뒷면이 렌더링 안 됨
+```
+
+### 해결: Two Sided
+
+```
+M_Level_Sphere 열기
+  ↓
+Material Result 노드 선택
+  ↓
+Details Panel
+  ↓
+Two Sided: ✓ (체크)
+  ↓
+Apply
+```
+
+**효과**
+
+```
+체크 전:
+  앞면만 보임
+
+체크 후:
+  앞면 + 뒷면 모두 보임
+  ↓
+  구 안에서도 파란색 보임 ✓
+```
+
+---
+
+## 🎭 Material 적용 및 테스트
+
+### SM_Level_Sphere에 적용
+
+```
+SM_Level_Sphere 열기
+  ↓
+Material Slot
+  ↓
+M_Level_Sphere 할당
+  ↓
+저장
+```
+
+### Player Start 배치
+
+```
+Viewport에서
+  ↓
+구 안쪽 가장자리에
+  ↓
+Player Start 배치
+  ↓
+Play 테스트
+```
+
+---
+
+## 💡 조명 추가
+
+### Point Light 배치
+
+```
+Place Actors → Lights
+  ↓
+Point Light
+  ↓
+구 안쪽 벽 근처에 배치
+```
+
+**배치 예시**
+
+```
+상단에 4개
+  ├─ 균등하게 배치
+  └─ Duplicate (Alt + 드래그)
+
+하단에 4개
+  ├─ 상단 4개 복제
+  └─ 아래로 이동
+```
+
+### Directional Light (Sky Light)
+
+```
+World에 기본으로 있는
+  ↓
+Directional Light
+  ↓
+밀폐 공간에도 영향
+  ↓
+Light Color: 파란색 (약간)
+```
+
+---
+
+## 🎮 Sphere Spawner 배치
+
+### 추가
+
+```
+Content/Blueprints/Small_Sphere/
+  ↓
+BP_Sphere_Spawner
+  ↓
+Viewport로 드래그
+```
+
+### 위치 설정
+
+```
+Details Panel
+  ↓
+Transform → Location
+  ↓
+곡선 화살표 (Reset to Default)
+  ↓
+(0, 0, 0) - 원점
+  ↓
+드론과 같은 위치
+```
+
+---
+
+## 🚁 드론 이동 추가
+
+### 목표
+
+```
+드론이 플레이어 방향으로
+  ↓
+천천히 이동
+  ↓
+난이도 증가
+```
+
+### 구현 (BP_Bot)
+
+### 1. Move Bot Forward 함수
+
+```
+Event Tick
+  ↓
+Get Actor Forward Vector
+  ↓
+Multiply
+  ├─ Forward Vector
+  └─ Speed (변수)
+  ↓
+Multiply
+  └─ Get World Delta Seconds
+  ↓
+Add Actor World Offset
+```
+
+**Delta Seconds 단축키**
+
+```
+핀 드래그하지 말고
+  ↓
+우클릭 → "Get World Delta Seconds"
+  ↓
+바로 생성
+```
+
+### 2. Speed 변수
+
+```
+Variables → + 버튼
+  ↓
+이름: Speed
+  ├─ Type: Float
+  └─ Default: 100
+```
+
+### 3. 함수화
+
+```
+노드들 선택
+  ↓
+우클릭 → Collapse to Function
+  ↓
+이름: Move Bot Forward
+```
+
+### 4. Comment 추가
+
+```
+C 키
+  ↓
+Comment: Move Forward
+  ├─ 색상: 파란색
+  └─ Show Bubble: ✓
+```
+
+---
+
+## ⚠️ Collision 문제 해결 (핵심!)
+
+### 문제 1: 구를 통과함
+
+```
+현재:
+  플레이어가 구를 통과
+  ↓
+  밖으로 나감
+  ↓
+  게임 진행 불가
+```
+
+### 해결: Collision 추가
+
+```
+SM_Level_Sphere 열기
+  ↓
+Collision → Add Sphere Simplified Collision
+  ↓
+Collision 데이터 생성
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380703/notion-blog/_/_/_5_/_-_-_7/image_17.png)
+
+---
+
+## 🔧 당신이 겪은 문제 (중요!)
+
+### 문제 2: 캐릭터가 계속 밖으로 빠져나감
+
+```
+증상:
+  ├─ 안에서 시작해도
+  ├─ 살짝만 움직이면
+  └─ 밖으로 튕겨나감
+
+원인:
+  Collision 설정 불완전
+```
+
+### 완전한 해결책
+
+### 1. Two Sided 체크
+
+```
+M_Level_Sphere
+  ↓
+Material Result 노드
+  ↓
+Two Sided: ✓
+```
+
+### 2. Collision Complexity 설정
+
+```
+SM_Level_Sphere
+  ↓
+Details Panel → Collision
+  ↓
+Collision Complexity:
+  "Use Complex Collision as Simple" ✓
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380703/notion-blog/_/_/_5_/_-_-_7/image_18.png)
+
+**이 설정이 핵심!**
+
+### 왜 필요한가?
+
+```
+Simple Collision만:
+  ├─ 기본 Sphere Collision
+  └─ 정확도 낮음
+  └─ 튕겨나가는 문제 발생
+
+Complex as Simple:
+  ├─ 정확한 메시 Collision
+  └─ 튕겨나감 방지 ✓
+```
+
+**비유**
+
+```
+Simple:
+  보이지 않는 풍선
+  ↓
+  정확하지 않음
+
+Complex as Simple:
+  실제 구 모양 그대로
+  ↓
+  정확한 Collision
+```
+
+---
+
+## ✅ 최종 Collision 설정 체크리스트
+
+### SM_Level_Sphere에서
+
+```
+1. Material
+   └─ Two Sided: ✓
+
+2. Collision
+   ├─ Add Sphere Simplified Collision
+   └─ Collision Complexity:
+       "Use Complex Collision as Simple" ✓
+```
+
+**이 두 가지 필수!**
+
+---
+
+## 🎮 최종 테스트
+
+### 전체 화면 모드
+
+```
+Play 중
+  ↓
+F11 (전체 화면)
+  ↓
+Alt + P (전체 화면에서 Play)
+  ↓
+ESC (종료)
+```
+
+### 테스트 항목
+
+```
+✓ 드론 회전 (플레이어 추적)
+✓ 드론 이동 (천천히 접근)
+✓ 레이저 발사
+✓ 구체 스폰
+✓ 구체 수집 (점수)
+✓ 피격 시 게임 오버
+✓ 구 밖으로 안 나감 ✓
+```
+
+---
+
+## 🎨 커스터마이징 (선택사항)
+
+### Mini Challenge
+
+```
+자유롭게 꾸미기:
+  ├─ Material 색상 변경
+  ├─ Point Light 추가/배치
+  ├─ Metallic/Roughness 조정
+  └─ 드론 Speed 조정
+```
+
+---
+
+## 📊 최종 프로젝트 구조
+
+### 레벨
+
+```
+Bot_Level
+  ├─ SM_Level_Sphere
+  ├─ BP_Bot
+  ├─ BP_Sphere_Spawner
+  ├─ Player Start
+  └─ Point Lights × 8
+```
+
+### Blueprints
+
+```
+Blueprints/
+  ├─ Bot/
+  │   └─ BP_Bot
+  ├─ Small_Sphere/
+  │   ├─ BP_Small_Sphere
+  │   └─ BP_Sphere_Spawner
+  └─ Game/
+      └─ BP_BadBotGameMode
+```
+
+### Assets
+
+```
+Assets/
+  ├─ Drone/
+  ├─ Effects/
+  ├─ Blaster_Beam/
+  ├─ Small_Sphere/
+  └─ LevelSphere/
+      ├─ SM_Level_Sphere
+      └─ M_Level_Sphere
+```
+
+---
+
+## 💡 핵심 배운 내용 (전체 요약)
+
+### Actor & Components
+
+```
+✓ Actor 생성 및 배치
+✓ Static Mesh Component
+✓ Component 계층구조
+✓ Scene Root
+```
+
+### Blueprint
+
+```
+✓ Event Graph
+✓ Variables
+✓ Functions
+✓ Pure Functions
+✓ Custom Events
+```
+
+### 이동 시스템
+
+```
+✓ Add Actor World Offset
+✓ Add Actor World Rotation
+✓ Get Actor Forward Vector
+✓ Delta Time
+```
+
+### Collision & Overlap
+
+```
+✓ Collision Presets
+✓ Overlap Events
+✓ On Component Begin Overlap
+✓ Generate Overlap Events
+✓ Complex Collision as Simple
+```
+
+### Timeline
+
+```
+✓ Float Track
+✓ Vector Track
+✓ Curve 편집
+✓ Update/Finished 핀
+```
+
+### Spawning
+
+```
+✓ Spawn Actor from Class
+✓ Timer System
+✓ Set Timer by Event
+✓ Looping
+```
+
+### Game Mode
+
+```
+✓ Game Mode 개념
+✓ 변수 저장
+✓ Get Game Mode
+✓ Cast to Class
+```
+
+### 상속 & 계층구조
+
+```
+✓ IS-A 관계
+✓ HAS-A 관계
+✓ Class Hierarchy
+✓ OOP 개념
+```
+
+---
+
+## 🎓 학습 성과
+
+### 구현한 시스템
+
+```
+1. 플레이어 추적 드론
+   └─ 회전 + 발사 + 이동
+
+2. 레이저 발사 시스템
+   └─ 사운드 + 파티클 + 충돌
+
+3. 수집 아이템
+   └─ 스폰 + 이동 + 수집
+
+4. 점수 시스템
+   └─ Game Mode + 증가 + 표시
+
+5. 게임 오버
+   └─ 피격 감지 + 종료
+```
+
+### 사용한 고급 기능
+
+```
+✓ MetaSound (사운드)
+✓ Niagara (파티클)
+✓ Timeline (애니메이션)
+✓ Cast (타입 변환)
+✓ Delegate (이벤트)
+```
+
+---
+
+## ⚠️ 당신의 Collision 문제 정리
+
+### 문제
+
+```
+1. 구 통과 가능
+   └─ Collision 미설정
+
+2. 캐릭터 튕겨나감
+   └─ Simple Collision 사용
+```
+
+### 해결
+
+```
+1. Add Collision
+   └─ Sphere Simplified Collision
+
+2. Two Sided
+   └─ Material에서 체크
+
+3. Complex as Simple (핵심!)
+   └─ Collision Complexity 설정
+   └─ 정확한 Collision 사용
+```
+
+**완벽한 해결!** ✓
+
+---
+
+## 🎯 핵심 정리
+
+```
+Level Sphere 제작
+  ├─ Modeling Mode로 생성
+  ├─ Pivot: Center
+  └─ Radius: 1000
+  ↓
+Material 설정
+  ├─ Base Color (파란색)
+  ├─ Two Sided ✓ (필수!)
+  └─ Metallic/Roughness (선택)
+  ↓
+Collision 설정 (매우 중요!)
+  ├─ Add Sphere Simplified Collision
+  └─ Complex as Simple ✓ (핵심!)
+  ↓
+드론 이동 추가
+  ├─ Forward Vector
+  ├─ Speed × Delta Time
+  └─ Add World Offset
+  ↓
+최종 통합
+  ├─ Spawner 배치
+  ├─ Point Lights 추가
+  └─ 테스트 완료
+  ↓
+첫 게임 완성! 🎉
+```
+
+---

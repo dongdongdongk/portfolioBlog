@@ -1,0 +1,1168 @@
+---
+title: '섹션 7: 백엔드: 포스트 리액션 기능 - 1 -'
+date: '2026-09-02'
+category: '풀스택/React를 사용한 Node 풀스택 웹 애플리케이션 빌드 및 배포'
+tags: ['풀스택', 'React를 사용한 Node 풀스택 웹 애플리케이션 빌드 및 배포']
+draft: false
+summary: ''
+---
+
+# { 리액션 기능 구현 계획 설명 }
+
+## 1. **기능 개요: 리액션 기능**
+
+```jsx
+사용자가 게시물에 리액션을 추가, 수정, 조회, 삭제할 수 있는 기능을 구현.
+
+이 기능은 컨트롤러, 인터페이스, 모델, 라우트, 스키마를 포함하여 전체 구조를 구성.
+```
+
+## 2. **컨트롤러에서 구현할 주요 기능**
+
+```jsx
+1. 리액션 추가 (addReaction)
+
+		사용자가 게시물에 리액션을 추가할 수 있는 메서드 구현.
+
+2. 리액션 수정 (updateReaction)
+
+		기존 리액션을 새로운 리액션으로 업데이트할 수 있도록 기능 제공.
+
+3. 리액션 조회 (getReactions)
+
+		게시물에 있는 다수의 리액션(모든 리액션)을 조회하는 메서드.
+
+		특정 리액션(단일 리액션)만 조회하는 메서드.
+
+4. 리액션 삭제 (removeReaction)
+
+		사용자가 게시물에서 리액션을 삭제할 수 있는 기능.
+```
+
+## 3. **Redis 캐싱을 활용한 리액션 저장 및 관리**
+
+```jsx
+리액션 데이터를 Redis의 리스트 데이터 구조로 관리.
+
+주요 Redis 명령어:
+
+1. LPUSH: 리액션 데이터를 리스트에 추가.
+
+2. LRANGE: 리스트에서 특정 범위의 데이터를 조회.
+
+3. LREM: 특정 리액션 데이터를 리스트에서 제거.
+
+4. LLEN: 리스트의 길이를 확인.
+```
+
+```jsx
+게시물 리액션을 추가, 수정, 조회, 삭제할 수 있는 API 완성.
+
+Redis 캐시를 통해 빠른 리액션 데이터 조회와 관리 구현.
+
+유지보수와 확장이 용이한 구조 설계.
+```
+
+# { 리액션 스키마, 모델, 인터페이스 작성 }
+
+## 1. `addReactionSchema`와 `removeReactionSchema`
+
+```jsx
+이 부분은 Joi 라이브러리를 사용해 데이터를 검증하는 스키마를 정의합니다.
+
+이 스키마는 클라이언트가 서버로 보내는 데이터를 검증하여
+
+필요한 필드가 있는지, 필드의 형식이 올바른지를 확인합니다.
+```
+
+```jsx
+const addReactionSchema: ObjectSchema = Joi.object().keys({
+  userTo: Joi.string().required().messages({
+    'any.required': 'userTo is a required property' // userTo 필드는 필수이며, 없을 경우 이 메시지가 반환됩니다.
+  }),
+  postId: Joi.string().required().messages({
+    'any.required': 'postId is a required property' // postId도 필수 필드입니다. 모든 데이터 유형에 공통적으로 적용되는 규칙을 의미
+  }),
+  type: Joi.string().required().messages({
+    'any.required': 'Reaction type is a required property' // type은 필수로 제공되어야 하며, 반응 유형을 나타냅니다.
+  }),
+  profilePicture: Joi.string().optional().allow(null, ''), // profilePicture는 선택 필드입니다. null이나 빈 문자열을 허용합니다.
+  previousReaction: Joi.string().optional().allow(null, ''), // 이전 반응은 선택적이며, 제공되지 않을 수도 있습니다.
+  postReactions: Joi.object().optional().allow(null, '') // 반응 객체는 선택적입니다.
+});
+```
+
+```jsx
+removeReactionSchema: 반응을 제거하는 작업을 위해 사용됩니다. 여기서는 단순히 postReactions 객체를 검증합니다.
+```
+
+```jsx
+const removeReactionSchema: ObjectSchema = Joi.object().keys({
+  postReactions: Joi.object().optional().allow(null, '') // postReactions는 선택 필드입니다.
+});
+
+```
+
+## 2. `ReactionModel` 정의
+
+```jsx
+Mongoose를 사용하여 MongoDB 컬렉션을 정의합니다.
+
+Reaction 문서는 반응 데이터를 저장하기 위한 스키마를 따릅니다.
+
+postId: 특정 게시물에 연결된 반응을 검색하기 위해 사용됩니다. 이를 위해 인덱스를 추가했습니다.
+
+default 값: 값이 제공되지 않을 경우 기본값을 설정합니다.
+```
+
+```jsx
+const reactionSchema: Schema = new Schema({
+  postId: { type: mongoose.Schema.Types.ObjectId, ref: 'Post', index: true }, // postId는 Post 컬렉션의 ID를 참조하며, 쿼리 최적화를 위해 인덱스를 생성합니다.
+  type: { type: String, default: '' }, // 반응 유형을 저장합니다.
+  username: { type: String, default: '' }, // 반응을 추가한 사용자의 이름입니다.
+  avataColor: { type: String, default: '' }, // 사용자의 아바타 색상을 저장합니다.
+  profilePicture: { type: String, default: '' }, // 사용자의 프로필 사진 URL입니다.
+  createdAt: { type: Date, default: Date.now() } // 문서 생성 시의 타임스탬프입니다.
+});
+
+const ReactionModel: Model<IReactionDocument> = model<IReactionDocument>('Reaction', reactionSchema, 'Reaction');
+```
+
+### `model<IReactionDocument>('Reaction', reactionSchema, 'Reaction')`의 구조:
+
+```jsx
+model 함수는 Mongoose에서 모델을 생성하는 데 사용됩니다. 여기에 전달되는 세 가지 중요한 매개변수를 살펴보겠습니다:
+
+첫 번째 매개변수: 'Reaction'
+
+		데이터베이스에서 컬렉션 이름으로 사용됩니다.
+
+		MongoDB는 기본적으로 이 이름의 복수형(예: reactions)을 컬렉션 이름으로 만듭니다.
+
+두 번째 매개변수: reactionSchema
+
+		reactionSchema는 컬렉션의 구조를 정의한 스키마입니다.
+
+		이 스키마에 따라 각 문서(데이터)가 어떤 형태로 저장되는지 결정됩니다.
+
+세 번째 매개변수: 'Reaction'
+
+		데이터베이스에서 컬렉션 이름을 명시적으로 지정합니다.
+
+		여기서 'Reaction'을 지정했으므로 MongoDB에서 컬렉션
+
+		이름은 정확히 Reaction으로 설정됩니다(복수형으로 변환되지 않음).
+
+
+		* 세 번째 매개변수를 사용해야 하는 상황
+
+			1. 컬렉션 이름이 복수형 규칙에 맞지 않는 경우
+
+					예를 들어, 컬렉션 이름이 data처럼 이미 복수형이거나,
+
+					복수형으로 변환하면 의미가 어색해질 수 있는 경우.
+
+			2. 기존 데이터베이스와 호환해야 하는 경우
+
+					이미 MongoDB에 특정 이름의 컬렉션이 존재하는 경우,
+
+					그 이름을 정확히 지정해야 합니다.
+
+			3. 대소문자를 구분해야 하는 경우
+
+					MongoDB에서는 기본적으로 컬렉션 이름이 소문자로 저장되지만,
+
+					특정한 대소문자 형식을 유지하고 싶을 때 유용합니다.
+```
+
+## 3. 인터페이스 정의
+
+```jsx
+IReactionDocument는 Reaction 문서의 데이터를 설명하며, TypeScript에서 강력한 타입 검사를 제공합니다.
+```
+
+```jsx
+export interface IReactionDocument extends Document {
+  _id: string | ObjectId; // MongoDB 문서 ID입니다.
+  username: string; // 사용자 이름
+  avataColor: string; // 아바타 색상
+  type: string; // 반응 유형 (like, love 등)
+  postId: string; // 게시물 ID
+  profilePicture: string; // 프로필 사진 URL
+  createdAt?: Date; // 생성 날짜
+  userTo?: string | ObjectId; // 게시물 작성자 ID
+  comment?: string; // 댓글 내용 (선택적)
+}
+
+```
+
+### 기타 인터페이스
+
+```jsx
+IReactions: 게시물의 모든 반응 수를 추적하기 위한 객체 구조입니다.
+```
+
+```jsx
+export interface IReactions {
+  like: number; // 좋아요 수
+  love: number; // 사랑해요 수
+  happy: number; // 행복해요 수
+  wow: number; // 놀라워요 수
+  sad: number; // 슬퍼요 수
+  angry: number; // 화나요 수
+}
+
+```
+
+```jsx
+IReactionJob: 작업 큐에 전달할 반응 작업의 구조를 정의합니다.
+```
+
+```jsx
+export interface IReactionJob {
+  postId: string; // 게시물 ID
+  username: string; // 사용자 이름
+  previousReaction: string; // 이전 반응 유형
+  userTo?: string; // 게시물 작성자 ID
+  userFrom?: string; // 반응을 추가한 사용자 ID
+  type?: string; // 새 반응 유형
+  reactionObject?: IReactionDocument; // 반응 문서 객체
+}
+
+```
+
+# { ReactionCache 클래스의 기본 개념 및 구현 설명 }
+
+## 1. **Redis의 데이터 구조**
+
+```jsx
+Redis는 다양한 데이터 구조를 제공하며, 각각의 데이터 구조는 특정 상황에 적합하게 사용됩니다.
+
+이 강의에서는 특히 다음 두 가지를 다루었습니다:
+
+		리스트(List): 순서가 있는 데이터 구조. 데이터를 왼쪽(LPUSH) 또는 오른쪽(RPUSH)에서 추가 가능.
+
+		해시(Hash): 키-값 쌍으로 구성된 데이터 구조. 특정 필드의 값을 쉽게 업데이트하거나 읽을 수 있음.
+```
+
+## 2. **ReactionCache 클래스**
+
+```jsx
+ReactionCache 클래스는 Redis의 기본 캐시 기능을 상속받아 게시물의 반응(좋아요, 싫어요 등)을 처리합니다.
+```
+
+## 주요 구현 내용
+
+### 1. **클래스 선언**
+
+```jsx
+ReactionCache 클래스는 BaseCache를 상속받으며, 게시물의 반응 데이터를 처리하는 메서드를 포함합니다.
+```
+
+```jsx
+export class ReactionCache extends BaseCache {
+  constructor() {
+    super('reactionsCache')
+  }
+}
+```
+
+### 2. **반응 저장 메서드**
+
+```jsx
+savePostReactionToCache 메서드는 게시물의 반응 데이터를 Redis에 저장하는 기능을 수행합니다.
+
+		매개변수 설명
+
+				key: 게시물의 고유 ID(식별자).
+
+				reaction: 저장할 반응 데이터 객체.
+
+				postReactions: 게시물 전체 반응 상태(좋아요, 싫어요 등).
+
+				type: 반응 타입(예: 'like', 'love').
+
+				previousReaction: 이전 반응 타입(이미 반응이 있을 경우 삭제 후 새 반응 저장).
+```
+
+## 세부 구현 과정
+
+### 1. **Redis 연결 확인 및 초기화**
+
+```jsx
+Redis 클라이언트가 열려 있지 않으면, 연결을 설정합니다.
+```
+
+```jsx
+if (!this.client.isOpen) {
+  await this.client.connect()
+}
+```
+
+### 2. **이전 반응 삭제 처리**
+
+```jsx
+이전 반응(previousReaction)이 존재하면 삭제 메서드를 호출해야 합니다.
+
+이 강의에서는 해당 메서드를 추후 구현 예정으로 남겨두었습니다.
+```
+
+```jsx
+if (previousReaction) {
+  // 이전 반응 삭제 메서드 호출 예정
+}
+```
+
+### 3. **리스트에 새 반응 추가**
+
+```jsx
+반응 데이터를 리스트(List) 형태로 저장.
+
+LPUSH를 사용하여 반응 데이터를 리스트의 왼쪽에 추가.
+
+반응 데이터는 객체(JSON)를 문자열(String)로 변환하여 저장.
+```
+
+```jsx
+await this.client.LPUSH(`reactions:${key}`, JSON.stringify(reaction))
+```
+
+### 4. **게시물의 반응 상태 업데이트**
+
+```jsx
+Redis에서 게시물 데이터를 해시(Hash) 형태로 관리.
+
+HSET을 사용하여 게시물의 반응 상태(postReactions)를 업데이트.
+
+반응 상태 역시 JSON 문자열로 변환하여 저장.
+```
+
+```jsx
+const dataToSave: string[] = ['reactions', JSON.stringify(postReactions)];
+await this.client.HSET(`posts:${key}`, dataToSave);
+```
+
+## 요약 및 다음 단계 & 개념 보충
+
+```jsx
+현재 구현에서는 새 반응 데이터를 Redis 리스트에 추가하고, 게시물의 전체 반응 상태를 업데이트하는 기능을 다루었습니다.
+
+다음 단계에서는 이전 반응을 삭제하는 메서드를 추가 구현할 예정입니다.
+
+이를 통해 중복 반응 데이터를 제거하고 최신 상태만 유지하도록 설계할 것입니다.
+```
+
+```jsx
+Redis와 JSON 변환
+
+		Redis는 문자열 기반 데이터베이스입니다.
+
+		따라서 객체 데이터를 저장하려면 JSON.stringify()로 변환이 필요합니다.
+
+		데이터를 다시 사용할 때는 JSON.parse()를 통해 원래 객체로 변환합니다.
+
+Redis의 리스트 사용 이유
+
+		리스트를 사용하면 반응 데이터를 순차적으로 저장할 수 있으며,
+
+		특정 게시물의 모든 반응을 쉽게 조회할 수 있습니다.
+
+트랜잭션 처리
+
+		Redis의 명령은 개별적으로 실행되지만,
+
+		여러 명령을 원자적으로 실행하려면 트랜잭션(Transaction)을 사용할 수도 있습니다.
+
+		이 강의에서는 단순한 구현에 초점을 맞췄습니다.
+
+		* "원자적"이라는 말은 모든 작업이 하나의 단위처럼 처리되어 중간 상태 없이 성공하거나 실패하는 것을 의미합니다.
+```
+
+# { Redis 캐시에 저장된 게시물 반응을 삭제 로직 }
+
+## 1. **삭제 메서드 `removePostReactionFromCache`의 역할**
+
+```jsx
+이 메서드는 Redis 캐시에 저장된 게시물의 특정 반응을 삭제합니다.
+
+사용자가 게시물에서 반응을 제거하거나,
+
+반응 유형을 변경할 때 기존 반응을 삭제해야 하는 상황에서 사용됩니다
+```
+
+## 2. **삭제 과정의 주요 단계**
+
+### 2.1 모든 반응 데이터 가져오기 (`LRANGE`)
+
+```jsx
+Redis 리스트에서 데이터를 조회
+
+const response: string[] = await this.client.LRANGE(`reactions:${key}`, 0, -1);
+
+LRANGE는 Redis의 리스트(List) 자료구조에서 특정 범위 데이터를 가져옵니다.
+
+0은 리스트의 시작 인덱스이고, -1은 끝 인덱스를 의미합니다. 이 값은 리스트의 모든 데이터를 가져오라는 명령입니다.
+
+결과는 JSON 문자열 배열로 반환됩니다.
+```
+
+### 2.2 특정 사용자 반응 찾기 (`getPreviousReaction`)
+
+```jsx
+가져온 반응 리스트에서 특정 사용자의 반응을 찾아야 합니다.
+
+이 작업은 getPreviousReaction 메서드를 통해 이루어집니다.
+```
+
+```jsx
+// 특정 사용자의 이전 반응을 찾는 메서드
+// - `response`: Redis에서 가져온 반응 데이터 배열 (JSON 문자열 형태).
+// - `username`: 이전 반응을 찾으려는 사용자의 이름.
+// - 반환값: 해당 사용자의 반응 객체(IReactionDocument) 또는 undefined.
+
+private getPreviousReaction(response: string[], username: string): IReactionDocument | undefined {
+  // 1. 반응 데이터 리스트를 저장할 배열 생성
+  // Redis에서 가져온 데이터는 JSON 문자열 형태이므로, 이를 IReactionDocument 객체로 변환하여 저장.
+  const list: IReactionDocument[] = [];
+
+  // 2. JSON 문자열을 IReactionDocument 객체로 변환
+  for (const item of response) {
+    // Helpers.parseJson: JSON 문자열을 파싱하여 객체로 변환하는 헬퍼 메서드.
+    // IReactionDocument 형식으로 캐스팅하여 배열에 추가.
+    list.push(Helpers.parseJson(item) as IReactionDocument);
+  }
+
+  // 3. lodash의 find 메서드를 사용하여 특정 사용자의 반응 찾기
+  // - list: 변환된 반응 객체 배열.
+  // - 콜백 함수: 각 리스트 항목(listItem)의 username이 전달받은 username과 일치하는지 확인.
+  return find(list, (listItem: IReactionDocument) => {
+    return listItem.username === username; // username이 일치하면 해당 객체를 반환.
+  });
+}
+
+```
+
+### 2.3 리스트에서 반응 삭제 (`LREM`)
+
+```jsx
+특정 사용자의 반응 데이터를 삭제합니다.
+```
+
+```jsx
+multi.LREM(`reactions:${key}`, 1, JSON.stringify(userPreviousReaction))
+```
+
+```jsx
+LREM 명령어:
+
+		Redis에서 리스트에서 특정 데이터를 제거할 때 사용합니다.
+
+		문법: LREM key count element
+
+		key: 데이터를 삭제할 Redis 리스트의 키.
+
+		count: 삭제할 데이터의 개수.
+
+		1이면 첫 번째로 매칭되는 데이터 하나만 삭제.
+
+		0이면 매칭되는 모든 데이터를 삭제.
+
+		element: 삭제할 데이터 값.
+
+삭제할 데이터:
+
+		userPreviousReaction 객체를 JSON 문자열로 변환(JSON.stringify)해 LREM의 element로 사용합니다.
+```
+
+### 2.4 명령 실행 (`multi.exec`)
+
+```jsx
+Redis의 트랜잭션을 실행합니다
+
+multi는 여러 명령어를 묶어서 실행할 수 있는 Redis의 트랜잭션 도구입니다.
+
+여기서는 LREM 명령을 실행합니다.
+```
+
+```jsx
+await multi.exec()
+```
+
+### 2.5 게시물 데이터 업데이트
+
+```jsx
+삭제 후, 게시물의 반응 데이터를 업데이트합니다:
+
+HSET은 Redis의 해시(Hash) 자료구조에서 데이터를 저장하거나 업데이트하는 명령어입니다.
+
+여기서 postReactions 객체를 JSON 문자열로 변환해 저장합니다.
+```
+
+```jsx
+const dataToSave: string[] = ['reactions', JSON.stringify(postReactions)];
+await this.client.HSET(`posts${key}`, dataToSave);
+```
+
+## 전체 삭제 로직 정리
+
+```jsx
+Redis에서 제거하는 과정을 각 단계에 대해 상세하게 설명합니다
+```
+
+### 1. **Redis 연결 확인**
+
+```jsx
+if (!this.client.isOpen) {
+  await this.client.connect()
+}
+```
+
+```jsx
+의도: Redis 클라이언트가 닫혀 있으면 데이터를 처리할 수 없으므로 연결을 먼저 확인합니다.
+
+		this.client.isOpen: Redis 클라이언트가 현재 열려 있는지 확인하는 속성.
+
+		this.client.connect(): Redis 클라이언트를 연결하는 메서드.
+
+설명: 만약 클라이언트가 닫혀 있으면, Redis 서버에 연결을 재설정하여 이후의 명령을 실행할 준비를 합니다.
+```
+
+### 2. **반응 리스트 가져오기 (LRANGE)**
+
+```jsx
+const response: string[] = await this.client.LRANGE(`reactions:${key}`, 0, -1);
+```
+
+```jsx
+의도: Redis에 저장된 특정 게시물(key)에 대한 반응 리스트를 모두 가져옵니다.
+
+Redis 데이터 구조:
+
+		반응 데이터는 List 구조로 저장되어 있습니다.
+
+		예: reactions:post123라는 Redis 키에 아래와 같은 문자열 형태의 데이터가 저장되어 있다고 가정합니다.
+```
+
+```jsx
+;[
+  '{"username": "user1", "reaction": "like"}',
+  '{"username": "user2", "reaction": "love"}',
+  '{"username": "user3", "reaction": "haha"}',
+]
+```
+
+```jsx
+LRANGE 동작:
+
+LRANGE는 Redis의 리스트(List)에서 데이터를 범위(range)로 가져오는 명령입니다.
+
+매개변수:
+
+		key: Redis 리스트의 이름 (예: reactions:post123).
+
+		start: 가져올 데이터의 시작 인덱스 (0은 리스트의 첫 번째 요소).
+
+		end: 가져올 데이터의 끝 인덱스 (-1은 리스트의 마지막 요소까지).
+
+결과:
+
+		리스트 전체를 가져옵니다(0부터 -1까지 지정).
+```
+
+### 3. **사용자 반응 찾기 (getPreviousReaction)**
+
+```jsx
+const userPreviousReaction: IReactionDocument = this.getPreviousReaction(response, username) as IReactionDocument;
+```
+
+```jsx
+의도: 가져온 반응 리스트(response)에서 특정 사용자(username)의 반응 데이터를 찾아 반환합니다.
+
+getPreviousReaction 상세 동작:
+
+		1. response는 JSON 문자열 리스트입니다. 이를 IReactionDocument 객체 리스트로 변환합니다.
+
+				예: '{"username": "user2", "reaction": "love"}' → { username: "user2", reaction: "love" }.
+
+		2. 변환된 리스트에서 username이 일치하는 객체를 찾습니다.
+
+				lodash의 find 메서드를 사용하여 조건에 맞는 첫 번째 항목을 반환합니다.
+```
+
+### 4. **반응 데이터 삭제 (LREM)**
+
+```jsx
+multi.LREM(`reactions:${key}`, 1, JSON.stringify(userPreviousReaction))
+await multi.exec()
+```
+
+```jsx
+의도: Redis 리스트에서 특정 사용자의 반응 데이터를 제거합니다.
+
+LREM 동작:
+
+		LREM은 리스트에서 지정된 값을 제거하는 Redis 명령입니다.
+
+		매개변수:
+
+				key: Redis 리스트의 이름 (예: reactions:post123).
+
+				count: 제거할 항목의 개수 (1은 처음으로 발견된 항목 1개만 제거).
+
+				value: 제거할 항목 (JSON 문자열로 저장된 사용자 반응 데이터).
+
+		결과:
+
+				해당 값이 리스트에서 제거됩니다.
+
+주의:
+
+		제거할 데이터는 JSON 문자열 형태로 Redis에 저장되어 있으므로,
+
+		이를 정확히 매칭하려면 JSON.stringify(userPreviousReaction) 형태로 변환해야 합니다.
+```
+
+### 5. **게시물 데이터 업데이트 (HSET)**
+
+```jsx
+const dataToSave: string[] = ['reactions', JSON.stringify(postReactions)];
+await this.client.HSET(`posts:${key}`, dataToSave);
+```
+
+```jsx
+의도: 특정 게시물(key)의 반응 데이터를 업데이트합니다.
+
+		반응 데이터가 변경되었으므로 Redis의 게시물 데이터에 이를 반영합니다.
+
+Redis 데이터 구조:
+
+		게시물 데이터는 Hash 구조로 저장되어 있습니다.
+
+		예: posts:post123라는 Redis 키에 아래와 같은 데이터가 저장되어 있을 수 있습니다
+```
+
+```jsx
+{
+  "title": "Post Title",
+  "content": "Post Content",
+  "reactions": '{"like": 2, "love": 1, "haha": 0}'
+}
+```
+
+```jsx
+HSET 동작:
+
+		HSET은 Redis의 Hash에서 필드의 값을 설정하는 명령입니다.
+
+		매개변수:
+
+				key: Hash 키 이름 (예: posts:post123).
+
+				field: 업데이트할 필드 이름 (예: reactions).
+
+				value: 필드에 저장할 데이터 (JSON 문자열 형태).
+```
+
+### 전체 흐름 요약
+
+```jsx
+1. Redis 연결 확인: Redis와 연결되어 있지 않다면 연결을 설정합니다.
+
+2. 반응 리스트 가져오기 (LRANGE): 게시물(key)과 연결된 모든 반응 데이터를 리스트로 가져옵니다.
+
+3. 사용자 반응 찾기 (getPreviousReaction): 가져온 리스트에서 해당 사용자의 반응 데이터를 검색합니다.
+
+4. 반응 데이터 삭제 (LREM): 리스트에서 해당 반응 데이터를 제거합니다.
+
+5. 게시물 데이터 업데이트 (HSET): 게시물 정보(특히 반응 데이터)를 업데이트하여 변경 사항을 반영합니다.
+```
+
+## 전체 코드
+
+```jsx
+// 필요한 외부 모듈 및 인터페이스 가져오기
+import { BaseCache } from '@service/redis/base.caches'; // Redis와 관련된 기본 캐시 클래스
+import { config } from '@root/config'; // 환경 설정을 위한 설정 파일
+import Logger from 'bunyan'; // 로깅을 위한 Bunyan 라이브러리
+import { ServerError } from '@global/helpers/error-handler'; // 서버 에러를 처리하는 클래스
+import { IReaction, IReactionDocument } from '@reaction/interfaces/reaction.interface'; // 리액션 인터페이스
+import { Helpers } from '@global/helpers/heplers'; // JSON 파싱 등을 돕는 헬퍼 함수
+import { find } from 'lodash'; // 배열에서 특정 조건을 만족하는 요소를 찾기 위한 Lodash의 find 함수
+
+// 로깅 인스턴스 생성
+const log: Logger = config.createLogger('reactionCache');
+
+// ReactionCache 클래스 정의
+export class ReactionCache extends BaseCache {
+  // 생성자 메서드: 클래스가 생성될 때 호출되며 부모 클래스인 BaseCache의 생성자를 호출
+  constructor() {
+    super('reactionsCache'); // BaseCache의 생성자에 'reactionsCache'라는 이름 전달
+  }
+
+  /**
+   * 새로운 리액션을 캐시에 저장하는 메서드
+   * @param key - 게시물의 고유 키 (예: 게시물 ID)
+   * @param reaction - 추가할 리액션 데이터
+   * @param postReactions - 게시물에 대한 전체 리액션 상태
+   * @param type - 리액션 타입 (예: 좋아요, 싫어요 등)
+   * @param previousReaction - 이전 리액션 타입 (변경 전 사용자 리액션)
+   */
+  public async savePostReactionToCache(
+    key: string,
+    reaction: IReactionDocument,
+    postReactions: IReaction,
+    type: string,
+    previousReaction: string
+  ): Promise<void> {
+    try {
+      // Redis 클라이언트가 열려 있지 않으면 연결 시도
+      if (!this.client.isOpen) {
+        await this.client.connect();
+      }
+
+      // 사용자가 이전에 남긴 리액션이 있다면 캐시에서 제거
+      if (previousReaction) {
+        this.removePostReactionFromCache(key, reaction.username, postReactions);
+      }
+
+      // 새로운 리액션을 추가하는 경우
+      if (type) {
+        // Redis의 리스트에 리액션 추가 (LPUSH는 리스트 앞쪽에 요소를 추가)
+        await this.client.LPUSH(`reactions:${key}`, JSON.stringify(reaction));
+
+        // 게시물의 리액션 상태를 Redis의 해시(Hash)에 저장
+        const dataToSave: string[] = ['reactions', JSON.stringify(postReactions)];
+        await this.client.HSET(`posts:${key}`, dataToSave);
+      }
+    } catch (error) {
+      // 에러 발생 시 로그를 남기고, 커스텀 에러를 던짐
+      log.error(error);
+      throw new ServerError('Server error. Try again');
+    }
+  }
+
+  /**
+   * 기존 리액션을 캐시에서 제거하는 메서드
+   * @param key - 게시물의 고유 키
+   * @param username - 리액션을 남긴 사용자의 이름
+   * @param postReactions - 게시물의 전체 리액션 상태
+   */
+  public async removePostReactionFromCache(
+    key: string,
+    username: string,
+    postReactions: IReaction
+  ): Promise<void> {
+    try {
+      // Redis 클라이언트가 열려 있지 않으면 연결 시도
+      if (!this.client.isOpen) {
+        await this.client.connect();
+      }
+
+      // Redis의 리스트에서 모든 리액션 가져오기
+      const response: string[] = await this.client.LRANGE(`reactions:${key}`, 0, -1);
+
+      // Redis의 트랜잭션 시작 (multi는 여러 명령어를 한 번에 실행)
+      const multi: ReturnType<typeof this.client.multi> = this.client.multi();
+
+      // 사용자의 이전 리액션을 리스트에서 찾기
+      const userPreviousReaction: IReactionDocument = this.getPreviousReaction(
+        response,
+        username
+      ) as IReactionDocument;
+
+      // 사용자의 이전 리액션을 리스트에서 제거
+      multi.LREM(`reactions:${key}`, 1, JSON.stringify(userPreviousReaction));
+
+      // 트랜잭션 실행
+      await multi.exec();
+
+      // 게시물의 리액션 상태를 Redis의 해시(Hash)에 업데이트
+      const dataToSave: string[] = ['reactions', JSON.stringify(postReactions)];
+      await this.client.HSET(`posts${key}`, dataToSave);
+    } catch (error) {
+      // 에러 발생 시 로그를 남기고, 커스텀 에러를 던짐
+      log.error(error);
+      throw new ServerError('Server error. Try again');
+    }
+  }
+
+  /**
+   * 사용자가 이전에 남긴 리액션을 찾는 메서드
+   * @param response - Redis에서 가져온 리액션 리스트
+   * @param username - 사용자의 이름
+   * @returns - 이전 리액션 객체 또는 undefined
+   */
+  private getPreviousReaction(
+    response: string[],
+    username: string
+  ): IReactionDocument | undefined {
+    // 문자열 리스트를 IReactionDocument 객체 리스트로 변환
+    const list: IReactionDocument[] = [];
+    for (const item of response) {
+      list.push(Helpers.parseJson(item) as IReactionDocument);
+    }
+
+    // Lodash의 find 함수로 특정 사용자의 리액션을 찾음
+    return find(list, (listItem: IReactionDocument) => {
+      return listItem.username === username;
+    });
+  }
+}
+
+* find(collection, predicate)
+	collection: 배열(Array) 또는 객체(Object).
+	predicate: 요소를 검사하는 조건 함수(콜백).
+	이 함수는 배열의 각 요소에 대해 호출되며,
+	true를 반환하면 해당 요소를 찾은 것으로 간주합니다.
+
+```
+
+# { Reactions 컨트롤러 & 라우터 추가 ( 캐쉬 추가 ) }
+
+```jsx
+Redis Cache를 활용하여 게시물에 대한 반응(좋아요, 사랑해요 등)을 추가하는 기능을 구현하는 방법을 설명
+
+컨트롤러를 작성해 본다
+```
+
+## 주요 개념
+
+```jsx
+Reactions 기능:
+
+		게시물에 대해 사용자 반응을 추가하는 기능.
+
+		"좋아요", "사랑해요", "행복해요" 등의 반응 유형이 포함.
+
+		사용자의 이전 반응을 확인하고 업데이트.
+
+Redis Cache 사용:
+
+		Redis를 사용하여 게시물의 반응 데이터를 빠르게 읽고 쓰기.
+
+		savePostReactionToCache 메서드를 사용하여 캐시에 데이터를 저장.
+
+라우트 설계:
+
+		클라이언트에서 데이터를 POST 요청으로 전송.
+
+		라우트를 /post/reaction으로 설정하여 반응 데이터를 서버에 추가.
+
+Joi Validation:
+
+		요청 데이터를 검증하여 필수 필드가 모두 포함되었는지 확인.
+```
+
+## Reaction 데이터 추가 기능 컨트롤러 구현 ( 캐쉬 )
+
+```jsx
+Add 클래스: 요청을 처리하고 데이터 검증, 캐시 저장 등을 담당.
+```
+
+```jsx
+import { joiValidation } from '@global/decorators/joi-validation.decorator';
+import { IReactionDocument } from '@reaction/interfaces/reaction.interface';
+import { addReactionSchema } from '@reaction/schemes/reactions';
+import { ReactionCache } from '@service/redis/reaction.cache';
+import { Request, Response } from 'express';
+import HTTP_STATUS from 'http-status-codes';
+import { ObjectId } from 'mongodb';
+
+// ReactionCache 인스턴스 생성
+const reactionCache: ReactionCache = new ReactionCache();
+
+export class Add {
+  // Joi 스키마로 요청 데이터 검증
+  @joiValidation(addReactionSchema)
+  public async reaction(req: Request, res: Response): Promise<void> {
+    const { userTo, postId, type, previousReaction, postReactions, profilePicture } = req.body;
+
+    // 반응 데이터 생성
+    const reactionObject: IReactionDocument = {
+      _id: new ObjectId(),
+      postId,
+      type,
+      avatarColor: req.currentUser!.avatarColor, // 현재 사용자 데이터에서 가져옴
+      username: req.currentUser!.username,
+      profilePicture
+    } as IReactionDocument;
+
+    // Redis Cache에 반응 데이터 저장
+    await reactionCache.savePostReactionToCache(postId, reactionObject, postReactions, type, previousReaction);
+
+    // 클라이언트에 성공 메시지 응답
+    res.status(HTTP_STATUS.OK).json({ message: 'Reaction added successfully' });
+  }
+}
+
+```
+
+```jsx
+요청 본문에서 postId, type 등의 데이터를 가져옴.
+
+IReactionDocument를 통해 반응 데이터를 생성.
+
+savePostReactionToCache로 캐시에 저장.
+
+결과를 JSON 형태로 반환.
+```
+
+## 라우트 구성
+
+```jsx
+Reaction 라우트 추가: Reaction 관련 요청을 처리하기 위한 라우트 정의.
+
+POST 요청으로 /post/reaction 경로에 반응 데이터를 추가.
+
+authMiddleware.checkAuthentication로 사용자가 인증되었는지 확인.
+```
+
+```jsx
+import { authMiddleware } from '@global/helpers/auth-middleware';
+import { Add } from '@reaction/controllers/add-reactions';
+import express, { Router } from 'express';
+
+class ReactionRoutes {
+  private router: Router;
+
+  constructor() {
+    this.router = express.Router();
+  }
+
+  public routes(): Router {
+    // POST 요청 처리
+    this.router.post('/post/reaction', authMiddleware.checkAuthentication, Add.prototype.reaction);
+    return this.router;
+  }
+}
+
+export const reactionRoutes: ReactionRoutes = new ReactionRoutes();
+```
+
+## 전체 애플리케이션 라우트 구성
+
+```jsx
+라우트 초기화: Reaction 라우트를 전체 애플리케이션에 연결.
+```
+
+```jsx
+import { reactionRoutes } from '@reaction/routes/reactionRoutes';
+import { Application } from 'express';
+
+const BASE_PATH = '/api/v1';
+
+export default (app: Application) => {
+  app.use(BASE_PATH, reactionRoutes.routes());
+};
+
+```
+
+## 테스트 진행
+
+```jsx
+reaction List 에 추가된다
+
+userTo 는 사용자 _id 를 가져오고 postId 는 글의 _id 를 가져온다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381351/notion-blog/_/React_Node_/_7_-_1_-/image.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381350/notion-blog/_/React_Node_/_7_-_1_-/image_1.png)
+
+## \* 문제 발생 ( 예전 리액션을 수정하려고 하면 오류 발생 )
+
+```jsx
+리액션을 수정하려고 예전 리액션 값을 주고 수정하려고 하면 오류가 발생한다 다음 내용에서 이걸 수정해본다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381351/notion-blog/_/React_Node_/_7_-_1_-/image_2.png)
+
+## 문제 상황
+
+```jsx
+테스트를 진행했을 때, 반응 데이터를 가져오거나 업데이트할 때 문제가 있었습니다:
+
+		데이터를 가져오는 곳에서 undefined(정의되지 않음) 값이 반환됨.
+
+		따라서 UI(사용자 인터페이스)에 반응이나 댓글 정보가 표시되지 않음.
+```
+
+## 문제 원인
+
+```jsx
+문제는 parseJson이라는 헬퍼 메서드 때문이었습니다.
+
+이 메서드는 JSON 형식의 문자열 데이터를 객체로 변환하는 역할을 합니다.
+
+그러나 코드에서 두 가지 문제가 있었습니다:
+
+데이터 반환 문제:
+
+		파싱(변환)한 데이터를 반환(return)하지 않아서, 결국 undefined가 반환되고 있었습니다.
+
+파싱 오류 처리 문제:
+
+		JSON이 아닌 데이터를 처리할 때 올바르게 반환하지 못하고 그냥 넘어가서 예상치 못한 결과를 초래했습니다.
+```
+
+### 수정 전
+
+```jsx
+static parseJson(prop: string): any {
+  try {
+    JSON.parse(prop); // 파싱만 시도하고 반환 안 함
+  } catch (error) {
+    return prop; // 오류 발생 시 원본 데이터 반환
+  }
+}
+```
+
+### **수정 후**
+
+```jsx
+static parseJson(prop: string): any {
+  try {
+    return JSON.parse(prop); // 파싱한 결과를 반환
+  } catch (error) {
+    return prop; // 오류 발생 시 원본 데이터 반환
+  }
+}
+```
+
+## 결론
+
+```jsx
+데이터를 처리하는 함수는 항상 결과를 반환해야 합니다.
+```
+
+# { MongoDB에서 리액션 데이터를 저장 }
+
+```jsx
+강의 내용은 MongoDB에서 특정 문서를 교체하거나,
+
+존재하지 않을 경우 새로 생성하고, 관련 데이터를 업데이트하는 과정을 설명합니다.
+```
+
+## 1. **클래스 생성 및 기본 설정**
+
+```jsx
+class ReactionService {
+  public async addReactionDataToDB(reactionData: IReactionJob): Promise<void> {
+    // 주요 데이터 추출
+    const { postId, userTo, userFrom, username, type, previousReaction, reactionObject } = reactionData;
+
+    // 비동기 작업 처리 (Promise.all 사용)
+    const updatedReaction = await Promise.all([
+      // 캐시에서 사용자 정보 가져오기
+      userCache.getUserFromCache(`${userTo}`),
+
+      // 리액션 데이터를 교체하거나 새로 생성
+      ReactionModel.findOneAndReplace(
+        { postId, type: previousReaction, username }, // 조건
+        reactionObject,                               // 교체할 문서
+        { upsert: true }                              // 문서가 없으면 새로 생성
+      ),
+
+      // 포스트 모델 업데이트
+      PostModel.findOneAndUpdate(
+        { _id: postId },                             // 조건
+        {
+          $inc: {
+            [`reactions.${previousReaction}`]: -1,  // 기존 리액션 감소
+            [`reactions.${type}`]: 1               // 새 리액션 증가
+          }
+        },
+        { new: true }                                // 업데이트된 문서 반환
+      )
+    ]);
+  }
+}
+
+```
+
+### 비동기 작업 및 Promise.all
+
+```jsx
+Promise.all: 여러 비동기 작업을 병렬로 실행하고 모든 작업이 완료되면 결과를 반환합니다.
+
+사용 이유:
+
+		캐시 데이터 가져오기, 리액션 데이터 업데이트,
+
+		포스트 데이터 업데이트가 서로 독립적이므로 병렬로 처리 가능.
+
+		처리 속도 향상.
+```
+
+### 3. **캐시에서 사용자 데이터 가져오기**
+
+```jsx
+userCache.getUserFromCache(`${userTo}`)
+```
+
+```jsx
+userTo: 알림 전송 등 추가 작업을 위해 필요한 사용자 ID.
+
+캐시 사용 이유:
+
+		DB 직접 조회보다 빠른 데이터 액세스 가능.
+
+		자주 사용되는 데이터를 효율적으로 관리.
+```
+
+### `findOneAndReplace` 메서드
+
+```jsx
+ReactionModel.findOneAndReplace(
+  { postId, type: previousReaction, username }, // 조건
+  reactionObject, // 교체할 문서
+  { upsert: true } // 문서가 없으면 새로 생성
+)
+```
+
+```jsx
+역할:
+
+		조건에 맞는 문서를 찾고 새 문서로 교체.
+
+		문서가 없을 경우 새로 생성(upsert: true).
+
+조건:
+
+		postId: 특정 포스트의 ID.
+
+		previousReaction: 이전 리액션 종류.
+
+		username: 사용자 이름.
+```
+
+### 포스트 데이터 업데이트
+
+```jsx
+PostModel.findOneAndUpdate(
+  { _id: postId }, // 조건
+  {
+    $inc: {
+      // 특정 필드 값 증감
+      [`reactions.${previousReaction}`]: -1, // 이전 리액션 감소
+      [`reactions.${type}`]: 1, // 새로운 리액션 증가
+    },
+  },
+  { new: true } // 업데이트된 문서 반환
+)
+```
+
+```jsx
+역할:
+
+		포스트의 리액션 데이터를 업데이트.
+
+$inc 연산자 사용:
+
+		기존 리액션(previousReaction) 값 감소.
+
+		새 리액션(type) 값 증가.
+
+
+* 알림 기능 (추후 구현 예정)
+```

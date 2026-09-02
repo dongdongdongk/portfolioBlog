@@ -1,0 +1,665 @@
+---
+title: 'Unity + Wwise 실시간 차폐(Occlusion) 시스템 구현하기'
+date: '2026-09-02'
+category: '게임 개발/WWISE'
+tags: ['게임 개발', 'WWISE']
+draft: false
+summary: ''
+---
+
+# 🎧 Unity + Wwise 실시간 차폐(Occlusion) 시스템 구현하기
+
+이번 가이드는 Unity에서 Wwise 오디오 미들웨어를 사용하여 **소리가 장애물에 가려질 때 자연스럽게 음량과 주파수가 변하는 시스템**을 만드는 방법을 다룹니다. 레이캐스트(Raycast)를 활용해 청자(Listener)와 소리 발생원(Emitter) 사이의 장애물을 감지하고, 실시간으로 오디오 파라미터를 조절합니다.
+
+---
+
+## 📋 목차
+
+1. [차폐(Occlusion) 시스템 개념 이해하기](https://claude.ai/chat/3c9eb2cd-2f60-40d2-b33e-6ce5733655bb#1-%EC%B0%A8%ED%8F%90occlusion-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [OcclusionEmitter 컴포넌트 구조](https://claude.ai/chat/3c9eb2cd-2f60-40d2-b33e-6ce5733655bb#2-occlusionemitter-%EC%BB%B4%ED%8F%AC%EB%84%8C%ED%8A%B8-%EA%B5%AC%EC%A1%B0)
+3. [WwiseOcclusionManager - 청자(Listener) 설정](https://claude.ai/chat/3c9eb2cd-2f60-40d2-b33e-6ce5733655bb#3-wwiseocclusionmanager---%EC%B2%AD%EC%9E%90listener-%EC%84%A4%EC%A0%95)
+4. [차폐 감지 설정 (Occlusion Settings)](https://claude.ai/chat/3c9eb2cd-2f60-40d2-b33e-6ce5733655bb#4-%EC%B0%A8%ED%8F%90-%EA%B0%90%EC%A7%80-%EC%84%A4%EC%A0%95-occlusion-settings)
+5. [레이캐스트 콘(Cone) 방식으로 장애물 감지하기](https://claude.ai/chat/3c9eb2cd-2f60-40d2-b33e-6ce5733655bb#5-%EB%A0%88%EC%9D%B4%EC%BA%90%EC%8A%A4%ED%8A%B8-%EC%BD%98cone-%EB%B0%A9%EC%8B%9D%EC%9C%BC%EB%A1%9C-%EC%9E%A5%EC%95%A0%EB%AC%BC-%EA%B0%90%EC%A7%80%ED%95%98%EA%B8%B0)
+6. [가시성(Visibility) 계산과 보간(Interpolation)](https://claude.ai/chat/3c9eb2cd-2f60-40d2-b33e-6ce5733655bb#6-%EA%B0%80%EC%8B%9C%EC%84%B1visibility-%EA%B3%84%EC%82%B0%EA%B3%BC-%EB%B3%B4%EA%B0%84interpolation)
+7. [Wwise RTPC로 실시간 오디오 제어하기](https://claude.ai/chat/3c9eb2cd-2f60-40d2-b33e-6ce5733655bb#7-wwise-rtpc%EB%A1%9C-%EC%8B%A4%EC%8B%9C%EA%B0%84-%EC%98%A4%EB%94%94%EC%98%A4-%EC%A0%9C%EC%96%B4%ED%95%98%EA%B8%B0)
+8. [Emitter 등록/해제 시스템](https://claude.ai/chat/3c9eb2cd-2f60-40d2-b33e-6ce5733655bb#8-emitter-%EB%93%B1%EB%A1%9D%ED%95%B4%EC%A0%9C-%EC%8B%9C%EC%8A%A4%ED%85%9C)
+9. [디버그 모드로 레이 시각화하기](https://claude.ai/chat/3c9eb2cd-2f60-40d2-b33e-6ce5733655bb#9-%EB%94%94%EB%B2%84%EA%B7%B8-%EB%AA%A8%EB%93%9C%EB%A1%9C-%EB%A0%88%EC%9D%B4-%EC%8B%9C%EA%B0%81%ED%99%94%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. 차폐(Occlusion) 시스템 개념 이해하기
+
+### 차폐(Occlusion)란?
+
+- **차폐(Occlusion)**: 현실에서 소리가 벽이나 장애물을 만나면 음량이 줄어들고 고음이 걸러지는 현상.
+- 게임에서는 플레이어와 소리 사이에 장애물이 있을 때 이를 자동으로 감지하여:
+  - **음량(Volume)** 감소
+  - **저역 통과 필터(Low-Pass Filter, LPF)** 적용 → 고음 차단, 먹먹한 소리
+
+### 시스템 구성 요소
+
+1. **Listener(청자)**: 소리를 듣는 주체 (보통 플레이어 캐릭터)
+2. **Emitter(발생원)**: 소리를 내는 오브젝트 (적, NPC, 환경음 등)
+3. **Occluding Layers(차폐 레이어)**: 소리를 막는 장애물로 설정할 레이어 (벽, 건물 등)
+4. **Raycast(레이 발사)**: Listener에서 Emitter로 여러 광선을 쏴서 장애물 감지
+5. **Wwise RTPC**: 감지 결과에 따라 실시간으로 오디오 파라미터 조절
+
+---
+
+## 2. OcclusionEmitter 컴포넌트 구조
+
+### 역할
+
+- 소리를 내는 게임 오브젝트에 부착하는 컴포넌트
+- Manager에 자신을 등록하여 차폐 계산 대상이 되도록 함
+
+### 주요 변수
+
+```csharp
+private WwiseOcclusionManager occlusionManager;
+```
+
+- Manager 스크립트 참조 저장
+- `FindFirstObjectByType`으로 씬에서 자동 탐색
+
+```csharp
+[HideInInspector] public float currentVisibility = 1f;
+```
+
+- **가시성 값**: 1.0 = 완전히 보임 (차폐 없음), 0.0 = 완전히 가려짐
+- `HideInInspector`: Inspector에는 안 보이지만 public이라 Manager가 접근 가능
+- 이 값에 따라 음량과 필터가 실시간으로 변함
+
+### 생명주기 메서드
+
+```csharp
+void OnEnable()
+```
+
+- 오브젝트가 활성화될 때 실행
+- Manager를 찾아서 자신을 등록(`RegisterEmitter`)
+
+```csharp
+void OnDisable()
+```
+
+- 오브젝트가 비활성화/제거될 때 실행
+- Manager에서 자신을 해제(`UnregisterEmitter`)
+- 메모리 누수 방지
+
+---
+
+## 3. WwiseOcclusionManager - 청자(Listener) 설정
+
+### Listener Settings (🎧)
+
+```csharp
+[SerializeField] private GameObject listener;
+```
+
+- 소리를 듣는 주체 오브젝트 (보통 플레이어)
+- Inspector에서 직접 할당 가능
+
+```csharp
+[SerializeField] private string listenerTag = "Player";
+```
+
+- 자동 할당 시 찾을 태그 이름
+- Unity에서 "Player" 태그를 가진 오브젝트를 탐색
+
+```csharp
+[SerializeField] private bool autoAssignListener = true;
+```
+
+- **자동 할당 기능**: true면 Start()에서 태그로 자동 탐색
+- false면 Inspector에서 수동 할당 필요
+
+### Start() 메서드
+
+```csharp
+void Start()
+{
+    if (autoAssignListener && listener == null)
+    {
+        listener = GameObject.FindWithTag(listenerTag);
+        if (!listener)
+        {
+            Debug.LogWarning($"WwiseOcclusionManager: Tag '{listenerTag}' not found.");
+        }
+    }
+}
+```
+
+- 자동 할당이 켜져있고 listener가 비어있으면 태그로 검색
+- 못 찾으면 경고 메시지 출력
+
+---
+
+## 4. 차폐 감지 설정 (Occlusion Settings)
+
+### 음향 파라미터
+
+```csharp
+[SerializeField] private float minVolume = 0.7f;
+```
+
+- **최소 음량 배율**: 완전히 가려졌을 때의 음량 (0.7 = 70%)
+- 값이 낮을수록 차폐 시 더 조용해짐
+
+```csharp
+[SerializeField] private float minFrequency = 500f;
+```
+
+- **최소 주파수 (Hz)**: 완전히 가려졌을 때 LPF 차단 주파수
+- 500Hz → 500Hz 이상의 고음이 모두 걸러짐 (먹먹한 소리)
+- 값이 낮을수록 더 많은 고음 차단
+
+```csharp
+[SerializeField] private float interpolationSpeed = 2f;
+```
+
+- **보간 속도**: 가시성 변화가 얼마나 부드럽게 적용될지
+- 값이 클수록 빠르게 반응, 작을수록 천천히 부드럽게 변화
+- 예: 2.0이면 초당 2배속으로 목표값에 접근
+
+### 레이캐스트 설정
+
+```csharp
+[SerializeField] private float coneAngle = 45f;
+```
+
+- **콘 각도 (도)**: 레이를 얼마나 넓게 퍼뜨릴지
+- 45° = 청자에서 발생원 방향으로 45도 각도의 원뿔 범위
+- 값이 클수록 더 넓은 영역 검사 (측면 장애물도 감지)
+
+```csharp
+[SerializeField] private int rayCount = 8;
+```
+
+- **레이 개수**: 원뿔 범위를 몇 개의 광선으로 검사할지
+- 8개 = 360도를 8등분하여 레이 발사 (0°, 45°, 90°, 135°...)
+- 많을수록 정확하지만 성능 부담 증가
+
+```csharp
+[SerializeField] private LayerMask occludingLayers;
+```
+
+- **차폐 레이어**: 어떤 레이어의 오브젝트가 소리를 막을지 선택
+- 예: "Wall", "Building" 레이어만 선택하면 캐릭터는 통과
+
+---
+
+## 5. 레이캐스트 콘(Cone) 방식으로 장애물 감지하기
+
+### Update() 메서드
+
+```csharp
+void Update()
+{
+    if (!listener) return;
+
+    foreach (var emitter in emitters)
+    {
+        if (!emitter) continue;
+        UpdateOcclusion(emitter);
+    }
+}
+```
+
+- 매 프레임마다 등록된 모든 Emitter에 대해 차폐 계산
+- listener가 없으면 스킵
+
+### UpdateOcclusion() - 차폐 계산 핵심
+
+### 1단계: 방향과 거리 계산
+
+```csharp
+Vector3 direction = emitter.transform.position - listener.transform.position;
+float distance = direction.magnitude;
+```
+
+- **direction**: 청자에서 발생원으로의 방향 벡터
+- **distance**: 둘 사이의 거리 (레이 길이로 사용)
+
+### 2단계: 원뿔 범위로 여러 레이 발사
+
+```csharp
+int hitCount = 0;
+
+for (int i = 0; i < rayCount; i++)
+{
+    float angle = ((float)i / rayCount) * 360f;
+```
+
+- **angle**: 현재 레이의 회전 각도
+- 예: rayCount=8일 때 → 0°, 45°, 90°, 135°, 180°, 225°, 270°, 315°
+
+```csharp
+    Vector3 offset = Quaternion.Euler(0, angle, 0) * Vector3.forward
+                     * Mathf.Tan(coneAngle * Mathf.Deg2Rad);
+
+```
+
+- **offset**: 원뿔 범위를 만드는 오프셋 벡터
+- `Quaternion.Euler(0, angle, 0)`: Y축 기준으로 회전
+- `Mathf.Tan(coneAngle * Mathf.Deg2Rad)`: 콘 각도에 따른 반지름 계산
+- 결과: 청자 주변을 원형으로 둘러싼 점들
+
+```csharp
+    Ray ray = new Ray(listener.transform.position, direction + offset);
+
+```
+
+- **Ray**: 청자 위치에서 (발생원 방향 + 오프셋) 방향으로 광선 생성
+- 원뿔 범위를 여러 방향에서 검사
+
+### 3단계: 장애물 히트 확인
+
+```csharp
+    if (Physics.Raycast(ray, distance, occludingLayers))
+    {
+        hitCount++;
+        if (debugMode) Debug.DrawRay(ray.origin, ray.direction * distance, rayColorBlocked);
+    }
+    else
+    {
+        if (debugMode) Debug.DrawRay(ray.origin, ray.direction * distance, rayColorClear);
+    }
+}
+
+```
+
+- `Physics.Raycast(ray, distance, occludingLayers)`: 지정 거리 내 차폐 레이어 충돌 검사
+- 충돌 시 `hitCount` 증가 → 가려진 레이 개수 카운트
+- 디버그 모드 시 레이를 색상으로 표시 (빨강=막힘, 초록=통과)
+
+---
+
+## 6. 가시성(Visibility) 계산과 보간(Interpolation)
+
+### 목표 가시성 계산
+
+```csharp
+float targetVisibility = 1f - (float)hitCount / rayCount;
+
+```
+
+- **가시성 공식**: 1 - (막힌 레이 수 / 전체 레이 수)
+- 예시:
+  - 8개 중 0개 막힘 → 1.0 (완전히 보임)
+  - 8개 중 4개 막힘 → 0.5 (절반 가려짐)
+  - 8개 중 8개 막힘 → 0.0 (완전히 가려짐)
+
+### 부드러운 보간 적용
+
+```csharp
+emitter.currentVisibility = Mathf.Lerp(
+    emitter.currentVisibility,
+    targetVisibility,
+    Time.deltaTime * interpolationSpeed
+);
+
+```
+
+- `Mathf.Lerp`: 현재값에서 목표값으로 부드럽게 이동
+- **왜 Emitter에 저장?**: 각 소리마다 독립적인 보간 상태 유지
+- `Time.deltaTime * interpolationSpeed`: 프레임 독립적 보간
+  - interpolationSpeed=2 → 초당 약 2배속으로 변화
+  - 갑작스러운 차폐 변화를 자연스럽게 완화
+
+---
+
+## 7. Wwise RTPC로 실시간 오디오 제어하기
+
+### RTPC(Real-Time Parameter Control)란?
+
+- Wwise에서 제공하는 **실시간 파라미터 제어** 기능
+- 게임 상태(HP, 거리, 차폐도 등)에 따라 오디오를 동적으로 변경
+
+### Wwise RTPC 설정
+
+```csharp
+[SerializeField] private AK.Wwise.RTPC occlusionLPF;
+[SerializeField] private AK.Wwise.RTPC occlusionVolume;
+
+```
+
+- **occlusionLPF**: 저역 통과 필터 주파수 제어
+- **occlusionVolume**: 음량 제어
+- Inspector에서 Wwise 프로젝트의 RTPC를 드래그 앤 드롭으로 연결
+
+### 필터 주파수 계산
+
+```csharp
+float smoothLPF = Mathf.Lerp(minFrequency, 22000f, emitter.currentVisibility);
+
+```
+
+- **범위**: minFrequency(500Hz) ~ 22000Hz (가청 주파수 최대)
+- **가시성별 값**:
+  - visibility=1.0 (완전히 보임) → 22000Hz (필터 없음, 원본 소리)
+  - visibility=0.5 (절반 가려짐) → 약 11250Hz (고음 일부 차단)
+  - visibility=0.0 (완전히 가려짐) → 500Hz (고음 거의 제거, 먹먹한 소리)
+
+### 음량 계산
+
+```csharp
+float smoothVolume = Mathf.Lerp(minVolume * 100f, 100f, emitter.currentVisibility);
+
+```
+
+- **범위**: minVolume\*100 (70) ~ 100 (Wwise는 퍼센트 단위 사용)
+- **가시성별 값**:
+  - visibility=1.0 → 100% (원본 음량)
+  - visibility=0.5 → 85% (약간 감소)
+  - visibility=0.0 → 70% (최소 음량)
+
+### RTPC 값 적용
+
+```csharp
+occlusionLPF.SetValue(emitter.gameObject, smoothLPF);
+occlusionVolume.SetValue(emitter.gameObject, smoothVolume);
+
+```
+
+- `SetValue(게임오브젝트, 값)`: 특정 오브젝트의 RTPC 파라미터 설정
+- Wwise에서 이 값을 받아 실시간으로 오디오 처리
+
+---
+
+## 8. Emitter 등록/해제 시스템
+
+### Emitter 리스트 관리
+
+```csharp
+private List<OcclusionEmitter> emitters = new List<OcclusionEmitter>();
+
+```
+
+- 씬에 있는 모든 활성화된 Emitter를 추적
+- Update()에서 이 리스트를 순회하며 차폐 계산
+
+### 등록 메서드
+
+```csharp
+public void RegisterEmitter(OcclusionEmitter emitter)
+{
+    if (!emitters.Contains(emitter))
+        emitters.Add(emitter);
+}
+
+```
+
+- Emitter가 OnEnable()에서 호출
+- **중복 체크**: 이미 리스트에 있으면 추가 안 함
+- 동적으로 생성/활성화되는 소리 오브젝트 대응
+
+### 해제 메서드
+
+```csharp
+public void UnregisterEmitter(OcclusionEmitter emitter)
+{
+    emitters.Remove(emitter);
+}
+
+```
+
+- Emitter가 OnDisable()에서 호출
+- 리스트에서 제거하여 불필요한 계산 방지
+- 오브젝트가 파괴되어도 안전하게 처리
+
+---
+
+## 9. 디버그 모드로 레이 시각화하기
+
+### Debug Settings (🧪)
+
+```csharp
+[SerializeField] private bool debugMode = false;
+
+```
+
+- true로 설정 시 Scene 뷰에서 레이캐스트를 시각적으로 확인 가능
+
+```csharp
+[SerializeField] private Color rayColorClear = Color.green;
+[SerializeField] private Color rayColorBlocked = Color.red;
+
+```
+
+- **rayColorClear**: 장애물 없이 통과한 레이 색상 (초록)
+- **rayColorBlocked**: 장애물에 막힌 레이 색상 (빨강)
+
+### 시각화 코드
+
+```csharp
+if (debugMode) Debug.DrawRay(ray.origin, ray.direction * distance, rayColorBlocked);
+
+```
+
+- `Debug.DrawRay`: Scene 뷰에 광선을 그림 (게임 화면에는 안 보임)
+- **활용법**:
+  - debugMode 켜고 Scene 뷰에서 플레이 → 레이가 어떻게 발사되는지 실시간 확인
+  - 콘 각도, 레이 개수 조정 시 효과 즉시 확인 가능
+  - 차폐가 제대로 감지되는지 디버깅
+
+---
+
+## 🎯 전체 동작 흐름 정리
+
+1. **초기화**: Listener 자동/수동 할당, Emitter들이 Manager에 등록
+2. **매 프레임 반복**:
+   - 각 Emitter에 대해:
+     - Listener에서 Emitter 방향으로 원뿔 범위의 여러 레이 발사
+     - 차폐 레이어와 충돌한 레이 개수 카운트
+     - 가시성 계산 (1 - 막힌비율)
+     - 현재 가시성을 목표값으로 부드럽게 보간
+     - 가시성에 따라 LPF와 음량 값 계산
+     - Wwise RTPC로 실시간 오디오 적용
+3. **결과**: 플레이어와 소리 사이에 장애물이 생기면 자연스럽게 소리가 먹먹해지고 작아짐
+
+---
+
+## 💡 사용 예시
+
+1. **설정 단계**:
+   - 빈 오브젝트에 WwiseOcclusionManager 추가
+   - Player 오브젝트에 "Player" 태그 지정
+   - Occluding Layers에 "Wall" 레이어 추가
+   - Wwise에서 RTPC 생성 후 Inspector에 연결
+2. **소리 오브젝트 준비**:
+   - 적 캐릭터에 AkGameObj + OcclusionEmitter 추가
+   - 자동으로 Manager에 등록됨
+3. **테스트**:
+   - Debug Mode 켜고 플레이
+   - 벽 뒤로 이동하면 빨간 레이 증가 → 소리 변화 확인
+
+🎧 `WwiseOcclusionManager.cs`
+
+```csharp
+using System.Collections.Generic;
+using UnityEngine;
+
+/// <summary>
+/// 🎧 WwiseOcclusionManager
+/// ─────────────────────────────
+/// 이 스크립트는 Wwise와 Unity를 통합해
+/// "플레이어와 소리 오브젝트 사이의 장애물(벽 등)"을 감지하고,
+/// 그에 따라 RTPC(실시간 파라미터 제어)를 조절하여
+/// 소리가 막히거나 둔탁하게 들리도록 처리하는 시스템입니다.
+///
+/// 🔹 Manager는 모든 'OcclusionEmitter'를 관리하며,
+///     각 사운드 오브젝트와 플레이어 사이에 벽이 있는지 체크합니다.
+/// 🔹 RTPC를 사용하여 Wwise에서 LPF(저음 필터)와 볼륨을 제어합니다.
+/// </summary>
+public class WwiseOcclusionManager : MonoBehaviour
+{
+    // 🎧 [Listener Settings] — 청취자(플레이어) 관련 설정
+    [Header("🎧 Listener Settings")]
+    [SerializeField] private GameObject listener; // 플레이어 (소리를 듣는 대상)
+    [SerializeField] private string listenerTag = "Player"; // 자동 탐색 시 찾을 태그 이름
+    [SerializeField] private bool autoAssignListener = true; // 시작 시 자동으로 Player 찾기 여부
+
+    // 🔧 [Occlusion Settings] — 소리 막힘 관련 계산 값
+    [Header("🔧 Occlusion Settings")]
+    [SerializeField] private float minVolume = 0.7f;       // 소리가 막혔을 때 최소 볼륨
+    [SerializeField] private float minFrequency = 500f;    // 막혔을 때 최소 필터 주파수
+    [SerializeField] private float interpolationSpeed = 2f;// 소리 감쇠 변화 속도
+    [SerializeField] private float coneAngle = 45f;        // 레이를 퍼뜨릴 각도
+    [SerializeField] private int rayCount = 8;             // 쏘는 레이 개수
+    [SerializeField] private LayerMask occludingLayers;    // 벽 등 막힘으로 처리할 Layer 설정
+
+    // 🧪 [Debug Settings] — 디버깅용 설정
+    [Header("🧪 Debug Settings")]
+    [SerializeField] private bool debugMode = false;       // Scene 뷰에서 레이 시각화할지 여부
+    [SerializeField] private Color rayColorClear = Color.green; // 막히지 않은 레이 색
+    [SerializeField] private Color rayColorBlocked = Color.red; // 막힌 레이 색
+
+    // 🎚️ [Wwise RTPC 설정]
+    [Header("🎚️ Wwise RTPC 설정")]
+    [SerializeField] private AK.Wwise.RTPC occlusionLPF;     // LPF (저역 통과 필터) RTPC
+    [SerializeField] private AK.Wwise.RTPC occlusionVolume;  // Volume RTPC
+
+    // ▶ 현재 활성화된 모든 소리 발생기 목록
+    private List<OcclusionEmitter> emitters = new List<OcclusionEmitter>();
+
+    // 🚀 Unity의 Start() — 게임 시작 시 실행
+    void Start()
+    {
+        // 자동으로 Listener를 찾아주는 기능 (선택적)
+        if (autoAssignListener && listener == null)
+        {
+            listener = GameObject.FindWithTag(listenerTag);
+            if (!listener)
+            {
+                Debug.LogWarning($"WwiseOcclusionManager: Tag '{listenerTag}' not found. 수동으로 Listener를 지정하세요.");
+            }
+        }
+    }
+
+    // 🔁 Unity의 Update() — 매 프레임마다 실행
+    // ▶ 각 Emitter(소리 오브젝트)에 대해 "막힘 정도"를 계산하고 Wwise에 전달
+    void Update()
+    {
+        if (!listener) return; // 플레이어가 없으면 중단
+
+        foreach (var emitter in emitters)
+        {
+            if (!emitter) continue;
+            UpdateOcclusion(emitter);
+        }
+    }
+
+    /// <summary>
+    /// 🎯 개별 소리 오브젝트(emitter)에 대해 Occlusion 계산
+    /// </summary>
+    private void UpdateOcclusion(OcclusionEmitter emitter)
+    {
+        // 플레이어 → 소리 오브젝트 방향 벡터
+        Vector3 direction = emitter.transform.position - listener.transform.position;
+        float distance = direction.magnitude; // 두 지점 사이 거리
+        int hitCount = 0; // 막힌 레이 개수
+
+        // 👇 다중 레이를 사용하여 "얼마나 막혀있는지"를 계산
+        for (int i = 0; i < rayCount; i++)
+        {
+            float angle = ((float)i / rayCount) * 360f;
+            Vector3 offset = Quaternion.Euler(0, angle, 0) * Vector3.forward * Mathf.Tan(coneAngle * Mathf.Deg2Rad);
+            Ray ray = new Ray(listener.transform.position, direction + offset);
+
+            // 지정된 LayerMask에 해당하는 물체에 맞으면 막힌 것으로 처리
+            if (Physics.Raycast(ray, distance, occludingLayers))
+            {
+                hitCount++;
+                if (debugMode)
+                    Debug.DrawRay(ray.origin, ray.direction * distance, rayColorBlocked);
+            }
+            else
+            {
+                if (debugMode)
+                    Debug.DrawRay(ray.origin, ray.direction * distance, rayColorClear);
+            }
+        }
+
+        // 🎚️ 막힌 정도 계산 (1 = 완전 투명, 0 = 완전 막힘)
+        float targetVisibility = 1f - (float)hitCount / rayCount;
+
+        // 📉 이전 프레임 값과 보간(Lerp)해서 부드럽게 변화시킴
+        emitter.currentVisibility = Mathf.Lerp(
+            emitter.currentVisibility,
+            targetVisibility,
+            Time.deltaTime * interpolationSpeed
+        );
+
+        // 🎛️ Wwise RTPC 값 계산 (가청 주파수, 볼륨)
+        float smoothLPF = Mathf.Lerp(minFrequency, 22000f, emitter.currentVisibility);  // LPF: 벽에 막히면 저음만 남게
+        float smoothVolume = Mathf.Lerp(minVolume * 100f, 100f, emitter.currentVisibility); // Volume: 막히면 볼륨 감소
+
+        // 🎚️ Wwise RTPC 적용
+        occlusionLPF.SetValue(emitter.gameObject, smoothLPF);
+        occlusionVolume.SetValue(emitter.gameObject, smoothVolume);
+    }
+
+    /// <summary>
+    /// 🔔 Emitter 등록 (사운드 오브젝트 활성화 시 호출됨)
+    /// </summary>
+    public void RegisterEmitter(OcclusionEmitter emitter)
+    {
+        if (!emitters.Contains(emitter))
+            emitters.Add(emitter);
+    }
+
+    /// <summary>
+    /// 🔕 Emitter 해제 (사운드 오브젝트 비활성화 시 호출됨)
+    /// </summary>
+    public void UnregisterEmitter(OcclusionEmitter emitter)
+    {
+        emitters.Remove(emitter);
+    }
+}
+
+```
+
+🔊 `OcclusionEmitter.cs`
+
+```csharp
+using UnityEngine;
+
+/// <summary>
+/// 🔊 OcclusionEmitter
+/// ─────────────────────────────
+/// 이 스크립트는 소리를 내는 오브젝트에 붙는 컴포넌트입니다.
+///
+/// ✔ 역할:
+/// - 게임이 시작되면 자동으로 Manager에 자신을 등록합니다.
+/// - 비활성화될 때 Manager에서 자신을 해제합니다.
+/// - Manager는 이 오브젝트의 위치를 기준으로 막힘 정도를 계산합니다.
+///
+/// 🎵 필수: AKGameObj 컴포넌트 (Wwise용)
+/// </summary>
+[RequireComponent(typeof(AkGameObj))]
+public class OcclusionEmitter : MonoBehaviour
+{
+    // ▶ Occlusion을 관리하는 매니저
+    private WwiseOcclusionManager occlusionManager;
+
+    // ▶ 현재 가시성 값 (1 = 잘 들림, 0 = 완전 막힘)
+    [HideInInspector] public float currentVisibility = 1f;
+
+    // 🟢 오브젝트가 활성화될 때 호출
+    void OnEnable()
+    {
+        // 씬 내의 WwiseOcclusionManager를 찾아 등록
+        occlusionManager = FindFirstObjectByType<WwiseOcclusionManager>();
+        if (occlusionManager)
+            occlusionManager.RegisterEmitter(this);
+    }
+
+    // 🔴 오브젝트가 비활성화되면 Manager에서 해제
+    void OnDisable()
+    {
+        if (occlusionManager)
+            occlusionManager.UnregisterEmitter(this);
+    }
+}
+```

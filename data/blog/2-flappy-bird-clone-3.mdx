@@ -1,0 +1,880 @@
+---
+title: '섹션 2: Flappy Bird Clone - 3 -'
+date: '2026-09-02'
+category: '게임 개발/Game Development in JS TS - The Complete Guide (w_'
+tags: ['게임 개발', 'Game Development in JS TS - The Complete Guide (w_']
+draft: false
+summary: ''
+---
+
+# { Phaser 게임 구조 리팩토링 }
+
+```jsx
+문제점
+
+		코드 집중도: 모든 코드가 index.js 파일에 작성되어 있어 복잡해지고 가독성이 떨어짐.
+
+		확장성 부족: 새로운 기능을 추가할 때 코드가 더 복잡해질 가능성이 큼.
+
+		구조적 문제: 컨텍스트 분리가 없어 코드 관리가 어려움.
+
+해결책
+
+		분리된 구조 도입: 기능별로 코드를 분리해 관리하고, Phaser 게임에서 사용되는 Scene을 활용.
+
+		클래스 기반 설계: Scene을 클래스로 정의해 코드의 재사용성과 가독성을 높임.
+```
+
+## 리팩토링 과정
+
+```jsx
+1. 새로운 디렉토리 생성
+
+		src/scenes 디렉토리를 생성.
+
+		Scene 관련 클래스 파일을 이 디렉토리에서 관리.
+
+2. PlayScene 클래스 작성
+
+		PlayScene.js 파일 생성.
+
+		Phaser의 Scene을 확장하여 PlayScene 클래스를 정의.
+```
+
+```jsx
+// Phaser 라이브러리를 가져옵니다.
+import Phaser from 'phaser'
+
+// PlayScene이라는 새로운 Scene(장면)을 정의합니다.
+class PlayScene extends Phaser.Scene {
+  // Scene의 생성자(constructor)입니다.
+  constructor() {
+    // Phaser.Scene의 생성자를 호출하여 Scene을 초기화합니다.
+    // "PlayScene"은 이 Scene의 고유 키입니다. 다른 Scene과 구분하는 데 사용됩니다.
+    super('PlayScene')
+
+    // 새(bird)의 초기 위치를 설정합니다. 게임에서 새가 처음 나타날 위치를 정의합니다.
+    this.initalBirdPosition = { x: 80, y: 300 }
+
+    // bird라는 변수는 나중에 새 객체를 저장하기 위해 사용됩니다. 초기값은 null입니다.
+    this.bird = null
+  }
+
+  // preload() 함수는 게임이 시작되기 전에 리소스(이미지, 소리 등)를 미리 로드하는 데 사용됩니다.
+  preload() {
+    // 배경 이미지를 로드합니다. "sky"는 이 이미지를 참조할 때 사용할 키입니다.
+    this.load.image('sky', 'assets/sky.png')
+
+    // 새 이미지를 로드합니다. "bird"는 이 이미지를 참조할 때 사용할 키입니다.
+    this.load.image('bird', 'assets/bird.png')
+  }
+
+  // create() 함수는 Scene이 생성될 때 호출됩니다.
+  create() {
+    // 배경 이미지를 화면에 추가합니다.
+    // (0, 0)은 배경 이미지의 왼쪽 상단 좌표를 설정하며, setOrigin(0)은 이미지의 기준점을 왼쪽 상단으로 설정합니다.
+    this.add.image(0, 0, 'sky').setOrigin(0)
+
+    // 새 객체를 물리 엔진이 적용된 스프라이트(sprite)로 생성합니다.
+    // initialBirdPosition에서 설정한 x, y 좌표에 이미지를 배치합니다.
+    this.bird = this.physics.add
+      .sprite(this.initalBirdPosition.x, this.initalBirdPosition.y, 'bird')
+      .setOrigin(0) // 기준점을 이미지의 왼쪽 상단으로 설정합니다.
+
+    // 새에 중력을 적용합니다. 중력 값이 클수록 새가 더 빠르게 아래로 떨어집니다.
+    this.bird.body.gravity.y = 400
+  }
+
+  // update() 함수는 게임 루프의 매 프레임마다 호출됩니다.
+  // 여기에는 게임 상태를 업데이트하거나 사용자 입력에 반응하는 코드가 들어갑니다.
+  update() {
+    // 현재는 아무 내용도 없지만, 나중에 새가 움직이거나 충돌을 처리하는 로직을 여기에 추가할 수 있습니다.
+  }
+}
+
+// PlayScene 클래스를 내보냅니다.
+// 다른 파일에서 이 Scene을 가져와 사용할 수 있도록 설정합니다.
+export default PlayScene
+```
+
+## Index.js 리팩토링
+
+```jsx
+PlayScene을 index.js에서 가져와 Phaser의 Scene으로 등록.
+```
+
+```jsx
+import Phaser from 'phaser'
+import PlayScene from './scenes/PlayScene'
+
+const config = {
+  type: Phaser.AUTO,
+  width: 2800,
+  height: 600,
+  physics: {
+    default: 'arcade',
+    arcade: { debug: true },
+  },
+  scene: [PlayScene], // PlayScene 추가
+}
+
+new Phaser.Game(config)
+```
+
+## 결과
+
+```jsx
+분리된 코드: Scene 관련 코드와 메인 설정 코드가 분리되어 관리가 용이해짐.
+
+구조적 이점: 확장 가능성이 높아져 향후 메뉴 화면, 점수 화면 등 추가 구현이 간단해짐.
+
+Phaser의 Scene 활용: Scene 간 이동 및 관리가 더 체계적으로 가능해짐.
+```
+
+# { Phaser 게임 개발에서 "PlayScene" 분리와 다중 씬 관리 이해하기 }
+
+```jsx
+이번 강의는 index.js 파일에서 일부 코드를 분리하여 PlayScene에 옮기는 첫 단계를 다룹니다.
+
+이를 통해 코드 구조를 개선하고 다중 씬(Scene)을 효율적으로 관리하는 방법을 배웁니다.
+```
+
+## 다중 씬의 개념
+
+```jsx
+
+		씬(Scene): 게임에서의 특정 화면이나 상태를 나타냄. 예:
+
+				PlayScene: 게임 화면 (현재 작업 중인 씬)
+
+				MenuScene: 시작 화면 및 메뉴 버튼
+
+				LeaderboardScene: 점수판
+
+				PauseScene: 일시 정지 화면
+
+
+		씬 관리:
+
+				Phaser는 자체적인 씬 관리 기능을 제공하며, 씬 간의 전환 및 정지(pause)를 쉽게 구현할 수 있음.
+
+				한 씬을 정지하면 기존의 게임 오브젝트는 그대로 유지되며, 다른 씬으로 전환 가능.
+```
+
+## 씬 구성 요소 및 초기화
+
+```jsx
+새로운 객체 생성:
+
+		초기값(WIDTH, HEIGHT, BIRD_POSITION)을 별도로 정의하고,
+
+		이를 sharedConfig라는 객체로 통합하여 PlayScene 생성자에 전달.
+
+		( 게임 전체 화면에 사용하는 똑같은 화면 크기 )
+```
+
+```jsx
+const WIDTH = 800
+const HEIGHT = 600
+const BIRD_POSITION = { x: WIDTH * 0.1, y: HEIGHT / 2 }
+
+const SHARED_CONFIG = {
+  width: WIDTH,
+  height: HEIGHT,
+  startPosition: BIRD_POSITION,
+}
+```
+
+```jsx
+PlayScene 초기화:
+
+		PlayScene 클래스는 생성자에서 전달받은 config 값을 내부 속성으로 저장.
+```
+
+```jsx
+class PlayScene extends Phaser.Scene {
+  constructor(config) {
+    super('PlayScene')
+    this.config = config
+    this.bird = null
+  }
+}
+```
+
+```jsx
+초기 새 위치 설정:
+
+	PlayScene에서 새(bird)의 위치를 config.startPosition을 사용하여 설정.
+```
+
+```jsx
+create() {
+  this.bird = this.physics.add
+    .sprite(this.config.startPosition.x, this.config.startPosition.y, "bird")
+    .setOrigin(0);
+  this.bird.body.gravity.y = 400;
+}
+```
+
+## Phaser의 this 객체
+
+### 1. **`this.add`**: **게임 오브젝트 추가**
+
+```jsx
+Phaser의 this.add는 게임 씬에 새로운 게임 오브젝트를 추가하는 데 사용됩니다.
+
+예를 들어, 스프라이트, 텍스트, 이미지 등을 생성할 수 있습니다.
+
+주요 메서드:
+
+		this.add.image(x, y, texture): 특정 좌표에 이미지를 추가.
+
+		this.add.sprite(x, y, texture): 스프라이트를 추가.
+
+		this.add.text(x, y, text, style): 텍스트를 추가.
+
+		this.add.group(config): 오브젝트 그룹을 생성.
+```
+
+```jsx
+this.add.image(400, 300, 'background')
+this.add.text(100, 100, 'Hello Phaser', { fontSize: '32px', color: '#ffffff' })
+```
+
+### 2. **`this.physics`**: **물리 엔진 사용**
+
+```jsx
+this.physics는 물리 엔진과 상호작용하는 오브젝트를 관리합니다.
+
+Phaser는 Arcade Physics를 기본으로 제공하며, 이를 통해 중력, 충돌, 속도 등을 쉽게 설정할 수 있습니다.
+
+주요 메서드:
+
+		this.physics.add.sprite(x, y, texture): 물리 속성이 적용된 스프라이트 추가.
+
+		this.physics.add.group(config): 물리 속성이 적용된 그룹 생성.
+
+		this.physics.add.collider(obj1, obj2, callback): 충돌 처리 설정.
+```
+
+```jsx
+const player = this.physics.add.sprite(100, 450, 'player')
+player.setBounce(0.2) // 튕김 효과
+player.setCollideWorldBounds(true) // 화면 경계 충돌 설정
+```
+
+### 3. **`this.scene`**: **씬 전환 및 관리**
+
+```jsx
+Phaser의 씬은 게임의 각 단계를 나타내며, this.scene을 사용해 씬 간 전환 및 관리가 가능합니다.
+
+주요 메서드:
+
+		this.scene.start('SceneName'): 지정된 씬으로 전환.
+
+		this.scene.stop('SceneName'): 지정된 씬을 중지.
+
+		this.scene.pause('SceneName'): 씬 일시 정지.
+
+		this.scene.resume('SceneName'): 정지된 씬 재개.
+```
+
+```jsx
+this.scene.start('GameScene') // GameScene으로 전환
+```
+
+### 4. **`this.config`**: **초기화 시 전달된 설정 값**
+
+```jsx
+this.config는 Phaser 게임 초기화 시 전달된 설정 값에 접근하는 데 사용됩니다.
+
+이를 통해 캔버스 크기, 배경색, FPS 등을 참조할 수 있습니다.
+```
+
+```jsx
+const config = {
+  type: Phaser.AUTO,
+  width: 800,
+  height: 600,
+  scene: [MainScene, GameScene],
+  physics: { default: 'arcade', arcade: { gravity: { y: 300 } } },
+}
+
+const game = new Phaser.Game(config)
+```
+
+```jsx
+this.config로 값 참조:
+
+console.log(this.config.width); // 800
+console.log(this.config.height); // 600
+```
+
+# { 리팩토링 마무리 최종 }
+
+## PlayScene.js
+
+```jsx
+import Phaser from 'phaser' // Phaser 라이브러리 가져오기
+
+const PIPES_TO_RENDER = 4 // 화면에 표시될 파이프 세트 수
+
+// PlayScene 클래스 정의: 게임의 핵심 로직이 들어있는 장면(Scene)
+class PlayScene extends Phaser.Scene {
+  // 생성자: 초기 설정값들을 받아 초기화
+  constructor(config) {
+    super('PlayScene') // 부모 클래스(Phaser.Scene) 생성자 호출
+    this.config = config // 전달받은 설정값 저장
+
+    // 주요 변수 초기화
+    this.bird = null // 플레이어 캐릭터(새)
+    this.pipes = null // 파이프 그룹
+
+    // 파이프 간 거리 및 속도 설정
+    this.pipeHorizontalDistance = 0 // 두 파이프 세트 간의 거리
+    this.pipeVerticalDistanceRange = [150, 250] // 상하 파이프 간 거리 범위
+    this.pipeHorizontalDistanceRange = [500, 550] // 두 세트 파이프 간 거리 범위
+    this.flapVelocity = 250 // 새가 플랩할 때 상승 속도
+  }
+
+  // preload: 게임에 필요한 리소스(이미지 등) 로드
+  preload() {
+    this.load.image('sky', 'assets/sky.png') // 배경 이미지
+    this.load.image('bird', 'assets/bird.png') // 새 이미지
+    this.load.image('pipe', 'assets/pipe.png') // 파이프 이미지
+  }
+
+  // create: 게임 장면 초기화 및 구성
+  create() {
+    // 배경 이미지 추가
+    this.add.image(0, 0, 'sky').setOrigin(0)
+
+    // 새 스프라이트 추가 및 중력 설정
+    this.bird = this.physics.add
+      .sprite(this.config.startPosition.x, this.config.startPosition.y, 'bird')
+      .setOrigin(0)
+    this.bird.body.gravity.y = 400
+
+    // 파이프 그룹 생성
+    this.pipes = this.physics.add.group()
+
+    // 파이프 그룹 초기화
+    for (let i = 0; i < PIPES_TO_RENDER; i++) {
+      const upperPipe = this.pipes.create(0, 0, 'pipe').setOrigin(0, 1) // 상단 파이프
+      const lowerPipe = this.pipes.create(0, 0, 'pipe').setOrigin(0, 0) // 하단 파이프
+      this.placePipe(upperPipe, lowerPipe) // 파이프 위치 설정
+    }
+
+    // 파이프 속도 설정 (왼쪽으로 이동)
+    this.pipes.setVelocityX(-200)
+
+    // 입력 이벤트 설정
+    this.input.on('pointerdown', this.flap, this) // 화면 터치 시 플랩
+    this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE) // 스페이스 키 등록
+  }
+
+  // update: 매 프레임마다 호출되어 게임 상태를 업데이트
+  update() {
+    // 새가 화면 밖으로 벗어났을 경우 위치 초기화
+    if (this.bird.y > this.config.height || this.bird.y < -this.bird.height) {
+      this.restartBirdPosition()
+    }
+
+    // 스페이스 키 입력 처리
+    if (this.spaceKey.isDown) {
+      this.flap() // 새가 플랩
+    }
+
+    // 파이프 재활용 처리
+    this.recyclePipes()
+  }
+
+  // placePipe: 상하 파이프 위치 설정
+  placePipe(uPipe, lPipe) {
+    const rightMostX = this.getRightMostPipe() // 가장 오른쪽 파이프 위치 가져오기
+    const pipeVerticalDistance = Phaser.Math.Between(...this.pipeVerticalDistanceRange) // 상하 파이프 간 거리 랜덤 설정
+    const pipeVerticalPosition = Phaser.Math.Between(
+      20,
+      this.config.height - 20 - pipeVerticalDistance
+    ) // 상단 파이프 Y 위치 랜덤 설정
+    const pipeHorizontalDistance = Phaser.Math.Between(...this.pipeHorizontalDistanceRange) // 다음 파이프 세트 간 거리 랜덤 설정
+
+    // 상단 파이프 위치 설정
+    uPipe.x = rightMostX + pipeHorizontalDistance
+    uPipe.y = pipeVerticalPosition
+
+    // 하단 파이프 위치 설정
+    lPipe.x = uPipe.x
+    lPipe.y = uPipe.y + pipeVerticalDistance
+  }
+
+  // recyclePipes: 화면 밖으로 나간 파이프를 재활용하여 다시 배치
+  recyclePipes() {
+    const tempPipes = []
+    this.pipes.getChildren().forEach((pipe) => {
+      if (pipe.getBounds().right <= 0) {
+        // 파이프가 화면 밖으로 나갔을 경우
+        tempPipes.push(pipe)
+        if (tempPipes.length === 2) {
+          // 상하 파이프 모두 모이면 재배치
+          this.placePipe(...tempPipes)
+        }
+      }
+    })
+  }
+
+  // getRightMostPipe: 가장 오른쪽에 있는 파이프의 X 좌표 반환
+  getRightMostPipe() {
+    let rightMostX = 0
+    this.pipes.getChildren().forEach((pipe) => {
+      rightMostX = Math.max(pipe.x, rightMostX)
+    })
+    return rightMostX
+  }
+
+  // restartBirdPosition: 새의 위치를 초기화
+  restartBirdPosition() {
+    this.bird.x = this.config.startPosition.x
+    this.bird.y = this.config.startPosition.y
+    this.bird.body.velocity.y = 0 // 새의 속도 초기화
+  }
+
+  // flap: 새가 위로 올라가는 동작
+  flap() {
+    this.bird.body.velocity.y = -this.flapVelocity // 새를 위로 이동
+  }
+}
+
+export default PlayScene // PlayScene 클래스 내보내기
+```
+
+### 자바스크립트 this
+
+```jsx
+JavaScript에서 **this**는 현재 실행 중인 코드의 **컨텍스트(context)**를 참조하는 키워드입니다.
+
+this의 의미는 함수가 호출된 방식에 따라 달라집니다.
+
+Phaser와 같은 객체지향 프로그래밍 스타일에서는 this가 매우 자주 사용되며,
+
+아래와 같은 상황에서 의미가 달라질 수 있습니다.
+```
+
+```jsx
+1. Phaser 클래스 내에서 this의 의미
+
+		this는 클래스 내부에서 현재 **클래스 인스턴스(객체)**를 참조합니다.
+
+		Phaser의 PlayScene 클래스에서 this는 PlayScene 인스턴스를 가리킵니다.
+
+
+		class PlayScene extends Phaser.Scene {
+		  constructor(config) {
+		    super('PlayScene');
+		    this.config = config; // 여기서 this는 PlayScene 인스턴스를 참조
+		  }
+
+		  create() {
+		    this.bird = this.physics.add.sprite(100, 100, 'bird'); // this는 PlayScene의 인스턴스
+		  }
+		}
+
+
+		사용 이유
+
+				this.config와 같은 형태로 인스턴스 변수에 접근하기 위해 사용합니다.
+
+				this.bird를 통해 새 객체를 인스턴스 변수로 저장하여 다른 메서드에서도 재사용할 수 있습니다.
+```
+
+```jsx
+Phaser 코드에서 this가 뜻하는 것
+
+		Phaser에서는 this가 **현재 장면(Scene)**을 의미해요.
+
+		지금 우리가 만들고 있는 PlayScene 안에서 this는 PlayScene 전체를 가리킨다고 보면 돼요.
+
+
+		this.bird = this.physics.add.sprite(100, 100, 'bird');
+
+
+		1. 첫 번째 this → 지금 작업 중인 PlayScene.
+
+		2. this.bird → PlayScene 안에 있는 새를 저장할 공간.
+
+		3. this.physics.add.sprite(...) → PlayScene의 물리 엔진을 써서 새를 추가하는 거예요.
+```
+
+```jsx
+2. 객체 내에서 메서드를 호출할 때
+
+		객체 내에서 this를 사용하면 현재 객체 자체를 참조합니다.
+
+		예를 들어, 아래 코드에서 this.flap을 호출하는 this는 PlayScene 인스턴스를 참조합니다:
+
+
+		this.input.on('pointerdown', this.flap, this);
+
+
+		첫 번째 this는 input 객체의 이벤트를 설정하기 위한 것입니다.
+
+		두 번째 this.flap은 PlayScene 클래스의 flap 메서드를 참조합니다.
+
+		마지막 this는 이벤트가 실행될 때 flap 메서드의 컨텍스트를 PlayScene으로 설정합니다.
+```
+
+## index.js
+
+```jsx
+import Phaser from 'phaser' // Phaser 라이브러리 가져오기
+import PlayScene from './scenes/PlayScene' // PlayScene 가져오기
+
+// 화면 크기 설정
+const WIDTH = 800 // 게임 화면 너비
+const HEIGHT = 600 // 게임 화면 높이
+
+// 새의 초기 위치 설정 (화면의 왼쪽 중간)
+const BIRD_POSITION = { x: WIDTH * 0.1, y: HEIGHT / 2 }
+
+// 공유 설정 객체: 여러 장면에서 사용할 공통 설정
+const SHARED_CONFIG = {
+  width: WIDTH, // 화면 너비
+  height: HEIGHT, // 화면 높이
+  startPosition: BIRD_POSITION, // 새의 초기 위치
+}
+
+// Phaser 게임 설정 객체
+const config = {
+  type: Phaser.AUTO, // 렌더링 방식 (AUTO는 WebGL 사용 가능하면 사용, 아니면 Canvas 사용)
+  ...SHARED_CONFIG, // 화면 크기와 새 위치 포함
+  physics: {
+    default: 'arcade', // 물리 엔진으로 Arcade 사용
+    arcade: {
+      debug: true, // 디버그 모드 활성화 (물리 충돌 영역 등을 표시)
+    },
+  },
+  scene: [new PlayScene(SHARED_CONFIG)], // 사용할 장면(Scenes) 목록. 여기서는 PlayScene을 추가.
+}
+
+// Phaser 게임 객체 생성: 설정(config)을 전달하여 게임 초기화
+new Phaser.Game(config)
+```
+
+# `create`, `update` 함수 리팩토링
+
+```jsx
+import Phaser from 'phaser' // Phaser 라이브러리를 가져옵니다.
+
+const PIPES_TO_RENDER = 4 // 화면에 표시할 파이프 쌍의 개수
+
+// PlayScene 클래스는 게임의 메인 화면 역할을 합니다.
+class PlayScene extends Phaser.Scene {
+  constructor(config) {
+    super('PlayScene') // 씬(Scene)의 이름을 설정
+    this.config = config // 게임 설정(높이, 너비 등)을 저장
+
+    // 객체 및 변수 초기화
+    this.bird = null // 새 캐릭터 객체
+    this.pipes = null // 파이프 그룹
+    this.pipeHorizontalDistance = 0 // 파이프 간의 가로 거리
+    this.pipeVerticalDistanceRange = [150, 250] // 상단/하단 파이프 간의 세로 거리 범위
+    this.pipeHorizontalDistanceRange = [500, 550] // 파이프 쌍 간의 가로 거리 범위
+    this.flapVelocity = 250 // 새가 날개를 퍼덕일 때 상승하는 속도
+  }
+
+  // 게임에서 사용할 이미지 리소스를 미리 로드합니다.
+  preload() {
+    this.load.image('sky', 'assets/sky.png') // 배경 이미지
+    this.load.image('bird', 'assets/bird.png') // 새 이미지
+    this.load.image('pipe', 'assets/pipe.png') // 파이프 이미지
+  }
+
+  // 게임 시작 시 호출되며, 게임 내 객체를 생성합니다.
+  create() {
+    this.createBG() // 배경을 생성
+    this.createBird() // 새를 생성
+    this.createPipes() // 파이프를 생성
+    this.handleInputs() // 사용자 입력(키보드, 마우스 클릭 등)을 처리
+  }
+
+  // 매 프레임마다 호출되어 게임 로직을 업데이트합니다.
+  update() {
+    this.checkGameStatus() // 새가 게임 화면을 벗어났는지 확인
+    this.recyclePipes() // 화면 밖으로 나간 파이프를 재활용
+  }
+
+  // **배경 생성**: 배경 이미지를 화면에 추가
+  createBG() {
+    this.add.image(0, 0, 'sky').setOrigin(0) // (0, 0)을 기준으로 배경 이미지를 추가
+  }
+
+  // **새 생성**: 화면 중앙에 새를 추가하고 중력을 설정
+  createBird() {
+    this.bird = this.physics.add
+      .sprite(this.config.startPosition.x, this.config.startPosition.y, 'bird') // 새를 지정된 위치에 추가
+      .setOrigin(0) // 새의 기준점을 좌측 상단(0, 0)으로 설정
+    this.bird.body.gravity.y = 400 // 중력 값을 설정하여 새가 자연스럽게 떨어지도록 설정
+  }
+
+  // **파이프 생성**: 파이프 그룹을 만들고 초기 위치에 배치
+  createPipes() {
+    this.pipes = this.physics.add.group() // 물리 그룹 생성(파이프끼리 충돌 가능)
+
+    for (let i = 0; i < PIPES_TO_RENDER; i++) {
+      // PIPES_TO_RENDER 값에 따라 파이프를 생성
+      const upperPipe = this.pipes.create(0, 0, 'pipe').setOrigin(0, 1) // 상단 파이프 생성 (하단 기준)
+      const lowerPipe = this.pipes.create(0, 0, 'pipe').setOrigin(0, 0) // 하단 파이프 생성 (상단 기준)
+      this.placePipe(upperPipe, lowerPipe) // 생성된 파이프를 화면에 배치
+    }
+
+    this.pipes.setVelocityX(-200) // 파이프가 왼쪽으로 이동하도록 속도를 설정
+  }
+
+  // **입력 처리**: 플레이어가 입력(클릭 또는 키보드)을 하면 새가 점프하도록 설정
+  handleInputs() {
+    this.input.on('pointerdown', this.flap, this) // 화면을 클릭하면 새가 날아오름
+    this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE) // SPACE 키를 추가하여 점프 가능
+  }
+
+  // **게임 상태 확인**: 새가 화면 밖으로 나갔는지 확인하고, SPACE 키 입력을 처리
+  checkGameStatus() {
+    if (this.bird.y > this.config.height || this.bird.y < -this.bird.height) {
+      // 새가 화면 아래로 떨어지거나 위로 벗어나면
+      this.restartBirdPosition() // 새의 위치를 초기화
+    }
+
+    if (this.spaceKey.isDown) {
+      // SPACE 키가 눌리면
+      this.flap() // 새가 날아오르게 함
+    }
+  }
+
+  // **파이프 배치**: 새 파이프를 화면에 추가
+  placePipe(uPipe, lPipe) {
+    const rightMostX = this.getRightMostPipe() // 가장 오른쪽에 있는 파이프의 위치를 가져옴
+    const pipeVerticalDistance = Phaser.Math.Between(...this.pipeVerticalDistanceRange) // 상단/하단 파이프 사이의 세로 거리 설정
+    const pipeVerticalPosition = Phaser.Math.Between(
+      20, // 최소 상단 여백
+      this.config.height - 20 - pipeVerticalDistance // 최소 하단 여백
+    )
+    const pipeHorizontalDistance = Phaser.Math.Between(...this.pipeHorizontalDistanceRange) // 파이프 쌍 간의 가로 거리 설정
+
+    uPipe.x = rightMostX + pipeHorizontalDistance // 상단 파이프의 가로 위치
+    uPipe.y = pipeVerticalPosition // 상단 파이프의 세로 위치
+
+    lPipe.x = uPipe.x // 하단 파이프의 가로 위치는 상단 파이프와 동일
+    lPipe.y = uPipe.y + pipeVerticalDistance // 하단 파이프는 상단 파이프 아래에 배치
+  }
+
+  // **파이프 재활용**: 화면 밖으로 나간 파이프를 새 위치로 이동
+  recyclePipes() {
+    const tempPipes = []
+    this.pipes.getChildren().forEach((pipe) => {
+      if (pipe.getBounds().right <= 0) {
+        // 파이프가 화면 왼쪽 끝을 벗어나면
+        tempPipes.push(pipe) // 해당 파이프를 배열에 추가
+        if (tempPipes.length === 2) {
+          // 상단/하단 파이프가 모두 배열에 추가되면
+          this.placePipe(...tempPipes) // 파이프를 새 위치에 배치
+        }
+      }
+    })
+  }
+
+  // **가장 오른쪽 파이프의 위치 가져오기**
+  getRightMostPipe() {
+    let rightMostX = 0 // 초기값은 0
+
+    this.pipes.getChildren().forEach(function (pipe) {
+      rightMostX = Math.max(pipe.x, rightMostX) // 가장 오른쪽에 있는 파이프의 x값 저장
+    })
+
+    return rightMostX
+  }
+
+  // **새 위치 초기화**: 새가 화면 밖으로 나가면 처음 위치로 돌아가도록 설정
+  restartBirdPosition() {
+    this.bird.x = this.config.startPosition.x // 새의 x 위치 초기화
+    this.bird.y = this.config.startPosition.y // 새의 y 위치 초기화
+    this.bird.body.velocity.y = 0 // 새의 속도 초기화
+  }
+
+  // **새가 날아오르는 동작**
+  flap() {
+    this.bird.body.velocity.y = -this.flapVelocity // 위로 이동하는 속도 설정
+  }
+}
+
+export default PlayScene // PlayScene 클래스를 다른 파일에서 사용할 수 있도록 내보냄
+```
+
+## 리팩토링 후 최종 구조
+
+```jsx
+create() {
+    this.createBG();
+    this.createBird();
+    this.createPipes();
+    this.handleInputs();
+}
+
+update() {
+    this.checkGameStatus();
+    this.recyclePipes();
+}
+
+// 분리된 함수들
+createBG() { /* 배경 생성 코드 */ }
+createBird() { /* 새 초기화 코드 */ }
+createPipes() { /* 파이프 초기화 코드 */ }
+handleInputs() { /* 입력 처리 코드 */ }
+checkGameStatus() { /* 게임 상태 확인 코드 */ }
+```
+
+```jsx
+create 함수 구조
+
+		create 함수는 게임이 시작될 때 필요한 모든 초기 작업을 순서대로 호출하며,
+
+		각 작업은 별도의 함수에서 세부적으로 구현됩니다.
+
+		따라서 이 함수만 봐도 게임의 초기화 과정을 한눈에 이해할 수 있습니다.
+
+
+
+update 함수
+
+		update 함수는 게임의 상태를 지속적으로 점검하며, 필요한 작업을 각 함수로 위임합니다.
+
+		이를 통해 게임의 주요 흐름을 간단하고 읽기 쉽게 유지할 수 있습니다.
+```
+
+# { Colliders 추가 및 게임 오버 처리 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380494/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_2_Flappy_Bird_Clone_-_3_-/image.png)
+
+## `physics.add.collider` 메서드를 사용
+
+```jsx
+Colliders의 필요성
+
+		게임 오브젝트(새와 파이프)가 충돌하지 않는 문제를 해결하기 위해 colliders를 추가.
+
+		충돌을 정의하지 않으면 새가 파이프를 통과해 비정상적인 동작을 하게 됨.
+
+Collider 설정
+
+		Colliders는 주로 create 함수 내에서 설정.
+
+		createColliders라는 새 함수를 정의하여 충돌을 처리.
+```
+
+```jsx
+createColliders() {
+    this.physics.add.collider(this.bird, this.pipes, this.gameOver, null, this);
+}
+```
+
+```jsx
+첫 번째 인자: 충돌 대상 1 (this.bird).
+
+두 번째 인자: 충돌 대상 2 (this.pipes 그룹 전체).
+
+세 번째 인자: 충돌 시 호출될 콜백 함수 (this.gameOver).
+
+네 번째 인자: 프로세스 콜백(null로 설정).
+
+다섯 번째 인자: 콜백 함수에 사용할 context (this).
+```
+
+## 콜백 함수 - gameOver
+
+```jsx
+콜백 함수 - gameOver
+
+		충돌 발생 시 호출되는 콜백 함수:
+
+		새의 초기 위치로 리셋.
+
+		게임을 재시작.
+```
+
+```jsx
+gameOver() {
+    this.bird.x = this.config.startPosition.x;
+    this.bird.y = this.config.startPosition.y;
+    this.bird.body.velocity.y = 0;
+}
+```
+
+## 새 위치 초과 시 게임 종료 처리
+
+```jsx
+checkGameStatus 함수에서 화면 밖으로 나가는 경우에도 gameOver 호출.
+```
+
+```jsx
+checkGameStatus() {
+    if (this.bird.y > this.config.height || this.bird.y < -this.bird.height) {
+        this.gameOver();
+    }
+}
+```
+
+## 버그 및 개선사항
+
+```jsx
+충돌 시 파이프와 새의 속도가 함께 감소하는 문제가 있음.
+
+향후 개선 필요.
+```
+
+# { 파이프를 움직이지 않게 설정 & 게임을 일시 정지하고 새로 시작 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380494/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_2_Flappy_Bird_Clone_-_3_-/image_1.png)
+
+## 1. **파이프를 움직이지 않게 설정하기 (`setImmovable`)**
+
+```jsx
+강의에서는 플레이어가 파이프와 충돌했을 때 파이프가 움직이거나 위치가 엉망이 되는 문제를 해결하는 방법을 다뤘습니다.
+```
+
+```jsx
+해결 방법:
+
+		파이프가 움직이지 않도록 설정하려면, setImmovable(true) 메서드를 사용해야 합니다.
+
+		이를 통해 파이프가 충돌 시 움직이지 않고 고정된 상태를 유지합니다.
+```
+
+```jsx
+const upperPipe = this.pipes
+  .create(0, 0, 'pipe')
+  .setImmovable(true) // 파이프가 움직이지 않도록 설정
+  .setOrigin(0, 1)
+const lowerPipe = this.pipes
+  .create(0, 0, 'pipe')
+  .setImmovable(true) // 아래쪽 파이프도 고정
+  .setOrigin(0, 0)
+```
+
+## 2. **게임을 일시 정지하고 새로 시작하기 & 색상 변경**
+
+```jsx
+충돌 시 파이프와 새가 서로 영향을 주는 대신, 게임을 일시 정지(pause) 한 후 일정 시간이 지나면 새로 시작하도록 설정합니다.
+```
+
+```jsx
+1단계: 일시 정지하기
+
+this.physics.pause(): 현재 물리 시뮬레이션을 멈춥니다. 이렇게 하면 게임 화면이 멈춘 것처럼 보입니다.
+
+플레이어가 파이프에 충돌하면 게임이 멈추고, 새의 색상이 빨간색으로 바뀌어 충돌이 시각적으로 표시됩니다.
+```
+
+```jsx
+gameOver() {
+  this.physics.pause(); // 게임 전체 물리 동작을 멈춤
+  this.bird.setTint(0xff0000); // 새의 색상을 빨간색으로 변경하여 충돌 표시
+}
+```

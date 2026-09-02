@@ -1,0 +1,1571 @@
+---
+title: '섹션 7: Polish - 1'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380477/notion-blog/_/3D_/_/_7_Polish_-_1/image.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380477/notion-blog/_/3D_/_/_7_Polish_-_1/image_1.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380477/notion-blog/_/3D_/_/_7_Polish_-_1/image_2.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380477/notion-blog/_/3D_/_/_7_Polish_-_1/image_3.png)
+
+# { 🎯 Screen Shake (화면 흔들림) 구현하기 }
+
+이번 강의는 총알 발사 시 화면을 흔들어서 더 강렬한 타격감을 주는 Screen Shake 효과를 Cinemachine을 활용해 구현하는 내용입니다.
+
+---
+
+## 📋 목차
+
+1. [Screen Shake와 Cinemachine Impulse 시스템](https://claude.ai/chat/759ca709-a8ef-445f-96e2-65f7e6cd8356#1-screen-shake%EC%99%80-cinemachine-impulse-%EC%8B%9C%EC%8A%A4%ED%85%9C)
+2. [Virtual Camera 설정과 ScreenShake 스크립트 작성](https://claude.ai/chat/759ca709-a8ef-445f-96e2-65f7e6cd8356#2-virtual-camera-%EC%84%A4%EC%A0%95%EA%B3%BC-screenshake-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%9E%91%EC%84%B1)
+3. [Impulse Source와 Listener 세부 설정](https://claude.ai/chat/759ca709-a8ef-445f-96e2-65f7e6cd8356#3-impulse-source%EC%99%80-listener-%EC%84%B8%EB%B6%80-%EC%84%A4%EC%A0%95)
+4. [Singleton 패턴 구현](https://claude.ai/chat/759ca709-a8ef-445f-96e2-65f7e6cd8356#4-singleton-%ED%8C%A8%ED%84%B4-%EA%B5%AC%ED%98%84)
+5. [OnAnyShoot 이벤트와 ScreenShakeActions 연결](https://claude.ai/chat/759ca709-a8ef-445f-96e2-65f7e6cd8356#5-onanyshoot-%EC%9D%B4%EB%B2%A4%ED%8A%B8%EC%99%80-screenshakeactions-%EC%97%B0%EA%B2%B0)
+6. [Action Camera 적용 및 최종 테스트](https://claude.ai/chat/759ca709-a8ef-445f-96e2-65f7e6cd8356#6-action-camera-%EC%A0%81%EC%9A%A9-%EB%B0%8F-%EC%B5%9C%EC%A2%85-%ED%85%8C%EC%8A%A4%ED%8A%B8)
+
+---
+
+## 1. Screen Shake와 Cinemachine Impulse 시스템
+
+### 1-1. Screen Shake가 필요한 이유
+
+현재 게임은 총알 발사 시 화면이 전혀 흔들리지 않아 타격감이 부족합니다.
+
+**Screen Shake 효과 추가 시**:
+
+- 총알 발사가 더 강렬하게 느껴짐
+- 시각적 피드백 제공
+- 게임 몰입감 향상
+
+### 1-2. Cinemachine Impulse 시스템
+
+**두 가지 핵심 컴포넌트**:
+
+**📡 Impulse Source (신호 발신자)**:
+
+- 화면 흔들림 신호를 발생
+- Screen Shake GameObject에 부착
+- `GenerateImpulse()` 메서드로 신호 전송
+
+**📻 Impulse Listener (신호 수신자)**:
+
+- Impulse Source의 신호를 받아 카메라 흔들림
+- Virtual Camera에 Extension으로 부착
+- 신호 수신 시 자동으로 흔들림 실행
+
+**작동 원리**:
+
+```
+Impulse Source → GenerateImpulse() 호출
+    ↓
+Impulse Listener → 신호 수신
+    ↓
+카메라 흔들림 발생!
+```
+
+---
+
+## 2. Virtual Camera 설정과 ScreenShake 스크립트 작성
+
+### 2-1. Virtual Camera에 Impulse Listener 추가
+
+1. **CinemachineVirtualCamera 선택**
+2. **Inspector → Extensions → Add Extension**
+3. **CinemachineImpulseListener 선택**
+
+**Extension**은 Virtual Camera에 추가 기능을 붙이는 시스템입니다. Impulse Listener는 신호를 감지하고 카메라를 흔드는 역할을 합니다.
+
+### 2-2. ScreenShake GameObject 생성
+
+1. **빈 GameObject 생성 → 이름: "ScreenShake"**
+2. **Transform 리셋**
+3. **Add Component → CinemachineImpulseSource**
+
+### 2-3. ScreenShake 스크립트 작성
+
+```csharp
+using UnityEngine;
+using Cinemachine; // Cinemachine 사용 필수
+
+public class ScreenShake : MonoBehaviour
+{
+    // Impulse Source 컴포넌트 저장
+    private CinemachineImpulseSource cinemachineImpulseSource;
+
+    private void Awake()
+    {
+        // 같은 GameObject의 CinemachineImpulseSource 가져오기
+        cinemachineImpulseSource = GetComponent<CinemachineImpulseSource>();
+    }
+
+    // 테스트용 코드
+    private void Update()
+    {
+        // T 키 입력 시 화면 흔들림
+        if (Input.GetKeyDown(KeyCode.T))
+        {
+            // Impulse 신호 발생 → Listener가 받아서 카메라 흔들림
+            cinemachineImpulseSource.GenerateImpulse();
+        }
+    }
+}
+```
+
+**테스트**: Play Mode에서 T 키 → 화면 흔들림 확인!
+
+---
+
+## 3. Impulse Source와 Listener 세부 설정
+
+### 3-1. Impulse Source 설정
+
+**ScreenShake GameObject 선택 → CinemachineImpulseSource**
+
+**Impulse Shape**: **Rumble**
+
+- 시간에 따른 흔들림 패턴
+- Rumble: 불규칙한 진동 (총알 발사에 적합)
+- Explosion: 큰 흔들림 → 점점 약해짐
+- Play Mode에서 T 키로 각 프리셋 테스트 가능
+
+**Time Envelope**: **0.1**
+
+- 흔들림 지속 시간
+- 총알 발사는 짧고 강렬해야 함
+
+**Default Velocity**: **(0, 0.3, 0)**
+
+- 카메라 흔들림 방향
+- Y축 +0.3: 위로 살짝 튀는 느낌 (총 반동 표현)
+- 초기값 (0, -1, 0)보다 더 자연스러움
+
+### 3-2. Play Mode 설정 저장
+
+**주의**: Play Mode에서 변경한 설정은 종료 시 사라집니다!
+
+**저장 방법**:
+
+1. Play Mode 상태에서 **CinemachineImpulseSource 우클릭 → Copy Component**
+2. **Play Mode 종료**
+3. **컴포넌트 우클릭 → Paste Component Values**
+
+### 3-3. Impulse Listener 설정
+
+**CinemachineVirtualCamera 선택 → Extensions → CinemachineImpulseListener**
+
+**Secondary Noise**: **6D Shake**
+
+- 기본 흔들림에 추가되는 세밀한 떨림
+- 더 자연스럽고 현실적인 효과
+- 3D 공간의 모든 축에서 흔들림 (위치 + 회전)
+
+**Duration**: **0.5**
+
+- 2차 노이즈 지속 시간
+
+**테스트**: Play Mode에서 T 키 → 이전보다 더 세밀하고 자연스러운 흔들림!
+
+---
+
+## 4. Singleton 패턴 구현
+
+### 4-1. Shake 메서드 작성
+
+테스트 코드를 제거하고 실제 사용할 메서드를 작성합니다.
+
+```csharp
+public class ScreenShake : MonoBehaviour
+{
+    private CinemachineImpulseSource cinemachineImpulseSource;
+
+    private void Awake()
+    {
+        cinemachineImpulseSource = GetComponent<CinemachineImpulseSource>();
+    }
+
+    // 화면 흔들기 메서드
+    // intensity: 흔들림 강도 (기본값 1f)
+    public void Shake(float intensity = 1f)
+    {
+        // 강도를 전달하여 Impulse 발생
+        cinemachineImpulseSource.GenerateImpulse(intensity);
+    }
+}
+
+```
+
+### 4-2. Singleton 패턴이란?
+
+**Singleton Pattern**: 클래스 인스턴스가 오직 하나만 존재하도록 보장하는 디자인 패턴
+
+**장점**:
+
+```csharp
+// Singleton 없이:
+ScreenShake screenShake = FindObjectOfType<ScreenShake>(); // 느림
+screenShake.Shake();
+
+// Singleton 사용:
+ScreenShake.Instance.Shake(); // 빠르고 간결
+
+```
+
+### 4-3. Singleton 구현
+
+```csharp
+public class ScreenShake : MonoBehaviour
+{
+    private CinemachineImpulseSource cinemachineImpulseSource;
+
+    // Static Instance: 클래스 레벨에서 하나만 존재
+    // public: 외부 접근 가능
+    // static: 클래스 이름으로 직접 접근 (ScreenShake.Instance)
+    // { get; private set; }: 읽기만 가능, 설정은 내부에서만
+    public static ScreenShake Instance { get; private set; }
+
+    private void Awake()
+    {
+        // 중복 체크
+        if (Instance != null)
+        {
+            Debug.LogError("There is more than one ScreenShake! " + transform + " - " + Instance);
+            Destroy(gameObject); // 중복 제거
+            return;
+        }
+
+        // 첫 번째 인스턴스 할당
+        Instance = this;
+
+        cinemachineImpulseSource = GetComponent<CinemachineImpulseSource>();
+    }
+
+    public void Shake(float intensity = 1f)
+    {
+        cinemachineImpulseSource.GenerateImpulse(intensity);
+    }
+}
+
+```
+
+**사용 예제**:
+
+```csharp
+// 다른 스크립트에서
+ScreenShake.Instance.Shake(5f); // 어디서든 간단하게 호출!
+
+```
+
+---
+
+## 5. OnAnyShoot 이벤트와 ScreenShakeActions 연결
+
+### 5-1. 이벤트 기반 설계의 필요성
+
+**직접 결합 방식 (나쁜 예)**:
+
+```csharp
+// ShootAction.cs
+private void Shoot()
+{
+    ScreenShake.Instance.Shake(5f); // 직접 호출
+}
+
+```
+
+**문제점**: ShootAction이 ScreenShake에 강하게 의존, 유지보수 어려움
+
+**이벤트 기반 설계 (좋은 예)**:
+
+```
+ShootAction → 이벤트 발생
+    ↓
+ScreenShakeActions → 이벤트 감지
+    ↓
+ScreenShake → 화면 흔들기
+
+```
+
+**장점**: 각 클래스가 독립적, 느슨한 결합, 확장 쉬움
+
+### 5-2. OnAnyShoot 정적 이벤트 추가
+
+**기존 OnShoot의 문제**: 각 유닛의 ShootAction마다 별도로 구독해야 함
+
+**해결책: Static Event**
+
+```csharp
+public class ShootAction : BaseAction
+{
+    // ✨ 새로 추가: Static Event
+    // 어떤 ShootAction이든 총을 쏘면 이 이벤트 발생
+    public static event EventHandler<OnShootEventArgs> OnAnyShoot;
+
+    // 기존 Instance Event (유지)
+    public event EventHandler<OnShootEventArgs> OnShoot;
+
+    public class OnShootEventArgs : EventArgs
+    {
+        public Unit targetUnit;     // 피격 대상
+        public Unit shootingUnit;   // 사격 유닛
+    }
+
+    private void Shoot()
+    {
+        // Static Event 발생 (모든 구독자에게 알림)
+        OnAnyShoot?.Invoke(this, new OnShootEventArgs
+        {
+            targetUnit = targetUnit,
+            shootingUnit = unit
+        });
+
+        // Instance Event도 유지
+        OnShoot?.Invoke(this, new OnShootEventArgs
+        {
+            targetUnit = targetUnit,
+            shootingUnit = unit
+        });
+
+        targetUnit.Damage(40);
+    }
+}
+
+```
+
+**OnAnyShoot 장점**: 한 번만 구독하면 모든 유닛의 발사 감지!
+
+### 5-3. ScreenShakeActions 스크립트
+
+**역할**: ShootAction과 ScreenShake를 중개
+
+1. **빈 GameObject 생성 → 이름: "ScreenShakeActions"**
+2. **스크립트 생성 및 부착**
+
+```csharp
+using UnityEngine;
+
+public class ScreenShakeActions : MonoBehaviour
+{
+    private void Start()
+    {
+        // ShootAction의 정적 이벤트 구독
+        // 어떤 유닛이든 총을 쏘면 ShootAction_OnAnyShoot 호출됨
+        ShootAction.OnAnyShoot += ShootAction_OnAnyShoot;
+    }
+
+    // 이벤트 핸들러: 총 발사 시 호출
+    // sender: 이벤트 발생시킨 객체
+    // e: 이벤트 데이터 (누가 누구를 쐈는지)
+    private void ShootAction_OnAnyShoot(object sender, ShootAction.OnShootEventArgs e)
+    {
+        // Singleton으로 ScreenShake 접근하여 화면 흔들기
+        ScreenShake.Instance.Shake();
+    }
+}
+
+```
+
+**실행 흐름**:
+
+```
+게임 시작 → ScreenShakeActions.Start() → 이벤트 구독
+Shoot Action 발동 → ShootAction.Shoot() → OnAnyShoot 발생
+ScreenShakeActions 감지 → ScreenShake.Instance.Shake()
+Impulse Source 신호 발송 → Listener 수신 → 카메라 흔들림!
+
+```
+
+---
+
+## 6. Action Camera 적용 및 최종 테스트
+
+### 6-1. 문제 발견
+
+**테스트**: Play → Shoot Action 선택 → 조준 → 발사
+**결과**: 화면이 흔들리지 않음! ❌
+
+**원인**:
+
+- Main Virtual Camera: Impulse Listener ✅
+- Action Camera: Impulse Listener ❌
+
+ActionCamera로 전환되면 Listener가 없어서 신호를 받지 못함!
+
+### 6-2. Action Camera에 Impulse Listener 추가
+
+1. **Main Virtual Camera 선택**
+2. **CinemachineImpulseListener 우클릭 → Copy Component**
+3. **Action Camera 선택**
+4. **Add Extension 우클릭 → Paste Component As New**
+
+### 6-3. 최종 테스트
+
+**테스트**: Play → Shoot Action → 조준 → 발사
+**결과**: 화면이 흔들림! ✅
+
+**완성된 실행 흐름**:
+
+```
+Shoot Action 발동
+→ ActionCamera 전환 (Impulse Listener 있음!)
+→ 총알 발사
+→ OnAnyShoot 이벤트 발생
+→ ScreenShakeActions 감지
+→ ScreenShake.Instance.Shake()
+→ Impulse Source 신호 발송
+→ ActionCamera의 Listener 수신
+→ 카메라 흔들림 발생! ✨
+
+```
+
+**주의**: 게임에 여러 Virtual Camera가 있다면 모두 Impulse Listener를 추가해야 합니다.
+
+---
+
+## 🎯 최종 정리
+
+### 핵심 시스템
+
+**Cinemachine Impulse**:
+
+- Impulse Source: 신호 발송
+- Impulse Listener: 신호 수신 및 카메라 흔들림
+
+**Singleton 패턴**:
+
+```csharp
+ScreenShake.Instance.Shake(5f); // 어디서든 접근
+
+```
+
+**이벤트 기반 설계**:
+
+```
+ShootAction → OnAnyShoot 이벤트
+ScreenShakeActions → 이벤트 감지
+ScreenShake → 화면 흔들기
+
+```
+
+### 주요 설정 값
+
+**Impulse Source**:
+
+- Shape: Rumble
+- Time: 0.1
+- Velocity: (0, 0.3, 0)
+
+**Impulse Listener**:
+
+- Secondary Noise: 6D Shake
+- Duration: 0.5
+
+### 확장 가능성
+
+```csharp
+// 다양한 상황에서 사용 가능
+ScreenShake.Instance.Shake(8f);  // 폭발
+ScreenShake.Instance.Shake(3f);  // 착지
+ScreenShake.Instance.Shake(2f);  // 피격
+
+```
+
+**다음 강의**: 폭발 효과 구현! 💥
+
+# { 🎯 수류탄 액션 구현하기 }
+
+이번 강의는 단일 대상이 아닌 범위 내 여러 유닛에게 피해를 주는 수류탄 투척 액션을 처음부터 끝까지 구현하는 방법을 다룹니다. 기본 액션 시스템 구조부터 물리 충돌 감지, 콜백 패턴까지 단계별로 학습합니다.
+
+---
+
+## 📋 목차
+
+1. [기본 GrenadeAction 클래스 구조 만들기](https://claude.ai/chat/5eaa0863-e231-47ad-aa9e-c9d6f884b6ae#1-%EA%B8%B0%EB%B3%B8-grenadeaction-%ED%81%B4%EB%9E%98%EC%8A%A4-%EA%B5%AC%EC%A1%B0-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+2. [유효한 투척 범위 계산하기](https://claude.ai/chat/5eaa0863-e231-47ad-aa9e-c9d6f884b6ae#2-%EC%9C%A0%ED%9A%A8%ED%95%9C-%ED%88%AC%EC%B2%99-%EB%B2%94%EC%9C%84-%EA%B3%84%EC%82%B0%ED%95%98%EA%B8%B0)
+3. [수류탄 발사체 오브젝트 제작](https://claude.ai/chat/5eaa0863-e231-47ad-aa9e-c9d6f884b6ae#3-%EC%88%98%EB%A5%98%ED%83%84-%EB%B0%9C%EC%82%AC%EC%B2%B4-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%EC%A0%9C%EC%9E%91)
+4. [수류탄 이동 로직 구현](https://claude.ai/chat/5eaa0863-e231-47ad-aa9e-c9d6f884b6ae#4-%EC%88%98%EB%A5%98%ED%83%84-%EC%9D%B4%EB%8F%99-%EB%A1%9C%EC%A7%81-%EA%B5%AC%ED%98%84)
+5. [범위 피해 시스템 구현](https://claude.ai/chat/5eaa0863-e231-47ad-aa9e-c9d6f884b6ae#5-%EB%B2%94%EC%9C%84-%ED%94%BC%ED%95%B4-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B5%AC%ED%98%84)
+6. [콜백 패턴으로 액션 완료 처리](https://claude.ai/chat/5eaa0863-e231-47ad-aa9e-c9d6f884b6ae#6-%EC%BD%9C%EB%B0%B1-%ED%8C%A8%ED%84%B4%EC%9C%BC%EB%A1%9C-%EC%95%A1%EC%85%98-%EC%99%84%EB%A3%8C-%EC%B2%98%EB%A6%AC)
+
+---
+
+## 1. 기본 GrenadeAction 클래스 구조 만들기
+
+### 1.1 BaseAction 상속과 추상 메서드 구현
+
+**BaseAction의 역할**
+
+- Unity에서 게임의 모든 행동(이동, 사격, 수류탄 등)은 `BaseAction`을 상속받아 구현됩니다
+- `BaseAction`은 추상 클래스(abstract class)로, 반드시 구현해야 하는 메서드들을 정의해놓았습니다
+- 이를 통해 모든 액션이 동일한 인터페이스를 가지게 되어 관리가 쉬워집니다
+
+**GrenadeAction 초기 구조**
+
+```csharp
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+
+// BaseAction을 상속받아 수류탄 액션 클래스 생성
+public class GrenadeAction : BaseAction
+{
+    // GetActionName: UI에 표시될 액션 이름 반환
+    public override string GetActionName()
+    {
+        return "Grenade";  // "Grenade"라는 문자열을 반환
+    }
+
+    // GetEnemyAIAction: AI가 이 액션을 평가할 때 사용
+    // 현재는 기본 구현만 (나중에 AI 로직 추가 예정)
+    public override EnemyAIAction GetEnemyAIAction(GridPosition gridPosition)
+    {
+        return new EnemyAIAction
+        {
+            gridPosition = gridPosition,  // 타겟 그리드 위치
+            actionValue = 0,              // AI 평가 점수 (0 = 아직 미구현)
+        };
+    }
+
+    // GetValidActionGridPositionList: 이 액션을 실행할 수 있는 유효한 위치들 반환
+    public override List<GridPosition> GetValidActionGridPositionList()
+    {
+        // 임시로 자기 자신의 위치만 반환 (테스트용)
+        return new List<GridPosition> { unit.GetGridPosition() };
+    }
+
+    // TakeAction: 실제로 액션을 실행하는 메서드
+    public override void TakeAction(GridPosition gridPosition, Action onActionComplete)
+    {
+        Debug.Log("Grenade Action");  // 콘솔에 로그 출력
+
+        ActionStart(onActionComplete);  // 액션 시작 처리 (BaseAction의 메서드)
+    }
+}
+```
+
+### 1.2 Update 메서드로 액션 활성화 상태 관리
+
+**isActive 플래그의 역할**
+
+- `isActive`는 현재 이 액션이 실행 중인지를 나타내는 불리언 변수입니다
+- BaseAction에서 관리되며, `ActionStart()`가 호출되면 true가 됩니다
+- 액션이 실행 중일 때만 로직을 처리하도록 제어합니다
+
+```csharp
+private void Update()
+{
+    // isActive가 false면 (액션이 실행 중이 아니면) 아무것도 하지 않음
+    if (!isActive)
+    {
+        return;  // 메서드를 즉시 종료
+    }
+
+    // 여기 아래에 액션 실행 중 처리할 로직 작성
+    // 현재는 테스트를 위해 즉시 완료 처리 (나중에 제거 예정)
+    ActionComplete();  // 액션 완료 처리
+}
+```
+
+### 1.3 유닛 프리팹에 컴포넌트 추가
+
+**Unity Editor 작업**
+
+1. Hierarchy에서 Unit 프리팹 선택
+2. Inspector 창에서 "Add Component" 버튼 클릭
+3. "GrenadeAction" 검색 후 추가
+4. 이제 모든 유닛이 수류탄 액션을 사용할 수 있습니다
+
+**결과 확인**
+
+- 게임 실행 시 UI에 "Grenade" 버튼이 나타남
+- 클릭하면 자신의 위치가 유효한 위치로 표시됨
+- 실행하면 콘솔에 "Grenade Action" 로그가 출력됨
+
+---
+
+## 2. 유효한 투척 범위 계산하기
+
+### 2.1 ShootAction의 거리 계산 로직 재사용
+
+**왜 ShootAction의 로직을 재사용하는가?**
+
+- 사격과 수류탄 모두 "특정 거리 내의 원형 범위"를 계산해야 합니다
+- 이미 검증된 코드를 재사용하면 버그를 줄이고 개발 시간을 단축할 수 있습니다
+- 단, 거리와 조건만 수류탄에 맞게 수정하면 됩니다
+
+**ShootAction의 GetValidActionGridPositionList 로직**
+
+```csharp
+// ShootAction.cs의 원본 로직
+public override List<GridPosition> GetValidActionGridPositionList()
+{
+    List<GridPosition> validGridPositionList = new List<GridPosition>();
+    GridPosition unitGridPosition = unit.GetGridPosition();
+
+    // 최대 사거리를 기준으로 정사각형 영역을 순회
+    for (int x = -maxShootDistance; x <= maxShootDistance; x++)
+    {
+        for (int z = -maxShootDistance; z <= maxShootDistance; z++)
+        {
+            GridPosition offsetGridPosition = new GridPosition(x, z);
+            GridPosition testGridPosition = unitGridPosition + offsetGridPosition;
+
+            // 유효한 그리드인지 확인
+            if (!LevelGrid.Instance.IsValidGridPosition(testGridPosition))
+            {
+                continue;
+            }
+
+            // 맨해튼 거리 계산으로 원형 범위 만들기
+            int testDistance = Mathf.Abs(x) + Mathf.Abs(z);
+            if (testDistance > maxShootDistance)
+            {
+                continue;
+            }
+
+            // 적이 있는지 확인
+            if (!LevelGrid.Instance.HasAnyUnitOnGridPosition(testGridPosition))
+            {
+                continue;
+            }
+
+            // 같은 팀인지 확인
+            Unit targetUnit = LevelGrid.Instance.GetUnitAtGridPosition(testGridPosition);
+            if (targetUnit.IsEnemy() == unit.IsEnemy())
+            {
+                continue;
+            }
+
+            validGridPositionList.Add(testGridPosition);
+        }
+    }
+
+    return validGridPositionList;
+}
+```
+
+### 2.2 GrenadeAction에 맞게 수정하기
+
+**수류탄의 특성**
+
+- 사격과 달리 빈 공간에도 던질 수 있어야 합니다
+- 장애물이 있어도 던질 수 있습니다 (포물선 궤적이므로)
+- 적이 없는 곳에도 전략적으로 던질 수 있습니다
+
+```csharp
+// 수류탄 투척 최대 거리 정의
+private int maxThrowDistance = 7;  // 7칸까지 던질 수 있음
+
+public override List<GridPosition> GetValidActionGridPositionList()
+{
+    List<GridPosition> validGridPositionList = new List<GridPosition>();
+
+    // 현재 유닛의 그리드 위치 가져오기
+    GridPosition unitGridPosition = unit.GetGridPosition();
+
+    // maxThrowDistance를 기준으로 정사각형 영역 전체를 검사
+    for (int x = -maxThrowDistance; x <= maxThrowDistance; x++)
+    {
+        for (int z = -maxThrowDistance; z <= maxThrowDistance; z++)
+        {
+            // 오프셋을 적용한 테스트 위치 계산
+            GridPosition offsetGridPosition = new GridPosition(x, z);
+            GridPosition testGridPosition = unitGridPosition + offsetGridPosition;
+
+            // 1. 맵 범위 내의 유효한 그리드인지 확인
+            if (!LevelGrid.Instance.IsValidGridPosition(testGridPosition))
+            {
+                continue;  // 맵 밖이면 건너뛰기
+            }
+
+            // 2. 맨해튼 거리로 원형 범위 만들기
+            // 맨해튼 거리: |x| + |z| (대각선은 2칸으로 계산)
+            int testDistance = Mathf.Abs(x) + Mathf.Abs(z);
+            if (testDistance > maxThrowDistance)
+            {
+                continue;  // 범위 밖이면 건너뛰기
+            }
+
+            // 3. 수류탄은 유닛/장애물 체크 없이 모든 위치가 유효
+            // (ShootAction과의 차이점)
+
+            validGridPositionList.Add(testGridPosition);
+        }
+    }
+
+    return validGridPositionList;
+}
+```
+
+**맨해튼 거리 설명**
+
+- 맨해튼 거리 = |x| + |z|
+- 예시:
+  - (0, 0) → (2, 3): 거리 = |2| + |3| = 5
+  - (0, 0) → (-1, 2): 거리 = |-1| + |2| = 3
+- 이 방식으로 정사각형이 아닌 다이아몬드 형태의 원형 범위를 만듭니다
+
+**테스트 결과**
+
+- 게임 실행 후 Grenade 선택 시
+- 유닛 주변 7칸 범위가 모두 유효한 위치로 표시됨
+- 적/아군/장애물 여부와 관계없이 모든 칸이 선택 가능
+
+---
+
+## 3. 수류탄 발사체 오브젝트 제작
+
+### 3.1 GameObject 계층 구조 설계
+
+**왜 두 단계 구조를 사용하는가?**
+
+- 부모 오브젝트: 스크립트와 로직을 담당
+- 자식 오브젝트: 시각적 표현만 담당
+- 이렇게 분리하면 나중에 모델 교체, 이펙트 추가 등이 쉬워집니다
+
+**Unity Editor 작업**
+
+```
+Grenade Projectile (Empty GameObject - 부모)
+└── Sphere (3D Object - 자식)
+```
+
+1. **부모 오브젝트 생성**
+   - Hierarchy 우클릭 → Create Empty
+   - 이름: "Grenade Projectile"
+   - Transform Reset (위치/회전/크기 초기화)
+2. **자식 오브젝트 생성**
+   - Grenade Projectile 우클릭 → 3D Object → Sphere
+   - 이름: "Sphere" (기본값 유지 가능)
+   - Scale을 (0.3, 0.3, 0.3)으로 축소
+     - 이유: 수류탄은 작고 빠르게 움직이므로 작은 크기가 적합
+3. **Sphere Collider 제거**
+   - Sphere의 Inspector에서 Sphere Collider 컴포넌트 찾기
+   - 우클릭 → Remove Component
+   - 이유: 시각적 표현만 필요하고, 물리 충돌은 부모에서 처리
+
+### 3.2 Material 생성 및 적용
+
+**Material이란?**
+
+- 3D 오브젝트의 표면 질감과 색상을 결정하는 에셋
+- 색상, 반사율, 거칠기 등의 속성을 설정할 수 있습니다
+
+**Material 제작 과정**
+
+1. **Material 에셋 생성**
+   - Project 창에서 Materials 폴더 선택
+   - 우클릭 → Create → Material
+   - 이름: "Grenade"
+2. **색상 설정**
+   - Material 선택 후 Inspector 확인
+   - "Base Map" 항목 찾기
+   - 왼쪽 색상 박스 클릭
+   - 어두운 회색 선택 (RGB: 약 50, 50, 50)
+     - 이유: 수류탄의 금속성 느낌 표현
+3. **Sphere에 적용**
+   - Hierarchy에서 Sphere 선택
+   - Grenade Material을 드래그해서 Sphere에 드롭
+   - 또는 Inspector의 Mesh Renderer → Materials → Element 0에 할당
+
+**실제 게임 개발 팁**
+
+- 강의에서는 간단한 Sphere 사용
+- 실전에서는:
+  - 수류탄 3D 모델 (.fbx, .obj 등) 사용
+  - 고해상도 텍스처 적용
+  - 하지만 수류탄은 작고 빠르게 움직이므로 간단한 모델도 충분
+
+---
+
+## 4. 수류탄 이동 로직 구현
+
+### 4.1 GrenadeProjectile 스크립트 생성
+
+**스크립트 역할**
+
+- 수류탄의 이동, 폭발, 피해 처리를 담당
+- GrenadeAction과 분리되어 수류탄 자체의 행동만 관리
+
+```csharp
+using System;
+using UnityEngine;
+
+public class GrenadeProjectile : MonoBehaviour
+{
+    // 수류탄이 날아갈 최종 목적지 (월드 좌표)
+    private Vector3 targetPosition;
+
+    // 수류탄이 목적지에 도달했을 때 호출될 콜백 함수
+    private Action onGrenadeBehaviorComplete;
+
+    // Setup: 수류탄을 초기화하는 메서드
+    // targetGridPosition: 그리드 좌표계의 목표 위치
+    // onGrenadeBehaviorComplete: 완료 시 실행할 콜백 함수
+    public void Setup(GridPosition targetGridPosition, Action onGrenadeBehaviorComplete)
+    {
+        // 콜백 함수 저장
+        this.onGrenadeBehaviorComplete = onGrenadeBehaviorComplete;
+
+        // 그리드 좌표를 월드 좌표로 변환
+        // LevelGrid.Instance: 싱글톤 패턴으로 접근하는 레벨 그리드
+        // GetWorldPosition: 그리드 좌표를 Unity 월드 좌표로 변환
+        targetPosition = LevelGrid.Instance.GetWorldPosition(targetGridPosition);
+    }
+}
+
+```
+
+**좌표 시스템 이해**
+
+- **GridPosition**: 게임의 논리적 좌표 (0, 0), (1, 2) 등
+- **World Position**: Unity의 실제 3D 좌표 (0.5, 0, 1.2) 등
+- **변환이 필요한 이유**:
+  - 게임 로직은 그리드로 처리 (턴제 전략)
+  - 실제 이동과 렌더링은 월드 좌표 사용
+
+### 4.2 이동 로직 구현
+
+```csharp
+// 이동 속도 상수 정의
+private float moveSpeed = 15f;  // 초당 15 Unity 유닛 이동
+
+// 목표 도달 판정 거리
+private float reachedTargetDistance = 0.2f;  // 0.2 유닛 이내면 도착으로 간주
+
+private void Update()
+{
+    // 1. 이동 방향 벡터 계산
+    // 목표 위치 - 현재 위치 = 방향 벡터
+    Vector3 moveDir = (targetPosition - transform.position).normalized;
+    // normalized: 벡터의 방향은 유지하되 길이를 1로 만듦
+    // 예: (3, 4) → (0.6, 0.8) (길이 1, 방향 동일)
+
+    // 2. 프레임 독립적 이동
+    // transform.position: 오브젝트의 현재 위치
+    // moveDir * moveSpeed: 초당 이동할 거리
+    // Time.deltaTime: 이전 프레임과의 시간 차이 (초)
+    //   - 60 FPS: 약 0.0167초
+    //   - 30 FPS: 약 0.0333초
+    // moveSpeed * Time.deltaTime = 프레임당 이동 거리
+    transform.position += moveDir * moveSpeed * Time.deltaTime;
+
+    // 3. 목표 도달 확인
+    // Vector3.Distance: 두 점 사이의 직선 거리 계산
+    if (Vector3.Distance(transform.position, targetPosition) < reachedTargetDistance)
+    {
+        // 목표 도착 시 처리 (다음 섹션에서 구현)
+    }
+}
+
+```
+
+**Vector3.normalized 상세 설명**
+
+```csharp
+// 예시로 이해하기
+Vector3 direction = new Vector3(3, 0, 4);
+// 길이 = √(3² + 0² + 4²) = √25 = 5
+
+Vector3 normalized = direction.normalized;
+// normalized = (3/5, 0, 4/5) = (0.6, 0, 0.8)
+// 길이 = √(0.6² + 0.8²) = √1 = 1
+
+// 왜 필요한가?
+// moveSpeed가 15일 때:
+// - 정규화 안 함: 실제 속도 = 5 * 15 = 75 (너무 빠름)
+// - 정규화 함: 실제 속도 = 1 * 15 = 15 (의도한 속도)
+
+```
+
+**Time.deltaTime의 중요성**
+
+```csharp
+// 시나리오 1: 60 FPS 컴퓨터
+// Time.deltaTime ≈ 0.0167초
+// 1초 동안 이동 거리 = 15 * 0.0167 * 60 = 15 유닛
+
+// 시나리오 2: 30 FPS 컴퓨터
+// Time.deltaTime ≈ 0.0333초
+// 1초 동안 이동 거리 = 15 * 0.0333 * 30 = 15 유닛
+
+// 결과: 어떤 컴퓨터든 동일한 속도로 이동!
+
+```
+
+### 4.3 수류탄 생성 로직 (GrenadeAction)
+
+```csharp
+public class GrenadeAction : BaseAction
+{
+    // SerializeField: Unity Inspector에서 할당 가능하도록 만듦
+    // private이지만 Inspector에는 보임
+    [SerializeField] private Transform grenadeProjectilePrefab;
+
+    public override void TakeAction(GridPosition gridPosition, Action onActionComplete)
+    {
+        // 1. Instantiate: 프리팹을 복제하여 씬에 생성
+        // grenadeProjectilePrefab: 복제할 원본 프리팹
+        // unit.GetWorldPosition(): 생성 위치 (유닛의 현재 위치)
+        // Quaternion.identity: 회전 없음 (기본 회전값)
+        Transform grenadeProjectileTransform = Instantiate(
+            grenadeProjectilePrefab,
+            unit.GetWorldPosition(),
+            Quaternion.identity
+        );
+
+        // 2. GetComponent: 생성된 오브젝트에서 GrenadeProjectile 컴포넌트 찾기
+        GrenadeProjectile grenadeProjectile =
+            grenadeProjectileTransform.GetComponent<GrenadeProjectile>();
+
+        // 3. Setup 호출: 수류탄 초기화
+        // gridPosition: 목표 그리드 위치
+        // OnGrenadeBehaviorComplete: 완료 시 호출할 메서드 (다음 섹션)
+        grenadeProjectile.Setup(gridPosition, OnGrenadeBehaviorComplete);
+
+        // 4. 액션 시작 처리
+        ActionStart(onActionComplete);
+    }
+
+    // 수류탄 폭발 완료 시 호출될 메서드 (현재는 빈 구현)
+    private void OnGrenadeBehaviorComplete()
+    {
+        // 나중에 구현 예정
+    }
+}
+
+```
+
+**Unity Editor 설정**
+
+1. **프리팹 생성**
+   - Hierarchy의 Grenade Projectile을 Project 창의 Prefabs 폴더로 드래그
+   - 이제 Grenade Projectile이 재사용 가능한 프리팹이 됨
+2. **Hierarchy에서 제거**
+   - Hierarchy의 Grenade Projectile 선택 후 Delete
+   - 이유: 게임 시작 시 존재할 필요 없음, 필요할 때 생성
+3. **GrenadeAction에 프리팹 할당**
+   - Hierarchy에서 Unit 프리팹 선택
+   - Inspector에서 Grenade Action 컴포넌트 찾기
+   - "Grenade Projectile Prefab" 필드에 프리팹 드래그 & 드롭
+
+**테스트 결과**
+
+- 게임 실행 → Grenade 선택 → 위치 클릭
+- 수류탄이 유닛 위치에서 생성됨
+- 목표 위치로 직선 이동
+- 도착 후 자동 소멸
+
+---
+
+## 5. 범위 피해 시스템 구현
+
+### 5.1 Physics.OverlapSphere 이해하기
+
+**Physics.OverlapSphere란?**
+
+- Unity의 물리 엔진을 사용한 충돌 감지 메서드
+- 특정 위치를 중심으로 구 형태의 영역 내 모든 Collider를 찾습니다
+- 실제 물리 시뮬레이션이 아닌 단순 "검사"만 수행
+
+**메서드 시그니처**
+
+```csharp
+public static Collider[] OverlapSphere(
+    Vector3 position,    // 구의 중심점 (월드 좌표)
+    float radius,        // 구의 반지름
+    int layerMask = AllLayers  // 선택적: 특정 레이어만 검사
+)
+```
+
+### 5.2 그리드 좌표와 월드 좌표 변환
+
+**중요한 개념**
+
+- **GridPosition 크기**: 1칸 = 월드 좌표 2 유닛
+- 예시:
+  - GridPosition (0, 0) → World (0, 0, 0)
+  - GridPosition (1, 0) → World (2, 0, 0)
+  - GridPosition (0, 1) → World (0, 0, 2)
+
+**피해 범위 결정**
+
+```csharp
+// 목표: 그리드 2칸 반경의 피해 범위
+// 그리드 2칸 = 월드 4 유닛
+private float damageRadius = 4f;
+
+// 만약 그리드 1칸 반경을 원하면:
+// private float damageRadius = 2f;
+
+// 만약 그리드 3칸 반경을 원하면:
+// private float damageRadius = 6f;
+
+```
+
+**시각적 예시**
+
+```
+그리드 좌표계:
+┌─┬─┬─┬─┬─┐
+│ │ │X│ │ │  X = 폭발 지점 (2, 2)
+├─┼─┼─┼─┼─┤
+│ │ │ │ │ │  damageRadius = 4f (그리드 2칸)
+├─┼─┼─┼─┼─┤  → 주변 2칸 범위의 유닛 모두 피해
+│ │ │ │ │ │
+└─┴─┴─┴─┴─┘
+
+```
+
+### 5.3 범위 피해 구현
+
+```csharp
+// GrenadeProjectile.cs의 Update 메서드 내부
+
+// 목표 도달 확인
+if (Vector3.Distance(transform.position, targetPosition) < reachedTargetDistance)
+{
+    // 1. 피해 반경 정의
+    float damageRadius = 4f;  // 월드 좌표 4 유닛 = 그리드 2칸
+
+    // 2. Physics.OverlapSphere로 범위 내 모든 Collider 찾기
+    // targetPosition: 폭발 중심점 (수류탄이 도착한 위치)
+    // damageRadius: 검사할 구의 반지름
+    // 반환값: 범위 내 모든 Collider를 담은 배열
+    Collider[] colliderArray = Physics.OverlapSphere(targetPosition, damageRadius);
+
+    // 3. 찾은 Collider들을 순회하며 처리
+    foreach (Collider collider in colliderArray)
+    {
+        // 4. TryGetComponent: Collider가 붙어있는 GameObject에 Unit 컴포넌트가 있는지 확인
+        // out Unit targetUnit: Unit이 있으면 targetUnit 변수에 할당
+        // 반환값: bool (Unit이 있으면 true, 없으면 false)
+        if (collider.TryGetComponent<Unit>(out Unit targetUnit))
+        {
+            // 5. Unit이 발견되면 피해 적용
+            // Damage(30): 30의 피해를 줌
+            // 강의에서는 사격(50)보다 낮은 30 사용
+            // 이유: AOE(Area of Effect) 공격이므로 단일 대상보다 약하게 설정
+            targetUnit.Damage(30);
+        }
+        // Unit이 아닌 다른 오브젝트(벽, 장애물 등)는 무시
+    }
+
+    // 6. 수류탄 오브젝트 제거
+    Destroy(gameObject);
+
+    // 7. 완료 콜백 호출 (다음 섹션에서 설명)
+    onGrenadeBehaviorComplete();
+}
+
+```
+
+**TryGetComponent vs GetComponent**
+
+```csharp
+// GetComponent: 컴포넌트가 없으면 null 반환
+Unit unit = collider.GetComponent<Unit>();
+if (unit != null)
+{
+    unit.Damage(30);
+}
+
+// TryGetComponent: 더 효율적이고 현대적인 방법
+// - null 체크 불필요
+// - 성능이 약간 더 좋음
+// - 코드가 더 깔끔함
+if (collider.TryGetComponent<Unit>(out Unit targetUnit))
+{
+    targetUnit.Damage(30);
+}
+
+```
+
+### 5.4 피해량 설정 고려사항
+
+**게임 밸런스 설계**
+
+```csharp
+// 현재 강의 설정:
+// - ShootAction: 50 피해 (단일 대상)
+// - GrenadeAction: 30 피해 (범위 공격)
+
+// 다른 설계 가능성:
+// 1. 거리 기반 피해
+float distanceFromExplosion = Vector3.Distance(targetUnit.transform.position, targetPosition);
+float damageMultiplier = 1f - (distanceFromExplosion / damageRadius);
+int damage = Mathf.RoundToInt(30 * damageMultiplier);
+// 가까울수록 큰 피해, 멀수록 적은 피해
+
+// 2. 수류탄 타입별 피해
+// - FragmentationGrenade: 30 피해, 넓은 범위
+// - ConcussionGrenade: 50 피해, 좁은 범위
+// - SmokeGrenade: 0 피해, 시야 차단 효과
+
+// 3. 아머/방어력 시스템 통합
+int finalDamage = CalculateDamageAfterArmor(baseDamage, targetUnit.GetArmor());
+```
+
+### 5.5 아군 피해(Friendly Fire) 처리
+
+**현재 구현**
+
+- 범위 내 **모든 유닛**에게 피해
+- 적과 아군 구분 없음
+
+```csharp
+// 현재 코드는 이렇게 동작:
+foreach (Collider collider in colliderArray)
+{
+    if (collider.TryGetComponent<Unit>(out Unit targetUnit))
+    {
+        targetUnit.Damage(30);  // 적이든 아군이든 피해
+    }
+}
+```
+
+**적만 피해를 받도록 수정하려면**
+
+```csharp
+foreach (Collider collider in colliderArray)
+{
+    if (collider.TryGetComponent<Unit>(out Unit targetUnit))
+    {
+        // 수류탄을 던진 유닛과 같은 팀이면 건너뛰기
+        if (targetUnit.IsEnemy() == throwingUnit.IsEnemy())
+        {
+            continue;  // 같은 팀이면 피해 없음
+        }
+
+        targetUnit.Damage(30);  // 적팀에게만 피해
+    }
+}
+```
+
+**강의의 선택: 아군도 피해받음**
+
+- 이유: 전략적 깊이 추가
+- 플레이어가 수류탄 위치를 신중히 선택해야 함
+- 무분별한 수류탄 사용 방지
+
+**테스트 결과**
+
+- 수류탄을 적 근처에 투척
+- 범위 내 모든 유닛이 피해를 받음
+- 아군 근처에 투척하면 아군도 피해받음
+
+---
+
+## 6. 콜백 패턴으로 액션 완료 처리
+
+### 6.1 현재 문제점 파악
+
+**무한 액션 문제**
+
+```csharp
+// GrenadeAction.cs - 문제가 되는 코드
+private void Update()
+{
+    if (!isActive)
+    {
+        return;
+    }
+
+    // 즉시 완료 처리 (테스트용 코드)
+    ActionComplete();  // ← 이 코드 제거했음
+}
+```
+
+**증상**
+
+- Update에서 ActionComplete 제거 후
+- 수류탄을 던지면 게임이 "Busy" 상태로 고정
+- 다른 액션을 수행할 수 없음
+- 턴이 진행되지 않음
+
+**원인 분석**
+
+- 수류탄은 별도 GameObject로 날아감
+- GrenadeAction은 수류탄이 언제 도착하는지 모름
+- 수류탄 폭발 후에도 GrenadeAction은 여전히 isActive = true
+
+### 6.2 콜백 패턴 이해하기
+
+**콜백(Callback)이란?**
+
+- "나중에 호출해줄 함수"를 미리 전달하는 프로그래밍 패턴
+- 비동기 작업(시간이 걸리는 작업)의 완료를 알리는 데 사용
+
+**일상 비유**
+
+```
+상황: 피자 주문
+
+1. 기존 방식 (문제):
+   - 나: "피자 주문합니다"
+   - 가게: "네"
+   - 나: (언제 오는지 모름, 계속 문 앞에서 대기)
+
+2. 콜백 방식 (해결):
+   - 나: "피자 주문합니다. 도착하면 이 번호(콜백)로 전화주세요"
+   - 가게: "네"
+   - 나: (다른 일 하다가 전화 오면 받으러 감)
+```
+
+**Unity에서의 콜백**
+
+```csharp
+// Action: C#의 콜백 타입 (매개변수 없는 함수)
+using System;
+
+// 예시 1: 간단한 콜백
+void DoSomethingAsync(Action onComplete)
+{
+    // 긴 작업 수행...
+    onComplete();  // 완료되면 콜백 호출
+}
+
+// 사용:
+DoSomethingAsync(() => {
+    Debug.Log("작업 완료!");
+});
+
+// 예시 2: 메서드를 콜백으로 전달
+void MyCallback()
+{
+    Debug.Log("작업 완료!");
+}
+
+DoSomethingAsync(MyCallback);
+```
+
+### 6.3 GrenadeProjectile에 콜백 추가
+
+```csharp
+// GrenadeProjectile.cs
+
+public class GrenadeProjectile : MonoBehaviour
+{
+    private Vector3 targetPosition;
+
+    // 1. 콜백을 저장할 변수 선언
+    // Action: 매개변수 없고 반환값 없는 함수 타입
+    private Action onGrenadeBehaviorComplete;
+
+    // 2. Setup 메서드에 콜백 매개변수 추가
+    public void Setup(
+        GridPosition targetGridPosition,
+        Action onGrenadeBehaviorComplete  // 콜백 받기
+    )
+    {
+        // 콜백 저장
+        this.onGrenadeBehaviorComplete = onGrenadeBehaviorComplete;
+
+        // 기존 코드
+        targetPosition = LevelGrid.Instance.GetWorldPosition(targetGridPosition);
+    }
+
+    private void Update()
+    {
+        // 이동 로직...
+        Vector3 moveDir = (targetPosition - transform.position).normalized;
+        transform.position += moveDir * moveSpeed * Time.deltaTime;
+
+        // 목표 도착 시
+        if (Vector3.Distance(transform.position, targetPosition) < reachedTargetDistance)
+        {
+            // 피해 처리...
+            float damageRadius = 4f;
+            Collider[] colliderArray = Physics.OverlapSphere(targetPosition, damageRadius);
+
+            foreach (Collider collider in colliderArray)
+            {
+                if (collider.TryGetComponent<Unit>(out Unit targetUnit))
+                {
+                    targetUnit.Damage(30);
+                }
+            }
+
+            // 오브젝트 제거
+            Destroy(gameObject);
+
+            // 3. 완료 콜백 호출 (중요!)
+            // 이 시점에 GrenadeAction에게 "폭발 완료했어요" 알림
+            onGrenadeBehaviorComplete();
+        }
+    }
+}
+```
+
+### 6.4 GrenadeAction에서 콜백 연결
+
+```csharp
+// GrenadeAction.cs
+
+public class GrenadeAction : BaseAction
+{
+    [SerializeField] private Transform grenadeProjectilePrefab;
+    private int maxThrowDistance = 7;
+
+    // Update는 이제 비어있음 (ActionComplete 제거했음)
+    private void Update()
+    {
+        if (!isActive)
+        {
+            return;
+        }
+        // 아무것도 하지 않음 - 콜백이 완료를 처리
+    }
+
+    public override void TakeAction(GridPosition gridPosition, Action onActionComplete)
+    {
+        // 1. 수류탄 생성
+        Transform grenadeProjectileTransform = Instantiate(
+            grenadeProjectilePrefab,
+            unit.GetWorldPosition(),
+            Quaternion.identity
+        );
+
+        // 2. GrenadeProjectile 컴포넌트 가져오기
+        GrenadeProjectile grenadeProjectile =
+            grenadeProjectileTransform.GetComponent<GrenadeProjectile>();
+
+        // 3. Setup 호출 시 콜백 메서드 전달
+        // OnGrenadeBehaviorComplete: 수류탄 폭발 시 호출될 메서드
+        grenadeProjectile.Setup(gridPosition, OnGrenadeBehaviorComplete);
+
+        // 4. 액션 시작 (BaseAction에 onActionComplete 저장)
+        ActionStart(onActionComplete);
+    }
+
+    // 5. 콜백 메서드 구현
+    // GrenadeProjectile의 폭발이 완료되면 이 메서드가 호출됨
+    private void OnGrenadeBehaviorComplete()
+    {
+        // BaseAction의 ActionComplete 호출
+        // 이것이 게임 시스템에 "액션 완료" 신호를 보냄
+        ActionComplete();
+    }
+}
+
+```
+
+### 6.5 콜백 체인 전체 흐름
+
+**전체 실행 흐름 다이어그램**
+
+```
+1. 플레이어가 수류탄 액션 선택
+   ↓
+2. TakeAction(gridPosition, onActionComplete) 호출
+   - onActionComplete: 게임 시스템에서 전달한 콜백
+   ↓
+3. 수류탄 GameObject 생성
+   ↓
+4. grenadeProjectile.Setup(gridPosition, OnGrenadeBehaviorComplete)
+   - OnGrenadeBehaviorComplete: GrenadeAction의 메서드
+   ↓
+5. ActionStart(onActionComplete) 호출
+   - isActive = true로 설정
+   - onActionComplete 저장
+   ↓
+6. 수류탄이 날아감 (GrenadeProjectile.Update)
+   ↓
+7. 목표 도착 → 폭발 → onGrenadeBehaviorComplete() 호출
+   ↓
+8. OnGrenadeBehaviorComplete() 실행
+   ↓
+9. ActionComplete() 호출
+   - isActive = false
+   - 저장된 onActionComplete() 호출
+   ↓
+10. 게임 시스템이 다음 행동 가능 상태로 전환
+```
+
+**코드로 보는 콜백 체인**
+
+```csharp
+// 게임 시스템 (예시)
+void PlayerTurn()
+{
+    grenadeAction.TakeAction(targetPos, () => {
+        Debug.Log("액션 완료! 다음 턴 시작");
+        // 다음 플레이어 차례로...
+    });
+}
+
+// GrenadeAction
+void TakeAction(GridPosition pos, Action onActionComplete)
+{
+    grenadeProjectile.Setup(pos, () => {
+        Debug.Log("수류탄 폭발!");
+        ActionComplete();  // → onActionComplete() 호출
+    });
+    ActionStart(onActionComplete);
+}
+
+// GrenadeProjectile
+void Setup(GridPosition pos, Action callback)
+{
+    this.callback = callback;
+    // 나중에 폭발 시 callback() 호출
+}
+```
+
+### 6.6 ActionPoints 테스트
+
+**문제 재현**
+
+- Unit 스크립트에서 actionPoints를 9로 설정
+- 수류탄을 연속으로 빠르게 클릭
+- 여러 개의 수류탄이 동시에 날아감 (버그!)
+
+**원인**
+
+- ActionComplete가 콜백으로 연결되기 전
+- 클릭할 때마다 즉시 새 액션 시작
+- 동시에 여러 수류탄 발사 가능
+
+**해결**
+
+- 콜백 패턴 구현 후
+- 수류탄이 폭발할 때까지 isActive = true
+- 다른 액션을 시작할 수 없음
+
+**최종 테스트**
+
+```csharp
+// Unit.cs에서 actionPoints를 원래대로 되돌림
+private int actionPoints = 2;  // 9에서 2로 변경
+```
+
+**테스트 시나리오**
+
+1. 게임 실행
+2. Grenade 선택 → 목표 지점 클릭
+3. 수류탄이 날아감 → 폭발 → 액션 종료
+4. 이제 다른 액션 선택 가능
+5. 빠르게 클릭해도 하나씩만 발사됨
+
+### 6.7 다중 유닛 피해 테스트
+
+**테스트 준비**
+
+1. Hierarchy에서 Enemy 유닛 선택
+2. Ctrl + D (복제)
+3. 다른 위치로 이동
+4. 여러 개의 적 유닛 배치
+
+**테스트 실행**
+
+- 적 유닛들이 모여있는 곳에 수류탄 투척
+- 범위 내 모든 적이 피해를 받는지 확인
+
+**결과 확인**
+
+- 수류탄 폭발 시
+- damageRadius(4f) 내의 모든 유닛에게 피해
+- 각 유닛의 HP가 30씩 감소
+- 콘솔에 피해 로그 출력
+
+---
+
+## 🎯 핵심 개념 정리
+
+### 액션 시스템 구조
+
+```csharp
+// 모든 액션은 이 구조를 따름:
+public abstract class BaseAction : MonoBehaviour
+{
+    protected bool isActive;  // 현재 실행 중인지
+
+    public abstract string GetActionName();  // UI 표시 이름
+    public abstract List<GridPosition> GetValidActionGridPositionList();  // 가능한 위치들
+    public abstract void TakeAction(GridPosition pos, Action onComplete);  // 실행
+
+    protected void ActionStart(Action onComplete);  // 시작 처리
+    protected void ActionComplete();  // 완료 처리
+}
+```
+
+### 좌표 변환
+
+```
+GridPosition (논리)  ←→  World Position (물리)
+      (1, 2)         →        (2, 0, 4)
+
+변환 공식:
+- Grid → World: world = grid * 2
+- World → Grid: grid = world / 2
+```
+
+### 콜백 패턴의 장점
+
+1. **비동기 처리**: 시간이 걸리는 작업을 기다릴 필요 없음
+2. **결합도 낮음**: GrenadeAction과 GrenadeProjectile이 독립적
+3. **확장성**: 새로운 발사체 타입 추가 용이
+4. **테스트 용이**: 각 컴포넌트를 독립적으로 테스트 가능
+
+### Physics.OverlapSphere의 활용
+
+```csharp
+// 범위 검사의 다양한 용도:
+// 1. 폭발 피해 (현재 구현)
+// 2. 버프/디버프 범위
+// 3. 시야 범위 체크
+// 4. AI의 주변 인식
+// 5. 상호작용 가능한 오브젝트 찾기
+```
+
+---
+
+## ⚠️ 주의사항
+
+1. **Grid vs World 좌표**
+   - 항상 어느 좌표계를 사용하는지 확인
+   - 변환 시 2배수 관계 기억
+2. **Collider 필수**
+   - Physics.OverlapSphere는 Collider가 있어야 감지
+   - Unit에 Collider 컴포넌트 필수
+3. **콜백 null 체크**
+
+   ```csharp
+   // 안전한 콜백 호출
+   onGrenadeBehaviorComplete?.Invoke();
+   // 또는
+   if (onGrenadeBehaviorComplete != null)
+       onGrenadeBehaviorComplete();
+   ```
+
+4. **Destroy 후 접근 금지**
+
+   ```csharp
+   Destroy(gameObject);
+   // 이후 코드는 다음 프레임부터 실행 안 됨
+   // 콜백은 Destroy 직전에 호출해야 함
+   ```
+
+---
+
+## 🚀 다음 단계 예고
+
+현재 수류탄은 기능적으로 완벽하지만 시각적으로 기본적입니다:
+
+- 단순한 회색 구체
+- 포물선 궤적 없음
+- 폭발 이펙트 없음
+- 사운드 없음
+
+다음 강의에서는:
+
+1. 파티클 시스템으로 폭발 이펙트 추가
+2. 포물선 궤적 구현
+3. 사운드 이펙트 추가
+4. UI 개선

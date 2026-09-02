@@ -1,0 +1,581 @@
+---
+title: 'Git hub action'
+date: '2026-09-02'
+category: 'Git'
+tags: ['Git']
+draft: false
+summary: ''
+---
+
+---
+
+## 1. 깃허브 액션(GitHub Actions)이란?
+
+- **자동화 도구**예요.
+- 깃허브 저장소에서 일어나는 특정 이벤트(예: `push`, `pull request`)에 따라 미리 정한 작업(workflow)을 자동으로 실행합니다.
+- 쉽게 말하면,
+  - “코드 푸시되면 자동으로 테스트 돌리기”
+  - “main 브랜치에 병합되면 자동으로 배포하기”
+    같은 걸 할 수 있게 해주는 도구예요.
+
+👉 개발자가 수동으로 해야 할 반복적인 작업을 자동화해 줍니다.
+
+---
+
+## 2. 핵심 개념
+
+깃허브 액션은 크게 **Workflow → Job → Step** 구조로 동작합니다.
+
+- **Workflow (워크플로우)**
+  - `.github/workflows/` 폴더 안에 있는 **YAML 파일**
+  - 어떤 이벤트에서 어떤 작업을 실행할지 정의하는 단위
+- **Job (잡)**
+  - 워크플로우 안에서 실행되는 **작업 묶음**
+  - 예: “테스트 실행 잡”, “배포 잡”
+- **Step (스텝)**
+  - 잡 안에서 실행되는 **작은 단계 하나**
+  - 예: “코드 체크아웃하기”, “Node.js 설치하기”, “npm run test 실행하기”
+
+---
+
+## 3. 간단한 예제
+
+예를 들어, **코드가 push될 때 자동으로 테스트 실행**하는 GitHub Actions 설정을 만들어볼게요.
+
+👉 파일 경로: `.github/workflows/test.yml`
+
+```yaml
+name: Node.js CI # 워크플로우 이름
+
+on: [push] # 이벤트: push가 발생하면 실행
+
+jobs:
+  build: # job 이름
+    runs-on: ubuntu-latest # 어떤 환경에서 실행할지 (가상환경: ubuntu)
+
+    steps:
+      - name: Checkout code # 1. 코드 불러오기
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js # 2. Node.js 설치
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies # 3. 의존성 설치
+        run: npm install
+
+      - name: Run tests # 4. 테스트 실행
+        run: npm test
+```
+
+---
+
+## 4. 동작 과정
+
+1. 내가 저장소에 **코드를 push**함
+2. 깃허브가 `on: [push]` 설정을 보고 자동으로 워크플로우 실행
+3. `ubuntu-latest` 환경에서 실행됨
+4. 단계별로:
+   - 저장소 코드 가져오기 (checkout)
+   - Node.js 설치
+   - `npm install` 실행
+   - `npm test` 실행
+
+👉 결과는 GitHub 저장소의 **Actions 탭**에서 확인 가능해요.
+
+---
+
+## 5. 더 쉽게 이해하기
+
+깃허브 액션을 하나의 **자동 로봇**이라고 생각하면 돼요.
+
+- 트리거(`on`) → "언제 실행할지" 알려주는 버튼
+- 잡(`jobs`) → 로봇이 할 큰 업무
+- 스텝(`steps`) → 업무 안에서 로봇이 해야 할 세부 단계
+
+---
+
+## 6. 추가로 할 수 있는 것들
+
+- 테스트 성공 시 자동 배포
+- PR 올릴 때 자동 코드 스타일 체크
+- 일정 시간마다 실행(cron job)
+- Docker 이미지 빌드 & 푸시
+
+# 스케줄(크론) 기본 예제
+
+- **무엇?** 특정 시간·주기로 자동 실행되는 워ーク플로우
+- **어디에?** 저장소의 `.github/workflows/*.yml` 파일 안
+- **형식?** `cron`(크론) 표기: `분 시 일 월 요일` (초 없음)
+
+> 중요 3가지
+
+1. **모든 시간은 UTC 기준**으로 적어야 해요. (한국 시간 KST=UTC+9)
+2. 너무 정확한 분 단위 보장은 X (수 분 정도 지연될 수 있음).
+3. 너무 촘촘한 주기(매분 등)는 비추천. 보통 **5분 이상 간격**을 권장해요.
+
+---
+
+## 자주 쓰는 스케줄 예시 (KST 기준 변환 포함)
+
+- **매일 오전 9시(KST)** → UTC로는 **00시**
+  ```yaml
+  - cron: '0 0 * * *' # 매일 00:00 UTC = 매일 09:00 KST
+  ```
+- **매주 월요일 오전 9시(KST)** → UTC로는 **일요일 24:00(=월 00:00)**
+  ```yaml
+  - cron: '0 0 * * 1' # 월요일 00:00 UTC = 월요일 09:00 KST
+  ```
+- **매 15분마다**
+  ```yaml
+  - cron: '*/15 * * * *'
+  ```
+- **매월 1일 09:00 KST** → UTC 00:00
+  ```yaml
+  - cron: '0 0 1 * *'
+  ```
+
+> KST(UTC+9) → UTC 변환: KST 시간 − 9시간 = UTC
+>
+> 한국은 일광절약시간제(DST) 없음.
+
+---
+
+## 실전 예제 A: “매일 오전 9시(KST) 백엔드 스크립트 실행”
+
+예: `scripts/daily-task.js` 를 매일 돌리기 (Node.js)
+
+### 3-1. 워크플로우 파일 만들기
+
+경로: `.github/workflows/daily-job.yml`
+
+```yaml
+name: Daily Job (09:00 KST)
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # 매일 00:00 UTC = 09:00 KST
+  workflow_dispatch: # 필요할 때 수동 실행 버튼도 생김
+
+jobs:
+  run-daily-task:
+    runs-on: ubuntu-latest
+    concurrency: # 겹쳐서 돌지 않게 안전장치
+      group: daily-task
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Run daily script
+        run: node scripts/daily-task.js
+        env:
+          API_KEY: ${{ secrets.API_KEY }} # 시크릿 사용 예시
+```
+
+### 3-2. 포인트
+
+- `workflow_dispatch`: **수동 실행**도 가능(테스트할 때 유용).
+- `concurrency`: 이전 실행이 끝나기 전엔 **겹치지 않게**.
+- 민감정보는 `secrets`에 저장 후 `env`로 주입.
+
+---
+
+## 실전 예제 B: “매 15분마다 헬스체크(ping)”
+
+특정 API를 정기 점검하는 간단한 `curl` 예시
+
+```yaml
+name: API Health Check (every 15 min)
+
+on:
+  schedule:
+    - cron: '*/15 * * * *' # 15분마다
+  workflow_dispatch:
+
+jobs:
+  ping-api:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping my API
+        run: |
+          set -e
+          # 200 OK가 아니면 실패 처리
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://example.com/healthz")
+          echo "Status: $STATUS"
+          if [ "$STATUS" -ne 200 ]; then
+            echo "Health check failed"
+            exit 1
+          fi
+```
+
+> 실패 시 Actions 탭에서 빨간불로 확인 가능, 필요하면 알림 설정도 가능.
+
+---
+
+## 자주 하는 실수 & 해결 팁
+
+1. **시간대 혼동**
+   - 파일에는 **항상 UTC**로 적기! (KST=UTC+9 기억)
+   - “KST 09:00”이면 `0 0 * * *` (UTC 00:00)
+2. **파일 위치/브랜치**
+   - 경로가 정확히 `.github/workflows/` 인지 확인
+   - 기본 브랜치(main 등)에 합쳐져 있어야 스케줄이 실행돼요.
+3. **활동 정지(휴면) 저장소**
+   - 저장소가 **오랫동안 활동이 없으면** GitHub가 스케줄을 **일시 중지**할 수 있어요.
+   - 이럴 땐 커밋/수동 실행으로 다시 활성화.
+4. **너무 잦은 주기**
+   - 매분 실행은 지연/스큐가 생길 수 있어요. **5~15분 간격** 추천.
+5. **즉시 테스트하고 싶을 때**
+   - `workflow_dispatch` 버튼으로 수동 실행.
+6. **중복 실행 방지**
+   - `concurrency`로 그룹 지정 후 `cancel-in-progress` 옵션 사용.
+
+---
+
+## 빠른 시작 체크리스트
+
+- [ ] 원하는 **KST 시각 → UTC**로 변환
+- [ ] `.github/workflows/XXX.yml` 생성
+- [ ] `on.schedule.cron`에 UTC 시간대 문자열 입력
+- [ ] 필요한 런타임/의존성/시크릿 준비
+- [ ] `workflow_dispatch`로 수동 테스트
+- [ ] Actions 탭에서 성공 여부 확인
+
+# 🚀 GitHub Actions 자동 블로그 생성 설정 가이드
+
+## 1. Secrets 설정
+
+리포지토리 → **Settings → Secrets and variables → Actions** 에 다음을 추가:
+
+- **필수**
+  - `OPENAI_API_KEY = sk-proj-xxxxx`
+  - `REDDIT_CLIENT_ID = your_reddit_client_id`
+  - `REDDIT_CLIENT_SECRET = your_reddit_client_secret`
+  - `REDDIT_USER_AGENT = WebMaker-Bot/1.0`
+  - `GMAIL_USER = your-email@gmail.com`
+  - `GMAIL_PASSWORD = gmail_app_password`
+  - `NOTIFICATION_EMAIL = notification@email.com`
+- **선택(현재 미사용)**
+  - `NEWS_API_KEY = xxxxx`
+  - `GNEWS_API_KEY = xxxxx`
+  - `UNSPLASH_ACCESS_KEY = xxxxx`
+
+---
+
+## 2. 테스트 실행 방법
+
+1. GitHub 리포지토리 → **Actions** 탭으로 이동
+2. **"Automated Blog Generation" workflow** 선택
+3. 상단의 **"Run workflow"** 버튼 클릭 → 수동 실행
+
+---
+
+## 3. 자동 실행 스케줄
+
+평일(월~금)에 아래 시간에 자동 실행됨:
+
+| 시간(UTC) | 미국 현지 | 한국(KST) | 실행 템플릿     |
+| --------- | --------- | --------- | --------------- |
+| 00:00     | 미국 저녁 | 오전 9시  | engaging 템플릿 |
+| 13:00     | 미국 아침 | 오후 10시 | summary 템플릿  |
+| 17:00     | 미국 점심 | 새벽 2시  | summary 템플릿  |
+
+---
+
+## 4. 체크리스트 ✅
+
+- [ ] 코드 최신 상태 커밋 & 푸시
+- [ ] GitHub Secrets 설정 완료
+- [ ] GitHub Actions → **수동 테스트 실행**
+- [ ] 자동 실행 스케줄 정상 동작 확인
+- [ ] 이메일 알림 수신 확인 (성공/실패 여부)
+
+## 📌 GitHub Actions에서 Secrets 종류
+
+1. **Repository secrets**
+   - 해당 리포지토리에서만 사용 가능
+   - **가장 일반적으로 쓰는 방법**
+   - 지금 설명드린 `OPENAI_API_KEY`, `REDDIT_CLIENT_ID` 같은 값은 여기에 넣으시면 됩니다 ✅
+2. **Environment secrets**
+   - 특정 **Environment** (예: production, staging 등)를 만들어서 환경별로 다른 secret을 설정할 때 사용
+   - 예: `production`에는 진짜 API Key, `staging`에는 테스트용 API Key
+3. **Organization secrets**
+   - (조직 단위 GitHub 계정에서만 가능)
+   - 여러 리포지토리에서 공유할 Secret을 한 번에 관리할 때 사용
+
+---
+
+## 📌 지금 상황에서 선택해야 할 것
+
+👉 **Repository secrets**에 넣으시면 됩니다.
+
+- 리포지토리 → **Settings → Secrets and variables → Actions → New repository secret**
+- 하나씩 추가 (`OPENAI_API_KEY`, `REDDIT_CLIENT_ID`, …)
+
+---
+
+## 📌 Variables는 뭐냐?
+
+- **Secrets**는 민감한 값(API 키, 비밀번호 등)을 암호화해서 저장
+- **Variables**는 보안이 필요 없는 일반 환경 변수 (예: `APP_ENV=production`, `LOG_LEVEL=debug`)
+
+---
+
+✅ 정리하면:
+
+- API 키, 이메일 계정, 비밀번호 → **Repository secrets**
+- 그냥 일반 환경 값 (예: `MODE=dev`) → **Variables**
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380189/notion-blog/Git/Git_hub_action/image.png)
+
+```jsx
+환경변수 설정
+
+GitHub 리포지토리로 이동해서 Settings → Secrets and variables → Actions에서 다음 secrets을 추가
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380189/notion-blog/Git/Git_hub_action/image_1.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380189/notion-blog/Git/Git_hub_action/image_2.png)
+
+```jsx
+name: Automated Blog Generation   # 워크플로우 이름. Actions 탭에 표시됨. YAML에서 '키: 값' 형태.
+
+on:                               # 언제(트리거) 실행할지 정의하는 루트 키.
+  schedule:                       # (1) 스케줄 기반 자동 실행. GitHub Actions의 예약 실행 기능.
+    - cron: '0 0 * * 1,2,3,4,5'   # 리스트 항목(-). cron 표현식은 문자열로 표기. GitHub은 UTC 기준.
+                                  # cron 형식: "분 시 일 월 요일"
+                                  # 여기선 평일(1~5)에 매일 00:00 UTC에 실행.
+                                  # 주석은 '#' 뒤에 작성. YAML에선 어디든 가능(문자열 안 제외).
+
+    - cron: '0 13 * * 1,2,3,4,5'  # 평일 매일 13:00 UTC 실행.
+    - cron: '0 17 * * 1,2,3,4,5'  # 평일 매일 17:00 UTC 실행.
+
+  workflow_dispatch:              # (2) 수동 실행 트리거. GitHub UI에서 직접 실행 가능.
+    inputs:                       # 수동 실행 시 받을 입력값들 정의.
+      template:                   # 입력 파라미터 이름.
+        description: 'Blog template to use'  # 설명. 작은따옴표/큰따옴표 모두 문자열.
+        required: false           # 필수 여부(Boolean). YAML은 true/false 소문자 권장.
+        default: 'summary'        # 기본값.
+        type: choice              # 선택형 입력.
+        options:                  # choice인 경우 가능한 값 목록(리스트).
+          - summary
+          - engaging
+          - informative
+
+jobs:                             # 실제로 실행할 작업들. 루트 키.
+  generate-blog:                  # 잡 이름(식별자). 임의로 정함.
+    runs-on: ubuntu-latest        # 어떤 러너에서 실행할지. GitHub 호스트 러너 라벨.
+
+    steps:                        # 잡 안에서 순서대로 실행할 단계 리스트.
+      - name: Checkout repository # 각 단계의 사람이 읽을 이름.
+        uses: actions/checkout@v4 # 'uses'는 재사용 가능한 액션을 불러 씀. 'owner/repo@버전' 형식.
+        with:                     # 해당 액션에 전달할 입력 인자.
+          token: ${{ secrets.GITHUB_TOKEN }} # GitHub Actions 표현식: ${{ ... }}
+                                            # 실행 시점에 평가되는 템플릿 문법.
+                                            # secrets.* 는 저장소/조직 시크릿 값에 접근.
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'      # Node.js 버전. 문자열로 쓰는 게 안전.
+          cache: 'npm'            # npm 캐시 사용(속도 개선).
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |                 # '|'는 블록 스칼라(여러 줄 문자열). 아래 들여쓴 줄들을 그대로 문자열로.
+            ~/.npm                # 캐시할 경로 목록을 여러 줄로 표기.
+            node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+                                  # 캐시 키. 여러 표현식 결합 가능.
+                                  # hashFiles()는 주어진 파일들의 해시를 생성.
+          restore-keys: |         # 캐시 복구 시 사용할 프리픽스 키들(여러 줄 문자열).
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+                                  # 'run'은 셸 명령을 실행. 문자열 한 줄이면 한 명령.
+                                  # CI 환경에선 npm ci 권장(깨끗하고 빠름).
+
+      - name: Set template if manual run
+        if: github.event_name == 'workflow_dispatch'
+                                  # 이 단계는 조건부 실행. 표현식의 평가 결과가 true일 때만 실행.
+        run: |                    # 여러 줄 셸 스크립트. 각 줄은 실제 셸에서 그대로 실행됨.
+          # sed: 파일 내용 치환. -i = in-place(파일 직접 수정)
+          sed -i 's/promptTemplate: "[^"]*"/promptTemplate: "${{ inputs.template }}"/' config/site.config.js
+          # 위 정규식: s/패턴/치환문자열/
+          # "[^"]*" = 큰따옴표로 둘러싸인 어떤 문자열이든(따옴표 제외 문자 0회 이상)
+          # ${{ inputs.template }} = 수동 실행 시 입력한 값
+          echo "🔧 Template set to: ${{ inputs.template }}"
+
+      - name: Generate blog post
+        env:                      # 이 단계에서만 유효한 환경변수 설정.
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}   # secrets에서 안전하게 주입.
+          NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
+          GNEWS_API_KEY: ${{ secrets.GNEWS_API_KEY }}
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+          REDDIT_USER_AGENT: ${{ secrets.REDDIT_USER_AGENT }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
+          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
+        run: |
+          echo "🚀 Starting blog generation..."
+
+          # node -e: 한 줄짜리 JS를 바로 실행. $(...)는 셸의 명령 치환(출력을 변수에 담음).
+          template=$(node -e "
+            const ScheduleHelper = require('./scripts/utils/schedule-helper.js');
+            console.log(ScheduleHelper.getCurrentTemplate());
+          ")
+
+          echo "🎯 Using template based on config: $template"
+
+          # sed로 site.config.js의 promptTemplate 값을 방금 계산한 template로 교체.
+          # 큰따옴표를 사용하면 셸 변수($template)가 확장됨.
+          sed -i "s/promptTemplate: \"[^\"]*\"/promptTemplate: \"$template\"/" config/site.config.js
+
+          # 블로그 생성 스크립트 실행(예: reddit/뉴스/이미지 API 등을 활용)
+          node scripts/generate-reddit-blog.js
+
+          echo "✅ Blog generation completed"
+
+      - name: Configure Git
+        run: |
+          # 로컬 git 사용자 정보 설정(커밋 작성자 표시용)
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action Bot"
+
+      - name: Commit and push changes
+        run: |
+          # 변경될 가능성이 있는 경로를 스테이징
+          git add content/posts/
+          git add config/
+
+          # 'if ! CMD; then' = CMD가 0이 아니면(실패/변경 있음 등) then 블록 실행.
+          # git diff --staged --quiet: 스테이지에 변경이 없으면 종료코드 0(조용히 통과)
+          if ! git diff --staged --quiet; then
+            # date -u: UTC 기준 시간. '+형식'은 출력 포맷 지정.
+            timestamp=$(date -u '+%Y-%m-%d %H:%M UTC')
+
+            # grep -o: 매칭 부분만 출력. cut -d'"' -f2: 따옴표로 분리해 2번째 필드(실제 값)만 추출.
+            template=$(grep -o 'promptTemplate: "[^"]*"' config/site.config.js | cut -d'"' -f2)
+
+            # 커밋 메시지에 템플릿/타임스탬프 포함
+            git commit -m "chore: 자동 블로그 포스트 생성 ($template) - $timestamp"
+            git push
+            echo "✅ New blog post committed and pushed"
+          else
+            echo "ℹ️ No changes to commit"  # 변경이 없으면 커밋/푸시 생략
+          fi
+
+      - name: Notify on failure
+        if: failure()              # 이전 단계 중 실패가 있었다면(true) 실행되는 내장 함수.
+        run: |
+          echo "❌ Blog generation failed"
+
+```
+
+## 🌀 전체 흐름
+
+1. **자동 실행 (schedule) 또는 수동 실행 (workflow_dispatch)** 으로 워크플로우 시작
+2. 실행 전에 **어떤 템플릿을 쓸지 결정**
+   - 수동 실행 시 → 사람이 직접 선택
+   - 자동 실행 시 → `automation.config.js` + `schedule-helper.js` 코드가 현재 시간대를 보고 자동으로 선택
+3. `config/site.config.js` 파일의 `promptTemplate` 값을 선택된 템플릿으로 바꿔치기
+4. `generate-reddit-blog.js` 실행 시, 바뀐 `promptTemplate` 값이 반영되어 블로그 글 생성
+
+---
+
+## 🔑 어디서 템플릿이 바뀌는가?
+
+워크플로우 코드 중 핵심 부분은 여기예요:
+
+```yaml
+# automation.config.js를 사용하여 현재 템플릿 결정
+template=$(node -e "
+  const ScheduleHelper = require('./scripts/utils/schedule-helper.js');
+  console.log(ScheduleHelper.getCurrentTemplate());
+")
+
+echo "🎯 Using template based on config: $template"
+
+# site.config.js의 promptTemplate 값을 선택된 템플릿으로 교체
+sed -i "s/promptTemplate: \"[^\"]*\"/promptTemplate: \"$template\"/" config/site.config.js
+
+```
+
+- `node -e` 로 JavaScript 한 줄 실행
+- `schedule-helper.js` 안에 있는 `getCurrentTemplate()` 함수 호출 → 이 함수가 "지금은 summary 써라", "engaging 써라" 같은 결정을 내려줌
+- 반환값을 `template` 변수에 저장
+- `sed` 명령으로 `site.config.js` 안에 `promptTemplate` 값을 그 값으로 교체
+
+---
+
+## ⚙️ `schedule-helper.js` 가 하는 일 (예상)
+
+보통 이런 구조예요:
+
+```jsx
+// scripts/utils/schedule-helper.js
+const config = require('../../automation.config.js')
+
+function getCurrentTemplate() {
+  const hour = new Date().getUTCHours() // 현재 UTC 시각
+
+  if (hour < 8) return config.morningTemplate // 오전에는 informative
+  if (hour < 16) return config.afternoonTemplate // 오후에는 engaging
+  return config.eveningTemplate // 저녁에는 summary
+}
+
+module.exports = { getCurrentTemplate }
+```
+
+그리고 `automation.config.js` 같은 파일에는 대략 이런 식으로 정의돼 있어요:
+
+```jsx
+module.exports = {
+  morningTemplate: 'informative',
+  afternoonTemplate: 'engaging',
+  eveningTemplate: 'summary',
+}
+```
+
+즉, **UTC 시간대(또는 실행 스케줄)에 따라 다른 템플릿 이름을 리턴**해주는 거예요.
+
+---
+
+## ✋ 수동 실행 시에는?
+
+여기서도 분기 있어요:
+
+```yaml
+- name: Set template if manual run
+  if: github.event_name == 'workflow_dispatch'
+  run: |
+    sed -i 's/promptTemplate: "[^"]*"/promptTemplate: "${{ inputs.template }}"/' config/site.config.js
+    echo "🔧 Template set to: ${{ inputs.template }}"
+```
+
+- 사람이 GitHub Actions UI에서 직접 실행하면 **summary / engaging / informative 중 하나**를 선택할 수 있음
+- 그러면 `inputs.template` 값이 들어가서 `site.config.js` 수정
+
+---
+
+## ✅ 결론
+
+- **자동 실행(schedule)**: `schedule-helper.js` 가 현재 시각/요일을 보고 자동 선택
+- **수동 실행(dispatch)**: 사람이 직접 선택
+- 최종적으로 `site.config.js` 의 `promptTemplate` 값이 매번 달라져서 → `generate-reddit-blog.js` 실행할 때마다 다른 스타일의 블로그 글이 나옴

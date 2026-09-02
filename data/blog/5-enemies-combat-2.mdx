@@ -1,0 +1,1904 @@
+---
+title: '섹션 5: Enemies & Combat - 2'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+# { 🎬 유닛 애니메이션 시스템 구축하기 }
+
+이번 강의는 별도의 클래스를 만들어서 유닛의 모든 애니메이션(이동, 사격 등)을 중앙에서 관리하는 방법을 다룹니다. 기존에는 각 액션 스크립트마다 Animator 참조를 가지고 있었지만, 이를 하나의 전담 클래스로 통합하여 코드 중복을 줄이고 디버깅을 쉽게 만듭니다.
+
+---
+
+## 📋 목차
+
+1. [기존 방식의 문제점 이해하기](https://claude.ai/chat/17820db5-7829-43e8-aeb5-ddf48ae822af#1-%EA%B8%B0%EC%A1%B4-%EB%B0%A9%EC%8B%9D%EC%9D%98-%EB%AC%B8%EC%A0%9C%EC%A0%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [UnitAnimator 클래스 생성하기](https://claude.ai/chat/17820db5-7829-43e8-aeb5-ddf48ae822af#2-unitanimator-%ED%81%B4%EB%9E%98%EC%8A%A4-%EC%83%9D%EC%84%B1%ED%95%98%EA%B8%B0)
+3. [MoveAction 리팩토링하기](https://claude.ai/chat/17820db5-7829-43e8-aeb5-ddf48ae822af#3-moveaction-%EB%A6%AC%ED%8C%A9%ED%86%A0%EB%A7%81%ED%95%98%EA%B8%B0)
+4. [이동 애니메이션 이벤트 연결하기](https://claude.ai/chat/17820db5-7829-43e8-aeb5-ddf48ae822af#4-%EC%9D%B4%EB%8F%99-%EC%95%A0%EB%8B%88%EB%A9%94%EC%9D%B4%EC%85%98-%EC%9D%B4%EB%B2%A4%ED%8A%B8-%EC%97%B0%EA%B2%B0%ED%95%98%EA%B8%B0)
+5. [사격 애니메이션 설정하기](https://claude.ai/chat/17820db5-7829-43e8-aeb5-ddf48ae822af#5-%EC%82%AC%EA%B2%A9-%EC%95%A0%EB%8B%88%EB%A9%94%EC%9D%B4%EC%85%98-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+6. [ShootAction 이벤트 구현하기](https://claude.ai/chat/17820db5-7829-43e8-aeb5-ddf48ae822af#6-shootaction-%EC%9D%B4%EB%B2%A4%ED%8A%B8-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+7. [최종 테스트 및 정리](https://claude.ai/chat/17820db5-7829-43e8-aeb5-ddf48ae822af#7-%EC%B5%9C%EC%A2%85-%ED%85%8C%EC%8A%A4%ED%8A%B8-%EB%B0%8F-%EC%A0%95%EB%A6%AC)
+
+---
+
+## 1. 기존 방식의 문제점 이해하기
+
+### 현재 상황 분석
+
+- **게임 상태**: 사격 액션이 구현되어 있음
+  - 유닛 선택 → 적 클릭 → 유닛이 회전하고 사격
+  - 콘솔에 "적을 사격했다"는 메시지 출력
+  - **문제점**: 시각적 애니메이션이 없음
+
+### 기존 MoveAction의 접근 방식
+
+```csharp
+// MoveAction에서 직접 Animator를 참조하는 방식
+[SerializeField] private Animator unitAnimator;
+
+// Update 메서드 내에서 직접 애니메이션 제어
+unitAnimator.SetBool("IsWalking", true);
+```
+
+### 이 방식의 문제점
+
+1. **코드 중복**: 각 액션 스크립트마다 Animator 참조를 선언해야 함
+2. **관리의 어려움**: 여러 곳에 흩어진 Animator 참조로 인해 디버깅이 복잡해짐
+3. **확장성 부족**: 새로운 액션을 추가할 때마다 Animator 관련 코드를 반복해야 함
+
+### 개선된 접근 방식
+
+- **중앙 집중식 관리**: `UnitAnimator` 전담 클래스 생성
+- **이벤트 기반 시스템**: 각 액션이 이벤트를 발생시키면 UnitAnimator가 감지하여 애니메이션 재생
+- **단일 책임 원칙**: 애니메이션 관련 로직을 한 곳에 모아서 관리
+
+---
+
+## 2. UnitAnimator 클래스 생성하기
+
+### 새 스크립트 생성
+
+1. **Scripts 폴더**에서 새 C# 스크립트 생성
+2. 이름: `UnitAnimator`
+
+### Animator 참조 설정
+
+```csharp
+using UnityEngine;
+
+public class UnitAnimator : MonoBehaviour
+{
+    // Animator 컴포넌트를 참조하기 위한 변수
+    // [SerializeField]: private 변수를 Unity Inspector에서 볼 수 있게 함
+    [SerializeField] private Animator animator;
+}
+```
+
+**개념 설명**:
+
+- **SerializeField 속성**:
+  - private 변수를 Unity 에디터에서 접근 가능하게 만듦
+  - 캡슐화(private)를 유지하면서도 Inspector에서 할당 가능
+  - public보다 안전한 방법
+
+### Unity 에디터에서 설정
+
+1. **Prefabs 폴더** → **Unit prefab** 열기 (적 유닛이 아닌 기본 Unit)
+2. Unit 오브젝트에 **UnitAnimator 스크립트** 컴포넌트 추가
+3. Inspector에서 **Animator 필드**에 Character 오브젝트의 Animator 컴포넌트 드래그 앤 드롭
+
+**설계 포인트**:
+
+- Unit prefab에 추가하는 이유: 모든 유닛이 이 기능을 공유하기 위해
+- Animator는 Character 자식 오브젝트에 있음 (캐릭터 모델에 연결됨)
+
+---
+
+## 3. MoveAction 리팩토링하기
+
+### 기존 Animator 참조 제거
+
+```csharp
+public class MoveAction : BaseAction
+{
+    // 이제 필요 없으므로 삭제
+    // [SerializeField] private Animator unitAnimator;
+
+    private Vector3 targetPosition;
+    [SerializeField] private int maxMoveDistance = 4;
+
+    // ... 나머지 코드
+}
+```
+
+**리팩토링 이유**:
+
+- Animator 참조는 이제 UnitAnimator 클래스에서만 관리
+- MoveAction은 이동 로직에만 집중
+- 관심사의 분리(Separation of Concerns) 원칙 적용
+
+### UnitAnimator에서 MoveAction 참조하기
+
+```csharp
+public class UnitAnimator : MonoBehaviour
+{
+    [SerializeField] private Animator animator;
+
+    private void Awake()
+    {
+        // TryGetComponent: 컴포넌트를 안전하게 가져오는 메서드
+        // out MoveAction moveAction: 컴포넌트를 찾으면 이 변수에 저장
+        if (TryGetComponent<MoveAction>(out MoveAction moveAction))
+        {
+            // 컴포넌트가 존재하면 이 블록 실행
+            // 이후 이벤트 구독 코드가 들어갈 예정
+        }
+    }
+}
+
+```
+
+**TryGetComponent vs GetComponent**:
+
+- **GetComponent**: 컴포넌트가 없으면 null 반환, 에러 없이 넘어감
+- **TryGetComponent**:
+  - 성공 여부를 bool로 반환 (true/false)
+  - 찾은 컴포넌트를 out 매개변수로 반환
+  - 더 명확하고 안전한 코드 작성 가능
+
+**왜 Awake에서 사용하는가?**:
+
+- Awake는 오브젝트가 생성될 때 한 번만 실행됨
+- Start보다 먼저 실행되어 초기화에 적합
+- 같은 GameObject의 컴포넌트를 찾으므로 GetComponent 사용 가능
+
+**선택적 액션 대비 설계**:
+
+- 현재는 모든 유닛이 MoveAction을 가짐
+- 하지만 나중에 일부 유닛만 특정 액션을 가질 수 있음
+- TryGetComponent로 안전하게 처리하여 확장성 확보
+
+---
+
+## 4. 이동 애니메이션 이벤트 연결하기
+
+### MoveAction에 이벤트 추가
+
+```csharp
+using System; // EventHandler 사용을 위해 필요
+
+public class MoveAction : BaseAction
+{
+    // 이동 시작 시 발생하는 이벤트
+    // public: 외부에서 구독 가능
+    // event: 이벤트 키워드 (특별한 델리게이트)
+    // EventHandler: 표준 이벤트 시그니처 (object sender, EventArgs e)
+    public event EventHandler OnStartMoving;
+
+    // 이동 종료 시 발생하는 이벤트
+    public event EventHandler OnStopMoving;
+
+    // ... 기존 변수들
+}
+
+```
+
+**이벤트 시스템 개념**:
+
+- **이벤트(Event)**: 특정 동작이 발생했음을 알리는 메커니즘
+- **발행자(Publisher)**: 이벤트를 발생시키는 쪽 (MoveAction)
+- **구독자(Subscriber)**: 이벤트를 듣는 쪽 (UnitAnimator)
+- **EventHandler**: C#의 표준 이벤트 델리게이트 타입
+  - object sender: 이벤트를 발생시킨 객체
+  - EventArgs e: 이벤트와 함께 전달할 추가 데이터 (여기서는 비어있음)
+
+### 이벤트 발생시키기 - 이동 시작
+
+```csharp
+public override void TakeAction(GridPosition gridPosition, Action onActionComplete)
+{
+    ActionStart(onActionComplete);
+    this.targetPosition = LevelGrid.Instance.GetWorldPosition(gridPosition);
+
+    // 이동을 시작할 때 이벤트 발생
+    // ?. (null 조건 연산자): OnStartMoving이 null이 아닐 때만 Invoke 실행
+    // 구독자가 없으면 아무 일도 일어나지 않음 (안전함)
+    OnStartMoving?.Invoke(this, EventArgs.Empty);
+
+    // 설명:
+    // - this: 현재 MoveAction 인스턴스를 전달
+    // - EventArgs.Empty: 빈 이벤트 인자 (추가 데이터 없음)
+}
+
+```
+
+**?. 연산자의 중요성**:
+
+```csharp
+// 잘못된 방법 (구독자가 없으면 NullReferenceException 발생)
+OnStartMoving.Invoke(this, EventArgs.Empty);
+
+// 올바른 방법 (구독자가 없어도 안전)
+OnStartMoving?.Invoke(this, EventArgs.Empty);
+
+```
+
+### 이벤트 발생시키기 - 이동 종료
+
+```csharp
+private void Update()
+{
+    if(!isActive)
+    {
+        return;
+    }
+
+    float stoppingDistance = 0.1f;
+    Vector3 moveDirection = (targetPosition - transform.position).normalized;
+
+    if (Vector3.Distance(transform.position, targetPosition) > stoppingDistance)
+    {
+        // 아직 목표 지점에 도달하지 않음 - 계속 이동
+        float moveSpeed = 4f;
+        transform.position += moveDirection * Time.deltaTime * moveSpeed;
+    }
+    else
+    {
+        // 목표 지점에 도달함
+
+        // 이동 종료 이벤트 발생
+        OnStopMoving?.Invoke(this, EventArgs.Empty);
+
+        // 액션 완료 처리
+        ActionComplete();
+    }
+
+    // 회전 처리
+    float rotationSpeed = 10f;
+    transform.forward = Vector3.Lerp(transform.forward, moveDirection, Time.deltaTime * rotationSpeed);
+}
+
+```
+
+**이벤트 발생 타이밍**:
+
+- **OnStartMoving**: TakeAction이 호출될 때 (유저가 이동 명령을 내릴 때)
+- **OnStopMoving**: 목표 지점에 도착했을 때 (Update에서 거리 체크)
+
+### UnitAnimator에서 이벤트 구독하기
+
+```csharp
+public class UnitAnimator : MonoBehaviour
+{
+    [SerializeField] private Animator animator;
+
+    private void Awake()
+    {
+        if (TryGetComponent<MoveAction>(out MoveAction moveAction))
+        {
+            // 이벤트 구독: += 연산자 사용
+            // moveAction.OnStartMoving 이벤트가 발생하면
+            // MoveAction_OnStartMoving 메서드가 자동으로 호출됨
+            moveAction.OnStartMoving += MoveAction_OnStartMoving;
+
+            // 이동 종료 이벤트도 구독
+            moveAction.OnStopMoving += MoveAction_OnStopMoving;
+        }
+    }
+
+    // 이동 시작 시 호출되는 콜백 메서드
+    // private: 외부에서 직접 호출할 필요 없음
+    // object sender: 이벤트를 발생시킨 객체 (MoveAction 인스턴스)
+    // System.EventArgs e: 이벤트 인자 (여기서는 사용 안 함)
+    private void MoveAction_OnStartMoving(object sender, System.EventArgs e)
+    {
+        // Animator의 "IsWalking" 파라미터를 true로 설정
+        // → Walking 애니메이션으로 전환
+        animator.SetBool("IsWalking", true);
+    }
+
+    // 이동 종료 시 호출되는 콜백 메서드
+    private void MoveAction_OnStopMoving(object sender, System.EventArgs e)
+    {
+        // Animator의 "IsWalking" 파라미터를 false로 설정
+        // → Idle 애니메이션으로 전환
+        animator.SetBool("IsWalking", false);
+    }
+}
+
+```
+
+**이벤트 구독 패턴**:
+
+```
+[발행자]                    [구독자]
+MoveAction  -------------→  UnitAnimator
+  |                            |
+  | OnStartMoving 발생         |
+  |------------------------→   | MoveAction_OnStartMoving 실행
+  |                            | → animator.SetBool("IsWalking", true)
+
+```
+
+**네이밍 컨벤션**:
+
+- 이벤트 핸들러 메서드명: `클래스명_On이벤트명`
+- 예: `MoveAction_OnStartMoving`
+- 어떤 이벤트에 반응하는지 명확하게 알 수 있음
+
+### 첫 번째 테스트
+
+1. Unity 에디터로 돌아가기
+2. 플레이 모드 실행
+3. **확인 사항**:
+   - 기본적으로 캐릭터는 Idle 상태
+   - 이동 명령을 내리면 Walking 애니메이션 재생
+   - 목표 지점에 도착하면 다시 Idle로 전환
+
+**결과**: 기존과 동일하게 작동하지만, 코드 구조가 훨씬 깔끔해짐
+
+---
+
+## 5. 사격 애니메이션 설정하기
+
+### Unit Prefab에서 Animator 설정
+
+1. **Prefabs 폴더** → **Unit prefab** 열기
+2. **Animator 컴포넌트** 선택 (Character 오브젝트에 있음)
+
+### 사격 애니메이션 추가
+
+**애니메이션 클립 찾기**:
+
+- 이전에 다운로드한 애셋에 포함된 애니메이션
+- 이름: **Firing Rifle Animation**
+
+**Animator에 추가하는 방법**:
+
+1. **Firing Rifle Animation** 클립 선택
+2. **Animator 창**으로 **드래그 앤 드롭**
+3. 새로운 애니메이션 상태(State)가 생성됨
+
+### Idle에서 Shooting으로 전환 설정
+
+**Transition 생성**:
+
+1. **Idle** 상태 **우클릭** → **Make Transition** 선택
+2. 화살표를 **Firing Rifle** 상태로 연결
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380473/notion-blog/_/3D_/_/_5_Enemies_Combat_-_2/image.png)
+
+**Transition 설정 - 조건 부분**:
+
+```
+Inspector에서 설정:
+├─ Has Exit Time: ☐ (체크 해제)
+│   → 애니메이션이 끝날 때까지 기다리지 않음
+│   → 즉시 전환 가능
+└─ Conditions: Parameter에 의해 트리거됨
+
+```
+
+**Has Exit Time 개념**:
+
+- **체크됨**: 현재 애니메이션이 완전히 끝난 후에만 전환
+- **체크 해제**: 조건이 충족되면 즉시 전환
+- 사격은 즉각적이어야 하므로 해제
+
+**Transition 설정 - 전환 속도**:
+
+```
+Transition Settings:
+├─ Fixed Duration: ☑ (체크)
+│   → 고정된 시간(초) 사용
+│   → 체크 해제 시: 애니메이션 길이의 비율로 계산
+└─ Transition Duration: 0
+    → 즉시 전환 (0초)
+
+```
+
+**사격은 왜 즉시 전환해야 하는가?**:
+
+- 플레이어가 사격 버튼을 누르면 바로 사격해야 자연스러움
+- 걷기 → 사격은 부드러운 전환이 필요 없음
+
+### Trigger 파라미터 생성
+
+**Animator Parameters 설정**:
+
+1. Animator 창에서 **Parameters** 탭 선택
+2. **+** 버튼 클릭 → **Trigger** 선택
+3. 이름: `Shoot`
+
+**Trigger 타입 개념**:
+
+- **Bool**: true/false 상태 유지 (수동으로 끄기 전까지 유지)
+- **Trigger**:
+  - 일회성 신호
+  - 트리거되면 자동으로 소비됨 (자동으로 꺼짐)
+  - 한 번의 액션에 적합 (사격처럼)
+
+**Trigger vs Bool 비교**:
+
+```csharp
+// Bool 방식 (Walking에 사용)
+animator.SetBool("IsWalking", true);  // 켜기
+animator.SetBool("IsWalking", false); // 꺼기 (수동으로 필요)
+
+// Trigger 방식 (Shooting에 사용)
+animator.SetTrigger("Shoot");  // 한 번 발생
+// 자동으로 소비되어 꺼짐 (다시 껐다는 코드 불필요)
+
+```
+
+### Transition 조건 설정
+
+1. **Idle → Firing Rifle** Transition 선택
+2. **Conditions** 섹션에서 **+ 버튼** 클릭
+3. **Shoot** 트리거 선택
+
+```
+조건:
+Shoot 트리거가 활성화되면 → Firing Rifle 애니메이션으로 전환
+```
+
+### Shooting에서 Idle으로 복귀 설정
+
+**Return Transition 생성**:
+
+1. **Firing Rifle** 상태 **우클릭** → **Make Transition**
+2. **Idle** 상태로 연결
+
+**복귀 Transition 설정**:
+
+```
+Inspector 설정:
+├─ Has Exit Time: ☑ (체크 유지)
+│   → 사격 애니메이션이 거의 끝날 때까지 재생
+│
+├─ Exit Time: 0.9
+│   → 애니메이션의 90% 지점에서 전환 시작
+│   → 1.0 = 100% (완전히 끝남)
+│   → 0.9 = 90% (약간 여유를 둠)
+│
+├─ Fixed Duration: ☑ (체크)
+│
+└─ Transition Duration: 0.1
+    → 전환에 10% 시간 사용
+    → 0.9 + 0.1 = 1.0 (전체 100%)
+
+```
+
+**Exit Time 설명**:
+
+- 0.0: 애니메이션 시작 지점
+- 0.5: 애니메이션 중간 지점
+- 0.9: 애니메이션 90% 지점 ✓ (사용)
+- 1.0: 애니메이션 완전히 끝남
+
+**왜 0.9에서 전환을 시작하는가?**:
+
+- 사격 애니메이션의 마지막 10%는 팔을 내리는 동작
+- 이 부분에서 Idle로 부드럽게 블렌딩
+- 0.1초 동안 두 애니메이션을 혼합하여 자연스러운 전환
+
+**최종 Animator 구조**:
+
+```
+          Shoot Trigger
+Idle ─────────────────→ Firing Rifle
+ ↑                            │
+ └────────────────────────────┘
+       Exit Time 0.9
+    (애니메이션 거의 끝날 때)
+
+```
+
+---
+
+## 6. ShootAction 이벤트 구현하기
+
+### 학습 과제 설명
+
+강사가 제시한 챌린지:
+
+1. ShootAction에 `OnShoot` 이벤트 추가
+2. UnitAnimator에서 해당 이벤트 구독
+3. 이벤트 발생 시 사격 애니메이션 재생
+
+**목적**: 앞에서 배운 이벤트 시스템 패턴을 직접 적용해보기
+
+### ShootAction에 이벤트 추가
+
+```csharp
+using System; // EventHandler를 위해 필요
+
+public class ShootAction : BaseAction
+{
+    // 사격 이벤트 선언
+    // MoveAction의 이벤트와 동일한 패턴
+    public event EventHandler OnShoot;
+
+    // 기존 변수들
+    private enum State
+    {
+        Aiming,
+        Shooting,
+        Cooloff
+    }
+    private State state;
+    private float totalSpinAmount;
+    private int maxShootDistance = 7;
+    private float stateTimer;
+    private Unit targetUnit;
+    private bool canShootBullet;
+
+    // ... Update 메서드 등
+}
+
+```
+
+### 이벤트 발생 위치 찾기
+
+**Shoot 메서드 분석**:
+
+```csharp
+private void Shoot()
+{
+    // 여기가 실제로 사격이 발생하는 지점!
+    // 이벤트를 여기서 발생시켜야 함
+
+    // 사격 이벤트 발생
+    // ?. 연산자: 구독자가 있을 때만 호출 (안전)
+    OnShoot?.Invoke(this, EventArgs.Empty);
+
+    // 대상 유닛에게 데미지 적용
+    targetUnit.Damage(40);
+}
+
+```
+
+**이벤트 발생 타이밍**:
+
+- State가 Shooting일 때
+- canShootBullet이 true일 때
+- 실제 피해를 입히기 직전
+
+**전체 사격 흐름**:
+
+```
+1. Aiming (조준 상태)
+   - 적을 향해 회전
+   - stateTimer 감소
+
+2. Shooting (사격 상태)
+   - canShootBullet == true일 때
+   - Shoot() 메서드 호출
+     ├→ OnShoot 이벤트 발생 ← 애니메이션 재생
+     └→ targetUnit.Damage(40) 실행
+   - canShootBullet = false로 설정
+
+3. Cooloff (쿨다운 상태)
+   - 잠시 대기
+   - stateTimer 끝나면 ActionComplete()
+
+```
+
+### UnitAnimator에서 ShootAction 구독
+
+```csharp
+public class UnitAnimator : MonoBehaviour
+{
+    [SerializeField] private Animator animator;
+
+    private void Awake()
+    {
+        // MoveAction 구독 (기존 코드)
+        if (TryGetComponent<MoveAction>(out MoveAction moveAction))
+        {
+            moveAction.OnStartMoving += MoveAction_OnStartMoving;
+            moveAction.OnStopMoving += MoveAction_OnStopMoving;
+        }
+
+        // ShootAction 구독 (새로운 코드)
+        // 유닛이 ShootAction을 가지고 있는지 확인
+        if (TryGetComponent<ShootAction>(out ShootAction shootAction))
+        {
+            // OnShoot 이벤트 구독
+            shootAction.OnShoot += ShootAction_OnShoot;
+        }
+    }
+
+    // 기존 MoveAction 이벤트 핸들러들
+    private void MoveAction_OnStartMoving(object sender, System.EventArgs e)
+    {
+        animator.SetBool("IsWalking", true);
+    }
+
+    private void MoveAction_OnStopMoving(object sender, System.EventArgs e)
+    {
+        animator.SetBool("IsWalking", false);
+    }
+
+    // ShootAction 이벤트 핸들러 (새로운 메서드)
+    private void ShootAction_OnShoot(object sender, System.EventArgs e)
+    {
+        // SetTrigger: Trigger 파라미터 활성화
+        // "Shoot" 트리거를 발생시킴
+        // → Animator가 Idle에서 Firing Rifle로 전환
+        animator.SetTrigger("Shoot");
+    }
+}
+
+```
+
+**SetBool vs SetTrigger**:
+
+```csharp
+// Bool 파라미터 (지속적인 상태)
+animator.SetBool("IsWalking", true);   // 켜기
+animator.SetBool("IsWalking", false);  // 끄기
+
+// Trigger 파라미터 (일회성 신호)
+animator.SetTrigger("Shoot");  // 발생시킴
+// 자동으로 소비되므로 끄는 코드 불필요
+
+```
+
+**전체 이벤트 체인**:
+
+```
+1. 플레이어가 사격 명령
+   ↓
+2. ShootAction.TakeAction() 호출
+   ↓
+3. State.Shooting이 될 때까지 대기
+   ↓
+4. Shoot() 메서드 실행
+   ├→ OnShoot?.Invoke() ─────┐
+   └→ targetUnit.Damage(40)   │
+                               │
+5. UnitAnimator가 이벤트 감지 ←┘
+   ↓
+6. ShootAction_OnShoot 실행
+   ↓
+7. animator.SetTrigger("Shoot")
+   ↓
+8. Animator가 Firing Rifle 애니메이션 재생
+
+```
+
+---
+
+## 7. 최종 테스트 및 정리
+
+### 테스트 절차
+
+1. Unity 에디터로 돌아가기
+2. **플레이 모드** 실행
+3. **테스트 시나리오**:
+   - 유닛 선택
+   - Shoot Action 선택
+   - 적 유닛 클릭
+   - **확인**: 유닛이 조준하고 사격 애니메이션 재생
+
+**예상 결과**:
+
+- 유닛이 적을 향해 회전 (Aiming)
+- 사격 애니메이션 재생 (Shooting)
+- 애니메이션 끝나면 Idle로 복귀
+
+### 코드 개선 효과
+
+**Before (기존 방식)**:
+
+```csharp
+// MoveAction.cs
+[SerializeField] private Animator unitAnimator;
+// 애니메이션 직접 제어
+
+// ShootAction.cs
+[SerializeField] private Animator unitAnimator;
+// 애니메이션 직접 제어
+
+// 문제점:
+// - 코드 중복
+// - Animator 참조가 여러 곳에 분산
+// - 새 액션 추가 시 매번 Animator 코드 작성
+
+```
+
+**After (개선된 방식)**:
+
+```csharp
+// MoveAction.cs
+public event EventHandler OnStartMoving;
+public event EventHandler OnStopMoving;
+// 이벤트만 발생
+
+// ShootAction.cs
+public event EventHandler OnShoot;
+// 이벤트만 발생
+
+// UnitAnimator.cs
+// 모든 애니메이션 로직을 여기서 관리
+// - Animator 참조는 단 하나
+// - 이벤트 구독을 통한 중앙 집중식 관리
+
+// 장점:
+// - 코드 중복 제거
+// - 관심사의 분리 (액션은 로직만, 애니메이터는 시각만)
+// - 디버깅 용이
+// - 확장성 향상
+
+```
+
+### 설계 패턴 정리
+
+**Observer 패턴 적용**:
+
+```
+[Subject/Observable]      [Observer]
+MoveAction/ShootAction ← UnitAnimator
+  |                         |
+  | 이벤트 발생             | 이벤트 감지
+  | (상태 변화 알림)        | (애니메이션 재생)
+
+```
+
+**단일 책임 원칙 (SRP)**:
+
+- **MoveAction**: 이동 로직만 담당
+- **ShootAction**: 사격 로직만 담당
+- **UnitAnimator**: 애니메이션만 담당
+
+### 향후 확장성
+
+**새로운 액션 추가 시**:
+
+```csharp
+// 1. 새 액션 클래스 생성
+public class JumpAction : BaseAction
+{
+    public event EventHandler OnJump;
+
+    private void Jump()
+    {
+        OnJump?.Invoke(this, EventArgs.Empty);
+        // 점프 로직
+    }
+}
+
+// 2. UnitAnimator에서 구독만 추가
+private void Awake()
+{
+    // ... 기존 구독들
+
+    if (TryGetComponent<JumpAction>(out JumpAction jumpAction))
+    {
+        jumpAction.OnJump += JumpAction_OnJump;
+    }
+}
+
+private void JumpAction_OnJump(object sender, System.EventArgs e)
+{
+    animator.SetTrigger("Jump");
+}
+
+// 끝! 매우 간단하게 확장 가능
+
+```
+
+### 남은 과제
+
+**현재 완성된 것**:
+
+- ✅ 이동 애니메이션
+- ✅ 사격 애니메이션 (모션만)
+
+**아직 남은 것**:
+
+- ❌ 총알 시각 효과 (VFX)
+- ❌ 사격 사운드
+- ❌ 피격 효과
+
+**다음 강의 예고**:
+
+- 사격 시각 효과 (Visual) 구현
+- 파티클 시스템 또는 프로젝타일 생성 예상
+
+### 핵심 개념 요약
+
+1. **이벤트 시스템**:
+   - 느슨한 결합 (Loose Coupling)
+   - 발행-구독 패턴
+   - 유지보수성 향상
+2. **TryGetComponent**:
+   - 안전한 컴포넌트 접근
+   - null 체크 불필요
+   - 선택적 기능 구현에 유용
+3. **Animator 파라미터 타입**:
+   - Bool: 지속적인 상태 (걷기/멈춤)
+   - Trigger: 일회성 액션 (사격/점프)
+4. **코드 구조화**:
+   - 관심사의 분리
+   - 단일 책임 원칙
+   - 확장 가능한 설계
+
+---
+
+이번 강의를 통해 코드를 깔끔하게 리팩토링하고, 확장 가능한 애니메이션 시스템을 구축했습니다. 다음 강의에서는 사격의 시각적 효과를 추가할 예정입니다.
+
+# { 🎯 총알 발사 시각 효과 만들기 (Bullet Visual) }
+
+이번 강의는 유닛이 총을 쏠 때 총알의 시각적 효과를 만들고, 궤적(Trail), 충돌 효과(Hit VFX), 정확한 이동 로직을 구현하는 내용입니다.
+
+---
+
+## 📋 목차
+
+1. [Trail Renderer로 총알 궤적 만들기](https://claude.ai/chat/172e0f96-a69c-4108-b7a5-3af68e8ba4b7#1-trail-renderer%EB%A1%9C-%EC%B4%9D%EC%95%8C-%EA%B6%A4%EC%A0%81-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+2. [총알 Material 설정 (발광 효과)](https://claude.ai/chat/172e0f96-a69c-4108-b7a5-3af68e8ba4b7#2-%EC%B4%9D%EC%95%8C-material-%EC%84%A4%EC%A0%95-%EB%B0%9C%EA%B4%91-%ED%9A%A8%EA%B3%BC)
+3. [총알 Prefab 생성 및 발사 위치 설정](https://claude.ai/chat/172e0f96-a69c-4108-b7a5-3af68e8ba4b7#3-%EC%B4%9D%EC%95%8C-prefab-%EC%83%9D%EC%84%B1-%EB%B0%8F-%EB%B0%9C%EC%82%AC-%EC%9C%84%EC%B9%98-%EC%84%A4%EC%A0%95)
+4. [EventArgs를 사용한 이벤트 데이터 전달](https://claude.ai/chat/172e0f96-a69c-4108-b7a5-3af68e8ba4b7#4-eventargs%EB%A5%BC-%EC%82%AC%EC%9A%A9%ED%95%9C-%EC%9D%B4%EB%B2%A4%ED%8A%B8-%EB%8D%B0%EC%9D%B4%ED%84%B0-%EC%A0%84%EB%8B%AC)
+5. [총알 이동 로직 구현 (Overshoot 문제 해결)](https://claude.ai/chat/172e0f96-a69c-4108-b7a5-3af68e8ba4b7#5-%EC%B4%9D%EC%95%8C-%EC%9D%B4%EB%8F%99-%EB%A1%9C%EC%A7%81-%EA%B5%AC%ED%98%84-overshoot-%EB%AC%B8%EC%A0%9C-%ED%95%B4%EA%B2%B0)
+6. [총알 높이 조정 (발 대신 몸통 조준)](https://claude.ai/chat/172e0f96-a69c-4108-b7a5-3af68e8ba4b7#6-%EC%B4%9D%EC%95%8C-%EB%86%92%EC%9D%B4-%EC%A1%B0%EC%A0%95-%EB%B0%9C-%EB%8C%80%EC%8B%A0-%EB%AA%B8%ED%86%B5-%EC%A1%B0%EC%A4%80)
+7. [Trail 부드럽게 사라지게 만들기](https://claude.ai/chat/172e0f96-a69c-4108-b7a5-3af68e8ba4b7#7-trail-%EB%B6%80%EB%93%9C%EB%9F%BD%EA%B2%8C-%EC%82%AC%EB%9D%BC%EC%A7%80%EA%B2%8C-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+8. [총알 충돌 시 파티클 효과 추가](https://claude.ai/chat/172e0f96-a69c-4108-b7a5-3af68e8ba4b7#8-%EC%B4%9D%EC%95%8C-%EC%B6%A9%EB%8F%8C-%EC%8B%9C-%ED%8C%8C%ED%8B%B0%ED%81%B4-%ED%9A%A8%EA%B3%BC-%EC%B6%94%EA%B0%80)
+
+---
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380472/notion-blog/_/3D_/_/_5_Enemies_Combat_-_2/image_1.png)
+
+## 1. Trail Renderer로 총알 궤적 만들기
+
+### Trail Renderer란?
+
+- **Trail Renderer**는 Unity에 내장된 컴포넌트로, 오브젝트가 이동할 때 자동으로 궤적(꼬리)을 그려주는 기능입니다.
+- 총알, 로켓, 마법 같은 빠르게 움직이는 오브젝트에 적합합니다.
+
+### 게임 오브젝트 구조 만들기
+
+```
+Bullet Projectile (빈 게임 오브젝트)
+└── Trail (Trail Renderer 컴포넌트)
+```
+
+1. **빈 게임 오브젝트 생성**:
+   - `Bullet Projectile` 이름으로 생성
+   - 이 오브젝트가 실제로 움직이는 부모 오브젝트
+2. **Trail 오브젝트 추가**:
+   - `Bullet Projectile` 안에서 우클릭 → Effects → Trail 생성
+   - Trail Renderer 컴포넌트가 자동으로 붙음
+
+### Trail Renderer 주요 설정값
+
+### Width (폭) 설정
+
+```
+현재 상태: 그래프 형태로 시간에 따른 폭 조절 가능
+설정 방법:
+1. 그래프를 클릭하면 텍스트박스로 변경됨
+2. 최대 폭을 0.05로 설정 (총알은 작으니까)
+```
+
+- **그래프에서 점 추가하기**: 그래프를 더블클릭하면 새로운 제어점 생성
+- **X축**: 시간 (0 = 시작, 1 = 끝)
+- **Y축**: 폭 크기
+
+**얇아지는 효과 만들기**:
+
+```
+시작 지점 (X=0): 최대 폭 (Y=1.0)
+중간 지점 (X=0.5 정도): 중간 폭
+끝 지점 (X=1.0): 최소 폭 (Y=0)
+→ 결과: 궤적이 시작은 굵고 끝으로 갈수록 가늘어짐
+```
+
+### Time (지속 시간)
+
+```
+기본값: 5초
+총알용 설정: 0.1초
+```
+
+- 궤적이 화면에 남아있는 시간
+- 총알은 빠르게 움직이므로 0.1초면 충분
+
+### Min Vertex Distance (최소 정점 거리)
+
+```
+설정값: 0.01
+```
+
+- **Vertex(정점)**: Trail의 메쉬를 구성하는 점들
+- 값이 작을수록: 더 부드러운 곡선 (정점이 많이 생성됨)
+- 값이 클수록: 각진 형태 (정점이 적게 생성됨)
+- 총알은 빠르게 움직이므로 0.01로 설정해 부드러운 궤적 유지
+
+### Scene View 업데이트 설정
+
+강의 중 언급된 Unity의 특이한 동작:
+
+```
+기본 동작: 마우스를 움직이거나 변화가 있을 때만 Scene View 업데이트
+문제: Trail이 사라지는 모습을 실시간으로 보기 어려움
+
+해결방법:
+Scene View 우측 상단 → Special Effects 버튼 → Always Refresh 체크
+→ 항상 실시간으로 화면 업데이트
+```
+
+---
+
+## 2. 총알 Material 설정 (발광 효과)
+
+### Material 생성 및 설정
+
+```
+경로: Materials 폴더
+이름: Bullet Projectile Material
+```
+
+### Material 속성 설정
+
+### Base Map (기본 색상)
+
+```
+색상: 노란색 계열 (Yellow)
+용도: 총알의 기본 색상
+```
+
+### Emission (발광)
+
+```
+활성화: Emission 체크박스 ON
+색상: 빨간색 (Red)
+강도(Intensity): 기본값보다 높게 설정
+```
+
+**Emission의 역할**:
+
+- 오브젝트가 스스로 빛을 내는 것처럼 보이게 함
+- 어두운 환경에서도 눈에 잘 띔
+- HDR 색상을 사용해 밝기 조절 가능
+
+### Material 적용
+
+```
+Trail Renderer 컴포넌트 선택
+→ Materials 섹션
+→ Element 0에 "Bullet Projectile Material" 드래그
+```
+
+**색상 실험 가능**:
+
+- 처음 시도: 노란색 + 빨간 발광
+- 나중에 조정: 좀 더 노란색으로 변경
+- 프로젝트에 맞게 자유롭게 변경 가능
+
+---
+
+## 3. 총알 Prefab 생성 및 발사 위치 설정
+
+### Transform 리셋의 중요성
+
+```
+Bullet Projectile의 Transform:
+Position: (0, 0, 0)
+Rotation: (0, 0, 0)
+Scale: (1, 1, 1)
+```
+
+**이유**:
+
+- 부모 오브젝트의 위치를 그대로 따라가도록
+- 자식 오브젝트(Trail)가 상대적으로 정확한 위치에 있도록
+
+### Prefab 생성
+
+```
+Bullet Projectile 오브젝트를 Prefabs 폴더로 드래그
+→ Prefab 파일 생성됨
+→ Hierarchy에서 원본 삭제 (코드로 생성할 것이므로)
+```
+
+### 발사 위치(Shoot Point) 설정
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380472/notion-blog/_/3D_/_/_5_Enemies_Combat_-_2/image_2.png)
+
+### 개념
+
+- 총알이 발사되는 정확한 위치를 지정
+- 무기의 총구 끝부분에 배치
+
+### 구조
+
+```
+Unit Prefab
+└── Character
+    └── Weapon
+        └── Shoot Point (새로 생성)
+```
+
+### 생성 및 배치
+
+```
+1. Unit Prefab 열기
+2. Weapon 게임 오브젝트 선택
+3. 우클릭 → Create Empty
+4. 이름: "Shoot Point"
+5. Position 조정: 무기 총구 끝으로 이동
+   - Scene View에서 수동으로 배치
+   - 정확한 위치: 총구가 끝나는 지점
+```
+
+### UnitAnimator 스크립트에 참조 추가
+
+```csharp
+public class UnitAnimator : MonoBehaviour
+{
+    [SerializeField] private Animator animator;
+
+    // 새로 추가: 총알 Prefab 참조
+    [SerializeField] private Transform bulletProjectilePrefab;
+
+    // 새로 추가: 발사 위치 참조
+    [SerializeField] private Transform shootPointTransform;
+}
+
+```
+
+**SerializeField의 역할**:
+
+- private 변수지만 Unity Inspector에서 보이게 함
+- 코드 수정 없이 에디터에서 참조 연결 가능
+
+### Inspector에서 참조 연결
+
+```
+Unit Prefab 선택
+→ Unit Animator 컴포넌트
+→ Bullet Projectile Prefab: "Bullet Projectile" Prefab 드래그
+→ Shoot Point Transform: "Shoot Point" 오브젝트 드래그
+```
+
+### 총알 생성 코드
+
+```csharp
+private void ShootAction_OnShoot(object sender, ShootAction.OnShootEventArgs e)
+{
+    animator.SetTrigger("Shoot");
+
+    // Instantiate: 게임 오브젝트를 실행 중에 생성하는 함수
+    // 매개변수 1: 생성할 Prefab
+    // 매개변수 2: 생성 위치 (Vector3)
+    // 매개변수 3: 생성 회전 (Quaternion)
+    Transform bulletProjectileTransform = Instantiate(
+        bulletProjectilePrefab,                    // 어떤 Prefab을 생성할지
+        shootPointTransform.position,              // 어디에 생성할지 (발사 위치)
+        Quaternion.identity                        // 회전 없음 (0도)
+    );
+}
+```
+
+**Quaternion.identity의 의미**:
+
+- `Quaternion.identity` = 회전 없음 = (0, 0, 0)
+- 총알은 점이나 마찬가지이므로 회전이 중요하지 않음
+
+### 첫 번째 테스트 결과
+
+```
+문제점: 총알이 생성은 되지만 움직이지 않음
+확인 방법:
+1. Play 모드 실행
+2. 총 발사
+3. Pause 클릭
+4. Hierarchy에서 "Bullet Projectile(Clone)" 확인
+5. 위치가 Shoot Point와 동일함을 확인
+
+다음 단계: 총알 이동 스크립트 작성 필요
+```
+
+---
+
+## 4. EventArgs를 사용한 이벤트 데이터 전달
+
+### 문제 상황
+
+```csharp
+// 현재 상태: 이벤트만 발생, 데이터 없음
+public event EventHandler OnShoot;
+
+// 필요한 것: 타겟 유닛의 위치 정보
+```
+
+UnitAnimator가 총알을 생성할 때 **어디로 발사해야 하는지** 알아야 합니다.
+
+### 해결 방법 1: Unit 직접 전달 (이전 강의 방법)
+
+```csharp
+public event EventHandler<Unit> OnShoot;
+// 장점: 간단함
+// 단점: 하나의 데이터만 전달 가능
+```
+
+### 해결 방법 2: EventArgs 상속 (이번 강의 방법)
+
+### EventArgs 클래스 생성
+
+```csharp
+public class ShootAction : BaseAction
+{
+    // 이벤트 선언 (커스텀 EventArgs 사용)
+    public event EventHandler<OnShootEventArgs> OnShoot;
+
+    // 커스텀 EventArgs 클래스 정의
+    public class OnShootEventArgs : EventArgs
+    {
+        // 전달하고 싶은 데이터들을 여기에 추가
+        public Unit targetUnit;        // 총을 맞는 유닛
+        public Unit shootingUnit;      // 총을 쏘는 유닛
+    }
+}
+```
+
+**EventArgs를 상속하는 이유**:
+
+- C# 표준 패턴
+- 여러 데이터를 하나의 객체로 묶어서 전달
+- 나중에 데이터 추가가 쉬움
+- 코드 가독성 향상
+
+### 명명 규칙
+
+```
+클래스명: On[이벤트명]EventArgs
+예시: OnShootEventArgs, OnMoveEventArgs
+```
+
+### 이벤트 발생 코드 수정
+
+```csharp
+private void Shoot()
+{
+    // EventArgs 객체 생성 및 데이터 설정
+    OnShoot?.Invoke(this, new OnShootEventArgs
+    {
+        targetUnit = targetUnit,      // 총 맞는 대상
+        shootingUnit = unit           // 총 쏘는 유닛 (자기 자신)
+    });
+
+    targetUnit.Damage(40);
+}
+
+```
+
+**객체 초기화 구문 설명**:
+
+```csharp
+new OnShootEventArgs
+{
+    targetUnit = targetUnit,
+    shootingUnit = unit
+}
+// 이것은 다음과 같음:
+OnShootEventArgs args = new OnShootEventArgs();
+args.targetUnit = targetUnit;
+args.shootingUnit = unit;
+
+```
+
+### 이벤트 수신 코드 수정
+
+```csharp
+// UnitAnimator.cs
+
+// 이전: EventArgs만 받음
+private void ShootAction_OnShoot(object sender, EventArgs e)
+
+// 이후: 커스텀 EventArgs 받음
+private void ShootAction_OnShoot(object sender, ShootAction.OnShootEventArgs e)
+{
+    animator.SetTrigger("Shoot");
+
+    // 총알 생성
+    Transform bulletProjectileTransform = Instantiate(
+        bulletProjectilePrefab,
+        shootPointTransform.position,
+        Quaternion.identity
+    );
+
+    // BulletProjectile 컴포넌트 가져오기
+    BulletProjectile bulletProjectile = bulletProjectileTransform.GetComponent<BulletProjectile>();
+
+    // e를 통해 타겟 유닛 정보 접근
+    Vector3 targetUnitShootAtPosition = e.targetUnit.GetWorldPosition();
+
+    // 타겟 위치를 총알에게 전달
+    bulletProjectile.Setup(targetUnitShootAtPosition);
+}
+
+```
+
+**GetComponent의 역할**:
+
+- 생성된 게임 오브젝트에서 특정 컴포넌트를 찾아옴
+- `GetComponent<타입>()` 형태로 사용
+- 여기서는 BulletProjectile 스크립트를 가져옴
+
+---
+
+## 5. 총알 이동 로직 구현 (Overshoot 문제 해결)
+
+### BulletProjectile 스크립트 기본 구조
+
+```csharp
+public class BulletProjectile : MonoBehaviour
+{
+    [SerializeField] private TrailRenderer trailRenderer;
+    [SerializeField] private Transform bulletHitVfxPrefab;
+
+    private Vector3 targetPosition;  // 총알이 향할 목표 지점
+
+    // 총알 초기 설정
+    public void Setup(Vector3 targetPosition)
+    {
+        this.targetPosition = targetPosition;
+    }
+}
+
+```
+
+### 기본 이동 로직
+
+```csharp
+private void Update()
+{
+    // 1. 이동 방향 계산
+    // targetPosition - 현재위치 = 방향 벡터
+    Vector3 moveDir = (targetPosition - transform.position).normalized;
+
+    // 2. 이동 속도 설정
+    float moveSpeed = 200f;  // 초당 200 유닛
+
+    // 3. 위치 업데이트
+    // Time.deltaTime: 이전 프레임과의 시간 차이 (약 0.016초)
+    // moveSpeed * Time.deltaTime: 이번 프레임에 이동할 거리
+    transform.position += moveDir * moveSpeed * Time.deltaTime;
+}
+
+```
+
+**normalized의 역할**:
+
+```
+예시:
+방향 벡터 = (10, 0, 0)
+방향 벡터.magnitude = 10
+normalized = (1, 0, 0)  // 크기를 1로 만듦
+
+이유: 방향만 필요하고, 속도는 moveSpeed로 따로 제어하기 위함
+```
+
+### 방법 1: 거리 체크 방식 (잘못된 방법)
+
+```csharp
+private void Update()
+{
+    Vector3 moveDir = (targetPosition - transform.position).normalized;
+
+    float moveSpeed = 200f;
+    transform.position += moveDir * moveSpeed * Time.deltaTime;
+
+    // 목표 지점과의 거리 계산
+    float distance = Vector3.Distance(transform.position, targetPosition);
+
+    // 거리가 충분히 가까우면 파괴
+    float stoppingDistance = 0.1f;
+    if (distance < stoppingDistance)
+    {
+        Destroy(gameObject);
+    }
+}
+```
+
+**문제점**:
+
+```
+프레임 1: 총알 위치 = 5.2, 목표 = 5.0, 거리 = 0.2 (통과)
+프레임 2: 총알 위치 = 4.8, 목표 = 5.0, 거리 = 0.2 (통과)
+프레임 3: 총알 위치 = 5.2, 목표 = 5.0, 거리 = 0.2 (통과)
+...무한 반복
+
+이유: 총알이 너무 빨라서 목표를 지나쳤다가 다시 돌아오기를 반복
+     (Overshoot 현상)
+```
+
+**실제 게임에서 보이는 현상**:
+
+- 총알이 목표 주변에서 왔다갔다 떨림
+- 운이 좋으면 우연히 stoppingDistance 안에 들어가서 파괴됨
+- 매우 불안정한 동작
+
+### 방법 2: Overshoot 감지 방식 (올바른 방법)
+
+### 핵심 개념
+
+```
+"이동 전보다 이동 후에 목표에서 더 멀어졌다면 = 지나쳤다"
+```
+
+### 구현 코드
+
+```csharp
+private void Update()
+{
+    // 이동 방향 계산
+    Vector3 moveDir = (targetPosition - transform.position).normalized;
+
+    // === 이동 전 거리 저장 ===
+    float distanceBeforeMoving = Vector3.Distance(transform.position, targetPosition);
+
+    // === 이동 실행 ===
+    float moveSpeed = 200f;
+    transform.position += moveDir * moveSpeed * Time.deltaTime;
+
+    // === 이동 후 거리 계산 ===
+    float distanceAfterMoving = Vector3.Distance(transform.position, targetPosition);
+
+    // === Overshoot 체크 ===
+    if (distanceBeforeMoving < distanceAfterMoving)
+    {
+        // 이동 전보다 이동 후가 더 멀다 = 목표를 지나쳤다!
+
+        // 정확한 위치로 스냅
+        transform.position = targetPosition;
+
+        // 총알 파괴
+        Destroy(gameObject);
+    }
+}
+```
+
+### 동작 흐름 예시
+
+```
+프레임 N:
+  이동 전: 총알(4.9) → 목표(5.0) | 거리 = 0.1
+  이동 실행: 0.2만큼 이동
+  이동 후: 총알(5.1) → 목표(5.0) | 거리 = 0.1
+
+  비교: 0.1(전) < 0.1(후)? NO
+
+프레임 N+1:
+  이동 전: 총알(5.1) → 목표(5.0) | 거리 = 0.1
+  이동 실행: 0.2만큼 이동
+  이동 후: 총알(5.3) → 목표(5.0) | 거리 = 0.3
+
+  비교: 0.1(전) < 0.3(후)? YES → 지나쳤다!
+  위치 보정: 총알을 5.0으로 이동
+  총알 파괴
+
+```
+
+**장점**:
+
+- 100% 정확하게 감지
+- 속도에 관계없이 작동
+- 떨림 현상 없음
+
+---
+
+## 6. 총알 높이 조정 (발 대신 몸통 조준)
+
+### 문제 상황
+
+```
+GetWorldPosition()은 유닛의 발(바닥) 위치를 반환
+→ 총알이 적의 발을 향해 날아감
+→ 부자연스러움
+```
+
+### 해결 방법
+
+```csharp
+private void ShootAction_OnShoot(object sender, ShootAction.OnShootEventArgs e)
+{
+    animator.SetTrigger("Shoot");
+
+    Transform bulletProjectileTransform = Instantiate(
+        bulletProjectilePrefab,
+        shootPointTransform.position,
+        Quaternion.identity
+    );
+
+    BulletProjectile bulletProjectile = bulletProjectileTransform.GetComponent<BulletProjectile>();
+
+    // 타겟의 기본 위치 (발 위치)
+    Vector3 targetUnitShootAtPosition = e.targetUnit.GetWorldPosition();
+
+    // === 높이 보정 ===
+    // 타겟의 Y 좌표를 발사 위치의 Y 좌표와 같게 설정
+    targetUnitShootAtPosition.y = shootPointTransform.position.y;
+    // 결과: 총알이 수평으로 날아감
+
+    bulletProjectile.Setup(targetUnitShootAtPosition);
+}
+
+```
+
+**원리 설명**:
+
+```
+Before:
+  발사 위치: (3, 1.5, 2)  ← shootPoint의 Y는 1.5 (어깨 높이)
+  타겟 위치: (8, 0, 5)    ← 적 발 위치의 Y는 0
+  결과: 총알이 아래로 향함
+
+After:
+  발사 위치: (3, 1.5, 2)
+  타겟 위치: (8, 1.5, 5)  ← Y를 1.5로 변경
+  결과: 총알이 수평으로 날아감
+```
+
+### 더 정교한 방법들 (강의에서 언급만 함)
+
+```
+방법 1: 적 캐릭터에 "Hit Point" 게임 오브젝트 추가
+  - Shoot Point처럼 어깨 높이에 빈 오브젝트 배치
+  - 그 위치를 타겟으로 사용
+  - 장점: 정확한 위치 지정 가능
+  - 단점: 모든 유닛에 설정 필요
+
+방법 2: Y 좌표만 맞추기 (이번 강의 채택)
+  - 가장 간단한 방법
+  - 대부분의 경우 충분히 자연스러움
+```
+
+---
+
+## 7. Trail 부드럽게 사라지게 만들기
+
+### 문제 상황
+
+```csharp
+// 현재 코드
+Destroy(gameObject);  // 부모 오브젝트 파괴
+
+// 결과:
+// 1. Bullet Projectile 파괴됨
+// 2. 자식인 Trail도 함께 즉시 파괴됨
+// 3. 화면에서 Trail이 갑자기 사라짐 (부자연스러움)
+
+```
+
+**Unity의 부모-자식 규칙**:
+
+- 부모가 파괴되면 모든 자식도 자동으로 파괴됨
+- 이것이 Trail이 갑자기 사라지는 이유
+
+### 해결 방법: Unparenting (부모 관계 해제)
+
+### 1단계: Trail Renderer 참조 추가
+
+```csharp
+public class BulletProjectile : MonoBehaviour
+{
+    [SerializeField] private TrailRenderer trailRenderer;  // Inspector에서 연결
+    private Vector3 targetPosition;
+
+    // ... 나머지 코드
+}
+
+```
+
+### 2단계: 파괴 전에 부모 관계 해제
+
+```csharp
+private void Update()
+{
+    Vector3 moveDir = (targetPosition - transform.position).normalized;
+    float distanceBeforeMoving = Vector3.Distance(transform.position, targetPosition);
+
+    float moveSpeed = 200f;
+    transform.position += moveDir * moveSpeed * Time.deltaTime;
+
+    float distanceAfterMoving = Vector3.Distance(transform.position, targetPosition);
+
+    if (distanceBeforeMoving < distanceAfterMoving)
+    {
+        transform.position = targetPosition;
+
+        // === Trail 부모 관계 해제 ===
+        trailRenderer.transform.SetParent(null);
+        // null을 부모로 설정 = 부모 없음 = 월드의 최상위 오브젝트가 됨
+
+        // 총알만 파괴 (Trail은 살아남음)
+        Destroy(gameObject);
+    }
+}
+```
+
+**SetParent(null)의 의미**:
+
+```
+Before:
+  Bullet Projectile (부모)
+  └── Trail (자식)
+
+After SetParent(null):
+  Bullet Projectile (부모)
+  Trail (독립된 오브젝트, 부모 없음)
+
+After Destroy:
+  Trail (독립된 오브젝트, 천천히 사라지는 중)
+```
+
+### 3단계: Auto Destruct 설정
+
+```
+문제: Trail이 독립되었지만 자동으로 파괴되지 않음
+     → 총을 1000번 쏘면 1000개의 Trail이 Scene에 남음
+     → 메모리 낭비
+```
+
+**해결책: Trail Renderer의 Auto Destruct 옵션**
+
+```
+1. Bullet Projectile Prefab 열기
+2. Trail 오브젝트 선택
+3. Trail Renderer 컴포넌트
+4. Auto Destruct 체크박스 ON
+```
+
+**Auto Destruct의 동작**:
+
+```
+조건: Trail의 길이가 0이 되면
+동작: 자동으로 GameObject.Destroy(this.gameObject) 실행
+
+Trail의 길이가 0이 되는 경우:
+- Time 설정값(0.1초)이 지나면 자동으로 길이 감소
+- 더 이상 새로운 점이 생성되지 않음 (부모가 파괴됨)
+- 0.1초 후 완전히 사라짐
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380472/notion-blog/_/3D_/_/_5_Enemies_Combat_-_2/image_3.png)
+
+### 최종 동작 흐름
+
+```
+1. 총알이 목표에 도달
+2. trailRenderer.transform.SetParent(null) 실행
+   → Trail이 독립적인 오브젝트가 됨
+3. Destroy(gameObject) 실행
+   → Bullet Projectile만 파괴
+4. Trail은 계속 존재하며 0.1초 동안 천천히 사라짐
+5. Time(0.1초) 경과
+   → Trail 길이가 0이 됨
+6. Auto Destruct 발동
+   → Trail 자동 파괴
+```
+
+---
+
+## 8. 총알 충돌 시 파티클 효과 추가
+
+### Particle System 생성
+
+```
+Hierarchy에서 우클릭
+→ Effects
+→ Particle System
+이름: Bullet Hit VFX
+```
+
+### 파티클 시스템 기본 설정
+
+### 1. Shape (모양) 설정
+
+```
+현재: Cone (원뿔) - 한 방향으로만 발사
+변경: Sphere (구) - 모든 방향으로 발사 (폭발 효과)
+
+Sphere 세부 설정:
+- Radius: 0.2
+  → 작은 반지름 = 밀집된 폭발 효과
+```
+
+**Shape 옵션 설명**:
+
+- Cone: 원뿔 모양, 방향성 있는 효과 (불, 연기)
+- Sphere: 구 모양, 전방향 폭발 효과
+- Box: 상자 모양, 영역 내 균등 분포
+
+### 2. Emission (방출) 설정
+
+```
+Rate over Time: 0
+→ 지속적으로 발생하지 않음
+
+Bursts (폭발적 방출):
+- Count: 30개
+- Time: 0 (즉시 발생)
+→ 총알이 적중하는 순간 30개의 파티클이 한 번에 생성
+```
+
+**Emission 방식**:
+
+```
+Rate over Time: 초당 X개 생성 (연속적)
+Bursts: 특정 시점에 X개 생성 (폭발적)
+```
+
+### 3. Duration & Looping (테스트용 설정)
+
+```
+Duration: 1초
+Looping: ON (체크)
+
+이유: 개발 중 효과를 계속 확인하기 위함
+나중에: Looping OFF로 변경 (한 번만 발생)
+```
+
+### 4. Start Lifetime (파티클 수명)
+
+```
+설정값: 0.3초
+
+의미: 각 파티클이 생성된 후 0.3초 동안 존재
+빠른 폭발 효과를 위해 짧게 설정
+```
+
+### 5. Start Speed (초기 속도)
+
+```
+기본: 고정 값 하나
+변경: Random Between Two Constants
+
+설정값:
+- Minimum: 0.5
+- Maximum: 3
+
+결과: 일부 파티클은 천천히, 일부는 빠르게 날아감
+      → 자연스러운 폭발 효과
+```
+
+**Random Between Two Constants 원리**:
+
+```
+생성되는 각 파티클마다:
+파티클 1: Random.Range(0.5f, 3f) = 1.2
+파티클 2: Random.Range(0.5f, 3f) = 2.7
+파티클 3: Random.Range(0.5f, 3f) = 0.9
+...
+```
+
+### 6. Start Size (초기 크기)
+
+```
+변경: Random Between Two Constants
+
+설정값:
+- Minimum: 0.1
+- Maximum: 0.2
+
+결과: 크기가 다양한 파티클들 생성
+```
+
+### 7. Stop Action (정지 시 동작)
+
+```
+옵션:
+- None: 아무것도 안 함
+- Disable: 비활성화
+- Destroy: 파괴
+- Callback: 함수 호출
+
+선택: Destroy
+
+의미:
+- Duration 시간이 끝나면
+- 모든 파티클이 사라지면
+- GameObject 자동 파괴
+- Trail의 Auto Destruct와 같은 원리
+```
+
+**Stop Action 동작 조건**:
+
+```
+파티클 시스템 완료 = Duration 시간 + 가장 오래 사는 파티클의 Lifetime
+
+예시:
+- Duration: 0초 (Bursts만 사용)
+- Start Lifetime: 0.3초
+→ 0 + 0.3 = 0.3초 후 자동 파괴
+```
+
+### 파티클 모듈 설정
+
+### Size over Lifetime (시간에 따른 크기 변화)
+
+```
+모듈 활성화: 체크박스 ON
+
+그래프 설정:
+- 시작(X=0): 크기 최대 (Y=1)
+- 끝(X=1): 크기 최소 (Y=0)
+
+효과: 파티클이 점점 작아지며 사라짐
+```
+
+**Curve (곡선) 편집**:
+
+```
+클릭: 그래프 클릭 시 Particle System Curves 창 표시
+조작:
+- 점 추가: 더블클릭
+- 점 이동: 드래그
+- 점 삭제: 우클릭
+```
+
+### Renderer (렌더링) 설정
+
+```
+Material: Bullet Projectile Material (총알과 같은 재질 사용)
+
+결과: 파티클들이 발광하는 빨간색/노란색으로 표시
+```
+
+### Prefab 생성 및 참조
+
+### 1. Prefab 생성
+
+```
+Bullet Hit VFX를 Prefabs 폴더로 드래그
+→ Hierarchy에서 원본 삭제
+```
+
+### 2. BulletProjectile에 참조 추가
+
+```csharp
+public class BulletProjectile : MonoBehaviour
+{
+    [SerializeField] private TrailRenderer trailRenderer;
+    [SerializeField] private Transform bulletHitVfxPrefab;  // 새로 추가
+
+    private Vector3 targetPosition;
+
+    // ... 나머지 코드
+}
+```
+
+### 3. Inspector에서 연결
+
+```
+Bullet Projectile Prefab 선택
+→ Bullet Hit Vfx Prefab 필드
+→ "Bullet Hit VFX" Prefab 드래그
+```
+
+### VFX 생성 코드
+
+```csharp
+private void Update()
+{
+    Vector3 moveDir = (targetPosition - transform.position).normalized;
+    float distanceBeforeMoving = Vector3.Distance(transform.position, targetPosition);
+
+    float moveSpeed = 200f;
+    transform.position += moveDir * moveSpeed * Time.deltaTime;
+
+    float distanceAfterMoving = Vector3.Distance(transform.position, targetPosition);
+
+    if (distanceBeforeMoving < distanceAfterMoving)
+    {
+        // 정확한 위치로 스냅
+        transform.position = targetPosition;
+
+        // Trail 독립
+        trailRenderer.transform.SetParent(null);
+
+        // === VFX 생성 ===
+        Instantiate(
+            bulletHitVfxPrefab,        // 생성할 Prefab
+            targetPosition,             // 적중 위치에 생성
+            Quaternion.identity         // 회전 없음
+        );
+        // 파티클 시스템이 알아서:
+        // 1. 즉시 Burst 발생 (30개 파티클)
+        // 2. 0.3초 동안 애니메이션
+        // 3. Stop Action: Destroy로 자동 정리
+
+        // 총알 파괴
+        Destroy(gameObject);
+    }
+}
+```
+
+### 최종 동작 흐름
+
+```
+1. 총알이 목표 도달
+   ↓
+2. transform.position = targetPosition
+   (정확한 위치로 보정)
+   ↓
+3. trailRenderer.transform.SetParent(null)
+   (Trail 독립)
+   ↓
+4. Instantiate(bulletHitVfxPrefab, targetPosition, ...)
+   (폭발 효과 생성)
+   ↓
+5. Destroy(gameObject)
+   (총알 파괴)
+   ↓
+6. [병렬 실행]
+   - Trail: 0.1초 후 Auto Destruct로 자동 정리
+   - VFX: 0.3초 후 Stop Action: Destroy로 자동 정리
+```
+
+---
+
+## 📌 전체 정리
+
+### 구현된 시스템 구조
+
+```
+Shoot Action (발사 버튼 클릭)
+    ↓
+ShootAction.OnShoot 이벤트 발생 (OnShootEventArgs 포함)
+    ↓
+UnitAnimator.ShootAction_OnShoot 실행
+    ↓
+Bullet Projectile 생성 (Shoot Point 위치)
+    ↓
+BulletProjectile.Setup(타겟 위치) 호출
+    ↓
+BulletProjectile.Update() 매 프레임 실행
+    - 타겟을 향해 이동
+    - Overshoot 체크
+    ↓
+목표 도달 감지
+    ↓
+정리 과정:
+    1. 위치 보정 (정확히 타겟에)
+    2. Trail 독립 (SetParent(null))
+    3. VFX 생성 (폭발 효과)
+    4. 총알 파괴
+    ↓
+자동 정리:
+    - Trail: 0.1초 후 Auto Destruct
+    - VFX: 0.3초 후 Stop Action: Destroy
+```
+
+### 사용된 Unity 기능
+
+1. **Trail Renderer**: 궤적 효과
+2. **Particle System**: 폭발 효과
+3. **Prefab**: 재사용 가능한 오브젝트
+4. **Instantiate**: 동적 오브젝트 생성
+5. **EventArgs**: 이벤트 데이터 전달
+6. **Transform Hierarchy**: 부모-자식 관계
+7. **Auto Destruct**: 자동 정리
+
+### 해결한 문제들
+
+1. ✅ 총알이 움직이지 않는 문제 → Transform 이동 로직
+2. ✅ 총알이 떨리는 문제 → Overshoot 감지
+3. ✅ 발을 향해 쏘는 문제 → Y 좌표 보정
+4. ✅ Trail이 갑자기 사라지는 문제 → SetParent(null)
+5. ✅ 오브젝트가 정리되지 않는 문제 → Auto Destruct, Stop Action
+
+### 다음 단계 예고
+
+```
+현재 상태: 총알이 적에게 도달하지만 데미지가 없음
+다음 강의: 체력(Health) 시스템 구현
+```

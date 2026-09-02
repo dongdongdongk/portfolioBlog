@@ -1,0 +1,540 @@
+---
+title: 'Obstruction과 Spatial Audio'
+date: '2026-09-02'
+category: '게임 개발/WWISE'
+tags: ['게임 개발', 'WWISE']
+draft: false
+summary: ''
+---
+
+---
+
+# { 🎧 Obstruction / Occlusion (기본 감쇠 시스템) 이해하기 }
+
+이번 강의는 **Wwise의 Obstruction(차폐)** 과 **Occlusion(폐쇄)** 시스템을 사용해
+
+소리가 벽이나 장애물에 의해 얼마나 감쇠(줄어드는지) 되는지를 제어하는 방법을 배우는 강의입니다.
+
+즉, **"플레이어와 소리 사이에 벽이 있으면 소리가 막히는 효과"**를 만드는 기능입니다.
+
+---
+
+## 📋 목차
+
+1. [Obstruction / Occlusion 개념 이해하기](https://chatgpt.com/c/68f030ae-6a84-8322-b95b-f6534570f04c#1-obstruction--occlusion-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [기본 감쇠 시스템(Attenuation System)](https://chatgpt.com/c/68f030ae-6a84-8322-b95b-f6534570f04c#2-%EA%B8%B0%EB%B3%B8-%EA%B0%90%EC%87%A0-%EC%8B%9C%EC%8A%A4%ED%85%9Cattenuation-system)
+3. [Wwise Authoring에서 설정하기](https://chatgpt.com/c/68f030ae-6a84-8322-b95b-f6534570f04c#3-wwise-authoring%EC%97%90%EC%84%9C-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+4. [Unity에서 사용하기](https://chatgpt.com/c/68f030ae-6a84-8322-b95b-f6534570f04c#4-unity%EC%97%90%EC%84%9C-%EC%82%AC%EC%9A%A9%ED%95%98%EA%B8%B0)
+5. [Obstruction과 Spatial Audio의 차이](https://chatgpt.com/c/68f030ae-6a84-8322-b95b-f6534570f04c#5-obstruction%EA%B3%BC-spatial-audio%EC%9D%98-%EC%B0%A8%EC%9D%B4)
+6. [정리 및 응용 예시](https://chatgpt.com/c/68f030ae-6a84-8322-b95b-f6534570f04c#6-%EC%A0%95%EB%A6%AC-%EB%B0%8F-%EC%9D%91%EC%9A%A9-%EC%98%88%EC%8B%9C)
+
+---
+
+## 1. Obstruction / Occlusion 개념 이해하기
+
+### 🎯 기본 개념
+
+- **Obstruction (차폐)**
+  → 소리가 들리는 **경로 중 일부가 막혀서 약간 줄어드는 경우**
+  예: 문이 반쯤 열린 상태에서 들리는 음악
+  → 여전히 소리가 들리지만, **고음역대(High frequencies)** 가 약간 감쇠됩니다.
+- **Occlusion (폐쇄)**
+  → 소리가 **벽 등으로 완전히 막혀서 거의 들리지 않는 경우**
+  예: 플레이어가 벽 뒤에 있을 때
+  → **전반적인 볼륨이 크게 줄고**, 소리가 **저음 위주로 둔탁하게** 변합니다.
+
+---
+
+### 🔊 실제로 들리는 차이
+
+| 구분            | 설명             | 청각적 느낌                         |
+| --------------- | ---------------- | ----------------------------------- |
+| **Obstruction** | 소리가 약간 막힘 | 고음이 줄고 소리가 "살짝 덮인 느낌" |
+| **Occlusion**   | 완전히 막힘      | 전체 볼륨이 줄고 둔탁한 저음만 남음 |
+
+---
+
+## 2. 기본 감쇠 시스템(Attenuation System)
+
+### ⚙️ Attenuation 이란?
+
+- Wwise의 **감쇠 시스템(Attenuation System)** 은 **소리가 거리나 환경에 따라 줄어드는 정도를 제어**합니다.
+- 예를 들어, 플레이어가 소리에서 멀어질수록 소리가 작아지는 것은 이 Attenuation 시스템 덕분입니다.
+
+---
+
+### 🎚️ Obstruction / Occlusion 과의 관계
+
+- **기본 감쇠(Attenuation)** 는 "거리"에 따른 볼륨 변화.
+- **Obstruction / Occlusion** 은 "장애물"에 따른 추가 볼륨 변화.
+
+즉,
+
+> 🎧 거리가 멀어지면 기본 감쇠가 작용하고,
+>
+> 벽이 가로막히면 Obstruction / Occlusion이 추가로 작용합니다.
+
+---
+
+## 3. Wwise Authoring에서 설정하기
+
+이 단계에서는 **Wwise Authoring Tool** 안에서
+
+Obstruction/Occlusion이 적용될 수 있도록 설정합니다.
+
+---
+
+### 🧩 1) Attenuation ShareSet 생성하기
+
+1. Wwise Authoring에서
+
+   **Project Explorer → ShareSets → Attenuations** 로 이동
+
+2. 우클릭 → **New Child → Attenuation** 선택
+3. 이름: `3D_Audio_Attenuation`
+4. Distance Curve(거리 감쇠 곡선) 설정
+   - 최소 거리(Min Distance): 1
+   - 최대 거리(Max Distance): 50
+   - Curve Type: Logarithmic (로그 곡선)
+
+이제 이 설정은 "거리에 따라 소리가 줄어드는 정도"를 정의합니다.
+
+---
+
+### 🧩 2) Obstruction / Occlusion Curve 설정하기
+
+Attenuation Editor에서 **Low-pass Filter Curve** 와 **Volume Curve** 를 조정합니다.
+
+- **Volume Curve (볼륨 곡선)**
+  → 장애물이 막을수록 볼륨이 얼마나 줄어드는지 설정.
+  예: 0일 때는 0dB, 1일 때는 -15dB
+- **Low-pass Filter Curve (로우패스 필터)**
+  → 막히면 고음이 줄어들도록 설정.
+  예: 0일 때 0Hz 손실 없음, 1일 때 고음 -12dB
+
+이렇게 하면 벽이 완전히 막혔을 때 고음이 둔탁하게 들립니다.
+
+---
+
+### 🧩 3) Event 연결
+
+1. Sound Object에 위에서 만든 Attenuation 적용
+2. Event (예: `Play_Fire`) 생성
+3. SoundBank 생성 → Unity에 빌드
+
+---
+
+## 4. Unity에서 사용하기
+
+이제 Unity에서 플레이어와 사운드 간의 **가시성(Visibility)** 을 판별해
+
+벽이 막고 있다면 **Obstruction / Occlusion** 값을 실시간으로 조절합니다.
+
+---
+
+### 🧱 1) Scene 구성
+
+- **Audio Source** 역할: Wwise에서 만들어진 Event를 트리거하는 GameObject (예: “Radio”)
+- **Player**: 청취자 역할 (Listener)
+- **Wall**: Mesh Collider 포함, 소리를 막는 장애물
+
+---
+
+### 💻 2) 예제 코드
+
+```csharp
+using UnityEngine;
+
+// 🎧 SoundOcclusion 스크립트
+// 이 스크립트는 "플레이어(청취자)"와 "소리 오브젝트" 사이에 벽이 있는지를 감지하고,
+// 벽이 있을 경우 Wwise의 Obstruction/Occlusion 기능을 사용해
+// 소리를 둔탁하거나 작게 들리게 만들어주는 역할을 합니다.
+
+public class SoundOcclusion : MonoBehaviour
+{
+    // 🎯 listener: 사운드를 듣는 대상 (일반적으로 Player)
+    // Wwise에서는 Listener가 귀(청취자)에 해당함.
+    public GameObject listener;
+
+    // 🎵 soundEvent: Wwise에서 만든 소리 이벤트
+    // 예: 'Play_Radio' 또는 'Play_Fire' 같은 이벤트
+    public AK.Wwise.Event soundEvent;
+
+    // (이 예제에서는 사용하지 않지만) Wwise 엔진 제어용 변수
+    // Wwise 초기화나 런타임 관리가 필요할 때 사용 가능.
+    private AkSoundEngineController soundEngine;
+
+    // 🚀 Unity가 시작될 때 호출되는 함수
+    void Start()
+    {
+        // soundEvent.Post(gameObject)
+        // → Wwise에서 등록된 소리 이벤트를 현재 오브젝트(gameObject) 위치에서 재생시킴.
+        // gameObject는 소리의 "발생 위치"를 의미함.
+        soundEvent.Post(gameObject);
+    }
+
+    // 🔁 매 프레임마다 실행되는 Unity의 Update() 함수
+    // → 여기서는 벽이 생겼는지 실시간으로 검사함.
+    void Update()
+    {
+        // RaycastHit: 광선(Ray)이 부딪힌 정보를 담는 구조체
+        RaycastHit hit;
+
+        // direction: 현재 오브젝트(소리의 위치)에서 listener(플레이어)까지의 방향 벡터
+        Vector3 direction = listener.transform.position - transform.position;
+
+        // 👇 Raycast를 사용해 소리와 플레이어 사이에 물리적인 장애물이 있는지 확인
+        // Physics.Raycast(출발점, 방향, out hit)
+        // → 출발점에서 지정한 방향으로 보이지 않는 광선을 쏘고,
+        //    무언가에 닿으면 true 반환 + 그 정보를 hit에 담음.
+        if (Physics.Raycast(transform.position, direction, out hit))
+        {
+            // 🎯 만약 부딪힌 오브젝트의 태그가 "Wall"이라면
+            // 즉, 소리와 플레이어 사이에 벽이 막고 있다면...
+            if (hit.collider.CompareTag("Wall"))
+            {
+                // 🔒 벽에 막힘 → Obstruction / Occlusion 적용
+
+                // SetObjectObstructionAndOcclusion()
+                // ▶ 이 함수는 특정 Listener와 Emitter(소리)의 관계에서
+                //    소리 감쇠(Obstruction)와 차단(Occlusion) 값을 설정하는 함수.
+
+                // obstruction: 소리가 부분적으로 막힐 때의 감쇠 정도 (0.0 ~ 1.0)
+                // occlusion: 완전히 막힐 때의 차단 정도 (0.0 ~ 1.0)
+                //
+                // 값이 0.0이면 전혀 막히지 않은 상태,
+                // 값이 1.0이면 완전히 막힌 상태를 의미함.
+                //
+                // → 여기서는 0.3 / 0.7로 설정했으므로
+                //    소리가 일부는 들리지만 꽤 둔탁하게 들리는 상태.
+                AkSoundEngine.SetObjectObstructionAndOcclusion(
+                    gameObject,   // 소리의 발생 위치
+                    listener,     // 청취자 (플레이어)
+                    obstruction: 0.3f,  // 부분적 감쇠
+                    occlusion: 0.7f     // 강한 폐쇄
+                );
+            }
+            else
+            {
+                // 🚪 벽에 막히지 않음 → Obstruction / Occlusion 초기화
+
+```
+
+🔹 **설명**
+
+- `Raycast` 로 소리와 플레이어 사이에 장애물이 있는지 확인합니다.
+- 벽이 감지되면 `SetObjectObstructionAndOcclusion()` 함수를 통해
+  실시간으로 감쇠(Volume 감소)와 필터 효과(Low-pass)를 적용합니다.
+
+---
+
+## 5. Obstruction과 Spatial Audio의 차이
+
+| 구분          | Obstruction / Occlusion                 | Spatial Audio                                 |
+| ------------- | --------------------------------------- | --------------------------------------------- |
+| **핵심 목적** | 벽이나 장애물로 인한 **소리 막힘** 표현 | 3D 공간 내의 **소리 반사·전달** 시뮬레이션    |
+| **작동 방식** | **직선 경로** 상의 가시성 계산          | **Room, Portal, Reflect** 등 공간 구조 분석   |
+| **주요 효과** | 소리 감쇠 + 로우패스 필터               | 반향(Reverb), 반사(Reflection), 공간감(Space) |
+| **설정 위치** | Attenuation Curve / API 제어            | Spatial Audio Room & Portal 설정              |
+| **사용 예시** | 문 뒤에서 소리가 둔탁하게 들림          | 복도 끝에서 울리는 반향음                     |
+
+👉 정리하자면
+
+- **Obstruction / Occlusion** = 소리의 **“막힘”**
+- **Spatial Audio** = 소리의 **“공간적 반사와 울림”**
+
+---
+
+## 6. 정리 및 응용 예시
+
+### 📘 요약
+
+| 항목            | 설명                                        |
+| --------------- | ------------------------------------------- |
+| **Obstruction** | 소리가 부분적으로 막혀 고음이 줄어듦        |
+| **Occlusion**   | 완전히 막혀서 전체 볼륨이 줄고 둔탁함       |
+| **적용 방법**   | Wwise Attenuation 설정 + Unity Raycast 감지 |
+| **주요 함수**   | `SetObjectObstructionAndOcclusion()`        |
+| **비교**        | Spatial Audio는 공간 반향 효과를 다룸       |
+
+---
+
+### 💡 응용 예시
+
+1. **FPS 게임**
+   - 벽 뒤의 적 총소리가 둔탁하게 들림
+   - 문을 열면 점점 선명해짐 (Obstruction 값 감소)
+2. **공포 게임**
+   - 방 밖의 괴물 소리가 문 사이로 새어 들어옴
+   - 문이 닫히면 Occlusion 값이 올라가며 소리 차단
+3. **스텔스 게임**
+   - 플레이어가 벽 뒤에 숨으면
+     적 AI가 청각으로 탐지하기 어려워짐 (감쇠 적용)
+
+---
+
+# { 🎧 Spatial Audio + Obstruction/Occlusion 통합 예제 (Room + Portal + Occlusion) }
+
+이번 강의는 **Wwise Spatial Audio 시스템**을 통해
+
+공간(Room)과 문(Portal)을 설정하고,
+
+여기에 **Obstruction / Occlusion(기본 감쇠 시스템)** 을 함께 적용해
+
+“문이 닫히면 소리가 막히고, 문을 열면 자연스럽게 들리는 현실적인 공간 사운드”를 구현하는 예제입니다.
+
+---
+
+## 📋 목차
+
+1. [개념 이해하기](https://www.notion.so/Obstruction-Spatial-Audio-28de683f737e80e59cfdc0c410e14740#1-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Room & Portal 시스템 구조](https://www.notion.so/Obstruction-Spatial-Audio-28de683f737e80e59cfdc0c410e14740#2-room--portal-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B5%AC%EC%A1%B0)
+3. [Wwise Authoring 설정](https://www.notion.so/Obstruction-Spatial-Audio-28de683f737e80e59cfdc0c410e14740#3-wwise-authoring-%EC%84%A4%EC%A0%95)
+4. [Unity 설정 단계](https://www.notion.so/Obstruction-Spatial-Audio-28de683f737e80e59cfdc0c410e14740#4-unity-%EC%84%A4%EC%A0%95-%EB%8B%A8%EA%B3%84)
+5. [Occlusion 코드 추가하기](https://www.notion.so/Obstruction-Spatial-Audio-28de683f737e80e59cfdc0c410e14740#5-occlusion-%EC%BD%94%EB%93%9C-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+6. [실행 결과](https://www.notion.so/Obstruction-Spatial-Audio-28de683f737e80e59cfdc0c410e14740#6-%EC%8B%A4%ED%96%89-%EA%B2%B0%EA%B3%BC-%ED%99%95%EC%9D%B8)
+7. [정리](https://www.notion.so/Obstruction-Spatial-Audio-28de683f737e80e59cfdc0c410e14740#7-%EC%A0%95%EB%A6%AC)
+
+---
+
+## 1. 개념 이해하기
+
+### 🎯 Spatial Audio 란?
+
+- Spatial Audio는 **소리가 “공간을 통해 이동하고 반사되는” 현상**을 시뮬레이션하는 시스템입니다.
+- 예를 들어,
+  - 방 안에서 들리는 반향(리버브),
+  - 문이 열린 방향으로만 소리가 들리는 현상,
+  - 벽에 부딪혀 퍼지는 잔향 등…
+
+이 모든 게 **Wwise Spatial Audio의 Room/Portal 시스템**으로 구현됩니다.
+
+---
+
+### 🔉 Obstruction / Occlusion 란?
+
+- Spatial Audio가 공간 전체의 **소리 이동 경로**를 계산한다면,
+  Obstruction/Occlusion은 **“소리와 리스너 사이에 벽이 막혀 있으면”**
+  그 소리를 감쇠시키는 **기본적인 차폐 시스템**입니다.
+
+| 기능                      | 설명                                           |
+| ------------------------- | ---------------------------------------------- |
+| **Spatial Audio**         | 소리가 공간(Room)과 문(Portal)을 통해 전달됨   |
+| **Occlusion/Obstruction** | 소리와 리스너 사이의 물리적 막힘을 감쇠로 표현 |
+
+👉 두 시스템을 함께 쓰면
+
+**“방 구조에 따라 소리가 울리고, 벽이나 문에 의해 막히는 자연스러운 사운드 환경”**을 구현할 수 있습니다.
+
+---
+
+## 2. Room & Portal 시스템 구조
+
+### 🏠 개념 구조도
+
+```
+[Room A] --- [Portal(문)] --- [Room B]
+```
+
+- Room A : 예를 들어 플레이어가 있는 “거실”
+- Room B : 소리가 나는 “주방”
+- Portal : 두 방 사이의 문 (열릴 수도, 닫힐 수도 있음)
+
+---
+
+### 🎧 작동 흐름
+
+1. Room B 안의 사운드(`Radio`, `TV`, `Monster`)가 재생됨
+2. 문(Portal)이 열려 있으면 → 소리가 Room A로 잘 전달됨
+3. 문이 닫히면 → Portal이 막히면서 Spatial Audio의 **Occlusion** 값 상승
+4. 동시에 Obstruction 시스템이 소리 감쇠를 더함 → “문 뒤에서 둔탁하게 들림”
+
+---
+
+## 3. Wwise Authoring 설정
+
+### ⚙️ 1) Spatial Audio 활성화
+
+1. **Project Settings → SoundBanks → Plug-ins** 로 이동
+2. `AkSpatialAudio` 플러그인이 포함되어 있는지 확인
+
+   → 없으면 추가
+
+---
+
+### 🎵 2) Attenuation ShareSet 설정
+
+- Wwise에서 `Attenuation`을 만들어
+  - Distance Curve (거리 감쇠)
+  - Low-pass Filter Curve (벽 막힘 시 고음 감소)
+  - Volume Curve (볼륨 감쇠)
+    를 설정합니다.
+
+---
+
+### 🔊 3) Event 생성
+
+- 예: `Play_Radio`
+  → Spatial Audio 지원 가능하도록 설정
+  → 위에서 만든 Attenuation 연결
+  → SoundBank 빌드
+
+---
+
+## 4. Unity 설정 단계
+
+### 🧱 1) 방(Room) 만들기
+
+1. 빈 오브젝트를 생성하고 이름을 `Room_Living` 으로 변경
+2. Collider를 추가 (예: Box Collider)
+3. `AkRoom` 컴포넌트 추가
+   - **Room ID**: LivingRoom
+   - **Reverb Aux Bus**: (필요시 리버브 버스 선택)
+   - **Wall Occlusion**: 0.5 (벽이 반쯤 막히는 정도)
+
+🎧 Room은 “소리가 울리는 공간 단위”를 의미합니다.
+
+---
+
+### 🚪 2) 포털(Portal) 만들기
+
+1. 두 Room 사이(문 위치)에 Plane 또는 Cube를 배치
+2. 이름: `Portal_Door`
+3. `AkPortal` 컴포넌트 추가
+   - **Front Room**: Room_Living
+   - **Back Room**: Room_Kitchen
+   - **Initial State**: Open
+
+📌 **문이 열리면** 소리 전달이 가능하고,
+
+**문이 닫히면** Portal이 “닫힘” 상태로 설정되어 소리가 차단됩니다.
+
+---
+
+### 🔈 3) 사운드 발생기 (Emitter) 배치
+
+1. Room_B(Kitchen)에 GameObject 생성 → 이름 `Radio`
+2. `AkAmbient` 또는 직접 만든 스크립트로 Wwise Event(`Play_Radio`) 재생
+3. `AkRoomPortalAware` 컴포넌트를 붙여 Spatial Audio가 작동하도록 설정
+
+---
+
+### 👂 4) 리스너(Listener) 설정
+
+1. Player 또는 Camera 오브젝트에 `AkAudioListener` 추가
+2. Player가 속한 Room(`Room_Living`)에 자동으로 감지되도록 `AkRoomAwareObject` 추가
+
+---
+
+## 5. Occlusion 코드 추가하기
+
+Portal이 닫혔을 때, Obstruction/Occlusion 값을 직접 제어할 수 있습니다.
+
+예를 들어, 문이 닫히면 Wwise의 Occlusion 값이 높아지게 하는 코드 👇
+
+```csharp
+using UnityEngine;
+
+public class DoorOcclusionController : MonoBehaviour
+{
+    public GameObject listener;         // 플레이어 (리스너)
+    public GameObject soundEmitter;     // 소리가 나는 오브젝트 (예: Radio)
+    public AK.Wwise.Event soundEvent;   // 재생할 사운드 이벤트
+    public AkPortal portal;             // 연결된 Portal
+
+    private bool doorOpen = true;
+
+    void Start()
+    {
+        soundEvent.Post(soundEmitter);  // 소리 시작
+    }
+
+    void Update()
+    {
+        // 스페이스바로 문 여닫기
+        if (Input.GetKeyDown(KeyCode.Space))
+        {
+            doorOpen = !doorOpen;
+            portal.SetPortal(open: doorOpen);  // Spatial Audio Portal 상태 변경
+        }
+
+        // Portal 닫힘 상태일 때 Occlusion 강하게 적용
+        if (!doorOpen)
+        {
+            AkSoundEngine.SetObjectObstructionAndOcclusion(
+                soundEmitter,
+                listener,
+                obstruction: 0.4f,
+                occlusion: 0.8f
+            );
+        }
+        else
+        {
+            AkSoundEngine.SetObjectObstructionAndOcclusion(
+                soundEmitter,
+                listener,
+                obstruction: 0f,
+                occlusion: 0f
+            );
+        }
+    }
+}
+
+```
+
+---
+
+### 🧩 코드 설명
+
+| 코드                                 | 설명                                     |
+| ------------------------------------ | ---------------------------------------- |
+| `portal.SetPortal(open: doorOpen)`   | Spatial Audio의 Portal(문)을 열거나 닫음 |
+| `SetObjectObstructionAndOcclusion()` | Wwise의 감쇠 시스템을 사용해 소리를 줄임 |
+| `obstruction`                        | 소리가 “부분적으로 막힘” 정도            |
+| `occlusion`                          | 소리가 “완전히 막힘” 정도                |
+| `spacebar`                           | 문을 여닫는 트리거 역할 (테스트용)       |
+
+---
+
+## 6. 실행 결과 확인
+
+🎮 **실행 시나리오**
+
+1. 플레이어가 **거실(Room A)** 에 있음
+2. **주방(Room B)** 에서 라디오 소리(`Play_Radio`)가 재생됨
+3. **문(Portal)** 이 열려 있음 →
+
+   🔊 소리가 자연스럽게 잘 들림
+
+4. **스페이스바를 눌러 문을 닫음 → Portal 닫힘 + Occlusion 적용**
+
+   🔇 라디오 소리가 둔탁해지고 고음이 줄어듦
+
+5. 문을 다시 열면 →
+
+   🎵 소리가 점점 선명하게 들림
+
+---
+
+## 7. 정리
+
+| 구분                      | 기능                      | 설명                                     |
+| ------------------------- | ------------------------- | ---------------------------------------- |
+| **Room**                  | 공간 단위                 | 반향과 벽 차폐 효과를 관리               |
+| **Portal**                | 두 Room을 연결하는 문     | 열리면 소리 전달, 닫히면 차단            |
+| **Spatial Audio**         | 공간 기반 소리 시뮬레이션 | 소리의 반사, 전달, 리버브 등             |
+| **Obstruction/Occlusion** | 장애물 기반 감쇠          | 벽이나 문 뒤에서 소리 둔탁하게           |
+| **통합 효과**             | 두 시스템을 결합          | 문 열고 닫기에 따라 자연스러운 음향 변화 |
+
+---
+
+## 💡 보너스 팁: 현실감 높이기
+
+| 상황            | 설정값 추천 (예시)              |
+| --------------- | ------------------------------- |
+| 나무문          | Obstruction 0.3 / Occlusion 0.5 |
+| 철문            | Obstruction 0.6 / Occlusion 0.9 |
+| 유리문          | Obstruction 0.2 / Occlusion 0.3 |
+| 커튼 등 천 재질 | Obstruction 0.1 / Occlusion 0.2 |
+
+이 값을 재질에 따라 다르게 적용하면 훨씬 현실적인 사운드를 만들 수 있습니다 🎧

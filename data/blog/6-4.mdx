@@ -1,0 +1,1482 @@
+---
+title: '섹션 6 : 샤프 슈터 4'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+# { 🎮 픽업 시스템 리팩토링 (Inheritance & Base Pickup Class) }
+
+이번 강의에서는 **무기 픽업(Weapon Pickup)** 과 **탄약 픽업(Ammo Pickup)** 을 공통적으로 처리할 수 있는 **기본 픽업 클래스(Base Pickup Class)** 를 설계하고, **상속(Inheritance)** 개념을 활용해 코드 중복을 줄이며 확장 가능한 구조로 리팩토링했습니다.
+
+---
+
+## 📋 목차
+
+1. [픽업(Pickup) 개념 이해하기](https://www.notion.so/281e683f737e80d99ed2c5619401701b#%ED%94%BD%EC%97%85pickup-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [상속 구조 설계하기](https://www.notion.so/281e683f737e80d99ed2c5619401701b#%EC%83%81%EC%86%8D-%EA%B5%AC%EC%A1%B0-%EC%84%A4%EA%B3%84%ED%95%98%EA%B8%B0)
+3. [기본 Pickup 클래스 구현](https://www.notion.so/281e683f737e80d99ed2c5619401701b#%EA%B8%B0%EB%B3%B8-pickup-%ED%81%B4%EB%9E%98%EC%8A%A4-%EA%B5%AC%ED%98%84)
+4. [Weapon Pickup 리팩토링](https://www.notion.so/281e683f737e80d99ed2c5619401701b#weapon-pickup-%EB%A6%AC%ED%8C%A9%ED%86%A0%EB%A7%81)
+5. [Pickup 동작 흐름 이해](https://www.notion.so/281e683f737e80d99ed2c5619401701b#pickup-%EB%8F%99%EC%9E%91-%ED%9D%90%EB%A6%84-%EC%9D%B4%ED%95%B4)
+6. [시각 효과 추가 (Pickup 회전)](https://www.notion.so/281e683f737e80d99ed2c5619401701b#%EC%8B%9C%EA%B0%81-%ED%9A%A8%EA%B3%BC-%EC%B6%94%EA%B0%80-pickup-%ED%9A%8C%EC%A0%84)
+
+---
+
+## 1. 픽업(Pickup) 개념 이해하기
+
+- **픽업(Pickup)** : 플레이어가 맵에서 획득할 수 있는 아이템.
+  - 무기, 탄약, 체력 회복 아이템 등 다양한 형태가 있음.
+- 공통 특징:
+  1. **플레이어와 충돌(Collider Trigger)** 시 이벤트 발생.
+  2. 충돌 시 특정 효과 발동 (무기 교체, 탄약 증가 등).
+  3. 이후 **자기 자신을 파괴(Destroy)** 해서 사라짐.
+
+👉 따라서, **픽업의 공통 로직을 하나의 클래스(Base Class)에 담고**,
+
+각각의 픽업(무기, 탄약)은 이 클래스를 **상속받아 개별 동작만 구현**하는 방식이 효율적임.
+
+---
+
+## 2. 상속 구조 설계하기
+
+상속 관계를 다음과 같이 설계:
+
+```
+MonoBehaviour
+   │
+   └── Pickup (추상 클래스, 공통 기능 담당)
+          │
+          ├── WeaponPickup (무기 교체 기능)
+          └── AmmoPickup   (탄약 보충 기능)
+```
+
+- **Pickup (추상 클래스)**
+  - `OnTriggerEnter` : 플레이어와 충돌 감지.
+  - `OnPickup` : 추상 메소드 → 자식 클래스에서 구체 동작 정의.
+  - `rotationSpeed` : 회전 속도 → 픽업 오브젝트에 시각 효과 부여.
+- **WeaponPickup**
+  - `OnPickup` 오버라이드 → **무기 교체(SwitchWeapon)** 실행.
+- **AmmoPickup**
+  - `OnPickup` 오버라이드 → **탄약 충전(AddAmmo)** 실행.
+
+---
+
+## 3. 기본 Pickup 클래스 구현
+
+```csharp
+using UnityEngine;
+
+public abstract class Pickup : MonoBehaviour
+{
+    [SerializeField] float rotationSpeed = 100f;  // 회전 속도
+    const string PLAYER_STRING = "Player";
+
+    void Update()
+    {
+        // Y축 회전 (회전 시각 효과)
+        transform.Rotate(0f, rotationSpeed * Time.deltaTime, 0f);
+    }
+
+    void OnTriggerEnter(Collider other)
+    {
+        // 플레이어와 충돌 감지
+        if (other.CompareTag(PLAYER_STRING))
+        {
+            // 플레이어가 가진 ActiveWeapon 컴포넌트 가져오기
+            ActiveWeapon activeWeapon = other.GetComponentInChildren<ActiveWeapon>();
+
+            // 자식 클래스에서 정의한 OnPickup 실행
+            OnPickup(activeWeapon);
+
+            // 픽업 오브젝트 파괴
+            Destroy(gameObject);
+        }
+    }
+
+    // 추상 메소드 → 자식 클래스에서 반드시 구현해야 함
+    protected abstract void OnPickup(ActiveWeapon activeWeapon);
+}
+```
+
+### 핵심 포인트
+
+- **추상 클래스(Abstract Class)**
+  - `public abstract class Pickup`
+  - 직접 오브젝트에 붙일 수 없음. 반드시 상속 후 사용.
+- **공통 로직**
+  - `Update()` → 회전 효과.
+  - `OnTriggerEnter()` → 플레이어 충돌 확인 + ActiveWeapon 전달 + 아이템 파괴.
+- **추상 메소드**
+  - `protected abstract void OnPickup(ActiveWeapon activeWeapon);`
+  - 자식 클래스가 반드시 자신만의 기능을 구현해야 함.
+
+---
+
+## 4. Weapon Pickup 리팩토링
+
+```csharp
+using UnityEngine;
+
+public class WeaponPickup : Pickup
+{
+    [SerializeField] WeaponSO weaponSO;
+
+    // 무기 픽업 시 → 무기 교체 실행
+    protected override void OnPickup(ActiveWeapon activeWeapon)
+    {
+        activeWeapon.SwitchWeapon(weaponSO);
+    }
+}
+```
+
+### 설명
+
+- **WeaponPickup은 Pickup을 상속** 받음 → `MonoBehaviour` 직접 상속 X.
+- `OnPickup` 구현부에서 **무기 교체(SwitchWeapon)** 실행.
+- `weaponSO`(Scriptable Object) 를 통해 어떤 무기를 줍는지 결정.
+
+👉 따라서 WeaponPickup은 `OnTriggerEnter` 나 회전 관련 코드를 신경쓸 필요 없음.
+
+(이미 Pickup 클래스가 공통적으로 처리해주기 때문)
+
+---
+
+## 5. Pickup 동작 흐름 이해
+
+1. 게임 실행 → Pickup 오브젝트가 `Update()` 에서 회전.
+2. 플레이어가 Pickup의 Collider와 충돌.
+3. `OnTriggerEnter()` 실행.
+   - 태그 `"Player"` 확인.
+   - 플레이어의 **ActiveWeapon 컴포넌트** 가져옴.
+   - `OnPickup(activeWeapon)` 호출.
+4. 자식 클래스(WeaponPickup / AmmoPickup)의 `OnPickup` 메소드 실행.
+   - WeaponPickup → `activeWeapon.SwitchWeapon(weaponSO)`
+   - AmmoPickup → `activeWeapon.AddAmmo(ammoType, amount)` (예상 구현)
+5. 아이템 획득 후 `Destroy(gameObject)` 로 오브젝트 제거.
+
+---
+
+## 6. 시각 효과 추가 (Pickup 회전)
+
+- **필요성** : 게임 뷰에서 픽업 아이템을 더 눈에 잘 띄게, "집을 수 있는 대상"임을 직관적으로 전달.
+
+### 구현
+
+```csharp
+[SerializeField] float rotationSpeed = 100f;
+
+void Update()
+{
+    transform.Rotate(0f, rotationSpeed * Time.deltaTime, 0f);
+}
+```
+
+- **SerializedField** : 인스펙터에서 회전 속도 조절 가능.
+- **Time.deltaTime** : 프레임에 관계없이 일정한 회전 속도 유지.
+- **Y축 회전** : 무기/탄약이 빙글빙글 도는 효과.
+
+---
+
+# ✅ 정리
+
+- **Pickup 시스템 리팩토링 목표** : 공통 기능은 `Pickup` 추상 클래스에 모으고, 개별 기능만 자식 클래스에서 구현.
+- **상속(Inheritance) 연습** : 중복 제거 + 확장성 높은 구조.
+- **무기 픽업(WeaponPickup)** : 무기 교체 기능 구현.
+- **탄약 픽업(AmmoPickup)** : 탄약 충전 기능 구현 예정.
+- **시각 효과** : 회전 기능 추가해 아이템이 "집을 수 있음"을 시각적으로 표현.
+
+# 🟢 C# 상속 기본 개념 (Java와 비교)
+
+## 1. 상속 선언 방법
+
+자바:
+
+```java
+class Animal {
+    void Speak() {
+        System.out.println("동물이 소리를 낸다");
+    }
+}
+
+class Dog extends Animal {
+    void Bark() {
+        System.out.println("멍멍");
+    }
+}
+```
+
+C#:
+
+```csharp
+class Animal {
+    public void Speak() {
+        Console.WriteLine("동물이 소리를 낸다");
+    }
+}
+
+class Dog : Animal {   // extends 대신 콜론(:) 사용
+    public void Bark() {
+        Console.WriteLine("멍멍");
+    }
+}
+```
+
+👉 차이점:
+
+- **Java** → `extends`
+- **C#** → `:` (콜론)
+
+---
+
+## 2. 접근 제어자 (접근 제한자)
+
+자바랑 거의 똑같음.
+
+- `public` : 어디서든 접근 가능
+- `protected` : 상속받은 클래스에서만 접근 가능
+- `private` : 자기 클래스 내부에서만 접근 가능
+
+C#에서도 동일하게 사용됩니다.
+
+---
+
+## 3. 메소드 오버라이딩
+
+자바:
+
+```java
+class Animal {
+    void Speak() {
+        System.out.println("동물이 소리를 낸다");
+    }
+}
+
+class Dog extends Animal {
+    @Override
+    void Speak() {
+        System.out.println("멍멍");
+    }
+}
+```
+
+C#:
+
+```csharp
+class Animal {
+    public virtual void Speak() {   // 오버라이딩 허용
+        Console.WriteLine("동물이 소리를 낸다");
+    }
+}
+
+class Dog : Animal {
+    public override void Speak() {  // 부모 메서드를 덮어씀
+        Console.WriteLine("멍멍");
+    }
+}
+```
+
+👉 차이점:
+
+- C#에서는 부모 메서드에 `virtual` 키워드가 있어야 자식이 `override` 가능.
+- 자바에서는 `@Override` 애너테이션만 붙이면 됨.
+
+---
+
+## 4. 추상 클래스 (abstract class)
+
+자바:
+
+```java
+abstract class Animal {
+    abstract void Speak();
+}
+class Dog extends Animal {
+    @Override
+    void Speak() {
+        System.out.println("멍멍");
+    }
+}
+```
+
+C#:
+
+```csharp
+abstract class Animal {
+    public abstract void Speak();
+}
+
+class Dog : Animal {
+    public override void Speak() {
+        Console.WriteLine("멍멍");
+    }
+}
+```
+
+👉 거의 똑같음. 다만 C#은 `override` 키워드를 꼭 붙여야 함.
+
+---
+
+## 5. 다중 상속
+
+- 자바와 마찬가지로 **클래스 다중 상속은 불가능** (단일 상속만 가능).
+- 하지만 **인터페이스는 여러 개 상속 가능**.
+
+C#:
+
+```csharp
+interface IFly {
+    void Fly();
+}
+
+interface ISwim {
+    void Swim();
+}
+
+class Duck : IFly, ISwim {
+    public void Fly() {
+        Console.WriteLine("오리가 날아간다");
+    }
+    public void Swim() {
+        Console.WriteLine("오리가 헤엄친다");
+    }
+}
+```
+
+---
+
+# 🟡 정리
+
+1. **상속 선언** → 자바: `extends`, C#: `:`
+2. **오버라이드** → 자바: `@Override`, C#: `virtual` + `override`
+3. **추상 클래스** → 거의 동일, C#은 `override` 키워드 필수
+4. **다중 상속** → 클래스는 불가, 인터페이스는 여러 개 가능
+
+---
+
+# { 🔫 Raycast 오버로드로 픽업 무시하기 }
+
+이번 강의는 **Raycast의 다양한 오버로드를 활용하여 총알이 불필요하게 "픽업 아이템"에 맞지 않도록 처리하는 방법**을 다룹니다.
+
+즉, FPS 게임에서 흔히 일어나는 문제인 “총알이 아이템과 충돌하는 현상”을 해결하는 방법을 학습합니다.
+
+---
+
+## 📋 목차
+
+1. [FPS에서 Raycast와 충돌 문제 이해하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#fps%EC%97%90%EC%84%9C-raycast%EC%99%80-%EC%B6%A9%EB%8F%8C-%EB%AC%B8%EC%A0%9C-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Physics.Raycast 오버로드 개념](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#physicsraycast-%EC%98%A4%EB%B2%84%EB%A1%9C%EB%93%9C-%EA%B0%9C%EB%85%90)
+3. [Weapon 스크립트 수정하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#weapon-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%88%98%EC%A0%95%ED%95%98%EA%B8%B0)
+4. [LayerMask와 Inspector 활용](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#layermask%EC%99%80-inspector-%ED%99%9C%EC%9A%A9)
+5. [QueryTriggerInteraction으로 트리거 무시하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#querytriggerinteraction%EC%9C%BC%EB%A1%9C-%ED%8A%B8%EB%A6%AC%EA%B1%B0-%EB%AC%B4%EC%8B%9C%ED%95%98%EA%B8%B0)
+6. [실제 Unity에서 테스트](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%EC%8B%A4%EC%A0%9C-unity%EC%97%90%EC%84%9C-%ED%85%8C%EC%8A%A4%ED%8A%B8)
+7. [정리 및 활용 팁](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%EC%A0%95%EB%A6%AC-%EB%B0%8F-%ED%99%9C%EC%9A%A9-%ED%8C%81)
+
+---
+
+## 1. FPS에서 Raycast와 충돌 문제 이해하기
+
+- **문제 상황**
+  - FPS 게임에서 총을 쏘면 `Physics.Raycast`를 사용해 총알 궤적을 판정합니다.
+  - 하지만 이때 **픽업 아이템(Pickup)** 같은 **트리거 콜라이더(Trigger Collider)**에도 충돌이 발생하는 문제가 있습니다.
+  - 현실적으로 총알이 아이템에 부딪혀 막히는 건 어색하기 때문에, 보통은 총알이 픽업을 "관통"해야 합니다.
+- **FPS 일반적인 동작**
+  - 총알은 아이템을 통과하고,
+  - 진짜 벽(Wall), 적 캐릭터(Enemy) 같은 "실제 장애물"과만 충돌해야 합니다.
+
+---
+
+## 2. Physics.Raycast 오버로드 개념
+
+- Unity의 `Physics.Raycast`는 여러 **오버로드(overload)**를 가지고 있습니다.
+- **오버로드란?** 같은 이름의 메서드라도, 전달하는 매개변수(parameter)의 조합에 따라 동작이 달라지는 것을 의미합니다.
+
+예시:
+
+```csharp
+Physics.Raycast(origin, direction);
+Physics.Raycast(origin, direction, out hitInfo, maxDistance);
+Physics.Raycast(origin, direction, out hitInfo, maxDistance, layerMask, queryTriggerInteraction);
+```
+
+- 주요 인수:
+  1. **origin** → 시작 위치 (카메라 위치 등)
+  2. **direction** → 쏘는 방향
+  3. **hitInfo** → 충돌 정보 저장 (RaycastHit)
+  4. **maxDistance** → 최대 사거리
+  5. **layerMask** → 충돌할 레이어 지정
+  6. **queryTriggerInteraction** → 트리거 콜라이더와 상호작용 여부
+- 이번 강의에서는 특히 **layerMask**와 **queryTriggerInteraction**이 핵심입니다.
+
+---
+
+## 3. Weapon 스크립트 수정하기
+
+- 기존의 Weapon 스크립트에서 `Raycast`를 단순히 호출하면 **모든 콜라이더와 충돌**하게 됩니다.
+- 이를 수정해, **레이어 마스크와 트리거 무시 옵션**을 추가합니다.
+
+```csharp
+[SerializeField] LayerMask interactionLayers;
+
+if (Physics.Raycast(
+        Camera.main.transform.position,
+        Camera.main.transform.forward,
+        out hit,
+        Mathf.Infinity,
+        interactionLayers,
+        QueryTriggerInteraction.Ignore))
+{
+    Instantiate(weaponSO.HitVFXPrefab, hit.point, Quaternion.identity);
+    EnemyHealth enemyHealth = hit.collider.GetComponent<EnemyHealth>();
+    enemyHealth?.TakeDamage(weaponSO.Dagage);
+}
+```
+
+- `interactionLayers` : 어떤 레이어와 상호작용할지 Inspector에서 지정 가능.
+- `QueryTriggerInteraction.Ignore` : **트리거 콜라이더(예: Pickup 아이템)는 무시**.
+
+---
+
+## 4. LayerMask와 Inspector 활용
+
+- **LayerMask 직렬화**
+  ```csharp
+  [SerializeField] LayerMask interactionLayers;
+  ```
+  → Inspector 창에서 레이어를 선택 가능.
+- 설정 예시:
+  - `Everything` : 모든 레이어와 충돌
+  - `Nothing` : 어떤 것도 충돌하지 않음
+  - 특정 레이어만 선택 가능
+- 활용 방법:
+  1. **Pickup 전용 레이어**를 만들어서 Raycast에서 제외하거나,
+  2. Unity가 기본 제공하는 **Ignore Raycast** 레이어를 활용할 수도 있습니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380455/notion-blog/_/3D_/3D_/_6_4/image.png)
+
+```csharp
+아이템에 레이어 선택창이 나타난다
+```
+
+---
+
+## 5. QueryTriggerInteraction으로 트리거 무시하기
+
+- Raycast 마지막 매개변수 `QueryTriggerInteraction`은 트리거를 처리하는 방식을 정합니다.
+- 옵션:
+  - `UseGlobal` : 프로젝트 기본 설정 따름
+  - `Ignore` : 트리거 콜라이더 무시
+  - `Collide` : 트리거도 충돌 대상으로 포함
+- 강의에서는 **`Ignore` 사용** → Pickup 같은 트리거 아이템은 총알과 충돌하지 않음.
+
+---
+
+## 6. 실제 Unity에서 테스트
+
+1. Weapon 프리팹 열기 (`Assets > Prefabs > Weapons`).
+2. **Interaction Layers** 필드 확인 → Inspector에서 레이어 선택 가능.
+3. Play 모드에서 테스트:
+   - `Everything` → 모든 것과 충돌 (픽업 포함).
+   - `Nothing` → 아무 것도 충돌하지 않음.
+   - 특정 레이어 제외 → 픽업은 무시, 적/환경과만 충돌.
+   - `QueryTriggerInteraction.Ignore` → 모든 트리거 무시 (간단한 해결책).
+
+---
+
+## 7. 정리 및 활용 팁
+
+- **핵심 요약**
+  - `Raycast` 기본 호출은 모든 콜라이더와 충돌.
+  - **LayerMask**로 특정 레이어만 충돌 처리 가능.
+  - **QueryTriggerInteraction.Ignore**로 트리거 콜라이더 무시 가능.
+- **활용 예시**
+  - 총알이 픽업 아이템이나 투명한 트리거 존에 막히지 않도록 처리.
+  - UI용 트리거, 이벤트 트리거 등을 총알 판정에서 제외.
+  - Inspector에서 레이어를 직관적으로 제어 → 디자이너와 협업할 때 유용.
+
+---
+
+✅ 이번 강의의 개념은 **"총알의 충돌 대상을 개발자가 제어할 수 있다"**는 점이고,
+
+✅ 실습은 **Weapon 스크립트에서 Raycast 오버로드를 적절히 선택하는 방법**에 집중했습니다.
+
+---
+
+# { 🔫 무기 탄창 & 탄약 시스템 구현하기 }
+
+이번 강의에서는 **무기별 탄약(Ammo)을 관리하고 UI에 표시**하는 기능을 구현합니다.
+
+각 무기는 **ScriptableObject(WeaponSO)** 에서 자체 탄창 크기를 가지며,
+
+플레이어 UI(Canvas)에 현재 탄약 개수를 표시하고,
+
+발사 시 탄약이 줄어들도록 로직을 작성합니다.
+
+---
+
+## 📋 목차
+
+1. [탄약 UI 설정하기 (Overlay Canvas)](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%ED%83%84%EC%95%BD-ui-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0-overlay-canvas)
+2. [WeaponSO에 MagazineSize 추가하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#weaponso%EC%97%90-magazinesize-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+3. [ActiveWeapon 스크립트 구조 변경하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#activeweapon-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EA%B5%AC%EC%A1%B0-%EB%B3%80%EA%B2%BD%ED%95%98%EA%B8%B0)
+4. [탄약 감소 & 표시 기능 구현하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%ED%83%84%EC%95%BD-%EA%B0%90%EC%86%8C--%ED%91%9C%EC%8B%9C-%EA%B8%B0%EB%8A%A5-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+5. [무기 교체 시 탄약 초기화하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%EB%AC%B4%EA%B8%B0-%EA%B5%90%EC%B2%B4-%EC%8B%9C-%ED%83%84%EC%95%BD-%EC%B4%88%EA%B8%B0%ED%99%94%ED%95%98%EA%B8%B0)
+6. [도전 과제 및 개선 포인트](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%EB%8F%84%EC%A0%84-%EA%B3%BC%EC%A0%9C-%EB%B0%8F-%EA%B0%9C%EC%84%A0-%ED%8F%AC%EC%9D%B8%ED%8A%B8)
+
+---
+
+## 1. 탄약 UI 설정하기 (Overlay Canvas)
+
+### 🎯 개념
+
+- **UI를 통해 현재 탄약을 플레이어에게 표시**.
+- UI 요소는 **컨테이너(Container)** 를 활용 → 아이콘과 텍스트를 묶어 정렬 & 배치.
+- Unity의 **TextMeshPro (TMP)** 를 사용해 깔끔한 숫자 표시.
+
+### 🛠️ 구현 단계
+
+1. **Overlay Canvas** 안에서 `Empty GameObject` 생성 → `Ammo Container`로 이름 변경.
+2. 위치 고정:
+   - 오른쪽 하단(Anchor → Alt + 우측 하단 클릭).
+   - Padding 조정으로 살짝 위/안쪽에 배치.
+3. **아이콘 배치**:
+   - `UI → Image` 생성, `Ammo Icon`으로 이름 변경.
+   - [Assets] → [Sharp Shooter Assets] → [Images] 폴더에서 탄약 아이콘 적용.
+4. **텍스트 배치**:
+   - `UI → Text - TextMeshPro` 생성, `Ammo Text`로 이름 변경.
+   - TMP Essentials 임포트 필요.
+   - 텍스트 크기 72 정도로 조절.
+   - 정렬: Ammo Icon은 **오른쪽**, Ammo Text는 **왼쪽**에 붙도록 컨테이너 기준으로 배치.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380452/notion-blog/_/3D_/3D_/_6_4/image_1.png)
+
+---
+
+## 2. WeaponSO에 MagazineSize 추가하기
+
+### 🎯 개념
+
+- **각 무기별 기본 탄창 크기(Magazine Size)를 ScriptableObject에 저장**.
+- 무기마다 시작 탄약이 다르게 설정 가능.
+
+### 🛠️ 구현 단계
+
+```csharp
+public int MagazineSize = 12;
+```
+
+- Pistol: 12발
+- Sniper Rifle: 8발
+- Machine Gun: 48발 (예시)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380453/notion-blog/_/3D_/3D_/_6_4/image_2.png)
+
+---
+
+## 3. ActiveWeapon 스크립트 구조 변경하기
+
+### 🎯 개념
+
+- 무기 장착, 탄약 관리, 발사, 줌 기능 등을 담당하는 핵심 클래스.
+- **시작 무기(startingWeapon)** 와 **현재 무기(currentWeaponSO)** 구분 필요.
+
+### 🛠️ 주요 변경점
+
+1. `startingWeapon` → **Inspector에서 설정 가능**.
+
+   `currentWeaponSO`는 내부에서만 관리.
+
+2. `SwitchWeapon()` 메소드로 **무기 장착 처리**:
+   - 기존 무기 파괴
+   - 새로운 무기 프리팹 생성
+   - `currentWeaponSO` 갱신
+   - `AdjustAmmo(weaponSO.MagazineSize)` 호출 → 탄약 초기화
+3. Start() 에서:
+
+   ```csharp
+   SwitchWeapon(startingWeapon);
+   AdjustAmmo(currentWeaponSO.MagazineSize);
+   ```
+
+---
+
+## 4. 탄약 감소 & 표시 기능 구현하기
+
+### 🎯 개념
+
+- **발사할 때마다 탄약이 줄어들고**
+- **UI(TextMeshPro)에 현재 탄약 표시**.
+
+### 🛠️ 핵심 메소드
+
+```csharp
+public void AdjustAmmo(int amount)
+{
+    currentAmmo += amount;
+
+    // 최대 탄창 크기 제한
+    if (currentAmmo > currentWeaponSO.MagazineSize)
+    {
+        currentAmmo = currentWeaponSO.MagazineSize;
+    }
+
+    // 최소 두 자리 숫자로 표시 (예: 03)
+    ammoText.text = currentAmmo.ToString("D2");
+}
+```
+
+- `"D3"` → 최소 **3자리** (`5 → "005"`)
+- `"D4"` → 최소 **4자리** (`12 → "0012"`)
+
+즉 `"D2"`는 **항상 두 자리 숫자로 보이도록 강제**하는 거예요.
+
+→ UI에서 탄약이 **3**이라도 `"03"`으로 표시되니까 더 깔끔해 보이는 거죠.
+
+---
+
+👉 정리하면:
+
+`ammoText.text = currentAmmo.ToString("D2");`
+
+= “현재 탄약을 문자열로 바꾸되, 항상 두 자리로 표시해라.”
+
+### 📌 HandleShoot() 수정
+
+```csharp
+if (timeSinceLastShot >= currentWeaponSO.FireRate && currentAmmo > 0)
+{
+    currentWeapon.Shoot(currentWeaponSO);
+    animator.Play(SHOOT_STRING, 0, 0f);
+    timeSinceLastShot = 0f;
+    AdjustAmmo(-1); // 발사 시 탄약 감소
+}
+```
+
+---
+
+## 5. 무기 교체 시 탄약 초기화하기
+
+### 🎯 개념
+
+- 새로운 무기를 장착하면, 해당 무기의 `MagazineSize` 만큼 탄약 설정.
+- 현재 탄약이 최대치를 넘지 않도록 제한.
+
+### 🛠️ 구현
+
+```csharp
+public void SwitchWeapon(WeaponSO weaponSO)
+{
+    if (currentWeapon)
+    {
+        Destroy(currentWeapon.gameObject);
+    }
+
+    Weapon newWeapon = Instantiate(weaponSO.weaponPrefab, transform).GetComponent<Weapon>();
+    currentWeapon = newWeapon;
+    this.currentWeaponSO = weaponSO;
+
+    AdjustAmmo(weaponSO.MagazineSize); // 새로운 무기 장착 시 탄약 초기화
+}
+```
+
+---
+
+✅ 여기까지가 이번 강의의 정리예요.
+
+탄약 시스템을 **UI + ScriptableObject + ActiveWeapon** 구조로 완전히 연결했죠.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380453/notion-blog/_/3D_/3D_/_6_4/image_3.png)
+
+---
+
+# { 🎯 탄약 픽업(Ammo Pickup) 만들기 }
+
+이번 강의에서는 **기본 Pickup 클래스에서 확장된 탄약 픽업 상자(Ammo Pickup)**를 구현하고, 모델/프리팹/머티리얼까지 세팅하는 과정을 다룹니다.
+
+---
+
+## 📋 목차
+
+1. [FBX 탄약 박스 모델 가져오기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#fbx-%ED%83%84%EC%95%BD-%EB%B0%95%EC%8A%A4-%EB%AA%A8%EB%8D%B8-%EA%B0%80%EC%A0%B8%EC%98%A4%EA%B8%B0)
+2. [Pickup 계층 구조 정리하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#pickup-%EA%B3%84%EC%B8%B5-%EA%B5%AC%EC%A1%B0-%EC%A0%95%EB%A6%AC%ED%95%98%EA%B8%B0)
+3. [콜라이더(Capsule Collider) 설정하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%EC%BD%9C%EB%9D%BC%EC%9D%B4%EB%8D%94capsule-collider-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+4. [Pickup 스크립트 구조 및 상속](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#pickup-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EA%B5%AC%EC%A1%B0-%EB%B0%8F-%EC%83%81%EC%86%8D)
+5. [AmmoPickup 스크립트 구현하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#ammopickup-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+6. [Prefab으로 저장하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#prefab%EC%9C%BC%EB%A1%9C-%EC%A0%80%EC%9E%A5%ED%95%98%EA%B8%B0)
+7. [모델 머티리얼 수정하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%EB%AA%A8%EB%8D%B8-%EB%A8%B8%ED%8B%B0%EB%A6%AC%EC%96%BC-%EC%88%98%EC%A0%95%ED%95%98%EA%B8%B0)
+8. [Trigger Collider 문제 해결](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#trigger-collider-%EB%AC%B8%EC%A0%9C-%ED%95%B4%EA%B2%B0)
+9. [Missing (Mesh) 버그 해결](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#missing-mesh-%EB%B2%84%EA%B7%B8-%ED%95%B4%EA%B2%B0)
+
+---
+
+## 1. FBX 탄약 박스 모델 가져오기
+
+- 경로: **GDTV Sharp Shooter Assets → Pickups 폴더**
+- 사용할 모델: **Create 모델 (FBX)**
+- Scene 뷰에서 **2D 모드**를 켜고, Player 근처에 FBX 모델을 드래그 앤 드롭.
+- 방해되는 UI 오버레이 캔버스는 눈 아이콘(Visibility) 비활성화로 숨겨두기.
+
+---
+
+## 2. Pickup 계층 구조 정리하기
+
+- FBX 모델만 단독으로 쓰지 않고, **부모 GameObject → 자식으로 모델 배치**하는 방식으로 정리.
+- 방법:
+  - 모델 선택 후 **Ctrl + Shift + G** → 빈 GameObject 생성 → `Model` 이름 지정.
+  - `Model`을 선택하고 **Ctrl + G** → 상위 `Ammo Pickup` GameObject 생성.
+- 최종 계층 구조:
+  ```
+  Ammo Pickup (빈 오브젝트, 스크립트 및 콜라이더 보관)
+   └── Model (FBX 모델)
+  ```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380453/notion-blog/_/3D_/3D_/_6_4/image_4.png)
+
+---
+
+## 3. 콜라이더(Capsule Collider) 설정하기
+
+- `Ammo Pickup`에 **Capsule Collider** 추가.
+- 위치(Y값) 살짝 올려 모델과 맞추기.
+- 반지름(Radius) 값: **0.7**
+  - 이전 무기 픽업(Weapon Pickup)과 동일한 값으로 통일.
+
+---
+
+## 4. Pickup 스크립트 구조 및 상속
+
+- **Pickup.cs (추상 클래스)**
+  - 모든 픽업 오브젝트의 공통 기능 관리.
+  - 기능:
+    - `Update()` → **회전 애니메이션** (Y축 회전)
+    - `OnTriggerEnter()` → 플레이어 태그(`Player`) 감지 후 `OnPickup()` 실행
+    - 추상 메소드 `OnPickup(ActiveWeapon activeWeapon)` → 각 픽업이 구체적으로 정의
+
+```csharp
+public abstract class Pickup : MonoBehaviour
+{
+    [SerializeField] float rotationSpeed = 100f;
+    const string PLAYER_STRING = "Player";
+
+    void Update()
+    {
+        transform.Rotate(0f, rotationSpeed * Time.deltaTime, 0f);
+    }
+
+    void OnTriggerEnter(Collider other)
+    {
+        if (other.CompareTag(PLAYER_STRING))
+        {
+            ActiveWeapon activeWeapon = other.GetComponentInChildren<ActiveWeapon>();
+            OnPickup(activeWeapon);
+            Destroy(gameObject);
+        }
+    }
+
+    protected abstract void OnPickup(ActiveWeapon activeWeapon);
+}
+```
+
+---
+
+## 5. AmmoPickup 스크립트 구현하기
+
+- **Pickup.cs 상속 → AmmoPickup.cs 생성**
+- 추가 필드: `[SerializeField] int ammoAmount = 10;`
+- `OnPickup()` 오버라이드:
+  - `activeWeapon.AdjustAmmo(ammoAmount);` 호출
+  - 탄약 증가 처리 (ActiveWeapon에 이미 정의된 로직 사용)
+
+```csharp
+public class AmmoPickup : Pickup
+{
+    [SerializeField] int ammoAmount = 10;
+
+    protected override void OnPickup(ActiveWeapon activeWeapon)
+    {
+        activeWeapon.AdjustAmmo(ammoAmount);
+    }
+}
+```
+
+- `ammoAmount` 값은 Inspector에서 조절 가능 (예: 100 설정 → 한 번에 탄약 가득 보충).
+
+---
+
+## 6. Prefab으로 저장하기
+
+- 완성된 `Ammo Pickup` 오브젝트를 **Prefabs → Pickups 폴더**로 드래그 앤 드롭.
+- 이제 게임 내에서 자유롭게 재사용 가능.
+
+---
+
+## 7. 모델 머티리얼 수정하기
+
+- FBX 모델에 **두 가지 재질(Materials)** 적용되어 있음.
+- 확인 방법: 모델 선택 → Inspector → Mesh Renderer → Element 0 / Element 1 확인.
+- 두 번째 재질(작은 흰색 부분)을 교체:
+  - 경로: **Textures and Materials → custom 폴더**
+  - 빛나는 청록색(Material)을 드래그 → 두 번째 슬롯에 적용.
+- Blender에서 미리 분리된 재질이므로, Unity에서 슬롯별 적용 가능.
+
+---
+
+## 8. Trigger Collider 문제 해결
+
+- 테스트 시, 탄약 상자를 지나쳐도 픽업이 안 됨 → 이유: **Capsule Collider가 Trigger 아님**
+- 해결 방법:
+  - `Capsule Collider` → **Is Trigger 체크**
+  - Prefab에 적용(Save changes).
+
+---
+
+## 9. Missing (Mesh) 버그 해결
+
+- 강의 중 작은 버그 발견: **Mesh Collider에서 Missing (Mesh) 오류 발생**
+- 해결 방법:
+  - 해당 **Mesh Collider 컴포넌트 삭제**
+  - 다시 **Mesh Collider 추가** → 자동으로 올바른 Mesh 연결.
+
+---
+
+# ✅ 강의 핵심 정리
+
+- **Pickup 시스템을 추상화 → 상속 구조로 관리**
+- **Ammo Pickup은 단 몇 줄로 구현 가능** (OnPickup만 구현)
+- FBX 모델 → GameObject 계층화, Collider/Trigger 세팅, Prefab 저장까지 완성.
+- 머티리얼 교체로 시각적 디테일까지 조정.
+- 작은 버그(Trigger 누락, Mesh Missing)까지 확인하고 해결.
+
+---
+
+# { 🎥 카메라 스태킹과 무기 클리핑 문제 해결하기 }
+
+이번 강의는 **FPS 무기가 벽을 뚫고 보이는 문제**를 **카메라 스태킹(Camera Stacking)** 기법을 활용해 해결하는 과정을 다룹니다.
+
+---
+
+## 📋 목차
+
+1. [무기 클리핑 문제 이해하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%EB%AC%B4%EA%B8%B0-%ED%81%B4%EB%A6%AC%ED%95%91-%EB%AC%B8%EC%A0%9C-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [카메라 스태킹 개념](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%EC%B9%B4%EB%A9%94%EB%9D%BC-%EC%8A%A4%ED%83%9C%ED%82%B9-%EA%B0%9C%EB%85%90)
+3. [계층 구조 정리하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%EA%B3%84%EC%B8%B5-%EA%B5%AC%EC%A1%B0-%EC%A0%95%EB%A6%AC%ED%95%98%EA%B8%B0)
+4. [Weapon 전용 카메라 생성하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#weapon-%EC%A0%84%EC%9A%A9-%EC%B9%B4%EB%A9%94%EB%9D%BC-%EC%83%9D%EC%84%B1%ED%95%98%EA%B8%B0)
+5. [레이어(Layer) 분리와 할당](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%EB%A0%88%EC%9D%B4%EC%96%B4layer-%EB%B6%84%EB%A6%AC%EC%99%80-%ED%95%A0%EB%8B%B9)
+6. [카메라 스택(Camera Stack) 설정하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%EC%B9%B4%EB%A9%94%EB%9D%BC-%EC%8A%A4%ED%83%9Dcamera-stack-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+7. [클리핑 평면(Clipping Planes) 조정하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%ED%81%B4%EB%A6%AC%ED%95%91-%ED%8F%89%EB%A9%B4clipping-planes-%EC%A1%B0%EC%A0%95%ED%95%98%EA%B8%B0)
+8. [오디오 리스너 문제 해결](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%EC%98%A4%EB%94%94%EC%98%A4-%EB%A6%AC%EC%8A%A4%EB%84%88-%EB%AC%B8%EC%A0%9C-%ED%95%B4%EA%B2%B0)
+9. [포스트 프로세싱(Post Processing) 적용 문제](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%ED%8F%AC%EC%8A%A4%ED%8A%B8-%ED%94%84%EB%A1%9C%EC%84%B8%EC%8B%B1post-processing-%EC%A0%81%EC%9A%A9-%EB%AC%B8%EC%A0%9C)
+10. [최종 결과 및 마무리](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%EC%B5%9C%EC%A2%85-%EA%B2%B0%EA%B3%BC-%EB%B0%8F-%EB%A7%88%EB%AC%B4%EB%A6%AC)
+
+---
+
+## 1. 무기 클리핑 문제 이해하기
+
+- FPS 게임에서 **총기 모델이 벽에 너무 가까워질 경우**, 무기 모델이 벽을 뚫고 나오는 문제가 발생.
+- 권총은 크기가 작아 티가 잘 안 나지만, **기관총/저격총**처럼 길이가 긴 무기는 벽을 관통해서 어색한 화면 연출을 만듦.
+- 이 문제는 **메인 카메라의 렌더링 방식**과 **무기의 배치 위치** 때문에 발생.
+
+---
+
+## 2. 카메라 스태킹 개념
+
+- **Camera Stacking (카메라 스태킹)** : 여러 카메라를 **겹쳐서 렌더링**하는 방식.
+  - **Base 카메라**: 메인 게임 월드(환경, NPC, 배경)를 렌더링.
+  - **Overlay 카메라**: 특정 레이어(무기, UI 등)만 별도로 렌더링해서 Base 카메라 위에 겹쳐 그림.
+- FPS 무기 문제 해결 방식:
+  - 무기 전용 카메라를 만들고 → 무기만 렌더링하도록 설정 → 메인 카메라에 Overlay로 스택.
+  - 이렇게 하면 무기가 벽에 닿아도 카메라에서 따로 처리되므로 벽을 뚫지 않음.
+
+---
+
+## 3. 계층 구조 정리하기
+
+- **Cameras 폴더** 생성 → `Main Camera`, `PlayerFollowCamera` 이동.
+- 불필요하게 무기를 `Cameras` 오브젝트 하위에 넣지 않음.
+- **Enemies 그룹화**: 로봇들을 선택 후 `Ctrl+Shift+G` → `Enemies` 생성.
+- **Pickups 그룹화**: 픽업 아이템들을 선택 후 `Ctrl+Shift+G` → `Pickups` 생성.
+- 결과적으로 **계층 구조가 깔끔하게 정리**됨.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380454/notion-blog/_/3D_/3D_/_6_4/image_5.png)
+
+---
+
+## 4. Weapon 전용 카메라 생성하기
+
+- 새로운 카메라 생성 → 이름을 **Weapon Camera** 로 변경.
+- 카메라 속성 설정:
+  - **Render Type**: `Overlay` 로 변경 (Base가 아닌 Overlay로 설정해야 스택에 추가 가능).
+  - **FOV(Field of View)**: 플레이어 카메라와 동일하게 맞추기 (예: 40).
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380454/notion-blog/_/3D_/3D_/_6_4/image_6.png)
+
+```csharp
+- **Render Type**: `Overlay` 로 변경 (Base가 아닌 Overlay로 설정해야 스택에 추가 가능).
+
+- **FOV(Field of View)**: 플레이어 카메라와 동일하게 맞추기
+```
+
+---
+
+## 5. 레이어(Layer) 분리와 할당
+
+- 무기를 다른 오브젝트와 분리하기 위해 새로운 레이어 생성:
+  - **Weapon 레이어** 생성.
+- 무기 폴더 내 모든 무기(권총, 기관총, 저격총 등)에 **Weapon 레이어 할당**.
+- "자식도 변경" 옵션 선택 → 무기의 모든 하위 오브젝트까지 일괄 적용.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380454/notion-blog/_/3D_/3D_/_6_4/image_7.png)
+
+---
+
+## 6. 카메라 스택(Camera Stack) 설정하기
+
+- **Weapon Camera** → `Culling Mask` 에서 **Weapon 레이어만 선택**.
+- **Main Camera** → `Culling Mask` 에서 **Weapon 제외**.
+- **Main Camera → Camera Stack**:
+  - `+` 버튼 클릭 → `Weapon Camera` 추가.
+- 결과:
+  - Main Camera는 월드(환경, 적, 오브젝트)를 렌더링.
+  - Weapon Camera는 무기만 렌더링.
+  - 두 화면이 합쳐져 최종 출력됨.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380454/notion-blog/_/3D_/3D_/_6_4/image_8.png)
+
+---
+
+## 7. 클리핑 평면(Clipping Planes) 조정하기
+
+- Weapon Camera의 **Near Clipping Plane** 값을 가능한 0에 가깝게 줄임 (예: 0.01).
+- 이렇게 하면 무기가 벽 앞에서 **잘리지 않고 정확히 표시**됨.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380454/notion-blog/_/3D_/3D_/_6_4/image_9.png)
+
+---
+
+## 8. 오디오 리스너 문제 해결
+
+- Unity는 씬에서 **오디오 리스너(Audio Listener)** 가 두 개 이상 있으면 경고 발생.
+- Weapon Camera에서 **Audio Listener 컴포넌트 제거** → 경고 해결.
+
+---
+
+## 9. 포스트 프로세싱(Post Processing) 적용 문제
+
+- 문제:
+  - Main Camera와 Weapon Camera 모두 **Post Processing** 활성화 시 → **겹쳐 보이는 현상** 발생.
+- 해결 방법:
+  - **Main Camera** → Post Processing `OFF`.
+  - **Weapon Camera** → Post Processing `ON`.
+- 추가 설정:
+  - Main Camera에서 **Anti-Aliasing(FXAA)** 적용 → 화면 품질 개선.
+  - Overlay 카메라에는 Anti-Aliasing 옵션이 표시되지 않음 → Base 카메라에서만 적용.
+
+---
+
+## 10. 최종 결과 및 마무리
+
+- 무기가 벽을 뚫는 문제 해결 ✅
+- 무기/환경을 분리한 **카메라 스태킹 구조 확립** ✅
+- Post Processing 적용도 원하는 대로 동작 ✅
+- 경고(오디오 리스너) 제거 완료 ✅
+- FPS 무기 시스템이 보다 **자연스럽고 깔끔하게 표현**됨.
+
+---
+
+# { 🔫 무기 반동 효과와 시네머신 임펄스 활용하기 }
+
+이번 강의에서는 **시네머신(Cinemachine)**의 **임펄스 소스(Impulse Source)**와 **임펄스 리스너(Impulse Listener)** 컴포넌트를 활용하여
+
+총기를 발사할 때 **자연스러운 화면 흔들림(반동 효과)**을 구현하는 방법을 다룬다.
+
+---
+
+## 📋 목차
+
+1. [시네머신 화면 흔들림 개념](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%EC%8B%9C%EB%84%A4%EB%A8%B8%EC%8B%A0-%ED%99%94%EB%A9%B4-%ED%9D%94%EB%93%A4%EB%A6%BC-%EA%B0%9C%EB%85%90)
+2. [Cinemachine Impulse Listener 설정하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#cinemachine-impulse-listener-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+3. [Weapon Prefab에 Impulse Source 추가하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#weapon-prefab%EC%97%90-impulse-source-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+4. [Impulse Source 값 조정하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#impulse-source-%EA%B0%92-%EC%A1%B0%EC%A0%95%ED%95%98%EA%B8%B0)
+5. [Weapon 스크립트에서 GenerateImpulse() 호출하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#weapon-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8%EC%97%90%EC%84%9C-generateimpulse-%ED%98%B8%EC%B6%9C%ED%95%98%EA%B8%B0)
+6. [Zoom(스코프) 시 카메라 처리 문제 해결하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#zoom%EC%8A%A4%EC%BD%94%ED%94%84-%EC%8B%9C-%EC%B9%B4%EB%A9%94%EB%9D%BC-%EC%B2%98%EB%A6%AC-%EB%AC%B8%EC%A0%9C-%ED%95%B4%EA%B2%B0%ED%95%98%EA%B8%B0)
+7. [최종 결과 및 주의사항](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%EC%B5%9C%EC%A2%85-%EA%B2%B0%EA%B3%BC-%EB%B0%8F-%EC%A3%BC%EC%9D%98%EC%82%AC%ED%95%AD)
+
+---
+
+## 1. 시네머신 화면 흔들림 개념
+
+- **목표** : 총을 발사했을 때 화면에 **살짝 반동(흔들림)** 효과를 주는 것.
+- 너무 과한 반동이나 기관총 스프레이 패턴 같은 복잡한 구현이 아니라,
+  **“한 발 쏠 때마다 화면이 살짝 흔들리는 정도”**를 구현하는 것이 이번 강의의 핵심.
+- **Cinemachine Impulse System** 구성 요소:
+  - **Impulse Source** : 충격(Impulse)을 발생시키는 발신기. (총구, 폭발 지점 등)
+  - **Impulse Listener** : 카메라에 부착되어 충격 신호를 받아 화면을 흔드는 역할.
+
+---
+
+## 2. Cinemachine Impulse Listener 설정하기
+
+- **위치** : 플레이어를 따라가는 **Cinemachine Virtual Camera**에 추가한다.
+- **방법** :
+  1. Virtual Camera 선택
+  2. **Extensions** → **Cinemachine Impulse Listener** 추가
+- **설정 특징** :
+  - 특별히 값을 바꿀 필요 없음 (기본값 그대로 사용 가능).
+  - 화면 흔들림의 강도/빈도는 Listener가 아니라 **Impulse Source**에서 조절한다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380452/notion-blog/_/3D_/3D_/_6_4/image_10.png)
+
+---
+
+## 3. Weapon Prefab에 Impulse Source 추가하기
+
+- 무기 프리팹(기관총, 권총, 저격소총 등)에 **Cinemachine Impulse Source** 컴포넌트 추가.
+- 이유: 각 무기마다 반동 정도가 다르므로 **프리팹별로 개별 설정 가능**해야 한다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380452/notion-blog/_/3D_/3D_/_6_4/image_11.png)
+
+---
+
+## 4. Impulse Source 값 조정하기
+
+- Inspector에서 **Cinemachine Impulse Source** 옵션을 무기별로 다르게 설정.
+- 주요 설정:
+  - **Amplitude Gain (진폭 증폭)** : 화면 흔들림 세기 조절.
+  - **Frequency Gain (주파수 증폭)** : 진동의 빠르기 조절.
+- 강의에서 사용한 예시 값:
+  - 권총 (Pistol) → **0.1**
+  - 기관총 (Machine Gun) → **0.05**
+  - 저격소총 (Sniper Rifle) → **0.2**
+
+👉 값이 음수인 경우 화면 흔들림이 더 과하게 느껴지므로, 적절히 조정해야 한다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380452/notion-blog/_/3D_/3D_/_6_4/image_12.png)
+
+---
+
+## 5. Weapon 스크립트에서 GenerateImpulse() 호출하기
+
+- **핵심 코드** : 총을 발사할 때 `impulseSource.GenerateImpulse();` 실행.
+
+### 코드 흐름
+
+```csharp
+void Awake()
+{
+    impulseSource = GetComponent<CinemachineImpulseSource>();
+}
+
+public void Shoot(WeaponSO weaponSO)
+{
+    muzzleFlash.Play();
+    impulseSource.GenerateImpulse();   // 💡 여기서 화면 흔들림 발생
+    ...
+}
+```
+
+- 위치: 총알 Raycast 발사와 총구 섬광(Muzzle Flash) 실행 직후.
+- 이렇게 하면 총알 발사 시마다 카메라가 **임펄스를 받아 흔들림 효과** 발생.
+
+---
+
+## 6. Zoom(스코프) 시 카메라 처리 문제 해결하기
+
+- **문제 상황** : 저격소총으로 줌인할 때 카메라 스태킹 문제 때문에 총구가 보이는 현상 발생.
+- 해결 방법 2가지:
+  1. **Mesh Renderer On/Off 제어**
+     - 저격소총 장착 시 `MeshRenderer.enabled = false` 로 숨기기
+     - 단, 무기 장착/해제 때마다 처리해야 하므로 코드가 번거로워짐.
+  2. **Weapon 전용 Camera 활용 (추천 방법)**
+     - Weapon Camera의 **Field of View (FOV)**를 조절하여 무기를 화면에서 제외.
+     - 줌인 시 → `weaponCamera.fieldOfView = ZoomAmount`
+     - 줌아웃 시 → `weaponCamera.fieldOfView = defaultFOV`
+
+👉 강의에서는 **두 번째 방법(Weapon Camera FOV 조절)**을 사용.
+
+### 🔎 `ActiveWeapon.cs` 안 `HandleZoom()` 수정된 부분
+
+```csharp
+[SerializeField] Camera weaponCamera;
+
+void HandleZoom()
+{
+    if (!currentWeaponSO.CanZoom) { return; }
+
+    float targetFOV;
+
+    if (starterAssetsInputs.zoom)
+    {
+        // 🔫 줌인 상태
+        targetFOV = currentWeaponSO.ZoomAmount;
+
+        // 플레이어 회전 속도 느리게 조절
+        firstPersonController.ChangeRotationSpeed(currentWeaponSO.ZoomRotationSpeed);
+
+        // 🎯 Weapon Camera도 동일하게 좁은 시야각 적용
+        weaponCamera.fieldOfView = currentWeaponSO.ZoomAmount;
+
+        // 비네트 효과 활성화
+        zoomVignette.SetActive(true);
+    }
+    else
+    {
+        // 🔄 줌아웃 상태
+        targetFOV = defaultFOV;
+
+        // 플레이어 회전 속도 원래대로 복구
+        firstPersonController.ChangeRotationSpeed(defaultRotationSpeed);
+
+        // 🎯 Weapon Camera도 기본 시야각으로 복구
+        weaponCamera.fieldOfView = defaultFOV;
+
+        // 비네트 효과 비활성화
+        zoomVignette.SetActive(false);
+    }
+
+    // 🎥 메인 플레이어 카메라 FOV는 부드럽게 전환
+    currentFOV = Mathf.SmoothDamp(currentFOV, targetFOV, ref fovVelocity, 0.1f);
+    playerFollowCamera.m_Lens.FieldOfView = currentFOV;
+}
+
+```
+
+---
+
+### 🔑 핵심 정리
+
+- **메인 플레이어 카메라 (playerFollowCamera)** : `Mathf.SmoothDamp`를 이용해 자연스럽게 줌 인/아웃 처리.
+- **무기 전용 카메라 (weaponCamera)** : `fieldOfView`를 직접 즉시 변경해줌.
+  → 이렇게 하면 저격소총 총구가 화면에 걸리지 않고, 줌 시 총구 안 보이는 문제가 해결됨.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380452/notion-blog/_/3D_/3D_/_6_4/image_13.png)
+
+---
+
+## 7. 최종 결과 및 주의사항
+
+- 권총: 작고 미묘한 화면 흔들림
+- 기관총: 연사 시 거의 느껴지지 않는 가벼운 흔들림
+- 저격소총: 강하고 뚜렷한 반동 효과
+- **실행 시 확인해야 할 것들**:
+  - Virtual Camera에 Impulse Listener가 정상적으로 추가되었는지
+  - 각 무기 프리팹에 Impulse Source가 추가되어 있는지
+  - `Weapon.cs`에서 `GenerateImpulse()` 호출이 잘 되는지
+  - Weapon Camera 참조가 올바르게 연결되었는지
+
+---
+
+✅ 정리하면 이번 강의의 본질은
+
+- **Listener는 카메라에 달아준다**
+- **Source는 무기 프리팹에 달아준다**
+- **Shoot() 메서드에서 GenerateImpulse() 호출한다**
+- **무기마다 Source 값 다르게 설정해 개성 있는 반동 연출**
+- **저격소총 줌 시에는 Weapon Camera FOV를 조절해 총구 안 보이게 처리**
+
+---
+
+# { 🚀 로켓 추진기와 파티클 시스템 제어하기 }
+
+이번 강의는 **로봇 파괴 시 폭발 효과를 위한 파티클 시스템을 직접 제작하고, 프리팹으로 구성해 코드에서 제어**하는 과정입니다.
+
+---
+
+## 📋 목차
+
+1. [파티클 시스템 개념 이해하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%ED%8C%8C%ED%8B%B0%ED%81%B4-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [기존 에셋 활용 및 크기 조정하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%EA%B8%B0%EC%A1%B4-%EC%97%90%EC%85%8B-%ED%99%9C%EC%9A%A9-%EB%B0%8F-%ED%81%AC%EA%B8%B0-%EC%A1%B0%EC%A0%95%ED%95%98%EA%B8%B0)
+3. [파티클 시스템 옵션 수정하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%ED%8C%8C%ED%8B%B0%ED%81%B4-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EC%98%B5%EC%85%98-%EC%88%98%EC%A0%95%ED%95%98%EA%B8%B0)
+4. [재질(Material) 교체 및 색상 변경하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%EC%9E%AC%EC%A7%88material-%EA%B5%90%EC%B2%B4-%EB%B0%8F-%EC%83%89%EC%83%81-%EB%B3%80%EA%B2%BD%ED%95%98%EA%B8%B0)
+5. [프리팹 제작 및 자동 파괴 설정](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%ED%94%84%EB%A6%AC%ED%8C%B9-%EC%A0%9C%EC%9E%91-%EB%B0%8F-%EC%9E%90%EB%8F%99-%ED%8C%8C%EA%B4%B4-%EC%84%A4%EC%A0%95)
+6. [스크립트에서 인스턴스화하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8%EC%97%90%EC%84%9C-%EC%9D%B8%EC%8A%A4%ED%84%B4%EC%8A%A4%ED%99%94%ED%95%98%EA%B8%B0)
+7. [최종 조정 및 테스트](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%EC%B5%9C%EC%A2%85-%EC%A1%B0%EC%A0%95-%EB%B0%8F-%ED%85%8C%EC%8A%A4%ED%8A%B8)
+
+---
+
+## 1. 파티클 시스템 개념 이해하기
+
+- **파티클 시스템(Particle System)**
+  → 작은 입자(Particles)를 대량으로 생성하여 **불꽃, 연기, 폭발, 잔해** 등의 효과를 표현하는 시스템.
+- **부모 파티클과 자식 파티클**
+  - 부모 시스템을 실행하면 자식 시스템도 함께 실행됨.
+  - 하나의 폭발 효과를 구성할 때 여러 개의 파티클 시스템을 조합하는 경우가 많음.
+
+---
+
+## 2. 기존 에셋 활용 및 크기 조정하기
+
+- **참고 에셋**: `Imported Assets → 제3자 에셋 → SimpleFX → Prefabs`
+- 선택 프리팹: **FX*폭발*잔해**
+- **기본 크기 문제**: 에셋이 너무 크므로 축소 필요.
+- **조정 방법**:
+  - 여러 파티클 시스템을 선택 → **Scaling Mode**를 `Shape → Hierarchy`로 변경.
+  - 이제 Transform 스케일로 직접 조정 가능.
+  - `X, Y, Z = 0.2` 로 설정 → 크기 축소.
+
+---
+
+## 3. 파티클 시스템 옵션 수정하기
+
+### ① 잔해(Explosion Debris)
+
+- **Emission(방출량)**
+  - 기본: 초당 150개 (Duration 0.1초 동안 실행 + 시작 시 추가 150개).
+  - 너무 많으므로 일부 제거.
+- **Start Delay(시작 지연)**
+  - 기본적으로 지연 있음.
+  - → `0.05초` 정도로 줄여, 더 자연스러운 효과 제공.
+
+---
+
+### ② 불꽃(Explosion Fire)
+
+- **Gravity Modifier (중력 계수)**
+  - 기본: `1` → 너무 빨리 떨어짐.
+  - 변경: `0.2` → 더 자연스러운 불꽃 상승.
+- **Start Size (입자 크기)**
+  - 기본: `1`
+  - 변경: `2` → 불꽃 입자 크기 확대.
+- **Start Speed (속도)**
+  - 기본: 낮음
+  - 변경: `30` → 불꽃이 더 빠르게 퍼져나감.
+- **Start Delay (시작 지연)**
+  - 불꽃은 **즉시 시작**하도록 `0`으로 변경.
+
+---
+
+### ③ 연기(Explosion Smoke)
+
+- 기본적으로 `1초 지연`이 있음.
+- 강의에서는 **발표 단순화를 위해 삭제**.
+  - (선택 사항: 원한다면 지연값 조정으로 잔류 연기를 표현할 수 있음).
+
+---
+
+## 4. 재질(Material) 교체 및 색상 변경하기
+
+### ① 잔해 재질 수정
+
+- **기존 재질**: SimpleFX 내 "파편 재질" 사용.
+- 방법:
+  - 재질을 열고 **Color 속성**에서 직접 색상 변경.
+  - **스포이드 툴(eyedropper)** → 장면의 로봇 색상(밝은 회색) 선택.
+  - 결과: 로봇 파편과 색상 통일.
+
+---
+
+### ② 불꽃 재질 수정
+
+- **기존 재질**: `FX_Base` (URP 전용 아님).
+- 문제: 발광(Emission) 속성이 없어 직접 추가하기 어려움.
+- 해결 방법:
+  - `Assets → Materials`에서 `FX_Green` 재질 복제(Ctrl+D).
+  - 이름: `FX_Orange` (재사용 가능하도록 일반화).
+  - **Base Map**: 따뜻한 주황색 선택.
+  - **Emission**: 강도 `4.6` → 너무 밝아 `2.6 ~ 3` 정도로 조정.
+  - 이 재질을 **불꽃 파티클 시스템에 적용**.
+
+---
+
+## 5. 프리팹 제작 및 자동 파괴 설정
+
+- **새 폴더 생성**: `Prefabs → VFX`
+- 폭발 프리팹 이름: **Robot Explosion VFX**
+- 파티클 시스템 프리팹에 **Stop Action → Destroy** 적용.
+  → 수명이 끝나면 자동으로 계층(Hierarchy)에서 제거됨.
+
+---
+
+## 6. 스크립트에서 인스턴스화하기
+
+- **적의 헬스 스크립트(EnemyHealth.cs)** 안에서 처리.
+
+### 코드 개요
+
+```csharp
+public GameObject robotExplosionVFX;  // 폭발 프리팹 참조
+
+void Die()
+{
+    // 폭발 생성 (로봇 위치에서 실행)
+    Instantiate(robotExplosionVFX, transform.position, Quaternion.identity);
+
+    // 로봇 오브젝트 제거
+    Destroy(gameObject);
+}
+
+```
+
+- **참조 연결 방법**:
+  - 유니티 에디터에서 Robot 프리팹 선택 → `Robot Explosion VFX`를 `Inspector`의 변수 슬롯에 드래그.
+  - **Apply to Prefab**으로 모든 로봇에 적용.
+
+---
+
+## 7. 최종 조정 및 테스트
+
+- **테스트 중 문제**: 폭발이 다소 작거나 큼.
+- **해결 방법**:
+  - 프리팹 Transform Scale 수정.
+  - 예시: `0.3 ~ 0.45` 범위에서 조정.
+  - **불꽃 크기만 따로 조정**: `0.4 ~ 0.6` 등 다양한 값 실험.
+- **최종 결과**:
+  - 로봇이 파괴될 때 적절한 크기의 폭발 발생.
+  - 불꽃/잔해 색상은 로봇과 어울리도록 변경됨.
+  - 파티클은 일정 시간 후 자동 제거.
+
+---
+
+✅ 이번 강의 핵심 정리
+
+1. **기존 폭발 프리팹을 가져와 크기와 옵션 수정**.
+2. **잔해/불꽃/연기 각각의 파티클 시스템 개별 조정**.
+3. **로봇 재질과 색상 일치하도록 파편 색상 교체**.
+4. **불꽃에는 Emission 속성이 있는 새 재질 적용**.
+5. **프리팹화 + Stop Action으로 자동 파괴**.
+6. **헬스 스크립트에서 인스턴스화하여 로봇 파괴 시 실행**.
+7. **실제 테스트로 크기와 속도 반복 조정**.
+
+---
+
+# { 🤖 로봇 폭발과 폭발 반경 제어하기 }
+
+이번 강의는 **로봇 폭발 시 VFX(시각 효과)와 연동하여 실제 게임플레이에 영향을 주는 기초 단계**를 다루었습니다.
+
+특히 **폭발 반경을 기준으로 플레이어에게 피해를 줄 수 있도록 준비하는 과정**과, **기즈모를 활용한 디버깅 방법**을 배웠습니다.
+
+---
+
+## 📋 목차
+
+1. [폭발 효과와 플레이어 피해 개념 이해하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%ED%8F%AD%EB%B0%9C-%ED%9A%A8%EA%B3%BC%EC%99%80-%ED%94%8C%EB%A0%88%EC%9D%B4%EC%96%B4-%ED%94%BC%ED%95%B4-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [콜라이더와 폭발 반경 설정하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%EC%BD%9C%EB%9D%BC%EC%9D%B4%EB%8D%94%EC%99%80-%ED%8F%AD%EB%B0%9C-%EB%B0%98%EA%B2%BD-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+3. [Explosion 스크립트 만들기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#explosion-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+4. [기즈모를 활용해 폭발 반경 시각화하기](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%EA%B8%B0%EC%A6%88%EB%AA%A8%EB%A5%BC-%ED%99%9C%EC%9A%A9%ED%95%B4-%ED%8F%AD%EB%B0%9C-%EB%B0%98%EA%B2%BD-%EC%8B%9C%EA%B0%81%ED%99%94%ED%95%98%EA%B8%B0)
+5. [SelfDestruct() 메서드로 로봇 자폭 구현](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#selfdestruct-%EB%A9%94%EC%84%9C%EB%93%9C%EB%A1%9C-%EB%A1%9C%EB%B4%87-%EC%9E%90%ED%8F%AD-%EA%B5%AC%ED%98%84)
+6. [로봇과 플레이어의 상호작용 (OnTriggerEnter)](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%EB%A1%9C%EB%B4%87%EA%B3%BC-%ED%94%8C%EB%A0%88%EC%9D%B4%EC%96%B4%EC%9D%98-%EC%83%81%ED%98%B8%EC%9E%91%EC%9A%A9-ontriggerenter)
+7. [프리팹 설정과 파티클 수명 관리](https://www.notion.so/6-4-281e683f737e80d99ed2c5619401701b#%ED%94%84%EB%A6%AC%ED%8C%B9-%EC%84%A4%EC%A0%95%EA%B3%BC-%ED%8C%8C%ED%8B%B0%ED%81%B4-%EC%88%98%EB%AA%85-%EA%B4%80%EB%A6%AC)
+
+---
+
+## 1. 폭발 효과와 플레이어 피해 개념 이해하기
+
+- 이번 강의의 목표는 단순히 **폭발 이펙트를 보여주는 것**이 아니라,
+  그 폭발이 실제로 **플레이어에게 피해를 주는 게임플레이 요소**로 작동하도록 만드는 것.
+- 일반적으로는 **플레이어에 Health 스크립트를 붙이고, 외부에서 피해를 주는 방식**을 구현하지만,
+  이번에는 역으로 **폭발 반경을 먼저 계산하고, 반경 안의 플레이어에게 피해를 가하는 방식**으로 접근.
+- 즉, **폭발 중심에서부터 영향을 주는 구조**를 설계.
+
+---
+
+## 2. 콜라이더와 폭발 반경 설정하기
+
+- 로봇에 **Capsule Collider**를 추가하여 **트리거(Trigger)** 로 사용.
+- 이미 로봇 본체에는 **비트리거 콜라이더(물리 충돌용)** 가 있으므로,
+  폭발 반경을 감지하는 용도로는 **별도의 Capsule Collider(Trigger)** 를 사용.
+- 반경 값은 대략 `1.5` 정도로 설정 → 폭발 범위를 의미.
+- 이 Trigger Collider는:
+  - 무기의 Raycast에는 영향을 주지 않음.
+  - 대신 **OnTriggerEnter** 이벤트를 발생시켜 로봇 자폭 조건을 만들 수 있음.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380453/notion-blog/_/3D_/3D_/_6_4/image_14.png)
+
+---
+
+## 3. Explosion 스크립트 만들기
+
+```csharp
+public class Explosion : MonoBehaviour
+{
+    [SerializeField] float radius = 1.5f;
+
+    void Start()
+    {
+        Explode(); // 폭발 시 실행할 함수 (현재는 의사코드 단계)
+    }
+
+    void Explode()
+    {
+        // 플레이어에게 피해 주기 (추후 구현 예정)
+    }
+}
+```
+
+- `radius` 값을 직렬화(SerializeField) 하여 인스펙터에서 쉽게 조정 가능.
+- **Start()** 에서 `Explode()` 함수를 실행 → 폭발 시작 시점에 로직 실행 준비.
+- 현재는 피해 계산 대신, 단순히 폭발 반경을 확인하는 디버깅 상태.
+
+---
+
+## 4. 기즈모를 활용해 폭발 반경 시각화하기
+
+- `OnDrawGizmos()` 메서드를 사용하면 **Scene 뷰에서만 보이는 디버깅 도구**를 만들 수 있음.
+- 예제 코드:
+
+```csharp
+void OnDrawGizmos()
+{
+    Gizmos.color = Color.red;
+    Gizmos.DrawWireSphere(transform.position, radius);
+}
+```
+
+- 결과:
+  - Scene 뷰에서 붉은 원형 Wire Sphere가 표시되어 폭발 범위를 직관적으로 확인할 수 있음.
+  - **Game 뷰나 빌드된 게임에는 표시되지 않음** (디버깅 전용).
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380453/notion-blog/_/3D_/3D_/_6_4/image_15.png)
+
+---
+
+## 5. SelfDestruct() 메서드로 로봇 자폭 구현
+
+- EnemyHealth 클래스에 **SelfDestruct() 메서드** 추가:
+  - 폭발 프리팹을 인스턴스화(Instantiate).
+  - 로봇 오브젝트를 Destroy().
+- 장점:
+  - **TakeDamage() 외부에서도 호출 가능** → 체력이 0이 아니어도 자폭 가능.
+  - 코드 중복 제거 (폭발 & 파괴 로직을 한 곳에 모음).
+
+---
+
+## 6. 로봇과 플레이어의 상호작용 (OnTriggerEnter)
+
+- Robot 클래스에 `OnTriggerEnter` 추가:
+
+```csharp
+void OnTriggerEnter(Collider other)
+{
+    if (other.CompareTag(PLAYER_STRING))
+    {
+        EnemyHealth enemyHealth = GetComponent<EnemyHealth>();
+        enemyHealth.SelfDestruct();
+    }
+}
+```
+
+- 로직 설명:
+  1. 로봇의 Trigger Collider에 **플레이어가 들어옴**.
+  2. `CompareTag("Player")` 로 플레이어인지 확인.
+  3. 맞다면 `SelfDestruct()` 실행 → 폭발 발생 후 로봇 파괴.
+
+---
+
+## 7. 프리팹 설정과 파티클 수명 관리
+
+- 로봇 폭발 프리팹의 Particle System 확인:
+  - **Stop Action** 을 `Destroy` 로 설정해야 파티클이 끝나면 자동 파괴됨.
+  - 부모와 자식 파티클 모두 동일하게 설정해야 **잔여 파티클이 씬에 남지 않음**.
+- 각 파티클의 **Start Lifetime** 조정:
+  - 기본값이 15초로 너무 길었음 → 3초 정도로 축소.
+  - 폭발 효과가 간결하고 깔끔하게 사라지도록 개선.
+
+---
+
+# ✅ 이번 강의 핵심 정리
+
+1. **Trigger Collider** 를 이용해 폭발 반경을 설정하고, 플레이어 감지 가능.
+2. **Explosion 스크립트**를 만들어 폭발 반경 및 피해 로직을 담당하도록 설계.
+3. **OnDrawGizmos** 로 Scene 뷰에서 폭발 반경을 직관적으로 확인 가능.
+4. **SelfDestruct()** 메서드로 로봇이 외부 조건(체력 0, 트리거 진입 등)에 따라 폭발하도록 구현.
+5. 파티클 시스템은 **Stop Action = Destroy** 로 설정하고, **Start Lifetime** 을 짧게 조정하여 깔끔한 폭발 효과 유지.

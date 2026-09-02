@@ -1,0 +1,2200 @@
+---
+title: '섹션 5: Shooter Sam - 13'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 체력 바 UI 만들기 }
+
+## 🎯 이번에 할 것
+
+**HUD에 체력 바 표시!**
+
+```
+Progress Bar 위젯 사용
+    ↓
+C++로 값 업데이트
+    ↓
+실시간 체력 표시! ❤️
+```
+
+---
+
+## 🎨 Step 1: Progress Bar 추가
+
+### 1-1: 위젯 배치
+
+**WBP_HUD 열기:**
+
+```
+1. Palette 검색: "Progress Bar"
+2. Canvas Panel로 드래그
+3. 왼쪽 상단 배치
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380649/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_13/image.png)
+
+**위치:**
+
+```
+Anchors: 좌상단 (기본값)
+Position: 여백 조금
+Size X: 350
+```
+
+---
+
+### 1-2: 외형 설정
+
+**Details 패널:**
+
+```
+Appearance:
+  Percent: 1.0 (전체 채움 = 100%)
+    → 테스트용
+
+  Fill Color and Opacity:
+    초록색 선택 ✅
+    (체력 = 초록색)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380647/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_13/image_1.png)
+
+---
+
+### Progress Bar 이해하기
+
+**Percent 값:**
+
+```
+0.0 = 0% (비어있음)
+0.5 = 50% (반)
+1.0 = 100% (가득 참)
+```
+
+**Fill Type:**
+
+```
+Left to Right (기본):
+  왼쪽에서 오른쪽으로 채움 ←→
+
+Top to Bottom:
+  위에서 아래로 채움 ↕
+
+등등...
+```
+
+---
+
+### 1-3: 이름 설정
+
+```
+Details → Name:
+  "HealthBar"
+
+매우 중요! ⚠️
+C++ 코드와 정확히 일치해야 함!
+```
+
+---
+
+## 💻 Step 2: C++ 변수 생성
+
+### 2-1: Header 파일
+
+**HUDWidget.h:**
+
+```cpp
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Blueprint/UserWidget.h"
+#include "Components/ProgressBar.h"  // 👈 Include 추가!
+#include "HUDWidget.generated.h"
+
+UCLASS()
+class SHOOTERSAM_API UHUDWidget : public UUserWidget
+{
+    GENERATED_BODY()
+
+public:
+    // ===== Progress Bar 변수 =====
+    UPROPERTY(EditAnywhere, meta = (BindWidget))
+    UProgressBar* HealthBar;
+
+    // ===== 업데이트 함수 =====
+    void SetHealthBarPercent(float NewPercent);
+};
+```
+
+---
+
+### UPROPERTY 설명
+
+**EditAnywhere:**
+
+```
+에디터에서 편집 가능
+→ 하지만 자동 바인딩됨
+```
+
+**meta = (BindWidget):**
+
+```
+위젯 블루프린트와 자동 연결
+  ↓
+이름이 같으면:
+  HealthBar (C++) ↔ HealthBar (블루프린트)
+  → 자동 바인딩!
+```
+
+---
+
+### BindWidget vs BindWidgetOptional
+
+**BindWidget (필수):**
+
+```cpp
+meta = (BindWidget)
+```
+
+**효과:**
+
+```
+블루프린트에 해당 이름 없으면:
+  → 에러! ❌
+  → 컴파일 안 됨
+
+강제성:
+  → 반드시 있어야 함
+```
+
+---
+
+**BindWidgetOptional (선택):**
+
+```cpp
+meta = (BindWidgetOptional)
+```
+
+**효과:**
+
+```
+블루프린트에 해당 이름 없어도:
+  → OK! ✅
+  → 그냥 nullptr
+
+유연성:
+  → 있으면 쓰고 없으면 말고
+```
+
+---
+
+**우리는 BindWidgetOptional 사용!**
+
+```cpp
+UPROPERTY(EditAnywhere, meta = (BindWidgetOptional))
+UProgressBar* HealthBar;
+```
+
+**이유:**
+
+```
+더 안전함
+→ 이름 틀려도 크래시 안 남
+→ 유연함
+```
+
+---
+
+### 2-2: 구현 파일
+
+**HUDWidget.cpp:**
+
+```cpp
+#include "HUDWidget.h"
+
+void UHUDWidget::SetHealthBarPercent(float NewPercent)
+{
+    // ===== 범위 체크 =====
+    if (NewPercent >= 0.0f && NewPercent <= 1.0f)
+    {
+        // ===== Progress Bar 업데이트 =====
+        HealthBar->SetPercent(NewPercent);
+    }
+}
+```
+
+---
+
+### 함수 분석
+
+**범위 체크:**
+
+```cpp
+if (NewPercent >= 0.0f && NewPercent <= 1.0f)
+```
+
+**왜 필요?**
+
+```
+Progress Bar는 0~1만 허용
+  ↓
+1.5 같은 값 넣으면:
+  → 이상하게 표시됨
+
+-0.5 같은 값:
+  → 말이 안 됨
+
+범위 체크:
+  → 안전! ✅
+```
+
+---
+
+**SetPercent:**
+
+```cpp
+HealthBar->SetPercent(NewPercent);
+```
+
+**동작:**
+
+```
+UProgressBar의 함수
+  ↓
+Percent 값 변경
+  ↓
+0.0 = 비움
+0.5 = 반
+1.0 = 가득
+```
+
+---
+
+## 🎮 Step 3: Player Controller 수정
+
+### 3-1: HUDWidget Public으로
+
+**ShooterSamPlayerController.h:**
+
+```cpp
+class SHOOTERSAM_API AShooterSamPlayerController : public APlayerController
+{
+    GENERATED_BODY()
+
+protected:
+    // ...
+
+public:  // 👈 Public으로 변경!
+    // ===== HUD 위젯 =====
+    UPROPERTY(EditDefaultsOnly)
+    TSubclassOf<UHUDWidget> HUDWidgetClass;
+
+    UHUDWidget* HUDWidget;  // 👈 접근 가능하게!
+};
+```
+
+**왜 Public?**
+
+```
+기존 (Protected):
+  외부에서 접근 불가
+  → Character가 HUDWidget 못 씀
+
+변경 (Public):
+  외부에서 접근 가능
+  → Character가 HUDWidget 사용 가능! ✅
+```
+
+---
+
+## 🏃 Step 4: Character에서 업데이트
+
+### 4-1: UpdateHUD 함수
+
+**ShooterSamCharacter.h:**
+
+```cpp
+#include "ShooterSamPlayerController.h"  // 👈 Include 추가
+
+class SHOOTERSAM_API AShooterSamCharacter : public ACharacter
+{
+    // ...
+
+private:
+    void UpdateHUD();
+};
+```
+
+---
+
+**ShooterSamCharacter.cpp:**
+
+```cpp
+void AShooterSamCharacter::UpdateHUD()
+{
+    // ===== 1. Player Controller 가져오기 =====
+    AShooterSamPlayerController* PlayerController =
+        Cast<AShooterSamPlayerController>(GetController());
+
+    // ===== 2. 유효성 확인 =====
+    if (PlayerController)
+    {
+        // ===== 3. 퍼센트 계산 =====
+        float NewPercent = Health / MaxHealth;
+
+        // ===== 4. 음수 방지 =====
+        if (NewPercent < 0.0f)
+        {
+            NewPercent = 0.0f;
+        }
+
+        // ===== 5. HUD 업데이트 =====
+        PlayerController->HUDWidget->SetHealthBarPercent(NewPercent);
+    }
+}
+```
+
+---
+
+### 코드 완전 분해
+
+**1. GetController()**
+
+```cpp
+GetController()
+```
+
+**동작:**
+
+```
+Character의 함수
+  ↓
+이 Character를 조종하는 Controller 반환
+  ↓
+AController* 타입
+```
+
+---
+
+**2. Cast**
+
+```cpp
+Cast<AShooterSamPlayerController>(GetController())
+```
+
+**왜?**
+
+```
+GetController() 반환:
+  AController* (부모 타입)
+
+우리가 원하는 것:
+  AShooterSamPlayerController* (자식)
+  → HUDWidget 변수 있음!
+
+Cast 필요!
+```
+
+---
+
+**3. 퍼센트 계산**
+
+```cpp
+float NewPercent = Health / MaxHealth;
+```
+
+**예시:**
+
+```
+Health = 100, MaxHealth = 100
+  → 100 / 100 = 1.0 (100%)
+
+Health = 50, MaxHealth = 100
+  → 50 / 100 = 0.5 (50%)
+
+Health = 25, MaxHealth = 100
+  → 25 / 100 = 0.25 (25%)
+
+Health = 0, MaxHealth = 100
+  → 0 / 100 = 0.0 (0%)
+```
+
+---
+
+**4. 음수 방지**
+
+```cpp
+if (NewPercent < 0.0f)
+{
+    NewPercent = 0.0f;
+}
+```
+
+**왜 필요?**
+
+```
+사망 시:
+  Health = 0
+  DetachFromControllerPendingDestroy()
+
+UpdateHUD 호출 시:
+  GetController() = nullptr
+  → 에러 가능
+
+또는:
+  Health가 음수가 될 수도
+  → 0.0으로 보정
+```
+
+---
+
+**5. HUD 업데이트**
+
+```cpp
+PlayerController->HUDWidget->SetHealthBarPercent(NewPercent);
+```
+
+**체이닝:**
+
+```
+PlayerController:
+  AShooterSamPlayerController*
+  ↓
+HUDWidget:
+  UHUDWidget*
+  ↓
+SetHealthBarPercent(NewPercent):
+  void 함수
+  → HealthBar->SetPercent() 호출
+```
+
+---
+
+### 4-2: 호출 위치
+
+**BeginPlay:**
+
+```cpp
+void AShooterSamCharacter::BeginPlay()
+{
+    Super::BeginPlay();
+
+    OnTakeAnyDamage.AddDynamic(this, &AShooterSamCharacter::OnDamageTaken);
+    Health = MaxHealth;
+
+    // ===== 초기 HUD 설정 =====
+    UpdateHUD();  // 👈 여기!
+
+    // Gun 설정...
+}
+```
+
+**왜?**
+
+```
+게임 시작 시:
+  체력 바가 비어있을 수도
+  → 잘못된 표시
+
+UpdateHUD() 호출:
+  → 100% 표시
+  → 정확함! ✅
+```
+
+---
+
+**OnDamageTaken:**
+
+```cpp
+void AShooterSamCharacter::OnDamageTaken(...)
+{
+    if (!IsAlive) return;
+
+    if (IsAlive)
+    {
+        Health -= Damage;
+
+        // ===== 데미지 받을 때마다 업데이트 =====
+        UpdateHUD();  // 👈 여기!
+
+        if (Health <= 0.0f)
+        {
+            IsAlive = false;
+            Health = 0.0f;
+            GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+            DetachFromControllerPendingDestroy();
+        }
+    }
+}
+```
+
+**왜 여기?**
+
+```
+UpdateHUD 위치:
+  Health -= Damage 직후 ✅
+
+사망 체크 전:
+  → Health 값 정확
+
+사망 체크 후는?
+  → Health = 0.0 강제 설정
+  → 괜찮음!
+
+DetachFromController 전:
+  → Controller 아직 있음
+  → UpdateHUD 정상 작동
+```
+
+---
+
+## 🎯 전체 흐름
+
+### 게임 시작
+
+```
+[BeginPlay]
+Health = MaxHealth (100)
+  ↓
+UpdateHUD():
+  NewPercent = 100 / 100 = 1.0
+  ↓
+HealthBar->SetPercent(1.0)
+  ↓
+체력 바 100% 표시! ✅
+```
+
+---
+
+### 데미지 받음
+
+```
+[총 맞음]
+OnDamageTaken:
+  Health = 100 - 35 = 65
+  ↓
+UpdateHUD():
+  NewPercent = 65 / 100 = 0.65
+  ↓
+HealthBar->SetPercent(0.65)
+  ↓
+체력 바 65% 표시!
+```
+
+---
+
+### 사망
+
+```
+[마지막 총알]
+OnDamageTaken:
+  Health = 35 - 35 = 0
+  ↓
+UpdateHUD():
+  NewPercent = 0 / 100 = 0.0
+  ↓
+HealthBar->SetPercent(0.0)
+  ↓
+체력 바 0% 표시!
+  ↓
+Health <= 0:
+  IsAlive = false
+  DetachFromControllerPendingDestroy()
+  ↓
+사망!
+```
+
+---
+
+## 📚 핵심 개념 정리
+
+### Progress Bar
+
+```
+0.0 ~ 1.0 범위
+→ 퍼센트 표시
+→ SetPercent()로 업데이트
+```
+
+### BindWidget
+
+```
+C++ 변수 ↔ 블루프린트 위젯 연결
+→ 이름 일치 필수
+→ 자동 바인딩
+```
+
+### 퍼센트 계산
+
+```
+현재값 / 최대값
+→ 항상 0~1
+→ Progress Bar에 적합
+```
+
+### UpdateHUD
+
+```
+BeginPlay: 초기 설정
+OnDamageTaken: 변화 반영
+```
+
+---
+
+## 💡 실전 팁
+
+### 색상 선택
+
+**상황별 색상:**
+
+```
+체력:
+  초록색 ✅
+  빨간색도 가능
+
+마나/스태미나:
+  파란색
+
+경험치:
+  노란색/보라색
+```
+
+---
+
+### 범위 체크 패턴
+
+**항상 체크:**
+
+```cpp
+void SetValue(float NewValue)
+{
+    // 범위 체크
+    if (NewValue < Min || NewValue > Max)
+        return;
+
+    // 안전하게 사용
+    DoSomething(NewValue);
+}
+```
+
+---
+
+### Smooth 업데이트
+
+**부드러운 감소:**
+
+```cpp
+// 현재: 즉시 변경
+HealthBar->SetPercent(0.5);
+
+// 개선: 서서히 변경 (고급)
+// Lerp 사용
+CurrentPercent = Lerp(CurrentPercent, TargetPercent, DeltaTime);
+```
+
+---
+
+## 🐛 문제 해결
+
+### 체력 바가 안 보여요!
+
+**체크:** WBP_HUD 컴파일했나? AddToViewport 호출됐나?
+
+### 값이 안 바뀌어요!
+
+**확인:** HealthBar 이름 정확한가? BindWidget 설정됐나? UpdateHUD 호출되나?
+
+### 크래시 나요!
+
+**원인:** HealthBar가 nullptr, BindWidget 실패, Controller 분리 후 호출
+
+---
+
+## 🎯 요약
+
+**Progress Bar로 체력 표시**
+
+```
+위젯 블루프린트:
+  Progress Bar 추가
+  이름: HealthBar
+  색상: 초록색
+
+C++:
+  BindWidget으로 연결
+  SetHealthBarPercent() 함수
+  퍼센트 = Health / MaxHealth
+
+호출:
+  BeginPlay: 초기화
+  OnDamageTaken: 업데이트
+```
+
+**결과:**
+
+```
+실시간 체력 표시
+데미지 받으면 감소
+사망하면 0%
+완벽! ✅
+```
+
+---
+
+# 총기 사운드 이펙트 구현 - 완전 초보 버전
+
+## 🎯 이번에 할 것
+
+**Sound Cue로 총소리 구현!**
+
+```
+2가지 사운드:
+  1. 발사음 (Shoot Sound)
+  2. 충격음 (Impact Sound)
+
+랜덤 재생 + 볼륨/피치 조절
+    ↓
+생생한 총격전! 🔫🔊
+```
+
+---
+
+## 🎵 Sound Cue란?
+
+### 개념
+
+**Sound Cue = 사운드 편집 시스템**
+
+```
+단순 사운드 파일:
+  .wav 파일 1개
+  → 그냥 재생만
+
+Sound Cue:
+  여러 사운드 조합
+  → 랜덤 재생
+  → 볼륨/피치 조절
+  → 다양한 효과
+```
+
+**비유:**
+
+```
+Animation Blueprint처럼:
+  노드 그래프로 편집
+  입력 → 처리 → 출력
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380647/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_13/image_2.png)
+
+---
+
+## 📁 Step 1: 폴더 구조
+
+### 1-1: SFX 폴더 생성
+
+```
+Content/MyStuff/SFX/
+  (Sound Effects 저장용)
+```
+
+---
+
+### 1-2: 사운드 파일 확인
+
+**제공된 사운드:**
+
+```
+Content/ShooterGame/Weapons/Mono_Sounds/
+
+발사음:
+  - AssaultRifle_Shot_01
+  - AssaultRifle_Shot_02
+  - ... (총 6개)
+
+충격음:
+  - AssaultRifle_Impact_01
+  - AssaultRifle_Impact_02
+  - ... (총 6개)
+```
+
+---
+
+## 🎨 Step 2: 발사음 Sound Cue 만들기
+
+### 2-1: Sound Cue 생성
+
+```
+MyStuff/SFX 폴더에서:
+  우클릭 → Audio → Sound Cue
+  이름: SC_RifleShot
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380647/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_13/image_3.png)
+
+---
+
+### 2-2: Sound Cue 편집기
+
+**더블클릭해서 열기:**
+
+```
+화면 구성:
+  - 그래프 (중앙)
+  - Output 노드 (기본)
+  - Details 패널 (왼쪽)
+```
+
+**Output 노드:**
+
+```
+최종적으로 재생될 사운드
+→ 여기로 연결해야 함
+```
+
+---
+
+## 🔧 Step 3: 랜덤 사운드 구현
+
+### 3-1: Wave Player (단일 사운드)
+
+**기본 방법:**
+
+```
+1. 그래프 우클릭
+2. "Wave Player" 생성
+3. Details에서 사운드 선택:
+   AssaultRifle_Shot_01
+4. Output에 연결
+5. 툴바의 "Play Cue" 클릭
+   → 재생됨!
+```
+
+---
+
+### 3-2: Random 노드 (랜덤 재생)
+
+**더 나은 방법:**
+
+**1. 기존 연결 삭제:**
+
+```
+Alt + 클릭으로 연결선 제거
+```
+
+**2. Random 노드 생성:**
+
+```
+우클릭 → "Random"
+Output에 연결
+```
+
+**3. 입력 핀 추가:**
+
+```
+Random 노드 선택
+→ Details
+→ "Add Input" 5번 클릭
+→ 총 6개 입력 핀
+```
+
+---
+
+### 3-3: Wave Players 추가 (수동)
+
+**방법 1 - 하나씩:**
+
+```
+1. Content Drawer 열기
+2. 사운드 2~6 선택
+3. 그래프로 드래그
+4. 각각 Random 입력에 연결
+```
+
+---
+
+### 3-4: 빠른 생성 (자동)
+
+**방법 2 - 한번에:**
+
+```
+1. Content Browser에서
+   모든 Shot 사운드 선택 (1~6)
+
+2. 그래프 우클릭
+
+3. "Create from Selected"
+   → "Random from Multiple Waves"
+
+4. 자동 생성!
+   모든 Wave Player + Random 노드
+   → 모두 연결됨
+
+5. Output만 연결하면 끝!
+```
+
+---
+
+### Random 노드 설정
+
+**Randomize Without Replacement:**
+
+```
+체크 ON (기본):
+  모든 사운드를 한 번씩 재생
+  → 반복 안 됨
+  → 다양함!
+
+  예: 1→3→5→2→4→6 (순서는 랜덤)
+       다시 1→5→3...
+
+체크 OFF:
+  완전 랜덤
+  → 같은 소리 연속 가능
+  → 1→1→1 가능
+```
+
+**추천: ON 유지 ✅**
+
+---
+
+## 🎛️ Step 4: Modulator (볼륨/피치 조절)
+
+### 4-1: Modulator 노드 추가
+
+```
+1. Random과 Output 사이 연결 끊기
+
+2. 우클릭 → "Modulator" 생성
+
+3. 연결:
+   Random → Modulator → Output
+```
+
+---
+
+### 4-2: Modulator 설정
+
+**Details 패널:**
+
+```
+Pitch Modulation:
+  Pitch Min: 0.95 (조금 낮게)
+  Pitch Max: 1.05 (조금 높게)
+
+  효과: 같은 소리도 약간씩 다르게!
+
+Volume Modulation:
+  Volume Min: 0.9
+  Volume Max: 1.0
+
+  효과: 볼륨도 약간 변화
+```
+
+---
+
+### Pitch란?
+
+**음 높이:**
+
+```
+Pitch 1.0 (기본):
+  원래 소리
+
+Pitch 0.5:
+  낮고 느린 소리
+
+Pitch 2.0:
+  높고 빠른 소리
+```
+
+**예시:**
+
+```
+같은 총소리 파일로:
+  Pitch 0.8 → 묵직한 느낌
+  Pitch 1.2 → 경쾌한 느낌
+
+다양성 증가! ✅
+```
+
+---
+
+## 💥 Step 5: 충격음 Sound Cue
+
+### 5-1: 새 Sound Cue
+
+```
+MyStuff/SFX:
+  우클릭 → Audio → Sound Cue
+  이름: SC_RifleShot_Impact
+```
+
+---
+
+### 5-2: 빠른 설정
+
+**같은 방식:**
+
+```
+1. Impact 사운드 전부 선택 (1~6)
+2. 그래프 우클릭
+3. "Random from Multiple Waves"
+4. Modulator 추가
+5. 연결 완료!
+```
+
+---
+
+### 5-3: 충격음 Modulator 설정
+
+```
+Pitch:
+  Min: 0.75 (더 낮게)
+  Max: 1.25 (더 높게)
+  → 충격음은 다양하게!
+
+Volume:
+  Min: 0.4 (작게)
+  Max: 0.5 (작게)
+  → 멀리서 들리니까!
+```
+
+**왜 볼륨 낮춤?**
+
+```
+발사음:
+  캐릭터 위치 (가까움)
+  → 크게
+
+충격음:
+  충격 지점 (멀 수 있음)
+  → 작게
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380647/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_13/image_4.png)
+
+---
+
+## 💻 Step 6: C++ 코드
+
+### 6-1: 변수 선언
+
+**Gun.h:**
+
+```cpp
+#pragma once
+
+#include "Sound/SoundBase.h"  // 👈 Include
+
+class SHOOTERSAM_API AGun : public AActor
+{
+    // ...
+
+    UPROPERTY(EditAnywhere)
+    float BulletDamage = 10.0f;
+
+    // ===== 사운드 =====
+    UPROPERTY(EditAnywhere)
+    USoundBase* ShootSound;
+
+    UPROPERTY(EditAnywhere)
+    USoundBase* ImpactSound;
+};
+```
+
+---
+
+### USoundBase란?
+
+**Sound Cue의 부모 클래스:**
+
+```
+USoundBase:
+  모든 사운드의 기본 타입
+  ↓
+USoundCue:
+  Sound Cue 에셋
+  ↓
+USoundWave:
+  .wav 파일
+
+USoundBase* 변수:
+  → Sound Cue 가능
+  → .wav 파일도 가능
+  → 유연함!
+```
+
+---
+
+### 6-2: 사운드 재생
+
+**Gun.cpp - PullTrigger():**
+
+```cpp
+void AGun::PullTrigger()
+{
+    // 총구 플래시
+    MuzzleFlashParticleSystem->Activate(true);
+
+    // ===== 발사음 재생 =====
+    UGameplayStatics::PlaySoundAtLocation(
+        GetWorld(),
+        ShootSound,
+        GetActorLocation()
+    );
+
+    // Line Trace...
+    if (IsHit)
+    {
+        // Impact 파티클
+        UNiagaraFunctionLibrary::SpawnSystemAtLocation(...);
+
+        // ===== 충격음 재생 =====
+        UGameplayStatics::PlaySoundAtLocation(
+            GetWorld(),
+            ImpactSound,
+            HitResult.ImpactPoint
+        );
+
+        // Damage 적용...
+    }
+}
+```
+
+---
+
+### PlaySoundAtLocation 분석
+
+```cpp
+static void PlaySoundAtLocation(
+    const UObject* WorldContextObject,
+    USoundBase* Sound,
+    FVector Location
+)
+```
+
+**파라미터:**
+
+**1. WorldContextObject**
+
+```cpp
+GetWorld()
+```
+
+- 현재 월드
+- 어디서 재생할지
+
+**2. Sound**
+
+```cpp
+ShootSound / ImpactSound
+```
+
+- 재생할 사운드
+- USoundBase\* (Sound Cue)
+
+**3. Location**
+
+```cpp
+GetActorLocation() / HitResult.ImpactPoint
+```
+
+- 재생 위치
+- 3D 위치
+
+---
+
+### 3D 사운드 시스템
+
+**위치 기반:**
+
+```
+가까운 소리:
+  크게 들림
+
+먼 소리:
+  작게 들림
+
+방향:
+  왼쪽/오른쪽 스피커 조절
+
+리얼함! ✅
+```
+
+---
+
+## 🎮 Step 7: 블루프린트 설정
+
+### BP_Gun 설정
+
+```
+1. BP_Gun 열기
+
+2. Details 패널:
+
+   Shoot Sound:
+     SC_RifleShot 선택
+
+   Impact Sound:
+     SC_RifleShot_Impact 선택
+
+3. Compile & Save
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380649/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_13/image_5.png)
+
+---
+
+## 🎯 전체 흐름
+
+### 총 쏠 때
+
+```
+[PullTrigger 호출]
+    ↓
+1. 총구 플래시 활성화
+    ↓
+2. PlaySoundAtLocation:
+   위치: Gun 위치
+   사운드: ShootSound
+     ↓
+   SC_RifleShot:
+     Random: Shot_01~06 중 선택
+     Modulator: 피치/볼륨 조절
+     ↓
+   총소리 재생! 🔫
+```
+
+---
+
+### 맞았을 때
+
+```
+[Line Trace 성공]
+    ↓
+3. Impact 파티클
+    ↓
+4. PlaySoundAtLocation:
+   위치: 충격 지점
+   사운드: ImpactSound
+     ↓
+   SC_RifleShot_Impact:
+     Random: Impact_01~06 중 선택
+     Modulator: 피치/볼륨 조절 (더 다양)
+     ↓
+   충격음 재생! 💥
+```
+
+---
+
+### 공중 발사
+
+```
+총 쏨
+  ↓
+발사음만 재생
+  ↓
+충격 없음 (Miss)
+```
+
+---
+
+### 적 맞춤
+
+```
+총 쏨
+  ↓
+발사음 재생 (Gun 위치)
+  ↓
+적 맞음
+  ↓
+충격음 재생 (적 위치, 멀리서)
+  ↓
+2가지 소리 모두!
+```
+
+---
+
+## 📚 핵심 개념 정리
+
+### Sound Cue
+
+```
+사운드 편집 시스템
+→ 노드 그래프
+→ 복잡한 사운드 제작
+```
+
+### Random 노드
+
+```
+여러 사운드 중 랜덤 선택
+→ Without Replacement: 반복 방지
+→ 다양성 증가
+```
+
+### Modulator
+
+```
+볼륨/피치 무작위 조절
+→ 같은 소리도 다르게
+→ 더 자연스러움
+```
+
+### PlaySoundAtLocation
+
+```
+3D 공간에서 사운드 재생
+→ 위치 기반
+→ 거리/방향 자동 계산
+```
+
+---
+
+## 💡 실전 팁
+
+### Sound Cue 네이밍
+
+**규칙:**
+
+```
+SC_ (Sound Cue 접두사)
++ 설명적 이름
+
+예:
+  SC_RifleShot
+  SC_RifleShot_Impact
+  SC_Footstep
+  SC_Explosion
+```
+
+---
+
+### Pitch 조절 가이드
+
+**미세 조정:**
+
+```
+Min: 0.95, Max: 1.05
+→ 자연스러움
+→ 발사음 추천
+```
+
+**다양성:**
+
+```
+Min: 0.75, Max: 1.25
+→ 확실히 다름
+→ 충격음 추천
+```
+
+**극단적:**
+
+```
+Min: 0.5, Max: 2.0
+→ 완전히 다른 소리
+→ 특수 효과용
+```
+
+---
+
+### Volume 조절 전략
+
+**가까운 소리:**
+
+```
+Min: 0.9, Max: 1.0
+→ 크게
+→ 발사음
+```
+
+**먼 소리:**
+
+```
+Min: 0.3, Max: 0.5
+→ 작게
+→ 충격음
+```
+
+**배경 소리:**
+
+```
+Min: 0.1, Max: 0.2
+→ 아주 작게
+→ 환경음
+```
+
+---
+
+### 사운드 파일 준비
+
+**여러 버전 만들기:**
+
+```
+최소 3~6개 변형
+→ 랜덤 효과
+→ 반복 느낌 없음
+
+같은 소리 1개만:
+  → 금방 질림
+  → 기계적임
+
+여러 버전:
+  → 자연스러움
+  → 몰입감 증가
+```
+
+---
+
+## 🎯 요약
+
+**Sound Cue로 사운드 구현**
+
+```
+준비:
+  발사음 파일 6개
+  충격음 파일 6개
+
+Sound Cue 구조:
+  Wave Players (6개)
+    ↓
+  Random (랜덤 선택)
+    ↓
+  Modulator (피치/볼륨)
+    ↓
+  Output (최종 사운드)
+
+C++:
+  USoundBase* 변수
+  PlaySoundAtLocation()
+  발사 위치 / 충격 위치
+
+결과:
+  다양한 총소리
+  자연스러운 충격음
+  3D 사운드!
+```
+
+# { 레벨 디자인 및 마무리 작업 }
+
+## 🎯 이번에 할 것
+
+**레벨 에셋 임포트 & 마무리!**
+
+```
+Fab 스토어에서 무료 에셋 다운로드
+    ↓
+NavMesh 설정
+    ↓
+플레이어 & 적 배치
+    ↓
+게임 완성! 🎮
+
+```
+
+---
+
+## 📦 Step 1: 레벨 에셋 다운로드
+
+### 1-1: Fab 스토어 접속
+
+```
+1. 브라우저에서 "Fab" 검색
+2. fab.com 접속
+3. Epic Games 계정 로그인
+
+```
+
+---
+
+### 1-2: 에셋 팩 찾기
+
+```
+검색:
+  "Modular SciFi Season 1"
+
+결과:
+  Modular Sci-Fi: Season 1 - Starter Bundle
+
+  → 완전 무료! ✅
+  → "Add to Library" 클릭
+
+```
+
+---
+
+### 1-3: Epic Games Launcher에서 설치
+
+```
+1. Epic Games Launcher 열기
+
+2. Library 섹션
+
+3. Fab Library로 스크롤
+   (안 보이면 Refresh)
+
+4. "Modular SciFi Season 1" 찾기
+
+5. "Add to Project" 클릭
+
+6. "Show All Projects"
+
+7. ShooterSam 프로젝트 선택
+
+```
+
+---
+
+### 버전 호환성 경고
+
+**메시지:**
+
+```
+"Not compatible with 5.6"
+
+```
+
+**해결:**
+
+```
+최신 호환 버전 선택:
+  → 5.4 선택
+  → 작동함! ✅
+
+```
+
+---
+
+### 1-4: 언리얼에서 확인
+
+```
+프로젝트 열기
+  ↓
+Content Browser:
+  새 폴더 "StarterBundle" 생김
+
+  실제로는:
+    Modular SciFi 에셋 팩
+
+```
+
+---
+
+## 🗺️ Step 2: 레벨 복제 및 설정
+
+### 2-1: 레벨 찾기
+
+```
+StarterBundle/
+  Collection_Maps/
+    Maps_01/
+      [여러 레벨들]
+
+```
+
+---
+
+### 2-2: 레벨 복제
+
+```
+1. Maps_01 선택
+
+2. 우클릭 → Duplicate
+
+3. 이름: MainLevel
+
+4. MyStuff/Maps 폴더로 이동:
+   - 왼클릭 드래그
+   - 또는 우클릭 → Move Here
+
+```
+
+---
+
+### 2-3: 기본 레벨 설정
+
+```
+Edit → Project Settings
+  ↓
+Maps & Modes
+  ↓
+Default Maps:
+  Game Default Map: MainLevel
+  Editor Startup Map: MainLevel
+
+```
+
+---
+
+### 레벨 둘러보기
+
+**특징:**
+
+```
+공상과학 기지
+겨울 풍경
+복도, 계단, 방들
+멋진 분위기! ✨
+
+```
+
+---
+
+## 🧭 Step 3: NavMesh 설정
+
+### 3-1: NavMeshBoundsVolume 배치
+
+```
+1. 뷰포트 줌 아웃
+
+2. Quick Add Menu (+ 버튼)
+   → Volumes
+   → Nav Mesh Bounds Volume
+
+3. 레벨 중앙에 배치
+
+```
+
+---
+
+### 3-2: 크기 조정
+
+**Details → Brush Settings:**
+
+```
+Brush Shape:
+  X: 10,000
+  Y: 10,000
+  Z: 10,000
+
+  → 레벨 전체 덮도록
+
+```
+
+---
+
+### 3-3: NavMesh 확인
+
+```
+1. 뷰포트 메뉴:
+   Show → Navigation
+
+2. 초록색 영역 표시:
+   → 걸어다닐 수 있는 곳
+
+3. 레벨 돌아다니며 확인:
+   - 복도 전부 초록색? ✅
+   - 계단도 초록색? ✅
+
+```
+
+---
+
+## 🐛 Step 4: 계단 충돌 버그 수정
+
+### 4-1: 문제 발견
+
+```
+계단 근처:
+  NavMesh 구멍 발견
+  → 빈 공간
+  → AI 못 감
+
+```
+
+**원인:**
+
+```
+계단 메시 충돌 문제
+
+```
+
+---
+
+### 4-2: 계단 메시 찾기
+
+```
+Content Browser:
+  StarterBundle 폴더
+  검색: "stairs"
+
+결과:
+  SM_Stairs_A1
+
+```
+
+---
+
+### 4-3: 충돌 수정
+
+```
+1. SM_Stairs_A1 더블클릭
+   (Static Mesh Editor 열림)
+
+2. 툴바 메뉴:
+   Show → Simple Collision
+
+3. 문제 발견:
+   계단 아래로 뻗은 충돌 메시
+   → 심연까지 쭉!
+
+4. 해당 충돌 선택
+
+5. Delete 키
+
+6. Save
+
+7. MainLevel로 복귀
+   → 문제 해결! ✅
+
+```
+
+---
+
+## 🎮 Step 5: Player Start 배치
+
+### 5-1: 기존 Player Start 제거
+
+```
+1. Play 테스트
+   → 어딘가에서 시작됨
+
+2. Outliner에서 "Player Start" 검색
+
+3. 찾으면 Delete
+
+```
+
+---
+
+### 5-2: 새 위치 선택
+
+```
+레벨 탐색:
+  복도 입구의 작은 방
+  → 여기서 시작!
+
+```
+
+---
+
+### 5-3: Player Start 배치
+
+```
+Quick Add Menu:
+  Player Start
+
+배치:
+  선택한 방 안
+  문 쪽 바라보게
+
+```
+
+---
+
+## 🎵 Step 6: 배경 음악
+
+### 6-1: Ambient Sound 배치
+
+```
+Quick Add Menu:
+  Ambient Sound
+
+레벨 아무 곳에나 배치
+
+```
+
+---
+
+### 6-2: 음악 설정
+
+**Details:**
+
+```
+Sound:
+  ShooterGame/Sounds/Music/
+    ShooterGame_Music 선택
+
+Volume Multiplier:
+  원하는 대로 조절
+
+Pitch Multiplier:
+  1.0 (기본)
+
+```
+
+**효과:**
+
+```
+게임 시작하면
+→ 배경 음악 재생! 🎵
+
+```
+
+---
+
+## 👤 Step 7: 플레이어 블루프린트
+
+### 7-1: BP 생성
+
+```
+Content Browser:
+  MyStuff/Blueprints/
+
+  ShooterSamCharacter 우클릭
+  → Create Child Blueprint Class
+
+  이름: BP_Player
+
+```
+
+---
+
+### 7-2: 외형 변경
+
+**Mesh 설정:**
+
+```
+Details → Mesh:
+  Skeletal Mesh: Wraith (Green)
+
+  → 초록색!
+  → 플레이어 구분 쉬움
+
+```
+
+---
+
+### 7-3: 속도 조정
+
+**Character Movement:**
+
+```
+Details → Character Movement (Walking)
+  Max Walk Speed: 500
+
+  → 적보다 빠르게!
+
+```
+
+---
+
+### 7-4: 체력 증가
+
+**Self 섹션:**
+
+```
+Max Health: 500
+
+  → 플레이어 생존력 향상
+  → 게임 밸런스
+
+```
+
+---
+
+## 👾 Step 8: 적 조정
+
+### 8-1: BP_ShooterSamCharacter 수정
+
+**속도 낮추기:**
+
+```
+Character Movement:
+  Max Walk Speed: 150
+
+  → 플레이어보다 느리게
+  → 도망칠 수 있음
+
+```
+
+---
+
+### 8-2: 총 데미지 확인
+
+**BP_Gun:**
+
+```
+Bullet Damage: 35
+
+계산:
+  적 체력 100
+  → 3발이면 사망
+  → 적당함! ✅
+
+```
+
+---
+
+## 🎯 Step 9: Game Mode 설정
+
+```
+BP_ShooterSamGameMode:
+  Default Pawn Class: BP_Player ✅
+
+  → 플레이어로 게임 시작!
+
+```
+
+---
+
+## 🗺️ Step 10: 적 배치
+
+### 레벨 디자인 전략
+
+**첫 번째 적:**
+
+```
+시작 방 바로 앞
+  → 플레이어 향하게
+  → 빠르게 전투 학습
+
+```
+
+---
+
+**두 번째 방:**
+
+```
+적 2명 배치
+  → 난이도 상승
+  → 엄폐 필요
+
+```
+
+---
+
+**분기점:**
+
+```
+왼쪽/오른쪽 선택
+  → 오른쪽에 적 배치
+  → "이쪽으로 가세요" 신호
+
+```
+
+---
+
+**계단 위:**
+
+```
+적 1명 더
+  → 위에서 공격
+  → 다양한 전투
+
+```
+
+---
+
+### 배치 원칙
+
+**Trail of Enemies:**
+
+```
+적의 흔적을 따라가듯
+  ↓
+플레이어 경로 유도
+  ↓
+자연스러운 진행
+
+```
+
+---
+
+## 🎮 테스트 플레이
+
+### 흐름 확인
+
+```
+1. 시작
+   → 첫 적 발견
+   → 전투!
+
+2. 방으로 진입
+   → 적 2명
+   → 교전!
+
+3. 오른쪽으로
+   → 적 발견
+   → 추격!
+
+4. 계단
+   → 위에서 공격
+   → 대응!
+
+```
+
+---
+
+## 💡 레벨 디자인 팁
+
+### 적 배치
+
+**난이도 곡선:**
+
+```
+시작: 적 1명
+  → 쉬움
+  → 학습
+
+중간: 적 2~3명
+  → 보통
+  → 전술 필요
+
+끝: 적 여럿
+  → 어려움
+  → 실력 발휘
+
+```
+
+---
+
+### 공간 활용
+
+**엄폐물:**
+
+```
+벽, 상자, 기둥
+  → 숨을 곳
+  → 전술적 플레이
+
+```
+
+**시야:**
+
+```
+긴 복도:
+  → 장거리 전투
+
+좁은 방:
+  → 근접 전투
+
+다양성!
+
+```
+
+---
+
+### 페이싱
+
+**전투-휴식-전투:**
+
+```
+전투 → 빈 복도 → 전투
+  ↓
+긴장과 이완
+  ↓
+지루하지 않음
+
+```
+
+---
+
+## 📚 핵심 개념 정리
+
+### NavMesh
+
+```
+AI 이동 가능 영역
+→ 초록색으로 표시
+→ 레벨 전체 덮어야
+
+```
+
+### Player Start
+
+```
+게임 시작 위치
+→ 1개만 필요
+→ 방향 중요
+
+```
+
+### Ambient Sound
+
+```
+배경 음악/효과음
+→ 분위기 연출
+→ 볼륨 조절 가능
+
+```
+
+### BP_Player
+
+```
+플레이어 전용 설정
+→ 외형, 속도, 체력
+→ 적과 차별화
+
+```
+
+---
+
+## 🎯 요약
+
+**레벨 완성 과정**
+
+```
+1. Fab 스토어에서 에셋 다운로드
+
+2. NavMesh 설정 (10,000x10,000x10,000)
+
+3. 계단 충돌 버그 수정
+
+4. Player Start 배치
+
+5. 배경 음악 추가
+
+6. BP_Player 생성 (초록색, 빠름, 체력 높음)
+
+7. 적 속도 낮춤 (150)
+
+8. Game Mode에 BP_Player 설정
+
+9. 적 전략적 배치
+
+10. 테스트 & 조정
+
+```
+
+---
+
+## 🚀 다음 단계
+
+**도전 과제:**
+
+```
+자신만의 레벨 만들기!
+  ↓
+적 배치 실험
+  ↓
+난이도 조절
+  ↓
+플레이 테스트
+  ↓
+개선 반복
+
+```
+
+**공유:**
+
+```
+플레이 영상 촬영
+→ 커뮤니티 공유
+→ 피드백 받기
+
+```
+
+---
+
+대단해요! 이제 완전한 슈팅 게임이 완성되었습니다!
+
+레벨 디자인, NavMesh, 적 배치까지... 정말 긴 여정이었지만 훌륭하게 완주하셨어요! 🎮✨
+
+**수고 많으셨습니다!** 🎉🎉🎉

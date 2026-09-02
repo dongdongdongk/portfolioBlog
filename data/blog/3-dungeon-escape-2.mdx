@@ -1,0 +1,1957 @@
+---
+title: '섹션 3: Dungeon Escape - 2'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 언리얼 수학 라이브러리와 부드러운 움직임 구현 }
+
+## 1. 전체 시스템 설계
+
+### 움직임 로직 개요
+
+```
+StartLocation (시작 위치)
+    +
+MoveOffset (이동 거리)
+    =
+TargetLocation (목표 위치)
+    ↓
+VInterpConstantTo() 함수로 부드럽게 이동
+    ↓
+목표 도달 시 자동 정지
+```
+
+---
+
+## 2. 필요한 변수 선언
+
+### Mover.h
+
+```cpp
+UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+class DUNGEONESCAPE_API UMover : public UActorComponent
+{
+    GENERATED_BODY()
+
+private:
+    // 일반 멤버 변수 (코드에서만 사용)
+    FVector StartLocation;      // 시작 위치
+    FVector TargetLocation;     // 목표 위치
+
+    // UPROPERTY 변수 (에디터에서 수정 가능)
+    UPROPERTY(EditAnywhere)
+    FVector MoveOffset;         // 이동 오프셋 (거리와 방향)
+
+    UPROPERTY(EditAnywhere)
+    float MoveTime = 4.0f;      // 이동 시간 (초)
+
+    UPROPERTY(EditAnywhere)
+    bool ShouldMove = false;    // 움직일지 여부
+};
+```
+
+### 변수 설명
+
+**StartLocation**:
+
+- 액터의 시작 위치
+- BeginPlay에서 한 번만 저장
+- 에디터 노출 불필요
+
+**TargetLocation**:
+
+- 최종 도착 위치
+- `StartLocation + MoveOffset`으로 계산
+- 에디터 노출 불필요
+
+**MoveOffset** (UPROPERTY):
+
+- **이동 거리와 방향**을 정의
+- 예: `(0, 0, 150)` = Z축으로 150cm 위로
+- **에디터에서 조정 가능** ✅
+
+**MoveTime** (UPROPERTY):
+
+- 목표까지 도달하는 **시간 (초 단위)**
+- 기본값: 4초
+- **에디터에서 조정 가능** ✅
+
+**ShouldMove** (UPROPERTY):
+
+- 움직임 **켜기/끄기** 스위치
+- 기본값: false (정지 상태)
+- **게임 실행 중 실시간 토글 가능** ✅
+
+---
+
+## 3. UPROPERTY 매크로 이해하기
+
+### EditAnywhere vs EditDefaultsOnly
+
+```cpp
+// EditAnywhere: 어디서든 편집 가능
+UPROPERTY(EditAnywhere)
+FVector MoveOffset;
+
+// EditDefaultsOnly: Blueprint 클래스에서만 편집
+UPROPERTY(EditDefaultsOnly)
+float MoveTime = 4.0f;
+
+// EditInstanceOnly: 배치된 인스턴스에서만 편집
+UPROPERTY(EditInstanceOnly)
+bool ShouldMove = false;
+```
+
+**권장**: 이 프로젝트에서는 `EditAnywhere` 사용
+
+### 기본값 설정
+
+```cpp
+// 방법 1: 선언과 동시 초기화 (권장)
+UPROPERTY(EditAnywhere)
+float MoveTime = 4.0f;
+
+// 방법 2: 생성자에서 초기화
+UMover::UMover()
+{
+    MoveTime = 4.0f;
+}
+```
+
+---
+
+## 4. BeginPlay에서 초기 설정
+
+### 목표 위치 계산
+
+```cpp
+void UMover::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // 1. 시작 위치 저장
+    StartLocation = GetOwner()->GetActorLocation();
+
+    // 2. 목표 위치 계산
+    TargetLocation = StartLocation + MoveOffset;
+}
+```
+
+### 계산 예시
+
+```
+StartLocation = (70, 45, 135)
+MoveOffset = (0, 0, 150)
+    ↓
+TargetLocation = (70, 45, 135) + (0, 0, 150)
+               = (70, 45, 285)
+
+결과: Z축으로 150cm 위로 이동
+```
+
+---
+
+## 5. if 문으로 움직임 제어
+
+### ShouldMove 체크
+
+```cpp
+void UMover::TickComponent(float DeltaTime, ...)
+{
+    Super::TickComponent(DeltaTime, ...);
+
+    // ShouldMove가 true일 때만 실행
+    if (ShouldMove)
+    {
+        // 움직임 코드
+    }
+}
+```
+
+### Bool 조건문 작성법
+
+```cpp
+// 방법 1: 명시적 비교 (길고 불필요)
+if (ShouldMove == true)
+
+// 방법 2: 직접 사용 (권장) ✅
+if (ShouldMove)
+
+// 반대 조건 (false 체크)
+if (!ShouldMove)  // ShouldMove가 false면 실행
+```
+
+---
+
+## 6. VInterpConstantTo() 함수
+
+### 헤더 파일 포함
+
+```cpp
+#include "Mover.h"
+#include "Math/UnrealMathUtility.h"  // FMath 함수 사용
+```
+
+**Include 지시문**:
+
+- 다른 파일의 코드를 **현재 파일에 붙여넣기**
+- `#include "Mover.h"` → Mover.h의 내용을 여기 붙여넣음
+- `#include "Math/UnrealMathUtility.h"` → FMath 클래스 사용 가능
+
+### 함수 시그니처
+
+```cpp
+static FVector VInterpConstantTo(
+    const FVector& Current,      // 현재 위치
+    const FVector& Target,       // 목표 위치
+    float DeltaTime,             // 델타 타임
+    float InterpSpeed            // 이동 속도 (cm/s)
+);
+```
+
+**파라미터 설명**:
+
+| 파라미터        | 타입    | 설명                  |
+| --------------- | ------- | --------------------- |
+| **Current**     | FVector | 현재 위치             |
+| **Target**      | FVector | 목표 위치             |
+| **DeltaTime**   | float   | 프레임 간 경과 시간   |
+| **InterpSpeed** | float   | 초당 이동 속도 (cm/s) |
+
+**반환값**:
+
+- **FVector** - 새로운 위치
+
+### 함수 특징
+
+**"Constant" (일정한) 의미**:
+
+- 일정한 **속도**로 이동
+- 가속/감속 없음
+- 선형적(직선적) 움직임
+
+**"To" (향해) 의미**:
+
+- 목표 **지점까지만** 이동
+- 목표 도달 시 **자동 정지**
+- 목표를 넘어가지 않음
+
+---
+
+## 7. 속도 계산하기
+
+### 공식
+
+```cpp
+float Speed = MoveOffset.Length() / MoveTime;
+```
+
+**수학 공식**:
+
+```
+속도 = 거리 / 시간
+Speed = Distance / Time
+```
+
+### 계산 예시
+
+```cpp
+MoveOffset = (0, 0, 150)      // Z축 150cm
+MoveTime = 4.0f               // 4초
+
+// Length() = 벡터의 길이(크기)
+Distance = MoveOffset.Length() = 150.0f
+
+// 속도 계산
+Speed = 150.0f / 4.0f = 37.5 cm/s
+```
+
+### Length() 함수
+
+```cpp
+FVector MyVector(3, 4, 0);
+float Length = MyVector.Length();  // 5.0
+
+// 피타고라스 정리: √(3² + 4²) = √25 = 5
+```
+
+**3D 공간**:
+
+```cpp
+FVector MoveOffset(10, 20, 30);
+float Length = MoveOffset.Length();
+// √(10² + 20² + 30²) = √1400 ≈ 37.42
+```
+
+---
+
+## 8. 완성된 이동 코드
+
+### Tick 함수
+
+```cpp
+void UMover::TickComponent(float DeltaTime, ...)
+{
+    Super::TickComponent(DeltaTime, ...);
+
+    if (ShouldMove)
+    {
+        // 1. 현재 위치 가져오기
+        FVector CurrentLocation = GetOwner()->GetActorLocation();
+
+        // 2. 속도 계산
+        float Speed = MoveOffset.Length() / MoveTime;
+
+        // 3. 새 위치 계산 (부드러운 이동)
+        FVector NewLocation = FMath::VInterpConstantTo(
+            CurrentLocation,  // 현재 위치
+            TargetLocation,   // 목표 위치
+            DeltaTime,        // 델타 타임
+            Speed             // 속도
+        );
+
+        // 4. 새 위치 적용
+        GetOwner()->SetActorLocation(NewLocation);
+    }
+}
+```
+
+---
+
+## 9. 동작 방식 상세 분석
+
+### 프레임별 동작
+
+**초기 상태**:
+
+```
+CurrentLocation = (70, 45, 135)
+TargetLocation = (70, 45, 285)
+Speed = 37.5 cm/s
+```
+
+**프레임 1 (DeltaTime = 0.0167초, 60 FPS)**:
+
+```
+이동 거리 = 37.5 * 0.0167 = 0.626cm
+NewLocation = (70, 45, 135.626)
+```
+
+**프레임 2**:
+
+```
+CurrentLocation = (70, 45, 135.626)
+이동 거리 = 37.5 * 0.0167 = 0.626cm
+NewLocation = (70, 45, 136.252)
+```
+
+**4초 후 (약 240 프레임)**:
+
+```
+NewLocation = (70, 45, 285) ← 목표 도달!
+VInterpConstantTo()가 자동으로 정지
+```
+
+### VInterpConstantTo의 내부 로직 (의사코드)
+
+```cpp
+FVector VInterpConstantTo(Current, Target, DeltaTime, Speed)
+{
+    // 1. 방향 벡터 계산
+    FVector Direction = Target - Current;
+    float Distance = Direction.Length();
+
+    // 2. 이번 프레임 이동 거리
+    float MaxDistance = Speed * DeltaTime;
+
+    // 3. 목표 도달 체크
+    if (Distance <= MaxDistance)
+    {
+        return Target;  // 목표 도달 - 정확히 목표 위치 반환
+    }
+    else
+    {
+        // 아직 목표 미도달 - 조금씩 이동
+        Direction.Normalize();  // 단위 벡터로 변환
+        return Current + Direction * MaxDistance;
+    }
+}
+```
+
+---
+
+## 10. 에디터에서 테스트하기
+
+### 1단계: 변수 설정
+
+**Door 선택 > Details > Mover Component**:
+
+```
+MoveOffset:
+  X: 0
+  Y: 0
+  Z: 150    ← Z축으로 150cm 위로
+
+MoveTime: 4.0  ← 4초 동안 이동
+
+ShouldMove: false  ← 처음엔 정지
+```
+
+### 2단계: 게임 실행
+
+**Play 버튼 클릭**
+
+- 문이 움직이지 않음 (ShouldMove = false)
+
+### 3단계: 실시간 토글
+
+**게임 실행 중**:
+
+```
+1. F8 키 누르기 (플레이어에서 빠져나오기)
+2. Door 선택
+3. Details > Mover > ShouldMove 체크 ✅
+4. 문이 위로 이동 시작!
+```
+
+### 4단계: 멈추기 테스트
+
+**이동 중**:
+
+```
+1. ShouldMove 체크 해제 ❌
+2. 문이 즉시 정지
+3. 다시 체크하면 계속 이동
+```
+
+---
+
+## 11. 코드 vs 이전 버전 비교
+
+### 이전 코드 (단순 증가)
+
+```cpp
+// ❌ 문제점
+CurrentLocation.Z += 100.0f * DeltaTime;
+GetOwner()->SetActorLocation(CurrentLocation);
+
+// 무한히 위로 올라감
+// 멈추지 않음
+// 목표 위치 없음
+```
+
+### 현재 코드 (수학 함수 사용)
+
+```cpp
+// ✅ 개선점
+float Speed = MoveOffset.Length() / MoveTime;
+FVector NewLocation = FMath::VInterpConstantTo(
+    CurrentLocation, TargetLocation, DeltaTime, Speed
+);
+GetOwner()->SetActorLocation(NewLocation);
+
+// 목표 위치까지만 이동
+// 자동으로 멈춤
+// 일정한 속도
+// 시간 제어 가능
+```
+
+---
+
+## 12. 핵심 함수 정리
+
+### FMath 클래스 주요 함수
+
+```cpp
+// 일정한 속도로 보간
+FVector NewPos = FMath::VInterpConstantTo(Current, Target, DeltaTime, Speed);
+
+// 가속/감속 보간 (부드러운 시작/끝)
+FVector NewPos = FMath::VInterpTo(Current, Target, DeltaTime, InterpSpeed);
+
+// 회전 보간
+FRotator NewRot = FMath::RInterpConstantTo(Current, Target, DeltaTime, Speed);
+
+// Float 보간
+float NewValue = FMath::FInterpConstantTo(Current, Target, DeltaTime, Speed);
+
+// 절대값
+float Abs = FMath::Abs(-10.5f);  // 10.5
+
+// 제곱근
+float Sqrt = FMath::Sqrt(25.0f);  // 5.0
+
+// 삼각함수
+float Sin = FMath::Sin(Angle);
+float Cos = FMath::Cos(Angle);
+```
+
+---
+
+## 13. 빌드 및 컴파일
+
+### Visual Studio에서 빌드
+
+**방법 1: Live Coding (빠름)**
+
+```
+Ctrl + Alt + F11
+```
+
+**방법 2: 전체 빌드 (안전)**
+
+```
+1. 언리얼 에디터 닫기
+2. Visual Studio > Build > Rebuild Solution
+3. 빌드 완료 후 에디터 다시 열기
+```
+
+**언제 전체 빌드?**
+
+- 새 변수 추가 시
+- 헤더 파일 수정 시
+- Live Coding이 실패할 때
+
+---
+
+## 14. 실전 응용 예제
+
+### 다양한 MoveOffset 설정
+
+```cpp
+// 위로 이동
+MoveOffset = (0, 0, 150)
+
+// 오른쪽으로 이동
+MoveOffset = (200, 0, 0)
+
+// 대각선 이동
+MoveOffset = (100, 100, 50)
+
+// 아래로 이동
+MoveOffset = (0, 0, -100)
+```
+
+### 다양한 속도 설정
+
+```cpp
+// 빠른 이동
+MoveTime = 1.0f  // 1초
+
+// 느린 이동
+MoveTime = 10.0f  // 10초
+
+// 순간 이동 (매우 빠름)
+MoveTime = 0.1f  // 0.1초
+```
+
+---
+
+## 15. 디버깅 팁
+
+### 로그로 값 확인
+
+```cpp
+void UMover::BeginPlay()
+{
+    Super::BeginPlay();
+
+    StartLocation = GetOwner()->GetActorLocation();
+    TargetLocation = StartLocation + MoveOffset;
+
+    // 디버그 로그
+    UE_LOG(LogTemp, Display, TEXT("Start: %s"),
+           *StartLocation.ToString());
+    UE_LOG(LogTemp, Display, TEXT("Target: %s"),
+           *TargetLocation.ToString());
+    UE_LOG(LogTemp, Display, TEXT("Distance: %f"),
+           MoveOffset.Length());
+}
+
+```
+
+### Tick에서 진행상황 확인
+
+```cpp
+void UMover::TickComponent(float DeltaTime, ...)
+{
+    if (ShouldMove)
+    {
+        FVector CurrentLocation = GetOwner()->GetActorLocation();
+        float DistanceToTarget = (TargetLocation - CurrentLocation).Length();
+
+        UE_LOG(LogTemp, Display, TEXT("Distance remaining: %f"),
+               DistanceToTarget);
+
+        // 나머지 코드...
+    }
+}
+
+```
+
+---
+
+## 핵심 요약
+
+### 1. 시스템 구조
+
+```
+StartLocation + MoveOffset = TargetLocation
+
+```
+
+### 2. 주요 변수
+
+```cpp
+FVector MoveOffset;     // 이동 거리/방향
+float MoveTime;         // 이동 시간
+bool ShouldMove;        // 움직임 제어
+
+```
+
+### 3. 핵심 함수
+
+```cpp
+// 부드러운 일정 속도 이동
+FMath::VInterpConstantTo(Current, Target, DeltaTime, Speed)
+
+```
+
+### 4. 속도 계산
+
+```cpp
+Speed = MoveOffset.Length() / MoveTime;
+
+```
+
+### 5. 제어 패턴
+
+```cpp
+if (ShouldMove) { /* 이동 */ }
+
+```
+
+### 6. Include 필수
+
+```cpp
+#include "Math/UnrealMathUtility.h"
+
+```
+
+**다음 강의**: 왕복 이동 구현! 🔄
+
+# { 왕복 이동 구현 (Ping-Pong Movement) }
+
+## 목표
+
+**ShouldMove 값에 따라 양방향 이동**
+
+- `ShouldMove = true` → 목표 위치로 이동
+- `ShouldMove = false` → 시작 위치로 복귀
+
+---
+
+## 1. 동작 원리
+
+### 기존 방식 (문제점)
+
+```cpp
+if (ShouldMove)
+{
+    // 이동 코드
+}
+// ShouldMove = false면 아무것도 안 함 (멈춤)
+```
+
+### 새로운 방식 (개선)
+
+```cpp
+if (ShouldMove)
+{
+    TargetLocation = StartLocation + MoveOffset;  // 목표로 이동
+}
+else
+{
+    TargetLocation = StartLocation;  // 시작점으로 복귀
+}
+
+// 항상 TargetLocation으로 이동 (방향만 바뀜)
+```
+
+---
+
+## 2. 핵심 아이디어
+
+### TargetLocation 동적 변경
+
+```
+ShouldMove = true:
+StartLocation (70, 45, 135)
+    +
+MoveOffset (0, 0, 150)
+    =
+TargetLocation (70, 45, 285) → 위로 이동
+
+ShouldMove = false:
+TargetLocation = StartLocation (70, 45, 135) → 원래 위치로 복귀
+```
+
+---
+
+## 3. 완성된 코드
+
+### BeginPlay() 수정
+
+```cpp
+void UMover::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // 시작 위치만 저장
+    StartLocation = GetOwner()->GetActorLocation();
+
+    // TargetLocation 계산 제거 (Tick에서 처리)
+}
+```
+
+### TickComponent() 수정
+
+```cpp
+void UMover::TickComponent(float DeltaTime, ...)
+{
+    Super::TickComponent(DeltaTime, ...);
+
+    // 1. ShouldMove에 따라 목표 위치 설정
+    if (ShouldMove)
+    {
+        TargetLocation = StartLocation + MoveOffset;  // 앞으로
+    }
+    else
+    {
+        TargetLocation = StartLocation;  // 뒤로
+    }
+
+    // 2. 항상 이동 실행 (방향만 다름)
+    FVector CurrentLocation = GetOwner()->GetActorLocation();
+    float Speed = MoveOffset.Length() / MoveTime;
+    FVector NewLocation = FMath::VInterpConstantTo(
+        CurrentLocation, TargetLocation, DeltaTime, Speed
+    );
+    GetOwner()->SetActorLocation(NewLocation);
+}
+```
+
+---
+
+## 4. 동작 시나리오
+
+### 시나리오 1: 정상 왕복
+
+```
+1. 게임 시작
+   - CurrentLocation = (70, 45, 135)
+   - ShouldMove = false
+   - TargetLocation = StartLocation = (70, 45, 135)
+   - 결과: 제자리 (움직이지 않음)
+
+2. ShouldMove = true 설정
+   - TargetLocation = (70, 45, 285)
+   - 위로 이동 시작
+
+3. 목표 도달 후
+   - CurrentLocation = (70, 45, 285)
+   - 계속 TargetLocation으로 이동 시도 (제자리)
+
+4. ShouldMove = false 설정
+   - TargetLocation = (70, 45, 135)
+   - 아래로 이동 시작 (원래 위치로 복귀)
+```
+
+### 시나리오 2: 중간에 방향 전환
+
+```
+1. 위로 이동 중 (50% 진행)
+   - CurrentLocation = (70, 45, 210)
+   - ShouldMove = true
+
+2. ShouldMove = false로 변경
+   - 즉시 TargetLocation = (70, 45, 135)로 변경
+   - 현재 위치에서 바로 시작점으로 복귀 시작
+```
+
+---
+
+## 5. 테스트 방법
+
+### 에디터에서 실시간 테스트
+
+```
+1. Play 버튼 클릭
+2. F8 키 (플레이어 빠져나오기)
+3. Door 선택 > Mover Component
+
+테스트 순서:
+- ShouldMove ✅ → 문이 위로 이동
+- ShouldMove ❌ → 문이 아래로 복귀
+- 이동 중 토글 → 즉시 방향 전환
+```
+
+---
+
+## 6. 현재 코드의 문제점 (인정된 결함)
+
+### 문제 1: 매 프레임 TargetLocation 재계산
+
+```cpp
+// 매 프레임마다 실행됨 (비효율적)
+if (ShouldMove)
+{
+    TargetLocation = StartLocation + MoveOffset;
+}
+```
+
+**문제점**:
+
+- ShouldMove가 변하지 않아도 계속 재계산
+- 불필요한 연산
+
+**해결 예정**: 다음 강의에서 개선
+
+### 문제 2: 목표 도달 후에도 계속 이동 시도
+
+```cpp
+// 목표에 도달해도 계속 실행
+FVector NewLocation = FMath::VInterpConstantTo(...);
+GetOwner()->SetActorLocation(NewLocation);
+```
+
+**문제점**:
+
+- 목표 위치에 있어도 매 프레임 계산
+- SetActorLocation() 계속 호출
+
+**해결 예정**: 다음 강의에서 거리 체크 추가
+
+---
+
+## 7. if-else 구조 이해
+
+### if-else 문법
+
+```cpp
+if (조건)
+{
+    // 조건이 true일 때 실행
+}
+else
+{
+    // 조건이 false일 때 실행
+}
+```
+
+### 실제 예제
+
+```cpp
+if (ShouldMove)  // ShouldMove == true
+{
+    TargetLocation = StartLocation + MoveOffset;
+}
+else  // ShouldMove == false
+{
+    TargetLocation = StartLocation;
+}
+```
+
+---
+
+## 8. 코드 변경 요약
+
+### 변경 전
+
+```cpp
+void UMover::BeginPlay()
+{
+    StartLocation = GetOwner()->GetActorLocation();
+    TargetLocation = StartLocation + MoveOffset;  // 한 번만 계산
+}
+
+void UMover::TickComponent(...)
+{
+    if (ShouldMove)  // true일 때만 이동
+    {
+        // 이동 코드
+    }
+}
+```
+
+### 변경 후
+
+```cpp
+void UMover::BeginPlay()
+{
+    StartLocation = GetOwner()->GetActorLocation();
+    // TargetLocation 계산 제거
+}
+
+void UMover::TickComponent(...)
+{
+    // 매 프레임 TargetLocation 업데이트
+    if (ShouldMove)
+    {
+        TargetLocation = StartLocation + MoveOffset;
+    }
+    else
+    {
+        TargetLocation = StartLocation;
+    }
+
+    // 항상 이동 (방향만 다름)
+    // 이동 코드...
+}
+```
+
+---
+
+## 핵심 정리
+
+### 1. 양방향 이동 로직
+
+```cpp
+true → 목표로
+false → 시작점으로
+```
+
+### 2. 핵심 변화
+
+- **항상 이동**하되, **방향만 변경**
+
+### 3. 실시간 제어
+
+- 게임 중 ShouldMove 토글 가능
+- 즉시 방향 전환
+
+### 4. 알려진 문제
+
+- 매 프레임 TargetLocation 재계산 (비효율)
+- 목표 도달 후에도 계속 실행 (불필요)
+
+### 5. 다음 강의 예고
+
+- 거리 체크로 도달 판정
+- 불필요한 연산 제거
+- 성능 최적화
+
+**현재: 동작은 하지만 비효율적 → 다음: 깔끔하고 효율적으로 개선! 🎯**
+
+# { 목표 도달 체크 및 최적화 }
+
+## 목표
+
+**목표 위치 도달 시 불필요한 연산 중단**
+
+- 현재 위치 = 목표 위치 → 이동 코드 실행 안 함
+- 이동 중일 때만 → 이동 코드 실행
+
+---
+
+## 1. 문제점 분석
+
+### 이전 코드의 비효율성
+
+```cpp
+// 매 프레임마다 실행 (목표 도달 후에도!)
+FVector CurrentLocation = GetOwner()->GetActorLocation();
+float Speed = MoveOffset.Length() / MoveTime;
+FVector NewLocation = FMath::VInterpConstantTo(...);
+GetOwner()->SetActorLocation(NewLocation);
+```
+
+**문제**:
+
+- 목표에 도착해도 계속 계산
+- `SetActorLocation()` 계속 호출
+- CPU 자원 낭비
+
+---
+
+## 2. 해결 방법: 벡터 비교
+
+### Equals() 함수
+
+```cpp
+bool FVector::Equals(const FVector& V, float Tolerance = KINDA_SMALL_NUMBER) const;
+```
+
+**기능**:
+
+- 두 벡터가 **거의 같은지** 비교
+- 정확히 같지 않아도 허용 오차 내면 `true`
+- 부동소수점 오차 고려
+
+**사용법**:
+
+```cpp
+FVector A(100, 200, 300);
+FVector B(100, 200, 300);
+
+bool IsSame = A.Equals(B);  // true
+```
+
+### 왜 == 대신 Equals()?
+
+```cpp
+// ❌ 부동소수점 문제
+FVector A(100.0f, 200.0f, 300.0f);
+FVector B(100.0000001f, 200.0f, 300.0f);
+
+A == B;        // false (정확히 다름)
+A.Equals(B);   // true (허용 오차 내)
+```
+
+**부동소수점 연산의 특성**:
+
+- 계산 과정에서 미세한 오차 발생
+- `Equals()`는 이를 고려한 비교
+
+---
+
+## 3. ReachedTarget 변수 추가
+
+### Mover.h
+
+```cpp
+UCLASS()
+class DUNGEONESCAPE_API UMover : public UActorComponent
+{
+    GENERATED_BODY()
+
+private:
+    FVector StartLocation;
+    FVector TargetLocation;
+
+    UPROPERTY(EditAnywhere)
+    FVector MoveOffset;
+
+    UPROPERTY(EditAnywhere)
+    float MoveTime = 4.0f;
+
+    UPROPERTY(EditAnywhere)
+    bool ShouldMove = false;
+
+    // 새로 추가: 목표 도달 여부
+    UPROPERTY(VisibleAnywhere)
+    bool ReachedTarget = false;
+};
+```
+
+### UPROPERTY 옵션 비교
+
+| 옵션                  | 읽기 | 쓰기 | 용도                   |
+| --------------------- | ---- | ---- | ---------------------- |
+| **EditAnywhere**      | ✅   | ✅   | 에디터에서 수정 가능   |
+| **VisibleAnywhere**   | ✅   | ❌   | 에디터에서 읽기만 가능 |
+| **BlueprintReadOnly** | ✅   | ❌   | Blueprint에서 읽기만   |
+
+**ReachedTarget은 VisibleAnywhere**:
+
+- 코드에서만 값 변경
+- 에디터에서는 확인만 가능
+- 디버깅에 유용
+
+---
+
+## 4. 완성된 코드
+
+### TickComponent() 전체
+
+```cpp
+void UMover::TickComponent(float DeltaTime, ...)
+{
+    Super::TickComponent(DeltaTime, ...);
+
+    // 1. 목표 위치 설정
+    if (ShouldMove)
+    {
+        TargetLocation = StartLocation + MoveOffset;
+    }
+    else
+    {
+        TargetLocation = StartLocation;
+    }
+
+    // 2. 현재 위치와 목표 위치 비교
+    FVector CurrentLocation = GetOwner()->GetActorLocation();
+    ReachedTarget = CurrentLocation.Equals(TargetLocation);
+
+    // 3. 목표 미도달 시에만 이동
+    if (ReachedTarget == false)  // 또는 if (!ReachedTarget)
+    {
+        float Speed = MoveOffset.Length() / MoveTime;
+        FVector NewLocation = FMath::VInterpConstantTo(
+            CurrentLocation, TargetLocation, DeltaTime, Speed
+        );
+        GetOwner()->SetActorLocation(NewLocation);
+    }
+}
+```
+
+---
+
+## 5. 로직 흐름도
+
+### 상태 다이어그램
+
+```
+시작
+  ↓
+ShouldMove 체크
+  ↓
+TargetLocation 설정
+  ↓
+현재 위치 가져오기
+  ↓
+ReachedTarget = CurrentLocation.Equals(TargetLocation)
+  ↓
+ReachedTarget == false?
+  ├─ Yes → 이동 코드 실행
+  └─ No → 아무것도 안 함 (효율적!)
+```
+
+### 시나리오별 동작
+
+**시나리오 1: 목표로 이동 중**
+
+```
+CurrentLocation = (70, 45, 200)
+TargetLocation = (70, 45, 285)
+ReachedTarget = false
+→ 이동 코드 실행 ✅
+```
+
+**시나리오 2: 목표 도달**
+
+```
+CurrentLocation = (70, 45, 285)
+TargetLocation = (70, 45, 285)
+ReachedTarget = true
+→ 이동 코드 건너뜀 (최적화!) ⚡
+```
+
+**시나리오 3: 방향 전환**
+
+```
+CurrentLocation = (70, 45, 285)  // 위에 있음
+ShouldMove = false로 변경
+→ TargetLocation = (70, 45, 135)
+→ ReachedTarget = false (다시 이동 필요)
+→ 이동 코드 실행 ✅
+```
+
+---
+
+## 6. 조건문 작성 방법
+
+### Bool 비교 방법
+
+```cpp
+// 방법 1: 명시적 비교
+if (ReachedTarget == false)
+
+// 방법 2: 부정 연산자 (더 간결) ✅
+if (!ReachedTarget)
+
+// 방법 3: true 비교 (읽기 좋지만 길다)
+if (ReachedTarget == true)
+
+// 방법 4: 직접 사용 (가장 간결) ✅
+if (ReachedTarget)
+```
+
+**권장 스타일**:
+
+```cpp
+// false 체크
+if (!ReachedTarget)  // ← 간결하고 명확
+
+// true 체크
+if (ReachedTarget)   // ← 간결하고 명확
+```
+
+---
+
+## 7. 디버그 로그로 확인
+
+### 테스트 코드
+
+```cpp
+if (!ReachedTarget)
+{
+    // 이동 중에만 로그 출력
+    UE_LOG(LogTemp, Display, TEXT("Mover is moving"));
+
+    float Speed = MoveOffset.Length() / MoveTime;
+    FVector NewLocation = FMath::VInterpConstantTo(...);
+    GetOwner()->SetActorLocation(NewLocation);
+}
+```
+
+### 예상 결과
+
+```
+// 이동 시작
+LogTemp: Display: Mover is moving
+LogTemp: Display: Mover is moving
+LogTemp: Display: Mover is moving
+...
+
+// 목표 도달
+(로그 멈춤)
+
+// 방향 전환
+LogTemp: Display: Mover is moving
+LogTemp: Display: Mover is moving
+...
+
+// 다시 도달
+(로그 멈춤)
+```
+
+---
+
+## 8. 에디터에서 확인하기
+
+### ReachedTarget 값 모니터링
+
+```
+1. Play 버튼
+2. F8 키 (빠져나오기)
+3. Door 선택 > Details > Mover Component
+
+확인 사항:
+- ReachedTarget: false → 이동 중
+- ReachedTarget: true → 목표 도착
+```
+
+**실시간 변화 관찰**:
+
+```
+시작 위치 (ShouldMove = false):
+└─ ReachedTarget = true ✅
+
+이동 중 (ShouldMove = true):
+└─ ReachedTarget = false ⏳
+
+목표 도착:
+└─ ReachedTarget = true ✅
+
+복귀 중 (ShouldMove = false):
+└─ ReachedTarget = false ⏳
+
+시작 위치 복귀:
+└─ ReachedTarget = true ✅
+```
+
+---
+
+## 9. 성능 개선 효과
+
+### 이전 vs 이후 비교
+
+**이전 (비효율)**:
+
+```cpp
+// 60 FPS 게임, 10초 동안 목표 위치에 정지
+60 프레임/초 × 10초 = 600회 불필요한 연산
+- GetActorLocation(): 600회
+- 속도 계산: 600회
+- VInterpConstantTo(): 600회
+- SetActorLocation(): 600회
+```
+
+**이후 (최적화)**:
+
+```cpp
+// 목표 도달 후
+if (!ReachedTarget)  // false이므로 블록 건너뜀
+{
+    // 실행 안 됨!
+}
+
+불필요한 연산: 0회 ⚡
+```
+
+---
+
+## 10. 추가 최적화 가능성
+
+### 현재 남은 비효율
+
+```cpp
+// 여전히 매 프레임 실행됨
+if (ShouldMove)
+{
+    TargetLocation = StartLocation + MoveOffset;  // 불필요한 재계산
+}
+else
+{
+    TargetLocation = StartLocation;  // 불필요한 재할당
+}
+```
+
+**개선 방법 (다음 강의 예정)**:
+
+- ShouldMove 값이 변경될 때만 TargetLocation 업데이트
+- 변경 감지 로직 추가
+
+---
+
+## 핵심 정리
+
+### 1. Equals() 함수
+
+```cpp
+CurrentLocation.Equals(TargetLocation)
+// 허용 오차 내에서 같으면 true
+```
+
+### 2. ReachedTarget 변수
+
+```cpp
+UPROPERTY(VisibleAnywhere)  // 읽기 전용
+bool ReachedTarget = false;
+```
+
+### 3. 최적화된 이동
+
+```cpp
+if (!ReachedTarget)  // 목표 미도달 시에만
+{
+    // 이동 코드 실행
+}
+```
+
+### 4. 성능 개선
+
+- 목표 도달 시 불필요한 연산 제거
+- CPU 자원 절약
+- 더 효율적인 코드
+
+### 5. Bool 조건문
+
+```cpp
+if (!ReachedTarget)  // false 체크 (간결)
+if (ReachedTarget)   // true 체크 (간결)
+```
+
+**결과: 똑똑하게 움직이는 문! 🚪⚡**
+
+# { 논리 NOT 연산자 (!) - 코드 간결화 }
+
+## 논리 NOT 연산자란?
+
+**기호**: `!` (느낌표)
+
+**기능**: 표현식의 결과를 **반전**시킴
+
+- `true` → `false`
+- `false` → `true`
+
+---
+
+## 기본 예제
+
+```cpp
+// 1. 리터럴 값
+!true    // false
+!false   // true
+
+// 2. 비교 연산
+!(8 < 7)   // false를 반전 → true
+!(10 > 9)  // true를 반전 → false
+
+// 3. 변수
+bool IsAlive = false;
+!IsAlive   // true
+```
+
+**읽는 방법**: "~가 아니다"
+
+- `!IsAlive` = "IsAlive가 아니다"
+- `!ReachedTarget` = "ReachedTarget이 아니다"
+
+---
+
+## 코드 개선 적용
+
+### 변경 전 (길고 명시적)
+
+```cpp
+if (ReachedTarget == false)
+{
+    // 이동 코드
+}
+```
+
+### 변경 후 (간결하고 관용적) ✅
+
+```cpp
+if (!ReachedTarget)
+{
+    // 이동 코드
+}
+```
+
+**의미**:
+
+- "목표에 도달하지 않았다면"
+- "ReachedTarget이 false라면"
+
+---
+
+## Bool 조건문 스타일 가이드
+
+### False 체크
+
+```cpp
+// ❌ 초보자 스타일 (길고 명시적)
+if (ReachedTarget == false)
+
+// ✅ 전문가 스타일 (간결하고 관용적)
+if (!ReachedTarget)
+```
+
+### True 체크
+
+```cpp
+// ❌ 불필요한 비교
+if (ShouldMove == true)
+
+// ✅ 직접 사용
+if (ShouldMove)
+```
+
+---
+
+## 완성된 코드
+
+```cpp
+void UMover::TickComponent(float DeltaTime, ...)
+{
+    Super::TickComponent(DeltaTime, ...);
+
+    // ShouldMove 직접 사용
+    if (ShouldMove)
+    {
+        TargetLocation = StartLocation + MoveOffset;
+    }
+    else
+    {
+        TargetLocation = StartLocation;
+    }
+
+    FVector CurrentLocation = GetOwner()->GetActorLocation();
+    ReachedTarget = CurrentLocation.Equals(TargetLocation);
+
+    // 논리 NOT 연산자 사용 ✅
+    if (!ReachedTarget)
+    {
+        float Speed = MoveOffset.Length() / MoveTime;
+        FVector NewLocation = FMath::VInterpConstantTo(
+            CurrentLocation, TargetLocation, DeltaTime, Speed
+        );
+        GetOwner()->SetActorLocation(NewLocation);
+    }
+}
+```
+
+---
+
+## 핵심 정리
+
+### 1. 논리 NOT 연산자
+
+```cpp
+!expression  // 결과 반전
+```
+
+### 2. 권장 스타일
+
+```cpp
+if (!ReachedTarget)  // ✅ 간결
+if (ReachedTarget == false)  // ❌ 장황
+```
+
+### 3. 읽기
+
+```cpp
+!ReachedTarget  // "목표에 도달하지 않았다"
+!ShouldMove     // "움직이지 않아야 한다"
+```
+
+### 4. C++ 관습
+
+- `!` 연산자가 **더 일반적**
+- 전문 개발자들이 선호하는 스타일
+- 처음엔 낯설지만 곧 익숙해짐
+
+**결과: 더 깔끔하고 전문적인 코드! 💪**
+
+# { C++ 언리얼 프로젝트 컴파일 과정 }
+
+## 컴파일이란?
+
+**사람이 읽는 코드 → 컴퓨터가 실행하는 프로그램**
+
+```
+C++ 코드 (.cpp, .h)
+    ↓ 컴파일
+실행 파일 (.exe)
+```
+
+---
+
+## 전체 컴파일 단계
+
+### 언리얼 C++ 프로젝트의 컴파일 흐름
+
+```
+1. 소스 코드 (.cpp, .h)
+    ↓
+2. Unreal Header Tool (언리얼 전용)
+    ↓
+3. Preprocessor (전처리기)
+    ↓
+4. Compiler (컴파일러)
+    ↓
+5. Linker (링커)
+    ↓
+6. 실행 파일 (.exe)
+```
+
+---
+
+## 1단계: 소스 코드
+
+### 우리가 작성하는 파일들
+
+```cpp
+// Mover.h (헤더 파일)
+class UMover : public UActorComponent
+{
+    // 선언
+};
+
+// Mover.cpp (소스 파일)
+#include "Mover.h"
+
+void UMover::BeginPlay()
+{
+    // 구현
+}
+```
+
+---
+
+## 2단계: Unreal Header Tool (언리얼 전용)
+
+### 역할
+
+**언리얼 특수 구문을 처리하여 추가 코드 생성**
+
+### 언리얼 특수 구문 예시
+
+```cpp
+UCLASS()                          // 언리얼 매크로
+class DUNGEONESCAPE_API UMover    // 언리얼 API 키워드
+{
+    GENERATED_BODY()              // 언리얼 매크로
+
+    UPROPERTY(EditAnywhere)       // 언리얼 매크로
+    FVector MoveOffset;
+};
+```
+
+**처리 결과**:
+
+- 이 구문들을 분석
+- C++과 언리얼 엔진을 연결하는 추가 코드 생성
+- 에디터와의 통신 가능하게 함
+
+---
+
+## 3단계: Preprocessor (전처리기)
+
+### 역할
+
+**`#`으로 시작하는 지시어 처리**
+
+### 주요 전처리기 지시어
+
+```cpp
+#include "Mover.h"                    // 파일 포함
+#include "Math/UnrealMathUtility.h"   // 파일 포함
+#define MAX_PLAYERS 4                 // 상수 정의
+#if DEBUG                             // 조건부 컴파일
+#endif
+```
+
+### #include의 작동 방식
+
+**처리 전**:
+
+```cpp
+// Game.cpp
+#include "Math.h"
+
+void MyGame()
+{
+    Add(1, 2);
+}
+```
+
+**처리 후** (중간 파일 .i):
+
+```cpp
+// Game.i
+// Math.h의 내용이 여기 복사됨
+int Add(int a, int b);  // ← Math.h에서 복사
+
+void MyGame()
+{
+    Add(1, 2);
+}
+```
+
+**핵심**:
+
+- `#include`는 **파일 내용을 복사-붙여넣기**
+- 헤더 파일의 모든 내용이 cpp 파일로 들어감
+
+---
+
+## 4단계: Compiler (컴파일러)
+
+### 역할
+
+**C++ 코드 → 기계어(바이너리 코드)로 변환**
+
+```
+Game.i (사람이 읽을 수 있는 코드)
+    ↓ 컴파일러
+Game.o (기계어, 0과 1)
+```
+
+### 각 .cpp 파일마다 .o 파일 생성
+
+```
+Mover.cpp → Mover.o
+Character.cpp → Character.o
+GameMode.cpp → GameMode.o
+```
+
+**아직 실행 불가**: 파일들이 분리되어 있음
+
+---
+
+## 5단계: Linker (링커)
+
+### 역할
+
+**여러 .o 파일들을 하나의 실행 파일로 연결**
+
+```
+Mover.o
+Character.o      → [Linker] → Game.exe
+GameMode.o
+```
+
+### 링커가 하는 중요한 일
+
+**함수 호출 연결**:
+
+```cpp
+// Game.cpp에서
+Add(1, 2);  // Add 함수 호출
+
+// Math.cpp에 정의됨
+int Add(int a, int b) { return a + b; }
+
+→ 링커가 이 둘을 연결!
+```
+
+---
+
+## 실전 예제: 파일 간 연결
+
+### 3개 파일 예제
+
+**Math.h** (선언):
+
+```cpp
+int Add(int a, int b);
+```
+
+**Math.cpp** (정의):
+
+```cpp
+#include "Math.h"
+
+int Add(int a, int b)
+{
+    return a + b;
+}
+```
+
+**Game.cpp** (사용):
+
+```cpp
+#include "Math.h"
+
+void MyGame()
+{
+    int Result = Add(1, 2);  // 3
+}
+```
+
+### 컴파일 과정
+
+**1. 전처리기**:
+
+Game.cpp → Game.i
+
+```cpp
+// Math.h 내용 복사됨
+int Add(int a, int b);
+
+void MyGame()
+{
+    int Result = Add(1, 2);
+}
+```
+
+Math.cpp → Math.i
+
+```cpp
+int Add(int a, int b);
+
+int Add(int a, int b)
+{
+    return a + b;
+}
+```
+
+**2. 컴파일러**:
+
+```
+Game.i → Game.o (기계어)
+Math.i → Math.o (기계어)
+```
+
+**3. 링커**:
+
+- Game.o에서 `Add()` 호출 발견
+- Math.o에서 `Add()` 정의 발견
+- 둘을 연결!
+- Game.exe 생성
+
+---
+
+## 왜 #include가 필요한가?
+
+### 실험: #include 제거
+
+**Mover.cpp에서**:
+
+```cpp
+// #include "Mover.h"  ← 주석 처리!
+
+void UMover::BeginPlay()
+{
+    // ...
+}
+```
+
+### 컴파일 에러 발생
+
+```
+Error: 'UMover' is not a class
+Error: 'UMover' undeclared identifier
+Error: missing type specifier
+```
+
+**이유**:
+
+- 컴파일러가 `UMover`가 무엇인지 모름
+- 헤더 파일에 클래스 선언이 있는데 포함 안 함
+- 선언 없이 정의할 수 없음
+
+### 올바른 방법
+
+```cpp
+#include "Mover.h"  // ✅ 필수!
+
+void UMover::BeginPlay()
+{
+    // 이제 컴파일러가 UMover가 뭔지 알아요
+}
+```
+
+---
+
+## 헤더 파일 (.h) vs 소스 파일 (.cpp)
+
+### 헤더 파일 (.h)
+
+**역할**: **선언** (Declaration)
+
+- "이런 것이 있다"고 알림
+- 함수 시그니처
+- 클래스 구조
+
+```cpp
+// Math.h
+int Add(int a, int b);  // 선언만
+
+class UMover  // 클래스 구조
+{
+    void BeginPlay();  // 선언만
+};
+```
+
+### 소스 파일 (.cpp)
+
+**역할**: **정의/구현** (Definition)
+
+- 실제로 어떻게 동작하는지
+- 함수 본문
+- 실제 코드
+
+```cpp
+// Math.cpp
+int Add(int a, int b)  // 정의
+{
+    return a + b;  // 실제 구현
+}
+
+// Mover.cpp
+void UMover::BeginPlay()  // 정의
+{
+    StartLocation = GetOwner()->GetActorLocation();
+}
+```
+
+---
+
+## 왜 이렇게 복잡하게?
+
+### 장점 1: 재사용성
+
+```cpp
+// Math.h를 여러 곳에서 include 가능
+#include "Math.h"  // Game.cpp
+#include "Math.h"  // Enemy.cpp
+#include "Math.h"  // Player.cpp
+
+// 모두 같은 Add() 함수 사용 가능
+```
+
+### 장점 2: 빠른 컴파일
+
+```
+Mover.cpp 수정
+    ↓
+Mover.cpp만 재컴파일  // 빠름!
+    ↓
+다른 파일은 그대로
+    ↓
+링커로 다시 연결
+```
+
+**전체 재컴파일 불필요!**
+
+---
+
+## 언리얼에서의 실전 예제
+
+### 우리 프로젝트의 include
+
+```cpp
+// Mover.cpp
+#include "Mover.h"                    // 1. 자기 자신의 헤더
+#include "Math/UnrealMathUtility.h"   // 2. FMath 사용 위해
+```
+
+**왜 필요?**
+
+1. `#include "Mover.h"`:
+   - `UMover` 클래스가 뭔지 알려줌
+   - 이거 없으면 컴파일 에러!
+2. `#include "Math/UnrealMathUtility.h"`:
+   - `FMath::VInterpConstantTo()` 사용 가능
+   - 이거 없으면 `FMath`를 모름
+
+---
+
+## 컴파일 흐름 요약
+
+### 단계별 변화
+
+```
+1. 소스 코드 (우리가 작성)
+   Mover.h, Mover.cpp
+   ↓
+2. Unreal Header Tool
+   언리얼 구문 처리
+   ↓
+3. 전처리기
+   #include 처리 → .i 파일
+   ↓
+4. 컴파일러
+   C++ → 기계어 → .o 파일
+   ↓
+5. 링커
+   .o 파일들 연결 → .exe
+   ↓
+6. 실행 파일
+   Game.exe (완성!)
+```
+
+---
+
+## 핵심 정리
+
+### 1. 컴파일 = 번역 과정
+
+```
+사람 언어(C++) → 컴퓨터 언어(기계어)
+```
+
+### 2. 주요 도구들
+
+- **Unreal Header Tool**: 언리얼 구문 처리
+- **Preprocessor**: `#include` 등 처리
+- **Compiler**: C++ → 기계어
+- **Linker**: 파일들 연결
+
+### 3. #include의 역할
+
+```cpp
+#include "Mover.h"  // 헤더 내용을 여기 복사-붙여넣기
+```
+
+### 4. 헤더 vs 소스
+
+- **.h**: 선언 (무엇이 있는지)
+- **.cpp**: 정의 (어떻게 동작하는지)
+
+### 5. 왜 분리?
+
+- 재사용성
+- 빠른 컴파일
+- 코드 구조화
+
+**이제 컴파일이 어떻게 돌아가는지 이해했습니다! 🎓**

@@ -1,0 +1,3169 @@
+---
+title: '배드 봇 - 드론 비행 슈팅 게임 - 5'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 언리얼 엔진 - 충돌 감지와 Hit Event }
+
+## 🎯 학습 목표
+
+블라스터 빔의 충돌 처리 구현
+
+- Static Mesh에 Collision 추가
+- Hit Event 구현
+- 충돌 시 파티클 효과 생성
+- 표면 법선 벡터로 방향 조정
+
+---
+
+## 📦 현재 상황
+
+```
+블라스터 빔 발사
+  ↓
+벽이나 물체에 부딪힘
+  ↓
+아무 일도 일어나지 않음
+
+목표:
+  ↓
+충돌 시 효과 표시 + 빔 파괴
+```
+
+---
+
+## 🔷 Static Mesh Collision 이해
+
+### Complex vs Simple Collision
+
+**Complex Collision (복잡한 콜리전)**
+
+```
+메시의 실제 폴리곤 사용
+  ├─ 모든 삼각형 개별 계산
+  ├─ 정확하지만 성능 저하
+  └─ 일반적으로 사용 안 함
+```
+
+**Simple Collision (단순 콜리전)**
+
+```
+기본 도형으로 근사
+  ├─ Box, Sphere, Capsule 등
+  ├─ 계산량 적음
+  ├─ 최적화됨
+  └─ 게임에서 주로 사용
+```
+
+### 확인 방법
+
+```
+Static Mesh Editor
+  ↓
+Show → Complex Collision
+  → 실제 메시 폴리곤
+
+Show → Simple Collision
+  → 단순화된 콜리전 볼륨
+```
+
+---
+
+## 🔧 SM_Blaster_Beam Collision 추가
+
+### 1. Static Mesh 열기
+
+```
+Content/Assets/Blaster_Beam/
+  ↓
+SM_Blaster_Beam 더블클릭
+  ↓
+Static Mesh Editor 열림
+```
+
+### 2. Collision 추가
+
+**메뉴 경로**
+
+```
+Collision → Add...
+```
+
+**옵션들**
+
+```
+├─ 10DOP-X/Y/Z
+├─ 18DOP
+├─ 26DOP
+├─ Auto Convex Collision
+├─ Sphere Simplified Collision
+├─ Capsule Simplified Collision
+└─ Box Simplified Collision
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380698/notion-blog/_/_/_5_/_-_-_5/image.png)
+
+### 3. 적합한 Collision 선택
+
+**Sphere (구)**
+
+```
+❌ 원통형 빔에 부적합
+→ 끝부분이 제대로 안 맞음
+```
+
+**Capsule (캡슐)**
+
+```
+✓ 원통에 가까움
+✓ 양 끝이 둥글게 처리
+△ 끝부분이 약간 튀어나옴
+```
+
+**Box (박스)**
+
+```
+✓ 빔 전체를 커버
+△ 모서리가 튀어나옴
+✓ 빠른 속도에서는 문제없음
+```
+
+**권장: Box Simplified Collision**
+
+```
+Collision → Add Box Simplified Collision
+  ↓
+빔 전체를 감싸는 박스 생성
+  ↓
+빠르게 움직이므로 정확도 덜 중요
+```
+
+### 4. Collision 삭제/변경
+
+**선택한 Collision 삭제**
+
+```
+Collision → Remove Selected Collision
+```
+
+**모든 Collision 삭제**
+
+```
+Collision → Remove Collision
+```
+
+---
+
+## ⚙️ Collision Complexity 설정
+
+### 중요 설정
+
+```
+Static Mesh Editor
+  ↓
+Details Panel
+  ↓
+Collision 섹션 찾기
+  ↓
+Collision Complexity
+  ├─ 기본값: Use Complex Collision as Simple
+  └─ 변경: Use Simple Collision as Complex ✓
+```
+
+**설정 의미**
+
+```
+Use Simple Collision as Complex
+  ↓
+Simple Collision Hull 사용
+  ↓
+필수 단계! (안 하면 Simple Collision 무시됨)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380695/notion-blog/_/_/_5_/_-_-_5/image_1.png)
+
+---
+
+## 🎯 Hit Event 구현
+
+### BP_Blaster_Beam Event Graph
+
+### 1. Component Hit Event 생성
+
+```
+Beam Mesh (컴포넌트) 드래그
+  ↓
+Add Event → On Component Hit
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380696/notion-blog/_/_/_5_/_-_-_5/image_2.png)
+
+**자동 생성되는 것들**
+
+```
+1. Bind 노드 (파란색)
+   Begin Play에 연결
+   ↓
+2. OnComponentHit_Event (빨간색)
+   충돌 시 실행되는 Custom Event
+```
+
+### 2. Event 구조 이해
+
+```
+OnComponentHit_Event
+  ├─ Hit Component: 부딪힌 컴포넌트 (Beam Mesh)
+  ├─ Other Actor: 맞은 액터
+  ├─ Other Comp: 맞은 액터의 컴포넌트
+  ├─ Normal Impulse: 충격량
+  └─ Hit: 충돌 정보 (Hit Result 구조체)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380697/notion-blog/_/_/_5_/_-_-_5/image_3.png)
+
+---
+
+## 🧪 Hit Event 테스트
+
+### 1. 디버그 출력 추가
+
+```
+OnComponentHit_Event
+  ↓
+Other Actor → Get Object Name
+  ↓
+Print String
+  └─ Duration: 60초
+```
+
+### 2. BP_Bot 임시 수정
+
+**단발 발사로 변경**
+
+```
+Set Timer by Event 우회
+  ↓
+Fire Blaster Beam 직접 호출 (1회만)
+```
+
+**회전 비활성화**
+
+```
+Interp to Rotation 연결 끊기
+  ↓
+드론이 회전 안 함
+  ↓
+조준 편함
+```
+
+### 3. 테스트용 벽 생성
+
+```
+Floor Platform 선택
+  ↓
+Alt + E (회전 기즈모)
+  ↓
+Alt 누른 채 90도 회전
+  ↓
+복제되며 벽으로 배치
+```
+
+### 4. 테스트 결과
+
+```
+Play
+  ↓
+빔이 벽에 충돌
+  ↓
+Print String으로 액터 이름 출력
+  ↓
+빔이 충돌 지점에서 정지
+```
+
+**정지하는 이유**
+
+```
+Projectile Movement Component
+  ↓
+Collision이 활성화되어
+  ↓
+벽에 의해 차단됨
+```
+
+---
+
+## ✨ Hit 위치에 파티클 생성
+
+### 1. Hit Result 분해
+
+```
+OnComponentHit_Event
+  ↓
+Hit (출력 핀) 드래그
+  ↓
+Break Hit Result 선택
+```
+
+**Break Hit Result 출력들**
+
+```
+├─ Blocking Hit: 차단 여부
+├─ Initial Overlap: 초기 겹침
+├─ Time: 충돌 시간
+├─ Distance: 거리
+├─ Location: 충돌 위치
+├─ Impact Point: 정확한 충격 지점 ✓
+├─ Normal: 표면 법선 벡터 ✓
+├─ Impact Normal: 충격 법선
+├─ Phys Mat: 물리 머티리얼
+├─ Hit Actor: 맞은 액터
+├─ Hit Component: 맞은 컴포넌트
+├─ Hit Bone Name: 맞은 본
+└─ Item: 추가 정보
+```
+
+### 2. Spawn System at Location
+
+```
+우클릭 → Spawn System at Location
+  ├─ Emitter Template: NS_Beam_Burst
+  ├─ Location ← Impact Point
+  └─ Rotation: (아직 미설정)
+```
+
+### 3. 테스트
+
+```
+벽을 가까이 이동
+  ↓
+Play
+  ↓
+충돌 시 파티클 생성 확인
+```
+
+**문제점**
+
+```
+파티클이 월드 X 방향으로만 발사
+  ↓
+벽 안쪽에서 봐야 보임
+  ↓
+방향이 고정되어 있음
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380697/notion-blog/_/_/_5_/_-_-_5/image_4.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380697/notion-blog/_/_/_5_/_-_-_5/image_5.png)
+
+---
+
+## 📐 Normal Vector로 방향 설정
+
+### Normal Vector란?
+
+```
+표면에 수직(직교)인 벡터
+  ├─ 90도로 튀어나옴
+  ├─ 표면 방향 나타냄
+  └─ 보통 길이 1로 정규화됨
+
+주의:
+  Normal Vector ≠ Normalized Vector
+  (표면 법선) ≠ (정규화된 벡터)
+```
+
+### 시각적 이해
+
+```
+벽 (평면)
+  │
+  │ ← Normal Vector (표면에 수직)
+  │
+  └─────
+```
+
+### Rotation 생성
+
+```
+Break Hit Result
+  ↓
+Normal (Vector 출력)
+  ↓
+Make Rot from X
+  ↓
+Return Value (Rotator)
+  ↓
+Spawn System at Location → Rotation
+```
+
+**Make Rot from X 선택 이유**
+
+```
+언리얼 엔진 규칙:
+  X축 = Forward (전방)
+  ↓
+Normal 벡터를 X축으로 설정
+  ↓
+해당 방향을 향하는 Rotation 생성
+```
+
+### 다른 옵션들
+
+```
+Make Rot from X: X축 기준 회전
+Make Rot from Y: Y축 기준 회전
+Make Rot from Z: Z축 기준 회전
+Make Rot from XY: X, Y축 기준
+Make Rot from XZ: X, Z축 기준
+...
+```
+
+---
+
+## 💥 Actor 파괴
+
+### Destroy Actor 추가
+
+```
+Spawn System at Location
+  ↓
+Destroy Actor
+  └─ Target: Self
+```
+
+**효과**
+
+```
+파티클 생성 후
+  ↓
+빔 액터 즉시 파괴
+  ↓
+수명 타이머 불필요
+```
+
+---
+
+## 🎨 경사 표면 테스트
+
+### 1. 벽 회전
+
+```
+벽 선택
+  ↓
+E 키 (회전 기즈모)
+  ↓
+45도 각도로 회전
+```
+
+### 2. 테스트
+
+```
+Play
+  ↓
+파티클이 벽 각도에 맞춰 발사
+  ↓
+Normal Vector가 표면에 수직으로 작동
+```
+
+### 3. 연속 발사로 복구
+
+```
+BP_Bot
+  ↓
+Set Timer by Event 재연결
+  ↓
+연속 발사 재개
+```
+
+**결과**
+
+```
+0.2초마다 발사
+  ↓
+각 빔이 벽에 충돌
+  ↓
+표면 각도에 맞춰 파티클 생성
+```
+
+---
+
+## 📋 최종 BP_Blaster_Beam 구조
+
+### Event Graph
+
+```
+Begin Play
+  ↓
+Bind to OnComponentHit
+  └─ Beam Mesh → On Component Hit
+
+OnComponentHit_Event
+  ├─ Hit → Break Hit Result
+  │   ├─ Impact Point → Location
+  │   └─ Normal → Make Rot from X → Rotation
+  ↓
+Spawn System at Location
+  ├─ NS_Beam_Burst
+  ├─ Location (from Impact Point)
+  └─ Rotation (from Normal)
+  ↓
+Destroy Actor
+```
+
+### Components
+
+```
+Beam Mesh (Static Mesh Component)
+  ├─ Static Mesh: SM_Blaster_Beam
+  ├─ Collision: Box Simplified
+  └─ Collision Complexity: Use Simple as Complex
+
+Projectile Movement
+  ├─ Initial Speed: 5000
+  └─ Max Speed: 5000
+```
+
+---
+
+## 🔍 Break Hit Result 주요 출력
+
+### 자주 사용하는 것들
+
+```
+Location
+  └─ 충돌 발생 위치 (대략)
+
+Impact Point ✓
+  └─ 정확한 충격 지점 (주로 사용)
+
+Normal ✓
+  └─ 표면 법선 벡터
+
+Hit Actor
+  └─ 맞은 액터 참조
+
+Hit Component
+  └─ 맞은 컴포넌트 참조
+
+Phys Mat
+  └─ 물리 머티리얼 (표면 종류)
+```
+
+---
+
+## ⚙️ Collision 설정 요약
+
+### Static Mesh (SM_Blaster_Beam)
+
+| 항목                 | 설정                  | 설명      |
+| -------------------- | --------------------- | --------- |
+| Simple Collision     | Box                   | 박스 모양 |
+| Collision Complexity | Use Simple as Complex | 필수!     |
+
+### Component (Beam Mesh)
+
+| 항목                | 설정          | 효과           |
+| ------------------- | ------------- | -------------- |
+| Generate Hit Events | True          | Hit Event 발생 |
+| Collision Preset    | 적절한 프리셋 | 차단/감지 설정 |
+
+---
+
+## ⚠️ 주의사항
+
+### 1. Collision Complexity
+
+```
+❌ 설정 안 하면
+  → Simple Collision 무시됨
+  → Complex Collision 사용
+  → 성능 저하
+
+✓ Use Simple as Complex 설정
+  → Simple Collision 사용
+  → 최적화됨
+```
+
+### 2. Socket 위치
+
+```
+Socket이 Collision 내부에 있으면
+  → 즉시 자기 자신과 충돌
+  → 발사 안 됨
+
+해결:
+  → Socket을 Collision 밖으로
+```
+
+### 3. Hit Event 조건
+
+```
+Hit Event 발생 조건:
+  ├─ Generate Hit Events = True
+  ├─ Collision 활성화
+  └─ 차단(Block) 설정
+```
+
+### 4. Normal Vector
+
+```
+Normal = 표면 법선 벡터
+  ↓
+표면에 수직
+  ↓
+Make Rot from X로 변환
+```
+
+### 5. Destroy Actor
+
+```
+Self 파괴 시:
+  ├─ 모든 컴포넌트 파괴
+  ├─ 더 이상 이벤트 발생 안 함
+  └─ 파티클 먼저 Spawn 필수
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Hit Event 흐름
+
+```
+충돌 발생
+  ↓
+OnComponentHit Broadcast
+  ↓
+Bind된 Event 실행
+  ↓
+Hit Result 데이터 전달
+  ↓
+처리 (파티클, 파괴 등)
+```
+
+### Hit Result 활용
+
+```
+Hit Result (구조체)
+  ├─ 위치 정보
+  ├─ 방향 정보
+  ├─ 액터 정보
+  └─ 물리 정보
+  ↓
+Break로 분해
+  ↓
+필요한 데이터만 사용
+```
+
+### Collision 최적화
+
+```
+Complex Collision (❌)
+  → 모든 폴리곤 계산
+  → 느림
+
+Simple Collision (✓)
+  → 기본 도형으로 근사
+  → 빠름
+  → 게임에서 사용
+```
+
+---
+
+## 🎓 학습 요약
+
+```
+Static Mesh Collision 추가
+  ├─ Box Simplified Collision
+  ├─ Collision Complexity 설정
+  └─ Socket 위치 확인
+  ↓
+Hit Event 구현
+  ├─ On Component Hit Bind
+  ├─ Custom Event 생성
+  └─ Hit Result 처리
+  ↓
+파티클 효과
+  ├─ Impact Point에서 생성
+  ├─ Normal Vector로 방향
+  └─ Make Rot from X
+  ↓
+Actor 파괴
+  └─ Destroy Actor
+  ↓
+완성: 충돌 반응 시스템
+```
+
+---
+
+# { 언리얼 엔진 - 플레이어 피격 감지와 게임 종료 }
+
+## 🎯 학습 목표
+
+플레이어가 블라스터 빔에 맞으면 게임 종료
+
+- Spawn 시 변수 설정 방법
+- 피격 대상 확인 로직
+- 조건부 실행 (Branch)
+- 게임 종료 구현
+
+---
+
+## 🤔 왜 이 기능이 필요한가?
+
+### 현재 상황
+
+```
+블라스터 빔 발사
+  ↓
+벽에 맞음 → 파티클 + 파괴 ✓
+플레이어에 맞음 → 파티클 + 파괴만? ❌
+
+문제:
+플레이어를 맞혀도 게임이 계속됨
+  ↓
+승패 조건 없음
+```
+
+### 목표
+
+```
+블라스터 빔이 플레이어를 맞히면
+  ↓
+게임 종료
+  ↓
+간단한 패배 조건 구현
+```
+
+---
+
+## 💡 핵심 개념: Target Pawn 비교
+
+### 문제 정의
+
+```
+블라스터 빔이 무언가에 맞음
+  ├─ 벽? → 그냥 파괴
+  └─ 플레이어? → 게임 종료
+
+어떻게 구분하나?
+  ↓
+맞은 대상이 플레이어인지 확인 필요
+```
+
+### 해결 아이디어
+
+```
+1. 블라스터 빔에게 "누구를 맞춰야 하는지" 알려줌
+   ↓
+2. 실제로 맞은 대상과 비교
+   ↓
+3. 일치하면 게임 종료
+```
+
+---
+
+## 📦 BP_Blaster_Beam에 Target Pawn 추가
+
+### 1. 변수 생성
+
+```
+BP_Blaster_Beam 열기
+  ↓
+Variables 섹션
+  ↓
++ 버튼
+  ↓
+이름: Target Pawn
+```
+
+### 2. 타입 변경
+
+```
+Variable Type 드롭다운
+  ↓
+"pawn" 검색
+  ↓
+Pawn (Object Reference) 선택
+```
+
+**왜 Pawn 타입인가?**
+
+```
+Actor: 모든 오브젝트 (너무 광범위)
+  ↓
+Pawn: 조종 가능한 캐릭터
+  ↓
+플레이어가 조종하는 캐릭터 = Pawn
+  ↓
+더 구체적이고 안전함
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380697/notion-blog/_/_/_5_/_-_-_5/image_6.png)
+
+---
+
+## 🔧 Expose on Spawn 설정
+
+### 개념 이해
+
+**일반 변수**
+
+```
+Blueprint 내부에서만 설정 가능
+  ↓
+외부에서 접근 불가
+```
+
+**Expose on Spawn**
+
+```
+액터를 Spawn할 때
+  ↓
+외부에서 변수 값을 설정 가능
+  ↓
+"생성하면서 초기화"
+```
+
+### 설정 방법
+
+```
+Target Pawn 변수 선택
+  ↓
+Details Panel
+  ↓
+1. Instance Editable: ✓ 체크
+   (눈 아이콘이 열림)
+
+2. Expose on Spawn: ✓ 체크
+```
+
+### 각 옵션의 의미
+
+**Instance Editable**
+
+```
+레벨에 배치된 액터의 변수를
+Details Panel에서 수정 가능
+
+예:
+레벨의 BP_Bot 선택
+  → Details에서 값 변경 가능
+```
+
+**Expose on Spawn**
+
+```
+Spawn Actor 노드에서
+변수를 입력 핀으로 노출
+
+SpawnActor 노드
+  ├─ Class
+  ├─ Transform
+  └─ Target Pawn ← 추가됨!
+
+```
+
+**왜 둘 다 필요한가?**
+
+```
+Instance Editable이 먼저 켜져야
+  ↓
+Expose on Spawn을 켤 수 있음
+  ↓
+단계적 접근 제어
+
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380697/notion-blog/_/_/_5_/_-_-_5/image_7.png)
+
+---
+
+## 🔌 BP_Bot에서 Target Pawn 설정
+
+### 1. 노드 새로고침
+
+```
+BP_Bot 열기
+  ↓
+Spawn Blaster Beam 함수
+  ↓
+SpawnActor BP_Blaster_Beam 노드 우클릭
+  ↓
+Refresh Node
+```
+
+**왜 Refresh가 필요한가?**
+
+```
+다른 Blueprint를 수정했을 때
+  ↓
+현재 Blueprint는 변경사항을 모름
+  ↓
+Refresh로 최신 정보 가져옴
+```
+
+### 2. Target Pawn 연결
+
+```
+SpawnActor 노드 확장
+  ↓
+Target Pawn 입력 핀 표시됨
+  ↓
+BP_Bot의 Target Pawn 변수 연결
+```
+
+**연결 흐름**
+
+```
+BP_Bot
+  ├─ Target Pawn (플레이어 저장됨)
+  │   ↓
+  └─ SpawnActor
+      └─ Target Pawn (블라스터 빔에 전달)
+```
+
+**결과**
+
+```
+블라스터 빔 생성 시
+  ↓
+자동으로 Target Pawn이 설정됨
+  ↓
+"이 빔은 누구를 맞춰야 하는지 앎"
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380698/notion-blog/_/_/_5_/_-_-_5/image_8.png)
+
+---
+
+## 🎯 Hit Actor와 Target Pawn 비교
+
+### BP_Blaster_Beam에서 구현
+
+### 1. 비교 노드 추가
+
+```
+OnComponentHit_Event
+  ↓
+Other Actor (맞은 대상)
+  ↓
+== (Equal) 노드
+  ├─ A: Other Actor
+  └─ B: Target Pawn
+  ↓
+Bool (참/거짓)
+```
+
+**Equal 노드 찾기**
+
+```
+Other Actor 드래그
+  ↓
+"==" 입력
+  ↓
+Equal (Object) 선택
+```
+
+### 2. 왜 비교하나?
+
+```
+Other Actor: 실제로 맞은 대상
+Target Pawn: 맞춰야 할 대상
+
+Other Actor == Target Pawn?
+  ├─ True: 플레이어를 맞춤!
+  └─ False: 다른 것을 맞춤 (벽 등)
+```
+
+---
+
+## 🌿 Branch로 조건 분기
+
+### Branch 노드란?
+
+```
+if문과 동일
+
+if (조건) {
+  // True 실행
+} else {
+  // False 실행
+}
+```
+
+### 구현
+
+```
+OnComponentHit_Event
+  ↓
+Branch
+  ├─ Condition ← (Other Actor == Target Pawn)
+  ├─ True → Quit Game
+  └─ False → Spawn System + Destroy Actor
+```
+
+### 흐름 이해
+
+**Case 1: 플레이어 피격 (True)**
+
+```
+블라스터 빔 충돌
+  ↓
+Other Actor == Target Pawn? → Yes
+  ↓
+Branch → True 핀 실행
+  ↓
+Quit Game
+
+```
+
+**Case 2: 벽 충돌 (False)**
+
+```
+블라스터 빔 충돌
+  ↓
+Other Actor == Target Pawn? → No
+  ↓
+Branch → False 핀 실행
+  ↓
+Spawn System → Destroy Actor
+
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380698/notion-blog/_/_/_5_/_-_-_5/image_9.png)
+
+---
+
+## 🎮 Quit Game 노드
+
+### 사용법
+
+```
+우클릭 → "Quit Game" 검색
+  ↓
+Quit Game 노드
+  ↓
+Branch True에 연결
+```
+
+### 동작
+
+```
+Quit Game 실행
+  ↓
+게임 즉시 종료
+  ↓
+에디터로 복귀
+```
+
+**제한사항**
+
+```
+현재는 단순 종료만
+  ↓
+나중에 배울 것들:
+  ├─ UI 메시지 표시
+  ├─ 점수 화면
+  ├─ 재시작 옵션
+  └─ 메인 메뉴 복귀
+```
+
+---
+
+## 🧹 함수로 정리 (Handle Hit)
+
+### 정리 전 문제
+
+```
+OnComponentHit_Event에서
+  ├─ Break Hit Result
+  ├─ Equal 비교
+  ├─ Branch
+  ├─ Spawn System
+  ├─ Destroy Actor
+  └─ Quit Game
+  ↓
+복잡하고 지저분함
+```
+
+### 함수로 축소
+
+```
+노드들 선택 (Branch부터 끝까지)
+  ↓
+우클릭 → Collapse to Function
+  ↓
+이름: Handle Hit
+```
+
+### 입력 파라미터 설정
+
+```
+Handle Hit 함수 선택
+  ↓
+Details Panel
+  ↓
+Inputs 섹션
+  ├─ 파라미터 A → 이름: Hit Actor
+  └─ 파라미터 B → 이름: Hit (Hit Result)
+```
+
+**왜 파라미터 이름을 바꾸나?**
+
+```
+기본 이름: A, B (의미 불명)
+  ↓
+변경 후: Hit Actor, Hit (이해 쉬움)
+  ↓
+코드 가독성 향상
+```
+
+### 정리 후 구조
+
+```
+OnComponentHit_Event
+  ├─ Other Actor
+  └─ Hit
+  ↓
+Handle Hit
+  ├─ Hit Actor (입력)
+  ├─ Hit (입력)
+  └─ [내부 로직 숨겨짐]
+```
+
+**함수 내부**
+
+```
+Hit Actor 입력
+  ↓
+Target Pawn과 비교
+  ↓
+Branch
+  ├─ True → Quit Game
+  └─ False → Spawn System + Destroy
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380695/notion-blog/_/_/_5_/_-_-_5/image_10.png)
+
+---
+
+## ⏱️ 게임 시작 딜레이 추가
+
+### 문제
+
+```
+게임 시작 즉시
+  ↓
+드론 발사 시작
+  ↓
+플레이어가 피할 시간 없음
+  ↓
+즉시 게임 오버
+```
+
+### 해결
+
+```
+BP_Bot Event Graph
+  ↓
+Begin Play
+  ↓
+Save Target Pawn
+  ↓
+Delay (1~2초) ← 추가
+  ↓
+Fire Blaster Beam (즉시 1회)
+  ↓
+Set Timer by Event (반복)
+```
+
+**Delay 설정**
+
+```
+Delay 노드 추가
+  ↓
+Duration: 1.0 또는 2.0초
+  ↓
+플레이어에게 준비 시간 제공
+```
+
+---
+
+## ✅ 최종 구조
+
+### BP_Blaster_Beam
+
+```
+Components
+  └─ Beam Mesh (Collision 설정)
+
+Variables
+  └─ Target Pawn (Pawn Reference)
+      ├─ Instance Editable: ✓
+      └─ Expose on Spawn: ✓
+
+Event Graph
+  ├─ Begin Play
+  │   └─ Bind to OnComponentHit
+  │
+  └─ OnComponentHit_Event
+      ├─ Other Actor
+      └─ Hit
+      ↓
+      Handle Hit (Function)
+        ├─ Hit Actor == Target Pawn?
+        │   ├─ True → Quit Game
+        │   └─ False → Spawn System + Destroy
+```
+
+### BP_Bot
+
+```
+Variables
+  └─ Target Pawn (저장된 플레이어)
+
+Event Graph
+  Begin Play
+    ↓
+  Get All Actors of Class (Pawn)
+    ↓
+  Save Target Pawn
+    ↓
+  Delay (1~2초)
+    ↓
+  Fire Blaster Beam (1회)
+    ↓
+  Set Timer by Event (반복)
+
+Functions
+  └─ Spawn Blaster Beam
+      ├─ SpawnActor BP_Blaster_Beam
+      └─ Target Pawn 설정 ← BP_Bot의 Target Pawn
+```
+
+---
+
+## 🔍 개념 심화 이해
+
+### Expose on Spawn 원리
+
+**일반적인 변수 초기화**
+
+```
+액터 생성
+  ↓
+변수는 기본값
+  ↓
+나중에 Set 노드로 변경
+```
+
+**Expose on Spawn 사용 시**
+
+```
+액터 생성하면서 동시에 변수 설정
+  ↓
+생성 즉시 올바른 값을 가짐
+  ↓
+별도 Set 노드 불필요
+```
+
+**왜 더 좋은가?**
+
+```
+타이밍 문제 없음
+  ├─ 생성과 동시에 설정
+  └─ 빔이 날아가기 전에 Target 설정 보장
+
+코드 간결
+  ├─ SpawnActor 한 번에 처리
+  └─ 추가 Set 노드 불필요
+```
+
+### Branch의 동작 원리
+
+```
+Branch = 코드의 갈림길
+
+Condition이 True
+  ↓
+True 핀에 연결된 노드들만 실행
+  ↓
+False 핀은 무시
+
+Condition이 False
+  ↓
+False 핀에 연결된 노드들만 실행
+  ↓
+True 핀은 무시
+```
+
+**예시**
+
+```
+플레이어 피격 (True)
+  ├─ Quit Game 실행
+  └─ Spawn System/Destroy는 실행 안 됨!
+
+벽 충돌 (False)
+  ├─ Quit Game 실행 안 됨
+  └─ Spawn System/Destroy만 실행
+```
+
+---
+
+## 📊 데이터 흐름 정리
+
+### 전체 흐름
+
+```
+1. 게임 시작
+   BP_Bot Begin Play
+     ↓
+   Get All Actors of Class (Pawn)
+     ↓
+   Save Target Pawn (플레이어)
+
+2. 빔 생성
+   Spawn Blaster Beam
+     ├─ Class: BP_Blaster_Beam
+     └─ Target Pawn: 플레이어 전달
+     ↓
+   빔의 Target Pawn = 플레이어
+
+3. 충돌 발생
+   OnComponentHit
+     ├─ Other Actor (실제 맞은 대상)
+     └─ Hit (충돌 정보)
+     ↓
+   Handle Hit 함수
+     ↓
+   Other Actor == Target Pawn?
+
+4. 결과
+   True: Quit Game
+   False: Spawn System + Destroy
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 1. Expose on Spawn 설정 순서
+
+```
+❌ 순서 틀리면 작동 안 됨
+
+올바른 순서:
+1. Instance Editable 먼저 체크
+2. 그 다음 Expose on Spawn 체크
+```
+
+### 2. 노드 Refresh
+
+```
+다른 Blueprint 수정 후
+  ↓
+반드시 Refresh Node
+  ↓
+안 하면 변경사항 반영 안 됨
+```
+
+### 3. Branch Condition
+
+```
+Condition에는 Bool만 연결
+  ├─ True/False 값만 가능
+  └─ 비교 연산자 (==, !=, >, < 등) 사용
+```
+
+### 4. Target Pawn 타입
+
+```
+Pawn 타입으로 설정
+  ↓
+Actor는 너무 광범위
+  ↓
+Character는 너무 구체적
+  ↓
+Pawn이 적절
+```
+
+### 5. 게임 시작 딜레이
+
+```
+딜레이 없으면 즉시 공격
+  ↓
+플레이어가 반응 못 함
+  ↓
+1~2초 여유 필수
+```
+
+---
+
+## 💡 개념 비유
+
+### Expose on Spawn
+
+```
+음식 주문에 비유:
+
+일반 변수:
+  1. 음식 만들기
+  2. 나중에 토핑 추가
+  (두 단계)
+
+Expose on Spawn:
+  1. 주문하면서 토핑까지 지정
+  (한 단계에 완료)
+```
+
+### Branch
+
+```
+교차로에 비유:
+
+조건이 신호등
+  ├─ 초록불 (True): 직진
+  └─ 빨간불 (False): 우회전
+
+한쪽만 갈 수 있음
+```
+
+### Target Pawn
+
+```
+택배에 비유:
+
+Target Pawn = 받는 사람 주소
+  ↓
+블라스터 빔 = 택배 상자
+  ↓
+충돌 = 도착
+  ↓
+주소 확인 = 비교
+  ├─ 맞으면: 배달 완료 (게임 종료)
+  └─ 틀리면: 반송 (그냥 파괴)
+```
+
+---
+
+## 🎓 학습 요약
+
+### 새로 배운 개념
+
+```
+1. Expose on Spawn
+   액터 생성 시 변수 초기화
+
+2. Instance Editable
+   외부에서 변수 접근 허용
+
+3. Refresh Node
+   Blueprint 변경사항 반영
+
+4. Branch
+   조건부 실행 (if문)
+
+5. Equal (==)
+   객체 비교 연산자
+
+6. Quit Game
+   게임 종료 함수
+```
+
+### 구현한 시스템
+
+```
+충돌 대상 확인
+  ├─ 플레이어: 게임 종료
+  └─ 기타: 파티클 + 파괴
+  ↓
+승패 조건 구현
+```
+
+---
+
+## 🎯 핵심 정리
+
+```
+Expose on Spawn의 힘
+  ├─ 생성 시 초기화
+  ├─ 타이밍 문제 해결
+  └─ 코드 간결화
+  ↓
+Branch로 조건 분기
+  ├─ 대상 확인
+  └─ 다른 동작 실행
+  ↓
+완성: 기본 게임플레이 로직
+
+```
+
+---
+
+# { 언리얼 엔진 - 픽업 아이템 (Small Sphere) 제작 }
+
+## 🎯 학습 목표
+
+수집 가능한 떠다니는 구체 아이템 제작
+
+- 모델링 모드로 커스텀 메시 생성
+- 발광 머티리얼 제작
+- 피벗 포인트 중앙 설정
+- 전진 이동 구현
+
+---
+
+## 🎮 게임 밸런스 문제
+
+### 현재 상황
+
+```
+게임 플레이
+  ├─ 드론이 공격 → 게임 오버 ✓
+  └─ 플레이어가 할 수 있는 것? ❌
+
+문제:
+  ↓
+이길 방법이 없음
+  ↓
+점수 획득 시스템 필요
+```
+
+### 해결 아이디어
+
+```
+떠다니는 구체 생성
+  ↓
+플레이어가 수집
+  ↓
+점수 획득
+  ↓
+게임 목표 생성
+```
+
+---
+
+## 🗺️ 테스트 레벨 생성
+
+### 왜 새 레벨이 필요한가?
+
+```
+Bot Level (기존)
+  ├─ 드론이 계속 공격
+  └─ 테스트하기 불편
+
+Test Level (새로 생성)
+  ├─ 드론 없음
+  └─ 구체 작업에 집중
+```
+
+### 생성 방법
+
+```
+File → New Level
+  ↓
+Basic 선택
+  ↓
+File → Save Current As
+  ↓
+폴더: Maps
+  ↓
+이름: Test_Level
+```
+
+**결과**
+
+```
+Maps 폴더
+  ├─ Bot_Level (드론 있음)
+  └─ Test_Level (테스트용)
+```
+
+---
+
+## 🔮 모델링 모드로 구체 생성
+
+### 모델링 모드란?
+
+```
+언리얼 엔진 내장 3D 모델링 도구
+  ├─ 외부 프로그램 없이
+  ├─ 에디터에서 직접 메시 생성
+  └─ 간단한 도형에 적합
+```
+
+### 1. 모델링 모드 전환
+
+```
+상단 메뉴
+  ↓
+Selection Mode → Modeling Mode
+  ↓
+또는 단축키: Shift + 5
+```
+
+### 2. 구체 생성
+
+```
+좌측 Create 탭
+  ↓
+Sphere 선택
+  ↓
+뷰포트에 클릭
+  ↓
+구체 생성
+```
+
+### 3. 반지름 설정
+
+```
+우측 Properties 패널
+  ↓
+Radius: 15
+  ↓
+작은 구체 완성
+```
+
+**크기 비교**
+
+```
+Radius 20: 너무 큼
+Radius 15: 적당 ✓
+Radius 10: 너무 작음
+```
+
+### 4. 수락
+
+```
+상단 Accept 버튼 클릭
+  ↓
+메시 확정
+  ↓
+Static Mesh Asset 생성
+```
+
+### 5. 선택 모드 복귀
+
+```
+Shift + 1
+  ↓
+또는 상단에서 Selection Mode 선택
+```
+
+---
+
+## 📁 에셋 정리
+
+### 자동 생성 폴더 문제
+
+```
+모델링 모드 사용 시
+  ↓
+자동으로 "_Generated" 폴더에 생성
+  ↓
+정리 필요
+```
+
+### 1. 메시 찾기
+
+```
+레벨의 구체 우클릭
+  ↓
+Browse to Asset
+  ↓
+Content Browser에서 표시
+```
+
+### 2. 이름 변경
+
+```
+F2 또는 우클릭 → Rename
+  ↓
+이름: SM_Small_Sphere
+```
+
+### 3. 폴더 구조 생성
+
+```
+Content/Assets/
+  └─ Small_Sphere/ (새로 생성)
+```
+
+### 4. 에셋 이동
+
+```
+SM_Small_Sphere 우클릭
+  ↓
+Move To...
+  ↓
+Assets/Small_Sphere 선택
+```
+
+---
+
+## ✨ 발광 머티리얼 제작
+
+### 1. 머티리얼 생성
+
+```
+Small_Sphere 폴더에서 우클릭
+  ↓
+Material 생성
+  ↓
+이름: M_Small_Sphere
+```
+
+### 2. 머티리얼 에디터 열기
+
+```
+M_Small_Sphere 더블클릭
+  ↓
+Material Editor 열림
+```
+
+### 3. 발광 색상 설정
+
+**Color Vector 노드**
+
+```
+3키 누른 채 클릭
+  ↓
+Vector3 (Color) 노드 생성
+  ↓
+색상: 금색 (Gold)
+  ├─ R: 1.0
+  ├─ G: 0.8
+  └─ B: 0.0
+```
+
+**Emissive Color 연결**
+
+```
+Vector3 출력
+  ↓
+Material 노드 → Emissive Color
+```
+
+### 4. 밝기 증폭
+
+**왜 증폭이 필요한가?**
+
+```
+기본 색상 (0~1 범위)
+  ↓
+너무 어두움
+  ↓
+곱하기로 증폭 필요
+```
+
+**Multiply 노드 추가**
+
+```
+M키 누른 채 클릭
+  ↓
+Multiply 노드 생성
+  ↓
+A: Vector3 (색상)
+B: 20 (상수)
+  ↓
+Material → Emissive Color 연결
+```
+
+**값 조정**
+
+```
+배수 10: 약간 어두움
+배수 20: 적당 ✓
+배수 50: 너무 밝음
+```
+
+### 5. 적용
+
+```
+Apply 버튼
+  ↓
+Save
+  ↓
+머티리얼 완성
+```
+
+### 6. 메시에 적용
+
+```
+SM_Small_Sphere 열기
+  ↓
+Material Slots 섹션
+  ↓
+M_Small_Sphere 할당
+  ↓
+Save
+```
+
+---
+
+## 🎯 피벗 포인트 문제
+
+### 문제 발견
+
+```
+첫 번째 구체의 피벗 포인트
+  ↓
+구체 하단에 위치
+  ↓
+회전 시 이상하게 회전
+```
+
+**왜 문제인가?**
+
+```
+E키로 회전 시
+  ↓
+피벗을 중심으로 회전
+  ↓
+하단 중심 회전 = 부자연스러움
+
+원하는 것:
+  ↓
+구체 중앙에서 회전
+```
+
+### 해결: 새 구체 생성
+
+### 1. 기존 구체 이름 변경
+
+```
+SM_Small_Sphere
+  ↓
+SM_Small_Sphere_Deprecated
+  ↓
+나중에 어떤 게 구버전인지 구분
+```
+
+### 2. 모델링 모드로 새 구체 생성
+
+```
+Shift + 5 (모델링 모드)
+  ↓
+Create → Sphere
+  ↓
+Radius: 15
+```
+
+### 3. 피벗 위치 설정
+
+```
+Pivot Location 옵션
+  ├─ Base (기본): 하단
+  └─ Center: 중앙 ✓
+```
+
+**Center 선택**
+
+```
+피벗이 구체 정중앙에 위치
+  ↓
+자연스러운 회전
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380695/notion-blog/_/_/_5_/_-_-_5/image_11.png)
+
+### 4. 현재 폴더에 저장
+
+```
+New Asset Location
+  ↓
+Use Current Folder 선택
+  ↓
+Small_Sphere 폴더에 자동 저장
+```
+
+### 5. Accept
+
+```
+Accept 버튼
+  ↓
+Shift + 1 (선택 모드)
+  ↓
+새 구체 생성 완료
+```
+
+### 6. 이름 변경 및 머티리얼 적용
+
+```
+생성된 메시
+  ↓
+이름: SM_Small_Sphere (기존 이름 재사용)
+  ↓
+머티리얼: M_Small_Sphere 적용
+  ↓
+Save
+```
+
+### 7. 구버전 삭제
+
+```
+SM_Small_Sphere_Deprecated 선택
+  ↓
+Delete 키
+  ↓
+경고: "2개 항목이 참조 중"
+  ↓
+Force Delete 클릭
+  ↓
+참조는 None으로 변경됨
+```
+
+---
+
+## 🎭 BP_Small_Sphere 액터 생성
+
+### 왜 Blueprint Actor가 필요한가?
+
+```
+Static Mesh만으로는
+  ├─ 움직임 불가
+  ├─ 로직 추가 불가
+  └─ 상호작용 불가
+
+Blueprint Actor로
+  ├─ 이동 구현
+  ├─ 회전 추가
+  ├─ 충돌 감지
+  └─ 점수 부여
+```
+
+### 1. 폴더 구조
+
+```
+Content/Blueprints/
+  └─ Small_Sphere/ (새로 생성)
+```
+
+### 2. Blueprint 생성
+
+```
+Small_Sphere 폴더에서 우클릭
+  ↓
+Blueprint Class
+  ↓
+Parent Class: Actor
+  ↓
+이름: BP_Small_Sphere
+```
+
+### 3. Component 추가
+
+```
+BP_Small_Sphere 열기
+  ↓
+Components 패널
+  ↓
+Add Component
+  ↓
+Static Mesh
+  ↓
+이름: Sphere_Mesh
+```
+
+### 4. Static Mesh 설정
+
+```
+Sphere_Mesh 선택
+  ↓
+Details Panel
+  ↓
+Static Mesh: SM_Small_Sphere
+  ↓
+자동으로 머티리얼도 적용됨
+```
+
+**확인**
+
+```
+Viewport에서
+  ↓
+금색 발광 구체 표시
+  ↓
+피벗이 중앙에 위치
+```
+
+---
+
+## 🚀 전진 이동 구현
+
+### 요구사항
+
+```
+구체가 계속 앞으로 이동
+  ├─ 자신의 Forward 방향
+  ├─ 속도 변수로 제어
+  └─ 프레임 독립적 (Delta Time 사용)
+```
+
+### Event Graph 구현
+
+### 1. Event Tick 사용
+
+```
+Event Graph
+  ↓
+Event Tick (이미 있음)
+```
+
+**왜 Event Tick인가?**
+
+```
+매 프레임마다 실행
+  ↓
+지속적인 이동 구현
+```
+
+### 2. Add Actor World Offset
+
+```
+Event Tick
+  ↓
+Add Actor World Offset
+```
+
+**이 노드의 역할**
+
+```
+Actor의 위치를 이동
+  ├─ World 좌표계 기준
+  ├─ 상대적 오프셋 추가
+  └─ 누적 이동
+```
+
+### 3. Forward Vector 계산
+
+```
+Get Actor Forward Vector
+  ↓
+Actor가 바라보는 방향 (X축)
+```
+
+**Forward Vector란?**
+
+```
+Actor의 로컬 X축 방향
+  ├─ 길이 1의 단위 벡터
+  ├─ 회전에 따라 변함
+  └─ 이동 방향 결정
+```
+
+### 4. 속도로 스케일링
+
+**Speed 변수 생성**
+
+```
+Variables 패널
+  ↓
++ 버튼
+  ↓
+이름: Speed
+  ├─ Type: Float
+  ├─ Default: 100
+  └─ Category: Movement
+```
+
+**Multiply 연결**
+
+```
+Get Actor Forward Vector
+  ↓
+Multiply (Vector × Float)
+  ├─ A: Forward Vector
+  └─ B: Speed
+  ↓
+스케일된 방향 벡터
+```
+
+**의미**
+
+```
+Forward Vector (길이 1)
+  × Speed (100)
+  = 초당 100 유닛 이동
+```
+
+### 5. Delta Time 적용
+
+**왜 Delta Time이 필요한가?**
+
+```
+Event Tick = 매 프레임 실행
+  ├─ 60fps: 1초에 60번
+  ├─ 30fps: 1초에 30번
+  └─ 프레임마다 다름
+
+Delta Time 없으면:
+  60fps: 빠름
+  30fps: 느림 (문제!)
+
+Delta Time 있으면:
+  모든 프레임레이트에서 동일한 속도 ✓
+```
+
+**구현**
+
+```
+Event Tick
+  ↓
+Delta Seconds (출력 핀)
+  ↓
+Multiply
+  ├─ A: Speed
+  └─ B: Delta Seconds
+  ↓
+Multiply
+  ├─ A: (Speed × Delta)
+  └─ B: Forward Vector
+```
+
+### 최종 연결
+
+```
+Event Tick
+  ↓
+[계산 파트]
+  Get Actor Forward Vector
+    ↓
+  Speed × Delta Seconds
+    ↓
+  Result × Forward Vector
+    ↓
+[이동 파트]
+  Add Actor World Offset
+    └─ Delta Location
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380695/notion-blog/_/_/_5_/_-_-_5/image_12.png)
+
+---
+
+## 📐 이동 수식 이해
+
+### 최종 수식
+
+```
+Delta Location = Forward Vector × Speed × Delta Time
+```
+
+### 단계별 분해
+
+```
+1. Get Actor Forward Vector
+   → (1, 0, 0) 방향 단위 벡터
+
+2. Speed × Delta Seconds
+   → 100 × 0.0167 (60fps 기준)
+   → 1.67
+
+3. Forward × (Speed × Delta)
+   → (1, 0, 0) × 1.67
+   → (1.67, 0, 0)
+
+4. Add Actor World Offset
+   → 현재 위치 + (1.67, 0, 0)
+   → 매 프레임 1.67 유닛 이동
+```
+
+### 1초 후 총 이동 거리
+
+```
+60fps 기준:
+  1.67 × 60 = 100 유닛
+
+30fps 기준:
+  3.33 × 30 = 100 유닛
+
+결과:
+  프레임레이트 무관하게 초당 100 유닛 ✓
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### 모델링 모드
+
+```
+에디터 내 3D 모델링
+  ├─ 간단한 도형 생성
+  ├─ 프로토타이핑에 유용
+  └─ 피벗 포인트 설정 가능
+```
+
+### Emissive Material
+
+```
+발광 효과
+  ├─ Emissive Color 사용
+  ├─ 곱하기로 밝기 증폭
+  └─ 라이트 영향 안 받음
+```
+
+### 피벗 포인트
+
+```
+회전/스케일의 중심점
+  ├─ 모델링 시 설정
+  ├─ 변경은 어려움
+  └─ 처음부터 올바르게 설정 중요
+```
+
+### Actor World Offset
+
+```
+누적 이동
+  ├─ 상대적 오프셋 추가
+  ├─ 현재 위치 기준
+  └─ 매 프레임 호출 가능
+```
+
+### Delta Time
+
+```
+프레임 독립성 보장
+  ├─ 모든 프레임레이트에서 동일 속도
+  ├─ Event Tick에서 필수
+  └─ Speed × Delta Seconds
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 1. 피벗 포인트 설정
+
+```
+모델링 시 반드시 확인
+  ├─ Base: 하단
+  └─ Center: 중앙 (권장)
+
+생성 후 변경 어려움
+  → 재생성 필요
+```
+
+### 2. Static Mesh vs Actor
+
+```
+Static Mesh:
+  ├─ 단순 배치용
+  └─ 로직 없음
+
+Actor Blueprint:
+  ├─ 로직 포함
+  └─ 게임플레이용 (사용!)
+```
+
+### 3. Default Value 설정
+
+```
+변수 생성 후
+  ↓
+반드시 Default Value 설정
+  ↓
+안 하면 0으로 초기화
+```
+
+### 4. Multiply 순서
+
+```
+Vector × Float: ✓ 작동
+Float × Vector: ✓ 작동 (순서 무관)
+
+하지만 가독성 위해:
+Speed × Delta → Float 결과
+Result × Forward → Vector 결과
+```
+
+### 5. Emissive 밝기
+
+```
+너무 밝으면:
+  ├─ 눈부심
+  └─ 디테일 손실
+
+적절한 값:
+  ├─ 10~30 범위
+  └─ 환경에 따라 조정
+```
+
+---
+
+## 🎓 학습 요약
+
+### 새로 배운 기능
+
+```
+1. 모델링 모드
+   Shift + 5로 전환
+
+2. 피벗 포인트 설정
+   Center vs Base
+
+3. Emissive Material
+   자체 발광 효과
+
+4. Add Actor World Offset
+   누적 이동
+
+5. Delta Time 활용
+   프레임 독립성
+```
+
+### 구현한 시스템
+
+```
+떠다니는 구체 픽업
+  ├─ 커스텀 메시 생성
+  ├─ 발광 머티리얼
+  ├─ 전진 이동
+  └─ 속도 제어
+```
+
+---
+
+# { 언리얼 엔진 - 구체 회전 및 호 운동 구현 }
+
+## 🎯 학습 목표
+
+구체에 회전 운동 추가
+
+- Add Actor World Rotation 사용
+- 랜덤 회전 방향 설정
+- 원호 운동 구현
+- 노드 정리 및 함수화
+
+---
+
+## 🌀 왜 회전이 필요한가?
+
+### 현재 상황
+
+```
+구체 이동
+  ↓
+직선으로만 전진
+  ↓
+단조로움
+```
+
+### 목표
+
+```
+전진 + 회전
+  ↓
+원호(Arc) 운동
+  ↓
+더 흥미로운 움직임
+```
+
+**게임 디자인 의도**
+
+```
+구체는 몇 초 후 사라짐
+  ↓
+플레이어가 찾아서 수집
+  ↓
+예측 불가능한 움직임 = 난이도 증가
+```
+
+---
+
+## 🔧 Root Component 최적화
+
+### 불필요한 Scene Root 제거
+
+**현재 구조**
+
+```
+BP_Small_Sphere
+  └─ Scene Root (DefaultSceneRoot)
+      └─ Sphere_Mesh
+```
+
+**문제점**
+
+```
+메시 하나만 있는데
+  ↓
+Scene Root가 불필요한 계층 추가
+  ↓
+복잡도만 증가
+```
+
+### 최적화
+
+```
+Sphere_Mesh를 Scene Root로 드래그
+  ↓
+"Set as new root?" 확인
+  ↓
+Yes
+```
+
+**결과**
+
+```
+BP_Small_Sphere
+  └─ Sphere_Mesh (Root)
+```
+
+**장점**
+
+```
+✓ 계층 단순화
+✓ 컴포넌트 하나만 관리
+✓ 성능 미세 개선
+```
+
+---
+
+## 🎮 회전 구현 도전 과제
+
+### 요구사항
+
+```
+1. 매 프레임 회전
+2. 회전 속도 제어 가능
+3. 프레임 독립적 (Delta Time 사용)
+4. 구체가 움직이면서 회전
+```
+
+---
+
+## 🔄 기본 회전 구현
+
+### 1. Add Actor World Rotation
+
+```
+Event Tick
+  ↓
+Add Actor World Rotation
+```
+
+**이 노드의 역할**
+
+```
+Actor 회전을 누적 추가
+  ├─ 상대적 회전 적용
+  ├─ 매 프레임 호출 가능
+  └─ 기존 회전에 더해짐
+```
+
+### 2. Delta Rotation 변수 생성
+
+**변수 생성**
+
+```
+Variables 패널
+  ↓
++ 버튼
+  ↓
+이름: Delta Rotation
+  ├─ Type: Rotator
+  └─ Category: Sphere Movement
+```
+
+**기본값 설정**
+
+```
+Delta Rotation
+  ├─ Pitch: 45
+  ├─ Yaw: 45
+  └─ Roll: 45
+```
+
+### 3. Delta Time 적용
+
+```
+Event Tick
+  ↓
+Delta Seconds
+  ↓
+Multiply (Rotator × Float)
+  ├─ A: Delta Rotation
+  └─ B: Delta Seconds
+  ↓
+Add Actor World Rotation
+  └─ Delta Rotation
+```
+
+**연결 흐름**
+
+```
+Delta Rotation 변수
+  ↓
+Get Delta Rotation
+  ↓
+Multiply
+  ├─ Delta Rotation
+  └─ Delta Seconds
+  ↓
+Add Actor World Rotation
+```
+
+### 4. 테스트
+
+```
+Play 버튼
+  ↓
+구체가 전진하면서 회전
+  ↓
+나선형(Spiral) 운동
+```
+
+---
+
+## 🎲 랜덤 회전 구현
+
+### 왜 랜덤인가?
+
+```
+고정 회전
+  ↓
+모든 구체가 같은 패턴
+  ↓
+예측 가능 (지루함)
+
+랜덤 회전
+  ↓
+각 구체마다 다른 패턴
+  ↓
+예측 불가능 (재미)
+```
+
+### 1. Random Rotator 노드
+
+```
+우클릭
+  ↓
+"Random Rotator" 검색
+  ↓
+Random Rotator 노드
+```
+
+**노드 옵션**
+
+```
+Random Rotator
+  ├─ Roll: ✓/✗ (체크박스)
+  └─ Return Value: Rotator
+```
+
+### 2. 왜 매 프레임마다 안 되나?
+
+**잘못된 방법**
+
+```
+Event Tick
+  ↓
+Random Rotator
+  ↓
+Add Actor World Rotation
+
+문제:
+  매 프레임 완전히 다른 회전
+  ↓
+불규칙한 떨림
+  ↓
+의도한 호 운동 아님
+```
+
+**올바른 방법**
+
+```
+Begin Play (한 번만)
+  ↓
+Random Rotator
+  ↓
+Set Delta Rotation
+
+Event Tick (매 프레임)
+  ↓
+Get Delta Rotation (고정된 값)
+  ↓
+Add Actor World Rotation
+
+결과:
+  일관된 회전 방향
+  ↓
+부드러운 호 운동
+```
+
+### 3. Begin Play에서 초기화
+
+```
+Event Begin Play
+  ↓
+Random Rotator
+  ├─ Roll: ✗ (체크 해제)
+  └─ Return Value
+  ↓
+Set Delta Rotation
+```
+
+**Roll 체크 해제 이유**
+
+```
+Yaw (좌우): 필요 ✓
+Pitch (상하): 필요 ✓
+Roll (기울기): 불필요 ✗
+
+Roll을 랜덤하게 하면
+  ↓
+구체가 빙빙 회전
+  ↓
+시각적으로 불필요
+```
+
+### 4. 기본값 초기화
+
+```
+Delta Rotation 변수
+  ↓
+Default Value
+  ├─ Pitch: 0
+  ├─ Yaw: 0
+  └─ Roll: 0
+```
+
+**이유**
+
+```
+Begin Play에서 설정할 것이므로
+  ↓
+기본값 0으로 초기화
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380696/notion-blog/_/_/_5_/_-_-_5/image_13.png)
+
+---
+
+## 📐 회전 크기 조정
+
+### 문제: 회전이 너무 빠름
+
+```
+Random Rotator
+  ↓
+Yaw, Pitch가 각각 -180 ~ 180
+  ↓
+너무 큰 회전각
+  ↓
+작은 원호 (빠르게 회전)
+```
+
+**원하는 것**
+
+```
+더 느린 회전
+  ↓
+더 큰 원호
+  ↓
+부드러운 움직임
+```
+
+### Rotation Scale 변수
+
+### 1. 변수 생성
+
+```
+Variables 패널
+  ↓
++ 버튼
+  ↓
+이름: Rotation Scale
+  ├─ Type: Float
+  ├─ Default: 0.25
+  └─ Category: Sphere Movement
+```
+
+### 2. 스케일 적용
+
+```
+Event Begin Play
+  ↓
+Random Rotator
+  ↓
+Multiply (Rotator × Float)
+  ├─ A: Random Rotator
+  └─ B: Rotation Scale (0.25)
+  ↓
+Set Delta Rotation
+```
+
+**효과**
+
+```
+Random Rotator: -180 ~ 180
+  ×
+Rotation Scale: 0.25
+  =
+결과: -45 ~ 45
+
+작은 회전각
+  ↓
+느린 회전
+  ↓
+큰 원호
+```
+
+### 3. 값 조정
+
+**테스트 결과**
+
+```
+0.25: 여전히 작은 호
+  ↓
+0.05로 감소
+  ↓
+더 큰 원호 ✓
+```
+
+**권장 값**
+
+```
+0.05 ~ 0.1: 큰 원호
+0.2 ~ 0.5: 중간 원호
+0.5 ~ 1.0: 작은 원호
+```
+
+---
+
+## 🧹 노드 정리 (함수화)
+
+### 정리 전 문제
+
+```
+Event Graph
+  ├─ Begin Play (초기화)
+  └─ Event Tick (업데이트)
+      ├─ 이동 로직
+      └─ 회전 로직
+  ↓
+복잡하고 읽기 어려움
+```
+
+### 1. Initialize Delta Rotation 함수
+
+```
+Begin Play의 노드들 선택
+  ↓
+우클릭 → Collapse to Function
+  ↓
+이름: Initialize Delta Rotation
+```
+
+**함수 내부**
+
+```
+Random Rotator
+  ↓
+Multiply × Rotation Scale
+  ↓
+Set Delta Rotation
+
+```
+
+### 2. Update Location 함수
+
+```
+이동 관련 노드들 선택
+  ↓
+우클릭 → Collapse to Function
+  ↓
+이름: Update Location
+
+```
+
+**입력 파라미터 변경**
+
+```
+Details Panel
+  ↓
+Inputs → A
+  ↓
+이름: Delta Seconds
+
+```
+
+**함수 내부**
+
+```
+Input: Delta Seconds
+  ↓
+Get Actor Forward Vector
+  ↓
+Speed × Delta Seconds
+  ↓
+Forward × Result
+  ↓
+Add Actor World Offset
+
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380696/notion-blog/_/_/_5_/_-_-_5/image_14.png)
+
+### 3. Update Rotation 함수
+
+```
+회전 관련 노드들 선택
+  ↓
+우클릭 → Collapse to Function
+  ↓
+이름: Update Rotation
+
+```
+
+**입력 파라미터**
+
+```
+Details Panel
+  ↓
+Inputs → A
+  ↓
+이름: Delta Seconds
+
+```
+
+**함수 내부**
+
+```
+Input: Delta Seconds
+  ↓
+Get Delta Rotation
+  ↓
+Multiply × Delta Seconds
+  ↓
+Add Actor World Rotation
+
+```
+
+### 4. 최종 Event Graph
+
+```
+Event Begin Play
+  ↓
+Initialize Delta Rotation
+
+Event Tick
+  ├─ Delta Seconds → Update Location
+  └─ Delta Seconds → Update Rotation
+```
+
+### 5. Reroute Node로 시각 정리
+
+```
+Delta Seconds 출력 핀
+  ↓
+더블클릭
+  ↓
+Reroute Node 생성
+  ↓
+두 함수에 분배
+```
+
+**효과**
+
+```
+와이어가 교차 안 함
+  ↓
+깔끔한 레이아웃
+  ↓
+가독성 향상
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380696/notion-blog/_/_/_5_/_-_-_5/image_15.png)
+
+---
+
+## 📊 변수 정리
+
+### Category 설정
+
+**Sphere Movement 카테고리**
+
+```
+├─ Speed (Float)
+├─ Delta Rotation (Rotator)
+└─ Rotation Scale (Float)
+
+```
+
+**설정 방법**
+
+```
+각 변수 선택
+  ↓
+Details Panel
+  ↓
+Category: Sphere Movement
+
+```
+
+**장점**
+
+```
+관련 변수 그룹화
+  ↓
+Details Panel에서 찾기 쉬움
+  ↓
+정리된 인터페이스
+```
+
+---
+
+## 🎨 최종 동작
+
+### 움직임 패턴
+
+```
+게임 시작
+  ↓
+Random Rotator로 회전 방향 결정
+  ↓
+매 프레임
+  ├─ Forward 방향으로 전진
+  └─ Delta Rotation으로 회전
+  ↓
+결과: 원호 운동
+```
+
+### 시각적 효과
+
+```
+각 구체마다
+  ↓
+다른 회전 방향 (랜덤)
+  ↓
+다른 호 궤적
+  ↓
+예측 불가능한 움직임
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380696/notion-blog/_/_/_5_/_-_-_5/image_16.png)
+
+---
+
+## 💡 핵심 개념 정리
+
+### Add Actor World Rotation
+
+```
+누적 회전 추가
+  ├─ 기존 회전에 더함
+  ├─ 상대적 회전
+  └─ 매 프레임 호출 가능
+```
+
+### Random Rotator
+
+```
+랜덤 회전각 생성
+  ├─ Yaw: -180 ~ 180
+  ├─ Pitch: -180 ~ 180
+  └─ Roll: -180 ~ 180 (선택)
+```
+
+### 초기화 vs 업데이트
+
+```
+Begin Play (1회)
+  → 랜덤 값 결정
+  → 변수에 저장
+
+Event Tick (매 프레임)
+  → 저장된 값 사용
+  → 일관된 움직임
+```
+
+### 원호 운동 원리
+
+```
+전진 + 회전
+  ↓
+매 프레임 방향이 조금씩 바뀜
+  ↓
+결과: 곡선 경로
+  ↓
+원호(Arc) 형태
+```
+
+---
+
+## ⚙️ 설정값 요약
+
+### Variables
+
+| 변수           | 타입    | 기본값  | 설명      |
+| -------------- | ------- | ------- | --------- |
+| Speed          | Float   | 100     | 전진 속도 |
+| Delta Rotation | Rotator | (0,0,0) | 회전량    |
+| Rotation Scale | Float   | 0.05    | 회전 크기 |
+
+### Functions
+
+| 함수                      | 역할           | 호출 시점  |
+| ------------------------- | -------------- | ---------- |
+| Initialize Delta Rotation | 랜덤 회전 설정 | Begin Play |
+| Update Location           | 위치 업데이트  | Event Tick |
+| Update Rotation           | 회전 업데이트  | Event Tick |
+
+---
+
+## ⚠️ 주의사항
+
+### 1. Random 호출 위치
+
+```
+❌ Event Tick에서 Random
+  → 매 프레임 다른 값
+  → 불규칙한 떨림
+
+✓ Begin Play에서 Random
+  → 1회만 결정
+  → 일관된 움직임
+```
+
+### 2. Roll 회전
+
+```
+대부분의 경우 Roll 불필요
+  ↓
+Yaw + Pitch만으로 충분
+  ↓
+Roll은 시각적 혼란
+```
+
+### 3. Rotation Scale
+
+```
+너무 크면 (>0.5):
+  ├─ 작은 원호
+  └─ 빠른 회전
+
+너무 작으면 (<0.01):
+  ├─ 거의 직선
+  └─ 회전 효과 미미
+
+권장: 0.05 ~ 0.1
+```
+
+### 4. Delta Time 필수
+
+```
+회전도 이동처럼
+  ↓
+반드시 Delta Time 곱하기
+  ↓
+프레임 독립성 보장
+```
+
+### 5. 함수 입력 이름
+
+```
+기본 이름 (A, B): 의미 불명
+  ↓
+명확한 이름 (Delta Seconds): 이해 쉬움
+  ↓
+코드 가독성 향상
+```
+
+---
+
+## 🎓 학습 요약
+
+### 새로 배운 기능
+
+```
+1. Add Actor World Rotation
+   누적 회전 추가
+
+2. Random Rotator
+   랜덤 회전각 생성
+
+3. Rotator × Float 연산
+   회전 크기 조정
+
+4. Reroute Node
+   와이어 정리
+
+5. 함수 입력 파라미터 이름 변경
+   가독성 개선
+```
+
+### 구현한 시스템
+
+```
+원호 운동 구체
+  ├─ 전진 이동
+  ├─ 랜덤 회전
+  ├─ 예측 불가능한 궤적
+  └─ 깔끔한 코드 구조
+```
+
+---
+
+## 📐 수학적 이해
+
+### 원호 운동 원리
+
+```
+시작 위치: (0, 0)
+방향: Forward (1, 0)
+
+프레임 1:
+  이동: (1, 0) × Speed × DT
+  회전: Delta Rotation
+  새 방향: (0.99, 0.1)
+
+프레임 2:
+  이동: (0.99, 0.1) × Speed × DT
+  회전: Delta Rotation
+  새 방향: (0.96, 0.2)
+
+...
+
+결과: 곡선 경로
+```
+
+### Rotation Scale 효과
+
+```
+Random Rotator: 180도
+  × Scale 1.0 = 180도 (작은 원)
+  × Scale 0.5 = 90도 (중간 원)
+  × Scale 0.1 = 18도 (큰 원)
+  × Scale 0.05 = 9도 (매우 큰 원)
+```
+
+---
+
+## 🎯 핵심 정리
+
+```
+랜덤 회전 초기화
+  ├─ Begin Play에서 1회
+  ├─ Random Rotator
+  └─ Rotation Scale로 조정
+  ↓
+매 프레임 업데이트
+  ├─ Forward 이동
+  ├─ 회전 적용
+  └─ Delta Time 곱하기
+  ↓
+결과: 부드러운 호 운동
+  ├─ 각 구체마다 다름
+  ├─ 예측 불가능
+  └─ 재미있는 게임플레이
+```

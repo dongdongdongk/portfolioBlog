@@ -1,0 +1,3968 @@
+---
+title: '인증 추가하기'
+date: '2026-09-02'
+category: '풀스택/React, NodeJS, Express 및 MongoDB - MERN 풀스택 가이드'
+tags: ['풀스택', 'React, NodeJS, Express 및 MongoDB - MERN 풀스택 가이드']
+draft: false
+summary: ''
+---
+
+# 인증 작동 방식(MERN 앱에서)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381323/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/_/Untitled.png)
+
+```jsx
+**프론트엔드와 백엔드 간의 통신:**
+
+현재의 로그인 로직에서는 사용자가 성공적으로 로그인한 경우에 대한 구체적인 확인 방법이 불분명하다.
+
+이를 보완하기 위해 토큰 기반의 인증 체계를 도입할 필요가 있다.
+
+로그인 후에 서버에서 발급한 토큰은 프론트엔드에서 안전하게 저장되어야 한다.
+
+이 토큰은 일종의 식별자로 사용되며,
+
+사용자가 다음 요청을 보낼 때마다 토큰이 함께 전송되어 서버가 해당 사용자를 식별하고 인증하는 데 사용된다.
+
+**세션과 토큰의 차이 설명:**
+
+과거에는 세션을 사용하여 사용자의 상태를 서버에 저장하고 관리다.
+
+그러나 현대의 웹 애플리케이션에서는 세션 대신 토큰을 사용하는 추세이다.
+
+세션은 서버 측에서 상태를 유지하며, 사용자의 식별 및 인증 정보를 저장한다.
+
+반면에 토큰은 클라이언트 측에서 상태를 유지하고, 사용자의 인증 정보를 안전하게 저장하며 필요할 때 서버에 제공한다.
+
+**토큰의 작동 원리:**
+
+토큰은 특정 데이터가 암호화된 문자열로, 특정 알고리즘과 프라이빗 키에 의해 생성된다.
+
+서버는 이 프라이빗 키를 사용하여 토큰의 유효성을 검증할 수 있다.
+
+토큰은 클라이언트에게 발급되어 안전한 저장소(쿠키 또는 로컬 스토리지)에 저장되며,
+
+클라이언트가 서버에 요청을 보낼 때 토큰이 함께 전송되어 서버가 해당 사용자를 인증한다.
+
+토큰은 무결성을 보장하고, 사용자가 변경하거나 위조할 수 없도록 설계되어 있다.
+
+**SPA에서의 인증 원리:**
+
+싱글 페이지 애플리케이션에서는 세션을 사용하는 전통적인 방식이 아닌 토큰 기반의 인증 체계가 사용된다.
+
+프론트엔드에서는 로그인 후에 발급받은 토큰을 안전한 위치에 저장하고,
+
+서버에 요청을 보낼 때 토큰을 함께 전송하여 인증을 수행한다. 이로써 클라이언트와 서버는 느슨하게 연결되어 있으며,
+
+효과적으로 사용자를 식별하고 인증할 수 있다.
+```
+
+# 사용자 비밀번호 해싱하기
+
+```jsx
+// users-controllers.js
+
+const { v4: uuid } = require('uuid')
+const { validationResult } = require('express-validator')
+const bcrypt = require('bcryptjs')
+
+const HttpError = require('../models/http-error')
+const User = require('../models/user')
+
+// 유저 목록 조회
+const getUsers = async (req, res, next) => {
+  let users
+  try {
+    // 데이터베이스에서 모든 사용자 정보를 불러옴 (비밀번호 제외)
+    users = await User.find({}, '-password')
+  } catch (err) {
+    // 에러 발생 시 500 상태코드로 에러 응답
+    const error = new HttpError('유저 정보를 불러오지 못했습니다', 500)
+    return next(error)
+  }
+  res.json(users)
+}
+
+// 회원가입
+const signup = async (req, res, next) => {
+  const errors = validationResult(req)
+  if (!errors.isEmpty()) {
+    // 유효성 검사 에러가 있을 경우, 해당 에러를 422 상태코드로 응답
+    const error = new HttpError(`${errors.errors[0].path}는 비어있을 수 없습니다`, 422)
+    return next(error)
+  }
+
+  const { name, email, password } = req.body
+
+  let existingUser
+  try {
+    // 이메일 중복 체크
+    existingUser = await User.findOne({ email: email })
+  } catch (err) {
+    // 에러 발생 시 500 상태코드로 에러 응답
+    const error = new HttpError('회원가입 실패', 500)
+    return next(error)
+  }
+
+  if (existingUser) {
+    // 중복된 이메일이 이미 존재할 경우, 422 상태코드로 에러 응답
+    const error = new HttpError('이미 유저가 있습니다.', 422)
+    return next(error)
+  }
+
+  let hashedPassword
+  try {
+    // 비밀번호 암호화
+    hashedPassword = await bcrypt.hash(password, 12)
+  } catch (err) {
+    // 암호화 중 에러 발생 시, 500 상태코드로 에러 응답
+    const error = new HttpError('사용자를 생성하지 못했습니다', 500)
+    return next(error)
+  }
+
+  const createdUser = new User({
+    name,
+    email,
+    image: req.file.path,
+    password: hashedPassword,
+    places: [],
+  })
+
+  try {
+    // 새로운 사용자 정보 저장
+    await createdUser.save()
+  } catch (err) {
+    // 저장 중 에러 발생 시, 500 상태코드로 에러 응답
+    const error = new HttpError('회원 저장에 오류가 발생했습니다', 500)
+    return next(error)
+  }
+
+  // 회원가입 성공 시, 201 상태코드로 응답
+  res.status(201).json({ user: createdUser })
+}
+
+// 로그인
+const login = async (req, res, next) => {
+  const { email, password } = req.body
+
+  let existingUser
+  try {
+    // 이메일로 사용자 찾기
+    existingUser = await User.findOne({ email: email })
+  } catch (err) {
+    // 조회 중 에러 발생 시, 500 상태코드로 에러 응답
+    const error = new HttpError('로그인 실패', 500)
+    return next(error)
+  }
+
+  if (!existingUser || existingUser.password !== password) {
+    // 사용자가 없거나 비밀번호가 일치하지 않을 경우, 401 상태코드로 에러 응답
+    const error = new HttpError('유저 정보가 틀립니다', 401)
+    return next(error)
+  }
+
+  // 로그인 성공 시, 성공 메시지와 사용자 정보를 JSON 형태로 응답
+  res.json({ message: '로그인 성공', user: existingUser })
+}
+
+// 모듈 내보내기
+exports.getUsers = getUsers
+exports.signup = signup
+exports.login = login
+```
+
+```jsx
+평문 비밀번호 해싱:
+
+가입 단계에서 새로운 사용자를 생성할 때, 사용자의 비밀번호를 평문으로 데이터베이스에 저장하지 않고
+
+bcrypt 라이브러리를 사용하여 해싱된 비밀번호로 저장한다. 이를 통해 보안 강화 및 데이터 유출 위험을 최소화할 수 있다.
+
+```
+
+```jsx
+npm i bcryptjs
+```
+
+```jsx
+해싱된 비밀번호를 생성한 후, User 모델의 password 프로퍼티에 저장하여 데이터베이스에 저장된다.
+
+이로써 사용자의 평문 비밀번호가 아닌 해싱된 암호가 안전하게 저장되게 된다.
+
+const bcrypt = require('bcryptjs');
+
+를 추가해 bcrypt 를 추가해주고
+
+* 비밀번호 해싱
+
+		let hashedPassword;
+    try {
+        // 비밀번호 암호화
+        hashedPassword = await bcrypt.hash(password, 12);
+    } catch (err) {
+        // 암호화 중 에러 발생 시, 500 상태코드로 에러 응답
+        const error = new HttpError('사용자를 생성하지 못했습니다', 500);
+        return next(error);
+    }
+
+* password 프로퍼티에 저장
+
+   const createdUser = new User({
+        name,
+        email,
+        image: req.file.path,
+        password : hashedPassword,
+        places : []
+    })
+```
+
+# 사용자 로그인(해싱된 암호 사용)하기
+
+```jsx
+// Express에서 사용하는 외부 라이브러리 및 모듈 불러오기
+const { v4: uuid } = require('uuid')
+const { validationResult } = require('express-validator')
+const bcrypt = require('bcryptjs')
+
+// 커스텀 HTTP 에러 모델 및 사용자 모델 불러오기
+const HttpError = require('../models/http-error')
+const User = require('../models/user')
+
+// 유저 목록 조회
+const getUsers = async (req, res, next) => {
+  let users
+  try {
+    // 데이터베이스에서 모든 사용자 정보를 불러옴 (비밀번호 제외)
+    users = await User.find({}, '-password')
+  } catch (err) {
+    // 에러 발생 시 500 상태코드로 에러 응답
+    const error = new HttpError('유저 정보를 불러오지 못했습니다', 500)
+    return next(error)
+  }
+  res.json(users)
+}
+
+// 회원가입
+const signup = async (req, res, next) => {
+  const errors = validationResult(req)
+  if (!errors.isEmpty()) {
+    // 유효성 검사 에러가 있을 경우, 해당 에러를 422 상태코드로 응답
+    const error = new HttpError(`${errors.errors[0].path}는 비어있을 수 없습니다`, 422)
+    return next(error)
+  }
+
+  const { name, email, password } = req.body
+
+  let existingUser
+  try {
+    // 이메일 중복 체크
+    existingUser = await User.findOne({ email: email })
+  } catch (err) {
+    // 에러 발생 시 500 상태코드로 에러 응답
+    const error = new HttpError('회원가입 실패', 500)
+    return next(error)
+  }
+
+  if (existingUser) {
+    // 중복된 이메일이 이미 존재할 경우, 422 상태코드로 에러 응답
+    const error = new HttpError('이미 유저가 있습니다.', 422)
+    return next(error)
+  }
+
+  let hashedPassword
+  try {
+    // 비밀번호 암호화
+    hashedPassword = await bcrypt.hash(password, 12)
+  } catch (err) {
+    // 암호화 중 에러 발생 시, 500 상태코드로 에러 응답
+    const error = new HttpError('사용자를 생성하지 못했습니다', 500)
+    return next(error)
+  }
+
+  const createdUser = new User({
+    name,
+    email,
+    image: req.file.path,
+    password: hashedPassword,
+    places: [],
+  })
+
+  try {
+    // 새로운 사용자 정보 저장
+    await createdUser.save()
+  } catch (err) {
+    // 저장 중 에러 발생 시, 500 상태코드로 에러 응답
+    const error = new HttpError('회원 저장에 오류가 발생했습니다', 500)
+    return next(error)
+  }
+
+  // 회원가입 성공 시, 201 상태코드로 응답
+  res.status(201).json({ user: createdUser })
+}
+
+// 로그인
+const login = async (req, res, next) => {
+  const { email, password } = req.body
+
+  let existingUser
+  try {
+    // 이메일로 사용자 찾기
+    existingUser = await User.findOne({ email: email })
+  } catch (err) {
+    // 조회 중 에러 발생 시, 500 상태코드로 에러 응답
+    const error = new HttpError('로그인 실패', 500)
+    return next(error)
+  }
+
+  if (!existingUser) {
+    // 사용자가 없거나 비밀번호가 일치하지 않을 경우, 401 상태코드로 에러 응답
+    const error = new HttpError('유저 정보가 틀립니다', 401)
+    return next(error)
+  }
+
+  let isValidPassword = false
+  try {
+    // 해시된 비밀번호 비교
+    isValidPassword = await bcrypt.compare(password, existingUser.password)
+  } catch (err) {
+    // 해시 비교 중 에러 발생 시, 500 상태코드로 에러 응답
+    const error = new HttpError('해싱 암호를 비교하는데 실패 했습니다', 500)
+    return next(error)
+  }
+
+  if (!isValidPassword) {
+    // 비밀번호 불일치 시, 401 상태코드로 에러 응답
+    const error = new HttpError('유저 정보가 틀립니다', 401)
+    return next(error)
+  }
+
+  // 로그인 성공 시, 성공 메시지와 사용자 정보를 JSON 형태로 응답
+  res.json({ message: '로그인 성공', user: existingUser })
+}
+
+// 모듈 내보내기
+exports.getUsers = getUsers
+exports.signup = signup
+exports.login = login
+```
+
+```jsx
+로그인 함수에서 사용자 비밀번호 인증을 위해서 수정을 해준다
+
+    let isValidPassword = false;
+    try {
+        // 해시된 비밀번호 비교
+        isValidPassword = await bcrypt.compare(password, existingUser.password)
+    } catch (err) {
+        // 해시 비교 중 에러 발생 시, 500 상태코드로 에러 응답
+        const error = new HttpError("해싱 암호를 비교하는데 실패 했습니다",500);
+        return next(error);
+    }
+
+인풋에서 받아온 비밀번호와  DB 에서 가져온 해시된 비밀번호를 비교해서 true 또는 false 를 반환한다
+
+해시 비교중 오류가 발생하면 에러
+
+    if (!isValidPassword){
+        // 비밀번호 불일치 시, 401 상태코드로 에러 응답
+        const error = new HttpError("유저 정보가 틀립니다", 401);
+        return next(error);
+    }
+
+그리고 비밀번호가 다를시
+
+유저 정보가 틀리하고 에러를 발생시키고 에러 핸들러 미들웨어로 전달
+```
+
+# 백엔드에서 토큰(JWT) 생성하기
+
+```jsx
+이제 사용자 인증이 완료되면 토큰을 발행해줘야 한다
+
+이를위해 서브파티 패키지를 설치해준다
+```
+
+```jsx
+npm i jsonwebtoken
+```
+
+```jsx
+// users-controllers.js
+
+// Express에서 사용하는 외부 라이브러리 및 모듈 불러오기
+const { v4: uuid } = require('uuid')
+const { validationResult } = require('express-validator')
+const bcrypt = require('bcryptjs')
+const jwt = require('jsonwebtoken')
+
+// 커스텀 HTTP 에러 모델 및 사용자 모델 불러오기
+const HttpError = require('../models/http-error')
+const User = require('../models/user')
+
+// 유저 목록 조회
+const getUsers = async (req, res, next) => {
+  let users
+  try {
+    // 데이터베이스에서 모든 사용자 정보를 불러옴 (비밀번호 제외)
+    users = await User.find({}, '-password')
+  } catch (err) {
+    // 에러 발생 시 500 상태코드로 에러 응답
+    const error = new HttpError('유저 정보를 불러오지 못했습니다', 500)
+    return next(error)
+  }
+  res.json(users)
+}
+
+// 회원가입
+const signup = async (req, res, next) => {
+  const errors = validationResult(req)
+  if (!errors.isEmpty()) {
+    // 유효성 검사 에러가 있을 경우, 해당 에러를 422 상태코드로 응답
+    const error = new HttpError(`${errors.errors[0].path}는 비어있을 수 없습니다`, 422)
+    return next(error)
+  }
+
+  const { name, email, password } = req.body
+
+  let existingUser
+  try {
+    // 이메일 중복 체크
+    existingUser = await User.findOne({ email: email })
+  } catch (err) {
+    // 에러 발생 시 500 상태코드로 에러 응답
+    const error = new HttpError('회원가입 실패', 500)
+    return next(error)
+  }
+
+  if (existingUser) {
+    // 중복된 이메일이 이미 존재할 경우, 422 상태코드로 에러 응답
+    const error = new HttpError('이미 유저가 있습니다.', 422)
+    return next(error)
+  }
+
+  let hashedPassword
+  try {
+    // 비밀번호 암호화
+    hashedPassword = await bcrypt.hash(password, 12)
+  } catch (err) {
+    // 암호화 중 에러 발생 시, 500 상태코드로 에러 응답
+    const error = new HttpError('사용자를 생성하지 못했습니다', 500)
+    return next(error)
+  }
+
+  const createdUser = new User({
+    name,
+    email,
+    image: req.file.path,
+    password: hashedPassword,
+    places: [],
+  })
+
+  try {
+    // 새로운 사용자 정보 저장
+    await createdUser.save()
+  } catch (err) {
+    // 저장 중 에러 발생 시, 500 상태코드로 에러 응답
+    const error = new HttpError('회원 저장에 오류가 발생했습니다', 500)
+    return next(error)
+  }
+
+  let token
+  try {
+    token = jwt.sign({ userId: createdUser._id, email: createdUser.email }, 'secretKey', {
+      expiresIn: '1h',
+    })
+  } catch (err) {
+    const error = new HttpError('토큰 생성에 실패하였습니다', 500)
+    return next(error)
+  }
+
+  // 회원가입 성공 시, 201 상태코드로 응답
+  res.status(201).json({ userId: createdUser._id, email: createdUser.email, token: token })
+}
+
+// 로그인
+const login = async (req, res, next) => {
+  const { email, password } = req.body
+
+  let existingUser
+  try {
+    // 이메일로 사용자 찾기
+    existingUser = await User.findOne({ email: email })
+  } catch (err) {
+    // 조회 중 에러 발생 시, 500 상태코드로 에러 응답
+    const error = new HttpError('로그인 실패', 500)
+    return next(error)
+  }
+
+  if (!existingUser) {
+    // 사용자가 없거나 비밀번호가 일치하지 않을 경우, 401 상태코드로 에러 응답
+    const error = new HttpError('유저 정보가 틀립니다', 401)
+    return next(error)
+  }
+
+  let isValidPassword = false
+  try {
+    // 해시된 비밀번호 비교
+    isValidPassword = await bcrypt.compare(password, existingUser.password)
+  } catch (err) {
+    // 해시 비교 중 에러 발생 시, 500 상태코드로 에러 응답
+    const error = new HttpError('해싱 암호를 비교하는데 실패 했습니다', 500)
+    return next(error)
+  }
+
+  if (!isValidPassword) {
+    // 비밀번호 불일치 시, 401 상태코드로 에러 응답
+    const error = new HttpError('유저 정보가 틀립니다', 401)
+    return next(error)
+  }
+
+  let token
+  try {
+    token = jwt.sign({ userId: existingUser._id, email: existingUser.email }, 'secretKey', {
+      expiresIn: '1h',
+    })
+  } catch (err) {
+    const error = new HttpError('토큰 생성에 실패하였습니다', 500)
+    return next(error)
+  }
+
+  // 로그인 성공 시, 성공 메시지와 사용자 정보를 JSON 형태로 응답
+  res.status(201).json({
+    userId: existingUser._id,
+    email: existingUser.email,
+    token: token,
+  })
+}
+
+// 모듈 내보내기
+exports.getUsers = getUsers
+exports.signup = signup
+exports.login = login
+```
+
+```jsx
+users-controllers.js 파일에서 jsonwebtoken 패키지를 불러와 jwt 상수에 저장한다.
+
+const jwt = require('jsonwebtoken');
+
+그리고 회원 가입에
+
+    let token;
+    try {
+        token = jwt.sign(
+            { userId: createdUser._id, email: createdUser.email },
+            'secretKey',
+            { expiresIn: '1h' }
+        );
+    } catch (err) {
+        const error = new HttpError("토큰 생성에 실패하였습니다", 500);
+        return next(error);
+    }
+
+    // 회원가입 성공 시, 201 상태코드로 응답
+    res.status(201).json({ userId: createdUser._id, email: createdUser.email, token: token });
+
+토큰을 발행하고 res. 에 token 을 넣어서 보내주게 하고
+
+로그인에도 똑같이 작성해준다
+
+    let token;
+    try {
+        token = jwt.sign(
+            { userId: existingUser._id, email: existingUser.email },
+            'secretKey',
+            { expiresIn: '1h' }
+        );
+    } catch (err) {
+        const error = new HttpError("토큰 생성에 실패하였습니다", 500);
+        return next(error);
+    }
+
+    // 로그인 성공 시, 성공 메시지와 사용자 정보를 JSON 형태로 응답
+    res.status(201).json({
+        userId: existingUser._id,
+        email: existingUser.email,
+        token : token
+    });
+```
+
+# Auth 미들웨어를 사용한 백엔드 라우트 보호
+
+```jsx
+middleware 폴더에 check-auth.js 파일을 생성한다
+
+* 현재 이 방법의 인증법은 쿠키등을 사용하는게 아니라 Context 를 사용해서 로그인을 제어한다
+```
+
+```jsx
+const jwt = require('jsonwebtoken')
+const HttpError = require('../models/http-error')
+
+// 토큰 검증 미들웨어
+module.exports = (req, res, next) => {
+  // 1. 요청 헤더에서 토큰 추출
+  const token = req.headers.authorization.split(' '[1])
+
+  try {
+    // 2. 토큰이 존재하지 않으면 에러 발생
+    if (!token) {
+      throw new Error('인증 실패')
+    }
+
+    // 3. 토큰 검증
+    const decodedToken = jwt.verify(token, 'secretKey')
+
+    // 4. 검증이 성공하면 사용자 데이터를 요청 객체에 추가
+    req.userData = { userId: decodedToken.userId }
+
+    // 5. 다음 미들웨어로 진행
+    next()
+  } catch (err) {
+    // 6. 토큰 검증 실패 시 401 상태코드와 함께 에러 응답
+    const error = new HttpError('인증 실패', 401)
+    return next(error)
+  }
+}
+```
+
+```jsx
+**요청 헤더에서 Authorization 헤더를 찾고, 해당 헤더의 값을 공백을 기준으로 나누어 토큰을 추출한다:**
+
+클라이언트에서 서버로 요청을 보낼 때, 보통 토큰은 Authorization 헤더에 담겨져 전송된다.
+
+req.headers.authorization을 통해 전송된 Authorization 헤더의 값을 받아온다.
+
+split(' ')을 사용하여 공백을 기준으로 나눠 배열로 만들고, 그 중 두 번째 요소(인덱스 1)를 토큰으로 사용한다.
+
+* split(' ')을 사용하여 공백을 기준으로 나눠 배열로 만들고, 그 중 두 번째 요소(인덱스 1)를 토큰으로 사용하는 이유는
+
+일반적으로 HTTP의 Authorization 헤더에서 사용되는 토큰의 형식이 "Bearer 토큰값"이기 때문이다.
+
+예를 들어, Authorization 헤더에
+
+"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ik"와 같이 전송될 수 있다.
+
+이 경우 "Bearer"는 토큰 타입을 나타내는 문자열이고, 실제 토큰은 뒤에 이어지는 문자열이다.
+
+split(' ')을 사용하면 공백을 기준으로 문자열을 나눠 배열로 만들게 되는데,
+
+이때 배열의 첫 번째 요소(인덱스 0)에는 "Bearer"와 같은 토큰 타입이 들어가게 딘다.
+
+따라서 실제 토큰은 두 번째 요소(인덱스 1)에 위치하게 되므로 이를 추출하여 사용하는 것이다.
+
+**토큰이 존재하지 않으면 "인증 실패"라는 에러를 발생시킨다:**
+
+얻어온 토큰이 존재하지 않으면, 즉 Authorization 헤더가 부적절하게 전송되었거나 토큰이 누락된 경우, 에러를 발생시킨다.
+
+throw new Error("인증 실패")를 통해 "인증 실패"라는 에러를 생성한다.
+
+**jwt 패키지를 사용하여 토큰을 검증한다:**
+
+jwt.verify(token, 'secretKey')를 통해 받아온 토큰을 서버에서 사용한 시크릿 키를 이용하여 검증한다.
+
+토큰의 유효성을 확인하는 과정으로, 검증이 성공하면 다음 단계로 진행한다.
+
+**검증이 성공하면 사용자 데이터를 요청 객체에 추가한다:**
+
+jwt.verify()에서 반환한 decodedToken에는 토큰에 담긴 정보가 들어있다. ( 토큰발급때 담은 값 )
+
+여기서는 사용자 ID를 추출하여 req.userData에 저장한다. 이 정보는 뒷 단계에서 다루어질 보호된 라우트에서 활용된다.
+
+**검증이 성공하면 다음 미들웨어로 진행한다:**
+
+토큰의 검증이 성공하면, 즉 유효한 토큰이라면 다음 미들웨어로 넘어간다.
+
+이 부분에서는 더 이상의 검증이 필요하지 않으므로 다음 단계로 흐름이 이어진다.
+
+**토큰 검증 실패 시 401 상태코드와 함께 "인증 실패"라는 에러를 생성하고, 다음 미들웨어에 에러를 전달하여 처리한다:**
+
+토큰 검증이 실패한 경우, 즉 유효하지 않거나 변조된 토큰인 경우, 401 상태코드와 함께 "인증 실패" 에러를 생성한다.
+
+이 에러는 다음 미들웨어에 전달되어, 예외처리 미들웨어나 에러 핸들러에서 처리할 수 있다.
+
+클라이언트에게 적절한 오류 응답이 전달된다.
+```
+
+## **`places-routes.js`** 파일에서 미들웨어를 사용하여 보호된 라우트에 적용
+
+```jsx
+// index.js
+
+// Express 프레임워크를 가져옵니다.
+const express = require('express')
+
+const { check } = require('express-validator')
+
+// places-controllers.js 파일에서 정의한 컨트롤러 함수를 가져옵니다.
+const placeControllers = require('../controllers/places-controllers')
+
+// Express의 Router를 사용하여 새로운 라우터를 생성합니다.
+const router = express.Router()
+
+// 파일 업로드 미들웨어를 가져옵니다.
+const fileUpload = require('../middleware/file-upload')
+
+const checkAuth = require('../middleware/check-auth')
+
+// /api/places/:pid 라우트를 처리하는 미들웨어 함수입니다.
+// 해당 라우트로 들어오는 GET 요청에 대해 placeControllers.getPlaceById 함수를 실행합니다.
+router.get('/:pid', placeControllers.getPlacesById)
+
+// /api/places/user/:uid 라우트를 처리하는 미들웨어 함수입니다.
+// 해당 라우트로 들어오는 GET 요청에 대해 placeControllers.getPlaceByUserId 함수를 실행합니다.
+router.get('/user/:uid', placeControllers.getPlaceByUserId)
+
+// 인증 라우트 추가 아래의 라우터들은 미들웨어 인증을 통과해야지 실행된다
+router.use(checkAuth)
+
+// 추가
+router.post(
+  '/',
+  fileUpload.single('image'),
+
+  [
+    check('title').not().isEmpty(),
+    check('description').isLength({ min: 5 }),
+    check('address').not().isEmpty(),
+  ],
+  placeControllers.createPlace
+)
+
+router.patch(
+  '/:pid',
+  [check('title').not().isEmpty(), check('description').isLength({ min: 5 })],
+
+  placeControllers.updatePlaceById
+)
+
+router.delete('/:pid', placeControllers.deletePlaceById)
+
+// 라우터를 모듈로 내보냅니다.
+module.exports = router
+```
+
+```jsx
+router.use(checkAuth); 를 추가해준다
+
+아래 라우터들은 위의 미들웨어의 인증을 통과해야지 접근이 가능하다
+```
+
+# React에서 JWT(토큰) 사용 및 첨부하기
+
+```jsx
+// Auth.js
+
+import React, { useState, useContext } from 'react'
+import { useNavigate } from 'react-router-dom'
+import Card from '../../shared/components/UIElements/Card'
+import Input from '../../shared/components/FormElements/Input'
+import Button from '../../shared/components/FormElements/Button'
+import ErrorModal from '../../shared/components/UIElements/ErrorModal'
+import LoadingSpinner from '../../shared/components/UIElements/LoadingSpinner'
+import ImageUpload from '../../shared/components/FormElements/ImageUpload'
+
+import { useForm } from '../../shared/hooks/form-hook'
+import { useHttpClient } from '../../shared/hooks/http-hook'
+import {
+  VALIDATOR_EMAIL,
+  VALIDATOR_MINLENGTH,
+  VALIDATOR_REQUIRE,
+} from '../../shared/util/validators'
+import { AuthContext } from '../../shared/context/auth-context'
+
+import './Auth.css'
+
+const Auth = () => {
+  const auth = useContext(AuthContext)
+  const navigate = useNavigate()
+  // 로그인 및 회원 가입을 위한 상태 및 커스텀 훅 초기화
+  const [isLoginMode, setIsLoginMode] = useState(true)
+  const { isLoading, error, sendRequest, clearError } = useHttpClient()
+  const [formState, inputHandler, setFormData] = useForm(
+    {
+      email: {
+        value: '',
+        isValid: false,
+      },
+      password: {
+        value: '',
+        isValid: false,
+      },
+    },
+    false
+  )
+
+  // 로그인 및 회원 가입 모드 전환
+  const switchModeHandler = () => {
+    if (!isLoginMode) {
+      // 회원 가입 모드에서 로그인 모드로 전환 시, 이름 입력 필드 추가
+      setFormData(
+        {
+          ...formState.inputs,
+          name: undefined,
+          image: undefined,
+        },
+        formState.inputs.email.isValid && formState.inputs.password.isValid
+      )
+    } else {
+      // 로그인 모드에서 회원 가입 모드로 전환 시, 이름 입력 필드 제거
+      setFormData(
+        {
+          ...formState.inputs,
+          name: {
+            value: '',
+            isValid: false,
+          },
+          image: {
+            value: null,
+            isValid: false,
+          },
+        },
+        false
+      )
+    }
+    setIsLoginMode((prevMode) => !prevMode)
+  }
+
+  // 로그인 또는 회원 가입 시도
+  const authSubmitHandler = async (event) => {
+    event.preventDefault()
+
+    if (isLoginMode) {
+      // 로그인 모드일 때
+      try {
+        const responseData = await sendRequest(
+          'http://localhost:5000/api/users/login',
+          'POST',
+          JSON.stringify({
+            email: formState.inputs.email.value,
+            password: formState.inputs.password.value,
+          }),
+          {
+            'Content-Type': 'application/json',
+          }
+        )
+        console.log(responseData)
+        auth.login(responseData.userId, responseData.token)
+        navigate('/')
+      } catch (error) {
+        // 오류 발생 시
+        console.error('Login Error:', error)
+      }
+    } else {
+      // 회원 가입 모드일 때
+      try {
+        const formData = new FormData()
+        formData.append('name', formState.inputs.name.value)
+        formData.append('email', formState.inputs.email.value)
+        formData.append('password', formState.inputs.password.value)
+        formData.append('image', formState.inputs.image.value)
+
+        const responseData = await sendRequest(
+          'http://localhost:5000/api/users/signup',
+          'POST',
+          formData
+        )
+        auth.login(responseData.userId, responseData.token)
+        navigate('/')
+      } catch (error) {
+        // 오류 발생 시
+      }
+    }
+  }
+
+  return (
+    <>
+      {/* HTTP 요청 오류를 표시하는 모달 및 로딩 스피너 */}
+      <ErrorModal error={error} onClear={clearError} />
+      {isLoading && <LoadingSpinner asOverlay />}
+
+      {/* 로그인/회원 가입 양식 */}
+      <Card className="authentication">
+        <h1>Login Required</h1>
+        <hr />
+
+        {/* 로그인/회원 가입 양식 */}
+        <form onSubmit={authSubmitHandler}>
+          {/* 회원 가입 모드에서만 보이는 이름 입력 필드 */}
+          {!isLoginMode && (
+            <Input
+              element="input"
+              id="name"
+              type="text"
+              label="Name"
+              validators={[VALIDATOR_REQUIRE()]}
+              errorText="Please enter a name"
+              onInput={inputHandler}
+            />
+          )}
+          {!isLoginMode && <ImageUpload center id="image" onInput={inputHandler} />}
+
+          {/* 이메일 및 비밀번호 입력 필드 */}
+          <Input
+            element="input"
+            id="email"
+            type="email"
+            label="E-Mail"
+            validators={[VALIDATOR_EMAIL()]}
+            errorText="Please enter a valid email address."
+            onInput={inputHandler}
+          />
+          <Input
+            element="input"
+            id="password"
+            type="password"
+            label="Password"
+            validators={[VALIDATOR_MINLENGTH(6)]}
+            errorText="Please enter a valid password at least 5 Ch."
+            onInput={inputHandler}
+          />
+
+          {/* 로그인/회원 가입 버튼 */}
+          <Button type="submit" disabled={!formState.isValid}>
+            {isLoginMode ? 'LOGIN' : 'SIGNUP'}
+          </Button>
+        </form>
+
+        {/* 로그인/회원 가입 모드 전환 버튼 */}
+        <Button inverse onClick={switchModeHandler}>
+          SWITCH TO {isLoginMode ? 'SIGNUP' : 'LOGIN'}
+        </Button>
+      </Card>
+    </>
+  )
+}
+
+export default Auth
+```
+
+```jsx
+로그인 및 회원가입에서 반환되는 데이터 수정:
+
+사용자 객체에서 userId를 userId로 변경:
+
+서버에서 반환되는 사용자 객체를 통일된 필드명으로 수정하여, 클라이언트에서 일관된 데이터를 다루기 위함이다.
+
+토큰 필드 추가:
+
+로그인 및 회원가입 시 토큰 필드를 반환받아, 이를 활용하여 인증된 사용자임을 나타내기 위함이다.
+
+auth.login(responseData.userId, responseData.token);
+```
+
+```jsx
+//App.js
+
+import React, { useState, useCallback } from 'react'
+import './App.css'
+import { Route, Routes, Navigate } from 'react-router-dom'
+import Users from './user/pages/Users'
+import NewPlace from './places/pages/NewPlace'
+import MainNavigation from './shared/components/Navigation/MainNavigation'
+import UserPlaces from './places/pages/UserPlaces'
+import UpdatePlace from './places/pages/UpdatePlace'
+import Auth from './user/pages/Auth'
+import { AuthContext } from './shared/context/auth-context'
+
+const App = () => {
+  // 로그인 상태와 사용자 ID를 관리하는 상태
+  const [token, setToken] = useState(false)
+  const [userId, setUserId] = useState(null)
+
+  // useCallback을 사용한 로그인 함수
+  const login = useCallback((userId, token) => {
+    setToken(token)
+    setUserId(userId)
+  }, [])
+
+  // useCallback을 사용한 로그아웃 함수
+  const logout = useCallback(() => {
+    setToken(null)
+    setUserId(null)
+  }, [])
+
+  // 라우팅을 위한 JSX 설정
+  let routes
+  if (token) {
+    // 로그인한 경우의 라우트 설정
+    routes = (
+      <>
+        <Route path="/" element={<Users />} />
+        <Route path="/:userId/places" element={<UserPlaces />} />
+        <Route path="/places/new" element={<NewPlace />} />
+        <Route path="/places/:placeId" element={<UpdatePlace />} />
+        <Route path="*" element={<Navigate replace to="/" />} />
+      </>
+    )
+  } else {
+    // 로그인하지 않은 경우의 라우트 설정
+    routes = (
+      <>
+        <Route path="/" element={<Users />} />
+        <Route path="/:userId/places" element={<UserPlaces />} />
+        <Route path="/auth" element={<Auth />} />
+        <Route path="*" element={<Navigate replace to="/auth" />} />
+      </>
+    )
+  }
+
+  // AuthContext.Provider를 사용하여 전역적으로 사용되는 사용자 정보 관리
+  return (
+    <AuthContext.Provider
+      value={{
+        isLoggedIn: !!token,
+        token: token,
+        userId: userId,
+        login: login,
+        logout: logout,
+      }}
+    >
+      <>
+        {/* 상단 네비게이션 바 */}
+        <MainNavigation />
+
+        {/* 메인 컨텐츠 영역 */}
+        <main>
+          {/* 라우트 설정 */}
+          <Routes>{routes}</Routes>
+        </main>
+      </>
+    </AuthContext.Provider>
+  )
+}
+
+export default App
+```
+
+```jsx
+App.js 파일 수정:
+
+useState 훅으로 token, setToken 추가:
+
+앱 전체에서 토큰을 상태로 관리하기 위해서 useState 훅을 사용하고, setToken 함수를 통해 토큰을 업데이트하는 기능을 추가한다.
+
+const [token, setToken] = useState(false);
+const [userId, setUserId] = useState(null);
+
+로그인 및 로그아웃 시에 setToken 호출:
+
+로그인 및 로그아웃 시, setToken 함수를 호출하여 앱 전역에서 토큰 상태를 업데이트하고, 이를 통해 로그인 상태를 관리한다.
+
+
+  // useCallback을 사용한 로그인 함수
+  const login = useCallback((userId,token) => {
+    setToken(token);
+    setUserId(userId);
+  }, []);
+
+isLoggedIn을 !!token으로 변경:
+
+isLoggedIn 상태를 !!token으로 변경하여 토큰의 존재 여부를 쉽게 확인하며, 이를 통해 로그인 여부를 판단한다.
+
+AuthContext.Provider 에 token 을 추가 전역적으로 token 을 사용하기 위해서
+
+<AuthContext.Provider
+      value={{
+        isLoggedIn: !!token,
+        token : token,
+        userId: userId,
+        login: login,
+        logout: logout
+      }}
+    >
+```
+
+```jsx
+// auth-context.js
+
+import { createContext } from 'react'
+
+// AuthContext라는 새로운 컨텍스트를 생성합니다.
+export const AuthContext = createContext({
+  // 컨텍스트의 초기값을 설정합니다.
+  isLoggedIn: false, // 사용자의 로그인 상태를 나타냅니다. 초기값은 false로 설정되어 있습니다.
+  userId: null, // 현재 로그인한 사용자의 ID를 나타냅니다. 초기값은 null로 설정되어 있습니다.
+  token: null, // x토큰 초기값 없어도 상관 없지만 일관성을 위해서
+  login: () => {}, // 로그인 함수를 빈 함수로 설정합니다. 실제 구현은 컨텍스트를 사용하는 컴포넌트에서 이뤄집니다.
+  logout: () => {}, // 로그아웃 함수를 빈 함수로 설정합니다. 실제 구현은 컨텍스트를 사용하는 컴포넌트에서 이뤄집니다.
+})
+```
+
+```jsx
+AuthContext.js 파일 수정:
+
+AuthContext에 token 추가:
+
+AuthContext에 토큰 상태를 추가하여, 컨텍스트를 통해 어디서든 토큰에 접근할 수 있도록 한다.
+
+AuthContext의 기본값으로 토큰 설정:
+
+AuthContext의 createContext 함수에 토큰을 기본값으로 설정함으로써, 컨텍스트의 초기값을 지정하고 일관성을 유지한다.
+```
+
+```jsx
+// NewPlace.js
+
+import React, { useContext } from 'react'
+import { useNavigate } from 'react-router-dom'
+import Input from '../../shared/components/FormElements/Input'
+import Button from '../../shared/components/FormElements/Button'
+import { VALIDATOR_REQUIRE, VALIDATOR_MINLENGTH } from '../../shared/util/validators'
+import { useForm } from '../../shared/hooks/form-hook'
+import './PlaceForm.css'
+import { useHttpClient } from '../../shared/hooks/http-hook'
+import { AuthContext } from '../../shared/context/auth-context'
+import ErrorModal from '../../shared/components/UIElements/ErrorModal'
+import LoadingSpinner from '../../shared/components/UIElements/LoadingSpinner'
+import ImageUpload from '../../shared/components/FormElements/ImageUpload'
+
+const NewPlace = () => {
+  // useContext를 통해 AuthContext에서 전역 상태를 가져옴
+  const auth = useContext(AuthContext)
+  // useNavigate 훅을 이용하여 페이지 이동 기능을 사용할 수 있는 navigate 함수 생성
+  const navigate = useNavigate()
+  // useHttpClient 훅을 이용하여 HTTP 요청 관련 기능들을 사용
+  const { isLoading, error, sendRequest, clearError } = useHttpClient()
+  // useForm 훅을 이용하여 폼 상태 및 관련 기능들을 사용
+  const [formState, inputHandler] = useForm(
+    {
+      title: {
+        value: '',
+        isValid: false,
+      },
+      description: {
+        value: '',
+        isValid: false,
+      },
+      address: {
+        value: '',
+        isValid: false,
+      },
+      image: {
+        value: '',
+        isValid: false,
+      },
+    },
+    false
+  )
+
+  // 장소 등록 폼을 제출했을 때의 핸들러 함수
+  const placeSubmitHandler = async (event) => {
+    event.preventDefault()
+    try {
+      // FormData를 사용하여 이미지를 포함한 폼 데이터 생성
+      const formData = new FormData()
+      formData.append('title', formState.inputs.title.value)
+      formData.append('description', formState.inputs.description.value)
+      formData.append('address', formState.inputs.address.value)
+      formData.append('creator', auth.userId)
+      formData.append('image', formState.inputs.image.value)
+
+      // useHttpClient 훅을 이용하여 서버에 POST 요청을 보냄
+      const responseData = await sendRequest('http://localhost:5000/api/places', 'POST', formData, {
+        // Authorization 헤더에 토큰을 추가하여 인증된 요청을 보냄
+        Authorization: 'Bearer ' + auth.token,
+      })
+
+      // 요청이 성공하면 메인 페이지로 이동
+      navigate('/')
+    } catch (error) {
+      // 요청이 실패하면 에러 처리
+    }
+  }
+
+  // JSX를 반환하여 컴포넌트를 렌더링
+  return (
+    <>
+      {/* 에러 모달 컴포넌트를 사용하여 에러가 있을 경우 표시 */}
+      <ErrorModal error={error} onClear={clearError} />
+      {/* 폼 요소를 가지고 있는 form 태그 */}
+      <form className="place-form" onSubmit={placeSubmitHandler}>
+        {/* 로딩 중일 경우 로딩 스피너를 표시 */}
+        {isLoading && <LoadingSpinner asOverlay />}
+        {/* 입력 컴포넌트들을 사용하여 각 필드에 대한 입력을 처리 */}
+        <Input
+          id="title"
+          element="input"
+          type="text"
+          label="Title"
+          validators={[VALIDATOR_REQUIRE()]}
+          errorText="Please enter a valid title."
+          onInput={inputHandler}
+        />
+        {/* 이미지 업로드 컴포넌트 */}
+        <ImageUpload id="image" onInput={inputHandler} errorText="이미지를 업로드 하세요" />
+        <Input
+          id="description"
+          element="textarea"
+          label="Description"
+          validators={[VALIDATOR_MINLENGTH(5)]}
+          errorText="Please enter a valid description (at least 5 characters)."
+          onInput={inputHandler}
+        />
+        <Input
+          id="address"
+          element="input"
+          label="Address"
+          validators={[VALIDATOR_REQUIRE()]}
+          errorText="Please enter a valid address."
+          onInput={inputHandler}
+        />
+        {/* 제출 버튼 */}
+        <Button type="submit" disabled={!formState.isValid}>
+          ADD PLACE
+        </Button>
+      </form>
+    </>
+  )
+}
+
+// 컴포넌트를 내보내기
+export default NewPlace
+```
+
+```jsx
+NewPlace.js 파일 수정:
+
+sendRequest 함수 호출 시 Authorization 헤더에 토큰 추가:
+
+API 요청 시 Authorization 헤더에 토큰을 첨부하여, 백엔드에서 해당 요청이 인증된 사용자에 의한 것임을 확인한다.
+
+      // useHttpClient 훅을 이용하여 서버에 POST 요청을 보냄
+      const responseData = await sendRequest(
+        'http://localhost:5000/api/places',
+        'POST',
+        formData,
+        {
+          // Authorization 헤더에 토큰을 추가하여 인증된 요청을 보냄
+          Authorization : 'Bearer ' + auth.token
+        }
+      );
+
+**여기서 정말 주의해야 할것은 'Bearer ' + auth.token 여기서 'Bearer ' 에 공백이 하나 있다는 것이다**
+
+FormData에 creator 필드 추가:
+
+새로운 장소를 생성할 때, 해당 장소를 생성한 사용자의 ID를 서버에 전달하여, 사용자와 연결된 장소를 생성하기 위함이다.
+
+formData.append('creator', auth.userId)
+```
+
+## Authorization: Bearer ${auth.token} 헤더를 추가하는 이유
+
+```jsx
+Authorization:
+
+Bearer ${auth.token} 헤더를 추가하는 이유는 주로 사용자 인증을 위한 토큰을 서버로 전달하기 위함이다.
+
+여기서 Bearer는 토큰의 유형을 나타내는 표준화된 방법 중 하나이다.
+
+인증 및 보안:
+
+대부분의 웹 애플리케이션은 사용자를 인증하고 보안을 강화하기 위해 토큰 기반의 인증 시스템을 사용한다.
+
+사용자가 로그인하면 서버에서는 유효한 사용자에게 토큰을 발급하고, 이 토큰은 사용자가 인증된 상태를 유지하는 데 사용된다.
+
+토큰의 종류:
+
+Bearer 토큰은 OAuth 2.0 및 JSON Web Token (JWT)과 같은 보안 표준에서 사용되는 일반적인 방식 중 하나이다.
+
+토큰의 유형을 명시하기 위해 Authorization 헤더에 Bearer를 사용한다.
+
+Bearer 토큰 구성:
+
+Bearer 토큰은 일반적으로 Bearer 다음에 실제 토큰이 붙어 있다.
+
+예를 들어, Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...와 같이 헤더에 추가된다.
+
+HTTP 헤더의 활용:
+
+Authorization 헤더는 HTTP 요청에서 자주 사용되며, 서버에게 클라이언트가 특정 자격 증명(credential)을 가지고 있다고 알리는 역할을 한다.
+
+Bearer 토큰을 Authorization 헤더에 추가하여 서버에게 현재 사용자의 인증 토큰을 제공한다.
+
+토큰의 전송:
+
+Bearer 토큰은 주로 HTTPS를 통해 안전하게 전송된다.
+
+HTTPS를 사용하면 통신이 암호화되어 중간에서 토큰을 가로채는 공격을 방지할 수 있다.
+
+장소 업데이트 요청에서의 활용:
+
+위에서 제시한 코드는 장소를 업데이트하는 PATCH 요청을 서버에 보내기 위한 것이다.
+
+이 때, 해당 장소에 대한 권한이 필요하며, 이 권한을 확인하기 위해 사용자의 토큰이 필요하다.
+
+따라서 Authorization: Bearer ${auth.token} 헤더를 추가하여 현재 사용자의 토큰을 서버로 전달한다.
+
+보안 강화:
+
+헤더에 포함된 Bearer 토큰을 통해 서버는 해당 요청이 유효한 사용자에 의한 것임을 확인하고, 권한이 부여된 작업을 수행할 수 있다.
+
+이렇게 함으로써 헤더에 Bearer 토큰을 추가하여 보안적인 측면을 강화하고, 서버가 요청을 올바르게 처리할 수 있도록 한다.
+```
+
+```jsx
+// check-auth.js
+
+const jwt = require('jsonwebtoken')
+const HttpError = require('../models/http-error')
+
+// 토큰 검증 미들웨어
+module.exports = (req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    return next()
+  }
+
+  // 1. 요청 헤더에서 토큰 추출
+  const token = req.headers.authorization.split(' ')[1]
+
+  try {
+    // 2. 토큰이 존재하지 않으면 에러 발생
+    if (!token) {
+      throw new Error('인증 실패')
+    }
+
+    // 3. 토큰 검증
+    const decodedToken = jwt.verify(token, 'secretKey')
+
+    // 4. 검증이 성공하면 사용자 데이터를 요청 객체에 추가
+    req.userData = { userId: decodedToken.userId }
+
+    // 5. 다음 미들웨어로 진행
+    next()
+  } catch (err) {
+    // 6. 토큰 검증 실패 시 401 상태코드와 함께 에러 응답
+    const error = new HttpError('인증 실패', 401)
+    return next(error)
+  }
+}
+```
+
+```jsx
+OPTIONS 요청에 대한 처리 추가:
+
+서버의 미들웨어에서 OPTIONS 요청에 대한 처리를 추가하여 이 요청이 인증에 필요하지 않도록 한다.
+
+OPTIONS 요청은 브라우저에서 자동으로 발생하는 사전 확인 요청으로, 실제 데이터를 전송하기 전에 서버가 요청을 수락할 수 있는지 확인한다.
+
+OPTIONS 요청이면 next() 호출: OPTIONS 요청이면 바로 다음 미들웨어로 전달되도록 next()를 호출한다.
+
+OPTIONS 요청은 인증과 관련이 없기 때문에 특별한 처리 없이 다음 미들웨어로 넘어가게 된다.
+
+실제 인증 로직 수행:
+
+실제 인증이 필요한 경우, 여기에 해당 로직을 추가한다.
+
+이 예제에서는 OPTIONS 요청에 대한 특별한 처리 외에는 기존의 인증 로직을 그대로 사용한다.
+
+토큰이 필요한 다른 미들웨어 또는 라우트로 전달:
+
+실제 데이터 요청에 대해서는 토큰이 필요하므로 이후의 미들웨어 또는 라우트로 토큰을 전달한다.
+
+이 부분은 실제 인증이 필요한 부분에 맞게 수정하여 사용면 된다.
+
+    if(req.method === 'OPTIONS') {
+        return next();
+    }
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381322/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/_/Untitled_1.png)
+
+## **OPTIONS 요청이란?**
+
+```jsx
+OPTIONS는 HTTP 프로토콜에서 제공하는 메서드 중 하나로, 클라이언트가 서버에게 어떠한 요청이 가능한지를 확인하기 위한 메서드이다.
+
+이 메서드는 주로 사전 검사(preflight) 요청에서 사용되며, 브라우저에서 자동으로 생성된다.
+
+사전 검사 (Preflight) 요청:
+
+클라이언트에서 실제 요청을 보내기 전에 서버에게 해당 요청이 안전하고 허용되는지 미리 확인하기 위해 사용된다.
+
+브라우저는 본격적인 요청을 보내기 전에 OPTIONS 메서드를 사용하여 사전 검사 요청을 전송한다.
+
+목적:
+
+서버가 특정 리소스에 대한 요청을 수락할지, 어떤 메서드를 사용할 수 있는지, 어떤 헤더를 사용할 수 있는지 등을 확인하는 데 사용된다.
+
+실제 데이터를 보내기 전에 서버와 클라이언트 간의 통신이 안전하게 이루어질 수 있는지 사전에 확인한다.
+
+헤더 필드:
+
+OPTIONS 요청은 일반적으로 Access-Control-Request-Method 및 Access-Control-Request-Headers 헤더를 포함한다.
+
+Access-Control-Request-Method: 실제 요청에서 사용될 메서드를 서버에게 알린다.
+
+Access-Control-Request-Headers: 실제 요청에서 사용될 헤더를 서버에게 알린다.
+
+응답:
+
+서버는 OPTIONS 요청에 대한 응답으로 Access-Control-Allow-Methods 및 Access-Control-Allow-Headers 헤더를 포함하여 허용되는 메서드 및 헤더를 클라이언트에게 알린다.
+
+이를 통해 브라우저는 실제 요청을 전송하기 전에 서버의 허용 여부를 확인하고 안전한 CORS (Cross-Origin Resource Sharing) 통신을 보장한다.
+
+인증 필요 없음:
+
+OPTIONS 요청은 주로 사전 검사를 위한 것이므로, 이 요청에는 일반적으로 인증이 필요하지 않다.
+
+따라서 인증 헤더를 포함하지 않고 서버에게 허용된지 여부만을 확인한다.
+
+서버 처리:
+
+서버는 OPTIONS 요청을 받으면 헤더 정보를 확인하고 클라이언트의 요청이 허용되는지 여부를 결정한다.
+
+서버에서는 특별한 처리가 필요 없는 경우, 간단히 200 OK 응답을 보내고 허용되는 메서드 및 헤더 정보를 헤더에 포함시켜 응답한다.
+
+CORS (Cross-Origin Resource Sharing):
+
+OPTIONS 요청은 주로 CORS에서 중요한 역할을 합니다.
+
+클라이언트가 서로 다른 도메인에서 리소스를 요청할 때 브라우저는 OPTIONS를 통해 사전 검사를 수행하여 안전한 교차 출처 통신을 유지한다.
+
+이러한 방식으로 OPTIONS 요청은 브라우저와 서버 간의 통신을 안전하게 하기 위한 사전 검사 단계로 활용되며,
+
+CORS와 함께 사용되어 웹 애플리케이션 간의 안전한 데이터 교환을 가능하게 한다.
+```
+
+```jsx
+// Auth.js
+
+import React, { useState, useContext } from 'react'
+import { useNavigate } from 'react-router-dom'
+import Card from '../../shared/components/UIElements/Card'
+import Input from '../../shared/components/FormElements/Input'
+import Button from '../../shared/components/FormElements/Button'
+import ErrorModal from '../../shared/components/UIElements/ErrorModal'
+import LoadingSpinner from '../../shared/components/UIElements/LoadingSpinner'
+import ImageUpload from '../../shared/components/FormElements/ImageUpload'
+
+import { useForm } from '../../shared/hooks/form-hook'
+import { useHttpClient } from '../../shared/hooks/http-hook'
+import {
+  VALIDATOR_EMAIL,
+  VALIDATOR_MINLENGTH,
+  VALIDATOR_REQUIRE,
+} from '../../shared/util/validators'
+import { AuthContext } from '../../shared/context/auth-context'
+
+import './Auth.css'
+
+const Auth = () => {
+  const auth = useContext(AuthContext)
+  const navigate = useNavigate()
+  // 로그인 및 회원 가입을 위한 상태 및 커스텀 훅 초기화
+  const [isLoginMode, setIsLoginMode] = useState(true)
+  const { isLoading, error, sendRequest, clearError } = useHttpClient()
+  const [formState, inputHandler, setFormData] = useForm(
+    {
+      email: {
+        value: '',
+        isValid: false,
+      },
+      password: {
+        value: '',
+        isValid: false,
+      },
+    },
+    false
+  )
+
+  // 로그인 및 회원 가입 모드 전환
+  const switchModeHandler = () => {
+    if (!isLoginMode) {
+      // 회원 가입 모드에서 로그인 모드로 전환 시, 이름 입력 필드 추가
+      setFormData(
+        {
+          ...formState.inputs,
+          name: undefined,
+          image: undefined,
+        },
+        formState.inputs.email.isValid && formState.inputs.password.isValid
+      )
+    } else {
+      // 로그인 모드에서 회원 가입 모드로 전환 시, 이름 입력 필드 제거
+      setFormData(
+        {
+          ...formState.inputs,
+          name: {
+            value: '',
+            isValid: false,
+          },
+          image: {
+            value: null,
+            isValid: false,
+          },
+        },
+        false
+      )
+    }
+    setIsLoginMode((prevMode) => !prevMode)
+  }
+
+  // 로그인 또는 회원 가입 시도
+  const authSubmitHandler = async (event) => {
+    event.preventDefault()
+
+    if (isLoginMode) {
+      // 로그인 모드일 때
+      try {
+        const responseData = await sendRequest(
+          'http://localhost:5000/api/users/login',
+          'POST',
+          JSON.stringify({
+            email: formState.inputs.email.value,
+            password: formState.inputs.password.value,
+          }),
+          {
+            'Content-Type': 'application/json',
+          }
+        )
+        console.log(responseData)
+        auth.login(responseData.userId, responseData.token)
+        navigate('/')
+      } catch (error) {
+        // 오류 발생 시
+        console.error('Login Error:', error)
+      }
+    } else {
+      // 회원 가입 모드일 때
+      try {
+        const formData = new FormData()
+        formData.append('name', formState.inputs.name.value)
+        formData.append('email', formState.inputs.email.value)
+        formData.append('password', formState.inputs.password.value)
+        formData.append('image', formState.inputs.image.value)
+
+        const responseData = await sendRequest(
+          'http://localhost:5000/api/users/signup',
+          'POST',
+          formData
+        )
+        auth.login(responseData.userId, responseData.token)
+        navigate('/')
+      } catch (error) {
+        // 오류 발생 시
+      }
+    }
+  }
+
+  return (
+    <>
+      {/* HTTP 요청 오류를 표시하는 모달 및 로딩 스피너 */}
+      <ErrorModal error={error} onClear={clearError} />
+      {isLoading && <LoadingSpinner asOverlay />}
+
+      {/* 로그인/회원 가입 양식 */}
+      <Card className="authentication">
+        <h1>Login Required</h1>
+        <hr />
+
+        {/* 로그인/회원 가입 양식 */}
+        <form onSubmit={authSubmitHandler}>
+          {/* 회원 가입 모드에서만 보이는 이름 입력 필드 */}
+          {!isLoginMode && (
+            <Input
+              element="input"
+              id="name"
+              type="text"
+              label="Name"
+              validators={[VALIDATOR_REQUIRE()]}
+              errorText="Please enter a name"
+              onInput={inputHandler}
+            />
+          )}
+          {!isLoginMode && <ImageUpload center id="image" onInput={inputHandler} />}
+
+          {/* 이메일 및 비밀번호 입력 필드 */}
+          <Input
+            element="input"
+            id="email"
+            type="email"
+            label="E-Mail"
+            validators={[VALIDATOR_EMAIL()]}
+            errorText="Please enter a valid email address."
+            onInput={inputHandler}
+          />
+          <Input
+            element="input"
+            id="password"
+            type="password"
+            label="Password"
+            validators={[VALIDATOR_MINLENGTH(6)]}
+            errorText="Please enter a valid password at least 5 Ch."
+            onInput={inputHandler}
+          />
+
+          {/* 로그인/회원 가입 버튼 */}
+          <Button type="submit" disabled={!formState.isValid}>
+            {isLoginMode ? 'LOGIN' : 'SIGNUP'}
+          </Button>
+        </form>
+
+        {/* 로그인/회원 가입 모드 전환 버튼 */}
+        <Button inverse onClick={switchModeHandler}>
+          SWITCH TO {isLoginMode ? 'SIGNUP' : 'LOGIN'}
+        </Button>
+      </Card>
+    </>
+  )
+}
+
+export default Auth
+```
+
+```jsx
+로그인 시 responseData.token을 auth.login에 전달:
+
+로그인 함수에 token 전달:
+
+로그인 시 서버에서 받은 응답 객체에서 토큰을 추출하여,
+
+이를 auth.login 함수에 전달하여 인증된 사용자임을 설정한다.
+
+AuthContext에서 토큰을 컨텍스트에 저장:
+
+AuthContext에서 반환되는 객체에 토큰을 추가하여, 컨텍스트를 통해 전역적으로 토큰에 접근 가능하게 한다.
+
+       if (isLoginMode) {
+            // 로그인 모드일 때
+            try {
+                const responseData = await sendRequest(
+                    'http://localhost:5000/api/users/login',
+                    'POST',
+                    JSON.stringify({
+                        email: formState.inputs.email.value,
+                        password: formState.inputs.password.value
+                    }),
+                    {
+                        'Content-Type': 'application/json'
+                    }
+                );
+                console.log(responseData)
+                auth.login(responseData.userId, responseData.token);
+                navigate('/');
+            } catch (error) {
+                // 오류 발생 시
+                console.error("Login Error:", error);
+            }
+        } else {
+            // 회원 가입 모드일 때
+            try {
+                const formData = new FormData();
+                formData.append('name',formState.inputs.name.value)
+                formData.append('email',formState.inputs.email.value)
+                formData.append('password',formState.inputs.password.value)
+                formData.append('image',formState.inputs.image.value)
+
+                const responseData = await sendRequest(
+                    'http://localhost:5000/api/users/signup',
+                    'POST',
+                    formData
+                );
+                auth.login(responseData.userId, responseData.token);
+                navigate('/');
+            } catch (error) {
+                // 오류 발생 시
+            }
+        }
+    };
+```
+
+# 토큰을 사용하여 장소 업데이트 및 삭제하기
+
+## 장소 삭제
+
+```jsx
+import React, { useContext, useState } from 'react'
+
+// 컴포넌트 및 훅 임포트
+import Card from '../../shared/components/UIElements/Card'
+import Button from '../../shared/components/FormElements/Button'
+import Modal from '../../shared/components/UIElements/Modal'
+import ErrorModal from '../../shared/components/UIElements/ErrorModal'
+import LoadingSpinner from '../../shared/components/UIElements/LoadingSpinner'
+import { AuthContext } from '../../shared/context/auth-context'
+import { useHttpClient } from '../../shared/hooks/http-hook'
+
+// CSS 파일 임포트
+import './PlaceItem.css'
+
+const PlaceItem = (props) => {
+  // AuthContext로부터 사용자 인증 정보를 가져옴
+  const auth = useContext(AuthContext)
+
+  // useHttpClient 훅을 사용하여 HTTP 요청과 에러 처리를 담당하는 객체를 가져옴
+  const { isLoading, error, sendRequest, clearError } = useHttpClient()
+
+  // 지도 모달 열기/닫기를 위한 상태 관리
+  const [showMap, setShowMap] = useState(false)
+
+  // 삭제 확인 모달 열기/닫기를 위한 상태 관리
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+
+  // 지도 모달 열기 핸들러
+  const openMapHandler = () => setShowMap(true)
+
+  // 지도 모달 닫기 핸들러
+  const closeMapHandler = () => setShowMap(false)
+
+  // 삭제 확인 모달 열기 핸들러
+  const showDeleteWarningHandler = () => {
+    setShowConfirmModal(true)
+  }
+
+  // 삭제 확인 모달 취소 핸들러
+  const cancelDeleteHandler = () => {
+    setShowConfirmModal(false)
+  }
+
+  // 삭제 확인 모달에서 DELETE 버튼 클릭 시 처리 핸들러
+  const confirmDeleteHandler = async () => {
+    setShowConfirmModal(false)
+    try {
+      // 서버에 DELETE 요청을 보냄
+      await sendRequest(`http://localhost:5000/api/places/${props.id}`, 'DELETE', null, {
+        Authorization: 'Bearer ' + auth.token,
+      })
+    } catch (error) {
+      // 에러 발생 시 아무 동작 없음 (추가 로직 필요)
+    }
+    // 삭제된 장소의 ID를 onDelete 콜백 함수를 통해 상위 컴포넌트에 전달
+    props.onDelete(props.id)
+  }
+
+  return (
+    <>
+      {/* 에러 모달 컴포넌트 */}
+      <ErrorModal error={error} onClear={clearError} />
+
+      {/* 지도 모달 컴포넌트 */}
+      <Modal
+        show={showMap}
+        onCancel={closeMapHandler}
+        header={props.address}
+        contentClass="place-item__modal-content"
+        footerClass="place-item__modal-actions"
+        footer={<Button onClick={closeMapHandler}>CLOSE</Button>}
+      >
+        <div className="map-container">
+          <h2>THE MAP</h2>
+        </div>
+      </Modal>
+
+      {/* 삭제 확인 모달 컴포넌트 */}
+      <Modal
+        show={showConfirmModal}
+        onCancel={cancelDeleteHandler}
+        header="Are you sure?"
+        footerClass="place-item__modal-actions"
+        footer={
+          <>
+            <Button inverse onClick={cancelDeleteHandler}>
+              CANCEL
+            </Button>
+            <Button danger onClick={confirmDeleteHandler}>
+              DELETE
+            </Button>
+          </>
+        }
+      >
+        <p>정말 삭제 하시겠습니까?</p>
+      </Modal>
+
+      {/* 장소 항목 */}
+      <li className="place-item">
+        {/* 카드 컴포넌트 */}
+        <Card className="place-item__content">
+          {isLoading && <LoadingSpinner asOverlay />}
+
+          {/* 장소 이미지 */}
+          <div className="place-item__image">
+            <img src={`http://localhost:5000/${props.image}`} alt={props.title} />
+          </div>
+
+          {/* 장소 정보 */}
+          <div className="place-item__info">
+            <h2>{props.title}</h2>
+            <h3>{props.address}</h3>
+            <p>{props.description}</p>
+          </div>
+
+          {/* 장소 액션 버튼 */}
+          <div className="place-item__actions">
+            {/* 지도 보기 버튼 */}
+            <Button inverse onClick={openMapHandler}>
+              VIEW ON MAP
+            </Button>
+
+            {/* 사용자가 로그인 중일 때만 편집 및 삭제 버튼 표시 */}
+            {auth.userId === props.creatorId && <Button to={`/places/${props.id}`}>EDIT</Button>}
+
+            {auth.userId === props.creatorId && (
+              <Button danger onClick={showDeleteWarningHandler}>
+                DELETE
+              </Button>
+            )}
+          </div>
+        </Card>
+      </li>
+    </>
+  )
+}
+
+export default PlaceItem
+```
+
+```jsx
+    // 삭제 확인 모달에서 DELETE 버튼 클릭 시 처리 핸들러
+    const confirmDeleteHandler = async () => {
+        setShowConfirmModal(false);
+        try {
+            // 서버에 DELETE 요청을 보냄
+            await sendRequest(
+                `http://localhost:5000/api/places/${props.id}`,
+                'DELETE',
+                null,
+                {
+                    Authorization: 'Bearer ' + auth.token
+                }
+            );
+        } catch (error) {
+            // 에러 발생 시 아무 동작 없음 (추가 로직 필요)
+        }
+        // 삭제된 장소의 ID를 onDelete 콜백 함수를 통해 상위 컴포넌트에 전달
+        props.onDelete(props.id);
+    };
+
+삭제 요청에 헤드 부분에
+
+Authorization: 'Bearer ' + auth.token 를 넣어준다
+
+그리고 body 는 값이 없기 때문에 null 로 설정한다
+```
+
+## 장소 업데이트
+
+```jsx
+import React, { useEffect, useState, useContext } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+
+import Input from '../../shared/components/FormElements/Input'
+import Button from '../../shared/components/FormElements/Button'
+import Card from '../../shared/components/UIElements/Card'
+import { VALIDATOR_REQUIRE, VALIDATOR_MINLENGTH } from '../../shared/util/validators'
+import { useForm } from '../../shared/hooks/form-hook'
+import { useHttpClient } from '../../shared/hooks/http-hook'
+import { AuthContext } from '../../shared/context/auth-context'
+import './PlaceForm.css'
+import LoadingSpinner from '../../shared/components/UIElements/LoadingSpinner'
+import ErrorModal from '../../shared/components/UIElements/ErrorModal'
+
+const UpdatePlace = () => {
+  // useNavigate 훅을 사용하여 페이지 간 이동을 담당하는 navigate 함수 호출
+  const navigate = useNavigate()
+
+  // AuthContext에서 사용자 정보를 가져옴
+  const auth = useContext(AuthContext)
+
+  // useHttpClient 훅을 통해 로딩 상태 및 에러 처리에 관련된 함수들을 가져옴
+  const { isLoading, error, sendRequest, clearError } = useHttpClient()
+
+  // 로드된 장소 데이터를 저장하는 state
+  const [loadedPlaces, setLoadedPlaces] = useState()
+
+  // URL 파라미터에서 placeId 추출
+  const placeId = useParams().placeId
+
+  // useForm 훅을 사용하여 양식 상태 및 관련 함수 초기화
+  const [formState, inputHandler, setFormData] = useForm(
+    {
+      title: {
+        value: '',
+        isValid: false,
+      },
+      description: {
+        value: '',
+        isValid: false,
+      },
+    },
+    false
+  )
+
+  // useEffect를 사용하여 페이지 로딩 시 특정 장소의 데이터를 가져오는 비동기 함수 호출
+  useEffect(() => {
+    const fetchPlaces = async () => {
+      try {
+        // sendRequest 함수를 사용하여 특정 장소의 데이터 가져오기
+        const responseData = await sendRequest(`http://localhost:5000/api/places/${placeId}`)
+
+        // 가져온 데이터로 loadedPlaces state 업데이트
+        setLoadedPlaces(responseData.places)
+
+        // 가져온 데이터를 사용하여 폼 데이터 업데이트
+        setFormData(
+          {
+            title: {
+              value: responseData.places.title,
+              isValid: true,
+            },
+            description: {
+              value: responseData.places.description,
+              isValid: true,
+            },
+          },
+          true
+        )
+      } catch (error) {
+        // 오류 발생 시 처리
+      }
+    }
+
+    // 페이지 로딩 시 fetchPlaces 함수 호출
+    fetchPlaces()
+  }, [sendRequest, placeId, setFormData])
+
+  // 장소 업데이트를 위한 submit 핸들러
+  const placeUpdateSubmitHandler = async (event) => {
+    event.preventDefault()
+    try {
+      // sendRequest 함수를 사용하여 장소 업데이트 요청 보내기
+      await sendRequest(
+        `http://localhost:5000/api/places/${placeId}`,
+        'PATCH',
+        JSON.stringify({
+          title: formState.inputs.title.value,
+          description: formState.inputs.description.value,
+        }),
+        {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + auth.token,
+        }
+      )
+
+      // 업데이트 성공 시 사용자를 해당 사용자의 장소 개요 페이지로 리디렉션
+      navigate('/' + auth.userId + '/places')
+    } catch (error) {
+      // 오류 발생 시 처리
+    }
+  }
+
+  // 로딩 중일 때 LoadingSpinner 출력
+  if (isLoading) {
+    return (
+      <div className="center">
+        <LoadingSpinner />
+      </div>
+    )
+  }
+
+  // 로드된 장소가 없고 오류가 없을 때 Card 컴포넌트를 사용한 메시지 출력
+  if (!loadedPlaces && !error) {
+    return (
+      <div className="center">
+        <Card>
+          <h2>Could not find place!</h2>
+        </Card>
+      </div>
+    )
+  }
+
+  // 오류가 있을 때 ErrorModal 출력
+  return (
+    <>
+      <ErrorModal error={error} onClear={clearError} />
+      {/* 로딩 중이 아니고 로드된 장소가 있을 때 양식 렌더링 */}
+      {!isLoading && loadedPlaces && (
+        <form className="place-form" onSubmit={placeUpdateSubmitHandler}>
+          {/* Input 컴포넌트를 사용하여 제목 입력란 렌더링 */}
+          <Input
+            id="title"
+            element="input"
+            type="text"
+            label="Title"
+            validators={[VALIDATOR_REQUIRE()]}
+            errorText="Please enter a valid title."
+            onInput={inputHandler}
+            initialValue={loadedPlaces.title}
+            initialValid={true}
+          />
+          {/* Input 컴포넌트를 사용하여 설명 입력란 렌더링 */}
+          <Input
+            id="description"
+            element="textarea"
+            label="Description"
+            validators={[VALIDATOR_MINLENGTH(5)]}
+            errorText="Please enter a valid description (min. 5 characters)."
+            onInput={inputHandler}
+            initialValue={loadedPlaces.description}
+            initialValid={true}
+          />
+          {/* 장소 업데이트 버튼 */}
+          <Button type="submit" disabled={!formState.isValid}>
+            UPDATE PLACE
+          </Button>
+        </form>
+      )}
+    </>
+  )
+}
+
+export default UpdatePlace
+```
+
+```jsx
+  // 장소 업데이트를 위한 submit 핸들러
+  const placeUpdateSubmitHandler = async event => {
+    event.preventDefault();
+    try {
+      // sendRequest 함수를 사용하여 장소 업데이트 요청 보내기
+      await sendRequest(
+        `http://localhost:5000/api/places/${placeId}`,
+        'PATCH',
+        JSON.stringify({
+          title: formState.inputs.title.value,
+          description: formState.inputs.description.value
+        }),
+        {
+          'Content-Type': 'application/json',
+          Authorization : 'Bearer ' +  auth.token
+        }
+      );
+
+마찬가지로 헤더 부분에  Authorization : 'Bearer ' +  auth.token 를 넣어준다
+```
+
+## **헤더(Header)란 무엇인가요?**
+
+```jsx
+헤더는 컴퓨터 과학 및 웹 개발에서 중요한 개념 중 하나로,
+
+데이터의 시작 부분에 위치하는 정보를 포함하는 부분을 가리킨다.
+
+특히, HTTP 헤더는 웹 브라우저와 웹 서버 간에 이루어지는 통신에서 메타데이터 및 추가 정보를 전송하기 위해 사용된다.
+```
+
+```jsx
+HTTP 헤더의 주요 역할:
+
+통신 제어:
+
+헤더는 클라이언트와 서버 간의 통신 방식 및 프로토콜을 제어한다.
+
+예를 들어, Content-Type 헤더는 전송되는 데이터의 유형을 지정하며, Content-Length 헤더는 전송되는 데이터의 크기를 나타낸다.
+
+캐싱 및 유효성 검사:
+
+Cache-Control 및 ETag 헤더는 캐싱과 관련된 정보를 전달한다.
+
+클라이언트는 이 정보를 기반으로 캐시를 활용하거나 다시 검색한다.
+
+인증 및 권한 부여:
+
+Authorization 헤더는 클라이언트의 인증 정보를 전송하고,
+
+서버는 이를 확인하여 접근 권한을 결정한다.
+
+사용자 에이전트 정보: User-Agent 헤더는 클라이언트의 브라우저나 애플리케이션 정보를 전송한다.
+
+이를 통해 서버는 적절한 콘텐츠를 제공하거나 최적화된 경험을 제공할 수 있다.
+
+리다이렉션 및 위치 지정: Location 헤더는 리다이렉션 시 새로운 위치를 알려주며,
+
+클라이언트는 이를 통해 다시 지정된 위치로 이동한다.
+```
+
+```jsx
+HTTP/1.1 200 OK
+Content-Type: text/html; charset=UTF-8
+Content-Length: 123
+Date: Wed, 02 Feb 2024 12:34:56 GMT
+Server: Apache
+
+위 예시에서 Content-Type, Content-Length, Date, Server 등이 헤더의 일부로,
+
+각각 데이터의 유형, 크기, 전송 날짜, 사용된 서버 등의 정보를 제공한다.
+```
+
+# 권한 부여(Authorization) 기능 추가하기 ( 장소 업데이트 )
+
+```jsx
+현재 문제는 서버 부분에서
+
+사용자를 인증하는 부분이 없다는 것이다
+
+이러면 악의적으로 프론트 코드를 수정해서 남의 글을 삭제하거나 업데이트 하는것이 가능해진다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381325/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/_/Untitled_2.png)
+
+```jsx
+postman 으로 로그인을 한 뒤
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381326/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/_/Untitled_3.png)
+
+```jsx
+반환 받은 값으로 헤더를 추가해주고
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381326/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/_/Untitled_4.png)
+
+```jsx
+권한이 없는 다른 아이디로 남의 글에 수정을 요청하면 이렇게 거부 당해야 한다
+```
+
+```jsx
+// places-controllers.js
+
+const { v4: uuid } = require('uuid')
+const { validationResult } = require('express-validator')
+const fs = require('fs')
+
+// HttpError 모델을 불러와 사용합니다.
+const HttpError = require('../models/http-error')
+const getCoordsForAddress = require('../util/location')
+const Place = require('../models/places')
+const User = require('../models/user')
+const { default: mongoose } = require('mongoose')
+
+// 특정 장소 ID에 대한 정보를 반환하는 함수입니다.
+const getPlacesById = async (req, res, next) => {
+  // 요청 파라미터에서 장소 ID를 추출합니다.
+  const placeId = req.params.pid
+
+  let places
+
+  try {
+    places = await Place.findById(placeId)
+  } catch (err) {
+    const error = new HttpError('오류발생 장소를 찾지 못했습니다', 500)
+    return next(error)
+  }
+
+  // 만약 장소를 찾지 못했다면 HttpError를 발생시키지 않고, next 함수를 통해 에러를 전달합니다.
+  if (!places) {
+    const error = new HttpError('유효한 장소 아이디를 찾지 못했습니다', 404)
+    return next(error)
+  }
+
+  // 찾은 장소를 JSON 형태로 응답합니다.
+  res.json({ places: places.toObject({ getters: true }) })
+}
+
+// 특정 사용자 ID에 대한 장소 정보를 반환하는 함수입니다.
+const getPlaceByUserId = async (req, res, next) => {
+  // 요청 파라미터에서 사용자 ID를 추출합니다.
+  const userId = req.params.uid
+
+  // let place;
+  let userWithPlaces
+  try {
+    userWithPlaces = await User.findById(userId).populate('places')
+  } catch (err) {
+    const error = new HttpError('장소를 불러오는데 실패했습니다', 500)
+    return next(error)
+  }
+
+  // 만약 사용자를 찾지 못했다면 HttpError를 발생시킵니다.
+  if (!userWithPlaces) {
+    return next(new HttpError('유저를 찾을 수 없습니다', 404))
+  }
+
+  // 찾은 장소를 JSON 형태로 응답합니다.
+  res.json({ places: userWithPlaces.places.map((place) => place.toObject({ getters: true })) })
+}
+
+const createPlace = async (req, res, next) => {
+  // express-validator를 사용하여 요청의 유효성을 검사합니다.
+  const errors = validationResult(req)
+  if (!errors.isEmpty()) {
+    console.log(errors)
+    // 에러가 배열로 나와서 첫 번째 인덱스의 경로를 사용하여 클라이언트에게 에러를 전달합니다.
+    next(new HttpError(`${errors.errors[0].path}는 비어있을 수 없습니다`, 422))
+  }
+
+  // 요청에서 필요한 데이터를 추출합니다.
+  const { title, description, address, creator } = req.body
+
+  let coordinates
+
+  try {
+    // 주소를 좌표로 변환하는 유틸리티 함수를 사용하여 좌표를 얻습니다.
+    coordinates = await getCoordsForAddress(address)
+  } catch (error) {
+    // 좌표 얻기가 실패하면 에러를 핸들링하여 다음 미들웨어로 전달합니다.
+    return next(error)
+  }
+
+  // 새로운 장소 객체를 생성합니다.
+  const createPlace = new Place({
+    title,
+    description,
+    address,
+    location: coordinates, // 얻은 좌표 정보를 사용하여 새로운 장소의 위치를 설정합니다.
+    image: req.file.path,
+    creator,
+  })
+
+  let user
+  try {
+    // 생성자(creator) ID를 사용하여 해당 사용자를 데이터베이스에서 찾습니다.
+    user = await User.findById(creator)
+  } catch (err) {
+    const error = new HttpError('새로운 장소 추가에 실패 했습니다', 500)
+    return next(error)
+  }
+
+  // 찾은 사용자가 없을 경우 에러를 생성하여 핸들링합니다.
+  if (!user) {
+    const error = new HttpError('제공된 ID의 유저를 찾을 수 없습니다', 404)
+    return next(error)
+  }
+
+  try {
+    // Mongoose 세션을 시작하고 트랜잭션을 시작합니다.
+    const sess = await mongoose.startSession()
+    sess.startTransaction()
+
+    // 새로운 장소를 데이터베이스에 저장합니다.
+    await createPlace.save({ session: sess })
+
+    // 사용자 문서에 새로운 장소의 ID를 추가합니다.
+    user.places.push(createPlace)
+    await user.save({ session: sess })
+
+    // 트랜잭션을 커밋합니다.
+    await sess.commitTransaction()
+  } catch (err) {
+    console.log(err)
+    const error = new HttpError('새 장소 추가 실패', 500)
+    // 저장 중에 에러가 발생하면 500 상태 코드와 함께 에러를 생성합니다.
+    return next(error)
+  }
+
+  // 클라이언트에게 성공적인 응답을 전송합니다.
+  res.status(201).json({ place: createPlace })
+}
+
+const updatePlaceById = async (req, res, next) => {
+  const errors = validationResult(req)
+  if (!errors.isEmpty()) {
+    console.log(errors)
+    throw new HttpError(`${errors.errors[0].path}는 비어있을 수 없습니다`, 422)
+  }
+  // 요청에서 필요한 데이터를 추출합니다.
+  const { title, description } = req.body
+  const placeId = req.params.pid
+
+  let place
+  try {
+    place = await Place.findById(placeId)
+  } catch (err) {
+    const error = new HttpError('업데이트 실패', 500)
+    return next(error)
+  }
+
+  if (place.creator.toString() !== req.userData.userId) {
+    const error = new HttpError('장소를 수정할 권한이 없습니다.', 401)
+    return next(error)
+  }
+
+  place.title = title
+  place.description = description
+
+  try {
+    await place.save()
+  } catch (err) {
+    const error = new HttpError('문제가 발생하였습니다 업데이트 할 수 없습니다', 500)
+    return next(error)
+  }
+
+  // 클라이언트에게 업데이트된 장소 정보를 응답합니다.
+  res.status(200).json({ place: place })
+}
+
+const deletePlaceById = async (req, res, next) => {
+  // 요청 파라미터에서 장소의 ID를 가져옵니다.
+  const placeId = req.params.pid
+  let place
+
+  // 장소를 찾아서 해당 ID로 검색한 결과를 가져옵니다.
+  try {
+    place = await Place.findById(placeId).populate('creator')
+  } catch (err) {
+    // 에러가 발생하면 500 상태 코드와 함께 에러 메시지를 반환합니다.
+    const error = new HttpError('문제발생 삭제에 실패했습니다', 500)
+    return next(error)
+  }
+
+  // 검색된 장소가 없으면 404 상태 코드와 함께 에러 메시지를 반환합니다.
+  if (!place) {
+    const error = new HttpError('장소 id 를 찾지 못하였습니다', 404)
+    return next(error)
+  }
+
+  // 이미지 주소 가져오기 (req.file.path 로 이미지 주소 들어가 있음)
+  const imagePath = place.image
+
+  // MongoDB 세션을 사용하여 트랜잭션을 시작합니다.
+  try {
+    const sess = await mongoose.startSession()
+    sess.startTransaction()
+
+    // 검색된 장소를 삭제합니다.
+    await place.deleteOne({ session: sess })
+
+    // 해당 장소를 생성한 사용자의 데이터에서 해당 장소를 제거합니다.
+    place.creator.places.pull(place)
+
+    // 수정된 사용자 데이터를 저장합니다.
+    await place.creator.save({ session: sess })
+
+    // 트랜잭션을 커밋하여 변경 사항을 영구적으로 반영합니다.
+    await sess.commitTransaction()
+  } catch (err) {
+    // 트랜잭션 도중 에러가 발생하면 500 상태 코드와 함께 에러 메시지를 반환합니다.
+    const error = new HttpError('삭제에 실패했습니다', 500)
+    return next(error)
+  }
+
+  fs.unlink(imagePath, (err) => {
+    console.log(err)
+  })
+
+  // 모든 작업이 성공적으로 완료되면 200 상태 코드와 함께 성공 메시지를 반환합니다.
+  res.status(200).json({ message: '삭제성공' })
+}
+
+// 외부에서 사용할 수 있도록 함수를 내보냅니다.
+exports.getPlacesById = getPlacesById
+exports.getPlaceByUserId = getPlaceByUserId
+exports.createPlace = createPlace
+exports.updatePlaceById = updatePlaceById
+exports.deletePlaceById = deletePlaceById
+```
+
+```jsx
+
+    if(place.creator.toString()!== req.userData.userId) {
+        const error = new HttpError("장소를 수정할 권한이 없습니다.", 401)
+        return next(error);
+    }
+
+place.creator.toString():
+
+place 객체의 creator 속성은 MongoDB에서 ObjectId 형태로 저장되어 있다.
+
+이를 toString() 메서드를 사용하여 문자열로 변환한다. 이렇게 하면 사용자 ID를 문자열로 얻을 수 있다.
+
+req.userData.userId:
+
+현재 로그인한 사용자의 ID가 저장된 userData 객체에서 userId를 가져온다.
+
+if(place.creator.toString() !== req.userData.userId):
+
+위에서 얻은 두 사용자 ID를 비교한다. 만약 둘이 다르다면,
+
+현재 로그인한 사용자가 해당 장소의 생성자가 아니므로 권한이 없다는 의미이다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381327/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/_/Untitled_5.png)
+
+# 장소 삭제 권한 부여
+
+```jsx
+const { v4: uuid } = require('uuid')
+const { validationResult } = require('express-validator')
+const fs = require('fs')
+
+// HttpError 모델을 불러와 사용합니다.
+const HttpError = require('../models/http-error')
+const getCoordsForAddress = require('../util/location')
+const Place = require('../models/places')
+const User = require('../models/user')
+const { default: mongoose } = require('mongoose')
+
+// 특정 장소 ID에 대한 정보를 반환하는 함수입니다.
+const getPlacesById = async (req, res, next) => {
+  // 요청 파라미터에서 장소 ID를 추출합니다.
+  const placeId = req.params.pid
+
+  let places
+
+  try {
+    places = await Place.findById(placeId)
+  } catch (err) {
+    const error = new HttpError('오류발생 장소를 찾지 못했습니다', 500)
+    return next(error)
+  }
+
+  // 만약 장소를 찾지 못했다면 HttpError를 발생시키지 않고, next 함수를 통해 에러를 전달합니다.
+  if (!places) {
+    const error = new HttpError('유효한 장소 아이디를 찾지 못했습니다', 404)
+    return next(error)
+  }
+
+  // 찾은 장소를 JSON 형태로 응답합니다.
+  res.json({ places: places.toObject({ getters: true }) })
+}
+
+// 특정 사용자 ID에 대한 장소 정보를 반환하는 함수입니다.
+const getPlaceByUserId = async (req, res, next) => {
+  // 요청 파라미터에서 사용자 ID를 추출합니다.
+  const userId = req.params.uid
+
+  // let place;
+  let userWithPlaces
+  try {
+    userWithPlaces = await User.findById(userId).populate('places')
+  } catch (err) {
+    const error = new HttpError('장소를 불러오는데 실패했습니다', 500)
+    return next(error)
+  }
+
+  // 만약 사용자를 찾지 못했다면 HttpError를 발생시킵니다.
+  if (!userWithPlaces) {
+    return next(new HttpError('유저를 찾을 수 없습니다', 404))
+  }
+
+  // 찾은 장소를 JSON 형태로 응답합니다.
+  res.json({ places: userWithPlaces.places.map((place) => place.toObject({ getters: true })) })
+}
+
+const createPlace = async (req, res, next) => {
+  // express-validator를 사용하여 요청의 유효성을 검사합니다.
+  const errors = validationResult(req)
+  if (!errors.isEmpty()) {
+    console.log(errors)
+    // 에러가 배열로 나와서 첫 번째 인덱스의 경로를 사용하여 클라이언트에게 에러를 전달합니다.
+    next(new HttpError(`${errors.errors[0].path}는 비어있을 수 없습니다`, 422))
+  }
+
+  // 요청에서 필요한 데이터를 추출합니다.
+  const { title, description, address, creator } = req.body
+
+  let coordinates
+
+  try {
+    // 주소를 좌표로 변환하는 유틸리티 함수를 사용하여 좌표를 얻습니다.
+    coordinates = await getCoordsForAddress(address)
+  } catch (error) {
+    // 좌표 얻기가 실패하면 에러를 핸들링하여 다음 미들웨어로 전달합니다.
+    return next(error)
+  }
+
+  // 새로운 장소 객체를 생성합니다.
+  const createPlace = new Place({
+    title,
+    description,
+    address,
+    location: coordinates, // 얻은 좌표 정보를 사용하여 새로운 장소의 위치를 설정합니다.
+    image: req.file.path,
+    creator,
+  })
+
+  let user
+  try {
+    // 생성자(creator) ID를 사용하여 해당 사용자를 데이터베이스에서 찾습니다.
+    user = await User.findById(creator)
+  } catch (err) {
+    const error = new HttpError('새로운 장소 추가에 실패 했습니다', 500)
+    return next(error)
+  }
+
+  // 찾은 사용자가 없을 경우 에러를 생성하여 핸들링합니다.
+  if (!user) {
+    const error = new HttpError('제공된 ID의 유저를 찾을 수 없습니다', 404)
+    return next(error)
+  }
+
+  try {
+    // Mongoose 세션을 시작하고 트랜잭션을 시작합니다.
+    const sess = await mongoose.startSession()
+    sess.startTransaction()
+
+    // 새로운 장소를 데이터베이스에 저장합니다.
+    await createPlace.save({ session: sess })
+
+    // 사용자 문서에 새로운 장소의 ID를 추가합니다.
+    user.places.push(createPlace)
+    await user.save({ session: sess })
+
+    // 트랜잭션을 커밋합니다.
+    await sess.commitTransaction()
+  } catch (err) {
+    console.log(err)
+    const error = new HttpError('새 장소 추가 실패', 500)
+    // 저장 중에 에러가 발생하면 500 상태 코드와 함께 에러를 생성합니다.
+    return next(error)
+  }
+
+  // 클라이언트에게 성공적인 응답을 전송합니다.
+  res.status(201).json({ place: createPlace })
+}
+
+const updatePlaceById = async (req, res, next) => {
+  const errors = validationResult(req)
+  if (!errors.isEmpty()) {
+    console.log(errors)
+    throw new HttpError(`${errors.errors[0].path}는 비어있을 수 없습니다`, 422)
+  }
+  // 요청에서 필요한 데이터를 추출합니다.
+  const { title, description } = req.body
+  const placeId = req.params.pid
+
+  let place
+  try {
+    place = await Place.findById(placeId)
+  } catch (err) {
+    const error = new HttpError('업데이트 실패', 500)
+    return next(error)
+  }
+
+  if (place.creator.toString() !== req.userData.userId) {
+    const error = new HttpError('장소를 수정할 권한이 없습니다.', 401)
+    return next(error)
+  }
+
+  place.title = title
+  place.description = description
+
+  try {
+    await place.save()
+  } catch (err) {
+    const error = new HttpError('문제가 발생하였습니다 업데이트 할 수 없습니다', 500)
+    return next(error)
+  }
+
+  // 클라이언트에게 업데이트된 장소 정보를 응답합니다.
+  res.status(200).json({ place: place })
+}
+
+const deletePlaceById = async (req, res, next) => {
+  // 요청 파라미터에서 장소의 ID를 가져옵니다.
+  const placeId = req.params.pid
+  let place
+
+  // 장소를 찾아서 해당 ID로 검색한 결과를 가져옵니다.
+  try {
+    place = await Place.findById(placeId).populate('creator')
+  } catch (err) {
+    // 에러가 발생하면 500 상태 코드와 함께 에러 메시지를 반환합니다.
+    const error = new HttpError('문제발생 삭제에 실패했습니다', 500)
+    return next(error)
+  }
+
+  // 검색된 장소가 없으면 404 상태 코드와 함께 에러 메시지를 반환합니다.
+  if (!place) {
+    const error = new HttpError('장소 id 를 찾지 못하였습니다', 404)
+    return next(error)
+  }
+
+  if (place.creator.id !== req.userData.userId) {
+    const error = new HttpError('장소를 삭제할 권한이 없습니다.', 401)
+    return next(error)
+  }
+
+  // 이미지 주소 가져오기 (req.file.path 로 이미지 주소 들어가 있음)
+  const imagePath = place.image
+
+  // MongoDB 세션을 사용하여 트랜잭션을 시작합니다.
+  try {
+    const sess = await mongoose.startSession()
+    sess.startTransaction()
+
+    // 검색된 장소를 삭제합니다.
+    await place.deleteOne({ session: sess })
+
+    // 해당 장소를 생성한 사용자의 데이터에서 해당 장소를 제거합니다.
+    place.creator.places.pull(place)
+
+    // 수정된 사용자 데이터를 저장합니다.
+    await place.creator.save({ session: sess })
+
+    // 트랜잭션을 커밋하여 변경 사항을 영구적으로 반영합니다.
+    await sess.commitTransaction()
+  } catch (err) {
+    // 트랜잭션 도중 에러가 발생하면 500 상태 코드와 함께 에러 메시지를 반환합니다.
+    const error = new HttpError('삭제에 실패했습니다', 500)
+    return next(error)
+  }
+
+  fs.unlink(imagePath, (err) => {
+    console.log(err)
+  })
+
+  // 모든 작업이 성공적으로 완료되면 200 상태 코드와 함께 성공 메시지를 반환합니다.
+  res.status(200).json({ message: '삭제성공' })
+}
+
+// 외부에서 사용할 수 있도록 함수를 내보냅니다.
+exports.getPlacesById = getPlacesById
+exports.getPlaceByUserId = getPlaceByUserId
+exports.createPlace = createPlace
+exports.updatePlaceById = updatePlaceById
+exports.deletePlaceById = deletePlaceById
+```
+
+```jsx
+
+삭제함수에 아래 내용을 추가해준다
+
+    if(place.creator.id !== req.userData.userId) {
+        const error = new HttpError("장소를 삭제할 권한이 없습니다.", 401)
+        return next(error);
+    }
+
+place.creator.id 부분은 Mongoose에서 관리되는 MongoDB 문서(Document)의 creator 필드(속성)에서 해당 문서의 생성자(User)의 ID를 의미
+```
+
+# React 애플리케이션에서 토큰 저장 및 새로고침 유지
+
+```jsx
+// App.js
+
+import React, { useState, useCallback, useEffect } from 'react'
+import './App.css'
+import { Route, Routes, Navigate } from 'react-router-dom'
+import Users from './user/pages/Users'
+import NewPlace from './places/pages/NewPlace'
+import MainNavigation from './shared/components/Navigation/MainNavigation'
+import UserPlaces from './places/pages/UserPlaces'
+import UpdatePlace from './places/pages/UpdatePlace'
+import Auth from './user/pages/Auth'
+import { AuthContext } from './shared/context/auth-context'
+
+const App = () => {
+  const [token, setToken] = useState(false)
+  const [userId, setUserId] = useState(null)
+
+  // useCallback을 사용한 로그인 함수
+  const login = useCallback((userId, token) => {
+    setToken(token)
+    setUserId(userId)
+    localStorage.setItem('userData', JSON.stringify({ userId: userId, token: token }))
+  }, [])
+
+  // useCallback을 사용한 로그아웃 함수
+  const logout = useCallback(() => {
+    setToken(null)
+    setUserId(null)
+  }, [])
+
+  // 라우팅을 위한 JSX 설정
+  let routes
+  if (token) {
+    // 로그인한 경우의 라우트 설정
+    routes = (
+      <>
+        <Route path="/" element={<Users />} />
+        <Route path="/:userId/places" element={<UserPlaces />} />
+        <Route path="/places/new" element={<NewPlace />} />
+        <Route path="/places/:placeId" element={<UpdatePlace />} />
+        <Route path="*" element={<Navigate replace to="/" />} />
+      </>
+    )
+  } else {
+    // 로그인하지 않은 경우의 라우트 설정
+    routes = (
+      <>
+        <Route path="/" element={<Users />} />
+        <Route path="/:userId/places" element={<UserPlaces />} />
+        <Route path="/auth" element={<Auth />} />
+        <Route path="*" element={<Navigate replace to="/auth" />} />
+      </>
+    )
+  }
+
+  // AuthContext.Provider를 사용하여 전역적으로 사용되는 사용자 정보 관리
+  return (
+    <AuthContext.Provider
+      value={{
+        isLoggedIn: !!token,
+        token: token,
+        userId: userId,
+        login: login,
+        logout: logout,
+      }}
+    >
+      <>
+        {/* 상단 네비게이션 바 */}
+        <MainNavigation />
+
+        {/* 메인 컨텐츠 영역 */}
+        <main>
+          {/* 라우트 설정 */}
+          <Routes>{routes}</Routes>
+        </main>
+      </>
+    </AuthContext.Provider>
+  )
+}
+
+export default App
+```
+
+```jsx
+
+로그인 함수에 localStorage.setItem('userData',JSON.stringify({userId : userId, token : token})) 를 추가해서
+
+로그인 시 토큰을 로컬스토리지에 저장하게 해준다
+
+  const login = useCallback((userId,token) => {
+    setToken(token);
+    setUserId(userId);
+    localStorage.setItem('userData',JSON.stringify({userId : userId, token : token}))
+  }, []);
+
+문제 식별:
+
+로그인 후 페이지를 새로 고치면 로그아웃되는 문제를 확인.
+
+문제 원인:
+
+새로 고침으로 인해 React 애플리케이션이 재시작되며, 상태가 메모리에만 저장되기 때문에 토큰이 사라지는 것이 원인.
+
+토큰 저장 위치 선정:
+
+Local Storage를 사용하여 토큰을 브라우저에 저장하기로 결정.
+
+Local Storage는 쉬운 JavaScript 액세스와 데이터 보존이 가능하며, 앱이 다시 시작되어도 유지됨.
+
+Local Storage 활용:
+
+토큰 및 사용자 데이터를 JSON 형식으로 Local Storage에 저장. 이를 통해 새로 고쳐도 유지되는 설정을 구현.
+
+토큰 및 사용자 데이터 저장:
+
+	* 로그인 후 데이터 저장 시점:
+
+	사용자가 로그인에 성공하면, 서버에서 받은 토큰과 사용자 관련 데이터(예: userId)를 로컬 스토리지에 저장해야 한다.
+
+
+	* Local Storage의 userData 엔트리:
+
+	설명: Local Storage는 브라우저에 데이터를 영구적으로 저장할 수 있는 메커니즘 중 하나이다.
+
+	이름 선택: userData로 명명한 것은 해당 데이터가 사용자와 관련이 있고, 토큰 및 사용자 데이터를 함께 저장하기 위함이다.
+
+
+	* 데이터 저장 방법:
+
+	localStorage.setItem('userData', JSON.stringify({ token, userId })) 코드를 사용하여 데이터를 저장한다.
+
+	localStorage.setItem 메서드는 로컬 스토리지에 데이터를 설정하는 메서드이다.
+
+	'userData'는 저장할 데이터의 키이다.
+
+
+	* JSON.stringify 활용:
+
+	목적: 로컬 스토리지에는 텍스트 데이터만 저장할 수 있다.
+
+	해결책: JSON.stringify를 사용하여 JavaScript 객체를 JSON 문자열로 변환한다.
+
+	예시: { token, userId } 객체가 JSON 형식의 문자열로 변환되어 저장된다.
+
+
+	* 저장된 데이터 예시:
+
+	만약 토큰이 'abc123'이고 userId가 'user123'이라면, 저장된 데이터는 다음과 같을 것이다: { "token": "abc123", "userId": "user123" }
+
+
+	* 새로 고침 시 데이터 유지:
+
+	이렇게 저장된 데이터는 페이지를 새로 고침해도 유지된다. 따라서 애플리케이션을 다시 시작할 때마다 로그인 상태가 유지된다.
+
+
+	* 보안 주의사항:
+
+	민감한 정보(예: 비밀번호)는 로컬 스토리지에 저장하지 않아야 한다.
+
+	토큰은 세션 관리 용도로 사용되므로 비밀번호와 같은 민감한 정보를 저장하지 않는 것이 안전하다.
+
+보안 고려 사항: 크로스 사이트 스크립팅에 취약한 문제는 React의 내장된 안전장치로 충분하게 대응 가능하며,
+
+토큰이나 사용자 정보를 도용하는 것은 해당 앱의 기본적인 보안 문제.
+
+( React 애플리케이션은 XSS에 취약할 수 있지만, React는 크로스 사이트 스크립팅 공격에 대응하기 위한 안전장치를 갖추고 있다 )
+
+기타 저장소 옵션: Cookies는 사용이 복잡하며, IndexedDB는 데이터베이스로 비교적 복잡하며 토큰 저장에는 적합하지 않음.
+```
+
+```jsx
+import React, { useState, useCallback, useEffect } from 'react'
+import './App.css'
+import { Route, Routes, Navigate } from 'react-router-dom'
+import Users from './user/pages/Users'
+import NewPlace from './places/pages/NewPlace'
+import MainNavigation from './shared/components/Navigation/MainNavigation'
+import UserPlaces from './places/pages/UserPlaces'
+import UpdatePlace from './places/pages/UpdatePlace'
+import Auth from './user/pages/Auth'
+import { AuthContext } from './shared/context/auth-context'
+
+const App = () => {
+  const [token, setToken] = useState(false)
+  const [userId, setUserId] = useState(null)
+
+  // useCallback을 사용한 로그인 함수
+  const login = useCallback((userId, token) => {
+    setToken(token)
+    setUserId(userId)
+    localStorage.setItem('userData', JSON.stringify({ userId: userId, token: token }))
+  }, [])
+
+  // useCallback을 사용한 로그아웃 함수
+  const logout = useCallback(() => {
+    setToken(null)
+    setUserId(null)
+    localStorage.removeItem('userData')
+  }, [])
+
+  useEffect(() => {
+    const storeData = JSON.parse(localStorage.getItem('userData'))
+    if (storeData && storeData.token) {
+      login(storeData.userId, storeData.token)
+    }
+  }, [login])
+
+  // 라우팅을 위한 JSX 설정
+  let routes
+  if (token) {
+    // 로그인한 경우의 라우트 설정
+    routes = (
+      <>
+        <Route path="/" element={<Users />} />
+        <Route path="/:userId/places" element={<UserPlaces />} />
+        <Route path="/places/new" element={<NewPlace />} />
+        <Route path="/places/:placeId" element={<UpdatePlace />} />
+        <Route path="*" element={<Navigate replace to="/" />} />
+      </>
+    )
+  } else {
+    // 로그인하지 않은 경우의 라우트 설정
+    routes = (
+      <>
+        <Route path="/" element={<Users />} />
+        <Route path="/:userId/places" element={<UserPlaces />} />
+        <Route path="/auth" element={<Auth />} />
+        <Route path="*" element={<Navigate replace to="/auth" />} />
+      </>
+    )
+  }
+
+  // AuthContext.Provider를 사용하여 전역적으로 사용되는 사용자 정보 관리
+  return (
+    <AuthContext.Provider
+      value={{
+        isLoggedIn: !!token,
+        token: token,
+        userId: userId,
+        login: login,
+        logout: logout,
+      }}
+    >
+      <>
+        {/* 상단 네비게이션 바 */}
+        <MainNavigation />
+
+        {/* 메인 컨텐츠 영역 */}
+        <main>
+          {/* 라우트 설정 */}
+          <Routes>{routes}</Routes>
+        </main>
+      </>
+    </AuthContext.Provider>
+  )
+}
+
+export default App
+```
+
+```jsx
+목표 및 컨텍스트 설정:
+
+로컬 스토리지에 저장된 토큰 활용하여 React 앱에서 자동 로그인 구현
+
+App 컴포넌트에서 useEffect를 활용하여 앱 시작 시 로그인 여부 확인
+
+App 컴포넌트 내 useEffect 및 함수 정의:
+
+useEffect를 활용하여 앱 시작 시 실행되는 로직 구현
+
+로컬 스토리지에서 토큰 확인하는 함수 추가, 의존성은 login 로 설정 ( login 함수가 변경될 때만 )
+
+  useEffect(() => {
+    const storeData = JSON.parse(localStorage.getItem('userData'));
+    if (storeData && storeData.token) {
+      login(storeData.userId, storeData.token);
+    }
+  }, [login])
+
+토큰 확인 및 자동 로그인 처리:
+
+useEffect 내부에서 로컬 스토리지에서 토큰 추출
+
+추출한 텍스트를 JSON 객체로 변환하여 userId 및 token 추출
+
+저장된 데이터가 있으면 토큰 확인 후 자동 로그인 처리
+
+로그아웃 기능 추가:
+
+로그아웃 시 로컬 스토리지에서 'userData' 키 제거하여 토큰 삭제
+
+ const logout = useCallback(() => {
+    setToken(null);
+    setUserId(null);
+    localStorage.removeItem('userData');
+  }, []);
+
+* 깜빡임 문제 해결
+
+useEffect() 완료까지 첫 주기에 스플래시 화면을 로딩하면 된다
+
+isCheckingAuth 상태를 useEffect() 내부에서 관리하고 확인 완료를 표시하기 위해 false로 설정하는 거
+
+지금은 로딩이 빨라서 그럴 필요가 없다
+
+* 예제 코드
+
+import React, { useEffect, useState } from 'react';
+
+const SplashScreen = () => {
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    // 앱이 처음 로딩될 때 실행되는 코드
+
+    // 예시: 인증 확인 로직
+    const checkAuthentication = async () => {
+      // 인증 확인이 진행 중임을 나타내는 상태를 true로 설정
+      setIsCheckingAuth(true);
+
+      // 실제 인증 확인 로직 수행 (예: 토큰이나 세션 확인)
+      // ...
+
+      // 인증 확인이 완료되면 상태를 false로 업데이트
+      setIsCheckingAuth(false);
+    };
+
+    // 인증 확인 함수 호출
+    checkAuthentication();
+  }, []); // useEffect의 두 번째 매개변수인 빈 배열은 의존성 없이 한 번만 실행하도록 설정
+
+  // isCheckingAuth가 true인 동안 로딩 중 화면을 표시
+  if (isCheckingAuth) {
+    return <div>Loading...</div>;
+  }
+
+  // 인증 확인이 완료되면 실제 앱 화면을 렌더링
+  return (
+    <div>
+      {/* 여기에 앱의 나머지 컴포넌트들을 추가 */}
+      <p>App content goes here.</p>
+    </div>
+  );
+};
+
+export default SplashScreen;
+```
+
+# 토큰 만료 기한 관리
+
+```jsx
+import React, { useState, useCallback, useEffect } from 'react'
+import './App.css'
+import { Route, Routes, Navigate } from 'react-router-dom'
+import Users from './user/pages/Users'
+import NewPlace from './places/pages/NewPlace'
+import MainNavigation from './shared/components/Navigation/MainNavigation'
+import UserPlaces from './places/pages/UserPlaces'
+import UpdatePlace from './places/pages/UpdatePlace'
+import Auth from './user/pages/Auth'
+import { AuthContext } from './shared/context/auth-context'
+
+const App = () => {
+  // 토큰 및 사용자 ID 상태 관리
+  const [token, setToken] = useState(false)
+  const [userId, setUserId] = useState(null)
+
+  // useCallback을 사용한 로그인 함수
+  const login = useCallback((userId, token, expirationDate) => {
+    setToken(token)
+    setUserId(userId)
+
+    // 만료 날짜 설정 또는 1시간 후로 설정
+    const tokenExpirationDate = expirationDate || new Date(new Date().getTime() + 1000 * 60 * 60)
+
+    // 사용자 데이터를 Local Storage에 저장
+    localStorage.setItem(
+      'userData',
+      JSON.stringify({ userId: userId, token: token, expiration: tokenExpirationDate.toISOString })
+    )
+  }, [])
+
+  // useCallback을 사용한 로그아웃 함수
+  const logout = useCallback(() => {
+    setToken(null)
+    setUserId(null)
+
+    // Local Storage에서 사용자 데이터 삭제
+    localStorage.removeItem('userData')
+  }, [])
+
+  // useEffect를 활용한 자동 로그인 처리
+  useEffect(() => {
+    // Local Storage에서 저장된 사용자 데이터 가져오기
+    const storedData = JSON.parse(localStorage.getItem('userData'))
+
+    // 저장된 데이터가 있고, 토큰이 존재하며, 만료 기간이 지나지 않았을 경우 자동 로그인
+    if (storedData && storedData.token && new Date(storedData.expiration) > new Date()) {
+      login(storedData.userId, storedData.token, new Date(storedData.expiration))
+    }
+  }, [login])
+
+  // 라우팅을 위한 JSX 설정
+  let routes
+  if (token) {
+    // 로그인한 경우의 라우트 설정
+    routes = (
+      <>
+        <Route path="/" element={<Users />} />
+        <Route path="/:userId/places" element={<UserPlaces />} />
+        <Route path="/places/new" element={<NewPlace />} />
+        <Route path="/places/:placeId" element={<UpdatePlace />} />
+        <Route path="*" element={<Navigate replace to="/" />} />
+      </>
+    )
+  } else {
+    // 로그인하지 않은 경우의 라우트 설정
+    routes = (
+      <>
+        <Route path="/" element={<Users />} />
+        <Route path="/:userId/places" element={<UserPlaces />} />
+        <Route path="/auth" element={<Auth />} />
+        <Route path="*" element={<Navigate replace to="/auth" />} />
+      </>
+    )
+  }
+
+  // AuthContext.Provider를 사용하여 전역적으로 사용되는 사용자 정보 관리
+  return (
+    <AuthContext.Provider
+      value={{
+        isLoggedIn: !!token,
+        token: token,
+        userId: userId,
+        login: login,
+        logout: logout,
+      }}
+    >
+      <>
+        {/* 상단 네비게이션 바 */}
+        <MainNavigation />
+
+        {/* 메인 컨텐츠 영역 */}
+        <main>
+          {/* 라우트 설정 */}
+          <Routes>{routes}</Routes>
+        </main>
+      </>
+    </AuthContext.Provider>
+  )
+}
+
+export default App
+```
+
+```jsx
+a. **토큰 만료 시간 설정**
+
+    - `login` 함수 내에서 토큰의 만료 시간을 1시간으로 설정.
+
+		- `tokenExpirationDate` 변수에 현재 시각에 1시간을 더한 시간을 저장.
+
+		- `expiration` 키를 추가하여 `tokenExpirationDate`를 ISO 문자열로 변환하여 저장.
+
+		toISOString() 메서드는 JavaScript의 Date 객체를 ISO 8601 형식의 문자열로 변환한다.
+
+    ISO 8601 형식은 날짜와 시간을 표현하는 국제 표준이며, 날짜와 시간 정보를 안전하게 저장하고 전송할 수 있는 형태로 정의되어 있다.
+
+    간단히 말해, toISOString()을 사용하면 Date 객체의 날짜와 시간 정보를 표준화된 문자열 형식으로 변환할 수 있다
+
+	  ( YYYY-MM-DDTHH:mm:ss.sssZ )
+
+		YYYY: 연도 (4자리)
+		MM: 월 (01부터 12까지)
+		DD: 일 (01부터 31까지)
+		T: 날짜와 시간을 구분하는 문자
+		HH: 시간 (00부터 23까지)
+		mm: 분 (00부터 59까지)
+		ss: 초 (00부터 59까지)
+		sss: 밀리초 (000부터 999까지)
+		Z: Zulu 시간, UTC를 나타냄
+
+  const login = useCallback((userId, token, expirationDate) => {
+    setToken(token);
+    setUserId(userId);
+
+    // 만료 날짜 설정 또는 1시간 후로 설정
+    const tokenExpirationDate = expirationDate || new Date(new Date().getTime() + 1000 * 60 * 60);
+
+    // 사용자 데이터를 Local Storage에 저장
+    localStorage.setItem('userData', JSON.stringify({ userId: userId, token: token, expiration: tokenExpirationDate.toISOString }));
+  }, []);
+
+b. **로직 문제 해결**
+
+    - `useEffect` 내에서 로그인이 자동으로 수행될 때, 토큰이 여전히 유효한지 확인.
+
+		- 저장된 만료 시각이 미래에도 유효하도록 확인.
+
+    - `storedData.expiration`을 가져와서 Date 객체로 변환하여 현재 시각과 비교.
+
+// 자동 로그인이 수행될 때 토큰이 여전히 유효한지 확인하는 useEffect
+useEffect(() => {
+  // Local Storage에서 저장된 사용자 데이터 가져오기
+  const storedData = JSON.parse(localStorage.getItem('userData'));
+
+  // 저장된 데이터가 있고, 토큰이 존재하며, 만료 기간이 지나지 않았을 경우 자동 로그인
+  if (storedData && storedData.token && new Date(storedData.expiration) > new Date()) {
+    login(storedData.userId, storedData.token, new Date(storedData.expiration));
+  }
+}, [login]);
+
+c. **자동 로그인 및 새로운 만료 날짜 생성**
+
+    - `expirationDate`를 추출하여 확인.
+
+    - `storedData.expiration`이 미래인 경우, 토큰이 아직 유효함을 의미.
+
+    - `login()` 호출 시, 만료 타임 스탬프를 세 번째 인수로 전달.
+
+    - 새로운 Date를 만들지 않고 expirationDate를 그대로 유지하고 로컬 스토리지에 저장.
+
+    - 만료 시간이 없어서 새로 생성하는 경우에도 expirationDate 활용.
+
+// 자동 로그인 및 새로운 만료 날짜 생성
+const login = useCallback((userId, token, expirationDate) => {
+  setToken(token);
+  setUserId(userId);
+
+  // 만료 날짜 설정
+  const tokenExpirationDate = expirationDate || new Date(new Date().getTime() + 1000 * 60 * 60);
+
+  // 사용자 데이터를 Local Storage에 저장
+  localStorage.setItem('userData', JSON.stringify({ userId: userId, token: token, expiration: tokenExpirationDate.toISOString }));
+}, []);
+
+// useEffect에서 호출되는 부분
+if (storedData && storedData.token && new Date(storedData.expiration) > new Date()) {
+  login(storedData.userId, storedData.token, new Date(storedData.expiration));
+}
+```
+
+# 자동 로그인 및 자동 로그아웃 ( 토큰이 만료되면 로그아웃)
+
+```jsx
+import React, { useState, useCallback, useEffect } from 'react'
+import './App.css'
+import { Route, Routes, Navigate } from 'react-router-dom'
+import Users from './user/pages/Users'
+import NewPlace from './places/pages/NewPlace'
+import MainNavigation from './shared/components/Navigation/MainNavigation'
+import UserPlaces from './places/pages/UserPlaces'
+import UpdatePlace from './places/pages/UpdatePlace'
+import Auth from './user/pages/Auth'
+import { AuthContext } from './shared/context/auth-context'
+
+let logoutTimer
+
+const App = () => {
+  // 토큰, 사용자 ID, 토큰 만료 시간 상태 관리
+  const [token, setToken] = useState(false)
+  const [tokenExpirationDate, setTokenExpirationDate] = useState()
+  const [userId, setUserId] = useState(null)
+
+  // useCallback을 사용한 로그인 함수
+  const login = useCallback((userId, token, expirationDate) => {
+    setToken(token)
+    setUserId(userId)
+    // 만료 날짜 설정 또는 1시간 후로 설정
+    const tokenExpirationDate = expirationDate || new Date(new Date().getTime() + 1000 * 60 * 60)
+    setTokenExpirationDate(tokenExpirationDate)
+
+    // 사용자 데이터를 Local Storage에 저장
+    localStorage.setItem(
+      'userData',
+      JSON.stringify({ userId: userId, token: token, expiration: tokenExpirationDate.toISOString })
+    )
+  }, [])
+
+  // useCallback을 사용한 로그아웃 함수
+  const logout = useCallback(() => {
+    setToken(null)
+    setUserId(null)
+    setTokenExpirationDate(null) // 기존에 만료 날짜도 초기화 해줘야함
+    // Local Storage에서 사용자 데이터 삭제
+    localStorage.removeItem('userData')
+  }, [])
+
+  // 타이머를 통한 자동 로그아웃 설정
+  useEffect(() => {
+    if (token && tokenExpirationDate) {
+      const remainingTime = tokenExpirationDate.getTime() - new Date().getTime()
+      logoutTimer = setTimeout(logout, remainingTime)
+    } else {
+      clearTimeout(logoutTimer)
+    }
+  }, [token, logout, tokenExpirationDate])
+
+  // useEffect를 활용한 자동 로그인 처리
+  useEffect(() => {
+    // Local Storage에서 저장된 사용자 데이터 가져오기
+    const storedData = JSON.parse(localStorage.getItem('userData'))
+
+    // 저장된 데이터가 있고, 토큰이 존재하며, 만료 기간이 지나지 않았을 경우 자동 로그인
+    if (storedData && storedData.token && new Date(storedData.expiration) > new Date()) {
+      login(storedData.userId, storedData.token, new Date(storedData.expiration))
+    }
+  }, [login])
+
+  // 라우팅을 위한 JSX 설정
+  let routes
+  if (token) {
+    // 로그인한 경우의 라우트 설정
+    routes = (
+      <>
+        <Route path="/" element={<Users />} />
+        <Route path="/:userId/places" element={<UserPlaces />} />
+        <Route path="/places/new" element={<NewPlace />} />
+        <Route path="/places/:placeId" element={<UpdatePlace />} />
+        <Route path="*" element={<Navigate replace to="/" />} />
+      </>
+    )
+  } else {
+    // 로그인하지 않은 경우의 라우트 설정
+    routes = (
+      <>
+        <Route path="/" element={<Users />} />
+        <Route path="/:userId/places" element={<UserPlaces />} />
+        <Route path="/auth" element={<Auth />} />
+        <Route path="*" element={<Navigate replace to="/auth" />} />
+      </>
+    )
+  }
+
+  // AuthContext.Provider를 사용하여 전역적으로 사용되는 사용자 정보 관리
+  return (
+    <AuthContext.Provider
+      value={{
+        isLoggedIn: !!token,
+        token: token,
+        userId: userId,
+        login: login,
+        logout: logout,
+      }}
+    >
+      <>
+        {/* 상단 네비게이션 바 */}
+        <MainNavigation />
+
+        {/* 메인 컨텐츠 영역 */}
+        <main>
+          {/* 라우트 설정 */}
+          <Routes>{routes}</Routes>
+        </main>
+      </>
+    </AuthContext.Provider>
+  )
+}
+
+export default App
+```
+
+```jsx
+let logoutTimer; 변수를 추가해준다
+
+let logoutTimer;는 외부에서 선언된 변수이다.
+
+이 변수는 컴포넌트가 렌더링되거나 컴포넌트의 상태가 변경되는 등의 상황에서 독립적으로 관리되는 데이터이다.
+
+이 변수가 컴포넌트 외부에 선언되었기 때문에 컴포넌트 내에서의 렌더링과 관계없이 전역적으로 유지된다.
+
+따라서 이 변수는 컴포넌트의 라이프사이클과 상태 변화에 영향을 받지 않는다.
+
+이러한 외부 변수의 사용은 컴포넌트의 상태 관리 외부에서 필요한 데이터를 보관하고 활용하는데 유용하다.
+
+여기서는 로그아웃 타이머를 관리하기 위해 사용되었다. 컴포넌트 외부에 위치한 변수는 해당 파일 전체에서 공유되며,
+
+컴포넌트의 렌더링과는 독립적으로 동작한다.
+
+이와 달리 컴포넌트의 상태(state)는 컴포넌트 내에서 관리되며, 상태가 변경될 때마다 컴포넌트가 다시 렌더링된다.
+
+컴포넌트의 상태는 컴포넌트의 라이프사이클과 밀접한 관련이 있으며, 상태 변경에 따라 UI가 업데이트된다.
+
+따라서 logoutTimer와 같은 변수는 컴포넌트의 외부에서 독립적으로 존재하며,
+
+컴포넌트가 언제 렌더링되든 렌더링과 관련 없이 일관된 동작을 수행할 수 있다.
+
+// 타이머를 통한 자동 로그아웃 설정
+  useEffect(() => {
+    if (token && tokenExpirationDate) {
+      const remainingTime = tokenExpirationDate.getTime() - new Date().getTime();
+      logoutTimer = setTimeout(logout, remainingTime)
+    } else {
+      clearTimeout(logoutTimer);
+    }
+  },[token, logout, tokenExpirationDate]);
+
+이 부분은 타이머를 활용하여 자동 로그아웃을 설정하는 부분이다.
+
+useEffect 훅을 사용하여 컴포넌트가 렌더링될 때마다 실행되는 부분이다.
+
+여기서는 토큰이 존재하고 토큰의 만료 시간이 설정되어 있다면 자동 로그아웃을 위한 타이머를 설정하고,
+
+그렇지 않은 경우에는 기존에 설정된 타이머를 해제한다.
+
+token 및 tokenExpirationDate ( 토큰 만료 시간 ) 의 존재 여부 확인:
+
+token과 tokenExpirationDate가 모두 존재해야 자동 로그아웃을 설정한다.
+
+남은 시간 계산:
+
+tokenExpirationDate.getTime() - new Date().getTime()을 통해 현재 시간과 토큰 만료 시간의 차이를 계산한다.
+
+이렇게 계산된 값은 토큰이 유효한 남은 시간을 밀리초 단위로 나타낸다.
+
+setTimeout을 통한 타이머 설정:
+
+setTimeout(logout, remainingTime)을 사용하여 남은 시간 후에 logout 함수를 호출하는 타이머를 설정한다.
+
+이로써 토큰이 만료되면 자동으로 로그아웃이 수행된다. ( 첫번째 인자 함수 , 두번째 인자 시간뒤 ( 첫번째 인자 실행 )
+
+기존 타이머의 해제:
+
+이전에 설정된 타이머가 있다면(clearTimeout(logoutTimer)) 해당 타이머를 즉시 해제한다.
+
+이는 새로운 토큰이나 만료 시간이 설정될 때, 기존의 타이머를 초기화하여 중복된 타이머가 발생하는 것을 방지한다.
+
+이렇게 함으로써 토큰이 유효한 동안은 자동 로그아웃 타이머가 설정되어 특정 시간 후에 자동으로 로그아웃이 수행되게 된다.
+
+이는 사용자가 일정 시간 동안 액티브하지 않거나 페이지를 닫은 경우에 보안을 강화하고, 불필요한 세션을 방지하는 데 도움이 된다.
+
+* useCallback() 훅을 사용하여 logout 함수를 정의한 것으로, 이는 logout 함수가 재생성되지 않도록 하는 역할을 한다.
+
+그렇게 함으로써 useEffect 내에서 logout 함수를 의존성으로 사용해도 무한 루프가 발생하지 않는다.
+
+각 의존성에 대한 설명:
+
+token:
+
+토큰은 사용자의 로그인 상태를 나타내는 값입니다. useEffect는 token 값이 변경될 때마다 실행된다.
+
+만약 로그인이 되어 있고 token이 변경된 경우, 자동 로그아웃 타이머를 설정한다.
+
+logout:
+
+logout은 로그아웃 함수를 나타내며, useEffect는 이 함수가 변경될 때마다 실행된다.
+
+로그아웃 함수는 타이머가 만료되어 자동 로그아웃이 발생하는 경우에 호출된다.
+
+tokenExpirationDate:
+
+tokenExpirationDate는 토큰의 만료 날짜를 나타내는 상태이다.
+
+useEffect는 이 값이 변경될 때마다 실행된다. 로그인된 상태에서만 타이머를 설정하므로,
+
+tokenExpirationDate가 변경되면 자동 로그아웃 타이머를 재설정한다.
+
+코드 동작 설명:
+
+token과 tokenExpirationDate가 모두 존재하는 경우 (token && tokenExpirationDate),
+
+remainingTime에 토큰의 만료 시간까지 남은 시간을 계산한다. 그리고 이 시간이 지난 후에 logout 함수를 호출하는 타이머를 설정한다.
+
+만약 token 또는 tokenExpirationDate가 없는 경우 (else 블록),
+
+현재 실행 중인 타이머가 있다면 이를 즉시 취소하고 자동 로그아웃이 발생하지 않도록 한다.
+
+const [tokenExpirationDate, setTokenExpirationDate] = useState();
+
+tokenExpirationDate 상태:
+
+tokenExpirationDate는 현재 사용자 토큰의 만료 날짜를 저장하는 React 상태이다.
+
+이 상태는 useState 훅을 사용하여 생성되었으며, 컴포넌트 내에서 특정 시점에 업데이트되는 값을 추적한다.
+
+setTokenExpirationDate 함수:
+
+setTokenExpirationDate는 tokenExpirationDate 상태를 업데이트하는 함수로,
+
+상태를 변경하고자 할 때 호출된다. React는 이 함수 호출을 감지하고 해당 상태를 갱신하여 컴포넌트를 리렌더링한다.
+
+useCallback을 사용한 로그인 함수:
+
+login 함수는 useCallback 훅을 사용하여 생성된 함수이다.
+
+이를 사용함으로써 함수가 재생성되지 않고 메모리에 단 하나만 유지된다.
+
+setTokenExpirationDate(null);
+
+로그아웃 시 위의 상태를 초기화 해주지 않으면 바로 로그아웃 상태가 계속 되기 때문에 초기화 해준다
+
+( 그렇지 않으면 기존의 만료 날짜를 계속 관리 및 명시하게 된다 )
+```
+
+# 커스텀 인증 훅 생성하기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381327/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/_/Untitled_6.png)
+
+```jsx
+// useAuth.js
+
+import { useState, useCallback, useEffect } from 'react'
+
+let logoutTimer
+
+const useAuth = () => {
+  // 토큰, 사용자 ID, 토큰 만료 시간 상태 관리
+  const [token, setToken] = useState(false)
+  const [tokenExpirationDate, setTokenExpirationDate] = useState()
+  const [userId, setUserId] = useState(null)
+
+  // useCallback을 사용한 로그인 함수
+  const login = useCallback((userId, token, expirationDate) => {
+    setToken(token)
+    setUserId(userId)
+    // 만료 날짜 설정 또는 1시간 후로 설정
+    const tokenExpirationDate = expirationDate || new Date(new Date().getTime() + 1000 * 60 * 60)
+    setTokenExpirationDate(tokenExpirationDate)
+
+    // 사용자 데이터를 Local Storage에 저장
+    localStorage.setItem(
+      'userData',
+      JSON.stringify({ userId: userId, token: token, expiration: tokenExpirationDate.toISOString })
+    )
+  }, [])
+
+  // useCallback을 사용한 로그아웃 함수
+  const logout = useCallback(() => {
+    setToken(null)
+    setUserId(null)
+    setTokenExpirationDate(null)
+    // Local Storage에서 사용자 데이터 삭제
+    localStorage.removeItem('userData')
+  }, [])
+
+  // 타이머를 통한 자동 로그아웃 설정
+  useEffect(() => {
+    if (token && tokenExpirationDate) {
+      const remainingTime = tokenExpirationDate.getTime() - new Date().getTime()
+      logoutTimer = setTimeout(logout, remainingTime)
+    } else {
+      clearTimeout(logoutTimer)
+    }
+  }, [token, logout, tokenExpirationDate])
+
+  // useEffect를 활용한 자동 로그인 처리
+  useEffect(() => {
+    // Local Storage에서 저장된 사용자 데이터 가져오기
+    const storedData = JSON.parse(localStorage.getItem('userData'))
+
+    // 저장된 데이터가 있고, 토큰이 존재하며, 만료 기간이 지나지 않았을 경우 자동 로그인
+    if (storedData && storedData.token && new Date(storedData.expiration) > new Date()) {
+      login(storedData.userId, storedData.token, new Date(storedData.expiration))
+    }
+  }, [login])
+
+  return { token, login, logout, userId }
+}
+
+export default useAuth
+```
+
+```jsx
+// App.js
+
+import React, { useState, useCallback, useEffect } from 'react'
+import './App.css'
+import { Route, Routes, Navigate } from 'react-router-dom'
+import Users from './user/pages/Users'
+import NewPlace from './places/pages/NewPlace'
+import MainNavigation from './shared/components/Navigation/MainNavigation'
+import UserPlaces from './places/pages/UserPlaces'
+import UpdatePlace from './places/pages/UpdatePlace'
+import Auth from './user/pages/Auth'
+import { AuthContext } from './shared/context/auth-context'
+import useAuth from './shared/hooks/auth-hook'
+
+const App = () => {
+  const { token, login, logout, userId } = useAuth()
+
+  // 라우팅을 위한 JSX 설정
+  let routes
+  if (token) {
+    // 로그인한 경우의 라우트 설정
+    routes = (
+      <>
+        <Route path="/" element={<Users />} />
+        <Route path="/:userId/places" element={<UserPlaces />} />
+        <Route path="/places/new" element={<NewPlace />} />
+        <Route path="/places/:placeId" element={<UpdatePlace />} />
+        <Route path="*" element={<Navigate replace to="/" />} />
+      </>
+    )
+  } else {
+    // 로그인하지 않은 경우의 라우트 설정
+    routes = (
+      <>
+        <Route path="/" element={<Users />} />
+        <Route path="/:userId/places" element={<UserPlaces />} />
+        <Route path="/auth" element={<Auth />} />
+        <Route path="*" element={<Navigate replace to="/auth" />} />
+      </>
+    )
+  }
+
+  // AuthContext.Provider를 사용하여 전역적으로 사용되는 사용자 정보 관리
+  return (
+    <AuthContext.Provider
+      value={{
+        isLoggedIn: !!token,
+        token: token,
+        userId: userId,
+        login: login,
+        logout: logout,
+      }}
+    >
+      <>
+        {/* 상단 네비게이션 바 */}
+        <MainNavigation />
+
+        {/* 메인 컨텐츠 영역 */}
+        <main>
+          {/* 라우트 설정 */}
+          <Routes>{routes}</Routes>
+        </main>
+      </>
+    </AuthContext.Provider>
+  )
+}
+
+export default App
+```
+
+```jsx
+useAuth 커스텀 훅을 만들어서 App.js 의 코드들을 옮겨 정리하도록 한다
+
+Auth-hook 파일 생성:
+
+useAuth라는 커스텀 훅을 만들고, 필요한 라이브러리(react)와 변수(useState, useCallback, useEffect)를 import 한다.
+
+logoutTimer를 파일 상단에 선언한다.
+
+2. Auth-hook 내부 구현:
+
+useAuth 함수 내부에서, useState를 사용하여 token, tokenExpirationDate, userId 상태를 관리한다.
+
+login 함수는 userId, token, expirationDate를 받아와 상태를 업데이트하고, localStorage에 사용자 데이터를 저장한다.
+
+logout 함수는 상태를 초기화하고 localStorage에서 사용자 데이터를 삭제한다.
+
+useEffect를 활용하여 자동 로그아웃 및 자동 로그인 처리를 구현한다.
+
+3. Auth-hook의 반환값 설정:
+
+useAuth 함수는 { token, login, logout, userId } 객체를 반환한다.
+
+4. App.js에서 Auth-hook 사용:
+
+useAuth를 import하고, 해당 훅을 호출하여 반환된 객체를 구조 분해하여 사용한다.
+
+기존의 로그인, 로그아웃 관련 로직을 삭제하고, useAuth에서 얻은 token, login, logout, userId를 사용한다.
+```
+
+# 사소한 수정
+
+## req.body 로 userId 얻기에서 토큰에서 userId 얻기
+
+```jsx
+// places-controllers.js
+
+const { v4: uuid } = require('uuid')
+const { validationResult } = require('express-validator')
+const fs = require('fs')
+
+// HttpError 모델을 불러와 사용합니다.
+const HttpError = require('../models/http-error')
+const getCoordsForAddress = require('../util/location')
+const Place = require('../models/places')
+const User = require('../models/user')
+const { default: mongoose } = require('mongoose')
+
+// 특정 장소 ID에 대한 정보를 반환하는 함수입니다.
+const getPlacesById = async (req, res, next) => {
+  // 요청 파라미터에서 장소 ID를 추출합니다.
+  const placeId = req.params.pid
+
+  let places
+
+  try {
+    places = await Place.findById(placeId)
+  } catch (err) {
+    const error = new HttpError('오류발생 장소를 찾지 못했습니다', 500)
+    return next(error)
+  }
+
+  // 만약 장소를 찾지 못했다면 HttpError를 발생시키지 않고, next 함수를 통해 에러를 전달합니다.
+  if (!places) {
+    const error = new HttpError('유효한 장소 아이디를 찾지 못했습니다', 404)
+    return next(error)
+  }
+
+  // 찾은 장소를 JSON 형태로 응답합니다.
+  res.json({ places: places.toObject({ getters: true }) })
+}
+
+// 특정 사용자 ID에 대한 장소 정보를 반환하는 함수입니다.
+const getPlaceByUserId = async (req, res, next) => {
+  // 요청 파라미터에서 사용자 ID를 추출합니다.
+  const userId = req.params.uid
+
+  // let place;
+  let userWithPlaces
+  try {
+    userWithPlaces = await User.findById(userId).populate('places')
+  } catch (err) {
+    const error = new HttpError('장소를 불러오는데 실패했습니다', 500)
+    return next(error)
+  }
+
+  // 만약 사용자를 찾지 못했다면 HttpError를 발생시킵니다.
+  if (!userWithPlaces) {
+    return next(new HttpError('유저를 찾을 수 없습니다', 404))
+  }
+
+  // 찾은 장소를 JSON 형태로 응답합니다.
+  res.json({ places: userWithPlaces.places.map((place) => place.toObject({ getters: true })) })
+}
+
+const createPlace = async (req, res, next) => {
+  // express-validator를 사용하여 요청의 유효성을 검사합니다.
+  const errors = validationResult(req)
+  if (!errors.isEmpty()) {
+    console.log(errors)
+    // 에러가 배열로 나와서 첫 번째 인덱스의 경로를 사용하여 클라이언트에게 에러를 전달합니다.
+    next(new HttpError(`${errors.errors[0].path}는 비어있을 수 없습니다`, 422))
+  }
+
+  // 요청에서 필요한 데이터를 추출합니다.
+  const { title, description, address } = req.body
+
+  let coordinates
+
+  try {
+    // 주소를 좌표로 변환하는 유틸리티 함수를 사용하여 좌표를 얻습니다.
+    coordinates = await getCoordsForAddress(address)
+  } catch (error) {
+    // 좌표 얻기가 실패하면 에러를 핸들링하여 다음 미들웨어로 전달합니다.
+    return next(error)
+  }
+
+  // 새로운 장소 객체를 생성합니다.
+  const createPlace = new Place({
+    title,
+    description,
+    address,
+    location: coordinates, // 얻은 좌표 정보를 사용하여 새로운 장소의 위치를 설정합니다.
+    image: req.file.path,
+    creator: req.userData.userId,
+  })
+
+  let user
+  try {
+    // 생성자(creator) ID를 사용하여 해당 사용자를 데이터베이스에서 찾습니다.
+    user = await User.findById(creator)
+  } catch (err) {
+    const error = new HttpError('새로운 장소 추가에 실패 했습니다', 500)
+    return next(error)
+  }
+
+  // 찾은 사용자가 없을 경우 에러를 생성하여 핸들링합니다.
+  if (!user) {
+    const error = new HttpError('제공된 ID의 유저를 찾을 수 없습니다', 404)
+    return next(error)
+  }
+
+  try {
+    // Mongoose 세션을 시작하고 트랜잭션을 시작합니다.
+    const sess = await mongoose.startSession()
+    sess.startTransaction()
+
+    // 새로운 장소를 데이터베이스에 저장합니다.
+    await createPlace.save({ session: sess })
+
+    // 사용자 문서에 새로운 장소의 ID를 추가합니다.
+    user.places.push(createPlace)
+    await user.save({ session: sess })
+
+    // 트랜잭션을 커밋합니다.
+    await sess.commitTransaction()
+  } catch (err) {
+    console.log(err)
+    const error = new HttpError('새 장소 추가 실패', 500)
+    // 저장 중에 에러가 발생하면 500 상태 코드와 함께 에러를 생성합니다.
+    return next(error)
+  }
+
+  // 클라이언트에게 성공적인 응답을 전송합니다.
+  res.status(201).json({ place: createPlace })
+}
+
+const updatePlaceById = async (req, res, next) => {
+  const errors = validationResult(req)
+  if (!errors.isEmpty()) {
+    console.log(errors)
+    throw new HttpError(`${errors.errors[0].path}는 비어있을 수 없습니다`, 422)
+  }
+  // 요청에서 필요한 데이터를 추출합니다.
+  const { title, description } = req.body
+  const placeId = req.params.pid
+
+  let place
+  try {
+    place = await Place.findById(placeId)
+  } catch (err) {
+    const error = new HttpError('업데이트 실패', 500)
+    return next(error)
+  }
+
+  if (place.creator.toString() !== req.userData.userId) {
+    const error = new HttpError('장소를 수정할 권한이 없습니다.', 401)
+    return next(error)
+  }
+
+  place.title = title
+  place.description = description
+
+  try {
+    await place.save()
+  } catch (err) {
+    const error = new HttpError('문제가 발생하였습니다 업데이트 할 수 없습니다', 500)
+    return next(error)
+  }
+
+  // 클라이언트에게 업데이트된 장소 정보를 응답합니다.
+  res.status(200).json({ place: place })
+}
+
+const deletePlaceById = async (req, res, next) => {
+  // 요청 파라미터에서 장소의 ID를 가져옵니다.
+  const placeId = req.params.pid
+  let place
+
+  // 장소를 찾아서 해당 ID로 검색한 결과를 가져옵니다.
+  try {
+    place = await Place.findById(placeId).populate('creator')
+  } catch (err) {
+    // 에러가 발생하면 500 상태 코드와 함께 에러 메시지를 반환합니다.
+    const error = new HttpError('문제발생 삭제에 실패했습니다', 500)
+    return next(error)
+  }
+
+  // 검색된 장소가 없으면 404 상태 코드와 함께 에러 메시지를 반환합니다.
+  if (!place) {
+    const error = new HttpError('장소 id 를 찾지 못하였습니다', 404)
+    return next(error)
+  }
+
+  if (place.creator.id !== req.userData.userId) {
+    const error = new HttpError('장소를 삭제할 권한이 없습니다.', 401)
+    return next(error)
+  }
+
+  // 이미지 주소 가져오기 (req.file.path 로 이미지 주소 들어가 있음)
+  const imagePath = place.image
+
+  // MongoDB 세션을 사용하여 트랜잭션을 시작합니다.
+  try {
+    const sess = await mongoose.startSession()
+    sess.startTransaction()
+
+    // 검색된 장소를 삭제합니다.
+    await place.deleteOne({ session: sess })
+
+    // 해당 장소를 생성한 사용자의 데이터에서 해당 장소를 제거합니다.
+    place.creator.places.pull(place)
+
+    // 수정된 사용자 데이터를 저장합니다.
+    await place.creator.save({ session: sess })
+
+    // 트랜잭션을 커밋하여 변경 사항을 영구적으로 반영합니다.
+    await sess.commitTransaction()
+  } catch (err) {
+    // 트랜잭션 도중 에러가 발생하면 500 상태 코드와 함께 에러 메시지를 반환합니다.
+    const error = new HttpError('삭제에 실패했습니다', 500)
+    return next(error)
+  }
+
+  fs.unlink(imagePath, (err) => {
+    console.log(err)
+  })
+
+  // 모든 작업이 성공적으로 완료되면 200 상태 코드와 함께 성공 메시지를 반환합니다.
+  res.status(200).json({ message: '삭제성공' })
+}
+
+// 외부에서 사용할 수 있도록 함수를 내보냅니다.
+exports.getPlacesById = getPlacesById
+exports.getPlaceByUserId = getPlaceByUserId
+exports.createPlace = createPlace
+exports.updatePlaceById = updatePlaceById
+exports.deletePlaceById = deletePlaceById
+```
+
+```jsx
+백엔드 수정 내용:
+
+    // 새로운 장소 객체를 생성합니다.
+    const createPlace = new Place({
+        title,
+        description,
+        address,
+        location: coordinates, // 얻은 좌표 정보를 사용하여 새로운 장소의 위치를 설정합니다.
+        image: req.file.path,
+        creator : req.userData.userId
+    });
+
+    let user;
+    try {
+        // 생성자(creator) ID를 사용하여 해당 사용자를 데이터베이스에서 찾습니다.
+        user = await User.findById(req.userData.userId);
+    } catch (err) {
+        const error = new HttpError('새로운 장소 추가에 실패 했습니다', 500);
+        return next(error);
+    }
+
+places-controllers에서 createPlace 함수 수정:
+
+새로운 장소를 만들 때, 사용자 ID를 req.userData.userId로 추출하여 사용한다. ( 토큰에서 추출하여 사용 )
+
+user = await User.findById(req.userData.userId); 또한 req.userData.userId 로 수정해준다
+
+places-routes에서 라우트에 접근하기 위해 인증이 필요한데, check-auth 미들웨어에서 userId를 추출하여 req.userData 객체에 저장한다.
+
+req.body 로 ID를 얻기보다 이 방법이 훨씬 안전하다
+
+사용자 ID를 URL 일부로 사용해야 하는 이유:
+
+장소 조회를 위한 필요성:
+
+places-routes에서 특정 사용자의 장소를 보기 위해서는 해당 사용자의 ID가 필요.
+
+각 사용자는 고유한 ID를 가지고 있어야 그들의 장소를 식별할 수 있음.
+
+토큰에서 얻은 ID 활용:
+
+토큰에서 얻은 사용자 ID를 사용하면 사용자는 자신의 장소만을 볼 수 있음.
+
+사용자 간의 데이터 격리를 통해 보안 상의 이슈를 최소화하며, 사용자의 개인 정보를 보호.
+
+안전한 URL에서의 ID 추출:
+
+사용자에게서 직접 ID를 얻는 것은 보안상의 이유로 권장되지 않음.
+
+대신 토큰에서 얻은 ID에 의존함으로써 안전성을 강화.
+
+URL을 통해 얻은 ID는 백엔드에서 검증되어 안전한 방식으로 사용자를 식별.
+
+결론적으로:
+
+URL 일부로 사용자 ID를 유지하는 것은 장소 조회 및 사용자 식별에 필수적.
+
+토큰을 통해 안전하게 얻은 ID를 사용하여 보안을 강화하며, 사용자의 프라이버시를 보호하는 핵심적인 요소.
+
+Frontend의 변경 사항:
+
+     try {
+      // FormData를 사용하여 이미지를 포함한 폼 데이터 생성
+      const formData = new FormData();
+      formData.append('title', formState.inputs.title.value)
+      formData.append('description', formState.inputs.description.value)
+      formData.append('address', formState.inputs.address.value)
+      formData.append('creator', auth.userId)
+      formData.append('image', formState.inputs.image.value)
+
+      // useHttpClient 훅을 이용하여 서버에 POST 요청을 보냄
+      const responseData = await sendRequest(
+        'http://localhost:5000/api/places',
+        'POST',
+        formData,
+        {
+          // Authorization 헤더에 토큰을 추가하여 인증된 요청을 보냄
+          Authorization : 'Bearer ' + auth.token
+        }
+      );
+
+      // 요청이 성공하면 메인 페이지로 이동
+      navigate('/');
+
+NewPlace.js에서는 더 이상 creator 필드를 요청에 추가할 필요가 없다.
+
+formData.append('creator', auth.userId) 를 삭제해준다
+
+이는 백엔드에서 creator가 더 이상 사용되지 않기 때문이다.
+
+5. 백엔드에서 creator 삭제:
+
+creator는 더 이상 사용되지 않기 때문에, createPlace 함수에서 creator 관련 코드를 제거한다.
+
+6. 테스트 및 확인:
+
+'나의 장소'를 추가 및 수정하여 토큰이 정상적으로 관리되는지 확인한다.
+
+새로운 장소를 추가할 때 creator를 요청에 추가하지 않아도 정상적으로 작동하는지 확인한다.
+
+사용자의 장소와 다른 사용자의 장소를 확인하여 프로젝트가 올바르게 작동하는지 확인한다.
+```
+
+```jsx
+// check-auth.js
+
+const jwt = require('jsonwebtoken')
+const HttpError = require('../models/http-error')
+
+// 토큰 검증 미들웨어
+module.exports = (req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    return next()
+  }
+
+  // 1. 요청 헤더에서 토큰 추출
+  const token = req.headers.authorization.split(' ')[1]
+
+  try {
+    // 2. 토큰이 존재하지 않으면 에러 발생
+    if (!token) {
+      throw new Error('인증 실패')
+    }
+
+    // 3. 토큰 검증
+    const decodedToken = jwt.verify(token, 'secretKey')
+
+    // 4. 검증이 성공하면 사용자 데이터를 요청 객체에 추가
+    req.userData = { userId: decodedToken.userId }
+
+    // 5. 다음 미들웨어로 진행
+    next()
+  } catch (err) {
+    // 6. 토큰 검증 실패 시 403 상태코드와 함께 에러 응답
+    const error = new HttpError('인증 실패', 403)
+    return next(error)
+  }
+}
+```

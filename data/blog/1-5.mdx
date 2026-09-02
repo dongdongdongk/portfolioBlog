@@ -1,0 +1,2911 @@
+---
+title: '1'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 🎮 압력판(Pressure Plate) 만들기 }
+
+## 🎯 목표
+
+플랫폼 게임의 필수 요소인 압력판을 만들어 레벨에 배치합니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380667/notion-blog/_/_/_5_/1/image.png)
+
+---
+
+## 🏗️ 레벨 준비
+
+### 새 플랫폼 추가
+
+```
+Content Browser
+  ↓
+Stacko Bot → Environment → Modules
+  ↓
+SM_Module_Floor 선택
+  ├─ 기존 플랫폼보다 작음
+  ├─ 하지만 더 두꺼움
+  └─ 점프 가능한 거리에 배치
+```
+
+**배치 위치**
+
+```
+두 번째 플랫폼에서
+  ↓
+제트팩 연료 다 쓴 후
+  ↓
+점프로 도달 가능한 거리
+```
+
+### 크기 조정 및 테스
+
+```
+플랫폼 선택 → Scale 조정
+  ↓
+Play로 테스트
+  ├─ 첫 플랫폼에서 점프
+  ├─ 연료 픽업 획득
+  └─ 새 플랫폼 도달 가능한지 확인
+```
+
+---
+
+## 📁 폴더 구조 준비
+
+### Interactables 폴더 생성
+
+```
+Content Browser → Blueprints
+  ↓
+우클릭 → New Folder
+  ↓
+이름: Interactables
+  └─ 상호작용 가능한 오브젝트 저장
+```
+
+**Interactables란?**
+
+- 플레이어가 상호작용할 수 있는 것들
+- 압력판, 버튼, 레버 등
+
+---
+
+## 🔧 압력판 Blueprint 만들기
+
+### 1단계: 기본 Blueprint 생성
+
+```
+Interactables 폴더 내
+  ↓
+우클릭 → Blueprint Class
+  ↓
+Parent Class: Actor
+  ↓
+이름: BP_PressurePlate
+```
+
+---
+
+## 🎨 압력판 메시 찾기
+
+### Stacko Bot 에셋 탐색
+
+```
+Content Browser
+  ↓
+Stacko Bot → Environment → Props
+  ↓
+찾은 메시
+  ├─ SM_PressurePlate_Frame (프레임)
+  └─ SM_PressurePlate_Platform (플랫폼)
+```
+
+### 충돌 확인
+
+```
+각 메시 더블클릭 → Collision
+  ↓
+Show Simple Collision
+  ├─ Frame: 단순 충돌 있음
+  └─ Platform: 단순 충돌 있음
+
+Collision Presets
+  └─ 둘 다 "Block All"로 설정됨
+```
+
+---
+
+## 🏗️ 컴포넌트 구조 만들기
+
+### 1단계: Platform 추가
+
+```
+BP_PressurePlate 열기
+  ↓
+Add Component → Static Mesh
+  ├─ 이름: Platform
+  └─ Static Mesh: SM_PressurePlate_Platform
+```
+
+### 2단계: Frame 추가
+
+```
+Add Component → Static Mesh
+  ├─ 이름: Frame
+  ├─ Static Mesh: SM_PressurePlate_Frame
+  └─ 부모: DefaultSceneRoot (루트에 추가)
+```
+
+### 3단계: 계층 구조 변경
+
+```
+Frame을 루트로 만들기
+  ↓
+Frame을 DefaultSceneRoot로 드래그
+  ↓
+구조
+  Frame (Root)
+    └─ Platform (자식)
+```
+
+**이유**
+
+```
+Frame
+  ├─ 고정됨 (움직이지 않음)
+  └─ 기준점 역할
+
+Platform
+  ├─ 움직임 (아래로 눌림)
+  └─ Frame에 상대적으로 이동
+```
+
+---
+
+## 📦 충돌 박스 추가
+
+### Box Component 추가
+
+```
+Add Component → Box Collision
+  ├─ 이름: Box (기본)
+  └─ 부모: Frame
+```
+
+### 위치 조정
+
+```
+Box 선택 → Details
+  ↓
+Location
+  └─ Z축 약간 위로 (플랫폼 위)
+```
+
+### 크기 조정
+
+```
+Box Extent (박스 범위)
+  ├─ X, Y: 플랫폼 크기에 맞춤
+  └─ Z: 작게 설정
+      └─ 점프 중에는 작동 안 하게
+```
+
+**크기 설정 이유**
+
+```
+높이가 너무 크면
+  └─ 점프만 해도 작동
+
+높이를 작게
+  └─ 플랫폼에 올라가야만 작동 ✅
+```
+
+---
+
+## 🎨 박스 시각화 설정
+
+### 선 굵기 변경
+
+```
+Box 선택 → Details
+  ↓
+Shape
+  └─ Line Thickness: 5
+      └─ 에디터에서 잘 보이게
+```
+
+### 색상 변경
+
+```
+Advanced (고급 설정 펼치기)
+  ↓
+Shape Color
+  └─ 원하는 색상 선택
+      └─ 기본보다 밝은 색 추천
+```
+
+---
+
+## ⚙️ 충돌 설정 확인
+
+### Box Collision 설정
+
+```
+Box 선택 → Collision
+  ↓
+기본 설정
+  └─ Overlap All Dynamic
+      └─ 모든 동적 오브젝트와 겹침 감지
+```
+
+### 최적화 고려사항
+
+```
+현재
+  └─ 모든 것과 겹침 감지
+
+최적화
+  └─ 플레이어만 감지하도록 변경 가능
+      └─ 나중에 구현
+```
+
+---
+
+## 🎮 레벨에 배치
+
+### 1단계: 압력판 배치
+
+```
+Content Browser에서
+BP_PressurePlate을 드래그
+  ↓
+세 번째 플랫폼 중앙에 배치
+```
+
+### 2단계: 위치 조정
+
+```
+압력판 선택
+  ↓
+Transform 조정
+  └─ 플랫폼 표면에 맞춤
+```
+
+### 3단계: 테스트
+
+```
+Play 버튼
+  ↓
+압력판 위로 이동
+  ↓
+올라갈 수 있는지 확인
+  └─ 아직 작동 안 함 (정상)
+```
+
+---
+
+## 📋 현재 상태
+
+### 완성된 구조
+
+```
+BP_PressurePlate
+  ├─ Frame (Static Mesh) - Root
+  │   └─ 고정된 프레임
+  ├─ Platform (Static Mesh)
+  │   └─ 눌리는 부분
+  └─ Box (Box Collision)
+      └─ 겹침 감지
+```
+
+### 동작 예정
+
+```
+플레이어가 Box와 겹침
+  ↓
+Platform이 아래로 이동
+  ↓
+압력판 작동!
+  └─ 다음 영상에서 구현
+```
+
+---
+
+## 🎓 핵심 정리
+
+### 압력판 구성 요소
+
+```
+Frame (프레임)
+  └─ 고정된 외부 틀
+
+Platform (플랫폼)
+  └─ 눌리는 부분
+
+Box Collision
+  └─ 감지 영역
+```
+
+### Blueprint 계층 구조
+
+```
+루트를 고정 부분으로
+  ├─ 움직일 부분을 자식으로
+  └─ 상대적 위치 변경 가능
+```
+
+### 충돌 박스 설정
+
+```
+크기
+  └─ 작동 조건에 맞게 조정
+
+시각화
+  ├─ Line Thickness: 보기 쉽게
+  └─ Color: 구분하기 쉽게
+```
+
+---
+
+## 🚀 다음 단계
+
+다음 영상에서 구현할 기능:
+
+```
+압력판 기능 추가
+  ├─ 겹침 감지
+  ├─ Platform 아래로 이동
+  └─ 시각적 피드백
+```
+
+# { 🎮 압력판(Pressure Plate) 만들기 }
+
+## 🎯 목표
+
+압력판을 밟으면 아래로 눌리고, 떼면 다시 올라오는 인터랙티브 오브젝트 제작
+
+---
+
+## 📋 전체 구조 개요
+
+```
+압력판 시스템
+  ├─ Box Component (충돌 감지)
+  ├─ Platform (눌리는 부분)
+  ├─ Press Target (목표 위치)
+  └─ Timeline (움직임 애니메이션)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380663/notion-blog/_/_/_5_/1/image_1.png)
+
+---
+
+## 🔧 1단계: 기본 설정
+
+### 1-1. 이벤트 그래프 준비
+
+**작업**
+
+```
+Components 패널
+  └─ Box Component 선택
+      └─ 우클릭 → Add Event → On Component Begin Overlap
+```
+
+**노드 생성 결과**
+
+- `On Component Begin Overlap (Box)` 이벤트 노드 추가됨
+- 뭔가 Box와 겹칠 때 실행되는 시작점
+
+**노드 출력 핀 설명**
+
+```
+On Component Begin Overlap
+  ├─ Overlapped Component: 충돌한 내 컴포넌트
+  ├─ Other Actor: 충돌한 상대 액터
+  ├─ Other Comp: 충돌한 상대 컴포넌트
+  ├─ Other Body Index: 물리 바디 인덱스
+  ├─ From Sweep: 쓸어서 충돌했는지 여부
+  └─ Sweep Result: 충돌 상세 정보
+```
+
+💡 **초보 설명**: 이 노드는 "누군가 Box 영역에 들어왔을 때" 신호를 보내는 센서입니다.
+
+---
+
+## ⏱️ 2단계: Timeline 생성
+
+### 2-1. Timeline 노드 추가
+
+**작업**
+
+```
+Event Graph에서 우클릭
+  → Timeline 검색
+  → Add Timeline... 선택
+  → 이름: "PlatformElevation"
+```
+
+### 2-2. Timeline 편집
+
+**Float Track 추가**
+
+```
+Timeline 더블클릭 → 편집 창 열림
+  ↓
+Add Float Track 클릭
+  ├─ Track 이름: "Elevation"
+  └─ 용도: 0~1 사이 값으로 높이 조절
+```
+
+**키 추가**
+
+```
+키 1
+  ├─ Time: 0.0
+  └─ Value: 0.0
+
+키 2
+  ├─ Time: 0.5
+  └─ Value: 1.0
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380665/notion-blog/_/_/_5_/1/image_2.png)
+
+💡 **초보 설명**: 0.5초 동안 0에서 1로 부드럽게 변하는 값을 만듭니다.
+
+**커브 부드럽게 만들기**
+
+```
+두 키 모두 선택 (Shift + 클릭)
+  ↓
+우클릭 → Auto
+  ↓
+선형이 아닌 부드러운 S자 곡선으로 변경
+```
+
+### 2-3. Timeline 노드 연결
+
+```
+On Component Begin Overlap
+  ↓
+PlatformElevation (Timeline)
+  └─ Play 핀 연결
+```
+
+**Timeline 노드 출력 핀**
+
+```
+PlatformElevation
+  ├─ Update: 매 프레임 실행 (값 변화 중)
+  ├─ Finished: 재생 완료 시 실행
+  ├─ Direction: 재생 방향 (Forward/Reverse)
+  └─ Elevation: Float Track의 현재 값 (0~1)
+```
+
+💡 **초보 설명**:
+
+- `Play`: 타임라인 시작
+- `Update`: 값이 변하는 동안 계속 실행
+- `Elevation`: 현재 진행도 (0% → 100%)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380666/notion-blog/_/_/_5_/1/image_3.png)
+
+---
+
+## 📍 3단계: 위치 시스템 구축
+
+### 3-1. 초기 위치 저장
+
+**Event BeginPlay 설정**
+
+```
+Event BeginPlay
+  ↓
+Get Actor Location (Self)
+  ├─ Target: Self (자기 자신)
+  └─ Return Value: 현재 위치 벡터
+  ↓
+변수로 승격 (Promote to Variable)
+  └─ 이름: "Initial Plate Location"
+```
+
+💡 **초보 설명**: 게임 시작할 때 압력판의 원래 위치를 기억합니다.
+
+### 3-2. 목표 위치 컴포넌트 추가
+
+**Components 패널 작업**
+
+```
+Components 패널
+  ↓
+Add Component
+  └─ Scene Component 선택
+      ├─ 이름 변경: "Platform Press Target"
+      └─ 위치: Platform 컴포넌트 아래로 약간 이동 (Z축 -10 정도)
+```
+
+**Scene Component란?**
+
+- 3D 공간의 위치만 가지는 빈 컴포넌트
+- 메시나 충돌 없음
+- 매우 가벼움
+- 위치 마커로 사용
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380666/notion-blog/_/_/_5_/1/image_4.png)
+
+---
+
+## 🔄 4단계: 보간(Lerp) 시스템
+
+### 4-1. Lerp 노드 이해
+
+**Lerp (Linear Interpolation) = 선형 보간**
+
+```
+두 값 사이를 부드럽게 이동
+
+A (시작값) ─────────── B (끝값)
+              ↑
+            Alpha (0~1)
+
+Alpha = 0.0 → A 값 반환
+Alpha = 0.5 → A와 B 중간 값
+Alpha = 1.0 → B 값 반환
+```
+
+### 4-2. Update Plate Location 함수 생성
+
+**노드 구조**
+
+```
+Timeline Update 출력
+  ↓
+[새 함수: Update Plate Location]
+  ↓
+Lerp (Vector)
+  ├─ A: Initial Plate Location (변수)
+  ├─ B: Platform Press Target의 World Location
+  └─ Alpha: Elevation (Timeline 값)
+  ↓
+Return Value
+  ↓
+Set World Location
+  ├─ Target: Platform (컴포넌트)
+  ├─ New Location: Lerp 결과값
+  ├─ Sweep: false (충돌 무시)
+  └─ Teleport: false (물리 적용)
+```
+
+**각 노드 기능 설명**
+
+**Get World Location**
+
+```
+용도: 컴포넌트의 월드 좌표 가져오기
+입력: Target (어떤 컴포넌트?)
+출력: Return Value (Vector 위치)
+```
+
+**Lerp (Vector)**
+
+```
+용도: 두 위치 사이를 부드럽게 보간
+입력:
+  ├─ A: 시작 위치
+  ├─ B: 목표 위치
+  └─ Alpha: 진행도 (0~1)
+출력: Return Value (계산된 중간 위치)
+```
+
+**Set World Location**
+
+```
+용도: 오브젝트를 특정 위치로 이동
+입력:
+  ├─ Target: 이동할 오브젝트
+  ├─ New Location: 목표 위치
+  ├─ Sweep: 이동 중 충돌 검사 여부
+  └─ Teleport: 순간이동 여부
+```
+
+### 4-3. Timeline Update 연결
+
+```
+PlatformElevation → Update 핀
+  ↓
+Update Plate Location (함수 호출)
+```
+
+💡 **작동 원리**
+
+```
+Timeline이 재생되면
+  ↓
+매 프레임 Update 실행
+  ↓
+Elevation 값이 0 → 1로 변화
+  ↓
+Lerp가 초기 위치 → 목표 위치로 계산
+  ↓
+Platform이 부드럽게 이동
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380666/notion-blog/_/_/_5_/1/image_5.png)
+
+---
+
+## 🔙 5단계: 복귀 기능 추가
+
+### 5-1. End Overlap 이벤트
+
+**작업**
+
+```
+Box Component 우클릭
+  └─ Add Event → On Component End Overlap
+```
+
+**노드 출력**
+
+```
+On Component End Overlap
+  ├─ Overlapped Component
+  ├─ Other Actor
+  ├─ Other Comp
+  └─ Other Body Index
+```
+
+### 5-2. Reverse 연결
+
+```
+On Component End Overlap
+  ↓
+PlatformElevation
+  └─ Reverse 핀 연결
+```
+
+**Reverse 기능**
+
+- Timeline을 역재생
+- 현재 위치에서 시작점으로 되돌아감
+- Elevation 값이 1 → 0으로 변화
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380666/notion-blog/_/_/_5_/1/image_6.png)
+
+---
+
+## ⚠️ 6단계: 충돌 문제 해결
+
+### 6-1. 문제 발견
+
+**테스트 시 발생한 문제**
+
+```
+압력판이 자기 자신과 계속 충돌
+  ↓
+On Begin Overlap이 계속 트리거됨
+  ↓
+Timeline이 재생/역재생 반복
+```
+
+**디버깅 방법**
+
+```
+On Component Begin Overlap
+  ↓
+Print String
+  └─ String: Other Actor의 Display Name
+```
+
+실행 결과: "BP_Pressure_Plate" 계속 출력 → 자기 자신과 충돌 중
+
+### 6-2. Collision Preset 변경
+
+**기존 Pickup Preset 사용**
+
+```
+Box Component 선택
+  ↓
+Details 패널
+  └─ Collision
+      ├─ Collision Presets: Pickup
+      └─ 효과: Pawn(플레이어)하고만 Overlap
+```
+
+**Pickup Preset 설정**
+
+```
+Collision Enabled: Query Only (물리 없이 감지만)
+Object Type: WorldDynamic
+  ├─ WorldStatic: Ignore
+  ├─ WorldDynamic: Ignore
+  ├─ Pawn: Overlap (★ 플레이어만 감지)
+  ├─ PhysicsBody: Ignore
+  └─ 나머지: Ignore
+```
+
+💡 **초보 설명**: Pickup은 "플레이어가 주울 수 있는 아이템" 설정입니다. Pawn(플레이어)하고만 반응합니다.
+
+### 6-3. 커스텀 Preset 생성 (선택사항)
+
+**이유**: Pickup은 이름이 압력판과 안 맞음
+
+**작업**
+
+```
+Edit → Project Settings
+  ↓
+Collision
+  ↓
+Preset 섹션에서 New... 클릭
+  ↓
+설정
+  ├─ Name: PressurePlate
+  ├─ Collision Enabled: Query Only
+  ├─ Object Type: WorldStatic
+  ├─ Description: "Pressure plate overlapping with player"
+  └─ Collision Responses
+      ├─ Default: Ignore
+      └─ Pawn: Overlap
+```
+
+**적용**
+
+```
+Box Component
+  └─ Collision Presets: PressurePlate
+```
+
+---
+
+## ✅ 7단계: 최종 정리
+
+### 7-1. 함수로 정리
+
+**정리할 노드들**
+
+```
+Lerp (Vector) + Set World Location
+```
+
+**함수 생성**
+
+```
+노드들 선택 → 우클릭
+  └─ Collapse to Function
+      ├─ 이름: Update Plate Location
+      └─ Category: Pressure Plate
+```
+
+### 7-2. 최종 Blueprint 구조
+
+```
+Event BeginPlay
+  └─ Initial Plate Location 저장
+
+On Component Begin Overlap (Box)
+  └─ PlatformElevation → Play
+
+On Component End Overlap (Box)
+  └─ PlatformElevation → Reverse
+
+PlatformElevation → Update
+  └─ Update Plate Location
+      └─ Lerp → Set World Location
+```
+
+---
+
+## 🧪 테스트 및 조정
+
+### 테스트 항목
+
+1. **압력판 위에 올라가기**
+   - Platform이 아래로 내려가는지 확인
+2. **압력판에서 내려오기**
+   - Platform이 다시 올라오는지 확인
+3. **반복 테스트**
+   - 여러 번 올라갔다 내려갔다 해보기
+
+### 조정 가능한 값
+
+**Platform Press Target 위치**
+
+```
+Z축 값 조정으로 눌림 깊이 변경
+  ├─ -5: 약간만 눌림
+  ├─ -10: 중간 정도 (권장)
+  └─ -15: 많이 눌림
+```
+
+**Timeline 길이**
+
+```
+PlatformElevation
+  ├─ 0.5초: 빠름
+  ├─ 1.0초: 보통
+  └─ 2.0초: 느림
+```
+
+---
+
+## 📝 핵심 개념 정리
+
+### Timeline
+
+```
+용도: 시간에 따른 값 변화 애니메이션
+특징:
+  ├─ 0~1 값으로 정규화 권장
+  ├─ Play/Reverse/Stop 제어 가능
+  └─ Update 핀으로 매 프레임 실행
+```
+
+### Lerp (보간)
+
+```
+용도: 두 값 사이를 부드럽게 전환
+공식: A + (B - A) × Alpha
+활용:
+  ├─ 위치 이동
+  ├─ 색상 변화
+  ├─ 크기 조절
+  └─ 회전 등
+```
+
+### Collision Preset
+
+```
+용도: 충돌 규칙 사전 설정
+장점:
+  ├─ 재사용 가능
+  ├─ 일관성 유지
+  └─ 설정 간편
+```
+
+### Scene Component
+
+```
+특징:
+  ├─ 위치 정보만 가짐
+  ├─ 렌더링 안 됨
+  ├─ 충돌 없음
+  └─ 마커/기준점으로 활용
+```
+
+---
+
+## 🎓 주요 노드 기능 요약
+
+| 노드                   | 용도                    | 주요 핀                     |
+| ---------------------- | ----------------------- | --------------------------- |
+| **Get Actor Location** | 액터 현재 위치 가져오기 | Target, Return Value        |
+| **Get World Location** | 컴포넌트 월드 좌표      | Target, Return Value        |
+| **Set World Location** | 오브젝트 위치 설정      | Target, New Location, Sweep |
+| **Lerp (Vector)**      | 두 위치 보간            | A, B, Alpha                 |
+| **Timeline**           | 시간 기반 애니메이션    | Play, Update, Finished      |
+| **Begin Overlap**      | 충돌 시작 감지          | Other Actor, Other Comp     |
+| **End Overlap**        | 충돌 종료 감지          | Other Actor, Other Comp     |
+
+---
+
+## 💡 주의사항
+
+1. **Timeline 정규화**
+   - Track 값은 항상 0~1 사용
+   - 실제 값 변환은 Lerp에서 처리
+2. **Collision Preset**
+   - 적절한 Preset 선택 중요
+   - 불필요한 충돌은 성능 저하
+3. **Self 참조**
+   - Get Actor는 Self(자기 자신) 사용
+   - 컴포넌트는 직접 선택
+4. **변수 저장**
+   - 초기값은 BeginPlay에서 저장
+   - 변수 이름은 명확하게
+5. **함수 정리**
+   - 반복되는 노드는 함수로
+   - Category 지정으로 분류
+
+---
+
+## 🚀 다음 단계
+
+현재 압력판은 시각적 효과만 있습니다.
+다음에는:
+
+- 압력판이 문을 여는 기능
+- 다른 오브젝트와 상호작용
+- 이벤트 시스템 연결
+
+등을 배울 예정입니다.
+
+---
+
+## ✨ 완성된 기능
+
+✅ 플레이어가 올라가면 압력판이 내려감
+
+✅ 플레이어가 떠나면 압력판이 올라옴
+
+✅ 부드러운 애니메이션
+
+✅ 플레이어만 반응 (다른 오브젝트 무시)
+
+✅ 재사용 가능한 구조
+
+# { 🎮 압력판 인터페이스 시스템 구축 }
+
+## 🎯 목표
+
+압력판이 다른 오브젝트들을 활성화/비활성화할 수 있도록 인터페이스 시스템 구축
+
+---
+
+## 📋 전체 시스템 개요
+
+```
+압력판 시스템 확장
+  ├─ Blueprint Interface (BPI_Interact)
+  │   ├─ Activate 함수
+  │   └─ DeActivate 함수
+  ├─ 압력판 (BP_Pressure_Plate)
+  │   ├─ Actors to Activate 배열
+  │   ├─ Does Un Press 옵션
+  │   └─ Timeline 이벤트 트랙
+  └─ 반응 오브젝트 (BP_Interactive_Platform)
+      └─ Interface 구현
+```
+
+**핵심 개념**
+
+```
+하드 레퍼런스 문제
+  ↓
+인터페이스로 해결
+  ↓
+느슨한 결합 (Loose Coupling)
+  ↓
+메모리 효율 + 유연성
+```
+
+---
+
+## 🔧 1단계: Does Un Press 옵션 추가
+
+### 1-1. 문제 정의
+
+**현재 동작**
+
+```
+압력판 위에 올라감
+  ↓
+Platform이 내려감
+  ↓
+압력판에서 내려옴
+  ↓
+Platform이 다시 올라감 (항상 복귀)
+```
+
+**원하는 동작**
+
+```
+옵션 1: 한 번 누르면 유지 (버튼 스타일)
+옵션 2: 누르는 동안만 활성 (스위치 스타일)
+```
+
+### 1-2. Does Un Press 변수 생성
+
+**작업**
+
+```
+Variables 패널
+  ↓
++ 버튼 클릭
+  ├─ 이름: Does Un Press
+  ├─ 타입: Boolean
+  ├─ Default: true
+  └─ Instance Editable: 체크 ✅
+```
+
+**Boolean 변수란?**
+
+- True(참) 또는 False(거짓) 두 가지 값만 가짐
+- 체크박스로 표현됨
+- On/Off, Yes/No 같은 선택에 사용
+
+**Instance Editable이란?**
+
+- 레벨에 배치된 각 인스턴스마다 다른 값 설정 가능
+- Details 패널에서 편집 가능
+- 같은 Blueprint라도 개별 설정 가능
+
+### 1-3. Branch 노드로 조건 분기
+
+**노드 구조**
+
+```
+On Component End Overlap (Box)
+  ↓
+Branch
+  ├─ Condition: Does Un Press
+  ├─ True → PlatformElevation → Reverse
+  └─ False → (아무것도 안 함)
+```
+
+**Branch 노드란?**
+
+```
+용도: if문과 같은 조건 분기
+입력:
+  └─ Condition: Boolean 값 (True/False)
+출력:
+  ├─ True: 조건이 참일 때 실행
+  └─ False: 조건이 거짓일 때 실행
+```
+
+**작동 원리**
+
+```
+Does Un Press = True
+  ↓
+압력판에서 내려옴
+  ↓
+Timeline Reverse 실행
+  ↓
+Platform이 올라감
+
+Does Un Press = False
+  ↓
+압력판에서 내려옴
+  ↓
+아무 일도 안 일어남
+  ↓
+Platform이 눌린 상태 유지
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380666/notion-blog/_/_/_5_/1/image_7.png)
+
+---
+
+## 🔌 2단계: Blueprint Interface 생성
+
+### 2-1. Interface의 필요성
+
+**하드 레퍼런스 문제**
+
+```
+압력판 Blueprint
+  ↓
+직접 참조 → Door Blueprint
+  ↓
+메모리에 Door 정보 로드
+  ↓
+Door를 사용하지 않아도 메모리 차지
+```
+
+**인터페이스 해결법**
+
+```
+압력판 Blueprint
+  ↓
+Interface만 참조 (가벼움)
+  ↓
+"Activate"라는 메시지만 전달
+  ↓
+받는 쪽에서 알아서 처리
+```
+
+💡 **비유**:
+
+- 하드 레퍼런스 = 특정 전화번호로 직접 통화
+- 인터페이스 = "관리자 아무나" 호출 (누가 받든 상관없음)
+
+### 2-2. Blueprint Interface 생성
+
+**경로**
+
+```
+Content Browser
+  ↓
+Blueprints/Interfaces 폴더
+  ↓
+우클릭 → Blueprint → Blueprint Interface
+  ↓
+이름: BPI_Interact
+```
+
+**BPI 접두사란?**
+
+- Blueprint Interface의 약자
+- 명명 규칙 (Naming Convention)
+- 파일 정리에 도움
+
+### 2-3. Activate 함수 추가
+
+**작업**
+
+```
+BPI_Interact 더블클릭
+  ↓
+Functions 패널
+  ↓
++ 버튼 클릭
+  └─ 이름: Activate
+```
+
+**저장 및 컴파일**
+
+💡 **Interface 함수 특징**
+
+- 구현 내용 없음 (비어있음)
+- 함수 시그니처만 정의
+- 각 클래스가 자기 방식으로 구현
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380667/notion-blog/_/_/_5_/1/image_8.png)
+
+---
+
+## 📦 3단계: Actors to Activate 배열 설정
+
+### 3-1. 배열 변수 생성
+
+**작업**
+
+```
+BP_Pressure_Plate 열기
+  ↓
+Variables 패널 → + 버튼
+  ├─ 이름: Actors to Activate
+  ├─ 타입: Actor → Object Reference
+  ├─ Instance Editable: 체크 ✅
+  └─ Details 패널 → Variable Type
+      └─ Array 버튼 클릭 (그물 아이콘)
+```
+
+**Array (배열)란?**
+
+```
+개념: 같은 타입의 데이터를 여러 개 저장하는 목록
+
+예시:
+  Actors to Activate
+    ├─ [0] Door_1
+    ├─ [1] Platform_2
+    ├─ [2] Light_3
+    └─ [3] Trap_4
+
+활용:
+  - 여러 오브젝트 관리
+  - 반복 처리 (For Each Loop)
+  - 동적 추가/삭제
+```
+
+### 3-2. For Each Loop 이해
+
+**For Each Loop 노드**
+
+```
+용도: 배열의 모든 요소를 하나씩 순회
+
+입력:
+  └─ Array: 순회할 배열
+
+출력:
+  ├─ Loop Body: 각 요소마다 실행
+  ├─ Array Element: 현재 요소
+  ├─ Array Index: 현재 인덱스 (0부터 시작)
+  └─ Completed: 모든 요소 처리 완료 시
+```
+
+**작동 과정**
+
+```
+For Each Loop 시작
+  ↓
+Array Element = Actors[0]
+  ↓
+Loop Body 실행
+  ↓
+Array Element = Actors[1]
+  ↓
+Loop Body 실행
+  ↓
+... (반복)
+  ↓
+Completed 실행
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380667/notion-blog/_/_/_5_/1/image_9.png)
+
+---
+
+## ⏱️ 4단계: Timeline Event Track
+
+### 4-1. 문제점 발견
+
+**Finished 핀의 문제**
+
+```
+Timeline → Finished
+  ↓
+Forward 재생 완료 시 실행
+  ↓
+Reverse 재생 완료 시도 실행 ⚠️
+  ↓
+원하지 않는 동작
+```
+
+### 4-2. Event Track 추가
+
+**작업**
+
+```
+PlatformElevation Timeline 더블클릭
+  ↓
++ Track 버튼 클릭
+  ↓
+Add Event Track
+  ├─ 이름: Press Event
+  └─ 키 추가: Time 0.5 (끝 부분)
+```
+
+**Event Track이란?**
+
+```
+개념: Timeline의 특정 시점에서 이벤트 발생
+
+Float Track vs Event Track
+  ├─ Float Track: 연속적인 값 변화 (0~1)
+  └─ Event Track: 특정 시점의 신호
+```
+
+**시각적 구조**
+
+```
+Timeline (0초 → 0.5초)
+  │
+  ├─ Float Track "Elevation"
+  │   └─ 0.0 → 1.0 (연속)
+  │
+  └─ Event Track "Press Event"
+      └─ 0.5초에 신호 발생 ⚡
+```
+
+### 4-3. Press Event 연결
+
+**Event Graph에 나타난 변화**
+
+```
+PlatformElevation 노드
+  ├─ Update 핀
+  ├─ Finished 핀
+  ├─ Direction 핀
+  ├─ Elevation 핀
+  └─ Press Event 핀 ✨ (새로 추가)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380663/notion-blog/_/_/_5_/1/image_10.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380663/notion-blog/_/_/_5_/1/image_11.png)
+
+---
+
+## 🔀 5단계: Direction Enum 활용
+
+### 5-1. Direction 이해
+
+**Direction Enum이란?**
+
+```
+Enum (열거형): 미리 정의된 값들 중 하나만 선택
+
+Direction의 값
+  ├─ Forward (정방향)
+  └─ Backward (역방향)
+```
+
+**Timeline Direction**
+
+```
+Play 실행 → Direction = Forward
+Reverse 실행 → Direction = Backward
+```
+
+### 5-2. On Press 함수 생성
+
+**노드 구조**
+
+```
+Press Event
+  ↓
+Branch
+  ├─ Condition: Direction == Forward?
+  ├─ True → For Each Loop
+  │            └─ Actors to Activate
+  │                └─ Activate (Interface)
+  └─ False → (실행 안 함)
+```
+
+**노드별 기능**
+
+**Equal (Enum)**
+
+```
+노드: == (Double Equal)
+용도: 두 값이 같은지 비교
+입력:
+  ├─ 좌측: Direction
+  └─ 우측: Forward
+출력:
+  └─ Boolean (True/False)
+```
+
+**Activate (Interface Message)**
+
+```
+노드: Activate (Message)
+용도: Interface 함수 호출
+입력:
+  └─ Target: Interface를 구현한 Actor
+특징:
+  - 빨간색 노드 (Interface)
+  - 각 타겟이 자기 방식으로 반응
+```
+
+### 5-3. 함수로 정리
+
+**작업**
+
+```
+Branch + For Each Loop + Activate 선택
+  ↓
+우클릭 → Collapse to Function
+  ├─ 이름: On Press
+  └─ 입력 추가: Direction (Enum)
+```
+
+**함수 구조**
+
+```
+On Press 함수
+  입력: Direction
+    ↓
+  Direction == Forward?
+    ├─ Yes → 모든 Actor 활성화
+    └─ No → 아무것도 안 함
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380663/notion-blog/_/_/_5_/1/image_12.png)
+
+## 🎯 Direction (Forward/Backward) 쉬운 설명
+
+## 🎬 Timeline의 재생 방향
+
+### 비유로 이해하기
+
+**영화 재생기**를 생각해보세요:
+
+```
+▶️ 재생 버튼 (Play)
+  └─ 영화가 앞으로 재생 = Forward
+
+◀️ 되감기 버튼 (Reverse)
+  └─ 영화가 뒤로 재생 = Backward
+```
+
+---
+
+## 📹 Timeline과 Direction
+
+### Timeline = 동영상 파일
+
+```
+Timeline: 0초 ─────────────► 0.5초
+          시작              끝
+
+▶️ Play 누르면:
+   0초 → 0.1초 → 0.2초 → 0.3초 → 0.4초 → 0.5초
+   (앞으로 진행) = Forward
+
+◀️ Reverse 누르면:
+   0.5초 → 0.4초 → 0.3초 → 0.2초 → 0.1초 → 0초
+   (뒤로 진행) = Backward
+```
+
+---
+
+## 🎮 압력판에서의 실제 동작
+
+## 🔍 왜 Direction을 확인해야 하나?
+
+### 문제 상황
+
+```
+Event Track은 "특정 시점"에만 반응합니다:
+
+Press Event (0.5초 위치)
+  ├─ Play로 재생 시: 0초 → 0.5초 도달 ✅ 발동!
+  └─ Reverse로 재생 시: 0.5초를 지나감 ⚠️ 발동!
+
+→ 둘 다 발동하는 문제!
+```
+
+### 해결 방법: Direction으로 구분
+
+```
+Press Event 발동
+  ↓
+Direction이 Forward인가?
+  ├─ Yes → "진짜 눌렀구나!" → Activate 실행
+  └─ No (Backward) → "되감기 중이구나" → 무시
+```
+
+---
+
+## 🤔 핵심 이해
+
+### Forward = "정상 재생"
+
+```
+누르는 동작
+  ↓
+Timeline 시작 → 끝
+  ↓
+압력판 위 → 아래
+  ↓
+Direction = Forward
+  ↓
+"활성화" 동작 실행
+```
+
+### Backward = "역재생"
+
+```
+떼는 동작
+  ↓
+Timeline 끝 → 시작
+  ↓
+압력판 아래 → 위
+  ↓
+Direction = Backward
+  ↓
+"비활성화" 동작 실행
+```
+
+---
+
+## ✨ 핵심 정리
+
+### Forward (정방향)
+
+```
+의미: Timeline 정상 재생
+방향: 시작 → 끝
+압력판: 눌림 동작
+용도: 활성화 (Activate)
+```
+
+### Backward (역방향)
+
+```
+의미: Timeline 역재생
+방향: 끝 → 시작
+압력판: 복귀 동작
+용도: 비활성화 (DeActivate)
+```
+
+### Direction 체크 이유
+
+```
+Event Track이 양방향 모두 발동
+  ↓
+Direction으로 구분 필수
+  ├─ Forward → 의도한 동작
+  └─ Backward → 무시
+```
+
+---
+
+## 🎓 완벽 이해 체크
+
+다음 질문에 답할 수 있다면 완벽히 이해한 것입니다:
+
+1. ✅ Forward는 Timeline의 어느 방향인가요?
+   → **시작에서 끝으로 (정상 재생)**
+2. ✅ Reverse를 실행하면 Direction 값은?
+   → **Backward**
+3. ✅ Press Event가 발동했는데 아무 일도 안 일어나는 경우는?
+   → **Direction이 Backward일 때 (되감는 중)**
+4. ✅ 압력판을 밟으면 어떤 Direction인가요?
+   → **Forward (Play 실행)**
+5. ✅ UnPress Event는 언제 "진짜" 작동하나요?
+   → **Direction이 Backward일 때**
+
+이제 Forward/Backward가 명확하게 이해되셨나요? 😊
+
+---
+
+## 🔄 6단계: Un Press 기능 추가
+
+### 6-1. DeActivate 인터페이스 함수
+
+**작업**
+
+```
+BPI_Interact 열기
+  ↓
+Functions → + 버튼
+  └─ 이름: DeActivate
+```
+
+### 6-2. UnPress Event Track
+
+**작업**
+
+```
+PlatformElevation Timeline
+  ↓
++ Track → Add Event Track
+  ├─ 이름: UnPress Event
+  └─ 키 추가: Time 0.0 (시작 부분)
+```
+
+**두 Event Track 비교**
+
+```
+Timeline 진행
+  │
+  ├─ 0.0초: UnPress Event 발생
+  │   └─ Reverse 시 이 지점 도달
+  │
+  └─ 0.5초: Press Event 발생
+      └─ Play 시 이 지점 도달
+```
+
+### 6-3. On Unpress 함수
+
+**노드 구조**
+
+```
+UnPress Event
+  ↓
+Branch
+  ├─ Condition: Direction == Backward?
+  ├─ True → For Each Loop
+  │            └─ Actors to Activate
+  │                └─ DeActivate (Interface)
+  └─ False → (실행 안 함)
+```
+
+**함수로 정리**
+
+```
+On Unpress 함수
+  입력: Direction
+    ↓
+  Direction == Backward?
+    ├─ Yes → 모든 Actor 비활성화
+    └─ No → 아무것도 안 함
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380664/notion-blog/_/_/_5_/1/image_13.png)
+
+---
+
+## 🏗️ 7단계: 테스트용 Interactive Platform
+
+### 7-1. Blueprint 생성
+
+**작업**
+
+```
+Content Browser
+  ↓
+Blueprints/Interactables 폴더
+  ↓
+우클릭 → Blueprint Class → Actor
+  └─ 이름: BP_Interactive_Platform
+```
+
+### 7-2. Interface 구현
+
+**작업**
+
+```
+BP_Interactive_Platform 열기
+  ↓
+Class Settings 버튼 클릭
+  ↓
+Details 패널
+  └─ Interfaces 섹션
+      └─ Implemented Interfaces
+          └─ Add → BPI_Interact
+```
+
+**구현된 함수 확인**
+
+```
+Functions 패널
+  └─ Interfaces 카테고리
+      ├─ Activate (이벤트)
+      └─ DeActivate (이벤트)
+```
+
+💡 **Interface 구현 특징**
+
+- 자동으로 함수 이벤트 생성됨
+- 각 함수를 원하는 대로 구현 가능
+- 같은 Interface를 여러 클래스가 다르게 구현 가능
+
+### 7-3. 테스트 구현
+
+**Activate 구현**
+
+```
+Activate 이벤트
+  ↓
+Print String
+  ├─ In String: "Activated"
+  └─ Text Color: 기본 (파란색)
+```
+
+**DeActivate 구현**
+
+```
+DeActivate 이벤트
+  ↓
+Print String
+  ├─ In String: "DeActivated"
+  └─ Text Color: Red 또는 Orange
+```
+
+**Print String 노드**
+
+```
+용도: 화면에 디버그 메시지 출력
+입력:
+  ├─ In String: 출력할 텍스트
+  ├─ Text Color: 색상
+  └─ Duration: 표시 시간
+특징:
+  - 테스트/디버깅용
+  - 게임 실행 중에만 보임
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380664/notion-blog/_/_/_5_/1/image_14.png)
+
+---
+
+## 🎮 8단계: 레벨 설정 및 테스트
+
+### 8-1. 액터 배치
+
+**작업**
+
+```
+레벨 뷰포트
+  ↓
+BP_Interactive_Platform 2개 배치
+  ├─ Platform_1 (위치 A)
+  └─ Platform_2 (위치 B)
+
+BP_Pressure_Plate 1개 배치
+  └─ 두 Platform 근처
+```
+
+### 8-2. 압력판 설정
+
+**작업**
+
+```
+BP_Pressure_Plate 선택
+  ↓
+Details 패널
+  ↓
+Actors to Activate 배열
+  ├─ + 버튼 2번 클릭 (요소 2개 추가)
+  ├─ [0] 슬롯: Eyedropper 도구
+  │    └─ 뷰포트에서 Platform_1 클릭
+  └─ [1] 슬롯: Eyedropper 도구
+       └─ 뷰포트에서 Platform_2 클릭
+```
+
+**Eyedropper 도구**
+
+```
+아이콘: 스포이트 모양
+용도: 씬의 액터를 직접 선택
+장점:
+  - 이름으로 찾을 필요 없음
+  - 시각적으로 선택
+  - 실수 방지
+```
+
+### 8-3. Does Un Press 설정
+
+**테스트 1: Does Un Press = false**
+
+```
+Details 패널
+  └─ Does Un Press: 체크 해제 ❌
+
+테스트 결과:
+  1. 압력판 밟음 → "Activated" 출력
+  2. 압력판에서 내려옴 → 아무 일 없음
+  3. Platform 눌린 상태 유지
+```
+
+**테스트 2: Does Un Press = true**
+
+```
+Details 패널
+  └─ Does Un Press: 체크 ✅
+
+테스트 결과:
+  1. 압력판 밟음 → "Activated" 출력
+  2. 압력판에서 내려옴 → "DeActivated" 출력
+  3. Platform 원래대로 복귀
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380664/notion-blog/_/_/_5_/1/image_15.png)
+
+---
+
+## 🔍 작동 순서 상세 분석
+
+### 시나리오 1: 누를 때 (Does Un Press = true)
+
+```
+1️⃣ 플레이어가 압력판 위에 올라감
+   ↓
+2️⃣ On Component Begin Overlap 발생
+   ↓
+3️⃣ PlatformElevation → Play 실행
+   ├─ Direction = Forward
+   └─ Timeline 0초 → 0.5초 재생 시작
+   ↓
+4️⃣ Update 핀 매 프레임 실행
+   ├─ Elevation: 0 → 1로 변화
+   └─ Update Plate Location 호출
+       └─ Platform이 아래로 이동
+   ↓
+5️⃣ Timeline 0.5초 도달
+   ├─ Press Event 발생
+   └─ On Press 함수 실행
+       ↓
+6️⃣ Branch: Direction == Forward?
+   └─ True (정방향이므로)
+       ↓
+7️⃣ For Each Loop 시작
+   ├─ Actors to Activate[0] → Activate
+   │   └─ Platform_1: "Activated" 출력
+   ├─ Actors to Activate[1] → Activate
+   │   └─ Platform_2: "Activated" 출력
+   └─ Loop 완료
+```
+
+### 시나리오 2: 뗄 때 (Does Un Press = true)
+
+```
+1️⃣ 플레이어가 압력판에서 내려옴
+   ↓
+2️⃣ On Component End Overlap 발생
+   ↓
+3️⃣ Branch: Does Un Press?
+   └─ True (체크되어 있음)
+       ↓
+4️⃣ PlatformElevation → Reverse 실행
+   ├─ Direction = Backward
+   └─ Timeline 0.5초 → 0초 역재생 시작
+   ↓
+5️⃣ Update 핀 매 프레임 실행
+   ├─ Elevation: 1 → 0으로 변화
+   └─ Update Plate Location 호출
+       └─ Platform이 위로 이동
+   ↓
+6️⃣ Timeline 0.0초 도달
+   ├─ UnPress Event 발생
+   └─ On Unpress 함수 실행
+       ↓
+7️⃣ Branch: Direction == Backward?
+   └─ True (역방향이므로)
+       ↓
+8️⃣ For Each Loop 시작
+   ├─ Actors to Activate[0] → DeActivate
+   │   └─ Platform_1: "DeActivated" 출력
+   ├─ Actors to Activate[1] → DeActivate
+   │   └─ Platform_2: "DeActivated" 출력
+   └─ Loop 완료
+```
+
+### 시나리오 3: 버튼 스타일 (Does Un Press = false)
+
+```
+1️⃣ 플레이어가 압력판 위에 올라감
+   ↓
+   [2️⃣~7️⃣은 시나리오 1과 동일]
+   ↓
+8️⃣ 플레이어가 압력판에서 내려옴
+   ↓
+9️⃣ On Component End Overlap 발생
+   ↓
+🔟 Branch: Does Un Press?
+   └─ False (체크 안 됨)
+       ↓
+⓫ 아무 일도 일어나지 않음
+   ├─ Reverse 실행 안 됨
+   ├─ Platform 눌린 상태 유지
+   └─ DeActivate 호출 안 됨
+```
+
+---
+
+## 🧩 핵심 시스템 원리
+
+### Interface 통신 구조
+
+```
+압력판 (Sender)
+  │
+  │ "Activate" 메시지
+  │
+  ├─→ Platform_1 (Receiver)
+  │     └─ 자기만의 방식으로 반응
+  │
+  ├─→ Platform_2 (Receiver)
+  │     └─ 자기만의 방식으로 반응
+  │
+  └─→ Door_3 (Receiver)
+        └─ 자기만의 방식으로 반응
+```
+
+**장점**
+
+```
+1. 느슨한 결합 (Loose Coupling)
+   └─ 압력판은 받는 쪽 타입을 몰라도 됨
+
+2. 확장성
+   └─ 새 타입 추가 쉬움 (Interface만 구현)
+
+3. 메모리 효율
+   └─ 하드 레퍼런스 없음
+
+4. 재사용성
+   └─ 같은 압력판으로 다양한 오브젝트 제어
+```
+
+### Timeline Event Track 원리
+
+```
+Event Track의 역할
+  ├─ 특정 시점에서 신호 발생
+  ├─ Direction과 조합하여 방향 구분
+  └─ Finished보다 정확한 타이밍 제어
+
+Press Event (0.5초)
+  ├─ Play 시: 정방향 완료
+  └─ Reverse 시: 통과 (하지만 Direction != Forward라 실행 안 됨)
+
+UnPress Event (0.0초)
+  ├─ Reverse 시: 역방향 완료
+  └─ Play 시: 통과 (하지만 Direction != Backward라 실행 안 됨)
+```
+
+---
+
+## 📊 노드 기능 총정리
+
+### 제어 흐름 노드
+
+**Branch**
+
+```
+용도: 조건부 실행
+입력: Condition (Boolean)
+출력: True, False
+활용: if문 구현
+```
+
+**For Each Loop**
+
+```
+용도: 배열 순회
+입력: Array
+출력: Loop Body, Array Element, Completed
+활용: 다중 오브젝트 처리
+```
+
+### 비교 노드
+
+**== (Equal)**
+
+```
+용도: 값 비교
+입력: 두 개의 같은 타입 값
+출력: Boolean
+종류: Integer, Float, String, Enum 등
+```
+
+### Interface 노드
+
+**Interface Message Call**
+
+```
+형태: 빨간색 노드
+용도: Interface 함수 호출
+특징:
+  ├─ 타겟 타입 불필요
+  ├─ Interface 구현한 액터만 반응
+  └─ 각자 다르게 구현 가능
+```
+
+### Timeline 노드
+
+**Event Track**
+
+```
+용도: 특정 시점 이벤트
+설정: Timeline 편집 창에서 키 추가
+출력: Event Graph에 핀 자동 생성
+```
+
+---
+
+## ⚙️ 주요 설정값
+
+### BP_Pressure_Plate
+
+```
+변수 설정
+  ├─ Does Un Press
+  │   ├─ Type: Boolean
+  │   ├─ Default: true
+  │   └─ Instance Editable: ✅
+  │
+  └─ Actors to Activate
+      ├─ Type: Actor (Object Reference)
+      ├─ Container Type: Array
+      └─ Instance Editable: ✅
+
+Timeline 설정
+  ├─ Float Track: Elevation (0.0 → 1.0)
+  ├─ Event Track: Press Event (0.5초)
+  └─ Event Track: UnPress Event (0.0초)
+```
+
+### BPI_Interact
+
+```
+Interface 함수
+  ├─ Activate
+  └─ DeActivate
+```
+
+---
+
+## 🎯 핵심 정리
+
+### 시스템 구조
+
+```
+압력판
+  ├─ 입력: 플레이어 충돌
+  ├─ 처리: Timeline 재생
+  ├─ 출력: Interface 메시지
+  └─ 옵션: Does Un Press
+
+Interface
+  ├─ 정의: Activate/DeActivate
+  ├─ 구현: 각 오브젝트마다 다름
+  └─ 통신: 느슨한 결합
+
+반응 오브젝트
+  ├─ Interface 구현
+  └─ 자기 방식대로 반응
+```
+
+### 작동 흐름
+
+```
+1. 충돌 감지 (Begin/End Overlap)
+   ↓
+2. Timeline 재생 (Play/Reverse)
+   ↓
+3. Event Track 트리거 (Press/UnPress)
+   ↓
+4. Direction 확인 (Forward/Backward)
+   ↓
+5. Interface 호출 (Activate/DeActivate)
+   ↓
+6. 각 오브젝트 반응
+```
+
+---
+
+## 💡 주의사항
+
+1. **Direction 체크 필수**
+   - Event Track은 방향 무관 발동
+   - Branch로 정방향/역방향 구분 필요
+2. **Interface 구현 확인**
+   - 배열에 추가한 Actor가 Interface 구현 필수
+   - 미구현 시 아무 일도 안 일어남
+3. **Event Track 타이밍**
+   - Press Event: Timeline 끝 (0.5초)
+   - UnPress Event: Timeline 시작 (0.0초)
+   - 위치 정확히 설정
+4. **배열 인덱스**
+   - 0부터 시작
+   - 빈 슬롯 주의
+5. **Eyedropper 사용**
+   - 같은 레벨의 액터만 선택 가능
+   - 다른 레벨 액터는 직접 드래그
+
+---
+
+## 🚀 확장 가능성
+
+현재 시스템으로 가능한 것:
+
+- ✅ 문 열기/닫기
+- ✅ 불빛 켜기/끄기
+- ✅ 함정 활성화
+- ✅ 플랫폼 이동
+- ✅ 사운드 재생
+- ✅ 파티클 효과
+
+다음 단계:
+
+- 실제 문 Blueprint 제작
+- 이동 플랫폼 구현
+- 복잡한 퍼즐 설계
+
+---
+
+## ✨ 완성된 시스템
+
+✅ 압력판 시각적 피드백
+
+✅ 버튼/스위치 두 가지 모드
+
+✅ 다중 오브젝트 제어
+
+✅ Interface 기반 느슨한 결합
+
+✅ 확장 가능한 구조
+
+✅ 메모리 효율적인 설계
+
+# { 🎮 Floating Platform (떠다니는 플랫폼) 만들기 }
+
+## 🎯 목표
+
+압력판을 밟으면 플랫폼이 한 위치에서 다른 위치로 부드럽게 이동하는 시스템 구축
+
+---
+
+## 📋 전체 구조 개요
+
+```
+BP_Interactive_Platform (부모 클래스)
+  ├─ Platform Mesh (정적 메시)
+  └─ BPI_Interact Interface 구현
+
+BP_Floating_Platform (자식 클래스)
+  ├─ Scene Root (시작 위치)
+  ├─ Interp Location (도착 위치)
+  ├─ Float Timeline (이동 애니메이션)
+  └─ Curve Asset (3초 정규화 곡선)
+
+압력판
+  └─ Actors to Activate 배열
+      └─ Floating Platform 참조
+```
+
+---
+
+## 🏗️ 1단계: Base Class 생성
+
+### 1-1. BP_Interactive_Platform 수정
+
+**기존 상태**
+
+```
+BP_Interactive_Platform
+  └─ Activate/DeActivate 구현
+      └─ Print String만 출력 (테스트용)
+```
+
+**새로운 목표**
+
+```
+BP_Interactive_Platform
+  ├─ 부모 클래스로 사용
+  ├─ 공통 컴포넌트 제공
+  └─ 자식 클래스가 기능 구현
+```
+
+### 1-2. Static Mesh 추가
+
+**작업**
+
+```
+BP_Interactive_Platform 열기
+  ↓
+Components 패널
+  ↓
+Add Component → Static Mesh
+  ├─ 이름: Platform Mesh
+  ├─ Mesh: SM_Platform 선택
+  └─ 계층 구조: Scene Root 아래 (루트로 만들지 않음)
+```
+
+**Scene Root 유지 이유**
+
+```
+Scene Root (DefaultSceneRoot)
+  └─ Platform Mesh
+
+이유:
+  ├─ Scene Root = 기준점 (시작 위치)
+  ├─ Platform Mesh = 움직이는 부분
+  └─ Interp Location = 목표 위치
+
+→ 세 개의 위치 관리 필요
+```
+
+💡 **초보 설명**:
+
+- Scene Root는 "여기가 시작점이야" 표시
+- Platform Mesh는 실제 보이는 부분
+- 나중에 Interp Location을 추가해서 "여기로 이동해" 표시
+
+### 1-3. Print String 제거
+
+**작업**
+
+```
+Event Graph
+  ↓
+Activate/DeActivate의 Print String 삭제
+  └─ 빈 이벤트로 남김 (자식 클래스가 구현)
+```
+
+---
+
+## 👶 2단계: 자식 클래스 생성
+
+### 2-1. BP_Floating_Platform 생성
+
+**작업**
+
+```
+Content Browser
+  ↓
+BP_Interactive_Platform 우클릭
+  ↓
+Create Child Blueprint Class
+  └─ 이름: BP_Floating_Platform
+```
+
+**상속 구조**
+
+```
+BP_Interactive_Platform (부모)
+  ├─ Platform Mesh ✅
+  ├─ BPI_Interact 구현 ✅
+  └─ Scene Root ✅
+
+BP_Floating_Platform (자식)
+  ├─ 부모의 모든 것 상속
+  └─ Activate 기능 직접 구현
+```
+
+💡 **상속이란?**
+
+- 부모의 컴포넌트, 변수, 함수를 자동으로 가짐
+- 자식은 추가 기능만 구현하면 됨
+- 여러 자식 클래스 만들어서 다양한 플랫폼 제작 가능
+
+---
+
+## 📐 3단계: Interp Location 추가
+
+### 3-1. Scene Component 추가
+
+**작업**
+
+```
+BP_Floating_Platform
+  ↓
+Components 패널
+  ↓
+Add Component → Scene Component
+  ├─ 이름: Interp Location
+  └─ 위치: 원하는 도착점으로 이동
+```
+
+**Scene Component 역할**
+
+```
+Scene Root (0, 0, 0)
+  └─ 시작 위치
+
+Interp Location (예: 0, 0, 500)
+  └─ 도착 위치
+
+→ Platform Mesh가 이 두 위치 사이를 이동
+```
+
+**위치 설정 예시**
+
+```
+위로 올라가기
+  └─ Z축: +500
+
+옆으로 이동
+  └─ Y축: +300
+
+앞으로 이동
+  └─ X축: +400
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380664/notion-blog/_/_/_5_/1/image_16.png)
+
+---
+
+## 📊 4단계: Curve Asset 생성
+
+### 4-1. Curve Asset이란?
+
+**기존 방식**
+
+```
+Timeline에서 직접 키 추가
+  ├─ 매번 반복 작업
+  ├─ 재사용 불가
+  └─ 관리 어려움
+```
+
+**Curve Asset 방식**
+
+```
+별도 파일로 Curve 저장
+  ├─ 한 번 만들면 재사용
+  ├─ 여러 Timeline에서 공유
+  └─ 중앙 관리 가능
+```
+
+**비유**
+
+```
+기존 방식 = 요리할 때마다 레시피 새로 작성
+Curve Asset = 레시피북에 저장해서 계속 사용
+```
+
+### 4-2. Curve Asset 생성
+
+**폴더 생성**
+
+```
+Content Browser
+  ↓
+Blueprints 폴더에서
+  ↓
+우클릭 → New Folder
+  └─ 이름: Curves
+```
+
+**Curve 생성**
+
+```
+Curves 폴더에서 우클릭
+  ↓
+Miscellaneous → Curve
+  ↓
+Curve Float 선택
+  └─ 이름: Curve_Normalized_3s
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380664/notion-blog/_/_/_5_/1/image_17.png)
+
+**명명 규칙**
+
+```
+Curve_Normalized_3s
+  ├─ Normalized: 0~1 정규화
+  └─ 3s: 3초 길이
+```
+
+### 4-3. Curve 편집
+
+**작업**
+
+```
+Curve_Normalized_3s 더블클릭
+  ↓
+Curve Editor 열림
+  ↓
+그래프 영역 우클릭 → Add Key
+```
+
+**키 1 설정**
+
+```
+선택 후 Details 패널
+  ├─ Time: 0.0
+  └─ Value: 0.0
+```
+
+**키 2 설정**
+
+```
+다시 우클릭 → Add Key
+  ├─ Time: 3.0
+  └─ Value: 1.0
+```
+
+💡 **주의**: 키 추가 순서대로 정렬됨
+
+- 첫 번째 키를 0.0으로 바꾸면 자동으로 맨 앞으로 이동
+
+**부드럽게 만들기**
+
+```
+두 키 모두 선택 (Shift + 클릭)
+  ↓
+우클릭 → Auto
+  └─ 직선이 S자 곡선으로 변경
+```
+
+**화면 맞추기**
+
+```
+툴바 → Zoom to Fit 버튼
+  └─ 전체 Curve가 화면에 보이도록 조정
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380665/notion-blog/_/_/_5_/1/image_18.png)
+
+---
+
+## ⏱️ 5단계: Timeline 설정
+
+### 5-1. Float Timeline 생성
+
+**작업**
+
+```
+BP_Floating_Platform Event Graph
+  ↓
+우클릭 → Add Timeline
+  └─ 이름: Float
+```
+
+💡 **이름 "Float" 의미**:
+
+- Float (부동소수점) ❌
+- Float (떠다님) ✅
+- 플랫폼이 공중에 떠다니는 동작
+
+### 5-2. External Curve 사용
+
+**기존 방식**
+
+```
+Timeline 편집 창
+  ↓
+Float Track 추가
+  ↓
+직접 키 추가 (반복 작업)
+```
+
+**External Curve 방식**
+
+```
+Timeline 편집 창
+  ↓
+Float Track 추가
+  ├─ 이름: Float
+  └─ Dropdown → Select Curve
+      └─ Curve_Normalized_3s 선택
+```
+
+**External Curve 장점**
+
+```
+✅ 재사용 가능
+✅ 중앙 관리
+✅ 빠른 설정
+✅ 일관성 유지
+```
+
+**Timeline Length 설정**
+
+```
+Timeline Details
+  └─ Length: 3.0
+      └─ Curve 길이와 일치
+```
+
+**External Curve 확인**
+
+```
+Timeline 편집 창
+  └─ Curve가 회색으로 표시
+      └─ 편집 불가 (외부 파일이므로)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380665/notion-blog/_/_/_5_/1/image_19.png)
+
+---
+
+## 🔄 6단계: Lerp 시스템 구현
+
+### 6-1. Update Platform Location 함수
+
+**노드 구조**
+
+```
+Float Timeline → Update
+  ↓
+Get Actor Location
+  ├─ Target: Self
+  └─ Return Value: Scene Root 위치 (시작점)
+  ↓
+Lerp (Vector)
+  ├─ A: Actor Location (Scene Root)
+  ├─ B: Interp Location의 World Location
+  └─ Alpha: Float (Timeline 값 0~1)
+  ↓
+Set World Location
+  ├─ Target: Platform Mesh
+  └─ New Location: Lerp 결과
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380665/notion-blog/_/_/_5_/1/image_20.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380665/notion-blog/_/_/_5_/1/image_21.png)
+
+**각 노드 설명**
+
+**Get Actor Location**
+
+```
+용도: Actor의 루트 위치 가져오기
+입력: Target (Self)
+출력: Vector (Scene Root 위치)
+특징: Scene Root = Actor의 기준점
+```
+
+**Get World Location (Interp Location)**
+
+```
+용도: Scene Component의 월드 좌표
+입력: Target (Interp Location)
+출력: Vector (목표 위치)
+```
+
+**Lerp (Vector)**
+
+```
+A: Scene Root 위치 (0, 0, 0)
+B: Interp Location 위치 (0, 0, 500)
+Alpha: 0~1 (Timeline 진행도)
+
+Alpha = 0.0 → (0, 0, 0)
+Alpha = 0.5 → (0, 0, 250)
+Alpha = 1.0 → (0, 0, 500)
+```
+
+**Set World Location**
+
+```
+Target: Platform Mesh (움직일 오브젝트)
+New Location: Lerp 계산 결과
+Sweep: false
+Teleport: false
+```
+
+### 6-2. Activate 이벤트 연결
+
+**노드 구조**
+
+```
+Activate (Interface Event)
+  ↓
+Float Timeline → Play from Start
+  ↓
+Update 핀 → Update Platform Location 함수
+```
+
+**작동 흐름**
+
+```
+1. 압력판 밟음
+   ↓
+2. Activate 호출
+   ↓
+3. Float Timeline 재생 시작
+   ↓
+4. 매 프레임 Update 실행
+   ↓
+5. Alpha 값이 0 → 1로 변화
+   ↓
+6. Platform Mesh가 Scene Root → Interp Location으로 이동
+   ↓
+7. 3초 후 도착
+```
+
+### 6-3. 함수로 정리
+
+**작업**
+
+```
+Lerp + Set World Location 노드 선택
+  ↓
+우클릭 → Collapse to Function
+  └─ 이름: Update Platform Location
+```
+
+---
+
+## 🎮 7단계: 레벨 배치 및 테스트
+
+### 7-1. 기존 Platform 제거
+
+**작업**
+
+```
+레벨에 있던 BP_Interactive_Platform 인스턴스
+  └─ 선택 후 Delete (테스트용이었음)
+```
+
+### 7-2. Floating Platform 배치
+
+**작업**
+
+```
+Content Browser
+  └─ BP_Floating_Platform 드래그
+      └─ 레벨에 배치
+
+Components에서 Interp Location 선택
+  └─ 위치 조정 (예: Z축 +500)
+```
+
+**위치 조정 예시**
+
+```
+배치 1:
+  Scene Root: (0, 0, 100)
+  Interp Location: (0, 0, 600)
+  → 위로 500 상승
+
+배치 2:
+  Scene Root: (500, 0, 100)
+  Interp Location: (0, 0, 100)
+  → 왼쪽으로 500 이동
+```
+
+### 7-3. 압력판 연결
+
+**작업**
+
+```
+BP_Pressure_Plate 선택
+  ↓
+Details 패널
+  └─ Actors to Activate
+      ├─ 기존 요소 삭제 (휴지통 아이콘)
+      ├─ + 버튼 클릭
+      └─ Eyedropper → Floating Platform 선택
+```
+
+### 7-4. 테스트
+
+**테스트 시나리오 1**
+
+```
+압력판 밟기
+  ↓
+Floating Platform이 위로 올라감
+  ↓
+3초 동안 부드럽게 이동
+  ↓
+Interp Location 위치에 도착
+```
+
+---
+
+## 🎨 8단계: 여러 Platform 만들기
+
+### 8-1. 두 번째 Platform 배치
+
+**작업**
+
+```
+BP_Floating_Platform을 다시 드래그
+  └─ 다른 위치에 배치
+
+Interp Location 조정
+  ├─ Scene Root: (1000, 0, 100)
+  └─ Interp Location: (1500, 0, 100)
+      └─ 오른쪽으로 500 이동
+```
+
+### 8-2. 배열에 추가
+
+**작업**
+
+```
+압력판 선택
+  ↓
+Actors to Activate
+  ├─ + 버튼 (요소 추가)
+  └─ Eyedropper → 두 번째 Platform 선택
+```
+
+**결과**
+
+```
+압력판 밟으면
+  ├─ Platform 1: 위로 이동
+  └─ Platform 2: 오른쪽으로 이동
+```
+
+---
+
+## 🔍 작동 원리 상세 분석
+
+### Timeline과 Lerp의 관계
+
+```
+시간 경과
+━━━━━━━━━━━━━━━━━━━━━━━━
+0초          1.5초        3초
+
+Timeline Float 값
+0.0          0.5          1.0
+
+Lerp 계산 (위로 이동 예시)
+━━━━━━━━━━━━━━━━━━━━━━━━
+Scene Root (0,0,100)
+           ↓
+Lerp Alpha=0.5 (0,0,350)
+           ↓
+Interp Location (0,0,600)
+
+Platform Mesh 위치
+━━━━━━━━━━━━━━━━━━━━━━━━
+0초: (0, 0, 100)
+1.5초: (0, 0, 350)
+3초: (0, 0, 600)
+```
+
+### External Curve의 장점 실례
+
+```
+시나리오: 10개의 다른 플랫폼 만들기
+
+기존 방식:
+  10개 Timeline × 각 2개 키 추가
+  = 20번의 반복 작업
+
+External Curve:
+  1번 Curve 생성
+  10개 Timeline에서 선택만
+  = 10번의 클릭
+```
+
+---
+
+## 🏗️ 아키텍처 분석
+
+### 클래스 상속 구조
+
+```
+BP_Interactive_Platform (부모)
+  역할: 공통 기능 제공
+  ├─ Platform Mesh
+  ├─ BPI_Interact 구현
+  └─ 기본 구조
+
+BP_Floating_Platform (자식)
+  역할: 떠다니는 기능 추가
+  ├─ 부모 기능 상속
+  ├─ Float Timeline
+  ├─ Interp Location
+  └─ Update Platform Location
+
+BP_Rotating_Platform (미래 자식)
+  역할: 회전하는 기능 추가
+  ├─ 부모 기능 상속
+  └─ 회전 로직만 추가
+
+BP_Disappearing_Platform (미래 자식)
+  역할: 사라지는 기능 추가
+  ├─ 부모 기능 상속
+  └─ 사라지는 로직만 추가
+```
+
+### Interface 통신
+
+```
+압력판 (알 필요 없음)
+  │
+  │ "Activate" 메시지만 전달
+  │
+  ├─→ Floating Platform
+  │     └─ 이동 로직 실행
+  │
+  ├─→ Rotating Platform
+  │     └─ 회전 로직 실행
+  │
+  └─→ Disappearing Platform
+        └─ 사라지는 로직 실행
+```
+
+---
+
+## 📝 핵심 개념 정리
+
+### Curve Asset
+
+```
+개념: 재사용 가능한 곡선 데이터
+타입:
+  ├─ Float Curve (단일 값)
+  ├─ Vector Curve (3차원 값)
+  └─ Linear Color Curve (색상)
+
+장점:
+  ✅ 중앙 관리
+  ✅ 재사용
+  ✅ 일관성
+  ✅ 수정 편의
+```
+
+### Scene Component
+
+```
+용도: 위치 마커
+특징:
+  ├─ 렌더링 안 됨 (보이지 않음)
+  ├─ 충돌 없음
+  ├─ 위치 정보만 저장
+  └─ 매우 가벼움
+
+활용:
+  ├─ 목표 위치
+  ├─ 기준점
+  ├─ 스폰 포인트
+  └─ 웨이포인트
+```
+
+### Lerp 보간
+
+```
+공식: A + (B - A) × Alpha
+
+예시: 높이 100 → 600으로 이동
+  Alpha = 0.0 → 100 + (600-100) × 0 = 100
+  Alpha = 0.25 → 100 + (600-100) × 0.25 = 225
+  Alpha = 0.5 → 100 + (600-100) × 0.5 = 350
+  Alpha = 0.75 → 100 + (600-100) × 0.75 = 475
+  Alpha = 1.0 → 100 + (600-100) × 1 = 600
+```
+
+---
+
+## 💡 주의사항
+
+1. **Scene Root vs Interp Location**
+   - Scene Root = 시작 위치 (Actor 기준점)
+   - Interp Location = 도착 위치 (수동 설정)
+   - 둘의 차이가 이동 거리
+2. **Platform Mesh는 루트가 아님**
+   - Scene Root가 기준점
+   - Platform Mesh는 움직이는 부분
+   - Get Actor Location은 Scene Root 반환
+3. **External Curve 수정**
+   - Timeline에서 직접 수정 불가
+   - Curve Asset 파일 열어서 수정
+   - 모든 사용처에 자동 반영
+4. **Timeline Length**
+   - Curve 길이와 일치해야 함
+   - 3초 Curve면 Length도 3.0
+5. **배열 인덱스**
+   - 여러 Platform 추가 가능
+   - 한 번에 모두 활성화
+   - 각각 다른 동작 가능
+
+---
+
+## 🎓 디자인 패턴
+
+### Template Method Pattern
+
+```
+부모 클래스 (BP_Interactive_Platform)
+  └─ 구조만 정의 (Activate 이벤트)
+
+자식 클래스들
+  ├─ BP_Floating_Platform: 이동 구현
+  ├─ BP_Rotating_Platform: 회전 구현
+  └─ BP_Disappearing_Platform: 사라짐 구현
+```
+
+### Observer Pattern (Interface 통신)
+
+```
+Subject (압력판)
+  └─ 상태 변화 알림 (Activate)
+
+Observers (플랫폼들)
+  └─ 각자 방식으로 반응
+```
+
+---
+
+## 🚀 확장 아이디어
+
+### 현재 시스템으로 가능한 것
+
+```
+1. 여러 방향 이동
+   ├─ 위/아래
+   ├─ 좌/우
+   └─ 앞/뒤
+
+2. 다양한 속도
+   └─ Curve 길이 조정 (1초, 5초, 10초)
+
+3. 다단계 이동
+   └─ 여러 Platform 체인으로 연결
+
+4. 왕복 이동
+   └─ DeActivate에서 Reverse 구현
+```
+
+### 추가 가능한 기능
+
+```
+회전 플랫폼
+  └─ Lerp (Rotator) 사용
+
+크기 변화
+  └─ Lerp (Vector) + Set Relative Scale 3D
+
+색상 변화
+  └─ Linear Color Lerp + Dynamic Material
+
+사라지는 플랫폼
+  └─ Set Visibility + Set Collision Enabled
+```
+
+---
+
+## ✨ 완성된 시스템
+
+✅ 재사용 가능한 Curve Asset
+
+✅ 상속 구조로 확장 가능
+
+✅ Interface 기반 느슨한 결합
+
+✅ 부드러운 이동 애니메이션
+
+✅ 여러 플랫폼 동시 제어
+
+✅ 위치 기반 유연한 설정
+
+✅ 깔끔한 코드 아키텍처

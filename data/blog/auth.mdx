@@ -1,0 +1,231 @@
+---
+title: '구글 로그인하기 Auth'
+date: '2026-09-02'
+category: '풀스택/개인 정리 (풀스택)'
+tags: ['풀스택', '개인 정리 (풀스택)']
+draft: false
+summary: ''
+---
+
+```jsx
+Auth 로그인 서비스를 사용하기 위해 Google Cloud Platform에 가입 & 새 프로젝트 만들기
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381450/notion-blog/_/_/_Auth/Untitled.png)
+
+```jsx
+웹 어플리케이션으로 설정해준다 그리고 대표 URl 그리고 리다이렉션 URl 을 설정해준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381450/notion-blog/_/_/_Auth/Untitled_1.png)
+
+# 구글 로그인 버튼 만들어주기
+
+```jsx
+로그인 페이지에 나타나는 구글 로그인 버튼을 만들어준다
+
+여기서 아까 구글 홈페이지에서 작성했던 환경변수 값으로 인가 코드를 받기위한 페이지로 리다이렉트 하게 한다
+
+환경변수와 함께 위의 주소로 ( 쿼리스트링에 합쳐서 ) 요청을 보내면 인가 코드를 받을 수 있다
+```
+
+```jsx
+import React from 'react'
+
+const GoogleLoginButton = () => {
+  // Google 로그인 버튼 클릭 시 실행되는 함수
+  const handleGoogleLogin = async () => {
+    // Google OAuth 인증을 위한 클라이언트 ID
+    const clientId = process.env.REACT_APP_GOOGLE_CLIENT_ID
+    // 리다이렉트 URI를 구성하여 현재 호스트의 /authGoogle 엔드포인트로 리다이렉트될 수 있도록 함
+    const redirectUri = encodeURIComponent(`${process.env.REACT_APP_BASE_URL}/authGoogle`)
+    // 요청할 권한(scope)을 설정, 프로필 정보와 이메일을 요청
+    const scope = encodeURIComponent('email profile')
+    // 응답 타입 설정, 코드를 요청하여 인증 코드를 받음
+    const responseType = 'code'
+
+    try {
+      // Google OAuth2 인증 엔드포인트 URL 구성
+      let url = 'https://accounts.google.com/o/oauth2/v2/auth'
+      url += `?client_id=${clientId}` // 클라이언트 ID 추가
+      url += `&redirect_uri=${redirectUri}` // 리다이렉트 URI 추가
+      url += `&response_type=${responseType}` // 응답 타입 추가
+      url += `&scope=${scope}` // 권한(scope) 추가
+
+      // Google 로그인 페이지로 리다이렉트
+      window.location.href = url
+    } catch (error) {
+      // 에러가 발생한 경우 콘솔에 에러 메시지 출력
+      console.error('Error logging in with Google:', error)
+    }
+  }
+
+  return (
+    <>
+      <div className="row">
+        {/* Google 로그인 버튼 */}
+        <button className="mt-5" onClick={handleGoogleLogin}>
+          {/* Google 로그인 이미지 */}
+          <img
+            className="text-center"
+            src={process.env.REACT_APP_BACKEND + `/images/google_login.png`}
+            id="google-login"
+            width="400px"
+          />
+        </button>
+      </div>
+    </>
+  )
+}
+
+export default GoogleLoginButton
+```
+
+# 구글 인가 코드를 사용해서 사용자 정보 받아오는 페이지
+
+```jsx
+위에서 쿼리 스트링으로 요청을 보내서 방아온 인가코드가 주소에 포함되어 있는데 이걸 추출하여 사용한다
+
+이 code 값을 서버로 보내서 이제 엑세스 토큰을 발급받을 것이다
+```
+
+```jsx
+import React, { useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
+import { toast } from 'react-toastify'
+import Loader from '../Layout/Loader'
+import axios from 'axios'
+
+const AuthGoogleCallback = () => {
+  const location = useLocation()
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search)
+    const authorizationCode = urlParams.get('code')
+
+    const sendDataToServer = async () => {
+      try {
+        const response = await axios.post(
+          process.env.REACT_APP_BACKEND_URL + `/auth/google`,
+          { code: authorizationCode },
+          { withCredentials: true }
+        )
+        console.log('받아온 유저 정보', response.data)
+        toast.success('로그인 성공!')
+        window.location.replace('/')
+      } catch (error) {
+        console.error(error)
+      }
+    }
+
+    sendDataToServer() // 함수 호출하여 서버로 데이터 전송
+  }, [location.search])
+
+  return (
+    <div>
+      <Loader />
+    </div>
+  )
+}
+
+export default AuthGoogleCallback
+```
+
+# 구글 로그인 서버
+
+```jsx
+받아온 인가 코드를 사용해서 토큰을 발급받는다
+
+https://oauth2.googleapis.com/token 이 주소로 값을 보내면 엑세스 토큰을 얻을 수 있고
+
+https://www.googleapis.com/oauth2/v1/userinfo?alt=json&access_token
+
+위의 주로소 엑세스 토큰을 보내서 사용자의 정보를 얻을 수 있다
+
+이렇게 한 뒤 사용자 email 을 확인해서 사용자가 존재하면 DB 에 저장하고 없다면 그대로 로그인을 바로 진행하게 한다
+
+( 임시 비밀번호 생성기는 비밀번호는 필수 영역인데 비워둘수가 없어서 사용하였다 )
+```
+
+```jsx
+const express = require("express");
+const router = express.Router();
+const axios = require("axios");
+const User = require("../model/user");
+const sendToken = require("../util/jwtToken");
+
+// 임시 비밀번호 생성 함수
+function generateRandomPassword() {
+  const length = 10; // 비밀번호 길이
+  const charset =
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"; // 사용할 문자셋
+  let password = "";
+  for (let i = 0; i < length; i++) {
+    const randomIndex = Math.floor(Math.random() * charset.length);
+    password += charset[randomIndex];
+  }
+  return password;
+}
+
+// 카카오 토큰 요청 및 사용자 정보 조회 핸들러
+router.post("/kakao", async (req, res, next) => {
+  const { code } = req.body; // 프론트엔드에서 받은 인가 코드
+  const restApiKey = "965a71a94f58405c10e1712ce59b83bd"; // 카카오 앱의 REST API 키
+
+.... 카카오 로그인 부분 생략
+
+// 구글 Auth 로그인
+
+// 구글 Auth 콜백
+router.post("/google", async (req, res) => {
+  const { code } = req.body;
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const redirectUri = encodeURI(`${process.env.BASE_URL}/authGoogle`);
+  console.log("데이터 값", code, clientId, clientSecret, redirectUri);
+
+  try {
+    // 구글에서 액세스 토큰 요청
+    const response = await axios.post(`https://oauth2.googleapis.com/token`, {
+      code: code,
+      client_id: clientId,
+      client_secret: clientSecret,
+      redirect_uri: redirectUri,
+      grant_type: "authorization_code",
+    });
+
+    const accessToken = response.data.access_token;
+
+    // 액세스 토큰을 사용하여 구글 사용자 정보 요청
+    const userInfoResponse = await axios.get(
+      `https://www.googleapis.com/oauth2/v1/userinfo?alt=json&access_token=${accessToken}`
+    );
+
+    // 사용자 정보
+    const userInfo = userInfoResponse.data;
+
+    // 여기서는 사용자를 데이터베이스에 저장하거나 로그인 처리를 수행합니다.
+    console.log(userInfo);
+
+    // 사용자 이메일을 통해 데이터베이스에서 사용자 조회
+    let user = await User.findOne({ email: userInfo.email });
+
+    // 사용자가 데이터베이스에 존재하지 않으면 새로운 사용자로 저장
+    if (!user) {
+      user = new User({
+        name: userInfo.name,
+        email: userInfo.email,
+        password: generateRandomPassword(),
+      });
+      await user.save();
+    }
+    sendToken(user, 201, res);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+module.exports = router;
+
+```

@@ -1,0 +1,3290 @@
+---
+title: '섹션 2: Obstacle Assault - 2'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 언리얼 엔진에서 액터 위치 설정하기 }
+
+## SetActorLocation 함수
+
+**C++에서 액터의 위치를 변경하는 함수**
+
+### 기본 문법
+
+```cpp
+SetActorLocation(FVector 위치);
+```
+
+## 사전 준비: 컴포넌트 추가
+
+### 문제 상황
+
+- 새로 만든 액터 클래스는 **Transform이 없음**
+- Transform이 없으면 위치, 회전, 크기 설정 불가
+
+### 해결 방법: 루트 컴포넌트 추가
+
+### 1. 에디터에서 추가
+
+```
+아웃라이너에서 액터 선택
+→ 디테일 패널 "Add Component" 버튼 (+)
+→ "Cube" 선택 (임시 자리표시자)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380616/notion-blog/_/_/_5_C_/_2_Obstacle_Assault_-_2/image.png)
+
+### 2. 루트 컴포넌트란?
+
+- 액터에 **처음 추가하는 컴포넌트**
+- 액터의 **기준점(Transform)** 역할
+- 모든 다른 컴포넌트는 루트를 기준으로 배치됨
+
+### 큐브를 플랫폼처럼 만들기
+
+```
+Scale 조정:
+- X: 3.0
+- Y: 3.0
+- Z: 0.15  (얇은 판 모양)
+```
+
+## SetActorLocation 사용법
+
+### 기본 예제
+
+```cpp
+// MovingPlatform.cpp
+void AMovingPlatform::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // FVector로 새 위치 설정
+    FVector NewLocation = FVector(-1110.0f, 610.0f, 440.0f);
+
+    // 액터를 NewLocation으로 이동
+    SetActorLocation(NewLocation);
+}
+```
+
+### 단계별 설명
+
+```cpp
+// 1. 위치 벡터 생성
+FVector TestVector = FVector(100.0f, 200.0f, 300.0f);
+//                           ↑       ↑       ↑
+//                           X       Y       Z
+
+// 2. 액터 위치 설정
+SetActorLocation(TestVector);
+//  ↑ 함수 이름
+//               ↑ FVector 인자
+```
+
+## 에디터에서 위치 복사하기
+
+### 방법 1: 수동으로 복사
+
+```
+1. 액터를 원하는 위치로 이동
+2. Location 값 확인
+   X: -1110
+   Y: 610
+   Z: 440
+3. 코드에 입력
+```
+
+### 방법 2: 위치 복사 기능 사용 (추천!)
+
+```
+1. 액터를 원하는 위치로 이동
+2. Location 항목에서 우클릭
+3. "Copy" 클릭
+4. 코드에 붙여넣기 → 숫자만 추출
+```
+
+## 완전한 코드 예제
+
+### 로컬 변수 사용
+
+```cpp
+// MovingPlatform.cpp
+void AMovingPlatform::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // 로컬 변수로 위치 설정
+    FVector TestVector = FVector(-1110.0f, 610.0f, 440.0f);
+    SetActorLocation(TestVector);
+
+    UE_LOG(LogTemp, Warning, TEXT("위치 설정 완료!"));
+}
+```
+
+**결과:** 게임 시작 시 플랫폼이 해당 위치로 **텔레포트**됨
+
+### 멤버 변수 사용 (더 좋은 방법!)
+
+```cpp
+// MovingPlatform.h
+UCLASS()
+class AMovingPlatform : public AActor
+{
+    GENERATED_BODY()
+
+public:
+    // 에디터에서 편집 가능한 목표 위치
+    UPROPERTY(EditAnywhere, Category = "Movement")
+    FVector TargetLocation = FVector(0.0f, 0.0f, 0.0f);
+
+protected:
+    virtual void BeginPlay() override;
+};
+```
+
+```cpp
+// MovingPlatform.cpp
+void AMovingPlatform::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // 멤버 변수 사용
+    SetActorLocation(TargetLocation);
+
+    UE_LOG(LogTemp, Warning, TEXT("목표 위치로 이동: X=%f, Y=%f, Z=%f"),
+           TargetLocation.X, TargetLocation.Y, TargetLocation.Z);
+}
+```
+
+## 멤버 변수 사용의 장점
+
+### ✅ 코드 재컴파일 불필요
+
+```cpp
+// ❌ 로컬 변수: 위치 바꾸려면 코드 수정 필요
+FVector TestVector = FVector(100.0f, 200.0f, 300.0f);
+// → 값 바꾸려면 코드 수정 → 컴파일 → 재시작
+
+// ✅ 멤버 변수: 에디터에서 바로 수정
+UPROPERTY(EditAnywhere)
+FVector TargetLocation;
+// → 에디터에서 값만 바꾸면 끝!
+```
+
+## 에디터 워크플로우
+
+### 1. 원하는 위치 찾기
+
+```
+뷰포트에서 액터를 원하는 위치로 이동
+→ Transform > Location 확인
+```
+
+### 2. 위치 복사
+
+```
+Location 항목 우클릭 → Copy
+또는
+X, Y, Z 값 직접 확인
+```
+
+### 3. 멤버 변수에 붙여넣기
+
+```
+디테일 패널에서 TargetLocation 찾기
+→ 벡터 위에서 우클릭 → Paste
+```
+
+### 4. 원위치로 되돌리기
+
+```
+액터를 원래 위치로 이동
+(게임 시작 시 TargetLocation으로 텔레포트됨)
+```
+
+### 5. 테스트
+
+```
+게임 플레이 → 액터가 목표 위치로 이동 확인
+```
+
+## 실전 활용 예제
+
+### 예제 1: 시작 위치 설정
+
+```cpp
+// MovingPlatform.h
+UPROPERTY(EditAnywhere, Category = "Setup")
+FVector StartLocation = FVector(0.0f, 0.0f, 100.0f);
+
+// MovingPlatform.cpp
+void AMovingPlatform::BeginPlay()
+{
+    Super::BeginPlay();
+    SetActorLocation(StartLocation);
+}
+```
+
+### 예제 2: 플레이어 근처로 이동
+
+```cpp
+void AMovingPlatform::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // 플레이어 캐릭터 찾기
+    APawn* PlayerPawn = GetWorld()->GetFirstPlayerController()->GetPawn();
+
+    if (PlayerPawn)
+    {
+        // 플레이어 위치 가져오기
+        FVector PlayerLocation = PlayerPawn->GetActorLocation();
+
+        // 플레이어 위 100유닛에 배치
+        FVector TargetLocation = PlayerLocation + FVector(0.0f, 0.0f, 100.0f);
+        SetActorLocation(TargetLocation);
+    }
+}
+```
+
+### 예제 3: 상대적 위치 이동
+
+```cpp
+void AMovingPlatform::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // 현재 위치 가져오기
+    FVector CurrentLocation = GetActorLocation();
+
+    // X축으로 500유닛 이동
+    FVector NewLocation = CurrentLocation + FVector(500.0f, 0.0f, 0.0f);
+    SetActorLocation(NewLocation);
+
+    UE_LOG(LogTemp, Warning, TEXT("이동 전: %s"), *CurrentLocation.ToString());
+    UE_LOG(LogTemp, Warning, TEXT("이동 후: %s"), *NewLocation.ToString());
+}
+```
+
+## 위치 관련 주요 함수
+
+| 함수                    | 설명               | 예시                                       |
+| ----------------------- | ------------------ | ------------------------------------------ |
+| `GetActorLocation()`    | 현재 위치 가져오기 | `FVector Pos = GetActorLocation();`        |
+| `SetActorLocation()`    | 위치 설정          | `SetActorLocation(NewPos);`                |
+| `AddActorWorldOffset()` | 상대적 이동        | `AddActorWorldOffset(FVector(100, 0, 0));` |
+
+## 디버깅 팁
+
+### 위치 확인하기
+
+```cpp
+void AMovingPlatform::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // 이동 전 위치
+    FVector OldLocation = GetActorLocation();
+    UE_LOG(LogTemp, Warning, TEXT("이동 전: X=%f, Y=%f, Z=%f"),
+           OldLocation.X, OldLocation.Y, OldLocation.Z);
+
+    // 위치 설정
+    SetActorLocation(TargetLocation);
+
+    // 이동 후 위치
+    FVector NewLocation = GetActorLocation();
+    UE_LOG(LogTemp, Warning, TEXT("이동 후: X=%f, Y=%f, Z=%f"),
+           NewLocation.X, NewLocation.Y, NewLocation.Z);
+}
+```
+
+### FVector.ToString() 활용
+
+```cpp
+FVector Location = GetActorLocation();
+UE_LOG(LogTemp, Warning, TEXT("위치: %s"), *Location.ToString());
+// 출력: 위치: X=-1110.000 Y=610.000 Z=440.000
+```
+
+## 주의사항
+
+### ⚠️ 컴포넌트 없으면 작동 안 함
+
+```cpp
+// ❌ 루트 컴포넌트가 없으면 위치 설정 불가
+// 먼저 컴포넌트를 추가해야 함!
+```
+
+### ⚠️ BeginPlay에서 즉시 이동
+
+```cpp
+// BeginPlay에서 호출 → 게임 시작 시 즉시 텔레포트
+// 부드러운 이동은 Tick()에서 구현
+```
+
+### ⚠️ 충돌 무시
+
+```cpp
+// SetActorLocation은 기본적으로 충돌 무시
+// 벽을 통과할 수 있음!
+// 충돌 감지가 필요하면 Sweep 옵션 사용
+SetActorLocation(NewLocation, true);  // Sweep 활성화
+```
+
+## 핵심 정리
+
+### SetActorLocation 사용법
+
+```cpp
+// 1. 위치 벡터 생성
+FVector NewLocation = FVector(X, Y, Z);
+
+// 2. 위치 설정
+SetActorLocation(NewLocation);
+```
+
+### 개발 워크플로우
+
+```
+1. 에디터에서 원하는 위치로 이동
+2. 위치 복사 (우클릭 → Copy)
+3. 멤버 변수에 붙여넣기
+4. 게임 플레이로 테스트
+5. 필요시 에디터에서 값 조정
+```
+
+### 왜 중요한가?
+
+- 🎮 **게임플레이 제어**: 액터를 원하는 위치로 이동
+- 🔄 **동적 배치**: 런타임에 위치 변경 가능
+- 🎯 **정확한 위치 지정**: 코드로 정밀한 위치 제어
+- ⚡ **텔레포트**: 순간 이동 구현
+
+**다음 단계:** Tick()에서 매 프레임마다 위치를 조금씩 변경하면 **부드러운 이동** 구현 가능!
+
+# { 언리얼 엔진 Tick 함수와 움직이는 플랫폼 }
+
+## 게임 루프 (Game Loop)
+
+### 게임 루프란?
+
+**게임이 실행되는 동안 계속 반복되는 사이클**
+
+### 게임 루프의 3단계
+
+```
+┌─────────────────────────────┐
+│   1. 입력 받기 (Input)       │
+│   - 키보드, 마우스, 컨트롤러 │
+└──────────┬──────────────────┘
+           ↓
+┌──────────────────────────────┐
+│   2. 게임 상태 업데이트       │
+│   - 변수 설정, 함수 호출      │
+│   - 위치 변경, 충돌 처리      │
+└──────────┬───────────────────┘
+           ↓
+┌──────────────────────────────┐
+│   3. 렌더링 (Render)         │
+│   - 그래픽을 화면에 표시      │
+└──────────┬───────────────────┘
+           ↓
+           └─→ 다시 1번으로 (반복!)
+```
+
+### 플립북처럼 작동
+
+```
+프레임 1 → 프레임 2 → 프레임 3 → ...
+(입력→업데이트→렌더링) 반복
+```
+
+## 프레임 (Frame)
+
+### 프레임이란?
+
+**게임 루프 한 사이클 = 1 프레임**
+
+### FPS (Frames Per Second)
+
+- **1초당 실행되는 프레임 수**
+- 높을수록 부드러운 게임 플레이
+- CPU/GPU 성능에 따라 달라짐
+
+```
+30 FPS = 1초에 30번 게임 루프 실행
+60 FPS = 1초에 60번 게임 루프 실행
+120 FPS = 1초에 120번 게임 루프 실행
+```
+
+## Tick 함수
+
+### Tick이란?
+
+**매 프레임마다 자동으로 호출되는 특수 함수**
+
+### BeginPlay vs Tick
+
+| 함수          | 호출 시점     | 호출 횟수          | 용도              |
+| ------------- | ------------- | ------------------ | ----------------- |
+| **BeginPlay** | 게임 시작 시  | **1번만**          | 초기 설정         |
+| **Tick**      | 매 프레임마다 | **초당 60~120번+** | 지속적인 업데이트 |
+
+### 시각화
+
+```
+게임 시작
+    ↓
+BeginPlay() ← 1번만 호출
+    ↓
+Tick() ← 프레임 1
+    ↓
+Tick() ← 프레임 2
+    ↓
+Tick() ← 프레임 3
+    ↓
+Tick() ← 프레임 4
+    ↓
+    ... (게임 종료까지 계속)
+```
+
+## Tick 함수 기본 사용법
+
+### 함수 선언
+
+```cpp
+// MovingPlatform.h
+UCLASS()
+class AMovingPlatform : public AActor
+{
+    GENERATED_BODY()
+
+protected:
+    virtual void Tick(float DeltaTime) override;
+};
+```
+
+### 함수 구현
+
+```cpp
+// MovingPlatform.cpp
+void AMovingPlatform::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    // 매 프레임마다 실행될 코드
+    UE_LOG(LogTemp, Warning, TEXT("Tick!"));
+}
+```
+
+## Tick 확인 실험
+
+### 실험 코드
+
+```cpp
+void AMovingPlatform::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    UE_LOG(LogTemp, Warning, TEXT("Tick"));
+}
+```
+
+### 결과
+
+```
+출력 로그:
+Tick
+Tick
+Tick
+Tick
+... (끊임없이 출력!)
+```
+
+**이유:** 60 FPS라면 1초에 60번 출력됨!
+
+## 움직이는 플랫폼 만들기
+
+### 문제: 같은 위치로 반복 설정
+
+```cpp
+void AMovingPlatform::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    // ❌ 매 프레임마다 같은 위치로 설정
+    SetActorLocation(MyVector);
+    // → 움직이지 않음! (항상 같은 곳)
+}
+```
+
+### 해결: 위치 값을 증가시키기
+
+```cpp
+void AMovingPlatform::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    // 1. Z 값 증가
+    MyVector.Z = MyVector.Z + 1.0f;
+
+    // 2. 새 위치로 이동
+    SetActorLocation(MyVector);
+}
+```
+
+## 위치 증가 원리
+
+### 작동 방식
+
+```cpp
+MyVector.Z = MyVector.Z + 1.0f;
+```
+
+### 단계별 설명
+
+```
+프레임 1:
+  MyVector.Z = 10
+  → 10 + 1 = 11
+  → MyVector.Z = 11
+
+프레임 2:
+  MyVector.Z = 11
+  → 11 + 1 = 12
+  → MyVector.Z = 12
+
+프레임 3:
+  MyVector.Z = 12
+  → 12 + 1 = 13
+  → MyVector.Z = 13
+
+... (계속 증가)
+```
+
+### 시각화
+
+```
+프레임마다 Z 위치 +1
+
+Z=10 → Z=11 → Z=12 → Z=13 → ...
+  ↑      ↑      ↑      ↑
+위로   위로   위로   위로
+```
+
+## 완전한 코드 예제
+
+### 헤더 파일 (.h)
+
+```cpp
+// MovingPlatform.h
+UCLASS()
+class AMovingPlatform : public AActor
+{
+    GENERATED_BODY()
+
+public:
+    // 에디터에서 설정 가능한 위치
+    UPROPERTY(EditAnywhere, Category = "Movement")
+    FVector MyVector = FVector(0.0f, 0.0f, 100.0f);
+
+protected:
+    virtual void BeginPlay() override;
+    virtual void Tick(float DeltaTime) override;
+};
+```
+
+### CPP 파일 (.cpp)
+
+```cpp
+// MovingPlatform.cpp
+void AMovingPlatform::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // 게임 시작 시 1번만 실행
+    UE_LOG(LogTemp, Warning, TEXT("게임 시작!"));
+}
+
+void AMovingPlatform::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    // 매 프레임마다 Z 값 증가 (위로 이동)
+    MyVector.Z = MyVector.Z + 1.0f;
+
+    // 새 위치로 설정
+    SetActorLocation(MyVector);
+}
+```
+
+## 이동 방향 변경
+
+### Z축 이동 (위로)
+
+```cpp
+void AMovingPlatform::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    MyVector.Z = MyVector.Z + 1.0f;  // 위로
+    SetActorLocation(MyVector);
+}
+```
+
+### X축 이동 (옆으로)
+
+```cpp
+void AMovingPlatform::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    MyVector.X = MyVector.X + 1.0f;  // X축 방향
+    SetActorLocation(MyVector);
+}
+```
+
+### Y축 이동 (앞뒤로)
+
+```cpp
+void AMovingPlatform::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    MyVector.Y = MyVector.Y + 1.0f;  // Y축 방향
+    SetActorLocation(MyVector);
+}
+```
+
+### 대각선 이동
+
+```cpp
+void AMovingPlatform::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    MyVector.X = MyVector.X + 1.0f;  // X축
+    MyVector.Z = MyVector.Z + 0.5f;  // Z축
+    SetActorLocation(MyVector);
+}
+```
+
+## 좌표축 이해
+
+### 언리얼 엔진 좌표계
+
+```
+        Z (위)
+        ↑
+        |
+        |
+        └─────→ X (앞/오른쪽)
+       /
+      /
+     Y (옆)
+```
+
+### 방향 예시
+
+- **X +** : 빨간 화살표 방향
+- **Y +** : 초록 화살표 방향
+- **Z +** : 파란 화살표 방향 (위로)
+
+## 실전 예제
+
+### 예제 1: 위로 천천히 이동
+
+```cpp
+void AMovingPlatform::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    // 매 프레임 0.5씩 증가 (느린 이동)
+    MyVector.Z = MyVector.Z + 0.5f;
+    SetActorLocation(MyVector);
+}
+```
+
+### 예제 2: 빠르게 이동
+
+```cpp
+void AMovingPlatform::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    // 매 프레임 5씩 증가 (빠른 이동)
+    MyVector.X = MyVector.X + 5.0f;
+    SetActorLocation(MyVector);
+}
+```
+
+### 예제 3: 현재 위치 기반 이동
+
+```cpp
+void AMovingPlatform::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    // 현재 위치 가져오기
+    FVector CurrentLocation = GetActorLocation();
+
+    // X 값 증가
+    CurrentLocation.X = CurrentLocation.X + 1.0f;
+
+    // 새 위치 설정
+    SetActorLocation(CurrentLocation);
+}
+```
+
+### 예제 4: 디버그 로그 추가
+
+```cpp
+void AMovingPlatform::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    // 위치 증가
+    MyVector.X = MyVector.X + 1.0f;
+
+    // 로그 출력 (매 프레임 - 주의!)
+    UE_LOG(LogTemp, Warning, TEXT("X 위치: %f"), MyVector.X);
+
+    SetActorLocation(MyVector);
+}
+```
+
+## 플레이어와 상호작용
+
+### 플랫폼 위에 서기
+
+```cpp
+// 플랫폼이 X축으로 이동
+void AMovingPlatform::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    MyVector.X = MyVector.X + 2.0f;
+    SetActorLocation(MyVector);
+}
+```
+
+**결과:** 플레이어가 플랫폼 위에 서면 함께 이동!
+
+## 증감 연산 패턴
+
+### 기본 패턴
+
+```cpp
+MyVector.Z = MyVector.Z + 1.0f;
+```
+
+### 단축 표현
+
+```cpp
+MyVector.Z += 1.0f;  // 위와 동일
+```
+
+### 비교
+
+```cpp
+// 모두 같은 의미
+MyVector.X = MyVector.X + 5.0f;
+MyVector.X += 5.0f;
+
+// 감소
+MyVector.Y = MyVector.Y - 2.0f;
+MyVector.Y -= 2.0f;
+```
+
+## 주의사항
+
+### ⚠️ 속도가 너무 빠름!
+
+```cpp
+// 60 FPS → 1초에 60유닛 이동
+MyVector.X = MyVector.X + 1.0f;
+```
+
+**문제:** FPS에 따라 이동 속도가 달라짐!
+
+- 30 FPS: 1초에 30유닛
+- 60 FPS: 1초에 60유닛
+- 120 FPS: 1초에 120유닛
+
+**해결책은 다음 강의에서!** (DeltaTime 사용)
+
+### ⚠️ Tick에서 로그 주의
+
+```cpp
+void AMovingPlatform::Tick(float DeltaTime)
+{
+    // ❌ 매 프레임마다 출력 → 로그 넘침!
+    UE_LOG(LogTemp, Warning, TEXT("Tick"));
+}
+```
+
+### ⚠️ Super::Tick 호출 필수
+
+```cpp
+void AMovingPlatform::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);  // ← 이거 필수!
+
+    // 나머지 코드...
+}
+```
+
+## 개발 워크플로우
+
+### 1. 기본 설정
+
+```cpp
+// 헤더에 멤버 변수 추가
+UPROPERTY(EditAnywhere)
+FVector MyVector;
+```
+
+### 2. Tick에서 증가
+
+```cpp
+void AMovingPlatform::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+    MyVector.Z += 1.0f;
+    SetActorLocation(MyVector);
+}
+```
+
+### 3. 컴파일 및 테스트
+
+```
+저장 → 라이브 코딩 → 게임 플레이
+```
+
+### 4. 에디터에서 조정
+
+```
+MyVector 초기값 변경 → 다시 테스트
+```
+
+## 핵심 정리
+
+### 게임 루프
+
+```
+입력 → 업데이트 → 렌더링 (반복)
+```
+
+### BeginPlay vs Tick
+
+```cpp
+BeginPlay()  // 1번만 실행 - 초기화
+Tick()       // 매 프레임 실행 - 지속적 업데이트
+```
+
+### 움직이는 플랫폼
+
+```cpp
+// 매 프레임:
+1. 위치 값 증가
+2. SetActorLocation 호출
+→ 계속 움직임!
+```
+
+### 이동 방향
+
+```cpp
+MyVector.X += 1.0f;  // 옆으로
+MyVector.Y += 1.0f;  // 앞뒤로
+MyVector.Z += 1.0f;  // 위아래로
+```
+
+# { 무빙 플랫폼 현재 위치에서 이동시키기 }
+
+## 문제점
+
+- 현재 플랫폼이 게임 시작 시 설정된 벡터 위치로 텔레포트됨
+- 레벨 디자인 시 플랫폼이 어디로 갈지 예측 불가능
+
+## 해결 방법: GetActorLocation() 사용
+
+### 핵심 개념
+
+```cpp
+// 현재 위치 가져오기
+FVector CurrentLocation = GetActorLocation();
+
+// X 위치 증가
+CurrentLocation.X = CurrentLocation.X + 1;
+
+// 새 위치로 설정
+SetActorLocation(CurrentLocation);
+
+```
+
+### 함수 네이밍 규칙
+
+- **Get~**: 값을 반환 (인수 없음)
+- **Set~**: 값을 설정 (인수 필요)
+
+## 구현 단계
+
+1. **기존 코드 제거**
+   - MyVector 변수 삭제 (헤더 + cpp)
+2. **Tick 함수 수정**
+
+   ```cpp
+   FVector CurrentLocation = GetActorLocation();
+   CurrentLocation.X = CurrentLocation.X + 1;
+   SetActorLocation(CurrentLocation);
+
+   ```
+
+3. **결과**
+   - 플랫폼이 에디터에서 배치한 위치에서 시작
+   - 매 프레임마다 X축으로 1씩 이동
+   - 레벨 디자인 시 이동 경로 예측 가능
+
+## 핵심 정리
+
+하드코딩된 벡터 대신 현재 위치를 가져와서 수정하면 플랫폼이 배치된 위치에서 자연스럽게 이동 시작
+
+# { DeltaTime을 사용한 프레임 독립적 움직임 }
+
+## 문제: 속도 문제 (Speed Problem)
+
+### 현재 상황
+
+```cpp
+// Tick 함수 내부
+CurrentLocation.X = CurrentLocation.X + 1;
+```
+
+- **빠른 컴퓨터** (100 FPS): 초당 100cm 이동
+- **느린 컴퓨터** (30 FPS): 초당 30cm 이동
+- 💥 **같은 게임이 컴퓨터마다 다르게 작동!**
+
+---
+
+## 해결책: DeltaTime
+
+### DeltaTime이란?
+
+> CPU가 마지막 프레임을 계산하는 데 걸린 시간(초 단위)
+
+**게임 루프:**
+
+1. 입력 받기
+2. 게임 상태 업데이트
+3. 그래픽 렌더링
+
+이 전체 사이클이 한 프레임이고, 걸린 시간이 DeltaTime
+
+---
+
+## DeltaTime 작동 원리
+
+### 컴퓨터 비교
+
+| 컴퓨터 | FPS | DeltaTime |
+| ------ | --- | --------- |
+| 느림   | 10  | 0.1초     |
+| 빠름   | 100 | 0.01초    |
+
+**법칙:** 컴퓨터가 느릴수록 DeltaTime 커짐 ⬆️
+
+---
+
+### DeltaTime 없을 때
+
+```
+느린 컴퓨터: 10프레임 × 1 = 10cm/초
+빠른 컴퓨터: 100프레임 × 1 = 100cm/초  ❌ 다름!
+```
+
+### DeltaTime 사용할 때
+
+```
+느린 컴퓨터: 10프레임 × (1 × 0.1) = 1cm/초
+빠른 컴퓨터: 100프레임 × (1 × 0.01) = 1cm/초  ✅ 같음!
+```
+
+---
+
+## 코드 구현
+
+### 기본 공식
+
+```cpp
+void ATick(float DeltaTime) {
+    // DeltaTime은 Tick 함수의 인자로 자동 제공됨
+
+    CurrentLocation.X = CurrentLocation.X + (1 * DeltaTime);
+
+    // 괄호로 명확하게 표시
+}
+```
+
+### 실용적인 속도 설정
+
+```cpp
+// DeltaTime 사용 시 숫자가 매우 작아짐
+CurrentLocation.X = CurrentLocation.X + (100 * DeltaTime);
+// 100 = 초당 100cm 이동 (= 1m/초)
+```
+
+---
+
+## 핵심 개념
+
+### ⚠️ 중요한 변화
+
+- **이전**: 1 입력 → 컴퓨터마다 다른 속도
+- **이후**: 100 입력 → 초당 100cm로 통일
+
+### 💡 생각 방식 전환
+
+```
+"프레임당 1씩" ❌
+         ↓
+"초당 100cm씩" ✅
+```
+
+---
+
+## 실전 적용
+
+```cpp
+void AMovingPlatform::Tick(float DeltaTime) {
+    FVector CurrentLocation = GetActorLocation();
+
+    // 초당 100cm 속도로 X축 이동
+    CurrentLocation.X = CurrentLocation.X + (100 * DeltaTime);
+
+    SetActorLocation(CurrentLocation);
+}
+```
+
+### 속도 조절 팁
+
+- **느리게**: 50 (초당 50cm = 0.5m)
+- **보통**: 100 (초당 100cm = 1m)
+- **빠르게**: 200 (초당 200cm = 2m)
+
+---
+
+## 요약
+
+✅ Tick 함수 안에서 값 더할 때는 **항상 DeltaTime 곱하기**
+
+✅ 숫자는 "초당 cm" 단위로 생각하기
+
+✅ 프레임 속도와 무관하게 동일한 속도 보장
+
+> 처음에 이해 안 되면 정상입니다! 반복해서 보고 직접 써보면서 익히세요 👍
+
+# { 벡터를 사용한 플랫폼 이동 }
+
+## 현재 문제점
+
+```cpp
+// 기존 코드
+CurrentLocation.X = CurrentLocation.X + (100 * DeltaTime);
+```
+
+**불편한 점:**
+
+- 축을 바꾸려면 `.X`를 `.Y`나 `.Z`로 코드 수정 필요
+- 속도를 바꾸려면 100을 직접 수정해야 함
+- 에디터에서 바로 조절 불가능 ❌
+
+---
+
+## 해결책: 속도 벡터 사용
+
+### 1단계: 멤버 변수 생성
+
+```cpp
+// 헤더 파일에 추가
+UPROPERTY(EditAnywhere)
+FVector PlatformVelocity = FVector(0, 0, 0);
+```
+
+**기본값 0,0,0 의미:**
+
+- X축 속도: 0
+- Y축 속도: 0
+- Z축 속도: 0
+- → 기본적으로 정지 상태
+
+---
+
+## 벡터 방향 이해하기
+
+### 속도 벡터의 의미
+
+```
+PlatformVelocity = (100, 0, 0)
+→ X축 양의 방향으로 초당 100cm
+
+PlatformVelocity = (-100, 0, 0)
+→ X축 음의 방향으로 초당 100cm
+
+PlatformVelocity = (0, 100, 0)
+→ Y축 양의 방향으로 초당 100cm
+
+PlatformVelocity = (0, 0, 100)
+→ 위로 초당 100cm
+
+PlatformVelocity = (0, 0, -100)
+→ 아래로 초당 100cm
+```
+
+---
+
+## 벡터 연산 이해하기
+
+### 1. 벡터 + 벡터
+
+```cpp
+FVector Vector1(1, 2, 3);
+FVector Vector2(4, 5, 6);
+FVector Result = Vector1 + Vector2;
+
+// 결과: (5, 7, 9)
+// X: 1+4=5
+// Y: 2+5=7
+// Z: 3+6=9
+```
+
+**규칙:** 같은 속성끼리 계산 (X끼리, Y끼리, Z끼리)
+
+---
+
+### 2. 벡터 × 실수
+
+```cpp
+FVector MyVector(1, 2, 3);
+float SomeFloat = 10;
+FVector Result = MyVector * SomeFloat;
+
+// 결과: (10, 20, 30)
+// X: 1×10=10
+// Y: 2×10=20
+// Z: 3×10=30
+```
+
+**규칙:** 벡터의 모든 속성에 같은 숫자 곱하기
+
+---
+
+## 최종 구현
+
+### 비효율적인 방법 (작동은 함)
+
+```cpp
+CurrentLocation.X = CurrentLocation.X + (PlatformVelocity.X * DeltaTime);
+CurrentLocation.Y = CurrentLocation.Y + (PlatformVelocity.Y * DeltaTime);
+CurrentLocation.Z = CurrentLocation.Z + (PlatformVelocity.Z * DeltaTime);
+```
+
+### ✅ 효율적인 방법 (권장)
+
+```cpp
+void AMovingPlatform::Tick(float DeltaTime) {
+    FVector CurrentLocation = GetActorLocation();
+
+    // 벡터 연산으로 한 번에 처리!
+    CurrentLocation = CurrentLocation + (PlatformVelocity * DeltaTime);
+
+    SetActorLocation(CurrentLocation);
+}
+```
+
+---
+
+## 작동 원리 분석
+
+```cpp
+// 예: PlatformVelocity = (100, 50, 0), DeltaTime = 0.016
+
+// 1단계: 벡터 × 실수
+PlatformVelocity * DeltaTime
+= (100, 50, 0) * 0.016
+= (1.6, 0.8, 0)  // 이번 프레임에 이동할 거리
+
+// 2단계: 벡터 + 벡터
+CurrentLocation + (1.6, 0.8, 0)
+= (기존X + 1.6, 기존Y + 0.8, 기존Z + 0)
+
+// 3단계: 결과 저장
+CurrentLocation에 새 위치 할당
+```
+
+---
+
+## 에디터에서 사용하기
+
+### 설정 예시
+
+**왼쪽으로 이동:**
+
+```
+Platform Velocity: (-100, 0, 0)
+```
+
+**오른쪽 위로 대각선:**
+
+```
+Platform Velocity: (100, 0, 50)
+```
+
+**천천히 위로:**
+
+```
+Platform Velocity: (0, 0, 10)
+```
+
+**빠르게 Y축 이동:**
+
+```
+Platform Velocity: (0, 200, 0)
+```
+
+---
+
+## 장점 정리
+
+✅ **코드 수정 없이** 에디터에서 방향/속도 조절
+
+✅ 3개 축을 **동시에** 제어 가능
+
+✅ 대각선 이동도 **간단하게** 구현
+
+✅ 레벨 디자인이 **훨씬 쉬워짐**
+
+---
+
+## 핵심 요약
+
+| 개념            | 설명                         |
+| --------------- | ---------------------------- |
+| **벡터 + 벡터** | 같은 속성끼리 더하기         |
+| **벡터 × 실수** | 모든 속성에 같은 숫자 곱하기 |
+| **결과**        | 항상 벡터 반환               |
+
+```cpp
+// 한 줄로 3축 동시 제어!
+CurrentLocation += PlatformVelocity * DeltaTime;
+```
+
+# { C++ 함수 기초 }
+
+## 함수의 종류
+
+### 1. 일반 함수 (Regular Function)
+
+- 클래스 밖에서 독립적으로 작동
+- 클래스의 멤버 변수/함수에 접근 불가
+- 자바와 C# 의 Static 같은
+
+### 2. 멤버 함수 (Member Function)
+
+- 클래스에 속함 (예: `Tick()`, `BeginPlay()`)
+- 클래스의 모든 기능 사용 가능
+
+---
+
+## 일반 함수 구조
+
+```cpp
+// 함수 시그니처 (선언부)
+void MyTestFunction()
+{
+    // 함수 본문 (실행될 코드)
+    int MyInt = 10;
+}
+```
+
+### 구성 요소
+
+| 요소          | 설명                      | 예시                         |
+| ------------- | ------------------------- | ---------------------------- |
+| **반환 타입** | 함수가 반환하는 값의 타입 | `void` (아무것도 반환 안 함) |
+| **함수 이름** | 함수를 호출할 때 사용     | `MyTestFunction`             |
+| **괄호 ()**   | 인수(매개변수) 목록       | `()` (비어있음 = 인수 없음)  |
+| **중괄호 {}** | 함수 본문 영역            | 실행할 코드 작성             |
+
+---
+
+## 함수 호출 방법
+
+```cpp
+// 함수 정의
+void MyTestFunction() {
+    UE_LOG(LogTemp, Display, TEXT("My test function called!"));
+}
+
+// 함수 호출
+void AMovingPlatform::BeginPlay() {
+    Super::BeginPlay();
+
+    MyTestFunction();  // 함수 이름 + 괄호 + 세미콜론
+}
+```
+
+---
+
+## ⚠️ 중요한 규칙들
+
+### 1. 함수 배치 순서
+
+```cpp
+// ✅ 올바른 방법
+void MyTestFunction() {
+    // 함수 본문
+}
+
+void AMovingPlatform::BeginPlay() {
+    MyTestFunction();  // 위에 정의했으므로 OK
+}
+```
+
+```cpp
+// ❌ 잘못된 방법
+void AMovingPlatform::BeginPlay() {
+    MyTestFunction();  // 에러! 아직 정의 안 됨
+}
+
+void MyTestFunction() {
+    // 함수 본문
+}
+```
+
+**이유:** 코드는 위에서 아래로 실행됨
+
+---
+
+### 2. 함수 전방 선언 (대안)
+
+```cpp
+// 시그니처만 먼저 선언 (세미콜론 필수!)
+void MyTestFunction();
+
+void AMovingPlatform::BeginPlay() {
+    MyTestFunction();  // OK
+}
+
+// 나중에 실제 구현
+void MyTestFunction() {
+    // 함수 본문
+}
+```
+
+---
+
+## 일반 함수의 제약사항
+
+### ❌ 클래스 멤버 함수 사용 불가
+
+```cpp
+void MyTestFunction() {
+    // 에러! GetActorLocation()은 AActor의 멤버 함수
+    FVector Location = GetActorLocation();
+}
+```
+
+**이유:** 일반 함수는 클래스에 속하지 않음
+
+---
+
+### ✅ 멤버 함수에서는 가능
+
+```cpp
+void AMovingPlatform::BeginPlay() {
+    // OK! BeginPlay는 AActor를 상속받은 멤버 함수
+    FVector Location = GetActorLocation();
+}
+```
+
+**이유:** `AMovingPlatform`이 `AActor`를 상속 받음
+
+---
+
+## 실습 예제
+
+### 문제
+
+1. `MyTestFunction()` 함수 만들기
+2. 함수 내부에서 로그 출력하기
+3. `BeginPlay()`에서 호출하기
+
+### 정답
+
+```cpp
+// MovingPlatform.cpp
+
+// 1. 함수 정의 (BeginPlay 위에!)
+void MyTestFunction() {
+    UE_LOG(LogTemp, Display, TEXT("My test function called!"));
+}
+
+// 2. BeginPlay에서 호출
+void AMovingPlatform::BeginPlay() {
+    Super::BeginPlay();
+
+    MyTestFunction();
+}
+```
+
+---
+
+## 컴파일 에러 모음
+
+### 에러 1: 순서 문제
+
+```
+Error: identifier "MyTestFunction" is undefined
+```
+
+→ **해결:** 함수를 호출 위치보다 위에 정의
+
+### 에러 2: 클래스 멤버 접근
+
+```
+Error: identifier "GetActorLocation" is undefined
+```
+
+→ **해결:** 일반 함수에서는 사용 불가, 멤버 함수로 변경
+
+---
+
+## 핵심 정리
+
+### 함수 만들기 체크리스트
+
+1. ✅ 반환 타입 작성 (`void`)
+2. ✅ 함수 이름 작성
+3. ✅ 괄호 `()` 추가
+4. ✅ 중괄호 `{}` 안에 코드 작성
+5. ✅ **호출하는 곳보다 위에 배치**
+
+### 함수 호출 체크리스트
+
+1. ✅ 함수 이름 입력
+2. ✅ 괄호 `()` 추가
+3. ✅ 세미콜론 `;` 추가
+
+---
+
+## 다음 강의 예고
+
+- 함수 **반환 타입** (void 외의 것들)
+- 함수 **인수(매개변수)** 사용법
+- **멤버 함수** 만들기
+
+> 팁: 일반 함수는 간단한 유틸리티에만 사용하고, 대부분은 멤버 함수를 사용하는 것이 좋습니다!
+
+# { 함수 매개변수 (Parameters/Arguments) }
+
+## 용어 정리
+
+### Parameter vs Argument (같은 개념)
+
+```cpp
+void MyFunction(float Parameter1) {  // 👈 Parameter (매개변수)
+    // 함수 정의 시 사용하는 용어
+}
+
+MyFunction(3.5f);  // 👈 Argument (인수)
+                   // 함수 호출 시 전달하는 값
+```
+
+**실무에서는:** 둘 다 "인수"라고 불러도 OK! 😊
+
+---
+
+## 기본 문법
+
+### 1개 매개변수
+
+```cpp
+void MyTestFunction(float MyFloatParam) {
+    UE_LOG(LogTemp, Display, TEXT("Value: %f"), MyFloatParam);
+}
+
+// 호출
+MyTestFunction(3.5f);
+```
+
+### 여러 개 매개변수
+
+```cpp
+void Calculate(float Param1, int Param2, FString Param3) {
+    // 쉼표로 구분!
+}
+
+// 호출 - 순서가 중요!
+Calculate(11.2f, 20, TEXT("Hello"));
+```
+
+---
+
+## ⚠️ 중요: 순서가 일치해야 함!
+
+```cpp
+void MyFunction(float A, int B, FString C) { }
+
+// ✅ 올바른 호출
+MyFunction(1.5f, 10, TEXT("OK"));
+//         ↓    ↓   ↓
+//       float int FString
+
+// ❌ 잘못된 호출
+MyFunction(10, 1.5f, TEXT("Error"));
+//         ↓    ↓
+//        int float  순서 틀림!
+```
+
+---
+
+## 실전 예제
+
+### 예제 1: 기본 사용
+
+```cpp
+// 함수 정의
+void PrintValue(float MyParam) {
+    UE_LOG(LogTemp, Display, TEXT("My parameter: %f"), MyParam);
+}
+
+// BeginPlay에서 호출
+void AMovingPlatform::BeginPlay() {
+    Super::BeginPlay();
+
+    PrintValue(3.5f);  // 출력: My parameter: 3.500000
+}
+```
+
+### 예제 2: 여러 매개변수
+
+```cpp
+// 함수 정의
+void LogInfo(float Speed, FString Name) {
+    UE_LOG(LogTemp, Display, TEXT("Speed: %f"), Speed);
+    UE_LOG(LogTemp, Display, TEXT("Name: %s"), *Name);  // FString은 * 필요!
+}
+
+// 호출
+void AMovingPlatform::BeginPlay() {
+    Super::BeginPlay();
+
+    FString ActorName = GetName();  // 액터 이름 가져오기
+    LogInfo(100.0f, ActorName);
+}
+```
+
+---
+
+## 매개변수 작동 원리
+
+```cpp
+void Calculate(float Input, int Multiplier) {
+    float Result = Input * Multiplier;  // 매개변수 사용
+    UE_LOG(LogTemp, Display, TEXT("Result: %f"), Result);
+}
+
+// 호출
+Calculate(5.0f, 10);
+
+// 내부에서 이렇게 됨:
+// Input = 5.0f
+// Multiplier = 10
+// Result = 50.0f
+```
+
+---
+
+## 형식 지정자 (Format Specifiers)
+
+| 타입        | 형식 지정자 | 예시                     |
+| ----------- | ----------- | ------------------------ |
+| **float**   | `%f`        | `TEXT("Value: %f")`      |
+| **int**     | `%d`        | `TEXT("Count: %d")`      |
+| **FString** | `%s`        | `TEXT("Name: %s"), *Str` |
+| **bool**    | `%d`        | `TEXT("IsTrue: %d")`     |
+
+```cpp
+void LogAll(float F, int I, FString S) {
+    UE_LOG(LogTemp, Display, TEXT("Float: %f, Int: %d, String: %s"),
+           F, I, *S);
+}
+```
+
+---
+
+## 실습 문제 & 정답
+
+### 문제
+
+1. `MyTestFunction`에 두 번째 매개변수 추가
+2. 타입은 `FString`
+3. 로그로 출력하기
+
+### 정답
+
+```cpp
+// 1. 함수 정의 수정
+void MyTestFunction(float MyFloatParam, FString MyStringParam) {
+    UE_LOG(LogTemp, Display, TEXT("Float: %f"), MyFloatParam);
+    UE_LOG(LogTemp, Display, TEXT("String: %s"), *MyStringParam);
+}
+
+// 2. BeginPlay에서 호출
+void AMovingPlatform::BeginPlay() {
+    Super::BeginPlay();
+
+    FString MyName = GetName();  // 액터 이름 가져오기
+    MyTestFunction(3.5f, MyName);
+}
+
+// 출력:
+// Float: 3.500000
+// String: MovingPlatform_0
+```
+
+---
+
+## 유용한 팁
+
+### GetName() 함수
+
+```cpp
+FString ActorName = GetName();
+// 현재 액터의 이름 반환
+// 예: "MovingPlatform_0"
+```
+
+### 게임 중 마우스 제어
+
+```
+Shift + F1  → 마우스 해제
+F8          → 플레이어에서 빠져나오기 (Eject)
+F8 다시     → 플레이어로 돌아가기
+```
+
+---
+
+## Java/C# 비교
+
+```java
+// Java
+public void calculate(float speed, int count) {
+    System.out.println("Speed: " + speed);
+}
+
+calculate(100.0f, 5);
+```
+
+```cpp
+// C++/언리얼
+void Calculate(float Speed, int Count) {
+    UE_LOG(LogTemp, Display, TEXT("Speed: %f"), Speed);
+}
+
+Calculate(100.0f, 5);
+```
+
+**똑같은 개념!** 😊
+
+---
+
+## 핵심 정리
+
+### 매개변수 만들기
+
+```cpp
+void FunctionName(Type Name, Type Name, ...) {
+    // 본문에서 자유롭게 사용
+}
+```
+
+### 체크리스트
+
+1. ✅ 타입 지정 (float, int, FString 등)
+2. ✅ 이름 지정
+3. ✅ 쉼표로 구분 (여러 개일 때)
+4. ✅ 호출 시 **순서 일치**
+5. ✅ FString은 로그 시 붙이기
+
+---
+
+## 실수하기 쉬운 것
+
+```cpp
+// ❌ 순서 틀림
+void Test(float A, int B) { }
+Test(10, 3.5f);  // 에러!
+
+// ❌ 개수 틀림
+void Test(float A, int B) { }
+Test(3.5f);  // 에러! 인수 부족
+
+// ❌ FString 로그 시 * 없음
+UE_LOG(LogTemp, Display, TEXT("%s"), MyString);  // 에러!
+UE_LOG(LogTemp, Display, TEXT("%s"), *MyString); // 정답!
+```
+
+# { 멤버 함수 (Member Function) }
+
+## 멤버 함수란?
+
+**클래스에 속하는 함수** = 클래스의 모든 기능에 접근 가능
+
+```cpp
+// 일반 함수 ❌
+void Test() {
+    GetActorLocation();  // 에러!
+}
+
+// 멤버 함수 ✅
+void AMovingPlatform::MovePlatform() {
+    GetActorLocation();  // OK!
+}
+```
+
+---
+
+## 멤버 함수 만드는 방법
+
+### 1단계: 헤더 파일에 선언 (Declaration)
+
+```cpp
+// MovingPlatform.h
+
+class AMovingPlatform : public AActor {
+    GENERATED_BODY()
+
+public:
+    void BeginPlay() override;
+    void Tick(float DeltaTime) override;
+
+    void MovePlatform(float DeltaTime);  // 👈 선언 (세미콜론!)
+};
+```
+
+### 2단계: CPP 파일에 정의 (Definition)
+
+```cpp
+// MovingPlatform.cpp
+
+void AMovingPlatform::MovePlatform(float DeltaTime) {
+//   ↑클래스명  ↑범위해상도연산자  ↑함수명
+
+    // 함수 본문
+    FVector CurrentLocation = GetActorLocation();
+    CurrentLocation += PlatformVelocity * DeltaTime;
+    SetActorLocation(CurrentLocation);
+}
+```
+
+---
+
+## 핵심 문법: 범위 해상도 연산자 `::`
+
+```cpp
+클래스이름::함수이름
+
+AMovingPlatform::MovePlatform  // "MovingPlatform 클래스의 MovePlatform 함수"
+```
+
+**역할:** 이 함수가 어느 클래스에 속하는지 표시
+
+---
+
+## 선언 vs 정의
+
+| 구분     | 위치       | 형태                    | 역할               |
+| -------- | ---------- | ----------------------- | ------------------ |
+| **선언** | 헤더 (.h)  | `void Func();`          | "이런 함수 있어요" |
+| **정의** | CPP (.cpp) | `void Class::Func() {}` | "실제 코드 구현"   |
+
+```cpp
+// 선언 - 세미콜론 O
+void MovePlatform(float DeltaTime);
+
+// 정의 - 중괄호 O
+void AMovingPlatform::MovePlatform(float DeltaTime) {
+    // 실제 코드
+}
+```
+
+---
+
+## 실전 예제: 코드 정리하기
+
+### Before (정리 전)
+
+```cpp
+void AMovingPlatform::Tick(float DeltaTime) {
+    Super::Tick(DeltaTime);
+
+    // 이동 코드가 Tick 안에 다 있음 (복잡!)
+    FVector CurrentLocation = GetActorLocation();
+    CurrentLocation += PlatformVelocity * DeltaTime;
+    SetActorLocation(CurrentLocation);
+}
+```
+
+### After (정리 후)
+
+```cpp
+// Tick은 깔끔하게!
+void AMovingPlatform::Tick(float DeltaTime) {
+    Super::Tick(DeltaTime);
+
+    MovePlatform(DeltaTime);  // 👈 가독성 좋음!
+}
+
+// 세부 구현은 따로
+void AMovingPlatform::MovePlatform(float DeltaTime) {
+    FVector CurrentLocation = GetActorLocation();
+    CurrentLocation += PlatformVelocity * DeltaTime;
+    SetActorLocation(CurrentLocation);
+}
+```
+
+---
+
+## Visual Studio 자동 생성 단축키
+
+### 방법 1: 수동
+
+```cpp
+// 1. 헤더에 선언
+void RotatePlatform(float DeltaTime);
+
+// 2. CPP에 직접 입력
+void AMovingPlatform::RotatePlatform(float DeltaTime) {
+}
+```
+
+### 방법 2: 자동 (추천!)
+
+```cpp
+// 1. 헤더에 선언
+void RotatePlatform(float DeltaTime);  // 👈 녹색 물결선
+
+// 2. 함수명에 커서 → Alt + Enter
+// 3. "정의 만들기" 선택
+// → CPP에 자동 생성됨!
+```
+
+---
+
+## 실습 문제 & 정답
+
+### 문제
+
+1. `RotatePlatform` 멤버 함수 만들기
+2. 매개변수: `float DeltaTime`
+3. 본문에 주석: "Rotate platform"
+4. `Tick`에서 호출하기
+
+### 정답
+
+```cpp
+// ========== MovingPlatform.h ==========
+
+class AMovingPlatform : public AActor {
+public:
+    void Tick(float DeltaTime) override;
+
+    void MovePlatform(float DeltaTime);
+    void RotatePlatform(float DeltaTime);  // 1. 선언
+};
+
+// ========== MovingPlatform.cpp ==========
+
+// 2. 정의
+void AMovingPlatform::RotatePlatform(float DeltaTime) {
+    // Rotate platform  // 3. 주석
+}
+
+void AMovingPlatform::Tick(float DeltaTime) {
+    Super::Tick(DeltaTime);
+
+    MovePlatform(DeltaTime);
+    RotatePlatform(DeltaTime);  // 4. 호출
+}
+```
+
+---
+
+## 일반 함수 vs 멤버 함수 차이
+
+### 함수 위치 규칙
+
+```cpp
+// ❌ 일반 함수 - 순서 중요!
+void Helper() { }  // 위에 있어야 함
+
+void BeginPlay() {
+    Helper();  // 호출
+}
+
+// ✅ 멤버 함수 - 순서 무관!
+void AMovingPlatform::BeginPlay() {
+    MovePlatform();  // 아래 있어도 OK
+}
+
+void AMovingPlatform::MovePlatform() {
+    // 정의가 나중에 있어도 됨
+}
+```
+
+**이유:** 멤버 함수는 헤더에 이미 선언되어 있어서 클래스가 알고 있음!
+
+---
+
+## 멤버 함수의 장점
+
+### 1. 클래스 기능 접근
+
+```cpp
+void AMovingPlatform::MovePlatform() {
+    GetActorLocation();   // ✅ OK
+    SetActorLocation();   // ✅ OK
+    PlatformVelocity;     // ✅ OK (멤버 변수)
+}
+```
+
+### 2. 코드 구조화
+
+```cpp
+// 깔끔한 Tick
+void Tick(float DeltaTime) {
+    MovePlatform(DeltaTime);
+    RotatePlatform(DeltaTime);
+    CheckCollision();
+}
+// 각 기능이 무엇인지 한눈에 보임!
+```
+
+### 3. 재사용성
+
+```cpp
+void BeginPlay() {
+    MovePlatform(0.016f);  // 여기서도
+}
+
+void Tick(float DeltaTime) {
+    MovePlatform(DeltaTime);  // 여기서도
+}
+```
+
+---
+
+## 체크리스트
+
+### 멤버 함수 만들기
+
+- [ ] 헤더에 선언 (`void Func();`)
+- [ ] CPP에 정의 (`void Class::Func() {}`)
+- [ ] 범위 해상도 연산자 `::` 사용
+- [ ] 매개변수 타입/이름 일치
+- [ ] 헤더 변경 시 에디터 종료 후 컴파일
+
+### 호출하기
+
+- [ ] 함수명 입력
+- [ ] 괄호 + 인수
+- [ ] 세미콜론
+
+---
+
+## Java/C# 비교
+
+```java
+// Java
+public class Player {
+    // 선언과 정의가 같이
+    public void attack() {
+        health -= 10;
+    }
+}
+```
+
+```cpp
+// C++ 언리얼
+// 헤더 - 선언
+class APlayer {
+    void Attack();
+};
+
+// CPP - 정의
+void APlayer::Attack() {
+    Health -= 10;
+}
+```
+
+**차이점:** C++은 선언/정의 분리 (헤더/CPP)
+
+---
+
+## 핵심 정리
+
+```
+멤버 함수 = 클래스 소속 함수
+
+만들기:
+1. 헤더에 선언 (세미콜론)
+2. CPP에 정의 (클래스명::)
+
+장점:
+✅ 클래스 모든 기능 사용
+✅ 코드 깔끔하게 정리
+✅ 순서 상관없음
+```
+
+**언리얼에서는 거의 모든 함수가 멤버 함수!** 🎯
+
+# { 클래스와 인스턴스 (Class & Instance) }
+
+## 핵심 개념
+
+### 클래스 (Class) = 레시피 📋
+
+- 어떻게 만들지 설명하는 설계도
+- 헤더(.h) + CPP(.cpp) 파일
+- 변수와 함수의 구조 정의
+
+### 인스턴스 (Instance) = 실제 요리 🍕
+
+- 레시피로 만든 실제 게임 오브젝트
+- 레벨에 배치된 각각의 액터
+- 클래스를 기반으로 생성
+
+---
+
+## 비유로 이해하기
+
+```
+클래스 = 붕어빵 틀 🔧
+인스턴스 = 실제 붕어빵 🥐🥐🥐
+
+하나의 틀(클래스)로
+여러 개의 붕어빵(인스턴스) 생성!
+```
+
+---
+
+## 코드로 보는 구조
+
+### 클래스 (레시피)
+
+```cpp
+// MovingPlatform.h - 클래스 정의
+
+class AMovingPlatform : public AActor {
+    GENERATED_BODY()
+
+public:
+    // 변수 (데이터)
+    UPROPERTY(EditAnywhere)
+    FVector PlatformVelocity = FVector(0, 0, 0);  // 기본값
+
+    UPROPERTY(EditAnywhere)
+    float MoveDistance = 200.0f;  // 기본값
+
+    // 함수 (기능)
+    void MovePlatform(float DeltaTime);
+    void RotatePlatform(float DeltaTime);
+};
+```
+
+### 인스턴스 (실제 오브젝트)
+
+```
+레벨에 배치:
+
+Instance 1:                Instance 2:
+PlatformVelocity: (100,0,0) | PlatformVelocity: (0,50,0)
+MoveDistance: 400           | MoveDistance: 200 (기본값)
+
+같은 클래스, 다른 값! ✅
+```
+
+---
+
+## 중요한 규칙 ⚠️
+
+### 규칙 1: 클래스 변경 → 모든 인스턴스 영향
+
+```cpp
+// 클래스에 새 변수 추가
+class AMovingPlatform {
+    UPROPERTY(EditAnywhere)
+    FVector TestVector = FVector(1, 1, 1);  // 추가!
+};
+```
+
+**결과:** 레벨의 모든 MovingPlatform에 TestVector 생김 ✅
+
+---
+
+### 규칙 2: 인스턴스 변경 → 다른 인스턴스 무관
+
+```
+Instance 1에서:
+- PlatformVelocity를 (-100, 0, 0)으로 변경
+- Cube 컴포넌트 추가
+
+Instance 2는:
+- 여전히 기본값 (0, 0, 0) ✅
+- Cube 없음 ✅
+```
+
+---
+
+## 시각적 정리
+
+```
+┌─────────────────────────────────┐
+│   클래스 (AMovingPlatform)      │
+│   - PlatformVelocity = (0,0,0)  │
+│   - MoveDistance = 200          │
+│   - MovePlatform()              │
+│   - RotatePlatform()            │
+└─────────────────────────────────┘
+           ↓ ↓ ↓
+   (레시피로 여러 개 생성)
+
+┌──────────┐  ┌──────────┐  ┌──────────┐
+│Instance1 │  │Instance2 │  │Instance3 │
+│Vel:(-100)│  │Vel:(0,50)│  │Vel:(0,0) │
+│Dist: 400 │  │Dist: 200 │  │Dist: 300 │
+└──────────┘  └──────────┘  └──────────┘
+```
+
+---
+
+## 실전 예제
+
+### 인스턴스 생성하기
+
+**방법 1: 에디터에서**
+
+```
+1. Content Browser → C++ Classes → ObstacleAssault
+2. MovingPlatform을 레벨로 드래그
+3. 새 인스턴스 생성 완료! ✅
+```
+
+**방법 2: 코드에서 (나중에 배움)**
+
+```cpp
+AMovingPlatform* NewPlatform = GetWorld()->SpawnActor<AMovingPlatform>();
+```
+
+---
+
+### 인스턴스 커스터마이징
+
+```
+Instance 1 설정:
+- PlatformVelocity: X = -100 (왼쪽으로)
+- Cube 컴포넌트 추가
+- Scale: (3, 3, 0.5)
+
+Instance 2 설정:
+- PlatformVelocity: Y = 50 (앞으로)
+- Sphere 컴포넌트 추가
+- Scale: (2, 2, 1)
+
+같은 클래스, 다른 모습! ✅
+```
+
+---
+
+## 변경 사항 영향 범위
+
+| 변경 위치    | 영향 범위     | 예시                     |
+| ------------ | ------------- | ------------------------ |
+| **클래스**   | 모든 인스턴스 | 새 변수 추가 → 전부 생김 |
+| **인스턴스** | 그 인스턴스만 | Velocity 변경 → 자기만   |
+
+---
+
+## 실습 예제: 클래스 변경
+
+### 클래스에 변수 추가
+
+```cpp
+// MovingPlatform.h
+
+UPROPERTY(EditAnywhere)
+FVector TestVector = FVector(1, 1, 1);
+```
+
+### 컴파일 후 확인
+
+```
+Before:
+Instance 1 - PlatformVelocity만 있음
+Instance 2 - PlatformVelocity만 있음
+
+After:
+Instance 1 - TestVector 생김! ✅
+Instance 2 - TestVector 생김! ✅
+```
+
+---
+
+## 인스턴스별 고유 설정
+
+### 컴포넌트 추가는 인스턴스별
+
+```
+Instance 1:
+- Cube 추가 (직접 추가)
+
+Instance 2:
+- Cube 없음! (자동으로 안 생김)
+- 다시 직접 추가해야 함
+```
+
+**이유:** 컴포넌트 추가는 인스턴스 변경이므로 다른 인스턴스에 영향 ❌
+
+---
+
+## 실습 문제 & 정답
+
+### 문제
+
+1. MovingPlatform 새 인스턴스 생성
+2. Cube 또는 다른 Shape 컴포넌트 추가
+3. Scale 조정해서 멋지게 만들기
+4. PlatformVelocity 커스터마이징
+
+### 정답 순서
+
+```
+1. Content Browser → C++ Classes
+   → MovingPlatform을 레벨로 드래그
+
+2. Details 패널 → Add Component
+   → Static Mesh (Cube)
+
+3. Transform → Scale
+   → (3, 3, 0.5) 정도로 조정
+
+4. Platform Velocity
+   → X: 100 (오른쪽으로)
+   또는 Y: -50 (뒤로)
+```
+
+---
+
+## Unity/Java 비교
+
+### Unity (C#)
+
+```csharp
+// 클래스 정의
+public class MovingPlatform : MonoBehaviour {
+    public Vector3 velocity;
+}
+
+// 인스턴스
+// - Hierarchy에서 GameObject로 존재
+// - Prefab = 클래스 비슷한 개념
+```
+
+### Java
+
+```java
+// 클래스
+class Player {
+    int health = 100;
+}
+
+// 인스턴스
+Player player1 = new Player();  // health: 100
+Player player2 = new Player();  // health: 100
+
+player1.health = 50;  // player2는 여전히 100
+```
+
+---
+
+## 핵심 정리
+
+### 클래스 (Class)
+
+```
+= 설계도, 레시피
+= .h + .cpp 파일
+= 변수와 함수 정의
+```
+
+### 인스턴스 (Instance)
+
+```
+= 실제 오브젝트
+= 레벨에 배치된 액터
+= 클래스 기반으로 생성
+```
+
+### 변경 규칙
+
+```
+클래스 변경 → 모든 인스턴스 ✅
+인스턴스 변경 → 그것만 ✅
+```
+
+---
+
+## 기억할 점
+
+1. **클래스 = 1개** (붕어빵 틀)
+2. **인스턴스 = 여러 개** (붕어빵들)
+3. **기본값은 클래스에서**, **커스터마이징은 인스턴스에서**
+4. **클래스 수정 = 강력함** (전체 업데이트)
+5. **인스턴스 수정 = 안전함** (다른 것 안 깨짐)
+
+---
+
+## 실무 활용
+
+```
+게임에서 적(Enemy) 100마리를 만든다면?
+
+Enemy 클래스 1개 만들고
+→ 인스턴스 100개 생성!
+
+나중에 적 체력 수정 필요?
+→ 클래스만 수정하면 100마리 전부 적용 ✅
+```
+
+**이것이 클래스/인스턴스 시스템의 힘!** 🎯
+
+# { 블루프린트 자식 클래스 (Blueprint Child Class) }
+
+```csharp
+**네, Prefab과 거의 같은 개념입니다!**
+```
+
+Unity 경험자라면:
+"아, Prefab이구나!" 하고 이해하면 됩니다 👍
+
+단, Unreal은:
+
+- C++ 상속이 더 명확하고
+- 비주얼 스크립팅도 추가로 가능
+
+```
+
+## 문제 상황
+
+### C++ 클래스로 인스턴스 생성 시
+
+```
+
+인스턴스 생성 → Cube 없음 😢
+→ 매번 수동으로 Cube 추가
+→ 매번 Scale 조정
+→ 불편함! ❌
+
+```
+
+---
+
+## 해결책: 블루프린트 자식 클래스
+
+### 구조 이해
+
+```
+
+C++ 클래스 (MovingPlatform)
+↓ 부모-자식 관계
+Blueprint 자식 클래스 (BP_MovingPlatform)
+↓ 인스턴스 생성
+실제 게임 오브젝트들
+
+```
+
+---
+
+## 계층 구조 비교
+
+### Before (C++ 클래스만)
+
+```
+
+C++ MovingPlatform
+↓
+Instance 1 (Cube 없음)
+Instance 2 (Cube 없음)
+Instance 3 (Cube 없음)
+→ 매번 Cube 추가해야 함 😰
+
+```
+
+### After (블루프린트 사용)
+
+```
+
+C++ MovingPlatform
+↓
+BP_MovingPlatform (Cube 미리 세팅!)
+↓
+Instance 1 (Cube 자동!)
+Instance 2 (Cube 자동!)
+Instance 3 (Cube 자동!)
+→ 편함! 😊
+
+````
+
+---
+
+## 블루프린트 자식 클래스 장점
+
+### 1. 비주얼 에디터 사용 가능 🎨
+
+```cpp
+// ❌ 코드로 모양 조정 (불편)
+Cube->SetScale(FVector(3, 3, 0.5));
+Cube->SetLocation(FVector(0, 0, 50));
+````
+
+```
+// ✅ 블루프린트 에디터로 조정 (직관적)
+→ 마우스로 드래그
+→ 실시간으로 보면서 조정
+→ 훨씬 쉬움!
+```
+
+### 2. C++ 기능 그대로 상속 ✅
+
+- `MovePlatform()` 함수
+- `PlatformVelocity` 변수
+- 모든 C++ 코드 작동
+
+### 3. 여러 종류 쉽게 제작
+
+```
+C++ MovingPlatform 1개
+    ↓
+BP_MovingPlatform1 (일반 큐브)
+BP_MovingPlatform2 (2층 플랫폼)
+BP_MovingPlatform3 (원형 플랫폼)
+```
+
+---
+
+## 블루프린트 자식 클래스 만들기
+
+### 1단계: 생성
+
+```
+Content Browser → My Assets 폴더
+→ 우클릭 → Blueprint Class
+→ All Classes 클릭
+→ 검색: "MovingPlatform"
+→ MovingPlatform 선택 (⚠️ 정확히 일치하는 것!)
+→ Select
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380615/notion-blog/_/_/_5_C_/_2_Obstacle_Assault_-_2/image_1.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380615/notion-blog/_/_/_5_C_/_2_Obstacle_Assault_-_2/image_2.png)
+
+### 2단계: 이름 짓기
+
+```
+생성된 파일 우클릭 → Rename
+→ "BP_MovingPlatform"
+
+💡 BP_ = Blueprint의 약자 (네이밍 규칙)
+```
+
+### 3단계: 편집
+
+```
+더블클릭으로 열기
+→ Blueprint Editor 열림
+```
+
+---
+
+## 블루프린트 에디터 구조
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380616/notion-blog/_/_/_5_C_/_2_Obstacle_Assault_-_2/image_3.png)
+
+```
+┌─────────────────────────────────────────────┐
+│  [Viewport]         [Details]               │
+│   여기서           선택한 컴포넌트          │
+│   액터 모양        설정 표시                │
+│   확인                                      │
+│                                             │
+│  [Components]                               │
+│   - DefaultSceneRoot                        │
+│   - Cube (추가할 것)                        │
+│   - Sphere (추가 가능)                      │
+└─────────────────────────────────────────────┘
+```
+
+### 주요 탭 설명
+
+| 탭             | 역할                                          |
+| -------------- | --------------------------------------------- |
+| **Viewport**   | 액터 모양 실시간 확인                         |
+| **Components** | 컴포넌트 목록 (Cube, Sphere 등)               |
+| **Details**    | 선택한 컴포넌트 속성 (Transform, Velocity 등) |
+
+---
+
+## 컴포넌트 추가하기
+
+### Cube 추가
+
+```
+Components 탭
+→ + Add 버튼 클릭
+→ "Cube" 검색
+→ 선택
+```
+
+### Scale 조정
+
+```
+Cube 선택
+→ Details → Transform → Scale
+→ X: 3, Y: 3, Z: 0.5
+```
+
+### 결과
+
+```
+Viewport에서 실시간으로 변화 확인 가능! 👁️
+```
+
+---
+
+## C++ 변수 확인/수정
+
+### Details 패널에서
+
+```
+Main Component 선택
+→ 아래로 스크롤
+→ "Platform Velocity" 보임!
+
+X: 100 으로 설정
+→ 기본적으로 X축 이동
+```
+
+**중요:** C++에서 `UPROPERTY(EditAnywhere)` 붙인 변수만 보임!
+
+---
+
+## 저장 & 컴파일
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380616/notion-blog/_/_/_5_C_/_2_Obstacle_Assault_-_2/image_4.png)
+
+### 블루프린트 작업 완료 후
+
+```
+1. Ctrl + S (또는 Save 버튼)
+2. Compile 버튼 클릭
+3. 메인 레벨로 돌아가기
+```
+
+💡 **블루프린트 컴파일 ≠ C++ 컴파일**
+
+- 블루프린트 에셋을 게임에서 사용 가능하게 만드는 과정
+
+---
+
+## 레벨에 배치하기
+
+### 인스턴스 생성
+
+```
+Content Browser
+→ BP_MovingPlatform
+→ 레벨로 드래그
+
+결과:
+✅ Cube 자동으로 있음!
+✅ Scale 이미 조정됨!
+✅ Velocity 기본값 설정됨!
+```
+
+### 여러 개 배치
+
+```
+같은 블루프린트를 여러 번 드래그
+→ 모두 같은 모양
+→ 각각 Velocity는 개별 조정 가능!
+```
+
+---
+
+## 실습 예제
+
+### 예제 1: 기본 플랫폼
+
+```
+Blueprint: BP_MovingPlatform
+- Cube 1개
+- Scale: (3, 3, 0.5)
+- Velocity: (100, 0, 0) - X축 이동
+```
+
+### 예제 2: 2층 플랫폼
+
+```
+Blueprint: BP_MovingPlatform2
+- Cube 1 (아래층)
+  Scale: (2, 2, 0.2)
+- Cube 2 (위층)
+  Scale: (2, 2, 0.2)
+  Location: Z = 50
+- Velocity: (0, 0, 50) - 위로 이동
+```
+
+---
+
+## 컴포넌트 계층 구조
+
+### 부모-자식 관계
+
+```
+DefaultSceneRoot (루트)
+├─ Cube1
+└─ Cube2
+```
+
+### 드래그로 관계 변경 가능
+
+```
+Before:
+DefaultSceneRoot
+├─ Cube1
+└─ Cube2
+
+After (Cube2를 Cube1로 드래그):
+DefaultSceneRoot
+└─ Cube1
+    └─ Cube2 (자식)
+```
+
+**효과:**
+
+- 부모 이동 시 자식도 따라감
+- 부모 회전 시 자식도 따라 회전
+
+---
+
+## 실습 문제 & 정답
+
+### 문제
+
+1. `BP_MovingPlatform2` 생성
+2. Cube 2개 추가
+3. 다른 Scale로 조정
+4. Velocity를 (0, 0, 50)으로 설정 (위로 이동)
+5. 레벨에 배치해서 테스트
+
+### 정답
+
+```
+1. 생성:
+Content Browser → 우클릭 → Blueprint Class
+→ MovingPlatform 검색 → Select
+→ 이름: BP_MovingPlatform2
+
+2. 컴포넌트 추가:
++ Add → Cube (첫 번째)
+DefaultSceneRoot 선택 → + Add → Cube (두 번째)
+
+3. Scale 조정:
+Cube1: (2, 2, 0.2)
+Cube2: (2, 2, 0.2), Location Z: 50
+
+4. Velocity 설정:
+Main Component 선택
+→ Platform Velocity → Z: 50
+
+5. 저장 & 컴파일:
+Ctrl + S → Compile → 레벨로 드래그
+```
+
+---
+
+## C++ vs 블루프린트 비교
+
+| 구분              | C++ 클래스 | 블루프린트 자식 |
+| ----------------- | ---------- | --------------- |
+| **코드**          | ✅ 있음    | ✅ 상속받음     |
+| **비주얼 편집**   | ❌ 없음    | ✅ 있음         |
+| **컴포넌트 추가** | 코드로     | 드래그로        |
+| **속도 조정**     | 코드 수정  | 에디터에서      |
+| **사용 시점**     | 로직 구현  | 디자인/외형     |
+
+---
+
+## 작업 흐름 (Workflow)
+
+### 권장 방식
+
+```
+1. C++에서 기능(로직) 구현
+   → MovePlatform(), RotatePlatform()
+
+2. 블루프린트에서 외형 디자인
+   → Cube 추가, Scale 조정
+
+3. 블루프린트 인스턴스로 레벨 구성
+   → 각각 다른 Velocity 설정
+```
+
+---
+
+## 자주 하는 실수
+
+### ❌ 실수 1: 잘못된 부모 선택
+
+```
+MovingPlatform_2 (다른 블루프린트) 선택
+→ 원하는 결과 안 나옴
+
+정답: MovingPlatform (C++ 클래스)만 선택!
+```
+
+### ❌ 실수 2: 저장 안 함
+
+```
+컴포넌트 추가
+→ 저장 안 하고 닫기
+→ 작업 날아감 😱
+
+정답: Ctrl + S로 꼭 저장!
+```
+
+### ❌ 실수 3: 컴파일 안 함
+
+```
+편집 완료
+→ Compile 안 하고 사용
+→ 변경사항 적용 안 됨
+
+정답: Compile 버튼 꼭 클릭!
+```
+
+---
+
+## Unity 비교
+
+### Unity (Prefab)
+
+```csharp
+// C# 스크립트 작성
+public class MovingPlatform : MonoBehaviour { }
+
+// Prefab으로 만들기
+GameObject에 컴포넌트 추가
+→ Prefab으로 저장
+→ 씬에 배치
+```
+
+### Unreal (Blueprint)
+
+```cpp
+// C++ 클래스 작성
+class AMovingPlatform : public AActor { }
+
+// Blueprint 자식 클래스 만들기
+C++ 클래스 선택
+→ Blueprint 생성
+→ 컴포넌트 추가
+→ 레벨에 배치
+```
+
+**비슷한 개념!** Unity Prefab ≈ Unreal Blueprint
+
+---
+
+## 핵심 정리
+
+### 블루프린트 자식 클래스란?
+
+```
+C++ 클래스를 부모로 하는
+비주얼 에디터용 클래스
+
+= C++ 기능 + 비주얼 디자인
+```
+
+### 언제 사용?
+
+```
+✅ 외형/모양 디자인할 때
+✅ 컴포넌트 배치할 때
+✅ 여러 종류의 변형 만들 때
+```
+
+### 만드는 순서
+
+```
+1. C++에서 기능 구현
+2. Blueprint 자식 생성
+3. 컴포넌트 추가/디자인
+4. 저장 & 컴파일
+5. 레벨에 배치
+```
+
+---
+
+## 기억할 공식
+
+```
+C++ 클래스 (로직)
+    +
+Blueprint 자식 (외형)
+    =
+완벽한 게임 오브젝트! 🎯
+```
+
+**언리얼의 강력한 하이브리드 시스템!** C++의 성능 + 블루프린트의 편의성 ✨
+
+# { 플랫폼 이동 거리 추적하기 }
+
+## 목표
+
+### 현재 상황
+
+```
+플랫폼이 계속 한 방향으로만 이동 ❌
+→ 멈추지 않음
+→ 돌아오지 않음
+```
+
+### 원하는 동작
+
+```
+플랫폼 이동 → 일정 거리 도달 → 다시 돌아옴 ✅
+```
+
+---
+
+## 구현 전략
+
+### 필요한 것들
+
+1. **시작 위치 (Start Location)** 📍
+   - 게임 시작 시 플랫폼의 원래 위치
+   - 돌아올 기준점
+2. **이동 거리 (Distance Moved)** 📏
+   - 시작 위치에서 얼마나 멀어졌는지
+   - 실시간 추적
+3. **최대 거리 (Max Distance)** - 다음 강의
+   - 이동할 수 있는 최대 거리
+   - 이 거리 도달 시 → 돌아오기
+
+---
+
+## 시각적 이해
+
+```
+시작 위치          현재 위치
+    ↓                ↓
+    [=================]
+    ←  이동 거리 (Distance)  →
+
+예: 300cm 이동 → 다시 돌아감
+```
+
+---
+
+## 코드 구현
+
+### 1단계: 시작 위치 멤버 변수 생성
+
+### 헤더 파일 (.h)
+
+```cpp
+// MovingPlatform.h
+
+class AMovingPlatform : public AActor {
+    GENERATED_BODY()
+
+public:
+    // ... 기존 코드
+
+private:
+    // 시작 위치 저장
+    FVector StartLocation;  // UPROPERTY 없음! (내부용)
+};
+```
+
+**왜 UPROPERTY 없나요?**
+
+- 에디터에서 수정할 필요 없음
+- C++ 내부에서만 사용
+- 자동으로 계산되는 값
+
+---
+
+### 2단계: BeginPlay에서 시작 위치 저장
+
+### CPP 파일 (.cpp)
+
+```cpp
+void AMovingPlatform::BeginPlay() {
+    Super::BeginPlay();
+
+    // 게임 시작 시 현재 위치를 시작 위치로 저장
+    StartLocation = GetActorLocation();
+}
+```
+
+**시점:**
+
+- 게임 시작 시 (또는 액터 스폰 시)
+- 딱 1번만 실행
+- 이후 변하지 않음
+
+---
+
+### 3단계: 이동 거리 계산
+
+### FVector::Dist() 함수 사용
+
+```cpp
+// 두 점 사이의 거리 계산
+float Distance = FVector::Dist(Point1, Point2);
+```
+
+**함수 설명:**
+
+- **클래스 함수**: FVector 클래스에 속함
+- **호출 방법**: `FVector::함수명` (범위 해상도 연산자)
+- **매개변수**: 두 개의 FVector
+- **반환값**: double (float으로 저장 가능)
+
+---
+
+### 4단계: 이동 거리 멤버 변수 생성
+
+### 헤더 파일 (.h)
+
+```cpp
+class AMovingPlatform : public AActor {
+public:
+    // 에디터에서 확인용
+    UPROPERTY(VisibleAnywhere)
+    float DistanceMoved = 0.0f;  // 기본값 0
+
+private:
+    FVector StartLocation;
+};
+```
+
+**VisibleAnywhere:**
+
+- 에디터에서 **볼 수만** 있음
+- 수정은 불가능
+- 실시간으로 값 확인 가능 👁️
+
+---
+
+### 5단계: MovePlatform에서 거리 계산
+
+### CPP 파일 (.cpp)
+
+```cpp
+void AMovingPlatform::MovePlatform(float DeltaTime) {
+    // 1. 현재 위치 가져오기
+    FVector CurrentLocation = GetActorLocation();
+
+    // 2. 새 위치 계산
+    CurrentLocation = CurrentLocation + (PlatformVelocity * DeltaTime);
+
+    // 3. 위치 업데이트
+    SetActorLocation(CurrentLocation);
+
+    // 4. 이동 거리 계산 (새로 추가!)
+    DistanceMoved = FVector::Dist(StartLocation, CurrentLocation);
+}
+```
+
+---
+
+## 범위 해상도 연산자 `::` 두 번째 용도
+
+### 용도 1: 멤버 함수 정의 (이미 배움)
+
+```cpp
+void AMovingPlatform::MovePlatform() {
+    // 클래스명::함수명
+}
+```
+
+### 용도 2: 클래스 함수 호출 (새로 배움)
+
+```cpp
+float Distance = FVector::Dist(A, B);
+// 클래스명::함수명
+```
+
+**차이점:**
+
+- 멤버 함수: 인스턴스에 속함
+- 클래스 함수 (Static): 클래스 자체에 속함
+
+---
+
+## FVector::Dist() 함수 상세
+
+### 함수 시그니처
+
+```cpp
+static double Dist(
+    const FVector& V1,  // 첫 번째 점
+    const FVector& V2   // 두 번째 점
+);
+```
+
+### 사용 예시
+
+```cpp
+FVector Start(0, 0, 0);
+FVector Current(100, 0, 0);
+
+float Distance = FVector::Dist(Start, Current);
+// 결과: 100.0
+```
+
+### Visual Studio 자동완성
+
+```cpp
+FVector::  // 입력 후 Ctrl + Space
+→ 함수 목록 표시
+→ "Dist" 검색
+→ Enter로 선택
+```
+
+---
+
+## 실행 흐름
+
+### 전체 과정
+
+```cpp
+// BeginPlay (게임 시작 시 1회)
+StartLocation = GetActorLocation();  // (0, 0, 0) 저장
+
+// Tick → MovePlatform (매 프레임)
+Frame 1:
+  CurrentLocation = (1, 0, 0)
+  DistanceMoved = Dist((0,0,0), (1,0,0)) = 1.0
+
+Frame 2:
+  CurrentLocation = (2, 0, 0)
+  DistanceMoved = Dist((0,0,0), (2,0,0)) = 2.0
+
+Frame 3:
+  CurrentLocation = (3, 0, 0)
+  DistanceMoved = Dist((0,0,0), (3,0,0)) = 3.0
+
+... 계속 증가
+```
+
+---
+
+## 에디터에서 확인하기
+
+### 실시간 모니터링
+
+```
+1. 레벨에서 MovingPlatform 선택
+2. Details 패널 확인
+3. Play 버튼 클릭
+4. Distance Moved 값 실시간 증가 확인 ✅
+```
+
+### 예상 결과
+
+```
+Distance Moved: 0      (시작)
+Distance Moved: 50     (0.5초 후)
+Distance Moved: 100    (1초 후)
+Distance Moved: 150    (1.5초 후)
+... 계속 증가
+```
+
+---
+
+## 코드 분석
+
+### 전체 코드 정리
+
+```cpp
+// ========== MovingPlatform.h ==========
+class AMovingPlatform : public AActor {
+public:
+    UPROPERTY(EditAnywhere)
+    FVector PlatformVelocity = FVector(100, 0, 0);
+
+    UPROPERTY(VisibleAnywhere)  // 👈 확인용
+    float DistanceMoved = 0.0f;
+
+private:
+    FVector StartLocation;  // 👈 내부용
+};
+
+// ========== MovingPlatform.cpp ==========
+void AMovingPlatform::BeginPlay() {
+    Super::BeginPlay();
+    StartLocation = GetActorLocation();  // 👈 시작 위치 저장
+}
+
+void AMovingPlatform::MovePlatform(float DeltaTime) {
+    FVector CurrentLocation = GetActorLocation();
+    CurrentLocation += PlatformVelocity * DeltaTime;
+    SetActorLocation(CurrentLocation);
+
+    // 👇 거리 계산 (핵심!)
+    DistanceMoved = FVector::Dist(StartLocation, CurrentLocation);
+}
+```
+
+---
+
+## UPROPERTY 종류 비교
+
+| 종류                | 에디터 표시 | 수정 가능 | 용도            |
+| ------------------- | ----------- | --------- | --------------- |
+| **EditAnywhere**    | ✅          | ✅        | 디자이너 조정용 |
+| **VisibleAnywhere** | ✅          | ❌        | 확인/디버그용   |
+| **없음**            | ❌          | ❌        | 내부 계산용     |
+
+---
+
+## 다음 단계 예고
+
+---
+
+## 실습 문제 & 정답
+
+### 문제
+
+1. `StartLocation` 멤버 변수 추가
+2. `BeginPlay`에서 초기화
+3. `DistanceMoved` 멤버 변수 추가 (VisibleAnywhere)
+4. `MovePlatform`에서 거리 계산
+
+### 정답
+
+```cpp
+// 헤더
+UPROPERTY(VisibleAnywhere)
+float DistanceMoved = 0.0f;
+
+FVector StartLocation;
+
+// BeginPlay
+void AMovingPlatform::BeginPlay() {
+    Super::BeginPlay();
+    StartLocation = GetActorLocation();
+}
+
+// MovePlatform
+void AMovingPlatform::MovePlatform(float DeltaTime) {
+    FVector CurrentLocation = GetActorLocation();
+    CurrentLocation += PlatformVelocity * DeltaTime;
+    SetActorLocation(CurrentLocation);
+
+    DistanceMoved = FVector::Dist(StartLocation, CurrentLocation);
+}
+```
+
+---
+
+## 자주 하는 실수
+
+### ❌ 실수 1: StartLocation 초기화 안 함
+
+```cpp
+// BeginPlay에서 설정 안 함
+void AMovingPlatform::BeginPlay() {
+    Super::BeginPlay();
+    // StartLocation = GetActorLocation(); ← 없음!
+}
+// 결과: StartLocation이 (0,0,0)으로 잘못된 거리 계산
+```
+
+### ❌ 실수 2: 잘못된 위치에서 거리 계산
+
+```cpp
+// BeginPlay에서 계산 (틀림!)
+void AMovingPlatform::BeginPlay() {
+    DistanceMoved = FVector::Dist(StartLocation, CurrentLocation);
+    // 1번만 실행됨 → 항상 0
+}
+
+// MovePlatform에서 계산 (정답!)
+void AMovingPlatform::MovePlatform(float DeltaTime) {
+    // 매 프레임 실행 → 실시간 업데이트 ✅
+}
+```
+
+### ❌ 실수 3: UPROPERTY 잘못 사용
+
+```cpp
+// StartLocation에 EditAnywhere (불필요!)
+UPROPERTY(EditAnywhere)
+FVector StartLocation;
+// 자동 계산되는 값이므로 수동 수정 불필요
+```
+
+---
+
+## 핵심 정리
+
+### 거리 추적 3단계
+
+```
+1. 시작 위치 저장 (BeginPlay)
+   StartLocation = GetActorLocation()
+
+2. 매 프레임 이동 (Tick → MovePlatform)
+   CurrentLocation += Velocity * DeltaTime
+
+3. 거리 계산 (MovePlatform)
+   DistanceMoved = Dist(Start, Current)
+```
+
+### 핵심 함수
+
+```cpp
+// 두 점 사이 거리 계산
+FVector::Dist(Point1, Point2)
+```
+
+### 다음 목표
+
+```
+현재: 계속 이동만 함
+목표: 300cm 이동 → 돌아오기
+```
+
+**이제 플랫폼이 얼마나 이동했는지 알 수 있습니다!** 📏✨

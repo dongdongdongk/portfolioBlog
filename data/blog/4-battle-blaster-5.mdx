@@ -1,0 +1,1676 @@
+---
+title: '섹션 4: Battle Blaster - 5'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 언리얼 엔진 C++ - Hit Event (충돌 이벤트) 핵심 정리 }
+
+## 📌 이번 강의의 목표
+
+발사체가 **무언가에 부딪혔을 때** 반응하게 만들기
+
+- 적에게 맞으면 → 데미지 주기
+- 벽에 맞으면 → 폭발 효과
+- 바닥에 맞으면 → 사라지기
+
+---
+
+## 🎯 핵심 개념: Delegate (델리게이트)
+
+### 델리게이트가 뭔가요?
+
+**"이벤트가 발생하면 내 함수를 호출해줘!"** 라고 등록하는 시스템
+
+```
+예시: 초인종 시스템
+┌─────────────┐         ┌──────────────┐
+│  초인종 눌림  │  →알림→  │  내가 문 열기  │
+│  (이벤트)   │         │   (내 함수)   │
+└─────────────┘         └──────────────┘
+```
+
+### 게임에서는?
+
+```
+┌──────────────┐         ┌────────────────┐
+│ 발사체가 충돌! │  →알림→  │  OnHit() 실행  │
+│  (Hit Event) │         │  (내가 만든 함수)│
+└──────────────┘         └────────────────┘
+```
+
+---
+
+## 📝 코드 단계별 완벽 분석
+
+### 1단계: Hit 함수 선언 (.h 파일)
+
+```cpp
+UFUNCTION()
+void OnHit(
+    UPrimitiveComponent* HitComponent,  // 맞은 내 컴포넌트
+    AActor* OtherActor,                 // 충돌한 상대 Actor
+    UPrimitiveComponent* OtherComp,     // 충돌한 상대 컴포넌트
+    FVector NormalImpulse,              // 충돌 힘의 방향
+    const FHitResult& Hit               // 충돌 상세 정보
+);
+```
+
+### 왜 `UFUNCTION()`이 필요한가요?
+
+```cpp
+UFUNCTION()  // ← 이게 없으면 델리게이트 연결 불가능!
+```
+
+- 언리얼 시스템에 "이 함수를 등록"하는 마법의 주문
+- 델리게이트는 **UFUNCTION()이 붙은 함수만** 연결 가능
+
+### 매개변수는 왜 이렇게 많나요?
+
+```
+HitComponent   → 내 발사체의 메시
+OtherActor     → 맞은 대상 (탱크, 벽, 바닥 등)
+OtherComp      → 맞은 대상의 컴포넌트
+NormalImpulse  → 물리 시뮬레이션용 충돌 힘
+Hit            → 정확한 충돌 위치, 각도 등
+```
+
+---
+
+### 2단계: 델리게이트 연결 (.cpp 파일)
+
+```cpp
+void AProjectile::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // "충돌하면 OnHit() 함수 호출해줘!" 등록
+    ProjectileMesh->OnComponentHit.AddDynamic(this, &AProjectile::OnHit);
+}
+```
+
+### 코드 해부
+
+```cpp
+ProjectileMesh->OnComponentHit  // 발사체 메시의 충돌 이벤트
+    .AddDynamic(                // 동적으로 함수 연결
+        this,                   // 이 클래스의
+        &AProjectile::OnHit     // OnHit 함수 주소
+    );
+```
+
+| 부분                  | 의미                              |
+| --------------------- | --------------------------------- |
+| `ProjectileMesh`      | 발사체의 메시 컴포넌트            |
+| `OnComponentHit`      | 언리얼이 제공하는 충돌 델리게이트 |
+| `AddDynamic`          | 함수를 연결하는 명령어            |
+| `this`                | 현재 발사체 객체                  |
+| `&AProjectile::OnHit` | OnHit 함수의 메모리 주소          |
+
+---
+
+### 3단계: Hit 함수 구현
+
+```cpp
+void AProjectile::OnHit(
+    UPrimitiveComponent* HitComponent,
+    AActor* OtherActor,
+    UPrimitiveComponent* OtherComp,
+    FVector NormalImpulse,
+    const FHitResult& Hit
+)
+{
+    // 안전 체크: 충돌한 대상이 유효한지 확인
+    if (OtherActor)
+    {
+        // 충돌한 대상의 이름을 로그에 출력
+        UE_LOG(LogTemp, Display, TEXT("Projectile Hit: %s"),
+               *OtherActor->GetActorNameOrLabel());
+    }
+}
+```
+
+---
+
+## 🔧 델리게이트 매개변수 찾는 방법
+
+### 실전 팁!
+
+```cpp
+// 1. Ctrl + 클릭으로 델리게이트 선언부로 이동
+ProjectileMesh->OnComponentHit
+
+// 2. 델리게이트 타입 찾기
+FComponentHitSignature
+
+// 3. 다시 Ctrl + 클릭으로 매개변수 확인
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_FiveParams(
+    FComponentHitSignature,        // 델리게이트 이름
+    UPrimitiveComponent,           // 소유 클래스
+    OnComponentHit,                // 변수명
+    UPrimitiveComponent*, HitComponent,  // ← 이 아래가 매개변수!
+    AActor*, OtherActor,
+    UPrimitiveComponent*, OtherComp,
+    FVector, NormalImpulse,
+    const FHitResult&, Hit
+);
+```
+
+---
+
+## ⚙️ 블루프린트 설정 (중요!)
+
+### Hit Event가 작동하려면 필수 설정
+
+**발사체 블루프린트 → Static Mesh 컴포넌트 선택**
+
+### 1. Collision 설정
+
+```
+Collision Presets: Custom
+Object Type: WorldDynamic (발사체는 움직이니까!)
+```
+
+### 2. 히트 이벤트 생성 체크
+
+```
+☑ Simulation Generates Hit Events  ← 반드시 체크!
+```
+
+이 체크박스가 없으면 **충돌해도 이벤트가 안 발생합니다!**
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380635/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_5/image.png)
+
+---
+
+## 🎮 실행 흐름 완벽 정리
+
+```
+1. 게임 시작
+   ↓
+2. BeginPlay() 실행
+   ↓
+3. OnComponentHit 델리게이트에 OnHit() 함수 연결
+   ↓
+4. 발사체 발사
+   ↓
+5. 발사체가 탱크에 충돌!
+   ↓
+6. OnComponentHit 델리게이트 발동
+   ↓
+7. OnHit() 함수 자동 호출
+   ↓
+8. "Projectile Hit: BP_Tank_0" 로그 출력
+```
+
+## 🎯 왜 이 설정이 필요한가?
+
+C++ 코드만으론 충분하지 않습니다! 블루프린트에서 **물리 충돌 규칙**을 설정해야 Hit Event가 발생합니다.
+
+---
+
+## ⚙️ 설정 단계
+
+### 📍 위치: BP_Projectile → ProjectileMesh 선택
+
+우측 Details 패널에서 **Collision** 섹션 찾기
+
+---
+
+## 1️⃣ Collision Presets: Custom
+
+### 기본 개념
+
+```
+BlockAll (기본값)  → 모든 것을 막음
+Custom            → 내가 직접 설정
+```
+
+### 왜 Custom인가?
+
+- **BlockAll**은 `WorldStatic`(움직이지 않는 물체)용 설정
+- 발사체는 **움직이는 물체**이므로 부적합
+- **Custom**으로 바꿔야 올바른 Object Type 설정 가능
+
+---
+
+## 2️⃣ Object Type: WorldDynamic
+
+### Object Type이란?
+
+**"나는 어떤 종류의 물체인가?"** 를 정의
+
+| 타입             | 설명               | 예시             |
+| ---------------- | ------------------ | ---------------- |
+| **WorldStatic**  | 움직이지 않는 물체 | 벽, 바닥, 건물   |
+| **WorldDynamic** | 움직이는 물체      | 발사체, 문, 상자 |
+| **Pawn**         | 플레이어/AI        | 탱크, 적         |
+
+### 왜 WorldDynamic인가?
+
+```
+발사체 = 날아가는 물체 = 움직임 = Dynamic ✅
+발사체 ≠ 벽처럼 고정됨 = Static ❌
+```
+
+---
+
+## 3️⃣ Simulation Generates Hit Events
+
+### 이게 가장 중요!
+
+```cpp
+☐ 체크 안함 → 충돌해도 OnComponentHit 델리게이트가 발동 안됨
+☑ 체크함   → 충돌하면 OnComponentHit 델리게이트 발동! ✅
+```
+
+### 작동 원리
+
+```
+발사체가 탱크에 충돌!
+         ↓
+이 체크박스가 ON?
+         ↓
+    YES → OnComponentHit 델리게이트 발동
+           → OnHit() 함수 호출 ✅
+
+    NO  → 아무 일도 안 일어남 ❌
+```
+
+---
+
+## 🔍 빠른 체크리스트
+
+설정 완료 확인:
+
+```
+✅ Collision Presets = Custom
+✅ Object Type = WorldDynamic
+✅ Simulation Generates Hit Events = ☑ 체크됨
+```
+
+**이 3가지 설정이 없으면 C++ 코드가 완벽해도 작동 안합니다!** ⚠️
+
+---
+
+## 💡 쉬운 비유
+
+```
+C++ 코드        = 초인종 배선 (전기 연결)
+블루프린트 설정  = 초인종 스위치 켜기 (전원 ON)
+
+둘 다 있어야 초인종이 울림! 🔔
+```
+
+---
+
+## 💡 초보자 Q&A
+
+### Q1: Overlap과 Hit의 차이는?
+
+| 이벤트      | 발생 조건 | 예시                   |
+| ----------- | --------- | ---------------------- |
+| **Overlap** | 겹쳤을 때 | 트리거 존, 아이템 획득 |
+| **Hit**     | 막혔을 때 | 벽 충돌, 발사체 타격   |
+
+```
+Overlap: 유령처럼 통과 가능
+Hit: 단단하게 막힘
+```
+
+### Q2: `AddDynamic`의 매개변수는?
+
+```cpp
+AddDynamic(this, &AProjectile::OnHit)
+           ────  ───────────────────
+            │              │
+            │              └─ 함수 주소 (앰퍼샌드 & 필수!)
+            │
+            └─ 함수를 가진 객체 ("이 발사체"를 의미)
+```
+
+### Q3: 왜 함수 앞에 `&`를 붙이나요?
+
+```cpp
+&AProjectile::OnHit  // 함수의 메모리 주소를 전달
+```
+
+델리게이트는 "함수 실행 결과"가 아니라 **"함수 위치"**를 알아야 나중에 호출 가능!
+
+---
+
+## 🎯 핵심 요약
+
+### 기억할 4가지
+
+1. **UFUNCTION()** - 델리게이트 연결에 필수
+2. **AddDynamic()** - 이벤트와 함수 연결
+3. **매개변수 일치** - 델리게이트가 요구하는 형식 그대로
+4. **블루프린트 설정** - "Simulation Generates Hit Events" 체크
+
+### 델리게이트 패턴
+
+```cpp
+// 1. 함수 선언 (UFUNCTION 필수!)
+UFUNCTION()
+void OnHit(...);
+
+// 2. BeginPlay에서 연결
+Mesh->OnComponentHit.AddDynamic(this, &클래스::OnHit);
+
+// 3. 함수 구현
+void 클래스::OnHit(...) { }
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380635/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_5/image_1.png)
+
+---
+
+## 🚀 다음 단계 예고
+
+이제 충돌을 감지할 수 있으니:
+
+- ✅ 데미지 시스템 구현
+- ✅ 폭발 이펙트 추가
+- ✅ 점수 계산
+- ✅ 체력 감소
+
+**OnHit 함수 안에서 모든 게 가능합니다!** 🎯
+
+# 그럼 물리가 있는 물체는 전부 **WorldDynamic?**
+
+## 🎯 정답: PhysicsBody
+
+움직이는 물체지만, 용도에 따라 다른 타입을 씁니다:
+
+---
+
+## 📦 Object Type 상세 분류
+
+### 1️⃣ **PhysicsBody** ← 물리 프롭은 이걸 써요!
+
+```
+용도: 물리 시뮬레이션으로 움직이는 물체
+예시:
+- 쓰레기통 (밀면 굴러감)
+- 상자 (던질 수 있음)
+- 의자 (쓰러뜨릴 수 있음)
+- 폭발에 날아가는 파편
+```
+
+### 2️⃣ **WorldDynamic** ← 발사체는 이걸 써요!
+
+```
+용도: 코드로 제어되는 움직이는 물체
+예시:
+- 발사체 (코드로 날아감)
+- 자동문 (타임라인으로 열림)
+- 엘리베이터 (경로 따라 움직임)
+- 회전하는 플랫폼
+```
+
+### 3️⃣ **WorldStatic** ← 절대 안 움직임
+
+```
+용도: 완전히 고정된 물체
+예시:
+- 벽
+- 바닥
+- 건물
+- 나무 (심지어 바람에도 안 흔들림)
+```
+
+---
+
+## 🤔 어떻게 구분하나요?
+
+```
+질문: 이 물체가 물리 엔진으로 움직이나요?
+      (밀면 굴러가거나, 중력으로 떨어지나요?)
+
+YES → PhysicsBody
+NO  → 아래로 계속
+
+질문: 코드나 애니메이션으로 위치가 바뀌나요?
+
+YES → WorldDynamic
+NO  → WorldStatic
+```
+
+---
+
+## 💡 실전 예시
+
+### 쓰레기통 설정
+
+```
+Static Mesh Component 선택
+  → Collision Presets: PhysicsActor (자동으로 PhysicsBody 타입)
+  → ☑ Simulate Physics (물리 시뮬레이션 활성화)
+  → ☑ Simulation Generates Hit Events
+```
+
+### 발사체 설정
+
+```
+Static Mesh Component 선택
+  → Collision Presets: Custom
+  → Object Type: WorldDynamic
+  → ☑ Simulation Generates Hit Events
+  → ☐ Simulate Physics (체크 안함! - 코드로 제어)
+```
+
+---
+
+## 🎮 Collision Presets 편리한 옵션
+
+언리얼이 미리 만들어놓은 설정들:
+
+| Preset           | Object Type | 용도        |
+| ---------------- | ----------- | ----------- |
+| **PhysicsActor** | PhysicsBody | 물리 프롭   |
+| **BlockAll**     | WorldStatic | 벽, 바닥    |
+| **Pawn**         | Pawn        | 플레이어/AI |
+| **Custom**       | 직접 설정   | 특수한 경우 |
+
+---
+
+## ✅ 핵심 정리
+
+```
+쓰레기통 (물리로 움직임)
+  → Object Type: PhysicsBody
+  → Simulate Physics: ON
+
+발사체 (코드로 움직임)
+  → Object Type: WorldDynamic
+  → Simulate Physics: OFF
+```
+
+**"물리 시뮬레이션 ON이면 → PhysicsBody"** 로 기억하세요! 🎯
+
+# { 언리얼 엔진 C++ - Health Component 핵심 정리 }
+
+## 📌 이번 강의의 목표
+
+**모든 액터에 붙일 수 있는 체력 시스템 만들기**
+
+- 탱크에도 붙이고
+- 타워에도 붙이고
+- 심지어 상자에도 붙일 수 있는 **재사용 가능한 컴포넌트**
+
+---
+
+## 🎯 핵심 개념: Actor Component
+
+### Actor Component가 뭔가요?
+
+- \*"기능 덩어리"\*\*를 만들어서 어떤 액터에든 붙일 수 있는 시스템
+
+```
+예시: 레고 블록처럼!
+┌─────────────┐
+│   탱크      │ + 🎯 Health Component
+│   타워      │ + 🎯 Health Component
+│   상자      │ + 🎯 Health Component
+└─────────────┘
+     ↑
+  같은 컴포넌트를 여러 액터에 재사용!
+```
+
+### 왜 컴포넌트로 만드나요?
+
+❌ **나쁜 방법:** 각 클래스마다 체력 코드 복붙
+
+```cpp
+// BasePawn.h
+float Health;
+float MaxHealth;
+
+// Enemy.h
+float Health;        // 또 복사...
+float MaxHealth;
+
+// Destructible.h
+float Health;        // 또또 복사...
+float MaxHealth;
+```
+
+✅ **좋은 방법:** 컴포넌트 하나만 만들고 붙이기
+
+```cpp
+// 어떤 클래스든
+UHealthComponent* HealthComp;  // 끝!
+```
+
+---
+
+## 📝 코드 완벽 분석
+
+### 1단계: Health Component 클래스 생성
+
+**Unreal Editor → Tools → New C++ Class → Actor Component**
+
+```
+Actor Component 특징:
+- Transform 없음 (위치, 회전, 크기 X)
+- 렌더링 없음 (화면에 안 보임)
+- 순수하게 데이터/로직만 담당
+```
+
+---
+
+### 2단계: 변수 선언 (.h 파일)
+
+```cpp
+UPROPERTY(EditAnywhere)
+float MaxHealth = 100.f;  // 최대 체력
+
+UPROPERTY(VisibleAnywhere)
+float Health;  // 현재 체력
+```
+
+### UPROPERTY 차이점
+
+| 속성                | 의미                  | 블루프린트에서          |
+| ------------------- | --------------------- | ----------------------- |
+| **EditAnywhere**    | 어디서든 수정 가능    | ✏️ 값 직접 입력 가능    |
+| **VisibleAnywhere** | 어디서든 볼 수만 있음 | 👁️ 보기만 가능 (수정 X) |
+
+```
+MaxHealth = EditAnywhere
+→ 타워는 50, 탱크는 100으로 각각 설정 가능 ✅
+
+Health = VisibleAnywhere
+→ 게임 중 현재 체력 확인용 (직접 수정하면 안 됨) ✅
+```
+
+---
+
+### 3단계: BeginPlay 구현 (.cpp 파일)
+
+```cpp
+void UHealthComponent::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // 게임 시작 시 체력을 최대치로 설정
+    Health = MaxHealth;
+}
+```
+
+### 왜 이렇게 하나요?
+
+```
+MaxHealth = 100 (디자이너가 설정한 최대값)
+Health = ??     (현재 체력, 초기값 없음)
+
+게임 시작!
+  ↓
+BeginPlay() 실행
+  ↓
+Health = MaxHealth
+  ↓
+Health = 100 (최대 체력으로 시작!)
+```
+
+---
+
+## 🎮 Projectile에 Damage 변수 추가
+
+### Projectile.h
+
+```cpp
+UPROPERTY(EditAnywhere)
+float Damage = 25.f;
+```
+
+### 왜 25인가요?
+
+```
+계산:
+MaxHealth = 100
+Damage = 25
+
+100 ÷ 25 = 4번 맞으면 사망! 🎯
+```
+
+---
+
+## 🔧 블루프린트에서 사용하기
+
+### 1️⃣ 탱크에 Health Component 추가
+
+```
+BP_Tank 열기
+  ↓
+Add Component 버튼 클릭
+  ↓
+"Health" 검색
+  ↓
+Health Component 선택
+  ↓
+Max Health = 100 (기본값 유지)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380635/notion-blog/_/_/_5_C_/_4_Battle_Blaster_-_5/image_2.png)
+
+### 2️⃣ 타워에 Health Component 추가
+
+```
+BP_Tower 열기
+  ↓
+Add Component
+  ↓
+Health Component 선택
+  ↓
+Max Health = 50 (타워는 약하게!)
+```
+
+**결과:**
+
+- 타워: 2번 맞으면 파괴 (50 ÷ 25 = 2)
+- 탱크: 4번 맞으면 파괴 (100 ÷ 25 = 4)
+
+---
+
+## 💡 컴포넌트 시스템의 장점
+
+### 재사용성
+
+```cpp
+// 한 번만 만들면
+UHealthComponent
+
+// 어디든 붙일 수 있음!
+BP_Tank + Health Component
+BP_Tower + Health Component
+BP_Crate + Health Component
+BP_Door + Health Component
+```
+
+### 유지보수 용이
+
+```
+Health Component 수정 1번
+  ↓
+모든 액터에 자동 적용! ✨
+```
+
+---
+
+## 🔄 전체 시스템 흐름
+
+```
+1. Health Component 생성 (C++)
+   ├─ MaxHealth = 100
+   └─ Health = 0 (초기값)
+
+2. BeginPlay() 실행
+   └─ Health = MaxHealth (100)
+
+3. 블루프린트에 추가
+   ├─ BP_Tank: MaxHealth = 100
+   └─ BP_Tower: MaxHealth = 50
+
+4. 게임 시작
+   ├─ Tank Health = 100
+   └─ Tower Health = 50
+
+5. 발사체 충돌 (다음 강의 예정)
+   └─ Health -= Damage
+```
+
+---
+
+## 🎓 초보자 Q&A
+
+### Q1: 왜 Health는 VisibleAnywhere인가요?
+
+```cpp
+UPROPERTY(VisibleAnywhere)  // 수정 금지!
+float Health;
+```
+
+**이유:** 게임 중 자동으로 계산되는 값이기 때문
+
+- 데미지 받으면 감소
+- 힐팩 먹으면 증가
+- 디자이너가 임의로 수정하면 안 됨!
+
+### Q2: MaxHealth는 왜 기본값이 100인가요?
+
+```cpp
+float MaxHealth = 100.f;  // C++에서 기본값
+```
+
+블루프린트에서 안 바꾸면 100 사용
+바꾸고 싶으면 각 블루프린트에서 수정 가능!
+
+### Q3: 발사체마다 다른 데미지를 주려면?
+
+**방법 1:** 발사체 블루프린트 여러 개 만들기
+
+```
+BP_Projectile_Tank  → Damage = 25
+BP_Projectile_Tower → Damage = 10
+```
+
+**방법 2:** 같은 발사체 사용
+
+```
+BP_Projectile → Damage = 25 (모두 동일)
+```
+
+강의에서는 **방법 2** 사용 (간단하니까!)
+
+---
+
+## 🎯 핵심 요약
+
+### 기억할 4가지
+
+1. **Actor Component** - 기능을 모듈화해서 재사용
+2. **EditAnywhere** - 블루프린트에서 값 수정 가능
+3. **VisibleAnywhere** - 보기만 가능 (수정 X)
+4. **BeginPlay** - Health를 MaxHealth로 초기화
+
+### 컴포넌트 패턴
+
+```cpp
+// 1. 컴포넌트 클래스 생성
+UCLASS()
+class UHealthComponent : public UActorComponent
+
+// 2. 변수 선언
+UPROPERTY(EditAnywhere)
+float MaxHealth = 100.f;
+
+// 3. 초기화
+void BeginPlay() {
+    Health = MaxHealth;
+}
+
+// 4. 블루프린트에 추가
+BP_Tank → Add Component → Health
+```
+
+# { 언리얼 엔진 C++ - Apply Damage 시스템 핵심 정리 }
+
+## 📌 이번 강의의 목표
+
+발사체가 적에게 맞았을 때 **실제로 데미지를 주는 시스템** 구축하기
+
+---
+
+## 🎯 언리얼의 데미지 시스템 구조
+
+### 전체 흐름도
+
+```
+1. 발사체 충돌 (OnHit 발동)
+   ↓
+2. ApplyDamage() 함수 호출
+   ↓
+3. 언리얼이 데미지 이벤트 생성
+   ↓
+4. 맞은 액터의 OnTakeAnyDamage 델리게이트 발동
+   ↓
+5. Health Component의 함수 호출 (다음 강의)
+   ↓
+6. 체력 감소 및 사망 처리 (다음 강의)
+```
+
+### 왜 직접 체력을 안 깎나요?
+
+❌ **나쁜 방법:** 직접 접근
+
+```cpp
+// 발사체에서 직접
+OtherActor->Health -= Damage;  // 너무 단순하고 확장성 없음
+```
+
+✅ **언리얼 방식:** 이벤트 시스템
+
+```cpp
+// 발사체는 "데미지를 줬다"는 신호만 보냄
+UGameplayStatics::ApplyDamage(...)
+
+// 맞은 액터가 알아서 반응
+OnTakeAnyDamage 델리게이트 발동
+→ Health Component가 체력 감소 처리
+```
+
+**장점:**
+
+- 발사체는 체력 시스템 몰라도 됨
+- 맞은 액터가 방어력, 무적 등 자유롭게 처리
+- 코드 분리로 유지보수 쉬움
+
+---
+
+## 📝 코드 단계별 완벽 분석
+
+### 1단계: 발사체 소유자 확인
+
+```cpp
+AActor* MyOwner = GetOwner();
+if (MyOwner)
+{
+    // 소유자가 있을 때만 진행
+}
+```
+
+### 왜 소유자가 필요한가요?
+
+```
+발사체 소유자 = 누가 쐈는지 정보
+→ 플레이어가 쏜 발사체 → 플레이어 점수 증가
+→ 적이 쏜 발사체 → 플레이어 체력 감소
+
+소유자 정보가 있어야 게임 로직 처리 가능!
+```
+
+**기억나시죠?** 이전 강의에서 설정했습니다:
+
+```cpp
+// BasePawn.cpp의 Fire() 함수
+Projectile->SetOwner(this);  // 발사체 주인 설정
+```
+
+---
+
+### 2단계: 안전 검사 (매우 중요!)
+
+```cpp
+if (OtherActor && (OtherActor != MyOwner) && (OtherActor != this))
+{
+    // 모든 조건이 true일 때만 데미지 적용
+}
+```
+
+### 각 조건 분석
+
+| 조건                    | 설명                  | 왜 필요한가?        |
+| ----------------------- | --------------------- | ------------------- |
+| `OtherActor`            | 충돌한 대상이 유효함  | nullptr 크래시 방지 |
+| `OtherActor != MyOwner` | 자기 자신을 안 맞춤   | 자해 방지           |
+| `OtherActor != this`    | 발사체 자신을 안 맞춤 | 에지 케이스 방지    |
+
+### 실제 상황 예시
+
+```
+❌ 검사 없으면:
+탱크가 발사 → 발사체가 탱크 자신을 맞춤 → 자살!
+
+✅ 검사 있으면:
+탱크가 발사 → OtherActor(탱크) == MyOwner(탱크)
+→ 조건 false → 데미지 적용 안함 → 안전!
+```
+
+---
+
+### 3단계: ApplyDamage 함수 호출
+
+```cpp
+UGameplayStatics::ApplyDamage(
+    OtherActor,                          // 1. 맞은 대상
+    Damage,                              // 2. 데미지량
+    MyOwner->GetInstigatorController(),  // 3. 누가 쐈는지
+    this,                                // 4. 발사체 자신
+    UDamageType::StaticClass()          // 5. 데미지 타입
+);
+```
+
+### 매개변수 완벽 설명
+
+**1번: `OtherActor` (피해를 입을 액터)**
+
+```cpp
+OtherActor  // 충돌한 상대 (탱크, 타워 등)
+```
+
+- 이 액터의 체력이 감소됨
+
+**2번: `Damage` (데미지 수치)**
+
+```cpp
+Damage  // 발사체의 Damage 변수 (25.0f)
+```
+
+- Projectile.h에서 선언한 변수
+- 블루프린트에서 수정 가능
+
+**3번: `MyOwner->GetInstigatorController()` (컨트롤러)**
+
+```cpp
+GetInstigatorController()  // 소유자의 컨트롤러 가져오기
+```
+
+**왜 컨트롤러가 필요한가요?**
+
+```
+플레이어 탱크가 쏨:
+  MyOwner = 플레이어 탱크
+  Controller = Player Controller
+  → 킬 카운트, 점수 증가 처리 가능
+
+적 타워가 쏨:
+  MyOwner = 적 타워
+  Controller = AI Controller
+  → AI 행동 로그 기록 가능
+
+🎯 언제 뭘 쓰나?
+```
+
+물리적 정보 필요? → Owner
+
+- 발사 위치
+- 액터 색깔
+- 체력
+
+게임 로직 정보 필요? → InstigatorController
+
+- 점수
+- 킬 카운트
+- 팀 정보
+- 입력 처리
+
+```
+
+---
+
+⚡ 핵심 정리
+```
+
+Owner = "뭐가 쐈는가" (물리적 존재)
+InstigatorController = "누가 조종해서 쐈는가" (논리적 주체)
+
+ApplyDamage에 컨트롤러가 필요한 이유:
+→ 게임 시스템(점수, 통계)이 컨트롤러를 기준으로 작동하기 때문!
+
+````
+
+**4번: `this` (데미지 원인 액터)**
+
+```cpp
+this  // 발사체 자신
+````
+
+- 실제 데미지를 일으킨 물체
+- 로그나 이펙트 생성에 사용
+
+**5번: `UDamageType::StaticClass()` (데미지 타입)**
+
+```cpp
+UDamageType::StaticClass()  // 일반 데미지 타입
+```
+
+**데미지 타입이란?**
+
+```
+총알 데미지   → 방탄복이 막음
+폭발 데미지   → 폭발 방어구가 막음
+화염 데미지   → 화염 저항이 막음
+독 데미지     → 해독제로 치료
+
+이 게임에서는 안 쓰니까 기본값(UDamageType) 사용!
+```
+
+---
+
+### 4단계: 발사체 파괴
+
+```cpp
+Destroy();  // if문 밖에서 실행!
+```
+
+### 왜 if문 밖에 있나요?
+
+```cpp
+void AProjectile::OnHit(...)
+{
+    AActor* MyOwner = GetOwner();
+    if (MyOwner)
+    {
+        if (OtherActor && ...)
+        {
+            // 데미지 적용
+        }
+    }
+
+    Destroy();  // ← 여기! 무조건 실행
+}
+```
+
+**이유:**
+
+```
+벽에 맞음 → 데미지 적용 안함 (벽은 체력 없음)
+         → 하지만 발사체는 파괴되어야 함!
+
+적에게 맞음 → 데미지 적용함
+           → 발사체도 파괴되어야 함!
+
+결론: 무엇에 맞든 발사체는 항상 파괴!
+```
+
+---
+
+## 🔍 GameplayStatics란?
+
+### 개념
+
+**언리얼이 제공하는 유틸리티 함수 모음집**
+
+```cpp
+#include "Kismet/GameplayStatics.h"  // 이 헤더 필수!
+
+UGameplayStatics::
+  ├─ ApplyDamage()        // 데미지 주기
+  ├─ SpawnEmitterAtLocation()  // 이펙트 생성
+  ├─ PlaySound2D()        // 사운드 재생
+  ├─ GetPlayerController()     // 플레이어 컨트롤러 가져오기
+  └─ ... 수백 개의 유용한 함수들
+```
+
+### 왜 Static인가요?
+
+```cpp
+// Static 함수 = 객체 없이 바로 호출 가능
+UGameplayStatics::ApplyDamage(...)  ✅
+
+// Static 아니면
+SomeObject->ApplyDamage(...)  // 객체 필요
+```
+
+---
+
+## 💡 초보자 Q&A
+
+### Q1: ApplyDamage는 체력을 직접 깎나요?
+
+**아니요!** ApplyDamage는 단지 **"신호"**를 보낼 뿐입니다.
+
+```
+ApplyDamage() 호출
+  ↓
+"OtherActor야, 너 Damage만큼 맞았어!" (이벤트 발생)
+  ↓
+OtherActor가 알아서 반응
+  ↓
+Health Component에서 체력 감소 처리 (다음 강의)
+```
+
+### Q2: Instigator와 DamageCauser의 차이는?
+
+```
+상황: 플레이어가 수류탄을 던짐 → 폭발 → 적이 맞음
+
+Instigator (선동자):
+  = 플레이어의 컨트롤러
+  = "누가 이 상황을 일으켰는가?"
+  → 점수, 킬 카운트에 사용
+
+DamageCauser (원인 액터):
+  = 수류탄 (또는 폭발 액터)
+  = "실제로 데미지를 준 물체가 뭔가?"
+  → 로그, 이펙트 위치에 사용
+```
+
+이 게임에서는:
+
+```
+Instigator = 탱크/타워의 컨트롤러
+DamageCauser = 발사체 (this)
+```
+
+### Q3: 왜 지금은 결과가 안 보이나요?
+
+```
+현재 상태:
+✅ ApplyDamage() 호출 완료
+✅ 데미지 이벤트 발생됨
+❌ 아무도 이벤트를 듣고 있지 않음!
+
+다음 강의 예정:
+Health Component에서 OnTakeAnyDamage 델리게이트 연결
+→ 그제야 체력이 실제로 감소함!
+```
+
+---
+
+## 🎯 전체 코드 흐름 정리
+
+```cpp
+void AProjectile::OnHit(...)
+{
+    // 1단계: 소유자 확인
+    AActor* MyOwner = GetOwner();
+    if (MyOwner)  // 소유자 있음?
+    {
+        // 2단계: 안전 검사
+        if (OtherActor &&              // 대상 유효?
+            OtherActor != MyOwner &&   // 자기 자신 아님?
+            OtherActor != this)        // 발사체 자신 아님?
+        {
+            // 3단계: 데미지 적용
+            UGameplayStatics::ApplyDamage(
+                OtherActor,     // 누구한테
+                Damage,         // 얼마나
+                MyOwner->GetInstigatorController(),  // 누가
+                this,           // 뭐로
+                UDamageType::StaticClass()  // 어떤 타입
+            );
+        }
+    }
+
+    // 4단계: 발사체 파괴 (무조건!)
+    Destroy();
+}
+```
+
+---
+
+## 🔄 실행 흐름 실전 예시
+
+### 시나리오: 플레이어가 타워를 쏨
+
+```
+1. 플레이어 탱크가 발사
+   └─ Projectile->SetOwner(탱크)
+
+2. 발사체가 타워에 충돌
+   └─ OnHit() 발동
+
+3. MyOwner = 탱크 (유효 ✅)
+
+4. 안전 검사:
+   ├─ OtherActor(타워) 유효? ✅
+   ├─ 타워 ≠ 탱크? ✅
+   └─ 타워 ≠ 발사체? ✅
+
+5. ApplyDamage(타워, 25, 탱크컨트롤러, 발사체, 일반타입)
+   └─ 언리얼: "타워야, 25 데미지 받았어!"
+
+6. 타워의 OnTakeAnyDamage 델리게이트 발동
+   └─ (다음 강의에서 연결할 예정)
+
+7. Destroy() → 발사체 사라짐
+```
+
+---
+
+## 🎓 핵심 요약
+
+### 기억할 5가지
+
+1. **ApplyDamage()** - 직접 체력 감소가 아닌 이벤트 발생
+2. **GameplayStatics** - 언리얼 유틸리티 함수 모음
+3. **안전 검사** - 자기 자신 맞추기 방지
+4. **Instigator** - "누가 쐈는지" 정보
+5. **Destroy()** - 발사체는 충돌 후 항상 파괴
+
+### 데미지 시스템 패턴
+
+```cpp
+// 1. 충돌 감지
+OnHit() 발동
+
+// 2. 소유자 + 안전 검사
+if (MyOwner && OtherActor && ...)
+
+// 3. 데미지 이벤트 발생
+UGameplayStatics::ApplyDamage(...)
+
+// 4. 발사체 파괴
+Destroy();
+
+// 5. 맞은 액터가 반응 (다음 강의)
+OnTakeAnyDamage 델리게이트
+```
+
+---
+
+## 🚀 다음 강의 예고
+
+현재는 데미지 "신호"만 보낸 상태!
+
+**다음에 할 일:**
+
+- ✅ Health Component에서 OnTakeAnyDamage 델리게이트 연결
+- ✅ 실제 체력 감소 구현
+- ✅ 체력 0이 되면 액터 파괴
+- ✅ 게임에서 효과 확인 가능!
+
+**"신호를 받는 쪽"을 만들 차례입니다!** 📡
+
+# { 언리얼 엔진 C++ - OnTakeAnyDamage 델리게이트 핵심 정리 }
+
+## 📌 이번 강의의 목표
+
+**데미지 "신호"를 받아서 실제로 체력을 감소시키기!**
+
+---
+
+## 🎯 전체 시스템 완성!
+
+### 지금까지의 여정
+
+```
+[이전 강의]
+발사체 충돌 → ApplyDamage() 호출 → 데미지 이벤트 발생
+                                      ↓
+                                   ❓누가 받나?
+
+[이번 강의]
+Health Component가 받아서 → 체력 감소 → 죽으면 파괴!
+```
+
+---
+
+## 🔄 완전한 데미지 흐름도
+
+```
+1. 발사체가 타워에 충돌
+   ↓
+2. Projectile::OnHit() 실행
+   ↓
+3. ApplyDamage(타워, 25, ...) 호출
+   ↓
+4. 언리얼 엔진이 데미지 이벤트 생성
+   ↓
+5. 타워의 OnTakeAnyDamage 델리게이트 발동 📡
+   ↓
+6. Health Component의 OnDamageTaken() 호출
+   ↓
+7. Health -= Damage (체력 감소)
+   ↓
+8. Health <= 0? → Destroy() (파괴!)
+```
+
+---
+
+## 📝 코드 단계별 완벽 분석
+
+### 1단계: 델리게이트 연결 (BeginPlay)
+
+```cpp
+void UHealthComponent::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // 1. 체력을 최대치로 초기화
+    Health = MaxHealth;
+
+    // 2. 델리게이트에 함수 연결
+    GetOwner()->OnTakeAnyDamage.AddDynamic(this, &UHealthComponent::OnDamageTaken);
+}
+```
+
+### 코드 해부
+
+```cpp
+GetOwner()  // 이 컴포넌트의 주인 (탱크 or 타워)
+    ->OnTakeAnyDamage  // 주인이 가진 데미지 델리게이트
+    .AddDynamic(  // 함수 연결
+        this,  // 이 Health Component의
+        &UHealthComponent::OnDamageTaken  // OnDamageTaken 함수
+    );
+```
+
+### 왜 GetOwner()를 쓰나요?
+
+```
+Health Component는 부품일 뿐!
+실제 데미지를 받는 건 주인(Owner)
+
+예시:
+┌─────────────────┐
+│   BP_Tower      │ ← 이 액터가 데미지를 받음
+│   ├─ Mesh      │
+│   └─ HealthComp │ ← 여기서 체력 관리
+└─────────────────┘
+
+GetOwner() = BP_Tower
+BP_Tower의 OnTakeAnyDamage 델리게이트에 연결!
+```
+
+---
+
+### 2단계: OnDamageTaken 함수 선언 (.h)
+
+```cpp
+UFUNCTION()
+void OnDamageTaken(
+    AActor* DamagedActor,        // 1. 데미지 받은 액터
+    float Damage,                // 2. 데미지 양
+    const UDamageType* DamageType,  // 3. 데미지 타입
+    AController* InstigatedBy,   // 4. 누가 쐈는지
+    AActor* DamageCauser         // 5. 발사체 같은 원인
+);
+```
+
+### 매개변수 의미
+
+| 매개변수         | 예시 값          | 설명                          |
+| ---------------- | ---------------- | ----------------------------- |
+| **DamagedActor** | BP_Tower_2       | 맞은 액터 (항상 Owner와 같음) |
+| **Damage**       | 25.0f            | 실제 데미지 수치              |
+| **DamageType**   | UDamageType      | 데미지 종류 (안 씀)           |
+| **InstigatedBy** | PlayerController | 누가 조종해서 맞췄는지        |
+| **DamageCauser** | BP_Projectile_3  | 실제로 맞힌 물체              |
+
+### 왜 UFUNCTION()이 필요한가요?
+
+```cpp
+UFUNCTION()  // ← 이게 없으면 델리게이트 연결 불가!
+```
+
+- 델리게이트는 `UFUNCTION()`으로 등록된 함수만 연결 가능
+- 언리얼 리플렉션 시스템에 함수를 등록하는 것
+
+---
+
+### 3단계: OnDamageTaken 함수 구현 (.cpp)
+
+```cpp
+void UHealthComponent::OnDamageTaken(
+    AActor* DamagedActor,
+    float Damage,
+    const UDamageType* DamageType,
+    AController* InstigatedBy,
+    AActor* DamageCauser
+)
+{
+    // 1단계: 데미지 유효성 검사
+    if (Damage > 0.0f)
+    {
+        // 2단계: 체력 감소
+        Health -= Damage;
+
+        // 3단계: 죽음 처리
+        if (Health <= 0.0f)
+        {
+            GetOwner()->Destroy();
+        }
+    }
+}
+```
+
+---
+
+## 💡 코드 세부 분석
+
+### 1️⃣ 데미지 검사
+
+```cpp
+if (Damage > 0.0f)
+```
+
+**왜 필요한가요?**
+
+```
+가능한 상황:
+- Damage = 0   → 의미 없음, 무시
+- Damage = -10 → 힐링? 버그? 무시
+- Damage = 25  → 정상! 처리
+
+음수 데미지나 0 데미지 방지!
+```
+
+---
+
+### 2️⃣ 체력 감소
+
+```cpp
+Health -= Damage;
+```
+
+### 이건 축약 표현입니다!
+
+```cpp
+// 긴 버전
+Health = Health - Damage;
+
+// 짧은 버전 (같은 의미!)
+Health -= Damage;
+```
+
+### 다른 연산자도 가능
+
+```cpp
+Health += 10;   // Health = Health + 10 (힐링)
+Health *= 2;    // Health = Health * 2 (버프)
+Score /= 2;     // Score = Score / 2 (페널티)
+
+```
+
+---
+
+### 3️⃣ 죽음 처리
+
+```cpp
+if (Health <= 0.0f)
+{
+    GetOwner()->Destroy();
+}
+
+```
+
+### 왜 `<= 0`인가요?
+
+```
+가능한 상황:
+
+Health = 10
+Damage = 25
+→ Health = -15 (음수!)
+
+따라서:
+❌ if (Health == 0)  // -15는 0이 아님!
+✅ if (Health <= 0)  // -15도 포함!
+
+```
+
+---
+
+## 🎮 실전 예시
+
+### 시나리오: 타워 파괴하기
+
+```
+타워 초기 상태:
+- MaxHealth = 50
+- Health = 50
+- 발사체 Damage = 25
+
+[첫 번째 충돌]
+1. ApplyDamage(타워, 25, ...)
+   ↓
+2. OnTakeAnyDamage 델리게이트 발동
+   ↓
+3. OnDamageTaken() 호출
+   - Damage = 25 > 0 ✅
+   - Health = 50 - 25 = 25
+   - Health <= 0? 아니오
+   → 타워 생존!
+
+[두 번째 충돌]
+1. ApplyDamage(타워, 25, ...)
+   ↓
+2. OnDamageTaken() 호출
+   - Damage = 25 > 0 ✅
+   - Health = 25 - 25 = 0
+   - Health <= 0? 예! ✅
+   → GetOwner()->Destroy()
+   → 타워 파괴! 💥
+
+```
+
+---
+
+## 🔍 델리게이트 매개변수 찾는 방법
+
+### 실전 팁!
+
+```cpp
+// 1단계: Ctrl + 클릭
+GetOwner()->OnTakeAnyDamage
+
+// 2단계: 델리게이트 타입 찾기
+FTakeAnyDamageSignature OnTakeAnyDamage;
+
+// 3단계: 타입 다시 Ctrl + 클릭
+FTakeAnyDamageSignature
+
+// 4단계: 매개변수 복사
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_FiveParams(
+    ...
+    AActor*, DamagedActor,
+    float, Damage,
+    const class UDamageType*, DamageType,
+    class AController*, InstigatedBy,
+    AActor*, DamageCauser
+);
+
+// 5단계: 쉼표 제거하고 함수에 붙여넣기!
+
+```
+
+---
+
+## 🎓 초보자 Q&A
+
+### Q1: 왜 컴포넌트에서 GetOwner()를 쓰나요?
+
+```cpp
+// Health Component는 부품일 뿐
+this = Health Component
+
+// 실제 데미지 받는 건 주인
+GetOwner() = BP_Tower
+
+// 델리게이트는 주인에게 있음!
+GetOwner()->OnTakeAnyDamage
+```
+
+**컴포넌트는 도구, 액터가 주인!**
+
+---
+
+### Q2: DamagedActor와 GetOwner()는 같은 건가요?
+
+**예! 항상 같습니다.**
+
+```cpp
+void OnDamageTaken(AActor* DamagedActor, ...)
+{
+    DamagedActor == GetOwner()  // 항상 true!
+
+    // 둘 다 같은 액터를 가리킴
+    DamagedActor->Destroy();  ✅
+    GetOwner()->Destroy();    ✅ (같은 것)
+}
+```
+
+---
+
+### Q3: 왜 탱크가 파괴되면 카메라도 사라지나요?
+
+```
+탱크 구조:
+┌──────────────┐
+│  BP_Tank     │ ← Destroy()하면
+│  ├─ Mesh    │    모든 자식도 파괴!
+│  ├─ Camera  │ ← 이것도 사라짐
+│  └─ Health  │
+└──────────────┘
+
+다음 강의 예정:
+탱크는 Destroy() 말고
+→ SetActorHiddenInGame(true) (안 보이게만)
+→ SetActorEnableCollision(false) (충돌 끄기)
+```
+
+---
+
+## 🔄 전체 시스템 최종 정리
+
+```
+[BasePawn.cpp]
+Fire() → SetOwner(this)
+         ↓
+[Projectile.cpp]
+OnHit() → ApplyDamage(OtherActor, 25, ...)
+          ↓
+[언리얼 엔진]
+데미지 이벤트 생성
+          ↓
+OtherActor->OnTakeAnyDamage 델리게이트 발동
+          ↓
+[HealthComponent.cpp]
+OnDamageTaken() 실행
+├─ Health -= Damage
+└─ if (Health <= 0)
+       └─ GetOwner()->Destroy()
+```
+
+---
+
+## 🎯 핵심 요약
+
+### 기억할 5가지
+
+1. **GetOwner()** - 컴포넌트의 주인 액터
+2. **OnTakeAnyDamage** - 모든 액터가 가진 데미지 델리게이트
+3. **AddDynamic()** - 델리게이트에 함수 연결
+4. **Health -= Damage** - 축약 연산자
+5. **Health <= 0** - 음수도 고려한 죽음 체크
+
+---
+
+## 📋 델리게이트 패턴 템플릿
+
+```cpp
+// .h 파일
+UFUNCTION()
+void OnDamageTaken(AActor* DamagedActor, float Damage, ...);
+
+// .cpp BeginPlay
+GetOwner()->OnTakeAnyDamage.AddDynamic(this, &클래스::OnDamageTaken);
+
+// .cpp 구현
+void 클래스::OnDamageTaken(...)
+{
+    if (Damage > 0.0f)
+    {
+        Health -= Damage;
+        if (Health <= 0.0f)
+        {
+            GetOwner()->Destroy();
+        }
+    }
+}
+```
+
+---
+
+## 🚀 다음 강의 예고
+
+현재 문제:
+
+- ✅ 데미지 시스템 완성!
+- ❌ 탱크 파괴되면 카메라도 사라짐
+- ❌ 게임 오버 처리 없음
+
+**다음에 할 일:**
+
+- Game Mode에서 게임 오버 처리
+- 탱크는 파괴 대신 비활성화
+- 승리/패배 UI 표시
+
+**완전한 게임 시스템 완성 직전!** 🎮✨

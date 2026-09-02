@@ -1,0 +1,3029 @@
+---
+title: 'EcommerceProject -2'
+date: '2026-09-02'
+category: '풀스택/프로젝트 정리'
+tags: ['풀스택', '프로젝트 정리']
+draft: false
+summary: ''
+---
+
+# 로그인 시 접근 권한 변경
+
+```jsx
+로그인 또는 회원가입 시
+
+이미 로그인 중이라면 로그인 또는 회원가입 페이지 말고 메인 페이지로 이동하게 한다
+```
+
+```jsx
+import React, { useEffect } from 'react'
+import Login from '../components/Login/Login'
+import { useSelector } from 'react-redux'
+import { useNavigate } from 'react-router-dom'
+
+const LoginPage = () => {
+  const navigate = useNavigate()
+  const { isAuthenticated } = useSelector((state) => state.user)
+
+  useEffect(() => {
+    if (isAuthenticated === true) {
+      navigate('/')
+    }
+  })
+
+  return (
+    <div>
+      <Login />
+    </div>
+  )
+}
+
+export default LoginPage
+```
+
+```jsx
+로그인 페이지에
+
+const navigate = useNavigate();
+const { isAuthenticated} = useSelector((state) => state.user);
+
+상태와 Redux 를 추가해주고
+
+    useEffect(() => {
+        if(isAuthenticated === true) {
+            navigate("/")
+        }
+    })
+
+로딩시 로그인 중이라면 메인페이지로 이동하게 한다
+```
+
+```jsx
+import React, { useEffect } from 'react'
+import Signup from '../components/Signup/Signup'
+import { useNavigate } from 'react-router-dom'
+import { useSelector } from 'react-redux'
+
+const SignupPage = () => {
+  const navigate = useNavigate()
+  const { isAuthenticated } = useSelector((state) => state.user)
+
+  useEffect(() => {
+    if (isAuthenticated === true) {
+      navigate('/')
+    }
+  })
+
+  return (
+    <div>
+      <Signup />
+    </div>
+  )
+}
+
+export default SignupPage
+```
+
+```jsx
+회원 가입도 똑같이 해준다
+```
+
+# 카트 리스트 만들기 ( 임시 )
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381459/notion-blog/_/_/EcommerceProject/EcommerceProject_-2/Untitled.png)
+
+## Card컴포넌트 추가
+
+```jsx
+import React, { useState } from 'react'
+import { RxCross1 } from 'react-icons/rx'
+import { IoBagHandleOutline } from 'react-icons/io5'
+import { HiOutlineMinus, HiPlus } from 'react-icons/hi'
+import styles from '../../styles/styles'
+import { Link } from 'react-router-dom'
+
+// Cart 컴포넌트 정의
+const Cart = ({ setOpenCart }) => {
+  // 가상의 장바구니 데이터
+  const cartData = [
+    {
+      name: 'Iphone 14 pro max 256 gb ssd and 8gb ram sliver colour',
+      description: 'test',
+      price: 999,
+    },
+    {
+      name: 'Iphone 14 pro max 256 gb ssd and 8gb ram sliver colour',
+      description: 'test',
+      price: 245,
+    },
+    {
+      name: 'Iphone 14 pro max 256 gb ssd and 8gb ram sliver colour',
+      description: 'test',
+      price: 645,
+    },
+  ]
+
+  // JSX 반환
+  return (
+    <div className="fixed top-0 left-0 z-10 h-screen w-full bg-[#0000004b]">
+      <div className="fixed top-0 right-0 flex min-h-full w-[25%] flex-col justify-between bg-white shadow-sm">
+        {/* 닫기 아이콘 */}
+        <div>
+          <div className="flex w-full justify-end pt-5 pr-5">
+            <RxCross1 size={25} className="cursor-pointer" onClick={() => setOpenCart(false)} />
+          </div>
+          {/* 장바구니 아이템 수 표시 */}
+          <div className={`${styles.noramlFlex} p-4`}>
+            <IoBagHandleOutline size={25} />
+            <h5 className="pl-2 text-[20px] font-[500]">3 items</h5>
+          </div>
+
+          {/* 장바구니 아이템 목록 */}
+          <br />
+          <div className="w-full border-t">
+            {cartData && cartData.map((i, index) => <CartSingle key={index} data={i} />)}
+          </div>
+        </div>
+
+        {/* 체크아웃 버튼 */}
+        <div className="mb-3 px-5">
+          <Link to="/checkout">
+            <div
+              className={`flex h-[45px] w-[100%] items-center justify-center rounded-[5px] bg-[#e44343]`}
+            >
+              <h1 className="text-[18px] font-[600] text-[#fff]">결제하기</h1>
+            </div>
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// CartSingle 컴포넌트 정의
+const CartSingle = ({ data }) => {
+  // 수량 및 총 가격 상태 관리
+  const [value, setValue] = useState(1)
+  const totalPrice = data.price * value
+
+  // JSX 반환
+  return (
+    <div className="border-b p-4">
+      {/* 아이템 정보 및 수량 조절 */}
+      <div className="flex w-full items-center">
+        <div>
+          {/* 수량 증가 버튼 */}
+          <div
+            className={`h-[25px] w-[25px] rounded-full border border-[#e4434373] bg-[#e44343] ${styles.noramlFlex} cursor-pointer justify-center`}
+            onClick={() => setValue(value + 1)}
+          >
+            <HiPlus size={18} color="#fff" />
+          </div>
+          <span className="pl-[10px]">{value}</span>
+          {/* 수량 감소 버튼 */}
+          <div
+            className="flex h-[25px] w-[25px] cursor-pointer items-center justify-center rounded-full bg-[#a7abb14f]"
+            onClick={() => setValue(value === 1 ? 1 : value - 1)}
+          >
+            <HiOutlineMinus size={16} color="#7d879c" />
+          </div>
+        </div>
+        {/* 상품 이미지 및 정보 */}
+        <img
+          src="https://bonik-react.vercel.app/assets/images/products/Fashion/Clothes/1.SilverHighNeckSweater.png"
+          alt=""
+          className="ml-2 h-[80px] w-[80px]"
+        />
+        <div className="pl-[5px]">
+          <h1>{data.name}</h1>
+          <h4 className="text-[15px] font-[400] text-[#00000082]">
+            ${data.price} * {value}
+          </h4>
+          <h4 className="font-Roboto pt-[3px] text-[17px] font-[600] text-[#d02222]">
+            US${totalPrice}
+          </h4>
+        </div>
+        {/* 닫기 아이콘 */}
+        <RxCross1 className="cursor-pointer" />
+      </div>
+    </div>
+  )
+}
+
+// Cart 컴포넌트 내보내기
+export default Cart
+```
+
+```jsx
+// 배경을 어둡게 만드는 부분
+<div className="fixed top-0 left-0 w-full bg-[#0000004b] h-screen z-10">
+  {/* ... */}
+</div>
+
+이 부분이 주변을 어둡게 만들어 준다
+
+bg-[#0000004b]으로, 이는 검은색(#000000)의 4B(75%) 투명도의 배경색을 나타낸다.
+
+이 배경은 화면 전체를 덮고, 투명도를 통해 배경이 약간 어둡게 표현된다.
+
+이것은 모달 형태로 전체 화면을 덮어서 사용자의 주의를 모달 창에 집중하도록 하는 효과를 낼 때 자주 사용된다.
+
+----------------------------------------------------------------------------------------------------------
+
+// JSX 반환
+return (
+  <div className="fixed top-0 left-0 w-full bg-[#0000004b] h-screen z-10">
+    {/* ... */}
+  </div>
+);
+
+// JSX 반환
+return (
+  <div className="fixed top-0 right-0 min-h-full w-[25%] bg-white flex flex-col justify-between shadow-sm">
+    {/* ... */}
+  </div>
+);
+
+두개의 return 을 가지고 있는데
+
+첫 번째 return 문은 화면 전체를 어둡게 만드는 배경 모달을 정의하고 있다.
+
+두 번째 return 문은 실제 장바구니 컨텐츠를 담은 모달 창을 정의하고 있다.
+
+( 아래 return 문을 위의 return 문에 CartSingle 컴포넌트로 넣어준다 )
+
+( 아래 CartSingle 은 하나의 아이템 하나하나고 위의 return 은 모달창 전체이다 )
+
+----------------------------------------------------------------------------------------------------------
+
+```
+
+```jsx
+import React, { useState } from 'react'
+import { Link } from 'react-router-dom'
+import styles from '../../styles/styles'
+import { categoriesData, productData } from '../../static/data'
+import { AiOutlineHeart, AiOutlineSearch, AiOutlineShoppingCart } from 'react-icons/ai'
+import { CgProfile } from 'react-icons/cg'
+import { IoIosArrowDown, IoIosArrowForward } from 'react-icons/io'
+import { BiMenuAltLeft } from 'react-icons/bi'
+import DropDown from './DropDown'
+import Navbar from './Navbar'
+import Cart from '../Cart/Cart'
+import { useSelector } from 'react-redux'
+
+// Header 컴포넌트 정의
+const Header = ({ activeHeading }) => {
+  // Redux의 useSelector를 통해 사용자 정보 및 인증 상태를 가져옴
+  const { isAuthenticated, user } = useSelector((state) => state.user)
+
+  // 검색어와 검색결과 상태 관리
+  const [searchTerm, setSearchTerm] = useState('')
+  const [searchData, setSearchData] = useState(null)
+
+  // 상단 헤더의 스타일을 관리하는 상태
+  const [active, setActive] = useState(false)
+
+  // 카테고리 드롭다운 관리 상태
+  const [dropDown, setDropDown] = useState(false)
+
+  // 장바구니 및 위시리스트 모달 열기/닫기 관리 상태
+  const [openCart, setOpenCart] = useState(false)
+  const [openWishlist, setOpenWishlist] = useState(false)
+
+  // 검색어 입력 시 핸들러
+  const handleSearchChange = (e) => {
+    const term = e.target.value
+    setSearchTerm(term)
+
+    // 제품 데이터를 검색어에 따라 필터링하여 검색결과 상태 업데이트
+    const filteredProducts = productData.filter((product) =>
+      product.name.toLowerCase().includes(term.toLowerCase())
+    )
+    setSearchData(filteredProducts)
+  }
+
+  // 스크롤 이벤트 핸들러, 스크롤 위치에 따라 상단 헤더의 스타일 변경
+  window.addEventListener('scroll', () => {
+    if (window.scrollY > 70) {
+      setActive(true)
+    } else {
+      setActive(false)
+    }
+  })
+
+  // JSX 반환
+  return (
+    <>
+      {/* 모바일 및 작은 화면에서 표시되는 상단 헤더 영역 */}
+      <div className={`${styles.section}`}>
+        <div className="800px:h-[50px] 800px:my-[20px] 800px:flex hidden items-center justify-between">
+          {/* 로고 */}
+          <div>
+            <Link to="/">
+              <img src={`http://localhost:5000/images/QuickDealMarketFix.jpg`} alt="" />
+            </Link>
+          </div>
+          {/* 검색창 */}
+          <div className="relative w-[50%]">
+            <input
+              type="text"
+              placeholder="Search Product..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+              className="h-[40px] w-full rounded-md border-[2px] border-[#e3bb8b] px-2"
+            />
+            <AiOutlineSearch size={30} className="absolute top-1.5 right-2 cursor-pointer" />
+            {/* 검색 결과가 있을 경우 결과를 표시하는 드롭다운 */}
+            {searchData && searchData.length !== 0 ? (
+              <div className="shadow-sm-2 absolute z-[9] min-h-[30vh] bg-slate-50 p-4">
+                {searchData &&
+                  searchData.map((i, index) => {
+                    const d = i.name
+                    const Product_name = d.replace(/\s+/g, '-')
+                    return (
+                      <Link to={`/product/${Product_name}`} key={index}>
+                        <div className="items-start-py-3 flex w-full">
+                          <img
+                            src={i.image_Url[0].url}
+                            alt=""
+                            className="mr-[10px] h-[40px] w-[40px]"
+                          />
+                          <h1>{i.name}</h1>
+                        </div>
+                      </Link>
+                    )
+                  })}
+              </div>
+            ) : null}
+          </div>
+          {/* 판매자 등록 링크 */}
+          <div className={`${styles.button}`}>
+            <Link to="/seller">
+              <h1 className="flex items-center text-[#fff]">
+                판매자 등록 <IoIosArrowForward className="ml-1" />
+              </h1>
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* 데스크탑에서 표시되는 상단 헤더 영역 */}
+      <div
+        className={`${
+          active === true ? 'fixed top-0 left-0 z-10 shadow-sm' : null
+        } 800px:flex hidden h-[70px] w-full items-center justify-between bg-[#e3bb8b] transition`}
+      >
+        <div className={`${styles.section} relative ${styles.noramlFlex} justify-between`}>
+          {/* 카테고리 드롭다운 */}
+          <div onClick={() => setDropDown(!dropDown)}>
+            <div className="1000px:block relative mt-[10px] hidden h-[60px] w-[270px]">
+              <BiMenuAltLeft size={30} className="absolute top-3 left-2" />
+              <button
+                className={`flex h-[100%] w-full items-center justify-between rounded-t-md bg-white pl-10 font-sans text-lg font-[500] select-none`}
+              >
+                All Categories
+              </button>
+              <IoIosArrowDown
+                size={20}
+                className="absolute top-4 right-2 cursor-pointer"
+                onClick={() => setDropDown(!dropDown)}
+              />
+              {/* 카테고리 드롭다운 컴포넌트 */}
+              {dropDown ? (
+                <DropDown categoriesData={categoriesData} setDropDown={setDropDown} />
+              ) : null}
+            </div>
+          </div>
+          {/* 네비게이션 메뉴 */}
+          <div className={`${styles.noramlFlex}`}>
+            <Navbar active={activeHeading} />
+          </div>
+          {/* 하트(위시리스트), 장바구니, 프로필 아이콘 */}
+          <div className="flex">
+            {/* 위시리스트 아이콘 */}
+            <div className={`${styles.noramlFlex}`}>
+              <div className="relative mr-[15px] cursor-pointer">
+                <AiOutlineHeart size={30} color="rgb(255 255 255 / 83%)" />
+                <span className="top right absolute top-0 right-0 m-0 h-4 w-4 rounded-full bg-[#3bc177] p-0 text-center font-mono text-[12px] leading-tight text-white">
+                  0
+                </span>
+              </div>
+            </div>
+            {/* 장바구니 아이콘 */}
+            <div className={`${styles.noramlFlex}`}>
+              <div className="relative mr-[15px] cursor-pointer" onClick={() => setOpenCart(true)}>
+                <AiOutlineShoppingCart size={30} color="rgb(255 255 255 / 83%)" />
+                <span className="top right absolute top-0 right-0 m-0 h-4 w-4 rounded-full bg-[#3bc177] p-0 text-center font-mono text-[12px] leading-tight text-white">
+                  1
+                </span>
+              </div>
+            </div>
+            {/* 프로필(인증된 경우) 또는 로그인 링크(인증되지 않은 경우) */}
+            <div className={`${styles.noramlFlex}`}>
+              <div className="relative mr-[15px] cursor-pointer">
+                {isAuthenticated ? (
+                  <Link to="/profile">
+                    <img
+                      src={`http://localhost:5000/${user.avatar}`}
+                      className="h-[35px] w-[35px] rounded-full"
+                      alt=""
+                    />
+                  </Link>
+                ) : (
+                  <Link to="/login">
+                    <CgProfile size={30} color="rgb(255 255 255 / 83%)" />
+                  </Link>
+                )}
+              </div>
+            </div>
+            {/* 장바구니 목록 팝업 */}
+            {openCart ? <Cart setOpenCart={setOpenCart} /> : null}
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// Header 컴포넌트 내보내기
+export default Header
+```
+
+```jsx
+Header에 아래 코드를 추가해준다
+
+          const [openCart, setOpenCart] = useState(false);
+          const [openWishlist, setOpenWishlist] = useState(false);
+
+새로운 상태를 추가해준다 카트와 위시 리스트를 오픈 해주기 위해서
+
+            {/* 장바구니 목록 팝업 */}
+            {openCart ? <Cart setOpenCart={setOpenCart} /> : null}
+
+openCart 가 true 일때 팝업이 나타나도록 코드를 추가
+
+           <div className={`${styles.noramlFlex}`}>
+              <div className="relative cursor-pointer mr-[15px]"
+                onClick={() => setOpenCart(true)}
+              >
+                <AiOutlineShoppingCart
+                  size={30}
+                  color="rgb(255 255 255 / 83%)"
+                />
+                <span className="absolute right-0 top-0 rounded-full bg-[#3bc177] w-4 h-4 top right p-0 m-0 text-white font-mono text-[12px] leading-tight text-center">
+                  1
+                </span>
+              </div>
+            </div>
+
+setOpenCart(true) 을 추가해줘 카트를 클릭하면 팝업 창이 열리도록 수정해준다
+
+```
+
+# 위시 리스트 만들기 ( 임시 )
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381458/notion-blog/_/_/EcommerceProject/EcommerceProject_-2/Untitled_1.png)
+
+## 위시리스트 컴포넌트
+
+```jsx
+import React, { useState } from 'react'
+import { RxCross1 } from 'react-icons/rx'
+import { IoBagHandleOutline } from 'react-icons/io5'
+import { BsCartPlus } from 'react-icons/bs'
+import styles from '../../styles/styles'
+import { Link } from 'react-router-dom'
+import { AiOutlineHeart } from 'react-icons/ai'
+
+// Wishlist 컴포넌트 정의
+const Wishlist = ({ setOpenWishlist }) => {
+  // 가상의 위시리스트 데이터
+  const cartData = [
+    {
+      name: 'Iphone 14 pro max 256 gb ssd and 8gb ram sliver colour',
+      description: 'test',
+      price: 999,
+    },
+    {
+      name: 'Iphone 14 pro max 256 gb ssd and 8gb ram sliver colour',
+      description: 'test',
+      price: 245,
+    },
+    {
+      name: 'Iphone 14 pro max 256 gb ssd and 8gb ram sliver colour',
+      description: 'test',
+      price: 645,
+    },
+  ]
+
+  // JSX 반환
+  return (
+    <div className="fixed top-0 left-0 z-10 h-screen w-full bg-[#0000004b]">
+      <div className="fixed top-0 right-0 flex min-h-full w-[25%] flex-col justify-between bg-white shadow-sm">
+        {/* 닫기 아이콘 */}
+        <div>
+          <div className="flex w-full justify-end pt-5 pr-5">
+            <RxCross1 size={25} className="cursor-pointer" onClick={() => setOpenWishlist(false)} />
+          </div>
+          {/* 위시리스트 아이템 수 표시 */}
+          <div className={`${styles.noramlFlex} p-4`}>
+            <AiOutlineHeart size={25} />
+            <h5 className="pl-2 text-[20px] font-[500]">3 items</h5>
+          </div>
+
+          {/* 위시리스트 아이템 목록 */}
+          <br />
+          <div className="w-full border-t">
+            {cartData && cartData.map((i, index) => <CartSingle key={index} data={i} />)}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// CartSingle 컴포넌트 정의
+const CartSingle = ({ data }) => {
+  // 수량 및 총 가격 상태 관리
+  const [value, setValue] = useState(1)
+  const totalPrice = data.price * value
+
+  // JSX 반환
+  return (
+    <div className="border-b p-4">
+      {/* 아이템 정보 및 수량 조절 */}
+      <div className="flex w-full items-center">
+        {/* 삭제 아이콘 */}
+        <RxCross1 className="cursor-pointer" />
+        {/* 상품 이미지 */}
+        <img
+          src="https://bonik-react.vercel.app/assets/images/products/Fashion/Clothes/1.SilverHighNeckSweater.png"
+          alt=""
+          className="ml-2 h-[80px] w-[80px]"
+        />
+        {/* 상품 정보 및 가격 */}
+        <div className="pl-[5px]">
+          <h1>{data.name}</h1>
+          <h4 className="font-Roboto pt-[3px] text-[17px] font-[600] text-[#d02222]">
+            US${totalPrice}
+          </h4>
+        </div>
+        {/* 장바구니 추가 아이콘 */}
+        <div>
+          <BsCartPlus size={20} className="cursor-pointer" title="Add to cart" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Wishlist 컴포넌트 내보내기
+export default Wishlist
+```
+
+```jsx
+카트 리스트랑 거의 같은 원리이다
+
+cartData.map((i, index) => <CartSingle key={index} data={i} />)}
+
+data 를 받아와서 아래 return 에서 실행
+```
+
+```jsx
+import React, { useState } from 'react'
+import { Link } from 'react-router-dom'
+import styles from '../../styles/styles'
+import { categoriesData, productData } from '../../static/data'
+import { AiOutlineHeart, AiOutlineSearch, AiOutlineShoppingCart } from 'react-icons/ai'
+import { CgProfile } from 'react-icons/cg'
+import { IoIosArrowDown, IoIosArrowForward } from 'react-icons/io'
+import { BiMenuAltLeft } from 'react-icons/bi'
+import DropDown from './DropDown'
+import Navbar from './Navbar'
+import Cart from '../Cart/Cart'
+import { useSelector } from 'react-redux'
+import Wishlist from '../Wishlist/Wishlist'
+
+const Header = ({ activeHeading }) => {
+  const { isAuthenticated, user } = useSelector((state) => state.user)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [searchData, setSearchData] = useState(null)
+  const [active, setActive] = useState(false)
+  const [dropDown, setDropDown] = useState(false)
+  const [openCart, setOpenCart] = useState(false)
+  const [openWishlist, setOpenWishlist] = useState(false)
+
+  const handleSearchChange = (e) => {
+    const term = e.target.value
+    setSearchTerm(term)
+
+    const filteredProducts = productData.filter((product) =>
+      product.name.toLowerCase().includes(term.toLowerCase())
+    )
+    setSearchData(filteredProducts)
+  }
+
+  window.addEventListener('scroll', () => {
+    if (window.scrollY > 70) {
+      setActive(true)
+    } else {
+      setActive(false)
+    }
+  })
+
+  return (
+    <>
+      <div className={`${styles.section}`}>
+        <div className="800px:h-[50px] 800px:my-[20px] 800px:flex hidden items-center justify-between">
+          <div>
+            <Link to="/">
+              <img src={`http://localhost:5000/images/QuickDealMarketFix.jpg`} alt="" />
+            </Link>
+          </div>
+          {/* 검색창 */}
+          <div className="relative w-[50%]">
+            <input
+              type="text"
+              placeholder="Search Product..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+              className="h-[40px] w-full rounded-md border-[2px] border-[#e3bb8b] px-2"
+            />
+            <AiOutlineSearch size={30} className="absolute top-1.5 right-2 cursor-pointer" />
+            {searchData && searchData.length !== 0 ? (
+              <div className="shadow-sm-2 absolute z-[9] min-h-[30vh] bg-slate-50 p-4">
+                {searchData &&
+                  searchData.map((i, index) => {
+                    const d = i.name
+
+                    const Product_name = d.replace(/\s+/g, '-')
+                    return (
+                      <Link to={`/product/${Product_name}`}>
+                        <div className="items-start-py-3 flex w-full">
+                          <img
+                            src={i.image_Url[0].url}
+                            alt=""
+                            className="mr-[10px] h-[40px] w-[40px]"
+                          />
+                          <h1>{i.name}</h1>
+                        </div>
+                      </Link>
+                    )
+                  })}
+              </div>
+            ) : null}
+          </div>
+
+          <div className={`${styles.button}`}>
+            <Link to="/seller">
+              <h1 className="flex items-center text-[#fff]">
+                판매자 등록 <IoIosArrowForward className="ml-1" />
+              </h1>
+            </Link>
+          </div>
+        </div>
+      </div>
+      <div
+        className={`${
+          active === true ? 'fixed top-0 left-0 z-10 shadow-sm' : null
+        } 800px:flex hidden h-[70px] w-full items-center justify-between bg-[#e3bb8b] transition`}
+      >
+        <div className={`${styles.section} relative ${styles.noramlFlex} justify-between`}>
+          {/* 카테고리 */}
+          <div onClick={() => setDropDown(!dropDown)}>
+            <div className="1000px:block relative mt-[10px] hidden h-[60px] w-[270px]">
+              <BiMenuAltLeft size={30} className="absolute top-3 left-2" />
+              <button
+                className={`flex h-[100%] w-full items-center justify-between rounded-t-md bg-white pl-10 font-sans text-lg font-[500] select-none`}
+              >
+                All Categories
+              </button>
+              <IoIosArrowDown
+                size={20}
+                className="absolute top-4 right-2 cursor-pointer"
+                onClick={() => setDropDown(!dropDown)}
+              />
+              {dropDown ? (
+                <DropDown categoriesData={categoriesData} setDropDown={setDropDown} />
+              ) : null}
+            </div>
+          </div>
+          {/* 네비항목 */}
+          <div className={`${styles.noramlFlex}`}>
+            <Navbar active={activeHeading} />
+          </div>
+
+          <div className="flex">
+            <div className={`${styles.noramlFlex}`}>
+              <div
+                className="relative mr-[15px] cursor-pointer"
+                onClick={() => setOpenWishlist(true)}
+              >
+                <AiOutlineHeart size={30} color="rgb(255 255 255 / 83%)" />
+                <span className="top right absolute top-0 right-0 m-0 h-4 w-4 rounded-full bg-[#3bc177] p-0 text-center font-mono text-[12px] leading-tight text-white">
+                  0
+                </span>
+              </div>
+            </div>
+
+            <div className={`${styles.noramlFlex}`}>
+              <div className="relative mr-[15px] cursor-pointer" onClick={() => setOpenCart(true)}>
+                <AiOutlineShoppingCart size={30} color="rgb(255 255 255 / 83%)" />
+                <span className="top right absolute top-0 right-0 m-0 h-4 w-4 rounded-full bg-[#3bc177] p-0 text-center font-mono text-[12px] leading-tight text-white">
+                  1
+                </span>
+              </div>
+            </div>
+            <div className={`${styles.noramlFlex}`}>
+              <div className="relative mr-[15px] cursor-pointer">
+                {isAuthenticated ? (
+                  <Link to="/profile">
+                    <img
+                      src={`http://localhost:5000/${user.avatar}`}
+                      className="h-[35px] w-[35px] rounded-full"
+                      alt=""
+                    />
+                  </Link>
+                ) : (
+                  <Link to="/login">
+                    <CgProfile size={30} color="rgb(255 255 255 / 83%)" />
+                  </Link>
+                )}
+              </div>
+            </div>
+            {/* 카트리스트 팝업 */}
+            {openCart ? <Cart setOpenCart={setOpenCart} /> : null}
+
+            {/* 위리리스트 팝업 */}
+            {openWishlist ? <Wishlist setOpenWishlist={setOpenWishlist} /> : null}
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+export default Header
+```
+
+```jsx
+헤더에 카트 리스트와 같이
+
+  {/* 위리리스트 팝업 */}
+            {openWishlist ? (
+              <Wishlist setOpenWishlist={setOpenWishlist} />
+            ) : null}
+
+와
+
+onClick={() => setOpenWishlist(true)}
+
+를 추가해줘서 코드가 작동되도록 해준다
+```
+
+# 상품 상세 페이지
+
+```jsx
+<Route path="/product/:name" element={<ProductDetailsPage />} />
+
+App.js 에 경로를 추가해준다
+```
+
+```jsx
+import React, { useState } from 'react'
+import {
+  AiFillHeart,
+  AiOutlineHeart,
+  AiOutlineMessage,
+  AiOutlineShoppingCart,
+} from 'react-icons/ai'
+import { Link, useNavigate } from 'react-router-dom'
+import styles from '../../styles/styles'
+
+const ProductDetails = ({ data }) => {
+  const [count, setCount] = useState(1)
+  const [click, setClick] = useState(false)
+  const [select, setSelect] = useState(0)
+  const navigate = useNavigate()
+
+  const incrementCount = () => {
+    setCount(count + 1)
+  }
+
+  const decrementCount = () => {
+    if (count > 1) {
+      setCount(count - 1)
+    }
+  }
+
+  const handleMessageSubmit = () => {
+    navigate('/inbox?conversation=507ebjver884ehfdjeriv84')
+  }
+
+  return (
+    <div className="bg-white">
+      {data ? (
+        <div className={`${styles.section} 800px:w-[80%] w-[90%]`}>
+          <div className="w-full py-5">
+            <div className="800px:flex block w-full">
+              <div className="800px:w-[50%] w-full">
+                <img src={data.image_Url[select].url} alt="" className="w-[80%]" />
+                <div className="flex w-full">
+                  <div className={`${select === 0 ? 'border' : 'null'} cursor-pointer`}>
+                    <img
+                      src={data?.image_Url[0].url}
+                      alt=""
+                      className="h-[200px]"
+                      onClick={() => setSelect(0)}
+                    />
+                  </div>
+                  <div className={`${select === 1 ? 'border' : 'null'} cursor-pointer`}>
+                    <img
+                      src={data?.image_Url[1].url}
+                      alt=""
+                      className="h-[200px]"
+                      onClick={() => setSelect(1)}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="800px:w-[50%] w-full pt-5">
+                <h1 className={`${styles.productTitle}`}>{data.name}</h1>
+                <p>{data.description}</p>
+                <div className="flex pt-3">
+                  <h4 className={`${styles.productDiscountPrice}`}>{data.discount_price}$</h4>
+                  <h3 className={`${styles.price}`}>{data.price ? data.price + '$' : null}</h3>
+                </div>
+
+                <div className="mt-12 flex items-center justify-between pr-3">
+                  <div>
+                    <button
+                      className="rounded-l bg-gradient-to-r from-teal-400 to-teal-500 px-4 py-2 font-bold text-white shadow-lg transition duration-300 ease-in-out hover:opacity-75"
+                      onClick={decrementCount}
+                    >
+                      -
+                    </button>
+                    <span className="bg-gray-200 px-4 py-[11px] font-medium text-gray-800">
+                      {count}
+                    </span>
+                    <button
+                      className="rounded-l bg-gradient-to-r from-teal-400 to-teal-500 px-4 py-2 font-bold text-white shadow-lg transition duration-300 ease-in-out hover:opacity-75"
+                      onClick={incrementCount}
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div>
+                    {click ? (
+                      <AiFillHeart
+                        size={30}
+                        className="cursor-pointer"
+                        onClick={() => setClick(!click)}
+                        color={click ? 'red' : '#333'}
+                        title="Remove from wishlist"
+                      />
+                    ) : (
+                      <AiOutlineHeart
+                        size={30}
+                        className="cursor-pointer"
+                        onClick={() => setClick(!click)}
+                        color={click ? 'red' : '#333'}
+                        title="Add to wishlist"
+                      />
+                    )}
+                  </div>
+                </div>
+                <div className={`${styles.button} !mt-6 flex !h-11 items-center !rounded`}>
+                  <span className="flex items-center text-white">
+                    Add to cart <AiOutlineShoppingCart className="ml-1" />
+                  </span>
+                </div>
+                <div className="flex items-center pt-8">
+                  <img
+                    src={data.shop.shop_avatar.url}
+                    alt=""
+                    className="mr-2 h-[50px] w-[50px] rounded-full"
+                  />
+                  <div className="pr-8">
+                    <h3 className={`${styles.shop_name} pt-1 pb-1`}>{data.shop.name}</h3>
+                    <h5 className="pb-3 text-[15px]">({data.shop.ratings}) Ratings</h5>
+                  </div>
+                  <div
+                    className={`${styles.button} mt-4 !h-11 !rounded bg-[#6443d1]`}
+                    onClick={handleMessageSubmit}
+                  >
+                    <span className="flex items-center text-white">
+                      Send Message <AiOutlineMessage className="ml-1" />
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <ProductDetailsInfo data={data} />
+          <br />
+          <br />
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+const ProductDetailsInfo = ({ data }) => {
+  const [active, setActive] = useState(1)
+
+  return (
+    <div className="800px:px-10 rounded bg-[#f5f6fb] px-3 py-2">
+      <div className="flex w-full justify-between border-b pt-10 pb-2">
+        <div className="relative">
+          <h5
+            className={
+              '800px:text-[20px] cursor-pointer px-1 text-[18px] leading-5 font-[600] text-[#000]'
+            }
+            onClick={() => setActive(1)}
+          >
+            Product Details
+          </h5>
+          {active === 1 ? <div className={`${styles.active_indicator}`} /> : null}
+        </div>
+        <div className="relative">
+          <h5
+            className={
+              '800px:text-[20px] cursor-pointer px-1 text-[18px] leading-5 font-[600] text-[#000]'
+            }
+            onClick={() => setActive(2)}
+          >
+            Product Reviews
+          </h5>
+          {active === 2 ? <div className={`${styles.active_indicator}`} /> : null}
+        </div>
+        <div className="relative">
+          <h5
+            className={
+              '800px:text-[20px] cursor-pointer px-1 text-[18px] leading-5 font-[600] text-[#000]'
+            }
+            onClick={() => setActive(3)}
+          >
+            Seller Information
+          </h5>
+          {active === 3 ? <div className={`${styles.active_indicator}`} /> : null}
+        </div>
+      </div>
+      {active === 1 ? (
+        <>
+          <p className="py-2 pb-10 text-[18px] leading-8 whitespace-pre-line">
+            Product details are a crucial part of any eCommerce website or online marketplace. These
+            details help the potential customers to make an informed decision about the product they
+            are interested in buying. A well-written product description can also be a powerful
+            marketing tool that can help to increase sales. Product details typically include
+            information about the product's features, specifications, dimensions, weight, materials,
+            and other relevant information that can help language, and be honest and transparent
+            about the product's features and limitations.
+          </p>
+          <p className="py-2 pb-10 text-[18px] leading-8 whitespace-pre-line">
+            customers to understand the product better. The product details section should also
+            include high-quality images and videos of the product, as well as customer reviews and
+            ratings. When writing product details, it is essential to keep the target audience in
+            mind. The language used should be clear and easy to understand, and technical terms
+            should be explained in simple language. The tone of the product details should be
+            persuasive, highlighting the unique features of the
+          </p>
+          <p className="py-2 pb-10 text-[18px] leading-8 whitespace-pre-line">
+            customers to understand the product better. The product details section should also
+            include high-quality images and videos of the product, as well as customer reviews and
+            ratings. When writing product details, it is essential to keep the target audience in
+            mind. The language used should be clear and easy to understand, and technical terms
+            should be explained in simple language. The tone of the product details should be
+            persuasive, highlighting the unique features of the
+          </p>
+        </>
+      ) : null}
+
+      {active === 2 ? (
+        <div className="flex min-h-[40vh] w-full items-center justify-center">
+          <p>No Reviews yet!</p>
+        </div>
+      ) : null}
+
+      {active === 3 && (
+        <div className="800px:flex block w-full p-5">
+          <div className="800px:w-[50%] w-full">
+            <div className="flex items-center">
+              <img
+                src={data.shop.shop_avatar.url}
+                className="h-[50px] w-[50px] rounded-full"
+                alt=""
+              />
+              <div className="pl-3">
+                <h3 className={`${styles.shop_name}`}>{data.shop.name}</h3>
+                <h5 className="pb-2 text-[15px]">({data.shop.ratings}) Ratings</h5>
+              </div>
+            </div>
+            <p className="pt-2">
+              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Quidem cum quibusdam omnis a
+              minima perspiciatis itaque magnam nesciunt, porro saepe aspernatur repudiandae iusto
+              sapiente, esse accusamus eligendi! Vel, officia similique?
+            </p>
+          </div>
+          <div className="800px:w-[50%] 800px:mt-0 800px:flex mt-5 w-full flex-col items-end">
+            <div className="text-left">
+              <h5 className="font-[600]">
+                Joined on: <span className="font-[500]">14 March,2023</span>
+              </h5>
+              <h5 className="pt-3 font-[600]">
+                Total Products: <span className="font-[500]">1,223</span>
+              </h5>
+              <h5 className="pt-3 font-[600]">
+                Total Reviews: <span className="font-[500]">324</span>
+              </h5>
+              <Link to="/">
+                <div className={`${styles.button} mt-3 !h-[39.5px] !rounded-[4px]`}>
+                  <h4 className="text-white">Visit Shop</h4>
+                </div>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default ProductDetails
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381458/notion-blog/_/_/EcommerceProject/EcommerceProject_-2/Untitled_2.png)
+
+```jsx
+ProductDetails 부분은 위의 사진과 설명, 증가,감소, 메세지 보내기 기능이 있다
+
+                  <div
+                    className={`${
+                      select === 0 ? "border" : "null"
+                    } cursor-pointer`}
+                  >
+
+사진을 클릭하면 주변에 살짝 선이 생기고 state 를 사용해서 제어한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381458/notion-blog/_/_/EcommerceProject/EcommerceProject_-2/Untitled_3.png)
+
+```jsx
+const ProductDetailsInfo = ({ data }) => {
+  const [active, setActive] = useState(1);
+
+  return (
+    <div className="bg-[#f5f6fb] px-3 800px:px-10 py-2 rounded">
+      {/* ... (탭 메뉴 및 활성화 표시) */}
+      {active === 1 ? (
+        <>
+          {/* ... (상품 세부 정보 표시) */}
+        </>
+      ) : null}
+
+      {active === 2 ? (
+        <div className="w-full justify-center min-h-[40vh] flex items-center">
+          <p>No Reviews yet!</p>
+        </div>
+      ) : null}
+
+      {active === 3 && (
+        <div className="w-full block 800px:flex p-5">
+          {/* ... (판매자 정보 표시) */}
+        </div>
+      )}
+    </div>
+  );
+};
+
+ProductDetailsInfo 섹션은 상품의 세부 정보, 리뷰, 판매자 정보를 탭으로 나누어 보여주는 부분이다.
+
+active state를 사용하여 현재 활성화된 탭을 추적하고, 각 탭에 해당하는 내용을 표시하고 있다.
+```
+
+# SuggestedProduct ( 추천 상품 )
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381458/notion-blog/_/_/EcommerceProject/EcommerceProject_-2/Untitled_4.png)
+
+```jsx
+import React, { useEffect, useState } from 'react'
+import { productData } from '../../static/data'
+import styles from '../../styles/styles'
+import ProductCard from '../Route/ProductCard'
+
+const SuggestedProduct = ({ data }) => {
+  // 관련된 제품 데이터를 상태로 관리
+  const [products, setProducts] = useState(null)
+
+  useEffect(() => {
+    // 부모 컴포넌트에서 전달된 data의 카테고리에 해당하는 제품 필터링
+    const filteredProducts = productData && productData.filter((i) => i.category === data.category)
+
+    // 필터링된 제품을 상태에 설정
+    setProducts(filteredProducts)
+  }, [data.category]) // data.category가 변경될 때마다 useEffect 다시 실행
+
+  return (
+    <div>
+      {data ? (
+        <div className={`p-4 ${styles.section}`}>
+          {/* 관련 제품 섹션 제목 */}
+          <h2 className={`${styles.heading} mb-5 border-b text-[25px] font-[500]`}>
+            Related Product
+          </h2>
+          {/* 그리드 형태로 제품 카드를 렌더링 */}
+          <div className="mb-12 grid grid-cols-1 gap-[20px] md:grid-cols-2 md:gap-[25px] lg:grid-cols-4 lg:gap-[25px] xl:grid-cols-5 xl:gap-[30px]">
+            {
+              // products 상태가 있고 각 제품에 대해 ProductCard 컴포넌트를 렌더링
+              products &&
+                products.map((product, index) => <ProductCard data={product} key={index} />)
+            }
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+export default SuggestedProduct
+```
+
+```jsx
+같은 카테고리의 제품을 필터링 해서 표시해준다
+```
+
+# 상품 상세 페이지
+
+```jsx
+import React, { useEffect, useState } from 'react'
+import { useParams } from 'react-router-dom'
+import Footer from '../components/Layout/Footer'
+import Header from '../components/Layout/Header'
+import ProductDetails from '../components/Products/ProductDetails'
+import { productData } from '../static/data'
+import SuggestedProduct from '../components/Products/SuggestedProduct'
+
+const ProductDetailsPage = () => {
+  // react-router의 useParams 훅을 사용하여 URL에서 동적으로 받아온 name 파라미터 추출
+  const { name } = useParams()
+
+  // 상품 데이터를 담을 상태 설정
+  const [data, setData] = useState(null)
+
+  // URL에서 받아온 name을 공백으로 치환하여 실제 상품명 생성
+  const productName = name.replace(/-/g, ' ')
+
+  useEffect(() => {
+    // productData에서 실제 상품명과 일치하는 상품 찾아서 상태에 설정
+    const product = productData.find((item) => item.name === productName)
+    setData(product)
+  }, [productName]) // productName이 변경될 때마다 useEffect 다시 실행
+
+  return (
+    <div>
+      {/* 페이지의 상단에 위치하는 Header 컴포넌트 */}
+      <Header />
+
+      {/* ProductDetails 컴포넌트에 상품 데이터 전달 */}
+      <ProductDetails data={data} />
+
+      {/* data가 존재하면 SuggestedProduct 컴포넌트에 상품 데이터 전달 */}
+      {data && <SuggestedProduct data={data} />}
+
+      {/* 페이지의 하단에 위치하는 Footer 컴포넌트 */}
+      <Footer />
+    </div>
+  )
+}
+
+export default ProductDetailsPage
+```
+
+```jsx
+
+        <Link to={`/product/${product_name}`}>
+          <img
+            src={data.image_Url[0].url}
+            alt=""
+            className="w-full h-[170px] object-contain"
+          />
+        </Link>
+
+ProductCard 컴포넌트 에서 이렇게 이동한다
+```
+
+```jsx
+const productName = name.replace(/-/g, " ");
+
+product-details/apple-iphone-12를 받아왔을 때, apple-iphone-12를 apple iphone 12로 바꿔주는 역할
+
+시각적으로 URL을 더 읽기 쉽게 만들고, 검색 엔진 최적화(SEO) 측면에서 도움을 주기 위해서 이렇게 한다
+
+( 예전에 Header 에서 제품명을 불러올 때 공백을 - 로 바꿔주는 과정을 추가했어서 지금 다시 URL 을 사용할때는 공백으로 바꿔주는
+
+과정을 처리해준다  const Product_name = d.replace(/\s+/g, "-"); <- 헤더에 있는 변환 부분 )
+```
+
+# Profile 페이지 생성
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381458/notion-blog/_/_/EcommerceProject/EcommerceProject_-2/Untitled_5.png)
+
+```jsx
+import React, { useEffect, useState } from 'react'
+import Header from '../components/Layout/Header' // Header 컴포넌트 import
+import styles from '../styles/styles' // 스타일 관련 클래스 import
+import ProfileSideBar from '../components/Profile/ProfileSidebar' // ProfileSideBar 컴포넌트 import
+import ProfileContent from '../components/Profile/ProfileContent' // ProfileContent 컴포넌트 import
+
+// ProfilePage 컴포넌트 정의
+const ProfilePage = () => {
+  const [active, setActive] = useState(1) // 상태 변수 'active'와 'setActive' 선언 및 초기값 설정
+
+  // JSX 반환
+  return (
+    <div>
+      {/* Header 컴포넌트 */}
+      <Header />
+
+      {/* 프로필 페이지의 메인 콘텐츠 영역 */}
+      <div className={`${styles.section} flex bg-[#f5f5f5] py-10`}>
+        {/* 프로필 사이드바 */}
+        <div className="800px:w-[335px] 800px:mt-0 sticky mt-[18%] w-[50px]">
+          {/* ProfileSideBar 컴포넌트에 'active'와 'setActive' 속성 전달 */}
+          <ProfileSideBar active={active} setActive={setActive} />
+        </div>
+
+        {/* 프로필 콘텐츠 */}
+        {/* ProfileContent 컴포넌트에 'active' 속성 전달 */}
+        <ProfileContent active={active} />
+      </div>
+    </div>
+  )
+}
+
+// ProfilePage 컴포넌트 내보내기
+export default ProfilePage
+```
+
+```jsx
+ProfileSideBar 에서 항목을 클릭하면 setActive 상태가 변하면서 active 값이 아래 두 컴포넌트에 전달된다
+
+```
+
+## ProfileContent.jsx
+
+```jsx
+import React, { useState } from 'react'
+import { AiOutlineArrowRight, AiOutlineCamera, AiOutlineDelete } from 'react-icons/ai'
+import { useSelector } from 'react-redux'
+import styles from '../../styles/styles'
+import { DataGrid } from '@material-ui/data-grid'
+import { Button } from '@material-ui/core'
+import { Link } from 'react-router-dom'
+import { MdOutlineTrackChanges } from 'react-icons/md'
+
+const ProfileContent = ({ active }) => {
+  const { user } = useSelector((state) => state.user)
+  const [name, setName] = useState(user && user.name)
+  const [email, setEmail] = useState(user && user.email)
+  const [phoneNumber, setPhoneNumber] = useState()
+  const [zipCode, setZipCode] = useState()
+  const [address1, setAddress1] = useState('')
+  const [address2, setAddress2] = useState('')
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+  }
+
+  return (
+    <div className="w-full">
+      {/* profile */}
+      {active === 1 && (
+        <>
+          <div className="flex w-full justify-center">
+            <div className="relative">
+              <img
+                src={`http://localhost:5000/${user?.avatar}`}
+                className="h-[150px] w-[150px] rounded-full border-[3px] border-[#e8d648] object-cover"
+                alt=""
+              />
+              <div className="absolute right-[5px] bottom-[5px] flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-full bg-[#E3E9EE]">
+                <AiOutlineCamera />
+              </div>
+            </div>
+          </div>
+          <br />
+          <br />
+          <div className="w-full px-5">
+            <form onSubmit={handleSubmit} aria-required={true}>
+              <div className="800px:flex block w-full pb-3">
+                <div className="800px:w-[50%] w-[100%]">
+                  <label className="block pb-2">Full Name</label>
+                  <input
+                    type="text"
+                    className={`${styles.input} 800px:mb-0 mb-4 !w-[95%]`}
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </div>
+                <div className="800px:w-[50%] w-[100%]">
+                  <label className="block pb-2">Email Address</label>
+                  <input
+                    type="text"
+                    className={`${styles.input} 800px:mb-0 mb-1 !w-[95%]`}
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="800px:flex block w-full pb-3">
+                <div className="800px:w-[50%] w-[100%]">
+                  <label className="block pb-2">Phone Number</label>
+                  <input
+                    type="number"
+                    className={`${styles.input} 800px:mb-0 mb-4 !w-[95%]`}
+                    required
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                  />
+                </div>
+                <div className="800px:w-[50%] w-[100%]">
+                  <label className="block pb-2">Zip Code</label>
+                  <input
+                    type="number"
+                    className={`${styles.input} 800px:mb-0 mb-4 !w-[95%]`}
+                    required
+                    value={zipCode}
+                    onChange={(e) => setZipCode(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="800px:flex block w-full pb-3">
+                <div className="800px:w-[50%] w-[100%]">
+                  <label className="block pb-2">Address 1</label>
+                  <input
+                    type="address"
+                    className={`${styles.input} !w-[95%]`}
+                    required
+                    value={address1}
+                    onChange={(e) => setAddress1(e.target.value)}
+                  />
+                </div>
+                <div className="800px:w-[50%] w-[100%]">
+                  <label className="block pb-2">Address 2</label>
+                  <input
+                    type="address"
+                    className={`${styles.input} !w-[95%]`}
+                    required
+                    value={address2}
+                    onChange={(e) => setAddress2(e.target.value)}
+                  />
+                </div>
+              </div>
+              <input
+                className={`mt-8 h-[40px] w-[250px] cursor-pointer rounded-[3px] border border-[#3a24db] text-center text-[#3a24db]`}
+                required
+                value="Update"
+                type="submit"
+              />
+            </form>
+          </div>
+        </>
+      )}
+
+      {/* order */}
+      {active === 2 && (
+        <div>
+          <AllOrders />
+        </div>
+      )}
+
+      {/* Refund */}
+      {active === 3 && (
+        <div>
+          <AllRefundOrders />
+        </div>
+      )}
+
+      {/* Track order */}
+      {active === 5 && (
+        <div>
+          <TrackOrder />
+        </div>
+      )}
+
+      {/* Track order */}
+      {active === 6 && (
+        <div>
+          <PaymentMethod />
+        </div>
+      )}
+
+      {/*  user Address */}
+      {active === 7 && (
+        <div>
+          <Address />
+        </div>
+      )}
+    </div>
+  )
+}
+
+const AllOrders = () => {
+  const orders = [
+    {
+      _id: '7463hvbfbhfbrtr28820221',
+      orderItems: [
+        {
+          name: 'Iphone 14 pro max',
+        },
+      ],
+      totalPrice: 120,
+      orderStatus: 'Processing',
+    },
+  ]
+
+  const columns = [
+    { field: 'id', headerName: 'Order ID', minWidth: 150, flex: 0.7 },
+
+    {
+      field: 'status',
+      headerName: 'Status',
+      minWidth: 130,
+      flex: 0.7,
+      cellClassName: (params) => {
+        return params.getValue(params.id, 'status') === 'Delivered' ? 'greenColor' : 'redColor'
+      },
+    },
+    {
+      field: 'itemsQty',
+      headerName: 'Items Qty',
+      type: 'number',
+      minWidth: 130,
+      flex: 0.7,
+    },
+
+    {
+      field: 'total',
+      headerName: 'Total',
+      type: 'number',
+      minWidth: 130,
+      flex: 0.8,
+    },
+
+    {
+      field: ' ',
+      flex: 1,
+      minWidth: 150,
+      headerName: '',
+      type: 'number',
+      sortable: false,
+      renderCell: (params) => {
+        return (
+          <>
+            <Link to={`/order/${params.id}`}>
+              <Button>
+                <AiOutlineArrowRight size={20} />
+              </Button>
+            </Link>
+          </>
+        )
+      },
+    },
+  ]
+
+  const row = []
+
+  orders &&
+    orders.forEach((item) => {
+      row.push({
+        id: item._id,
+        itemsQty: item.orderItems.length,
+        total: 'US$ ' + item.totalPrice,
+        status: item.orderStatus,
+      })
+    })
+
+  return (
+    <div className="pt-1 pl-8">
+      <DataGrid rows={row} columns={columns} pageSize={10} disableSelectionOnClick autoHeight />
+    </div>
+  )
+}
+
+const AllRefundOrders = () => {
+  const orders = [
+    {
+      _id: '7463hvbfbhfbrtr28820221',
+      orderItems: [
+        {
+          name: 'Iphone 14 pro max',
+        },
+      ],
+      totalPrice: 120,
+      orderStatus: 'Processing',
+    },
+  ]
+
+  const columns = [
+    { field: 'id', headerName: 'Order ID', minWidth: 150, flex: 0.7 },
+
+    {
+      field: 'status',
+      headerName: 'Status',
+      minWidth: 130,
+      flex: 0.7,
+      cellClassName: (params) => {
+        return params.getValue(params.id, 'status') === 'Delivered' ? 'greenColor' : 'redColor'
+      },
+    },
+    {
+      field: 'itemsQty',
+      headerName: 'Items Qty',
+      type: 'number',
+      minWidth: 130,
+      flex: 0.7,
+    },
+
+    {
+      field: 'total',
+      headerName: 'Total',
+      type: 'number',
+      minWidth: 130,
+      flex: 0.8,
+    },
+
+    {
+      field: ' ',
+      flex: 1,
+      minWidth: 150,
+      headerName: '',
+      type: 'number',
+      sortable: false,
+      renderCell: (params) => {
+        return (
+          <>
+            <Link to={`/order/${params.id}`}>
+              <Button>
+                <AiOutlineArrowRight size={20} />
+              </Button>
+            </Link>
+          </>
+        )
+      },
+    },
+  ]
+
+  const row = []
+
+  orders &&
+    orders.forEach((item) => {
+      row.push({
+        id: item._id,
+        itemsQty: item.orderItems.length,
+        total: 'US$ ' + item.totalPrice,
+        status: item.orderStatus,
+      })
+    })
+
+  return (
+    <div className="pt-1 pl-8">
+      <DataGrid rows={row} columns={columns} pageSize={10} autoHeight disableSelectionOnClick />
+    </div>
+  )
+}
+
+const TrackOrder = () => {
+  const orders = [
+    {
+      _id: '7463hvbfbhfbrtr28820221',
+      orderItems: [
+        {
+          name: 'Iphone 14 pro max',
+        },
+      ],
+      totalPrice: 120,
+      orderStatus: 'Processing',
+    },
+  ]
+
+  const columns = [
+    { field: 'id', headerName: 'Order ID', minWidth: 150, flex: 0.7 },
+    {
+      field: 'status',
+      headerName: 'Status',
+      minWidth: 130,
+      flex: 0.7,
+      cellClassName: (params) => {
+        return params.getValue(params.id, 'status') === 'Delivered' ? 'greenColor' : 'redColor'
+      },
+    },
+    {
+      field: 'itemsQty',
+      headerName: 'Items Qty',
+      type: 'number',
+      minWidth: 130,
+      flex: 0.7,
+    },
+
+    {
+      field: 'total',
+      headerName: 'Total',
+      type: 'number',
+      minWidth: 130,
+      flex: 0.8,
+    },
+    {
+      field: ' ',
+      flex: 1,
+      minWidth: 130,
+      headerName: '',
+      type: 'number',
+      sortable: false,
+      renderCell: (params) => {
+        return (
+          <>
+            <Link to={`/order/${params.id}`}>
+              <Button>
+                <MdOutlineTrackChanges size={20} />
+              </Button>
+            </Link>
+          </>
+        )
+      },
+    },
+  ]
+
+  const row = []
+
+  orders &&
+    orders.forEach((item) => {
+      row.push({
+        id: item._id,
+        itemsQty: item.orderItems.length,
+        total: 'US$ ' + item.totalPrice,
+        status: item.orderStatus,
+      })
+    })
+
+  return (
+    <div className="pt-1 pl-8">
+      <DataGrid rows={row} columns={columns} pageSize={10} disableSelectionOnClick autoHeight />
+    </div>
+  )
+}
+
+const PaymentMethod = () => {
+  return (
+    <div className="w-full px-5">
+      <div className="flex w-full items-center justify-between">
+        <h1 className="pb-2 text-[25px] font-[600] text-[#000000ba]">Payment Methods</h1>
+        <div className={`${styles.button} !rounded-md`}>
+          <span className="text-[#fff]">Add New</span>
+        </div>
+      </div>
+      <br />
+      <div className="800px:h-[70px] flex h-min w-full items-center justify-between rounded-[4px] bg-white px-3 pr-10 shadow">
+        <div className="flex items-center">
+          <img src="https://bonik-react.vercel.app/assets/images/payment-methods/Visa.svg" alt="" />
+          <h5 className="800px:text-[unset] pl-5 text-[12px] font-[600]">Shahriar Sajeeb</h5>
+        </div>
+        <div className="flex items-center pl-8">
+          <h6 className="800px:text-[unset] text-[12px]">1234 **** *** ****</h6>
+          <h5 className="800px:text-[unset] pl-6 text-[12px]">08/2022</h5>
+        </div>
+        <div className="flex min-w-[10%] items-center justify-between pl-8">
+          <AiOutlineDelete size={25} className="cursor-pointer" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const Address = () => {
+  return (
+    <div className="w-full px-5">
+      <div className="flex w-full items-center justify-between">
+        <h1 className="pb-2 text-[25px] font-[600] text-[#000000ba]">My Addresses</h1>
+        <div className={`${styles.button} !rounded-md`}>
+          <span className="text-[#fff]">Add New</span>
+        </div>
+      </div>
+      <br />
+      <div className="800px:h-[70px] flex h-min w-full items-center justify-between rounded-[4px] bg-white px-3 pr-10 shadow">
+        <div className="flex items-center">
+          <h5 className="pl-5 font-[600]">Default</h5>
+        </div>
+        <div className="flex items-center pl-8">
+          <h6 className="800px:text-[unset] text-[12px]">
+            494 Erdman Pasaage, New Zoietown, Paraguay
+          </h6>
+        </div>
+        <div className="flex items-center pl-8">
+          <h6 className="800px:text-[unset] text-[12px]">(213) 840-9416</h6>
+        </div>
+        <div className="flex min-w-[10%] items-center justify-between pl-8">
+          <AiOutlineDelete size={25} className="cursor-pointer" />
+        </div>
+      </div>
+    </div>
+  )
+}
+export default ProfileContent
+```
+
+```jsx
+ProfileSideBar 에서 전달된 active 값에 따라 화면을 출력하며
+
+npm install @material-ui/core --legacy-peer-deps
+
+@material-ui/data-grid --legacy-peer-deps
+
+을 설치하여 테이블을 조금더 편하게 만들어서 사용한다
+
+return (
+    <div className="w-full">
+      {/* profile */}
+      {active === 1 && (
+        <>
+          <div className="flex justify-center w-full">
+            <div className="relative">
+              <img
+                src={`http://localhost:5000/${user?.avatar}`}
+                className="w-[150px] h-[150px] rounded-full object-cover border-[3px] border-[#e8d648]"
+                alt=""
+              />
+              <div className="w-[30px] h-[30px] bg-[#E3E9EE] rounded-full flex items-center justify-center cursor-pointer absolute bottom-[5px] right-[5px]">
+                <AiOutlineCamera />
+              </div>
+            </div>
+          </div>
+          <br />
+          <br />
+          <div className="w-full px-5">
+            <form onSubmit={handleSubmit} aria-required={true}>
+              <div className="w-full 800px:flex block pb-3">
+                <div className=" w-[100%] 800px:w-[50%]">
+                  <label className="block pb-2">Full Name</label>
+                  <input
+                    type="text"
+                    className={`${styles.input} !w-[95%] mb-4 800px:mb-0`}
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </div>
+                <div className=" w-[100%] 800px:w-[50%]">
+                  <label className="block pb-2">Email Address</label>
+                  <input
+                    type="text"
+                    className={`${styles.input} !w-[95%] mb-1 800px:mb-0`}
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="w-full 800px:flex block pb-3">
+                <div className=" w-[100%] 800px:w-[50%]">
+                  <label className="block pb-2">Phone Number</label>
+                  <input
+                    type="number"
+                    className={`${styles.input} !w-[95%] mb-4 800px:mb-0`}
+                    required
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                  />
+                </div>
+                <div className=" w-[100%] 800px:w-[50%]">
+                  <label className="block pb-2">Zip Code</label>
+                  <input
+                    type="number"
+                    className={`${styles.input} !w-[95%] mb-4 800px:mb-0`}
+                    required
+                    value={zipCode}
+                    onChange={(e) => setZipCode(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="w-full 800px:flex block pb-3">
+                <div className=" w-[100%] 800px:w-[50%]">
+                  <label className="block pb-2">Address 1</label>
+                  <input
+                    type="address"
+                    className={`${styles.input} !w-[95%]`}
+                    required
+                    value={address1}
+                    onChange={(e) => setAddress1(e.target.value)}
+                  />
+                </div>
+                <div className=" w-[100%] 800px:w-[50%]">
+                  <label className="block pb-2">Address 2</label>
+                  <input
+                    type="address"
+                    className={`${styles.input} !w-[95%]`}
+                    required
+                    value={address2}
+                    onChange={(e) => setAddress2(e.target.value)}
+                  />
+                </div>
+              </div>
+              <input
+                className={`w-[250px] h-[40px] border border-[#3a24db] text-center text-[#3a24db] rounded-[3px] mt-8 cursor-pointer`}
+                required
+                value="Update"
+                type="submit"
+              />
+            </form>
+          </div>
+        </>
+      )}
+
+      {/* order */}
+      {active === 2 && (
+        <div>
+          <AllOrders />
+        </div>
+      )}
+
+      {/* Refund */}
+      {active === 3 && (
+        <div>
+          <AllRefundOrders />
+        </div>
+      )}
+
+      {/* Track order */}
+      {active === 5 && (
+        <div>
+          <TrackOrder />
+        </div>
+      )}
+
+      {/* Track order */}
+      {active === 6 && (
+        <div>
+          <PaymentMethod />
+        </div>
+      )}
+
+      {/*  user Address */}
+      {active === 7 && (
+        <div>
+          <Address />
+        </div>
+      )}
+    </div>
+  );
+};
+
+프로필 정보 편집 기능:
+
+사용자의 이름, 이메일, 전화번호, 우편번호, 주소를 입력받는 폼을 제공한다.
+
+useState를 사용하여 각 입력 필드의 값을 상태로 관리하고,
+
+onChange 이벤트를 통해 사용자 입력을 감지하여 상태를 업데이트한다.
+
+Update" 버튼 클릭 시 handleSubmit 함수가 호출되어 폼 데이터를 처리하도록 구현되어 있다.
+
+      {/* order */}
+      {active === 2 && (
+        <div>
+          <AllOrders />
+        </div>
+      )}
+
+이 부분은 ProfileSidebar.jsx 에서 상위로 ProfilePage.jsx 에 setActive 상태를 통해 active 값을 전달한다
+
+<ProfileContent active={active} /> 그럼 ProfileContent.jsx 에서 active 값을 받고
+
+그걸 표시한다
+
+--------------------------------------------------------------------------------------------------
+
+const AllOrders = () => {
+  // ...
+  const orders = [
+    {
+      _id: "7463hvbfbhfbrtr28820221",
+      orderItems: [
+        {
+          name: "Iphone 14 pro max",
+        },
+      ],
+      totalPrice: 120,
+      orderStatus: "Processing",
+    },
+  ];
+  // ...
+};
+
+주문 내역, 환불 주문, 주문 추적, 결제 수단, 사용자 주소 페이지:
+
+해당 페이지에 대한 내용을 나타내는 서브 컴포넌트들이 구현되어 있다.
+
+주문 내역, 환불 주문, 주문 추적 페이지에서는 DataGrid 컴포넌트를 사용하여 주문 목록을 테이블 형태로 표시하고,
+
+각 주문에 대한 상세 정보로 이동할 수 있는 링크를 제공한다.
+
+결제 수단과 사용자 주소 페이지에서는 각각의 결제 수단과 주소에 대한 정보를 표시하고, 삭제 기능을 제공한다.
+
+--------------------------------------------------------------------------------------------------
+
+const AllOrders = () => {
+  const orders = [
+    {
+      _id: "7463hvbfbhfbrtr28820221",
+      orderItems: [
+        {
+          name: "Iphone 14 pro max",
+        },
+      ],
+      totalPrice: 120,
+      orderStatus: "Processing",
+    },
+  ];
+
+  const columns = [
+    { field: "id", headerName: "Order ID", minWidth: 150, flex: 0.7 },
+
+    {
+      field: "status",
+      headerName: "Status",
+      minWidth: 130,
+      flex: 0.7,
+      cellClassName: (params) => {
+        return params.getValue(params.id, "status") === "Delivered"
+          ? "greenColor"
+          : "redColor";
+      },
+    },
+    {
+      field: "itemsQty",
+      headerName: "Items Qty",
+      type: "number",
+      minWidth: 130,
+      flex: 0.7,
+    },
+
+    {
+      field: "total",
+      headerName: "Total",
+      type: "number",
+      minWidth: 130,
+      flex: 0.8,
+    },
+
+    {
+      field: " ",
+      flex: 1,
+      minWidth: 150,
+      headerName: "",
+      type: "number",
+      sortable: false,
+      renderCell: (params) => {
+        return (
+          <>
+            <Link to={`/order/${params.id}`}>
+              <Button>
+                <AiOutlineArrowRight size={20} />
+              </Button>
+            </Link>
+          </>
+        );
+      },
+    },
+  ];
+
+  const row = [];
+
+  orders &&
+    orders.forEach((item) => {
+      row.push({
+        id: item._id,
+        itemsQty: item.orderItems.length,
+        total: "US$ " + item.totalPrice,
+        status: item.orderStatus,
+      });
+    });
+
+  return (
+    <div className="pl-8 pt-1">
+      <DataGrid
+        rows={row}
+        columns={columns}
+        pageSize={10}
+        disableSelectionOnClick
+        autoHeight
+      />
+    </div>
+  );
+};
+
+**주문 데이터 정의:**
+
+orders 상수에는 하나의 주문 객체가 포함된 배열이 정의되어 있다.
+
+각 주문 객체에는 주문 ID(_id), 주문 상품 목록(orderItems), 총 가격(totalPrice),
+
+주문 상태(orderStatus) 등의 정보가 포함되어 있다.
+
+**테이블 컬럼 정의:**
+
+columns 배열에는 주문 정보를 표시할 테이블의 각 열에 대한 정의가 있다.
+
+field: 데이터와 연결된 필드명을 지정한다.
+
+headerName: 테이블 헤더에 표시될 열의 이름을 지정한다.
+
+minWidth, flex: 테이블 열의 최소 너비 및 유연성을 지정한다.
+
+cellClassName: 열 내의 셀에 동적으로 클래스를 추가하는 함수로, 주문 상태에 따라 배경색이 다르게 지정된다.
+
+type: 열의 데이터 타입을 지정한다.
+
+sortable: 해당 열이 정렬 가능한지 여부를 지정한다.
+
+renderCell: 셀을 렌더링하는 함수로, 주문 ID를 이용하여 해당 주문 상세 페이지로 이동하는 링크를 생성한다.
+
+**테이블 데이터 구성:**
+
+row 배열은 각 주문을 나타내는 행의 데이터를 포함한다.
+
+이 배열은 orders 배열을 순회하면서 필요한 정보를 추출하여 구성된다.
+
+**DataGrid 컴포넌트 렌더링:**
+
+최종적으로 DataGrid 컴포넌트가 렌더링된다.
+
+rows에는 테이블의 각 행에 대한 데이터가, columns에는 테이블의 각 열에 대한 정의가 전달된다.
+
+pageSize는 페이지당 행의 개수를 지정하며,
+
+disableSelectionOnClick은 행을 클릭했을 때 선택 기능을 비활성화한다.
+
+autoHeight는 테이블의 높이를 자동으로 조절하도록 설정한다.
+
+**스타일 및 레이아웃:**
+
+pl-8 및 pt-1 클래스를 통해 좌측 여백과 상단 여백이 설정되어 있다.
+
+이렇게 구성된 코드는 주문 정보를 테이블 형태로 나타내며,
+
+주문 상태에 따라 각 행의 배경색이 동적으로 결정되고,
+
+주문 ID를 클릭하면 해당 주문의 상세 페이지로 이동할 수 있는 링크가 제공된다.
+
+--------------------------------------------------------------------------------------------------
+
+```
+
+```jsx
+const TrackOrder = () => {
+  const orders = [
+    {
+      _id: "7463hvbfbhfbrtr28820221",
+      orderItems: [
+        {
+          name: "Iphone 14 pro max",
+        },
+      ],
+      totalPrice: 120,
+      orderStatus: "Processing",
+    },
+  ];
+
+  const columns = [
+    { field: "id", headerName: "Order ID", minWidth: 150, flex: 0.7 },
+    {
+      field: "status",
+      headerName: "Status",
+      minWidth: 130,
+      flex: 0.7,
+      cellClassName: (params) => {
+        return params.getValue(params.id, "status") === "Delivered"
+          ? "greenColor"
+          : "redColor";
+      },
+    },
+    {
+      field: "itemsQty",
+      headerName: "Items Qty",
+      type: "number",
+      minWidth: 130,
+      flex: 0.7,
+    },
+
+    {
+      field: "total",
+      headerName: "Total",
+      type: "number",
+      minWidth: 130,
+      flex: 0.8,
+    },
+    {
+      field: " ",
+      flex: 1,
+      minWidth: 130,
+      headerName: "",
+      type: "number",
+      sortable: false,
+      renderCell: (params) => {
+        return (
+          <>
+            <Link to={`/order/${params.id}`}>
+              <Button>
+                <MdOutlineTrackChanges size={20} />
+              </Button>
+            </Link>
+          </>
+        );
+      },
+    },
+  ];
+
+  const row = [];
+
+  orders &&
+    orders.forEach((item) => {
+      row.push({
+        id: item._id,
+        itemsQty: item.orderItems.length,
+        total: "US$ " + item.totalPrice,
+        status: item.orderStatus,
+      });
+    });
+
+  return (
+    <div className="pl-8 pt-1">
+      <DataGrid
+        rows={row}
+        columns={columns}
+        pageSize={10}
+        disableSelectionOnClick
+        autoHeight
+      />
+    </div>
+  );
+};
+
+그 아래도 계속 같은 방식으로 각 항목을 만들어 준다
+```
+
+```jsx
+const PaymentMethod = () => {
+  return (
+    <div className="w-full px-5">
+      <div className="flex w-full items-center justify-between">
+        <h1 className="text-[25px] font-[600] text-[#000000ba] pb-2">
+          Payment Methods
+        </h1>
+        <div className={`${styles.button} !rounded-md`}>
+          <span className="text-[#fff]">Add New</span>
+        </div>
+      </div>
+      <br />
+      <div className="w-full bg-white h-min 800px:h-[70px] rounded-[4px] flex items-center px-3 shadow justify-between pr-10">
+        <div className="flex items-center">
+          <img
+            src="https://bonik-react.vercel.app/assets/images/payment-methods/Visa.svg"
+            alt=""
+          />
+          <h5 className="pl-5 font-[600] text-[12px] 800px:text-[unset]">
+            Shahriar Sajeeb
+          </h5>
+        </div>
+        <div className="pl-8 flex items-center">
+          <h6 className="text-[12px] 800px:text-[unset]">1234 **** *** ****</h6>
+          <h5 className="pl-6 text-[12px] 800px:text-[unset]">08/2022</h5>
+        </div>
+        <div className="min-w-[10%] flex items-center justify-between pl-8">
+          <AiOutlineDelete size={25} className="cursor-pointer" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const Address = () => {
+  return (
+    <div className="w-full px-5">
+      <div className="flex w-full items-center justify-between">
+        <h1 className="text-[25px] font-[600] text-[#000000ba] pb-2">
+          My Addresses
+        </h1>
+        <div className={`${styles.button} !rounded-md`}>
+          <span className="text-[#fff]">Add New</span>
+        </div>
+      </div>
+      <br />
+      <div className="w-full bg-white h-min 800px:h-[70px] rounded-[4px] flex items-center px-3 shadow justify-between pr-10">
+        <div className="flex items-center">
+          <h5 className="pl-5 font-[600]">Default</h5>
+        </div>
+        <div className="pl-8 flex items-center">
+          <h6 className="text-[12px] 800px:text-[unset]">
+            494 Erdman Pasaage, New Zoietown, Paraguay
+          </h6>
+        </div>
+        <div className="pl-8 flex items-center">
+          <h6 className="text-[12px] 800px:text-[unset]">(213) 840-9416</h6>
+        </div>
+        <div className="min-w-[10%] flex items-center justify-between pl-8">
+          <AiOutlineDelete size={25} className="cursor-pointer" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+그 외에 아래 두 항목은 하드 코딩으로 만들어 놨다 간단한 구조이다
+```
+
+# 권한이 있는 페이지로 보호하기
+
+```jsx
+import React, { useEffect } from 'react'
+import './App.css'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import LoginPage from './pages/LoginPage'
+import SignupPage from './pages/SignupPage'
+import ActivationPage from './pages/ActivationPage'
+import { ToastContainer, toast } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
+import axios from 'axios'
+import Store from './redux/store'
+import { loadUser, clearErrors } from './redux/user/userAction'
+import HomePage from './pages/HomePage'
+import EventsPage from './pages/EventsPage'
+import ProductsPage from './pages/ProductsPage'
+import BestSellingPage from './pages/BestSellingPage'
+import FAQPage from './pages/FAQPage'
+import { useSelector } from 'react-redux'
+import ProductDetailsPage from './pages/ProductDetailsPage'
+import ProfilePage from './pages/ProfilePage'
+import ProtectedRoute from './ProtectedRoute'
+
+const App = () => {
+  // Redux에서 user 상태 정보를 가져오기 위한 useSelector
+  const { loading, isAuthenticated } = useSelector((state) => state.user)
+
+  // 컴포넌트가 마운트되었을 때, 사용자 정보 로드 액션 실행
+  useEffect(() => {
+    Store.dispatch(loadUser())
+    // Store.dispatch(clearErrors());
+  }, [])
+
+  return (
+    <>
+      {/* 로딩 중일 때 */}
+      {loading ? (
+        <div style={{ textAlign: 'center', marginTop: '50vh' }}>로딩 중...</div>
+      ) : (
+        // 로딩이 완료된 후
+        <BrowserRouter>
+          {/* React Router의 Routes 컴포넌트로 라우팅 설정 */}
+          <Routes>
+            {/* 각 페이지에 대한 라우트 설정 */}
+            <Route path="/" element={<HomePage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/sign-up" element={<SignupPage />} />
+            <Route path="/activation/:activation_token" element={<ActivationPage />} />
+            <Route path="/events" element={<EventsPage />} />
+            <Route path="/products" element={<ProductsPage />} />
+            <Route path="/product/:name" element={<ProductDetailsPage />} />
+            <Route path="/best-selling" element={<BestSellingPage />} />
+            <Route path="/faq" element={<FAQPage />} />
+
+            {/* 프로필 페이지는 인증된 사용자만 접근 가능한 ProtectedRoute로 설정 */}
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute isAuthenticated={isAuthenticated}>
+                  <ProfilePage />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+          {/* 알림 메시지를 보여주는 ToastContainer 컴포넌트 */}
+          <ToastContainer
+            position="bottom-center"
+            autoClose={5000}
+            hideProgressBar={false}
+            newestOnTop={false}
+            closeOnClick
+            rtl={false}
+            pauseOnFocusLoss
+            draggable
+            pauseOnHover
+            theme="dark"
+          />
+        </BrowserRouter>
+      )}
+    </>
+  )
+}
+
+export default App
+```
+
+```jsx
+const { loading, isAuthenticated  } = useSelector((state) => state.user);
+
+seSelector((state) => state.user): Redux의 상태에서 user 객체를 가져온다.
+
+이 객체는 보통 사용자와 관련된 정보를 포함하고 있다.
+
+const { loading, isAuthenticated }: user 객체에서 loading과 isAuthenticated 속성을 추출한다.
+
+--------------------------------------------------------------------------------------------------
+
+            {/* 프로필 페이지는 인증된 사용자만 접근 가능한 ProtectedRoute로 설정 */}
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute isAuthenticated={isAuthenticated}>
+                  <ProfilePage />
+                </ProtectedRoute>
+              }
+            />
+
+ProtectedRoute 를 만들고
+
+ProtectedRoute 컴포넌트를 사용하여 해당 라우트에 접근하기 전에 사용자가 인증되어 있는지 확인한다.
+
+isAuthenticated prop은 사용자의 인증 상태를 나타내는 불리언 값이다.
+```
+
+## ProtectedRoute.js
+
+```jsx
+import { Navigate } from 'react-router-dom'
+
+// 인증된 사용자만 접근을 허용하는 ProtectedRoute 컴포넌트
+const ProtectedRoute = ({ isAuthenticated, children }) => {
+  // 만약 사용자가 인증되어 있지 않다면 로그인 페이지로 이동
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />
+  }
+  // 사용자가 인증되어 있으면 해당 컴포넌트(children)를 렌더링
+  return children
+}
+
+// ProtectedRoute 컴포넌트를 외부에서 사용할 수 있도록 내보내기
+export default ProtectedRoute
+```
+
+```jsx
+const ProtectedRoute = ({ isAuthenticated, children }):
+
+isAuthenticated와 children이라는 두 개의 props를 받아온다.
+
+isAuthenticated: 사용자가 인증되었는지 여부를 나타내는 불리언 값이다.
+
+children: ProtectedRoute 컴포넌트 안에 중첩된 컴포넌트들이다.
+```
+
+# 모바일 버전 헤더와 네비 만들기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381459/notion-blog/_/_/EcommerceProject/EcommerceProject_-2/Untitled_6.png)
+
+```jsx
+const [open, setOpen] = useState(false) // 상태도 추가 필요
+
+;<div
+  className={`${
+    active === true ? 'fixed top-0 left-0 z-10 shadow-sm' : null
+  } 800px:hidden top-0 left-0 z-50 h-[60px] w-full bg-[#fff] shadow-sm`}
+>
+  <div className="flex w-full items-center justify-between">
+    {/* 모바일 메뉴 버튼 */}
+    <div>
+      <BiMenuAltLeft size={40} className="ml-4" onClick={() => setOpen(true)} />
+    </div>
+    {/* 로고 */}
+    <div>
+      <Link to="/">
+        <img
+          src={`http://localhost:5000/images/QuickDealMarketFix.jpg`}
+          alt=""
+          className="mt-3 cursor-pointer"
+        />
+      </Link>
+    </div>
+    {/* 장바구니 아이콘 */}
+    <div>
+      <div className="relative mr-[20px]">
+        <AiOutlineShoppingCart size={30} />
+        {/* 장바구니 아이템 개수 */}
+        <span class="top right absolute top-0 right-0 m-0 h-4 w-4 rounded-full bg-[#3bc177] p-0 text-center font-mono text-[12px] leading-tight text-white">
+          1
+        </span>
+      </div>
+    </div>
+  </div>
+
+  {/* 모바일 사이드바  */}
+  {open && (
+    <div className={`fixed top-0 left-0 z-20 h-full w-full bg-[#0000005f]`}>
+      <div className="fixed top-0 left-0 z-10 h-screen w-[60%] overflow-y-scroll bg-[#fff]">
+        <div className="flex w-full justify-between pr-3">
+          {/* 위시리스트 아이콘 */}
+          <div>
+            <div className="relative mr-[15px]">
+              <AiOutlineHeart size={30} className="mt-5 ml-3" />
+              {/* 위시리스트 아이템 개수 */}
+              <span class="top right absolute top-0 right-0 m-0 h-4 w-4 rounded-full bg-[#3bc177] p-0 text-center font-mono text-[12px] leading-tight text-white">
+                0
+              </span>
+            </div>
+          </div>
+          {/* 모바일 닫기 버튼 */}
+          <RxCross1 size={30} className="mt-5 ml-4" onClick={() => setOpen(false)} />
+        </div>
+
+        {/* 모바일 검색창 */}
+        <div className="h-[40px relative] m-auto my-8 w-[92%]">
+          {/* 검색어 입력 필드 */}
+          <input
+            type="search"
+            placeholder="Search Product..."
+            className="h-[40px] w-full rounded-md border-[2px] border-[#3957db] px-2"
+            value={searchTerm}
+            onChange={handleSearchChange}
+          />
+          {/* 검색 결과 목록 */}
+          {searchData && (
+            <div className="absolute left-0 z-10 w-full bg-[#fff] p-3 shadow">
+              {searchData.map((i) => {
+                const d = i.name
+
+                const Product_name = d.replace(/\s+/g, '-')
+                // 검색 결과를 상품 페이지로 연결하는 링크
+                return (
+                  <Link to={`/product/${Product_name}`}>
+                    <div className="flex items-center">
+                      {/* 상품 이미지 */}
+                      <img src={i.image_Url[0].url} alt="" className="mr-2 w-[50px]" />
+                      {/* 상품 이름 */}
+                      <h5>{i.name}</h5>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* 네비게이션 메뉴 */}
+        <Navbar active={activeHeading} />
+        {/* 판매자 등록 링크 */}
+        <div className={`${styles.button} ml-4 !rounded-[4px]`}>
+          <Link to="/shop-create">
+            <h1 className="flex items-center text-[#fff]">
+              Become Seller <IoIosArrowForward className="ml-1" />
+            </h1>
+          </Link>
+        </div>
+        <br />
+        <br />
+        <br />
+
+        {/* 로그인/가입 또는 프로필 이미지 */}
+        <div className="flex w-full justify-center">
+          {isAuthenticated ? (
+            <div>
+              {/* 프로필 이미지 링크 */}
+              <Link to="/profile">
+                <img
+                  src={`http://localhost:5000/${user.avatar}`}
+                  alt=""
+                  className="h-[60px] w-[60px] rounded-full border-[3px] border-[#0eae88]"
+                />
+              </Link>
+            </div>
+          ) : (
+            <>
+              {/* 로그인 링크 */}
+              <Link to="/login" className="pr-[10px] text-[18px] text-[#000000b7]">
+                Login /
+              </Link>
+              {/* 가입 링크 */}
+              <Link to="/sign-up" className="text-[18px] text-[#000000b7]">
+                Sign up
+              </Link>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )}
+</div>
+```
+
+```jsx
+기본 헤더 아래에 위의 내용을 추가해준다 화면의 넓이가 좁아지면 활성화 되도록 설정해준다
+
+반응형 디자인:
+
+뷰포트의 너비가 800px 미만인 경우에만 모바일 헤더가 활성화된다.
+
+CSS에서 800px:hidden 스타일을 사용하여 데스크톱 버전에서는 헤더가 숨겨지도록 한다.
+
+모바일 버전의 헤더는 w-full, h-[60px], bg-[#fff]와 같은 스타일을 가지고 있다.
+
+메뉴 버튼:
+
+왼쪽 상단에는 메뉴 버튼이 있습니다. BiMenuAltLeft 아이콘이 클릭되면 모바일 사이드바가 나타난다.
+
+로고:
+
+가운데에는 웹사이트 로고가 표시되어 있다. 로고를 클릭하면 홈페이지로 이동한다.
+
+장바구니 아이콘:
+
+오른쪽 상단에는 AiOutlineShoppingCart 아이콘이 있다. 클릭하면 장바구니에 대한 동작을 수행힌다.
+
+사이드바:
+
+모바일에서는 메뉴 버튼 클릭 시 나타나는 사이드바가 있다.
+
+사이드바에는 검색창, 위시리스트, 네비게이션 메뉴, 셀러 등록 버튼, 검색 결과가 표시된다.
+
+검색창:
+
+검색 아이콘을 클릭하면 검색창이 나타나고, 검색 결과가 나타날 경우 해당 결과를 보여준다.
+
+프로필 이미지 또는 로그인/가입 링크:
+
+오른쪽 하단에는 프로필 이미지 또는 로그인/가입 링크가 있다.
+
+사용자가 로그인한 경우에는 프로필 이미지가 표시되고, 그렇지 않은 경우 로그인 및 가입 링크가 표시된다.
+
+모바일 사이드바 닫기:
+
+사이드바를 닫기 위해서는 사이드바 내부에 위치한 닫기 버튼(RxCross1 아이콘)을 클릭한다.
+```
+
+## 모바일 네브바
+
+```jsx
+import React from 'react'
+import { Link } from 'react-router-dom'
+import { navItems } from '../../static/data'
+import styles from '../../styles/styles'
+
+const Navbar = ({ active }) => {
+  return (
+    // 화면 폭이 800px 이상이면 Flex 속성을 사용하여 네비게이션 바 아이템을 가로로 배열
+    <div className={`block 800px:${styles.noramlFlex}`}>
+      {
+        // navItems 배열을 순회하며 네비게이션 바 아이템 생성
+        navItems &&
+          navItems.map((i, index) => (
+            <div className="flex" key={index}>
+              {/* Link 컴포넌트를 사용하여 네비게이션 바 아이템에 링크 추가 */}
+              <Link
+                to={i.url}
+                // 조건부 스타일링을 사용하여 활성화된 페이지는 다르게 스타일 적용
+                className={`${active === index + 1 ? 'text-[#e3bb8b]' : '800px:text-[#fff] text-black'} 800px:pb-0 cursor-pointer} px-6 pb-[30px] font-[500]`}
+              >
+                {i.title}
+              </Link>
+            </div>
+          ))
+      }
+    </div>
+  )
+}
+
+export default Navbar
+```
+
+```jsx
+예전에 만든 네브바를 수정해준다
+
+Flex 속성의 활용:
+
+styles.noramlFlex에서 가져온 Flex 스타일은 화면 폭이 800px 이상인 경우에만 적용된다.
+
+따라서 화면 폭이 800px 미만인 경우에는 block 클래스가 적용되어 수직으로 쌓이게 되고,
+
+800px 이상인 경우에는 Flex 속성에 따라 가로로 나란히 배열된다.
+```
+
+# 체크아웃 ( 결제 페이지 만들기 )
+
+## 결제 페이지
+
+```jsx
+import React from 'react'
+import Header from '../components/Layout/Header'
+import CheckoutSteps from '../components/Checkout/CheckoutSteps'
+import Checkout from '../components/Checkout/Checkout'
+import Footer from '../components/Layout/Footer'
+
+const CheckoutPage = () => {
+  return (
+    <div>
+      {/* 페이지 상단에 고정된 헤더 컴포넌트 */}
+      <Header />
+      <br />
+      <br />
+      {/* 체크아웃 진행 단계를 나타내는 컴포넌트 */}
+      <CheckoutSteps active={1} />
+      {/* 실제 체크아웃 정보를 입력하는 컴포넌트 */}
+      <Checkout />
+      <br />
+      <br />
+      {/* 페이지 하단에 위치한 푸터 컴포넌트 */}
+      <Footer />
+    </div>
+  )
+}
+
+export default CheckoutPage
+```
+
+## Checkout.jsx
+
+```jsx
+import React, { useState } from 'react'
+import styles from '../../styles/styles'
+import { Country, State } from 'country-state-city'
+import { useNavigate } from 'react-router-dom'
+
+const Checkout = () => {
+  const navigate = useNavigate()
+
+  // 결제 페이지로 이동하는 함수
+  const paymentSubmit = () => {
+    navigate('/payment')
+  }
+
+  return (
+    <div className="flex w-full flex-col items-center py-8">
+      <div className="1000px:w-[70%] 800px:flex block w-[90%]">
+        {/* 배송 정보 입력 컴포넌트 */}
+        <div className="800px:w-[65%] w-full">
+          <ShippingInfo />
+        </div>
+        {/* 장바구니 데이터 표시 컴포넌트 */}
+        <div className="800px:w-[35%] 800px:mt-0 mt-8 w-full">
+          <CartData />
+        </div>
+      </div>
+      {/* 결제 페이지로 이동하는 버튼 */}
+      <div className={`${styles.button} 800px:w-[280px] mt-10 w-[150px]`} onClick={paymentSubmit}>
+        <h5 className="text-white">Go to Payment</h5>
+      </div>
+    </div>
+  )
+}
+
+// 배송 정보 입력 컴포넌트
+const ShippingInfo = () => {
+  const [country, setCountry] = useState('')
+
+  return (
+    <div className="800px:w-[95%] w-full rounded-md bg-white p-5 pb-8">
+      <h5 className="text-[18px] font-[500]">Shipping Address</h5>
+      <br />
+      <form>
+        {/* 입력 폼들 */}
+        {/* ... */}
+
+        <div className="flex w-full pb-3">
+          {/* 국가 선택 */}
+          <div className="w-[50%]">
+            <label className="block pb-2">Country</label>
+            <select
+              className="h-[40px] w-[95%] rounded-[5px] border"
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+            >
+              {/* 국가 목록 옵션 출력 */}
+              {/* ... */}
+            </select>
+          </div>
+          {/* 도시 선택 */}
+          <div className="w-[50%]">
+            <label className="block pb-2">Country</label>
+            <select className="h-[40px] w-[95%] rounded-[5px] border">
+              {/* 도시 목록 옵션 출력 */}
+              {/* ... */}
+            </select>
+          </div>
+        </div>
+
+        {/* 나머지 입력 폼들 */}
+        {/* ... */}
+      </form>
+    </div>
+  )
+}
+
+// 장바구니 데이터 표시 컴포넌트
+const CartData = () => {
+  return (
+    <div className="w-full rounded-md bg-[#fff] p-5 pb-8">
+      {/* 장바구니 항목들의 가격 및 할인 정보 표시 */}
+      {/* ... */}
+
+      {/* 할인 쿠폰 입력 폼 */}
+      <form>
+        <input
+          type="text"
+          className={`${styles.input} h-[40px] pl-2`}
+          placeholder="Coupoun code"
+          required
+        />
+        <input
+          className={`mt-8 h-[40px] w-full cursor-pointer rounded-[3px] border border-[#f63b60] text-center text-[#f63b60]`}
+          required
+          value="Apply code"
+          type="submit"
+        />
+      </form>
+    </div>
+  )
+}
+
+export default Checkout
+```
+
+```jsx
+paymentSubmit:
+
+결제 페이지로 이동하는 함수입니다. 버튼 클릭 시 /payment 경로로 이동합니다.
+
+------------------------------------------------------------------------------
+
+// 배송 정보 입력 컴포넌트
+const ShippingInfo = () => {
+  // 국가 선택 상태를 저장하기 위한 state
+  const [country, setCountry] = useState("");
+
+  return (
+    // 배송 정보 입력을 위한 컨테이너
+    <div className="w-full 800px:w-[95%] bg-white rounded-md p-5 pb-8">
+      {/* 섹션 제목 */}
+      <h5 className="text-[18px] font-[500]">Shipping Address</h5>
+      <br />
+      {/* 배송 정보 입력 폼 */}
+      <form>
+        {/* 섹션 내부의 수직적인 레이아웃을 위한 수평적인 Flex 레이아웃 */}
+        <div className="w-full flex pb-3">
+          {/* 이름 입력 폼 */}
+          <div className="w-[50%]">
+            <label className="block pb-2">Full Name</label>
+            <input
+              type="text"
+              required
+              className={`${styles.input} !w-[95%]`}
+            />
+          </div>
+          {/* 이메일 입력 폼 */}
+          <div className="w-[50%]">
+            <label className="block pb-2">Email Address</label>
+            <input type="email" required className={`${styles.input}`} />
+          </div>
+        </div>
+
+        {/* 전화번호 및 우편번호 입력 폼 */}
+        <div className="w-full flex pb-3">
+          {/* 전화번호 입력 폼 */}
+          <div className="w-[50%]">
+            <label className="block pb-2">Phone Number</label>
+            <input
+              type="number"
+              required
+              className={`${styles.input} !w-[95%]`}
+            />
+          </div>
+          {/* 우편번호 입력 폼 */}
+          <div className="w-[50%]">
+            <label className="block pb-2">Zip Code</label>
+            <input type="number" required className={`${styles.input}`} />
+          </div>
+        </div>
+
+        {/* 국가 및 도시 선택 폼 */}
+        <div className="w-full flex pb-3">
+          {/* 국가 선택 드롭다운 메뉴 */}
+          <div className="w-[50%]">
+            <label className="block pb-2">Country</label>
+            <select
+              className="w-[95%] border h-[40px] rounded-[5px]"
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+            >
+              {/* 국가 목록 옵션 출력 */}
+              <option className="block pb-2" value="">
+                Choose your country
+              </option>
+              {Country &&
+                Country.getAllCountries().map((item) => (
+                  <option key={item.isoCode} value={item.isoCode}>
+                    {item.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+          {/* 도시 선택 드롭다운 메뉴 */}
+          <div className="w-[50%]">
+            <label className="block pb-2">City</label>
+            <select className="w-[95%] border h-[40px] rounded-[5px]">
+              {/* 선택된 국가에 해당하는 도시 목록 옵션 출력 */}
+              <option className="block pb-2" value="">
+                Choose your City
+              </option>
+              {State &&
+                State.getStatesOfCountry(country).map((item) => (
+                  <option key={item.isoCode} value={item.isoCode}>
+                    {item.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+        </div>
+
+        {/* 나머지 주소 입력 폼 */}
+        <div className="w-full flex pb-3">
+          {/* 주소1 입력 폼 */}
+          <div className="w-[50%]">
+            <label className="block pb-2">Address1</label>
+            <input
+              type="address"
+              required
+              className={`${styles.input} !w-[95%]`}
+            />
+          </div>
+          {/* 주소2 입력 폼 */}
+          <div className="w-[50%]">
+            <label className="block pb-2">Address2</label>
+            <input type="address" required className={`${styles.input}`} />
+          </div>
+        </div>
+
+        {/* 기타 내용 (추가 정보 입력 등) */}
+        <div></div>
+      </form>
+    </div>
+  );
+};
+
+export default ShippingInfo;
+
+ShippingInfo 컴포넌트:
+
+사용자의 배송 정보를 입력하는 부분이다.
+
+Country, State 모듈을 사용하여 국가 및 도시 목록을 가져온다.
+
+npm i country-state-city 를 사용해서 모든 국가 정보를 불러온다 ( 자세한건 공식문서 확인 )
+
+        {/* 국가 및 도시 선택 폼 */}
+        <div className="w-full flex pb-3">
+          {/* 국가 선택 드롭다운 메뉴 */}
+          <div className="w-[50%]">
+            {/* "Country" 라벨 출력 */}
+            <label className="block pb-2">Country</label>
+            {/* 국가 선택을 위한 드롭다운 메뉴 */}
+            <select
+              // 드롭다운 메뉴의 스타일 및 값 설정
+              className="w-[95%] border h-[40px] rounded-[5px]"
+              value={country}  // 현재 선택된 국가 값을 표시
+              onChange={(e) => setCountry(e.target.value)}  // 국가 선택이 변경될 때마다 state 업데이트
+            >
+              {/* 기본 옵션: 국가를 선택하지 않은 경우 */}
+              <option className="block pb-2" value="">
+                Choose your country
+              </option>
+              {/* 국가 목록 출력 */}
+              {Country &&
+                Country.getAllCountries().map((item) => (
+                  <option key={item.isoCode} value={item.isoCode}>
+                    {item.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+
+--------------------------------------------------------------------------------------------------
+
+CartData 컴포넌트:
+
+사용자의 장바구니 정보를 표시하고 할인 쿠폰을 입력하는 부분이다.
+
+가격, 할인 정보, 쿠폰 입력 폼 등이 있다. ( 아직 별거 없음 )
+```
+
+## CheckoutSteps.jsx
+
+```jsx
+import React from 'react'
+import styles from '../../styles/styles'
+
+const CheckoutSteps = ({ active }) => {
+  console.log(active)
+
+  return (
+    <div className="flex w-full justify-center">
+      {/* 단계 표시 부분 */}
+      <div className="800px:w-[50%] flex w-[90%] flex-wrap items-center">
+        {/* 첫 번째 단계: 배송 정보 입력 */}
+        <div className={`${styles.noramlFlex}`}>
+          <div className={`${styles.cart_button}`}>
+            <span className={`${styles.cart_button_text}`}>1.Shipping</span>
+          </div>
+
+          {/* 배송 정보 입력 단계 표시 바 */}
+          <div
+            className={`${
+              active > 1
+                ? '800px:w-[70px] h-[4px] w-[30px] !bg-[#f63b60]'
+                : '800px:w-[70px] h-[4px] w-[30px] !bg-[#FDE1E6]'
+            }`}
+          />
+        </div>
+
+        {/* 두 번째 단계: 결제 */}
+        <div className={`${styles.noramlFlex}`}>
+          {/* 두 번째 단계 버튼 */}
+          <div
+            className={`${
+              active > 1 ? `${styles.cart_button}` : `${styles.cart_button} !bg-[#FDE1E6]`
+            }`}
+          >
+            {/* 두 번째 단계 텍스트 */}
+            <span
+              className={`${
+                active > 1
+                  ? `${styles.cart_button_text}`
+                  : `${styles.cart_button_text} !text-[#f63b60]`
+              }`}
+            >
+              2.Payment
+            </span>
+          </div>
+        </div>
+
+        {/* 세 번째 단계: 결제 성공 */}
+        <div className={`${styles.noramlFlex}`}>
+          {/* 세 번째 단계 표시 바 */}
+          <div
+            className={`${
+              active > 3
+                ? '800px:w-[70px] h-[4px] w-[30px] !bg-[#f63b60]'
+                : '800px:w-[70px] h-[4px] w-[30px] !bg-[#FDE1E6]'
+            }`}
+          />
+
+          {/* 세 번째 단계 버튼 */}
+          <div
+            className={`${
+              active > 2 ? `${styles.cart_button}` : `${styles.cart_button} !bg-[#FDE1E6]`
+            }`}
+          >
+            {/* 세 번째 단계 텍스트 */}
+            <span
+              className={`${
+                active > 2
+                  ? `${styles.cart_button_text}`
+                  : `${styles.cart_button_text} !text-[#f63b60]`
+              }`}
+            >
+              3.Success
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default CheckoutSteps
+```
+
+```jsx
+CheckoutSteps 컴포넌트는 주문 진행 단계를 표시하는 UI를 생성한다.
+
+active prop은 현재 활성화된 단계를 나타낸다.
+
+각 단계는 버튼과 표시 바로 나누어져 있다.
+
+각 버튼은 해당 단계를 나타내며, active prop에 따라 색상이 변경된다.
+
+각 표시 바는 현재 진행 중인 단계까지의 진행을 시각적으로 나타낸다.
+
+( 결제하기로 다음 단계로 넘어가면 그 페이지에서는 active 가 2 또는 3으로 변해서 진행 단계가 변하게 된다 )
+```

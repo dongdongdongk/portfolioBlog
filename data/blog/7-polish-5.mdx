@@ -1,0 +1,138 @@
+---
+title: '섹션 7: Polish - 5'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+# { 🗺️ 맵의 어두운 부분(Fog of War) 구현 정리 }
+
+## 구현 개요
+
+맵에서 보이지 않는 영역(어두운 부분)을 GameObject들을 숨김/표시하는 방식으로 구현했습니다. 특정 조건(유닛 이동, 문 열기)이 충족되면 숨겨진 오브젝트들이 나타나거나 사라지는 시스템입니다.
+
+---
+
+## 핵심 구현 방법
+
+### 1. 숨길 오브젝트 그룹 설정
+
+```csharp
+// LevelScripting 클래스에서 관리
+[SerializeField] private List<GameObject> hider1List;  // 첫 번째 구역을 가리는 오브젝트들
+[SerializeField] private List<GameObject> hider2List;  // 두 번째 구역을 가리는 오브젝트들
+[SerializeField] private List<GameObject> hider3List;  // 세 번째 구역을 가리는 오브젝트들
+[SerializeField] private List<GameObject> enemy1List;  // 첫 번째 적 그룹
+[SerializeField] private List<GameObject> enemy2List;  // 두 번째 적 그룹
+
+```
+
+### 2. 이벤트 기반 트리거 설정
+
+```csharp
+private void Start()
+{
+    // 유닛이 이동할 때마다 체크
+    LevelGrid.Instance.OnAnyUnitMovedGridPosition += LevelGrid_OnAnyUnitMovedGridPosition;
+
+    // door1이 열리면 hider2List 숨기기
+    door1.OnDoorOpened += (object sender, EventArgs e) =>
+    {
+        SetActiveGameObjectList(hider2List, false);
+    };
+
+    // door2가 열리면 hider3List 숨기고 enemy2List 표시
+    door2.OnDoorOpened += (object sender, EventArgs e) =>
+    {
+        SetActiveGameObjectList(hider3List, false);
+        SetActiveGameObjectList(enemy2List, true);
+    };
+}
+
+```
+
+### 3. 위치 기반 트리거
+
+```csharp
+private void LevelGrid_OnAnyUnitMovedGridPosition(object sender, LevelGrid.OnAnyUnitMovedGridPositionEventArgs e)
+{
+    // 유닛이 z=5 위치에 도달하면 첫 번째 구역 공개
+    if (e.toGridPosition.z == 5 && !hasShownFirstHider)
+    {
+        hasShownFirstHider = true;
+        SetActiveGameObjectList(hider1List, false);  // 가림막 제거
+        SetActiveGameObjectList(enemy1List, true);   // 적 표시
+    }
+}
+
+```
+
+### 4. 오브젝트 활성화/비활성화 헬퍼 메서드
+
+```csharp
+private void SetActiveGameObjectList(List<GameObject> gameObjectList, bool isActive)
+{
+    foreach (GameObject gameObject in gameObjectList)
+    {
+        gameObject.SetActive(isActive);  // 각 오브젝트를 켜거나 끄기
+    }
+}
+
+```
+
+---
+
+## 구현 단계별 정리
+
+### 단계 1: 가림막 오브젝트 준비
+
+1. Unity에서 Cube나 Plane으로 어두운 영역을 가릴 오브젝트 생성
+2. 검은색 또는 어두운 재질 적용
+3. 여러 개를 하나의 그룹으로 묶기 (hider1, hider2, hider3 등)
+
+### 단계 2: LevelScripting 스크립트 설정
+
+1. `LevelScripting` 스크립트를 빈 GameObject에 추가
+2. Inspector에서 가림막 오브젝트들을 각 List에 할당
+3. 트리거할 Door 오브젝트들도 할당
+
+### 단계 3: 이벤트 연결
+
+1. `LevelGrid.OnAnyUnitMovedGridPosition` 이벤트 구독
+2. `Door.OnDoorOpened` 이벤트 구독
+3. 조건에 따라 오브젝트 활성화/비활성화
+
+### 단계 4: 조건 설정
+
+- **위치 기반**: 특정 GridPosition 도달 시
+- **상호작용 기반**: Door가 열릴 때
+- **일회성 체크**: `hasShownFirstHider` 같은 bool 플래그 사용
+
+---
+
+## 핵심 포인트
+
+1. **이벤트 시스템 활용**: LevelGrid와 Door의 이벤트를 활용해 느슨한 결합 유지
+2. **List 관리**: GameObject를 그룹으로 관리해서 일괄 제어
+3. **플래그 사용**: 한 번만 실행되어야 하는 로직은 bool 변수로 제어
+4. **SetActive 메서드**: Unity의 기본 기능으로 간단하게 표시/숨김 처리
+
+---
+
+## 다른 프로젝트 적용 시 체크리스트
+
+✅ 가림막용 GameObject 준비
+
+✅ LevelScripting 같은 관리 스크립트 생성
+
+✅ SerializeField List 선언 및 Inspector 할당
+
+✅ 트리거 조건 결정 (위치? 상호작용? 시간?)
+
+✅ 이벤트 구독 및 핸들러 작성
+
+✅ SetActive 호출로 표시/숨김 처리
+
+✅ 중복 실행 방지용 플래그 추가

@@ -1,0 +1,1523 @@
+---
+title: '섹션 5: Shooter Sam - 4'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# 총 쏘기 입력 설정하기
+
+## 🎯 이번에 만들 것
+
+마우스 **왼쪽 버튼**을 누르면 총을 쏘는 기능입니다!
+
+아직 실제로 총알이 발사되지는 않고, **버튼을 눌렀는지 감지**하는 것까지만 만듭니다.
+
+```
+마우스 클릭! → "Shoot!" 메시지 출력
+```
+
+---
+
+## 🧩 전체 과정 (큰 그림)
+
+언리얼에서 입력을 만드는 3단계:
+
+```
+1단계: Input Action 만들기
+   ↓  (무엇을 할 건지 정의)
+
+2단계: Mapping Context에 연결
+   ↓  (어떤 버튼으로 할 건지)
+
+3단계: C++ 함수에 연결
+   ↓  (실제 동작 구현)
+```
+
+---
+
+## 📝 Step 1: Input Action 만들기
+
+### Input Action이 뭔가요?
+
+**"이런 동작을 할 거야"** 라고 선언하는 것입니다.
+
+예시:
+
+- 점프하기
+- 달리기
+- **총 쏘기** ← 우리가 만들 것
+
+### 어떻게 만들어요?
+
+**Content Browser에서:**
+
+```
+1. Input 폴더 찾기
+2. 우클릭 → Input → Input Action
+3. 이름: "IA_Shoot" (Input Action_Shoot)
+4. 더블클릭해서 열기
+```
+
+### 설정하기
+
+**아무것도 안 해도 됩니다!** ✅
+
+```
+Value Type: Boolean (기본값)
+```
+
+**왜 Boolean이에요?**
+
+- 총을 쏘거나 / 안 쏘거나
+- True(참) / False(거짓)
+- 중간값이 필요 없음
+
+**다른 타입 예시:**
+
+- Float: 자동차 가속 (0~100%)
+- Vector2D: 캐릭터 이동 (앞/뒤/좌/우)
+- Vector3D: 비행 (위/아래 포함)
+
+---
+
+## 🎮 Step 2: Mapping Context에 연결
+
+### Mapping Context가 뭔가요?
+
+**"어떤 버튼을 누르면 동작할까?"** 를 정하는 것입니다.
+
+```
+IA_Shoot → 마우스 왼쪽 버튼
+IA_Shoot → 게임패드 X버튼
+```
+
+### 설정하기
+
+**IMC_Default (Input Mapping Context) 열기**
+
+```
+1. Mappings 섹션에서 "+" 클릭
+2. Action: "IA_Shoot" 선택
+3. Key: "Left Mouse Button" 선택
+```
+
+**게임패드도 추가하기 (선택사항)**
+
+```
+1. 같은 IA_Shoot에 "+" 클릭 (매핑 추가)
+2. Key: "Gamepad Face Button Bottom" (X버튼)
+```
+
+**결과:**
+
+```
+IA_Shoot
+  ├─ Left Mouse Button (마우스)
+  └─ Gamepad X (게임패드)
+```
+
+**저장하기!** 💾
+
+---
+
+## 💻 Step 3: C++ 함수 만들기
+
+이제 실제로 **총을 쏘는 함수**를 만들 차례입니다.
+
+### 3-1: 헤더 파일 (.h)
+
+**ShooterSamCharacter.h** 열기
+
+**Input Action 변수 추가:**
+
+```cpp
+// 다른 Input Action들 아래에 추가
+UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input)
+class UInputAction* ShootAction;
+```
+
+**총 쏘는 함수 선언:**
+
+```cpp
+// 다른 함수들 아래에 추가 (public: 섹션에)
+void Shoot();
+```
+
+---
+
+### 3-2: 구현 파일 (.cpp)
+
+**ShooterSamCharacter.cpp** 열기
+
+**Step A: 함수 구현하기**
+
+파일 맨 아래에 추가:
+
+```cpp
+void AShooterSamCharacter::Shoot()
+{
+    // 일단 메시지만 출력 (테스트용)
+    UE_LOG(LogTemp, Display, TEXT("Shoot!"));
+}
+```
+
+**코드 설명:**
+
+- `UE_LOG` = 언리얼 로그 시스템
+- `LogTemp` = 임시 로그 카테고리
+- `Display` = 일반 정보 레벨
+- `TEXT("Shoot!")` = 출력할 메시지
+
+---
+
+**Step B: 입력과 함수 연결하기**
+
+`SetupPlayerInputComponent` 함수 안에서:
+
+```cpp
+void AShooterSamCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+    if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+    {
+        // Jumping (기존 코드)
+        EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
+
+        // 다른 입력들...
+
+        // ===== 여기에 추가! =====
+        EnhancedInputComponent->BindAction(ShootAction, ETriggerEvent::Started, this, &AShooterSamCharacter::Shoot);
+    }
+}
+```
+
+**코드 한 줄씩 이해:**
+
+```cpp
+BindAction(ShootAction, ETriggerEvent::Started, this, &AShooterSamCharacter::Shoot);
+```
+
+1. `ShootAction` = 어떤 입력?
+2. `ETriggerEvent::Started` = 언제? → **버튼을 누르는 순간**
+3. `this` = 누가? → 이 캐릭터
+4. `&AShooterSamCharacter::Shoot` = 무엇을? → Shoot 함수 실행
+
+---
+
+### Trigger Event 종류
+
+```cpp
+ETriggerEvent::Started   // 버튼 누르는 순간 (1번만)
+ETriggerEvent::Triggered // 버튼 누르고 있는 동안 (계속)
+ETriggerEvent::Completed // 버튼 떼는 순간 (1번만)
+```
+
+**총 쏘기는 Started가 적합합니다!**
+
+- 한 번 누르면 한 발만 발사
+- Triggered 쓰면? → 연사됨 (나중에 기관총 만들 때 사용)
+
+---
+
+## 🔗 Step 4: 블루프린트에서 연결
+
+C++ 코드만으로는 부족합니다. **어떤 Input Action을 쓸지** 블루프린트에서 지정해야 해요!
+
+### 설정 방법
+
+**Content Browser에서:**
+
+```
+1. "BP_ShooterSamCharacter" 찾기
+2. 더블클릭해서 열기
+3. Details 패널에서 검색: "Shoot Action"
+4. 드롭다운 클릭 → "IA_Shoot" 선택
+5. Compile & Save
+```
+
+**왜 이렇게 해야 하나요?**
+
+C++에서는:
+
+```cpp
+UInputAction* ShootAction;  // 빈 변수만 선언
+```
+
+블루프린트에서:
+
+```
+ShootAction = IA_Shoot  // 실제 에셋 연결!
+```
+
+---
+
+## ✅ 테스트하기
+
+### 1. 컴파일하기
+
+```
+Visual Studio: Ctrl + Shift + B (빌드)
+```
+
+### 2. 언리얼 에디터로 돌아가기
+
+### 3. Play 버튼 누르기
+
+### 4. 마우스 왼쪽 버튼 클릭!
+
+### 5. 결과 확인
+
+**화면 왼쪽 위에 "Shoot!" 메시지가 보이면 성공!** 🎉
+
+```
+왼쪽 버튼 클릭 → "Shoot!" 출력
+다시 클릭 → "Shoot!" 출력
+```
+
+---
+
+## 🐛 문제 해결
+
+### "Shoot!" 메시지가 안 나와요!
+
+**체크리스트:**
+
+1. **Input Action 만들었나요?**
+   - IA_Shoot 에셋 확인
+2. **Mapping Context에 추가했나요?**
+   - IMC_Default 열어서 확인
+3. **C++ 컴파일했나요?**
+   - Visual Studio에서 빌드 성공 확인
+4. **블루프린트 설정했나요?**
+   - BP_ShooterSamCharacter → Shoot Action = IA_Shoot
+5. **로그가 안 보이나요?**
+   - `~` (물결표) 눌러서 콘솔 열기
+   - 또는 Output Log 창 확인
+
+**Live Coding으로 빠르게 적용:**
+
+```
+Ctrl + Alt + F11 (언리얼 에디터에서)
+```
+
+---
+
+## 📚 핵심 개념 정리
+
+### Input Action
+
+"무엇을 할 건지" 정의
+
+- IA_Shoot = 총 쏘기
+
+### Mapping Context
+
+"어떤 버튼으로 할 건지" 정의
+
+- 마우스 왼쪽 버튼 = IA_Shoot
+- 게임패드 X버튼 = IA_Shoot
+
+### BindAction
+
+입력과 함수를 연결
+
+```
+입력(ShootAction) → 함수(Shoot)
+```
+
+### Trigger Event
+
+언제 실행할지 정의
+
+- Started = 누르는 순간
+- Triggered = 누르는 동안
+- Completed = 떼는 순간
+
+---
+
+## 🎯 지금까지 한 일
+
+```
+[입력 감지 시스템 완성!]
+
+마우스 클릭
+    ↓
+Input Action (IA_Shoot)
+    ↓
+Mapping Context (Left Mouse Button)
+    ↓
+BindAction (연결)
+    ↓
+Shoot() 함수 실행
+    ↓
+"Shoot!" 메시지 출력
+```
+
+---
+
+# { 총(Gun) 액터 만들기 }
+
+## 🎯 이번에 만들 것
+
+플레이어가 **손에 들고 쏠 수 있는 총** 을 만듭니다!
+
+지금은 총 모델만 만들고, 나중에 캐릭터 손에 붙일 예정입니다.
+
+---
+
+## 🤔 왜 총을 따로 만드나요?
+
+### 방법 1: 캐릭터 모델에 총이 붙어있음 ❌
+
+```
+캐릭터 메시
+  └─ 손
+      └─ 총 (고정됨)
+```
+
+**단점:**
+
+- 총 한 개만 가능
+- 무기 교체 불가능
+- 총마다 캐릭터를 새로 만들어야 함
+
+### 방법 2: 총을 별도 액터로 만듦 ✅
+
+```
+캐릭터
+  └─ 손 소켓
+      └─ 총 액터 (교체 가능)
+          ├─ 소총
+          ├─ 샷건
+          └─ 런처
+```
+
+**장점:**
+
+- 무기 여러 개 만들 수 있음
+- 무기 교체 가능
+- 각 무기마다 독립적인 기능
+
+**이 방법을 사용합니다!** 🎯
+
+---
+
+## 🏗️ 총의 구조 설계
+
+### 컴포넌트 계층
+
+```
+AGun (액터)
+  └─ SceneRoot (씬 컴포넌트) ← 루트
+      └─ Mesh (스켈레탈 메시) ← 총 모델
+```
+
+### 왜 이렇게 만드나요?
+
+**SceneRoot를 중간에 두는 이유:**
+
+```
+방법 1: Mesh를 바로 루트로
+Mesh (루트)
+  └─ 위치 조정이 어려움
+
+방법 2: SceneRoot를 루트로 (우리 방법)
+SceneRoot (루트) ← 이걸 손에 붙임
+  └─ Mesh ← 이걸 조정해서 정렬
+```
+
+**비유:**
+
+- SceneRoot = 손잡이
+- Mesh = 실제 총
+
+손잡이(SceneRoot)를 손에 붙이고, 총(Mesh)의 위치를 조정하면 정렬이 쉬워집니다!
+
+---
+
+## 📝 Step 1: C++ 총 클래스 만들기
+
+### 1-1: 새 C++ 클래스 생성
+
+**언리얼 에디터:**
+
+```
+Tools → New C++ Class
+→ Actor 선택
+→ 이름: "Gun"
+→ Create Class
+```
+
+---
+
+### 1-2: 헤더 파일 작성 (Gun.h)
+
+```cpp
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameFramework/Actor.h"
+#include "Gun.generated.h"
+
+UCLASS()
+class SHOOTERSAM_API AGun : public AActor
+{
+    GENERATED_BODY()
+
+public:
+    AGun();
+
+    // ===== 컴포넌트 =====
+
+    // 루트 컴포넌트 (빈 씬)
+    UPROPERTY(VisibleAnywhere)
+    USceneComponent* SceneRoot;
+
+    // 총 모델
+    UPROPERTY(VisibleAnywhere)
+    USkeletalMeshComponent* Mesh;
+
+    // ===== 함수 =====
+
+    // 총 쏘기 함수
+    void PullTrigger();
+};
+```
+
+**코드 설명:**
+
+**SceneRoot (씬 컴포넌트)**
+
+```cpp
+USceneComponent* SceneRoot;
+```
+
+- 빈 컴포넌트 (보이지 않음)
+- 위치/회전/크기만 가짐
+- 다른 컴포넌트들의 부모 역할
+
+**Mesh (스켈레탈 메시)**
+
+```cpp
+USkeletalMeshComponent* Mesh;
+```
+
+- 실제 총 모델
+- 스켈레탈 메시 = 뼈대가 있는 모델
+- 애니메이션 가능 (장전, 발사 등)
+
+**PullTrigger (방아쇠 당기기)**
+
+```cpp
+void PullTrigger();
+```
+
+- 나중에 총을 쏠 때 호출할 함수
+- 지금은 테스트용 메시지만
+
+---
+
+### 1-3: 구현 파일 작성 (Gun.cpp)
+
+**생성자에서 컴포넌트 만들기:**
+
+```cpp
+#include "Gun.h"
+
+AGun::AGun()
+{
+    PrimaryActorTick.bCanEverTick = true;
+
+    // 1단계: SceneRoot 만들기
+    SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("Scene Root"));
+    SetRootComponent(SceneRoot);  // 루트로 설정!
+
+    // 2단계: Mesh 만들기
+    Mesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Mesh"));
+    Mesh->SetupAttachment(SceneRoot);  // SceneRoot에 붙이기!
+}
+```
+
+**한 줄씩 이해하기:**
+
+```cpp
+SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("Scene Root"));
+```
+
+- `CreateDefaultSubobject` = 컴포넌트 생성
+- `<USceneComponent>` = 씬 컴포넌트 타입
+- `TEXT("Scene Root")` = 에디터에서 보일 이름
+
+```cpp
+SetRootComponent(SceneRoot);
+```
+
+- 이 컴포넌트를 액터의 **루트(뿌리)** 로 만듦
+- 모든 것의 기준점이 됨
+
+```cpp
+Mesh->SetupAttachment(SceneRoot);
+```
+
+- Mesh를 SceneRoot의 **자식**으로 붙임
+- SceneRoot가 움직이면 Mesh도 따라감
+
+---
+
+**PullTrigger 함수 구현:**
+
+```cpp
+void AGun::PullTrigger()
+{
+    // 테스트용: "Bang" 메시지 출력
+    UE_LOG(LogTemp, Display, TEXT("Bang"));
+}
+```
+
+지금은 메시지만 출력하지만, 나중에 여기서:
+
+- 총알 발사
+- 사운드 재생
+- 이펙트 생성
+
+등을 구현할 예정입니다.
+
+---
+
+## 🎨 Step 2: 블루프린트 만들기
+
+C++ 클래스만으로는 게임에서 못 써요. **블루프린트**를 만들어야 합니다!
+
+### 2-1: 총 메시 찾기
+
+**Content Browser:**
+
+```
+ShooterGame 폴더
+  → Weapons
+  → SK_Rifle (스켈레탈 메시)
+```
+
+**스켈레탈 메시 vs 스태틱 메시:**
+
+```
+스태틱 메시 (Static Mesh)
+  - 움직이지 않는 모델
+  - 예: 바위, 건물, 상자
+  - 가벼움
+
+스켈레탈 메시 (Skeletal Mesh)
+  - 뼈대(Skeleton)가 있는 모델
+  - 애니메이션 가능
+  - 예: 캐릭터, 무기(장전 등)
+  - 조금 무거움
+```
+
+이 프로젝트에서는 총이 **스켈레탈 메시**로 되어있어요.
+
+---
+
+### 2-2: 블루프린트 생성
+
+**Content Browser → My Stuff:**
+
+```
+1. 우클릭 → Blueprint Class
+2. 부모 클래스: "Gun" 선택 (방금 만든 C++ 클래스)
+3. 이름: "BP_Rifle"
+4. 더블클릭해서 열기
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380657/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_4/image.png)
+
+**이름 짓기 팁:**
+
+- BP_Rifle (소총)
+- BP_Shotgun (샷건)
+- BP_Launcher (런처)
+
+무기 종류마다 다른 블루프린트를 만들 수 있어요!
+
+---
+
+### 2-3: 총 모델 설정
+
+**블루프린트 에디터에서:**
+
+```
+1. Components 패널에서 "Mesh" 선택
+2. Details 패널에서:
+   - Skeletal Mesh Asset
+   - 드롭다운 클릭
+   - "SK_Rifle" 선택
+```
+
+**화면에 총이 보이면 성공!** ✅
+
+---
+
+### 2-4: 컴포넌트 구조 확인
+
+**Components 패널:**
+
+```
+BP_Rifle (Self)
+  └─ SceneRoot (Scene Component)
+      └─ Mesh (Skeletal Mesh)  ← 총 모델 보임
+```
+
+**SceneRoot 선택해서 움직여보기:**
+
+- 위치 툴(W): 총 전체가 움직임
+- 회전 툴(E): 총 전체가 회전
+
+**Mesh 선택해서 움직여보기:**
+
+- SceneRoot는 제자리
+- Mesh만 움직임
+
+**이게 바로 SceneRoot를 만든 이유입니다!**
+
+나중에 손에 붙일 때:
+
+1. SceneRoot를 손 소켓에 붙임
+2. Mesh 위치를 조정해서 정렬
+
+## 📚 핵심 개념 정리
+
+### Actor (액터)
+
+게임에 배치할 수 있는 모든 오브젝트
+
+- 총, 캐릭터, 문, 상자 등
+
+### Component (컴포넌트)
+
+액터를 구성하는 부품
+
+- 메시, 라이트, 사운드 등
+
+### Scene Component
+
+위치/회전/크기 정보만 있는 빈 컴포넌트
+
+- 다른 컴포넌트들의 부모 역할
+- 눈에 보이지 않음
+
+### Skeletal Mesh Component
+
+뼈대가 있는 3D 모델
+
+- 애니메이션 가능
+- 캐릭터, 동물, 움직이는 물체
+
+### Root Component
+
+액터의 최상위 컴포넌트
+
+- 액터의 위치 = 루트 컴포넌트의 위치
+- 모든 자식 컴포넌트의 기준점
+
+---
+
+## 🎯 지금까지 만든 것
+
+```
+[총 액터 완성!]
+
+C++ Gun 클래스
+  ├─ SceneRoot (루트)
+  ├─ Mesh (총 모델)
+  └─ PullTrigger() (쏘기 함수)
+      ↓
+BP_Rifle 블루프린트
+  ├─ Mesh에 SK_Rifle 설정
+  └─ 게임에서 사용 준비 완료!
+```
+
+---
+
+## 💡 왜 이렇게 복잡하게 만드나요?
+
+### 간단한 방법 (안 좋음)
+
+```
+캐릭터에 총을 직접 그림
+→ 총 바꾸려면 캐릭터 전체 수정
+```
+
+### 우리 방법 (좋음)
+
+```
+총 = 독립적인 액터
+→ 총만 바꾸면 됨
+→ 여러 캐릭터가 같은 총 사용 가능
+→ 총만 수정하면 모든 곳에 반영
+```
+
+**프로그래밍 원칙: 모듈화**
+
+- 기능을 독립적으로 만들기
+- 재사용 가능하게 만들기
+- 유지보수 쉽게 만들기
+
+---
+
+## 🎓 보너스: 실전 팁
+
+### 다른 무기 추가하는 법
+
+**1단계: 새 블루프린트 만들기**
+
+```
+BP_Rifle 복사
+→ BP_Shotgun으로 이름 변경
+```
+
+**2단계: 메시만 바꾸기**
+
+```
+Mesh → SK_Shotgun 선택
+```
+
+**3단계: 완성!**
+
+- 코드 수정 필요 없음
+- 블루프린트만 바꾸면 됨
+
+### 총마다 다른 기능 추가하려면?
+
+**PullTrigger 함수를 블루프린트에서 Override:**
+
+```
+BP_Rifle → PullTrigger
+  → 단발 사격
+
+BP_Shotgun → PullTrigger
+  → 산탄 발사
+
+BP_MachineGun → PullTrigger
+  → 연사
+```
+
+---
+
+# { 캐릭터가 총 생성하기 }
+
+## 🎯 이번에 할 것
+
+캐릭터가 게임 시작하면 **자동으로 총을 만들어서** 들고 있게 만듭니다!
+
+```
+게임 시작
+    ↓
+캐릭터 BeginPlay 실행
+    ↓
+총 스폰!
+    ↓
+마우스 클릭 → 총 발사!
+```
+
+---
+
+## 🧩 전체 흐름 (큰 그림)
+
+```
+1. 캐릭터에 총 변수 추가
+2. BeginPlay에서 총 생성
+3. Shoot 함수에서 총의 PullTrigger 호출
+```
+
+**비유:**
+
+- 게임 시작 = 배우 등장
+- BeginPlay = 배우가 소품(총) 준비
+- Shoot 함수 = 배우가 소품 사용
+
+---
+
+## 📝 Step 1: 헤더 파일 준비 (ShooterSamCharacter.h)
+
+### 1-1: Gun 클래스 include
+
+```cpp
+#include "Gun.h"  // 총 클래스 사용하기 위해
+```
+
+**왜 필요한가요?**
+
+- 다른 클래스를 사용하려면 include 필수
+- Gun 클래스의 정보를 알려줘야 함
+
+---
+
+### 1-2: 총 관련 변수 추가
+
+```cpp
+UCLASS()
+class AShooterSamCharacter : public ACharacter
+{
+    // ... 기존 코드 ...
+
+    // ===== 총 관련 변수 =====
+
+    // 어떤 총을 만들지 (블루프린트에서 설정)
+    UPROPERTY(EditAnywhere)
+    TSubclassOf<AGun> GunClass;
+
+    // 실제로 생성된 총
+    UPROPERTY()
+    AGun* Gun;
+};
+```
+
+**코드 설명:**
+
+**GunClass - 총 청사진 지정용**
+
+```cpp
+TSubclassOf<AGun> GunClass;
+```
+
+- `TSubclassOf<AGun>` = AGun 타입의 클래스를 담는 변수
+- 블루프린트(BP_Rifle)를 여기에 지정
+- `EditAnywhere` = 에디터에서 수정 가능
+
+**비유:**
+
+```
+GunClass = 설계도
+"어떤 총을 만들까?" → BP_Rifle 선택
+```
+
+**Gun - 생성된 총 보관용**
+
+```cpp
+AGun* Gun;
+```
+
+- 실제로 만들어진 총 객체를 가리키는 포인터
+- 게임 중에 총을 제어할 때 사용
+
+**비유:**
+
+```
+Gun = 실제 물건
+게임에서 생성된 총을 여기에 보관
+```
+
+---
+
+### 1-3: BeginPlay 함수 선언 추가
+
+```cpp
+protected:
+    virtual void BeginPlay() override;
+```
+
+**BeginPlay가 뭔가요?**
+
+게임이 시작될 때 **딱 한 번** 자동으로 실행되는 함수입니다.
+
+```
+게임 시작
+    ↓
+BeginPlay 실행 (자동)
+    ↓
+게임 진행
+```
+
+**사용 예시:**
+
+- 무기 준비
+- 체력 초기화
+- UI 생성
+- 등등...
+
+---
+
+## 💻 Step 2: 구현 파일 작성 (ShooterSamCharacter.cpp)
+
+### 2-1: BeginPlay 함수 구현
+
+```cpp
+void AShooterSamCharacter::BeginPlay()
+{
+    Super::BeginPlay();  // 부모 클래스의 BeginPlay도 실행
+
+    // 1단계: 총 생성
+    Gun = GetWorld()->SpawnActor<AGun>(GunClass);
+
+    // 2단계: 총이 제대로 만들어졌는지 확인
+    if (Gun)
+    {
+        // 3단계: 총의 주인을 이 캐릭터로 설정
+        Gun->SetOwner(this);
+    }
+}
+```
+
+**한 줄씩 완벽 이해하기:**
+
+---
+
+**Step 1: Super::BeginPlay()**
+
+```cpp
+Super::BeginPlay();
+```
+
+- `Super` = 부모 클래스 (ACharacter)
+- 부모의 BeginPlay도 실행해야 함
+- **항상 맨 처음에 호출!**
+
+**왜 필요한가요?**
+
+```
+부모 클래스(ACharacter)
+  └─ 캐릭터 초기화 작업들
+
+자식 클래스(ShooterSamCharacter)
+  └─ 우리가 추가한 작업들
+
+Super::BeginPlay() 안 하면?
+→ 캐릭터 기본 초기화가 안 됨!
+```
+
+---
+
+**Step 2: SpawnActor로 총 생성**
+
+```cpp
+Gun = GetWorld()->SpawnActor<AGun>(GunClass);
+```
+
+**부분별로 쪼개기:**
+
+```cpp
+GetWorld()
+```
+
+- 현재 게임 월드(레벨) 가져오기
+- 모든 액터가 살아가는 공간
+
+```cpp
+->SpawnActor<AGun>
+```
+
+- 월드에 액터 생성하는 함수
+- `<AGun>` = 어떤 타입인지 명시
+
+```cpp
+(GunClass)
+```
+
+- 어떤 블루프린트로 만들지
+- BP_Rifle이 지정되어 있음
+
+**전체 의미:**
+
+```
+"현재 월드에 AGun 타입의 액터를
+ GunClass(BP_Rifle) 블루프린트로 만들어줘!"
+```
+
+**반환값:**
+
+```cpp
+Gun = ...
+```
+
+- 생성된 총을 Gun 변수에 저장
+- 나중에 이 총을 제어할 수 있음
+
+---
+
+**Step 3: 총 주인 설정**
+
+```cpp
+if (Gun)
+{
+    Gun->SetOwner(this);
+}
+```
+
+**if (Gun) 체크하는 이유:**
+
+```cpp
+// 만약 총 생성 실패하면?
+Gun = nullptr  // Gun이 null
+
+// null 포인터로 함수 호출하면?
+Gun->SetOwner(this);  // 💥 게임 크래시!
+
+// 그래서 체크 필수!
+if (Gun)  // Gun이 유효한지 확인
+{
+    Gun->SetOwner(this);  // 안전하게 호출
+}
+```
+
+**SetOwner(this)의 의미:**
+
+```cpp
+Gun->SetOwner(this);
+```
+
+- `SetOwner` = 주인 지정하기
+- `this` = 이 캐릭터 자신
+
+**왜 주인을 설정하나요?**
+
+총이 나중에 주인을 알아야 할 때가 많아요:
+
+```cpp
+// 총 클래스에서:
+AGun::PullTrigger()
+{
+    // 누가 쏘는지 알아야 함
+    ACharacter* Shooter = Cast<ACharacter>(GetOwner());
+
+    // 주인의 체력 확인
+    // 주인의 위치 확인
+    // 등등...
+}
+```
+
+**비유:**
+
+```
+총 = 도구
+주인 = 도구를 사용하는 사람
+
+"이 총은 이 캐릭터 것입니다" 라고 표시
+```
+
+---
+
+### 2-2: Shoot 함수 수정
+
+```cpp
+void AShooterSamCharacter::Shoot()
+{
+    if (Gun)
+    {
+        Gun->PullTrigger();
+    }
+}
+```
+
+**기존 코드:**
+
+```cpp
+void AShooterSamCharacter::Shoot()
+{
+    UE_LOG(LogTemp, Display, TEXT("Shoot!"));
+}
+```
+
+**새 코드:**
+
+```cpp
+void AShooterSamCharacter::Shoot()
+{
+    if (Gun)  // 총이 있으면
+    {
+        Gun->PullTrigger();  // 총의 방아쇠 당기기
+    }
+}
+```
+
+**흐름:**
+
+```
+마우스 클릭
+    ↓
+Shoot() 호출
+    ↓
+Gun이 있는지 확인
+    ↓
+Gun->PullTrigger() 호출
+    ↓
+"Bang!" 메시지 출력
+```
+
+---
+
+### if 문 단축 형태 (보너스 설명)
+
+**일반적인 형태:**
+
+```cpp
+if (Gun)
+{
+    Gun->PullTrigger();
+}
+```
+
+**단축 형태 1:**
+
+```cpp
+if (Gun)
+    Gun->PullTrigger();  // 중괄호 생략
+```
+
+**단축 형태 2:**
+
+```cpp
+if (Gun) Gun->PullTrigger();  // 한 줄로
+```
+
+**주의사항:**
+
+```cpp
+// ❌ 나쁜 예: 나중에 코드 추가하면 버그 발생
+if (Gun)
+    Gun->PullTrigger();
+    Gun->Reload();  // if 밖의 코드! (항상 실행됨)
+
+// ✅ 좋은 예: 항상 중괄호 사용
+if (Gun)
+{
+    Gun->PullTrigger();
+    Gun->Reload();  // if 안의 코드 (Gun 있을 때만 실행)
+}
+```
+
+**권장사항:**
+
+- 코드 1줄이어도 중괄호 쓰기
+- 나중에 유지보수하기 편함
+- 버그 예방
+
+---
+
+## 🔗 Step 3: 블루프린트 설정
+
+C++ 코드만으로는 부족합니다! **어떤 총을 만들지** 지정해야 해요.
+
+### 설정 방법
+
+**Content Browser:**
+
+```
+1. BP_ShooterSamCharacter 찾기
+2. 더블클릭해서 열기
+3. Details 패널에서 검색: "Gun Class"
+4. 드롭다운 클릭
+5. "BP_Rifle" 선택
+6. Compile & Save
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380656/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_4/image_1.png)
+
+**이제 완성!** ✅
+
+---
+
+## ✅ 테스트하기
+
+### 1. 컴파일
+
+```
+Visual Studio: Ctrl + Shift + B
+```
+
+### 2. Play 버튼
+
+### 3. F8 키 눌러서 캐릭터 벗어나기
+
+### 4. 월드 아웃라이너에서 "Gun" 찾기
+
+**총이 바닥에 놓여있으면 성공!** 🎉
+
+```
+위치: (0, 0, 0)
+이유: 위치를 지정 안 해서 월드 중심에 생성됨
+```
+
+**걱정 마세요!**
+
+- 다음 강의에서 손에 붙일 예정
+- 지금은 제대로 생성되는지만 확인
+
+---
+
+### 5. 총 쏘기 테스트
+
+**다시 게임 시작 (F8 해제)**
+
+**마우스 왼쪽 버튼 클릭**
+
+**화면에 "Bang!" 메시지 보이면 성공!** 🎉
+
+```
+클릭
+    ↓
+Shoot() 호출
+    ↓
+Gun->PullTrigger() 호출
+    ↓
+"Bang!" 출력
+```
+
+---
+
+## 📚 핵심 개념 정리
+
+### SpawnActor
+
+게임 월드에 액터를 생성하는 함수
+
+```cpp
+GetWorld()->SpawnActor<타입>(클래스);
+```
+
+### TSubclassOf
+
+클래스 타입을 담는 변수
+
+```cpp
+TSubclassOf<AGun> GunClass;  // Gun 계열 클래스만
+```
+
+### SetOwner
+
+액터의 주인을 지정
+
+```cpp
+Gun->SetOwner(this);  // 이 캐릭터가 주인
+```
+
+### BeginPlay
+
+게임 시작 시 자동 실행
+
+```cpp
+void BeginPlay() override
+{
+    Super::BeginPlay();  // 필수!
+    // 초기화 작업...
+}
+```
+
+### this 키워드
+
+현재 객체 자신을 가리킴
+
+```cpp
+Gun->SetOwner(this);  // "나(이 캐릭터)"
+```
+
+---
+
+## 🔍 SpawnActor 더 자세히
+
+### 기본 형태
+
+```cpp
+SpawnActor<타입>(클래스)
+```
+
+### 위치/회전 지정 (선택사항)
+
+```cpp
+FVector Location(100, 200, 300);
+FRotator Rotation(0, 90, 0);
+
+SpawnActor<AGun>(GunClass, Location, Rotation);
+```
+
+**우리가 안 쓴 이유:**
+
+- 어차피 손에 붙일 예정
+- 위치는 나중에 AttachToComponent로 설정
+
+---
+
+## 🎯 지금까지의 전체 흐름
+
+```
+[게임 시작부터 발사까지]
+
+1. 게임 시작
+    ↓
+2. BeginPlay 실행
+    ↓
+3. SpawnActor로 총 생성
+    ↓
+4. SetOwner로 주인 설정
+    ↓
+5. Gun 변수에 저장
+    ↓
+6. 플레이어가 마우스 클릭
+    ↓
+7. Shoot 함수 실행
+    ↓
+8. Gun->PullTrigger 호출
+    ↓
+9. "Bang!" 출력
+```
+
+---
+
+## 🚀 다음 단계
+
+**다음 강의에서:**
+
+1. **손 소켓 만들기**
+   - 캐릭터 메시에 소켓 추가
+   - 손 뼈대에 정확히 배치
+2. **총을 손에 붙이기**
+
+   ```cpp
+   Gun->AttachToComponent(
+       GetMesh(),
+       FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+       TEXT("WeaponSocket")
+   );
+   ```
+
+3. **결과:**
+
+   ```
+   총이 바닥에서 → 손으로 이동!
+   ```
+
+---
+
+## 💡 실전 팁
+
+### 여러 무기 시스템 만들기
+
+**방법 1: GunClass를 바꾸기**
+
+```cpp
+// BP_Character_Rifle
+GunClass = BP_Rifle
+
+// BP_Character_Shotgun
+GunClass = BP_Shotgun
+```
+
+**방법 2: 런타임에 바꾸기**
+
+```cpp
+void ChangeWeapon(TSubclassOf<AGun> NewGunClass)
+{
+    // 기존 총 제거
+    if (Gun)
+    {
+        Gun->Destroy();
+    }
+
+    // 새 총 생성
+    Gun = GetWorld()->SpawnActor<AGun>(NewGunClass);
+    Gun->SetOwner(this);
+}
+```
+
+---
+
+## 🐛 문제 해결
+
+### "Bang!" 메시지가 안 나와요!
+
+**체크리스트:**
+
+1. **총이 생성되었나요?**
+
+   ```
+   F8 → 아웃라이너에서 "Gun" 찾기
+   ```
+
+2. **GunClass 설정했나요?**
+
+   ```
+   BP_ShooterSamCharacter → Gun Class = BP_Rifle
+   ```
+
+3. **컴파일했나요?**
+
+   ```
+   Visual Studio에서 빌드 성공 확인
+   ```
+
+4. **Gun 포인터가 null인가요?**
+
+   ```cpp
+   // 디버그 로그 추가
+   if (Gun)
+   {
+       UE_LOG(LogTemp, Warning, TEXT("Gun exists!"));
+       Gun->PullTrigger();
+   }
+   else
+   {
+       UE_LOG(LogTemp, Error, TEXT("Gun is null!"));
+   }
+   ```
+
+---
+
+### 총이 생성 안 돼요!
+
+**가능한 원인:**
+
+1. **GunClass가 nullptr**
+   - 블루프린트에서 설정 안 함
+2. **BP_Rifle이 잘못됨**
+   - 메시 설정 확인
+   - 부모 클래스 확인 (Gun이어야 함)
+3. **월드가 null**
+   - BeginPlay가 너무 일찍 호출됨 (보통 아님)
+
+---
+
+## 🎓 보너스: Owner의 활용
+
+### Owner를 사용하는 예시
+
+```cpp
+// Gun.cpp
+void AGun::PullTrigger()
+{
+    // 주인이 누구인지 확인
+    AShooterSamCharacter* Shooter = Cast<AShooterSamCharacter>(GetOwner());
+
+    if (Shooter)
+    {
+        // 주인의 위치에서 발사
+        FVector ShootLocation = Shooter->GetActorLocation();
+
+        // 주인이 보는 방향으로 발사
+        FVector ShootDirection = Shooter->GetActorForwardVector();
+
+        // 총알 발사!
+    }
+}
+```
+
+### Owner가 없으면?
+
+```cpp
+// ❌ 나쁜 예
+void AGun::PullTrigger()
+{
+    // 누가 쏘는지 모름
+    // 어디서 쏘는지 모름
+    // 어느 방향으로 쏘는지 모름
+}
+```
+
+**그래서 SetOwner가 중요합니다!** 🎯
+
+---
+
+잘 따라오셨어요! 이제 총이 생성되고 발사도 됩니다!
+
+다음 강의에서는 총을 손에 붙여서 진짜 들고 있는 것처럼 만들어볼게요! 🎉
+
+**혹시 막히는 부분 있으면 언제든 질문하세요!**

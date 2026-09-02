@@ -1,0 +1,138 @@
+---
+title: 'BCh05 02 p241 파트3 더미데이터만들기'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# 테스트 코드 작성
+
+## 회원 테스트 코드
+
+```java
+회원이 없으면 일단 아무것도 시작할수가 없다
+
+이런걸 보고 "1차 도메인" 이라고 한다
+
+회원 도메인 부터 작성하도록 한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381221/notion-blog/_/_/_/_/BCh05_02_p241_3_/Untitled.png)
+
+## 회원 인서트 테스트
+
+```java
+@SpringBootTest
+public class MemberRepositoryTests {
+
+    @Autowired
+    private MemberRepository memberRepository;
+
+    @Test
+    public void insertMembers() {
+
+        IntStream.rangeClosed(1,100).forEach(i -> {
+            Member member = Member.builder()
+                    .email("user" + i + "@aaa.com")
+                    .password("123456")
+                    .name("USER" + i)
+                    .build();
+            memberRepository.save(member);
+        });
+
+    }
+}
+```
+
+```java
+회원 100명을 생성하는 테스트 코드를 실행한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381220/notion-blog/_/_/_/_/BCh05_02_p241_3_/Untitled_1.png)
+
+## 게시글 인서트 테스트
+
+```java
+@SpringBootTest
+public class BoardRepositoryTests {
+
+    @Autowired
+    private BoardRepository boardRepository;
+
+    @Test
+    public void insertBoards() {
+        IntStream.rangeClosed(1,100).forEach(i -> {
+            Member member = Member.builder().email("user" + i + "@aaa.com").build();
+
+            Board board = Board.builder()
+                    .title("Title..." + i)
+                    .content("Content..." + i)
+                    //pk writer 가 반드시 있어야 한다는걸 주의
+                    .writer(member)
+                    .build();
+            boardRepository.save(board);
+        });
+    }
+
+}
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381220/notion-blog/_/_/_/_/BCh05_02_p241_3_/Untitled_2.png)
+
+### 멤버가 쓴 게시글 테스트
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381221/notion-blog/_/_/_/_/BCh05_02_p241_3_/Untitled_3.png)
+
+```java
+간단하게 멤버가 쓴 게시글을 확인 가능한지 테스트 해보았다
+```
+
+## 댓글 임의 생성 테스트
+
+```java
+임의의 bno 번호를 만들고 300개 댓글을 등록한다
+```
+
+```java
+@SpringBootTest
+public class ReplyRepositoryTests {
+
+    @Autowired
+    private ReplyRepository replyRepository;
+
+    @Test
+    public void insertReply() {
+        IntStream.rangeClosed(1,300).forEach(i -> {
+            // 1 부터 100까지의 임의의 번호 0.0, 0.1, 0.2, 0.3, 1.5, 3.6, 5.7, 8.3 9.9 이런식으로 숫자 생성 x100 + 1
+            Long bno = (long)(Math.random() * 100) + 1; // (long) 으로 형변환 int 니까
+            Board board = Board.builder().bno(bno).build();
+            Reply reply = Reply.builder()
+                    .text("Reply....." + i)
+                    .board(board)
+                    .replyer("guest")
+                    .build();
+            replyRepository.save(reply);
+        });
+    }
+}
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381221/notion-blog/_/_/_/_/BCh05_02_p241_3_/Untitled_4.png)
+
+# 필요한 쿼리 기능 정의
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381221/notion-blog/_/_/_/_/BCh05_02_p241_3_/Untitled_5.png)
+
+```java
+화면을 보면 이미 여러개의 엔티티가 동시에 사용되고 있다
+
+게시글의 Board
+
+댓글의 Reply
+
+작성자의 Member
+
+이렇게 동시에 3개의 엔티티를 불러와서 사용해야한다
+```

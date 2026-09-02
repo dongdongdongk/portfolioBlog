@@ -1,0 +1,646 @@
+---
+title: 'Unity Lighting System  가이드'
+date: '2026-09-02'
+category: '게임 개발/유니티 개인 정리'
+tags: ['게임 개발', '유니티 개인 정리']
+draft: false
+summary: ''
+---
+
+# 🌟 Unity Lighting System 완전 정복 가이드
+
+이번 가이드는 Unity의 조명 시스템(Lighting System)을 완벽하게 이해하고, 손전등이 제대로 작동하지 않는 문제를 해결하는 방법을 다룹니다.
+
+---
+
+## 📋 목차
+
+1. [Unity 조명 시스템 3가지 방식](https://claude.ai/chat/7fdd1c0e-5f6f-4ef4-be01-f0bea8e6f402#1-unity-%EC%A1%B0%EB%AA%85-%EC%8B%9C%EC%8A%A4%ED%85%9C-3%EA%B0%80%EC%A7%80-%EB%B0%A9%EC%8B%9D)
+2. [Light Component 주요 옵션](https://claude.ai/chat/7fdd1c0e-5f6f-4ef4-be01-f0bea8e6f402#2-light-component-%EC%A3%BC%EC%9A%94-%EC%98%B5%EC%85%98)
+3. [Static 설정의 의미](https://claude.ai/chat/7fdd1c0e-5f6f-4ef4-be01-f0bea8e6f402#3-static-%EC%84%A4%EC%A0%95%EC%9D%98-%EC%9D%98%EB%AF%B8)
+4. [Lighting Window 핵심 설정](https://claude.ai/chat/7fdd1c0e-5f6f-4ef4-be01-f0bea8e6f402#4-lighting-window-%ED%95%B5%EC%8B%AC-%EC%84%A4%EC%A0%95)
+5. [손전등 문제 해결 3단계](https://claude.ai/chat/7fdd1c0e-5f6f-4ef4-be01-f0bea8e6f402#5-%EC%86%90%EC%A0%84%EB%93%B1-%EB%AC%B8%EC%A0%9C-%ED%95%B4%EA%B2%B0-3%EB%8B%A8%EA%B3%84)
+6. [호러 게임 추천 설정](https://claude.ai/chat/7fdd1c0e-5f6f-4ef4-be01-f0bea8e6f402#6-%ED%98%B8%EB%9F%AC-%EA%B2%8C%EC%9E%84-%EC%B6%94%EC%B2%9C-%EC%84%A4%EC%A0%95)
+
+---
+
+## 1. Unity 조명 시스템 3가지 방식
+
+### Realtime Lighting (실시간 조명)
+
+**개념:**
+게임 실행 중 매 프레임마다 빛을 계산하는 방식
+
+**장점:**
+
+- ✅ 빛이 즉시 반응 (손전등 켜면 바로 밝아짐)
+- ✅ 자유롭게 움직임
+
+**단점:**
+
+- ❌ 성능 부담 큼
+- ❌ 간접광 없음 (벽 반사 효과 없음)
+
+**사용 예시:**
+
+```
+손전등, 횃불, 폭발, 자동차 헤드라이트
+```
+
+---
+
+### Baked Lighting (구워진 조명)
+
+**개념:**
+개발 단계에서 미리 빛을 계산해서 이미지(Lightmap)로 저장하는 방식
+
+**장점:**
+
+- ✅ 성능 매우 가벼움
+- ✅ 간접광 표현 가능 (아름다운 조명)
+
+**단점:**
+
+- ❌ 완전히 고정됨 (빛 움직임 불가)
+- ❌ Dynamic 오브젝트는 제대로 못 받음
+
+**사용 예시:**
+
+```
+태양광, 천장 형광등, 가로등
+```
+
+---
+
+### Mixed Lighting (혼합 조명)
+
+**개념:**
+Static 오브젝트는 Baked, Dynamic 오브젝트는 Realtime으로 처리
+
+**장점:**
+
+- ✅ 성능과 품질의 균형
+- ✅ 손전등도 작동 + 간접광도 있음
+
+**추천 모드:**
+
+```
+Baked Indirect ← 호러 게임에 최적!
+  - 직접광: Realtime
+  - 간접광: Baked
+```
+
+---
+
+## 2. Light Component 주요 옵션
+
+Light를 선택하면 Inspector에 나타나는 옵션들:
+
+### Type (빛의 종류)
+
+**Directional Light**
+
+- 태양처럼 평행하게 내려오는 빛
+- 예시: 태양, 달
+
+**Spot Light**
+
+- 손전등처럼 원뿔 모양으로 퍼지는 빛
+- **예시: 손전등 (가장 중요!)** ⭐
+
+**Point Light**
+
+- 전구처럼 모든 방향으로 퍼지는 빛
+- 예시: 전구, 촛불
+
+**Area Light**
+
+- 면에서 나오는 빛 (Baked만 가능)
+- 예시: 창문, 패널
+
+---
+
+### Mode (조명 계산 방식) - 가장 중요!
+
+**Realtime**
+
+```
+매 프레임 계산
+→ 손전등은 반드시 이것!
+```
+
+**Mixed**
+
+```
+Static은 Baked + Realtime 둘 다
+Dynamic은 Realtime
+→ 천장 조명은 이것!
+```
+
+**Baked**
+
+```
+완전히 고정
+→ 절대 안 움직이는 조명만
+```
+
+---
+
+### Intensity (밝기)
+
+빛의 강도
+
+**권장 값:**
+
+```
+태양: 1~2
+천장 조명: 1~3
+손전등: 5~8
+폭발: 10~50
+```
+
+---
+
+### Range (범위) - Spot/Point만
+
+빛이 도달하는 최대 거리
+
+**권장 값:**
+
+```
+손전등: 20~30
+전구: 5~10
+가로등: 20~40
+```
+
+---
+
+### Spot Angle (각도) - Spot Light만
+
+빛이 퍼지는 각도
+
+**권장 값:**
+
+```
+좁은 손전등: 30~50°
+일반 손전등: 60~90°
+넓은 조명: 100~120°
+
+```
+
+---
+
+### Color (색상)
+
+빛의 색
+
+**예시:**
+
+```
+태양: 약간 노란색
+달/밤: 푸른색
+촛불: 주황색
+형광등: 차가운 흰색
+호러 분위기: 푸른 녹색
+
+```
+
+---
+
+### Shadow Type (그림자)
+
+**No Shadows**: 그림자 없음 (가장 가벼움)
+**Hard Shadows**: 선명한 그림자
+**Soft Shadows**: 부드러운 그림자 (권장, 현실적)
+
+---
+
+### Render Mode - Realtime만
+
+**Auto**: Unity가 자동 결정
+**Important**: 픽셀 단위 계산 (고품질, 손전등용)
+**Not Important**: Vertex 단위 계산 (저품질)
+
+---
+
+## 3. Static 설정의 의미
+
+### Static이란?
+
+**게임 중 절대 움직이지 않는 오브젝트를 표시하는 것**
+
+```
+Inspector 우측 상단:
+  Static ▼ 드롭다운
+
+```
+
+### Contribute GI (가장 중요!)
+
+```
+☑️ 체크: Lightmap 적용받음 (Baked Light 받음)
+☐ 해제: Lightmap 무시 (Realtime Light만 받음)
+
+```
+
+### 설정 예시
+
+**Static으로 설정:**
+
+```
+☑️ 벽, 바닥, 천장
+☑️ 책상, 캐비넷 (안 움직인다면)
+
+```
+
+**Non-Static으로 설정:**
+
+```
+☐ 플레이어
+☐ 문 (열고 닫힘)
+☐ 서랍 (열림)
+
+```
+
+---
+
+## 4. Lighting Window 핵심 설정
+
+### 열기
+
+```
+Window > Rendering > Lighting
+
+```
+
+### Scene 탭 핵심 옵션
+
+### Environment Lighting
+
+**Ambient Color**
+
+```
+기본 주변광 색상
+호러 게임: RGB(15, 18, 22) - 매우 어두운 푸른 회색
+
+```
+
+**Intensity Multiplier**
+
+```
+환경광 강도
+호러 게임: 0.3~0.5
+
+```
+
+---
+
+### Realtime Lighting
+
+**Realtime Global Illumination**
+
+```
+☑️ 체크: Realtime Light도 간접광 만듦 (매우 무거움!)
+☐ 해제: 직접광만 (권장)
+
+```
+
+---
+
+### Mixed Lighting
+
+**Baked Global Illumination**
+
+```
+☑️ 체크: Lightmap 생성 활성화
+☐ 해제: Baking 안 함
+
+```
+
+**Lighting Mode**
+
+```
+Baked Indirect: ← 호러 게임 추천!
+  - Static도 Realtime Light 받음
+  - 손전등 잘 작동!
+
+Shadowmask:
+  - 고품질 그림자용
+
+Subtractive:
+  - 모바일용
+
+```
+
+---
+
+### Lightmapping Settings
+
+**Lightmapper**
+
+```
+Progressive GPU: GPU로 계산 (빠름, 권장)
+Progressive CPU: CPU로 계산 (느림)
+
+```
+
+**Indirect Samples**
+
+```
+간접광 샘플링 수
+256: 빠름, 거칠 수 있음
+512: 기본 권장
+1024: 고품질, 느림
+
+```
+
+**Bounces**
+
+```
+빛 반사 횟수
+2: 권장 (충분함)
+3+: 차이 거의 없음
+
+```
+
+**Lightmap Resolution**
+
+```
+Lightmap 텍스처 밀도
+20~30: 넓은 벽용
+40~80: 디테일 많은 곳
+
+```
+
+**Ambient Occlusion**
+
+```
+☑️ 체크: 구석진 곳 더 어둡게 (호러 분위기!)
+Max Distance: 1
+
+```
+
+**Auto Generate**
+
+```
+☐ 해제 권장: 수동으로 Generate 버튼 클릭
+
+```
+
+---
+
+## 5. 손전등 문제 해결 3단계
+
+### 문제: 던전에서 손전등이 안 밝아짐
+
+**원인:**
+
+```
+던전 에셋이 Baked Lighting으로 구워져 있음
+→ 던전 벽이 Static 설정됨
+→ Realtime Light(손전등) 무시됨
+
+```
+
+---
+
+### 해결 Step 1: Lighting Mode 변경
+
+```
+Window > Rendering > Lighting > Scene 탭
+
+[Mixed Lighting]
+  ☑️ Baked Global Illumination (체크)
+  Lighting Mode: Baked Indirect ← 선택!
+
+```
+
+**이 모드의 효과:**
+
+```
+Static 오브젝트도 Realtime Light 받음!
+
+```
+
+---
+
+### 해결 Step 2: 손전등 설정 확인
+
+```
+손전등 Light 선택:
+  Mode: Realtime ← 반드시!
+  Intensity: 6~8 (던전은 높게)
+  Range: 20~30
+  Spot Angle: 60~80
+
+```
+
+---
+
+### 해결 Step 3: Lightmap 재생성
+
+```
+Lighting Window 하단:
+  ☐ Auto Generate (체크 해제)
+  [Clear Baked Data] 클릭
+  [Generate Lighting] 클릭
+
+대기: 5~30분
+
+```
+
+---
+
+### 빠른 대안: 완전 Realtime
+
+Baking 싫으면:
+
+```
+[Realtime Lighting]
+  ☑️ Realtime Global Illumination (체크)
+
+[Mixed Lighting]
+  ☐ Baked Global Illumination (체크 해제!)
+
+던전 오브젝트:
+  Static 전부 해제
+
+모든 Light:
+  Mode: Realtime
+
+→ 바로 작동! (하지만 성능 저하)
+
+```
+
+---
+
+## 6. 호러 게임 추천 설정
+
+### 전역 설정
+
+```
+[Environment]
+  Ambient Color: RGB(15, 18, 22)
+  Intensity: 0.3
+
+[Mixed Lighting]
+  ☑️ Baked Global Illumination
+  Lighting Mode: Baked Indirect
+
+[Lightmapping]
+  Indirect Samples: 512
+  Bounces: 2
+  Lightmap Resolution: 40
+  Ambient Occlusion: ☑️
+    Max Distance: 1
+
+```
+
+---
+
+### 손전등 설정
+
+```
+Type: Spot Light
+Mode: Realtime
+Color: RGB(255, 245, 220) - 약간 따뜻한 흰색
+Intensity: 6 (오피스) / 8 (던전)
+Range: 25
+Spot Angle: 65
+Shadow Type: Soft Shadows
+Render Mode: Important
+
+```
+
+---
+
+### 천장 형광등 설정
+
+```
+Type: Point Light
+Mode: Mixed
+Color: RGB(220, 235, 255) - 차가운 형광등
+Intensity: 1.5
+Range: 8~10
+Shadow Type: Soft Shadows
+
+```
+
+---
+
+### 컬트 제단 조명
+
+```
+Type: Spot Light
+Mode: Realtime (발견 시 켜지니까)
+Color: RGB(150, 50, 50) - 불길한 붉은색
+Intensity: 3
+Range: 10
+Spot Angle: 90
+Shadow Type: Soft Shadows
+
+```
+
+---
+
+### Static 설정
+
+**Static으로:**
+
+```
+☑️ 벽, 바닥, 천장
+☑️ 책상, 캐비넷
+☑️ 기둥, 계단
+
+```
+
+**Non-Static으로:**
+
+```
+☐ 플레이어
+☐ 문
+☐ 서랍
+
+```
+
+---
+
+### 손전등 On/Off 스크립트
+
+```csharp
+using UnityEngine;
+
+public class FlashlightController : MonoBehaviour
+{
+    private Light flashlight;
+
+    void Start()
+    {
+        flashlight = GetComponent<Light>();
+        flashlight.enabled = false;
+    }
+
+    void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.F))
+        {
+            flashlight.enabled = !flashlight.enabled;
+
+            // Wwise 사운드
+            if (flashlight.enabled)
+            {
+                AkSoundEngine.PostEvent("Play_Flashlight_On", gameObject);
+            }
+            else
+            {
+                AkSoundEngine.PostEvent("Play_Flashlight_Off", gameObject);
+            }
+        }
+    }
+}
+
+```
+
+---
+
+## 📌 빠른 체크리스트
+
+### 손전등이 안 될 때
+
+```
+□ Lighting Mode: Baked Indirect 확인
+□ 손전등 Mode: Realtime 확인
+□ 손전등 Intensity: 6 이상 확인
+□ Generate Lighting 실행했는지 확인
+□ Play 모드에서 손전등 켜졌는지 확인 (enabled = true)
+
+```
+
+### Baking 전 체크
+
+```
+□ Auto Generate 끄기
+□ Static 설정 확인 (벽/바닥만)
+□ Lighting Mode: Baked Indirect
+□ Ambient Occlusion 켜기
+□ Generate Lighting 클릭
+
+```
+
+### 문제 해결
+
+**손전등 여전히 안 됨:**
+→ 던전 오브젝트 Static 해제 시도
+
+**Baking 너무 오래 걸림:**
+→ Indirect Samples: 512 → 256
+
+**얼룩 발생:**
+→ Indirect Samples: 512 → 1024
+
+**너무 어둡거나 밝음:**
+→ Ambient Color / Light Intensity 조정
+
+---
+
+**이제 손전등이 완벽하게 작동할 거예요! 🔦✨**

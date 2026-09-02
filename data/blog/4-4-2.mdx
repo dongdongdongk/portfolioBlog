@@ -1,0 +1,1575 @@
+---
+title: '섹션 4: 백엔드: 인증 기능 - 4 -'
+date: '2026-09-02'
+category: '풀스택/React를 사용한 Node 풀스택 웹 애플리케이션 빌드 및 배포'
+tags: ['풀스택', 'React를 사용한 Node 풀스택 웹 애플리케이션 빌드 및 배포']
+draft: false
+summary: ''
+---
+
+# { 로그인 기능 구현 }
+
+```jsx
+Express.js를 기반으로 로그인 기능을 추가하는 방법을 설명합니다.
+
+Express.js에서 JWT 토큰을 이용해 사용자를 인증하고, 세션에 로그인 토큰을 저장하는 구조입니다.
+```
+
+## 로그인 컨트롤러 `signin.ts` 추가
+
+```jsx
+먼저 signin.ts 파일을 controllers에 생성하고 SignIn이라는 클래스를 정의합니다.
+
+로그인 처리를 위한 메서드 read를 구현하고, JWT 토큰과 세션 처리를 포함한 로직을 작성합니다.
+```
+
+```jsx
+// express의 Request, Response 객체 타입을 가져옵니다.
+// Request는 클라이언트 요청 정보를, Response는 서버의 응답 정보를 다룹니다.
+import { Request, Response } from 'express';
+
+// 설정 파일에서 config 객체를 가져옵니다. 이 설정에는 JWT 토큰 비밀 키와 같은 중요한 정보가 들어 있습니다.
+import { config } from '@root/config';
+
+// jsonwebtoken 모듈을 가져와 JWT(JSON Web Token) 생성에 사용합니다.
+import JWT from 'jsonwebtoken';
+
+// 요청 데이터의 유효성을 검사하기 위해 사용되는 커스텀 데코레이터입니다.
+// 이 데코레이터는 @joiValidation(loginSchema)와 함께 사용됩니다.
+import { joiValidation } from '@global/decorators/joi-validation.decorator';
+
+// HTTP 응답 상태 코드를 다루기 위해 http-status-codes 모듈을 가져옵니다.
+import HTTP_STATUS from 'http-status-codes';
+
+// 사용자 인증에 필요한 데이터베이스 접근 로직을 제공하는 서비스입니다.
+import { authService } from '@service/db/auth.service';
+
+// 잘못된 요청이 있을 때 에러를 생성하기 위한 클래스입니다.
+import { BadRequestError } from '@global/helpers/error-handler';
+
+// 로그인 시 요청 데이터의 유효성을 검사하기 위한 스키마입니다.
+import { loginSchema } from '@auth/schemes/signin';
+
+// 사용자 인증에 관련된 데이터 인터페이스를 정의한 파일에서 IAuthDocument를 가져옵니다.
+import { IAuthDocument } from '@auth/interfaces/auth.interface';
+
+// SignIn 클래스는 사용자의 로그인 처리를 담당합니다.
+export class SignIn {
+
+  // joiValidation 데코레이터를 사용해 loginSchema에 따라 요청의 유효성을 검증합니다.
+  @joiValidation(loginSchema)
+  public async read(req: Request, res: Response): Promise<void> {
+    // 클라이언트 요청의 body에서 username과 password를 추출합니다.
+    const { username, password } = req.body;
+
+    // authService를 사용해 데이터베이스에서 해당 username을 가진 사용자를 찾습니다.
+    const existingUser: IAuthDocument = await authService.getAuthUserByUsername(username);
+
+    // 사용자가 없으면 오류를 발생시켜 잘못된 자격 증명을 알립니다.
+    if(!existingUser) {
+      throw new BadRequestError('Invalid credentials');
+    }
+
+    // 입력된 비밀번호와 데이터베이스에 저장된 비밀번호가 일치하는지 비교합니다.
+    const passwordsMatch: boolean = await existingUser.comparePassword(password);
+    if(!passwordsMatch) {
+      throw new BadRequestError('Invalid credentials');
+    }
+
+    // 로그인 성공 시, JWT 토큰을 생성하여 사용자 정보를 포함합니다.
+    const userJwt: string = JWT.sign(
+      {
+        userId: existingUser._id,     // 사용자의 고유 ID
+        uId: existingUser.uId,        // 추가 식별자 (필요에 따라 추가된 필드)
+        email: existingUser.email,    // 사용자의 이메일 주소
+        username: existingUser.username,  // 사용자의 사용자명
+        avatarColor: existingUser.avatarColor // 아바타 색상 등 추가 정보
+      },
+      config.JWT_TOKEN! // JWT 토큰 비밀 키 (설정 파일에서 가져옴)
+    );
+
+    // 생성한 JWT 토큰을 세션에 저장합니다.
+    req.session = { jwt: userJwt };
+
+    // 클라이언트에게 로그인 성공 메시지, 사용자 정보, 토큰을 JSON 형식으로 반환합니다.
+    res.status(HTTP_STATUS.OK).json({
+      message: 'User login successfully',  // 성공 메시지
+      user: existingUser,                  // 사용자 정보
+      token: userJwt                       // JWT 토큰
+    });
+  }
+}
+
+```
+
+## `auth.service.ts`에 새로운 메서드 추가
+
+```jsx
+위의 username 을 기반으로 사용자가 존재하는지 확인하기 위해 새로운 메서드를 auth.service 에 추가해준다
+
+( 그전에는 메일 또는 username 으로 확인하는 메서드만 있었다 )
+```
+
+```jsx
+public async getAuthUserByUsername(username: string): Promise<IAuthDocument> {
+  const user: IAuthDocument = await AuthModel.findOne({
+    username: Helpers.firstletterUppercase(username)
+  }).exec() as IAuthDocument;
+  return user;
+}
+```
+
+### 전체 코드
+
+```jsx
+// IAuthDocument 인터페이스를 import하여 사용자 인증 데이터를 정의합니다.
+// AuthModel은 사용자 데이터를 MongoDB에 저장하고 조회할 수 있는 모델입니다.
+// Helpers는 다양한 헬퍼 함수들을 모아놓은 유틸리티 파일로, 주로 문자열 처리를 위한 함수들을 제공합니다.
+import { IAuthDocument } from '@auth/interfaces/auth.interface';
+import { AuthModel } from '@auth/models/auth.schema';
+import { Helpers } from '@global/helpers/heplers';
+
+// AuthService 클래스는 사용자 인증 관련 작업을 수행하는 서비스로, 사용자 생성, 조회 등을 담당합니다.
+class AuthService {
+
+  // createAuthUser 메서드는 새로운 사용자 데이터를 MongoDB에 저장합니다.
+  // data: IAuthDocument - 저장할 사용자 데이터가 담긴 객체입니다.
+  public async createAuthUser(data: IAuthDocument): Promise<void> {
+    // AuthModel의 create 메서드를 사용하여 데이터를 MongoDB에 저장합니다.
+    await AuthModel.create(data);
+  }
+
+  // getUserByUsernameOrEmail 메서드는 사용자 이름 또는 이메일로 사용자를 검색합니다.
+  // username: string - 검색할 사용자의 이름입니다.
+  // email: string - 검색할 사용자의 이메일 주소입니다.
+  // 반환 값: 사용자 데이터를 포함한 IAuthDocument 객체를 반환합니다.
+  public async getUserByUsernameOrEamil(username: string, email: string): Promise<IAuthDocument> {
+    // 검색 쿼리를 설정합니다. $or 연산자를 사용하여 이름 또는 이메일 중 하나가 일치하는 사용자를 찾습니다.
+    const query = {
+      // Helpers의 firstletterUppercase 함수로 사용자의 이름 첫 글자를 대문자로 변환하여 검색에 사용합니다.
+      $or: [{ username: Helpers.firstletterUppercase(username) },
+            // Helpers의 lowerCase 함수로 사용자의 이메일을 소문자로 변환하여 검색에 사용합니다.
+            { email: Helpers.lowerCase(email) }]
+    };
+    // AuthModel의 findOne 메서드를 사용하여 MongoDB에서 쿼리 조건에 맞는 사용자 데이터를 찾습니다.
+    // exec() 메서드는 쿼리를 실행하여 IAuthDocument 형식의 사용자 데이터를 반환합니다.
+    const user: IAuthDocument = await AuthModel.findOne(query).exec() as IAuthDocument;
+    return user;  // 찾은 사용자 데이터를 반환합니다.
+  }
+
+  // getAuthUserByUsername 메서드는 사용자 이름으로 사용자를 검색합니다.
+  // username: string - 검색할 사용자의 이름입니다.
+  // 반환 값: 사용자 데이터를 포함한 IAuthDocument 객체를 반환합니다.
+  public async getAuthUserByUsername(username: string): Promise<IAuthDocument> {
+    // 이름을 대소문자 구분 없이 찾기 위해 Helpers의 firstletterUppercase 함수를 사용해 대문자로 변환한 후 검색합니다.
+    const user: IAuthDocument = await AuthModel.findOne({ username: Helpers.firstletterUppercase(username) }).exec() as IAuthDocument;
+    return user;  // 찾은 사용자 데이터를 반환합니다.
+  }
+}
+
+// authService 객체를 생성하여 다른 파일에서 사용할 수 있도록 export 합니다.
+// AuthService 클래스를 기반으로 하여 authService는 사용자 인증 관련 기능을 제공합니다.
+export const authService: AuthService = new AuthService();
+
+```
+
+## 로그인 라우트 `/signin` 추가
+
+### authRoutes.ts
+
+```jsx
+// SignIn과 SignUp 컨트롤러를 import하여, 각 요청을 처리하는 로직을 정의한 파일에서 가져옵니다.
+import { SignIn } from '@auth/controllers/signin';
+import { SignUp } from '@auth/controllers/signup';
+// Express와 Express의 Router 객체를 import하여 라우팅을 구성합니다.
+import express, { Router } from 'express';
+
+// AuthRoutes 클래스는 인증 관련 라우트를 정의합니다.
+class AuthRoutes {
+  private router: Router;
+
+  constructor() {
+    // Express의 Router 객체를 초기화하여, 이 클래스 내에서 사용할 수 있도록 합니다.
+    this.router = express.Router();
+  }
+
+  // routes 메서드는 이 클래스에서 정의된 라우트를 반환합니다.
+  // 반환된 라우트는 외부에서 사용할 수 있으며, 서버의 엔드포인트와 연결됩니다.
+  public routes(): Router {
+    // 회원가입 라우트 설정: 클라이언트가 '/signup' 경로로 POST 요청을 보내면 SignUp의 create 메서드가 호출됩니다.
+    this.router.post('/signup', SignUp.prototype.create);
+    // 로그인 라우트 설정: 클라이언트가 '/signin' 경로로 POST 요청을 보내면 SignIn의 read 메서드가 호출됩니다.
+    this.router.post('/signin', SignIn.prototype.read);
+
+    // 이 router를 반환하여 다른 파일에서도 사용할 수 있도록 합니다.
+    return this.router;
+  }
+};
+
+// authRoutes 객체를 생성하여 다른 파일에서 사용할 수 있도록 export 합니다.
+export const authRoutes: AuthRoutes = new AuthRoutes();
+
+```
+
+### routes.ts
+
+```jsx
+// 위에서 정의한 authRoutes와 서버의 큐 작업을 위한 serverAdapter를 import합니다.
+import { authRoutes } from '@auth/routes/authRoutes';
+import { serverAdapter } from '@service/queues/base.queue';
+// Express의 Application 타입을 import하여 타입 정의에 사용합니다.
+import { Application } from 'express';
+
+// API의 기본 경로를 상수로 정의합니다. 모든 API는 '/api/v1'로 시작하게 됩니다.
+const BASE_PATH = '/api/v1';
+
+// app: Application - Express 애플리케이션 인스턴스를 매개변수로 받아, 라우트를 구성하는 함수를 export합니다.
+export default (app: Application) => {
+  // routes 함수는 서버의 라우트를 정의하는 역할을 합니다.
+  const routes = () => {
+    // '/queues' 경로에 대해 serverAdapter에서 제공하는 라우터를 사용하여 큐 관련 엔드포인트를 설정합니다.
+    app.use('/queues', serverAdapter.getRouter());
+    // '/api/v1' 경로를 기본 경로로 설정하여 authRoutes의 라우트를 사용합니다.
+    app.use(BASE_PATH, authRoutes.routes());
+  };
+
+  // routes 함수를 호출하여 정의한 모든 라우트를 애플리케이션에 적용합니다.
+  routes();
+};
+
+```
+
+## 라우팅 원리와 순서 설명
+
+```jsx
+라우트 정의:
+
+		AuthRoutes 클래스에서 /signup과 /signin 경로에 대한 POST 요청 라우트를 정의합니다.
+
+		각 경로가 호출되면 SignUp과 SignIn 컨트롤러의 메서드가 요청을 처리합니다.
+
+라우트 객체 생성:
+
+		authRoutes 객체는 AuthRoutes 클래스의 인스턴스이며,
+
+		이 객체의 routes() 메서드를 호출하면 설정된 라우트가 반환됩니다.
+
+서버와 라우트 연결:
+
+		export default로 정의된 함수는 서버 인스턴스(app)를 매개변수로 받아 app.use 메서드를 사용해 실제 API 경로와 라우트를 연결합니다.
+
+		app.use(BASE_PATH, authRoutes.routes())로 /api/v1/signup, /api/v1/signin이 생성됩니다.
+
+전체 라우트 활성화:
+
+		정의된 라우트 함수(routes())를 호출하여 서버가 해당 라우트를 인식하고 사용할 수 있게 합니다.
+```
+
+# { 가입 인증 버그 수정 }
+
+## 문제 상황 설명
+
+```jsx
+현재 로그인 시스템에서 두 가지 종류의 사용자 데이터를 다루고 있습니다:
+
+
+		1. OTS 사용자 데이터 (기본 정보)
+
+				간단한 사용자 정보를 담고 있음
+
+				username, email, avatarColor 같은 기본적인 정보만 포함
+
+				이것은 마치 사용자의 '약식 프로필'이라고 생각하면 됩니다
+
+
+		2. 전체 사용자 데이터 (상세 정보)
+
+				더 자세한 사용자 정보를 담고 있음
+
+				실제 데이터베이스에 저장된 완전한 사용자 정보
+
+				이것은 사용자의 '전체 프로필'이라고 생각하면 됩니다
+```
+
+## 발견된 문제 → 해결 방법
+
+```jsx
+발견된 문제
+
+		현재 로그인할 때 JWT(로그인 토큰)를 만들 때 OTS 사용자 데이터(약식 프로필)의 ID를 사용하고 있었습니다.
+
+		이는 올바르지 않습니다.
+
+해결 방법
+
+		1. OTS ID를 이용해 전체 사용자 데이터를 찾는 새로운 함수를 만듦
+
+		2. JWT 생성 시 전체 사용자 데이터의 ID를 사용하도록 변경
+```
+
+# { 로그인 컨트롤러 업데이트 }
+
+# { Redis에서 캐시된 사용자 데이터 가져오기 }
+
+```jsx
+이 강의에서는 Redis에 캐시된 사용자 데이터를 가져와서 클라이언트에게 원래의 형태로 전달하는 방법을 다룹니다.
+
+Redis는 일반적으로 문자열로 데이터를 저장하므로, 숫자나 객체 형식의 데이터를 저장할 때 문자열로 변환해야 합니다. 이
+
+데이터를 가져올 때 JSON으로 파싱해서 원래 형태로 변환하는 것이 필요합니다.
+```
+
+## `Helpers` 클래스에 `parseJson` 메서드 추가하기
+
+```jsx
+먼저, 캐시에서 데이터를 가져올 때 JSON 형식으로 파싱하는 메서드가 필요합니다.
+
+Helpers 클래스에 parseJson 메서드를 추가해서 문자열 데이터를 JSON으로 변환하고,
+
+문자열이 아닌 경우에는 원래 데이터를 그대로 반환하도록 만듭니다.
+
+* 예전에 캐시에 등록할때 몇몇 데이터를 json 에서 string 타입으로 변환했기 때문에
+
+const secondList: string[] = [
+      'blocked',
+      JSON.stringify(blocked),
+      'blockedBy',
+      JSON.stringify(blockedBy),
+      'profilePicture',
+      `${profilePicture}`,
+      'followersCount',
+      `${followersCount}`,
+      'followingCount',
+      `${followingCount}`,
+      'notifications',
+      JSON.stringify(notifications),
+      'social',
+      JSON.stringify(social)
+    ];
+```
+
+### 추가 부분
+
+```jsx
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  static parseJson(prop: string): any {
+    try {
+      JSON.parse(prop);
+    } catch (error) {
+      console.log('JSON 파싱 중 에러 발생:', error);
+      console.log('파싱 시도한 데이터:', prop);
+      return prop;
+    }
+
+
+* 이 메서드는 문자열 데이터를 JSON 형식으로 변환하며, JSON이 아닌 경우 오류를 발생시키지 않고 원래 데이터를 그대로 반환해줍니다.
+```
+
+### 전체 코드
+
+```jsx
+export class Helpers {
+
+  // 문자열의 첫 글자를 대문자로 변환하는 함수
+  // 전달된 문자열을 소문자로 변환한 후, 각 단어의 첫 글자만 대문자로 만들어 반환합니다.
+  static firstletterUppercase(str: string): string {
+    const valueString = str.toLowerCase();
+    return valueString
+      .split(' ') // 공백을 기준으로 단어를 나눕니다.
+      .map((value: string) => `${value.charAt(0).toUpperCase()}${value.slice(1).toLowerCase()}`)
+      // 각 단어의 첫 글자를 대문자로, 나머지는 소문자로 변환합니다.
+      .join(' '); // 변환된 단어들을 다시 공백으로 합칩니다.
+  }
+
+  // 전달된 문자열을 모두 소문자로 변환하는 함수
+  static lowerCase(str: string): string {
+    return str.toLowerCase();
+  }
+
+  // 주어진 길이만큼의 무작위 숫자를 생성하여 반환하는 함수
+  // 예를 들어, integerLength가 4인 경우 네 자리의 무작위 숫자가 반환됩니다.
+  static generateRandomIntegers(integerLength: number): number {
+    const characters = '0123456789'; // 사용할 숫자 목록
+    let result = ' '; // 결과값 초기화 (문자열 타입)
+    const charactersLength = characters.length;
+    for (let i = 0; i < integerLength; i++) {
+      result += characters.charAt(Math.floor(Math.random() * charactersLength));
+      // 숫자 목록에서 임의의 위치를 골라 result 문자열에 추가합니다.
+    }
+    return parseInt(result, 10); // 문자열을 정수로 변환하여 반환합니다.
+  }
+
+  // 문자열을 JSON으로 변환하는 함수
+  // 주어진 문자열이 JSON 형식일 경우 객체로 파싱하고, 형식이 아니면 원본 문자열을 그대로 반환합니다.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  static parseJson(prop: string): any {
+    try {
+      // JSON 형식으로 파싱을 시도합니다.
+      return JSON.parse(prop);
+    } catch (error) {
+      // 파싱 중 에러가 발생할 경우, 오류를 콘솔에 출력하고 원본 문자열을 그대로 반환합니다.
+      console.log('JSON 파싱 중 에러 발생:', error);
+      console.log('파싱 시도한 데이터:', prop);
+      return prop;
+    }
+  }
+}
+
+```
+
+## Redis에서 사용자 데이터 가져오기 (`getUserFromCache` 메서드)
+
+```jsx
+이제 getUserFromCache 메서드를 구현해보겠습니다.
+
+이 메서드는 Redis에서 특정 사용자 ID로 저장된 데이터를 가져오고,
+
+필요한 속성들을 JSON으로 파싱해서 반환합니다.
+
+user.cache.ts 에 아래 메서드를 추가해주도록 한다
+```
+
+```jsx
+// 캐시에서 사용자 정보를 가져오는 함수
+// Redis에서 `userId`에 해당하는 데이터를 가져와 IUserDocument 형식으로 변환하여 반환합니다.
+public async getUserFromCache(userId: string): Promise<IUserDocument | null> {
+  try {
+    // Redis 클라이언트가 연결되어 있지 않으면, 연결을 시도합니다.
+    if (!this.client.isOpen) {
+      await this.client.connect(); // Redis 서버에 연결을 요청합니다.
+    }
+
+    // Redis에서 사용자 ID에 해당하는 데이터를 HGETALL 명령어로 가져옵니다.
+    // Redis에 저장된 데이터를 IUserDocument 형식으로 변환하기 위해 타입 단언을 사용합니다.
+    const response: IUserDocument = await this.client.HGETALL(`users:${userId}`) as unknown as IUserDocument;
+
+    // JSON 문자열로 저장된 각 필드 값을 실제 데이터 타입으로 변환하여 response 객체에 저장합니다.
+    response.createdAt = new Date(Helpers.parseJson(`${response.createdAt}`)); // 생성일을 Date 객체로 변환합니다.
+    response.postsCount = Helpers.parseJson(`${response.postsCount}`); // 게시물 수를 숫자로 변환합니다.
+    response.blocked = Helpers.parseJson(`${response.blocked}`); // 사용자가 차단된 상태인지 불린 값으로 변환합니다.
+    response.blockedBy = Helpers.parseJson(`${response.blockedBy}`); // 사용자를 차단한 ID 목록을 배열로 변환합니다.
+    response.notifications = Helpers.parseJson(`${response.notifications}`); // 알림 설정을 JSON 형식으로 변환합니다.
+    response.social = Helpers.parseJson(`${response.social}`); // 소셜 미디어 정보들을 JSON 형식으로 변환합니다.
+    response.followersCount = Helpers.parseJson(`${response.followersCount}`); // 팔로워 수를 숫자로 변환합니다.
+    response.followingCount = Helpers.parseJson(`${response.followingCount}`); // 팔로잉 수를 숫자로 변환합니다.
+
+    // 변환된 사용자 데이터를 반환합니다.
+    return response;
+
+  } catch (error) {
+    // 에러가 발생할 경우, 로그에 에러를 기록하고 사용자에게 서버 에러 메시지를 전달합니다.
+    log.error(error);
+    throw new ServerError('Server error. Try again.');
+  }
+}
+
+* 여러 사용자의 데이터를 한 번에 가져와야 할 경우 HGETALL을 사용할 수 없습니다.
+
+	이런 경우에는 sorted set을 사용해야 하며, 이는 나중에 구현할 예정입니다.
+```
+
+# { MongoDB 에서 사용자 데이터 가져오기 }
+
+```jsx
+이번에는 캐시가 아니라 DB 에서 사용자 데이터를 가져온다
+
+db 의 user.service.ts 에 새로운 메서드를 추가한다
+```
+
+## 메서드 설명: `getUserById`
+
+```jsx
+getUserById는 userId를 매개변수로 받아 MongoDB의 aggregate 메서드를 통해 해당 사용자의 정보를 조회하고,
+
+인증 컬렉션에서 authId 필드를 참조해 인증 정보를 함께 가져오는 기능을 합니다.
+
+이는 일반 find 메서드보다 더 유연하게 데이터 조작 및 결합이 가능합니다.
+```
+
+## MongoDB의 `aggregate` 메서드 사용 이유
+
+```jsx
+aggregate는 여러 단계의 "파이프라인"을 사용해 데이터 조작이 가능합니다.
+
+예를 들어 match로 조건 필터링을 하고, lookup으로 다른 컬렉션과 조인(참조)한 후
+
+unwind로 배열을 개별 객체로 변환할 수 있습니다. 이는 복잡한 데이터 구조를 한 번에 조회할 때 유용합니다.
+```
+
+## 코드 단계별 분석
+
+```jsx
+다음은 코드의 각 파이프라인을 설명하며, 중요한 개념을 쉽게 이해할 수 있도록 예제와 함께 설명합니다.
+```
+
+```jsx
+import { IUserDocument } from '@user/interfaces/user.interface';
+import { UserModel } from '@user/models/user.schema';
+import mongoose from 'mongoose';
+
+class UserService {
+
+  public async getUserById(userId: string): Promise<IUserDocument> {
+    const users: IUserDocument[] = await UserModel.aggregate([
+      // 1. 사용자 ID 필터링
+      { $match: { _id: new mongoose.Types.ObjectId(userId) } },
+
+      // 2. 'authId' 필드로 인증 컬렉션 조인
+      { $lookup: {
+          from: 'Auth',
+          localField: 'authId',
+          foreignField: '_id',
+          as: 'authId'
+        }
+      },
+
+      // 3. 배열로 반환된 'authId' 필드를 단일 객체로 변환
+      { $unwind: '$authId' }
+    ]);
+
+    return users[0]; // 배열의 첫 번째 요소 반환 (단일 사용자)
+  }
+}
+export const userService: UserService = new UserService();
+
+```
+
+### 1. `$match` 파이프라인
+
+```jsx
+$match는 MongoDB에서 데이터를 필터링할 때 사용하는 조건 지정 연산자입니다.
+
+데이터베이스에서 원하는 데이터만을 찾아오기 위해 특정 조건을 설정할 수 있습니다.
+
+여기서는 userId라는 특정 사용자 정보를 얻기 위해 $match를 사용하여 _id 필드가 주어진 userId와 일치하는
+
+데이터를 검색하고 있습니다.
+
+다만 여기서 중요한 점은 userId가 문자열 형식으로 전달된다는 것인데,
+
+MongoDB에서는 _id 필드가 ObjectId라는 형식으로 저장됩니다.
+
+따라서 문자열로 전달된 userId는 MongoDB의 ObjectId 형식으로 변환하지 않으면, 일치하는 데이터를 찾지 못합니다.
+
+간단히 말해,
+
+우리가 일반 문자열로는 MongoDB에서 _id 값을 정확히 찾을 수 없기 때문에 userId를 MongoDB의
+
+ObjectId로 변환하여 $match에 넣어야 합니다.
+
+이렇게 하면 MongoDB는 userId가 가리키는 정확한 사용자 정보를 반환할 수 있습니다.
+
+new mongoose.Types.ObjectId(userId) * 변환 코드
+```
+
+```jsx
+{
+  $match: {
+    _id: new mongoose.Types.ObjectId(userId)
+  }
+}
+```
+
+### 2. `$lookup` 파이프라인
+
+```jsx
+$lookup은 MongoDB에서 조인(join) 역할을 하는 연산자로,
+
+현재 컬렉션의 데이터를 다른 컬렉션의 데이터와 연결해 필요한 정보를 가져올 때 사용합니다.
+
+SQL에서 테이블을 연결해 조회하는 것과 비슷한 개념입니다.
+
+이 예제에서는 사용자 컬렉션에서 사용자의 authId 필드를 Auth 컬렉션의 _id 필드와 연결하여
+
+사용자의 인증 정보를 가져오고자 합니다.
+
+예를 들어, 사용자 데이터에는 인증 정보가 없기 때문에,
+
+authId 값을 이용해 Auth 컬렉션에서 해당 사용자의 인증 데이터를 가져오는 것입니다.
+
+localField와 foreignField의 역할
+
+localField:
+
+		현재 컬렉션(사용자 컬렉션)에서 연결하고자 하는 필드를 지정합니다.
+
+		여기서는 authId를 설정하여, 사용자가 가지고 있는 authId 값을 사용하여 Auth 컬렉션에서 인증 정보를 찾습니다.
+
+foreignField:
+
+		참조할 다른 컬렉션(Auth 컬렉션)에서 연결할 필드를 지정합니다.
+
+		여기서는 _id를 설정하여, authId와 일치하는 _id를 가진 Auth 컬렉션의 데이터를 찾도록 합니다.
+
+간단히 말해, localField의 값(authId)을 기준으로 foreignField(_id)와 일치하는 데이터를 찾습니다.
+
+이렇게 하면, Auth 컬렉션에 있는 인증 정보가 사용자의 authId와 연결되어 가져와집니다
+```
+
+```jsx
+{
+  $lookup: {
+    from: 'Auth', // 참조할 컬렉션 이름
+    localField: 'authId', // 현재 사용자의 인증 ID ( 유저 컬렉션의 필드 )
+    foreignField: '_id', // 인증 컬렉션의 ID
+    as: 'authId' // as는 조인 결과를 저장할 필드의 이름입니다. 즉, $lookup 연산의 결과가 새로 생성된 필드에 저장되는데, 이 필드의 이름을 as를 통해 정의합니다
+  }
+}
+```
+
+### 3. `$unwind` 파이프라인
+
+```jsx
+$unwind는 MongoDB에서 배열 형태로 반환된 데이터를 단일 객체로 변환하는 데 사용됩니다.
+
+lookup 연산을 통해 다른 컬렉션의 데이터를 가져올 때,
+
+결과는 기본적으로 배열로 반환되는데, 이는 여러 개의 결과를 포함할 가능성이 있기 때문입니다.
+
+그러나 대부분의 경우 한 개의 데이터만 필요할 때가 많습니다.
+
+여기서는 사용자의 authId 필드에 연결된 인증 정보가 **lookup**을 통해 배열로 반환되는데,
+
+$unwind를 사용하면 이 배열을 단일 객체로 변환할 수 있습니다.
+
+이렇게 단일 객체로 변환하면, 배열 없이도 **인증 정보 필드(authId)**에 쉽게 접근할 수 있게 됩니다.
+```
+
+```jsx
+{
+  $unwind: '$authId'
+}
+```
+
+## `populate`와 `aggregate`
+
+```jsx
+populate와 aggregate는 MongoDB에서 데이터를 조회할 때 사용되는 두 가지 방법입니다.
+
+이 둘은 목적과 사용 방식에서 차이가 있습니다.
+```
+
+### `populate`의 이해
+
+```jsx
+정의:
+
+		populate는 Mongoose에서 제공하는 메서드로, 문서의 특정 필드가 다른 컬렉션의 ID를 참조할 때,
+
+		그 ID에 해당하는 문서를 자동으로 조회하여 채워줍니다.
+
+사용 방법:
+
+		일반적으로 find 또는 findOne과 함께 사용됩니다. 예를 들어,
+
+		사용자 문서가 authId라는 필드를 가지고 있고, 이 필드가 Auth 컬렉션의 _id를 참조하는 경우,
+
+
+장점:
+
+		간편함: populate는 사용하기 쉽고, 관련 데이터를 쉽게 가져올 수 있습니다.
+
+		코드 간결성: 기본적인 관계를 처리하기 위한 코드가 짧고 간결합니다.
+
+제한 사항:
+
+		단순한 관계: populate는 주로 단순한 관계(1 또는 N:1)에서 사용됩니다.
+
+		성능: 대량의 데이터에서 여러 번의 쿼리를 실행하므로 성능이 저하될 수 있습니다.
+```
+
+```jsx
+const user = await UserModel.findOne({ _id: userId }).populate('authId')
+```
+
+### `aggregate`의 이해
+
+```jsx
+정의:
+
+		aggregate는 MongoDB에서 제공하는 기능으로, 데이터의 복잡한 처리, 변환, 집계 작업을 수행할 수 있습니다.
+
+		여러 단계의 파이프라인을 사용하여 데이터를 처리합니다.
+
+사용 방법:
+
+		aggregate는 여러 단계의 연산자(예: $match, $lookup, $unwind, $group 등)를 사용하여 데이터를 조작합니다.
+
+장점:
+
+		복잡한 쿼리: 여러 데이터를 조합하거나 필터링하는 복잡한 작업을 수행할 수 있습니다.
+
+		유연성: 다양한 연산자를 조합하여 복잡한 데이터 처리가 가능합니다.
+
+		성능: 대량의 데이터를 처리할 때 성능이 개선될 수 있습니다.
+
+제한 사항:
+
+		복잡성: 코드가 복잡해지고, 이해하기 어려울 수 있습니다.
+
+		배열 반환: 항상 배열을 반환하므로, 단일 결과를 얻기 위해서는 배열의 첫 번째 요소를 사
+```
+
+```jsx
+const users = await UserModel.aggregate([
+  { $match: { _id: new mongoose.Types.ObjectId(userId) } },
+  { $lookup: { from: 'Auth', localField: 'authId', foreignField: '_id', as: 'authId' } },
+  { $unwind: '$authId' },
+])
+const user = users[0] // 첫 번째 요소를 가져옵니다.
+```
+
+### 요약
+
+```jsx
+populate는 간단한 참조 관계에서 데이터를 쉽게 가져오는 방법이며,
+
+사용이 간편합니다. 하지만 성능 이슈가 있을 수 있습니다.
+
+aggregate는 복잡한 데이터 처리와 조작을 가능하게 하며, 다양한 조건을 조합할 수 있습니다.
+
+그러나 사용하기 어려운 경우가 많습니다.
+```
+
+### \* MongoDB의 `aggregate` 파이프라인에서 `$unwind: '$authId'`와 같이 사용되는 `$` 기호는 특정 필드를 참조하기 위해 사용됩니다.
+
+```jsx
+$ 기호는 MongoDB에서 필드를 참조할 때 사용하는 구문입니다.
+
+예를 들어, '$authId'는 현재 문서의 authId라는 필드를 의미합니다.
+
+따라서 $unwind: '$authId'는 현재 문서에서 authId 필드의 값을 기준으로 배열을 펼치는(unwind) 작업을 수행하겠다는 의미입니다.
+```
+
+```jsx
+예를 들어, authId 필드가 다음과 같은 배열로 구성된 문서가 있다고 가정해 봅시다:
+
+{
+  "_id": "user123",
+  "name": "John Doe",
+  "authId": [
+    { "_id": "auth1", "type": "admin" },
+    { "_id": "auth2", "type": "user" }
+  ]
+}
+
+$unwind: '$authId'를 사용하면 이 문서가 다음과 같이 두 개의 문서로 변환됩니다:
+
+// 첫 번째 문서
+{
+  "_id": "user123",
+  "name": "John Doe",
+  "authId": { "_id": "auth1", "type": "admin" }
+}
+
+// 두 번째 문서
+{
+  "_id": "user123",
+  "name": "John Doe",
+  "authId": { "_id": "auth2", "type": "user" }
+}
+
+여기서 $unwind는 authId 배열을 펼쳐서 각 요소를 독립된 문서로 만듭니다.
+
+이때 '$authId'에서 $는 authId라는 필드를 가리킵니다.
+```
+
+# { MongoDB 에서 사용자 데이터 가져오기 - 2 -}
+
+## 사용자 ID로 사용자 정보를 가져오는 `getUserById` 메서드
+
+```jsx
+위의 내용에서 $project: 가 추가되었다
+
+이 메서드는 주어진 사용자 ID에 맞는 사용자 데이터를 데이터베이스에서 가져옵니다.
+
+aggregate 메서드는 MongoDB에서 제공하는 데이터 처리 방법으로,
+
+여러 단계(파이프라인)를 거쳐 원하는 데이터를 가공할 수 있어 성능 면에서 효율적입니다.
+```
+
+```jsx
+$match: 주어진 사용자 ID와 일치하는 문서를 찾습니다. 이때, userId 문자열을 MongoDB의 ObjectID로 변환하기 위해 mongoose.Types.ObjectId(userId)를 사용합니다.
+
+$lookup: Auth 컬렉션의 authId 필드와 UserModel 컬렉션의 authId 필드를 연결하여 사용자 정보와 인증 정보를 병합합니다.
+
+$unwind: lookup 결과가 배열 형태로 반환되기 때문에 이를 하나의 객체로 변환하여 원하는 필드에 직접 접근할 수 있도록 합니다.
+
+$project: 가져오고 싶은 필드만 선택해 반환할 수 있도록 합니다. 예를 들어, 특정 필드를 제외하려면 해당 필드를 0으로 설정하고, 포함하려면 1로 설정합니다.
+```
+
+## `aggregateProject` 메서드로 반환할 필드 설정
+
+```jsx
+이 메서드는 project 단계에서 사용할 필드를 정의하여 재사용이 가능하게 합니다.
+```
+
+```jsx
+private aggregateProject() {
+  return {
+    _id: 1,
+    username: '$authId.username', // username 필드
+    uId: '$authId.uId',
+    email: '$authId.email',
+    avatarColor: '$authId.avatarColor',
+    createAt: '$authId.createAt',
+    work: 1,
+    school: 1,
+    quote: 1,
+    location: 1,
+    blocked: 1,
+    blockedBy: 1,
+    followersCount: 1,
+    followingCount: 1,
+    notifications: 1,
+    social: 1,
+    bgImageVersion: 1,
+    bgImageId: 1,
+    profilePicture: 1,
+  };
+}
+```
+
+```jsx
+이제 getUserById 메서드 내에서 aggregateProject()를 호출해 설정된 필드를 사용합니다.
+```
+
+```jsx
+public async getUserById(userId: string): Promise<IUserDocument> {
+  const users: IUserDocument[] = await UserModel.aggregate([
+    { $match: { _id: new mongoose.Types.ObjectId(userId)} },
+    { $lookup: { from: 'Auth', localField: 'authId', foreignField: '_id', as: 'authId'} },
+    { $unwind: '$authId'},
+    { $project: this.aggregateProject() } // this 키워드는 클래스의 인스턴스(객체)를 참조합니다. 즉, 클래스 내부에서 this를 사용하면 현재 클래스 인스턴스를 의미
+  ]);
+  return users[0]; // 첫 번째 사용자 반환
+}
+```
+
+```jsx
+$match: _id가 주어진 userId와 일치하는 문서 필터링.
+
+$lookup: authId 필드를 기반으로 사용자와 인증 정보 병합.
+
+$unwind: authId 배열을 객체로 변환해 필드에 직접 접근 가능하게 만듦.
+
+$project: 반환할 필드를 설정하여 원하는 데이터만 추출.
+```
+
+# { 로그인 로직 개선: 사용자 ID 처리 변경 버그픽스 }
+
+```jsx
+이 강의 내용에서는 로그인 컨트롤러에서의 JWT 생성 과정에서 생긴 문제를 수정하는 방법에 대해 설명하고 있습니다
+```
+
+## 1. 문제 개요
+
+```jsx
+
+현재 로그인 로직에서는 사용자가 로그인을 시도하면 다음과 같은 순서로 동작합니다:
+
+1. 사용자가 존재하는지 username으로 확인.
+
+2. 비밀번호가 맞는지 검증.
+
+3. 맞다면, 사용자의 정보를 바탕으로 JWT (JSON Web Token) 생성.
+
+지금 JWT (JSON Web Token)를 생성하는 과정에서 잘못된 사용자 ID가 사용되고 있어 문제가 발생하고 있습니다.
+
+구체적으로 말하면, 토큰 생성 시 진짜 사용자 ID가 아닌, **인증 정보와 연결된 임시 ID (OTS ID)**를 사용하고 있는 상태입니다.
+
+( auth의 ID 를 사용하고 있는건데 이건 임시 ID 다 user 의 ID 를 사용해야함 )
+
+이런 상태에서는 인증에 문제가 생길 수 있습니다.
+
+JWT는 주로 사용자를 인증하거나 권한을 부여하는 데 쓰입니다.
+
+따라서 JWT 안에 포함되는 정보가 정확해야 합니다.
+
+사용자의 진짜 ID가 아닌 OTS ID를 사용하게 되면,
+
+나중에 사용자가 인증을 요청할 때 JWT 안의 정보와 실제 사용자 정보가 일치하지 않을 수 있습니다.
+
+이를 해결하려면, JWT에 올바른 진짜 사용자 ID를 넣어야 합니다.
+
+그래서, 코드에서는 사용자의 실제 ID를 가져오기 위해 새로운 메서드(getUserByAuthId)를 추가해 수정하는 작업을 합니다.
+
+이 메서드는 기존의 OTS ID를 사용해 올바른 사용자 데이터를 찾고,
+
+그 데이터에서 진짜 사용자 ID를 가져옵니다. 그런 다음, 이 ID를 사용해 정확한 JWT를 생성하게 됩니다.
+
+* 쉽게 말하면 지금은 user ID 가 아니라 OTS ID 로 토큰을 생성중
+```
+
+## User Schema 인덱스 추가
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381345/notion-blog/_/React_Node_/_4_-_4_-/image.png)
+
+```jsx
+authId: { type: mongoose.Schema.Types.ObjectId, ref: 'Auth', index: true }
+```
+
+```jsx
+먼저, User Schema에 인덱스를 설정합니다.
+
+인덱스를 설정하는 이유는 데이터 검색 성능을 높이기 위함입니다.
+```
+
+### 인덱스가 중요한 이유
+
+```jsx
+데이터베이스에서 많은 양의 데이터를 다루는 경우, 원하는 데이터를 빠르게 찾기 위해 인덱스를 설정합니다.
+
+예를 들어, 책을 찾을 때 책 제목 순서로 정렬된 카탈로그(인덱스)를 참고하면 빨리 찾을 수 있는 것과 비슷한 원리입니다.
+
+authId 필드에 인덱스를 설정하면, 해당 ID로 검색할 때 속도가 빨라집니다.
+```
+
+## User Service에 새로운 메서드 추가
+
+```jsx
+JWT 생성을 위해 정확한 사용자 데이터를 가져올 필요가 있기 때문에,
+
+authId로 사용자를 찾는 새로운 메서드 getUserByAuthId를 User Service에 추가합니다.
+```
+
+```jsx
+public async getUserByAuthId(authId: string): Promise<IUserDocument> {
+    const users: IUserDocument[] = await UserModel.aggregate([
+      { $match: { authId: new mongoose.Types.ObjectId(authId)} }, // authId로 일치하는 사용자 찾기
+      { $lookup: { from: 'Auth', localField: 'authId', foreignField: '_id', as: 'authId'} }, // auth 컬렉션과 연결
+      { $unwind: '$authId'}, // 배열로 반환된 authId 데이터를 객체로 변환
+      { $project: this.aggregateProject()} // 필요한 필드만 반환
+    ]);
+    return users[0];
+}
+
+```
+
+## 로그인 컨트롤러 수정 signin.ts
+
+```jsx
+새로 만든 getUserByAuthId 메서드를 사용해 올바른 사용자 정보를 가져옵니다.
+
+이제 이 user 객체에는 필요한 user ID가 포함되어 있으며, 이를 기반으로 JWT를 생성할 수 있습니다.
+```
+
+```jsx
+const user: IUserDocument = await userService.getUserByAuthId(`${existingUser._id}`);
+```
+
+## JWT 생성 시 수정 사항
+
+```jsx
+마지막으로, 기존의 existingUser 대신 올바른 user 객체에서 user ID를 가져와 JWT를 생성합니다.
+
+이렇게 수정하면 JWT 생성 시 정확한 user ID가 포함되므로, 인증 시스템이 더욱 정확하게 동작할 수 있습니다.
+```
+
+```jsx
+const userJwt: string = JWT.sign(
+  {
+    userId: user._id,                 // 새로운 user 객체의 ID
+    uId: existingUser.uId,
+    email: existingUser.email,
+    username: existingUser.username,
+    avatarColor: existingUser.avatarColor
+  },
+  config.JWT_TOKEN!
+);
+```
+
+# { 로그인 컨트롤러 업데이트 }
+
+## 사용자 로그인 시 전체 사용자 정보를 반환하기 위한 변경 사항
+
+```jsx
+이번 수정 사항의 목표는 로그인 시 기존 사용자(exisitingUser) 데이터만을 보내는 대신,
+
+전체 사용자 문서(user document)를 반환하는 것입니다.
+
+이는 사용자에게 ID, 사용자명, 이메일, 아바타 색상, UID, 생성일 등
+
+더 많은 정보를 포함하여 보낼 수 있게 합니다.
+
+수정할 클래스
+
+	SignIn 클래스 (로그인 관련 클래스)
+
+강의에서는 SignIn 클래스에서만 이 변경 사항을 반영하도록 하며,
+
+SignUp 클래스에서는 이미 관련 데이터가 포함되어 있어 별도 수정이 필요 없습니다.
+```
+
+### 사용자 문서 생성하기
+
+```jsx
+전체 사용자 정보를 보내기 위해 기존 사용자 데이터와 새 객체를 결합합니다.
+
+이를 위해 스프레드 연산자를 사용해 user 객체의 모든 속성을 추가하고, 추가 정보들은 따로 설정합니다.
+```
+
+```jsx
+// 1. 전체 사용자 문서를 만드는 코드
+const userDocument: IUserDocument = {
+  ...user, // user 객체에 있는 모든 필드를 추가합니다.
+  authId: existingUser!._id, // 기존 사용자 데이터에서 authId를 추가
+  username: existingUser!.username, // 사용자명 추가
+  email: existingUser!.email, // 이메일 추가
+  avatarColor: existingUser!.avatarColor, // 아바타 색상 추가
+  uId: existingUser!.uId, // UID 추가
+  createdAt: existingUser!.createdAt // 생성일 추가
+} as IUserDocument;
+```
+
+### 사용자 문서 전송
+
+```jsx
+새로 만든 userDocument 객체를 응답으로 전송합니다.
+
+클라이언트는 이 응답을 통해 사용자에 관한 완전한 데이터를 받게 됩니다.
+```
+
+```jsx
+// 2. 응답에 사용자 문서를 포함하여 전송
+res.status(HTTP_STATUS.OK).json({
+  message: 'User login successfully',
+  user: userDocument, // 완전한 사용자 문서 전송
+  token: userJwt, // JWT 토큰도 함께 전송
+})
+```
+
+## 최종 요약
+
+```jsx
+위와 같은 방식으로 signin.ts 파일에서 기존 사용자 정보가 아닌 전체 사용자 문서를 클라이언트에게
+
+전송하도록 하였습니다.
+
+SignUp에서는 이미 충분한 데이터가 전송되므로 수정이 필요 없으며,
+
+SignIn 클래스에서만 이 변경 사항을 적용하면 됩니다.
+
+이제 로그인 후 클라이언트가 필요한 모든 정보를 제공받아 사용자 인터페이스에서
+
+더 풍부한 사용자 경험을 만들 수 있습니다.
+```
+
+# { 사용자 로그아웃 기능 구현 }
+
+```jsx
+이 강의는 로그아웃(Sign Out) 기능을 구현하는 방법에 대해 설명합니다.
+
+로그아웃 요청이 들어오면 서버에서 사용자 세션을 삭제하여 로그아웃을 완료하고,
+
+응답 메시지로 "로그아웃 성공"을 반환합니다.
+```
+
+## 로그아웃 컨트롤러 파일 생성 (`signout.ts`)
+
+```jsx
+로그아웃 기능을 구현하기 위해 로그아웃 컨트롤러 파일을 만듭니다.
+
+이 파일은 SignOut 클래스를 정의하며, update 메서드를 통해 요청된 로그아웃 작업을 처리합니다.
+```
+
+```jsx
+import HTTP_STATUS from 'http-status-codes';
+import { Request, Response } from 'express';
+
+export class SignOut {
+  public async update(req: Request, res: Response): Promise<void> {
+    // 세션을 null로 설정하여 세션 삭제 (로그아웃)
+    req.session = null;
+    // 응답으로 성공 메시지, 빈 유저 객체, 빈 토큰을 전송
+    res.status(HTTP_STATUS.OK).json({
+      message: 'Logout successful',
+      user: {},
+      token: ''
+    });
+  }
+}
+```
+
+```jsx
+req.session = null:
+
+		세션을 null로 설정하여 사용자가 로그인 상태에서 벗어나도록 합니다.
+
+res.status(HTTP_STATUS.OK).json({...}):
+
+		상태 코드 200(OK)과 함께 로그아웃 성공 메시지를 JSON 형식으로 반환합니다.
+```
+
+## 로그아웃 라우트 추가하기
+
+```jsx
+로그아웃 요청을 처리하기 위해 새로운 라우트를 추가해야 합니다.
+
+AuthRoutes 클래스에서 signoutRoute 메서드를 정의하여 로그아웃 라우트를 추가합니다.
+```
+
+```jsx
+import { SignIn } from '@auth/controllers/signin';
+import { SignOut } from '@auth/controllers/signout';
+import { SignUp } from '@auth/controllers/signup';
+import express, { Router } from 'express';
+
+class AuthRoutes {
+  private router: Router;
+
+  constructor() {
+    this.router = express.Router();
+  }
+
+  public routes(): Router {
+    // 회원가입과 로그인 라우트 설정
+    this.router.post('/signup', SignUp.prototype.create);
+    this.router.post('/signin', SignIn.prototype.read);
+    return this.router;
+  }
+
+  public signoutRoute(): Router {
+    // 로그아웃 라우트 설정
+    this.router.get('/signout', SignOut.prototype.update);
+    return this.router;
+  }
+}
+
+export const authRoutes: AuthRoutes = new AuthRoutes();
+
+```
+
+### 왜 `routes()`와 `signoutRoute()` 메서드를 분리하는가?
+
+```jsx
+보안과 접근 권한:
+
+		로그인되지 않은 사용자는 로그아웃 라우트를 사용할 필요가 없기 때문에 별도로 구분하여 관리합니다.
+
+		로그인과 로그아웃의 기능을 분리함으로써 각 라우트의 접근 권한을 명확하게 할 수 있습니다.
+
+코드의 가독성:
+
+		기능별로 라우트를 나눔으로써 코드가 명확해지고 가독성이 좋아집니다.
+
+		routes()는 회원가입과 로그인을 위한 것이고, signoutRoute()는 로그아웃만을 위한 라우트라는 것이
+
+		더 명확해집니다.
+
+확장성:
+
+		만약 로그인된 사용자에게만 접근 권한이 있는 라우트를 추가해야 할 경우,
+
+		로그아웃 라우트와 비슷한 방식으로 인증이 필요한 라우트를 쉽게 확장할 수 있습니다.
+```
+
+## 애플리케이션에 라우트 적용하기 (`routes.ts`)
+
+```jsx
+애플리케이션의 routes.ts 파일에서 로그아웃 라우트를 설정합니다.
+
+이를 통해 로그아웃 요청이 들어왔을 때 해당 라우트를 찾고 SignOut 컨트롤러의 update 메서드로 연결됩니다.
+```
+
+```jsx
+import { authRoutes } from '@auth/routes/authRoutes';
+import { serverAdapter } from '@service/queues/base.queue';
+import { Application } from 'express';
+
+const BASE_PATH = '/api/v1';
+
+export default (app: Application) => {
+  const routes = () => {
+    app.use('/queues', serverAdapter.getRouter()); // 큐 라우트
+    app.use(BASE_PATH, authRoutes.routes());       // 회원가입, 로그인 라우트
+    app.use(BASE_PATH, authRoutes.signoutRoute()); // 로그아웃 라우트
+  };
+  routes();
+};
+```
+
+```jsx
+app.use(BASE_PATH, authRoutes.signoutRoute()):
+
+		signoutRoute()를 호출하여 로그아웃 라우트를 애플리케이션에 추가합니다.
+```
+
+# { 현재 로그인한 사용자의 정보 가져오기 }
+
+## `CurrentUser` 클래스 및 `read` 메서드 추가
+
+```jsx
+CurrentUser 클래스는 현재 로그인한 사용자의 정보를 가져오는 역할을 합니다.
+
+이 클래스는 read라는 비동기 메서드를 가지고 있습니다.
+
+이 메서드는 먼저 Redis 캐시에서 사용자의 정보를 조회하고, 없으면 데이터베이스에서 사용자 정보를 가져옵니다.
+```
+
+```jsx
+// express에서 Request와 Response 타입을 가져옵니다.
+import { Request, Response } from 'express';
+// Redis 캐시를 위한 UserCache 클래스를 가져옵니다.
+import { UserCache } from '@service/redis/user.cache';
+// 사용자 인터페이스를 가져옵니다.
+import { IUserDocument } from '@user/interfaces/user.interface';
+// 데이터베이스에서 사용자 정보를 처리하는 서비스 모듈을 가져옵니다.
+import { userService } from '@service/db/user.service';
+// HTTP 상태 코드를 가져옵니다.
+import HTTP_STATUS from 'http-status-codes';
+
+// userCache 객체를 초기화합니다.
+const userCache: UserCache = new UserCache();
+
+// CurrentUser 클래스를 정의합니다.
+export class CurrentUser {
+  // read 메서드는 요청을 처리하고 응답을 보냅니다.
+  public async read(req: Request, res: Response): Promise<void> {
+    // 사용자 여부를 나타내는 변수입니다. 기본값은 false입니다.
+    let isUser = false;
+    // JWT 토큰을 저장하는 변수입니다. 기본값은 null입니다.
+    let token = null;
+    // 사용자 정보를 저장하는 변수입니다. 기본값은 null입니다.
+    let user = null;
+
+    // Redis 캐시에서 사용자 정보를 가져옵니다.
+    const cachedUser: IUserDocument = await userCache.getUserFromCache(`${req.currentUser!.userId}`) as IUserDocument;
+
+    // 캐시에 데이터가 없으면 데이터베이스에서 사용자 정보를 가져옵니다.
+    const existingUser: IUserDocument = cachedUser ? cachedUser : await userService.getUserById(`${req.currentUser!.userId}`);
+
+    // 사용자 정보가 있으면 상태값을 설정합니다. Object.keys(existingUser).length는 existingUser 객체의 키(key) 개수를 세는 코드입니다. 키는 객체 안에 있는 속성의 이름을 의미합니다. 속성이 없으면 데이터 없음alse
+    if (Object.keys(existingUser).length) {
+      // 사용자가 존재함을 나타냅니다.
+      isUser = true;
+      // 세션에서 JWT 토큰을 가져옵니다.
+      token = req.session?.jwt;
+      // 사용자 정보를 저장합니다.
+      user = existingUser;
+    }
+
+    // HTTP 상태 코드 200(OK)와 함께 JSON 응답을 보냅니다.
+    res.status(HTTP_STATUS.OK).json({ token, isUser, user });
+  }
+}
+
+```
+
+```jsx
+캐시 조회:
+
+		userCache.getUserFromCache 메서드를 사용하여 Redis 캐시에서 사용자 정보를 조회합니다.
+
+		캐시에 사용자 정보가 있다면 데이터베이스를 조회하지 않고, 캐시 데이터를 반환합니다.
+
+데이터베이스 조회:
+
+		캐시에 정보가 없을 경우 userService.getUserById 메서드를 사용하여 MongoDB에서 데이터를 가져옵니다.
+
+응답 설정:
+
+		사용자 정보가 존재하면 isUser를 true로 설정하고, 세션에서 JWT 토큰을 가져와 token에 저장합니다.
+
+		마지막으로 사용자 정보와 함께 JSON 형태로 응답을 보냅니다.
+```
+
+## 라우터 설정 - `CurrentUserRoutes` 클래스 추가
+
+```jsx
+이제 CurrentUser 클래스를 Express 라우터에 연결하여 /currentuser 엔드포인트에서 사용할 수 있도록 설정합니다.
+```
+
+```jsx
+// express와 Router를 가져옵니다.
+import express, { Router } from 'express';
+// CurrentUser 클래스(컨트롤러)를 가져옵니다.
+import { CurrentUser } from '@auth/controllers/current-user';
+
+// CurrentUserRoutes 클래스를 정의합니다.
+class CurrentUserRoutes {
+  // router 변수를 선언합니다.
+  private router: Router;
+
+  // 생성자 함수입니다. 클래스가 인스턴스화될 때 호출됩니다.
+  constructor() {
+    // express.Router()를 사용하여 router 객체를 초기화합니다.
+    this.router = express.Router();
+  }
+
+  // routes 메서드입니다. 이 메서드는 라우터 설정을 반환합니다.
+  public routes(): Router {
+    // '/currentuser' 경로에 대해 GET 요청이 들어오면 CurrentUser 클래스의 read 메서드를 실행합니다.
+    this.router.get('/currentuser', CurrentUser.prototype.read);
+
+    // 설정된 라우터를 반환합니다.
+    return this.router;
+  }
+};
+
+// CurrentUserRoutes 클래스의 인스턴스를 생성하고 currentUserRoutes로 내보냅니다.
+export const currentUserRoutes: CurrentUserRoutes = new CurrentUserRoutes();
+
+```
+
+## `routes.ts` 파일에서 라우터 추가
+
+```jsx
+마지막으로 routes.ts 파일에 새로운 currentUserRoutes를 추가하여 전체 애플리케이션에서 사용할 수 있도록 합니다.
+```
+
+```jsx
+import { authRoutes } from '@auth/routes/authRoutes';
+import { currentUserRoutes } from '@auth/routes/currentRoutes';
+import { serverAdapter } from '@service/queues/base.queue';
+import { Application } from 'express';
+
+const BASE_PATH = '/api/v1';
+
+export default (app: Application) => {
+  const routes = () => {
+    app.use('/queues', serverAdapter.getRouter());
+    app.use(BASE_PATH, authRoutes.routes());
+    app.use(BASE_PATH, authRoutes.signoutRoute());
+
+    // currentUser 라우터 추가
+    app.use(BASE_PATH, currentUserRoutes.routes());
+  };
+  routes();
+};
+```
+
+## 테스트를 진행해보면 오류 발생 "Cannot read property 'userId' of undefined”
+
+```jsx
+마지막에 발생하는 오류는 "Cannot read property 'userId' of undefined" 오류입니다.
+
+이 오류는 req.currentUser가 undefined일 때, req.currentUser.userId를 접근하려고 시도할 때 발생합니다.
+
+이 오류는 req.currentUser가 설정되지 않았거나, 잘못된 상태에서 접근되고 있다는 것을 의미합니다.
+
+일반적으로 req.currentUser는 인증을 담당하는 미들웨어에서 설정해야 합니다.
+
+만약 사용자가 인증되지 않았거나, 인증 과정에서 문제가 발생한 경우, req.currentUser가 undefined로 남을 수 있습니다.
+```
+
+```jsx
+해결방법
+
+인증 미들웨어 확인: req.currentUser를 설정하는 미들웨어가 제대로 작동하고, CurrentUser 컨트롤러 이전에 실행되는지 확인합니다.
+
+예를 들어, authMiddleware를 사용하여 로그인 상태를 확인하고, req.currentUser에 값을 할당해야 합니다.
+```
+
+# { 오류 원인 및 해결: `req.currentUser`가 `undefined`일 때 발생하는 문제 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381345/notion-blog/_/React_Node_/_4_-_4_-/image_1.png)
+
+```jsx
+에러의 원인은 단순히 current user 속성을 설정하지 않았기 때문입니다.
+
+코드에서 이 속성을 사용하려고 했지만, 실제 사용자 페이로드를 설정하는 부분이 없었습니다.
+
+인터페이스를 보면, current user는 이러한 속성들을 가져야 하는데, 코드 어디에서도 이를 설정하지 않았습니다.
+```
+
+```jsx
+이 강의에서는 Node.js 애플리케이션에서 사용자 인증을 처리하는 미들웨어를 만드는 방법을 다룹니다. JWT(JSON Web Token)를 사용하여:
+
+		* 사용자가 로그인한 상태인지, 즉 인증된 상태인지 확인합니다.
+
+		* 특정 경로(Route)에 접근할 때 사용자가 인증된 상태임을 보장합니다.
+
+		* 토큰이 만료되거나 유효하지 않을 경우를 처리합니다.
+```
+
+## `AuthMiddleware` 클래스 만들기
+
+```jsx
+먼저 AuthMiddleware 클래스를 생성하여 두 가지 중요한 확인 작업을 처리합니다.
+
+		* 토큰 검증(verifyUser): JWT 토큰이 세션에 존재하는지, 유효한지를 확인합니다.
+
+		* 인증 확인(checkAuthentication): 사용자가 인증된 상태인지 확인합니다.
+```
+
+```jsx
+import { Request, Response, NextFunction } from 'express';  // express의 Request, Response, NextFunction 타입을 가져옵니다.
+import JWT from 'jsonwebtoken';  // JWT를 처리하기 위해 jsonwebtoken 라이브러리를 가져옵니다.
+import { config } from '@root/config';  // 설정 값(config)을 가져옵니다. 여기서 JWT 토큰 키 등이 설정되어 있을 수 있습니다.
+import { NotAuthorizedError } from 'src/shared/globals/helpers/error-handler';  // 권한이 없는 오류를 처리할 수 있는 커스텀 오류 클래스입니다.
+import { AuthPayload } from '@auth/interfaces/auth.interface';  // JWT 토큰에서 추출한 사용자 정보(payload)의 타입 정의입니다.
+
+export class AuthMiddleware {
+  // 사용자를 검증하는 메서드입니다. 토큰이 있는지, 그리고 그 토큰이 유효한지를 확인합니다.
+  public verifyUser(req: Request, _res: Response, next: NextFunction): void {
+    // 세션에서 JWT 토큰을 찾습니다. 만약 세션에 토큰이 없다면 인증되지 않은 상태입니다.
+    if (!req.session?.jwt) {
+      // 토큰이 없으면, NotAuthorizedError를 던져서 인증 오류를 발생시킵니다.
+      throw new NotAuthorizedError('토큰이 존재하지 않습니다. 다시 로그인 해주세요.');
+    }
+
+    try {
+      // JWT.verify를 사용하여 세션에 저장된 토큰을 확인합니다.
+      // 토큰이 유효하다면, 그 안에 포함된 사용자 정보(payload)를 디코딩하여 `payload` 변수에 저장합니다.
+      const payload: AuthPayload = JWT.verify(req.session.jwt, config.JWT_TOKEN!) as AuthPayload;
+
+      // 디코딩된 `payload`를 요청 객체(req) 안에 `currentUser`라는 이름으로 저장합니다.
+      // 이 정보는 후속 미들웨어나 라우트에서 사용할 수 있습니다.
+      req.currentUser = payload;
+    } catch (error) {
+      // 만약 토큰 검증 중 오류가 발생하면, 유효하지 않은 토큰이라는 오류를 던집니다.
+      // 예를 들어, 토큰이 변조되었거나 만료된 경우입니다.
+      throw new NotAuthorizedError('유효하지 않은 토큰입니다. 다시 로그인 해주세요.');
+      console.log(error);  // 오류 내용을 콘솔에 출력하여 디버깅을 돕습니다.
+    }
+
+    // 모든 검증이 끝난 후, `next()`를 호출하여 다음 미들웨어나 라우트 핸들러로 제어를 넘깁니다.
+    next();
+  }
+
+  // 사용자가 인증된 상태인지 확인하는 메서드입니다.
+  // `verifyUser` 미들웨어가 먼저 실행되어야 이 메서드가 제대로 작동합니다.
+  public checkAuthentication(req: Request, _res: Response, next: NextFunction): void {
+    // `req.currentUser`에 사용자 정보가 없다면, 인증되지 않은 사용자로 간주합니다.
+    if (!req.currentUser) {
+      // 인증되지 않은 사용자가 접근하려 할 경우, NotAuthorizedError를 던집니다.
+      throw new NotAuthorizedError('이 경로에 접근하려면 인증이 필요합니다.');
+    }
+
+    // 인증이 완료되면, `next()`를 호출하여 다음 미들웨어나 라우트 핸들러로 제어를 넘깁니다.
+    next();
+  }
+}
+
+```
+
+### \* `next`와 `NextFunction`
+
+```jsx
+next():
+
+		미들웨어 함수에서 next()를 호출하면, Express는 다음 미들웨어로 요청을 넘깁니다.
+
+		즉, 현재 미들웨어에서 처리가 끝난 후, 다음 작업을 이어서 실행하는 역할을 합니다.
+
+NextFunction:
+
+		이는 next() 함수의 타입입니다. NextFunction은 미들웨어 함수에서 next()를 호출할 수 있도록 정의된 타입입니다.
+
+		이 타입을 사용하면, Express가 요청을 처리하는 흐름을 제어할 수 있습니다.
+
+
+에러 처리: 만약 에러가 발생하면, next(error)와 같이 next()에 에러를 전달하여 에러 처리 미들웨어로 넘길 수도 있습니다.
+```
+
+```jsx
+import { Request, Response, NextFunction } from 'express';
+
+const myMiddleware = (req: Request, res: Response, next: NextFunction) => {
+  console.log('첫 번째 미들웨어 실행');
+  next();  // 이걸 호출하면, 다음 미들웨어로 넘어갑니다.
+};
+
+const secondMiddleware = (req: Request, res: Response, next: NextFunction) => {
+  console.log('두 번째 미들웨어 실행');
+  res.send('응답 완료!');  // 최종적으로 응답을 클라이언트에 보냅니다.
+};
+
+app.use(myMiddleware);  // 첫 번째 미들웨어 사용
+app.use(secondMiddleware);  // 두 번째 미들웨어 사용
+```
+
+## 미들웨어를 라우트에 적용하기
+
+```jsx
+AuthMiddleware를 생성한 후, 이를 특정 경로에 적용하여 인증된 사용자만 접근할 수 있도록 설정합니다. 예를 들어:
+
+현재 사용자(Current User) 경로: /currentuser 경로에 checkAuthentication 미들웨어를 추가하여 인증된 사용자만 이 경로에 접근할 수 있도록 설정합니다.
+```
+
+```jsx
+import express, { Router } from 'express';  // express와 Router를 임포트
+import { CurrentUser } from '@auth/controllers/current-user';  // CurrentUser 컨트롤러를 임포트
+import { authMiddleware } from '@global/helpers/auth-middleware';  // 인증 관련 미들웨어를 임포트
+
+// CurrentUserRoutes 클래스를 정의합니다. 이 클래스는 사용자의 현재 정보를 다루는 라우트를 관리합니다.
+class CurrentUserRoutes {
+  private router: Router;  // router는 라우트 핸들러를 정의하는 Express의 Router 객체입니다.
+
+  // 생성자에서는 Express Router 객체를 초기화합니다.
+  constructor() {
+    this.router = express.Router();  // express.Router()를 호출하여 라우터를 생성합니다.
+  }
+
+  // routes 메서드는 실제로 라우트를 설정하는 메서드입니다.
+  public routes(): Router {
+    // /currentuser 경로로 GET 요청이 들어올 때,
+    // 먼저 `checkAuthentication` 미들웨어를 실행하여 인증을 확인합니다.
+    // 인증이 통과하면 `CurrentUser.prototype.read` 메서드를 호출하여
+    // 현재 사용자 정보를 응답으로 보냅니다.
+    this.router.get('/currentuser', authMiddleware.checkAuthentication, CurrentUser.prototype.read);
+    return this.router;  // 설정된 라우터를 반환합니다.
+  }
+}
+
+// CurrentUserRoutes 클래스의 인스턴스를 생성하여 내보냅니다.
+// 이 인스턴스는 라우터를 설정하고 사용하는 데 사용됩니다.
+export const currentUserRoutes: CurrentUserRoutes = new CurrentUserRoutes();
+
+```
+
+## 미들웨어를 메인 애플리케이션 라우트에 추가하기
+
+```jsx
+마지막으로, 애플리케이션 수준에서 verifyUser 미들웨어를 추가하여 모든 인증된 경로에 대해 JWT 토큰을 검증하도록 설정합니다.
+
+이 방식으로, 인증이 필요한 모든 라우트는 이 미들웨어를 통해 토큰 검증을 거칩니다.
+```
+
+```jsx
+import { authRoutes } from '@auth/routes/authRoutes';
+import { currentUserRoutes } from '@auth/routes/currentRoutes';
+import { authMiddleware } from '@global/helpers/auth-middleware';
+import { serverAdapter } from '@service/queues/base.queue';
+import { Application } from 'express';
+
+const BASE_PATH = '/api/v1';
+
+export default (app: Application) => {
+  const routes = () => {
+    app.use('/queues', serverAdapter.getRouter());
+    app.use(BASE_PATH, authRoutes.routes());
+    app.use(BASE_PATH, authRoutes.signoutRoute());
+
+    // 인증된 경로에 대해 JWT 토큰을 확인하도록 `verifyUser` 적용
+    app.use(BASE_PATH, authMiddleware.verifyUser, currentUserRoutes.routes());
+  };
+  routes();
+};
+
+```
+
+## 테스트
+
+```jsx
+미들웨어가 제대로 작동하는지 테스트할 수 있습니다:
+
+1. 로그인: 로그인하여 JWT 토큰을 발급받습니다.
+
+2. /currentuser 경로 접근: 미들웨어가 토큰을 검증하고 인증된 사용자에게 접근을 허용하는지 확인합니다.
+
+3. 토큰 만료 테스트: 토큰의 만료 시간을 짧게 설정(예: 5초)하여 만료 후 접근이 제한되는지 확인합니다.
+```
+
+## 오류 처리 시나리오
+
+```jsx
+AuthMiddleware 클래스는 여러 가지 상황을 처리합니다:
+
+		토큰이 없을 때: 세션에 토큰이 없으면 verifyUser 메서드가 오류를 발생시킵니다.
+
+		토큰이 유효하지 않을 때: 토큰이 만료되었거나 위조된 경우, verifyUser가 오류를 발생시킵니다.
+
+		인증되지 않은 상태로 접근 시도: 인증이 필요한 경로에 비인증 사용자가 접근하려고 하면 checkAuthentication 메서드가 오류를 발생시킵니다.
+```

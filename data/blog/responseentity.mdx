@@ -1,0 +1,106 @@
+---
+title: 'ResponseEntity 사용법'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# **ResponseEntity**개념
+
+```java
+ResponseEntity는 단순히 ResponseBody를 전달하는 것과 다르게 헤더 정보와 HTTP 상태 코드를 함께 가공하여 전달할 수 있다.
+```
+
+```java
+기존 프로젝트에는 단순히 값을 body에 담아 전달하기 위한 api 서버를 구성하였다. 하지만 프론트 개발자와의 원할한 통신을 위해서는
+
+body 이외에 HTTP의 상태 코드와 헤더 정보를 좀 더 상세하게 조작해야 할 필요가 있다.
+```
+
+# **@RestController**
+
+```java
+Spring에는 기본적으로 @Controller와 @ResponseBody을 합쳐둔 @RestController 애노테이션으로 인하여 손쉽게 REST API를 구성할 수 있다.
+```
+
+## 간단한 User의 정보를 가지고 있는 도메인 클래스
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381129/notion-blog/_/_/_/ResponseEntity_/Untitled.png)
+
+## @RestController가 적용된 controller에 정의한 User 조회 메소드
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381126/notion-blog/_/_/_/ResponseEntity_/Untitled_1.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381126/notion-blog/_/_/_/ResponseEntity_/Untitled_2.png)
+
+```java
+postman을 활용하여 간단하게 확인해보면 Json 형태로 body에 담겨 응답하는 것을 확인할 수 있다.
+
+이렇게 @RestController 애노테이션을 사용하면 편리하고 손쉽게 REST API를 구현할 수 있다는 것을 확인할 수 있었다.
+
+데이터를 단순히 제공하는데 그치지 않고 더 나아가 응답에 헤더 정보와 HTTP 상태 코드 등을 좀 더 세밀하게 개발자가 처리해야 할 때 **ResponseEntity** 를 사용한다 ****
+```
+
+# **ResponseEntity**
+
+```java
+Spring에서는 body와 헤더 정보, 상태 코드 등을 담을 수 있는 ResponseEntity가 제공된다.
+
+기존에는 User 클래스를 return 타입으로 지정햇지만 ResponseEntity로 추가적인 정보를 설정할 수 있다.
+
+예를 들면 존재하지 않는 id를 가진 user를 조회하면 404 상태 코드를 return 하도록 작성하였다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381128/notion-blog/_/_/_/ResponseEntity_/Untitled_3.png)
+
+```java
+또한 ResponseEntity를 생성하기 위한 방법에는 생성자를 사용하는 방법과 static 메소드를 사용하는 방법으로 제공된다.
+
+ResponseEntity.ok().body(userRepository.findById(id));
+
+new ResponseEntity<>(userRepository.findById(id), HttpStatus.OK);
+
+이제 이러한 ResponseEntity를 활용하면 다양한 정보를 적용하여 응답으로 전달할 수 있게 된다.
+```
+
+# **ResponseEntity의 응용**
+
+```java
+ResponseEntity는 일반적인 객체 뿐만 아니라 List와 Map 등 다양한 객체들을 담아서 전달이 가능하다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381128/notion-blog/_/_/_/ResponseEntity_/Untitled_4.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381128/notion-blog/_/_/_/ResponseEntity_/Untitled_5.png)
+
+```java
+Map의 장점으로는 단일 객체보다 다양한 정보를 한번에 함께 제공할 수 있기 때문에 좀 더 큰 확장성을 가지고 있다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381128/notion-blog/_/_/_/ResponseEntity_/Untitled_6.png)
+
+```java
+예를 들면 List와 같이 여러 값을 제공할 때 count와 같은 정보도 함께 담아 전달하도록 설정할 수 있기 때문에 좀 더 필요한 정보를 손쉽게 가공하여 클라이언트에게 전달할 수 있다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381128/notion-blog/_/_/_/ResponseEntity_/Untitled_7.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381129/notion-blog/_/_/_/ResponseEntity_/Untitled_8.png)
+
+```java
+하지만 이렇게 매번 Return을 위해 Map을 생성하여 필요한 정보를 put 하는 것은 매우 귀찮은 일이다. 응답을 위한 필드 값을 명시한 클래스를 횔용하면 이러한 귀찮음을 해결할 수 있다.
+
+inner 클래스로 간단하게 명시한 Result 클래스이다. Result class에는 data를 담는 필드와 count 값을 가지는 int 필드 두 개로 이루어져 있다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381129/notion-blog/_/_/_/ResponseEntity_/Untitled_9.png)
+
+```java
+Map을 사용했을 때와 동일하지만 이러한 응답 형식이 정해져 있다면 이렇게 별도로 클래스를 제작하여 사용하는 것이 코드의 재사용성을 손쉽게 줄일 수 있다.
+
+이러한 별도의 클래스는 개발자의 입맛에 맞추어 다양하게 수정하여 사용할 수 있다.
+
+Body에 응답을 위한 별도의 클래스를 제작하여 사용하면 정해진 규약에 따라 데이터를 전달할 수 있는 장점이 있다.
+```

@@ -1,0 +1,620 @@
+---
+title: 'Supabase Realtime'
+date: '2026-09-02'
+category: '풀스택/Supabase'
+tags: ['풀스택', 'Supabase']
+draft: false
+summary: ''
+---
+
+```jsx
+Supabase Realtime은 데이터베이스의 변화를 실시간으로 클라이언트(예: 웹 브라우저)에 알려주는 기능입니다.
+
+TalentSwap의 채팅 시스템에서는 사용자 A가 메시지를 보내면 사용자 B의 화면에 즉시 메시지가 나타나도록 만드는 핵심 기술입니다.
+
+이 가이드는 Supabase Realtime의 개념, 문법, 동작 방식, 그리고 TalentSwap에서의 활용을 초보자 친화적으로 설명합니다.
+```
+
+# { 목차 }
+
+```jsx
+1. Supabase Realtime이란? (개념과 역할)
+
+2. 어떻게 동작하는가? (작동 원리)
+
+3. Supabase Realtime의 주요 문법 (코드 구조와 사용법)
+
+4. TalentSwap 채팅 시스템에서의 활용 (실제 예제)
+
+5. 디버깅과 트러블슈팅 (문제 해결 방법)
+
+6. 추가 팁과 모범 사례
+```
+
+# { 1. Supabase Realtime이란? }
+
+## 1.1. 개념
+
+```jsx
+Supabase Realtime은 Supabase의 PostgreSQL 데이터베이스에서 특정 테이블의 데이터 변화(예: 새 데이터 추가, 수정, 삭제)를 실시간으로 감지해 클라이언트에 전송하는 기능입니다.
+
+이를 통해 사용자들은 서버에 별도로 요청하지 않아도 데이터를 즉시 받아볼 수 있습니다.
+
+비유 없이 쉽게 설명:
+
+데이터베이스는 데이터를 저장하는 창고입니다.
+
+Supabase Realtime은 창고에 새 물건(데이터)이 추가되거나 바뀌면 즉시 클라이언트(사용자의 브라우저)에 "새 물건 들어왔어요!"라고 알리는 메신저입니다.
+
+TalentSwap에서는 새 메시지가 데이터베이스에 추가되면, 상대방의 화면에 즉시 표시되도록 합니다.
+```
+
+## 1.2. 역할
+
+```jsx
+실시간 메시지 업데이트: 사용자 A가 메시지를 보내면 사용자 B의 화면에 즉시 표시.
+
+알림 시스템: 새 메시지가 도착하면 헤더의 종 모양 아이콘에 빨간 점 표시.
+
+효율성: 서버에 주기적으로 데이터를 요청(polling)하지 않고, WebSocket을 통해 변화만 전송.
+```
+
+## 1.3. 사용 기술
+
+```jsx
+WebSocket: 클라이언트와 서버 간의 지속적인 연결을 유지해 실시간 데이터 전송.
+
+PostgreSQL의 LISTEN/NOTIFY: 데이터베이스에서 변화가 발생하면 이벤트를 발생시킴.
+
+Supabase 클라이언트: JavaScript/TypeScript로 작성된 클라이언트 라이브러리를 통해 쉽게 설정.
+```
+
+# { 2. 어떻게 동작하는가? }
+
+## 2.1. 동작 원리
+
+```jsx
+Supabase Realtime은 WebSocket을 통해 데이터베이스와 클라이언트를 연결합니다. 동작 흐름은 다음과 같습니다:
+
+1. 클라이언트가 구독 시작:
+
+		클라이언트(브라우저)가 특정 테이블(예: messages)의 변화를 감지하도록 Supabase에 요청.
+
+		예: "특정 채팅방의 새 메시지를 알려줘!"
+
+2. 데이터베이스 변화 감지:
+
+		PostgreSQL 데이터베이스에서 INSERT(추가), UPDATE(수정), DELETE(삭제) 같은 변화가 발생.
+
+		Supabase는 이를 postgres_changes 이벤트로 포착.
+
+3. 실시간 알림 전송:
+
+		WebSocket을 통해 구독 중인 클라이언트에 변화 데이터를 전송.
+
+		데이터는 JSON 형태로 전달됨 (예: 새 메시지의 내용, ID 등).
+
+4. 클라이언트에서 처리:
+
+		클라이언트는 받은 데이터를 화면에 반영 (예: 새 메시지를 채팅창에 추가).
+```
+
+## 2.2. TalentSwap에서의 예
+
+```jsx
+사용자 A가 메시지를 보내면, messages 테이블에 새 행이 추가됨.
+
+Supabase Realtime이 이를 감지해 사용자 B에게 알림.
+
+사용자 B의 Next.js 앱이 새 메시지를 받아 채팅창에 즉시 표시.
+```
+
+# { 3. Supabase Realtime의 주요 문법 }
+
+```jsx
+Supabase Realtime은 @supabase/supabase-js 라이브러리를 사용해 구현됩니다. 주요 문법과 구성 요소를 살펴보겠습니다.
+```
+
+## 3.1. Supabase 클라이언트 설정
+
+```jsx
+먼저 Supabase 클라이언트를 초기화합니다.
+```
+
+```jsx
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  'https://your-project.supabase.co', // Supabase 프로젝트 URL
+  'your-public-anon-key' // Supabase 공개 키
+)
+```
+
+```jsx
+createClient: Supabase와 연결하는 함수.
+
+URL과 키는 Supabase 프로젝트 설정에서 확인 가능.
+
+이 클라이언트는 데이터베이스 조회, 삽입, 실시간 구독 등 모든 작업에 사용됨.
+```
+
+## 3.2. 채널 생성 및 구독
+
+```jsx
+Supabase Realtime은 채널(channel)을 통해 특정 데이터를 구독합니다.
+
+채널은 WebSocket 연결의 특정 주제(topic)라고 생각하면 됩니다.
+```
+
+```jsx
+const channel = supabase
+  .channel('channel-name') // 고유한 채널 이름
+  .on(
+    'postgres_changes', // 이벤트 타입
+    {
+      event: 'INSERT', // 감지할 이벤트 (INSERT, UPDATE, DELETE 등)
+      schema: 'public', // 데이터베이스 스키마
+      table: 'table-name', // 대상 테이블
+      filter: 'column=eq.value', // 필터 조건 (선택)
+    },
+    (payload) => {
+      // 변화 발생 시 실행될 콜백 함수
+      console.log('변화 발생:', payload)
+    }
+  )
+  .subscribe() // 구독 시작
+```
+
+```jsx
+.channel('channel-name'): 고유한 채널 이름을 지정 (예: messages:chat123).
+
+.on('postgres_changes', ...): PostgreSQL의 변화 이벤트를 감지.
+
+		event: 감지할 변화 타입 (INSERT, UPDATE, DELETE, 또는 *로 모두 감지).
+
+		schema: 테이블이 속한 스키마 (보통 public).
+
+		table: 대상 테이블 (예: messages).
+
+		filter: 특정 조건에 맞는 변화만 감지 (예: chat_id=eq.chat123).
+
+.subscribe(): WebSocket 연결을 시작해 구독 활성화.
+```
+
+## 3.3. 구독 해제
+
+```jsx
+구독을 종료하려면 채널을 제거합니다.
+```
+
+```jsx
+supabase.removeChannel(channel)
+```
+
+```jsx
+컴포넌트가 언마운트되거나 채팅방을 나갈 때 호출.
+
+메모리 누수를 방지하고 불필요한 네트워크 연결을 정리.
+```
+
+## 3.4. 구독 상태 관리
+
+```jsx
+구독 상태를 모니터링해 연결 상태를 확인할 수 있습니다.
+```
+
+```jsx
+const channel = supabase
+  .channel('channel-name')
+  .on('postgres_changes', { ... }, (payload) => { ... })
+  .subscribe((status) => {
+    console.log('구독 상태:', status);
+    if (status === 'SUBSCRIBED') {
+      console.log('구독 성공!');
+    } else if (status === 'CHANNEL_ERROR') {
+      console.log('연결 오류 발생');
+    } else if (status === 'TIMED_OUT') {
+      console.log('타임아웃, 재연결 필요');
+    }
+  });
+```
+
+```jsx
+SUBSCRIBED: 구독 성공.
+
+CHANNEL_ERROR: 연결 오류.
+
+TIMED_OUT: 연결 시간 초과.
+
+CLOSED: 구독 종료.
+```
+
+## 3.5. 페이로드 구조
+
+```jsx
+Supabase Realtime이 전송하는 데이터(payload)는 JSON 형태입니다.
+```
+
+```jsx
+{
+  "event": "INSERT",
+  "schema": "public",
+  "table": "messages",
+  "new": {
+    "id": "uuid",
+    "chat_id": "chat123",
+    "sender_id": "user123",
+    "content": "Hello!",
+    "created_at": "2025-07-30T15:40:00Z"
+  },
+  "commit_timestamp": "2025-07-30T15:40:00Z"
+}
+```
+
+```jsx
+event: 발생한 변화 타입 (INSERT, UPDATE, DELETE).
+
+new: 새로 추가된 데이터 (INSERT의 경우).
+
+old: 삭제된 데이터 (DELETE의 경우).
+
+commit_timestamp: 변화가 발생한 시간.
+```
+
+# { 4. TalentSwap 채팅 시스템에서의 활용 }
+
+```jsx
+TalentSwap에서는 Supabase Realtime을 두 가지 주요 목적으로 사용합니다:
+
+
+		특정 채팅방의 메시지 실시간 업데이트 (/src/hooks/useChat.ts).
+
+		새 메시지 알림 (/src/hooks/useNotifications.ts).
+```
+
+## 4.1. 채팅방 메시지 실시간 업데이트
+
+```jsx
+상황: 사용자가 특정 채팅방(/chat/[id])에 있을 때, 상대방이 보낸 메시지를 즉시 화면에 표시.
+```
+
+```jsx
+import { useState, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient('https://your-project.supabase.co', 'your-public-anon-key');
+
+export function useChat(chatId?: string) {
+  const [messages, setMessages] = useState([]);
+
+  useEffect(() => {
+    if (!chatId) return;
+
+    // 특정 채팅방 메시지 구독
+    const channel = supabase
+      .channel(`messages:${chatId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `chat_id=eq.${chatId}`,
+        },
+        (payload) => {
+          // 자신이 보낸 메시지는 제외 (Optimistic Update로 이미 표시됨)
+          if (payload.new.sender_id !== 'current_user_id') {
+            setMessages((prev) => [...prev, payload.new]);
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('구독 상태:', status);
+      });
+
+    // 컴포넌트 언마운트 시 구독 정리
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [chatId]);
+
+  return { messages, setMessages };
+}
+```
+
+```jsx
+동작 순서:
+
+		1. Next.js 컴포넌트(/app/chat/[id]/page.tsx)에서 useChat 훅을 호출.
+
+		2. chatId가 제공되면, 해당 채팅방의 메시지 구독 시작.
+
+		3. 새 메시지가 messages 테이블에 추가되면, payload.new를 받아 messages 상태에 추가.
+
+		4. 자신이 보낸 메시지는 제외 (Optimistic Update로 이미 화면에 표시됨).
+
+		5. 컴포넌트가 언마운트되면(useEffect의 cleanup 함수), 구독을 정리해 메모리 누수 방지.
+
+Next.js와의 통합:
+
+		useEffect는 클라이언트 컴포넌트('use client')에서 실행.
+
+		동적 라우팅(/chat/[id])에서 chatId를 params.id로 가져옴.
+```
+
+## 4.2. 새 메시지 알림
+
+```jsx
+상황: 사용자가 채팅방 밖에 있을 때, 새 메시지가 도착하면 헤더의 종 모양 아이콘에 알림 표시.
+```
+
+```jsx
+import { useState, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient('https://your-project.supabase.co', 'your-public-anon-key');
+
+export function useNotifications(userId: string) {
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    // 모든 메시지 감지 (전역 구독)
+    const channel = supabase
+      .channel(`user-notifications-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+        },
+        (payload) => {
+          if (payload.new.sender_id !== userId) {
+            const newNotification = {
+              id: `notif-${Date.now()}`,
+              type: 'chat_message',
+              title: 'New Message',
+              message: payload.new.content,
+              chatId: payload.new.chat_id,
+            };
+            setNotifications((prev) => [newNotification, ...prev]);
+            setUnreadCount((prev) => prev + 1);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [userId]);
+
+  const markAsRead = (notificationId: string) => {
+    setNotifications((prev) => prev.filter((notif) => notif.id !== notificationId));
+    setUnreadCount((prev) => prev - 1);
+  };
+
+  return { notifications, unreadCount, markAsRead };
+}
+```
+
+```jsx
+동작 순서:
+
+		1. useNotifications 훅이 사용자 ID(userId)를 받아 전역 메시지 구독 시작.
+
+		2. messages 테이블에 새 메시지가 추가되면, 발신자가 자신이 아닌 경우 알림 생성.
+
+		3. 알림을 notifications 상태에 추가하고, unreadCount 증가.
+
+		4. 알림 클릭 시 markAsRead로 읽음 처리 및 카운트 감소.
+
+		5. 컴포넌트 언마운트 시 구독 정리.
+
+Next.js와의 통합:
+
+		/src/components/common/NotificationDropdown.tsx에서 사용.
+
+		알림 클릭 시 window.location.href로 /chat/[chatId]로 이동.
+```
+
+# { 5. 디버깅과 트러블슈팅 }
+
+```jsx
+초보 개발자가 Supabase Realtime에서 자주 마주칠 수 있는 문제를 해결하는 방법을 정리합니다.
+```
+
+## 5.1. 실시간 메시지가 안 옴
+
+```jsx
+증상: 새 메시지가 데이터베이스에 추가되지만 클라이언트에 반영되지 않음.
+
+원인:
+
+		구독이 제대로 설정되지 않음.
+
+		WebSocket 연결 문제 (네트워크 불안정).
+
+		RLS 정책으로 데이터 접근 제한.
+```
+
+### 1. 구독 상태 확인
+
+```jsx
+const channel = supabase
+  .channel(`messages:${chatId}`)
+  .on('postgres_changes', { ... }, (payload) => {
+    console.log('새 메시지:', payload);
+  })
+  .subscribe((status) => {
+    console.log('구독 상태:', status);
+    if (status === 'SUBSCRIBED') {
+      console.log('구독 성공');
+    } else if (status === 'CHANNEL_ERROR') {
+      console.log('연결 오류, 3초 후 재시도');
+      setTimeout(() => subscribeToMessages(chatId), 3000);
+    }
+  });
+```
+
+```jsx
+console.log로 상태 확인.
+
+CHANNEL_ERROR 시 재시도 로직 추가.
+```
+
+### 2. RLS 정책 확인
+
+```jsx
+CREATE POLICY "Users can view messages" ON messages
+  FOR SELECT USING (
+    chat_id IN (
+      SELECT id FROM chats WHERE auth.uid() = user1_id OR auth.uid() = user2_id
+    )
+  );
+```
+
+```jsx
+사용자가 해당 채팅방의 메시지에 접근 권한이 있는지 확인.
+```
+
+### 3. 네트워크 상태 확인
+
+```jsx
+useEffect(() => {
+  const handleOnline = () => {
+    console.log('네트워크 연결됨, 구독 재시작')
+    subscribeToMessages(chatId)
+  }
+  window.addEventListener('online', handleOnline)
+  return () => window.removeEventListener('online', handleOnline)
+}, [chatId])
+```
+
+## 5.2. 메시지 중복 표시
+
+```jsx
+증상: 같은 메시지가 여러 번 화면에 나타남.
+
+원인:
+
+		Optimistic Update와 실시간 업데이트가 중복 처리됨.
+
+		동일한 메시지 ID가 여러 번 추가됨.
+```
+
+```jsx
+해결:
+
+const handleNewMessage = (newMessage) => {
+  setMessages((prev) => {
+    if (prev.find((msg) => msg.id === newMessage.id)) {
+      console.log('중복 메시지 무시:', newMessage.id);
+      return prev;
+    }
+    return [...prev, newMessage];
+  });
+};
+```
+
+```jsx
+메시지 ID로 중복 체크.
+
+자신이 보낸 메시지는 제외
+```
+
+```jsx
+if (newMessage.sender_id === userId) return
+```
+
+## 5.3. 구독이 끊김
+
+```jsx
+증상: 일정 시간 후 실시간 업데이트가 멈춤.
+
+원인:
+
+		WebSocket 연결 타임아웃.
+
+		컴포넌트 언마운트 시 구독 정리 누락.
+```
+
+```jsx
+해결:
+
+구독 정리 확인:
+
+useEffect(() => {
+  const channel = supabase.channel(`messages:${chatId}`).on(...).subscribe();
+  return () => supabase.removeChannel(channel);
+}, [chatId]);
+
+재연결 로직 추가
+
+const retrySubscription = (chatId) => {
+  console.log('재연결 시도');
+  const channel = supabase.channel(`messages:${chatId}`).on(...).subscribe();
+};
+```
+
+# { 6. 추가 팁과 모범 사례 }
+
+## 6.1. 구독 최적화
+
+```jsx
+단일 채널 사용: 동일한 채팅방에 대해 여러 번 구독하지 않도록 주의
+```
+
+```jsx
+useEffect(() => {
+  if (messageChannel) supabase.removeChannel(messageChannel);
+  const channel = supabase.channel(`messages:${chatId}`).on(...).subscribe();
+  setMessageChannel(channel);
+  return () => supabase.removeChannel(channel);
+}, [chatId]);
+```
+
+```jsx
+필터 활용: 불필요한 데이터를 줄이기 위해 filter 사용
+```
+
+```jsx
+filter: `chat_id=eq.${chatId}`
+```
+
+## 6.2. 성능 고려
+
+```jsx
+메모리 관리: 컴포넌트 언마운트 시 반드시 구독 정리.
+
+상태 업데이트 최적화:
+```
+
+```jsx
+setMessages((prev) => [...prev, newMessage]) // 함수형 업데이트로 최신 상태 보장
+```
+
+## 6.3. 디버깅 팁
+
+```jsx
+Supabase 대시보드에서 Realtime 로그 확인.
+
+console.log로 페이로드와 구독 상태 추적.
+
+브라우저 개발자 도구의 네트워크 탭에서 WebSocket 연결 확인.
+```
+
+# 마무리
+
+```jsx
+Supabase Realtime은 TalentSwap 채팅 시스템에서 메시지와 알림을 실시간으로 처리하는 핵심 기술입니다. 주요 포인트는 다음과 같습니다:
+
+		채널과 구독: 특정 테이블의 변화를 감지해 클라이언트에 전송.
+
+		문법: .channel(), .on('postgres_changes', ...), .subscribe()로 설정.
+
+		Next.js 통합: 클라이언트 컴포넌트에서 useEffect로 구독 관리.
+
+		트러블슈팅: 구독 상태 확인, RLS 점검, 중복 방지.
+```

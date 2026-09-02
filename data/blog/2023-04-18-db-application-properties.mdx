@@ -1,0 +1,516 @@
+---
+title: '2023-04-18(마리아 DB 사용법, application.properties연결 등)'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# 마리아 DB 사용법
+
+![Untitled](<2023-04-18(%EB%A7%88%EB%A6%AC%EC%95%84%20DB%20%EC%82%AC%EC%9A%A9%EB%B2%95,%20application%20properties%EC%97%B0%EA%B2%B0%20%EB%93%B1)/Untitled.png>)
+
+```jsx
+3가지 DB 중에 하나를 선택해서 사용해야한다
+```
+
+![Untitled](<2023-04-18(%EB%A7%88%EB%A6%AC%EC%95%84%20DB%20%EC%82%AC%EC%9A%A9%EB%B2%95,%20application%20properties%EC%97%B0%EA%B2%B0%20%EB%93%B1)/Untitled%201.png>)
+
+```jsx
+use db; 를 사용해서 사용할 DB 를 선택해준다.
+
+* 여기서 선택해주지 않는다면 db.test 라고 붙여줘야한다.(불편함)
+```
+
+```sql
+-- DataBase 선택
+
+use db;
+
+-- 크게 오라클과 다를바 없지만 약간의 차이가 있다.
+-- Oracle 영어 한글자 1byte, 한글 1글자 2~3
+-- Mysql 영어및 한글 1글자는 크기가 같다
+
+CREATE TABLE TEST ( -- 대 소문자를 구분
+	NUM BIGINT AUTO_INCREMENT PRIMARY KEY, -- AUTO_INCREMENT 시퀸서랑 비슷한 기능
+	NAME VARCHAR(100), -- VARCHAR2 가 VARCHAR 임
+	INFO LONGTEXT,  -- 오라클의 CLOB 같은 큰 글자를 담을 때
+	BIRTH DATE
+)
+
+SELECT *
+FROM db.TEST;  -- use db 를 사용했기 때문에 db. 생략가능
+
+INSERT INTO TEST (NUM, NAME, INFO, BIRTH)
+VALUES(NULL, 'IU', 'singer', now())  -- now 는 지금 시간  NULL 을 넣어서 시퀸스 사용
+
+INSERT INTO TEST
+VALUES (0, 'WINTER', 'Group', now()) -- 자동증가 옵션을 주고싶으면 0 이나 null 을 주기
+
+INSERT INTO TEST (NAME, INFO, BIRTH )
+VALUES('CHOA', 'TEST', now() )      -- 아예 생략도 가능하다  (총 3가지 null,0,제거)
+```
+
+## DataType
+
+### 1. Number(숫자)
+
+```jsx
+1. BIT(N)  : 1-8(byte)
+2. INT     : -21억 ~ +21억
+3. BIGINT  : Long과 같다
+4. FLOAT   : 소숫점 7자리
+5. DOUBLE  : 소숫점 15자리
+6. DECIMAL(전체자릿수, 소숫점자리수)
+```
+
+### 2. 문자열
+
+```jsx
+1. CHAR(1-255)  : 글자수, 고정길이 문자열
+2. VARHCAR(?)   : 가변길이 문자열
+3. TEXT         : 65535
+4. MEDIUMTEXT   : 1677715
+4. LONGTEXT     : 4GB
+```
+
+### 3. 날짜
+
+```jsx
+1. DATE : YYYY-MM-DD
+2. TIME : HH:MM:SS
+3. DATETIME : YYYY-MM-DD HH:MM:SS
+4. TIMESTAMP : DB의 TIME_ZONE 시스템 변수와 관련이 있음,
+```
+
+### 4. 기타
+
+```jsx
+1. JSON    :  JSON문서 저장, MYSQL 5.7.8이상 부터 지원
+2. GEOMETRY : 선, 점 , 도형 같은 공간 데이터 객체를 저장
+```
+
+## Limit
+
+```jsx
+SELECT 때 일정한 갯수 만큼 조회할 때 사용
+Oracle의 ROWNUM 대신 사용
+
+LIMIT 시작인덱스번호 , 조회할 갯수 (몇번부터 , 몇개까지 가져올거냐)
+
+SELECT * FROM QNA
+ORDER BY NUM DESC
+LIMIT 0 , 10
+
+SELECT * FROM QNA
+ORDER BY NUM DESC
+LIMIT 10 , 10
+
+SELECT * FROM QNA
+ORDER BY NUM DESC
+LIMIT 20 , 10
+```
+
+- db 실습
+
+  ```sql
+  -- DataBase 선택
+
+  use db;
+
+  -- 크게 오라클과 다를바 없지만 약간의 차이가 있다.
+  -- Oracle 영어 한글자 1byte, 한글 1글자 2~3
+  -- Mysql 영어및 한글 1글자는 크기가 같다
+
+  CREATE TABLE TEST ( -- 대 소문자를 구분
+  	NUM BIGINT AUTO_INCREMENT PRIMARY KEY, -- AUTO_INCREMENT 시퀸서랑 비슷한 기능
+  	NAME VARCHAR(100), -- VARCHAR2 가 VARCHAR 임
+  	INFO LONGTEXT,  -- 오라클의 CLOB 같은 큰 글자를 담을 때
+  	BIRTH DATE
+  );
+
+  SELECT *
+  FROM db.TEST;  -- use db 를 사용했기 때문에 db. 생략가능
+
+  INSERT INTO TEST (NUM, NAME, INFO, BIRTH)
+  VALUES(NULL, 'IU', 'singer', now())  -- now 는 지금 시간  NULL 을 넣어서 시퀸스 사용
+
+  INSERT INTO TEST
+  VALUES (0, 'WINTER', '테스또', now()) -- 자동증가 옵션을 주고싶으면 0 이나 null 을 주기
+
+  INSERT INTO TEST (NAME, INFO, BIRTH )
+  VALUES('CHOA', 'TEST', now() )      -- 아예 생략도 가능하다  (총 3가지 null,0,제거)
+
+  INSERT INTO TEST(NAME, INFO, BIRTH)
+  VALUES('한글테스트','테테테',now())
+
+  -- BOARD : NOTICE, QNA
+
+  -- 글번호, 글제목, 글내용, 작성자, 작성일, 조회수
+
+  -- REF, STEP, DEPTH
+
+  -- FILE : NOTICEFILES, QNAFILES
+  -- 파일번호, 글번호, 저장된파일명, 업로드파일명
+
+  CREATE TABLE NOTICE (
+  	NUM BIGINT AUTO_INCREMENT PRIMARY KEY,
+  	TITLE VARCHAR(500),
+  	INFO LONGTEXT,
+  	WRITER VARCHAR(500),
+  	REGDATE DATE,
+  	HIT BIGINT
+
+  );
+
+  CREATE TABLE QNA (
+  	NUM BIGINT AUTO_INCREMENT PRIMARY KEY,
+  	TITLE VARCHAR(500),
+  	INFO LONGTEXT,
+  	WRITER VARCHAR(500),
+  	REGDATE DATE,
+  	HIT BIGINT,
+  	REF BIGINT,
+  	STEP BIGINT,
+  	DEPTH BIGINT
+  );
+
+  INSERT INTO QNA
+  VALUES(NULL,'갈갈','가러렁','가런ㅎㅇㄹ',NOW(),0,1,0,0)
+
+  CREATE TABLE NOTICEFILES (
+  NUM BIGINT,
+  FILENUM BIGINT AUTO_INCREMENT PRIMARY KEY,
+  FILENAME VARCHAR(500),
+  ORINAME VARCHAR(500)
+  );
+  ALTER TABLE NOTICEFILES ADD CONSTRAINT NOTICEFILES_FILENUM_FK  FOREIGN KEY(NUM) REFERENCES NOTICE(NUM)
+
+
+
+
+  CREATE TABLE QNAFILES (
+  NUM BIGINT,
+  FILENUM BIGINT AUTO_INCREMENT PRIMARY KEY,
+  FILENAME VARCHAR(500),
+  ORINAME VARCHAR(500)
+  );
+  ALTER TABLE QNAFILES ADD CONSTRAINT QNAFILES_FILENUM_FK  FOREIGN KEY(NUM) REFERENCES QNA(NUM)
+
+  INSERT INTO NOTICEFILES (NUM, FILENUM, FILENAME, ORINAME)
+  VALUES(NULL,NULL,'파일네임','오리네임')
+
+  DROP TABLE NOTICEFILES
+
+  DROP TABLE QNAFILES
+
+  DROP TABLE QNA
+
+  DROP TABLE NOTICE
+
+  ALTER DATABASE db
+  CHARACTER SET = 'UTF8'
+  COLLATE = 'utf8_general_ci';
+
+  COMMIT
+
+  )
+  ```
+
+# ORM
+
+![Untitled](<2023-04-18(%EB%A7%88%EB%A6%AC%EC%95%84%20DB%20%EC%82%AC%EC%9A%A9%EB%B2%95,%20application%20properties%EC%97%B0%EA%B2%B0%20%EB%93%B1)/Untitled%202.png>)
+
+```sql
+예) 마이 바티스
+```
+
+![Untitled](<2023-04-18(%EB%A7%88%EB%A6%AC%EC%95%84%20DB%20%EC%82%AC%EC%9A%A9%EB%B2%95,%20application%20properties%EC%97%B0%EA%B2%B0%20%EB%93%B1)/Untitled%203.png>)
+
+```sql
+하이버 네이트 : 복잡한 쿼리를 쓰게 불편하다
+```
+
+# 부트에서 DAO 변화 (@Mapper)
+
+```java
+
+더이상 DAO 가 필요하지 않고 내용이 없는 인터페이스로 대체한다
+```
+
+```java
+**NoticeDAO**
+
+package com.iu.base.board.notice;
+
+import org.apache.ibatis.annotations.Mapper;
+
+import com.iu.base.board.BoardDAO;
+
+@Mapper   // 원래는 @Repository 를 줬었는데 이는 객체를 만들라는 뜻인데 인터페이스는 불가능
+public interface NoticeDAO extends BoardDAO {
+
+}
+```
+
+```java
+ex)
+아래와 같은 형식으로 변화된다
+
+old)
+
+public List<ProductDTO> getProductList()throws Exception{
+		return sqlSession.selectList(NAMESPACE+"getProductList");
+	}
+
+new)
+
+public Long getTotalCount(Pager pager) throws Exception;
+
+ex) id = 메서드 명  = getTotalCount
+
+		리턴타입 = Long
+
+		namespace = com.iu.base.board.notice.NoticeDAO
+```
+
+- @Mapper 상세 설명
+
+  ```java
+
+  **sqlsession 사용**
+
+  package com.example.dao;
+
+  import java.util.List;
+
+  import org.apache.ibatis.session.SqlSession;
+  import org.springframework.beans.factory.annotation.Autowired;
+  import org.springframework.stereotype.Repository;
+
+  import com.example.dto.NoticeDTO;
+
+  @Repository
+  public class NoticeDAOImpl implements NoticeDAO {
+
+      @Autowired
+      private SqlSession sqlSession;
+
+      private static final String NAMESPACE = "com.example.mapper.NoticeMapper";
+
+      @Override
+      public List<NoticeDTO> getAllNotices() {
+          return sqlSession.selectList(NAMESPACE + ".selectAllNotices");
+      }
+
+      @Override
+      public NoticeDTO getNoticeById(int id) {
+          return sqlSession.selectOne(NAMESPACE + ".selectNoticeById", id);
+      }
+
+      @Override
+      public void addNotice(NoticeDTO notice) {
+          sqlSession.insert(NAMESPACE + ".insertNotice", notice);
+      }
+
+      @Override
+      public void updateNotice(NoticeDTO notice) {
+          sqlSession.update(NAMESPACE + ".updateNotice", notice);
+      }
+
+      @Override
+      public void deleteNotice(int id) {
+          sqlSession.delete(NAMESPACE + ".deleteNotice", id);
+      }
+
+  }
+
+  ============================================================================================================================================================
+
+  **@Mapper을 사용한 예제
+
+  인터페이스**
+  package com.example.dao;  //@Mapper 을 사용할 때 는 일반적으로 인터페이스를 사용한다. xml 설정 대신 인터페이스를 사용하여 sql 매핑을 정의하기 때문에
+
+  import java.util.List;
+
+  import org.apache.ibatis.annotations.Mapper;
+
+  import com.example.dto.NoticeDTO;
+
+  @Mapper
+  public interface NoticeMapper {
+
+      List<NoticeDTO> selectAllNotices();
+
+      NoticeDTO selectNoticeById(int id);
+
+      void insertNotice(NoticeDTO notice);
+
+      void updateNotice(NoticeDTO notice);
+
+      void deleteNotice(int id);
+
+  }
+
+  ==========================================================================================================================================================
+
+  package com.example.dao;
+
+  import java.util.List;
+
+  import org.springframework.beans.factory.annotation.Autowired;
+  import org.springframework.stereotype.Repository;
+
+  import com.example.dto.NoticeDTO;
+
+  @Repository
+  public class NoticeDAOImpl implements NoticeDAO {
+
+      @Autowired
+      private NoticeMapper noticeMapper;
+
+      @Override
+      public List<NoticeDTO> getAllNotices() {
+          return noticeMapper.selectAllNotices();
+      }
+
+      @Override
+      public NoticeDTO getNoticeById(int id) {
+          return noticeMapper.selectNoticeById(id);
+      }
+
+      @Override
+      public void addNotice(NoticeDTO notice) {
+          noticeMapper.insertNotice(notice);
+      }
+
+      @Override
+      public void updateNotice(NoticeDTO notice) {
+          noticeMapper.updateNotice(notice);
+      }
+
+      @Override
+      public void deleteNotice(int id) {
+          noticeMapper.deleteNotice(id);
+      }
+
+  }
+  ```
+
+- **BoardDAO**
+
+  ```java
+  **BoardDAO**
+
+  package com.iu.base.board;
+
+  import java.util.List;
+
+  import com.iu.base.board.qna.QnaVO;
+  import com.iu.base.util.Pager;
+
+  public interface BoardDAO {
+
+  	//글갯수
+  	public Long getTotalCount(Pager pager) throws Exception;
+
+  	//글리스트 조회
+  	public List<BoardVO> getList(Pager pager) throws Exception;
+
+  	//글하나 조회(detail)
+  	public BoardVO getDetail(BoardVO boardVO) throws Exception;
+
+  	//File 조회
+  	public BoardFileVO getFileDetail(BoardFileVO boardFileVO) throws Exception;
+
+  	//글쓰기
+  	public int setInsert(BoardVO boardVO) throws Exception;
+
+  	//글수정
+  	public int setUpdate(BoardVO boardVO) throws Exception;
+
+  	//글삭제
+  	public int setDelete(BoardVO boardVO) throws Exception;
+
+  	public int setBoardFileAdd(BoardFileVO boardFileVO) throws Exception;
+  }
+  ```
+
+![Untitled](<2023-04-18(%EB%A7%88%EB%A6%AC%EC%95%84%20DB%20%EC%82%AC%EC%9A%A9%EB%B2%95,%20application%20properties%EC%97%B0%EA%B2%B0%20%EB%93%B1)/Untitled%204.png>)
+
+```java
+@Mapper 어노테이션 사용
+```
+
+![Untitled](<2023-04-18(%EB%A7%88%EB%A6%AC%EC%95%84%20DB%20%EC%82%AC%EC%9A%A9%EB%B2%95,%20application%20properties%EC%97%B0%EA%B2%B0%20%EB%93%B1)/Untitled%205.png>)
+
+![Untitled](<2023-04-18(%EB%A7%88%EB%A6%AC%EC%95%84%20DB%20%EC%82%AC%EC%9A%A9%EB%B2%95,%20application%20properties%EC%97%B0%EA%B2%B0%20%EB%93%B1)/Untitled%206.png>)
+
+```sql
+메서드 명과 동일하게 id 를 적어줘야함
+```
+
+# application.properties연결
+
+![Untitled](<2023-04-18(%EB%A7%88%EB%A6%AC%EC%95%84%20DB%20%EC%82%AC%EC%9A%A9%EB%B2%95,%20application%20properties%EC%97%B0%EA%B2%B0%20%EB%93%B1)/Untitled%207.png>)
+
+```java
+아래 코드를 입력하면 -dev 파일을 여기로 불러오겠다 라는뜻(  application.properties 에 없는건 application-dev.properties 에서 찾는다)
+
+spring.config.import=classpath:application-dev.properties
+
+```
+
+![Untitled](<2023-04-18(%EB%A7%88%EB%A6%AC%EC%95%84%20DB%20%EC%82%AC%EC%9A%A9%EB%B2%95,%20application%20properties%EC%97%B0%EA%B2%B0%20%EB%93%B1)/Untitled%208.png>)
+
+# Mapper, Config 경로설정
+
+```java
+Mapper 과 DAO 가 같은경로에 있다면 따로 설정이 필요없지만
+
+다른 경로에 위치한다면 아래와 같이 코드를 application.properties에 입력하여 경로를 설정해 주어야 한다. (기존의 databasecontext 에 있던 내용을 여기로 옮긴것)
+
+Config 는 꼭 이름으로 명시해 주어야한다. * 등 사용불가
+
+## Mapper, Config 설정
+mybatis.mapper-locations=classpath:database/mappers/*Mapper.xml
+mybatis.config-location=classpath:database/config/MybatisConfig.xml
+```
+
+![Untitled](<2023-04-18(%EB%A7%88%EB%A6%AC%EC%95%84%20DB%20%EC%82%AC%EC%9A%A9%EB%B2%95,%20application%20properties%EC%97%B0%EA%B2%B0%20%EB%93%B1)/Untitled%209.png>)
+
+![Untitled](<2023-04-18(%EB%A7%88%EB%A6%AC%EC%95%84%20DB%20%EC%82%AC%EC%9A%A9%EB%B2%95,%20application%20properties%EC%97%B0%EA%B2%B0%20%EB%93%B1)/Untitled%2010.png>)
+
+# LIMIT 사용하기
+
+![Untitled](<2023-04-18(%EB%A7%88%EB%A6%AC%EC%95%84%20DB%20%EC%82%AC%EC%9A%A9%EB%B2%95,%20application%20properties%EC%97%B0%EA%B2%B0%20%EB%93%B1)/Untitled%2011.png>)
+
+```java
+리미트의 순서는 맨 마지막에 위치한다.
+```
+
+![Untitled](<2023-04-18(%EB%A7%88%EB%A6%AC%EC%95%84%20DB%20%EC%82%AC%EC%9A%A9%EB%B2%95,%20application%20properties%EC%97%B0%EA%B2%B0%20%EB%93%B1)/Untitled%2012.png>)
+
+```java
+인덱스 번호 0 번 부터 10개 가져오기
+```
+
+![Untitled](<2023-04-18(%EB%A7%88%EB%A6%AC%EC%95%84%20DB%20%EC%82%AC%EC%9A%A9%EB%B2%95,%20application%20properties%EC%97%B0%EA%B2%B0%20%EB%93%B1)/Untitled%2013.png>)
+
+```java
+20 번 부터 10개 가져오기
+```
+
+```java
+config 설정
+```
+
+![Untitled](<2023-04-18(%EB%A7%88%EB%A6%AC%EC%95%84%20DB%20%EC%82%AC%EC%9A%A9%EB%B2%95,%20application%20properties%EC%97%B0%EA%B2%B0%20%EB%93%B1)/Untitled%2014.png>)
+
+```java
+concat
+
+오라클에서는 연결 연산자 || 가 있었지만 다른곳은 CONCAT 이라는 연결자를 사용해서 연결해야 한다. (두개 이상의 단어를 붙이는것)
+```

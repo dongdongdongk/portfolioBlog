@@ -1,0 +1,2458 @@
+---
+title: '섹션 4: 백엔드: 인증 기능 - 1 -'
+date: '2026-09-02'
+category: '풀스택/React를 사용한 Node 풀스택 웹 애플리케이션 빌드 및 배포'
+tags: ['풀스택', 'React를 사용한 Node 풀스택 웹 애플리케이션 빌드 및 배포']
+draft: false
+summary: ''
+---
+
+# { 섹션 소개 }
+
+```jsx
+1. 인증 기능 소개
+
+		이 섹션에서는 인증 기능을 설정하고 구현하는 방법을 배웁니다.
+
+		다음과 같은 기능을 만들 예정입니다:
+
+				회원가입(Sign Up): 새로운 사용자를 등록.
+
+				로그인(Sign In): 기존 사용자가 로그인.
+
+				로그아웃(Sign Out): 사용자가 로그아웃.
+
+				현재 인증된 사용자 정보 가져오기: 현재 로그인된 사용자의 정보를 가져오는 기능.
+
+2. Redis와 MongoDB 사용
+
+		Redis는 데이터를 캐시(임시 저장소)로 사용하기 위해 설정할 예정입니다.
+
+		MongoDB는 데이터베이스로 사용하며, 사용자의 정보를 저장할 예정입니다.
+
+		데이터를 Redis에 추가하고, MongoDB에도 추가하는 방법을 구현합니다.
+
+3. Redis 클라이언트 설정
+
+		Redis와 애플리케이션을 연결하기 위해 Redis 클라이언트를 설정하는 방법을 배웁니다.
+
+		이 클라이언트를 사용해 Redis에 데이터를 저장하고 읽을 수 있습니다.
+
+4. 메시지 큐와 워커 설정
+
+		**메시지 큐(Message Queue)**를 설정해 데이터를 처리할 수 있도록 할 예정입니다.
+
+		**워커(Worker)**는 큐에서 데이터를 가져와 데이터베이스(MongoDB)에 저장하는 역할을 합니다.
+
+5. 테스트 진행
+
+		이 섹션에서는 작성한 코드를 테스트하는 방법도 배웁니다.
+
+		Xcode와 같은 도구를 사용해 API 요청을 보내고, 사용자를 만들거나 로그인하고, 로그아웃하는 등의 기능을 테스트합니다.
+
+		사용자가 로그인하지 않은 상태에서 요청을 보내면 에러 메시지를 받을 수 있고,
+
+		로그인에 성공하면 성공 메시지를 확인할 수 있습니다.
+
+6. 간단한 테스트 흐름
+
+		회원가입: 새로운 사용자를 생성.
+
+		로그인: 사용자가 로그인하고, 성공 메시지를 확인.
+
+		로그아웃: 사용자가 로그아웃하며, 정상적으로 처리된다는 메시지를 확인.
+
+		현재 사용자 정보 확인: 로그인된 사용자의 정보를 가져오는 요청을 통해, 응답을 확인.
+```
+
+# { 데이터 흐름 및 Redis와 MongoDB 사용 }
+
+## 애플리케이션 데이터 흐름
+
+```jsx
+애플리케이션에서는 MongoDB를 주 데이터 저장소로 사용하며, Redis는 인메모리 캐시로 사용합니다.
+
+Redis는 원래 데이터 캐시 역할이지만, 일부 개발자들은 Redis를 주 데이터베이스로 사용하기도 합니다.
+
+강의에서는 Redis를 주로 인메모리 캐시로만 사용합니다.
+
+메시지 큐와 **워커(Worker)**를 통해 MongoDB에 데이터를 저장할 것입니다.
+```
+
+### 인메모리 캐시란?
+
+```jsx
+* 인메모리 캐시는 데이터를 빠르게 저장하고 불러오는 공간으로, **컴퓨터의 메모리(RAM)**를 이용해 작동합니다.
+
+	쉽게 말해, 자주 쓰는 데이터를 미리 메모리에 저장해 두고, 필요할 때마다 빠르게 꺼내 쓰는 방식입니다.
+```
+
+### 메세지 큐와 워커란?
+
+```jsx
+**메시지 큐(Message Queue)**와 **워커(Worker)**는 프로그램이 많은 작업을 효율적으로 처리할 수 있도록 돕는 시스템입니다.
+
+1. 메시지 큐 (Message Queue)
+
+메시지 큐는 작업 목록을 저장해 두는 줄 같은 것이라고 생각하면 됩니다.
+
+예를 들어, 어떤 웹사이트에서 여러 사용자가 동시에 글을 작성하면, 서버는 그 많은 요청을 한꺼번에 처리하기 어렵습니다.
+
+그래서 서버는 모든 작업을 즉시 처리하지 않고, 메시지 큐에 순서대로 요청을 넣어둡니다.
+
+메시지 큐는 이렇게 작업들을 차례대로 쌓아두고 처리할 수 있게 해줍니다.
+
+2. 워커 (Worker)
+
+워커는 이 메시지 큐에서 작업을 하나씩 꺼내서 처리하는 역할을 합니다. 바리스타가 주문서를 보고 음료를 만드는 것처럼,
+
+워커는 큐에 쌓인 작업을 처리합니다.
+
+이 방식의 장점은, 서버가 한 번에 많은 작업을 처리하려고 하지 않고,
+
+차례차례 처리하면서 시스템이 과부하 걸리지 않게 도와주는 것입니다.
+
+워커는 메시지 큐에서 작업을 꺼내서 처리한 후, 데이터베이스에 저장하거나 사용자에게 결과를 알려줍니다.
+```
+
+## 데이터 처리 과정
+
+```jsx
+사용자가 데이터를 추가(예: 회원가입, 게시물 작성, 채팅 메시지)하려고 할 때,
+
+데이터를 바로 MongoDB에 저장하지 않고 먼저 Redis에 저장합니다.
+
+이때, 모든 데이터를 Redis에 저장하지 않고, 자주 조회되는 데이터만 Redis에 저장합니다.
+
+예를 들어, 사용자 프로필이나 게시물 데이터는 자주 조회되므로 Redis에 저장하는 것이 좋습니다.
+
+반면, 알림 데이터와 같이 자주 조회되지 않는 데이터는 Redis에 저장할 필요가 없으며,
+
+바로 MongoDB에 저장할 수 있습니다.
+
+```
+
+## 메시지 큐와 워커
+
+```jsx
+데이터가 Redis에 저장된 후, 메시지 큐에 추가됩니다.
+
+워커는 메시지 큐에서 데이터를 가져와 MongoDB에 저장합니다.
+
+이 과정에서 사용자에게는 MongoDB에 데이터가 저장될 때까지 기다리게 하지 않고,
+
+Redis에 데이터가 저장되자마자 응답을 받게 됩니다.
+```
+
+## Redis와 [Socket.IO](http://socket.io/) 활용
+
+```jsx
+Socket.IO를 사용하여 실시간으로 사용자에게 데이터를 전달합니다.
+
+예를 들어, 사용자가 게시물을 생성할 때, 데이터가 Redis에 저장된 후 바로 Socket.IO를 통해 사용자에게 응답이 전달됩니다.
+
+이후, 백그라운드에서는 워커가 메시지 큐에서 데이터를 가져와 MongoDB에 저장합니다.
+
+하지만 사용자는 이러한 백그라운드 작업을 기다리지 않고 즉시 응답을 받습니다.
+```
+
+## 데이터 흐름 요약
+
+```jsx
+사용자 요청 → 백엔드 서버 → Redis 저장 → 메시지 큐로 전송 → 워커가 큐에서 데이터를 가져와 MongoDB 저장.
+
+이 과정에서 Socket.IO를 통해 Redis에서 데이터를 받은 후 사용자에게 실시간으로 응답을 전송.
+```
+
+# { Redis의 데이터 타입과 명령어 }
+
+```jsx
+Redis의 데이터 타입과 명령어에 대해 다루고 있으며, 실제 애플리케이션에서 어떻게 사용할지 설명합니다.
+```
+
+## 1. Redis 데이터 타입
+
+```jsx
+Redis는 여러 데이터 타입을 지원합니다.
+
+문자열(String), 리스트(List), 셋(Set), 해시(Hash), **정렬된 셋(Sorted Set)**
+
+각각의 데이터 타입은 다르게 사용되며, 이를 다루는 명령어도 다릅니다.
+```
+
+### (1) **문자열 (String)**
+
+```jsx
+가장 기본적인 데이터 타입으로, 키-값 형태로 데이터를 저장합니다.
+
+예시: "username" : "JohnDoe"
+
+문자열은 텍스트나 숫자 등 다양한 데이터 형식을 저장할 수 있
+```
+
+### (2) **리스트 (List)**
+
+```jsx
+JavaScript의 배열(array)과 유사하며, 순서가 있는 문자열들의 리스트입니다.
+
+리스트 안에는 문자열만 저장됩니다. 다른 타입의 데이터를 저장하려면 먼저 문자열로 변환해야 합니다.
+
+예시: ["apple", "banana", "cherry"]
+```
+
+### (3) **셋 (Set)**
+
+```jsx
+중복을 허용하지 않는 문자열들의 모음입니다.
+
+순서가 없으며, 중복되지 않는 데이터만 저장됩니다.
+
+예시: {"red", "blue", "green"}
+```
+
+### (4) **해시 (Hash)**
+
+```jsx
+JavaScript의 객체(object)와 유사하게 필드와 값을 쌍으로 저장합니다.
+
+예시: {"name": "Alice", "age": 30, "city": "Seoul"}
+
+보통 사용자 데이터 같은 객체 정보를 저장할 때 유용합니다.
+```
+
+### (5) **정렬된 셋 (Sorted Set)**
+
+```jsx
+셋과 유사하지만, 각 값에 점수(숫자)가 부여되고 이 점수를 기준으로 정렬됩니다.
+
+예시: {"score1": 100, "score2": 200, "score3": 150} (이 예시에서 숫자 순서로 정렬)
+```
+
+## 2. Redis 명령어
+
+```jsx
+Redis에서 데이터를 저장하고 관리하는 데 사용하는 몇 가지 중요한 명령어가 있습니다.
+```
+
+### (1) **리스트(List) 관련 명령어**
+
+```jsx
+LPUSH: 리스트의 왼쪽에 요소를 추가합니다.
+
+		예시: LPUSH mylist "apple" → ["apple", ...]
+
+RPUSH: 리스트의 오른쪽에 요소를 추가합니다.
+
+		예시: RPUSH mylist "banana" → [..., "banana"]
+
+LRANGE: 리스트의 특정 범위의 요소를 가져옵니다.
+
+		예시: LRANGE mylist 0 -1 → 리스트의 모든 요소 가져오기
+
+LINDEX: 리스트에서 특정 인덱스의 값을 가져옵니다.
+
+		예시: LINDEX mylist 0 → 첫 번째 요소 가져오기
+
+LLEN: 리스트의 길이를 반환합니다.
+
+		예시: LLEN mylist → 리스트에 몇 개의 요소가 있는지 반환
+
+LREM: 리스트에서 특정 요소를 삭제합니다.
+
+		예시: LREM mylist 1 "apple" → "apple"을 한 개 삭제
+
+LSET: 리스트의 특정 인덱스에 있는 값을 업데이트합니다.
+
+		예시: LSET mylist 1 "cherry" → 두 번째 요소를 "cherry"로 변경
+```
+
+### (2) **정렬된 셋(Sorted Set) 관련 명령어**
+
+```jsx
+ZADD: 정렬된 셋에 새로운 값을 추가하고, 해당 값에 점수를 부여합니다.
+
+		예시: ZADD myset 100 "John" → "John"이라는 멤버에 100점 부여
+
+ZCARD: 정렬된 셋에 저장된 멤버의 수를 반환합니다.
+
+		예시: ZCARD myset → 멤버 수 반환
+
+ZCOUNT: 특정 범위 내의 점수를 가진 멤버 수를 반환합니다.
+
+		예시: ZCOUNT myset 50 100 → 점수가 50에서 100 사이인 멤버 수 반환
+
+ZRANGE: 특정 범위에 있는 멤버들을 가져옵니다.
+
+		예시: ZRANGE myset 0 -1 → 모든 멤버 가져오기
+
+ZREM: 정렬된 셋에서 특정 멤버를 삭제합니다.
+
+		예시: ZREM myset "John" → "John" 삭제
+```
+
+### (3) **해시(Hash) 관련 명령어**
+
+```jsx
+HSET: 해시에 새로운 필드와 값을 추가하거나 업데이트합니다.
+
+		예시: HSET user:1000 name "Alice" → 사용자 1000의 이름을 "Alice"로 설정
+
+HGET: 해시에서 특정 필드의 값을 가져옵니다.
+
+		예시: HGET user:1000 name → "Alice" 반환
+
+HGETALL: 해시의 모든 필드와 값을 가져옵니다.
+
+		예시: HGETALL user:1000 → {"name": "Alice", "age": 30} 반환
+
+HINCRBY: 해시에서 특정 필드의 숫자를 증가 또는 감소시킵니다.
+
+		예시: HINCRBY user:1000 age 1 → 나이를 1살 증가
+
+
+HMGET : Hash 자료구조에 대해 여러 개의 필드 값을 한 번에 가져올 수 있는 명령어
+
+		HMSET user:1001 name "John" age "30" city "New York"
+
+		# 여러 필드 값 가져오기
+		HMGET user:1001 name age city
+```
+
+### (4)set 관련 명령어
+
+```jsx
+SADD: Set에 새로운 멤버 추가
+
+		SADD myset "apple" "banana" "orange"
+
+
+SMEMBERS: Set의 모든 멤버 가져오기
+
+		SMEMBERS mySet
+
+
+SREM: Set에서 특정 멤버 삭제
+
+		SREM myset "banana"
+
+
+SCARD: Set에 저장된 멤버의 수 반환
+
+		SCARD myset
+
+
+SISMEMBER: 특정 값이 Set에 존재하는지 확인
+
+		SISMEMBER myset "apple"
+
+
+SPOP: Set에서 임의의 멤버 하나를 제거하고 반환
+
+		SPOP myset
+
+
+SMOVE: 멤버를 한 Set에서 다른 Set으로 이동
+
+		SMOVE myset yourset "orange"
+
+
+SUNION: 두 개 이상의 Set에서 모든 멤버 가져오기
+
+		SUNION myset yourset
+
+
+SDIFF: 첫 번째 Set에만 있는 멤버를 반환합니다.
+
+		SDIFF myset yourset
+```
+
+### 몇가지 예제
+
+```jsx
+# Set 생성 및 멤버 추가
+SADD fruits "apple" "banana" "orange"
+SADD fruits "grape" "watermelon"
+
+# Set의 모든 멤버 조회
+SMEMBERS fruits
+
+# Set에서 특정 멤버 제거
+SREM fruits "banana"
+
+# Set의 멤버 수 확인
+SCARD fruits
+
+# 특정 값이 Set에 존재하는지 확인
+SISMEMBER fruits "apple"
+
+# 임의의 멤버 제거 및 반환
+SPOP fruits
+
+# 멤버를 다른 Set으로 이동
+SADD vegetables "carrot" "tomato"
+SMOVE fruits vegetables "apple"
+
+# 두 Set의 합집합 조회
+SADD moreFruits "mango" "pineapple"
+SUNION fruits moreFruits
+
+# 두 Set의 차집합 조회
+SDIFF vegetables fruits
+
+```
+
+# **{ Cloudinary** 클라우드 이미지 관리하기 }
+
+```jsx
+ Cloudinary는 파일을 저장하고 관리할 수 있는 클라우드 서비스로, 주로 이미지와 비디오 같은 미디어 파일을 처리하는 데 자주 사용됩니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381341/notion-blog/_/React_Node_/_4_-_1_-/image.png)
+
+```jsx
+계정을 생성하고 로그인하면 대시보드 화면에서 필요한 정보
+
+(Cloud Name, API Key, API Secret)를 볼 수 있습니다. 이 정보는 클라우드에 파일을 업로드할 때 사용됩니다.
+```
+
+## **환경 변수 설정**:
+
+```jsx
+Cloudinary를 사용하려면 API 정보를 애플리케이션에 설정해야 합니다. 이를 위해 .env 파일에 환경 변수를 추가합니다.
+
+필요한 변수들은 CLOUD_NAME, CLOUD_API_KEY, CLOUD_API_SECRET입니다.
+
+설정한 환경 변수들은 코드에서 사용되며, 새로운 환경 변수를 추가할 때는 config 파일도 업데이트해야 합니다.
+```
+
+### .env 에 변수 추가
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381338/notion-blog/_/React_Node_/_4_-_1_-/image_1.png)
+
+### config.ts 에 변수&생성 추가
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381340/notion-blog/_/React_Node_/_4_-_1_-/image_2.png)
+
+```jsx
+this.CLOUD_NAME = process.env.CLOUD_NAME || ''
+this.CLOUD_API_KEY = process.env.CLOUD_API_KEY || ''
+this.CLOUD_API_SECRET = process.env.CLOUD_SECRET || ''
+
+이렇게다(오타났다)
+```
+
+## **Node.js에서 Cloudinary 설정**:
+
+```jsx
+Node.js에서 Cloudinary를 사용하려면 Cloudinary Node.js 라이브러리를 설치해야 합니다.
+
+npm을 통해 설치하며, 이를 통해 이미지 파일을 쉽게 업로드할 수 있습니다.
+
+Cloudinary 라이브러리 설치 후, 애플리케이션에서 사용할 수 있도록 설정 함수를 만듭니다.
+
+이 함수는 환경 변수로 설정된 Cloudinary 정보를 사용하여 Cloudinary의 API와 통신할 수 있게 해줍니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381340/notion-blog/_/React_Node_/_4_-_1_-/image_3.png)
+
+```jsx
+npm i cloudinary
+```
+
+### 설정 함수 추가
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381340/notion-blog/_/React_Node_/_4_-_1_-/image_4.png)
+
+```jsx
+import cloudinary from 'cloudinary';
+
+// Cloudinary 구성 설정을 위한 메서드
+public cloudinaryConfig(): void {
+  // Cloudinary의 기본 설정을 구성합니다.
+  cloudinary.v2.config({
+    // Cloudinary 계정의 클라우드 이름을 설정합니다.
+    // CLOUD_NAME은 환경 변수에서 가져온 클라우드 이름을 의미합니다.
+    cloud_name: this.CLOUD_NAME,
+
+    // Cloudinary API를 사용하기 위한 API 키를 설정합니다.
+    // CLOUD_API_KEY는 환경 변수에서 가져온 API 키입니다.
+    api_key: this.CLOUD_API_KEY,
+
+    // Cloudinary API에 대한 비밀 키를 설정합니다.
+    // CLOUD_API_SECRET는 환경 변수에서 가져온 비밀 키입니다.
+    api_secret: this.CLOUD_API_SECRET
+  });
+}
+```
+
+## 파일 업로드 함수 만들기
+
+```jsx
+글로벌에 helpers 에 cloudinary-upload.ts 파일을 만들고 아래와 같이 코드를 작성해준다
+
+파일을 업로드할 때 사용할 업로드 함수를 만듭니다.
+
+이 함수는 주어진 파일을 base64 인코딩된 문자열로 받아서 Cloudinary에 업로드합니다.
+
+업로드할 때 public ID(파일의 고유 식별자)를 설정하거나, Cloudinary가 자동으로 생성하도록 할 수 있습니다.
+
+업로드 과정에서 에러가 발생할 경우 에러를 처리하거나, 성공하면 업로드 결과를 반환하는 구조로 함수가 작성됩니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381340/notion-blog/_/React_Node_/_4_-_1_-/image_5.png)
+
+```jsx
+// Cloudinary와 관련된 타입을 가져옵니다.
+// UploadApiResponse는 업로드 성공 시 반환되는 응답의 타입을 나타내고,
+// UploadApiErrorResponse는 업로드 실패 시 반환되는 에러의 타입을 나타냅니다.
+import cloudinary, { UploadApiResponse, UploadApiErrorResponse } from 'cloudinary';
+
+// 파일을 Cloudinary에 업로드하는 함수입니다.
+// 매개변수:
+// - file: 업로드할 파일의 경로 또는 URL을 나타냅니다.
+// - public_id: 업로드된 파일의 고유 ID를 설정하는 선택적 매개변수입니다. (옵션)
+// - overwrite: 동일한 public_id가 이미 존재할 경우 덮어쓸지 여부를 설정하는 선택적 매개변수입니다. (기본값: false)
+// - invalidate: CDN 캐시를 무효화할지 여부를 설정하는 선택적 매개변수입니다. (기본값: false)
+// 반환값: Promise 객체를 반환하며, 성공 시 UploadApiResponse, 실패 시 UploadApiErrorResponse를 반환합니다.
+export function upload(
+  file: string,
+  public_id?: string, // ?파라미터가 필수가 아니며, 이 파라미터를 전달하지 않아도 함수가 정상적으로 실행될 수 있다는 뜻
+  overwrite?: boolean,
+  invalidate?: boolean
+): Promise<UploadApiResponse | UploadApiErrorResponse | undefined> {
+  // 새로운 Promise 객체를 생성합니다. Promise는 비동기 작업의 결과를 처리하기 위해 사용됩니다.
+  return new Promise((resolve) => {
+    // cloudinary.v2.uploader.upload 메서드를 사용하여 파일을 업로드합니다.
+    cloudinary.v2.uploader.upload(
+      file, // 업로드할 파일의 경로 또는 URL
+      {
+        // 업로드 옵션을 객체로 전달합니다.
+        public_id,  // 업로드된 파일의 고유 ID (선택적)
+        overwrite,   // 동일한 public_id가 존재할 경우 덮어쓸지 여부 (선택적)
+        invalidate    // CDN 캐시를 무효화할지 여부 (선택적)
+      },
+      // 업로드 작업이 완료되면 호출되는 콜백 함수입니다.
+      (error: UploadApiErrorResponse | undefined, result: UploadApiResponse | undefined) => {
+        // 만약 에러가 발생했다면, resolve를 호출하여 에러를 반환합니다.
+        if (error) resolve(error);
+        // 에러가 없으면, 업로드 결과를 반환합니다.
+        resolve(result);
+      }
+    );
+  });
+}
+
+```
+
+### 코드 동작 원리
+
+```jsx
+Cloudinary 설정:
+
+Cloudinary 라이브러리의 v2.config 메서드를 사용하여 Cloudinary API와의 통신을 설정합니다.
+
+설정 과정에서 환경 변수로부터 Cloud Name, API Key, API Secret을 불러옵니다.
+
+업로드 함수:
+
+파일을 base64로 인코딩한 후, Cloudinary API를 통해 업로드합니다.
+
+업로드 후에는 파일에 대한 Public ID와 Version ID 같은 정보를 반환받으며, 이를 데이터베이스에 저장할 수 있습니다.
+
+옵션 설정:
+
+파일을 업로드할 때 Public ID를 수동으로 설정할 수 있고, 이미 존재하는 파일을 덮어쓰거나 무효화할 수 있는 옵션을 제공하여, 파일 관리가 더 유연해집니다.
+
+* base64 인코딩: 파일을 문자열로 변환하여 전송하는 방식입니다.
+
+* cloudinary.v2.uploader.upload 는 3개의 매개변수를 받고 있는거다
+
+cloudinary.v2.uploader.upload(
+  file,                // 첫 번째 매개변수: 파일 경로 또는 URL
+  {                    // 두 번째 매개변수: 옵션 객체
+    public_id,
+    overwrite,
+    invalidate
+  },
+  (error, result) => { // 세 번째 매개변수: 콜백 함수
+    // 업로드 완료 후의 처리 로직
+  }
+);
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381341/notion-blog/_/React_Node_/_4_-_1_-/image_6.png)
+
+```jsx
+* 위와 같이 메서드에 마우스를 올려서 어떤 매개변수를 받는지 확인하면서 넣어주도록 하자
+```
+
+# { Joi와 TypeScript로 회원가입 및 로그인 유효성 검사 구현 }
+
+```jsx
+
+이 강의에서는 회원가입, 로그인, 비밀번호 변경 기능에 대한 유효성 검사를 위한 스키마를 만들고, 나중에 이를 기반으로 TypeScript 데코레이터를 사용하는 방법을 설명합니다.
+
+유효성 검사는 사용자가 전송한 데이터를 서버가 받아들이기 전에 검사하는 단계입니다.
+
+이 작업을 수행하기 위해 Joi라는 모듈을 사용하며, 이를 설치한 후에 유효성 검사를 수행합니다.
+```
+
+## Joi 모듈 설치
+
+```jsx
+npm i joi
+```
+
+### **Joi란?**
+
+```jsx
+Joi는 **데이터 유효성 검사(validation)**를 쉽게 할 수 있도록 도와주는 라이브러리입니다.
+
+예를 들어, 회원가입이나 로그인 폼에서 사용자가 입력한 정보(이름, 이메일, 비밀번호 등)가 올바른지 확인하고 싶을 때 Joi를 사용하면 손쉽게 검사할 수 있습니다.
+```
+
+```jsx
+import Joi from 'joi' // Joi 라이브러리를 가져옵니다.
+
+// 이름과 나이를 검사할 스키마를 정의합니다.
+const schema = Joi.object({
+  name: Joi.string().min(3).max(30).required(), // 이름은 문자열이고, 최소 3글자, 최대 30글자여야 합니다.
+  age: Joi.number().min(18).max(65).required(), // 나이는 숫자이고, 최소 18세, 최대 65세여야 합니다.
+})
+
+// 사용자가 입력한 데이터를 만듭니다.
+const userData = {
+  name: 'John', // 이름: John
+  age: 25, // 나이: 25
+}
+
+// Joi의 validate 함수로 데이터가 스키마에 맞는지 검사합니다.
+const { error, value } = schema.validate(userData)
+
+// 에러가 있으면 에러 메시지를 출력하고, 없으면 데이터가 유효하다고 출력합니다.
+if (error) {
+  console.log('Error:', error.details[0].message) // 에러가 있으면 상세 메시지를 출력합니다.
+} else {
+  console.log('Valid data:', value) // 데이터가 유효하면 출력합니다.
+}
+```
+
+```jsx
+Joi.object({...}): 객체 스키마를 정의합니다. 여기에 이름과 나이에 대한 검사 조건을 추가합니다.
+
+Joi.string(): name 필드는 문자열이어야 한다는 것을 의미합니다.
+
+Joi.number(): age 필드는 숫자여야 한다는 것을 의미합니다.
+
+.min(), .max(): 최소, 최대값을 설정합니다.
+
+.required(): 이 필드는 반드시 있어야 한다는 의미입니다.
+```
+
+## 디렉토리 구조 설정
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381341/notion-blog/_/React_Node_/_4_-_1_-/image_7.png)
+
+```jsx
+프로젝트 내에 features라는 디렉토리를 생성한 후, 그 안에 Oath라는 폴더를 만들고 여러 하위 폴더를 추가합니다:
+```
+
+```jsx
+controllers: 비즈니스 로직이 포함될 폴더입니다.
+
+interfaces: TypeScript 인터페이스가 정의될 폴더입니다.
+
+models: MongoDB와 관련된 모델 파일들이 들어갈 폴더입니다.
+
+routes: API 경로가 정의될 폴더입니다.
+
+schemas: 유효성 검사에 사용할 스키마가 정의될 폴더입니다.
+```
+
+## 회원가입 유효성 검사 스키마 ( signup.ts )
+
+```jsx
+import Joi, { ObjectSchema } from 'joi';
+
+// 회원가입 유효성 검사를 위한 Joi 스키마 정의
+const signupSchema: ObjectSchema = Joi.object().keys({ // key 는 객체의 각 속성(key)들에 대한 유효성 검사를 정의하는 메서드
+  // username: 필수 문자열, 최소 4자, 최대 8자
+  username: Joi.string().required().min(4).max(8).messages({
+    'string.base': 'Username must be of type string', // username이 문자열이 아니면 출력될 메시지
+    'string.min': 'Invalid username', // username이 4자 미만일 때 출력
+    'string.max': 'Invalid username', // username이 8자 초과일 때 출력
+    'string.empty': 'Username is a required field' // username이 비어 있을 때 출력
+  }),
+  // password: 필수 문자열, 최소 4자, 최대 8자
+  password: Joi.string().required().min(4).max(8).messages({
+    'string.base': 'Password must be of type string', // password가 문자열이 아니면 출력될 메시지
+    'string.min': 'Invalid password', // password가 4자 미만일 때 출력
+    'string.max': 'Invalid password', // password가 8자 초과일 때 출력
+    'string.empty': 'Password is a required field' // password가 비어 있을 때 출력
+  }),
+  // email: 필수 문자열, 유효한 이메일 형식
+  email: Joi.string().required().email().messages({
+    'string.base': 'Email must be of type string', // email이 문자열이 아니면 출력될 메시지
+    'string.email': 'Email must be valid', // email 형식이 잘못되었을 때 출력
+    'string.empty': 'Email is a required field' // email이 비어 있을 때 출력
+  }),
+  // avatarColor: 필수 문자열, 사용자 아바타 색상
+  avatarColor: Joi.string().required().messages({
+    'any.required': 'Avatar color is required' // avatarColor가 비어 있을 때 출력
+  }),
+  // avatarImage: 필수 문자열, 사용자 아바타 이미지 (Base64 등으로 인코딩된 이미지)
+  avatarImage: Joi.string().required().messages({
+    'any.required': 'Avatar image is required' // avatarImage가 비어 있을 때 출력
+  })
+});
+
+// 스키마를 외부에서 사용할 수 있도록 export
+export { signupSchema };
+```
+
+```jsx
+* .key({}) 옵션
+
+객체(Object): 예를 들어, 회원가입을 할 때, username(아이디), password(비밀번호), email(이메일) 같은 정보를 한 덩어리로 보낼 수 있어요. 이 덩어리를 객체라고 부릅니다.
+
+keys(): 이건 객체 안에 있는 각 정보(아이디, 비밀번호, 이메일)에 대해 검사 규칙을 만드는 것입니다.
+
+검사 규칙: 예를 들어, 아이디는 최소 4글자, 최대 8글자여야 하고, 비밀번호도 같은 규칙을 따르며, 이메일은 반드시 유효한 형식이어야 한다는 규칙을 세울 수 있습니다.
+```
+
+## 로그인 유효성 검사 스키마 ( signin.ts )
+
+```jsx
+import Joi, { ObjectSchema } from 'joi';
+
+// 로그인 유효성 검사를 위한 Joi 스키마 정의
+const loginSchema: ObjectSchema = Joi.object().keys({
+  // username: 필수 문자열, 최소 4자, 최대 8자
+  username: Joi.string().required().min(4).max(8).messages({
+    'string.base': 'Username must be of type string', // username이 문자열이 아니면 출력될 메시지
+    'string.min': 'Invalid username', // username이 4자 미만일 때 출력
+    'string.max': 'Invalid username', // username이 8자 초과일 때 출력
+    'string.empty': 'Username is a required field' // username이 비어 있을 때 출력
+  }),
+  // password: 필수 문자열, 최소 4자, 최대 8자
+  password: Joi.string().required().min(4).max(8).messages({
+    'string.base': 'Password must be of type string', // password가 문자열이 아니면 출력될 메시지
+    'string.min': 'Invalid password', // password가 4자 미만일 때 출력
+    'string.max': 'Invalid password', // password가 8자 초과일 때 출력
+    'string.empty': 'Password is a required field' // password가 비어 있을 때 출력
+  })
+});
+
+// 로그인 스키마를 외부에서 사용할 수 있도록 export
+export { loginSchema };
+```
+
+## 이메일 및 비밀번호 변경 스키마 ( password.ts )
+
+```jsx
+import Joi, { ObjectSchema } from 'joi';
+
+// 이메일 및 비밀번호 변경을 위한 Joi 스키마 정의
+const emailSchema: ObjectSchema = Joi.object().keys({
+  // email: 필수 문자열, 유효한 이메일 형식
+  email: Joi.string().email().required().messages({
+    'string.base': 'Field must be valid', // email이 문자열이 아니면 출력될 메시지
+    'string.required': 'Field must be valid', // 필드가 필수임을 나타냄
+    'string.email': 'Field must be valid' // email 형식이 잘못되었을 때 출력
+  })
+});
+
+// 비밀번호 변경 시 사용되는 Joi 스키마 정의
+const passwordSchema: ObjectSchema = Joi.object().keys({
+  // password: 필수 문자열, 최소 4자, 최대 8자
+  password: Joi.string().required().min(4).max(8).messages({
+    'string.base': 'Password should be of type string', // password가 문자열이 아니면 출력될 메시지
+    'string.min': 'Invalid password', // password가 4자 미만일 때 출력
+    'string.max': 'Invalid password', // password가 8자 초과일 때 출력
+    'string.empty': 'Password is a required field' // password가 비어 있을 때 출력
+  }),
+  // confirmPassword: 필수, password와 일치해야 함
+  confirmPassword: Joi.string().required().valid(Joi.ref('password')).messages({
+    'any.only': 'Passwords should match', // confirmPassword가 password와 일치하지 않을 때 출력
+    'any.required': 'Confirm password is a required field' // confirmPassword가 비어 있을 때 출력
+  })
+});
+
+// 이메일 및 비밀번호 스키마를 외부에서 사용할 수 있도록 export
+export { emailSchema, passwordSchema };
+```
+
+```jsx
+* ref() 설명
+
+ref()는 다른 값을 참고하는 것이에요.
+
+예를 들어, 비밀번호와 비밀번호 확인을 검사할 때, "비밀번호 확인" 필드가 기존 비밀번호와 같은지 검사하려면, ref('password')를 사용해서 비밀번호를 참조할 수 있습니다.
+
+이게 **참조(reference)**라는 개념이에요. 즉, "이 값은 저 값과 같아야 한다"는 규칙을 만들 때 사용해요.
+
+더 많은 상황에서 ref() 사용:
+
+ref()는 단순히 다른 값과 비교할 때만 사용되는 게 아니라, 어떤 값이 다른 값에 의존할 때도 사용할 수 있어요.
+
+예를 들어, 어떤 항목이 부모 항목에 따라 달라지거나, 값을 계산해서 검사해야 할 때도 사용됩니다.
+```
+
+# { Joi를 이용한 요청 데이터 검증 데코레이터 구현 (TypeScript) }
+
+```jsx
+TypeScript의 데코레이터(Decorator) 기능을 사용해 Joi 라이브러리로 들어오는 요청 데이터(req.body)를 검증하는 방법을 설명합니다.
+
+이 데코레이터를 컨트롤러에 적용하여 특정 스키마를 기반으로 데이터를 검증하고, 문제가 있을 경우 에러를 발생시키도록 구성합니다.
+```
+
+## 새로운 폴더 및 파일 생성
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381341/notion-blog/_/React_Node_/_4_-_1_-/image_8.png)
+
+```jsx
+src/shared/globals 경로 아래에 decorators 폴더를 만들고, 그 안에 joiValidation.decorators.ts 파일을 생성합니다.
+
+이 파일에 데코레이터를 작성할 것입니다
+```
+
+## 데코레이터 개념 설명
+
+```jsx
+데코레이터는 클래스나 메서드에 부착되어 특정 기능을 수행할 수 있는 특수한 선언입니다.
+
+예를 들어, 메서드에 데코레이터를 적용해 요청을 검증하는 등의 작업을 할 수 있습니다.
+```
+
+## 필요한 모듈 임포트
+
+```jsx
+JoiRequestValidationError는 이미 에러 처리 헬퍼에서 만들어진 클래스를 임포트하여 사용할 것이며,
+
+요청 데이터를 받아오는 Express의 Request 객체와 Joi 라이브러리의 ObjectSchema도 임포트합니다.
+```
+
+## 데코레이터 타입 정의
+
+```jsx
+type IjoiDecorator = (target: any, key: string, descriptor: PropertyDescriptor) => void;
+
+IjoiDecorator는 데코레이터 함수가 가지는 기본 구조를 타입으로 정의한 것입니다. 데코레이터는 세 가지 인자를 받습니다:
+
+		target: 데코레이터가 적용된 메서드나 클래스의 대상
+
+		key: 데코레이터가 적용된 메서드의 이름
+
+		descriptor: 메서드에 대한 속성 정보를 담고 있는 객체 (프로퍼티 디스크립터)
+
+		void는 함수가 어떤 값을 반환하지 않음을 나타냅니다.
+```
+
+## Joi 검증 데코레이터 함수 생성
+
+```jsx
+export function joiValidation(schema: ObjectSchema): IjoiDecorator {
+  return (_target: any, _key: string, descriptor: PropertyDescriptor) => {
+    const originalMethod = descriptor.value;
+
+    descriptor.value = async function (...args: any[]) {
+      const req: Request = args[0];
+      const { error } = await Promise.resolve(schema.validate(req.body));
+      if (error?.details) {
+        throw new JoiRequestValidationError(error.details[0].message);
+      }
+      return originalMethod.apply(this, args);
+    };
+    return descriptor;
+  };
+}
+```
+
+```jsx
+인자 설명:
+
+		schema: Joi에서 정의한 객체 스키마로, 이 스키마를 사용해 요청 데이터를 검증합니다.
+
+
+		이 함수는 데코레이터를 반환하는데, 그 반환된 데코레이터는 메서드에 적용됩니다.
+
+		_target: 데코레이터가 붙은 클래스의 인스턴스 또는 그 자체예요. 하지만 여기서는 사용하지 않으니 _로 표시했어요.
+
+		_key: 데코레이터가 붙은 메소드 이름을 의미해요. 이것도 여기서는 사용하지 않아요.
+
+		descriptor: 이 메소드에 대한 정보 객체를 담고 있어요. 여기서 중요한 건 descriptor.value, 즉 원래 메소드의 내용이에요.
+
+
+메서드 원본 저장:
+
+		const originalMethod = descriptor.value;
+
+
+		descriptor.value는 원래 메서드의 함수입니다. 이를 나중에 검증 후 다시 실행할 수 있도록 저장합니다.
+
+		즉 **originalMethod**는 원래 메소드를 가리키고, 우리는 이걸 나중에 검증 후에 실행할 거예요.
+
+		이 메소드를 따로 저장해 두는 이유는, 검증이 끝난 후에 다시 실행해주기 위함이에요.
+
+
+비동기 함수로 메서드 재정의
+
+		descriptor.value = async function (...args: any[]) {
+
+
+		descriptor.value를 비동기 함수로 재정의하여 검증 로직을 삽입합니다.
+
+		args[0]은 Request 객체이며, 이를 통해 요청 본문(req.body)을 가져옵니다.
+
+		이 부분에서 원래 메소드를 바꾸고 있어요. args[0]은 **req 객체(HTTP 요청)**이고, 여기서 req.body를 가져와서 검증할 거예요.
+
+		**schema.validate(req.body)**는 **Joi를 사용해 req.body**를 스키마에 맞게 검사해요.
+
+		만약 요청 데이터가 스키마에 맞지 않으면 **error**가 발생해요.
+
+
+Joi 검증 실행
+
+		const { error } = await Promise.resolve(schema.validate(req.body));
+
+
+		schema.validate(req.body)를 호출하여 요청 데이터가 정의된 스키마와 일치하는지 검증합니다.
+
+		Promise.resolve()를 사용하여 비동기로 처리합니다.
+
+
+
+검증 실패 시 에러 발생:
+
+		if (error?.details) {
+		  throw new JoiRequestValidationError(error.details[0].message);
+		}
+
+
+		만약 검증 중 오류가 발생하면 JoiRequestValidationError를 통해 해당 오류 메시지를 클라이언트로 전달합니다.
+
+		만약 **error**가 있으면, 에러를 발생시키고 메소드를 중단해요.
+
+		**JoiRequestValidationError**라는 커스텀 에러를 발생시키고, 에러 메시지는
+
+		**error.details[0].message**에 담긴 내용을 사용해요. 이 메시지는 "뭐가 잘못됐는지" 설명해주는 거예요.
+
+
+검증 성공 시 원본 메서드 호출:
+
+		검증에 성공하면, 다시 원래 함수 (originalMethod)를 실행해요.
+
+		apply(this, args)는 원래 함수에 같은 인자를 넘겨서 실행하는 역할을 해요.
+
+		그래서, 데이터가 올바르면 검증이 끝나고 나서 원래 하려던 작업(예: 사용자 생성, 데이터 저장 등)을 진행하는 거죠.
+
+
+데코레이터 반환
+
+		마지막으로 변경된 디스크립터를 반환합니다.
+
+		이로써 요청 데이터가 검증된 후에도 원본 메서드가 정상적으로 실행되도록 보장합니다.
+```
+
+### 정리
+
+```jsx
+사용자가 데이터를 보냅니다.
+
+		이 때, 데이터가 잘못된 형식일 수도 있고, 올바른 형식일 수도 있어요.
+
+데코레이터가 데이터를 검증합니다.
+
+		Joi 스키마에 맞게 데이터가 잘 들어왔는지 체크해요. 예를 들어, 이름은 필수로 있어야 하고,
+
+		이메일 형식은 맞아야 하고, 나이는 숫자여야 하는 등의 규칙을 정의해둘 수 있어요.
+
+데이터가 규칙에 맞지 않으면 에러를 던집니다.
+
+		잘못된 데이터를 보냈을 경우, 에러가 발생하고 API는 중단돼요.
+
+		이 에러는 우리가 정의한 JoiRequestValidationError로 던져지죠.
+
+데이터가 맞으면 원래 하려던 작업을 실행합니다.
+
+		데이터가 올바르면 원래 함수(예: 사용자 생성, 데이터 저장)를 정상적으로 실행합니다.
+```
+
+### 사용 예시
+
+```jsx
+다음은 이 데코레이터를 어떻게 사용할 수 있는지 예시예요
+```
+
+```jsx
+class UserController {
+  @joiValidation(someJoiSchema)
+  public createUser(req: Request, res: Response) {
+    // 검증된 데이터로 사용자를 생성하는 코드
+    res.send("User created!");
+  }
+}
+```
+
+```jsx
+@joiValidation(someJoiSchema)는 createUser 함수가 실행되기 전에
+
+someJoiSchema라는 스키마를 사용해 req.body 데이터를 먼저 검증해요.
+
+데이터가 잘못되었으면 에러를 던지고, 맞으면 사용자 생성 로직을 실행해요.
+```
+
+### 함수 실행 시간을 측정하는 데코레이터 예제
+
+```jsx
+// 함수 실행 시간을 측정하는 데코레이터 함수
+function LogExecutionTime(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  const originalMethod = descriptor.value;
+
+  // 메서드를 덮어씌우는 부분
+  descriptor.value = function (...args: any[]) {
+    const start = performance.now();  // 함수 시작 시간
+    const result = originalMethod.apply(this, args);  // 원래 함수 실행
+    const end = performance.now();    // 함수 끝난 시간
+
+    console.log(`${propertyKey} 함수 실행 시간: ${end - start}ms`);
+    return result;
+  };
+
+  return descriptor;
+}
+
+// 클래스에 데코레이터를 적용할 메서드가 포함된 클래스
+class MathOperations {
+  @LogExecutionTime  // 함수 실행 시간을 기록하는 데코레이터 적용
+  calculateSquare(n: number): number {
+    return n * n;
+  }
+}
+
+// 데코레이터가 적용된 함수 사용
+const math = new MathOperations();
+console.log(math.calculateSquare(5));  // 실행 시간과 결과가 콘솔에 출력됨
+
+calculateSquare 함수 실행 시간: 0.02ms
+25
+```
+
+### `apply`를 사용하는 이유
+
+```jsx
+apply는 원래 함수를 특정한 this 값으로 호출하고, 인자들을 배열 형태로 전달하고 싶을 때 사용해요.
+
+이것은 함수 호출의 유연성을 더해줍니다.
+
+예를 들어, 어떤 객체에 this를 맞춰서 함수를 호출하고 싶을 때 유용하죠.
+```
+
+```jsx
+function greet(greeting, punctuation) {
+  console.log(`${greeting}, my name is ${this.name}${punctuation}`);
+}
+
+const person = {
+  name: 'Alice'
+};
+
+// apply를 사용하여 this를 person 객체로 설정하고 인자 배열을 넘김
+greet.apply(person, ['Hello', '!']);
+// 출력: "Hello, my name is Alice!"
+
+여기서 greet 함수는 원래는 this가 무엇을 가리키는지 알 수 없어요.
+
+하지만 apply를 사용해서 this를 person 객체로 지정해주면, 함수 내에서 **this.name이 'Alice'**로 설정돼요.
+
+두 번째 인자인 배열 ['Hello', '!']은 함수의 인자로 전달됩니다.
+```
+
+### \_ 의 뜻은?
+
+```jsx
+앞의 밑줄(_)은 관례적으로 해당 매개변수가 사용되지 않음을 나타내는 표기법입니다.
+
+이는 TypeScript나 JavaScript에서 종종 쓰이며, 코드에서 변수를 선언했지만 실제로 그 변수를 사용하지 않을 때,
+
+혼란을 방지하고자 밑줄을 붙이는 방식입니다.
+```
+
+### 스키마?
+
+```jsx
+스키마(Schema)는 데이터의 구조를 정의하는 설계도와 같은 것입니다. 쉽게 설명하자면,
+
+스키마는 데이터베이스나 데이터 구조에서 어떤 형태와 규칙으로 데이터를 저장할지를 설명하는 것입니다.
+
+{
+  "name": "string",
+  "email": "string",
+  "age": "number"
+}
+
+구조 정의: 스키마는 데이터의 필드(컬럼) 이름과 각 필드의 데이터 타입을 정의합니다.
+
+					 예를 들어, 사용자의 정보를 저장하는 경우, 이름, 이메일, 나이와 같은 필드를 포함할 수 있습니다.
+
+
+유효성 검사: 스키마는 데이터가 유효한지 검증하는 역할도 합니다. 즉, 데이터가 스키마에서 정의한 규칙을 따르는지 확인합니다.
+
+						예를 들어, 나이는 숫자여야 하고, 이메일은 유효한 형식이어야 합니다.
+
+
+일관성 유지: 스키마를 사용하면 데이터의 일관성을 유지할 수 있습니다.
+
+						 모든 데이터가 같은 규칙을 따르기 때문에, 데이터베이스에 저장된 데이터가 예측 가능하고 신뢰할 수 있습니다.
+```
+
+## 전체 코드
+
+```jsx
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// @typescript-eslint/no-explicit-any 규칙을 비활성화하여 any 타입을 허용합니다.
+
+import { JoiRequestValidationError } from '@global/helpers/error-handler';
+// JoiRequestValidationError는 요청(Request) 데이터의 유효성 검사 에러를 처리하기 위한 커스텀 에러 클래스입니다.
+
+import { Request } from 'express';
+// Express.js의 Request 객체를 불러옵니다. 이는 HTTP 요청을 나타내는 객체입니다.
+
+import { ObjectSchema } from 'joi';
+// joi 라이브러리에서 제공하는 ObjectSchema를 불러옵니다. 이는 요청의 body를 검증하는 스키마입니다.
+
+type IjoiDecorator = (target: any, key: string, descriptor: PropertyDescriptor) => void;
+// IjoiDecorator는 함수 데코레이터 타입을 정의합니다.
+// 데코레이터는 클래스 메서드에 추가 기능을 제공하기 위한 도구로,
+// target(클래스 또는 객체), key(메서드 이름), descriptor(메서드 속성)를 매개변수로 받습니다.
+
+export function joiValidation(schema: ObjectSchema): IjoiDecorator {
+  // joiValidation 함수는 유효성 검사 스키마를 받아 데코레이터를 반환하는 함수입니다.
+
+  return (_target: any, _key: string, descriptor: PropertyDescriptor) => {
+    // 데코레이터 함수가 반환됩니다. 여기서 _target은 클래스 또는 객체, _key는 메서드 이름, descriptor는 메서드 속성입니다.
+    // 이 데코레이터는 실제 메서드에 유효성 검사를 추가하는 역할을 합니다.
+
+    const originalMethod = descriptor.value;
+    // originalMethod는 데코레이터가 적용된 메서드를 저장해둔 변수입니다.
+    // 나중에 이 메서드를 호출하기 위해 저장해둡니다.
+
+    descriptor.value = async function (...args: any[]) {
+      // descriptor.value에 새로운 비동기 함수를 정의합니다.
+      // ...args는 해당 메서드에 전달되는 인자를 모두 배열 형태로 받습니다.
+
+      const req: Request = args[0];
+      // 첫 번째 인자는 HTTP 요청 객체(req)로, 이를 사용해 요청 데이터를 가져옵니다.
+
+      // validate 또는 validateAsync로 요청의 body를 스키마에 맞춰 검증합니다.
+      const { error } = await Promise.resolve(schema.validate(req.body));
+      // schema.validate(req.body)를 사용해 요청의 body가 스키마에 맞는지 확인합니다.
+      // Promise.resolve는 비동기적으로 처리되도록 보장합니다.
+
+      if (error?.details) {
+        // 만약 에러가 발생하고 그 에러에 세부 사항(details)이 있을 경우
+        throw new JoiRequestValidationError(error.details[0].message);
+        // JoiRequestValidationError를 발생시키며, 첫 번째 에러 메시지를 전달합니다.
+      }
+
+      return originalMethod.apply(this, args);
+      // 요청 데이터가 유효하다면 원래 메서드(originalMethod)를 호출하여 실행합니다.
+      // apply(this, args)는 원래 메서드를 this 문맥과 함께 호출하면서 인자를 그대로 전달합니다.
+    };
+
+    return descriptor;
+    // 수정된 descriptor를 반환하여 메서드에 데코레이터를 적용합니다.
+  };
+}
+
+```
+
+```jsx
+1. joiValidation 함수:
+
+		이 함수는 joi 라이브러리를 사용하여 요청(Request)의 body 데이터를 스키마에 따라 유효성 검사를 수행하는 데코레이터를 반환합니다.
+
+		schema는 유효성 검사를 정의하는 ObjectSchema 타입입니다.
+
+		이 데코레이터는 클래스 메서드에 붙여서, 메서드가 실행되기 전에 유효성 검사를 수행하게 합니다.
+
+2. 데코레이터의 동작:
+
+		descriptor.value는 메서드를 가리키는 속성으로, 원래 메서드의 실행을 가로채서 유효성 검사를 추가할 수 있게 합니다.
+
+		validate 함수는 요청의 데이터를 받아 스키마와 비교해 유효한지 검증합니다. 만약 유효하지 않다면 error 객체가 생성되고,
+
+		이 객체의 details 속성에는 에러의 구체적인 정보가 담겨 있습니다.
+
+		에러가 있을 경우 JoiRequestValidationError를 발생시켜, 사용자에게 어떤 데이터가 잘못되었는지 알려줍니다.
+
+3. Promise 처리:
+
+		validate 메서드는 동기식이나 비동기식으로 동작할 수 있는데, 여기서는 비동기 처리를 보장하기 위해 Promise.resolve로 감싸서 처리합니다.
+
+		이를 통해 함수가 항상 비동기적으로 동작하며, await 키워드로 결과를 기다리게 됩니다.
+
+4. 원래 메서드 호출:
+
+		유효성 검사가 통과되면 originalMethod.apply로 원래 메서드가 실행됩니다.
+
+		apply(this, args)는 원래 메서드가 원래 문맥(this)과 인자를 그대로 받아 실행되도록 보장해 줍니다.
+```
+
+## any 타입 오류 ( /_ eslint-disable @typescript-eslint/no-explicit-any _/ )
+
+```jsx
+any 타입을 사용하면 오류가 발생한다 이를 해결하기 위해서 ctrl + . 로 에러를 fix 한다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381341/notion-blog/_/React_Node_/_4_-_1_-/image_9.png)
+
+```jsx
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+주석을 코드 상단에 추가하면, 해당 파일 내에서 any 타입을 사용하는 것에 대한 경고가 비활성화됩니다.
+
+즉, 이 파일에서는 any 타입을 자유롭게 사용할 수 있게 됩니다.
+
+주석은 주로 다음과 같은 경우에 사용됩니다:
+
+		1. 코드 작성 중에 일시적으로 any 타입을 사용해야 할 경우.
+
+		2. 타입이 복잡하거나 불확실한 상황에서 간편하게 작업하고 싶을 때.
+
+		3. 아직 명확한 타입을 정의하지 않았지만 코드를 작성하는 과정에서 빠르게 진행하고 싶을 때.
+```
+
+# { 인증 인터페이스 및 모델 스키마 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381338/notion-blog/_/React_Node_/_4_-_1_-/image_10.png)
+
+```jsx
+이 강의에서는 MongoDB와 Mongoose를 사용하여 사용자 인증 시스템을 구축하는 방법을 설명하고 있습니다.
+```
+
+## 1. **인터페이스 정의 (Interface) ( auth.interface.ts )**
+
+```jsx
+우리는 먼저 TypeScript의 인터페이스를 정의하여 데이터 타입을 명확하게 관리하고자 합니다.
+
+인터페이스는 JavaScript의 객체 구조를 명확하게 정의하는 방법입니다.
+
+여기서는 사용자 인증에 필요한 데이터 구조를 만들기 위해 인터페이스를 사용합니다.
+```
+
+```jsx
+import { Document } from 'mongoose';  // Mongoose 라이브러리에서 Document 타입을 가져옵니다.
+import { ObjectId } from 'mongodb';   // MongoDB 라이브러리에서 ObjectId 타입을 가져옵니다.
+
+/**
+ * Express.js의 Request 인터페이스에 currentUser라는 속성을 추가하여
+ * 사용자가 인증되었는지 확인하는 데 사용할 수 있습니다.
+ * AuthPayload 타입을 사용하여 사용자 정보를 저장합니다.
+ */
+declare global {
+  namespace Express {
+    interface Request {
+      currentUser?: AuthPayload;  // 인증된 사용자 정보가 있을 수 있습니다.
+    }
+  }
+}
+
+/**
+ * AuthPayload는 인증된 사용자 정보를 저장하는 인터페이스입니다.
+ * 로그인한 사용자의 id, uId, 이메일, 사용자 이름, 아바타 색상을 저장합니다.
+ */
+export interface AuthPayload {
+  userId: string;     // 사용자 고유 ID
+  uId: string;        // 사용자 고유 식별자
+  email: string;      // 사용자 이메일
+  username: string;   // 사용자 이름
+  avatarColor: string; // 사용자 아바타 색상
+  iat?: number;       // 토큰 발행 시간(optional)
+}
+
+/**
+ * IAuthDocument는 Mongoose의 Document 타입을 확장한 인터페이스로,
+ * 데이터베이스에서 사용자 정보를 저장하는 모델을 정의합니다.
+ */
+export interface IAuthDocument extends Document {
+  _id: string | ObjectId;   // 사용자 ID (MongoDB의 ObjectId 혹은 문자열 형태)
+  uId: string;              // 사용자 고유 식별자
+  username: string;         // 사용자 이름
+  email: string;            // 사용자 이메일
+  password?: string;        // 암호 (optional)
+  avatarColor: string;      // 아바타 색상
+  createdAt: Date;          // 계정 생성일
+  passwordResetToken?: string;      // 비밀번호 재설정 토큰 (optional)
+  passwordResetExpires?: number | string; // 비밀번호 재설정 토큰 만료 시간 (optional)
+
+  // 사용자가 입력한 비밀번호가 데이터베이스에 저장된 비밀번호와 같은지 비교하는 메서드
+  comparePassword(password: string): Promise<boolean>;
+
+  // 비밀번호를 암호화하여 저장하는 메서드
+  hashPassword(password: string): Promise<string>;
+}
+
+/**
+ * ISignUpData는 사용자가 회원가입할 때 제출하는 데이터를 나타냅니다.
+ * MongoDB에 저장될 회원 정보의 구조를 정의합니다.
+ */
+export interface ISignUpData {
+  _id: ObjectId;     // 사용자 ID (MongoDB의 ObjectId 형태)
+  uId: string;       // 사용자 고유 식별자
+  email: string;     // 사용자 이메일
+  username: string;  // 사용자 이름
+  password: string;  // 암호
+  avatarColor: string; // 아바타 색상
+}
+
+/**
+ * IAuthJob은 인증과 관련된 작업을 나타내는 인터페이스로,
+ * 작업 값(value)은 문자열 또는 IAuthDocument 타입일 수 있습니다.
+ */
+export interface IAuthJob {
+  value?: string | IAuthDocument;  // 작업 값으로 문자열 또는 사용자 문서(IAuthDocument)를 가질 수 있습니다.
+}
+
+```
+
+```jsx
+declare global 설명
+
+		declare global {}:
+
+				이 부분은 전역으로 사용할 수 있는 타입 정의를 추가하는 것입니다.
+
+				즉, Express.js 프로젝트의 어디서든지 사용할 수 있게 됩니다.
+
+				( 전역으로 사용할 타입이나 인터페이스를 선언 )
+
+
+		namespace Express {}:
+
+				Express.js는 기본적으로 요청(Request), 응답(Response) 객체를 처리하는 웹 프레임워크입니다.
+
+				이 코드는 Express의 Request 객체에 새로운 속성을 추가하는 것을 의미합니다.
+
+
+		interface Request {}:
+
+				여기서 Request는 Express.js에서 사용하는 요청 객체입니다.
+
+				이 객체는 사용자가 서버로 보내는 요청과 관련된 정보를 담고 있습니다.
+
+				예를 들어, 로그인 요청을 하면, 그 안에 사용자 이름이나 비밀번호 등이 들어 있을 수 있죠.
+
+
+		currentUser?: AuthPayload;:
+
+				currentUser라는 새로운 속성을 추가합니다. 이 속성에는 AuthPayload 타입의 사용자 정보가 들어갑니다.
+
+				?는 선택적(optional)이라는 뜻인데, 즉 이 속성이 있을 수도 있고, 없을 수도 있다는 의미입니다.
+
+				사용자가 로그인하면 currentUser에 값이 들어가고, 로그인하지 않았으면 없을 수 있다는 뜻입니다.
+
+AuthPayload 인터페이스:
+
+		userId, uId, email, username, avatarColor 등 사용자의 인증 정보를 정의하는 구조입니다.
+
+		이 구조는 서버에서 사용자를 인증하고, 그 사용자 정보를 어딘가에 저장하거나 사용할 때 유용합니다.
+
+		iat는 optional(선택적) 필드로, 토큰이 언제 발급되었는지를 나타냅니다. 주로 JWT 토큰에 사용됩니다.
+
+IAuthDocument 인터페이스:
+
+		Mongoose의 Document를 확장하여 사용자 데이터를 MongoDB에 저장할 때의 구조를 정의합니다.
+
+		comparePassword 메서드는 사용자가 로그인할 때
+
+		입력한 비밀번호가 저장된 비밀번호와 같은지 확인하는 기능을 제공합니다.
+
+		hashPassword 메서드는 사용자의 비밀번호를 해시(암호화)해서 안전하게 저장하는 기능을 제공합니다.
+
+		비밀번호 재설정 기능을 위해 passwordResetToken과 passwordResetExpires 필드도 정의되어 있습니다.
+
+
+ISignUpData 인터페이스:
+
+		사용자가 회원가입할 때 제출하는 정보를 정의합니다. MongoDB에 저장될 필드들로 구성되어 있습니다.
+
+		password는 암호로, 서버에서 저장할 때 해시처리(암호화)되어 안전하게 저장됩니다.
+
+
+IAuthJob 인터페이스:
+
+		인증 작업과 관련된 데이터를 처리할 때 사용합니다.
+
+		이 작업의 값은 string 또는 IAuthDocument 타입일 수 있습니다.
+
+		예를 들어, 사용자 인증이 완료된 후 처리할 데이터를 전달할 때 사용될 수 있습니다.
+```
+
+### 고유 ID (ObjectId) 와 고유 식별자 (uId) 차이
+
+```jsx
+왜 둘 다 필요할까?
+
+1. 데이터베이스 내부용 vs 외부용
+
+		고유 ID: 데이터베이스 내부에서 데이터를 찾을 때 사용.
+
+		고유 식별자: 클라이언트나 다른 시스템에서 데이터를 구분할 때 사용.
+
+2. 보안
+
+		고유 ID는 너무 복잡하고 데이터베이스 구조를 노출할 위험이 있으니까 외부에 보여주기 싫어요.
+
+		대신 고유 식별자를 외부에 보여줘서 안전하게 관리할 수 있어요.
+
+3. 사람들이 이해하기 쉽게
+
+		사람들이 64f8e10f9c4d2e12345abcde를 기억하는 건 어렵죠.
+
+		대신 user12345처럼 쉽게 읽을 수 있는 값을 사용하는 거예요.
+
+
+고유 ID (ObjectId)
+
+		→ "내 주민등록번호"
+
+		→ 내가 누구인지 정확히 구분할 수 있는 번호 (예: 990101-1234567).
+
+고유 식별자 (uId)
+
+		→ "내 별명"
+
+		→ 사람들이 나를 쉽게 부를 수 있도록 만든 이름 (예: john_doe).
+
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381339/notion-blog/_/React_Node_/_4_-_1_-/image_11.png)
+
+---
+
+### \* Mongoose의 `Document`
+
+```jsx
+Mongoose의 Document는 MongoDB에서 데이터를 저장할 때 사용하는 객체를 뜻합니다.
+
+쉽게 말해, **MongoDB에 저장되는 데이터 한 개를 나타내는 '객체'**입니다.
+
+MongoDB에 사용자의 정보를 저장한다고 할 때, 하나의 Document는 한 명의 사용자의 정보를 의미합니다.
+
+그 안에는 이름, 이메일, 비밀번호 같은 정보가 들어갑니다.
+
+Mongoose의 Document 특징:
+
+		MongoDB에서 데이터를 다룰 때 사용: 이 Document는 MongoDB에 데이터를 저장하거나, 가져오거나, 수정할 때 사용됩니다.
+
+		Schema를 기반으로 생성: Mongoose에서 미리 정의한 데이터 구조(Schema)에 따라 이 Document가 만들어집니다.
+
+		데이터와 함께 메서드 포함 가능: Document 안에 메서드를 정의할 수 있는데, 이 메서드들은 데이터를 처리하는 기능을 포함할 수 있습니다.
+
+		예를 들어, 비밀번호를 비교하거나, 해시할 수 있는 메서드를 만들 수 있습니다.
+```
+
+## 2. **Mongoose 스키마와 모델 정의 ( auth.schema.ts )**
+
+```jsx
+MongoDB와 상호작용하기 위해 Mongoose를 사용합니다.
+
+Mongoose는 MongoDB의 데이터를 쉽게 관리할 수 있도록 도와주는 라이브러리입니다.
+
+우리는 사용자 인증에 필요한 데이터베이스 스키마를 정의하고, 이를 통해 데이터를 저장하거나 가져옵니다.
+```
+
+```jsx
+import { hash, compare } from 'bcryptjs';  // bcryptjs 라이브러리에서 비밀번호 해시 및 비교 함수를 불러옴
+import { IAuthDocument } from '@auth/interfaces/auth.interface';  // IAuthDocument 타입을 불러옴
+import { model, Model, Schema } from 'mongoose';  // Mongoose에서 모델, 스키마 등을 불러옴
+
+const SALT_ROUND = 10;  // 비밀번호 해싱에 사용될 솔트(salt)의 라운드 수를 설정. 보안 강도와 관련됨
+
+// 사용자 인증 관련 데이터를 저장할 Mongoose 스키마 정의
+const authSchema: Schema = new Schema(
+  {
+    username: { type: String },  // 사용자 이름을 저장
+    uId: { type: String },  // 고유 사용자 ID를 저장
+    email: { type: String },  // 이메일을 저장
+    password: { type: String },  // 해시된 비밀번호를 저장
+    avatarColor: { type: String },  // 사용자 아바타 색상을 저장
+    createdAt: { type: Date, default: Date.now },  // 계정 생성 날짜를 저장
+    passwordResetToken: { type: String, default: '' },  // 비밀번호 초기화에 필요한 토큰을 저장
+    passwordResetExpires: { type: Number }  // 비밀번호 초기화 토큰의 만료 시간을 저장
+  },
+  {
+    toJSON: { // transform 함수는 JSON으로 변환할 때, 데이터를 어떻게 수정할지 정의하는 함수입니다. 이 함수는 두 가지 매개변수를 받습니다:
+      // JSON으로 변환할 때, 응답에서 비밀번호 필드를 제거
+      transform(_doc, ret) {
+        delete ret.password;  // 비밀번호 정보를 숨김
+        return ret;
+      }
+    }
+  }
+);
+
+// 스키마에 미리 정의된 'save' 이벤트 전에 실행되는 미들웨어 (비밀번호를 해시함)
+authSchema.pre('save', async function (this: IAuthDocument, next: () => void) {
+  const hashedPassword: string = await hash(this.password as string, SALT_ROUND);  // 비밀번호를 해시 처리
+  this.password = hashedPassword;  // 해시된 비밀번호로 대체
+  next();  // 다음 작업으로 넘어감
+});
+
+// 사용자 입력 비밀번호와 해시된 비밀번호를 비교하는 메서드
+authSchema.methods.comparePassword = async function (password: string): Promise<boolean> { // authSchema.methods는 Mongoose에서 제공하는 기능으로, **스키마(schema)**에 인스턴스 메서드를 추가하는 방법
+  const hashedPassword: string = (this as unknown as IAuthDocument).password!;  // 해시된 비밀번호를 가져옴
+  return compare(password, hashedPassword);  // 입력된 비밀번호와 저장된 해시된 비밀번호를 비교
+};
+
+// 비밀번호를 해시하는 메서드
+authSchema.methods.hashPassword = async function (password: string): Promise<string> {
+  return hash(password, SALT_ROUND);  // 주어진 비밀번호를 해시 처리
+};
+
+// Mongoose 모델을 생성합니다. 이 모델은 'Auth' 컬렉션과 연결됩니다.
+// 'Auth' 컬렉션은 사용자 데이터를 저장하는 곳입니다.
+// 모델을 통해 MongoDB에서 데이터를 쉽게 조회하거나 저장할 수 있습니다.
+
+// 'Auth': 모델 이름. MongoDB에서 기본적으로 'auths'라는 컬렉션을 만듭니다.
+// authSchema: 스키마. 이 모델로 생성되는 문서(데이터)의 구조를 정의합니다.
+// 'Auth': 컬렉션 이름을 직접 'Auth'로 지정하여 MongoDB에서 이 이름으로 데이터를 저장합니다.
+const AuthModel: Model<IAuthDocument> = model<IAuthDocument>('Auth', authSchema, 'Auth'); // model 메서드를 사용해 모델을 생성합니다.
+
+// AuthModel을 내보냅니다.
+// 다른 파일에서 이 모델을 가져와서 MongoDB와 상호작용할 수 있게 됩니다.
+export { AuthModel };
+
+```
+
+```jsx
+bcryptjs 라이브러리:
+
+		bcryptjs는 비밀번호를 안전하게 저장하기 위해 해시(hashing)를 사용합니다.
+
+		단순히 비밀번호를 저장하는 것이 아니라, 복잡하게 변환된 해시값을 저장함으로써
+
+		데이터베이스가 해킹당해도 원래 비밀번호를 알 수 없게 해줍니다.
+
+		hash: 비밀번호를 해시 처리하는 함수입니다.
+
+		compare: 사용자가 입력한 비밀번호와 해시된 비밀번호를 비교하는 함수입니다.
+
+Mongoose 스키마:
+
+		MongoDB에 데이터를 저장하기 위해 Mongoose라는 라이브러리를 사용합니다.
+
+		이 스키마는 데이터의 구조를 정의하는 설계도와 같습니다.
+
+
+		authSchema: 이 스키마는 사용자의 인증 관련 정보를 정의합니다. 사용자의 이메일,
+
+								사용자 이름, 해시된 비밀번호 등을 저장합니다.
+
+toJSON 변환:
+
+		toJSON은 Mongoose에서 제공하는 옵션 중 하나입니다. MongoDB에서 데이터를 JSON 형식으로 변환할 때,
+
+		특정 작업을 할 수 있게 해줍니다.
+
+		MongoDB에서 데이터를 불러올 때, 비밀번호 같은 중요한 정보는 포함되면 안 됩니다.
+
+		transform 함수는 응답으로 보낼 때 password 필드를 제거하여 사용자 정보가 노출되지 않도록 합니다.
+
+		transform 함수는 JSON으로 변환할 때, 데이터를 어떻게 수정할지 정의하는 함수입니다.
+
+		이 함수는 두 가지 매개변수를 받습니다:
+
+		_doc: 원래의 데이터 객체 (원본 데이터)
+
+		ret: 클라이언트에게 응답으로 보내질 변환된 데이터 객체 (응답 데이터)
+
+		delete ret.password;는 응답 데이터에서 비밀번호 필드를 삭제하는 코드입니다.
+
+pre('save') 미들웨어:
+
+		데이터를 저장하기 전에 특정 작업을 할 수 있는 미들웨어입니다.
+
+		여기서는 비밀번호를 저장하기 전에 먼저 해시로 변환하는 역할을 합니다.
+
+		예를 들어, 사용자가 비밀번호를 "mypassword"로 입력하면 이 미들웨어가 mypassword를 해시한 값으로 변환하고,
+
+		그 변환된 값을 데이터베이스에 저장합니다.
+
+		* this.password as string
+
+					as 키워드는 TypeScript에서 타입을 명시적으로 변환할 때 사용하는 문법입니다.
+
+					즉, 특정 값이 어떤 타입인지 명확히 알려주는 역할을 합니다.
+
+
+					this.password: 이 this는 authSchema로 생성된 인스턴스를 가리킵니다.
+
+					이 인스턴스에는 password라는 속성이 포함되어 있습니다.
+
+					as string: password 속성의 타입이 때로는 string | undefined일 수 있습니다.
+
+					즉, 비밀번호가 없을 수도 있기 때문에, undefined일 가능성도 포함될 수 있습니다.
+
+
+					하지만 여기서는 비밀번호가 반드시 string이라고 확신할 수 있는 상황이므로,
+
+					TypeScript에게 "이 값은 string으로 취급해도 돼"라고 알려주는 것입니다.
+
+비밀번호 비교 메서드:
+
+		comparePassword: 사용자가 로그인할 때 입력한 비밀번호와 데이터베이스에 저장된 해시된 비밀번호를 비교합니다.
+
+											예를 들어, 사용자가 로그인을 위해 비밀번호 "mypassword"를 입력하면,
+
+											이 메서드는 그 비밀번호를 해시한 후,
+
+											데이터베이스에 저장된 해시값과 비교하여 맞는지 확인합니다.
+
+
+비밀번호 해시 메서드:
+
+		hashPassword: 비밀번호를 해시하는 메서드입니다.
+
+									새로운 비밀번호를 만들거나 비밀번호를 변경할 때 사용합니다.
+
+모델 생성:
+
+		마지막으로 AuthModel이라는 모델을 생성합니다.
+
+		이 모델을 통해 MongoDB에 사용자 데이터를 저장하고 불러올 수 있습니다.
+
+		AuthModel은 authSchema 구조를 따르며, "Auth"라는 이름의 컬렉션에 데이터를 저장합니다.
+```
+
+## 3. **패스 설정 및 `bcryptjs` 설치**
+
+```jsx
+Mongoose 모델을 사용하려면 TypeScript에서 경로 설정을 해야 합니다.
+
+이를 통해 인터페이스와 모델을 쉽게 가져올 수 있습니다.
+
+또한, 비밀번호 해싱을 위해 bcryptjs 라이브러리를 설치합니다.
+```
+
+```jsx
+tsconfig.json 설정 파일 수정:
+
+"paths": {
+  "@auth/*" : ["./src/features/auth/*"],
+  "@global/*" : ["./src/shared/globals/*"],
+  "@service/*" : ["./src/shared/services/*"],
+  "@socket/*" : ["./src/shared/sockets/*"],
+  "@worker/*" : ["./src/shared/workers/*"],
+  "@root/*" : ["./src/*"]
+}
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381339/notion-blog/_/React_Node_/_4_-_1_-/image_12.png)
+
+```jsx
+bcryptjs 설치
+
+npm install bcryptjs
+
+npm install --save-dev @types/bcryptjs
+```
+
+```jsx
+회원 가입(SignUp) 기능을 만드는 과정에서 사용할 **컨트롤러(controller)**와 **서비스(service)**를 어떻게 구현하는지를 보여줍니다.
+
+이 기능은 새로운 사용자를 생성하고 MongoDB 데이터베이스에 저장하며,
+
+또한 중복된 사용자 이름(username)이나 이메일(email)이 존재하는지를 확인합니다.
+
+여기에 더해 **JSON Web Token (JWT)**을 사용해 사용자 인증을 처리할 준비를 하고 있습니다
+```
+
+## 패키치 설치
+
+```jsx
+jsonwebtoken: JWT(JSON Web Token)를 사용하여 사용자의 인증 정보를 토큰 형태로 관리합니다.
+
+lodash: JavaScript에서 자주 사용되는 유틸리티 라이브러리로, 배열, 객체, 문자열 등의 데이터를
+
+				다루는 다양한 편리한 함수들을 제공 _.map(), _.filter()
+```
+
+```jsx
+npm i jsonwebtoken lodash
+
+npm i @types/jsonwebtoken @types/lodash
+
+* @types는 TypeScript 프로젝트에서 해당 라이브러리의 타입 정보를 사용할 수 있게 해주는 패키지입니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381339/notion-blog/_/React_Node_/_4_-_1_-/image_13.png)
+
+## SignUp 컨트롤러 파일 생성
+
+```jsx
+컨트롤러는 클라이언트 요청을 처리하는 로직을 담고 있습니다.
+
+controllers 폴더에 signup.ts 파일을 생성하고, 여기에 회원가입 시 사용자의 데이터를 받아서 처리할 코드를 작성합니다.
+```
+
+```jsx
+// MongoDB의 ObjectId를 가져오는 코드. 현재는 사용하지 않음.
+// import { ObjectId } from 'mongodb';
+import { Request, Response } from 'express'; // Express의 Request와 Response 객체를 가져옵니다.
+import { joiValidation } from '@global/decorators/joi-validation.decorator'; // JOI 유효성 검사 데코레이터를 가져옵니다.
+import { signupSchema } from '@auth/schemes/signup'; // 회원가입 스키마를 가져옵니다.
+import { IAuthDocument } from '@auth/interfaces/auth.interface'; // 인증 관련 인터페이스를 가져옵니다.
+import { authService } from '@service/db/auth.service'; // 데이터베이스와 상호작용하는 authService를 가져옵니다.
+import { BadRequestError } from '@global/helpers/error-handler'; // 잘못된 요청을 처리하기 위한 에러 클래스입니다.
+
+export class SignUp {
+  // joiValidation 데코레이터를 사용하여 요청의 유효성을 검사합니다.
+  @joiValidation(signupSchema) // signupSchema 는 예전에 스키마에 signup.ts 에 적혀있다
+  public async create(req: Request, res: Response): Promise<void> {
+    // 요청의 본문에서 username, email, password, avatarColor, avatarImage 값을 추출합니다.
+    const { username, email, password, avatarColor, avatarImage } = req.body;
+
+    // 사용자 이름 또는 이메일로 사용자가 이미 존재하는지 확인합니다.
+    const checkIfUserExit: IAuthDocument = await authService.getUserByUsernameOrEamil(username, email);
+
+    // 사용자가 이미 존재하면 BadRequestError를 발생시킵니다.
+    if (checkIfUserExit) {
+      throw new BadRequestError('Invalid credentials');
+    }
+
+    // 이후에 사용자를 데이터베이스에 저장하는 로직이 들어갈 수 있습니다.
+    // 예: await authService.createUser({ username, email, password, avatarColor, avatarImage });
+
+    // 요청이 성공적으로 처리되면 응답을 반환합니다.
+    // res.status(201).json({ message: 'User registered successfully!' });
+  }
+}
+
+```
+
+## AuthService 파일 생성
+
+```jsx
+이제 중복된 이메일이나 사용자 이름이 존재하는지 확인하는 서비스 로직을 작성해야 합니다.
+
+services/db 폴더에 auth.service.ts 파일을 생성하고 아래의 코드를 작성합니다.
+```
+
+```jsx
+// IAuthDocument 인터페이스를 가져옵니다. 사용자 인증 관련 데이터의 구조를 정의합니다.
+import { IAuthDocument } from '@auth/interfaces/auth.interface';
+// AuthModel은 MongoDB와 상호작용하기 위한 스키마 모델입니다.
+import { AuthModel } from '@auth/models/auth.schema';
+// Helpers는 다양한 유틸리티 함수를 제공하는 헬퍼 클래스입니다.
+import { Helpers } from '@global/helpers/heplers';
+
+// AuthService 클래스를 정의합니다. 이 클래스는 사용자 인증 관련 서비스를 제공합니다.
+class AuthService {
+  // 사용자의 사용자 이름 또는 이메일로 사용자 정보를 조회하는 비동기 메서드입니다.
+  public async getUserByUsernameOrEamil(username: string, email: string): Promise<IAuthDocument> {
+    // MongoDB 쿼리를 정의합니다. username이 첫 글자 대문자이고, email은 소문자로 변환하여 비교합니다.
+    const query = {
+      // $or 연산자를 사용하여 username 또는 email 중 하나가 일치하는 경우를 찾습니다.
+      $or: [
+        { username: Helpers.firstletterUppercase(username) }, // username의 첫 글자를 대문자로 변환하여 검색
+        { email: Helpers.lowerCase(email) } // email을 소문자로 변환하여 검색
+      ]
+    };
+
+    // AuthModel을 사용하여 MongoDB에서 사용자 정보를 조회합니다.
+    const user: IAuthDocument = await AuthModel.findOne(query).exec() as IAuthDocument;
+
+    // 조회된 사용자 정보를 반환합니다. 사용자가 없으면 null을 반환합니다.
+    return user;
+  }
+}
+
+// AuthService의 인스턴스를 생성하여 외부에서 사용할 수 있도록 export합니다.
+export const authService: AuthService = new AuthService();
+```
+
+### \* `exec()` 뜻? 없이도 사용 가능
+
+```jsx
+
+exec() 메서드는 Mongoose의 쿼리 빌더에서 쿼리를 실행하는 방법입니다.
+
+findOne 메서드가 반환하는 쿼리 객체에 exec()를 호출하면 데이터베이스에 실제로 쿼리를 실행하고 결과를 반환합니다.
+
+exec()는 Promise를 반환하므로, 결과를 비동기로 처리할 수 있습니다.
+
+exec() 없이도 쿼리를 실행할 수 있습니다.
+
+const user: IAuthDocument = await AuthModel.findOne(query);
+
+위와 같이 하면 findOne() 메서드 자체가 Promise를 반환하기 때문에, await을 통해 결과를 직접 받을 수 있습니다.
+
+exec()를 사용하는 이유:
+
+쿼리 실행의 명시성을 높이고, 예외 처리를 용이하게 하며, 쿼리의 실행을 명확히 나타내기 위해 사용됩니다.
+
+필수 여부:
+
+꼭 필요한 것은 아니지만, 사용하면 코드의 가독성과 관리가 더 쉬워질 수 있습니다. ( 팀 관행에 따른다 )
+
+```
+
+## 헬퍼(Helper) 함수 생성
+
+```jsx
+다음은 globals/helpers 폴더에 helpers.ts 파일을 생성하여 문자열 처리에 필요한 유틸리티 함수들을 작성합니다.
+
+firstletterUppercase: 사용자의 이름이 모두 소문자로 입력되었을 때, 첫 글자만 대문자로 변경해주는 함수입니다.
+
+lowerCase: 이메일과 같이 대소문자 구분이 없는 경우, 모든 문자를 소문자로 변환합니다.
+
+generateRandomIntegers : 지정된 길이의 랜덤한 숫자 문자열을 생성하고 이를 정수로 변환하여 반환합니다.
+```
+
+```jsx
+// Helper 기능을 모아놓은 클래스 정의
+export class Helpers {
+
+  // 문자열의 첫 글자를 대문자로 변환하는 메서드
+  static firstletterUppercase(str: string): string {
+    // 입력된 문자열을 소문자로 변환
+    const valueString = str.toLowerCase();
+
+    // 문자열을 공백 단위로 나누고 각 단어의 첫 글자를 대문자로 변환
+    return valueString
+      .split(' ')  // 공백을 기준으로 문자열을 배열로 변환
+      .map((value: string) =>
+        // 각 단어의 첫 글자를 대문자로, 나머지는 소문자로 변환
+        `${value.charAt(0).toUpperCase()}${value.slice(1).toLowerCase()}`
+      )
+      .join(' ');  // 배열을 다시 공백을 포함한 문자열로 결합하여 반환
+  }
+
+  // 문자열을 모두 소문자로 변환하는 메서드
+  static lowerCase(str: string): string {
+    return str.toLowerCase();  // 문자열의 모든 문자를 소문자로 변환하여 반환
+  }
+
+  // 지정된 길이만큼의 랜덤한 정수를 생성하는 메서드
+  static generateRandomIntegers(integerLength: number): number {
+    // 사용할 숫자 문자열을 정의 (0-9까지)
+    const characters = '0123456789';
+
+    // 결과를 저장할 빈 문자열을 초기화 (공백으로 시작)
+    let result = ' ';
+
+    // 사용할 문자 집합의 길이를 저장 (10, 숫자의 개수)
+    const charactersLength = characters.length;
+
+    // integerLength만큼 반복하여 랜덤 숫자를 생성
+    for (let i = 0; i < integerLength; i++) {
+      // 0부터 charactersLength(10) 사이의 랜덤 인덱스를 선택하여 해당 숫자를 추가
+      result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    }
+
+    // 생성된 문자열을 정수로 변환하여 반환
+    return parseInt(result, 10);  // 10진수로 변환
+  }
+}
+
+```
+
+# { 사용자 회원가입 처리 로직 및 이미지 업로드 기능 구현 }
+
+```jsx
+회원가입 기능을 구현하면서, MongoDB와 Cloudinary를 이용해 사용자 데이터를 처리하고
+
+프로필 이미지를 업로드하는 과정을 다룹니다.
+```
+
+```jsx
+// MongoDB에서 사용할 ObjectId 임포트
+import { ObjectId } from 'mongodb'; // ObjectId는 MongoDB에서 각각의 데이터(문서)에 고유한 ID를 생성하고 부여하는 데 사용
+// Express의 Request와 Response 타입 임포트
+import { Request, Response } from 'express';
+// Joi 유효성 검사 데코레이터 임포트
+import { joiValidation } from '@global/decorators/joi-validation.decorator';
+// 회원가입 시 사용할 스키마 임포트
+import { signupSchema } from '@auth/schemes/signup';
+// 회원가입과 관련된 인터페이스 임포트
+import { IAuthDocument, ISignUpData } from '@auth/interfaces/auth.interface';
+// 데이터베이스 서비스에서 회원 정보를 가져오는 서비스 임포트
+import { authService } from '@service/db/auth.service';
+// 에러 핸들링을 위한 커스텀 에러 클래스 임포트
+import { BadRequestError } from '@global/helpers/error-handler';
+// 헬퍼 클래스 임포트 (여기서 문자열을 조작하는 메서드 등을 사용할 예정)
+import { Helpers } from '@global/helpers/heplers';
+// Cloudinary에서 제공하는 파일 업로드 응답 타입 및 업로드 함수 임포트
+import { UploadApiResponse } from 'cloudinary';
+import { upload } from '@global/helpers/cloudinary-upload';
+// 다시 한 번 MongoDB ObjectId 임포트 (아마 위쪽과 중복될 수 있음)
+import { ObjectId } from 'mongodb';
+
+// 회원가입 처리를 담당하는 클래스
+export class SignUp {
+
+  // Joi를 사용해 회원가입 요청(req.body)에 대한 유효성 검사를 적용하는 데코레이터
+  @joiValidation(signupSchema)
+  public async create(req: Request, res: Response): Promise<void> {
+    // 클라이언트에서 전달받은 사용자 정보 추출
+    const { username, email, password, avatarColor, avatarImage } = req.body;
+
+    // 데이터베이스에서 해당 사용자 이름 또는 이메일이 존재하는지 확인
+    const checkIfUserExist: IAuthDocument = await authService.getUserByUsernameOrEamil(username, email);
+
+    // 사용자 이름 또는 이메일이 이미 존재하면 에러를 발생시킴
+    if (checkIfUserExist) {
+      throw new BadRequestError('Invalid credentials'); // 유효하지 않은 자격 증명 에러 메시지
+    }
+
+    // 새로운 사용자와 관련된 ObjectId 생성 (MongoDB에서 사용)
+    const authObjectId: ObjectId = new ObjectId();
+    const userObjectId: ObjectId = new ObjectId();
+
+    // 사용자 고유 ID(uId) 생성 (12자리의 랜덤한 숫자 생성)
+    const uId = `${Helpers.generateRandomIntegers(12)}`;
+
+    // 사용자 데이터를 객체로 구성하고, 회원가입 데이터를 생성하는 메서드에 전달
+    const authData: IAuthDocument = SignUp.prototype.signupData({
+      _id: authObjectId,
+      uId,
+      username,
+      email,
+      password,
+      avatarColor
+    });
+
+    // 클라우드 서비스(Cloudinary)에 아바타 이미지를 업로드, 그리고 업로드 응답을 처리
+    const result: UploadApiResponse = await upload(avatarImage, `${userObjectId}`, true, true) as UploadApiResponse;
+
+    // 업로드 결과에 public_id가 없을 경우 에러를 발생시킴
+    if (!result?.public_id) {
+      throw new BadRequestError('File upload Error occurred. Try again'); // 파일 업로드 에러 메시지
+    }
+
+    // (추가 작업: 여기서 회원 데이터를 DB에 저장하거나 추가 작업을 할 수 있음)
+  }
+
+  // 회원가입 데이터를 생성하는 비공개 메서드
+  private signupData(data: ISignUpData): IAuthDocument {
+    const { _id, username, email, uId, password, avatarColor } = data;
+
+    // 전달받은 데이터를 가공하여 새로운 사용자 문서(IAuthDocument) 형태로 반환
+    return {
+      _id,
+      uId,
+      // 사용자 이름 첫 글자를 대문자로 변환
+      username: Helpers.firstletterUppercase(username),
+      // 이메일을 소문자로 변환
+      email: Helpers.lowerCase(email),
+      // 비밀번호, 아바타 색상 저장
+      password,
+      avatarColor,
+      // 생성일자를 현재 시간으로 설정
+      createdAt: new Date()
+    } as IAuthDocument;
+  }
+}
+
+```
+
+## 1. 회원가입 기본 로직 설정
+
+### 사용자 검증
+
+```jsx
+사용자가 입력한 username과 email이 이미 존재하는지 확인하는 부분부터 시작합니다.
+
+authService.getUserByUsernameOrEmail(username, email) 메서드를 호출해
+
+데이터베이스에서 해당 유저가 있는지 체크합니다. 이미 존재하는 경우, BadRequestError를 던집니다.
+```
+
+```jsx
+const checkIfUserExit: IAuthDocument = await authService.getUserByUsernameOrEamil(username, email);
+if (checkIfUserExit) {
+  throw new BadRequestError('Invalid credentials');
+}
+```
+
+### ObjectId 생성
+
+```jsx
+MongoDB에서 ObjectId는 각 데이터의 고유 식별자입니다.
+
+여기서는 사용자와 인증 데이터를 위한 두 개의 ObjectId를 생성합니다.
+```
+
+```jsx
+const authObjectId: ObjectId = new ObjectId();
+const userObjectId: ObjectId = new ObjectId();
+
+* 몽고 DB 고유 아이디 고유 아이디 만들기 예시
+import { ObjectId } from 'mongodb';
+
+const userId = new ObjectId();  // 새로운 고유 ID를 생성
+console.log(userId);  // 예: 507f191e810c19729de860ea
+
+이렇게 하면, userId는 MongoDB의 ObjectId 형식으로 생성된 고유한 ID를 가지게 됩니다.
+```
+
+## 2. UID 생성
+
+```jsx
+uId는 사용자에게 부여되는 고유 ID로, 랜덤한 12자리 숫자를 생성하여 부여합니다.
+
+Helpers 모듈에 정의된 generateRandomIntegers 메서드를 사용합니다.
+```
+
+```jsx
+const uId = `${Helpers.generateRandomIntegers(12)}`
+```
+
+## 3. 사용자 데이터 생성
+
+```jsx
+새로운 사용자를 데이터베이스에 저장할 데이터를 생성하기 위해 signupData라는 메서드를 만듭니다.
+
+이 메서드는 전달된 데이터를 기반으로 MongoDB에 저장될 문서를 구성합니다.
+```
+
+```jsx
+private signupData(data: ISignUpData): IAuthDocument {
+  const { _id, username, email, uId, password, avatarColor } = data;
+  return {
+    _id,
+    uId,
+    username: Helpers.firstletterUppercase(username),  // 첫 글자를 대문자로 변환
+    email: Helpers.lowerCase(email),  // 이메일을 소문자로 변환
+    password,
+    avatarColor,
+    createdAt: new Date()
+  } as IAuthDocument;
+}
+
+```
+
+## 4. Cloudinary 이미지 업로드
+
+```jsx
+사용자가 업로드한 프로필 이미지를 Cloudinary에 업로드하는 부분입니다.
+
+이미지가 성공적으로 업로드되면 public_id가 반환되고, 이 public_id는 이미지 파일을 추후 식별하는데 사용됩니다.
+```
+
+```jsx
+const result: UploadApiResponse = await upload(avatarImage, `${userObjectId}`, true, true) as UploadApiResponse;
+if (!result?.public_id) {
+  throw new BadRequestError('File upload Error occurred. Try again');
+}
+```
+
+```jsx
+const result: UploadApiResponse = await upload(avatarImage, `${userObjectId}`, true, true) as UploadApiResponse;
+
+public_id: 사용자 ObjectId를 이미지 파일의 public_id로 사용하여,
+
+					 이미지가 업데이트될 때도 동일한 ID를 유지합니다.
+
+overwrite: true로 설정해 이미지를 덮어씁니다.
+
+invalidate: true로 설정해 캐시된 이미지를 무효화합니다.
+
+if (!result?.public_id) {
+  throw new BadRequestError('File upload Error occurred. Try again');
+}
+
+이미지 업로드 중 오류가 발생하면 public_id가 반환되지 않으므로, 이 경우 오류 메시지를 사용자에게 전달합니다.
+```
+
+### \* `SignUp.prototype.signupData`에서 **`prototype`**을 사용하는 이유
+
+```jsx
+SignUp.prototype.signupData에서 **prototype**을 사용하는 이유는,
+
+인스턴스를 만들지 않고도 클래스의 메서드를 직접 호출하기 위해서입니다.
+
+클래스와 인스턴스:
+
+		보통 클래스(SignUp) 안에 있는 메서드(signupData)를 호출하려면 먼저 **클래스의 인스턴스(객체)**를 만들어야 해요.
+
+		const signupInstance = new SignUp();
+
+		signupInstance.signupData();
+
+		이렇게 객체(signupInstance)를 만들어서 메서드를 호출하는 방식이에요.
+
+프로토타입 사용 이유:
+
+		그런데 코드에서는 새로운 객체를 만들지 않고, 바로 메서드를 호출하고 있어요.
+
+		그걸 가능하게 하는 게 바로 SignUp.prototype.signupData입니다.
+
+		**prototype**을 사용하면 인스턴스를 만들지 않고도 클래스의 메서드에 바로 접근할 수 있어요.
+
+		SignUp.prototype.signupData();
+
+
+왜 이렇게 할까?
+
+		이 코드는 create 메서드 안에서 사용되고 있는데,
+
+		create 메서드는 클래스 인스턴스와 관계없이 호출될 수 있는 구조일 수 있어요.
+
+		즉, 굳이 새로운 SignUp 객체를 만들지 않고도 메서드를 쓰고 싶을 때 prototype을 사용해서 메서드를 호출할 수 있는 거죠.
+```
+
+# { 회원가입과 이미지 업로드 구현 및 테스트 }
+
+```jsx
+이 강의는 Express 프레임워크를 사용한 사용자 인증 시스템을 만들면서
+
+이미지 업로드 기능을 구현하는 방법을 다루고 있습니다.
+
+그 과정에서 라우트 정의, 컨트롤러 설정, 그리고 테스트 방법을 포함해 전체적인 흐름을 보여줍니다.
+```
+
+## 1. **폴더 구조와 파일 생성**
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381339/notion-blog/_/React_Node_/_4_-_1_-/image_14.png)
+
+```jsx
+우선, 인증과 관련된 라우트를 정의할 파일들을 생성해야 합니다.
+
+features/auth/routes 폴더 생성:
+
+		이 폴더 안에 authRoutes.ts 파일을 만들고, 여기에서 인증과 관련된 라우트들을 정의합니다.
+
+authRoutes.ts 파일 작성:
+
+		authRoutes.ts는 Express의 Router를 사용해 라우트 설정을 간단하게 관리하는 클래스입니다.
+```
+
+```jsx
+// SignUp 컨트롤러를 불러옴. 회원가입 처리를 담당하는 로직이 들어있음
+import { SignUp } from '@auth/controllers/singup';
+
+// Express.js에서 제공하는 기본 기능과 Router 클래스를 가져옴
+import express, { Router } from 'express';
+
+// AuthRoutes 클래스 정의: 회원가입과 관련된 경로(라우트)를 관리하는 클래스
+class AuthRoutes {
+  // private로 선언된 router: 이 클래스 내부에서만 사용할 수 있는 Express Router 인스턴스
+  private router: Router;
+
+  // 클래스가 생성될 때 실행되는 생성자 함수
+  constructor() {
+    // Express의 Router 인스턴스를 생성함. 이 인스턴스를 통해 라우트(경로)를 정의함.
+    this.router = express.Router();
+  }
+
+  // 라우트를 정의하고 반환하는 메서드
+  public routes(): Router {
+    // 회원가입 요청을 처리하는 POST 라우트 정의
+    // '/signup' 경로로 들어온 POST 요청을 SignUp 컨트롤러의 create 메서드로 처리함
+    // SignUp.prototype.create은 회원가입 요청을 처리하는 함수로, 요청 데이터를 받아서 회원가입 로직을 실행함
+    this.router.post('/signup', SignUp.prototype.create);
+
+    // 라우터에 정의된 모든 경로를 반환함. 반환된 라우터는 Express 애플리케이션에서 사용될 수 있음
+    return this.router;
+  }
+};
+
+// AuthRoutes 클래스의 인스턴스를 생성하고 이를 외부에서 사용할 수 있도록 export 함
+// 이로 인해 다른 파일에서도 authRoutes를 import하여 사용할 수 있게 됨
+export const authRoutes: AuthRoutes = new AuthRoutes();
+
+```
+
+## 2. **메인 라우터에 등록**
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381339/notion-blog/_/React_Node_/_4_-_1_-/image_15.png)
+
+```jsx
+
+authRoutes.ts에서 정의한 라우트를 실제로 Express 앱에 등록해야 합니다. 이 작업은 routes.ts 파일에서 이루어집니다.
+
+		BASE_PATH는 API의 기본 경로로, 모든 경로가 /api/v1로 시작합니다.
+
+		실제로 authRoutes의 라우트를 사용하도록 설정합니다.
+```
+
+```jsx
+// authRoutes에서 정의된 회원가입 라우트를 불러옴
+import { authRoutes } from '@auth/routes/authRoutes';
+
+// Express 애플리케이션 타입을 불러옴. 이를 통해 Express 앱의 타입을 지정할 수 있음
+import { Application } from 'express';
+
+// API의 기본 경로를 정의함. 모든 라우트는 '/api/v1' 경로를 기준으로 동작하게 됨
+const BASE_PATH = '/api/v1';
+
+// app 인스턴스를 인자로 받아서 라우트를 설정하는 기본 함수를 export 함
+export default (app: Application) => {
+  // routes 함수 정의: 애플리케이션에서 사용할 라우트를 설정하는 역할을 함
+  const routes = () => {
+    // app.use()를 통해 기본 경로(BASE_PATH)와 라우트(authRoutes)를 결합하여 Express 앱에 추가함
+    // '/api/v1' 뒤에 authRoutes에서 정의한 라우트가 추가됨. 예: '/api/v1/signup'
+    app.use(BASE_PATH, authRoutes.routes());
+  };
+
+  // routes 함수를 즉시 실행하여 라우트를 설정함
+  routes();
+};
+
+```
+
+## 3. **SignUp 컨트롤러 수정(추가)**
+
+```jsx
+// Express.js에서 Request와 Response 타입을 가져옴. 이를 통해 요청(req)과 응답(res)의 타입을 정의할 수 있음
+import { Request, Response } from 'express';
+
+// Joi를 이용한 유효성 검사 데코레이터를 가져옴. 회원가입 시 Joi 스키마를 이용해 입력값을 검증
+import { joiValidation } from '@global/decorators/joi-validation.decorator';
+
+// 회원가입 시 입력값을 검증할 스키마를 가져옴
+import { signupSchema } from '@auth/schemes/signup';
+
+// 인증과 관련된 인터페이스들을 가져옴. (IAuthDocument: 인증 데이터 타입, ISignUpData: 회원가입 데이터 타입)
+import { IAuthDocument, ISignUpData } from '@auth/interfaces/auth.interface';
+
+// 데이터베이스에서 사용자 데이터를 처리하는 서비스
+import { authService } from '@service/db/auth.service';
+
+// 잘못된 요청 시 발생하는 에러 처리 클래스
+import { BadRequestError } from '@global/helpers/error-handler';
+
+// 도우미 클래스. 예를 들어, 문자열을 대문자로 변환하는 등의 유틸리티 함수들이 포함됨
+import { Helpers } from '@global/helpers/heplers';
+
+// Cloudinary에서 파일을 업로드한 결과를 처리하는 타입
+import { UploadApiResponse } from 'cloudinary';
+
+// Cloudinary에 파일을 업로드하는 도우미 함수
+import { upload } from '@global/helpers/cloudinary-upload';
+
+// MongoDB에서 객체 ID를 생성할 때 사용하는 ObjectId 클래스
+import { ObjectId } from 'mongodb';
+
+// HTTP 상태 코드를 상수로 정의한 라이브러리
+import HTTP_STATUS from 'http-status-codes';
+
+// 회원가입을 처리하는 클래스
+export class SignUp {
+
+  // Joi를 이용한 유효성 검사 데코레이터. signupSchema를 이용해 입력값을 검증함
+  @joiValidation(signupSchema)
+
+  // create 메서드: 회원가입 요청을 처리하는 비동기 함수
+  // req: 클라이언트의 요청 정보, res: 서버에서 클라이언트로 보낼 응답 정보
+  public async create(req: Request, res: Response): Promise<void> {
+
+    // 클라이언트 요청(req.body)에서 필요한 회원가입 정보(사용자 이름, 이메일, 비밀번호, 아바타 색상 및 이미지)를 가져옴
+    const { username, email, password, avatarColor, avatarImage } = req.body;
+
+    // 사용자 이름이나 이메일이 이미 존재하는지 확인하는 메서드
+    const checkIfUserExit: IAuthDocument = await authService.getUserByUsernameOrEamil(username, email);
+
+    // 만약 해당 사용자 이름이나 이메일이 이미 존재하면, 에러를 발생시킴
+    if (checkIfUserExit) {
+      throw new BadRequestError('Invalid credentials'); // "이미 존재하는 사용자" 에러 처리
+    }
+
+    // 새로운 ObjectId를 생성. 각각 인증 정보(auth)와 사용자 정보(user)에 사용됨
+    const authObjectId: ObjectId = new ObjectId();
+    const userObjectId: ObjectId = new ObjectId();
+
+    // 12자리의 랜덤 숫자를 생성해 사용자 ID로 사용
+    const uId = `${Helpers.generateRandomIntegers(12)}`;
+
+    // 회원가입 데이터를 생성하는 내부 메서드를 호출해 사용자 인증 정보를 생성
+    const authDate: IAuthDocument = SignUp.prototype.signupData({
+      _id: authObjectId,
+      uId,
+      username,
+      email,
+      password,
+      avatarColor
+    });
+
+    // Cloudinary에 아바타 이미지를 업로드함. 업로드된 이미지 정보를 result에 저장
+    // avatarImage는 Base64 인코딩된 이미지 데이터이며, userObjectId는 이미지 식별자 역할을 함
+    const result: UploadApiResponse = await upload(avatarImage, `${userObjectId}`, true, true) as UploadApiResponse;
+
+    // Cloudinary에서 업로드된 이미지의 결과를 확인하는 부분. public_id가 없으면 에러 처리
+    if (!result?.public_id) {
+      throw new BadRequestError('File upload Error accurred. Try again'); // "파일 업로드 오류" 에러 처리
+    }
+
+    // 회원가입이 성공했을 경우, 클라이언트에게 201 상태 코드와 성공 메시지를 응답으로 보냄
+    res.status(HTTP_STATUS.CREATED).json({ message: 'User created successfully', authDate });
+  }
+
+  // signupData 메서드: 회원가입 데이터를 생성하고, 이를 IAuthDocument 형식으로 반환
+  // 회원가입 시 입력받은 데이터들을 받아 데이터베이스에 저장할 형식으로 변환
+  private signupData(data: ISignUpData): IAuthDocument {
+    const { _id, username, email, uId, password, avatarColor } = data;
+
+    // 입력된 데이터를 가공하여 반환. 사용자의 이름은 첫 글자를 대문자로 변환하고, 이메일은 소문자로 변환
+    return {
+      _id,
+      uId,
+      username: Helpers.firstletterUppercase(username), // 첫 글자 대문자 변환
+      email: Helpers.lowerCase(email), // 이메일 소문자 변환
+      password, // 비밀번호는 그대로 사용
+      avatarColor, // 아바타 색상
+      createdAt: new Date() // 생성 날짜 추가
+    } as IAuthDocument;
+  }
+}
+
+```
+
+```jsx
+회원가입을 처리할 컨트롤러에서 성공적인 회원가입 시 응답을 전송하는 로직을 추가합니다.
+
+예시로, signup.ts에 아래와 같이 응답 코드를 작성합니다.
+
+// signup.ts 파일 내용
+import HTTP_STATUS from 'http-status-codes';
+
+export const create = (req, res) => {
+  // 회원가입이 성공했을 때 201 상태 코드와 메시지 전송
+  res.status(HTTP_STATUS.CREATED).json({ message: 'User created successfully', authDate: new Date() });
+};
+```
+
+### 라우터의 동작 순서 요약
+
+```jsx
+우터는 사용자가 특정 URL로 요청을 보냈을 때, 그 요청을 어떻게 처리할지 결정하는 역할을 합니다.
+
+아래 설명은 회원가입 기능을 처리하는 라우터의 동작 순서를 단계별로 쉽게 풀어서 설명한 것입니다
+```
+
+```jsx
+1. 라우터 생성 (회원가입 경로 만들기)
+
+		먼저, authRoutes.ts 파일에서 회원가입을 처리할 경로를 만듭니다.
+
+동작 과정:
+
+		Router 생성:
+
+				express.Router()를 사용해서 새로운 라우터를 만들어요.
+
+				이 라우터는 특정 경로로 들어오는 요청을 처리하는 방법을 정의할 수 있게 해줘요.
+
+
+		경로 설정:
+
+				/signup 경로로 POST 요청이 들어오면, 회원가입 처리를 담당하는 함수를 실행하라고 설정합니다.
+
+				POST 방식은 데이터를 서버로 보낼 때 사용하는 방식이에요. 여기서는 회원가입 요청을 처리할 때 사용해요.
+
+
+		예시:
+
+				사용자가 회원가입을 하기 위해 POST /signup 요청을 보내면,
+
+				이 요청이 **회원가입 처리 함수(SignUp.create)**로 전달되도록 하는 작업입니다.
+
+2. 라우터를 Express 애플리케이션에 연결 (경로 붙이기)
+
+이제 routes.ts 파일에서 방금 만든 라우터를 Express 애플리케이션에 연결합니다.
+
+이 연결 작업을 통해 우리가 만든 경로가 실제로 서버에서 동작하게 돼요.
+
+동작 과정:
+
+기본 경로 설정:
+
+API 경로가 **/api/v1**로 시작하도록 설정해요. 즉, 모든 경로는 **/api/v1**로 시작하게 됩니다.
+
+이건 버전 관리를 위해 사용해요. 나중에 v2가 생기면 /api/v2 같은 경로를 만들 수 있죠.
+
+라우터 연결:
+app.use()를 사용해서 /api/v1 경로에 우리가 만든 회원가입 경로를 붙여줍니다.
+
+이렇게 하면 실제 경로는 **/api/v1/signup**이 됩니다.
+
+예시:
+
+최종적으로 회원가입 경로는 **/api/v1/signup**이 됩니다. 이제 사용자가 POST 방식으로 **/api/v1/signup**에 요청을 보내면,
+
+이 요청이 우리가 설정한 회원가입 함수로 전달돼요.
+
+3. 사용자의 요청 처리 (회원가입 기능 동작)
+
+마지막으로, 사용자가 /api/v1/signup 경로로 요청을 보내면, 그 요청이 실제로 **회원가입 처리 함수(SignUp.create)**로 전달되고,
+
+회원가입 로직이 실행됩니다.
+
+동작 과정:
+
+요청 받기:
+
+사용자가 회원가입을 위해 POST /api/v1/signup 요청을 보냅니다.
+
+이때 요청에는 회원가입에 필요한 정보(예: 사용자 이름, 이메일, 비밀번호 등)가 포함돼요.
+
+요청 처리:
+
+이 요청은 SignUp.create 메서드로 전달되고, 여기서 회원가입에 필요한 여러 작업을 처리합니다. 예를 들어,
+
+데이터베이스에 사용자를 저장하거나, 아바타 이미지를 업로드하는 작업을 하죠.
+
+응답 보내기:
+
+회원가입이 성공적으로 완료되면, 서버는 "회원가입 성공" 메시지를 응답으로 돌려줍니다.
+
+예시:
+
+사용자가 POST /api/v1/signup 경로로 요청을 보내면,
+
+이 요청이 회원가입을 처리하는 SignUp.create 메서드로 전달되어 회원가입 작업이 이루어집니다.
+
+완료되면, 서버는 **"회원가입이 완료되었습니다"**라는 메시지를 응답으로 보내줍니다.
+
+```
+
+## 4. **테스트 환경 설정 (REST Client)**
+
+```jsx
+사용해보니 별로였다 postman 쓰자
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381340/notion-blog/_/React_Node_/_4_-_1_-/image_16.png)
+
+## \* 오류 정리
+
+### err.code=ECONNREFUSED
+
+```jsx
+( 레디스 설치 안해서 서버 실행이 계속 실패했었다 (err.code=ECONNREFUSED) AggregateError )
+
+Redis가 설치되지 않아서 서버 실행이 실패하는 경우가 있으니, Redis를 설치하고 올바르게 실행되도록 설정합니다.
+```
+
+### Error: Must supply api_key
+
+```jsx
+Cloudinary 같은 클라우드 서비스에 이미지를 업로드하려면 API 키 설정이 필요합니다.
+
+API 키가 없으면 오류가 발생하므로, 다음 설정을 추가하여 이를 해결합니다.
+
+* loadConfig() 는 app.ts 에 있으며 어플리케이션을 시작할 때 config 값이 모두 있는지 확인하는 validateConfig()
+
+	그리고 Cloudinary 환경번수를 불러오는 cloudinaryConfig() 를 추가해준다
+```
+
+```jsx
+// 클라우드 설정을 불러오는 코드 추가
+private loadConfig(): void {
+  config.validateConfig();
+  config.cloudinaryConfig();  // Cloudinary API 설정 호출
+}
+```

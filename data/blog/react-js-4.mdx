@@ -1,0 +1,1922 @@
+---
+title: 'React.js 프론트 제작'
+date: '2026-09-02'
+category: '풀스택/React, NodeJS, Express 및 MongoDB - MERN 풀스택 가이드'
+tags: ['풀스택', 'React, NodeJS, Express 및 MongoDB - MERN 풀스택 가이드']
+draft: false
+summary: ''
+---
+
+# 프로젝트 기본 구조 만들기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381304/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled.png)
+
+```jsx
+프로젝트 구조를 보면
+
+장소와 관련된 폴더 하위에 컴포넌트와 페이지 폴더가 존재한다
+
+이러한 구조는 큰 프로젝트에 적합하며 빠르게 관련된 페이지와 컴포넌트를 찾을 수 있다
+
+( 유저는 유저와 관련된 페이지, 컴포넌트 폴더를 또 하위에 만들어준다 )
+
+shared 는 장소와 유저 모두에 관계가 없는 기능을 다루는 컴포넌트와 앱 전체에 두루 사용되는 컴포넌트를 추가한다
+
+( 여기는 pages 가 필요없다 )
+```
+
+# 기본적인 라우팅
+
+```jsx
+npm i react-router-dom
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381304/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_1.png)
+
+```jsx
+import './App.css'
+import { Route, Routes, Navigate } from 'react-router-dom'
+import Users from './user/pages/Users'
+import NewPlace from './places/pages/NewPlace'
+
+const App = () => {
+  return (
+    <Routes>
+      <Route path="/" element={<Users />} />
+      <Route path="/places/new" element={<NewPlace />} />
+      {/* 다른 페이지로 이동하려 하면 리다이렉트 */}
+      <Route path="*" element={<Navigate replace to="/" />} />
+    </Routes>
+  )
+}
+
+export default App
+```
+
+```jsx
+App.js 에 페이지 라우팅을 구현해준다
+
+정해진 페이지가 아니면 <Navigate replace to="/"/> 로 홈으로 돌아오게 만든다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381304/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_2.png)
+
+```jsx
+index.js 에 <BrowserRouter> 로 감싸주는걸 잊지말자
+```
+
+```jsx
+하지만 결국에는 정규 React 컴포넌트에 해당하는 다양한 메인 컴포넌트 (pages) 를
+
+URL에 입력한 경로에 따라 렌더링해야 한다
+
+이런 방식으로 싱글 페이지 애플리케이션이 멀티 페이지 애플리케이션이 되는것
+
+이건 여전히 초기의 싱글 HTML 페이지 이다
+
+View Page Source를 통해 언제든 유효성 검사를 할 수 있다
+
+( ID가 root인 div 태그를 가진 싱글 HTML 페이지로 나온다 )
+
+하지만 React는 페이지 새로고침 없이 화면의 내용을 다시 렌더링한다
+
+서드 파티 라이브러리를 통해 우리가 입력한 URL을 토대로 렌더링하는 것
+
+입력한 경로를 토대로 어떤 컴포넌트를 렌더링할지 지시하는 라이브러리인것
+```
+
+# UsersList 페이지 , UserItem 컴포넌트 만들기 ( 유저 정보 출력하기 )
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381304/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_3.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381305/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_4.png)
+
+```jsx
+App.js 에서 / 경로로 이동하게 만들어준다
+```
+
+## Users.js
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381305/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_5.png)
+
+```jsx
+import React from 'react'
+import UserList from '../components/UserList'
+
+const Users = () => {
+  const USERS = [
+    {
+      id: 'ul',
+      name: 'Max Scum',
+      image:
+        'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTJQI2LqLPX9YHtBRMcpt5oruL1jaaRD57OFA&usqp=CAU',
+      places: 3,
+    },
+  ]
+
+  return <UserList items={USERS} />
+}
+
+export default Users
+```
+
+```jsx
+Users 에는 현재 DB 가 없기 때문에 임시 더미 DB 를 만들어 주고 회원 데이터를 만들어준다
+
+그리고 만든 데이터를 items 라는 props 에 담아서 UserList 로 보내준다
+```
+
+## UserList.js
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381305/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_6.png)
+
+```jsx
+import React from 'react'
+import './UserList.css'
+import UserItem from './UserItem'
+
+const UserList = (props) => {
+  if (props.items.length === 0) {
+    return (
+      <div>
+        <h2>No users found</h2>
+      </div>
+    )
+  }
+
+  return (
+    <ul className="users-list">
+      {props.items.map((user) => (
+        <UserItem
+          key={user.id}
+          id={user.id}
+          image={user.image}
+          name={user.name}
+          placeCount={user.places}
+        />
+      ))}
+    </ul>
+  )
+}
+
+export default UserList
+```
+
+```jsx
+UserList 에 보면 만약 유저의 데이터가 없을시 ( if(props.items.length === 0) ) 유저의 데이터가 없다는 텍스트가 출력되고
+
+데이터가 있다면 아까 props 로 가져온 items 를 사용해서 map 을 돌려 유저 정보를 props 로 UserItem 으로 보내주기로 한다
+```
+
+## UserItem.js
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381305/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_7.png)
+
+```jsx
+import React from 'react'
+import './UserItem.css'
+
+const UserItem = (props) => {
+  return (
+    <li className="user-item">
+      <div className="user-item__content">
+        <div className="user-item__image">
+          <img src={props.image} alt={props.name} />
+        </div>
+        <div className="user-item__info">
+          <h2>{props.name}</h2>
+          <h3>
+            {props.placeCount} {props.placeCount === 1 ? 'Place' : 'Places'}
+          </h3>
+        </div>
+      </div>
+    </li>
+  )
+}
+
+export default UserItem
+```
+
+```jsx
+마지막으로 userItem 에서는 props 로 받은 유저 정보를 사용해서
+
+각 내용들을 출력하도록 한다
+
+( 단수냐 복수냐에 따라 3항 연산자를 사용해서 뒤에 붙는 텍스트를 출력하도록 하였다 )
+```
+
+## 앱 스타일링 및 기타 컴포넌트
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381305/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_8.png)
+
+```jsx
+스타일링을 위해서 css 파일을 작성해준다
+```
+
+## UserItem.css
+
+```jsx
+.user-item {
+    margin: 1rem;
+    width: calc(45% - 2rem);
+    min-width: 17.5rem;
+  }
+
+  .user-item a {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    text-decoration: none;
+    padding: 1rem;
+    color: white;
+    background: #292929;
+  }
+
+  .user-item a:hover,
+  .user-item a:active {
+    background: #ffd900;
+  }
+
+  .user-item__content {
+    padding: 0;
+  }
+
+  .user-item__image {
+    width: 4rem;
+    height: 4rem;
+    margin-right: 1rem;
+  }
+
+  .user-item__info h2 {
+    font-size: 1.5rem;
+    margin: 0 0 0.5rem 0;
+    font-weight: normal;
+    color: #ffd900;
+  }
+
+  .user-item:hover h2,
+  .user-item:active h2,
+  .user-item:hover h3,
+  .user-item:active h3 {
+    color: #292929;
+  }
+
+  .user-item__info h3 {
+    margin: 0;
+  }
+```
+
+## UserList.css
+
+```jsx
+.users-list {
+    list-style: none;
+    margin: 0 auto;
+    padding: 0;
+    width: 90%;
+    max-width: 50rem;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381313/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_9.png)
+
+```jsx
+아직 이미지 부분이 문제가 많다
+
+이를 해결하기 위해서 새로운 공용 컴포넌트를 추가해준다
+```
+
+## 이미지 만을 위한 컴포넌트 제작하기 ( Avatar.js )
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381306/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_10.png)
+
+```jsx
+import React from 'react'
+
+import './Avatar.css'
+
+const Avatar = (props) => {
+  return (
+    <div className={`avatar ${props.className}`} style={props.style}>
+      <img src={props.image} alt={props.alt} style={{ width: props.width, height: props.width }} />
+    </div>
+  )
+}
+
+export default Avatar
+```
+
+```jsx
+shared 폴더에 UIElements 폴더를 만들고
+
+Avatar.js 파일을 추가해준다
+
+이는 이미지 만들 위한 컴포넌트다
+```
+
+## Avatar.css
+
+```jsx
+.avatar {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.avatar img {
+  display: block;
+  border-radius: 50%;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+```
+
+### 이미지에 Avatar.js 컴포넌트 적용해주기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381306/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_11.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381306/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_12.png)
+
+```jsx
+import React from 'react'
+import './UserItem.css'
+import Avatar from '../../shared/components/UIElements/Avatar'
+
+const UserItem = (props) => {
+  return (
+    <li className="user-item">
+      <div className="user-item__content">
+        <div className="user-item__image">
+          {/* <img src={props.image} alt={props.name} /> */}
+          <Avatar image={props.image} alt={props.name} />
+        </div>
+        <div className="user-item__info">
+          <h2>{props.name}</h2>
+          <h3>
+            {props.placeCount} {props.placeCount === 1 ? 'Place' : 'Places'}
+          </h3>
+        </div>
+      </div>
+    </li>
+  )
+}
+
+export default UserItem
+```
+
+```jsx
+방금 만든 Avatar.js 컴포넌트를
+
+UserItem 의 image 에 넣어서 사용해준다
+
+props 값으로 image 와 name 을 보내주는데 나머지 몇가지 값이 Avatar.js 를 보면 필요하지만
+
+필요하지 않다면 꼭 보내줄 필요가 없기 때문에 비워두고 image 와 name 만 보내주도록 한다
+```
+
+## Card.js 적용해주기 ( Card.js )
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381307/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_13.png)
+
+```jsx
+shared 폴더에 만들어준 Card.js 를 사용하여 UserItem 을 더 꾸며주기로 한다
+```
+
+```jsx
+import React from 'react'
+
+import './Card.css'
+
+const Card = (props) => {
+  return (
+    <div className={`card ${props.className}`} style={props.style}>
+      {/* 해당 컴포넌트가 사용될 때 컴포넌트 태그 사이에 작성된 내용들이 props.children으로 전달 */}
+      {props.children}
+    </div>
+  )
+}
+
+export default Card
+```
+
+## UserItem.js
+
+```jsx
+import React from 'react'
+import { Link } from 'react-router-dom'
+
+import Avatar from '../../shared/components/UIElements/Avatar'
+import Card from '../../shared/components/UIElements/Card'
+import './UserItem.css'
+
+const UserItem = (props) => {
+  return (
+    <li className="user-item">
+      <Card className="user-item__content">
+        <Link to={`/${props.id}/places`}>
+          <div className="user-item__image">
+            <Avatar image={props.image} alt={props.name} />
+          </div>
+          <div className="user-item__info">
+            <h2>{props.name}</h2>
+            <h3>
+              {props.placeCount} {props.placeCount === 1 ? 'Place' : 'Places'}
+            </h3>
+          </div>
+        </Link>
+      </Card>
+    </li>
+  )
+}
+
+export default UserItem
+```
+
+```jsx
+<Card> 로 내용을 감싸주고
+
+Link 를 추가해서 클릭 시 유저의 상세 정보로 이동할 수 있도록 만들어 주었다
+```
+
+# 프레젠테이션 컴포넌트 vs 스테이트풀 컴포넌트 ( **React 컴포넌트 유형 )**
+
+```jsx
+React에는 두 가지 주요 유형의 컴포넌트가 있다:
+
+프레젠테이션 컴포넌트와 스테이트풀(stateful) 컴포넌트.
+
+**프레젠테이션 컴포넌트**는 주로 콘텐츠를 출력하고 스타일 및 구조를 담당하는 단순한 컴포넌트로,
+
+외부에서 데이터를 받아 화면에 표시한다.
+
+**스테이트풀 컴포넌트**는 상태를 관리하고 자식 컴포넌트가 새 데이터를 받도록 조직하는 등 복잡한 로직을 처리한다.
+
+* 일반적으로 데이터를 관리하고 가져오는 컴포넌트는 적고, 화면을 보여주는 역할을 하는 프레젠테이션 컴포넌트가 더 많다.
+```
+
+## **컴포넌트 설명 ( 예시 )**
+
+```jsx
+Card
+
+컴포넌트는 프레젠테이션 컴포넌트의 예시로, 단순히 콘텐츠를 렌더링하고 스타일을 적용한다.
+
+Avatar
+
+컴포넌트와 UserItem 컴포넌트도 마찬가지로 간단한 프레젠테이션 컴포넌트이며, 외부에서 받은 데이터를 렌더링한다.
+
+UsersList
+
+컴포넌트는 렌더링 대상을 정하는 로직이 추가된 프레젠테이션 컴포넌트이다.
+
+Users
+
+컴포넌트는 현재는 더미 데이터를 사용하지만, 나중에는 스테이트풀 컴포넌트로 발전하여 데이터를 가져오는 역할을 수행할 것이다.
+```
+
+# 메인 헤더 추가하기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381307/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_14.png)
+
+```jsx
+
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381307/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_15.png)
+
+```jsx
+shared 폴더로 이동한 뒤 Navigation 폴더를 만든 뒤
+
+새로운 컴포넌트들을 추가해준다
+```
+
+## MainHeader.jsx
+
+```jsx
+import React from 'react'
+
+import './MainHeader.css'
+
+const MainHeader = (props) => {
+  return <header className="main-header">{props.children}</header>
+}
+
+export default MainHeader
+```
+
+```jsx
+메인 해더는 단순하다
+
+props.children React가 인식하는 몇 안 되는 특수 프로퍼티 중 하나
+
+props.children은 항상 컴포넌트의 여는 태그와 닫는 태그 사이에 전달하는 항목을 가리킨다
+
+이게 무슨 의미내면 MainNavigation 으로 이동해보자
+```
+
+# MainNavigation
+
+```jsx
+import React from 'react'
+import { Link } from 'react-router-dom'
+
+import MainHeader from './MainHeader'
+import './MainNavigation.css'
+
+const MainNavigation = (props) => {
+  return (
+    <MainHeader>
+      <button className="main-navigation__menu-btn">
+        <span />
+        <span />
+        <span />
+      </button>
+      <h1 className="main-navigation__title">
+        <Link to="/">YourPlaces</Link>
+      </h1>
+      <nav></nav>
+    </MainHeader>
+  )
+}
+
+export default MainNavigation
+```
+
+```jsx
+잘 보면 <MainHeader> 사이에 태그들이 있는데 이게 모두 위의 MainHeader.jsx 의 {props.children} 에
+
+들어가게 된다
+
+* 결론 MainHeader.jsx 내부에 MainNavigation 컴포넌트가 들어가게 된다
+```
+
+# NavLink 추가하기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381307/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_16.png)
+
+```jsx
+import React from 'react'
+import { NavLink } from 'react-router-dom'
+
+import './NavLinks.css'
+
+const NavLinks = (props) => {
+  return (
+    <ul className="nav-links">
+      <li>
+        <NavLink to="/">ALL USERS</NavLink>
+      </li>
+      <li>
+        <NavLink to="/ul/places">MY PLACES</NavLink>
+      </li>
+      <li>
+        <NavLink to="/places/new">ADD PLACE</NavLink>
+      </li>
+      <li>
+        <NavLink to="/auth">AUTHENTICATE</NavLink>
+      </li>
+    </ul>
+  )
+}
+
+export default NavLinks
+```
+
+```jsx
+네비게이션에 들어갈 링크를 모아둔 컴포넌트다
+
+리액트 돔의 NavLink 를 사용해서 원하는 포인트로 이동하게 해준다
+
+* 일반적으로 단순한 링크가 필요한 경우 Link를 사용하고,
+
+활성 라우트에 대한 스타일이나 특별한 활성화 기준이 필요한 경우 NavLink를 사용하는 것이 일반적
+
+* NavLink는 Link의 확장 버전으로,
+
+현재 활성 라우트에 대한 스타일을 지정하거나 사용자 정의 조건에 따라 링크를 활성화할 수 있는 기능을 제공한다.
+
+( Link 는 단순 하이퍼 링크 )
+
+NavLink는 주로 내비게이션 메뉴 등에서 현재 페이지에 대한 시각적인 피드백이 필요한 경우에 사용됩
+```
+
+## MainNavigation.jsx 에 NavLink 넣어주기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381307/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_17.png)
+
+```jsx
+아까 만든 MainNavigation.jsx 의 <nav> 에 넣어준다
+```
+
+# 기본 데스크톱 및 모바일 내비게이션 구현
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381308/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_18.png)
+
+```jsx
+현재 모바일 버전으로 전환하면 위의 헤더가 겹쳐져서 이상하게 보인다
+
+이 문제를 해결하기 위해서 사이드 드로어 ( 옆으로 열리는 네비게이션 ) 을 만들어본다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381308/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_19.png)
+
+```jsx
+import React from 'react'
+
+import './SideDrawer.css'
+
+const SideDrawer = (props) => {
+  return <aside className="side-drawer">{props.children}</aside>
+}
+
+export default SideDrawer
+```
+
+```jsx
+사이드 드로어  컴포넌트를 만들어 준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381308/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_20.png)
+
+```jsx
+그리고 MainNavigation 부분에 SideDrawer 컴포넌트를 넣어주고 <NavLinks> 컴포넌트를 넣어 props 로 보내주게 해준다 ( {props.children} 로 )
+```
+
+# 포털 이해
+
+```jsx
+React Portal은 React 컴포넌트를 본래 렌더링되는 위치 외에서도 구현하거나 렌더링할 수 있게 해주는 기능이다.
+
+Portal을 사용하는 이유
+
+사이드 드로어와 같은 컴포넌트는 일반적으로 메인 내비게이션의 일부로 렌더링되어 메인 내비게이션과 함께 표시된다.
+
+Portal을 사용하면 HTML 파일에서 새로운 렌더링 위치를 지정할 수 있으며,
+
+예시로 Public 폴더의 index.html 파일에 새로운 div 태그를 추가하여 이를 구현하는 방법을 제시 해보겠다
+```
+
+## **Portal을 통한 렌더링 위치 설정**
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381308/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_21.png)
+
+```jsx
+public 의  index.html 로 이동해서
+
+<div id="drawer-hook"></div> 를 추가해줘 새로 렌더링 될 위치를 지정해준다 ( id 이름은 내가 정하기 나름 )
+
+( 이부분에 사이드 드로어가 렌더링 될것이다 )
+
+( HTML 파일에서 새로운 렌더링 위치를 정하기 위해, index.html 파일에 "drawer-hook"이라는 ID를 가진 div 태그를 추가하고,
+
+이 위치에 사이드 드로어를 렌더링할 것을 명시 한다 )
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381309/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_22.png)
+
+```jsx
+import React from 'react'
+import ReactDOM from 'react-dom'
+
+import './SideDrawer.css'
+
+const SideDrawer = (props) => {
+  // 1. JSX로 사이드 드로어의 콘텐츠를 정의
+  const content = <aside className="side-drawer">{props.children}</aside>
+
+  // 2. 렌더링할 위치의 DOM 요소 선택
+  const portalRoot = document.getElementById('drawer-hook')
+
+  // 3. ReactDOM.createPortal을 사용하여 콘텐츠를 렌더링할 위치와 방법을 설정하고 반환
+  return ReactDOM.createPortal(content, portalRoot)
+}
+
+export default SideDrawer
+```
+
+```jsx
+위의 코드에서 content 상수에는 사이드 드로어의 JSX 콘텐츠가 저장되어 있다.
+
+이는 일반적인 React 컴포넌트처럼 구성된 것이며, 사이드 드로어의 내용이 포함되어 있다.
+
+그 다음, ReactDOM.createPortal 함수를 사용하여 이 콘텐츠를 선택한 위치에 렌더링한다.
+
+portalRoot 상수에는 렌더링할 위치로 지정한 "drawer-hook"이라는 ID를 가진 div 태그가 저장되어 있다. ( 아까 index.html 에 사용 )
+
+마지막으로, SideDrawer 컴포넌트는 이렇게 생성된 Portal을 반환한다.
+
+이렇게 함으로써, React는 해당 콘텐츠를 portalRoot에 지정된 위치에 렌더링한다.
+
+이를 통해, 일반적인 컴포넌트처럼 작성된 JSX를 원하는 다른 위치에 Portal을 통해 렌더링할 수 있게 된다.
+```
+
+## SideDrawer 열기 닫기 구현
+
+### BackDrop 컴포넌트 추가
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381309/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_23.png)
+
+```jsx
+import React from 'react'
+import ReactDOM from 'react-dom'
+
+import './Backdrop.css'
+
+// Backdrop 컴포넌트 정의
+const Backdrop = (props) => {
+  // createPortal을 사용하여 백드롭을 루트 DOM 요소 외부로 렌더링
+  return ReactDOM.createPortal(
+    // 백드롭을 나타내는 div 엘리먼트
+    <div className="backdrop" onClick={props.onClick}></div>,
+    // 백드롭을 렌더링할 위치를 document.getElementById('backdrop-hook')로 설정
+    document.getElementById('backdrop-hook')
+  )
+}
+
+// Backdrop 컴포넌트를 내보냄
+export default Backdrop
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381309/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_24.png)
+
+```jsx
+index.html 에 렌더링 될 위치를 지정
+```
+
+```jsx
+import React, { useState } from 'react'
+import { Link } from 'react-router-dom'
+
+import MainHeader from './MainHeader'
+import NavLinks from './NavLinks'
+import SideDrawer from './SideDrawer'
+import Backdrop from '../UIElements/Backdrop'
+
+import './MainNavigation.css'
+
+const MainNavigation = (props) => {
+  // 드로어의 열고 닫음 상태를 관리하는 useState 선언
+  const [drawerIsOpen, setDrawerIsOpen] = useState(false)
+
+  // 드로어 열기 함수
+  const openDrawer = () => {
+    setDrawerIsOpen(true)
+  }
+
+  // 드로어 닫기 함수
+  const closeDrawer = () => {
+    setDrawerIsOpen(false)
+  }
+
+  return (
+    <>
+      {/* 드로어가 열려있을 때만 백드롭 렌더링 */}
+      {drawerIsOpen && <Backdrop onClick={closeDrawer} />}
+
+      {/* 드로어가 열려있을 때만 사이드 드로어 렌더링 */}
+      {drawerIsOpen && (
+        <SideDrawer>
+          <nav className="main-navigation__drawer-nav">
+            <NavLinks />
+          </nav>
+        </SideDrawer>
+      )}
+
+      {/* 메인 헤더 영역 */}
+      <MainHeader>
+        {/* 드로어를 열기 위한 메뉴 버튼 */}
+        <button className="main-navigation__menu-btn" onClick={openDrawer}>
+          <span />
+          <span />
+          <span />
+        </button>
+
+        {/* 로고 또는 사이트 제목 */}
+        <h1 className="main-navigation__title">
+          <Link to="/">YourPlaces</Link>
+        </h1>
+
+        {/* 메인 내비게이션 링크 영역 */}
+        <nav className="main-navigation__header-nav">
+          <NavLinks />
+        </nav>
+      </MainHeader>
+    </>
+  )
+}
+
+export default MainNavigation
+```
+
+### **상태 관리를 위한 useState 선언**
+
+```jsx
+상태를 관리하기 위한
+
+const [drawerIsOpen, setDrawerIsOpen] = useState(false)
+
+상태를 선언해준다 초기값은 false 로
+```
+
+### **드로어 렌더링 조건 확인**
+
+```jsx
+drawerIsOpen 값이 참이면 드로어 컴포넌트를 렌더링하고, 그렇지 않으면 아무것도 랜더링 하지 않게 3항 연산자를 만들어준다
+
+           {drawerIsOpen &&
+                (<SideDrawer>
+                    <nav className="main-navigation__drawer-nav">
+                        <NavLinks />
+                    </nav>
+                </SideDrawer>
+                )
+            }
+```
+
+### **드로어 열기 기능 구현**
+
+```jsx
+버튼 클릭 시 openDrawer 함수가 호출되어 setDrawerIsOpen을 이용하여 drawerIsOpen 상태를 참으로 변경하게 한다
+
+    const openDrawer = () => {
+        setDrawerIsOpen(true);
+    }
+
+버튼에 함수 연결
+
+<button className="main-navigation__menu-btn" onClick={openDrawer}>
+```
+
+### **드로어 닫기 기능 구현**
+
+```jsx
+closeDrawer 함수를 추가하여 드로어를 닫을 수 있도록 한다
+
+    const closeDrawer = () => {
+        setDrawerIsOpen(false);
+    }
+```
+
+### **백드롭 컴포넌트 추가 및 드로어와 연동**
+
+```jsx
+Backdrop 컴포넌트를 렌더링하고, 클릭 시 closeDrawer 함수를 호출하여 드로어를 닫을 수 있도록 구현한다
+
+{drawerIsOpen && <Backdrop onClick={closeDrawer}/>}
+```
+
+# 사이드 드로어 애니메이션 효과 부여하기
+
+## **react-transition-group 라이브러리 설치**
+
+```jsx
+npm i react-transition-group
+```
+
+```jsx
+간단히 말하자면 애니메이션 효과를 쉽게 사용하게 해주는 라이브러리 이다
+
+처음으로 아이템을 렌더링하거나 아이템을 제거할 때 이 라이브러리가 도움이 된다
+```
+
+## SideDrawer.jsx
+
+```jsx
+// React 및 ReactDOM 라이브러리를 import
+import React from 'react'
+import ReactDOM from 'react-dom'
+
+// react-transition-group 라이브러리에서 CSSTransition 컴포넌트를 import
+import { CSSTransition } from 'react-transition-group'
+
+// SideDrawer.css 파일에서 스타일을 import
+import './SideDrawer.css'
+
+// SideDrawer 함수형 컴포넌트 정의
+const SideDrawer = (props) => {
+  // 1. JSX로 사이드 드로어의 콘텐츠를 정의
+  const content = (
+    <CSSTransition
+      in={props.show} // 드로어의 표시 여부를 결정하는 props
+      timeout={200} // 애니메이션 효과의 지속 시간 (200ms)
+      classNames="slide-in-left" // 적용할 CSS 클래스 이름
+      mountOnEnter // 드로어가 나타날 때 DOM에 추가
+      unmountOnExit // 드로어가 사라질 때 DOM에서 제거
+    >
+      {/* aside 태그로 감싼 드로어 콘텐츠 */}
+      <aside className="side-drawer">{props.children}</aside>
+    </CSSTransition>
+  )
+
+  // 2. 렌더링할 위치의 DOM 요소 선택
+  const portalRoot = document.getElementById('drawer-hook')
+
+  // 3. ReactDOM.createPortal을 사용하여 콘텐츠를 렌더링할 위치와 방법을 설정하고 반환
+  return ReactDOM.createPortal(content, portalRoot)
+}
+
+// SideDrawer 컴포넌트를 내보내기
+export default SideDrawer
+```
+
+## MainNavigation.jsx
+
+```jsx
+import React, { useState } from 'react'
+import { Link } from 'react-router-dom'
+
+import MainHeader from './MainHeader'
+import NavLinks from './NavLinks'
+import SideDrawer from './SideDrawer'
+import Backdrop from '../UIElements/Backdrop'
+
+import './MainNavigation.css'
+
+const MainNavigation = (props) => {
+  // 드로어의 열고 닫음 상태를 관리하는 useState 선언
+  const [drawerIsOpen, setDrawerIsOpen] = useState(false)
+
+  // 드로어 열기 함수
+  const openDrawer = () => {
+    setDrawerIsOpen(true)
+  }
+
+  // 드로어 닫기 함수
+  const closeDrawer = () => {
+    setDrawerIsOpen(false)
+  }
+
+  return (
+    <>
+      {/* 드로어가 열려있을 때만 백드롭 렌더링 */}
+      {drawerIsOpen && <Backdrop onClick={closeDrawer} />}
+
+      {/* 
+            SideDrawer 컴포넌트를 렌더링합니다.
+            'show' prop을 통해 현재 드로어가 열려 있는지 닫혀 있는지를 전달합니다.
+            만약 'drawerIsOpen' 상태가 true이면, 즉 드로어가 열려 있다면 SideDrawer가 나타납니다. */}
+      <SideDrawer show={drawerIsOpen}>
+        {/* SideDrawer 내부에 들어갈 내용을 정의합니다. */}
+        {/* 여기서는 드로어 내비게이션의 링크를 포함한 NavLinks 컴포넌트가 들어갑니다. */}
+        <nav className="main-navigation__drawer-nav">
+          <NavLinks />
+        </nav>
+      </SideDrawer>
+
+      {/* 메인 헤더 영역 */}
+      <MainHeader>
+        {/* 드로어를 열기 위한 메뉴 버튼 */}
+        <button className="main-navigation__menu-btn" onClick={openDrawer}>
+          <span />
+          <span />
+          <span />
+        </button>
+
+        {/* 로고 또는 사이트 제목 */}
+        <h1 className="main-navigation__title">
+          <Link to="/">YourPlaces</Link>
+        </h1>
+
+        {/* 메인 내비게이션 링크 영역 */}
+        <nav className="main-navigation__header-nav">
+          <NavLinks />
+        </nav>
+      </MainHeader>
+    </>
+  )
+}
+
+export default MainNavigation
+```
+
+## **CSSTransition 컴포넌트를 사용하여 애니메이션 효과 적용**
+
+```jsx
+// MainNavigation.js
+
+import { CSSTransition } from 'react-transition-group'
+
+// ... (다른 코드)
+;<CSSTransition
+  in={props.show} // 드로어가 노출되면 true, 아니면 false
+  timeout={200} // 애니메이션 효과의 길이 설정 (200ms)
+  classNames="slide-in-left" // CSS 클래스 이름
+  mountOnEnter
+  unmountOnExit
+>
+  <aside>{/* ... (드로어 내용) */}</aside>
+</CSSTransition>
+```
+
+## **onClick 핸들러를 이용한 드로어 닫기 기능 추가**
+
+```jsx
+// SideDrawer.js
+
+<aside onClick={props.onClick}>{/* ... (드로어 내용) */}</aside>
+```
+
+## **openDrawerHandler와 closeDrawerHandler 함수 추가**
+
+```jsx
+// MainNavigation.js
+
+const openDrawerHandler = () => {
+  // 드로어 열기 로직
+}
+
+const closeDrawerHandler = () => {
+  // 드로어 닫기 로직
+}
+
+// ... (다른 코드)
+;<SideDrawer onClick={closeDrawerHandler} />
+```
+
+## **링크 클릭 시 드로어 자동 닫기 구현**
+
+```jsx
+// SideDrawer.js
+
+// onClick 프로퍼티로 전달된 함수 호출
+<aside onClick={props.onClick}>{/* ... (드로어 내용) */}</aside>
+```
+
+```jsx
+**이 부분은 조금더 나중에 정리가 필요하고 공부가 필요하겠다**
+```
+
+# 사용자 장소 렌더링하기 및 동적 라우트 세그먼트 사용하기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381309/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_25.png)
+
+```jsx
+현재 사용자 프로필을 클릭하면 아무런 반응이 없다
+
+이제 사용자 프로필을 클릭하면 그 사용자의 place 로 이동하게 해본다
+```
+
+## UserPlace.js
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381309/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_26.png)
+
+```jsx
+import React from 'react'
+import PlaceList from '../components/PlaceList'
+
+const UserPlaces = () => {
+  const DUMMY_PLACES = [
+    {
+      id: 'p1',
+      title: 'Empire',
+      description: 'One of the famous',
+      imageUrl:
+        'https://blog.btcc.com/wp-content/uploads/2022/10/2022102705575983912_1666817880.png',
+      address: '무학공원',
+      location: {
+        lat: 35.824981,
+        lng: 128.639735,
+      },
+      creator: 'u1',
+    },
+    {
+      id: 'p2',
+      title: 'Empire',
+      description: 'One of the famous',
+      imageUrl:
+        'https://blog.btcc.com/wp-content/uploads/2022/10/2022102705575983912_1666817880.png',
+      address: '무학공원',
+      location: {
+        lat: 35.824981,
+        lng: 128.639735,
+      },
+      creator: 'u2',
+    },
+  ]
+
+  return <PlaceList items={DUMMY_PLACES} />
+}
+
+export default UserPlaces
+```
+
+```jsx
+UserPlace.js 를 제작해준다
+
+PlaceList 에 items 로 DUMMY_PLACES 배열을 보내준다
+```
+
+## PlaceList.js
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381310/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_27.png)
+
+```jsx
+import React from 'react'
+
+import Card from '../../shared/components/UIElements/Card'
+import PlaceItem from './PlaceItem'
+
+import './PlaceList.css'
+
+const PlaceList = (props) => {
+  if (props.items.length === 0) {
+    return (
+      <div className="place-list center">
+        <Card>
+          <h2>No Places found. Maybe create one?</h2>
+          <button>Share Place</button>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <ul className="place-list">
+      {props.items.map((place) => (
+        <PlaceItem
+          key={place.id}
+          id={place.id}
+          image={place.imageUrl}
+          title={place.title}
+          description={place.description}
+          address={place.address}
+          creatorId={place.creator}
+          coordinates={place.location}
+        />
+      ))}
+    </ul>
+  )
+}
+
+export default PlaceList
+```
+
+```jsx
+PlaceList 를 만들어 준다
+
+이 컴포넌트는 PlaceItem.js 를 map 을 이용해서 출력한다
+
+받아온 DUMMY_PLACES 를 map 에 넣어서 <PlaceItem> 으로 보내준다
+
+그리고 PlaceItem 이 출력
+```
+
+## PlaceItem.js
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381310/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_28.png)
+
+```jsx
+import React from 'react'
+
+import Card from '../../shared/components/UIElements/Card'
+
+import './PlaceItem.css'
+
+const PlaceItem = (props) => {
+  return (
+    <li className="place-item">
+      <Card className="place-item__content">
+        <div className="place-item__image">
+          <img src={props.image} alt={props.title} />
+        </div>
+        <div className="place-item__info">
+          <h2>{props.title}</h2>
+          <h3>{props.address}</h3>
+          <p>{props.description}</p>
+        </div>
+        <div className="place-item__action">
+          <button>VIEW ON MAP</button>
+          <button>EDIT</button>
+          <button>DELETE</button>
+        </div>
+      </Card>
+    </li>
+  )
+}
+
+export default PlaceItem
+```
+
+```jsx
+각각의 내용을 받아와서 출력한다
+```
+
+## App.js
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381310/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_29.png)
+
+```jsx
+UserPlaces 로 이동하는 경로를 만들어준다
+
+/:userId/places
+
+로 이동한다 userId 는
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381310/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_30.png)
+
+```jsx
+예전 Users 에 만들어둔 id 가 들어가게 된다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381311/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_31.png)
+
+```jsx
+<Link to={`/${props.id}/places`}>
+
+를 이용해서 상세 place로 이동하게 된다
+```
+
+# 라우트 매개변수 가져오기 ( 사용자가 쓴 글만 가져오기 )
+
+```jsx
+현재 문제는 유저를 클릭했을 때 그 유저가 쓴 글만 출력해야 하는데 모든 장소가 유저에 관계없이 다 출력되는 것이다
+
+이 문제를 해결하기 위해서 유저 id 와 글의 creator 을 비교해서 필터링을 해보도록 한다
+```
+
+```jsx
+import React from 'react'
+import PlaceList from '../components/PlaceList'
+import { useParams } from 'react-router-dom'
+
+const UserPlaces = () => {
+  const DUMMY_PLACES = [
+    {
+      id: 'p1',
+      title: 'Empire',
+      description: 'One of the famous',
+      imageUrl:
+        'https://blog.btcc.com/wp-content/uploads/2022/10/2022102705575983912_1666817880.png',
+      address: '무학공원',
+      location: {
+        lat: 35.824981,
+        lng: 128.639735,
+      },
+      creator: 'u1',
+    },
+    {
+      id: 'p2',
+      title: 'Empire',
+      description: 'One of the famous',
+      imageUrl:
+        'https://blog.btcc.com/wp-content/uploads/2022/10/2022102705575983912_1666817880.png',
+      address: '무학공원',
+      location: {
+        lat: 35.824981,
+        lng: 128.639735,
+      },
+      creator: 'u2',
+    },
+  ]
+
+  // useParams() 함수를 사용하여 현재 경로의 URL 매개변수에서 userId를 추출합니다.
+
+  // 예전에 내가 쓰던방법
+  // const params = useParams()
+  // const userId = params.userId
+
+  // 더 짧은 새로운 방법
+  const userId = useParams().userId
+
+  // DUMMY_PLACES 배열에서 현재 사용자(userId)에 해당하는 장소들을 필터링합니다.
+  const loadedPlaces = DUMMY_PLACES.filter((place) => place.creator === userId)
+
+  // PlaceList 컴포넌트에 전달할 데이터로 사용될 loadedPlaces를 가진 JSX를 반환합니다.
+  // PlaceList 컴포넌트는 이 데이터를 받아서 해당 사용자가 생성한 장소들을 표시합니다.
+  return <PlaceList items={loadedPlaces} />
+}
+
+export default UserPlaces
+```
+
+```jsx
+
+useParams 를 사용해서 주소에서 :userId 부분을 가져온다
+
+그리고
+
+필터를 사용해서 장소를 만든 creator 과 userId 같은 배열을 반환하여
+
+<PlaceList> 에 props 로 보내준다
+```
+
+# 버튼 스타일 추가하기
+
+```jsx
+현재 버튼은 못생겼다
+
+이쁘게 만들어보자
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381311/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_32.png)
+
+```jsx
+shared 에 components 에 FormElements 폴더를 추가해주고
+
+Button 을 추가해준다
+
+( 폼 생성과 사용자 인터랙션에 유용한 컴포넌트를 여기에 저장 )
+```
+
+## Button
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381311/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_33.png)
+
+```jsx
+import React from 'react'
+import { Link } from 'react-router-dom'
+
+import './Button.css'
+
+const Button = (props) => {
+  if (props.href) {
+    return (
+      <a
+        className={`button button--${props.size || 'default'} ${
+          props.inverse && 'button--inverse'
+        } ${props.danger && 'button--danger'}`}
+        href={props.href}
+      >
+        {props.children}
+      </a>
+    )
+  }
+  if (props.to) {
+    return (
+      <Link
+        to={props.to}
+        exact={props.exact}
+        className={`button button--${props.size || 'default'} ${
+          props.inverse && 'button--inverse'
+        } ${props.danger && 'button--danger'}`}
+      >
+        {props.children}
+      </Link>
+    )
+  }
+  return (
+    <button
+      className={`button button--${props.size || 'default'} ${
+        props.inverse && 'button--inverse'
+      } ${props.danger && 'button--danger'}`}
+      type={props.type}
+      onClick={props.onClick}
+      disabled={props.disabled}
+    >
+      {props.children}
+    </button>
+  )
+}
+
+export default Button
+```
+
+```jsx
+버튼은 Link 를 거느냐 herf 를 거느냐 등등 조건에 따라서 다른 형태로 나오도록 만들어졌다
+```
+
+## PlaceItem.jsx
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381311/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_34.png)
+
+```jsx
+버튼을 전부 새로만든 컴포넌트 버튼으로 교체해준다
+```
+
+# 포털 ( **ReactDOM.createPortal )**
+
+```jsx
+React에서 ReactDOM.createPortal은 포털(Portal)을 생성하는 메서드이다.
+
+포털은 React 트리의 일부가 아닌 다른 DOM 요소에 자식 요소를 렌더링할 수 있게 해준다.
+
+일반적으로 Modal, Tooltip, Popover 등을 구현할 때 유용하게 사용된다.
+```
+
+## React트리란?
+
+```jsx
+React 트리는 React 앱의 구조를 나타내는 가상의 계층 구조라고 생각할 수 있다.
+
+일반적으로 React 컴포넌트들은 부모-자식 관계를 가지며 트리 형태를 이루고 있다.
+
+이 구조 안에서 각 컴포넌트는 부모 컴포넌트로부터 상태와 속성을 상속받아 렌더링되고, 이를 통해 화면이 구성된다.
+
+포털은 이러한 React 트리의 일부가 아닌, 외부에 위치한 다른 HTML DOM 요소에 컴포넌트를 렌더링할 수 있게 해준다.
+
+다시 말해, 포털은 React 트리 외부에 있는 특정 DOM 요소에 자식 요소를 렌더링하는 기능을 제공한다.
+
+예를 들어, 모달 창을 생각해보자.
+
+모달은 일반적으로 페이지의 특정 위치에 나타나야 하며,
+
+이를 위해서는 React 트리 외부의 DOM 요소에 해당 모달 컴포넌트를 렌더링해야 한다.
+
+포털을 사용하면 모달을 React 트리 밖에 있는 특정 DOM 요소에 부착할 수 있다.
+
+간단히 말하면, 포털은 React의 트리 구조 밖에 있는 HTML 요소에 컴포넌트를 효과적으로 삽입할 수 있는 기능을 제공하여,
+
+특정 UI 요소를 트리의 구조와는 독립적으로 처리할 수 있게 해준다.
+
+* 한마디로 외부적인 요소 ( 모달, 툴팁 등등 외적 요소를 나타나게 할 때 사용하는것 )
+```
+
+## **왜 `createPortal`이 필요한가?**
+
+```jsx
+React 앱에서 UI는 일반적으로 하나의 루트 DOM 요소에서 시작한다.
+
+하지만 때로는 모달 창과 같이 다른 DOM 요소에 렌더링해야 하는 경우가 있다.
+
+createPortal은 이런 상황에서 도움이 된다.
+```
+
+## **요약**
+
+```jsx
+ReactDOM.createPortal은 React에서 포털을 생성하는 데 사용된다.
+
+포털은 React 트리의 일부가 아닌 다른 DOM 요소에 자식을 렌더링할 수 있게 해준다.
+
+주로 모달이나 팝오버 등을 다른 DOM 요소에 렌더링해야 할 때 활용된다.
+```
+
+## **예제를 통한 설명**
+
+```jsx
+아래의 예제에서는 Modal 컴포넌트를 사용하여 포털을 만드는 방법을 보여준다.
+```
+
+```jsx
+import React from 'react'
+import ReactDOM from 'react-dom'
+
+// 함수형 컴포넌트 Modal 선언
+const Modal = ({ children }) => {
+  // modal-root라는 ID를 가진 DOM 요소를 찾아 modalRoot에 할당
+  const modalRoot = document.getElementById('modal-root')
+
+  // ReactDOM.createPortal을 사용하여 모달의 children을 modalRoot에 렌더링
+  return ReactDOM.createPortal(children, modalRoot)
+}
+
+// 함수형 컴포넌트 App 선언
+const App = () => {
+  return (
+    <div>
+      <h1>My App</h1>
+      {/* 모달은 다른 DOM 요소에 렌더링됩니다. */}
+      <Modal>
+        <p>This is a modal content!</p>
+      </Modal>
+    </div>
+  )
+}
+
+// App 컴포넌트를 내보냄
+export default App
+```
+
+```jsx
+이 예제에서 Modal은 자식 컴포넌트를 받아 포털로 렌더링한다.
+
+( {children}은 React 컴포넌트 내에서 렌더링된 자식 요소들을 나타내는 특별한 prop이다.
+
+React에서 부모 컴포넌트가 자식 컴포넌트를 포함하고 있는 경우, 이 자식 컴포넌트들은 부모 컴포넌트의 children prop을 통해 전달된다. )
+
+createPortal의 두 번째 매개변수는 포털로 사용할 DOM 요소이다.
+
+이 경우에는 modal-root라는 ID를 가진 DOM 요소가 필요하다. ( index.html 에 넣어줘야 한다 )
+```
+
+# 모달창 만들기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381311/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_35.png)
+
+## Modal.jsx
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381312/notion-blog/_/React_NodeJS_Express_MongoDB_-_MERN_/React_js_/Untitled_36.png)
+
+```jsx
+import React from 'react'
+import ReactDOM from 'react-dom'
+import { CSSTransition } from 'react-transition-group'
+import Backdrop from './Backdrop'
+
+import './Modal.css'
+
+const ModalOverlay = (props) => {
+  const content = (
+    <div className={`modal ${props.className}`} style={props.style}>
+      <header className={`modal__header ${props.headerClass}`}>
+        <h2>{props.header}</h2>
+      </header>
+      <form onSubmit={props.onSubmit ? props.onSubmit : (event) => event.preventDefault()}>
+        <div className={`modal__content ${props.contentClass}`}>{props.children}</div>
+        <footer className={`modal__footer ${props.footerClass}`}>{props.footer}</footer>
+      </form>
+    </div>
+  )
+
+  return ReactDOM.createPortal(content, document.getElementById('modal-hook'))
+}
+
+const Modal = (props) => {
+  return (
+    <>
+      {props.show && <Backdrop onClick={props.onCancel} />}
+      <CSSTransition in={props.show} mountOnEnter unmountOnExit timeout={200} classNames="modal">
+        <ModalOverlay {...props} />
+      </CSSTransition>
+    </>
+  )
+}
+
+export default Modal
+```
+
+### **ModalOverlay 컴포넌트 (부분 설명)**
+
+```jsx
+const ModalOverlay = (props) => {
+  // 1. JSX로 모달의 내용을 정의합니다.
+  const content = (
+    <div className={`modal ${props.className}`} style={props.style}>
+      {/* 1.1. 모달 헤더 부분을 생성합니다. */}
+      <header className={`modal__header ${props.headerClass}`}>
+        <h2>{props.header}</h2>
+      </header>
+      {/* 1.2. 모달 내용 부분을 생성합니다. */}
+      <form
+        onSubmit={
+          // 1.2.1. onSubmit 함수가 주어졌다면 해당 함수를 실행하고,
+          //        그렇지 않으면 기본 이벤트 동작을 방지하는 함수를 실행합니다.
+          props.onSubmit ? props.onSubmit : (event) => event.preventDefault()
+        }
+      >
+        <div className={`modal__content ${props.contentClass}`}>
+          {/* 1.2.2. 모달 내용(children)을 동적으로 받아옵니다. */}
+          {props.children}
+        </div>
+        {/* 1.3. 모달 푸터 부분을 생성합니다. */}
+        <footer className={`modal__footer ${props.footerClass}`}>
+          {/* 1.3.1. 모달 푸터(footer)를 동적으로 받아옵니다. */}
+          {props.footer}
+        </footer>
+      </form>
+    </div>
+  )
+
+  // 2. ReactDOM.createPortal을 사용하여 모달을 특정 DOM 요소에 렌더링합니다.
+  //    (modal-hook이라는 ID를 가진 DOM 요소에 렌더링됩니다.)
+  return ReactDOM.createPortal(content, document.getElementById('modal-hook'))
+}
+```
+
+```jsx
+ModalOverlay는 모달의 내용을 정의하는 역할을 한다.
+
+헤더, 내용, 푸터 등의 구성요소를 props를 통해 동적으로 받아와 생성한다.
+
+ReactDOM.createPortal을 사용하여 모달을 특정 DOM 요소에 렌더링한다. 여기서는 modal-hook이라는 ID를 가진 요소이다.
+```
+
+### **Modal 컴포넌트 ( 부분 설명 )**
+
+```jsx
+const Modal = (props) => {
+  // 1. 모달이 열린 경우 배경을 가려주는 Backdrop을 렌더링합니다.
+  return (
+    <>
+      {/* 1.1. props.show가 true인 경우에만 Backdrop을 렌더링합니다. */}
+      {props.show && <Backdrop onClick={props.onCancel} />}
+      {/* 2. CSSTransition을 사용하여 모달에 애니메이션 효과를 부여합니다. */}
+      <CSSTransition
+        // 2.1. CSSTransition이 활성화되는 조건을 설정합니다. (props.show 값에 따라)
+        in={props.show}
+        // 2.2. 처음 마운트될 때 애니메이션을 적용합니다.
+        mountOnEnter
+        // 2.3. 모달이 사라질 때 컴포넌트를 언마운트합니다.
+        unmountOnExit
+        // 2.4. 애니메이션 지속 시간을 설정합니다.
+        timeout={200}
+        // 2.5. CSS 클래스의 이름을 설정합니다. (모달에 적용될 애니메이션 클래스)
+        classNames="modal"
+      >
+        {/* 3. ModalOverlay 컴포넌트에 props를 전달하여 모달을 생성합니다. */}
+        <ModalOverlay {...props} />
+      </CSSTransition>
+    </>
+  )
+}
+```
+
+```jsx
+Modal은 전체적인 모달을 관리하는 역할을 한다.
+
+Backdrop은 모달이 열린 상태에서 배경을 가려주는 역할을 한다.
+
+CSSTransition을 사용하여 모달이 나타날 때와 사라질 때의 애니메이션 효과를 부여한다.
+
+ModalOverlay에 필요한 정보를 props로 전달하여 모달을 구성한다.
+```
+
+## **PlaceItem.js (장소 아이템 컴포넌트)**
+
+```jsx
+const PlaceItem = (props) => {
+  // 1. showMap 상태를 통해 모달의 표시 여부를 관리합니다.
+  const [showMap, setShowMap] = useState(false)
+
+  // 2. 모달을 열고 닫는 핸들러 함수를 정의합니다.
+  const openMapHandler = () => setShowMap(true)
+  const closeMapHandler = () => setShowMap(false)
+
+  return (
+    <>
+      {/* 3. showMap이 참일 때만 지도 모달을 렌더링합니다. */}
+      {/* 3.1. Modal 컴포넌트에 모달 표시 여부와 관련된 설정값 및 내용을 전달합니다. */}
+      <Modal
+        show={showMap}
+        onCancel={closeMapHandler}
+        header={props.address}
+        contentClass="place-item__modal-content"
+        footerClass="place-item__modal-actions"
+        footer={<Button onClick={closeMapHandler}>CLOSE</Button>}
+      >
+        {/* 3.2. 지도 모달 내부의 컨텐츠를 정의합니다. */}
+        <div className="map-container">
+          <h2>THE MAP</h2>
+        </div>
+      </Modal>
+      {/* 4. 각 장소에 대한 정보를 보여주는 장소 아이템을 렌더링합니다. */}
+      <li className="place-item">
+        {/* 4.1. Card 컴포넌트로 감싼 장소 아이템의 내용을 정의합니다. */}
+        <Card className="place-item__content">
+          {/* 4.2. 장소 아이템의 이미지, 정보, 액션 영역을 구성합니다. */}
+          <div className="place-item__image">
+            <img src={props.image} alt={props.title} />
+          </div>
+          <div className="place-item__info">
+            <h2>{props.title}</h2>
+            <h3>{props.address}</h3>
+            <p>{props.description}</p>
+          </div>
+          <div className="place-item__actions">
+            {/* 4.3. VIEW ON MAP, EDIT, DELETE 버튼을 렌더링하고 각각의 동작을 설정합니다. */}
+            <Button inverse onClick={openMapHandler}>
+              VIEW ON MAP
+            </Button>
+            <Button to={`places/${props.id}`}>EDIT</Button>
+            <Button danger>DELETE</Button>
+          </div>
+        </Card>
+      </li>
+    </>
+  )
+}
+```
+
+```jsx
+PlaceItem 컴포넌트는 각 장소에 대한 정보를 보여주는 역할을 한다.
+
+모달을 열고 닫기 위한 상태(showMap)와 핸들러 함수들을 정의한다.
+
+모달을 사용하여 지도를 표시하고, 해당 모달에 필요한 정보를 props로 전달한다.
+```
+
+## **index.html**
+
+```jsx
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- ... (헤더 부분) ... -->
+  </head>
+  <body>
+    <!-- ... (기타 요소) ... -->
+    <div id="backdrop-hook"></div>
+    <div id="modal-hook"></div>
+    <!-- ... (기타 요소) ... -->
+  </body>
+</html>
+```
+
+```jsx
+index.html 파일에서는 애플리케이션에서 사용하는 각각의 훅(hook)에 대한 DOM 요소를 정의한다
+```
+
+## 요약
+
+```jsx
+모달 컴포넌트는 ModalOverlay와 Modal로 구성되어 있다.
+
+ModalOverlay는 모달의 내용을 정의하고, ReactDOM.createPortal을 사용하여 특정 DOM 요소에 렌더링한다.
+
+Modal은 전체적인 모달을 관리하며, Backdrop과 CSSTransition을 사용하여 모달의 외부 및 애니메이션을 처리한다.
+
+PlaceItem 컴포넌트에서는 각 장소에 대한 정보를 보여주고, 모달을 사용하여 지도를 표시한다.
+
+index.html 파일에서는 애플리케이션에서 사용하는 각각의 훅(hook)에 대한 DOM 요소를 정의한다.
+```
+
+# Google Maps로 지도 렌더링하기
+
+```jsx
+npm 등을 사용해서 쉽게 만드는 것도 가능하지만 이번에는 직접 만들어본다
+```
+
+# 리액트 **Ref**
+
+```jsx
+React에서의 Ref 역할:
+
+React는 일반적으로 데이터를 상태(state)와 속성(props)를 통해 관리한다.
+
+그러나 때로는 직접 DOM에 접근하거나 다른 컴포넌트의 인스턴스를 얻어야 할 경우가 있다. 이때 Ref가 사용된다.
+
+Ref는 React에서 사용되는 개념으로, 주로 DOM 요소나 클래스 컴포넌트에 접근하기 위한 방법을 제공한다.
+
+React에서는 주로 선언적인 방식으로 상태와 UI를 관리하지만,
+
+가끔씩은 선언적인 스타일을 벗어나 직접 DOM이나 다른 컴포넌트에 접근해야 하는 경우가 있다. 이때 Ref를 사용한다.
+
+간단히 말하면, Ref는 React 컴포넌트 내에서 특정한 요소에 "참조"를 생성하는 객체이다.
+
+이 참조를 사용하면 해당 요소에 직접적으로 접근하여 값을 읽거나 변경할 수 있다.
+
+이것은 React의 주요 철학 중 하나인 "선언적인 프로그래밍"을 깨지 않으면서도 필요한 경우에만 "명령형 프로그래밍"을 허용한다.
+```
+
+```jsx
+간단한 예를 들어보겠다.
+
+만약 특정 input 요소에 포커스를 주고 싶다면, Ref를 사용하여 해당 요소에 접근할 수 있다.
+
+이때 선언적인 방식으로는 힘들었던 작업을 Ref를 통해 쉽게 수행할 수 있다.
+
+* 아래 코드의 주요 목적은 컴포넌트가 처음으로 렌더링될 때 input 요소에 자동으로 포커스를 주는 것
+```
+
+```jsx
+import React, { useRef, useEffect } from 'react'
+
+const MyComponent = () => {
+  // Ref 생성
+  const myInputRef = useRef()
+
+  // 컴포넌트가 마운트될 때 실행되는 효과
+  useEffect(() => {
+    // Ref를 사용하여 input 요소에 포커스를 설정
+    myInputRef.current.focus()
+  }, [])
+
+  // JSX에서 Ref를 할당
+  return <input ref={myInputRef} />
+}
+```
+
+```jsx
+useRef 훅을 사용하여 myInputRef라는 Ref 객체를 생성
+
+useEffect 훅을 사용하여 컴포넌트가 마운트될 때 실행되는 효과를 정의한다.
+
+myInputRef.current를 사용하여 Ref가 현재 참조하는 DOM 요소에 직접적으로 접근한다.
+
+( current는 useRef 객체의 속성 중 하나이다. useRef 객체는 .current라는 속성을 가지고 있으며,
+
+이 속성은 useRef로 참조한 대상에 대한 실제 값 또는 DOM 요소를 가리킨다 )
+
+current 속성은 이 객체가 현재 참조하고 있는 값을 나타냄 그렇기 때문에 현재는 input 을 가리킴
+
+focus() 메서드를 호출하여 input 요소에 포커스를 설정한다
+
+JSX에서 ref 속성을 사용하여 Ref를 input 요소에 할당한다.
+
+이제 myInputRef.current를 통해 해당 input 요소에 접근할 수 있다.
+```
+
+## Ref 와 ReactDOM.createPortal 의 차이
+
+```jsx
+Ref는 React 컴포넌트 내에서 특정 DOM 요소에 직접 접근하기 위한 것이고,
+
+ReactDOM.createPortal은 React 컴포넌트의 일부를 다른 DOM 요소로 렌더링하기 위한 것
+```
+
+## **Ref 사용 상황**
+
+### **DOM 요소에 접근:**
+
+```jsx
+Ref를 사용하여 특정 DOM 요소에 직접적으로 접근할 수 있다. 예를 들어,
+
+특정 input 요소에 포커스를 설정하거나 값을 가져오려는 경우 Ref를 사용할 수 있다.
+```
+
+```jsx
+import React, { useRef, useEffect } from 'react'
+
+const MyComponent = () => {
+  const myInputRef = useRef()
+
+  useEffect(() => {
+    // 컴포넌트가 마운트되면 input 요소에 포커스를 설정합니다.
+    myInputRef.current.focus()
+  }, [])
+
+  return <input ref={myInputRef} />
+}
+```
+
+### **외부 라이브러리와 통합:**
+
+```jsx
+외부 라이브러리가 DOM 요소에 접근하려면 Ref를 활용할 수 있다.
+
+예를 들어, D3.js, Chart.js와 같은 라이브러리와 통합할 때 사용할 수 있다.
+```
+
+```jsx
+import React, { useRef, useEffect } from 'react'
+import * as d3 from 'd3'
+
+const D3Chart = () => {
+  const chartRef = useRef()
+
+  useEffect(() => {
+    // D3를 사용하여 차트를 그리기 위해 chartRef를 활용합니다.
+    const chart = d3.select(chartRef.current)
+    // ... D3 로직 ...
+  }, [])
+
+  return <div ref={chartRef}></div>
+}
+```
+
+### **컴포넌트 간 통신:**
+
+```jsx
+Ref를 사용하여 부모 컴포넌트에서 자식 컴포넌트로 데이터를 전달하거나
+
+자식 컴포넌트에서 부모 컴포넌트의 메서드를 호출하는 등 컴포넌트 간의 통신에 활용할 수 있다.
+```
+
+```jsx
+import React, { useRef } from 'react'
+import ChildComponent from './ChildComponent'
+
+const ParentComponent = () => {
+  const childRef = useRef()
+
+  const handleClick = () => {
+    // 자식 컴포넌트의 메서드 호출
+    childRef.current.doSomething()
+  }
+
+  return (
+    <>
+      <ChildComponent ref={childRef} />
+      <button onClick={handleClick}>Call Child Method</button>
+    </>
+  )
+}
+```
+
+### **애니메이션 및 DOM 조작:**
+
+```jsx
+Ref를 사용하여 애니메이션을 제어하거나 특정 DOM 조작을 수행할 수 있다.
+
+예를 들어, 애니메이션 트리거 시점이나 특정 DOM 요소의 크기를 측정할 때 사용할 수 있다.
+```
+
+```jsx
+import React, { useRef, useState, useEffect } from 'react'
+
+const AnimatedComponent = () => {
+  const boxRef = useRef()
+  const [width, setWidth] = useState(0)
+
+  useEffect(() => {
+    // 컴포넌트가 마운트되면 boxRef의 너비를 측정하여 상태 업데이트
+    setWidth(boxRef.current.offsetWidth)
+  }, [])
+
+  return (
+    <div ref={boxRef} style={{ width: `${width}px`, transition: 'width 0.5s' }}>
+      Animated Box
+    </div>
+  )
+}
+```
+
+# 구글 지도 추가

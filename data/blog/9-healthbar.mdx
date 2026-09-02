@@ -1,0 +1,1110 @@
+---
+title: '섹션 9: Healthbar'
+date: '2026-09-02'
+category: '게임 개발/Game Development in JS TS - The Complete Guide (w_'
+tags: ['게임 개발', 'Game Development in JS TS - The Complete Guide (w_']
+draft: false
+summary: ''
+---
+
+# { Phaser 3로 플레이어 체력 바 구현하기 }
+
+```jsx
+이 강의에서는 적의 공격을 받았을 때 플레이어의 체력을 감소시키고,
+
+이를 체력 바(Health Bar)에 표시하는 기능을 구현합니다.
+```
+
+## 1. HealthBar 클래스 생성
+
+```jsx
+HealthBar는 플레이어의 체력을 시각적으로 표시하는 역할을 합니다.
+
+이를 위해 Phaser의 Graphics 객체를 사용하여 사각형을 그립니다.
+```
+
+```jsx
+import Phaser from 'phaser'
+
+class HealthBar {
+  /**
+   * 체력 바를 생성하는 클래스
+   * @param {Phaser.Scene} scene - 체력 바를 추가할 씬
+   * @param {number} x - 체력 바의 x 좌표
+   * @param {number} y - 체력 바의 y 좌표
+   * @param {number} health - 초기 체력 값
+   */
+  constructor(scene, x, y, health) {
+    // Phaser의 Graphics 객체를 생성하여 체력 바를 그릴 준비
+    this.bar = new Phaser.GameObjects.Graphics(scene)
+
+    // 체력 바의 위치 지정
+    this.x = x
+    this.y = y
+
+    // 현재 체력 값 저장
+    this.value = health
+
+    // 체력 바의 크기 설정 (너비 40px, 높이 8px)
+    this.size = {
+      width: 40, // 체력 바 전체 너비 (고정값)
+      height: 8, // 체력 바 높이 (고정값)
+    }
+
+    /**
+     * 픽셀당 체력 값 계산
+     * - 체력 바의 너비를 초기 체력 값으로 나누어, 체력 1당 몇 픽셀인지 계산
+     * - 예를 들어 초기 체력이 100이고, 바의 너비가 40이면, 40 / 100 = 0.4 픽셀
+     *   즉, 체력 1 감소 시 바의 너비가 0.4픽셀 줄어듦
+     */
+    this.pixelPerHealth = this.size.width / health
+
+    /**
+     * this.bar 객체를 씬에 추가
+     * - `scene.add.existing(this.bar)`은 Phaser에서 이미 생성한 객체를 씬에 추가하는 메서드
+     * - 기존에 생성한 객체를 씬에서 렌더링하고, 업데이트할 수 있도록 함
+     */
+    scene.add.existing(this.bar)
+  }
+}
+
+export default HealthBar
+```
+
+```jsx
+✅ 체력 바 크기 계산:
+
+예를 들어, 체력이 100이고 체력 바의 너비가 40픽셀이라면
+
+➡ 40 ÷ 100 = 0.4 픽셀/체력
+
+scene.add.existing(this.bar)
+
+Phaser에서 new Phaser.GameObjects.Graphics(scene)으로 그래픽 객체를 생성했지만,
+
+이것만으로는 화면에 보이지 않음.
+
+scene.add.existing(this.bar)을 호출하면 이 그래픽 객체가 씬에 추가되고,
+
+이후 Phaser가 관리할 수 있음.
+
+이 과정을 통해 Phaser의 업데이트 루프에서 객체가 렌더링되고, 업데이트될 수 있음.
+```
+
+## 2. Player 클래스에서 HealthBar 추가
+
+```jsx
+플레이어 객체에 체력 바를 추가합니다.
+```
+
+```jsx
+import Phaser from 'phaser'
+import HealthBar from '../hud/HealthBar'
+
+class Player extends Phaser.Physics.Arcade.Sprite {
+  constructor(scene, x, y) {
+    super(scene, x, y, 'player')
+
+    scene.add.existing(this)
+    scene.physics.add.existing(this)
+
+    this.init()
+  }
+
+  init() {
+    this.health = 100 // 초기 체력 100 설정
+    this.hp = new HealthBar(this.scene, 0, 0, this.health) // 체력 바 생성
+  }
+}
+
+export default Player
+```
+
+# { Phaser 3 Health Bar 구현 2 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380512/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_9_Healthbar/image.png)
+
+```jsx
+이 강의에서는 **Health Bar(체력 바)**를 Phaser 3에서 구현하는 과정을 설명합니다.
+
+이번 강의에서 우리는 Health Bar의 기본 형태를 그리는 것에 집중합니다.
+```
+
+## 1. Health Bar를 그리는 함수 `draw` 만들기
+
+```jsx
+Health Bar를 그리기 위해 draw(x, y)라는 함수를 생성합니다.
+
+이 함수는 x, y 좌표를 받아서 체력 바의 기본 모양을 그리는 역할을 합니다.
+```
+
+```jsx
+draw(x, y) {
+    this.bar.clear();  // 기존의 체력 바를 지움 (화면 갱신을 위해)
+    const { width, height } = this.size;  // 체력 바의 크기 가져오기
+
+    this.bar.fillStyle(0x9B9B9B);  // 배경 색상 설정 (회색)
+    this.bar.fillRect(x, y, width, height);  // 체력 바 사각형 그리기
+}
+
+```
+
+```jsx
+fillStyle은 도형을 채울 때 사용할 색상을 지정하는 메서드입니다.
+
+		0x9B9B9B: 16진수(hex) 색상 코드로, 회색을 의미합니다.
+
+fillRect는 사각형을 채워서 그리는 메서드입니다.
+
+		x, y: 사각형의 시작 위치 (좌측 상단)
+
+		width, height: 사각형의 가로, 세로 크기
+```
+
+## 2. `constructor`에서 초기 설정
+
+```jsx
+체력 바를 생성할 때 초기 설정을 진행합니다.
+```
+
+```jsx
+constructor(scene, x, y, health) {
+    this.bar = new Phaser.GameObjects.Graphics(scene);
+
+    this.x = x;
+    this.y = y;
+    this.value = health;  // 체력 값 저장
+    this.size = { width: 40, height: 8 };  // 체력 바 크기 설정
+
+    this.pixelPerHealth = this.size.width / health;  // 체력당 픽셀 수 계산
+
+    scene.add.existing(this.bar);  // Phaser 씬에 추가
+    this.draw(x, y);  // 초기 체력 바 그리기
+}
+```
+
+## 3. 체력 바의 위치 문제
+
+```jsx
+현재 x = 0, y = 0 위치에 체력 바가 그려집니다.
+
+하지만 카메라가 이동할 때 체력 바가 따라가지 않는 문제가 발생합니다.
+```
+
+# { Phaser 3에서 카메라 이동 및 줌 효과에 따른 체력 바(Health Bar) 위치 문제 해결하기 }
+
+## 문제 상황
+
+```jsx
+현재 플레이어(캐릭터)의 체력 바가 화면에 표시되지만,
+
+플레이어가 이동하면 체력 바가 따라오지 않습니다.
+
+즉, 플레이어가 이동할 때 카메라가 따라가지만, 체력 바는 원래 위치에 그대로 남아 있는 문제가 발생합니다.
+
+또한, 카메라 줌(Zoom) 기능을 적용했을 때 체력 바의 위치가 예상과 다르게 표시되는 현상이 나타납니다.
+```
+
+## 1. 체력 바가 카메라를 따라오도록 수정
+
+```jsx
+기본적으로 Phaser에서 GameObject는 기본적으로 카메라의 영향을 받습니다.
+
+따라서 특정 객체가 카메라 이동과 상관없이 고정되도록 하려면 setScrollFactor(0, 0)을 설정해야 합니다.
+```
+
+```jsx
+this.bar.setScrollFactor(0)
+```
+
+```jsx
+위 설정을 하면 체력 바가 고정되어 카메라가 움직여도 제자리에 남아 있게 됩니다.
+
+하지만 여기서 추가적인 문제가 발생합니다.
+
+줌(Zoom) 기능이 활성화되었을 때, 체력 바가 사라지거나 엉뚱한 위치에 나타나는 현상이 발생할 수 있습니다.
+```
+
+## 2. 줌(Zoom) 기능으로 인한 위치 문제
+
+```jsx
+줌이 적용되면 기존 화면의 좌표 체계가 달라집니다.
+
+줌 값이 1.5라면, 기존 1픽셀이 1.5배로 커지면서 전체적인 화면 크기가 변하게 됩니다.
+
+즉, 화면의 중심점과 각 요소의 상대적인 위치가 변하기 때문에
+
+setScrollFactor(0, 0)을 설정하더라도 체력 바의 위치가 예상과 다르게 나타날 수 있습니다.
+
+이를 이해하기 위해 화면 줌의 원리를 살펴보겠습니다.
+```
+
+### 2.1 줌의 원리
+
+```jsx
+화면 크기가 1280 × 600이고, 줌(Zoom) 배율이 1.5라면, 실제 보이는 영역은 줄어듭니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380511/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_9_Healthbar/image_1.png)
+
+```jsx
+즉, 실제로 보이는 영역은 853 × 400이며,
+
+이 영역을 다시 확대해서 원래 1280 × 600 크기로 표시하는 것입니다.
+
+이 과정에서 원래 200, 200 좌표에 있던 체력 바가 보이지 않거나 잘못된 위치로 이동할 수 있습니다.
+```
+
+# { 줌을 고려한 체력 바 위치 계산 }
+
+## 줌(Zoom) 개념과 적용 방법 정리
+
+### 1. 줌의 개념
+
+```jsx
+줌을 적용하면 실제 맵의 일부만 확대되어 보입니다.
+
+확대된 영역을 계산해야 하며, 중심을 기준으로 어느 위치가 보일지를 정해야 합니다.
+
+줌 비율이 1.5이면 전체 맵 크기에 대해 1/1.5만큼만 보이게 됩니다.
+```
+
+## 2. 줌을 적용한 좌표 계산 방법
+
+```jsx
+줌이 적용된 후 보이는 영역의 왼쪽 상단(Left Top Corner) 좌표를 계산하는 방법입니다.
+```
+
+### 1) 줌 비율(zoomFactor) 설정
+
+```jsx
+const zoomFactor = 1.5
+```
+
+```jsx
+줌 비율을 1.5로 설정하면 전체 맵이 1.5배 확대됩니다.
+```
+
+### 2) 왼쪽 상단(Left Top Corner) 좌표 계산
+
+```jsx
+const leftTopCorner = {
+  x: (width - width / zoomFactor) / 2,
+  y: (height - height / zoomFactor) / 2,
+}
+```
+
+```jsx
+width / zoomFactor: 줌이 적용된 후 실제로 보이는 너비
+
+height / zoomFactor: 줌이 적용된 후 실제로 보이는 높이
+
+(width - (width / zoomFactor)) / 2: 좌측에서 보이지 않는 부분을 고려하여 위치 조정
+
+(height - (height / zoomFactor)) / 2: 상단에서 보이지 않는 부분을 고려하여 위치 조정
+```
+
+### 예제 값 (width=1600, height=600, zoomFactor=1.5)
+
+```jsx
+x = (1600 - (1600 / 1.5)) / 2 = 213
+y = (600 - (600 / 1.5)) / 2 = 100
+```
+
+### 3) 오른쪽 상단(Right Top Corner) 좌표 계산
+
+```jsx
+const rightTopCorner = {
+  x: (width / zoomFactor + (width - width / zoomFactor)) / 2,
+  y: (height - height / zoomFactor) / 2,
+}
+```
+
+```jsx
+X 좌표는 보이는 영역의 우측 끝 부분을 기준으로 계산합니다.
+Y 좌표는 왼쪽 상단과 동일하게 계산됩니다.
+```
+
+### 예제 값 (width=1600, height=600, zoomFactor=1.5)
+
+```jsx
+x = ((1600 / 1.5) + (1600 - (1600 / 1.5))) / 2 = 1066.67
+y = 100
+```
+
+## 3. 플레이어의 UI 요소(체력바 등) 위치 적용
+
+```jsx
+줌된 화면에서 UI 요소(체력바 등)를 올바르게 배치하기 위해 계산한 좌표를 적용합니다.
+```
+
+```jsx
+this.scene.config.leftTopCorner.x
+this.scene.config.leftTopCorner.y
+```
+
+```jsx
+기존에 고정된 값(200, 100) 을 사용하던 UI 요소 좌표를 계산된 좌표 값으로 변경합니다.
+
+이를 통해 줌 비율이 바뀌더라도 올바른 위치에 UI가 배치됩니다.
+```
+
+## 최종 코드
+
+```jsx
+import Phaser from 'phaser'
+
+import PlayScene from './scenes/Play'
+import PreloadScene from './scenes/Preload'
+
+// 1. 맵 크기 설정
+const mapWidth = 1600
+
+// 2. 브라우저 크기에 맞춰 캔버스 크기 설정
+const width = document.body.offsetWidth
+const height = 600
+
+// 줌 비율 설정
+const zoomFactor = 1.5
+
+// 3. 오프셋 계산 (보이지 않는 영역 크기)
+const mapOffset = mapWidth - width
+
+// 공통 설정
+const SHARED_CONFIG = {
+  mapOffset: mapOffset,
+  width: width,
+  height: height,
+  zoomFactor: zoomFactor,
+  debug: false,
+
+  // 왼쪽 상단 좌표 계산 (줌을 고려한 위치)
+  leftTopCorner: {
+    x: (width - width / zoomFactor) / 2, // x좌표는 전체 너비에서 보이는 영역을 빼고 반으로 나누어 위치 설정
+    y: (height - height / zoomFactor) / 2, // y좌표는 전체 높이에서 보이는 영역을 빼고 반으로 나누어 위치 설정
+  },
+
+  // 오른쪽 상단 좌표 계산 (줌을 고려한 위치)
+  rightTopCorner: {
+    x: (width / zoomFactor + (width - width / zoomFactor)) / 2, // x좌표는 보이는 영역의 우측 끝까지 고려하여 계산
+    y: (height - height / zoomFactor) / 2, // y좌표는 왼쪽 상단 좌표와 동일
+  },
+}
+
+// 씬들을 배열로 나열
+const Scenes = [PreloadScene, PlayScene]
+
+// 씬 생성 함수 (SHARED_CONFIG을 넘겨줌)
+const createScene = (Scene) => new Scene(SHARED_CONFIG)
+
+// 씬 초기화 함수
+const initScenes = () => Scenes.map(createScene)
+
+// Phaser 설정
+const config = {
+  type: Phaser.AUTO,
+  ...SHARED_CONFIG,
+  pixelArt: true,
+  physics: {
+    default: 'arcade',
+    arcade: {
+      debug: SHARED_CONFIG.debug,
+    },
+  },
+  scene: initScenes(), // 씬 초기화
+}
+
+// Phaser 게임 시작
+new Phaser.Game(config)
+```
+
+### player.js
+
+```jsx
+init() {
+        this.hasBeenHit = false;
+        this.bounceVelocity = 200;
+        this.gravity = 800;
+        this.playerSpeed = 200;
+        this.jumpCount = 0;
+        this.consecutiveJumps = 1;
+        this.body.setSize(20, 36);
+        this.jumpSpeed = -250;
+
+        this.body.setGravityY(500);
+        this.setCollideWorldBounds(true);
+        this.cursors = this.scene.input.keyboard.createCursorKeys();
+        this.setOrigin(0.5, 1);
+        this.health = 100;
+
+        this.hp = new HealthBar(
+            this.scene,
+            this.scene.config.leftTopCorner.x ,
+            this.scene.config.leftTopCorner.y,
+            this.health
+        )
+        initAnimations(this.scene.anims);
+    }
+```
+
+```jsx
+        this.hp = new HealthBar(
+            this.scene,
+            this.scene.config.leftTopCorner.x ,
+            this.scene.config.leftTopCorner.y,
+            this.health
+        )
+
+
+ HealthBar 생성 시 위치 추가
+```
+
+# { Phaser 3에서 Health Bar(체력바) 제작하기 3 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380511/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_9_Healthbar/image_2.png)
+
+```jsx
+이 강의에서는 줌이 적용된 상태에서 Health Bar(체력바)의 위치를 조정한 후,
+
+체력바에 추가적인 레이어를 추가하여 테두리를 표현하는 방법을 배웁니다.
+```
+
+## 1. 기본 Health Bar(체력바) 생성
+
+```jsx
+먼저, HealthBar 클래스를 생성하여 기본적인 체력바를 구현합니다.
+```
+
+```jsx
+import Phaser from 'phaser'
+
+class HealthBar {
+  constructor(scene, x, y, health) {
+    this.bar = new Phaser.GameObjects.Graphics(scene) // Phaser의 Graphics 객체 생성
+    this.bar.setScrollFactor(0) // 화면 스크롤의 영향을 받지 않도록 설정
+
+    this.x = x
+    this.y = y
+    this.value = health // 최대 체력값
+    this.size = {
+      width: 40, // 체력바 너비
+      height: 8, // 체력바 높이
+    }
+
+    this.pixelPerHealth = this.size.width / health // 체력 1당 픽셀 크기 계산
+
+    scene.add.existing(this.bar) // 씬에 그래픽 객체 추가
+    this.draw(x, y) // 체력바 그리기
+  }
+
+  draw(x, y) {
+    this.bar.clear() // 기존 그래픽 지우기
+    const { width, height } = this.size
+
+    const margin = 2 // 테두리 여백
+
+    // **배경(테두리)**
+    this.bar.fillStyle(0xefefef) // 회색 테두리 색상
+    this.bar.fillRect(x, y, width + margin, height + margin) // 테두리 그리기
+
+    // **체력바(녹색)**
+    this.bar.fillStyle(0x56f344) // 초록색 체력바
+    this.bar.fillRect(x + margin, y + margin, width - margin, height - margin) // 체력바 내부 그리기
+  }
+}
+
+export default HealthBar
+```
+
+```jsx
+위 코드에서 fillRect(x, y, width, height) 함수는 주어진 위치에 사각형을 그립니다.
+
+현재 구현에서는 테두리(회색)와 체력바(녹색)만 있는 상태입니다.
+```
+
+## 2. 추가적인 레이어로 테두리 표현하기
+
+### 1) 체력바 위치 조정
+
+```jsx
+체력바가 너무 화면 구석에 붙어 있는 것을 방지하기 위해 위치를 약간 이동시킵니다.
+
+이렇게 하면 체력바가 화면 구석에서 약간 떨어진 위치에 표시됩니다.
+```
+
+```jsx
+this.x = x + 5 // X 좌표를 5px 오른쪽으로 이동
+this.y = y + 5 // Y 좌표를 5px 아래로 이동
+```
+
+### 2) 체력바에 테두리 추가하기
+
+```jsx
+테두리 효과를 만들기 위해 배경 레이어를 추가합니다.
+```
+
+```jsx
+💡 적용할 구조
+
+테두리(회색)
+
+배경(흰색)
+
+체력바(녹색, 실제 체력 값 반영됨)
+
+📌 개념 설명
+
+테두리 크기를 기존보다 2px 크게 설정하여 테두리 역할을 하도록 합니다.
+
+그 안쪽에 배경(흰색)을 넣어 체력바를 감싸는 효과를 줍니다.
+
+최종적으로 체력바(녹색)를 배경 위에 표시합니다.
+```
+
+```jsx
+    draw(x, y) {
+        this.bar.clear();
+        const { width, height } = this.size;
+
+        const margin = 2;
+
+        this.bar.fillStyle(0xefefef);
+        this.bar.fillRect(x, y, width + margin, height + margin);
+
+        this.bar.fillStyle(0x56f344);
+        this.bar.fillRect(x + margin, y + margin, width - margin, height - margin);
+    }
+```
+
+```jsx
+테두리 그리기
+
+배경(흰색)
+
+체력바의 배경을 흰색(0xffffff)으로 표시합니다.
+
+위치를 + margin만큼 이동하여 테두리 내부에 들어가도록 합니다.
+
+체력바(녹색)
+
+실제 체력을 표시할 녹색(0x56f344) 체력바를 배경 위에 그립니다.
+
+```
+
+# { 체력바 감소 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380511/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_9_Healthbar/image_3.png)
+
+```jsx
+이번 강의에서는 Phaser 3를 사용하여 **체력바(Health Bar)**를 구현하는 방법을 설명합니다.
+
+체력바는 기본적으로 흰색 배경 위에 녹색 바를 표시하며, 체력이 감소하면 녹색 바가 줄어드는 방식으로 동작합니다.
+```
+
+## 1. HealthBar 클래스 생성
+
+```jsx
+HealthBar 클래스는 다음과 같은 요소로 구성됩니다.
+
+체력바 그래픽 객체 생성
+
+기본 배경(흰색) 및 체력(녹색) 바 그리기
+
+체력이 감소하면 녹색 바 길이 줄이기
+```
+
+```jsx
+import Phaser from 'phaser'
+
+class HealthBar {
+  constructor(scene, x, y, health) {
+    this.bar = new Phaser.GameObjects.Graphics(scene)
+    this.bar.setScrollFactor(0) // 카메라 스크롤 영향 없음
+
+    this.x = x
+    this.y = y
+    this.value = health
+    this.size = { width: 40, height: 8 }
+
+    this.pixelPerHealth = this.size.width / health // 체력에 따른 픽셀 비율 계산
+
+    scene.add.existing(this.bar)
+    this.draw(x, y) // 체력바 초기화
+  }
+
+  draw(x, y) {
+    // 기존에 그려진 그래픽을 모두 초기화 (이전 상태를 지우고 새로 그리기 위함)
+    this.bar.clear()
+
+    // 체력바 크기 정보 (너비와 높이)
+    const { width, height } = this.size
+
+    // 바깥쪽 테두리와 내부 바 사이의 여백 (margin)
+    const margin = 2
+
+    // [1] 체력바의 바깥 테두리 (보라색)
+    // - 전체 체력바의 배경이 되는 영역
+    // - 기존 바 크기보다 여백(margin)만큼 크게 설정하여 테두리처럼 보이게 만듦
+    this.bar.fillStyle(0x9b00ff) // 보라색 설정
+    this.bar.fillRect(x, y, width + margin, height + margin) // 바깥 테두리 그리기
+
+    // [2] 체력바의 내부 배경 (흰색)
+    // - 실제 체력바가 표시될 영역
+    // - 보라색 테두리 안쪽에 배치
+    this.bar.fillStyle(0xffffff) // 흰색 설정
+    this.bar.fillRect(x + margin, y + margin, width - margin, height - margin) // 내부 배경 그리기
+
+    // [3] 현재 체력에 해당하는 녹색 바
+    // - 체력 수치(this.value)에 따라 크기가 동적으로 변경됨
+    // - `pixelPerHealth`는 체력 1당 픽셀 수로, 체력 값에 비례하여 바의 너비가 변함
+    const healthWidth = Math.floor(this.pixelPerHealth * this.value) // 현재 체력에 맞는 바의 길이 계산
+
+    this.bar.fillStyle(0x00ff00) // 녹색 설정
+    this.bar.fillRect(x + margin, y + margin, healthWidth - margin, height - margin) // 체력바 그리기
+  }
+}
+
+export default HealthBar
+```
+
+## 2. 체력 감소
+
+```jsx
+체력이 줄어들면 녹색 바의 길이를 조정해야 합니다.
+
+이를 위해 this.pixelPerHealth * this.value를
+
+사용하여 현재 체력에 맞는 바의 길이를 계산합니다.
+
+Math.floor()를 이용해 소수점을 제거합니다.
+```
+
+```jsx
+const healthWidth = Math.floor(this.pixelPerHealth * this.value)
+```
+
+# { Phaser 3: 체력바(Health Bar) 구현 및 체력 감소 기능 정리 }
+
+```jsx
+이번 강의에서는 플레이어의 체력바(Health Bar)를 구현하고,
+
+체력이 감소하는 기능을 추가하는 과정을 자세히 정리해보겠습니다.
+```
+
+## 1. **체력바(Health Bar) 구현**
+
+### 1-1. HealthBar 클래스 생성
+
+```jsx
+Phaser에서 체력바를 그리기 위해 Phaser.GameObjects.Graphics 객체를 사용합니다.
+
+아래는 HealthBar 클래스를 생성하는 코드입니다.
+```
+
+### hud/HealthBar.js
+
+```jsx
+import Phaser from 'phaser'
+
+class HealthBar {
+  constructor(scene, x, y, health) {
+    this.bar = new Phaser.GameObjects.Graphics(scene)
+    this.bar.setScrollFactor(0) // 카메라 스크롤 영향을 받지 않도록 설정
+
+    this.x = x
+    this.y = y
+    this.value = health // 초기 체력 값
+    this.size = {
+      width: 40, // 체력바 너비
+      height: 8, // 체력바 높이
+    }
+
+    this.pixelPerHealth = this.size.width / health // 체력 1당 픽셀 크기 계산
+
+    scene.add.existing(this.bar)
+    this.draw(x, y) // 초기 체력바 그리기
+  }
+
+  // 체력 감소 함수
+  decrease(amount) {
+    this.value = amount
+    this.draw(this.x, this.y) // 체력 업데이트 후 다시 그리기
+  }
+
+  draw(x, y) {
+    this.bar.clear() // 기존 체력바 삭제
+    const { width, height } = this.size
+    const margin = 2
+
+    // 검은색 테두리
+    this.bar.fillStyle(0x9b00ff)
+    this.bar.fillRect(x, y, width + margin, height + margin)
+
+    // 하얀색 배경
+    this.bar.fillStyle(0xffffff)
+    this.bar.fillRect(x + margin, y + margin, width - margin, height - margin)
+
+    // 체력바 색상 변경 (1/3 이하일 경우 빨간색)
+    const healthWidth = Math.floor(this.pixelPerHealth * this.value)
+    if (healthWidth <= this.size.width / 3) {
+      this.bar.fillStyle(0xff0000) // 빨간색
+    } else {
+      this.bar.fillStyle(0x00ff00) // 초록색
+    }
+
+    // 체력이 0 이상일 때만 체력바 그리기
+    if (healthWidth > 0) {
+      this.bar.fillRect(x + margin, y + margin, healthWidth - margin, height - margin)
+    }
+  }
+}
+
+export default HealthBar
+```
+
+```jsx
+HealthBar 클래스는 체력바를 그래픽 객체로 생성합니다.
+
+draw() 함수에서 체력에 따라 색상이 변하도록 설정했습니다.
+
+decrease(amount) 함수는 체력 값을 줄이고 다시 그리는 역할을 합니다.
+```
+
+## 2. **플레이어(Player) 클래스에 체력바 적용**
+
+```jsx
+Player 클래스에 HealthBar 객체를 추가하여 플레이어의 체력을 시각적으로 표현합니다.
+```
+
+### entities/Player.js
+
+```jsx
+import Phaser from 'phaser'
+import initAnimations from './anims/PlayerAnims'
+import collidable from '../mixins/collidable'
+import HealthBar from '../hud/HealthBar'
+
+class Player extends Phaser.Physics.Arcade.Sprite {
+  constructor(scene, x, y) {
+    super(scene, x, y, 'player')
+
+    scene.add.existing(this)
+    scene.physics.add.existing(this)
+
+    Object.assign(this, collidable)
+
+    this.init()
+    this.initEvents()
+  }
+
+  init() {
+    this.hasBeenHit = false
+    this.playerSpeed = 200
+    this.jumpSpeed = -250
+    this.health = 100 // 초기 체력 설정
+
+    this.body.setSize(20, 36)
+    this.body.setGravityY(500)
+    this.setCollideWorldBounds(true)
+
+    this.cursors = this.scene.input.keyboard.createCursorKeys()
+    this.setOrigin(0.5, 1)
+
+    // 체력바 추가
+    this.hp = new HealthBar(
+      this.scene,
+      this.scene.config.leftTopCorner.x + 5,
+      this.scene.config.leftTopCorner.y + 5,
+      this.health
+    )
+
+    initAnimations(this.scene.anims)
+  }
+
+  initEvents() {
+    this.scene.events.on(Phaser.Scenes.Events.UPDATE, this.update, this)
+  }
+
+  update() {
+    if (this.hasBeenHit) {
+      return
+    }
+    const { left, right, space } = this.cursors
+    const isSpaceJustDown = Phaser.Input.Keyboard.JustDown(space)
+    const onFloor = this.body.onFloor()
+
+    if (left.isDown) {
+      this.setVelocityX(-this.playerSpeed)
+      this.setFlipX(true)
+    } else if (right.isDown) {
+      this.setVelocityX(this.playerSpeed)
+      this.setFlipX(false)
+    } else {
+      this.setVelocityX(0)
+    }
+
+    if (isSpaceJustDown && (onFloor || this.jumpCount < 1)) {
+      this.setVelocityY(this.jumpSpeed)
+      this.jumpCount++
+    }
+
+    if (onFloor) {
+      this.jumpCount = 0
+    }
+
+    onFloor
+      ? this.body.velocity.x !== 0
+        ? this.play('run', true)
+        : this.play('idle', true)
+      : this.play('jump', true)
+  }
+
+  // 체력 감소 처리
+  takesHit(initiator) {
+    if (this.hasBeenHit) {
+      return
+    }
+
+    console.log('player got hit')
+    this.hasBeenHit = true
+    this.bounceOff()
+
+    // 체력 감소
+    this.health -= initiator.damage
+    this.hp.decrease(this.health)
+
+    // 일정 시간 후 피격 가능 상태로 변경
+    this.scene.time.delayedCall(800, () => {
+      this.hasBeenHit = false
+      this.clearTint()
+    })
+  }
+}
+
+export default Player
+```
+
+```jsx
+HealthBar 객체를 추가하여 플레이어의 체력을 UI로 표현했습니다.
+
+takesHit(initiator) 함수에서 적에게 맞을 때 체력이 감소하도록 설정했습니다.
+```
+
+## 3. **적(Enemy) 클래스에 데미지 추가**
+
+```jsx
+적이 플레이어를 공격할 때 체력이 감소하도록 Enemy 클래스에 데미지 값을 추가합니다.
+```
+
+### entities/Enemy.js
+
+```jsx
+import Phaser from 'phaser'
+import collidable from '../mixins/collidable'
+
+class Enemy extends Phaser.Physics.Arcade.Sprite {
+  constructor(scene, x, y, key) {
+    super(scene, x, y, key)
+
+    scene.add.existing(this)
+    scene.physics.add.existing(this)
+
+    Object.assign(this, collidable)
+
+    this.init()
+  }
+
+  init() {
+    this.speed = 50
+    this.damage = 20 // 적이 가하는 데미지 설정
+
+    this.body.setGravityY(500)
+    this.setCollideWorldBounds(true)
+    this.setVelocityX(this.speed)
+  }
+}
+
+export default Enemy
+```
+
+```jsx
+damage = 20을 추가하여 적이 플레이어에게 줄 데미지를 설정했습니다.
+```
+
+# { 적과 충돌 버그 수정 }
+
+```jsx
+적과 충돌해도 hp 가 떨어지지 않고 충돌하는 적을 찾을 수 없다는 오류가 발생했다
+```
+
+```jsx
+    takesHit(initiator) {
+        if (this.hasBeenHit) {
+            return;
+        }
+        console.log("player got hit");
+        this.hasBeenHit = true;
+        this.bounceOff();
+        const hitAim = this.playDamageTween();
+        debugger
+        this.health -= initiator.damage;
+        this.hp.decrease(this.health)
+
+        // 일정 시간(1초) 후 다시 피격 가능하도록 설정
+        this.scene.time.delayedCall(800, () => {
+            this.hasBeenHit = false;
+            hitAim.stop();
+            this.clearTint();
+        });
+    }
+```
+
+```jsx
+Player.js 의 이 부분에서 initiator 를 찾지 못하여서 오류가 발생하였다
+```
+
+## 문제 해결
+
+```jsx
+문제는 play.js 의 아래 부분을 추가해주지 않아서 발생 하고 있었다
+```
+
+```jsx
+
+    onPlayerCollision(enemy, player) {
+       player.takesHit(enemy);
+    }
+
+    createEnemyColliders(enemies, { colliders }) {
+        enemies
+            .addColliders(colliders.platformsColliders)
+            .addColliders(colliders.player, this.onPlayerCollision);
+    }
+```
+
+```jsx
+적과 충돌하면 onPlayerCollision 를 실행하게 해줘야
+
+takesHit 함수로 enemy 가 전달되어 initiator 를 찾을 수 있었다
+```
+
+# { Phaser에서 플레이어의 체력바(Health Bar) 구현 및 스케일 조정 }
+
+```jsx
+체력바의 크기를 조절하는 방법을 설명합니다.
+```
+
+## 체력바 크기(스케일) 조정
+
+```jsx
+체력바의 크기가 너무 작기 때문에 스케일을 조정하는 기능을 추가합니다.
+```
+
+## 3.1 **스케일 매개변수 추가**
+
+```jsx
+Player 클래스에서 체력바 생성 시 스케일 값을 전달
+
+HealthBar 클래스에서 스케일을 적용하도록 수정
+```
+
+### ✅ **Player 클래스에서 스케일 2배 적용**
+
+```jsx
+this.hp = new HealthBar(
+  this.scene,
+  this.scene.config.leftTopCorner.x + 5,
+  this.scene.config.leftTopCorner.y + 5,
+  2,
+  this.health
+)
+```
+
+```jsx
+2 가 스케일이다
+```
+
+### ✅ **HealthBar 클래스에서 스케일 적용**
+
+```jsx
+  class HealthBar {
+
+    constructor(scene, x, y, scale = 1, health) {
+        this.bar = new Phaser.GameObjects.Graphics(scene);
+
+        this.x = x / scale;
+        this.y = y / scale;
+
+        this.scale = scale;
+        this.value = health;
+        this.size = {
+            width: 40,
+            height: 8
+        }
+
+        this.pixelPerHealth = this.size.width / health;
+
+        scene.add.existing(this.bar);
+        this.draw(this.x, this.y, this.scale);
+    }
+```
+
+### ✅ **draw 함수에서 스케일 적용**
+
+```jsx
+draw(x, y, scale) {
+    // 기존의 그래픽을 초기화 (지우고 다시 그리기 위해)
+    this.bar.clear();
+
+    // 체력바 크기 정보 가져오기
+    const { width, height } = this.size;
+
+    // 체력바 테두리(바깥쪽 박스)와 내부 박스 사이의 간격(마진)
+    const margin = 2;
+
+    // 🔵 1. 체력바 배경을 보라색으로 그림 (전체 박스)
+    this.bar.fillStyle(0x9B00FF); // 보라색
+    this.bar.fillRect(x, y, width + margin, height + margin);
+
+    // ⚪ 2. 체력바의 내부를 흰색으로 그림 (실제 체력바 영역)
+    this.bar.fillStyle(0xffffff); // 흰색
+    this.bar.fillRect(x + margin, y + margin, width - margin, height - margin);
+
+    // 현재 체력에 따라 체력바의 너비를 계산 (최대 체력 대비 남은 체력 비율)
+    const healthWidth = Math.floor(this.pixelPerHealth * this.value);
+
+    // 🔴 3. 체력 바의 색상 결정 (남은 체력이 1/3 이하이면 빨강, 그렇지 않으면 초록)
+    if (healthWidth <= this.size.width / 3) {
+        this.bar.fillStyle(0xFF0000); // 빨간색 (체력이 적을 때)
+    } else {
+        this.bar.fillStyle(0x00FF00); // 초록색 (체력이 충분할 때)
+    }
+
+    // 🟩 4. 체력바 내부를 현재 체력값만큼 채우기
+    if (healthWidth > 0) {
+        this.bar.fillRect(x + margin, y + margin, healthWidth - margin, height - margin);
+    }
+
+    // 📌 5. 체력바의 스크롤을 고정하고 크기를 조정
+    return this.bar
+        .setScrollFactor(0, 0) // 카메라가 움직여도 체력바가 고정됨
+        .setScale(scale); // 설정된 크기만큼 체력바를 확대/축소
+}
+
+```
+
+```jsx
+❓ 왜 return this.bar 를 해주는 걸까?
+
+		Phaser에서는 Graphics 객체를 조작한 후 다시 반환(return)하면,
+
+		이 메서드를 호출한 곳에서 this.bar 객체를 다시 활용할 수 있습니다.
+
+				draw() 메서드는 this.bar 객체의 그래픽을 업데이트하는 역할을 함
+
+				return을 하면, this.bar의 최신 상태를 즉시 사용할 수 있음
+
+				만약 return을 하지 않으면, 이 메서드를 호출한 곳에서 체력바를 직접 조작할 때 불편할 수 있음
+
+		즉, return을 통해 최신 체력바 객체를 반환하여 체력 상태를 즉시 반영할 수 있도록 설계된 것입니다.
+```

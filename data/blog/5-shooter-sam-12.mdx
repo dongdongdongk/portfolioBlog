@@ -1,0 +1,2507 @@
+---
+title: '섹션 5: Shooter Sam - 12'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { LastKnownPlayerLocation Service 만들기 }
+
+## 🎯 이번에 할 것
+
+**마지막 목격 위치 추적 시스템!**
+
+```
+Chase 중:
+  LastKnownPlayerLocation 계속 업데이트
+    ↓
+시야 잃으면:
+  마지막 위치로 이동
+    ↓
+조사 시작! 🔍
+```
+
+---
+
+## 🐛 먼저 버그 수정
+
+### 문제 1: 삐걱거리는 움직임
+
+**원인:**
+
+```
+Move To:
+  한 번 위치 정하면
+  → 그 위치로만 이동
+  → 플레이어가 움직여도 무시
+  → 삐걱거림!
+```
+
+---
+
+**해결: Observe Blackboard Value**
+
+**Move To 노드 설정:**
+
+```
+1. Chase의 Move To 선택
+2. Details 패널 아래로 스크롤
+3. Observe Blackboard Value:
+   ☑ 체크! (켜기)
+```
+
+**효과:**
+
+```
+Move To가 PlayerLocation 계속 관찰
+  ↓
+값 바뀌면 즉시 반영
+  ↓
+부드러운 추적! ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380642/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_11/image_11.png)
+
+---
+
+### 문제 2: AI가 너무 빠름
+
+**적 캐릭터 설정:**
+
+```
+1. BP_ShooterSamCharacter (적용)
+2. Details → Character Movement
+3. Max Walk Speed: 600 → 150
+```
+
+**결과:**
+
+```
+플레이어: 600 (기본)
+적: 150 (느림)
+  ↓
+도망칠 수 있음! ✅
+```
+
+---
+
+## 🎨 왜 새 Service가 필요한가요?
+
+### 기존 Service vs 새 Service
+
+**PlayerLocationIfSeen (기존):**
+
+```cpp
+기능:
+  - LineOfSightTo 확인 ✅
+  - 보이면 설정
+  - 안 보이면 해제
+  - SetFocus/ClearFocus
+
+위치: Selector (최상위)
+용도: PlayerLocation 관리
+```
+
+**PlayerLocation (새 것):**
+
+```cpp
+기능:
+  - LineOfSightTo 없음 ❌
+  - 무조건 설정만
+  - 단순함!
+
+위치: Chase Sequence
+용도: LastKnownPlayerLocation 관리
+```
+
+---
+
+### 왜 분리하나요?
+
+**LastKnownPlayerLocation 특성:**
+
+```
+언제 업데이트?
+  → Chase 중에만!
+  → Investigate나 Return 중엔 의미 없음
+
+왜 Chase에만?
+  → Chase = 플레이어 보는 중
+  → 보는 동안만 위치 알 수 있음
+  → 당연히 Chase에서만 업데이트!
+```
+
+**위치 비교:**
+
+```
+Selector
+  [PlayerLocationIfSeen]
+  ├─ Chase
+  │   [PlayerLocation] ← 여기!
+  │   └─ Move To
+  ├─ Investigate
+  └─ Return
+```
+
+---
+
+## 💻 Step 1: 새 Service 클래스
+
+### 1-1: 클래스 생성
+
+```
+Tools → New C++ Class
+Parent: BTService_BlackboardBase
+Name: BTService_PlayerLocation
+Create
+```
+
+---
+
+### 1-2: 헤더 파일
+
+**BTService_PlayerLocation.h:**
+
+```cpp
+#pragma once
+
+#include "CoreMinimal.h"
+#include "BehaviorTree/Services/BTService_BlackboardBase.h"
+#include "BTService_PlayerLocation.generated.h"
+
+UCLASS()
+class SHOOTERSAM_API UBTService_PlayerLocation : public UBTService_BlackboardBase
+{
+    GENERATED_BODY()
+
+public:
+    // 생성자
+    UBTService_PlayerLocation();
+
+    // TickNode 오버라이드
+    virtual void TickNode(
+        UBehaviorTreeComponent& OwnerComp,
+        uint8* NodeMemory,
+        float DeltaSeconds
+    ) override;
+};
+```
+
+---
+
+## 🔧 Step 2: 구현
+
+### 2-1: 생성자
+
+**BTService_PlayerLocation.cpp:**
+
+```cpp
+#include "BTService_PlayerLocation.h"
+#include "Kismet/GameplayStatics.h"
+#include "BehaviorTree/BlackboardComponent.h"
+
+UBTService_PlayerLocation::UBTService_PlayerLocation()
+{
+    NodeName = TEXT("Get Player Location");
+}
+```
+
+**NodeName:**
+
+```
+에디터에서 보이는 이름
+→ "Get Player Location"
+→ 무슨 Service인지 명확!
+```
+
+---
+
+### 2-2: TickNode 구현
+
+**전체 코드:**
+
+```cpp
+void UBTService_PlayerLocation::TickNode(
+    UBehaviorTreeComponent& OwnerComp,
+    uint8* NodeMemory,
+    float DeltaSeconds
+)
+{
+    // ===== 1. Super 호출 =====
+    Super::TickNode(OwnerComp, NodeMemory, DeltaSeconds);
+
+    // ===== 2. Player Pawn 가져오기 =====
+    APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
+
+    // ===== 3. Blackboard 가져오기 =====
+    UBlackboardComponent* Blackboard = OwnerComp.GetBlackboardComponent();
+
+    // ===== 4. 유효성 확인 후 설정 =====
+    if (PlayerPawn && Blackboard)
+    {
+        Blackboard->SetValueAsVector(
+            GetSelectedBlackboardKey(),
+            PlayerPawn->GetActorLocation()
+        );
+    }
+}
+```
+
+---
+
+## 🔍 코드 상세 분석
+
+### GetPlayerPawn vs AI Controller
+
+**이전 방식 (PlayerLocationIfSeen):**
+
+```cpp
+// AI Controller 통해서
+AShooterAI* OwnerController = Cast<AShooterAI>(OwnerComp.GetAIOwner());
+AShooterSamCharacter* Player = OwnerController->PlayerCharacter;
+```
+
+**새 방식 (PlayerLocation):**
+
+```cpp
+// GameplayStatics 직접 사용
+APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
+```
+
+---
+
+**GetPlayerPawn 함수:**
+
+```cpp
+static APawn* GetPlayerPawn(
+    const UObject* WorldContextObject,
+    int32 PlayerIndex
+)
+```
+
+**파라미터:**
+
+**1. WorldContextObject**
+
+```cpp
+GetWorld()
+```
+
+- 현재 월드 객체
+- Service도 UObject 상속
+- GetWorld() 사용 가능!
+
+**2. PlayerIndex**
+
+```
+0: 첫 번째 플레이어
+1: 두 번째 플레이어 (멀티플레이어)
+...
+
+대부분 0 사용!
+```
+
+---
+
+**반환값: APawn\***
+
+```cpp
+APawn* PlayerPawn
+```
+
+**왜 APawn?**
+
+```
+모든 플레이어는 Pawn
+  ↓
+Character도 Pawn 상속
+  ↓
+GetActorLocation() 사용 가능
+  ↓
+위치만 필요하니 Cast 불필요!
+```
+
+---
+
+### GetBlackboardComponent
+
+**이전 방식:**
+
+```cpp
+// AI Controller 통해서
+AShooterAI* OwnerController = ...;
+UBlackboardComponent* Blackboard = OwnerController->GetBlackboardComponent();
+```
+
+**새 방식:**
+
+```cpp
+// OwnerComp에서 직접
+UBlackboardComponent* Blackboard = OwnerComp.GetBlackboardComponent();
+```
+
+**왜 간단?**
+
+```
+OwnerComp (참조):
+  BehaviorTreeComponent
+  ↓
+BT는 항상 Blackboard 가짐
+  ↓
+직접 가져오기 가능!
+  ↓
+AI Controller 거칠 필요 없음
+```
+
+---
+
+### 유효성 확인
+
+```cpp
+if (PlayerPawn && Blackboard)
+{
+    // 설정
+}
+```
+
+**왜 2개만 확인?**
+
+**PlayerPawn:**
+
+```
+GetPlayerPawn 실패 가능
+→ nullptr 반환 가능
+```
+
+**Blackboard:**
+
+```
+GetBlackboardComponent 실패 가능
+→ nullptr 반환 가능
+```
+
+**AI Controller는?**
+
+```
+확인 안 해도 됨!
+→ 이번엔 안 씀
+```
+
+---
+
+### 위치 설정
+
+```cpp
+Blackboard->SetValueAsVector(
+    GetSelectedBlackboardKey(),
+    PlayerPawn->GetActorLocation()
+);
+```
+
+**GetSelectedBlackboardKey():**
+
+```
+에디터에서 선택한 Key
+  ↓
+Chase에서: LastKnownPlayerLocation
+```
+
+**PlayerPawn->GetActorLocation():**
+
+```
+플레이어 현재 위치
+  ↓
+FVector (X, Y, Z)
+```
+
+---
+
+## 🎮 Step 3: Behavior Tree 설정
+
+### 3-1: Service 추가
+
+**Chase Sequence에:**
+
+```
+1. Chase 시퀀스 우클릭
+2. Add Service
+3. "Player Location" 선택
+```
+
+**결과:**
+
+```
+Chase (회색)
+  [Get Player Location] (초록색)
+  └─ Move To (보라색)
+```
+
+---
+
+### 3-2: Blackboard Key 설정
+
+**Service 클릭:**
+
+```
+Details 패널:
+
+Blackboard:
+  Blackboard Key: LastKnownPlayerLocation ✅
+
+  매우 중요!
+  이걸 업데이트할 거임!
+```
+
+---
+
+### 3-3: Interval 설정
+
+```
+Interval: 0.1 (초당 10번)
+Random Deviation: 0.0 (랜덤 없음)
+```
+
+**왜 빠르게?**
+
+```
+마지막 위치를 정확하게!
+  ↓
+플레이어 빠르게 움직이면
+  ↓
+자주 업데이트해야 정확함
+```
+
+---
+
+## 🎯 전체 실행 흐름
+
+### Chase 진입 시
+
+```
+[Chase Sequence 시작]
+    ↓
+Service 활성화
+    ↓
+0.1초마다 TickNode 실행:
+  1. PlayerPawn 가져오기
+  2. Blackboard 가져오기
+  3. LastKnownPlayerLocation = PlayerPawn 위치
+    ↓
+Chase 계속 실행 중:
+  LastKnownPlayerLocation 계속 업데이트! ✅
+```
+
+---
+
+### 시야 잃을 때
+
+```
+[Chase 중 - Service 작동 중]
+LastKnownPlayerLocation = (100, 200, 50)
+    ↓
+플레이어 벽 뒤로!
+    ↓
+PlayerLocationIfSeen Service:
+  LineOfSightTo = false
+  → PlayerLocation 해제
+    ↓
+Chase Decorator:
+  PlayerLocation Is Set? → No ❌
+  ↓
+Chase 중단! (Observer Aborts)
+    ↓
+Investigate 시작
+    ↓
+Move To (LastKnownPlayerLocation)
+  → (100, 200, 50)으로 이동
+  → 마지막 목격 위치! ✅
+```
+
+---
+
+## 📊 2개 Service 비교
+
+### PlayerLocationIfSeen
+
+```
+위치: Selector (최상위)
+
+실행: 항상
+
+기능:
+  - LineOfSightTo 확인
+  - 보이면: PlayerLocation 설정
+  - 안 보이면: PlayerLocation 해제
+  - SetFocus/ClearFocus
+
+목적: Chase 진입/탈출 제어
+```
+
+---
+
+### PlayerLocation
+
+```
+위치: Chase Sequence
+
+실행: Chase 중에만
+
+기능:
+  - PlayerPawn 위치 가져오기
+  - LastKnownPlayerLocation 설정
+  - 단순 업데이트만
+
+목적: 마지막 목격 위치 기록
+```
+
+---
+
+## 💡 왜 이렇게 설계?
+
+### 역할 분리
+
+**PlayerLocationIfSeen (판단):**
+
+```
+"플레이어 보이나?"
+  ↓
+Yes → Chase
+No → Investigate/Return
+
+의사 결정 담당
+```
+
+**PlayerLocation (기록):**
+
+```
+"플레이어 어디 있었지?"
+  ↓
+계속 기록
+  ↓
+나중에 사용
+
+데이터 수집 담당
+```
+
+---
+
+### 실전 예시
+
+```
+[시나리오]
+
+1. 플레이어 발견
+   PlayerLocationIfSeen:
+     → PlayerLocation 설정
+     → Chase 진입 ✅
+
+2. Chase 중
+   PlayerLocation:
+     → LastKnown 계속 업데이트
+     → (10,20,30) → (15,25,35) → (20,30,40)
+
+3. 플레이어 벽 뒤로
+   PlayerLocationIfSeen:
+     → PlayerLocation 해제
+     → Chase 중단 ❌
+
+   PlayerLocation:
+     → LastKnown 마지막 값 유지
+     → (20,30,40) 그대로!
+
+4. Investigate 진입
+   Move To (LastKnown)
+     → (20,30,40)으로 이동
+     → "여기서 놓쳤어!"
+```
+
+---
+
+## 🐛 현재 문제점
+
+### 조사 무한 반복
+
+**현상:**
+
+```
+Investigate 도착
+  ↓
+Wait 3초
+  ↓
+Investigate 성공
+  ↓
+Selector로 복귀
+  ↓
+Chase: PlayerLocation 없음 (건너뛰기)
+Investigate: LastKnown 있음 (실행)
+  ↓
+또 이동... 무한 반복! ❌
+```
+
+**왜?**
+
+```
+LastKnownPlayerLocation이
+계속 설정되어 있음!
+  ↓
+Investigate Decorator:
+  LastKnown Is Set? → Yes ✅
+  ↓
+계속 Investigate 반복
+```
+
+---
+
+**해결 방법 (다음 강의):**
+
+```
+Wait 3초 후:
+  LastKnownPlayerLocation 해제!
+  ↓
+Investigate Decorator:
+  LastKnown Is Set? → No ❌
+  ↓
+Return으로 전환! ✅
+```
+
+---
+
+## 📚 핵심 개념 정리
+
+### GetPlayerPawn
+
+```
+GameplayStatics 함수
+→ 플레이어 Pawn 반환
+→ WorldContextObject + PlayerIndex
+```
+
+### APawn
+
+```
+모든 플레이어/AI 기본 클래스
+→ Character도 Pawn 상속
+→ GetActorLocation() 사용 가능
+```
+
+### Service 위치
+
+```
+Selector: 항상 실행
+Sequence: 해당 Sequence 중에만
+→ 용도에 맞게 배치!
+```
+
+### Observe Blackboard Value
+
+```
+Move To 설정
+→ Key 값 변화 감지
+→ 즉시 반영
+→ 부드러운 추적
+```
+
+---
+
+## 💡 실전 팁
+
+### Service 간단하게 만들기
+
+**불필요한 것 제거:**
+
+```cpp
+// PlayerLocationIfSeen (복잡)
+- AI Controller 가져오기
+- Cast
+- LineOfSightTo
+- SetFocus/ClearFocus
+
+// PlayerLocation (단순)
+- PlayerPawn만
+- 위치만 설정
+- 끝!
+
+단순할수록 좋음!
+```
+
+---
+
+### GetWorld() 사용
+
+**Service에서:**
+
+```cpp
+GetWorld()
+```
+
+**가능한 이유:**
+
+```
+Service는 UObject 상속
+  ↓
+GetWorld() 함수 가짐
+  ↓
+어디서든 사용 가능!
+```
+
+---
+
+### Interval 조정
+
+**정확도 vs 성능:**
+
+```
+높은 정확도:
+  Interval: 0.05~0.1
+  → 초당 10~20번
+  → 정확하지만 무거움
+
+보통:
+  Interval: 0.1~0.2
+  → 초당 5~10번
+  → 균형
+
+낮은 정확도:
+  Interval: 0.5~1.0
+  → 초당 1~2번
+  → 가볍지만 부정확
+```
+
+---
+
+## 🐛 문제 해결
+
+### LastKnown이 안 설정돼요!
+
+**체크:**
+
+```
+1. Service 추가했나?
+   → Chase에 초록색 표시
+
+2. Blackboard Key 설정했나?
+   → Details → LastKnownPlayerLocation
+
+3. Chase에 진입했나?
+   → PlayerLocation 설정되어 있어야
+
+4. Blackboard 확인
+   → Play 중 값 확인
+```
+
+---
+
+### 이상한 위치로 가요!
+
+**원인:**
+
+```
+BB_EnemyAI:
+  LastKnownPlayerLocation
+  Use Default Value 체크됨
+  → 기본값으로 감!
+```
+
+**해결:**
+
+```
+1. BB_EnemyAI 열기
+2. LastKnownPlayerLocation 선택
+3. Use Default Value 체크 해제 ✅
+4. Save
+```
+
+---
+
+### Service가 작동 안 해요!
+
+**체크:**
+
+```
+1. Chase 진입했나?
+   → PlayerLocation 있어야
+
+2. Interval 확인
+   → 너무 길면 느림
+
+3. GetPlayerPawn 반환값
+   → nullptr인지 로그로 확인
+```
+
+---
+
+## 🚀 다음 단계
+
+**현재 완성:**
+
+```
+✅ PlayerLocation Service
+✅ LastKnownPlayerLocation 추적
+✅ Investigate로 마지막 위치 이동
+✅ 부드러운 추적 (Observe Blackboard Value)
+```
+
+**현재 문제:**
+
+```
+❌ Investigate 무한 반복
+```
+
+**다음 강의:**
+
+```
+1. Wait 후 LastKnown 해제
+   → Decorator로 구현
+   → 또는 Custom Task
+
+2. Return으로 전환
+   → 조사 완료 후 복귀
+
+3. 완전한 AI 사이클 완성!
+```
+
+---
+
+## 🎯 요약
+
+**새 Service: PlayerLocation**
+
+```
+목적:
+  LastKnownPlayerLocation 업데이트
+
+위치:
+  Chase Sequence
+
+기능:
+  GetPlayerPawn으로 위치 가져오기
+  → LastKnown에 설정
+  → 단순!
+
+결과:
+  시야 잃으면
+  → 마지막 목격 위치로 이동
+  → 조사 시작!
+```
+
+**2개 Service 역할:**
+
+```
+PlayerLocationIfSeen:
+  - 의사 결정
+  - Chase 진입/탈출
+
+PlayerLocation:
+  - 데이터 수집
+  - 위치 기록
+```
+
+---
+
+# { Custom BT Task 만들기 }
+
+## 🎯 이번에 할 것
+
+**Blackboard 값 지우는 Task 만들기!**
+
+```
+Investigate 끝나면:
+  LastKnownPlayerLocation 해제
+    ↓
+Return으로 전환
+    ↓
+완전한 AI 사이클 완성! ✅
+```
+
+---
+
+## 🤔 왜 Custom Task가 필요한가요?
+
+### 현재 문제점
+
+**Investigate 무한 반복:**
+
+```
+[Investigate 실행]
+Move To (LastKnown)
+  ↓
+Wait 3초
+  ↓
+Investigate 성공
+  ↓
+Selector로 복귀
+  ↓
+Chase: PlayerLocation 없음 (건너뛰기)
+Investigate: LastKnown 있음! (또 실행)
+  ↓
+또 이동... 무한 반복! ❌
+```
+
+**원인:**
+
+```
+LastKnownPlayerLocation이
+계속 설정되어 있음!
+  ↓
+절대 안 지워짐
+  ↓
+Investigate 조건 항상 true
+```
+
+---
+
+### 해결 방법
+
+**Clear Task 추가:**
+
+```
+Investigate Sequence:
+  ├─ Move To (LastKnown)
+  ├─ Clear Blackboard Value ← 새로 추가!
+  └─ Wait (3.0)
+
+실행:
+  1. 마지막 위치로 이동
+  2. LastKnown 해제! ✅
+  3. 3초 대기
+  4. Investigate 성공
+  5. Return으로 전환!
+```
+
+---
+
+## 📝 Step 1: Custom Task 클래스 생성
+
+### 1-1: 새 클래스
+
+```
+Tools → New C++ Class
+검색: "BTTask"
+```
+
+**2가지 옵션:**
+
+```
+BTTaskNode (기본)
+  → 일반 작업
+
+BTTask_BlackboardBase (Blackboard용)
+  → Blackboard Key 설정/해제
+  → 우리가 쓸 것! ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380647/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_12/image.png)
+
+**이름:**
+
+```
+BTTask_ClearBlackboardValue
+```
+
+---
+
+### 왜 BlackboardBase?
+
+**BTTask_BlackboardBase:**
+
+```
+GetSelectedBlackboardKey() 제공
+  ↓
+에디터에서 Key 선택 가능
+  ↓
+안전하고 편리함!
+```
+
+**일반 BTTaskNode:**
+
+```
+Key 이름 하드코딩 필요
+  ↓
+오타 위험
+  ↓
+불편함
+```
+
+---
+
+## 💻 Step 2: 코드 작성
+
+### 2-1: 헤더 파일
+
+**BTTask_ClearBlackboardValue.h:**
+
+```cpp
+#pragma once
+
+#include "CoreMinimal.h"
+#include "BehaviorTree/Tasks/BTTask_BlackboardBase.h"
+#include "BTTask_ClearBlackboardValue.generated.h"
+
+UCLASS()
+class SHOOTERSAM_API UBTTask_ClearBlackboardValue : public UBTTask_BlackboardBase
+{
+    GENERATED_BODY()
+
+public:
+    // 생성자
+    UBTTask_ClearBlackboardValue();
+
+    // ExecuteTask 오버라이드
+    virtual EBTNodeResult::Type ExecuteTask(
+        UBehaviorTreeComponent& OwnerComp,
+        uint8* NodeMemory
+    ) override;
+};
+```
+
+---
+
+### ExecuteTask란?
+
+**Service의 TickNode vs Task의 ExecuteTask**
+
+**TickNode (Service):**
+
+```
+주기적으로 계속 실행
+  ↓
+0.1초마다 반복
+  ↓
+여러 프레임에 걸쳐 작업
+```
+
+**ExecuteTask (Task):**
+
+```
+한 번만 실행!
+  ↓
+Task 시작될 때 딱 1번
+  ↓
+즉시 완료
+```
+
+---
+
+**언제 뭘 쓸까?**
+
+```
+TickNode:
+  - 계속 업데이트 필요
+  - 위치 추적
+  - 상태 모니터링
+
+ExecuteTask:
+  - 한 번만 하면 됨
+  - 값 설정/해제
+  - 사운드 재생
+  - 애니메이션 트리거
+```
+
+---
+
+### 2-2: 생성자
+
+**BTTask_ClearBlackboardValue.cpp:**
+
+```cpp
+#include "BTTask_ClearBlackboardValue.h"
+#include "BehaviorTree/BlackboardComponent.h"
+
+UBTTask_ClearBlackboardValue::UBTTask_ClearBlackboardValue()
+{
+    NodeName = TEXT("Clear Blackboard Value");
+}
+```
+
+**NodeName:**
+
+```
+에디터에서 보이는 이름
+→ "Clear Blackboard Value"
+→ 무슨 Task인지 명확!
+```
+
+---
+
+### 2-3: ExecuteTask 구현
+
+**전체 코드:**
+
+```cpp
+EBTNodeResult::Type UBTTask_ClearBlackboardValue::ExecuteTask(
+    UBehaviorTreeComponent& OwnerComp,
+    uint8* NodeMemory
+)
+{
+    // ===== 1. Super 호출 =====
+    Super::ExecuteTask(OwnerComp, NodeMemory);
+
+    // ===== 2. Blackboard 가져오기 =====
+    UBlackboardComponent* Blackboard = OwnerComp.GetBlackboardComponent();
+
+    // ===== 3. 값 지우기 =====
+    if (Blackboard)
+    {
+        Blackboard->ClearValue(GetSelectedBlackboardKey());
+    }
+
+    // ===== 4. 성공 반환 =====
+    return EBTNodeResult::Succeeded;
+}
+```
+
+---
+
+## 🔍 코드 상세 분석
+
+### Super::ExecuteTask
+
+```cpp
+Super::ExecuteTask(OwnerComp, NodeMemory);
+```
+
+**왜 필요?**
+
+```
+부모 클래스 초기화
+  ↓
+안 하면:
+  Task 제대로 작동 안 함
+
+항상 첫 줄에!
+```
+
+---
+
+### Blackboard 가져오기
+
+```cpp
+UBlackboardComponent* Blackboard = OwnerComp.GetBlackboardComponent();
+```
+
+**Service와 동일:**
+
+```
+OwnerComp (참조):
+  BehaviorTreeComponent
+  ↓
+GetBlackboardComponent():
+  현재 Blackboard 반환
+  ↓
+UBlackboardComponent*
+```
+
+---
+
+### 값 지우기
+
+```cpp
+if (Blackboard)
+{
+    Blackboard->ClearValue(GetSelectedBlackboardKey());
+}
+```
+
+**ClearValue:**
+
+```
+해당 Key의 값 제거
+  ↓
+nullptr로 만듦
+  ↓
+Is Set 조건: false
+```
+
+**GetSelectedBlackboardKey:**
+
+```
+에디터에서 선택한 Key
+  ↓
+Investigate에서: LastKnownPlayerLocation
+```
+
+---
+
+### 반환값: EBTNodeResult
+
+**가능한 값:**
+
+```cpp
+EBTNodeResult::Succeeded   // 성공 ✅
+EBTNodeResult::Failed      // 실패 ❌
+EBTNodeResult::Aborted     // 중단 ⚠️
+EBTNodeResult::InProgress  // 진행 중 🔄
+```
+
+---
+
+**언제 뭘 반환?**
+
+**Succeeded (성공):**
+
+```
+작업 완료
+  ↓
+다음 Task로
+  ↓
+대부분의 경우
+```
+
+**Failed (실패):**
+
+```
+작업 실패
+  ↓
+Sequence 중단
+  ↓
+조건 불만족 시
+```
+
+**InProgress (진행 중):**
+
+```
+여러 프레임 걸림
+  ↓
+나중에 완료
+  ↓
+예: 긴 이동, 애니메이션
+```
+
+**Aborted (중단):**
+
+```
+강제 중단
+  ↓
+Failed와 같음
+```
+
+---
+
+**우리 Task:**
+
+```cpp
+return EBTNodeResult::Succeeded;
+```
+
+**왜 항상 Succeeded?**
+
+```
+ClearValue는 항상 성공
+  ↓
+실패할 이유 없음
+  ↓
+nullptr도 OK
+  ↓
+무조건 성공!
+```
+
+---
+
+## 🎮 Step 3: Behavior Tree 설정
+
+### 3-1: Task 추가
+
+**Investigate Sequence:**
+
+```
+1. Move To와 Wait 사이 우클릭
+2. Add Task
+3. "Clear Blackboard Value" 선택
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380645/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_12/image_1.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380645/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_12/image_2.png)
+
+---
+
+### 3-2: Key 설정
+
+**Clear Task 선택:**
+
+```
+Details 패널:
+
+Blackboard:
+  Blackboard Key: LastKnownPlayerLocation ✅
+
+  매우 중요!
+  이 Key를 지울 거임!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380646/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_12/image_3.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380646/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_12/image_4.png)
+
+---
+
+### 3-3: 최종 구조
+
+```
+Investigate Sequence
+  ├─ 1️⃣ Move To (LastKnownPlayerLocation)
+  ├─ 2️⃣ Clear Blackboard Value (LastKnownPlayerLocation)
+  └─ 3️⃣ Wait (3.0)
+```
+
+**실행 순서:**
+
+```
+1. 마지막 목격 위치로 이동
+2. LastKnown 해제 (Clear!)
+3. 3초 대기
+4. Investigate 성공
+```
+
+---
+
+## 🎯 전체 실행 흐름
+
+### 완전한 AI 사이클
+
+```
+[1. Chase - 추격]
+플레이어 보임
+  ↓
+PlayerLocationIfSeen Service:
+  PlayerLocation 설정 ✅
+  ↓
+Chase Decorator:
+  PlayerLocation Is Set? → Yes ✅
+  ↓
+Chase 실행:
+  - Move To (PlayerLocation)
+  - PlayerLocation Service:
+      LastKnownPlayerLocation 계속 업데이트
+  ↓
+추격 중...
+
+```
+
+---
+
+```
+[2. 시야 상실]
+플레이어 벽 뒤로!
+  ↓
+PlayerLocationIfSeen Service:
+  PlayerLocation 해제 ❌
+  ↓
+Chase Decorator:
+  PlayerLocation Is Set? → No ❌
+  ↓
+Observer Aborts:
+  Chase 즉시 중단!
+
+```
+
+---
+
+```
+[3. Investigate - 조사]
+Selector 다시 시작
+  ↓
+Chase: PlayerLocation 없음 (건너뛰기)
+  ↓
+Investigate Decorator:
+  LastKnown Is Set? → Yes ✅ (Chase에서 기록함)
+  ↓
+Investigate 실행:
+  1️⃣ Move To (LastKnown)
+     → 마지막 목격 위치로 이동
+  2️⃣ Clear Blackboard Value
+     → LastKnown 해제! ✅
+  3️⃣ Wait (3.0)
+     → 3초 대기
+  ↓
+Investigate 성공
+
+```
+
+---
+
+```
+[4. Return - 복귀]
+Selector 다시 시작
+  ↓
+Chase: PlayerLocation 없음 (건너뛰기)
+Investigate: LastKnown 없음! (Clear됨) ✅
+  ↓
+Return 실행:
+  Move To (StartLocation)
+    ↓
+  시작 위치로 복귀
+    ↓
+  대기 모드
+```
+
+---
+
+```
+[5. 반복]
+Return 중:
+  플레이어 다시 발견?
+    ↓
+  PlayerLocation 설정
+    ↓
+  Observer Aborts:
+    Return 중단
+    ↓
+  Chase 시작!
+    ↓
+  1번으로...
+```
+
+---
+
+## 📊 Service vs Task 비교
+
+### Service
+
+**특징:**
+
+```
+계속 실행
+주기적 반복 (Interval)
+TickNode 함수
+초록색 표시
+```
+
+**용도:**
+
+```
+위치 추적
+상태 모니터링
+계속 업데이트
+```
+
+**예시:**
+
+```
+PlayerLocationIfSeen
+PlayerLocation
+체력 확인
+거리 계산
+```
+
+---
+
+### Task
+
+**특징:**
+
+```
+한 번만 실행
+즉시 완료
+ExecuteTask 함수
+보라색 표시
+```
+
+**용도:**
+
+```
+특정 행동
+값 설정/해제
+일회성 작업
+```
+
+**예시:**
+
+```
+Move To
+Wait
+Clear Blackboard Value
+사운드 재생
+애니메이션 실행
+```
+
+---
+
+## 💡 실전 팁
+
+### ExecuteTask vs TickNode
+
+**단순 작업:**
+
+```cpp
+// ExecuteTask 사용
+EBTNodeResult::Type ExecuteTask(...)
+{
+    DoSomething();  // 한 번만
+    return Succeeded;
+}
+```
+
+**복잡한 작업:**
+
+```cpp
+// TickTask 사용 (고급)
+void TickTask(...)
+{
+    // 매 프레임 체크
+    if (Complete)
+    {
+        FinishExecute(Succeeded);
+    }
+}
+```
+
+---
+
+### 반환값 선택
+
+**성공/실패만:**
+
+```cpp
+// 대부분의 경우
+if (Success)
+    return Succeeded;
+else
+    return Failed;
+```
+
+**여러 프레임:**
+
+```cpp
+// 복잡한 경우
+StartTask();
+return InProgress;
+// TickTask에서 나중에 완료
+```
+
+---
+
+### Blackboard Key 안전하게
+
+**하드코딩 (위험):**
+
+```cpp
+// ❌ 안 좋음
+Blackboard->ClearValue("LastKnownPlayerLocation");
+// 오타 위험!
+```
+
+**GetSelectedBlackboardKey (안전):**
+
+```cpp
+// ✅ 좋음
+Blackboard->ClearValue(GetSelectedBlackboardKey());
+// 에디터에서 선택
+// 오타 불가능
+```
+
+---
+
+## 🐛 문제 해결
+
+### Task가 실행 안 돼요!
+
+**체크:** Sequence에 연결됐나? 순서 확인, Blackboard Key 설정 확인
+
+### 값이 안 지워져요!
+
+**확인:** Play 중 Blackboard 탭에서 값 확인, GetSelectedBlackboardKey 맞나?
+
+### Investigate가 여전히 반복돼요!
+
+**원인:** Clear Task 위치 틀림 (Wait 뒤에 있으면 안 됨!), Key 이름 다름
+
+---
+
+## 🚀 완성!
+
+**현재 완성된 AI 시스템:**
+
+```
+✅ PlayerLocationIfSeen Service
+   → PlayerLocation 설정/해제
+   → Chase 진입/탈출 제어
+
+✅ PlayerLocation Service
+   → LastKnownPlayerLocation 기록
+   → 마지막 목격 위치 추적
+
+✅ Clear Blackboard Value Task
+   → LastKnown 해제
+   → Return으로 전환
+
+✅ 3가지 상태 완전 동작
+   → Chase ↔ Investigate ↔ Return
+   → 자연스러운 순환
+```
+
+---
+
+## 🎯 요약
+
+**Custom Task = 한 번 실행되는 작업**
+
+```
+ExecuteTask:
+  Task 시작 시 1번 호출
+  ↓
+작업 수행
+  ↓
+Succeeded/Failed 반환
+  ↓
+다음 Task로
+```
+
+**Clear Blackboard Value:**
+
+```
+목적: Key 값 제거
+위치: Investigate 중간
+효과: Return으로 전환 가능
+```
+
+**완전한 AI:**
+
+```
+Chase → Investigate → Return
+무한 반복 가능
+자연스러운 행동
+```
+
+---
+
+# { AI 공격 구현 }
+
+## 🎯 이번에 할 것
+
+**적이 총 쏘는 기능 완성!**
+
+```
+사거리 내 진입:
+  Shoot Task 실행
+    ↓
+2초마다 반복
+    ↓
+플레이어 사망 처리까지! 💀
+```
+
+---
+
+## 🎨 최종 AI 구조
+
+### Shoot Sequence 추가
+
+```
+Chase Sequence
+  ├─ Move To (PlayerLocation, R:1000)
+  └─ Sequence (Shoot)
+      [Conditional Loop: PlayerLocation]
+      ├─ Shoot
+      └─ Wait (2.0)
+```
+
+**동작:**
+
+```
+1. 10m 거리까지 접근
+2. Shoot Sequence 진입
+3. 총 쏘기
+4. 2초 대기
+5. 반복... (PlayerLocation 있는 동안)
+```
+
+---
+
+## 💻 Step 1: Shoot Task 클래스
+
+### 1-1: 클래스 생성
+
+```
+Tools → New C++ Class
+Parent: BTTaskNode (기본)
+  → Blackboard 필요 없음!
+Name: BTTaskNode_Shoot
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380646/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_12/image_5.png)
+
+**왜 기본 버전?**
+
+```
+BlackboardBase:
+  GetSelectedBlackboardKey() 사용
+  → Key 선택 필요
+
+기본 BTTaskNode:
+  Key 필요 없음
+  → 그냥 쏘기만 하면 됨! ✅
+```
+
+---
+
+### 1-2: 헤더 파일
+
+**BTTaskNode_Shoot.h:**
+
+```cpp
+#pragma once
+
+#include "CoreMinimal.h"
+#include "BehaviorTree/BTTaskNode.h"
+#include "BTTaskNode_Shoot.generated.h"
+
+UCLASS()
+class SHOOTERSAM_API UBTTaskNode_Shoot : public UBTTaskNode
+{
+    GENERATED_BODY()
+
+public:
+    UBTTaskNode_Shoot();
+
+    virtual EBTNodeResult::Type ExecuteTask(
+        UBehaviorTreeComponent& OwnerComp,
+        uint8* NodeMemory
+    ) override;
+};
+```
+
+---
+
+## 🔧 Step 2: 구현
+
+### 2-1: 생성자
+
+```cpp
+#include "BTTaskNode_Shoot.h"
+#include "ShooterAI.h"
+
+UBTTaskNode_Shoot::UBTTaskNode_Shoot()
+{
+    NodeName = TEXT("Shoot At Player");
+}
+```
+
+---
+
+### 2-2: ExecuteTask - 기본 구조
+
+```cpp
+EBTNodeResult::Type UBTTaskNode_Shoot::ExecuteTask(
+    UBehaviorTreeComponent& OwnerComp,
+    uint8* NodeMemory
+)
+{
+    Super::ExecuteTask(OwnerComp, NodeMemory);
+
+    // ===== 결과 변수 =====
+    EBTNodeResult::Type Result = EBTNodeResult::Failed;
+
+    // ... 작업 수행 ...
+
+    return Result;
+}
+```
+
+---
+
+### 결과 변수 패턴
+
+**왜 이렇게?**
+
+**나쁜 방법 (여러 return):**
+
+```cpp
+EBTNodeResult::Type ExecuteTask(...)
+{
+    if (조건1)
+        return Succeeded;  // ← 여러 곳에서 return
+
+    if (조건2)
+        return Failed;     // ← 관리 어려움
+
+    return Failed;         // ← 마지막에도 필요
+}
+```
+
+**좋은 방법 (결과 변수):**
+
+```cpp
+EBTNodeResult::Type ExecuteTask(...)
+{
+    EBTNodeResult::Type Result = Failed;  // 기본값
+
+    if (조건1)
+        Result = Succeeded;  // 변경만
+
+    return Result;  // ← 한 곳에서만 return
+}
+```
+
+**장점:**
+
+```
+✅ return 문 1개만
+✅ 읽기 쉬움
+✅ 수정 쉬움
+✅ 디버깅 쉬움
+```
+
+---
+
+### 2-3: AI Controller 가져오기
+
+```cpp
+AShooterAI* OwnerController = Cast<AShooterAI>(OwnerComp.GetAIOwner());
+```
+
+**익숙한 패턴!**
+
+```
+OwnerComp (BehaviorTreeComponent):
+  GetAIOwner()
+    ↓
+  AAIController* 반환
+    ↓
+  Cast<AShooterAI>
+    ↓
+  AShooterAI* 얻음!
+```
+
+---
+
+### 2-4: 캐릭터들 가져오기
+
+```cpp
+if (OwnerController)
+{
+    // ===== 적 캐릭터 =====
+    AShooterSamCharacter* OwnerCharacter = OwnerController->MyCharacter;
+
+    // ===== 플레이어 캐릭터 =====
+    AShooterSamCharacter* PlayerCharacter = OwnerController->PlayerCharacter;
+}
+```
+
+---
+
+**MyCharacter & PlayerCharacter**
+
+**ShooterAI.h에서:**
+
+```cpp
+class AShooterAI : public AAIController
+{
+public:
+    AShooterSamCharacter* MyCharacter;      // 적
+    AShooterSamCharacter* PlayerCharacter;  // 플레이어
+};
+```
+
+**언제 설정됐나?**
+
+**ShooterAI.cpp:**
+
+```cpp
+void AShooterAI::StartBehaviorTree(AShooterSamCharacter* Player)
+{
+    MyCharacter = Cast<AShooterSamCharacter>(GetPawn());
+    PlayerCharacter = Player;
+    // ...
+}
+```
+
+**GameMode에서:**
+
+```cpp
+void BeginPlay()
+{
+    Player = GetPlayerPawn(...);
+
+    for (AI in AllAIs)
+    {
+        AI->StartBehaviorTree(Player);  // 여기서 설정!
+    }
+}
+```
+
+---
+
+### 2-5: 유효성 확인 및 Shoot
+
+```cpp
+if (OwnerCharacter && PlayerCharacter && PlayerCharacter->IsAlive)
+{
+    OwnerCharacter->Shoot();
+    Result = EBTNodeResult::Succeeded;
+}
+```
+
+---
+
+**3가지 조건:**
+
+**1. OwnerCharacter (적)**
+
+```
+nullptr 체크
+→ AI가 조종하는 캐릭터 있나?
+```
+
+**2. PlayerCharacter (플레이어)**
+
+```
+nullptr 체크
+→ 플레이어 있나?
+```
+
+**3. PlayerCharacter->IsAlive**
+
+```
+생존 여부
+→ 죽은 플레이어는 안 쏨!
+```
+
+**모두 만족:**
+
+```
+Shoot() 호출
+  ↓
+Result = Succeeded
+```
+
+---
+
+### Shoot() 함수
+
+**ShooterSamCharacter.cpp:**
+
+```cpp
+void AShooterSamCharacter::Shoot()
+{
+    if (Gun)
+    {
+        Gun->PullTrigger();  // 총 발사!
+    }
+}
+```
+
+**이미 구현된 함수:**
+
+```
+플레이어 입력에서 사용
+→ 같은 함수를 AI도 호출
+→ 재사용!
+```
+
+---
+
+### 2-6: 전체 코드
+
+```cpp
+EBTNodeResult::Type UBTTaskNode_Shoot::ExecuteTask(
+    UBehaviorTreeComponent& OwnerComp,
+    uint8* NodeMemory
+)
+{
+    Super::ExecuteTask(OwnerComp, NodeMemory);
+
+    // 기본값: Failed
+    EBTNodeResult::Type Result = EBTNodeResult::Failed;
+
+    // AI Controller
+    AShooterAI* OwnerController = Cast<AShooterAI>(OwnerComp.GetAIOwner());
+
+    if (OwnerController)
+    {
+        // 캐릭터들
+        AShooterSamCharacter* OwnerCharacter = OwnerController->MyCharacter;
+        AShooterSamCharacter* PlayerCharacter = OwnerController->PlayerCharacter;
+
+        // 유효성 & 생존 확인
+        if (OwnerCharacter && PlayerCharacter && PlayerCharacter->IsAlive)
+        {
+            // 총 쏘기!
+            OwnerCharacter->Shoot();
+
+            // 성공
+            Result = EBTNodeResult::Succeeded;
+        }
+    }
+
+    return Result;
+}
+```
+
+---
+
+## 🎮 Step 3: Behavior Tree 설정
+
+### 3-1: Shoot Sequence 생성
+
+**Chase 안에:**
+
+```
+1. 새 Sequence 생성
+2. Node Name: "Shoot"
+3. Move To 다음에 연결
+```
+
+**구조:**
+
+```
+Chase
+  ├─ Move To (PlayerLocation, R:1000)
+  └─ Shoot Sequence
+```
+
+---
+
+### 3-2: Shoot Task 추가
+
+**Shoot Sequence 안에:**
+
+```
+1. 우클릭 → Add Task
+2. "Shoot At Player" 선택
+```
+
+---
+
+### 3-3: Wait 추가
+
+**Shoot Task 다음:**
+
+```
+1. 우클릭 → Add Task → Wait
+2. Wait Time: 2.0
+```
+
+**결과:**
+
+```
+Shoot Sequence
+  ├─ Shoot
+  └─ Wait (2.0)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380646/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_12/image_6.png)
+
+---
+
+### 3-4: Conditional Loop Decorator
+
+**Shoot Sequence에:**
+
+```
+1. Shoot Sequence 우클릭
+2. Add Decorator → Conditional Loop
+3. Details:
+   - Blackboard Key: PlayerLocation
+```
+
+---
+
+**Conditional Loop란?**
+
+**일반 Sequence:**
+
+```
+한 번만 실행
+  ↓
+1. Shoot
+2. Wait
+3. 끝
+```
+
+**Conditional Loop:**
+
+```
+조건 true인 동안 반복!
+  ↓
+1. Shoot
+2. Wait
+3. 다시 Shoot
+4. 다시 Wait
+5. 계속...
+```
+
+**조건:**
+
+```
+Blackboard Key: PlayerLocation
+  ↓
+PlayerLocation 있는 동안 반복
+  ↓
+없으면 종료
+```
+
+---
+
+### 3-5: Move To 거리 조정
+
+**Chase의 Move To:**
+
+```
+Details:
+  Acceptable Radius: 200 → 1000 ✅
+```
+
+**왜?**
+
+```
+200 (2m):
+  너무 가까움
+  → 총 쏘기 어려움
+
+1000 (10m):
+  적당한 거리
+  → 총 쏘기 좋음
+  → 리얼한 전투!
+```
+
+---
+
+### 최종 구조
+
+```
+Selector
+  [PlayerLocationIfSeen]
+
+  ├─ Chase
+  │   [PlayerLocation Service]
+  │   ├─ Move To (PlayerLocation, R:1000)
+  │   └─ Shoot Sequence
+  │       [Conditional Loop: PlayerLocation]
+  │       ├─ Shoot
+  │       └─ Wait (2.0)
+  │
+  ├─ Investigate
+  │   ├─ Move To (LastKnown)
+  │   ├─ Clear (LastKnown)
+  │   └─ Wait (3.0)
+  │
+  └─ Return
+      └─ Move To (StartLocation)
+```
+
+---
+
+## 💀 Step 4: 사망 처리
+
+### DetachFromControllerPendingDestroy
+
+**ShooterSamCharacter.cpp:**
+
+```cpp
+void AShooterSamCharacter::OnDamageTaken(...)
+{
+    if (!IsAlive) return;
+
+    if (IsAlive)
+    {
+        Health -= Damage;
+
+        if (Health <= 0.0f)
+        {
+            IsAlive = false;
+            Health = 0.0f;
+
+            // 충돌 끄기
+            GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+            // ===== 컨트롤러 분리 =====
+            DetachFromControllerPendingDestroy();
+        }
+    }
+}
+```
+
+---
+
+**DetachFromControllerPendingDestroy란?**
+
+**효과:**
+
+```
+캐릭터 ← Controller 연결 끊기
+  ↓
+더 이상 입력 안 받음
+  ↓
+카메라 제어 안 됨
+  ↓
+사망 상태!
+```
+
+**왜 필요?**
+
+**분리 안 하면:**
+
+```
+사망 후에도:
+  - 마우스로 카메라 회전 가능
+  - WASD 입력 받음 (움직이진 않지만)
+  - 이상함!
+```
+
+**분리하면:**
+
+```
+사망 후:
+  - 입력 전부 무시
+  - 완전한 사망 상태
+  - 자연스러움! ✅
+```
+
+---
+
+## 🎯 완전한 실행 흐름
+
+### Chase → Shoot 과정
+
+```
+[1. 플레이어 발견]
+PlayerLocationIfSeen Service:
+  LineOfSightTo = true
+  → PlayerLocation 설정
+    ↓
+Chase 진입
+```
+
+---
+
+```
+[2. 접근]
+Move To (PlayerLocation, R:1000):
+  10m 거리까지 이동
+    ↓
+도착 (성공)
+```
+
+---
+
+```
+[3. Shoot Sequence 진입]
+Conditional Loop 체크:
+  PlayerLocation Is Set? → Yes ✅
+  ↓
+Shoot Sequence 시작
+```
+
+---
+
+```
+[4. 총 쏘기]
+Shoot Task:
+  OwnerCharacter->Shoot()
+    ↓
+  Gun->PullTrigger()
+    ↓
+  총알 발사!
+    ↓
+  성공
+```
+
+---
+
+```
+[5. 대기]
+Wait (2.0):
+  2초 대기
+    ↓
+  성공
+```
+
+---
+
+```
+[6. 반복 체크]
+Shoot Sequence 끝
+  ↓
+Conditional Loop:
+  PlayerLocation 여전히 있나?
+    ↓
+  Yes → 다시 Shoot! (4번으로)
+  No → Shoot Sequence 종료
+```
+
+---
+
+### 시야 상실
+
+```
+[Shoot 중 플레이어 숨음]
+PlayerLocationIfSeen Service:
+  LineOfSightTo = false
+  → PlayerLocation 해제
+    ↓
+Conditional Loop:
+  PlayerLocation 없음!
+  → Shoot Sequence 종료
+    ↓
+Chase 종료
+    ↓
+Investigate로...
+```
+
+---
+
+### 플레이어 사망
+
+```
+[Shoot 맞음]
+OnDamageTaken:
+  Health -= Damage
+    ↓
+Health <= 0:
+  IsAlive = false
+  DetachFromControllerPendingDestroy()
+    ↓
+다음 Shoot Task:
+  PlayerCharacter->IsAlive? → No
+  → Failed 반환
+    ↓
+Shoot Sequence 종료
+    ↓
+AI도 사격 중단
+```
+
+---
+
+## 📚 핵심 개념 정리
+
+### BTTaskNode vs BTTask_BlackboardBase
+
+```
+기본: Key 필요 없음
+BlackboardBase: Key 필요
+→ 용도에 맞게 선택
+```
+
+### Conditional Loop
+
+```
+조건 만족하는 동안 반복
+→ PlayerLocation 있으면 계속 쏘기
+→ 없으면 종료
+```
+
+### DetachFromControllerPendingDestroy
+
+```
+Controller와 Pawn 분리
+→ 사망 처리
+→ 입력 무시
+```
+
+### IsAlive 체크
+
+```
+사망한 플레이어는 안 쏨
+→ 자연스러운 AI
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380646/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_12/image_7.png)
+
+---
+
+## 💡 실전 팁
+
+### Acceptable Radius 조정
+
+**상황별 거리:**
+
+```
+근접 공격:
+  100~200 (1~2m)
+  → 칼, 주먹
+
+중거리 총:
+  500~1000 (5~10m)
+  → 권총, SMG
+
+장거리 총:
+  2000~5000 (20~50m)
+  → 저격총, 라이플
+```
+
+---
+
+### Wait 시간 조정
+
+**발사 속도:**
+
+```
+빠름:
+  Wait: 0.5~1.0초
+  → 기관총 느낌
+
+보통:
+  Wait: 1.5~2.5초
+  → 권총 느낌
+
+느림:
+  Wait: 3.0~5.0초
+  → 저격총 느낌
+```
+
+---
+
+### 결과 변수 패턴 활용
+
+**복잡한 조건:**
+
+```cpp
+EBTNodeResult::Type ExecuteTask(...)
+{
+    EBTNodeResult::Type Result = Failed;
+
+    if (조건1)
+    {
+        if (조건2)
+        {
+            if (조건3)
+            {
+                DoSomething();
+                Result = Succeeded;
+            }
+        }
+    }
+
+    return Result;  // 한 곳에서만!
+}
+```
+
+---
+
+## 🎯 요약
+
+**Shoot Task = 공격 기능**
+
+```
+ExecuteTask:
+  AI Controller 가져오기
+  ↓
+캐릭터들 가져오기
+  ↓
+유효성 & IsAlive 확인
+  ↓
+Shoot() 호출
+  ↓
+성공/실패 반환
+```
+
+**Conditional Loop:**
+
+```
+조건 만족하는 동안 반복
+→ Shoot → Wait → Shoot → Wait...
+→ 조건 false되면 종료
+```
+
+**완전한 AI:**
+
+```
+Chase: 접근 → 총 쏘기
+Investigate: 조사
+Return: 복귀
+사망 처리: 완벽!
+```
+
+---

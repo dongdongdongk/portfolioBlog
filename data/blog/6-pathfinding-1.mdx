@@ -1,0 +1,1436 @@
+---
+title: '섹션 6: Pathfinding - 1'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+# { 🎯 C# 제네릭(Generics) 완벽 이해하기 }
+
+이번 강의는 C#의 제네릭 기능을 배우고, 이를 활용해 Unit 클래스의 액션 가져오기 함수를 개선하는 내용입니다. 제네릭을 사용하면 여러 타입에서 동작하는 클래스나 함수를 만들 수 있어 코드 재사용성이 크게 향상됩니다.
+
+## 📋 목차
+
+1. [제네릭(Generics)의 개념과 필요성](https://claude.ai/chat/fc662e32-0fa2-47b6-af88-fc7b1429a05d#1-%EC%A0%9C%EB%84%A4%EB%A6%ADgenerics%EC%9D%98-%EA%B0%9C%EB%85%90%EA%B3%BC-%ED%95%84%EC%9A%94%EC%84%B1)
+2. [제네릭의 실제 사용 예시 - List<T>](https://claude.ai/chat/fc662e32-0fa2-47b6-af88-fc7b1429a05d#2-%EC%A0%9C%EB%84%A4%EB%A6%AD%EC%9D%98-%EC%8B%A4%EC%A0%9C-%EC%82%AC%EC%9A%A9-%EC%98%88%EC%8B%9C---listt)
+3. [제네릭 클래스 만들기 - 기본 문법](https://claude.ai/chat/fc662e32-0fa2-47b6-af88-fc7b1429a05d#3-%EC%A0%9C%EB%84%A4%EB%A6%AD-%ED%81%B4%EB%9E%98%EC%8A%A4-%EB%A7%8C%EB%93%A4%EA%B8%B0---%EA%B8%B0%EB%B3%B8-%EB%AC%B8%EB%B2%95)
+4. [제네릭 타입 매개변수 명명 규칙](https://claude.ai/chat/fc662e32-0fa2-47b6-af88-fc7b1429a05d#4-%EC%A0%9C%EB%84%A4%EB%A6%AD-%ED%83%80%EC%9E%85-%EB%A7%A4%EA%B0%9C%EB%B3%80%EC%88%98-%EB%AA%85%EB%AA%85-%EA%B7%9C%EC%B9%99)
+5. [제네릭 제약 조건(Constraints) 사용하기](https://claude.ai/chat/fc662e32-0fa2-47b6-af88-fc7b1429a05d#5-%EC%A0%9C%EB%84%A4%EB%A6%AD-%EC%A0%9C%EC%95%BD-%EC%A1%B0%EA%B1%B4constraints-%EC%82%AC%EC%9A%A9%ED%95%98%EA%B8%B0)
+6. [제네릭 함수(Generic Method) 만들기](https://claude.ai/chat/fc662e32-0fa2-47b6-af88-fc7b1429a05d#6-%EC%A0%9C%EB%84%A4%EB%A6%AD-%ED%95%A8%EC%88%98generic-method-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+7. [Unit 클래스에 GetAction<T> 함수 구현하기](https://claude.ai/chat/fc662e32-0fa2-47b6-af88-fc7b1429a05d#7-unit-%ED%81%B4%EB%9E%98%EC%8A%A4%EC%97%90-getactiont-%ED%95%A8%EC%88%98-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+8. [기존 코드 리팩토링 - 개별 함수 제거하기](https://claude.ai/chat/fc662e32-0fa2-47b6-af88-fc7b1429a05d#8-%EA%B8%B0%EC%A1%B4-%EC%BD%94%EB%93%9C-%EB%A6%AC%ED%8C%A9%ED%86%A0%EB%A7%81---%EA%B0%9C%EB%B3%84-%ED%95%A8%EC%88%98-%EC%A0%9C%EA%B1%B0%ED%95%98%EA%B8%B0)
+9. [UnitActionsSystem 수정하기](https://claude.ai/chat/fc662e32-0fa2-47b6-af88-fc7b1429a05d#9-unitactionssystem-%EC%88%98%EC%A0%95%ED%95%98%EA%B8%B0)
+10. [최종 테스트 및 검증](https://claude.ai/chat/fc662e32-0fa2-47b6-af88-fc7b1429a05d#10-%EC%B5%9C%EC%A2%85-%ED%85%8C%EC%8A%A4%ED%8A%B8-%EB%B0%8F-%EA%B2%80%EC%A6%9D)
+
+---
+
+## 1. 제네릭(Generics)의 개념과 필요성
+
+### 제네릭이란?
+
+**제네릭(Generics)** 은 C#의 강력한 기능으로, **여러 타입에서 동작할 수 있는 클래스, 인터페이스, 함수 등을 만들 수 있게 해주는 기능**입니다.
+
+### 왜 제네릭이 필요한가?
+
+일반적으로 클래스를 만들 때, 특정 타입(예: `int`, `string`)에 종속되어 설계합니다. 하지만 **비슷한 로직을 다른 타입에서도 사용하고 싶을 때**, 제네릭을 사용하면 코드 중복 없이 재사용할 수 있습니다.
+
+**예시 시나리오:**
+
+- Grid 시스템을 만들었는데, 에너지 그리드에서는 특정 타입을 사용하고
+- 길찾기 그리드에서는 다른 타입을 사용하고 싶을 때
+- 같은 Grid 시스템 로직을 재사용하면서 타입만 다르게 할 수 있습니다
+
+### 제네릭을 사용할 수 있는 곳
+
+- **Class (클래스)**
+- **Interface (인터페이스)**
+- **Function (함수/메서드)**
+- **Delegate (델리게이트)**
+- 거의 모든 곳에서 사용 가능합니다
+
+---
+
+## 2. 제네릭의 실제 사용 예시 - List<T>
+
+### 우리가 이미 사용하고 있던 제네릭
+
+사실 제네릭이라는 이름을 몰랐어도, **이미 사용하고 있었습니다**. 가장 흔한 예가 바로 **List**입니다.
+
+```csharp
+// 정수를 저장하는 리스트
+List<int> intList = new List<int>();
+
+// Unit 타입을 저장하는 리스트
+List<Unit> unitList = new List<Unit>();
+```
+
+### List의 정의 살펴보기
+
+List를 우클릭하고 "Go to Definition"으로 정의를 보면:
+
+```csharp
+public class List<T>
+{
+    // T는 "어떤 타입이든 될 수 있는" 제네릭 타입 매개변수입니다
+    // 리스트를 생성할 때 T에 구체적인 타입을 지정합니다
+}
+```
+
+- **`<T>`** 부분이 제네릭을 나타냅니다
+- `List<int>`를 만들면 → T는 int가 됩니다
+- `List<string>`을 만들면 → T는 string이 됩니다
+
+### EventHandler의 제네릭
+
+이벤트 핸들러도 제네릭을 사용합니다:
+
+```csharp
+public event EventHandler<bool> OnBusyChanged;
+```
+
+- `EventHandler<T>`에서 T는 이벤트 인자의 타입을 정의합니다
+- `EventHandler<bool>`이면 boolean 값을 전달하는 이벤트입니다
+
+---
+
+## 3. 제네릭 클래스 만들기 - 기본 문법
+
+### 일반 클래스의 문제점
+
+먼저 일반 클래스를 만들어 문제점을 이해해봅시다:
+
+```csharp
+// int만 받을 수 있는 클래스
+public class MyClass
+{
+    private int i;  // int 타입만 저장 가능
+
+    // 생성자도 int만 받음
+    public MyClass(int i)
+    {
+        this.i = i;
+        Debug.Log(this.i);
+    }
+}
+
+// 사용 예시
+MyClass myClass1 = new MyClass(5);  // ✅ 작동함 - 5 출력
+
+MyClass myClass2 = new MyClass("test");  // ❌ 에러! string은 안됨
+
+```
+
+**문제점:** 이 클래스는 int만 사용할 수 있습니다. string을 사용하려면 완전히 새로운 클래스를 만들어야 합니다.
+
+### 제네릭 클래스로 변환하기
+
+이제 이 클래스를 **제네릭 클래스**로 변환해봅시다:
+
+```csharp
+// 제네릭 클래스 - 어떤 타입이든 사용 가능!
+public class MyClass<T>  // <T> 추가 - T는 제네릭 타입 매개변수
+{
+    private T i;  // int 대신 T 사용
+
+    // 생성자도 T 타입을 받음
+    public MyClass(T i)
+    {
+        this.i = i;
+        Debug.Log(this.i);
+    }
+}
+
+// 사용 예시 - 여러 타입으로 사용 가능!
+MyClass<string> myClass1 = new MyClass<string>("test");  // ✅ string 버전
+MyClass<int> myClass2 = new MyClass<int>(5);            // ✅ int 버전
+```
+
+### 실행 결과
+
+```
+test  // string 버전 출력
+5     // int 버전 출력
+```
+
+**같은 클래스를 두 가지 다른 타입으로 사용**할 수 있게 되었습니다!
+
+### 문법 정리
+
+```csharp
+public class ClassName<T>  // <T> 부분이 제네릭 선언
+{
+    private T variable;     // T를 타입처럼 사용
+
+    public ClassName(T parameter)  // 매개변수 타입도 T
+    {
+        variable = parameter;
+    }
+}
+
+// 사용할 때는 구체적인 타입을 지정
+ClassName<int> obj = new ClassName<int>(값);
+```
+
+---
+
+## 4. 제네릭 타입 매개변수 명명 규칙
+
+### T는 단순한 이름일 뿐
+
+```csharp
+public class MyClass<T>  // T는 변수 이름처럼 작명하는 것
+```
+
+- **T**는 "Type"의 약자로, 관례적으로 많이 사용됩니다
+- 하지만 **T는 실제로 존재하는 타입이 아니라, 그냥 우리가 정한 이름**입니다
+
+### 다른 이름 사용하기
+
+원하면 다른 이름도 사용할 수 있습니다:
+
+```csharp
+// 긴 이름도 가능
+public class MyClass<TCustomType>
+{
+    private TCustomType value;
+}
+
+// 의미 있는 이름 사용
+public class Grid<TGridObject>
+{
+    private TGridObject gridObject;
+}
+```
+
+### 명명 규칙
+
+**표준 규칙:**
+
+- 제네릭 타입 매개변수는 **T로 시작**합니다
+- 단일 타입이면 그냥 **T** 사용
+- 여러 타입이면 **TFirst, TSecond** 또는 **의미 있는 이름** 사용
+
+```csharp
+// 표준적인 사용
+public class List<T>                    // 단일 타입
+public class Dictionary<TKey, TValue>   // 두 개의 타입
+public class Grid<TGridObject>          // 의미 있는 이름
+```
+
+---
+
+## 5. 제네릭 제약 조건(Constraints) 사용하기
+
+### 제약 조건이란?
+
+제네릭은 **어떤 타입이든 사용 가능**하지만, 때로는 **특정 조건을 만족하는 타입만 허용**하고 싶을 때가 있습니다. 이때 **제약 조건(Constraints)** 을 사용합니다.
+
+### where 키워드 사용하기
+
+```csharp
+// 제약 없음 - 모든 타입 가능
+public class MyClass<T>
+{
+    // ...
+}
+
+// 제약 있음 - BaseAction을 상속한 타입만 가능
+public class MyClass<T> where T : BaseAction
+{
+    // T는 반드시 BaseAction을 상속받은 클래스여야 함
+}
+```
+
+### 실제 예시
+
+```csharp
+public class ActionContainer<T> where T : BaseAction
+{
+    private T action;
+
+    public ActionContainer(T action)
+    {
+        this.action = action;
+    }
+}
+
+// 사용 예시
+ActionContainer<ShootAction> shootContainer =
+    new ActionContainer<ShootAction>(new ShootAction());  // ✅ 작동
+    // ShootAction은 BaseAction을 상속하므로 OK
+
+ActionContainer<string> stringContainer =
+    new ActionContainer<string>("test");  // ❌ 에러!
+    // string은 BaseAction을 상속하지 않음
+
+ActionContainer<int> intContainer =
+    new ActionContainer<int>(5);  // ❌ 에러!
+    // int도 BaseAction을 상속하지 않음
+```
+
+### 제약 조건의 장점
+
+1. **타입 안정성**: 잘못된 타입 사용을 컴파일 타임에 방지
+2. **특정 메서드 사용 가능**: 제약된 타입의 메서드/속성을 안전하게 사용 가능
+
+```csharp
+public class ActionProcessor<T> where T : BaseAction
+{
+    public void ProcessAction(T action)
+    {
+        // BaseAction의 메서드를 안전하게 호출 가능
+        action.TakeAction(gridPosition, callback);
+        action.GetActionPointCost();
+        // 제약이 없었다면 이 메서드들을 호출할 수 없음
+    }
+}
+```
+
+---
+
+## 6. 제네릭 함수(Generic Method) 만들기
+
+### 클래스 전체가 아닌 함수만 제네릭으로
+
+지금까지는 **클래스 전체**를 제네릭으로 만들었습니다. 하지만 **특정 함수만** 제네릭으로 만들 수도 있습니다.
+
+### 일반 클래스에 제네릭 함수 추가하기
+
+```csharp
+// 클래스는 일반 클래스 (제네릭 아님)
+public class MyClass
+{
+    private int i;  // 일반 int 필드
+
+    // 일반 생성자
+    public MyClass(int i)
+    {
+        this.i = i;
+        Debug.Log(this.i);
+    }
+
+    // 이 함수만 제네릭! <T> 추가
+    public void Testing<T>(T value)
+    {
+        Debug.Log(value);
+    }
+}
+```
+
+### 사용 방법
+
+```csharp
+// 클래스 생성 시에는 타입 지정 불필요 (일반 클래스)
+MyClass myClass = new MyClass(5);
+
+// 함수 호출 시에만 타입 지정
+myClass.Testing<string>("test string");  // string 타입으로 호출
+myClass.Testing<int>(100);               // int 타입으로 호출
+myClass.Testing<float>(3.14f);           // float 타입으로 호출
+```
+
+### 출력 결과
+
+```
+5              // 생성자에서 출력
+test string    // Testing<string> 호출
+100            // Testing<int> 호출
+3.14           // Testing<float> 호출
+```
+
+### 클래스 vs 함수 제네릭 비교
+
+```csharp
+// 1. 클래스 전체가 제네릭
+public class GenericClass<T>
+{
+    private T value;
+    public void Method(T parameter) { }
+}
+// 사용: GenericClass<int> obj = new GenericClass<int>();
+
+// 2. 함수만 제네릭
+public class NormalClass
+{
+    private int value;
+    public void GenericMethod<T>(T parameter) { }
+}
+// 사용: NormalClass obj = new NormalClass();
+//      obj.GenericMethod<int>(5);
+```
+
+### 언제 함수 제네릭을 사용하나?
+
+- **클래스 전체가 특정 타입에 종속되지 않을 때**
+- **하나의 함수만 여러 타입을 다뤄야 할 때**
+- 예: Unit 클래스의 GetAction<T>() - Unit 클래스 자체는 일반 클래스지만, 액션을 가져오는 함수만 제네릭
+
+---
+
+## 7. Unit 클래스에 GetAction<T> 함수 구현하기
+
+### 기존 문제점
+
+현재 Unit 클래스에는 각 액션별로 개별 함수가 있습니다:
+
+```csharp
+// 기존 코드 - 비효율적!
+private MoveAction moveAction;
+private SpinAction spinAction;
+private ShootAction shootAction;
+
+public MoveAction GetMoveAction() { return moveAction; }
+public SpinAction GetSpinAction() { return spinAction; }
+public ShootAction GetShootAction() { return shootAction; }
+```
+
+**문제점:**
+
+- 액션이 추가될 때마다 새로운 필드와 함수를 만들어야 함
+- 코드 중복이 많음
+- 유지보수가 어려움
+- 게임을 동적으로 확장하기 어려움
+
+### 해결책: 제네릭 함수 만들기
+
+**하나의 제네릭 함수**로 모든 액션을 가져올 수 있게 만듭니다:
+
+```csharp
+// Unit.cs에 추가할 새로운 함수
+public T GetAction<T>() where T : BaseAction
+{
+    // baseActionArray를 순회하면서
+    foreach (BaseAction baseAction in baseActionArray)
+    {
+        // 현재 액션이 T 타입인지 확인
+        if (baseAction is T)
+        {
+            // T 타입으로 캐스팅해서 반환
+            return (T)baseAction;
+        }
+    }
+    // 찾지 못하면 null 반환
+    return null;
+}
+```
+
+### 코드 상세 분석
+
+### 1. 함수 시그니처
+
+```csharp
+public T GetAction<T>() where T : BaseAction
+```
+
+- **`public T`**: 반환 타입이 T (제네릭 타입)
+- **`GetAction<T>()`**: 함수 이름과 제네릭 타입 매개변수 선언
+- **`where T : BaseAction`**: 제약 조건 - T는 BaseAction을 상속한 타입만 가능
+
+### 2. 배열 순회
+
+```csharp
+foreach (BaseAction baseAction in baseActionArray)
+```
+
+- **`baseActionArray`**: Unit에 붙어있는 모든 액션 컴포넌트 배열
+- Awake()에서 `GetComponents<BaseAction>()`으로 초기화됨
+- 이 배열에는 MoveAction, SpinAction, ShootAction 등이 들어있음
+
+### 3. 타입 체크
+
+```csharp
+if (baseAction is T)
+```
+
+- **`is` 키워드**: 객체가 특정 타입인지 확인하는 연산자
+- `baseAction is T`는 "baseAction이 T 타입인가?"를 확인
+- 예시:
+  - T가 MoveAction이면: "이 baseAction이 MoveAction인가?"
+  - T가 ShootAction이면: "이 baseAction이 ShootAction인가?"
+
+### 4. 타입 캐스팅과 반환
+
+```csharp
+return (T)baseAction;
+```
+
+- **`(T)`**: 명시적 타입 캐스팅
+- baseAction을 T 타입으로 변환해서 반환
+- 이미 `is T`로 확인했으므로 안전한 캐스팅
+
+### 5. null 반환
+
+```csharp
+return null;
+```
+
+- 모든 배열을 확인했는데도 T 타입을 찾지 못하면 null 반환
+- 예: `GetAction<GrenadeAction>()`을 호출했는데 Unit에 GrenadeAction이 없으면 null
+
+### 사용 예시
+
+```csharp
+// 기존 방식 (삭제할 코드)
+MoveAction moveAction = unit.GetMoveAction();
+ShootAction shootAction = unit.GetShootAction();
+
+// 새로운 방식 (제네릭 사용)
+MoveAction moveAction = unit.GetAction<MoveAction>();
+ShootAction shootAction = unit.GetAction<ShootAction>();
+SpinAction spinAction = unit.GetAction<SpinAction>();
+
+// 새로운 액션 추가 시에도 별도 함수 불필요!
+GrenadeAction grenadeAction = unit.GetAction<GrenadeAction>();
+```
+
+### 장점
+
+1. **확장성**: 새 액션 타입 추가 시 코드 수정 불필요
+2. **코드 간결성**: 하나의 함수로 모든 액션 타입 처리
+3. **타입 안정성**: 컴파일 타임에 타입 체크
+4. **유지보수 용이**: 중복 코드 제거
+
+---
+
+## 8. 기존 코드 리팩토링 - 개별 함수 제거하기
+
+### 삭제할 코드 정리
+
+이제 새로운 `GetAction<T>()` 함수를 만들었으니, **기존의 불필요한 코드들을 제거**해야 합니다.
+
+### Unit.cs에서 삭제할 부분
+
+### 1. 필드 선언 제거
+
+```csharp
+// ❌ 삭제할 코드
+// private MoveAction moveAction;
+// private SpinAction spinAction;
+// private ShootAction shootAction;
+
+// ✅ 유지할 코드
+private BaseAction[] baseActionArray;  // 이것만 있으면 됨!
+```
+
+### 2. Awake()에서 초기화 코드 제거
+
+```csharp
+private void Awake()
+{
+    healthSystem = GetComponent<HealthSystem>();
+
+    // ❌ 삭제할 코드
+    // moveAction = GetComponent<MoveAction>();
+    // spinAction = GetComponent<SpinAction>();
+    // shootAction = GetComponent<ShootAction>();
+
+    // ✅ 유지할 코드
+    baseActionArray = GetComponents<BaseAction>();  // 이것만 필요!
+}
+```
+
+### 3. 개별 Get 함수들 제거
+
+```csharp
+// ❌ 전부 삭제!
+// public MoveAction GetMoveAction()
+// {
+//     return moveAction;
+// }
+
+// public SpinAction GetSpinAction()
+// {
+//     return spinAction;
+// }
+
+// public ShootAction GetShootAction()
+// {
+//     return shootAction;
+// }
+
+// ✅ 새로운 제네릭 함수만 유지
+public T GetAction<T>() where T : BaseAction
+{
+    foreach (BaseAction baseAction in baseActionArray)
+    {
+        if (baseAction is T)
+        {
+            return (T)baseAction;
+        }
+    }
+    return null;
+}
+```
+
+### 정리 후 Unit.cs 코드
+
+```csharp
+public class Unit : MonoBehaviour
+{
+    // ... 기타 필드들 ...
+
+    private BaseAction[] baseActionArray;  // 이것만 있으면 됨!
+
+    private void Awake()
+    {
+        healthSystem = GetComponent<HealthSystem>();
+        baseActionArray = GetComponents<BaseAction>();  // 한 줄로 모든 액션 가져오기
+    }
+
+    // 제네릭 함수 하나로 모든 액션 타입 처리
+    public T GetAction<T>() where T : BaseAction
+    {
+        foreach (BaseAction baseAction in baseActionArray)
+        {
+            if (baseAction is T)
+            {
+                return (T)baseAction;
+            }
+        }
+        return null;
+    }
+
+    // ... 기타 함수들 ...
+}
+```
+
+### 코드 간결화 효과
+
+**Before (리팩토링 전):**
+
+- 필드 3개 (moveAction, spinAction, shootAction)
+- 초기화 코드 3줄
+- Get 함수 3개 (각각 3-4줄)
+- 총 약 15-20줄
+
+**After (리팩토링 후):**
+
+- 필드 1개 (baseActionArray)
+- 초기화 코드 1줄
+- Get 함수 1개 (9줄)
+- 총 약 10줄
+
+**새 액션 추가 시:**
+
+- Before: 필드 추가 + 초기화 추가 + Get 함수 추가 = 최소 5줄
+- After: **코드 수정 불필요!** 0줄
+
+---
+
+## 9. UnitActionsSystem 수정하기
+
+### 에러 발생 확인
+
+Unit.cs에서 코드를 삭제했으므로, 다른 스크립트에서 **에러가 발생**합니다. Unity 에디터에서 확인하면 여러 에러가 표시됩니다.
+
+### UnitActionsSystem.cs 수정
+
+### 수정 위치 1: SetSelectedUnit 함수
+
+```csharp
+// ❌ 기존 코드 - 에러 발생!
+private void SetSelectedUnit(Unit unit)
+{
+    selectedUnit = unit;
+    SetSelectedAction(unit.GetMoveAction());  // GetMoveAction()이 더 이상 존재하지 않음!
+
+    OnSelectedUnitChanged?.Invoke(this, EventArgs.Empty);
+}
+
+// ✅ 수정된 코드 - 제네릭 사용
+private void SetSelectedUnit(Unit unit)
+{
+    selectedUnit = unit;
+    SetSelectedAction(unit.GetAction<MoveAction>());  // 제네릭 함수 사용!
+
+    OnSelectedUnitChanged?.Invoke(this, EventArgs.Empty);
+}
+```
+
+**설명:**
+
+- `GetMoveAction()` 함수가 삭제되었으므로 사용 불가
+- 대신 `GetAction<MoveAction>()`을 사용
+- **동일한 기능**이지만 더 유연한 방식
+- 나중에 다른 액션을 기본으로 설정하고 싶으면 타입만 바꾸면 됨
+
+### EnemyAI.cs 수정 (강의에서 언급된 부분)
+
+강의에서는 "move action"에 대한 수정도 언급했습니다:
+
+```csharp
+// ❌ 기존 코드
+ShootAction shootAction = enemyUnit.GetShootAction();
+
+// ✅ 수정된 코드
+ShootAction shootAction = enemyUnit.GetAction<ShootAction>();
+```
+
+**설명:**
+
+- EnemyAI에서 적 유닛의 ShootAction을 가져올 때도 제네릭 함수 사용
+- 이제 모든 곳에서 일관되게 `GetAction<T>()` 사용
+
+### 에러 해결 확인
+
+수정 후 Unity 에디터를 확인하면:
+
+- **에러가 모두 사라짐** ✅
+- 빌드 성공
+- 경고 없음
+
+---
+
+## 10. 최종 테스트 및 검증
+
+### 게임 실행하기
+
+Play 버튼을 눌러 게임을 실행합니다.
+
+### 테스트 항목
+
+### 1. 유닛 선택 테스트
+
+- 유닛을 클릭하여 선택
+- 선택 시 MoveAction이 기본으로 설정되는지 확인
+- **결과:** ✅ 정상 작동
+
+### 2. 이동 액션 테스트
+
+- 선택된 유닛으로 이동 가능한 위치 클릭
+- 유닛이 정상적으로 이동하는지 확인
+- **결과:** ✅ 정상 작동
+
+### 3. 다른 액션 전환 테스트
+
+- UI에서 다른 액션(Spin, Shoot 등) 선택
+- 각 액션이 정상적으로 동작하는지 확인
+- **결과:** ✅ 정상 작동
+
+### 4. 적 AI 테스트
+
+- 턴을 넘겨 적 AI 실행
+- 적이 ShootAction을 올바르게 수행하는지 확인
+- **결과:** ✅ 정상 작동
+
+### 검증 결과
+
+**"게임이 여전히 완벽하게 작동합니다. 이전과 똑같이 동작합니다."**
+
+### 리팩토링의 의미
+
+중요한 점은:
+
+- **겉으로 보이는 동작은 완전히 동일**
+- **내부 코드는 훨씬 깔끔하고 유지보수하기 쉬워짐**
+- **새 기능 추가가 훨씬 쉬워짐**
+
+이것이 바로 **좋은 리팩토링**입니다!
+
+---
+
+## 🎓 강의 핵심 요약
+
+### 제네릭의 정의
+
+- **여러 타입에서 동작하는 클래스/함수를 만드는 C#의 강력한 기능**
+
+### 주요 개념
+
+1. **제네릭 클래스**
+
+   ```csharp
+   public class MyClass<T> { }
+   ```
+
+2. **제네릭 함수**
+
+   ```csharp
+   public T MyMethod<T>() { }
+   ```
+
+3. **제네릭 제약**
+
+   ```csharp
+   public T MyMethod<T>() where T : BaseClass { }
+   ```
+
+### 실전 적용
+
+**Before:**
+
+```csharp
+public MoveAction GetMoveAction() { return moveAction; }
+public SpinAction GetSpinAction() { return spinAction; }
+public ShootAction GetShootAction() { return shootAction; }
+```
+
+**After:**
+
+```csharp
+public T GetAction<T>() where T : BaseAction
+{
+    foreach (BaseAction baseAction in baseActionArray)
+    {
+        if (baseAction is T)
+        {
+            return (T)baseAction;
+        }
+    }
+    return null;
+}
+```
+
+### 장점
+
+- ✅ 코드 재사용성 극대화
+- ✅ 타입 안정성 보장
+- ✅ 확장성 향상
+- ✅ 유지보수 용이
+
+### 다음 강의 예고
+
+"다음 강의에서는 **Grid 시스템을 제네릭으로 리팩토링**하여 에너지 그리드와 길찾기 그리드 모두에서 사용할 수 있게 만들겠습니다."
+
+# { 🎯 Unity 그리드 시스템 제네릭 리팩토링 }
+
+이번 강의는 그리드 시스템을 제네릭(Generics)으로 리팩토링하여 게임 로직과 길찾기(Pathfinding) 시스템에서 각각 다른 그리드 오브젝트 타입을 사용할 수 있도록 만드는 내용입니다.
+
+## 📋 목차
+
+1. [제네릭 리팩토링이 필요한 이유](https://claude.ai/chat/d0e114f5-592c-4728-93f1-03a3e714b155#1-%EC%A0%9C%EB%84%A4%EB%A6%AD-%EB%A6%AC%ED%8C%A9%ED%86%A0%EB%A7%81%EC%9D%B4-%ED%95%84%EC%9A%94%ED%95%9C-%EC%9D%B4%EC%9C%A0)
+2. [제네릭(Generics) 개념 이해하기](https://claude.ai/chat/d0e114f5-592c-4728-93f1-03a3e714b155#2-%EC%A0%9C%EB%84%A4%EB%A6%ADgenerics-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+3. [GridSystem에 제네릭 적용하기](https://claude.ai/chat/d0e114f5-592c-4728-93f1-03a3e714b155#3-gridsystem%EC%97%90-%EC%A0%9C%EB%84%A4%EB%A6%AD-%EC%A0%81%EC%9A%A9%ED%95%98%EA%B8%B0)
+4. [제네릭 제약조건과 한계](https://claude.ai/chat/d0e114f5-592c-4728-93f1-03a3e714b155#4-%EC%A0%9C%EB%84%A4%EB%A6%AD-%EC%A0%9C%EC%95%BD%EC%A1%B0%EA%B1%B4%EA%B3%BC-%ED%95%9C%EA%B3%84)
+5. [Func 델리게이트로 해결하기](https://claude.ai/chat/d0e114f5-592c-4728-93f1-03a3e714b155#5-func-%EB%8D%B8%EB%A6%AC%EA%B2%8C%EC%9D%B4%ED%8A%B8%EB%A1%9C-%ED%95%B4%EA%B2%B0%ED%95%98%EA%B8%B0)
+6. [LevelGrid 클래스 수정하기](https://claude.ai/chat/d0e114f5-592c-4728-93f1-03a3e714b155#6-levelgrid-%ED%81%B4%EB%9E%98%EC%8A%A4-%EC%88%98%EC%A0%95%ED%95%98%EA%B8%B0)
+7. [GridObject 클래스 수정하기](https://claude.ai/chat/d0e114f5-592c-4728-93f1-03a3e714b155#7-gridobject-%ED%81%B4%EB%9E%98%EC%8A%A4-%EC%88%98%EC%A0%95%ED%95%98%EA%B8%B0)
+8. [디버그 오브젝트 처리하기](https://claude.ai/chat/d0e114f5-592c-4728-93f1-03a3e714b155#8-%EB%94%94%EB%B2%84%EA%B7%B8-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%EC%B2%98%EB%A6%AC%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. 제네릭 리팩토링이 필요한 이유
+
+### 현재 그리드 시스템의 문제점
+
+**기존 구조:**
+
+- `GridSystem` 클래스는 특정 `GridObject` 타입에만 작동하도록 만들어져 있음
+- 각 그리드 위치마다 `GridObject`를 생성하고, 그 안에 유닛(Unit) 리스트를 관리
+- 게임 로직(어떤 유닛이 해당 위치에 있는지)을 처리하는 데 특화됨
+
+**문제 상황:**
+
+- 길찾기(Pathfinding) 시스템도 그리드 기반이지만, `GridObject`와는 다른 데이터를 저장해야 함
+- 길찾기는 유닛 정보가 아닌 이동 가능 여부, 경로 비용 등의 정보가 필요
+
+**잘못된 해결 방법들:**
+
+1. **거대한 GridObject 만들기**
+   - 게임 로직 + 길찾기 로직을 하나의 클래스에 모두 넣기
+   - 문제: 시스템 분리 원칙 위배, 유지보수 어려움
+2. **GridSystem 전체 복사하기**
+   - 똑같은 코드를 복사해서 다른 이름으로 만들기
+   - 문제: 코드 중복, 수정 시 두 곳 모두 변경해야 함
+
+**올바른 해결 방법:**
+
+- 제네릭을 사용하여 그리드 시스템의 핵심 로직은 재사용하되, 저장되는 객체 타입만 다르게 설정
+
+---
+
+## 2. 제네릭(Generics) 개념 이해하기
+
+### 제네릭이란?
+
+**정의:**
+
+- 클래스나 메서드를 작성할 때 사용할 타입을 미리 정하지 않고, 나중에 지정할 수 있게 하는 기능
+- "타입의 플레이스홀더(자리 표시자)"라고 생각하면 됨
+
+**비유:**
+
+- 일반 클래스: "정수만 담는 상자"
+- 제네릭 클래스: "무엇이든 담을 수 있는 상자인데, 만들 때 뭘 담을지 정하는 상자"
+
+**C# 제네릭 문법:**
+
+```csharp
+// 제네릭 클래스 선언
+public class MyClass<T>  // T는 타입 매개변수
+{
+    private T myValue;  // T 타입의 변수
+
+    public void SetValue(T value)  // T 타입을 파라미터로 받음
+    {
+        myValue = value;
+    }
+}
+
+// 사용 예시
+MyClass<int> intClass = new MyClass<int>();      // T를 int로 사용
+MyClass<string> stringClass = new MyClass<string>(); // T를 string으로 사용
+
+```
+
+**타입 매개변수 네이밍 규칙:**
+
+- `T`: Type의 약자, 가장 일반적
+- `TGridObject`: 의미를 명확히 하기 위해 접두사 T + 설명적인 이름
+
+---
+
+## 3. GridSystem에 제네릭 적용하기
+
+### 클래스 선언 변경
+
+**변경 전:**
+
+```csharp
+public class GridSystem
+{
+    // GridObject만 사용 가능
+}
+```
+
+**변경 후:**
+
+```csharp
+public class GridSystem<TGridObject>  // TGridObject라는 타입 매개변수 추가
+{
+    // 이제 TGridObject는 어떤 타입이든 될 수 있음
+}
+```
+
+### 모든 GridObject 참조 변경
+
+**목적:** 클래스 내부에서 사용되는 모든 구체적인 `GridObject` 타입을 제네릭 `TGridObject`로 교체
+
+**변경 사항:**
+
+1. **배열 선언:**
+
+```csharp
+// 변경 전
+private GridObject[,] gridObjectArray;
+
+// 변경 후
+private TGridObject[,] gridObjectArray;  // 이제 어떤 타입의 배열도 가능
+
+```
+
+1. **생성자 파라미터:**
+
+```csharp
+// 변경 전
+public GridSystem(int width, int height, float cellSize)
+
+// 변경 후
+public GridSystem(int width, int height, float cellSize, ...)  // 아직 미완성
+```
+
+1. **반환 타입:**
+
+```csharp
+// 변경 전
+public GridObject GetGridObject(GridPosition gridPosition)
+{
+    return gridObjectArray[gridPosition.x, gridPosition.z];
+}
+
+// 변경 후
+public TGridObject GetGridObject(GridPosition gridPosition)  // 반환 타입도 제네릭으로
+{
+    return gridObjectArray[gridPosition.x, gridPosition.z];
+}
+```
+
+---
+
+## 4. 제네릭 제약조건과 한계
+
+### 문제 발생: 객체 생성 불가
+
+**원래 코드 (변경 전):**
+
+```csharp
+for (int x = 0; x < width; x++)
+{
+    for (int z = 0; z < height; z++)
+    {
+        GridPosition gridPosition = new GridPosition(x, z);
+        // GridObject를 직접 생성
+        gridObjectArray[x, z] = new GridObject(this, gridPosition);
+    }
+}
+```
+
+**제네릭으로 변경 시도:**
+
+```csharp
+// 이렇게 하면 에러 발생!
+gridObjectArray[x, z] = new TGridObject(this, gridPosition);
+```
+
+**에러 이유:**
+
+- `TGridObject`가 어떤 타입인지 모르기 때문에 `new` 키워드로 생성할 수 없음
+- 만약 `TGridObject`가 인터페이스나 추상 클래스라면? 생성 불가능
+- 생성자가 없는 클래스라면? 생성 불가능
+
+### 해결 시도 1: new() 제약조건
+
+**제약조건 문법:**
+
+```csharp
+public class GridSystem<TGridObject> where TGridObject : new()
+{
+    // TGridObject는 반드시 매개변수 없는 기본 생성자를 가져야 함
+}
+```
+
+**이 방법의 문제점:**
+
+- `new()` 제약조건은 **매개변수가 없는 생성자만** 허용
+- 우리 코드는 2개의 매개변수 필요: `(GridSystem, GridPosition)`
+- C#에서는 매개변수가 있는 생성자를 제약조건으로 지정할 수 없음
+
+**왜 이런 제한이 있나?**
+
+- C#의 제네릭 제약조건 시스템은 매개변수화된 생성자를 지원하지 않음
+- `new(int, string)` 같은 문법은 존재하지 않음
+
+---
+
+## 5. Func 델리게이트로 해결하기
+
+### 델리게이트(Delegate) 개념
+
+**델리게이트란?**
+
+- 메서드를 참조할 수 있는 타입
+- "메서드를 변수처럼 저장하고 전달할 수 있게 해주는 것"
+- C#의 함수형 프로그래밍 기능
+
+**Func 델리게이트:**
+
+- 반환값이 있는 메서드를 참조하는 제네릭 델리게이트
+- 마지막 타입 파라미터가 반환 타입, 나머지는 입력 파라미터
+
+**Func 델리게이트 문법:**
+
+```csharp
+Func<int, string>  // int를 받아서 string을 반환하는 메서드
+Func<int, int, bool>  // 두 개의 int를 받아서 bool을 반환하는 메서드
+Func<string>  // 파라미터 없이 string을 반환하는 메서드
+
+```
+
+### GridSystem 생성자에 Func 추가
+
+```csharp
+public GridSystem(int width, int height, float cellSize,
+    Func<GridSystem<TGridObject>, GridPosition, TGridObject> createGridObject)
+{
+    // 파라미터 설명:
+    // 1. width, height, cellSize: 그리드 크기 설정
+    // 2. createGridObject: 그리드 오브젝트를 생성하는 함수
+    //    - 입력1: GridSystem<TGridObject> (현재 그리드 시스템 참조)
+    //    - 입력2: GridPosition (생성할 위치)
+    //    - 반환: TGridObject (생성된 오브젝트)
+
+    this.width = width;
+    this.height = height;
+    this.cellSize = cellSize;
+    gridObjectArray = new TGridObject[width, height];
+
+    for (int x = 0; x < width; x++)
+    {
+        for (int z = 0; z < height; z++)
+        {
+            GridPosition gridPosition = new GridPosition(x, z);
+
+            // new TGridObject() 대신 전달받은 함수 호출
+            // createGridObject 함수에 this와 gridPosition을 전달
+            // 함수가 알아서 적절한 타입의 객체를 생성해서 반환
+            gridObjectArray[x, z] = createGridObject(this, gridPosition);
+        }
+    }
+}
+
+```
+
+**왜 이 방법이 작동하는가?**
+
+- 제네릭 제약조건의 한계를 우회
+- 객체 생성 로직을 `GridSystem` 외부로 위임
+- `GridSystem`을 사용하는 쪽에서 객체 생성 방법을 직접 제공
+
+**using System 추가:**
+
+```csharp
+using System;  // Func를 사용하기 위해 필요
+```
+
+---
+
+## 6. LevelGrid 클래스 수정하기
+
+### GridSystem 인스턴스 선언 변경
+
+**변경 전:**
+
+```csharp
+private GridSystem gridSystem;  // 일반 GridSystem
+```
+
+**변경 후:**
+
+```csharp
+private GridSystem<GridObject> gridSystem;  // 제네릭 타입 명시
+// GridObject라는 구체적인 타입을 사용하는 GridSystem
+```
+
+**의미:**
+
+- `GridSystem`이 제네릭 클래스가 되었으므로, 어떤 타입을 사용할지 반드시 명시해야 함
+- `<GridObject>`를 붙여서 "GridObject 타입을 사용하는 그리드 시스템"임을 선언
+
+### 생성자에서 GridSystem 생성
+
+```csharp
+void Awake()
+{
+    if (Instance != null)
+    {
+        Debug.LogError("There is more than one UnitActionsSystem! " + transform + " - " + Instance);
+        Destroy(gameObject);
+        return;
+    }
+    Instance = this;
+
+    // GridSystem 생성 - 제네릭 타입 명시
+    gridSystem = new GridSystem<GridObject>(
+        10,      // width: 그리드 가로 크기
+        10,      // height: 그리드 세로 크기
+        2f,      // cellSize: 각 셀의 크기
+
+        // createGridObject 델리게이트 - 람다 표현식 사용
+        (GridSystem<GridObject> g, GridPosition gridPosition) =>
+            new GridObject(g, gridPosition)
+    );
+
+    gridSystem.CreateDebugObjects(gridDebugObjectPrefab);
+}
+
+```
+
+### 람다 표현식(Lambda Expression) 상세 설명
+
+**람다 표현식이란?**
+
+- 익명 함수(이름 없는 함수)를 간결하게 작성하는 문법
+- 델리게이트를 구현할 때 자주 사용
+
+**전체 문법 분해:**
+
+```csharp
+(GridSystem<GridObject> g, GridPosition gridPosition) => new GridObject(g, gridPosition)
+
+// 파라미터 부분
+(GridSystem<GridObject> g, GridPosition gridPosition)
+// g: 그리드 시스템 참조를 받는 파라미터
+// gridPosition: 그리드 위치를 받는 파라미터
+
+// 화살표 연산자
+=>
+// "이 파라미터들로 이런 동작을 한다"는 의미
+
+// 반환값 부분
+new GridObject(g, gridPosition)
+// GridObject를 생성해서 반환
+// 생성자에 g(그리드 시스템)와 gridPosition(위치)를 전달
+```
+
+**동일한 코드를 일반 메서드로 작성하면:**
+
+```csharp
+// 람다 표현식 대신 메서드 사용
+private GridObject CreateGridObjectMethod(GridSystem<GridObject> g, GridPosition gridPosition)
+{
+    return new GridObject(g, gridPosition);
+}
+
+// Awake에서
+gridSystem = new GridSystem<GridObject>(10, 10, 2f, CreateGridObjectMethod);
+
+```
+
+**람다 표현식의 장점:**
+
+- 코드가 간결함
+- 일회성 함수를 별도로 선언하지 않아도 됨
+- 코드의 의도가 명확함 (이 위치에서 바로 어떤 객체를 생성하는지 보임)
+
+---
+
+## 7. GridObject 클래스 수정하기
+
+### GridSystem 타입 변경
+
+**변경 전:**
+
+```csharp
+public class GridObject
+{
+    private GridSystem gridSystem;  // 제네릭 없는 GridSystem 참조
+    private GridPosition gridPosition;
+    private List<Unit> unitList;
+
+    public GridObject(GridSystem gridSystem, GridPosition gridPosition)
+    {
+        this.gridSystem = gridSystem;
+        this.gridPosition = gridPosition;
+        unitList = new List<Unit>();
+    }
+}
+```
+
+**변경 후:**
+
+```csharp
+public class GridObject
+{
+    // GridObject 타입을 사용하는 GridSystem을 명시
+    private GridSystem<GridObject> gridSystem;
+    private GridPosition gridPosition;
+    private List<Unit> unitList;
+
+    // 생성자 파라미터도 동일하게 변경
+    public GridObject(GridSystem<GridObject> gridSystem, GridPosition gridPosition)
+    {
+        this.gridSystem = gridSystem;
+        this.gridPosition = gridPosition;
+        unitList = new List<Unit>();
+    }
+
+    // 나머지 메서드들은 변경 없음
+    public override string ToString() { ... }
+    public void AddUnit(Unit unit) { ... }
+    public void RemoveUnit(Unit unit) { ... }
+    public List<Unit> GetUnitList() { ... }
+    public bool HasAnyUnit() { ... }
+    public Unit GetUnit() { ... }
+}
+```
+
+**변경 이유:**
+
+- `GridSystem`이 제네릭 클래스가 되었으므로, 참조할 때 타입 명시 필수
+- `GridObject`는 자기 자신을 타입 파라미터로 사용하는 `GridSystem`을 참조
+- "GridObject를 담는 GridSystem"이라는 명확한 관계 설정
+
+---
+
+## 8. 디버그 오브젝트 처리하기
+
+### 문제 상황
+
+**CreateDebugObjects 메서드의 에러:**
+
+```csharp
+public void CreateDebugObjects(Transform debugPrefab)
+{
+    for (int x = 0; x < width; x++)
+    {
+        for (int z = 0; z < height; z++)
+        {
+            GridPosition gridPosition = new GridPosition(x, z);
+
+            Transform debugTransform = GameObject.Instantiate(debugPrefab,
+                GetWorldPosition(gridPosition), Quaternion.identity);
+            GridDebugObject gridDebugObject = debugTransform.GetComponent<GridDebugObject>();
+
+            // 여기서 에러 발생!
+            gridDebugObject.SetGridObject(GetGridObject(gridPosition));
+            // gridDebugObject.SetGridObject는 GridObject 타입을 기대
+            // 하지만 GetGridObject는 TGridObject 타입을 반환
+        }
+    }
+}
+```
+
+**왜 에러가 발생하나?**
+
+- `GridDebugObject` 클래스는 원래 `GridObject` 타입만 받도록 설계됨
+- 하지만 제네릭 `GridSystem`에서는 `TGridObject` 타입을 반환
+- `TGridObject`와 `GridObject`는 다른 타입 (비록 같을 수도 있지만 컴파일러는 구분)
+
+### 임시 해결: 강제 형변환 (Casting)
+
+```csharp
+public void CreateDebugObjects(Transform debugPrefab)
+{
+    for (int x = 0; x < width; x++)
+    {
+        for (int z = 0; z < height; z++)
+        {
+            GridPosition gridPosition = new GridPosition(x, z);
+
+            Transform debugTransform = GameObject.Instantiate(debugPrefab,
+                GetWorldPosition(gridPosition), Quaternion.identity);
+            GridDebugObject gridDebugObject = debugTransform.GetComponent<GridDebugObject>();
+
+            // as 키워드로 안전한 형변환
+            gridDebugObject.SetGridObject(GetGridObject(gridPosition) as GridObject);
+
+            // as GridObject의 의미:
+            // GetGridObject가 반환한 TGridObject를 GridObject로 변환 시도
+            // 변환 실패 시 null 반환 (예외 발생 안 함)
+        }
+    }
+}
+```
+
+**as 키워드 설명:**
+
+- C#의 안전한 형변환 연산자
+- 변환 가능하면 변환된 값 반환
+- 변환 불가능하면 `null` 반환 (예외 발생 X)
+- `(GridObject)` 직접 캐스팅보다 안전
+
+**왜 임시 해결인가?**
+
+- 강의자가 명시: "디버그 객체는 나중에 길찾기용으로 다른 데이터를 표시할 때 리팩토링할 예정"
+- 지금은 기존 기능이 작동하도록 하는 것이 목표
+- 추후 강의에서 제네릭 디버그 시스템으로 개선될 예정
+
+### 다른 형변환 방법 비교
+
+```csharp
+// 1. 직접 캐스팅 (Cast Operator)
+(GridObject)GetGridObject(gridPosition)
+// 변환 실패 시 InvalidCastException 예외 발생
+
+// 2. as 키워드 (Safe Cast)
+GetGridObject(gridPosition) as GridObject
+// 변환 실패 시 null 반환, 예외 없음
+
+// 3. is 패턴 매칭 (Pattern Matching)
+if (GetGridObject(gridPosition) is GridObject gridObj)
+{
+    gridDebugObject.SetGridObject(gridObj);
+}
+// 변환 가능 여부 확인 후 안전하게 사용
+```
+
+---
+
+## 테스트 및 검증
+
+### 컴파일 확인
+
+**Unity 에디터에서:**
+
+- 모든 스크립트 저장
+- Unity로 돌아가서 자동 컴파일 대기
+- Console 창에 에러가 없는지 확인
+
+**컴파일 성공 조건:**
+
+- `GridSystem<TGridObject>` 제네릭 클래스 정의 완료
+- `LevelGrid`에서 `GridSystem<GridObject>` 사용
+- `GridObject`가 `GridSystem<GridObject>` 참조
+- `CreateDebugObjects`에서 형변환 처리
+
+### 런타임 테스트
+
+**Play 모드 실행:**
+
+```
+1. Play 버튼 클릭
+2. 씬 로드 확인
+3. 그리드 디버그 오브젝트 생성 확인
+4. 유닛 이동 테스트
+5. 공격 액션 테스트
+6. 모든 기능이 이전과 동일하게 작동하는지 확인
+```
+
+**기대 결과:**
+
+- 모든 기능이 리팩토링 전과 똑같이 작동
+- 눈에 보이는 변화는 없음
+- 내부적으로 제네릭 시스템으로 변경됨
+
+**강의자의 확인:**
+
+> "유닛을 움직일 수 있고, 공격할 수 있고, 모든 종류의 액션을 취할 수 있으며, 모든 것이 이전과 똑같이 완벽하게 작동합니다."
+
+---
+
+## 핵심 정리
+
+### 리팩토링 전후 비교
+
+**변경 전:**
+
+```csharp
+// 특정 타입에만 작동
+public class GridSystem
+{
+    private GridObject[,] gridObjectArray;
+
+    public GridSystem(...)
+    {
+        gridObjectArray[x, z] = new GridObject(this, gridPosition);
+    }
+}
+```
+
+**변경 후:**
+
+```csharp
+// 어떤 타입이든 사용 가능
+public class GridSystem<TGridObject>
+{
+    private TGridObject[,] gridObjectArray;
+
+    public GridSystem(..., Func<GridSystem<TGridObject>, GridPosition, TGridObject> createGridObject)
+    {
+        gridObjectArray[x, z] = createGridObject(this, gridPosition);
+    }
+}
+```
+
+### 제네릭 리팩토링의 이점
+
+**1. 코드 재사용성:**
+
+- 같은 `GridSystem` 클래스를 여러 목적으로 사용 가능
+- 게임 로직용: `GridSystem<GridObject>`
+- 길찾기용: `GridSystem<PathNode>` (다음 강의에서)
+
+**2. 유지보수성:**
+
+- 핵심 그리드 로직은 한 곳에만 존재
+- 버그 수정이나 기능 개선 시 한 번만 수정
+
+**3. 타입 안정성:**
+
+- 컴파일 타임에 타입 체크
+- 런타임 에러 감소
+
+### 다음 강의 예고
+
+**길찾기 시스템 구현:**
+
+- `GridSystem<PathNode>` 생성
+- `PathNode` 클래스는 길찾기에 필요한 정보만 저장
+- 게임 로직과 길찾기 로직 완전 분리
+- 디버그 시스템도 제네릭으로 리팩토링
+
+**제네릭의 진가:**
+
+> "이제 우리는 어떤 타입과도 사용할 수 있는 정말 훌륭한 클래스를 갖게 되었고, 이것은 길찾기와 함께 이 그리드 시스템을 재사용할 때 매우 유용할 것입니다."

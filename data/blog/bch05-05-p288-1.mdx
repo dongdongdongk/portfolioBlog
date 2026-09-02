@@ -1,0 +1,482 @@
+---
+title: 'BCh05 05 p288 컨트롤러와화면(1)'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+## 리스트 페이지 컨트롤러 만들기
+
+```java
+이제 기본적인 작업이 완료 되었으니 화면단과 컨트롤러를 만들어준다
+```
+
+![Untitled](<BCh05%2005%20p288%20%EC%BB%A8%ED%8A%B8%EB%A1%A4%EB%9F%AC%EC%99%80%ED%99%94%EB%A9%B4(1)/Untitled.png>)
+
+```java
+기본적인 Board 컨트롤러 작성
+```
+
+![Untitled](<BCh05%2005%20p288%20%EC%BB%A8%ED%8A%B8%EB%A1%A4%EB%9F%AC%EC%99%80%ED%99%94%EB%A9%B4(1)/Untitled%201.png>)
+
+```java
+@GetMapping("/list")
+    public void list(PageRequestDTO pageRequestDTO, Model model){
+
+        log.info("list............." + pageRequestDTO);
+
+        model.addAttribute("result", boardService.getList(pageRequestDTO));
+
+    }
+```
+
+```java
+리스트 url 로 이동 하기위한 코드 작성
+
+* @ModelAtribue 가 없지만 객체 타입은 자동으로 모델에 추가되서 전달된다.
+```
+
+## 리스트 페이지 제작
+
+![Untitled](<BCh05%2005%20p288%20%EC%BB%A8%ED%8A%B8%EB%A1%A4%EB%9F%AC%EC%99%80%ED%99%94%EB%A9%B4(1)/Untitled%202.png>)
+
+```java
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
+    <th:block th:replace="~{/layout/basic :: setContent(~{this::content})}"></th:block>
+
+        <th:block th:fragment="content">
+            <h1>exSidebar Page</h1>
+        </th:block>
+
+</html>
+```
+
+```java
+basic html 은 예전에 사용했던걸 다시 사용하고 list 를 작성해준다
+```
+
+![Untitled](<BCh05%2005%20p288%20%EC%BB%A8%ED%8A%B8%EB%A1%A4%EB%9F%AC%EC%99%80%ED%99%94%EB%A9%B4(1)/Untitled%203.png>)
+
+```java
+이후 th:block 내부에 리스트를 출력하기 위한 코드추가
+```
+
+![Untitled](<BCh05%2005%20p288%20%EC%BB%A8%ED%8A%B8%EB%A1%A4%EB%9F%AC%EC%99%80%ED%99%94%EB%A9%B4(1)/Untitled%204.png>)
+
+```java
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
+<th:block th:replace="~{/layout/basic.html::setContent(~{this::content})}"></th:block>
+
+<th:block th:fragment="content">
+    <table class="table table-striped">
+        <thead>
+        <tr>
+            <th scope="col">#</th>
+            <th scope="col">Title</th>
+            <th scope="col">Writer</th>
+            <th scope="col">Regdate</th>
+        </tr>
+        </thead>
+        <tbody>
+
+        <tr th:each="dto:${result.dtoList}">
+            <th scope="row">
+                <a th:href="@{read(bno=${dto.bno})}"> [[${dto.bno}]] </a>
+            </th>
+            <td>[[${dto.title}]] ---------------- [<b th:text="${dto.replyCount}"></b>]</td>
+            <td>[[${dto.writerName}]] <small>[[${dto.writerEmail}]]</small></td>
+            <td>[[${#temporals.format(dto.regDate, 'yyyy/MM/dd')}]]</td>
+        </tr>
+
+        </tbody>
+    </table>
+</th:block>
+
+</html>
+```
+
+### 오류 ( 타임리프에 ${} 로 값을 넣을때 그 값이 없으면 오류가 난다
+
+```java
+${} 에 값이 없거나 타입이 없으면 값을 넣어주지 말자 ex) ${pageRequestDTO.type} 아직 type이 없어서 오류가 난다
+```
+
+# 게시물 등록
+
+```java
+게시물 등록으로 이동 할 get,post 컨트롤러 추가
+```
+
+![Untitled](<BCh05%2005%20p288%20%EC%BB%A8%ED%8A%B8%EB%A1%A4%EB%9F%AC%EC%99%80%ED%99%94%EB%A9%B4(1)/Untitled%205.png>)
+
+## 등록 페이지 작성
+
+![Untitled](<BCh05%2005%20p288%20%EC%BB%A8%ED%8A%B8%EB%A1%A4%EB%9F%AC%EC%99%80%ED%99%94%EB%A9%B4(1)/Untitled%206.png>)
+
+```java
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
+<th:block th:replace="~{/layout/basic :: setContent(~{this::content} )}">
+
+  <th:block th:fragment="content">
+
+    <h1 class="mt-4">Board Register Page</h1>
+
+    <form th:action="@{/board/register}" th:method="post">
+      <div class="form-group">
+        <label >Title</label>
+        <input type="text" class="form-control" name="title" placeholder="Enter Title">
+      </div>
+      <div class="form-group">
+        <label >Content</label>
+        <textarea class="form-control" rows="5" name="content"></textarea>
+      </div>
+      <div class="form-group">
+        <label >Writer Email</label>
+        <input type="email" class="form-control" name="writerEmail" placeholder="Writer Email ">
+      </div>
+
+      <button type="submit" class="btn btn-primary">Submit</button>
+    </form>
+
+  </th:block>
+
+</th:block>
+```
+
+```java
+등록할 때 writeEmail 부분은 DB에 등록되어 있는 Member 의 이름중 하나를 사용하여야 한다
+```
+
+### 오류 (테이블 UTF-8 형식)
+
+```java
+JPA 등을 사용할떄는 테이블이 자동으로 만들어지기 때문에 인코딩을 변경할 시간이 없다 ( 연관 관계를 자동으로 연결해서 )
+
+ALTER DATABASE 테이블면 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+DB를 만들고 어플리케이션을 실행해서 테이블을 자동으로 만들기전에 위의 설정을 추가해준다
+```
+
+# 게시물 상세 조회
+
+![Untitled](<BCh05%2005%20p288%20%EC%BB%A8%ED%8A%B8%EB%A1%A4%EB%9F%AC%EC%99%80%ED%99%94%EB%A9%B4(1)/Untitled%207.png>)
+
+```java
+게시물 번호를 클릭하여 상세 조회
+```
+
+## 게시물 상세 조회 컨트롤러 추가
+
+![Untitled](<BCh05%2005%20p288%20%EC%BB%A8%ED%8A%B8%EB%A1%A4%EB%9F%AC%EC%99%80%ED%99%94%EB%A9%B4(1)/Untitled%208.png>)
+
+```java
+게시물 상세조회를 위한 컨트롤러를 추가한다
+
+pageRequestDTO 는 requestDTO 로 명시해서 Model에 담아서 보낸다 (자동으로 담김)
+```
+
+## 게시물 상세 페이지 작성
+
+```java
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
+<th:block th:replace="~{/layout/basic :: setContent(~{this::content} )}">
+
+    <th:block th:fragment="content">
+
+        <h1 class="mt-4">Board Read Page</h1>
+
+        <div class="form-group">
+            <label >Bno</label>
+            <input type="text" class="form-control" name="bno" th:value="${dto.bno}" readonly >
+        </div>
+
+        <div class="form-group">
+            <label >Title</label>
+            <input type="text" class="form-control" name="title" th:value="${dto.title}" readonly >
+        </div>
+        <div class="form-group">
+            <label >Content</label>
+            <textarea class="form-control" rows="5" name="content" readonly>[[${dto.content}]]</textarea>
+        </div>
+        <div class="form-group">
+            <label >Writer</label>
+            <input type="text" class="form-control" name="writer" th:value="${dto.writerName}" readonly>
+        </div>
+        <div class="form-group">
+            <label >RegDate</label>
+            <input type="text" class="form-control" name="regDate" th:value="${#temporals.format(dto.regDate, 'yyyy/MM/dd HH:mm:ss')}" readonly>
+        </div>
+        <div class="form-group">
+            <label >ModDate</label>
+            <input type="text" class="form-control" name="modDate" th:value="${#temporals.format(dto.modDate, 'yyyy/MM/dd HH:mm:ss')}" readonly>
+        </div>
+
+<!--        <a th:href="@{/board/modify(bno = ${dto.bno}, page=${requestDTO.page}, type=${requestDTO.type}, keyword =${requestDTO.keyword})}">-->
+<!--            <button type="button" class="btn btn-primary">Modify</button>-->
+<!--        </a>-->
+
+<!--        <a th:href="@{/board/list(page=${requestDTO.page} , type=${requestDTO.type}, keyword =${requestDTO.keyword})}">-->
+<!--            <button type="button" class="btn btn-info">List</button>-->
+<!--        </a>-->
+    </th:block>
+</th:block>
+```
+
+```java
+Hibernate:
+    select
+        board0_.bno as col_0_0_,
+        member1_.email as col_1_0_,
+        count(reply2_.rno) as col_2_0_,
+        board0_.bno as bno1_0_0_,
+        member1_.email as email1_1_1_,
+        board0_.moddate as moddate2_0_0_,
+        board0_.regdate as regdate3_0_0_,
+        board0_.content as content4_0_0_,
+        board0_.title as title5_0_0_,
+        board0_.writer_email as writer_e6_0_0_,
+        member1_.moddate as moddate2_1_1_,
+        member1_.regdate as regdate3_1_1_,
+        member1_.name as name4_1_1_,
+        member1_.password as password5_1_1_
+    from
+        board board0_
+    left outer join
+        member member1_
+            on board0_.writer_email=member1_.email
+    left outer join
+        reply reply2_
+            on (
+                reply2_.board_bno=board0_.bno
+            )
+    where
+        board0_.bno=?
+```
+
+```java
+left join 으로 다른 엔티티도 불러옴 (writeMember 과 댓글수(화면에서 사용은 안함) 을 불러와서 그렇다
+```
+
+# 게시물 수정,삭제
+
+```java
+게시물 수정과 삭제 기능을 제작
+```
+
+## 게시물 삭제, 수정 컨트롤러
+
+![Untitled](<BCh05%2005%20p288%20%EC%BB%A8%ED%8A%B8%EB%A1%A4%EB%9F%AC%EC%99%80%ED%99%94%EB%A9%B4(1)/Untitled%209.png>)
+
+```java
+// 게시물 조회,수정
+    @GetMapping({"/read","/modify"})
+    public void read(@ModelAttribute("requestDTO") PageRequestDTO pageRequestDTO, Long bno, Model model) {
+
+        log.info("bno: " + bno);
+
+        BoardDTO boardDTO = boardService.get(bno);
+
+        log.info("{}", boardDTO);
+
+        model.addAttribute("dto", boardDTO);
+
+    }
+
+    // 게시물 삭제
+    @PostMapping("/remove")
+    public String remove(Long bno, RedirectAttributes redirectAttributes){
+
+        log.info("bno: " + bno);
+
+        boardService.removeWithReplies(bno);
+
+        redirectAttributes.addFlashAttribute("msg", bno);
+
+        return "redirect:/board/list";
+
+    }
+```
+
+```java
+게시물 수정페이지 이동은 read 와 받는 파라미터가 같기 때문에 주소를 {} 이렇게 받아서 한번에 해결하도록 한다
+```
+
+### 수정 POST Mapping 추가
+
+![Untitled](<BCh05%2005%20p288%20%EC%BB%A8%ED%8A%B8%EB%A1%A4%EB%9F%AC%EC%99%80%ED%99%94%EB%A9%B4(1)/Untitled%2010.png>)
+
+```java
+실제 수정을 진행할 Post modify 를 추가해준다
+
+수정후 이동되는 페이지는 상세 페이지다 (read)
+
+* 추가할때 type 과 keyword 가 없었는데 requestDTO 에 추가해주자
+```
+
+### **addAttribute, addFlashAttribute**
+
+```java
+**addAttribute**는 URL에 붙어서 값이 전달되어 유지가 되지만
+
+**addFlashAttribute**는 일회성으로 URL에 붙지 않고 한 번의 리다이렉션 요청 후에는 값이 사라진다.
+
+이는 일시적인 데이터를 한 페이지에서 다음 페이지로 전달하는 데 유용
+
+* 여기서 사용하는 이유는 read 로 갔다가 다시 list 로 이동하려면 URL 에서 값이 유지되어야 하기 때문이다
+```
+
+## 수정(삭제) 페이지 추가
+
+![Untitled](<BCh05%2005%20p288%20%EC%BB%A8%ED%8A%B8%EB%A1%A4%EB%9F%AC%EC%99%80%ED%99%94%EB%A9%B4(1)/Untitled%2011.png>)
+
+```java
+read 페이지를 똑같이 붙여넣지만 수정 가능한 부분만 readOnly 를 풀어준다
+
+그리고 다시 보낼필요 없는 부분 writer, 수정날짜 등 의 name 은 지워준다   + form action 추가
+
+그리고 삭제 수정 버튼을 추가하고 기능을 구현하기 위해 자바 스크립트를 추가해준다
+```
+
+```java
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
+<th:block th:replace="~{/layout/basic :: setContent(~{this::content} )}">
+
+    <th:block th:fragment="content">
+
+        <h1 class="mt-4">Board Modify Page</h1>
+        <form action="/board/modify" method="post">
+            <div class="form-group">
+                <!--검색 조건을 유지하기 위한 hidden-->
+                <input type="hidden" name="page" th:value="${requestDTO.page}">
+                <input type="hidden" name="type" th:value="${requestDTO.type}">
+                <input type="hidden" name="keyword" th:value="${requestDTO.keyword}">
+
+                <label >Bno</label>
+                <input type="text" class="form-control" name="bno" th:value="${dto.bno}" readonly >
+            </div>
+
+            <div class="form-group">
+                <label >Title</label>
+                <input type="text" class="form-control" name="title" th:value="${dto.title}">
+            </div>
+            <div class="form-group">
+                <label >Content</label>
+                <textarea class="form-control" rows="5" name="content">[[${dto.content}]]</textarea>
+            </div>
+            <div class="form-group">
+                <label >Writer</label>
+                <input type="text" class="form-control" th:value="${dto.writerName}" readonly>
+            </div>
+            <div class="form-group">
+                <label >RegDate</label>
+                <input type="text" class="form-control" th:value="${#temporals.format(dto.regDate, 'yyyy/MM/dd HH:mm:ss')}" readonly>
+            </div>
+            <div class="form-group">
+                <label >ModDate</label>
+                <input type="text" class="form-control" th:value="${#temporals.format(dto.modDate, 'yyyy/MM/dd HH:mm:ss')}" readonly>
+            </div>
+
+            <!--        <a th:href="@{/board/modify(bno = ${dto.bno}, page=${requestDTO.page}, type=${requestDTO.type}, keyword =${requestDTO.keyword})}">-->
+            <!--            <button type="button" class="btn btn-primary">Modify</button>-->
+            <!--        </a>-->
+
+            <!--        <a th:href="@{/board/list(page=${requestDTO.page} , type=${requestDTO.type}, keyword =${requestDTO.keyword})}">-->
+            <!--            <button type="button" class="btn btn-info">List</button>-->
+            <!--        </a>-->
+        </form>
+        <button type="button" class="btn btn-primary modifyBtn">Modify</button>
+        <button type="button" class="btn btn-info listBtn">List</button>
+        <button type="button" class="btn btn-danger removeBtn">Remove</button>
+
+        <script th:inline="javascript">
+            const removeBtn = document.querySelector(".removeBtn");
+            const actionForm = document.querySelector("form");
+            const modifyBtn = document.querySelector(".modifyBtn");
+            const pageInfo = document.querySelector("input[name='page']");
+            const typeInfo = document.querySelector("input[name='type']");
+            const keywordInfo = document.querySelector("input[name='keyword']");
+            const listBtn = document.querySelector(".listBtn");
+
+            removeBtn.addEventListener('click', function (){
+                actionForm.setAttribute("action","/board/remove")
+                actionForm.method = "post";
+                actionForm.submit();
+            });
+
+            modifyBtn.addEventListener('click', function (){
+                if(!confirm("수정하시겠습니까?")){
+                    return;
+                }
+                actionForm.setAttribute("action", "/board/modify")
+                actionForm.method = "post"
+                actionForm.submit();
+            });
+
+            listBtn.addEventListener("click", function (){
+                actionForm.innerHTML=""; //form 태그의 내용 삭제
+                actionForm.append(pageInfo); // 목록에 필요한 페이지 값 추가
+                actionForm.append(typeInfo); // 목록에 필요한 타입 값 추가
+                actionForm.append(keywordInfo); // 목록에 필요한 키워드 값 추가
+                actionForm.setAttribute("action", "/board/list")
+                actionForm.method = "get";
+                actionForm.submit();
+            });
+
+        </script>
+
+    </th:block>
+</th:block>
+```
+
+## 자바스크립트 추가
+
+```java
+         <script th:inline="javascript">
+            const removeBtn = document.querySelector(".removeBtn");
+            const actionForm = document.querySelector("form");
+            const modifyBtn = document.querySelector(".modifyBtn");
+            const pageInfo = document.querySelector("input[name='page']");
+            const typeInfo = document.querySelector("input[name='type']");
+            const keywordInfo = document.querySelector("input[name='keyword']");
+            const listBtn = document.querySelector(".listBtn");
+
+            removeBtn.addEventListener('click', function (){
+                actionForm.setAttribute("action","/board/remove")
+                actionForm.method = "post";
+                actionForm.submit();
+            });
+
+            modifyBtn.addEventListener('click', function (){
+                if(!confirm("수정하시겠습니까?")){
+                    return;
+                }
+                actionForm.setAttribute("action", "/board/modify")
+                actionForm.method = "post"
+                actionForm.submit();
+            });
+
+            listBtn.addEventListener("click", function (){
+                actionForm.innerHTML=""; //form 태그의 내용 삭제
+                actionForm.append(pageInfo); // 목록에 필요한 페이지 값 추가
+                actionForm.append(typeInfo); // 목록에 필요한 타입 값 추가
+                actionForm.append(keywordInfo); // 목록에 필요한 키워드 값 추가
+                actionForm.setAttribute("action", "/board/list")
+                actionForm.method = "get";
+                actionForm.submit();
+            });
+
+        </script>
+
+```

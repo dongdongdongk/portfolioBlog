@@ -1,0 +1,1027 @@
+---
+title: 'EcommerceProject -4'
+date: '2026-09-02'
+category: '풀스택/프로젝트 정리'
+tags: ['풀스택', '프로젝트 정리']
+draft: false
+summary: ''
+---
+
+# Header.jsx 수정 ( 카트, 위시리스트 출력 찜하기, 장바구니 기능 기능 )
+
+```jsx
+// Header 컴포넌트는 웹 애플리케이션의 상단 헤더 부분을 담당합니다.
+
+import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import styles from "../../styles/styles";
+import { categoriesData, productData } from "../../static/data";
+import {
+  AiOutlineHeart,
+  AiOutlineSearch,
+  AiOutlineShoppingCart,
+} from "react-icons/ai";
+import { RxCross1 } from "react-icons/rx";
+import { CgProfile } from "react-icons/cg";
+import { IoIosArrowDown, IoIosArrowForward } from "react-icons/io";
+import { BiMenuAltLeft } from "react-icons/bi";
+import DropDown from "./DropDown";
+import Navbar from "./Navbar";
+import Cart from "../Cart/Cart";
+import { useSelector } from "react-redux";
+import Wishlist from "../Wishlist/Wishlist";
+
+const Header = ({ activeHeading }) => {
+  // useSelector를 통해 Redux store에서 상태값을 가져옵니다.
+  const { isAuthenticated, user } = useSelector((state) => state.user);
+  const { allProducts } = useSelector((state) => state.product);
+  const { cart } = useSelector((state) => state.cart);
+  const { wishList } = useSelector((state) => state.wishList);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchData, setSearchData] = useState(null);
+  const [active, setActive] = useState(false);
+  const [dropDown, setDropDown] = useState(false);
+  const [openCart, setOpenCart] = useState(false);
+  const [openWishlist, setOpenWishlist] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  // 검색어 입력 핸들러
+  const handleSearchChange = (e) => {
+    const term = e.target.value;
+    setSearchTerm(term);
+
+    // 상품 데이터에서 검색어와 일치하는 상품을 찾아 setSearchData로 설정합니다.
+    const filteredProducts =
+      allProducts &&
+      allProducts.filter((product) =>
+        product.name.toLowerCase().includes(term.toLowerCase())
+      );
+    setSearchData(filteredProducts);
+  };
+
+  // 스크롤 이벤트 핸들러
+  window.addEventListener("scroll", () => {
+    // 스크롤 위치에 따라 헤더의 스타일을 변경합니다.
+    if (window.scrollY > 70) {
+      setActive(true);
+    } else {
+      setActive(false);
+    }
+  });
+
+  return (
+    <>
+      {/* 데스크탑 화면에서 보이는 헤더 영역 */}
+      <div className={`${styles.section}`}>
+        <div className="hidden 800px:h-[50px] 800px:my-[20px] 800px:flex items-center justify-between">
+          <div>
+            {/* 홈으로 이동하는 링크와 로고 이미지 */}
+            <Link to="/">
+              <img
+                src={`http://localhost:5000/images/QuickDealMarketFix.jpg`}
+                alt=""
+              />
+            </Link>
+          </div>
+          {/* 검색창 */}
+          <div className="w-[50%] relative">
+            <input
+              type="text"
+              placeholder="Search Product..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+              className="h-[40px] w-full px-2 border-[#e3bb8b] border-[2px] rounded-md"
+            />
+            <AiOutlineSearch
+              size={30}
+              className="absolute right-2 top-1.5 cursor-pointer"
+            />
+            {/* 검색 결과가 있을 경우, 결과를 보여주는 드롭다운 */}
+            {searchData && searchData.length !== 0 ? (
+              <div className="absolute min-h-[30vh] bg-slate-50 shadow-sm-2 z-[9] p-4">
+                {searchData &&
+                  searchData.map((i, index) => {
+                    const d = i.name;
+
+                    const Product_name = d.replace(/\s+/g, "-");
+                    return (
+                      <Link to={`/product/${Product_name}`} key={index}>
+                        <div className="w-full flex items-start-py-3">
+                          <img
+                            src={`http://localhost:5000/${i.images[0]}`}
+                            alt=""
+                            className="w-[40px] h-[40px] mr-[10px]"
+                          />
+                          <h1>{i.name}</h1>
+                        </div>
+                      </Link>
+                    );
+                  })}
+              </div>
+            ) : null}
+          </div>
+
+          <div className={`${styles.button}`}>
+            {/* 새로운 상품을 등록하는 링크 */}
+            <Link to="/shop-create">
+              <h1 className="text-[#fff] flex items-center">
+                판매자 등록 <IoIosArrowForward className="ml-1" />
+              </h1>
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* 데스크탑에서 스크롤 시 나타나는 헤더 */}
+      <div
+        className={`${
+          active === true ? "shadow-sm fixed top-0 left-0 z-10" : null
+        } transition hidden 800px:flex items-center justify-between w-full bg-[#e3bb8b] h-[70px]`}
+      >
+        <div
+          className={`${styles.section} relative ${styles.noramlFlex} justify-between`}
+        >
+          {/* 카테고리 드롭다운 */}
+          <div onClick={() => setDropDown(!dropDown)}>
+            <div className="relative h-[60px] mt-[10px] w-[270px] hidden 1000px:block">
+              <BiMenuAltLeft size={30} className="absolute top-3 left-2" />
+              <button
+                className={`h-[100%] w-full flex justify-between items-center pl-10 bg-white font-sans text-lg font-[500] select-none rounded-t-md`}
+              >
+                All Categories
+              </button>
+              <IoIosArrowDown
+                size={20}
+                className="absolute right-2 top-4 cursor-pointer"
+                onClick={() => setDropDown(!dropDown)}
+              />
+              {/* 카테고리 드롭다운 컴포넌트 */}
+              {dropDown ? (
+                <DropDown
+                  categoriesData={categoriesData}
+                  setDropDown={setDropDown}
+                />
+              ) : null}
+            </div>
+          </div>
+
+          {/* 네비게이션 메뉴 */}
+          <div className={`${styles.noramlFlex}`}>
+            <Navbar active={activeHeading} />
+          </div>
+
+          {/* 위시리스트, 카트, 프로필 아이콘 */}
+          <div className="flex">
+            <div className={`${styles.noramlFlex}`}>
+              <div
+                className="relative cursor-pointer mr-[15px]"
+                onClick={() => setOpenWishlist(true)}
+              >
+                {/* 위시리스트 아이콘과 개수 표시 */}
+                <AiOutlineHeart size={30} color="rgb(255 255 255 / 83%)" />
+                <span className="absolute right-0 top-0 rounded-full bg-[#3bc177] w-4 h-4 top right p-0 m-0 text-white font-mono text-[12px] leading-tight text-center">
+                  {wishList && wishList.length}
+                </span>
+              </div>
+            </div>
+
+            <div className={`${styles.noramlFlex}`}>
+              <div
+                className="relative cursor-pointer mr-[15px]"
+                onClick={() => setOpenCart(true)}
+              >
+                {/* 카트 아이콘과 개수 표시 */}
+                <AiOutlineShoppingCart
+                  size={30}
+                  color="rgb(255 255 255 / 83%)"
+                />
+                <span className="absolute right-0 top-0 rounded-full bg-[#3bc177] w-4 h-4 top right p-0 m-0 text-white font-mono text-[12px] leading-tight text-center">
+                  {cart && cart.length}
+                </span>
+              </div>
+            </div>
+```
+
+```jsx
+        <div className={`${styles.noramlFlex}`}>
+              <div className="relative cursor-pointer mr-[15px]">
+                {/* 프로필 아이콘 (로그인 되어 있을 경우 프로필 이미지, 아닐 경우 로그인 페이지로 이동하는 링크) */}
+                {isAuthenticated ? (
+                  <Link to="/profile">
+                    <img
+                      src={`http://localhost:5000/${user.avatar}`}
+                      className="w-[35px] h-[35px] rounded-full"
+                      alt=""
+                    />
+                  </Link>
+                ) : (
+                  <Link to="/login">
+                    <CgProfile size={30} color="rgb(255 255 255 / 83%)" />
+                  </Link>
+                )}
+              </div>
+            </div>
+            {/* 카트리스트 팝업 */}
+            {openCart ? <Cart setOpenCart={setOpenCart} /> : null}
+
+            {/* 위시리스트 팝업 */}
+            {openWishlist ? (
+              <Wishlist setOpenWishlist={setOpenWishlist} />
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      {/* 모바일 헤더 */}
+      <div
+        className={`${
+          active === true ? "shadow-sm fixed top-0 left-0 z-10" : null
+        }
+      w-full h-[60px] bg-[#fff] z-50 top-0 left-0 shadow-sm 800px:hidden`}
+      >
+        <div className="w-full flex items-center justify-between">
+          <div>
+            <BiMenuAltLeft
+              size={40}
+              className="ml-4"
+              onClick={() => setOpen(true)}
+            />
+          </div>
+          <div>
+            <Link to="/">
+              <img
+                src={`http://localhost:5000/images/QuickDealMarketFix.jpg`}
+                alt=""
+                className="mt-3 cursor-pointer"
+              />
+            </Link>
+          </div>
+          <div>
+            <div className="relative mr-[20px]">
+              {/* 카트 아이콘과 개수 표시 (클릭 시 카트리스트 팝업 열림) */}
+              <AiOutlineShoppingCart size={30} />
+              <span class="absolute right-0 top-0 rounded-full bg-[#3bc177] w-4 h-4 top right p-0 m-0 text-white font-mono text-[12px]  leading-tight text-center">
+                {cart && cart.length}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* 모바일 사이드바 */}
+        {open && (
+          <div
+            className={`fixed w-full bg-[#0000005f] z-20 h-full top-0 left-0`}
+          >
+            <div className="fixed w-[60%] bg-[#fff] h-screen top-0 left-0 z-10 overflow-y-scroll">
+              <div className="w-full justify-between flex pr-3">
+                <div>
+                  <div className="relative mr-[15px]">
+                    {/* 위시리스트 아이콘과 개수 표시 (클릭 시 위시리스트 팝업 열림) */}
+                    <AiOutlineHeart size={30} className="mt-5 ml-3" />
+                    <span class="absolute right-0 top-0 rounded-full bg-[#3bc177] w-4 h-4 top right p-0 m-0 text-white font-mono text-[12px]  leading-tight text-center">
+                      0
+                    </span>
+                  </div>
+                </div>
+                <RxCross1
+                  size={30}
+                  className="ml-4 mt-5"
+                  onClick={() => setOpen(false)}
+                />
+              </div>
+
+              {/* 검색창 */}
+              <div className="my-8 w-[92%] m-auto h-[40px relative]">
+                <input
+                  type="search"
+                  placeholder="Search Product..."
+                  className="h-[40px] w-full px-2 border-[#3957db] border-[2px] rounded-md"
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                />
+                {/* 검색 결과가 있을 경우, 결과를 보여주는 드롭다운 */}
+                {searchData && (
+                  <div className="absolute bg-[#fff] z-10 shadow w-full left-0 p-3">
+                    {searchData.map((i, index) => {
+                      const d = i.name;
+
+                      const Product_name = d.replace(/\s+/g, "-");
+                      return (
+                        <Link to={`/product/${Product_name}`} key={index}>
+                          <div className="flex items-center">
+                            <img
+                              src={i.image_Url[0].url}
+                              alt=""
+                              className="w-[50px] mr-2"
+                            />
+                            <h5>{i.name}</h5>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* 네비게이션 메뉴 */}
+              <Navbar active={activeHeading} />
+              {/* 새로운 상품을 등록하는 링크 */}
+              <div className={`${styles.button} ml-4 !rounded-[4px]`}>
+                <Link to="/shop-create">
+                  <h1 className="text-[#fff] flex items-center">
+                    Become Seller <IoIosArrowForward className="ml-1" />
+                  </h1>
+                </Link>
+              </div>
+              <br />
+              <br />
+              <br />
+
+              <div className="flex w-full justify-center">
+                {isAuthenticated ? (
+                  <div>
+                    {/* 로그인 되어 있을 경우 프로필 이미지 표시 */}
+                    <Link to="/profile">
+                      <img
+                        src={`http://localhost:5000/${user.avatar}`}
+                        alt=""
+                        className="w-[60px] h-[60px] rounded-full border-[3px] border-[#0eae88]"
+                      />
+                    </Link>
+                  </div>
+                ) : (
+                  <>
+                    {/* 로그인이 되어 있지 않을 경우 로그인 및 회원가입 링크 표시 */}
+                    <Link
+                      to="/login"
+                      className="text-[18px] pr-[10px] text-[#000000b7]"
+                    >
+                      Login /
+                    </Link>
+                    <Link
+                      to="/sign-up"
+                      className="text-[18px] text-[#000000b7]"
+                    >
+                      Sign up
+                    </Link>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+};
+
+export default Header;
+```
+
+```jsx
+카트리스트 팝업 (Cart 컴포넌트):
+
+openCart 상태를 통해 팝업의 열림/닫힘 여부를 관리한다.
+
+Cart 컴포넌트는 setOpenCart prop을 통해 부모 컴포넌트에서 팝업 상태를 조절할 수 있다.
+
+Redux의 상태에서 가져온 cart 배열을 통해 카트에 담긴 상품 정보를 표시한다.
+
+각 상품에는 삭제 기능이 있어 사용자가 카트에서 상품을 제거할 수 있다.
+
+------------------------------------------------------------------------------------------------------
+
+위시리스트 팝업 (Wishlist 컴포넌트):
+
+openWishlist 상태를 통해 팝업의 열림/닫힘 여부를 관리한다.
+
+Wishlist 컴포넌트는 setOpenWishlist prop을 통해 부모 컴포넌트에서 팝업 상태를 조절할 수 있다.
+
+Redux의 상태에서 가져온 wishList 배열을 통해 위시리스트에 담긴 상품 정보를 표시한다.
+
+각 상품에는 삭제 기능이 있어 사용자가 위시리스트에서 상품을 제거할 수 있다.
+```
+
+# Cart.jsx ( 장바구니 컴포넌트 작성 )
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381462/notion-blog/_/_/EcommerceProject/EcommerceProject_-4/Untitled.png)
+
+```jsx
+import React, { useState } from 'react'
+import { RxCross1 } from 'react-icons/rx'
+import { IoBagHandleOutline } from 'react-icons/io5'
+import { HiOutlineMinus, HiPlus } from 'react-icons/hi'
+import styles from '../../styles/styles'
+import { Link } from 'react-router-dom'
+import { useDispatch, useSelector } from 'react-redux'
+import { addToCart, removeFromCart } from '../../redux/cart/cartAction'
+import { toast } from 'react-toastify'
+
+// 카트 팝업 컴포넌트
+const Cart = ({ setOpenCart }) => {
+  // Redux에서 카트 정보 가져오기
+  const { cart } = useSelector((state) => state.cart)
+  const dispatch = useDispatch()
+
+  // 카트에서 상품 삭제 핸들러
+  const removeFromCartHandler = (data) => {
+    dispatch(removeFromCart(data))
+  }
+
+  // 카트에 담긴 상품의 총 가격 계산
+  const totalPrice = cart.reduce((acc, item) => acc + item.qty * item.discountPrice, 0)
+
+  // 상품 수량 변경 핸들러
+  const quantityChangeHandler = (data) => {
+    dispatch(addToCart(data))
+  }
+
+  return (
+    <div className="fixed top-0 left-0 z-10 h-screen w-full bg-[#0000004b]">
+      <div className="fixed top-0 right-0 flex h-full w-[25%] flex-col justify-between overflow-y-scroll bg-white shadow-sm">
+        {cart && cart.length === 0 ? (
+          <div className="flex h-screen w-full items-center justify-center">
+            <div className="fixed top-3 right-3 flex w-full justify-end pt-5 pr-5">
+              <RxCross1 size={25} className="cursor-pointer" onClick={() => setOpenCart(false)} />
+            </div>
+            <h5>장바구니에 상품이 없습니다!</h5>
+          </div>
+        ) : (
+          <>
+            <div>
+              <div className="flex w-full justify-end pt-5 pr-5">
+                <RxCross1 size={25} className="cursor-pointer" onClick={() => setOpenCart(false)} />
+              </div>
+              {/* 장바구니 아이템 개수 표시 */}
+              <div className={`${styles.noramlFlex} p-4`}>
+                <IoBagHandleOutline size={25} />
+                <h5 className="pl-2 text-[20px] font-[500]">{cart && cart.length} items</h5>
+              </div>
+
+              {/* 카트에 담긴 상품 목록 */}
+              <br />
+              <div className="w-full border-t">
+                {cart &&
+                  cart.map((i, index) => (
+                    <CartSingle
+                      key={index}
+                      data={i}
+                      quantityChangeHandler={quantityChangeHandler}
+                      removeFromCartHandler={removeFromCartHandler}
+                    />
+                  ))}
+              </div>
+            </div>
+
+            <div className="mb-3 px-5">
+              {/* 체크아웃 버튼 */}
+              <Link to="/checkout">
+                <div
+                  className={`flex h-[45px] w-[100%] items-center justify-center rounded-[5px] bg-[#e44343]`}
+                >
+                  <h1 className="text-[18px] font-[600] text-[#fff]">
+                    Checkout Now ({totalPrice}원)
+                  </h1>
+                </div>
+              </Link>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// 카트에 담긴 개별 상품 표시 컴포넌트
+const CartSingle = ({ data, quantityChangeHandler, removeFromCartHandler }) => {
+  // 로컬 상태 사용 (수량 변경 시 반영)
+  const [value, setValue] = useState(data.qty)
+  const totalPrice = data.discountPrice * value
+
+  // 상품 수량 증가 함수
+  const increment = (data) => {
+    if (data.stock < value) {
+      toast.error('상품 제고를 초과하였습니다!')
+    } else {
+      setValue(value + 1)
+      const updateCartData = { ...data, qty: value + 1 }
+      quantityChangeHandler(updateCartData)
+    }
+  }
+
+  // 상품 수량 감소 함수
+  const decrement = (data) => {
+    setValue(value === 1 ? 1 : value - 1)
+    const updateCartData = { ...data, qty: value === 1 ? 1 : value - 1 }
+    quantityChangeHandler(updateCartData)
+  }
+
+  return (
+    <div className="border-b p-4">
+      <div className="flex w-full items-center">
+        <div>
+          {/* 수량 증가 버튼 */}
+          <div
+            className={`h-[25px] w-[25px] rounded-full border border-[#e4434373] bg-[#e44343] ${styles.noramlFlex} cursor-pointer justify-center`}
+            onClick={() => increment(data)}
+          >
+            <HiPlus size={18} color="#fff" />
+          </div>
+          {/* 수량 표시 */}
+          <span className="pl-[10px]">{data.qty}</span>
+          {/* 수량 감소 버튼 */}
+          <div
+            className="flex h-[25px] w-[25px] cursor-pointer items-center justify-center rounded-full bg-[#a7abb14f]"
+            onClick={() => decrement(data)}
+          >
+            <HiOutlineMinus size={16} color="#7d879c" />
+          </div>
+        </div>
+        {/* 상품 이미지 */}
+        <img
+          src={`http://localhost:5000/${data?.images[0]}`}
+          alt=""
+          className="mr-2 ml-2 h-min w-[130px] rounded-[5px]"
+        />
+        <div className="pl-[5px]">
+          {/* 상품 정보 및 가격 */}
+          <h1>{data.name}</h1>
+          <h4 className="text-[15px] font-[400] text-[#00000082]">
+            ${data.discountPrice} * {value}
+          </h4>
+          {/* 총 가격 */}
+          <h4 className="font-Roboto pt-[3px] text-[17px] font-[600] text-[#d02222]">
+            {totalPrice} 원
+          </h4>
+        </div>
+        {/* 카트에서 상품 삭제 버튼 */}
+        <RxCross1 className="cursor-pointer" onClick={() => removeFromCartHandler(data)} />
+      </div>
+    </div>
+  )
+}
+
+export default Cart
+```
+
+```jsx
+장바구니 팝업 (Cart 컴포넌트):
+
+Redux를 사용하여 전역 상태인 장바구니 정보를 가져와 화면에 표시한다.
+
+장바구니가 비어있으면 비어있다는 안내 메시지가 나타난다.
+
+장바구니에 상품이 있는 경우 각 상품의 정보를 나타내고, 총 가격을 계산하여 표시한다.
+
+상품 수량을 증가 또는 감소시킬 수 있으며, 해당 변경은 Redux를 통해 전역 상태에 반영된다.
+
+Checkout Now 버튼을 클릭하면 결제 페이지로 이동한다.
+
+장바구니 개별 상품 표시 (CartSingle 컴포넌트):
+
+장바구니에 담긴 각 상품을 개별적으로 표시한다.
+
+상품 수량을 증가 및 감소시킬 수 있는 버튼이 있다.
+
+수량 변경 시 Redux를 통해 전역 상태를 업데이트하고, 해당 변경사항은 장바구니 팝업에 실시간으로 반영된다.
+
+상품 이미지, 이름, 가격, 총 가격 등이 표시되며, 상품 삭제 버튼을 통해 장바구니에서 해당 상품을 제거할 수 있다.
+
+------------------------------------------------------------------------------------------------------
+
+              {/* 카트에 담긴 상품 목록 */}
+              <br />
+              <div className="w-full border-t">
+                {cart &&
+                  cart.map((i, index) => (
+                    <CartSingle
+                      key={index}
+                      data={i}
+                      quantityChangeHandler={quantityChangeHandler}
+                      removeFromCartHandler={removeFromCartHandler}
+                    />
+                  ))}
+              </div>
+            </div>
+
+하위 컴포넌트 <CartSingle> 에서 상위 컴포넌트로 함수를 이용해서 값을 전달한다
+```
+
+# ProductCard.jsx 컴포너트 수정 ( 장바구니 , 찜 추가 )
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381462/notion-blog/_/_/EcommerceProject/EcommerceProject_-4/Untitled_1.png)
+
+```jsx
+위시리스트 관리:
+
+사용자가 상품을 위시리스트에 추가 또는 제거할 수 있다.
+
+상품이 위시리스트에 있는지 여부에 따라 아이콘의 색상이 변경된다.
+
+장바구니 관리:
+
+사용자가 상품을 장바구니에 추가할 수 있다.
+
+이미 장바구니에 있는 상품은 중복으로 추가할 수 없다.
+
+상품의 재고를 초과하여 장바구니에 추가하려고 하면 오류 메시지가 표시된다.
+
+퀵뷰:
+
+상품에 대한 간략한 정보를 퀵뷰로 확인할 수 있다.
+
+퀵뷰를 열거나 닫을 수 있다.
+
+상품 정보 표시:
+
+상품 이미지, 상점 이름, 상품명, 평점, 할인가, 정가, 판매량 등의 정보가 표시된다.
+
+상품명이 일정 길이를 초과하면 일부만 표시되고 생략 부호가 표시된다.
+
+애니메이션 및 시각적 피드백:
+
+위시리스트 추가/제거, 장바구니 추가 등의 동작에 대한 시각적 피드백이 제공된다.
+
+( 찜 추가시 아이콘 빨간색으로 칠해지기 )
+```
+
+```jsx
+import React, { useState } from 'react'
+import {
+  AiFillHeart,
+  AiFillStar,
+  AiOutlineEye,
+  AiOutlineHeart,
+  AiOutlineShoppingCart,
+  AiOutlineStar,
+} from 'react-icons/ai'
+import { addToWishList, removeFromWishList } from '../../redux/wishList/wishListAction'
+import { addToCart } from '../../redux/cart/cartAction'
+import { Link } from 'react-router-dom'
+import { useDispatch, useSelector } from 'react-redux'
+import styles from '../../styles/styles'
+import ProductDetailsCard from './ProductDetailCard'
+import { useEffect } from 'react'
+import { toast } from 'react-toastify'
+import Ratings from '../Products/Ratings'
+
+const ProductCard = ({ data, isEvent }) => {
+  const { wishList } = useSelector((state) => state.wishList)
+  const { cart } = useSelector((state) => state.cart)
+  const [click, setClick] = useState(false)
+  const [open, setOpen] = useState(false)
+  const dispatch = useDispatch()
+
+  // 위시리스트에 해당 상품이 있는지 확인하여 상태 업데이트
+  useEffect(() => {
+    if (wishList && wishList.find((i) => i._id === data._id)) {
+      setClick(true)
+    } else {
+      setClick(false)
+    }
+  }, [wishList])
+
+  // 위시리스트에서 상품 제거 핸들러
+  const removeFromWishListHandler = (data) => {
+    setClick(!click)
+    dispatch(removeFromWishList(data))
+  }
+
+  // 위시리스트에 상품 추가 핸들러
+  const addToWishListHandler = (data) => {
+    setClick(!click)
+    dispatch(addToWishList(data))
+  }
+
+  // 장바구니에 상품 추가 핸들러
+  const addToCartHandler = (id) => {
+    const isItemExists = cart && cart.find((i) => i._id === id)
+    if (isItemExists) {
+      toast.error('상품이 이미 카트에 있습니다!')
+    } else {
+      if (data.stock < 1) {
+        toast.error('상품의 재고를 초과했습니다!')
+      } else {
+        const cartData = { ...data, qty: 1 }
+        dispatch(addToCart(cartData))
+        toast.success('장바구니에 상품을 추가했습니다!')
+      }
+    }
+  }
+
+  return (
+    <>
+      <div className="relative h-[370px] w-full cursor-pointer rounded-lg bg-white p-3 shadow-sm">
+        {/* 장바구니, 위시리스트, 퀵뷰, 상품이미지 등을 표시하는 컨테이너 */}
+        <div className="flex justify-end"></div>
+        <Link to={`/product/${data._id}`}>
+          {/* 상품 이미지 */}
+          <img
+            src={`http://localhost:5000/${data.images && data.images[0]}`}
+            alt=""
+            className="h-[170px] w-full object-contain"
+          />
+        </Link>
+        <Link to={`/shop/preview/${data?.shop._id}`}>
+          {/* 상점 이름 */}
+          <h5 className={`${styles.shop_name}`}>{data.shop.name}</h5>
+        </Link>
+        <Link to={`/product/${data._id}`}>
+          {/* 상품명 */}
+          <h4 className="pb-3 font-[500]">
+            {data.name.length > 40 ? data.name.slice(0, 40) + '...' : data.name}
+          </h4>
+
+          {/* 상품 평점 */}
+          <div className="flex">
+            <Ratings rating={data?.ratings} />
+          </div>
+
+          {/* 상품 할인가, 정가, 판매량 */}
+          <div className="flex items-center justify-between py-2">
+            <div className="flex">
+              <h5 className={`${styles.productDiscountPrice}`}>
+                {data.originalPrice === 0 ? data.originalPrice : data.discountPrice} 원
+              </h5>
+              <h4 className={`${styles.price}`}>
+                {data.originalPrice ? data.originalPrice + ' 원' : null}
+              </h4>
+            </div>
+            <span className="text-[17px] font-[400] text-[#68d284]">50 sold</span>
+          </div>
+        </Link>
+
+        {/* side options */}
+        <div>
+          {/* 위시리스트에 추가 또는 제거 아이콘 */}
+          {click ? (
+            <AiFillHeart
+              size={22}
+              className="absolute top-5 right-2 cursor-pointer"
+              onClick={() => removeFromWishListHandler(data)}
+              color={click ? 'red' : '#333'}
+              title="Remove from wishlist"
+            />
+          ) : (
+            <AiOutlineHeart
+              size={22}
+              className="absolute top-5 right-2 cursor-pointer"
+              onClick={() => addToWishListHandler(data)}
+              color={click ? 'red' : '#333'}
+              title="Add to wishlist"
+            />
+          )}
+
+          {/* 퀵뷰 아이콘 */}
+          <AiOutlineEye
+            size={22}
+            className="absolute top-14 right-2 cursor-pointer"
+            onClick={() => setOpen(!open)}
+            color="#333"
+            title="Quick view"
+          />
+
+          {/* 장바구니에 추가 아이콘 */}
+          <AiOutlineShoppingCart
+            size={25}
+            className="absolute top-24 right-2 cursor-pointer"
+            onClick={() => addToCartHandler(data._id)}
+            color="#444"
+            title="Add to cart"
+          />
+
+          {/* 퀵뷰 팝업 */}
+          {open ? <ProductDetailsCard setOpen={setOpen} data={data} /> : null}
+        </div>
+      </div>
+    </>
+  )
+}
+
+export default ProductCard
+```
+
+```jsx
+isEvent 는 나중에 이벤트랑 연관 지어서 사용할거다 ( 미완성 )
+
+------------------------------------------------------------------------------------------------------
+
+          {/* 상품명 */}
+          <h4 className="pb-3 font-[500]">
+            {data.name.length > 40 ? data.name.slice(0, 40) + "..." : data.name}
+          </h4>
+
+상품명이 길면 줄이는 기능
+```
+
+# Wishlist.jsx 컴포넌트 수정
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381462/notion-blog/_/_/EcommerceProject/EcommerceProject_-4/Untitled_2.png)
+
+```jsx
+위시리스트 불러오기 및 삭제 기능:
+
+useSelector를 사용하여 Redux에서 위시리스트 상태를 가져오고, removeFromWishListHandler 함수를 통해 아이템을 위시리스트에서 삭제한다.
+
+카트에 아이템 추가 기능:
+
+addToCartHandler 함수를 통해 위시리스트의 아이템을 카트에 추가한다.
+
+위시리스트 상태에 따른 화면 렌더링:
+
+wishList의 길이에 따라 비어있는 경우와 아이템이 있는 경우에 대한 조건부 렌더링이 이루어진다. ( 위시리스트가 없으면 없습니다 뜨는것 )
+
+닫기 버튼 기능:
+
+화면 상단의 닫기 버튼 또는 화면 배경 클릭 시 setOpenWishlist(false)를 호출하여 위시리스트 창을 닫는다.
+
+카트 아이템 목록 출력:
+
+위시리스트에 있는 각각의 아이템에 대해 CartSingle 컴포넌트를 이용하여 아이템 정보를 화면에 표시한다.
+
+수량 조절 및 가격 계산:
+
+value 상태를 통해 수량을 조절하며, 할인 가격을 곱하여 각 아이템의 총 가격을 계산한다.
+
+이미지 및 상품 정보 표시:
+
+각 카트 아이템에는 상품 이미지와 정보가 표시되며, 상품명과 할인된 가격이 포함된다.
+```
+
+```jsx
+import React, { useState } from 'react'
+import { RxCross1 } from 'react-icons/rx'
+import { IoBagHandleOutline } from 'react-icons/io5'
+import { BsCartPlus } from 'react-icons/bs'
+import styles from '../../styles/styles'
+import { Link } from 'react-router-dom'
+import { AiOutlineHeart } from 'react-icons/ai'
+import { useDispatch, useSelector } from 'react-redux'
+import { removeFromWishList } from '../../redux/wishList/wishListAction'
+import { addToCart } from '../../redux/cart/cartAction'
+
+// Wishlist Component
+const Wishlist = ({ setOpenWishlist }) => {
+  // Redux에서 상태 및 디스패치 함수 가져오기
+  const { wishList } = useSelector((state) => state.wishList)
+  const dispatch = useDispatch()
+
+  // 위시리스트에서 아이템 삭제
+  const removeFromWishListHandler = (data) => {
+    dispatch(removeFromWishList(data))
+  }
+
+  // 카트에 아이템 추가
+  const addToCartHandler = (data) => {
+    const newData = { ...data, qty: 1 }
+    dispatch(addToCart(newData))
+    setOpenWishlist(false)
+  }
+
+  return (
+    <div className="fixed top-0 left-0 z-10 h-screen w-full bg-[#0000004b]">
+      <div className="fixed top-0 right-0 flex min-h-full w-[25%] flex-col justify-between bg-white shadow-sm">
+        {/* 위시리스트의 길이에 따라 조건부 렌더링 */}
+        {wishList && wishList.length === 0 ? (
+          <div className="flex h-screen w-full items-center justify-center">
+            {/* 닫기 버튼 */}
+            <div className="fixed top-3 right-3 flex w-full justify-end pt-5 pr-5">
+              <RxCross1
+                size={25}
+                className="cursor-pointer"
+                onClick={() => setOpenWishlist(false)}
+              />
+            </div>
+            {/* 비어있는 위시리스트 메시지 */}
+            <h5>위시 리스트에 상품이 없습니다!</h5>
+          </div>
+        ) : (
+          <>
+            {/* 위시리스트에 아이템이 있는 경우 */}
+            <div>
+              {/* 닫기 버튼 */}
+              <div className="flex w-full justify-end pt-5 pr-5">
+                <RxCross1
+                  size={25}
+                  className="cursor-pointer"
+                  onClick={() => setOpenWishlist(false)}
+                />
+              </div>
+              {/* 위시리스트의 아이템 수 표시 */}
+              <div className={`${styles.noramlFlex} p-4`}>
+                <AiOutlineHeart size={25} />
+                <h5 className="pl-2 text-[20px] font-[500]">
+                  {wishList && wishList.length} 개의 상품
+                </h5>
+              </div>
+
+              {/* 카트 아이템 목록 */}
+              <br />
+              <div className="w-full border-t">
+                {wishList &&
+                  wishList.map((i, index) => (
+                    <CartSingle
+                      key={index}
+                      data={i}
+                      removeFromWishListHandler={removeFromWishListHandler}
+                      addToCartHandler={addToCartHandler}
+                    />
+                  ))}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// CartSingle Component
+const CartSingle = ({ data, removeFromWishListHandler, addToCartHandler }) => {
+  const [value, setValue] = useState(1)
+  // const totalPrice = data.price * value;
+  const totalPrice = data.discountPrice * value
+
+  return (
+    <div className="border-b p-4">
+      <div className="flex w-full items-center">
+        <RxCross1 className="cursor-pointer" onClick={() => removeFromWishListHandler(data)} />
+        <img
+          src={`http://localhost:5000/${data?.images[0]}`}
+          alt=""
+          className="mr-2 ml-2 h-min w-[130px] rounded-[5px]"
+        />
+        <div className="pl-[5px]">
+          <h1>{data.name}</h1>
+          <h4 className="font-Roboto pt-[3px] text-[17px] font-[600] text-[#d02222]">
+            {totalPrice} 원
+          </h4>
+        </div>
+        <div>
+          <BsCartPlus
+            size={20}
+            className="cursor-pointer"
+            tile="Add to cart"
+            onClick={() => addToCartHandler(data)}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default Wishlist
+```
+
+```jsx
+하위 컴포넌트 <CartSingle> 에서 상위 컴포넌트로 함수를 이용해서 값을 전달한다
+
+	        <RxCross1
+	          className="cursor-pointer"
+	          onClick={() => removeFromWishListHandler(data)}
+	        />
+
+          <BsCartPlus
+            size={20}
+            className="cursor-pointer"
+            tile="Add to cart"
+            onClick={() => addToCartHandler(data)}
+          />
+
+상위 컴포넌트의 함수로 값을 전달하여 상품을 삭제하고 추가한다 ( 카트에 )
+```
+
+# Ratings.jsx 컴포넌트 추가 ( 별 표시 )
+
+```jsx
+import React from 'react'
+import { AiFillStar, AiOutlineStar } from 'react-icons/ai'
+import { BsStarHalf } from 'react-icons/bs'
+
+// Ratings 컴포넌트
+const Ratings = ({ rating }) => {
+  // 별 아이콘을 담을 배열 초기화
+  const stars = []
+
+  // 별 아이콘을 반복문을 통해 생성
+  for (let i = 1; i <= 5; i++) {
+    if (i <= rating) {
+      // 현재 인덱스가 평점 이하인 경우, 채워진 별 아이콘 추가
+      stars.push(<AiFillStar key={i} size={20} color="#f6b100" className="mr-2 cursor-pointer" />)
+    } else if (i === Math.ceil(rating) && !Number.isInteger(rating)) {
+      // 소수점이 존재하는 경우, 반 채워진 별 아이콘 추가
+      stars.push(<BsStarHalf key={i} size={17} color="#f6ba00" className="mr-2 cursor-pointer" />)
+    } else {
+      // 나머지 경우 빈 별 아이콘 추가
+      stars.push(
+        <AiOutlineStar key={i} size={20} color="#f6ba00" className="mr-2 cursor-pointer" />
+      )
+    }
+  }
+
+  // 생성된 별 아이콘을 화면에 표시
+  return <div className="flex"> {stars}</div>
+}
+
+export default Ratings
+```

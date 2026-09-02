@@ -1,0 +1,135 @@
+---
+title: '17단원: Control Surface 사용하기'
+date: '2026-09-02'
+category: '게임 개발/WWISE'
+tags: ['게임 개발', 'WWISE']
+draft: false
+summary: ''
+---
+
+# { 🎛 Control Surface 사용하기 }
+
+Wwise에서는 사운드 디자이너가 마우스와 키보드로만 작업할 때보다 훨씬 빠르게 여러 파라미터를 동시에 조작할 수 있도록 **외부 MIDI 컨트롤러(Control Surface)** 를 지원합니다.
+
+이 기능을 통해 물리적인 **페이더(Fader)**, **노브(Knob)**, **버튼(Button)** 등을 Wwise의 각종 **속성(Volume, Pitch 등)** 과 **명령(Play, Stop 등)** 에 연결할 수 있습니다.
+
+즉, 실제 믹싱 콘솔처럼 오디오를 **직관적이고 즉시적으로 제어할 수 있는 환경**을 만드는 것입니다.
+
+---
+
+## 📋 목차
+
+1. [Control Surface 개념 이해하기](https://www.notion.so/17-Control-Surface-289e683f737e80a28311da6cb8e8dde9#control-surface-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [MIDI 컨트롤러 연결 및 설정](https://www.notion.so/17-Control-Surface-289e683f737e80a28311da6cb8e8dde9#midi-%EC%BB%A8%ED%8A%B8%EB%A1%A4%EB%9F%AC-%EC%97%B0%EA%B2%B0-%EB%B0%8F-%EC%84%A4%EC%A0%95)
+3. [Control Surface Device 추가하기](https://www.notion.so/17-Control-Surface-289e683f737e80a28311da6cb8e8dde9#control-surface-device-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+4. [Control Surface Mapping 만들기](https://www.notion.so/17-Control-Surface-289e683f737e80a28311da6cb8e8dde9#control-surface-mapping-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+5. [Property와 Command 매핑하기](https://www.notion.so/17-Control-Surface-289e683f737e80a28311da6cb8e8dde9#property%EC%99%80-command-%EB%A7%A4%ED%95%91%ED%95%98%EA%B8%B0)
+6. [Mapping 테스트 및 활용](https://www.notion.so/17-Control-Surface-289e683f737e80a28311da6cb8e8dde9#mapping-%ED%85%8C%EC%8A%A4%ED%8A%B8-%EB%B0%8F-%ED%99%9C%EC%9A%A9)
+
+---
+
+## 1. Control Surface 개념 이해하기
+
+- **Control Surface**란
+  Wwise의 여러 오디오 속성이나 명령을 **외부 물리 장치(MIDI Controller)** 와 연결해 조작할 수 있도록 하는 인터페이스입니다.
+  예를 들어,
+  - MIDI 장치의 **페이더 움직임 → 볼륨 조절**
+  - **노브 회전 → Pitch 변화**
+  - **버튼 → Event 재생**
+    등으로 매핑할 수 있습니다.
+- **장점**
+  - 여러 파라미터를 동시에 제어할 수 있음.
+  - 마우스 클릭보다 훨씬 빠른 조작.
+  - 실제 믹싱 콘솔처럼 ‘손맛’ 있는 작업이 가능.
+  - 라이브 믹싱 중 실시간 변화를 직관적으로 확인 가능.
+
+---
+
+## 2. MIDI 컨트롤러 연결 및 설정
+
+1. 외부 MIDI 장치를 PC에 연결합니다.
+
+   (예: KORG nanoKONTROL, Akai MPD, Novation Launch Control 등)
+
+2. Wwise 실행 후 **Project → Preferences → MIDI** 탭으로 이동.
+   - MIDI 입력 장치 목록에서 연결된 컨트롤러를 선택합니다.
+   - 올바르게 인식되면 “Connected” 상태로 표시됩니다.
+3. 연결이 완료되면 Wwise는 해당 장치에서 오는 **MIDI CC (Control Change)** 신호를 인식할 준비가 됩니다.
+
+---
+
+## 3. Control Surface Device 추가하기
+
+1. 메뉴 상단에서 **Layouts → Mixing** 또는 **Layouts → User → Control Surface** 뷰를 엽니다.
+2. **Control Surface Devices** 패널에서
+
+   **Add Device (+)** 버튼을 클릭합니다.
+
+3. 새 장치를 추가할 때 다음 정보를 설정합니다:
+   - **Name**: 장치 이름 지정 (예: “nanoKONTROL2”).
+   - **Type**: MIDI 선택.
+   - **Input Device**: 연결된 장치 이름 선택.
+   - **Output Device**: 필요 시 동일 장치 선택 (양방향 통신 가능).
+
+> 💡 참고: 일부 MIDI 장치는 Wwise가 자동으로 감지하여 목록에 표시됩니다.
+
+---
+
+## 4. Control Surface Mapping 만들기
+
+1. **Control Surface Mappings** 패널로 이동합니다.
+2. **Add Mapping Set** 버튼 클릭 → 새로운 매핑 세트 생성.
+
+   (예: “FireGem Mix Session” 등)
+
+3. 매핑 세트 안에는 **Mapping Group**을 만들 수 있습니다.
+   - 예: “Volume Control”, “Effect Control”, “Transport Commands” 등으로 그룹화.
+
+---
+
+## 5. Property와 Command 매핑하기
+
+각 물리적 컨트롤(페이더, 노브, 버튼 등)을 Wwise 속성 또는 명령에 연결합니다.
+
+### 🎚 Property 매핑 예시
+
+| 물리 컨트롤 | 매핑 대상                         | 설명                          |
+| ----------- | --------------------------------- | ----------------------------- |
+| Fader 1     | FireGem Blast → Volume            | 사운드의 볼륨을 페이더로 제어 |
+| Fader 2     | FireGem Explode → Pitch           | 피치를 실시간으로 변경        |
+| Knob 1      | RoomVerb → Reverb Mix             | 리버브 양을 조절              |
+| Knob 2      | Player Footstep → Low-Pass Filter | 거리감을 표현하는 필터 조정   |
+
+- 매핑 방식:
+  - “Learn” 버튼을 누른 뒤 컨트롤러의 해당 페이더나 노브를 움직이면 자동으로 연결됩니다.
+  - 매핑 후 Wwise 상에서 파라미터 이름과 연결된 CC 번호가 표시됩니다.
+
+### ▶ Command 매핑 예시
+
+| 버튼     | 매핑 명령         | 설명                  |
+| -------- | ----------------- | --------------------- |
+| Button 1 | Play              | 이벤트 재생           |
+| Button 2 | Stop              | 이벤트 중지           |
+| Button 3 | Mute Selected Bus | 선택한 버스 음소거    |
+| Button 4 | Solo Selected Bus | 선택한 버스 솔로 재생 |
+
+---
+
+## 6. Mapping 테스트 및 활용
+
+1. **Soundcaster** 또는 **Mixing Desk** 뷰를 열어 실제 사운드를 재생합니다.
+2. MIDI 컨트롤러의 노브/페이더/버튼을 움직여 연결된 속성 변화를 확인합니다.
+3. 동시에 여러 컨트롤을 조작하여 실제 믹싱처럼 자연스러운 변화 실험.
+
+> 🎧 예: FireGem Blast 사운드를 재생한 상태에서
+>
+> 페이더로 볼륨을 줄이면서 리버브 노브를 돌려 공간감을 키우는 식의 실시간 조정 가능.
+
+---
+
+## 💡 정리
+
+- Control Surface는 **실시간 오디오 조작을 위한 물리적 인터페이스**입니다.
+- **MIDI 신호**를 통해 Wwise의 파라미터를 제어합니다.
+- Soundcaster나 Mixing Desk와 함께 사용하면 **빠르고 직관적인 사운드 튜닝 환경**을 구현할 수 있습니다.
+- 실시간 사운드 테스트, 믹싱, 게임 오디오 밸런싱 작업에 매우 유용합니다.

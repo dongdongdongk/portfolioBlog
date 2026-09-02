@@ -1,0 +1,201 @@
+---
+title: 'BCh04 03 p148 단일항목테스트'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# 엔티티 테스트
+
+## 더미데이터 입력 테스트
+
+```java
+단일항목 조회 테스트를 실시한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381206/notion-blog/_/_/_/_/BCh04_03_p148_/Untitled.png)
+
+```java
+Test 에 repository 패키지를 만들고
+
+GuestbookRepositoryTests 클래스를 만든뒤 더미 데이터를 인서트 하는 테스트를 작성한다
+
+아까 작성한 수정시간 관련 설정을 상속 받았기 때문에 자동으로 등록 수정 시간이 등록된다
+```
+
+```java
+package org.zerock.guestbook.repository;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.zerock.guestbook.entity.Guestbook;
+
+import java.util.stream.IntStream;
+
+@SpringBootTest
+public class GuestbookRepositoryTests {
+
+    @Autowired
+    private GuestbookRepository guestbookRepository;
+
+    //더미 데이터 인서트 테스트
+    @Test
+    public void insertDummies(){
+        IntStream.rangeClosed(1,300).forEach(i->{
+            Guestbook guestbook = Guestbook.builder()
+                    .title("Title....." + i)
+                    .content("Content...." + i)
+                    .writer("user" + (i % 10))
+                    .build();
+            System.out.println(guestbookRepository.save(guestbook));
+        });
+
+    }
+}
+```
+
+## 수정시간 등록 테스트
+
+```java
+데이터를 수정해서 수정된 시간이 등록되는지 확인한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381204/notion-blog/_/_/_/_/BCh04_03_p148_/Untitled_1.png)
+
+```java
+//데이터를 변경해서 수정시간이 등록되는지 확인
+    @Test
+    public void updateTest() {
+        Optional<Guestbook> result = guestbookRepository.findById(300L); //존재하는 번호로 테스트 (findById 를 사용하면 항상 Optional)
+        if(result.isPresent()) {  // isPresent()는 Optional 객체 내에 값이 존재하는지 확인하는 메서드
+            Guestbook guestbook = result.get();
+            guestbook.changeTitle("Changed Title......");
+            guestbook.changeContent("Changed Content.....");
+            guestbookRepository.save(guestbook);
+        }
+    }
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381204/notion-blog/_/_/_/_/BCh04_03_p148_/Untitled_2.png)
+
+```java
+데이터를 조회해서 수정된 엔티티 객체와 자신이 가지고 있는 객체를 비교해서 수정할 부분을 결정한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381205/notion-blog/_/_/_/_/BCh04_03_p148_/Untitled_3.png)
+
+```java
+그러나 지금은 전부 업데이트 해주는 형식이 되었다 이때문에 일부를 수정해주는 형태로 만드는 경우가 많다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381205/notion-blog/_/_/_/_/BCh04_03_p148_/Untitled_4.png)
+
+# Querydsl 테스트
+
+## Querydsl 사용 상황
+
+```java
+제목/내용/작성자 와 같이 단 하나의 항목으로 검색하는 경우
+
+제목 + 내용 / 내용 + 작성자 / 제목 + 작성자 와 같이 2개의 항목으로 검색하는 경우
+
+제목 + 내용 + 작성자 와 같이 3개의 항목으로 검색하는 경우
+
+이렇게 다양한 조건으로 검색할 때 매번 메소드를 만들면 효율적이지 못하기 때문에 이때
+
+Querydsl 을 사용한다
+```
+
+## Querydsl의 사용법
+
+```java
+* QueryDSL을 사용하기 위한 엔티티에 해당하는 Query 클래스 "Q클래스명" 을 생성
+
+* BooleanExpression 을 이용해서 조건을 만들고
+
+* BooleanBuilder 에 작성된 조건 Predicate(expression) 를 추가하고
+
+*  booleanBuilder 를 이용해서 실행  (Page<Guestbook> result = guestbookRepository.findAll(**booleanBuilder**,pageable);)
+```
+
+## Querydsl 단일항목 테스트
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381205/notion-blog/_/_/_/_/BCh04_03_p148_/Untitled_5.png)
+
+```java
+  	@Test
+    public void testQuery1() {
+        Pageable pageable = PageRequest.of(0,10, Sort.by("gno").descending());
+
+        //fidAll 은 JpaRepository 에 있는 메서드인데 거기에 Querydsl 을 적용하려면 QuerydslPredicateExecutor<> 를 사용한다
+
+        //Predicate 는 자바에도 있기 때문에 임포트 할때 주의
+        QGuestbook qGuestbook = QGuestbook.guestbook;
+
+        BooleanBuilder booleanBuilder = new BooleanBuilder();
+
+        //title like %1% 같은걸 코드를 통해서 만들어 내는것이라 생각하면 편하다
+        BooleanExpression expression = qGuestbook.title.contains("1");
+
+        //익스프레션을 빌더에 추가해서 조건을 추가해준다
+        booleanBuilder.and(expression);
+
+        Page<Guestbook> result = guestbookRepository.findAll(booleanBuilder,pageable);
+
+        result.forEach(guestbook -> {
+            System.out.println(guestbook);
+        });
+
+    }
+```
+
+```java
+* Pageable pageable = PageRequest.of(0, 10, Sort.by("gno").descending());: 페이징 처리를 위한 설정을 생성. 페이지 번호는 0부터 시작하고 한 페이지에 10개의 항목을 표시하며, gno 필드를 내림차순으로 정렬
+
+* QGuestbook qGuestbook = QGuestbook.guestbook;: QueryDSL을 사용하기 위한 Guestbook 엔티티에 해당하는 Query 클래스 QGuestbook을 생성
+
+* BooleanBuilder booleanBuilder = new BooleanBuilder();: 동적 검색 조건을 추가하기 위한 빌더를 초기화
+
+* BooleanExpression expression = qGuestbook.title.contains("1");: "1"을 포함하는 title 필드의 검색 조건을 생성
+
+* booleanBuilder.and(expression);: 앞서 생성한 검색 조건을 빌더에 추가하여 "1"을 포함하는 title을 검색하는 조건을 설정
+
+* Page<Guestbook> result = guestbookRepository.findAll(booleanBuilder, pageable);: 조건에 맞는 데이터를 조회하고, 해당 결과를 페이지별로 가져옴
+
+* result.forEach(guestbook -> { System.out.println(guestbook); });: 조회한 결과를 반복문을 통해 출력
+```
+
+![< querydsl에서 쓰는 Predicate와 Java8에서 쓰이는 Predicate>](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381205/notion-blog/_/_/_/_/BCh04_03_p148_/Untitled_6.png)
+
+< querydsl에서 쓰는 Predicate와 Java8에서 쓰이는 Predicate>
+
+## 꼭 확인해야 할 부분
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381205/notion-blog/_/_/_/_/BCh04_03_p148_/Untitled_7.png)
+
+```java
+현재 작성한 BooleanExpression 에 해당하는 Where 절을 꼭 확인하고
+
+추가로 limit 부분을 확인해야 한다 (페이징을 할때는 꼭 limit 또는 로우넘이 걸리는지 확인)
+```
+
+## 상세한 사용법 설명
+
+```jsx
+1. 동적 처리를 위해 q도메인 클래스 선언 이를 이용하면 엔티티 클래스에 선언된 title, content 같은
+
+필드들을 변수로 활용할 수 있다.
+
+2. BooleanBuilder 는 where문에 들어가는 조건을 넣어주는 컨테이너라 생각
+
+3. 원하는 조건은 필드 값과 같이 결합해서 생성 (BooleanExpression 부분)(BooleanExpression 는 or, and 로 where 절에 추가 Hibernate 의 생성 쿼리보면 이해 쉬움))
+
+4. 만들어진 조건은 where문에 and 나 or 같은 키워드로 결합시킨다 (BooleanBuilder builder 에 builder.and(expression);)
+
+5. BooleanBuilder 는 GuestbookRepository에 추가된 QuerydslPredicateExcuter 인터페이스의
+
+findAll() 을 사용할 수 있다
+```

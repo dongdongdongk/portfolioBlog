@@ -1,0 +1,1003 @@
+---
+title: '섹션 14: Collectables & Traps (함정, 수집품)'
+date: '2026-09-02'
+category: '게임 개발/Game Development in JS TS - The Complete Guide (w_'
+tags: ['게임 개발', 'Game Development in JS TS - The Complete Guide (w_']
+draft: false
+summary: ''
+---
+
+# { Phaser에서 Collectable(수집 아이템) 시스템 구현 개념 정리 }
+
+```jsx
+이 강의에서는 다이아몬드(혹은 크리스탈) 같은 수집 아이템을 게임에 추가하였습니다
+```
+
+## 1️⃣ **Tiled 맵에서 Collectables(수집 아이템) 배치**
+
+```jsx
+게임에 수집할 수 있는 아이템을 추가하려면, Tiled 에디터에서 새로운 레이어를 만들어야 합니다.
+
+Tiled에서의 설정 과정
+
+		1. collectables라는 새로운 Object Layer를 생성
+
+		2. diamond.png를 TileSet의 Collection of Images로 추가
+
+		3. 여러 위치에 다이아몬드를 배치
+
+		4. 맵을 저장
+
+💡 핵심 개념:
+
+		Object Layer: 맵에 특정한 개체(Collectable 아이템)를 추가하기 위한 레이어
+
+		Collection of Images: 여러 개의 개별적인 이미지를 하나의 타일셋처럼 관리할 수 있는 설정
+```
+
+![image.png](<%EC%84%B9%EC%85%98%2014%20Collectables%20&%20Traps%20(%ED%95%A8%EC%A0%95,%20%EC%88%98%EC%A7%91%ED%92%88)/image.png>)
+
+![image.png](<%EC%84%B9%EC%85%98%2014%20Collectables%20&%20Traps%20(%ED%95%A8%EC%A0%95,%20%EC%88%98%EC%A7%91%ED%92%88)/image%201.png>)
+
+## ㅁ
+
+2️⃣ **Phaser에서 Collectables 레이어 불러오기**
+
+![image.png](<%EC%84%B9%EC%85%98%2014%20Collectables%20&%20Traps%20(%ED%95%A8%EC%A0%95,%20%EC%88%98%EC%A7%91%ED%92%88)/image%202.png>)
+
+```jsx
+Tiled에서 설정한 collectables 레이어를 Phaser 코드에서 불러옵니다.
+```
+
+```jsx
+const collectables = map.getObjectLayer('collectables')
+```
+
+```jsx
+map.getObjectLayer("collectables")를 사용하면 Tiled에서 만든
+
+collectables 레이어의 데이터를 가져올 수 있습니다.
+```
+
+## 3️⃣ **Collectables 객체 생성 및 게임에 추가**
+
+### 📌 **Collectables를 Phaser의 그룹(Group)으로 관리**
+
+```jsx
+수집 아이템을 Static Group으로 만들어 배치합니다.
+```
+
+```jsx
+createCollectables(collectableLayer) {
+    // 물리 엔진을 사용하여 정적인(움직이지 않는) 그룹을 생성합니다.
+    const collectables = this.physics.add.staticGroup();
+
+    // `collectableLayer`는 타일맵(Tiled)에서 가져온 'collectables' 레이어입니다.
+    // 이 레이어에 있는 모든 오브젝트를 반복문을 통해 순회합니다.
+    collectableLayer.objects.forEach(collectable => {
+        // `collectables.get(x, y, 'diamond')`
+        // - `get` 메서드는 그룹에서 기존의 비활성화된 오브젝트를 찾거나, 없으면 새로 생성합니다.
+        // - X, Y 좌표를 설정하여 다이아몬드 이미지를 해당 위치에 배치합니다.
+        // - 'diamond'는 사전에 로드된 이미지의 키(key)입니다.
+        collectables.get(collectable.x, collectable.y, 'diamond')
+            .setDepth(-1); // 깊이(Depth)를 설정하여 플레이어보다 뒤쪽에 배치되도록 합니다.
+    });
+
+    // 생성된 collectables 그룹을 반환하여 나중에 게임에서 사용할 수 있도록 합니다.
+    return collectables;
+}
+
+```
+
+```jsx
+📌 작동 방식:
+
+1. this.physics.add.staticGroup() → 정적인 그룹(Static Group)을 생성
+
+2. 각 collectable을 가져와 그룹에 추가
+
+		collectables.get(collectable.x, collectable.y, 'diamond')
+
+		setDepth(-1) → 배경보다 뒤쪽에 배치
+
+💡 핵심 개념:
+
+		Static Group: 움직이지 않는 물체를 배치하는 데 사용 (플레이어와 충돌 가능)
+
+		setDepth(-1): 다이아몬드를 플레이어보다 뒤에 배치
+```
+
+## 4️⃣ **Collectables 아이템의 이미지 로드**
+
+```jsx
+Collectable이 화면에 표시되려면, preload 단계에서 이미지 로드가 필요합니다.
+
+이제 diamond.png 이미지가 Phaser에서 사용될 수 있습니다.
+```
+
+```jsx
+this.load.image('diamond', 'assets/collectibles/diamond.png')
+```
+
+## 5️⃣ **Collectables 배경 및 레이어 깊이(depth) 조정**
+
+```jsx
+다이아몬드가 배경 요소보다 앞에 나오도록 setDepth() 값을 조정합니다.
+
+Depth 값이 낮을수록 배경으로 밀려남 (ex. 배경: -2, 아이템: -1, 플레이어: 0)
+```
+
+# { 플레이어와 수집품(Collectables) 간의 상호작용 }
+
+```jsx
+이 강의에서는 플레이어와 수집품(Collectables) 간의 상호작용을 구현하는 방법을 배웁니다.
+```
+
+## 수집품 추가하기
+
+```jsx
+먼저, 수집품을 게임에 추가하는 코드부터 살펴볼게요.
+```
+
+```jsx
+createCollectables(collectableLayer) {
+    const collectables = this.physics.add.staticGroup();
+
+    collectableLayer.objects.forEach(collectable => {
+        collectables.get(collectable.x, collectable.y, 'diamond').setDepth(-1);
+    });
+
+    return collectables;
+}
+```
+
+```jsx
+this.physics.add.staticGroup() : 충돌이 가능하지만 움직이지 않는 그룹을 생성합니다.
+
+collectableLayer.objects.forEach(...) : 타일맵에서 수집품 위치를 가져와 보석(diamond)을 배치합니다.
+
+setDepth(-1) : 배경보다 한 단계 낮게 배치하여 UI 요소보다 뒤에 위치하게 합니다.
+
+get 메서드
+
+		get 메서드는 collectables 그룹에서 'diamond'라는 이미지를 가진 오브젝트를 가져오거나
+
+		새로 생성해서, (x, y) 위치에 배치 해주는 역할을 해
+
+		즉, "맵에 보석(collectables)을 배치하는 코드"
+```
+
+## 플레이어와 수집품의 충돌 감지
+
+```jsx
+이제 플레이어가 수집품을 획득하도록 설정해야 합니다.
+
+Phaser에서는 overlap을 사용하여 두 개체가 겹칠 때 특정 동작을 실행할 수 있어요.
+```
+
+```jsx
+// createPlayerColliders 함수는 플레이어와 다양한 객체들 간의 충돌 및 겹침을 처리하는 함수입니다.
+createPlayerColliders(player, { colliders }) {
+    // 플레이어와 플랫폼 충돌 처리
+    player
+        // 플랫폼과 충돌을 처리합니다. (플랫폼에서 떨어지지 않도록 하고, 플레이어가 땅 위에 있을 수 있게 만듭니다)
+        .addColliders(colliders.platformsColliders)
+
+        // 적의 총알과 충돌할 때, 총알이 플레이어에 닿으면 onWeaponHit 함수를 실행합니다.
+        .addColliders(colliders.projectiles, this.onWeaponHit)
+
+        // 수집품과 겹칠 때 onCollect 함수를 실행하여 수집품을 획득할 수 있도록 합니다.
+        .addOverlap(colliders.collectables, this.onCollect);
+}
+```
+
+```jsx
+addColliders(colliders.platformsColliders) : 플레이어가 플랫폼과 충돌하도록 설정
+
+addColliders(colliders.projectiles, this.onWeaponHit) : 적의 공격을 플레이어가 맞으면 onWeaponHit 함수 실행
+
+addOverlap(colliders.collectables, this.onCollect) : 플레이어가 수집품과 겹치면 onCollect 함수 실행
+```
+
+## 플레이어(player)와 다른 여러 객체들 간의 충돌 및 겹침 처리
+
+```jsx
+이 코드는 createPlayerColliders라는 메서드를 호출하면서 플레이어(player)와
+
+다른 여러 객체들 간의 충돌 및 겹침 처리를 합니다.
+
+함수 내부에서 각 객체가 서로 어떻게 상호작용할지를 설정하는 역할을 합니다.
+```
+
+```jsx
+// createPlayerColliders를 호출하여, 플레이어와 충돌 및 겹침 처리할 객체들을 전달합니다.
+this.createPlayerColliders(player, {
+  colliders: {
+    // 플레이어와 충돌할 플랫폼 레이어를 전달합니다.
+    platformsColliders: layers.platformsColliders,
+
+    // 플레이어와 충돌할 적의 총알을 가져옵니다.
+    projectiles: enemies.getProjectiles(),
+
+    // 플레이어와 겹칠 수 있는 수집품들을 전달합니다.
+    collectables,
+  },
+})
+```
+
+## 수집품을 비활성화하여 사라지게 만들기
+
+```jsx
+이제 onCollect 함수를 구현하여 플레이어가 수집품을 획득하면 이를 없애도록 할게요.
+```
+
+```jsx
+onCollect(entity, collectable) {
+    console.log('Collecting')
+    collectable.disableBody(true, true);
+    collectable.destroy();
+}
+```
+
+```jsx
+console.log('Collecting'); : 디버깅을 위해 콘솔에 출력
+
+collectable.disableBody(true, true);
+
+		첫 번째 true : 충돌을 비활성화하여 더 이상 플레이어가 닿을 수 없도록 함
+
+		두 번째 true : 시각적으로 보이지 않도록 설정
+
+collectable.destroy(); : 메모리에서 삭제하여 성능 최적화
+```
+
+# { 다이아몬드 수집 아이템에 애니메이션 적용하기 }
+
+```jsx
+이 강의에서는 플레이어가 수집할 수 있는 다이아몬드 아이템에 반짝이는 애니메이션을 추가하는 과정을 설명합니다.
+```
+
+## 1. 다이아몬드 이미지 로드
+
+```jsx
+먼저, 다이아몬드의 여러 프레임 이미지를 preload 함수에서 미리 로드해야 합니다.
+```
+
+```jsx
+this.load.image('diamond', './assets/collectables/diamond.png')
+
+this.load.image('diamond-1', './assets/collectables/diamond_big_01.png')
+this.load.image('diamond-2', './assets/collectables/diamond_big_02.png')
+this.load.image('diamond-3', './assets/collectables/diamond_big_03.png')
+this.load.image('diamond-4', './assets/collectables/diamond_big_04.png')
+this.load.image('diamond-5', './assets/collectables/diamond_big_05.png')
+this.load.image('diamond-6', './assets/collectables/diamond_big_06.png')
+```
+
+```jsx
+이렇게 하면 다이아몬드의 여러 이미지가 게임에 로드됩니다.
+
+각 이미지에는 조금씩 다른 반짝임 효과가 포함되어 있습니다.
+```
+
+## 2. 다이아몬드 애니메이션 생성
+
+```jsx
+애니메이션을 만들기 위해 initAnims 함수에서 애니메이션을 추가해야 합니다.
+```
+
+```jsx
+export default (anims) => {
+  anims.create({
+    key: 'diamond-shine',
+    frames: [
+      { key: 'diamond-1' },
+      { key: 'diamond-2' },
+      { key: 'diamond-3' },
+      { key: 'diamond-4' },
+      { key: 'diamond-5' },
+      { key: 'diamond-6' },
+    ],
+    frameRate: 10, // 초당 10프레임
+    repeat: -1, // 무한 반복
+  })
+}
+```
+
+```jsx
+key: 'diamond-shine' → 애니메이션 이름
+
+frames → 다이아몬드의 반짝이는 효과를 위해 6장의 이미지를 순서대로 사용
+
+frameRate: 10 → 초당 10프레임
+
+repeat: -1 → 애니메이션이 무한 반복됨
+```
+
+## 3. 애니메이션을 전체 다이아몬드 그룹에 적용
+
+```jsx
+다이아몬드 애니메이션을 모든 수집 가능한 아이템(Collectables)에 적용하려면,
+
+createCollectables 함수에서 playAnimation을 호출해야 합니다.
+```
+
+```jsx
+createCollectables(collectableLayer) {
+    const collectables = this.physics.add.staticGroup();
+
+    collectableLayer.objects.forEach(collectable => {
+        collectables.get(collectable.x, collectable.y, 'diamond').setDepth(-1);
+    })
+
+    // 다이아몬드 반짝이는 애니메이션 적용
+    collectables.playAnimation('diamond-shine');
+
+    return collectables;
+}
+```
+
+```jsx
+이제 모든 다이아몬드가 diamond-shine 애니메이션을 실행합니다.
+```
+
+## 4. 애니메이션이 적용되지 않는 문제 해결
+
+```jsx
+문제 발생 원인
+
+		우리는 createCollectables 함수에서 다이아몬드(diamond)를 생성한 후,
+
+		playAnimation('diamond-shine')을 호출하여 애니메이션을 적용하려고 했습니다.
+
+		하지만 실행해보니 애니메이션이 적용되지 않는 문제가 발생했습니다.
+
+		이유는 애니메이션이 아직 등록되지 않았기 때문입니다.
+
+		즉,
+
+		createCollectables 함수가 실행될 때 다이아몬드가 먼저 생성됩니다.
+
+		하지만 애니메이션(diamond-shine)은 아직 존재하지 않음
+
+		따라서 "Missing animation diamond-shine" 오류 발생
+
+정리
+
+		애니메이션을 적용하려면 먼저 등록한 후 객체를 생성해야 한다.
+
+		initAnims(this.anims);를 createCollectables를 호출하기 전에 실행하면 해결됨.
+
+		순서를 올바르게 설정하면 diamond-shine 애니메이션이 정상적으로 적용됨. 🚀
+```
+
+```jsx
+create() {
+    const map = this.createMap();
+    initAnims(this.anims);  // 애니메이션을 먼저 초기화
+    const layers = this.createLayers(map);
+    const playerZones = this.getPlayerZones(layers.playerZones);
+    const player = this.createPlayer(playerZones.start);
+    const enemies = this.createEnemies(layers.enemySpawns, layers.platformsColliders);
+    const collectables = this.createCollectables(layers.collectables);
+}
+```
+
+# { Collectible(수집 가능한 아이템) 애니메이션 적용하기 }
+
+```jsx
+이 강의에서는 Collectible(다이아몬드 같은 수집 아이템) 에 부유(Floating) 애니메이션을 적용하는 방법을 설명합니다.
+```
+
+## 1. Collectible을 별도의 파일로 분리하기
+
+```jsx
+Collectible을 관리하기 위해 collectables/Collectable.js 파일을 새로 만들고,
+
+Phaser의 Arcade.Sprite를 확장하여 클래스를 생성합니다.
+```
+
+```jsx
+import Phaser from 'phaser'
+
+class Collectable extends Phaser.Physics.Arcade.Sprite {
+  constructor(scene, x, y, key) {
+    super(scene, x, y, key) // Phaser의 Sprite 클래스를 상속
+
+    scene.add.existing(this) // 현재 씬에 이 Collectible(스프라이트)을 추가
+
+    this.score = 1 // 기본 점수는 1점으로 설정
+
+    // Tween 애니메이션 추가
+    scene.tweens.add({
+      targets: this, // 애니메이션을 적용할 대상 (Collectable)
+      y: this.y - 3, // Y축으로 3픽셀 위로 이동
+      duration: Phaser.Math.Between(1500, 2500), // 1.5초 ~ 2.5초 랜덤 지속 시간
+      repeat: -1, // 무한 반복
+      ease: 'Linear', // 속도 일정하게 유지
+      yoyo: true, // 위로 갔다가 다시 아래로 돌아오는 효과
+    })
+  }
+}
+
+export default Collectable
+```
+
+## 2. Tween 애니메이션을 적용하는 방식
+
+```jsx
+Tween을 사용하여 Collectible이 부드럽게 위아래로 움직이는 효과를 줍니다.
+
+💡 Tween이란? Phaser에서 객체를 특정 방향으로 이동시키거나 변화를 줄 때 사용하는 애니메이션 기능입니다.
+```
+
+### 🚀 Tween의 주요 설정값
+
+![image.png](<%EC%84%B9%EC%85%98%2014%20Collectables%20&%20Traps%20(%ED%95%A8%EC%A0%95,%20%EC%88%98%EC%A7%91%ED%92%88)/image%203.png>)
+
+### 애니메이션 동작 방식
+
+```jsx
+1. Collectible이 기본 위치에서 Y축으로 3픽셀 위로 이동
+
+2. 랜덤한 시간(1.5초 ~ 2.5초) 동안 이동
+
+3. yoyo 옵션이 활성화되어 다시 원래 위치로 돌아옴
+
+4. 무한 반복 (-1 설정으로 반복)
+
+5. 각 Collectible마다 이동 속도가 다르게 설정됨 → 자연스럽게 떠 있는 효과 생성
+```
+
+## 3. PlayScene에서 Collectible 사용하기
+
+```jsx
+이제 Play.js에서 새로 만든 Collectable 클래스를 가져와서 사용해야 합니다.
+```
+
+```jsx
+import Collectable from '../collectables/Collectable'
+```
+
+### Collectible을 생성하는 함수 추가
+
+```jsx
+아래 코드에서 createCollectables 함수는 게임의 특정 위치에 Collectible을 배치하고, 그룹화하여 관리합니다.
+```
+
+```jsx
+createCollectables(collectableLayer) {
+    // 정적인(움직이지 않는) 그룹을 생성하고, 깊이(depth)를 -1로 설정하여 배경보다 앞에 오도록 함
+    const collectables = this.physics.add.staticGroup().setDepth(-1);
+
+    // collectableLayer에 정의된 모든 수집 아이템(예: 다이아몬드)을 하나씩 처리
+    collectableLayer.objects.forEach(collectable => {
+        // Collectable 클래스를 사용하여 새로운 수집 아이템을 생성하고 그룹에 추가
+        collectables.add(new Collectable(this, collectable.x, collectable.y, 'diamond'));
+    });
+
+    // 그룹 내 모든 수집 아이템에 'diamond-shine' 애니메이션을 적용하여 반짝이는 효과 추가
+    collectables.playAnimation('diamond-shine');
+
+    // 생성된 수집 아이템 그룹을 반환하여 다른 곳에서도 사용할 수 있도록 함
+    return collectables;
+}
+
+```
+
+```jsx
+1. staticGroup()을 이용해 Collectible 그룹을 생성
+
+2. collectableLayer.objects.forEach(...)
+
+→ collectableLayer에 있는 모든 오브젝트를 반복하며, 각 위치에 Collectible을 추가
+
+3. collectables.playAnimation('diamond-shine');
+
+→ Collectible이 반짝이는 애니메이션 실행
+
+4. 생성된 Collectible 그룹을 반환
+```
+
+## Yo-Yo 효과란?
+
+```jsx
+이 강의에서 가장 중요한 개념 중 하나는 yoyo: true 옵션입니다.
+
+💡 Yo-Yo 효과란?
+
+Collectible이 위로 이동한 후 다시 원래 자리로 돌아오는 애니메이션 효과입니다.
+```
+
+### Yo-Yo 동작 원리
+
+```jsx
+y: this.y - 3 → Y축 방향으로 3픽셀 이동
+
+지정된 duration(1.5초 ~ 2.5초) 동안 이동
+
+yoyo: true → 다시 원래 자리로 되돌아옴
+
+repeat: -1 → 무한 반복
+```
+
+# { Collectable 그룹 리팩토링 }
+
+## 1. **Collectable을 그룹으로 관리하는 이유**
+
+```jsx
+현재 PlayScene에서 개별적으로 Collectable 객체를 생성하고 있음.
+
+이를 Collectables 그룹을 만들어 관리하면 코드가 더 간결해지고, 재사용성이 증가함.
+```
+
+## 2. **Collectables 그룹 생성**
+
+```jsx
+새로운 Collectables 클래스를 만들어 Phaser의 StaticGroup을 상속받음.
+```
+
+### Collectables.js
+
+```jsx
+// Phaser 모듈을 가져옴 (게임 개발을 위한 라이브러리)
+import Phaser from 'phaser'
+
+// Collectable 클래스를 가져옴 (수집 가능한 아이템을 나타내는 클래스)
+import Collectable from '../collectables/Collectable'
+
+/**
+ * Collectables 그룹 클래스 (Phaser의 StaticGroup을 상속받음)
+ * - 여러 개의 Collectable 객체를 관리하는 그룹
+ * - StaticGroup은 물리 엔진을 사용하지만, 움직이지 않는(static) 객체들을 위한 그룹
+ */
+class Collectables extends Phaser.Physics.Arcade.StaticGroup {
+  /**
+   * 생성자(Constructor)
+   * @param {Phaser.Scene} scene - Collectables 그룹을 생성할 씬(Scene)
+   */
+  constructor(scene) {
+    // 부모 클래스(StaticGroup)의 생성자 호출
+    // scene.physics.world → 현재 씬의 물리(world) 시스템을 가져옴
+    // scene → Collectables 그룹이 속할 씬
+    super(scene.physics.world, scene)
+
+    // 그룹의 설정을 지정하는 메서드
+    this.createFromConfig({
+      classType: Collectable, // 그룹 내에서 생성될 객체의 클래스 타입을 Collectable로 지정
+    })
+  }
+}
+
+// Collectables 클래스를 내보내서 다른 파일에서 사용할 수 있도록 함
+export default Collectables
+```
+
+```jsx
+createFromConfig() 메서드를 사용하여 Collectable 클래스 타입을 설정하면,
+
+get() 호출 시 자동으로 Collectable 인스턴스가 생성됨.
+
+이렇게 하면 PlayScene에서 직접 new Collectable()을 호출할 필요가 없음.
+```
+
+### \* `uper(scene.physics.world, scene);` 하는 이유
+
+```jsx
+✅ 물리 충돌을 적용하기 위해 scene.physics.world를 전달
+✅ 그룹이 특정 씬에 속하도록 scene을 전달
+✅ Phaser의 StaticGroup이 물리 엔진을 통해 관리될 수 있도록 설정
+
+이렇게 하면 Collectables 그룹에 있는 모든 객체가 자동으로 물리 충돌 시스템과 연동됩니다!
+```
+
+## 3. **PlayScene에서 Collectables 사용**
+
+```jsx
+Collectables 그룹을 PlayScene에서 생성하고, get() 메서드를 사용해 수집 아이템을 추가.
+```
+
+### 변경 전 (기존 방식)
+
+```jsx
+createCollectables(collectableLayer) {
+    const collectables = new Collectable(this).setDepth(-1);
+
+    collectableLayer.objects.forEach(collectable => {
+        collectables.add(new Collectable(this, collectable.x, collectable.y, 'diamond')
+
+    });
+
+    collectables.playAnimation('diamond-shine');
+    return collectables;
+}
+
+```
+
+### 변경 후 (리팩토링된 방식)
+
+```jsx
+// Collectables 그룹을 가져옴 (Collectables 그룹은 Collectable 객체를 관리하는 그룹)
+import Collectables from "../groups/Collectables";
+
+createCollectables(collectableLayer) {
+    // Collectables 그룹을 생성하고, 깊이(depth)를 -1로 설정하여 배경보다 뒤에 위치하도록 함
+    const collectables = new Collectables(this).setDepth(-1);
+
+    // collectableLayer (타일맵에서 가져온 수집 아이템 정보) 안의 모든 객체를 순회
+    collectableLayer.objects.forEach(collectable => {
+        // collectables 그룹에서 해당 위치(x, y)에 'diamond' 이미지를 가진 Collectable 객체를 생성 또는 재사용
+        collectables.get(collectable.x, collectable.y, 'diamond');
+    });
+
+    // Collectables 그룹을 반환하여 다른 곳에서 사용할 수 있도록 함
+    return collectables;
+}
+
+```
+
+```jsx
+new Collectables(this)를 통해 그룹을 생성.
+
+collectables.get(x, y, 'diamond')을 호출하면 Collectables 그룹이 자동으로 Collectable 객체를 관리.
+
+Collectables가 StaticGroup을 상속받아, get()이 객체를 재사용하도록 처리.
+
+```
+
+## 4. **Collectables 그룹 사용의 장점**
+
+```jsx
+1. 코드 간결화
+
+		Collectables 클래스를 따로 만들었기 때문에 PlayScene의 코드가 단순해짐.
+
+2. 객체 재사용
+
+		get() 메서드를 사용하면 Phaser의 StaticGroup이 자동으로 기존 객체를 재사용할 수 있음.
+
+3. Collectable 클래스의 기능 유지
+
+		Collectables 그룹이 Collectable 클래스를 상속받아 필요한 기능 (score 등)을 유지할 수 있음.
+```
+
+## 5. **디버깅 포인트**
+
+```jsx
+만약 Collectables 그룹에서 Collectable 인스턴스가 아닌 Arcade.Sprite가 반환된다면,
+
+classType 설정이 제대로 되지 않은 것.
+
+collectables.get(x, y, 'diamond')이 올바르게 작동하는지 확인하기 위해 콘솔에서 객체의 score 값을 확인 가능.
+```
+
+### 잘못된 경우:
+
+```jsx
+Collectable이 아닌 일반 Arcade.Sprite로 생성된 경우 score 속성이 없음.
+```
+
+```jsx
+console.log(collectables.get(x, y, 'diamond').score) // undefined
+```
+
+### 올바른 경우:
+
+```jsx
+Collectable 클래스를 상속받아 score 속성이 정상적으로 적용됨.
+```
+
+```jsx
+console.log(collectables.get(x, y, 'diamond').score) // 1
+```
+
+# { Phaser Collectables 시스템 개선 정리 }
+
+## 목표
+
+```jsx
+Tiled 맵의 Collectables Layer에서 점수(score) 속성을 추출하여 Collectable 객체에 할당.
+
+Layer 전체의 속성과 개별 객체의 속성을 구분하여 다룰 수 있도록 개선.
+```
+
+## 1. Collectables 그룹에서 Layer 속성 추출
+
+### 기존 문제점
+
+```jsx
+Collectables 그룹에서 Collectable 객체를 추가할 때, 개별 객체의 속성을 고려하지 않음.
+
+Layer 전체에 적용되는 속성(예: 기본 점수)을 객체에 반영할 수 있도록 개선 필요.
+```
+
+### 해결 방법
+
+```jsx
+Layer 전체의 속성을 하나의 객체(Map)로 변환하여 다루기 쉽게 만든다.
+
+속성을 key-value 형태로 변환하여 프로그래밍적으로 접근 가능하게 한다.
+```
+
+## 1.1 Layer 속성을 객체(Map) 형태로 변환
+
+```jsx
+1️⃣ mapProperties() 함수 추가
+
+Layer의 속성 배열을 { 속성이름: 값 } 형태의 객체로 변환하는 함수.
+```
+
+```jsx
+mapProperties(propertiesList) {
+    // 만약 propertiesList가 존재하지 않거나, 빈 배열이라면 undefined를 반환하고 종료
+    if (!propertiesList || propertiesList.length === 0) {
+        return;
+    }
+
+    // propertiesList 배열을 객체(Map) 형태로 변환
+    return propertiesList.reduce((map, obj) => {
+        // 각 속성 객체(obj)의 name을 key로, value를 value로 저장
+        map[obj.name] = obj.value;
+        return map; // 변환된 객체(Map)를 다음 순회에서도 유지
+    }, {}); // 초기값은 빈 객체 {}
+}
+```
+
+```jsx
+reduce()를 활용한 변환 과정
+
+		propertiesList는 배열 형태이며, 각 요소는 { name: "속성이름", type: "타입", value: 값 } 구조.
+
+		reduce()를 사용하여 { 속성이름: 값 } 형태의 객체(Map)으로 변환.
+```
+
+### 예제 변환 과정
+
+```jsx
+;[
+  { name: 'score', type: 'int', value: 1 },
+  { name: 'type', type: 'string', value: 'diamond' },
+]
+```
+
+```jsx
+⬇ 변환 후
+
+{
+    "score": 1,
+    "type": "diamond"
+}
+```
+
+## 2. Collectables Layer에서 객체 추가
+
+### 기존 문제점
+
+```jsx
+Layer에서 Collectable 객체를 추가할 때, 속성 정보를 고려하지 않고 this.get(x, y, key) 형태로만 추가.
+```
+
+### 해결 방법
+
+```jsx
+addFromLayer() 함수에서 mapProperties() 함수를 사용하여 Layer 속성을 추출.
+
+Layer의 기본 속성을 적용할 수 있도록 개선.
+```
+
+### 2️⃣ `addFromLayer()` 함수 수정
+
+```jsx
+addFromLayer(layer) {
+    // layer의 properties(속성 리스트)를 객체(Map) 형태로 변환
+    const properties = this.mapProperties(layer.properties);
+
+    // layer의 objects(객체 리스트)를 하나씩 순회하며 처리
+    layer.objects.forEach(collectable => {
+        // collectable 객체의 (x, y) 좌표에 properties.type 타입의 객체를 추가
+        this.get(collectable.x, collectable.y, properties.type);
+    });
+}
+```
+
+```jsx
+mapProperties()를 통해 Layer 속성을 { 속성이름: 값 } 형태의 객체로 변환.
+
+layer.objects.forEach()를 통해 각 객체를 추가할 때 Layer의 기본 속성(type)을 적용.
+```
+
+## 3. PlayScene에서 Collectables 생성 방식 개선
+
+### 기존 문제점
+
+```jsx
+Collectables 객체를 생성할 때, PlayScene에서 직접 Collectables 그룹을 만들고 객체를 추가.
+```
+
+### 해결 방법
+
+```jsx
+PlayScene에서 Collectables 객체를 생성하고 addFromLayer() 호출.
+```
+
+### 3️⃣ PlayScene의 `createCollectables()` 수정
+
+```jsx
+createCollectables(collectableLayer) {
+    const collectables = new Collectables(this).setDepth(-1);
+    collectables.addFromLayer(collectableLayer);
+    collectables.playAnimation('diamond-shine');
+    return collectables;
+}
+```
+
+```jsx
+🔹 변경된 동작 방식
+
+		new Collectables(this)로 Collectables 그룹을 생성.
+
+		addFromLayer(collectableLayer)로 Layer에서 Collectables 추가.
+
+		playAnimation('diamond-shine')으로 애니메이션 적용.
+```
+
+## 4. 개선된 동작 과정 정리
+
+### 기존 흐름
+
+```jsx
+PlayScene에서 Collectables 그룹을 생성.
+
+Layer의 개별 객체만 반복하면서 Collectables를 추가 (Layer의 속성 고려 X).
+```
+
+### 개선된 흐름
+
+```jsx
+Collectables.addFromLayer()에서 Layer 전체 속성을 mapProperties()로 변환.
+
+Layer의 속성을 반영하여 Collectable 객체 추가.
+```
+
+### 오브젝트에 속성 추가하기
+
+```jsx
+아래 그림과 같이 왼쪽 커스텀 프로퍼티에 속성을 추가 가능하다
+
+( 각각의 객체에 다른 속성을 추가 가능하다 )
+```
+
+![image.png](<%EC%84%B9%EC%85%98%2014%20Collectables%20&%20Traps%20(%ED%95%A8%EC%A0%95,%20%EC%88%98%EC%A7%91%ED%92%88)/image%204.png>)
+
+![image.png](<%EC%84%B9%EC%85%98%2014%20Collectables%20&%20Traps%20(%ED%95%A8%EC%A0%95,%20%EC%88%98%EC%A7%91%ED%92%88)/image%205.png>)
+
+# { Tiled에서 수집 아이템(Collectables) 점수 시스템 적용하기 ( 어려워서 재 정리 ) }
+
+```jsx
+이 강의에서는 Tiled에서 설정한 점수(score) 정보를 가져와서,
+
+Phaser 게임에서 각 수집 아이템(Collectables)에 적용하는 방법을 배운다.
+
+Tiled에서 설정한 기본 점수 + 개별 아이템의 점수를 가져와서 활용하는 과정
+```
+
+## 1️⃣ Tiled에서 점수 설정하기
+
+```jsx
+Phaser에서 Tiled(타일드) 맵 에디터를 사용하여 맵을 만들고,
+
+그 안에 있는 **Collectables(수집 아이템, 예: 다이아몬드💎)**에 점수를 부여할 수 있다.
+```
+
+### ✅ 기본 점수 설정 (Collectibles Layer)
+
+![image.png](<%EC%84%B9%EC%85%98%2014%20Collectables%20&%20Traps%20(%ED%95%A8%EC%A0%95,%20%EC%88%98%EC%A7%91%ED%92%88)/image%206.png>)
+
+```jsx
+1. Tiled에서 Collectibles 레이어 선택
+
+2. 우측 패널에서 'Custom Properties(사용자 속성)' 추가
+
+3. 속성 이름: score / 데이터 타입: Integer (정수)
+
+4. 기본 값: 1 (모든 수집 아이템의 기본 점수)
+
+✅ 결과: Collectibles 레이어에 있는 모든 아이템의 기본 점수가 1로 설정됨.
+```
+
+### ✅ 개별 아이템의 점수 설정 (다이아몬드 하나만 점수 변경)
+
+![image.png](<%EC%84%B9%EC%85%98%2014%20Collectables%20&%20Traps%20(%ED%95%A8%EC%A0%95,%20%EC%88%98%EC%A7%91%ED%92%88)/image%207.png>)
+
+```jsx
+1. Tiled에서 개별 다이아몬드(Collectable Object) 클릭
+
+2. 우측 패널에서 'Custom Properties' 추가
+
+3. 속성 이름: score / 데이터 타입: Integer
+
+4. 값: 5 (예: 특정 다이아몬드 하나의 점수를 5점으로 변경)
+
+✅ 결과: 기본 점수는 1이지만, 특정 다이아몬드는 5점을 가지게 됨.
+```
+
+## 2️⃣ Phaser에서 점수 정보 가져오기
+
+```jsx
+이제 Tiled에서 설정한 점수(score) 속성을 Phaser 코드에서 가져와야 함.
+```
+
+### ✅ 기존 Collectables 생성 코드
+
+```jsx
+collectableLayer.objects.forEach((collectable) => {
+  collectables.add(new Collectable(this, collectable.x, collectable.y, 'diamond'))
+})
+```
+
+```jsx
+🚨 문제점:
+
+현재는 Collectables을 배치할 뿐, Tiled에서 설정한 score 값은 가져오지 않음.
+
+➡ 해결 방법:
+
+		Collectables 그룹을 따로 만들기 (Collectables 클래스 생성)
+
+		점수 속성을 읽어서 적용하기 (Tiled에서 설정한 score 값 가져오기)
+```
+
+## 3️⃣ Collectables 그룹을 따로 만들어 점수 속성 가져오기
+
+![image.png](<%EC%84%B9%EC%85%98%2014%20Collectables%20&%20Traps%20(%ED%95%A8%EC%A0%95,%20%EC%88%98%EC%A7%91%ED%92%88)/image%208.png>)
+
+```jsx
+기존 Play 씬에서 Collectables를 추가하는 코드를 따로 Collectables 클래스로 분리한다.
+```
+
+### ✅ 새로운 `Collectables` 클래스 만들기
+
+```jsx
+class Collectables extends Phaser.Physics.Arcade.StaticGroup {
+  constructor(scene) {
+    super(scene.physics.world, scene)
+
+    this.createFromConfig({
+      classType: Collectable,
+    })
+  }
+
+  addFromLayer(layer) {
+    const properties = this.mapProperties(layer.properties)
+    layer.objects.forEach((collectable0) => {
+      this.get(collectable0.x, collectable0.y, 'diamond')
+    })
+  }
+
+  mapProperties(propertiesList) {
+    debugger
+    if (!propertiesList || propertiesList.length === 0) {
+      return
+    }
+
+    return propertiesList.reduce((map, obj) => {
+      map[obj.name] = obj.value
+      return map
+    }, {})
+  }
+}
+
+export default Collectables
+```
+
+## 4️⃣ Play 씬에서 Collectables 그룹 사용하기
+
+```jsx
+    createCollectables(collectableLayer) {
+        const collectables = new Collectables(this).setDepth(-1)
+        collectables.addFromLayer(collectableLayer);
+        collectables.playAnimation('diamond-shine');
+
+        return collectables;
+    }
+```

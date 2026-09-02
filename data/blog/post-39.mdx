@@ -1,0 +1,157 @@
+---
+title: '도메인과 서브도메인 배포 완벽 가이드'
+date: '2026-09-02'
+category: '배포 & CI CD'
+tags: ['배포 & CI CD']
+draft: false
+summary: ''
+---
+
+# 개념 이해하기
+
+## 도메인이란?
+
+```jsx
+도메인: 인터넷상의 주소 (예: roono.net)
+
+서브도메인: 도메인의 하위 주소 (예: base64tool.roono.net)
+
+집 주소로 비유하면:
+
+도메인 = 서울시 강남구 (큰 지역)
+
+서브도메인 = 서울시 강남구 테헤란로 123번지 (구체적 위치)
+```
+
+## DNS란?
+
+```jsx
+DNS (Domain Name System): 도메인을 실제 서버 위치로 바꿔주는 전화번호부
+```
+
+```jsx
+사용자가 "base64tool.roono.net"을 입력
+    ↓
+DNS가 "어디 서버에 있는지" 찾아줌
+    ↓
+실제 서버로 연결
+```
+
+# 실제 설정 과정
+
+## 1단계: 도메인 구매 완료
+
+```jsx
+Spaceship에서 roono.net 구매 완료
+
+1년 등록, 자동갱신 OFF
+```
+
+## 2단계: DNS 설정 (Spaceship)
+
+```jsx
+목표: base64tool.roono.net이 Vercel 서버를 가리키도록 설정
+```
+
+### DNS 레코드 추가
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380946/notion-blog/_CI_CD/_/image.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380945/notion-blog/_CI_CD/_/image_1.png)
+
+```jsx
+Host: base64tool
+Type: CNAME
+Value: cname.vercel-dns.com
+TTL: 30 min
+```
+
+```jsx
+base64tool + .roono.net = base64tool.roono.net
+
+이 주소로 오는 요청을 cname.vercel-dns.com으로 보내라
+
+cname.vercel-dns.com은 Vercel의 로드밸런서 주소
+```
+
+```jsx
+1. 사용자: "base64tool.roono.net 접속하고 싶어!"
+
+2. DNS: "그건 cname.vercel-dns.com한테 물어봐!"
+
+3. Vercel 로드밸런서: "base64tool.roono.net이구나!
+                     너는 한국에 있으니까
+                     서울 서버로 연결해줄게!"
+
+4. 서울 서버: "base64tool 프로젝트 보여줄게!"
+
+5. 사용자: "웹사이트 잘 보여!"
+```
+
+### DNS 설정에서 값은 어디서?
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380945/notion-blog/_CI_CD/_/image_2.png)
+
+```jsx
+위의 값은 어디서 가져오냐면
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380945/notion-blog/_CI_CD/_/image_3.png)
+
+```jsx
+이 값을 넣어줘야 한다
+```
+
+## 3단계: Vercel 프로젝트 배포
+
+```jsx
+ Vercel 서버에 업로드해서 실제 웹사이트 만들기
+```
+
+## 4단계: Vercel에서 도메인 연결
+
+```jsx
+Vercel 대시보드에서:
+
+1. Settings → Domains
+
+2. Add Domain 클릭
+
+3. base64tool.roono.net 입력
+
+4. Environment: Production 선택
+
+5. Add 클릭
+
+의미: Vercel에게 "이 도메인으로 오는 요청을 내 프로젝트로 보내줘"라고 알려주는 것
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380945/notion-blog/_CI_CD/_/image_4.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380945/notion-blog/_CI_CD/_/image_5.png)
+
+## 전체 흐름 정리
+
+```jsx
+1. 사용자가 브라우저에 "base64tool.roono.net" 입력
+   ↓
+2. DNS가 "cname.vercel-dns.com"으로 리디렉션
+   ↓
+3. Vercel이 "아, 이 도메인은 당신의 프로젝트구나!" 판단
+   ↓
+4. 실제 프로젝트 서버로 연결
+   ↓
+5. 사용자에게 웹사이트 표시
+```
+
+## CNAME vs A 레코드
+
+```jsx
+A 레코드: 도메인 → IP 주소 (예: 192.168.1.1)
+
+❌ IP가 바뀌면 다시 설정해야 함
+
+CNAME 레코드: 도메인 → 다른 도메인 (예: cname.vercel-dns.com)
+
+✅ 목적지 서버가 바뀌어도 자동으로 따라감
+```

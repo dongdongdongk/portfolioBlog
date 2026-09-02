@@ -1,0 +1,464 @@
+---
+title: 'YelpCamp 오류 및 데이터 검증'
+date: '2026-09-02'
+category: '풀스택/The Web Developer 부트캠프 2022'
+tags: ['풀스택', 'The Web Developer 부트캠프 2022']
+draft: false
+summary: ''
+---
+
+# 클라이언트 양식 유효성 검사
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381397/notion-blog/_/The_Web_Developer_2022/node_js/YelpCamp_/Untitled.png)
+
+```jsx
+간단하게 부트스트랩의 내장 기능으로 클라이언트 유효성 검사를 실시하였다
+```
+
+```jsx
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import axios from 'axios'
+import Button from 'react-bootstrap/Button'
+import Col from 'react-bootstrap/Col'
+import Form from 'react-bootstrap/Form'
+import InputGroup from 'react-bootstrap/InputGroup'
+import Row from 'react-bootstrap/Row'
+import FloatingLabel from 'react-bootstrap/FloatingLabel'
+
+const CampGroundAdd = () => {
+  const navigate = useNavigate()
+  const [validated, setValidated] = useState(false)
+  //상태 초기화
+  const [formData, setFormData] = useState({
+    title: '',
+    location: '',
+    image: '',
+    price: '',
+    description: '',
+  })
+
+  // 입력값 변경 핸들러
+  const handleChange = (e) => {
+    const { name, value } = e.target
+    setFormData((prevDate) => ({
+      ...prevDate,
+      [name]: value,
+    }))
+  }
+
+  // const handleSubmit = (event) => {
+  //     const form = event.currentTarget;
+  //     if (form.checkValidity() === false) {
+  //       event.preventDefault();
+  //       event.stopPropagation();
+  //     }
+
+  //     setValidated(true);
+  //   };
+
+  // 폼 제출 핸들러
+  const onSubmitHandler = async (e) => {
+    e.preventDefault()
+
+    const form = e.currentTarget
+
+    if (form.checkValidity() === false) {
+      setValidated(true)
+      return
+    }
+
+    setValidated(false)
+
+    // 폼 데이터 전송
+    try {
+      await axios.post('http://localhost:4000/campground/new', formData)
+      navigate('/campground')
+    } catch (error) {
+      console.error('SAVE FAIL', error)
+    }
+  }
+
+  return (
+    <>
+      <Form noValidate validated={validated} onSubmit={onSubmitHandler}>
+        <Row className="mb-3">
+          <Form.Group as={Col} md="6" controlId="title">
+            <Form.Label>Title</Form.Label>
+            <Form.Control
+              type="text"
+              placeholder="title"
+              name="title"
+              value={formData.title}
+              onChange={handleChange}
+              required
+            />
+            <Form.Control.Feedback type="invalid">
+              Please provide a valid title.
+            </Form.Control.Feedback>
+          </Form.Group>
+        </Row>
+        <Row className="mb-3">
+          <Form.Group as={Col} md="6" controlId="location">
+            <Form.Label>Location</Form.Label>
+            <Form.Control
+              type="text"
+              placeholder="location"
+              name="location"
+              value={formData.location}
+              onChange={handleChange}
+              required
+            />
+            <Form.Control.Feedback type="invalid">
+              Please provide a valid location.
+            </Form.Control.Feedback>
+          </Form.Group>
+        </Row>
+        <Row className="mb-3">
+          <Form.Group as={Col} md="6" controlId="image">
+            <Form.Label>Image</Form.Label>
+            <Form.Control
+              type="text"
+              placeholder="image"
+              name="image"
+              value={formData.image}
+              onChange={handleChange}
+              required
+            />
+            <Form.Control.Feedback type="invalid">
+              Please provide a valid image.
+            </Form.Control.Feedback>
+          </Form.Group>
+        </Row>
+        <Row className="mb-3">
+          <Form.Group as={Col} md="6" controlId="price">
+            <Form.Label>Price</Form.Label>
+            <InputGroup hasValidation>
+              <InputGroup.Text id="inputGroupPrepend">$</InputGroup.Text>
+              <Form.Control
+                type="text"
+                placeholder="price"
+                aria-describedby="inputGroupPrepend"
+                value={formData.price}
+                onChange={handleChange}
+                name="price"
+                required
+              />
+              <Form.Control.Feedback type="invalid">Please choose a price.</Form.Control.Feedback>
+            </InputGroup>
+          </Form.Group>
+        </Row>
+        <Row className="mb-3">
+          <Form.Group as={Col} md="6" controlId="description">
+            <Form.Label>Description</Form.Label>
+            <InputGroup hasValidation>
+              <FloatingLabel controlId="description" label="description">
+                <Form.Control
+                  as="textarea"
+                  placeholder="Leave a description here"
+                  value={formData.description}
+                  onChange={handleChange}
+                  name="description"
+                  style={{ height: '100px' }}
+                  required
+                />
+              </FloatingLabel>
+              <Form.Control.Feedback
+                type="invalid"
+                style={{ display: validated ? 'block' : 'none' }}
+              >
+                Please provide a valid description.
+              </Form.Control.Feedback>
+            </InputGroup>
+          </Form.Group>
+        </Row>
+        <Button type="submit">Submit form</Button>
+      </Form>
+    </>
+  )
+}
+
+export default CampGroundAdd
+```
+
+# ExpressError Class 정의하기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381394/notion-blog/_/The_Web_Developer_2022/node_js/YelpCamp_/Untitled_1.png)
+
+```jsx
+서버에서 오류를 검증하기 위해서 util 폴더를 만들고
+
+catchAsync.js 와 ExpressError.js 를 만들어준다
+```
+
+## catchAsync.js, ExpressError.js정의하고 사용하기
+
+```jsx
+**catchAsync.js**
+
+module.exports = func => {
+    return (req, res, next) => {
+        func(req, res, next).catch(e => next(e));
+    }
+}
+```
+
+```jsx
+catchAsync.js 미들웨어가 비동기 함수에서 발생한 에러를 처리하고
+
+에러를 next 함수를 통해 다음 미들웨어로 전달하도록 도와준다
+
+이후 index.js 로 돌아가서
+
+const catchAsync = require("./util/catchAsync")
+
+를 통해 모듈을 연결해주고
+
+라우터 함수를 catchAsync 로 감싸주면 아래 미들웨어를 호출해서 에러를 핸들링 하게 된다
+
+특정 조건에 따른 명시적인 응답은 개발자가 직접 구현해주어야 한다. ex) 찾는 id 가 없다면??
+
+아까 만든 ExpressError.js 를 사용해서 (메세지, 에러코드) 이렇게 인자를 전달해서 에러를 발생시킨다
+```
+
+```jsx
+**ExpressError.js**
+
+class ExpressError extends Error {
+    constructor(message, statusCode) {
+        super();
+        this.message = message
+        this.statusCode = statusCode
+    }
+}
+
+module.exports = ExpressError;
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381395/notion-blog/_/The_Web_Developer_2022/node_js/YelpCamp_/Untitled_2.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381396/notion-blog/_/The_Web_Developer_2022/node_js/YelpCamp_/Untitled_3.png)
+
+```jsx
+잘못된 아이디를 입력했을 때
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381396/notion-blog/_/The_Web_Developer_2022/node_js/YelpCamp_/Untitled_4.png)
+
+```jsx
+CastError 발생 시 미들웨어 실행하며 오류 전
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381396/notion-blog/_/The_Web_Developer_2022/node_js/YelpCamp_/Untitled_5.png)
+
+```jsx
+추가와 업데이트 오류는
+
+req.body.newCamp 가 비어있을 때 오류를 전달한다
+
+( if 가 위에 있는데도 작동하는 이유는 catchAsync 로 감싸서 그렇다 )
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381396/notion-blog/_/The_Web_Developer_2022/node_js/YelpCamp_/Untitled_6.png)
+
+```jsx
+app.all('*', (req, res, next) => {
+  next(new ExpressError('Page Not Found'), 404)
+})
+
+app.use((err, req, res, next) => {
+  const { statusCode = 500, message = 'Something went wrong' } = err
+  res.status(statusCode).send(message)
+})
+```
+
+```jsx
+index.js 의 맨 아래에 위의 코드를 작성해준다
+
+app.all 미들웨어는 모든 라우터를 뚫고 내려오면 페이지가 없음을 에러에 담아서 다음으로 전달한다
+
+그럼 app.use 는 위의 라우터에서 발생한 자잘한 오류들과 라우터를 모두 지나쳤을시 app.all 의 오류를 받아 page not found를
+
+출력한다
+```
+
+# 404 페이지 만들기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381396/notion-blog/_/The_Web_Developer_2022/node_js/YelpCamp_/Untitled_7.png)
+
+```jsx
+라우터의 맨 아래에 위와 같이 404 페이지를 추가해주고
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381397/notion-blog/_/The_Web_Developer_2022/node_js/YelpCamp_/Untitled_8.png)
+
+```jsx
+페이지를 만들어준다
+```
+
+# JOI 스키마 유효성 검사
+
+```jsx
+서버에서 현재는 값이 있느냐 없느냐만 검사 가능하다
+
+그럼 값이 하나만 빠지거나 원하는 형식이 아닐때는 어떻게 확인할까? 하나하나 전부 if 로검사하면
+
+너무 번거롭다
+
+이떄 JOI 라는 JavaScript 유효성 검사 도구를 사용할 수 있다
+```
+
+```jsx
+npm i joi
+****
+입력해서 서버에 joi 를 설치해준다
+
+https://joi.dev/api/?v=17.9.1
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381397/notion-blog/_/The_Web_Developer_2022/node_js/YelpCamp_/Untitled_9.png)
+
+```jsx
+// 추가
+app.post(
+  '/campground/new',
+  catchAsync(async (req, res) => {
+    // if (!req.body.newCamp) throw new ExpressError('Invalid Campground Data', 400);
+    const campgroundSchema = Joi.object({
+      // Joi를 사용하여 유효성 검사를 위한 스키마를 정의 몽구스의 스키마가 아니다 몽구스가 시작하기도 전에 시작됨
+      title: Joi.string().required(),
+      price: Joi.number().required().min(0),
+      description: Joi.string().required(),
+      location: Joi.string().required(),
+      image: Joi.string().required(),
+    })
+    const { error } = campgroundSchema.validate(req.body, { abortEarly: false }) // { abortEarly: false } 이렇게 해줘야 모든 오류가 출력된다 Joi 스키마를 사용하여 클라이언트로부터 받은 req.body 데이터를 유효성 검사. validate 메서드의 결과로부터 error 객체를 추출
+    if (error) {
+      const errorMessage = error.details.map((detail) => detail.message).join(', ') // 배열의 모든 요소를 연결해 하나의 문자열로 만든다 사이에 인수 , 를 넣음
+      console.log('Formatted Error Message:', errorMessage)
+      throw new ExpressError(errorMessage, 400)
+    }
+    const newCamp = new CampGround(req.body)
+    await newCamp.save()
+    D
+    res.send('SaveSuccess')
+  })
+)
+```
+
+```jsx
+위와 같이 검사를 실시해준다
+
+Joi를 사용하여 유효성 검사를 위한 스키마를 정의하고 ( 몽구스의 스키마가 아니다 몽구스로 저장하기도 전에 검사를 함 )
+
+Joi.object() 에 campgroundSchema 를 전달하고
+
+campgroundSchema.validate 에 (req.body) 를 전달해서 유효성 검사를 실시한 뒤
+
+error 를 출력하여 throw new ExpressError(errorMessage, 400) 로 에러를 보낸다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381394/notion-blog/_/The_Web_Developer_2022/node_js/YelpCamp_/Untitled_10.png)
+
+## JOI 유효성 검사 미들웨어
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381395/notion-blog/_/The_Web_Developer_2022/node_js/YelpCamp_/Untitled_11.png)
+
+```jsx
+// 추가
+app.post(
+  '/campground/new',
+  validateCampground,
+  catchAsync(async (req, res) => {
+    // if (!req.body.newCamp) throw new ExpressError('Invalid Campground Data', 400);
+    const newCamp = new CampGround(req.body)
+    await newCamp.save()
+    res.send('SaveSuccess')
+  })
+)
+```
+
+```jsx
+위에 만들어둔
+
+const campgroundSchema = Joi.object({
+        title: Joi.string().required(),
+        price: Joi.number().required().min(0),
+        description : Joi.string().required(),
+        location : Joi.string().required(),
+        image : Joi.string().required()
+    })
+
+를 별개 파일을 만들어서 이동시킨다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381395/notion-blog/_/The_Web_Developer_2022/node_js/YelpCamp_/Untitled_12.png)
+
+```jsx
+const Joi = require('joi')
+
+module.exports.campgroundSchema = Joi.object({
+  title: Joi.string().required(),
+  price: Joi.number().required().min(0),
+  description: Joi.string().required(),
+  location: Joi.string().required(),
+  image: Joi.string().required(),
+})
+```
+
+```jsx
+validate.js 를 만들어 주고 campgroundSchema 를 만들어주고 module.exports 해준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381395/notion-blog/_/The_Web_Developer_2022/node_js/YelpCamp_/Untitled_13.png)
+
+```jsx
+const { campgroundSchema } = require('./validate') * 추가되면
+
+const { campgroundSchema, otherSchema } = require('./validate')
+```
+
+```jsx
+index.js 에 { campgroundSchema } 를 객체 분해(destructuring) 해서 가져온다
+
+./validate 모듈에서 campgroundSchema만 가져오는 것이므로,
+
+이렇게 중괄호를 사용하여 해당 속성만을 가져온다.
+
+이것을 사용하면 모듈에서 내보낸 객체의 특정 속성에 직접 접근할 필요 없이, 필요한 부분만을 간단하게 추출하여 사용할 수 있다
+```
+
+```jsx
+객체 분해(destructuring) 를 사용하지 않으면 validate.campgroundSchema 이런식으로 일일이 다 접근해서 사용해야한다
+
+( campgroundSchema  를 campgroundSchema  로 가져오는것 )
+
+// 다른 파일에서 사용하는 예
+
+const validate = require("./validate");
+
+// campgroundSchema와 otherSchema에 직접 접근
+console.log(validate.campgroundSchema);
+console.log(validate.otherSchema);
+
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381395/notion-blog/_/The_Web_Developer_2022/node_js/YelpCamp_/Untitled_14.png)
+
+```jsx
+const validateCampground = (req, res, next) => {
+  const { error } = campgroundSchema.validate(req.body, { abortEarly: false })
+  if (error) {
+    const errorMessage = error.details.map((detail) => detail.message).join(', ')
+    throw new ExpressError(errorMessage, 400)
+  } else {
+    next()
+  }
+}
+```
+
+```jsx
+index.js 에 아까 만든 (스키마는 이동했고)
+
+미들웨어에 else 해서 문제가 없으면 next() 로 다음 미들웨어로 넘어가게 해주는걸 꼭 기억하자
+```

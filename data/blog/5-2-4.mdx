@@ -1,0 +1,1655 @@
+---
+title: '섹션:5 음식 배달 앱 - 2'
+date: '2026-09-02'
+category: '프론트/React Native'
+tags: ['프론트', 'React Native']
+draft: false
+summary: ''
+---
+
+# { 🔑 인증 기능 구현 가이드 }
+
+> 회원가입 / 로그인 / 현재 유저 조회 + Sentry 에러 추적
+
+---
+
+## 📋 이번 강의에서 구현하는 것
+
+```
+lib/appwrite.ts
+├── createUser()     — 회원가입: 인증 계정 생성 + DB에 유저 저장
+├── signIn()         — 로그인: 이메일/비밀번호 세션 생성
+├── getCurrentUser() — 현재 로그인된 유저 정보 조회
+├── getMenu()        — 메뉴 목록 조회 (카테고리/검색 필터)
+└── getCategories()  — 카테고리 목록 조회
+```
+
+---
+
+## 1. 회원가입의 두 단계
+
+부동산 앱(구글 OAuth)과 달리, 이메일 인증은 **두 가지 작업을 동시에** 해야 합니다.
+
+```
+createUser() 실행 순서:
+
+1. account.create()       → Appwrite 인증 시스템에 계정 생성
+                            (ID/이메일/비밀번호 저장)
+2. signIn()               → 가입 즉시 자동 로그인
+3. avatars.getInitialsURL() → 이름으로 이니셜 아바타 URL 생성
+4. databases.createDocument() → DB users 컬렉션에 유저 정보 저장
+                                (이름/이메일/accountId/아바타)
+
+왜 DB에도 저장하나?
+  Appwrite 인증 시스템: 로그인/로그아웃만 관리
+  DB users 컬렉션: 주문내역, 배송주소 등 다른 데이터와 관계 형성 가능
+```
+
+---
+
+## 2. 전체 코드 + 주석
+
+```tsx
+// lib/appwrite.ts
+
+import { Account, Avatars, Client, Databases, ID, Query } from 'react-native-appwrite'
+import { CreateUserParams, SignInParams, GetMenuParams } from '@/types'
+
+export const appwriteConfig = {
+  endpoint: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT!,
+  projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID!,
+  platform: 'com.jsm.foodordering',
+  databaseId: '...',
+  userCollectionId: '...',
+  categoriesCollectionId: '...',
+  menuCollectionId: '...',
+}
+
+export const client = new Client()
+client
+  .setEndpoint(appwriteConfig.endpoint)
+  .setProject(appwriteConfig.projectId)
+  .setPlatform(appwriteConfig.platform)
+
+export const account = new Account(client)
+export const databases = new Databases(client)
+const avatars = new Avatars(client) // 내부에서만 사용 → export 불필요
+
+// ── 회원가입 ────────────────────────────────────────────
+export const createUser = async ({ email, password, name }: CreateUserParams) => {
+  try {
+    // STEP 1: Appwrite 인증 계정 생성
+    const newAccount = await account.create(
+      ID.unique(), // 고유 ID 자동 생성
+      email,
+      password,
+      name
+    )
+    if (!newAccount) throw Error
+
+    // STEP 2: 가입 즉시 자동 로그인
+    await signIn({ email, password })
+
+    // STEP 3: 이니셜 아바타 URL 생성
+    // 예: "Adrian" → "A" 이니셜이 들어간 원형 이미지 URL
+    const avatarUrl = avatars.getInitialsURL(name)
+
+    // STEP 4: DB에 유저 문서 생성 (인증 계정과 연결)
+    return await databases.createDocument(
+      appwriteConfig.databaseId,
+      appwriteConfig.userCollectionId,
+      ID.unique(),
+      {
+        email,
+        name,
+        accountId: newAccount.$id, // 인증 계정 ID — 나중에 조회 시 사용
+        avatar: avatarUrl,
+      }
+    )
+  } catch (e) {
+    throw new Error(e as string)
+  }
+}
+
+// ── 로그인 ──────────────────────────────────────────────
+export const signIn = async ({ email, password }: SignInParams) => {
+  try {
+    // 이메일/비밀번호로 세션 생성 → 로그인 상태 유지
+    await account.createEmailPasswordSession(email, password)
+  } catch (e) {
+    throw new Error(e as string)
+  }
+}
+
+// ── 현재 유저 조회 ──────────────────────────────────────
+export const getCurrentUser = async () => {
+  try {
+    // STEP 1: 현재 로그인된 인증 계정 가져오기
+    const currentAccount = await account.get()
+    if (!currentAccount) throw Error
+
+    // STEP 2: accountId로 DB에서 유저 문서 찾기
+    const currentUser = await databases.listDocuments(
+      appwriteConfig.databaseId,
+      appwriteConfig.userCollectionId,
+      [Query.equal('accountId', currentAccount.$id)] // accountId가 일치하는 문서만
+    )
+    if (!currentUser) throw Error
+
+    // 첫 번째(유일한) 유저 문서 반환
+    return currentUser.documents[0]
+  } catch (e) {
+    console.log(e)
+    throw new Error(e as string)
+  }
+}
+
+// ── 메뉴 조회 ───────────────────────────────────────────
+export const getMenu = async ({ category, query }: GetMenuParams) => {
+  try {
+    const queries: string[] = []
+
+    // 카테고리 필터가 있을 때만 추가
+    if (category) queries.push(Query.equal('categories', category))
+
+    // 검색어가 있을 때만 추가
+    if (query) queries.push(Query.search('name', query))
+
+    const menus = await databases.listDocuments(
+      appwriteConfig.databaseId,
+      appwriteConfig.menuCollectionId,
+      queries // 조건 없으면 빈 배열 → 전체 조회
+    )
+    return menus.documents
+  } catch (e) {
+    throw new Error(e as string)
+  }
+}
+
+// ── 카테고리 조회 ───────────────────────────────────────
+export const getCategories = async () => {
+  try {
+    const categories = await databases.listDocuments(
+      appwriteConfig.databaseId,
+      appwriteConfig.categoriesCollectionId
+    )
+    return categories.documents
+  } catch (e) {
+    throw new Error(e as string)
+  }
+}
+```
+
+---
+
+## 3. 로그인 화면에 Sentry 연동
+
+```tsx
+// app/(auth)/signin.tsx
+
+import * as Sentry from '@sentry/react-native'
+
+const submit = async () => {
+  const { email, password } = form
+  if (!email || !password)
+    return Alert.alert('Error', 'Please enter valid email address & password.')
+
+  setIsSubmitting(true)
+  try {
+    await signIn({ email, password })
+    router.replace('/')
+  } catch (error: any) {
+    Alert.alert('Error', error.message)
+    Sentry.captureEvent(error) // ← 에러를 Sentry 대시보드에 전송
+  } finally {
+    setIsSubmitting(false)
+  }
+}
+```
+
+### Sentry란?
+
+```
+개발 중 에러:
+  터미널/콘솔에서 바로 확인 → 문제 없음
+
+앱 출시 후 에러:
+  사용자 폰에서 발생 → 개발자는 모름 😱
+
+Sentry가 하는 일:
+  앱에서 에러 발생
+      ↓
+  Sentry.captureEvent(error) 호출
+      ↓
+  Sentry 대시보드에 자동 전송
+      ↓
+  개발자가 어떤 에러가, 어디서, 몇 번 났는지 확인 가능
+```
+
+---
+
+## 4. `account.create` vs `databases.createDocument` 차이
+
+```
+account.create()
+  → Appwrite 인증 시스템에 저장
+  → 로그인/로그아웃/세션 관리에 사용
+  → 이메일, 비밀번호, 이름만 저장
+
+databases.createDocument()
+  → Appwrite DB에 저장
+  → 다른 컬렉션(주문, 배송주소 등)과 관계 형성 가능
+  → accountId, 이메일, 이름, 아바타 등 커스텀 필드 저장
+
+둘 다 필요한 이유:
+  인증: account (세션 관리)
+  데이터 관계: databases (주문 ↔ 유저 연결 등)
+```
+
+---
+
+## 5. `getCurrentUser`의 2단계 조회
+
+```tsx
+// 1단계: 현재 세션의 인증 계정 가져오기
+const currentAccount = await account.get()
+// → { $id: "auth_123", email: "...", name: "..." }
+
+// 2단계: accountId로 DB 유저 문서 찾기
+const currentUser = await databases.listDocuments(databaseId, userCollectionId, [
+  Query.equal('accountId', currentAccount.$id),
+])
+// → DB에 저장된 유저 문서 (아바타, 주문내역 관계 등 포함)
+
+// 왜 2단계?
+// account.get()은 인증 정보만 줌 → 아바타 URL 같은 커스텀 데이터 없음
+// DB 조회를 통해 우리가 저장한 모든 유저 정보를 가져옴
+```
+
+---
+
+## ⚠️ 흔한 에러와 해결
+
+| 에러                                             | 원인                                                     | 해결                                                              |
+| ------------------------------------------------ | -------------------------------------------------------- | ----------------------------------------------------------------- |
+| "Not authorized to perform the requested action" | DB 컬렉션 권한 미설정                                    | Appwrite → 컬렉션 → Settings → Permissions → Any → CRUD 모두 허용 |
+| "Session already active"                         | 회원가입 시 signIn 호출 → 세션 생성됨 → 다시 로그인 시도 | 정상 동작. 이미 로그인 상태이므로 홈으로 이동                     |
+| "Password must be at least 8 characters"         | 비밀번호 8자 미만                                        | 8자 이상 입력                                                     |
+
+---
+
+## 🔑 핵심 요약
+
+1. **`createUser`의 4단계** = 인증 계정 생성 → 자동 로그인 → 아바타 URL 생성 → DB에 유저 저장
+2. **`account.createEmailPasswordSession`** = 이메일/비밀번호로 세션 생성 (= 로그인)
+3. **`getCurrentUser`의 2단계** = 인증 계정 ID 조회 → 그 ID로 DB 유저 문서 찾기
+4. **`Query.equal("accountId", id)`** = 특정 accountId와 일치하는 문서만 필터링
+5. **`Sentry.captureEvent(error)`** = 에러 발생 시 Sentry 대시보드로 자동 전송
+6. **동적 쿼리 배열** = 조건이 있을 때만 `push()` → 없으면 전체 조회 (`getMenu` 패턴)
+
+# { 🛡️ Sentry 설정 & 에러 모니터링 가이드 }
+
+> React Native 앱에 Sentry를 연동하고 에러를 추적하는 방법
+
+---
+
+## 💡 Sentry가 필요한 이유
+
+```
+개발 중:
+  에러 발생 → 내 터미널에 바로 표시 → 즉시 확인 가능
+
+앱 출시 후:
+  에러 발생 → 사용자 폰에서만 발생 → 개발자는 전혀 모름 😱
+  사용자 피드백: "앱이 그냥 안 돼요..." (context 없음)
+
+Sentry 있을 때:
+  에러 발생 → Sentry 대시보드에 자동 전송
+  → 어떤 에러인지, 어디서 났는지, 어떤 기기인지 모두 확인 가능
+```
+
+---
+
+## 1. 설치 — Sentry Wizard로 자동 설정
+
+```bash
+# Sentry Wizard: 설정 파일을 자동으로 생성해줌
+npx @sentry/wizard@latest -i react-native
+```
+
+실행 후 선택:
+
+1. Sentry SaaS (sentry.io) 선택
+2. 계정 로그인
+3. 새 프로젝트 생성 (React Native 선택)
+4. Session Replay 활성화 → **Yes** (모바일 화면 녹화 기능)
+5. Feedback Widget 활성화 → **Yes**
+
+> 💡 Wizard가 `app.json`, `metro.config.js`, `_layout.tsx` 등을 자동으로 수정해줍니다.
+
+---
+
+## 2. 설치 후 자동 생성되는 코드
+
+```tsx
+// app/_layout.tsx (Wizard가 자동 추가)
+import * as Sentry from '@sentry/react-native'
+
+Sentry.init({
+  dsn: 'https://...@sentry.io/...', // 내 프로젝트 고유 주소
+  tracesSampleRate: 1.0, // 성능 추적 비율 (1.0 = 100%)
+  replaysSessionSampleRate: 0.1, // Session Replay 비율
+})
+```
+
+---
+
+## 3. 에러 수동 캡처 — `Sentry.captureEvent`
+
+```tsx
+// app/(auth)/signin.tsx
+
+import * as Sentry from '@sentry/react-native'
+
+const submit = async () => {
+  try {
+    await signIn({ email, password })
+    router.replace('/')
+  } catch (error: any) {
+    Alert.alert('Error', error.message)
+
+    // Sentry 대시보드로 에러 전송
+    Sentry.captureEvent(error)
+  }
+}
+```
+
+> 💡 `Sentry.captureEvent()`를 catch 블록에 추가하면
+> 에러 발생 시 자동으로 대시보드에 전송됩니다.
+> 로그인, 회원가입, 장바구니 등 중요한 기능의 catch 블록마다 추가하세요.
+
+---
+
+## 4. Sentry 대시보드에서 볼 수 있는 정보
+
+```
+에러 하나당 제공되는 정보:
+├── 에러 메시지 (예: "Session is already active")
+├── 에러가 발생한 파일 + 라인 번호
+├── 스택 트레이스 (에러 경로 전체)
+├── 사용자 기기 (예: iPhone 13 Pro Max)
+├── OS 버전 (예: iOS 18.6)
+├── 발생 시각
+└── 발생 횟수
+```
+
+---
+
+## 5. Seer — AI 에러 해결 에이전트
+
+Sentry의 AI 기능으로, GitHub 저장소와 연결하면 에러의 원인과 해결책을 자동으로 분석합니다.
+
+```
+사용 방법:
+1. Sentry 대시보드 → 에러 클릭
+2. "Find Root Cause" 버튼 클릭
+3. GitHub 저장소 연결 (첫 사용 시)
+4. Seer가 코드를 분석해서 원인과 해결책 제시
+
+예시 분석 결과:
+"401 Unauthorized on /account/sessions/email →
+ The authentication token may be expired or invalid.
+ A session already exists. Check if the user is already
+ logged in before calling createEmailPasswordSession."
+```
+
+---
+
+## 6. 테스트용 에러 발생 버튼 (설치 확인용)
+
+```tsx
+// Sentry 연동 확인을 위해 임시로 추가
+// 확인 후 반드시 삭제!
+
+import * as Sentry from "@sentry/react-native";
+import { Button } from "react-native";
+
+<FlatList
+  ...
+  ListFooterComponent={() => (
+    <Button
+      title="Try"
+      onPress={() => { Sentry.nativeCrash(); }}  // 테스트 에러 발생
+    />
+  )}
+/>
+```
+
+---
+
+## 7. Session Replay란?
+
+```
+Session Replay:
+  사용자가 에러를 만나기 직전까지 어떤 행동을 했는지
+  화면 녹화처럼 재생해서 볼 수 있는 기능
+
+웹에서는 오래전부터 지원 → 최근 모바일도 지원 시작
+
+활용 예:
+  "결제 화면에서 앱이 죽었다"는 에러가 들어옴
+  → Session Replay로 사용자가 무엇을 눌렀는지 그대로 재생
+  → 재현하기 어려운 버그도 쉽게 원인 파악 가능
+```
+
+---
+
+## ✅ 체크리스트
+
+- [ ] `npx @sentry/wizard@latest -i react-native` 실행
+- [ ] Sentry 계정 생성 + 프로젝트 연결
+- [ ] Session Replay, Feedback Widget 활성화
+- [ ] 테스트 에러 버튼으로 연동 확인
+- [ ] 확인 후 테스트 버튼 제거
+- [ ] 주요 기능 catch 블록에 `Sentry.captureEvent(error)` 추가
+- [ ] (선택) GitHub 저장소 연결 → Seer 활성화
+
+---
+
+## 🔑 핵심 요약
+
+1. **Sentry** = 앱 출시 후 사용자 기기에서 발생하는 에러를 수집하고 분석하는 도구
+2. **Wizard** = 설정 파일 자동 생성 (`npx @sentry/wizard@latest -i react-native`)
+3. **`Sentry.captureEvent(error)`** = catch 블록에 한 줄 추가로 에러 전송
+4. **대시보드** = 에러 메시지 + 스택 트레이스 + 기기 정보 + 발생 횟수 확인
+5. **Seer** = GitHub 연결 시 AI가 에러 원인과 해결책 자동 분석
+6. **Session Replay** = 에러 직전 사용자 행동을 화면 녹화처럼 재생 (모바일도 지원)
+
+# { 🐻 Zustand 전역 상태 관리 가이드 }
+
+> React Context보다 간단하게 앱 전체 로그인 상태 관리하기
+
+---
+
+## 💡 왜 Zustand인가?
+
+|             | React Context        | Redux                     | Zustand  |
+| ----------- | -------------------- | ------------------------- | -------- |
+| 설정 복잡도 | 중간 (Provider 필요) | 높음 (reducer, action 등) | **낮음** |
+| 코드 양     | 중간                 | 많음                      | **최소** |
+| 성능        | 리렌더링 이슈 있음   | 좋음                      | **좋음** |
+| 학습 난이도 | 쉬움                 | 어려움                    | **쉬움** |
+
+> 💡 Zustand는 "그냥 JavaScript 객체"처럼 쓸 수 있습니다.
+
+---
+
+## 1. 설치
+
+```bash
+npm install zustand
+```
+
+---
+
+## 2. store 구조
+
+```
+store/
+└── auth.store.ts   ← 로그인 상태 전역 관리
+```
+
+---
+
+## 3. 전체 코드 + 주석
+
+```tsx
+// store/auth.store.ts
+
+import { create } from 'zustand'
+import { User } from '@/types'
+import { getCurrentUser } from '@/lib/appwrite'
+
+// 이 store에서 관리할 상태와 함수의 타입 정의
+type AuthState = {
+  // 상태값
+  isAuthenticated: boolean // 로그인 여부
+  user: User | null // 현재 유저 정보
+  isLoading: boolean // 유저 정보 로딩 중 여부
+
+  // setter 함수들
+  setIsAuthenticated: (value: boolean) => void
+  setUser: (user: User | null) => void
+  setLoading: (loading: boolean) => void
+
+  // 서버에서 유저 정보를 가져와 상태를 업데이트하는 함수
+  fetchAuthenticatedUser: () => Promise<void>
+}
+
+// create(): Zustand 스토어 생성
+// set: 상태를 업데이트하는 함수 (React의 setState와 유사)
+const useAuthStore = create<AuthState>((set) => ({
+  // ── 초기 상태값 ──────────────────────────────────
+  isAuthenticated: false,
+  user: null,
+  isLoading: true, // 앱 시작 시 유저 확인 중이므로 true로 시작
+
+  // ── setter 함수들 ─────────────────────────────────
+  // set({ 키: 값 }) → 해당 키만 업데이트 (나머지는 유지)
+  setIsAuthenticated: (value) => set({ isAuthenticated: value }),
+  setUser: (user) => set({ user }),
+  setLoading: (value) => set({ isLoading: value }),
+
+  // ── 유저 조회 함수 ────────────────────────────────
+  fetchAuthenticatedUser: async () => {
+    set({ isLoading: true })
+    try {
+      // Appwrite에서 현재 로그인된 유저 정보 조회
+      const user = await getCurrentUser()
+
+      if (user) {
+        // 유저 있음 → 로그인 상태로 업데이트
+        set({ isAuthenticated: true, user: user as User })
+      } else {
+        // 유저 없음 → 비로그인 상태로 업데이트
+        set({ isAuthenticated: false, user: null })
+      }
+    } catch (e) {
+      console.log('fetchAuthenticatedUser error', e)
+      set({ isAuthenticated: false, user: null })
+    } finally {
+      set({ isLoading: false }) // 성공/실패 관계없이 로딩 종료
+    }
+  },
+}))
+
+export default useAuthStore
+```
+
+---
+
+## 4. React Context vs Zustand 비교
+
+### React Context (부동산 앱 방식)
+
+```tsx
+// 1. Context 생성
+const GlobalContext = createContext()
+
+// 2. Provider로 전체 앱 감싸기 (필수!)
+export const GlobalProvider = ({ children }) => {
+  const [user, setUser] = useState(null)
+  return <GlobalContext.Provider value={{ user, setUser }}>{children}</GlobalContext.Provider>
+}
+
+// 3. 사용 (Context 안에 있어야만 동작)
+const { user } = useContext(GlobalContext)
+```
+
+### Zustand (음식 배달 앱 방식)
+
+```tsx
+// 1. store 생성 (auth.store.ts에서 한 번만)
+
+// 2. Provider 불필요 — 그냥 import해서 바로 사용
+const { user, isAuthenticated } = useAuthStore()
+// 어느 컴포넌트에서든, Provider 밖에서도 동작
+```
+
+---
+
+## 5. 사용 방법 — 어느 화면에서든 호출 가능
+
+### 앱 시작 시 유저 정보 가져오기
+
+```tsx
+// app/_layout.tsx
+
+import useAuthStore from '@/store/auth.store'
+
+export default function RootLayout() {
+  const { isLoading, fetchAuthenticatedUser } = useAuthStore()
+
+  useEffect(() => {
+    // 앱 시작 시 한 번만 실행 → 로그인 상태 확인
+    fetchAuthenticatedUser()
+  }, [])
+
+  // 폰트 로딩 중이거나 유저 확인 중이면 스플래시 유지
+  if (!fontsLoaded || isLoading) return null
+
+  return <Stack />
+}
+```
+
+### 탭 레이아웃에서 로그인 체크
+
+```tsx
+// app/(tabs)/_layout.tsx
+
+import useAuthStore from '@/store/auth.store'
+import { Redirect } from 'expo-router'
+
+export default function TabLayout() {
+  // 이전: const isAuthenticated = false; (하드코딩)
+  // 이후: 실제 전역 상태에서 가져오기
+  const { isAuthenticated } = useAuthStore()
+
+  if (!isAuthenticated) return <Redirect href="/signin" />
+  return <Slot />
+}
+```
+
+### 인증 레이아웃에서 이미 로그인된 유저 리디렉트
+
+```tsx
+// app/(auth)/_layout.tsx
+
+import useAuthStore from "@/store/auth.store";
+import { Redirect } from "expo-router";
+
+export default function AuthLayout() {
+  const { isAuthenticated } = useAuthStore();
+
+  // 이미 로그인된 상태면 로그인 화면 대신 홈으로
+  if (isAuthenticated) return <Redirect href="/" />;
+
+  return (...);
+}
+```
+
+### 홈 화면에서 유저 정보 표시
+
+```tsx
+// app/(tabs)/index.tsx
+
+import useAuthStore from '@/store/auth.store'
+
+export default function Home() {
+  const { user } = useAuthStore()
+
+  // 디버깅용: 유저 정보 콘솔 출력
+  console.log(JSON.stringify(user, null, 2))
+  //                          ↑      ↑   ↑
+  //                       출력값   replacer  들여쓰기
+
+  return <Text>안녕하세요, {user?.name}님</Text>
+}
+```
+
+---
+
+## 6. `JSON.stringify(obj, null, 2)` 패턴
+
+```tsx
+// 객체를 읽기 좋은 형태로 콘솔에 출력할 때
+
+const user = { name: 'Adrian', email: 'a@a.com', $id: '123' }
+
+console.log(user)
+// → [object Object] (읽기 어려움)
+
+console.log(JSON.stringify(user, null, 2))
+// → {
+//     "name": "Adrian",
+//     "email": "a@a.com",
+//     "$id": "123"
+//   }
+// 두 번째 인자: replacer (null = 모두 포함)
+// 세 번째 인자: 들여쓰기 공백 수 (2 = 2칸)
+```
+
+---
+
+## ✅ 체크리스트
+
+- [ ] `npm install zustand`
+- [ ] `store/auth.store.ts` 생성
+- [ ] `AuthState` 타입 정의
+- [ ] `useAuthStore` 스토어 생성 (초기 상태 + setters + fetchAuthenticatedUser)
+- [ ] `app/_layout.tsx`에서 `fetchAuthenticatedUser()` 호출
+- [ ] `app/(tabs)/_layout.tsx`에서 하드코딩 제거 → `useAuthStore` 사용
+- [ ] `app/(auth)/_layout.tsx`에서 이미 로그인된 유저 홈으로 리디렉트
+
+---
+
+## 🔑 핵심 요약
+
+1. **Zustand** = Provider 없이 어느 컴포넌트에서든 `useAuthStore()` 한 줄로 전역 상태 접근
+2. **`create((set) => ({...}))`** = 스토어 생성, `set({ 키: 값 })`으로 상태 업데이트
+3. **`fetchAuthenticatedUser`** = Appwrite에서 유저 정보 조회 후 스토어에 저장
+4. **앱 시작 시 한 번만** `fetchAuthenticatedUser` 호출 → 이후 어디서든 스토어에서 꺼내 씀
+5. **`isLoading: true`로 시작** = 유저 확인 중에는 화면 렌더링 막아 로그인/비로그인 깜빡임 방지
+6. **`JSON.stringify(obj, null, 2)`** = 객체를 보기 좋게 콘솔 출력하는 디버깅 패턴
+
+# { 📱 탭 네비게이션 가이드 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381488/notion-blog/_/React_Native/React_Native_-_/_5_-_2/image.png)
+
+> 부동산 앱과 거의 동일 — 새로 나온 플로팅 스타일 위주로 정리
+
+---
+
+## 전체 코드 + 주석
+
+```tsx
+// app/(tabs)/_layout.tsx
+
+import { images } from '@/constants'
+import useAuthStore from '@/store/auth.store'
+import { TabBarIconProps } from '@/types'
+import cn from 'clsx'
+import { Redirect, Tabs } from 'expo-router'
+import { Image, Text, View } from 'react-native'
+
+// 재사용 탭 아이콘 컴포넌트
+const TabBarIcon = ({ focused, icon, title }: TabBarIconProps) => (
+  <View className="tab-icon">
+    <Image
+      source={icon}
+      className="size-7"
+      resizeMode="contain"
+      tintColor={focused ? '#FE8C00' : '#5D5F6D'} // 활성: 주황, 비활성: 회색
+    />
+    <Text className={cn('text-sm font-bold', focused ? 'text-primary' : 'text-gray-200')}>
+      {title}
+    </Text>
+  </View>
+)
+
+export default function TabLayout() {
+  const { isAuthenticated } = useAuthStore()
+
+  // 비로그인 → 로그인 화면으로
+  if (!isAuthenticated) return <Redirect href="/signin" />
+
+  return (
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarShowLabel: false, // 기본 라벨 숨김 (TabBarIcon에서 직접 렌더링)
+
+        // 플로팅 탭바 스타일
+        tabBarStyle: {
+          borderTopLeftRadius: 50,
+          borderTopRightRadius: 50,
+          borderBottomLeftRadius: 50,
+          borderBottomRightRadius: 50,
+          marginHorizontal: 20, // 좌우 여백으로 화면 너비보다 좁게
+          height: 80,
+          position: 'absolute', // 화면 위에 떠 있는 효과
+          bottom: 40, // 하단에서 40px 위에 위치
+          backgroundColor: 'white',
+          // 그림자 (iOS)
+          shadowColor: '#1a1a1a',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          // 그림자 (Android)
+          elevation: 5,
+        },
+      }}
+    >
+      <Tabs.Screen
+        name="index"
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabBarIcon title="Home" icon={images.home} focused={focused} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="search"
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabBarIcon title="Search" icon={images.search} focused={focused} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="cart"
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabBarIcon title="Cart" icon={images.bag} focused={focused} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabBarIcon title="Profile" icon={images.person} focused={focused} />
+          ),
+        }}
+      />
+    </Tabs>
+  )
+}
+```
+
+---
+
+## 새로 나온 것 — 플로팅 탭바 스타일
+
+부동산 앱에서는 탭바가 화면 하단에 붙어 있었지만, 이번 앱은 **떠 있는(floating) 탭바**를 만듭니다.
+
+```
+일반 탭바:                 플로팅 탭바:
+┌──────────────┐           ┌──────────────┐
+│              │           │              │
+│    화면       │           │    화면       │
+│              │           │              │
+├──────────────┤           │  ╭────────╮  │  ← 둥근 모서리 + 공중에 떠 있음
+│ 🏠 🔍 🛒 👤 │           │  │🏠🔍🛒👤│  │
+└──────────────┘           │  ╰────────╯  │
+                           └──────────────┘
+```
+
+**핵심 CSS 속성:**
+
+```tsx
+tabBarStyle: {
+  borderRadius: 50,       // 모든 모서리 둥글게
+  marginHorizontal: 20,   // 좌우 여백 → 화면 너비보다 좁아짐
+  position: "absolute",   // 화면 레이어 위에 올라옴
+  bottom: 40,             // 아래에서 40px 띄움
+}
+```
+
+**그림자 iOS vs Android:**
+
+```tsx
+// iOS 그림자
+shadowColor: "#1a1a1a",
+shadowOffset: { width: 0, height: 2 },  // 아래쪽으로 2px 그림자
+shadowOpacity: 0.1,
+shadowRadius: 4,
+
+// Android 그림자 (iOS 속성과 별개로 설정 필요)
+elevation: 5,
+```
+
+> ⚠️ React Native에서는 iOS와 Android의 그림자 설정이 다릅니다.
+> iOS는 `shadow*` 속성을, Android는 `elevation` 속성을 씁니다.
+
+---
+
+## 탭바 하단 여백 문제
+
+탭바가 `position: absolute`이면 콘텐츠 위에 떠 있어서 **FlatList의 마지막 항목이 탭바에 가릴 수 있습니다.**
+
+```tsx
+// 해결: contentContainerClassName에 pb(padding-bottom)를 탭바 높이 이상으로 설정
+<FlatList
+  contentContainerClassName="pb-28" // 탭바(80px) + 여백(40px) = 120px 이상
+/>
+```
+
+---
+
+## 🔑 핵심 요약
+
+1. **플로팅 탭바** = `position: absolute` + `bottom: 40` + `marginHorizontal: 20` + `borderRadius: 50`
+2. **그림자** = iOS는 `shadow*` 속성, Android는 `elevation` (둘 다 설정해야 함)
+3. **`tabBarShowLabel: false`** = 기본 라벨 숨기고 `TabBarIcon`에서 직접 텍스트 렌더링
+4. **콘텐츠 가림 방지** = `contentContainerClassName="pb-28"` 등으로 하단 여백 확보
+
+# { 🗄️ 음식 배달 앱 — DB 설계 가이드 }
+
+> 카테고리 → 메뉴 → 커스터마이제이션 → 조인 테이블까지
+
+---
+
+## 📋 전체 컬렉션 구조
+
+```
+DB: app
+├── users                  ← 로그인 유저 정보 (이전 강의에서 생성)
+├── categories             ← 음식 카테고리 (버거, 피자 등)
+├── menu                   ← 개별 메뉴 아이템
+├── customizations         ← 재사용 가능한 옵션 (토핑, 사이드 등)
+└── menu_customizations    ← 메뉴 ↔ 옵션 연결 테이블 (조인 테이블)
+
+Storage:
+└── assets bucket          ← 메뉴 이미지 파일 저장
+```
+
+---
+
+## 1. categories 컬렉션
+
+```
+메뉴를 카테고리로 묶어서 필터링을 쉽게 만들기 위한 컬렉션
+```
+
+| 속성          | 타입         | 필수 | 설명                              |
+| ------------- | ------------ | ---- | --------------------------------- |
+| `name`        | String (100) | ✅   | 카테고리 이름 (Burgers, Pizza 등) |
+| `description` | String (100) | ✅   | 카테고리 설명                     |
+
+---
+
+## 2. menu 컬렉션
+
+```
+각 음식 아이템의 모든 정보를 담는 핵심 컬렉션
+```
+
+| 속성          | 타입              | 필수 | 설명                   |
+| ------------- | ----------------- | ---- | ---------------------- |
+| `name`        | String (200)      | ✅   | 메뉴 이름              |
+| `description` | String (2000)     | ✅   | 메뉴 설명              |
+| `image_url`   | URL               | ✅   | 이미지 URL             |
+| `rating`      | Float             | ✅   | 평점 (1~5)             |
+| `calories`    | Integer (1~10000) | ✅   | 칼로리                 |
+| `protein`     | Integer (0~10000) | ✅   | 단백질(g)              |
+| `price`       | Float (1~10000)   | ✅   | 가격                   |
+| `categories`  | Relationship      | ✅   | 카테고리 연결 (다대일) |
+
+**관계 설정:**
+
+```
+menu → categories: 다대일 (many-to-one)
+메뉴 아이템 하나는 카테고리 하나에 속함
+하나의 카테고리에 여러 메뉴 아이템이 속할 수 있음
+```
+
+---
+
+## 3. customizations 컬렉션
+
+```
+옵션(토핑, 사이드 등)을 별도 컬렉션으로 분리해서 재사용
+
+이렇게 하는 이유:
+  감자튀김 가격이 $3 → $5로 바뀌면?
+  ✅ customizations 컬렉션 한 곳만 수정하면 전체 반영
+  ❌ 각 메뉴마다 직접 수정 → 실수 발생 가능
+```
+
+| 속성    | 타입            | 필수 | 설명                        |
+| ------- | --------------- | ---- | --------------------------- |
+| `name`  | String (100)    | ✅   | 옵션 이름 (Extra Cheese 등) |
+| `price` | Float (1~10000) | ✅   | 추가 가격                   |
+| `type`  | Enum            | ✅   | 옵션 종류                   |
+
+**type Enum 선택지:**
+
+```
+Topping / Side / Size / Crust / Bread / Spice / Base / Sauce
+```
+
+---
+
+## 4. menu_customizations 컬렉션 (조인 테이블)
+
+### 왜 필요한가? — 다대다(Many-to-Many) 관계
+
+```
+문제:
+  버거에는 Extra Cheese 옵션이 있음
+  피자에도 Extra Cheese 옵션이 있음
+  → Extra Cheese는 여러 메뉴에 속할 수 있음
+
+  버거에는 여러 옵션이 있음
+  → 하나의 메뉴에도 여러 옵션이 있을 수 있음
+
+  결론: 메뉴와 옵션은 "다대다" 관계
+```
+
+```
+다대다 관계를 직접 연결하면:
+  menu.customizations = [Extra Cheese, Fries, Coke, ...]
+  → 같은 데이터가 여러 메뉴에 중복 저장 → 비효율적
+
+조인 테이블(menu_customizations)로 해결:
+  menu_customizations 레코드 하나 = (메뉴 하나, 옵션 하나)
+  예: { menu: "버거", customization: "Extra Cheese" }
+      { menu: "버거", customization: "Fries" }
+      { menu: "피자", customization: "Extra Cheese" }
+```
+
+| 속성             | 타입         | 설명               |
+| ---------------- | ------------ | ------------------ |
+| `menu`           | Relationship | 연결된 메뉴 아이템 |
+| `customizations` | Relationship | 연결된 옵션        |
+
+**관계 설정:**
+
+```
+menu_customizations → menu:           다대일 (cascade 삭제)
+menu_customizations → customizations: 다대일 (cascade 삭제)
+```
+
+---
+
+## 5. Storage — assets 버킷
+
+```
+Appwrite Storage: 이미지, 파일 등을 저장하는 공간
+  → 메뉴 이미지 업로드 시 사용
+
+설정:
+  Storage → 새 버킷 → 이름: assets
+  설정 → 권한 → All Users → 읽기/쓰기/삭제 허용
+```
+
+---
+
+## 6. .env 및 appwriteConfig 업데이트
+
+```bash
+# .env (또는 appwriteConfig에 직접 입력)
+
+EXPO_PUBLIC_APPWRITE_DATABASE_ID=...
+EXPO_PUBLIC_APPWRITE_USER_COLLECTION_ID=...
+EXPO_PUBLIC_APPWRITE_CATEGORIES_COLLECTION_ID=...     # 새로 추가
+EXPO_PUBLIC_APPWRITE_MENU_COLLECTION_ID=...           # 새로 추가
+EXPO_PUBLIC_APPWRITE_CUSTOMIZATIONS_COLLECTION_ID=... # 새로 추가
+EXPO_PUBLIC_APPWRITE_MENU_CUSTOMIZATIONS_COLLECTION_ID=... # 새로 추가
+EXPO_PUBLIC_APPWRITE_BUCKET_ID=...                    # 새로 추가
+```
+
+```tsx
+// lib/appwrite.ts
+export const appwriteConfig = {
+  // ...기존
+  categoriesCollectionId: '...',
+  menuCollectionId: '...',
+  customizationsCollectionId: '...',
+  menuCustomizationsCollectionId: '...',
+  bucketId: '...',
+}
+```
+
+---
+
+## 7. 전체 관계도
+
+```
+categories (1)
+    │
+    └─── (다대일) ───< menu (다)
+                          │
+                          └─── (다대다 via 조인 테이블)
+                                    │
+                          menu_customizations
+                                    │
+                                    └─── customizations
+```
+
+---
+
+## 🔑 핵심 요약
+
+1. **categories** = 메뉴를 그룹으로 묶어 필터링 용이하게 함
+2. **menu** = 음식 아이템 (이름/가격/영양정보 + categories와 관계)
+3. **customizations** = 재사용 가능한 옵션 (가격 변경 시 한 곳만 수정)
+4. **menu_customizations** = 다대다 관계를 처리하는 조인 테이블
+5. **조인 테이블이 필요한 이유** = 메뉴 ↔ 옵션이 다대다 관계이기 때문
+6. **Storage buckets** = Appwrite에서 이미지 파일을 저장하는 공간
+7. **데이터 정규화** = 데이터를 분리된 컬렉션으로 나눠 중복 없이 재사용 가능하게 설계
+
+# { 🌱 음식 배달 앱 — DB 시딩 }
+
+> 부동산 앱과 거의 동일 — 새로 나온 것만 정리
+
+---
+
+## 부동산 앱과의 차이점
+
+|                | 부동산 앱     | 음식 배달 앱                       |
+| -------------- | ------------- | ---------------------------------- |
+| 이미지 저장    | 외부 URL 사용 | **Appwrite Storage에 직접 업로드** |
+| 시딩 버튼 위치 | 홈 화면       | 검색 화면 (임시)                   |
+
+---
+
+## 새로 나온 것 — Appwrite Storage 업로드
+
+부동산 앱에서는 이미지를 Unsplash URL로 저장했지만, 이번 앱은 이미지를 **Appwrite Storage 버킷에 직접 업로드**합니다.
+
+```tsx
+// lib/appwrite.ts에 추가
+
+import { Storage } from 'react-native-appwrite'
+
+// Storage 인스턴스 생성 (이미지 파일 업로드/다운로드)
+export const storage = new Storage(client)
+```
+
+seed.ts 내부에서 storage를 사용해 이미지를 버킷에 업로드한 뒤, 그 URL을 menu 컬렉션의 `image_url` 필드에 저장합니다.
+
+---
+
+## 시딩 실행 방법
+
+```tsx
+// app/(tabs)/search.tsx (임시 버튼 추가)
+
+import { seed } from '@/lib/seed'
+import { Button } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+
+const Search = () => {
+  return (
+    <SafeAreaView>
+      <Button
+        title="Seed"
+        onPress={() => {
+          seed().catch((e) => console.log('failed to seed the database', e))
+        }}
+      />
+    </SafeAreaView>
+  )
+}
+```
+
+```
+실행 후 흐름:
+1. DB 전체 삭제 (중복 방지)
+2. categories 생성
+3. customizations 생성
+4. menu 생성 + 이미지 Storage 업로드
+5. menu_customizations (조인 테이블) 생성
+6. "Seeding complete" 로그 확인
+7. 버튼 제거
+```
+
+> ⚠️ 시딩에는 10~60초 정도 걸립니다. 완료 로그가 뜰 때까지 버튼을 다시 누르지 마세요.
+> ⚠️ 모든 컬렉션 권한이 "All Users → 전체 허용"으로 설정되어 있어야 합니다.
+> categories 컬렉션 권한을 빠뜨리면 "not authorized" 에러가 납니다.
+
+---
+
+## 나머지 세팅 내용
+
+`data.ts`와 `seed.ts` 파일은 강의에서 직접 설명 없이 GitHub에서 복사 붙여넣기로 진행되었으므로 별도 정리 없이 그대로 사용합니다.
+
+시딩 개념 상세 내용은 `restate_db_seed.md` 참고.
+
+# { 🍔 MenuCard 컴포넌트 가이드 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381488/notion-blog/_/React_Native/React_Native_-_/_5_-_2/image_1.png)
+
+> Appwrite Storage 이미지 + 플로팅 이미지 레이아웃
+
+---
+
+## 📋 MenuCard 구조
+
+```
+TouchableOpacity (menu-card 클래스)
+├── Image (floating — 카드 밖으로 튀어나옴)
+├── Text (메뉴 이름)
+├── Text ("from $가격")
+└── TouchableOpacity (Add to Cart 버튼)
+```
+
+---
+
+## 전체 코드 + 주석
+
+```tsx
+// components/MenuCard.tsx
+
+import { Image, Platform, Text, TouchableOpacity } from 'react-native'
+import { appwriteConfig } from '@/lib/appwrite'
+import { MenuItem } from '@/types'
+
+interface Props {
+  item: MenuItem
+}
+
+const MenuCard = ({ item }: Props) => {
+  // item에서 필요한 필드만 구조 분해
+  const { image_url, name, price } = item
+
+  // Appwrite Storage 이미지 URL 생성
+  // Storage에 저장된 이미지는 projectId를 쿼리 파라미터로 붙여야 접근 가능
+  const imageUrl = `${image_url}?project=${appwriteConfig.projectId}`
+
+  return (
+    <TouchableOpacity
+      className="menu-card"
+      // OS별 그림자 처리
+      // iOS: globals.css의 menu-card 클래스에서 shadow 설정
+      // Android: elevation으로 그림자 표현 (iOS shadow 속성 미지원)
+      style={Platform.OS === 'android' ? { elevation: 10, shadowColor: '#878787' } : {}}
+    >
+      {/* 이미지: absolute + -top-10 → 카드 위쪽으로 튀어나오는 플로팅 효과 */}
+      <Image source={{ uri: imageUrl }} className="absolute -top-10 size-32" resizeMode="contain" />
+
+      {/* 메뉴 이름 */}
+      <Text
+        className="base-bold text-dark-100 mb-2 text-center"
+        numberOfLines={1} // 한 줄 초과 시 "..." 처리
+      >
+        {name}
+      </Text>
+
+      {/* 가격 */}
+      <Text className="body-regular mb-4 text-gray-200">from ${price}</Text>
+
+      {/* 장바구니 추가 버튼 */}
+      <TouchableOpacity onPress={() => {}}>
+        <Text className="paragraph-bold text-primary">+ Add to cart</Text>
+      </TouchableOpacity>
+    </TouchableOpacity>
+  )
+}
+
+export default MenuCard
+```
+
+---
+
+## 새로 나온 개념 — Appwrite Storage 이미지 URL
+
+```tsx
+// Appwrite Storage에 업로드된 이미지에 접근하는 방법
+// 단순히 image_url만으로는 접근 불가 → projectId를 쿼리 파라미터로 추가해야 함
+
+const imageUrl = `${image_url}?project=${appwriteConfig.projectId}`
+// 예: "https://cloud.appwrite.io/v1/storage/buckets/.../files/.../view?project=abc123"
+
+// 비교: 외부 URL (Unsplash 등)은 그냥 쓰면 됨
+// <Image source={{ uri: "https://images.unsplash.com/..." }} />
+
+// Appwrite Storage URL은 프로젝트 인증이 필요해서 projectId 추가 필수
+// <Image source={{ uri: `${image_url}?project=${projectId}` }} />
+```
+
+---
+
+## 플로팅 이미지 효과
+
+```
+카드 위로 이미지가 튀어나온 레이아웃:
+
+     🍔          ← 이미지 (absolute -top-10)
+┌──────────┐
+│          │
+│  버거 이름 │
+│  from $5  │
+│ + Add to  │
+└──────────┘
+```
+
+```tsx
+// absolute: 카드 레이아웃 흐름에서 벗어나 자유롭게 위치
+// -top-10: 위쪽으로 40px 이동 (음수 margin)
+<Image className="absolute -top-10 size-32" />
+
+// 부모 TouchableOpacity에 overflow: visible이 기본이라 카드 밖으로 나올 수 있음
+// globals.css의 menu-card 클래스에 paddingTop 여백을 줘서 이미지 공간 확보 필요
+```
+
+---
+
+## Platform.OS로 OS별 스타일 분기
+
+```tsx
+import { Platform } from "react-native";
+
+// 방법 1: style prop에서 조건 처리
+style={Platform.OS === "android" ? { elevation: 10 } : {}}
+
+// 방법 2: Platform.select() 활용 (여러 값이 있을 때 깔끔)
+style={Platform.select({
+  android: { elevation: 10, shadowColor: "#878787" },
+  ios: {},     // iOS는 CSS에서 처리
+})}
+```
+
+---
+
+## 🔑 핵심 요약
+
+1. **Appwrite Storage URL** = `${image_url}?project=${projectId}` 형태로 접근
+2. **`absolute -top-10`** = 카드 위로 이미지가 플로팅하는 시각 효과
+3. **`Platform.OS === "android"`** = Android에서 elevation으로 그림자 처리 (iOS는 CSS)
+4. **`numberOfLines={1}`** = 긴 메뉴 이름을 한 줄로 자르고 "..." 처리
+5. **Add to Cart 버튼** = 다음 강의에서 Zustand 장바구니 상태와 연결 예정
+
+# { 🔍 검색바 & 필터 & 장바구니 스토어 가이드 }
+
+> SearchBar + Filter 컴포넌트 + Zustand 카트 스토어
+
+---
+
+## 📋 이번 강의에서 만드는 것
+
+```
+components/
+├── SearchBar.tsx   ← 검색 입력창 (디바운싱 대신 submit 방식)
+├── Filter.tsx      ← 가로 스크롤 카테고리 필터
+├── CartItem.tsx    ← 장바구니 아이템 카드
+└── CustomHeader.tsx ← 장바구니/상세 화면 공통 헤더
+
+store/
+└── cart.store.ts   ← Zustand 장바구니 전역 상태
+```
+
+---
+
+## 1. SearchBar 컴포넌트
+
+### 왜 디바운싱 대신 submit 방식인가?
+
+```
+디바운싱 방식 문제:
+  FlatList의 ListHeaderComponent 안에 TextInput 넣으면
+  → 키스트로크마다 FlatList 리렌더링
+  → 키보드가 자동으로 닫히는 버그 발생 (React Native 알려진 이슈)
+
+해결책: 사용자가 엔터/검색 버튼 누를 때만 URL 업데이트
+  → 타이핑 중에는 local state만 업데이트
+  → 키보드 유지
+```
+
+```tsx
+// components/SearchBar.tsx
+
+import { images } from '@/constants'
+import { router, useLocalSearchParams } from 'expo-router'
+import { useState } from 'react'
+import { Image, TextInput, TouchableOpacity, View } from 'react-native'
+
+const SearchBar = () => {
+  const params = useLocalSearchParams<{ query?: string }>()
+
+  // local state: 타이핑 즉시 반영 (화면에 보이는 텍스트)
+  const [query, setQuery] = useState(params.query)
+
+  const handleSearch = (text: string) => {
+    setQuery(text) // 즉시 입력창 업데이트
+    if (!text) router.setParams({ query: undefined }) // 빈 값이면 URL 파라미터 제거
+  }
+
+  // 엔터 키 눌렀을 때 실행
+  const handleSubmit = () => {
+    if (query?.trim()) router.setParams({ query }) // URL 파라미터 업데이트 → 검색 실행
+  }
+
+  return (
+    <View className="searchbar">
+      <TextInput
+        className="flex-1 p-5"
+        placeholder="Search for pizzas, burgers..."
+        value={query}
+        onChangeText={handleSearch}
+        onSubmitEditing={handleSubmit} // 엔터 키 → handleSubmit 실행
+        placeholderTextColor="#A0A0A0"
+        returnKeyType="search" // 키보드 엔터 버튼에 "search" 표시
+      />
+      {/* 검색 아이콘 버튼 — 클릭 시 URL 파라미터 업데이트 */}
+      <TouchableOpacity className="pr-5" onPress={() => router.setParams({ query })}>
+        <Image source={images.search} className="size-6" resizeMode="contain" tintColor="#5D5F6D" />
+      </TouchableOpacity>
+    </View>
+  )
+}
+
+export default SearchBar
+```
+
+### `onSubmitEditing` + `returnKeyType`
+
+```tsx
+// 엔터 키를 눌렀을 때 실행할 함수
+onSubmitEditing = { handleSubmit }
+
+// 키보드 엔터 버튼 모양 변경
+returnKeyType = 'search' // → 돋보기 아이콘 또는 "검색" 표시
+returnKeyType = 'done' // → "완료"
+returnKeyType = 'go' // → "이동"
+returnKeyType = 'next' // → "다음"
+```
+
+---
+
+## 2. Filter 컴포넌트
+
+```tsx
+// components/Filter.tsx
+
+import { Category } from '@/types'
+import { router, useLocalSearchParams } from 'expo-router'
+import { useState } from 'react'
+import { FlatList, Platform, Text, TouchableOpacity } from 'react-native'
+import cn from 'clsx'
+
+const Filter = ({ categories }: { categories: Category[] }) => {
+  const searchParams = useLocalSearchParams()
+
+  // 현재 선택된 카테고리 (URL 파라미터에서 초기값 읽기)
+  const [active, setActive] = useState(searchParams.category || '')
+
+  const handlePress = (id: string) => {
+    setActive(id)
+    if (id === 'all')
+      router.setParams({ category: undefined }) // 전체 선택 → 필터 제거
+    else router.setParams({ category: id }) // 특정 카테고리 선택
+  }
+
+  // "All" 옵션을 맨 앞에 추가 + 실제 카테고리 목록 이어붙이기
+  const filterData: (Category | { $id: string; name: string })[] = categories
+    ? [{ $id: 'all', name: 'All' }, ...categories]
+    : [{ $id: 'all', name: 'All' }]
+
+  return (
+    <FlatList
+      data={filterData}
+      keyExtractor={(item) => item.$id}
+      horizontal // 가로 스크롤
+      showsHorizontalScrollIndicator={false}
+      contentContainerClassName="gap-x-2 pb-3"
+      renderItem={({ item }) => (
+        <TouchableOpacity
+          key={item.$id}
+          className={cn(
+            'filter',
+            active === item.$id ? 'bg-amber-500' : 'bg-white' // 선택 시 주황색
+          )}
+          style={Platform.OS === 'android' ? { elevation: 5, shadowColor: '#878787' } : {}}
+          onPress={() => handlePress(item.$id)}
+        >
+          <Text className={cn('body-medium', active === item.$id ? 'text-white' : 'text-gray-200')}>
+            {item.name}
+          </Text>
+        </TouchableOpacity>
+      )}
+    />
+  )
+}
+
+export default Filter
+```
+
+---
+
+## 3. Zustand 장바구니 스토어
+
+### 장바구니의 핵심 문제 — 유니크한 아이템이란?
+
+```
+단순히 메뉴 ID로만 구분하면?
+  "치즈버거 (기본)" 추가
+  "치즈버거 (엑스트라 치즈)" 추가
+  → 같은 메뉴 ID → 수량만 증가 (틀림!)
+
+올바른 구분:
+  메뉴 ID + 커스터마이제이션 조합으로 구분
+  → 다른 옵션이면 다른 아이템으로 취급
+```
+
+### `areCustomizationsEqual` 유틸 함수
+
+```tsx
+// 두 커스터마이제이션 배열이 동일한지 비교
+const areCustomizationsEqual = (a: CartCustomization[], b: CartCustomization[]): boolean => {
+  if (a.length !== b.length) return false
+
+  // 정렬 후 ID 비교 (순서 상관없이 같은 옵션이면 동일하게 취급)
+  const sortedA = [...a].sort((x, y) => x.id.localeCompare(y.id))
+  const sortedB = [...b].sort((x, y) => x.id.localeCompare(y.id))
+
+  return sortedA.every((item, idx) => item.id === sortedB[idx].id)
+}
+```
+
+### 스토어 전체 구조
+
+```tsx
+// store/cart.store.ts
+
+import { create } from 'zustand'
+import { CartCustomization, CartItemType, CartStore } from '@/types'
+
+export const useCartStore = create<CartStore>((set, get) => ({
+  items: [], // 장바구니 아이템 배열
+
+  // ── 아이템 추가 ──────────────────────────────
+  addItem: (item) => {
+    const { items } = get()
+
+    // 같은 메뉴 + 같은 옵션이 이미 있으면 수량만 증가
+    const existing = items.find(
+      (i) =>
+        i.id === item.id &&
+        areCustomizationsEqual(i.customizations ?? [], item.customizations ?? [])
+    )
+
+    if (existing) {
+      set({ items: items.map((i) => (i === existing ? { ...i, quantity: i.quantity + 1 } : i)) })
+    } else {
+      // 없으면 새 아이템 추가 (수량 1로 시작)
+      set({ items: [...items, { ...item, quantity: 1 }] })
+    }
+  },
+
+  // ── 수량 증가 ──────────────────────────────
+  increaseQty: (id, customizations) => {
+    set({
+      items: get().items.map((i) =>
+        i.id === id && areCustomizationsEqual(i.customizations ?? [], customizations)
+          ? { ...i, quantity: i.quantity + 1 }
+          : i
+      ),
+    })
+  },
+
+  // ── 수량 감소 (0이 되면 자동 제거) ──────────
+  decreaseQty: (id, customizations) => {
+    set({
+      items: get()
+        .items.map((i) =>
+          i.id === id && areCustomizationsEqual(i.customizations ?? [], customizations)
+            ? { ...i, quantity: i.quantity - 1 }
+            : i
+        )
+        .filter((i) => i.quantity > 0), // 수량 0 이하인 아이템 제거
+    })
+  },
+
+  // ── 특정 아이템 제거 ───────────────────────
+  removeItem: (id, customizations) => {
+    set({
+      items: get().items.filter(
+        (i) => !(i.id === id && areCustomizationsEqual(i.customizations ?? [], customizations))
+      ),
+    })
+  },
+
+  // ── 전체 비우기 ────────────────────────────
+  clearCart: () => set({ items: [] }),
+
+  // ── 총 수량 ────────────────────────────────
+  getTotalItems: () => get().items.reduce((sum, i) => sum + i.quantity, 0),
+
+  // ── 총 가격 ────────────────────────────────
+  getTotalPrice: () => get().items.reduce((sum, i) => sum + i.price * i.quantity, 0),
+}))
+```
+
+---
+
+## 4. 장바구니 화면 결제 요약
+
+```tsx
+// app/(tabs)/cart.tsx (일부)
+
+const { items, getTotalItems, getTotalPrice } = useCartStore();
+const totalItems = getTotalItems();
+const totalPrice = getTotalPrice();
+
+// 결제 요약 UI
+<PaymentInfoStripe label={`Total Items (${totalItems})`} value={`$${totalPrice.toFixed(2)}`} />
+<PaymentInfoStripe label="Delivery Fee" value="$5" />
+<PaymentInfoStripe label="Discount" value="-$0.50" valueStyle="text-success" />
+
+{/* 구분선 */}
+<View className="border-t border-gray-300 my-2" />
+
+{/* 최종 합계: 가격 + 배달비 - 할인 */}
+<PaymentInfoStripe
+  label="Total"
+  value={`$${(totalPrice + 5 - 0.5).toFixed(2)}`}
+  labelStyle="base-bold text-dark-100"
+  valueStyle="base-bold text-dark-100 text-right"
+/>
+```
+
+### `.toFixed(2)` — 소수점 두 자리 고정
+
+```tsx
+// 통화 표시 시 소수점 두 자리로 고정
+;(29.9999)
+  .toFixed(2)(
+    // → "30.00"
+    5
+  )
+  .toFixed(2)(
+    // → "5.00"
+    3.1
+  )
+  .toFixed(2) // → "3.10"
+// 반환값은 string 타입임에 주의
+```
+
+---
+
+## 5. CartButton — 실제 수량 연결
+
+```tsx
+// components/CartButton.tsx
+
+const CartButton = () => {
+  const { getTotalItems } = useCartStore()
+  const totalItems = getTotalItems() // 이전: 하드코딩 10 → 이제 실제 전역 상태
+
+  return (
+    <TouchableOpacity onPress={() => router.push('/cart')}>
+      <Image source={images.bag} className="size-5" />
+      {totalItems > 0 && (
+        <View className="cart-badge">
+          <Text className="small-bold text-white">{totalItems}</Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  )
+}
+```
+
+---
+
+## 🔑 핵심 요약
+
+1. **SearchBar submit 방식** = FlatList 안 TextInput 키보드 닫힘 버그 우회 → 엔터/버튼 누를 때만 URL 업데이트
+2. **`returnKeyType="search"`** = 키보드 엔터 버튼을 돋보기로 변경
+3. **`onSubmitEditing`** = 엔터 키 눌렀을 때 실행할 함수 지정
+4. **Filter** = "All" 옵션을 수동으로 앞에 추가 후 `[{ $id: 'all' }, ...categories]` 스프레드
+5. **장바구니 유니크 키** = 메뉴 ID만으로는 부족 → 메뉴 ID + 커스터마이제이션 조합
+6. **`areCustomizationsEqual`** = 두 옵션 배열을 정렬 후 ID 비교로 동일성 판단
+7. **`.toFixed(2)`** = 통화 표시 시 소수점 두 자리로 고정 (반환값은 string)

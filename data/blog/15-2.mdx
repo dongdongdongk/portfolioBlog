@@ -1,0 +1,1097 @@
+---
+title: '섹션 15: 사운드 효과 + 더 많은 장면 - 2 -'
+date: '2026-09-02'
+category: '게임 개발/Game Development in JS TS - The Complete Guide (w_'
+tags: ['게임 개발', 'Game Development in JS TS - The Complete Guide (w_']
+draft: false
+summary: ''
+---
+
+# **{ 멀티 레벨 시스템** 구현 }
+
+## 새로운 레벨 파일 생성
+
+```jsx
+기존 crystal_world_map.json을 복사하여
+
+crystal_world_map_level_1.json, crystal_world_map_level_2.json으로 변경
+
+새로운 맵을 로드하도록 코드 수정
+```
+
+## 새로운 레벨 디자인
+
+```jsx
+기존 플랫폼, 장애물(traps), 환경 요소 삭제 후 새로 배치
+
+시작 지점(Spawn Point)과 종료 지점 설정
+
+새로운 장애물(traps) 및 수집 아이템(collectibles) 배치
+```
+
+## 레벨 로드 및 테스트
+
+```jsx
+level_1과 level_2를 번갈아 가며 로드하여 정상 작동 확인
+
+앞으로 두 레벨 간 전환 기능을 추가할 예정
+```
+
+# { 동적으로 레벨 전환하기 }
+
+## 1. **PlayScene 시작 방식 리팩토링**
+
+```jsx
+먼저, PreloadScene에서 PlayScene을 시작하는 방식을 개선합니다.
+
+기존에는 preload() 함수에서 리소스 로딩이 끝나자마자 this.startGame()을 호출했습니다.
+
+이를 이벤트 기반으로 변경하여, 모든 리소스가 로드된 후에 실행되도록 합니다.
+```
+
+```jsx
+// Phaser의 Preload 씬을 정의하는 클래스
+class Preload extends Phaser.Scene {
+  constructor() {
+    // "PreloadScene"이라는 이름으로 씬을 생성
+    super('PreloadScene')
+  }
+
+  // preload() 함수는 게임이 실행되기 전에 필요한 리소스를 미리 로드하는 역할을 한다.
+  preload() {
+    // Tiled에서 만든 타일맵 JSON 파일을 로드 (레벨 1과 레벨 2)
+    this.load.tilemapTiledJSON('level_1', 'assets/crystal_world_map_level_1.json')
+    this.load.tilemapTiledJSON('level_2', 'assets/crystal_world_map_level_2.json')
+
+    // 타일셋 이미지 로드 (맵을 구성하는 그래픽 요소)
+    this.load.image('tiles-1', './assets/main_lev_build_1.png')
+
+    // 모든 자산이 로드되었을 때 startGame() 실행
+    // this.load.once()는 이벤트 리스너로, 'complete' 이벤트가 한 번 발생하면 지정된 콜백을 실행함
+    this.load.once('complete', () => {
+      this.startGame()
+    })
+  }
+
+  // 게임을 시작하는 함수
+  startGame() {
+    // registry는 Phaser에서 글로벌 데이터를 저장하는 객체
+    // 여기서는 'level'이라는 키를 만들어 값을 1로 설정 (초기 레벨을 1로 지정)
+    this.registry.set('level', 1)
+
+    // 'PlayScene' 씬을 시작 (실제 게임 플레이가 시작됨)
+    this.scene.start('PlayScene')
+  }
+}
+```
+
+## 2. **현재 레벨 값을 저장하고 불러오기**
+
+```jsx
+여러 개의 레벨을 다루려면, 현재 진행 중인 레벨을 저장해야 합니다.
+
+Phaser의 registry 기능을 활용하여 데이터 저장 및 불러오기를 합니다.
+```
+
+### 2.1 `PlayScene`에서 현재 레벨 가져오기
+
+```jsx
+새로운 함수를 만들어 registry에서 현재 레벨을 가져오도록 합니다.
+```
+
+```jsx
+getCurrentLevel() {
+    return this.registry.get('level') || 1; // 레벨 값이 없으면 기본값 1
+}
+```
+
+## 3. **레벨에 따라 맵 로드하기**
+
+```jsx
+이제 getCurrentLevel()을 이용하여 현재 레벨에 맞는 맵을 불러옵니다.
+
+이제 게임이 시작될 때 level_1, level_2 등 동적으로 로드됩니다.
+```
+
+```jsx
+createMap() {
+    const map = this.make.tilemap({ key: `level_${this.getCurrentLevel()}` });
+    map.addTilesetImage("main_lev_build_1", "tiles-1");
+    return map;
+}
+```
+
+## 4. **레벨 완료 시 다음 레벨로 이동하기**
+
+```jsx
+플레이어가 끝 지점에 도달하면 다음 레벨로 이동해야 합니다.
+
+레벨 값을 증가시키고, 장면을 재시작하여 새로운 레벨을 로드하도록 합니다.
+```
+
+```jsx
+createEndOfLevel(end, player) {
+    // 끝 지점(end)의 위치에 'end' 스프라이트 생성
+    const endOfLevel = this.physics.add
+        .sprite(end.x, end.y, "end") // 끝 지점(end)의 x, y 위치에 스프라이트 추가
+        .setSize(5, this.config.height) // 충돌 영역을 폭 5px, 화면 높이만큼 설정
+        .setAlpha(0) // 스프라이트를 투명하게 설정 (충돌 감지는 되지만 보이지 않음)
+        .setOrigin(0.5, 1); // 스프라이트의 원점을 중앙 하단으로 설정
+
+    // 플레이어와 'endOfLevel' 스프라이트가 충돌하면 실행될 이벤트 설정
+    const eolOverlap = this.physics.add.overlap(player, endOfLevel, () => {
+        // 중복 실행 방지: 충돌 감지 비활성화
+        eolOverlap.active = false;
+
+        // 레벨 종료 로그 출력
+        console.log("End of level reached!");
+
+        // this.registry.inc('level', 1)
+        // → 현재 저장된 'level' 값을 1 증가시킴
+        this.registry.inc('level', 1);
+
+        // 현재 씬을 재시작하며, 'gameStatus'를 'LEVEL_COMPLETED'로 설정
+        this.scene.restart({ gameStatus: 'LEVEL_COMPLETED' });
+    });
+}
+
+```
+
+# { 메뉴 씬(Menu Scene) 생성 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380491/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_15_-_2_-/image.png)
+
+```jsx
+게임을 실행하면 처음 보이는 메뉴 화면입니다.
+
+여기서 사용자는 게임 시작(Play), 레벨 선택(Levels), 종료(Exit) 버튼을 볼 수 있습니다.
+```
+
+## 프로젝트 설정
+
+```jsx
+① 필요한 파일
+
+BaseScene.js → 공통 기능을 처리하는 기본 씬
+
+MenuScene.js → 메뉴 화면을 담당하는 씬
+
+PreloadScene.js → 이미지 등 리소스를 미리 불러오는 씬
+
+PlayScene.js → 게임 플레이 씬
+
+index.js → Phaser 게임을 실행하는 기본 파일
+
+② 씬(Scene) 개념
+
+Phaser의 씬은 게임의 화면을 의미합니다.
+
+우리는 MenuScene을 만들고, 버튼을 클릭하면 PlayScene으로 이동하도록 할 것입니다.
+```
+
+## BaseScene (공통 씬) 만들기
+
+```jsx
+메뉴 씬, 게임 씬 등 여러 씬에서 공통으로 사용할 기능을 BaseScene.js 파일에 정의합니다
+```
+
+### 1) `BaseScene.js` 코드
+
+```jsx
+import Phaser from 'phaser'
+
+class BaseScene extends Phaser.Scene {
+  constructor(key, config) {
+    super(key)
+    this.config = config
+    this.fontSize = 45 // 기본 글자 크기
+    this.lineHeight = 52 // 줄 간격
+    this.fontOptions = { fontSize: `${this.fontSize}px`, fill: '#fff' } // 글자 스타일
+    this.screenCenter = [config.width / 2, config.height / 2] // 화면 중앙 좌표
+  }
+
+  create() {
+    // 배경 이미지 추가
+    this.add.image(0, 0, 'menu-bg').setOrigin(0).setScale(2.7)
+
+    // 뒤로 가기 버튼 추가 (필요한 경우)
+    if (this.config.canGoBack) {
+      const backButton = this.add
+        .image(this.config.width - 10, this.config.height - 10, 'back')
+        .setOrigin(1)
+        .setScale(2)
+        .setInteractive()
+
+      backButton.on('pointerup', () => {
+        this.scene.start('MenuScene')
+      })
+    }
+  }
+
+  createMenu(menu, setupMenuEvents) {
+    let lastMenuPositionY = 0
+    menu.forEach((menuItem) => {
+      const menuPosition = [this.screenCenter[0], this.screenCenter[1] + lastMenuPositionY]
+      menuItem.textGo = this.add
+        .text(...menuPosition, menuItem.text, this.fontOptions)
+        .setOrigin(0.5, 1)
+      lastMenuPositionY += this.lineHeight
+      setupMenuEvents(menuItem)
+    })
+  }
+}
+
+export default BaseScene
+```
+
+```jsx
+✅ BaseScene은 여러 씬에서 공통적으로 사용할 기능을 제공합니다.
+✅ create()에서 배경을 추가하고, 필요하면 뒤로 가기 버튼도 넣습니다.
+✅ createMenu()는 메뉴 버튼을 생성하는 기능을 합니다.
+```
+
+## MenuScene (메뉴 화면) 만들기
+
+```jsx
+이제 본격적으로 MenuScene.js 파일을 만들어 메뉴 버튼을 추가하고 동작하도록 만들겠습니다.
+```
+
+### 1) `MenuScene.js` 코드
+
+```jsx
+import Phaser from 'phaser'
+import BaseScene from './BaseScene'
+
+class MenuScene extends BaseScene {
+  constructor(config) {
+    super('MenuScene', config)
+    this.menu = [
+      { scene: 'PlayScene', text: '시작' }, // PlayScene으로 이동
+      { scene: 'LevelScene', text: '레벨 선택' }, // LevelScene으로 이동 (미구현)
+      { scene: null, text: '종료' }, // 게임 종료
+    ]
+  }
+
+  create() {
+    super.create() // BaseScene의 create() 실행
+
+    this.createMenu(this.menu, (menuItem) => this.setupMenuEvents(menuItem))
+  }
+
+  setupMenuEvents(menuItem) {
+    const textGo = menuItem.textGo
+    textGo.setInteractive()
+
+    // 🔹 글꼴 스타일 적용
+    textGo.setStyle({
+      fontFamily: 'Noto Sans KR',
+      fontSize: '65px',
+      fill: '#000',
+    })
+
+    // 🔹 마우스를 올리면 글자 색 변경 (흰색)
+    textGo.on('pointerover', () => {
+      textGo.setStyle({ fill: '#fff' })
+    })
+
+    // 🔹 마우스를 떼면 다시 원래 색 (검은색)
+    textGo.on('pointerout', () => {
+      textGo.setStyle({ fill: '#000' })
+    })
+
+    // 🔹 버튼 클릭 시 실행되는 이벤트
+    textGo.on('pointerup', () => {
+      if (menuItem.scene) {
+        this.scene.start(menuItem.scene)
+      }
+
+      if (menuItem.text === '종료') {
+        this.game.destroy(true)
+      }
+    })
+  }
+}
+
+export default MenuScene
+```
+
+```jsx
+✅ this.menu → 메뉴 버튼 목록을 정의합니다.
+✅ create() → createMenu()를 호출하여 메뉴 버튼을 생성합니다.
+✅ setupMenuEvents() → 버튼 클릭, 마우스 오버 효과 등을 설정합니다.
+✅ "시작" 버튼 클릭 → PlayScene으로 이동
+✅ "레벨 선택" 버튼 클릭 → LevelScene으로 이동
+✅ "종료" 버튼 클릭 → 게임 종료
+```
+
+## `index.js`에서 `MenuScene` 추가
+
+```jsx
+이제 index.js에서 MenuScene을 Phaser 게임에 추가합니다.
+```
+
+```jsx
+import Phaser from 'phaser'
+import PreloadScene from './PreloadScene'
+import MenuScene from './MenuScene'
+import PlayScene from './PlayScene'
+
+const SHARED_CONFIG = {
+  width: 800,
+  height: 600,
+}
+
+const Scenes = [PreloadScene, MenuScene, PlayScene]
+const createScene = (Scene) => new Scene(SHARED_CONFIG)
+const initScenes = () => Scenes.map(createScene)
+
+const config = {
+  type: Phaser.AUTO,
+  ...SHARED_CONFIG,
+  scene: initScenes(),
+}
+
+new Phaser.Game(config)
+```
+
+```jsx
+✅ Scenes 배열에 MenuScene을 추가
+✅ 게임을 실행하면 메뉴 씬이 먼저 보이게 됨
+```
+
+## `PreloadScene.js`에서 이미지 불러오기
+
+```jsx
+배경 이미지를 사용하기 위해 PreloadScene.js에서 이미지 로드를 추가해야 합니다.
+```
+
+```jsx
+class PreloadScene extends Phaser.Scene {
+  constructor() {
+    super('PreloadScene')
+  }
+
+  preload() {
+    this.load.image('menu-bg', 'assets/background01.png') // 메뉴 배경 이미지 로드
+  }
+
+  create() {
+    this.scene.start('MenuScene') // 게임 시작 시 메뉴 씬부터 실행
+  }
+}
+```
+
+```jsx
+✅ 배경 이미지를 미리 로드
+✅ 게임이 시작되면 MenuScene을 보여줌
+```
+
+# { Phaser로 레벨 선택 기능 구현하기 }
+
+```jsx
+이 강의에서는 레벨 선택 메뉴를 구현하는 방법을 단계별로 설명합니다.
+
+게임을 처음 실행하면 기본적으로 첫 번째 레벨만 잠금 해제된 상태에서 시작합니다.
+
+이후 레벨을 완료하면 다음 레벨이 잠금 해제되도록 동작합니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380490/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_15_-_2_-/image_1.png)
+
+## 1. 프로젝트 설정 및 기본 개념
+
+```jsx
+LevelScene을 새로 만들고, MenuScene에서 레벨 선택 화면으로 이동할 수 있도록 수정합니다.
+
+레벨 선택 화면에서는 잠금 해제된 레벨만 표시됩니다.
+
+플레이어가 특정 레벨을 선택하면 해당 레벨로 이동합니다.
+```
+
+## 2. `LevelScene.js` 파일 생성
+
+### 기본 `LevelScene` 생성
+
+```jsx
+BaseScene을 상속받아 LevelScene을 생성합니다.
+
+메뉴 항목을 저장할 this.menu 배열을 만듭니다.
+
+this.registry.get('unlocked-levels')를 사용하여 잠금 해제된 레벨 정보를 가져옵니다.
+```
+
+```jsx
+// BaseScene을 가져와서 상속받음
+import BaseScene from './BaseScene'
+
+// LevelScene 클래스 선언 (BaseScene을 상속)
+class LevelScene extends BaseScene {
+  constructor(config) {
+    // "LevelScene"이라는 이름을 가진 씬 생성
+    // "canGoBack: true"를 추가하여 '뒤로가기 버튼'을 활성화
+    super('LevelScene', { ...config, canGoBack: true })
+  }
+
+  // 씬이 시작될 때 실행되는 메서드
+  create() {
+    // 부모 클래스(BaseScene)의 create() 실행 (공통 UI 생성)
+    super.create()
+
+    // 레벨 선택 메뉴를 저장할 배열 초기화
+    this.menu = []
+
+    // 게임 진행도에 따라 잠금 해제된 레벨 개수를 가져옴
+    const levels = this.registry.get('unlocked-levels')
+
+    // 1부터 잠금 해제된 레벨 수까지 반복하며 메뉴 항목 추가
+    for (let i = 1; i <= levels; i++) {
+      this.menu.push({
+        scene: 'PlayScene', // 클릭 시 이동할 씬 (게임 플레이 화면)
+        text: `Level ${i}`, // 버튼에 표시될 텍스트 (예: Level 1, Level 2)
+        level: i, // 해당 버튼이 나타내는 레벨 번호
+      })
+    }
+
+    // 생성된 메뉴를 화면에 표시하고, 클릭 이벤트 설정
+    this.createMenu(this.menu, (menuItem) => this.setupMenuEvents(menuItem))
+  }
+
+  // 메뉴 항목(레벨 버튼)에 대한 이벤트 설정
+  setupMenuEvents(menuItem) {
+    const textGo = menuItem.textGo // 버튼 텍스트 객체 가져오기
+    textGo.setInteractive() // 버튼을 클릭할 수 있도록 설정
+
+    // 버튼의 기본 폰트 스타일 설정
+    textGo.setStyle({
+      fontFamily: 'Noto Sans', // 폰트 종류
+      fontSize: '50px', // 폰트 크기
+      fill: '#000', // 기본 텍스트 색상 (검정색)
+    })
+
+    // 마우스를 올리면 텍스트 색상을 흰색으로 변경
+    textGo.on('pointerover', () => textGo.setStyle({ fill: '#fff' }))
+
+    // 마우스를 떼면 다시 검정색으로 변경
+    textGo.on('pointerout', () => textGo.setStyle({ fill: '#000' }))
+
+    // 버튼을 클릭했을 때 실행되는 이벤트
+    textGo.on('pointerup', () => {
+      if (menuItem.scene) {
+        // 선택한 레벨 정보를 저장 (현재 선택한 레벨 번호)
+        this.registry.set('level', menuItem.level)
+
+        // 해당 레벨의 플레이 씬으로 이동
+        this.scene.start(menuItem.scene)
+      }
+    })
+  }
+}
+
+// LevelScene 클래스를 외부에서 사용할 수 있도록 내보내기 (export)
+export default LevelScene
+```
+
+```jsx
+registry.get("unlocked-levels")를 이용해 현재 잠금 해제된 레벨을 확인합니다.
+
+menu 배열을 사용하여 동적으로 레벨 버튼을 생성합니다.
+
+setupMenuEvents 함수에서 버튼을 클릭하면 해당 레벨로 이동합니다.
+```
+
+## 3. `MenuScene.js`에서 레벨 선택 메뉴 추가
+
+```jsx
+기본 메뉴에 LevelScene을 추가하여 플레이어가 레벨 선택 화면으로 이동할 수 있도록 합니다.
+```
+
+```jsx
+class MenuScene extends BaseScene {
+  constructor(config) {
+    super('MenuScene', config)
+    this.menu = [
+      { scene: 'PlayScene', text: 'Play' },
+      { scene: 'LevelScene', text: 'Levels' }, // 레벨 선택 메뉴 추가
+      { scene: null, text: 'Exit' },
+    ]
+  }
+
+  create() {
+    super.create()
+    this.createMenu(this.menu, (menuItem) => this.setupMenuEvents(menuItem))
+  }
+}
+```
+
+```jsx
+메뉴 항목에 "Levels" 버튼을 추가하여 LevelScene으로 이동할 수 있도록 합니다.
+```
+
+## 4. `index.js`에서 `LevelScene`을 등록
+
+```jsx
+LevelScene을 Phaser의 씬 리스트에 추가해야 사용할 수 있습니다.
+
+LevelScene을 임포트하고 Scenes 배열에 추가했습니다.
+```
+
+```jsx
+import LevelScene from './scenes/LevelScene'
+
+const Scenes = [PreloadScene, MenuScene, LevelScene, PlayScene]
+const createScene = (Scene) => new Scene(SHARED_CONFIG)
+const initScenes = () => Scenes.map(createScene)
+```
+
+## 5. `PreloadScene.js`에서 필요한 리소스 로드
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380490/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_15_-_2_-/image_2.png)
+
+```jsx
+버튼을 표시하려면 back.png 같은 버튼 이미지를 미리 로드해야 합니다.
+
+back 버튼을 로드하여 화면에서 뒤로 가기 버튼을 사용할 수 있도록 합니다.
+```
+
+```jsx
+this.load.image('back', './assets/back.png')
+```
+
+# { "뒤로 가기(Back)" 버튼 추가하기 }
+
+```jsx
+이 강의에서는 게임의 플레이 씬(PlayScene)에 "뒤로 가기(Back)" 버튼을 추가하는 방법을 배울 거야.
+
+이 버튼을 누르면 메뉴 화면(MenuScene)으로 돌아가게 만들 거야.
+
+그리고 버튼이 화면의 오른쪽 아래(Right Bottom Corner)에 고정된 위치에 표시되도록 설정할 거야.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380491/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_15_-_2_-/image_3.png)
+
+## 1. 버튼 위치 찾기 (Right Bottom Corner 계산)
+
+### 목표
+
+```jsx
+게임 화면의 오른쪽 아래(Right Bottom Corner)에 버튼을 배치해야 해.
+
+이때, 카메라가 움직여도 버튼이 고정된 위치에 있어야 함.
+
+💡 카메라는 플레이어를 따라 움직이기 때문에, 일반적인 버튼 배치와 달리 "스크롤 팩터(Scroll Factor)"를 0으로 설정해야 해!
+```
+
+### 버튼 위치 계산하기
+
+```jsx
+버튼을 배치하기 위해 화면의 오른쪽 아래 좌표(x, y)를 계산해야 해.
+
+게임의 기본적인 화면 크기(Width, Height)와 줌(Zoom Factor) 을 사용해서 위치를 구할 거야.
+
+📌 계산 과정
+
+		rightBottomCorner.x
+
+				오른쪽 위 좌표(rightTopCorner.x)와 동일 → X 좌표는 그대로 유지
+
+
+		rightBottomCorner.y
+
+				캔버스 높이를 반영하여 아래쪽으로 이동
+```
+
+```jsx
+// 1. 맵 전체의 가로 길이 설정
+const mapWidth = 1600 // 게임의 맵(배경)의 전체 너비 (픽셀 단위)
+
+// 2. 브라우저 크기에 맞춰 캔버스 크기 설정
+const width = document.body.offsetWidth // 현재 브라우저 창의 너비를 가져옴
+const height = 600 // 고정된 게임 높이 (예: 600px)
+const zoomFactor = 1.5 // 줌(확대) 비율 → 화면을 1.5배 확대하여 보이게 함
+
+/**
+ * 🧐 왜 zoomFactor(줌 비율)이 필요한가?
+ * - 기본적으로 Phaser에서는 카메라를 이용해 게임 화면을 조절함.
+ * - 줌(zoomFactor)을 적용하면, 화면이 더 확대되어 보임.
+ * - 즉, 줌을 사용하면 작은 해상도에서도 더 넓은 맵을 볼 수 있음.
+ * - 하지만 확대하면 실제 캔버스 좌표가 달라지므로, 버튼 위치도 조정해야 함!
+ */
+
+// 3. 오프셋 계산 (보이지 않는 맵 영역 크기 계산)
+const mapOffset = mapWidth - width
+// 전체 맵에서 현재 화면에 보이는 부분(width)을 제외한 나머지 숨겨진 영역의 너비
+
+// 4. 공통 설정 값 저장 (SHARED_CONFIG)
+const SHARED_CONFIG = {
+  mapOffset: mapOffset, // 숨겨진 맵 영역 크기
+  width: width, // 현재 화면(브라우저)의 너비
+  height: height, // 현재 화면의 높이
+  zoomFactor: zoomFactor, // 줌 비율 (1.5배 확대)
+  debug: true, // 디버그 모드 활성화
+
+  /**
+   * 📌 각 모서리의 좌표 계산 (줌 적용)
+   * - 줌이 적용되면 실제 화면에서 보이는 크기가 줄어들므로,
+   *   각 코너의 위치를 다시 계산해줘야 함!
+   */
+
+  // 왼쪽 위 (Left Top Corner)
+  leftTopCorner: {
+    x: (width - width / zoomFactor) / 2, // 전체 너비에서 보이는 부분만큼 이동
+    y: (height - height / zoomFactor) / 2, // 전체 높이에서 보이는 부분만큼 이동
+  },
+
+  // 오른쪽 위 (Right Top Corner)
+  rightTopCorner: {
+    x: width / zoomFactor + (width - width / zoomFactor) / 2,
+    // 보이는 화면의 오른쪽 끝 좌표 계산
+    y: (height - height / zoomFactor) / 2, // 상단은 동일
+  },
+
+  // 오른쪽 아래 (Right Bottom Corner) - '뒤로 가기(Back) 버튼'을 배치할 위치
+  rightBottomCorner: {
+    x: width / zoomFactor + (width - width / zoomFactor) / 2,
+    // X 좌표: 오른쪽 위(Right Top Corner)와 동일
+
+    y: height / zoomFactor + (height - height / zoomFactor) / 2,
+    // Y 좌표: 캔버스의 아래쪽을 기준으로 계산
+  },
+}
+```
+
+```jsx
+rightBottomCorner.x : 오른쪽 위 좌표(rightTopCorner.x)와 동일
+
+rightBottomCorner.y : 화면의 높이(height)를 이용해 계산
+```
+
+## 2. "뒤로 가기(Back)" 버튼 만들기
+
+## 목표
+
+```jsx
+이제 실제로 버튼을 추가하는 함수(createBackButton) 를 만들 거야.
+```
+
+### 버튼 추가 방법
+
+```jsx
+1. 버튼을 추가: this.add.image(x, y, "back")
+
+2. 원점을 조정: setOrigin(1, 1) → 오른쪽 아래를 기준점으로 설정
+
+3. 카메라 움직임과 무관하도록 설정: setScrollFactor(0)
+
+4. 버튼 크기 조정: setScale(2)
+
+5. 버튼을 클릭 가능하게 설정: setInteractive()
+
+6. 클릭 시 메뉴로 이동: this.scene.start("MenuScene")
+```
+
+```jsx
+createBackButton() {
+    const btn = this.add.image(
+        this.config.rightBottomCorner.x,  // X 좌표 (오른쪽 아래)
+        this.config.rightBottomCorner.y,  // Y 좌표 (오른쪽 아래)
+        "back" // 이미지 키 (백 버튼)
+    )
+    .setOrigin(1, 1)  // 오른쪽 아래를 기준점으로 설정
+    .setScrollFactor(0)  // 스크롤 영향 받지 않도록 설정
+    .setScale(2)  // 크기 2배 확대
+    .setInteractive();  // 클릭 가능하게 설정
+
+    // 버튼 클릭 시 "MenuScene"으로 이동
+    btn.on("pointerup", () => {
+        this.scene.start("MenuScene");
+    });
+}
+
+```
+
+## 3. 버튼을 게임 화면에 추가
+
+### 목표
+
+```jsx
+버튼을 플레이 씬(PlayScene)에 표시해야 함.
+```
+
+### 실행 과정
+
+```jsx
+createBackButton()을 create() 함수 내부에서 호출
+
+버튼이 화면에 나타남
+```
+
+```jsx
+class Play extends Phaser.Scene {
+  constructor(config) {
+    super('PlayScene')
+    this.config = config
+  }
+
+  create(gameStatus) {
+    this.score = 0
+    this.hud = new Hud(this, 0, 0).setDepth(1)
+
+    const map = this.createMap()
+    initAnims(this.anims)
+    const layers = this.createLayers(map)
+    const playerZones = this.getPlayerZones(layers.playerZones)
+    const player = this.createPlayer(playerZones.start)
+
+    const enemies = this.createEnemies(layers.enemySpawns, layers.platformsColliders)
+    const collectables = this.createCollectables(layers.collectables)
+
+    this.createPlayerColliders(player, {
+      colliders: {
+        platformsColliders: layers.platformsColliders,
+        projectiles: enemies.getProjectiles(),
+        collectables,
+        traps: layers.traps,
+      },
+    })
+
+    this.createBG(map)
+    this.createEnemyColliders(enemies, {
+      colliders: {
+        platformsColliders: layers.platformsColliders,
+        player,
+      },
+    })
+
+    this.createBackButton() // ✅ 백 버튼 추가
+    this.createEndOfLevel(playerZones.end, player)
+    this.setupFollowupCameraOn(player)
+  }
+}
+```
+
+# { 레벨 시스템과 엔딩 크레딧 씬 구현 }
+
+```jsx
+이번 강의에서는 레벨 시스템을 완성하고, 최종 레벨을 클리어했을 때 크레딧 화면으로 이동하는 기능을 추가할 것입니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380491/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_15_-_2_-/image_4.png)
+
+## 1. 레벨 시스템 마무리
+
+```jsx
+게임에서 레벨을 클리어하면 다음 레벨을 해금하도록 시스템을 마무리하겠습니다.
+```
+
+### 1-1. 기본적으로 1개의 레벨만 해금되도록 설정
+
+```jsx
+게임이 시작할 때 첫 번째 레벨만 활성화되도록 설정해야 합니다.
+
+이를 위해 unlocked-levels 값을 초기화합니다.
+```
+
+### `startGame` 함수 수정
+
+```jsx
+startGame() {
+    console.log("startGame");
+    this.registry.set('level', 1);  // 현재 레벨을 1로 설정
+    this.registry.set('unlocked-levels', 1);  // 해금된 레벨을 1로 설정
+    this.scene.start('MenuScene');  // 메뉴 씬으로 이동
+}
+```
+
+```jsx
+registry.set('level', 1): 게임을 시작할 때 레벨을 1로 설정합니다.
+
+registry.set('unlocked-levels', 1): 첫 번째 레벨만 해금된 상태로 설정합니다.
+
+이제 게임을 실행하면, 처음에는 오직 첫 번째 레벨만 선택 가능합니다.
+```
+
+### 1-2. 레벨 클리어 시 다음 레벨 해금
+
+```jsx
+이제 플레이어가 레벨을 클리어하면 다음 레벨을 해금해야 합니다.
+```
+
+### `createEndOfLevel` 함수 수정
+
+```jsx
+createEndOfLevel(end, player) {
+    const endOfLevel = this.physics.add
+        .sprite(end.x, end.y, "end")
+        .setSize(5, this.config.height)
+        .setAlpha(0)
+        .setOrigin(0.5, 1);
+
+    const eolOverlap = this.physics.add.overlap(player, endOfLevel, () => {
+        eolOverlap.active = false;
+
+        if (this.registry.get('level') === this.config.lastLevel) {
+            this.scene.start("CreditsScene");  // 마지막 레벨이면 크레딧 씬으로 이동
+            return;
+        }
+
+        console.log("End of level reached!");
+        this.registry.inc('level', 1);  // 현재 레벨 증가
+        this.registry.inc('unlocked-levels', 1);  // 해금된 레벨 증가
+        this.scene.restart({ gameStatus: 'LEVEL_COMPLETED' });  // 다음 레벨로 이동
+    });
+}
+
+```
+
+```jsx
+플레이어가 레벨 종료 지점(endOfLevel)에 도달하면:
+
+		1. this.registry.get('level') === this.config.lastLevel → 마지막 레벨인지 확인
+
+		2. 마지막 레벨이면 CreditsScene으로 이동
+
+		3. 아니라면:
+
+				현재 레벨을 증가 (this.registry.inc('level', 1))
+
+				해금된 레벨도 증가 (this.registry.inc('unlocked-levels', 1))
+
+				this.scene.restart()를 호출하여 다음 레벨로 이동
+
+이제 게임을 클리어하면 자동으로 다음 레벨이 해금됩니다.
+```
+
+## 2. 최종 레벨 후 크레딧 화면 추가
+
+```jsx
+이제 게임에서 마지막 레벨을 클리어하면 크레딧 화면이 표시되도록 구현하겠습니다.
+```
+
+### 2-1. 크레딧 씬 (`CreditsScene`) 생성
+
+```jsx
+먼저 새로운 씬 파일을 만들고, 크레딧 메시지를 표시합니다.
+```
+
+### `CreditsScene.js` 추가
+
+```jsx
+// import Phaser from "phaser";
+import BaseScene from './BaseScene'
+
+class CreditsScene extends BaseScene {
+  constructor(config) {
+    super('CreditsScene', { ...config, canGoBack: true })
+
+    this.menu = [
+      { scene: null, text: '플레이해 주셔서 감사합니다.' },
+      { scene: null, text: '-DongK-' },
+    ]
+  }
+
+  create() {
+    super.create()
+    this.createMenu(this.menu, (menuItem) => this.setupCreditsStyle(menuItem))
+  }
+
+  setupCreditsStyle(menuItem) {
+    const textGo = menuItem.textGo
+    textGo.setInteractive()
+    textGo.setStyle({
+      fontFamily: 'CustomFont',
+      fontSize: '40px',
+      fill: '#000', // 검은색 텍스트
+      align: 'center',
+    })
+  }
+}
+
+export default CreditsScene
+```
+
+```jsx
+this.menu: 크레딧 씬에 감사의 메시지를 표시
+
+setupCreditsStyle(menuItem): 텍스트 스타일 지정
+
+이제 CreditsScene을 Phaser 게임에서 사용할 수 있습니다.
+```
+
+### 2-2. `CreditsScene`을 Phaser에 등록
+
+```jsx
+이제 CreditsScene을 Phaser 씬 목록에 추가해야 합니다.
+
+CreditsScene을 scene 목록에 추가
+```
+
+### `index.js` 수정
+
+```jsx
+import CreditsScene from './scenes/CreditsScene'
+
+const config = {
+  type: Phaser.AUTO,
+  width: 800,
+  height: 600,
+  scene: [MenuScene, PlayScene, CreditsScene],
+}
+
+const game = new Phaser.Game(config)
+```
+
+### 2-3. 마지막 레벨에서 크레딧 씬으로 이동
+
+```jsx
+플레이어가 마지막 레벨을 클리어하면 자동으로 크레딧 씬으로 이동하도록 설정합니다.
+
+현재 레벨이 마지막 레벨(config.lastLevel)과 같다면 크레딧 화면으로 이동!
+```
+
+### `createEndOfLevel`에서 마지막 레벨 체크
+
+```jsx
+if (this.registry.get('level') === this.config.lastLevel) {
+  this.scene.start('CreditsScene') // 마지막 레벨이면 크레딧 화면으로 이동
+  return
+}
+```
+
+### 2-4. 마지막 레벨 설정
+
+```jsx
+마지막으로, 게임의 마지막 레벨이 몇 번째인지 설정합니다.
+
+이제 레벨 2를 클리어하면 자동으로 크레딧 씬으로 이동합니다!
+```
+
+### `SHARED_CONFIG`에서 `lastLevel` 설정
+
+```jsx
+const SHARED_CONFIG = {
+  width: 800,
+  height: 600,
+  lastLevel: 2, // 마지막 레벨을 2로 설정
+}
+```
+
+# { 게임에 배경 음악 추가하기 }
+
+## 1. 배경 음악 추가 개요
+
+```jsx
+이번 강의에서는 Phaser 게임에 배경 음악을 추가하는 방법을 다룹니다.
+
+게임 플레이 도중 배경 음악이 반복 재생되도록 설정하며,
+
+음악이 중복 재생되지 않도록 처리하는 방법도 설명합니다.
+```
+
+## 2. 배경 음악 파일 로드 (Preload Scene)
+
+```jsx
+Phaser에서 사용할 모든 에셋(이미지,
+
+사운드 등)은 preload 단계에서 미리 로드해야 합니다.
+
+우선 PreloadScene에서 음악 파일을 불러옵니다.
+```
+
+### Preload.js
+
+```jsx
+class Preload extends Phaser.Scene {
+  constructor() {
+    super('PreloadScene')
+  }
+
+  preload() {
+    // 기존 이미지 및 타일셋 로드
+    this.load.tilemapTiledJSON('level_1', 'assets/crystal_world_map_level_1.json')
+    this.load.image('tiles-1', './assets/main_lev_build_1.png')
+
+    // 🎵 배경 음악 파일 로드
+    this.load.audio('theme', 'assets/music/theme_music.wav')
+  }
+
+  create() {
+    // 모든 에셋이 로드되면 게임 시작
+    this.scene.start('PlayScene')
+  }
+}
+```
+
+```jsx
+this.load.audio('theme', 'assets/music/theme_music.wav');
+
+위 코드를 추가하면 theme라는 키 값으로 배경 음악이 로드됩니다.
+```
+
+## 3. 배경 음악 재생하기 (Play Scene)
+
+```jsx
+이제 PlayScene에서 배경 음악을 재생하는 함수를 추가합니다.
+```
+
+### PlayScene.js
+
+```jsx
+class PlayScene extends Phaser.Scene {
+  constructor() {
+    super('PlayScene')
+  }
+
+  create() {
+    this.score = 0
+    this.hud = new Hud(this, 0, 0).setDepth(1)
+
+    // 🎵 배경 음악 재생
+    this.playBgMusic()
+
+    const map = this.createMap()
+    initAnims(this.anims)
+    const layers = this.createLayers(map)
+    const playerZones = this.getPlayerZones(layers.playerZones)
+    const player = this.createPlayer(playerZones.start)
+  }
+
+  // 배경 음악을 재생하는 함수
+  playBgMusic() {
+    // 이미 음악이 재생 중이면 실행하지 않음
+    if (this.sound.get('theme')) {
+      return
+    }
+
+    // 음악 추가 및 재생
+    this.sound.add('theme', { loop: true, volume: 0.03 }).play()
+  }
+}
+```
+
+```jsx
+this.sound.get('theme')
+
+이미 음악이 재생되고 있다면 중복 실행을 막기 위해 return 합니다.
+
+그렇지 않으면 this.sound.add('theme', { loop: true, volume: 0.03 })을 통해 음악을 추가하고, .play()로 재생합니다.
+
+loop: true 옵션을 주어 음악이 끝나면 자동으로 반복 재생되도록 설정했습니다.
+
+volume: 0.03으로 볼륨을 조정하여 너무 크지 않도록 설정했습니다.
+```
+
+## 4. 배경 음악이 중복 재생되는 문제 해결
+
+```jsx
+게임을 다시 시작할 때마다 음악이 여러 번 겹쳐서 재생되는 문제가 발생할 수 있습니다.
+
+이를 방지하기 위해 this.sound.get('theme')을 사용하여 음악이 이미 재생 중인지 확인한 후,
+
+재생 중이라면 새로운 음악을 추가하지 않도록 했습니다.
+```
+
+```jsx
+if (this.sound.get('theme')) {
+  return
+}
+```

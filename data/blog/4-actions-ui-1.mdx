@@ -1,0 +1,2747 @@
+---
+title: '섹션 4: Actions & UI - 1'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+# { 🎮 **유닛을 ‘정확한 그리드 칸’으로만 이동시키는 MoveAction 시스템 구현 }**
+
+이번 강의에서는 **유닛이 아무 위치나 움직이는 문제를 해결하고**,
+
+**정확한 그리드 칸(GridPosition)으로만 이동하도록 구조를 재정비**한다.
+
+이를 위해 강의에서는 다음 흐름으로 작업했다:
+
+---
+
+# 1️⃣ 기존 문제점: 유닛이 아무 곳에나 이동한다
+
+현재까지의 코드는…
+
+- 마우스로 클릭한 **월드 좌표(Vector3)** 로 바로 이동함
+- 그래서 **그리드 기반 전략 게임**인데도,
+  - 그리드 칸 중심이 아닌 엉뚱한 위치
+  - 모서리
+  - 유닛/건물 위
+  - 맵 밖
+    …으로 이동 가능함
+
+이건 **그리드 기반 게임의 핵심 규칙을 깨는 큰 문제**.
+
+---
+
+# 2️⃣ 해결 방법: MoveAction 클래스를 분리해 “액션 시스템” 구조 확립
+
+### ✔ 액션을 단위(Unit)에 붙이는 구조로 변경
+
+유닛이 할 수 있는 행동(Action)을 **유닛 안에 직접 작성하지 않고**,
+
+**MoveAction**, **ShootAction**, **SpinAction** 같은 스크립트로 따로 만든다.
+
+즉:
+
+```
+Unit
+  ├─ MoveAction
+  ├─ ShootAction
+  └─ 기타 액션…
+```
+
+➡️ 이렇게 하면 **유닛이 할 수 있는 행동을 모듈처럼 추가/제거 가능**
+
+➡️ 액션 관련 코드는 모두 MoveAction 안에 깔끔하게 정리
+
+---
+
+# 3️⃣ MoveAction 스크립트를 만들어 이동 코드를 분리하기
+
+강의는 이렇게 진행됨:
+
+### ▶ 1. MoveAction.cs 생성
+
+Unit 프리팹에 AddComponent로 붙임
+
+### ▶ 2. Unit.cs 안에 있던 이동 관련 코드 이동
+
+아래와 같은 것들을 MoveAction으로 옮김:
+
+- targetPosition 저장
+- 이동 Update 로직
+- Move() 함수
+- 애니메이션 처리
+
+남기지 않은 것 → “GridPosition 갱신 로직”
+
+그건 유닛이 어떤 이동 액션을 하든 **새 위치를 그리드에 등록하는 건 Unit이 책임져야 하기 때문**.
+
+---
+
+# 4️⃣ Unit.cs 에서 MoveAction 가져오는 기능 추가
+
+Unit은 자신에게 붙은 MoveAction을 알아야 한다.
+
+```csharp
+private MoveAction moveAction;
+
+private void Awake() {
+    moveAction = GetComponent<MoveAction>();
+}
+
+public MoveAction GetMoveAction() {
+    return moveAction;
+}
+```
+
+➡️ 이제 UnitActionsSystem 이
+
+`selectedUnit.GetMoveAction().Move(targetPosition)`
+
+형태로 액션을 실행할 수 있다.
+
+---
+
+# 5️⃣ UnitActionsSystem 수정하기
+
+기존에는
+
+```csharp
+selectedUnit.Move(MouseWorld.GetPosition());
+```
+
+(이렇게 Unit이 직접 Move 기능을 수행했음)
+
+수정 후:
+
+```csharp
+selectedUnit.GetMoveAction().Move(MouseWorld.GetPosition());
+```
+
+➡️ **액션 시스템 구조 완성**
+
+---
+
+# 6️⃣ 이동은 되지만 여전히 “아무 곳에나 이동” 문제가 남았음
+
+그래서 MoveAction 내부에
+
+“이 유닛이 현재 이동할 수 있는 모든 그리드 칸 목록”
+
+을 계산하는 기능을 만든다.
+
+---
+
+# 7️⃣ MoveAction: GetValidActionGridPositionList() 구현
+
+이 함수는:
+
+- 유닛 기준으로
+- 특정 이동 거리(maxMoveDistance) 안에서
+- 이동 가능한 모든 **GridPosition** 을 모두 모아 리스트로 반환
+
+코드 구조는 아래와 같음:
+
+```csharp
+public List<GridPosition> GetValidActionGridPositionList() {
+    List<GridPosition> validGridPositionList = new List<GridPosition>();
+
+    GridPosition unitGridPosition = unit.GetGridPosition();
+
+    for (int x = -maxMoveDistance; x <= maxMoveDistance; x++) {
+        for (int z = -maxMoveDistance; z <= maxMoveDistance; z++) {
+
+            GridPosition offset = new GridPosition(x, z);
+            GridPosition testPosition = unitGridPosition + offset;
+
+            Debug.Log(testPosition);
+        }
+    }
+
+    return validGridPositionList;
+}
+```
+
+---
+
+# 8️⃣ 중요한 개념 정리 — "오프셋(Offset)으로 범위 검사"
+
+예를 들어 유닛이 (10, 5)에 서 있고, 이동 거리 1이 가능하다고 하자.
+
+그럼 가능한 오프셋은:
+
+```
+(-1, -1), (-1, 0), (-1, +1)
+( 0, -1), ( 0, 0), ( 0, +1)
+(+1, -1), (+1, 0), (+1, +1)
+```
+
+각 오프셋을 현재 위치에 더하면 가능한 모든 그리드 칸이 나온다.
+
+이 개념이 초보자에게는 조금 추상적일 수 있는데,
+
+쉽게 설명하면:
+
+> "유닛이 있는 칸을 중심점으로 잡고
+>
+> 좌우/앞뒤/대각선을 싹 돌면서
+>
+> 내가 갈 수 있는 칸인지 확인하는 과정"
+
+---
+
+# 9️⃣ GridPosition struct에서 + 연산자를 직접 구현해야 하는 이유
+
+`unitGridPosition + offsetGridPosition`
+
+이 코드를 쓰려면 GridPosition이 **+ 연산**을 지원해야 한다.
+
+C#은 struct에 대해 기본적으로 + 연산을 지원하지 않기 때문에
+
+직접 구현해야 한다.
+
+```csharp
+public static GridPosition operator +(GridPosition a, GridPosition b) {
+    return new GridPosition(a.x + b.x, a.z + b.z);
+}
+```
+
+➡️ 이렇게 해야 두 GridPosition을 더하는 직관적인 코드 사용 가능.
+
+---
+
+# 🔟 테스트 코드로 출력해보기
+
+Testing.cs에서 T 키를 누르면 MoveAction의 함수 실행:
+
+```csharp
+if (Input.GetKeyDown(KeyCode.T)) {
+    unit.GetMoveAction().GetValidActionGridPositionList();
+}
+```
+
+그러면 콘솔에 각 GridPosition이 출력된다.
+
+---
+
+# 1️⃣1️⃣ 현재 동작 모습 정리
+
+- 현재는 **모든 오프셋 값이 그대로 출력됨**
+- 그래서 음수 좌표(맵 밖 위치)도 그대로 나옴
+  → 예: (-1, -2)
+
+이건 아직 “유효한 칸인지 필터링하지 않았기 때문”
+
+➡️ 다음 강의에서
+
+**맵 밖**, **다른 유닛이 있는 칸**, **장애물 칸** 등을 제외하는 “유효성 검사”를 추가하게 된다.
+
+---
+
+# 🎯 최종 요약 — 이번 강의의 핵심 개념
+
+| 핵심 요소                      | 설명                                           |
+| ------------------------------ | ---------------------------------------------- |
+| MoveAction                     | 유닛의 “행동”을 담당하는 독립 클래스           |
+| Unit이 MoveAction을 소유       | Unit은 자신이 가진 액션들을 관리함             |
+| UnitActionsSystem              | 현재 선택된 유닛의 액션을 실행하는 컨트롤러    |
+| GetValidActionGridPositionList | 유닛이 이동할 수 있는 그리드 칸을 계산         |
+| GridPosition 연산자 오버로딩   | 그리드 좌표 + 오프셋을 쉽게 계산하기 위해 필요 |
+
+## MoveAction
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+/// <summary>
+/// MoveAction:
+/// Unit 게임오브젝트에 붙여서 '이동' 동작을 담당하는 컴포넌트입니다.
+/// - 실제로 이동/회전/걷기 애니메이션 토글을 처리합니다.
+/// - 또한 이 액션이 유효하게 이동할 수 있는 그리드 포지션 후보들을 계산하는 함수도 포함합니다.
+/// </summary>
+public class MoveAction : MonoBehaviour
+{
+    // 실제로 이동해야 할 목적지 월드 좌표 (Vector3)
+    // Move() 호출 시 이 값이 설정되며 Update()에서 이 위치로 이동합니다.
+    private Vector3 targetPosition;
+
+    // 이 MoveAction이 붙어있는 Unit 참조
+    // Unit은 자신의 GridPosition(그리드 좌표)을 알고 있고,
+    // LevelGrid와의 동기화를 담당합니다.
+    private Unit unit;
+
+    // 애니메이터: 걷기/정지 애니메이션을 토글하기 위해 사용합니다.
+    // 인스펙터에서 해당 유닛의 Animator를 드래그해서 연결해야 합니다.
+    [SerializeField] private Animator unitAnimator;
+
+    // 유닛이 한 번에 이동할 수 있는 최대 거리 (그리드 단위)
+    // 인스펙터에서 값을 바꿔 실험해볼 수 있습니다.
+    [SerializeField] private int maxMoveDistance = 4;
+
+    /// <summary>
+    /// Awake는 객체가 생성될 때 처음에 한 번 호출됩니다.
+    /// 여기서는 Unit 컴포넌트를 가져오고, 초기 targetPosition을 현재 위치로 설정합니다.
+    /// </summary>
+    private void Awake()
+    {
+        // 같은 GameObject에 붙어있는 Unit 컴포넌트를 찾아서 할당.
+        // MoveAction은 항상 Unit에 붙는다고 가정합니다.
+        unit = GetComponent<Unit>();
+
+        // 현재 Transform 위치를 목적지로 설정해 둡니다.
+        // 이렇게 하면 게임 시작 시 즉시 '이동 중'으로 판단되는 것을 방지합니다.
+        targetPosition = transform.position;
+    }
+
+    /// <summary>
+    /// Update는 매 프레임마다 호출됩니다.
+    /// 실제 이동 처리(이동 및 회전)와 애니메이션 상태 갱신을 여기서 수행합니다.
+    /// </summary>
+    private void Update()
+    {
+        // 목적지에 거의 도달했다고 판단할 최소 거리(정지 거리)
+        // 이 값보다 가까우면 '도착'으로 간주해서 정지 애니메이션을 재생합니다.
+        float stoppingDistance = 0.5f;
+
+        // 현재 위치와 targetPosition 간의 거리가 stoppingDistance보다 크면 이동 처리
+        if (Vector3.Distance(transform.position, targetPosition) > stoppingDistance)
+        {
+            // targetPosition 방향으로 향하는 단위 벡터 (방향)
+            Vector3 moveDirection = (targetPosition - transform.position).normalized;
+
+            // 이동 속도 (유닛이 초당 얼마만큼 이동하는지)
+            // 필요하면 인스펙터에서 조절 가능하도록 SerializeField로 변경해도 됩니다.
+            float moveSpeed = 4f;
+
+            // 실제 위치 이동: 프레임 독립성을 위해 Time.deltaTime을 곱함
+            // transform.position += moveDirection * moveSpeed * Time.deltaTime;
+            transform.position += moveDirection * Time.deltaTime * moveSpeed;
+
+            // 회전 처리: 현재 바라보는 방향(transform.forward)에서 목표 방향(moveDirection)으로 부드럽게 보간
+            // rotationSpeed가 클수록 더 빨리 회전합니다.
+            float rotationSpeed = 10f;
+            transform.forward = Vector3.Lerp(transform.forward, moveDirection, Time.deltaTime * rotationSpeed);
+
+            // 걷는 애니메이션 재생을 위해 Animator의 파라미터를 true로 설정
+            // Animator에는 "IsWalking" 같은 bool 파라미터가 있어야 합니다.
+            if (unitAnimator != null)
+            {
+                unitAnimator.SetBool("IsWalking", true);
+            }
+            else
+            {
+                // 디버그: Animator를 연결하지 않았을 때 문제를 빨리 찾을 수 있도록 로그 출력
+                Debug.LogWarning($"Unit '{gameObject.name}' MoveAction: unitAnimator가 연결되어 있지 않습니다.");
+            }
+        }
+        else
+        {
+            // 목적지에 도달했거나 거의 도달한 경우, 멈춘 애니메이션을 재생
+            if (unitAnimator != null)
+            {
+                unitAnimator.SetBool("IsWalking", false);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 외부에서 이 액션을 호출하여 유닛을 지정한 월드 좌표로 이동시키도록 합니다.
+    /// 예: selectedUnit.GetMoveAction().Move(MouseWorld.GetPosition());
+    /// </summary>
+    /// <param name="targetPosition">이동하려는 월드 좌표</param>
+    public void Move(Vector3 targetPosition)
+    {
+        // 전달받은 좌표를 내부 targetPosition에 저장하면 Update()에서 이동이 시작됩니다.
+        this.targetPosition = targetPosition;
+    }
+
+    /// <summary>
+    /// 이 액션(이동)이 현재 유닛 위치에서 이동할 수 있는 모든 그리드 좌표를 계산하여 리스트로 반환합니다.
+    /// - 아직 유효성 검사(맵 범위, 장애물, 다른 유닛 등)는 하지 않은 상태입니다.
+    /// - 각 그리드 칸은 GridPosition 구조체로 표현됩니다.
+    /// </summary>
+    /// <returns>가능한 GridPosition 후보 리스트 (아직 필터링 전)</returns>
+    public List<GridPosition> GetValidActionGridPositionList()
+    {
+        // 결과를 담을 리스트 초기화
+        List<GridPosition> validGridPositionList = new List<GridPosition>();
+
+        // 현재 유닛의 그리드 위치를 Unit으로부터 가져옵니다.
+        // Unit은 LevelGrid와 동기화되어 자신의 GridPosition을 알고 있습니다.
+        GridPosition unitGridPosition = unit.GetGridPosition();
+
+        // maxMoveDistance 범위만큼 좌우/앞뒤로 탐색합니다.
+        // 이중 for문을 사용하여 '오프셋'을 만들고, 그 오프셋을 현재 유닛 위치에 더해 테스트할 좌표(testGridPosition)를 계산합니다.
+        // 예를 들어 maxMoveDistance = 1이면 -1..0..1 범위의 오프셋을 만들어 3x3 영역을 확인합니다.
+        for (int x = -maxMoveDistance; x <= maxMoveDistance; x++)
+        {
+            for (int z = -maxMoveDistance; z <= maxMoveDistance; z++)
+            {
+                // 현재 반복에서의 오프셋(그리드 단위)
+                GridPosition offsetGridPosition = new GridPosition(x, z);
+
+                // 오프셋을 현재 유닛의 GridPosition에 더해 최종 테스트 좌표를 계산
+                // GridPosition에는 + 연산자가 오버로딩되어 있어 합산 가능해야 합니다.
+                GridPosition testGridPosition = unitGridPosition + offsetGridPosition;
+
+                // 현재는 단순히 콘솔에 찍어 확인 (디버그용)
+                // 실제로는 이 위치가 맵 범위 내인지, 다른 유닛이 있는지, 장애물이 있는지 등을 검사해서
+                // validGridPositionList에 추가해야 합니다.
+                Debug.Log($"테스트 그리드 포지션: {testGridPosition}");
+
+                // 예시(아직 구현 전): 만약 테스트가 유효하면 리스트에 추가
+                // if (IsValidGridPosition(testGridPosition)) {
+                //     validGridPositionList.Add(testGridPosition);
+                // }
+            }
+        }
+
+        // 현재는 필터링을 하지 않았으므로 validGridPositionList는 빈 리스트입니다.
+        // 다음 단계에서는 맵 경계 검사, 충돌 검사 등 필터링 로직을 추가합니다.
+        return validGridPositionList;
+    }
+
+    // 주석: 향후 필요한 헬퍼 메서드 예시
+    // private bool IsValidGridPosition(GridPosition pos) { ... }
+    // - LevelGrid.Instance.IsValidGridPosition(pos) 처럼 맵 범위 체크
+    // - LevelGrid.Instance.HasAnyUnitOnGridPosition(pos) 로 유닛 겹침 검사
+    // - LevelGrid.Instance.IsWalkableGridPosition(pos) 로 타일 통과 가능 여부 검사
+}
+
+```
+
+# { 🚀 MOVE 액션에 “유효한 이동 위치(Valid Move Positions)” 검증 로직 추가하기 }
+
+이번 강의는 “유닛이 이동할 수 있는 위치를 올바르게 제한하는 기능”을 만드는 과정이다.
+
+즉, **마우스로 클릭했다고 해서 유닛이 아무데나 가는 게 아니라**,
+
+- 그리드 안에 있는지?
+- 내 현재 자리인지?
+- 다른 유닛이 이미 서 있는지?
+- 이동 가능한 거리인지?
+
+이런 **유효성 검증(Validation)** 을 전부 통과한 경우에만 이동하도록 만드는 강의이다.
+
+---
+
+# 📋 목차
+
+1. 이동 후보 위치 만들기 개념 복습
+2. Validation 1 — 그리드 범위 안인지 검사하기
+3. Validation 2 — 현재 내가 있는 자리인지 검사하기
+4. Validation 3 — 그 위치에 다른 유닛이 이미 있는지 검사하기
+5. 유효한 Move Position 리스트 반환하기
+6. 마우스 클릭 시 “유효한 위치인지” 체크하기
+7. MoveAction 함수 수정 (월드 → 그리드 변환)
+8. 전체 동작 확인
+
+---
+
+---
+
+## 1. 이동 후보 위치 만들기 개념 복습
+
+유닛은 기본적으로 **최대 이동 거리(maxMoveDistance)** 안에서
+
+**상하좌우 및 대각선** 방향으로 이동 가능하다.
+
+그래서 MoveAction에서는 먼저 이런 위치들을 모두 계산해 목록으로 가져온다.
+
+하지만 이 목록에는 **문제가 있다**:
+
+- 그리드 밖(예: -1, -1)
+- 내 현재 자리 그대로
+- 다른 유닛이 점령한 자리
+- 이동 불가능한 거리
+
+같은 **잘못된 위치들**이 포함되어 있다.
+
+그래서 이제부터 “잘못된 위치들을 걸러내는(validation) 과정”을 만들 것이다.
+
+---
+
+## 2. Validation 1 — 그리드 범위 안인지 검사하기
+
+### ✔ 개념
+
+게임 보드는 “0 ~ width-1”, “0 ~ height-1” 범위만 존재한다.
+
+그 밖의 값(-1, -1 같은 값)은 실제 그리드 타일이 아니다.
+
+따라서 “그리드 외부”는 무조건 이동할 수 없으므로 배제해야 한다.
+
+---
+
+## ✔ GridSystem에 isValidGridPosition 함수 추가
+
+이 함수는 “해당 그리드 좌표가 정상 범위인지 체크”.
+
+```csharp
+public bool IsValidGridPosition(GridPosition gridPosition) {
+    return
+        gridPosition.x >= 0 &&              // x는 0 이상
+        gridPosition.z >= 0 &&              // z도 0 이상
+        gridPosition.x < width &&           // x는 width보다 작아야 함
+        gridPosition.z < height;            // z는 height보다 작아야 함
+}
+```
+
+### 👶 초보 설명
+
+- `>= 0`: 음수 좌표는 존재하지 않는다.
+- `< width`: width = 10이면 가능한 x 좌표는 0~9
+- `< height`: height = 10이면 가능한 z 좌표는 0~9
+
+즉, “실제 맵 안의 정사각형 타일인지” 검사하는 것.
+
+---
+
+## ✔ LevelGrid에서도 같은 함수를 외부에 노출하기 위해 래핑 (pass-through)
+
+```csharp
+public bool IsValidGridPosition(GridPosition gridPosition) {
+    return gridSystem.IsValidGridPosition(gridPosition);
+}
+```
+
+이제 GameObject 어디에서든 LevelGrid.Instance.IsValidGridPosition(...) 사용 가능.
+
+---
+
+## 3. Validation 2 — 현재 내가 있는 자리인지 검사하기
+
+유닛이 “자기 자신 있는 칸(x,y)”을 이동 대상으로 선택하는 것은 말이 안 된다.
+
+실제로 아무 변화도 없는데 턴만 소비하는 이상한 행동이 되기 때문.
+
+그래서 “내 현재 위치와 같으면 제외”해야 한다.
+
+MoveAction 내부에서 검사:
+
+```csharp
+if (unitGridPosition == testGridPosition) {
+    continue;   // 같은 자리면 건너뛰기
+}
+```
+
+### 👶 초보 설명
+
+`continue` → 현재 for 반복(루프)에서 **이번 데이터는 무시**하고 다음 반복으로 넘어간다.
+
+---
+
+## 4. Validation 3 — 그 위치에 다른 유닛이 이미 있는지 검사하기
+
+유닛이 겹칠 수 없으므로
+
+“해당 그리드에 다른 유닛이 있는지” 검사하는 기능이 필요하다.
+
+---
+
+## ✔ GridObject에서 "해당 칸에 유닛이 있는지" 검사하는 기능 만들기
+
+GridObject는 위치 1개를 표현하며, 그 칸 위에 어떤 유닛들이 있는지 저장한다.
+
+```csharp
+public bool HasAnyUnit() {
+    return unitList.Count > 0;   // 유닛이 1개라도 있으면 true
+}
+```
+
+---
+
+## ✔ LevelGrid에도 공개 함수로 래핑
+
+```csharp
+public bool HasAnyUnitOnGridPosition(GridPosition gridPosition) {
+    GridObject gridObject = GetGridObject(gridPosition);
+    return gridObject.HasAnyUnit();
+}
+```
+
+### 공개 함수로 래핑한다?
+
+> 직접 내부 데이터를 건들지 못하게 하고, 대신 그 데이터를 사용할 수 있도록 ‘겉에 포장된(public) 함수’를 만들어 제공한다는 뜻이야.
+
+---
+
+### 📦 **레벨 그리드(LevelGrid)**는 큰 박스야
+
+그 안에는 여러 값과 기능(예: `GetGridObject()`, `GetGridPosition()`)이 들어있어.
+
+그런데 **바깥에서 박스 안의 물건을 마음대로 꺼내거나 바꿀 수 있게 하면 구조가 망가질 수 있음**.
+
+그래서 이렇게 하는 대신:
+
+👉 **박스 안의 내용을 바르게 사용할 수 있도록 “정해진 방법(public 함수)”만 열어주자!**
+
+이게 바로 “공개 함수로 래핑(wrap)한다”는 뜻이야.
+
+### 1) **캡슐화(Encapsulation)**
+
+내부 구조를 보호하고, 바깥에서 망가뜨리지 못하게 함.
+
+### 2) **나중에 구조 바뀌어도 바깥 코드는 그대로 유지**
+
+내부에서 gridArray → dictionary로 바꿔도
+
+public 함수만 유지하면 바깥은 아무 문제 없음.
+
+### 3) **코드를 더 깔끔하고 안전하게 관리**
+
+---
+
+## ✔ MoveAction에서 검사
+
+```csharp
+if (LevelGrid.Instance.HasAnyUnitOnGridPosition(testGridPosition)) {
+    continue;  // 누군가 이미 서 있으므로 이동 불가
+}
+```
+
+---
+
+## 5. 유효한 Move Position 리스트 반환하기
+
+위의 모든 검사를 통과한 위치만 “진짜 이동 가능한 위치”.
+
+MoveAction 내부의 흐름:
+
+```csharp
+List<GridPosition> validGridPositions = new List<GridPosition>();
+
+foreach (GridPosition testGridPosition in testGridPositionList) {
+
+    // 1) 그리드 범위 넘는지 검사
+    if (!LevelGrid.Instance.IsValidGridPosition(testGridPosition)) {
+        continue;
+    }
+
+    // 2) 자기 자리인지 검사
+    if (unitGridPosition == testGridPosition) {
+        continue;
+    }
+
+    // 3) 다른 유닛이 있는지 검사
+    if (LevelGrid.Instance.HasAnyUnitOnGridPosition(testGridPosition)) {
+        continue;
+    }
+
+    // 모든 검사 통과 → 진짜 이동 가능
+    validGridPositions.Add(testGridPosition);
+}
+```
+
+---
+
+## 6. 유효한 위치인지 검사하는 전용 함수 만들기
+
+이젠 “유효 위치 목록이 이미 만들어져 있으니까”,
+
+특정 좌표가 리스트에 포함되어 있는지만 보면 된다.
+
+```csharp
+public bool IsValidActionGridPosition(GridPosition gridPosition) {
+    List<GridPosition> validGridPositionList = GetValidActionGridPositionList();
+    return validGridPositionList.Contains(gridPosition);
+}
+```
+
+### ✔ 초보 설명
+
+- `.Contains()` → 리스트 안에 그 값이 있는지 true/false로 알려줌.
+
+---
+
+## 7. 마우스 클릭 시 검사 적용하기
+
+UnitActionSystem에서 마우스로 클릭하면 이동하려는 로직이 있다.
+
+기존에는 "월드 좌표(World Position)"로 이동했지만
+
+이제 "그리드 좌표"를 사용해야 한다.
+
+---
+
+## ✔ 마우스 월드 → 그리드 변환
+
+```csharp
+GridPosition mouseGridPosition =
+    LevelGrid.Instance.GetGridPosition(MouseWorld.GetPosition());
+```
+
+---
+
+## ✔ 이동 가능 여부 검사 후 이동 실행
+
+```csharp
+if (selectedUnit.GetMoveAction().IsValidActionGridPosition(mouseGridPosition)) {
+    selectedUnit.GetMoveAction().Move(mouseGridPosition);
+}
+```
+
+---
+
+## 8. MoveAction의 Move 함수 월드 좌표 → 그리드 좌표로 수정
+
+MoveAction.Move 함수는 기존에 "worldPosition"을 받았지만
+
+이제는 "gridPosition"을 받아서 내부에서 worldPosition으로 변환해야 한다.
+
+```csharp
+public void Move(GridPosition gridPosition) {
+
+    // grid → world 변환
+    targetPosition = LevelGrid.Instance.GetWorldPosition(gridPosition);
+
+    // 이제 이동 로직은 그대로 targetPosition으로 이동
+}
+```
+
+---
+
+## 9. LevelGrid에 grid → world 변환 함수 공개하기
+
+```csharp
+public Vector3 GetWorldPosition(GridPosition gridPosition) {
+    return gridSystem.GetWorldPosition(gridPosition);
+}
+```
+
+---
+
+## 10. 전체 동작 확인
+
+이제 게임에서 테스트하면 다음 기능이 모두 정상 작동한다.
+
+- ❌ 그리드 밖 클릭 → 이동 안 됨
+- ❌ 자기 자리 클릭 → 이동 안 됨
+- ❌ 다른 유닛 위 클릭 → 이동 안 됨
+- ❌ 이동 범위 밖 클릭 → 이동 안 됨
+- ✔ 범위 안 + 빈 칸 클릭 → 이동됨
+
+또한 마우스가 비스듬한 곳을 클릭해도
+
+"그리드 좌표"로 변환되므로 정확하게 타일 중심으로 유닛이 이동한다.
+
+---
+
+# 🎉 요약
+
+MOVE 액션을 위한 유효성 검증 시스템 구축:
+
+1. **그리드 내부인지 검사**
+2. **현재 자리인지 검사**
+3. **다른 유닛이 점령한 칸인지 검사**
+4. **모든 검증 통과한 칸만 이동 가능 칸 리스트에 추가**
+5. **마우스 클릭 시 해당 칸이 이동 가능한 칸 리스트에 포함돼야만 이동**
+6. **MoveAction은 이제 gridPosition을 입력받고 내부에서 worldPosition으로 변환**
+
+# { 🧩 그리드 시스템 비주얼 만들기 }
+
+이번 강의는 **그리드 위에 시각적 표시(비주얼)를 생성하고, 움직일 수 있는 위치만 동적으로 보여주는 기능**을 구현한다.
+
+(전체 강의 짧은 요약: _그리드 시스템 위에 "어떤 칸이 이동 가능한지"를 표시하는 UI를 만든다._)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380469/notion-blog/_/3D_/_/_4_Actions_UI_-_1/image.png)
+
+---
+
+## 📋 목차
+
+1. 그리드 시각화 개념 이해하기
+2. Prefab을 이용한 간단한 시각적 표시 만들기
+3. GridSystemVisual 구조 설계
+4. GridSystem에서 width/height 공개하기
+5. GridSystemVisualSingle 생성 및 저장
+6. 전체 숨기기/특정 목록만 표시 기능 구현
+7. 유닛 움직임에 따라 자동 업데이트하기
+
+---
+
+# 1. 그리드 시각화 개념 이해하기
+
+지금까지는:
+
+- 그리드 좌표 계산 O
+- 유닛이 이동 가능한 위치 제한 O
+- 하지만 **어디가 이동 가능한지 화면에 보이지 않음 ❌**
+
+그래서 강의 목표는:
+
+✔ 그리드 위에 투명한 사각형을 깔아서
+
+✔ “이 칸은 이동 가능”을 시각적으로 보여주는 기능 만들기
+
+**비주얼은 두 가지 방식이 있다:**
+
+| 방식                       | 설명                                          |
+| -------------------------- | --------------------------------------------- |
+| **최적화 방식**            | 한 번에 큰 Mesh를 생성해 성능 최적화 (복잡함) |
+| **간단한 방식(이번 강의)** | 각 칸에 프리팹(Quad)을 생성해서 올림 (쉬움)   |
+
+강의에서는 초보자를 위해 **간단한 Prefab 방식**으로 구현한다.
+
+---
+
+# 2. Prefab을 이용한 간단한 시각적 표시 만들기
+
+### 과정 요약
+
+1. 빈 오브젝트 생성 → `Grid System Visual Single`
+2. 그 안에 **3D Object → Quad** 생성
+3. 다운받은 텍스처를 사용해 Material 제작
+4. Material을 Quad에 적용
+5. Quad를 위로 회전(90°)시키고 살짝 띄워서 z-fighting 방지
+6. 크기를 그리드 셀 크기(2x2)에 맞게 조절
+7. Prefab 폴더에 드래그해 저장
+
+**핵심 개념:**
+
+- 그리드 셀 하나를 나타내는 비주얼 "타일"이다.
+- 이 타일을 그리드 전체에 복사해서 배치한다.
+- 기본은 숨겨진 상태로 두고, 필요한 칸만 Show() 해서 보이게 한다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380468/notion-blog/_/3D_/_/_4_Actions_UI_-_1/image_1.png)
+
+```csharp
+프리팹에 GridSystemVisualSingle 스크립트 붙여주기
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380468/notion-blog/_/3D_/_/_4_Actions_UI_-_1/image_2.png)
+
+---
+
+# 3. GridSystemVisual 구조 설계
+
+### 스크립트 1 — `GridSystemVisualSingle`
+
+각 타일(Quad)을 제어하는 스크립트다.
+
+핵심 기능:
+
+```csharp
+meshRenderer.enabled = true;  // 보이기
+meshRenderer.enabled = false; // 숨기기
+```
+
+### 스크립트 2 — `GridSystemVisual`
+
+그리드 전체의 비주얼을 관리하는 매니저이다.
+
+해야 하는 일:
+
+- Prefab을 받아서
+  ✔ 그리드 크기만큼 Instantiate
+  ✔ 2차원 배열에 저장
+  ✔ 필요할 때 Show/Hide
+  ✔ 매 프레임 업데이트해 상태 갱신
+
+---
+
+# 4. GridSystem에서 width/height 공개하기
+
+GridSystemVisual은 그리드 크기(width/height)를 알아야 한다.
+
+그래서 GridSystem에 다음을 공개함:
+
+```csharp
+public int GetWidth() => width;
+public int GetHeight() => height;
+```
+
+그리고 LevelGrid에 pass-through 함수 추가:
+
+```csharp
+public int GetWidth() => gridSystem.GetWidth();
+public int GetHeight() => gridSystem.GetHeight();
+```
+
+---
+
+# 5. GridSystemVisualSingle 생성 및 저장
+
+GridSystemVisual.Start()에서 다음 로직 수행:
+
+1. `gridSystemVisualSingleArray` 2차원 배열 생성
+2. for 문으로 x,z 전체를 순회
+3. 각 칸마다 Prefab Instantiate
+4. 생성된 오브젝트에서 `GridSystemVisualSingle` 컴포넌트 가져와 배열에 저장
+
+```csharp
+gridSystemVisualSingleArray[x, z] =
+    gridSystemVisualSingleTransform.GetComponent<GridSystemVisualSingle>();
+```
+
+이제:
+
+➡ `gridSystemVisualSingleArray[x,z]` 로 바로 해당 칸을 제어할 수 있다.
+
+(보이기/숨기기 등)
+
+---
+
+# 6. 전체 숨기기 / 특정 목록만 표시 기능 구현
+
+## 전체 숨기기
+
+모든 칸을 숨긴다.
+
+```csharp
+public void HideAllGridPosition() {
+    for x...
+        for z...
+            gridSystemVisualSingleArray[x, z].Hide();
+}
+```
+
+## 목록만 표시
+
+MoveAction이 제공하는 이동 가능한 GridPosition 리스트를 받아서
+
+그 칸들만 Show() 한다.
+
+```csharp
+public void ShowGridPositionList(List<GridPosition> list) {
+    foreach (var pos in list) {
+        gridSystemVisualSingleArray[pos.x, pos.z].Show();
+    }
+}
+```
+
+---
+
+# 7. 유닛 움직임에 따라 자동 업데이트하기
+
+핵심은 `UpdateGridVisual()`.
+
+### UpdateGridVisual() 내부 동작
+
+1. 모든 칸 Hide()
+2. 현재 선택된 유닛 가져오기
+3. 그 유닛의 MoveAction에서 “이동 가능한 그리드 목록” 얻기
+4. 그 리스트만 Show()
+
+즉,
+
+🎯 “선택된 유닛이 갈 수 있는 칸만 실시간 표시”
+
+```csharp
+public void UpdateGridVisual() {
+    HideAllGridPosition();
+    Unit selectedUnit = UnitActionsSystem.Instance.GetSelectedUnit();
+
+    ShowGridPositionList(
+        selectedUnit.GetMoveAction().GetValidActionGridPositionList()
+    );
+}
+```
+
+그리고 Update()에서 계속 호출:
+
+```csharp
+private void Update() {
+    UpdateGridVisual();
+}
+```
+
+---
+
+# ⭐ 최종적으로 완성되는 기능
+
+- 씬에 들어가면 전 그리드 셀마다 비주얼(Opaque Quad)이 생성됨
+- 기본은 모두 숨겨짐
+- 선택된 유닛의 이동 가능 범위만 Show()로 나타남
+- 유닛 이동 / 유닛 선택 변경 시 자동으로 갱신됨
+- 이후 공격/특수 행동마다 다른 색이나 텍스처로 표시할 기반까지 마련됨
+
+## GridSystemVisual
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class GridSystemVisual : MonoBehaviour
+{
+    // 🔥 싱글톤 패턴 사용
+    // 모든 스크립트에서 GridSystemVisual을 쉽게 접근하려고 싱글톤을 사용한다.
+    // 게임에 그리드 비주얼은 하나만 필요하기 때문에 딱 1개만 존재하도록 제한함.
+    public static GridSystemVisual Instance { get; private set; }
+
+    // 그리드 한 칸에 해당하는 비주얼 프리팹.
+    // 예: 바닥에 표시되는 하이라이트 타일 같은 것.
+    [SerializeField] private Transform gridSystemVisualSinglePrefab;
+
+    // 생성된 모든 그리드 비주얼 객체들을 2차원 배열로 저장.
+    // 나중에 필요할 때 바로 꺼내서 Show/Hide 할 수 있게 하려고 저장하는 것.
+    private GridSystemVisualSingle[,] gridSystemVisualSingleArray;
+
+    private void Awake()
+    {
+        // 🔥 싱글톤 패턴: 이미 Instance가 있으면 새로 생긴 건 삭제함.
+        // 이유: GridSystemVisual은 게임에서 하나만 있어야 하기 때문.
+        if (Instance != null)
+        {
+            Debug.LogError("There is more than one GridSystemVisual! " + transform + " - " + Instance);
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+    }
+
+    private void Start()
+    {
+        // LevelGrid에서 그리드의 크기를 가져옴 (가로, 세로).
+        // 이 크기만큼 비주얼 오브젝트를 만든다.
+        gridSystemVisualSingleArray = new GridSystemVisualSingle[
+            LevelGrid.Instance.GetWidth(),
+            LevelGrid.Instance.GetHeight()
+        ];
+
+        // 🔥 2중 for문으로 모든 그리드 좌표에 대해 비주얼 타일 생성
+        // 이유:
+        //   1) 처음에 전체 타일을 미리 생성해두면
+        //   2) 나중에 MoveAction 같은 곳에서 하이라이트를 표시할 때
+        //      이미 만들어진 객체를 켜기만 하면 되므로 훨씬 효율적이다.
+        for (int x = 0; x < LevelGrid.Instance.GetWidth(); x++)
+        {
+            for (int z = 0; z < LevelGrid.Instance.GetHeight(); z++)
+            {
+                GridPosition gridPosition = new GridPosition(x, z);
+
+                // 월드 좌표로 변환해서 프리팹을 해당 위치에 배치
+                Transform gridSystemVisualSingleTransform = Instantiate(
+                    gridSystemVisualSinglePrefab,
+                    LevelGrid.Instance.GetWorldPosition(gridPosition), // ← "왜 worldPosition 변환이 필요한지?"
+                                                                      //     grid는 x,z 기반이지만 실제 오브젝트는 월드 좌표에 있어야 하기 때문.
+                    Quaternion.identity // *“회전이 전혀 없는 상태(0도 회전)
+                );
+
+                // 생성된 오브젝트의 GridSystemVisualSingle 스크립트를 배열에 저장
+                // 이유: 나중에 빠르게 찾아서 Show() / Hide() 할 수 있음
+                gridSystemVisualSingleArray[x, z] =
+                    gridSystemVisualSingleTransform.GetComponent<GridSystemVisualSingle>();
+            }
+        }
+    }
+
+    private void Update()
+    {
+        // 🔥 선택된 유닛에 따라 "현재 유효한 이동 가능 위치"를 계속 갱신해서 보여주기 위함
+        UpdateGridVisual();
+    }
+
+    // 🔥 전체 그리드 하이라이트를 숨김
+    // 이유: 새로 표시하기 전에 반드시 모든 타일을 숨겨줘야 "중복 표시"가 안 된다.
+    public void HideAllGridPosition()
+    {
+        for (int x = 0; x < LevelGrid.Instance.GetWidth(); x++)
+        {
+            for (int z = 0; z < LevelGrid.Instance.GetHeight(); z++)
+            {
+                gridSystemVisualSingleArray[x, z].Hide();
+            }
+        }
+    }
+
+    // 전달받은 그리드 리스트만 하이라이트 표시(show)
+    public void ShowGridPositionList(List<GridPosition> gridPositionList)
+    {
+        foreach (GridPosition gridPosition in gridPositionList)
+        {
+            // 배열에서 해당 위치 타일을 찾아서 show
+            gridSystemVisualSingleArray[gridPosition.x, gridPosition.z].Show();
+        }
+    }
+
+    // 🔥 유닛 선택 상태에 따라 그리드 비주얼을 갱신하는 핵심 함수
+    public void UpdateGridVisual()
+    {
+        // 1️⃣ 먼저 모든 하이라이트를 비활성화
+        HideAllGridPosition();
+
+        // 2️⃣ 현재 선택된 유닛 가져오기
+        Unit selectedUnit = UnitActionsSystem.Instance.GetSelectedUnit();
+
+        // 3️⃣ 그 유닛이 이동할 수 있는 모든 위치(리스트)를 구해서
+        //    해당 좌표에 있는 타일만 Show() 한다.
+        ShowGridPositionList(
+            selectedUnit.GetMoveAction().GetValidActionGridPositionList()
+        );
+
+        // 결과:
+        // - 선택한 유닛이 이동 가능한 칸만 밝게 표시됨
+        // - 유저가 어떤 칸으로 이동할 수 있는지 직관적으로 보임
+    }
+}
+
+```
+
+# { 🎮 여러 액션 시스템 구축하기 (Multiple Actions with Base Class) }
+
+이번 강의는 **Move 액션 외에 Spin 액션을 추가**하고, **액션 간 충돌 문제를 해결**하며, 여러 액션을 쉽게 관리할 수 있도록 **베이스 클래스 구조를 설계**하는 내용입니다.
+
+---
+
+## 📋 목차
+
+1. [현재 상태 확인 및 새로운 액션 추가 목표](https://claude.ai/chat/16c99d70-9cd5-436f-bf34-29f704c7db33#1-%ED%98%84%EC%9E%AC-%EC%83%81%ED%83%9C-%ED%99%95%EC%9D%B8-%EB%B0%8F-%EC%83%88%EB%A1%9C%EC%9A%B4-%EC%95%A1%EC%85%98-%EC%B6%94%EA%B0%80-%EB%AA%A9%ED%91%9C)
+2. [SpinAction 기본 구현하기](https://claude.ai/chat/16c99d70-9cd5-436f-bf34-29f704c7db33#2-spinaction-%EA%B8%B0%EB%B3%B8-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+3. [첫 번째 테스트와 문제 발견](https://claude.ai/chat/16c99d70-9cd5-436f-bf34-29f704c7db33#3-%EC%B2%AB-%EB%B2%88%EC%A7%B8-%ED%85%8C%EC%8A%A4%ED%8A%B8%EC%99%80-%EB%AC%B8%EC%A0%9C-%EB%B0%9C%EA%B2%AC)
+4. [회전 문제 해결 - Move 중 회전 유지하기](https://claude.ai/chat/16c99d70-9cd5-436f-bf34-29f704c7db33#4-%ED%9A%8C%EC%A0%84-%EB%AC%B8%EC%A0%9C-%ED%95%B4%EA%B2%B0---move-%EC%A4%91-%ED%9A%8C%EC%A0%84-%EC%9C%A0%EC%A7%80%ED%95%98%EA%B8%B0)
+5. [액션 충돌 문제의 근본 원인](https://claude.ai/chat/16c99d70-9cd5-436f-bf34-29f704c7db33#5-%EC%95%A1%EC%85%98-%EC%B6%A9%EB%8F%8C-%EB%AC%B8%EC%A0%9C%EC%9D%98-%EA%B7%BC%EB%B3%B8-%EC%9B%90%EC%9D%B8)
+6. [isActive 시스템 도입 - MoveAction](https://claude.ai/chat/16c99d70-9cd5-436f-bf34-29f704c7db33#6-isactive-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EB%8F%84%EC%9E%85---moveaction)
+7. [SpinAction 개선 - 360도 제한 구현](https://claude.ai/chat/16c99d70-9cd5-436f-bf34-29f704c7db33#7-spinaction-%EA%B0%9C%EC%84%A0---360%EB%8F%84-%EC%A0%9C%ED%95%9C-%EA%B5%AC%ED%98%84)
+8. [BaseAction 클래스 설계하기](https://claude.ai/chat/16c99d70-9cd5-436f-bf34-29f704c7db33#8-baseaction-%ED%81%B4%EB%9E%98%EC%8A%A4-%EC%84%A4%EA%B3%84%ED%95%98%EA%B8%B0)
+9. [MoveAction 리팩토링](https://claude.ai/chat/16c99d70-9cd5-436f-bf34-29f704c7db33#9-moveaction-%EB%A6%AC%ED%8C%A9%ED%86%A0%EB%A7%81)
+10. [SpinAction 리팩토링](https://claude.ai/chat/16c99d70-9cd5-436f-bf34-29f704c7db33#10-spinaction-%EB%A6%AC%ED%8C%A9%ED%86%A0%EB%A7%81)
+11. [최종 테스트 및 정리](https://claude.ai/chat/16c99d70-9cd5-436f-bf34-29f704c7db33#11-%EC%B5%9C%EC%A2%85-%ED%85%8C%EC%8A%A4%ED%8A%B8-%EB%B0%8F-%EC%A0%95%EB%A6%AC)
+
+---
+
+## 1. 현재 상태 확인 및 새로운 액션 추가 목표
+
+### 현재 게임 상태
+
+- **Move 액션**: 유닛을 선택하고 이동할 수 있음
+- **검증 시스템**: 이동 가능한 위치를 시각적으로 표시
+- **다중 유닛**: 여러 유닛을 선택하고 각각 이동 가능
+
+### 새로운 목표
+
+- **Spin 액션 추가**: 유닛이 제자리에서 360도 회전하는 액션
+- **목적**: 시각적으로 명확하고 재미있는 테스트 액션 구현
+- **코드 구조**: 향후 더 많은 액션을 쉽게 추가할 수 있는 구조 만들기
+
+---
+
+## 2. SpinAction 기본 구현하기
+
+### 1단계: SpinAction 스크립트 생성
+
+**Scripts 폴더**에 새로운 C# 스크립트 생성:
+
+- 이름: `SpinAction.cs`
+
+### 2단계: Unit 프리팹에 컴포넌트 추가
+
+**중요 개념 - 액션 시스템 구조**:
+
+- 모든 액션은 **Unit 오브젝트에 컴포넌트로 부착**됨
+- Unit 프리팹을 선택하고 `SpinAction` 스크립트를 추가
+
+### 3단계: 기본 Spin 함수 작성
+
+```csharp
+using UnityEngine;
+
+public class SpinAction : MonoBehaviour
+{
+    // Spin 액션을 실행하는 public 함수
+    public void Spin()
+    {
+        // 이 함수가 호출되면 회전 시작
+    }
+}
+```
+
+**설명**:
+
+- `public void Spin()`: 외부에서 이 함수를 호출해서 회전을 시작함
+
+### 4단계: 회전 로직 구현
+
+```csharp
+public class SpinAction : MonoBehaviour
+{
+    private bool startSpinning; // 회전 중인지 확인하는 플래그
+
+    void Update()
+    {
+        // 매 프레임마다 회전 중인지 체크
+        if (startSpinning)
+        {
+            // 360도를 프레임 독립적으로 회전
+            float spinAddAmount = 360f * Time.deltaTime;
+
+            // Y축 기준으로 회전 (위에서 내려다본 평면 회전)
+            transform.eulerAngles += new Vector3(0, spinAddAmount, 0);
+        }
+    }
+
+    public void Spin()
+    {
+        startSpinning = true; // 회전 시작 플래그 활성화
+    }
+}
+
+```
+
+**상세 설명**:
+
+**회전 개념**:
+
+- `transform.eulerAngles`: 오브젝트의 회전값 (X, Y, Z 각도)
+- `new Vector3(0, spinAddAmount, 0)`:
+  - X = 0: 좌우로 기울이지 않음
+  - Y = spinAddAmount: 위아래 축 기준 회전 (캐릭터가 빙글빙글)
+  - Z = 0: 앞뒤로 기울이지 않음
+
+**프레임 독립적 회전**:
+
+- `360f * Time.deltaTime`:
+  - `360f`: 초당 360도 회전 (1초에 한 바퀴)
+  - `Time.deltaTime`: 이전 프레임과의 시간 차이
+  - 결과: 컴퓨터 성능에 관계없이 일정한 속도로 회전
+
+**동작 흐름**:
+
+1. `Spin()` 함수 호출 → `startSpinning = true`
+2. 매 프레임 `Update()`에서 회전 확인
+3. `startSpinning`이 true면 계속 회전
+
+---
+
+## 3. 첫 번째 테스트와 문제 발견
+
+### Unit 스크립트에 SpinAction 참조 추가
+
+```csharp
+public class Unit : MonoBehaviour
+{
+    private MoveAction moveAction;
+    private SpinAction spinAction; // 새로운 참조 추가
+
+    private void Awake()
+    {
+        // 컴포넌트 자동 탐색
+        moveAction = GetComponent<MoveAction>();
+        spinAction = GetComponent<SpinAction>(); // SpinAction 찾기
+    }
+
+    // 외부에서 접근할 수 있도록 노출
+    public SpinAction GetSpinAction()
+    {
+        return spinAction;
+    }
+}
+
+```
+
+**GetComponent 개념**:
+
+- 같은 GameObject에 붙어있는 컴포넌트를 자동으로 찾아줌
+- `GetComponent<SpinAction>()`: SpinAction 스크립트를 찾아서 반환
+
+### UnitActionsSystem에서 테스트 입력 추가
+
+```csharp
+public class UnitActionsSystem : MonoBehaviour
+{
+    private void Update()
+    {
+        // 좌클릭: 이동 (기존 코드)
+        if (Input.GetMouseButtonDown(0))
+        {
+            // ... 이동 로직
+        }
+
+        // 우클릭: 회전 (테스트용)
+        if (Input.GetMouseButtonDown(1)) // 마우스 우클릭 (버튼 인덱스 1)
+        {
+            selectedUnit.GetSpinAction().Spin(); // 선택된 유닛 회전
+        }
+    }
+}
+
+```
+
+**마우스 버튼 인덱스**:
+
+- `0`: 좌클릭
+- `1`: 우클릭
+- `2`: 휠클릭
+
+### 첫 테스트 결과
+
+**테스트**: 우클릭하면?
+
+- ✅ **성공**: 캐릭터가 계속 회전함
+
+**문제**:
+
+- ❌ 회전이 **멈추지 않고 무한 회전**
+- 나중에 수정 예정
+
+---
+
+## 4. 회전 문제 해결 - Move 중 회전 유지하기
+
+### 새로운 문제 발견
+
+**테스트 시나리오**:
+
+1. 우클릭으로 회전 시작 → 캐릭터 회전 중
+2. 좌클릭으로 이동 명령 → **회전이 멈춤**
+3. 이동 완료 → 다시 회전 재개
+
+**왜 이런 일이?**
+
+### MoveAction의 기존 회전 로직 분석
+
+```csharp
+// MoveAction.cs의 Update()
+void Update()
+{
+    if (Vector3.Distance(transform.position, targetPosition) > stoppingDistance)
+    {
+        // 이동 중일 때
+        float moveSpeed = 4f;
+        transform.position += moveDirection * Time.deltaTime * moveSpeed;
+
+        // ⚠️ 이동 방향으로 회전 (이동 중에만 실행됨)
+        float rotationSpeed = 10f;
+        transform.forward = Vector3.Lerp(transform.forward, moveDirection,
+                                         Time.deltaTime * rotationSpeed);
+    }
+}
+
+```
+
+**문제점**:
+
+- 회전 코드가 **이동 중일 때만** (if문 안에서) 실행됨
+- SpinAction의 회전과 충돌하면서 의도하지 않은 동작 발생
+
+### 해결 방법: 회전 로직을 항상 실행하도록 변경
+
+```csharp
+void Update()
+{
+    // moveDirection 계산을 if 밖으로 이동
+    Vector3 moveDirection = (targetPosition - transform.position).normalized;
+
+    if (Vector3.Distance(transform.position, targetPosition) > stoppingDistance)
+    {
+        // 이동만 담당
+        float moveSpeed = 4f;
+        transform.position += moveDirection * Time.deltaTime * moveSpeed;
+        unitAnimator.SetBool("IsWalking", true);
+    }
+    else
+    {
+        unitAnimator.SetBool("IsWalking", false);
+    }
+
+    // 회전은 항상 실행 (if 밖에 위치)
+    float rotationSpeed = 10f;
+    transform.forward = Vector3.Lerp(transform.forward, moveDirection,
+                                     Time.deltaTime * rotationSpeed);
+}
+
+```
+
+**변경 사항**:
+
+- `moveDirection` 계산을 if문 밖으로 이동
+- 회전 로직도 if문 밖으로 이동
+- → **이동 여부와 관계없이 항상 목표 방향을 향함**
+
+---
+
+## 5. 액션 충돌 문제의 근본 원인
+
+### 테스트로 새로운 문제 확인
+
+```csharp
+// SpinAction.cs에 디버그 추가
+public void Spin()
+{
+    Debug.Log("Spin"); // 함수 호출 확인용
+    startSpinning = true;
+}
+```
+
+**테스트 결과**:
+
+1. 좌클릭으로 이동 → 정상 작동
+2. 우클릭으로 회전 시도 → **회전하지 않음!**
+3. 콘솔에는 "Spin" 출력 → 함수는 호출됨
+
+**문제 분석**:
+
+- `Spin()` 함수는 **정상 호출**됨
+- 하지만 캐릭터가 **회전하지 않음**
+
+### 근본 원인: 두 액션의 회전 충돌
+
+**충돌 상황**:
+
+```
+MoveAction.Update() 실행:
+  → transform.forward를 moveDirection으로 변경
+
+SpinAction.Update() 실행:
+  → transform.eulerAngles에 회전값 추가
+
+결과: 두 코드가 같은 transform.rotation을 동시에 제어
+      → 서로 덮어쓰면서 의도하지 않은 동작
+
+```
+
+**해결 방향**:
+
+- 턴 기반 게임이므로 **한 번에 하나의 액션만 실행**되어야 함
+- 액션이 활성화/비활성화 상태를 가져야 함
+
+---
+
+## 6. isActive 시스템 도입 - MoveAction
+
+### isActive 플래그 추가
+
+```csharp
+public class MoveAction : MonoBehaviour
+{
+    private bool isActive; // 이 액션이 현재 실행 중인지 확인
+
+    // ... 기타 필드들
+}
+```
+
+### Update에서 isActive 체크
+
+```csharp
+void Update()
+{
+    // ⭐ 핵심: 액션이 활성화되지 않았으면 아무것도 하지 않음
+    if (!isActive)
+    {
+        return; // 함수를 즉시 종료
+    }
+
+    // 이 아래 코드는 isActive가 true일 때만 실행됨
+    Vector3 moveDirection = (targetPosition - transform.position).normalized;
+
+    if (Vector3.Distance(transform.position, targetPosition) > stoppingDistance)
+    {
+        // 이동 로직...
+    }
+    else
+    {
+        // 목표 지점 도착
+        unitAnimator.SetBool("IsWalking", false);
+        isActive = false; // ⭐ 액션 종료
+    }
+
+    // 회전 로직...
+}
+
+```
+
+**early return 패턴**:
+
+```csharp
+// ❌ 이렇게 하면 들여쓰기가 많아짐
+if (isActive)
+{
+    // 모든 로직
+    // 많은 코드
+    // 들여쓰기 깊어짐
+}
+
+// ✅ 이렇게 하면 깔끔함
+if (!isActive) return; // 비활성 상태면 바로 종료
+
+// 들여쓰기 없이 깔끔한 코드
+
+```
+
+### Move 함수에서 isActive 설정
+
+```csharp
+public void Move(GridPosition gridPosition)
+{
+    this.targetPosition = LevelGrid.Instance.GetWorldPosition(gridPosition);
+    isActive = true; // ⭐ 이동 시작 시 액션 활성화
+}
+
+```
+
+**동작 흐름**:
+
+1. `Move()` 호출 → `isActive = true`
+2. 매 프레임 `Update()`에서 이동 처리
+3. 목표 지점 도착 → `isActive = false`
+4. 이후 프레임부터는 `return`으로 즉시 종료
+
+---
+
+## 7. SpinAction 개선 - 360도 제한 구현
+
+### 문제: 무한 회전
+
+현재 SpinAction은 한 번 시작하면 **영원히 회전**함
+
+### 해결: 360도 회전 후 자동 종료
+
+```csharp
+public class SpinAction : MonoBehaviour
+{
+    private bool isActive; // startSpinning 이름 변경
+    private float totalSpinAmount; // 누적 회전량 추적
+
+    void Update()
+    {
+        // 비활성 상태면 실행하지 않음 (MoveAction과 동일 패턴)
+        if (!isActive)
+        {
+            return;
+        }
+
+        // 프레임당 회전량 계산
+        float spinAddAmount = 360f * Time.deltaTime;
+
+        // 실제 회전 적용
+        transform.eulerAngles += new Vector3(0, spinAddAmount, 0);
+
+        // 누적 회전량 기록
+        totalSpinAmount += spinAddAmount;
+
+        // 360도 이상 회전했는지 체크
+        if (totalSpinAmount >= 360f)
+        {
+            isActive = false; // 액션 종료
+        }
+    }
+
+    public void Spin()
+    {
+        isActive = true; // 액션 시작
+        totalSpinAmount = 0f; // 누적 회전량 초기화 (중요!)
+    }
+}
+
+```
+
+**상세 설명**:
+
+**totalSpinAmount의 역할**:
+
+```
+프레임 1: spinAddAmount = 6도 → totalSpinAmount = 6도
+프레임 2: spinAddAmount = 6도 → totalSpinAmount = 12도
+프레임 3: spinAddAmount = 6도 → totalSpinAmount = 18도
+...
+프레임 60: totalSpinAmount = 360도 → isActive = false (종료)
+
+```
+
+**왜 0으로 초기화?**:
+
+- `Spin()` 함수가 여러 번 호출될 수 있음
+- 매번 새로운 360도 회전을 시작해야 하므로 누적값 리셋 필요
+
+### 테스트 결과
+
+1. 우클릭 → 360도 회전 후 자동 정지 ✅
+2. 좌클릭으로 이동 → 이동 중에는 회전 안 함 ✅
+3. 이동 완료 후 우클릭 → 다시 회전 ✅
+4. 다른 유닛 선택해서 회전 → 각각 독립적으로 동작 ✅
+
+---
+
+## 8. BaseAction 클래스 설계하기
+
+### 코드 중복 발견
+
+**MoveAction과 SpinAction의 공통점**:
+
+```csharp
+// MoveAction
+private Unit unit;
+private bool isActive;
+
+protected virtual void Awake()
+{
+    unit = GetComponent<Unit>();
+}
+
+// SpinAction
+// unit은 없지만 필요함
+private bool isActive;
+
+```
+
+**문제점**:
+
+- 모든 액션마다 같은 코드 반복
+- 나중에 액션이 10개, 20개가 되면 관리 어려움
+
+### 객체 지향 설계: 상속 활용
+
+**개념**:
+
+- 공통된 기능을 **부모 클래스(Base Class)**에 작성
+- 각 액션은 **자식 클래스(Derived Class)**로 상속받음
+
+### Actions 폴더 구조화
+
+```
+Scripts/
+  └── Actions/
+      ├── BaseAction.cs      (부모 클래스)
+      ├── MoveAction.cs      (자식 클래스)
+      └── SpinAction.cs      (자식 클래스)
+
+```
+
+### BaseAction 클래스 작성
+
+```csharp
+using UnityEngine;
+
+// abstract: 이 클래스는 직접 사용할 수 없고, 반드시 상속받아야 함
+public abstract class BaseAction : MonoBehaviour
+{
+    // protected: 자식 클래스에서 접근 가능 (private보다 한 단계 개방)
+    protected Unit unit;
+    protected bool isActive;
+
+    // virtual: 자식 클래스에서 오버라이드(재정의) 가능
+    protected virtual void Awake()
+    {
+        // 모든 액션은 Unit 컴포넌트 참조 필요
+        unit = GetComponent<Unit>();
+    }
+}
+
+```
+
+**주요 키워드 설명**:
+
+### `abstract` (추상 클래스)
+
+```csharp
+public abstract class BaseAction { }
+
+// ❌ 이렇게 사용할 수 없음
+BaseAction action = new BaseAction(); // 컴파일 에러!
+
+// ✅ 반드시 상속받아서 사용
+public class MoveAction : BaseAction { } // OK
+
+```
+
+- **목적**: 공통 기능만 정의하고, 직접 사용은 못하게 막음
+- **비유**: "동물" 클래스는 추상적, "고양이", "개"는 구체적
+
+### `protected` (보호된 접근)
+
+```csharp
+public class BaseAction
+{
+    private int privateField;     // 오직 BaseAction에서만 접근
+    protected int protectedField; // BaseAction + 자식 클래스 접근 가능
+    public int publicField;       // 모든 곳에서 접근 가능
+}
+
+public class MoveAction : BaseAction
+{
+    void Test()
+    {
+        // privateField = 10;    // ❌ 에러! private은 접근 불가
+        protectedField = 20;     // ✅ OK! protected는 접근 가능
+        publicField = 30;        // ✅ OK! public은 당연히 가능
+    }
+}
+
+```
+
+**접근 제한 레벨**:
+
+```
+private     → 가장 제한적 (자기 자신만)
+  ↓
+protected   → 중간 (자신 + 자식)
+  ↓
+public      → 가장 개방적 (모든 곳)
+
+```
+
+### `virtual` (가상 함수)
+
+```csharp
+// 부모 클래스
+public class BaseAction
+{
+    protected virtual void Awake()  // virtual: 재정의 가능
+    {
+        Debug.Log("BaseAction Awake");
+    }
+}
+
+// 자식 클래스
+public class MoveAction : BaseAction
+{
+    protected override void Awake()  // override: 부모 함수 재정의
+    {
+        base.Awake();  // 부모의 Awake 먼저 실행
+        Debug.Log("MoveAction Awake");
+    }
+}
+
+```
+
+**실행 순서**:
+
+```
+1. base.Awake() 호출
+   → "BaseAction Awake" 출력
+2. 자식의 추가 코드 실행
+   → "MoveAction Awake" 출력
+
+```
+
+---
+
+## 9. MoveAction 리팩토링
+
+### 1단계: 상속 관계 변경
+
+```csharp
+// 변경 전
+public class MoveAction : MonoBehaviour
+{
+    private Unit unit;
+    private bool isActive;
+    // ...
+}
+
+// 변경 후
+public class MoveAction : BaseAction  // MonoBehaviour → BaseAction
+{
+    // unit과 isActive 제거 (BaseAction에서 상속받음)
+    // ...
+}
+
+```
+
+**상속 체인**:
+
+```
+MonoBehaviour (Unity 기본 클래스)
+    ↑
+BaseAction (우리가 만든 중간 클래스)
+    ↑
+MoveAction (최종 구현 클래스)
+
+```
+
+### 2단계: Awake 오버라이딩
+
+```csharp
+public class MoveAction : BaseAction
+{
+    private Vector3 targetPosition;
+
+    protected override void Awake()  // Awake 재정의
+    {
+        base.Awake();  // ⭐ 부모의 Awake 먼저 실행 (unit 초기화)
+
+        // MoveAction만의 추가 초기화
+        targetPosition = transform.position;
+    }
+}
+
+```
+
+**왜 base.Awake()를 호출?**:
+
+```csharp
+// BaseAction의 Awake
+protected virtual void Awake()
+{
+    unit = GetComponent<Unit>();  // ← 이 코드가 실행되어야 함!
+}
+
+// MoveAction의 Awake
+protected override void Awake()
+{
+    base.Awake();  // ← BaseAction의 unit 초기화를 실행
+    // 이제 unit을 사용할 수 있음
+}
+
+```
+
+**만약 base.Awake()를 안 호출하면?**:
+
+```csharp
+protected override void Awake()
+{
+    // base.Awake(); // ← 호출 안 함
+    targetPosition = transform.position;
+}
+
+// 나중에 Update에서
+void Update()
+{
+    GridPosition unitGridPosition = unit.GetGridPosition();
+    // ❌ NullReferenceException! unit이 null임
+}
+
+```
+
+### 3단계: 최종 MoveAction 코드
+
+```csharp
+public class MoveAction : BaseAction  // 상속 변경
+{
+    private Vector3 targetPosition;
+    [SerializeField] private Animator unitAnimator;
+    [SerializeField] private int maxMoveDistance = 4;
+
+    protected override void Awake()  // Awake 오버라이드
+    {
+        base.Awake();  // 부모 Awake 실행
+        targetPosition = transform.position;
+    }
+
+    private void Update()
+    {
+        // unit과 isActive는 BaseAction에서 상속받아 사용
+        if (!isActive) return;
+
+        // ... 나머지 이동 로직 동일
+    }
+
+    public void Move(GridPosition gridPosition)
+    {
+        this.targetPosition = LevelGrid.Instance.GetWorldPosition(gridPosition);
+        isActive = true;  // BaseAction의 protected 필드 사용
+    }
+
+    // ... GetValidActionGridPositionList 등 나머지 함수들
+}
+
+```
+
+---
+
+## 10. SpinAction 리팩토링
+
+### 간단한 리팩토링
+
+```csharp
+// 변경 전
+public class SpinAction : MonoBehaviour
+{
+    private bool isActive;
+    // ...
+}
+
+// 변경 후
+public class SpinAction : BaseAction  // 상속 변경
+{
+    // isActive 제거 (BaseAction에서 상속)
+    private float totalSpinAmount;
+
+    // Awake 함수 불필요 (BaseAction의 Awake 자동 실행)
+
+    void Update()
+    {
+        if (!isActive) return;  // BaseAction의 isActive 사용
+
+        float spinAddAmount = 360f * Time.deltaTime;
+        transform.eulerAngles += new Vector3(0, spinAddAmount, 0);
+        totalSpinAmount += spinAddAmount;
+
+        if (totalSpinAmount >= 360f)
+        {
+            isActive = false;  // BaseAction의 isActive 사용
+        }
+    }
+
+    public void Spin()
+    {
+        isActive = true;  // BaseAction의 isActive 사용
+        totalSpinAmount = 0f;
+    }
+}
+
+```
+
+**SpinAction이 더 간단한 이유**:
+
+- Unit 참조가 필요 없음 (회전만 하면 됨)
+- 추가 초기화가 필요 없음
+- → Awake 오버라이드 불필요
+
+---
+
+## 11. 최종 테스트 및 정리
+
+### 테스트 시나리오
+
+```
+1. 유닛 선택
+2. 좌클릭으로 이동 → ✅ 정상 이동
+3. 우클릭으로 회전 → ✅ 360도 회전 후 정지
+4. 다시 좌클릭 이동 → ✅ 이동 중 회전하지 않음
+5. 다른 유닛 선택
+6. 회전 후 이동 → ✅ 각 유닛 독립적으로 동작
+
+```
+
+### 완성된 클래스 구조
+
+```
+BaseAction (abstract)
+├── protected Unit unit
+├── protected bool isActive
+└── protected virtual void Awake()
+
+MoveAction : BaseAction
+├── Update() - 이동 로직
+├── Move() - 이동 시작
+└── GetValidActionGridPositionList()
+
+SpinAction : BaseAction
+├── Update() - 회전 로직
+└── Spin() - 회전 시작
+
+```
+
+### 새로운 액션 추가하기
+
+이제 새 액션을 추가하려면:
+
+```csharp
+public class JumpAction : BaseAction  // BaseAction만 상속
+{
+    // unit과 isActive는 자동으로 사용 가능!
+
+    void Update()
+    {
+        if (!isActive) return;
+
+        // 점프 로직...
+
+        // 점프 완료
+        isActive = false;
+    }
+
+    public void Jump()
+    {
+        isActive = true;
+    }
+}
+
+```
+
+**장점**:
+
+- `unit`과 `isActive` 자동으로 사용 가능
+- 공통 패턴 유지로 코드 일관성 확보
+- 새 액션 추가가 매우 간단함
+
+### 남은 문제
+
+**동시 액션 실행 문제**:
+
+```
+Move 시작 → 이동 중 → Spin 시도
+  → 두 액션이 동시에 isActive = true
+  → 충돌 발생
+
+```
+
+**해결 예정**:
+
+- 다음 강의에서 **액션 시스템 개선**
+- 한 번에 하나의 액션만 실행되도록 제한
+
+---
+
+## 🎯 핵심 개념 총정리
+
+### 1. isActive 패턴
+
+```csharp
+// 액션 시작
+public void StartAction()
+{
+    isActive = true;
+}
+
+// 매 프레임 체크
+void Update()
+{
+    if (!isActive) return;  // 비활성 시 즉시 종료
+    // 액션 로직...
+}
+
+// 액션 완료
+void CompleteAction()
+{
+    isActive = false;
+}
+
+```
+
+### 2. 객체 지향 상속 구조
+
+```
+부모 클래스 (BaseAction)
+  - 공통 필드와 메서드 정의
+  - abstract: 직접 사용 불가
+
+자식 클래스 (MoveAction, SpinAction)
+  - BaseAction 상속받음
+  - 공통 기능 자동 획득
+  - 각자의 고유 로직 추가
+
+```
+
+### 3. 접근 제한자 활용
+
+```
+private    : 자기 자신만
+protected  : 자신 + 자식 클래스
+public     : 모든 곳
+
+```
+
+### 4. virtual/override 패턴
+
+```csharp
+// 부모: 재정의 가능하게 선언
+protected virtual void Awake() { }
+
+// 자식: 재정의하면서 부모 기능도 유지
+protected override void Awake()
+{
+    base.Awake();  // 부모 실행
+    // 추가 로직
+}
+
+```
+
+# { 🎮 게임에서 한 번에 하나의 액션만 실행하기 (Busy State System) }
+
+이번 강의는 게임에서 여러 액션이 동시에 실행되지 않도록 Busy 상태를 관리하고, C# 델리게이트(Delegate)를 사용해서 액션 완료를 감지하는 시스템을 구현하는 내용입니다.
+
+---
+
+## 📋 목차
+
+1. [문제 상황 파악하기](https://claude.ai/chat/6c840fd7-e2c8-4aaf-86bf-880c523d437a#1-%EB%AC%B8%EC%A0%9C-%EC%83%81%ED%99%A9-%ED%8C%8C%EC%95%85%ED%95%98%EA%B8%B0)
+2. [Busy 상태 시스템 만들기](https://claude.ai/chat/6c840fd7-e2c8-4aaf-86bf-880c523d437a#2-busy-%EC%83%81%ED%83%9C-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+3. [델리게이트(Delegate) 개념 이해하기](https://claude.ai/chat/6c840fd7-e2c8-4aaf-86bf-880c523d437a#3-%EB%8D%B8%EB%A6%AC%EA%B2%8C%EC%9D%B4%ED%8A%B8delegate-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+4. [델리게이트를 사용해서 액션 완료 감지하기](https://claude.ai/chat/6c840fd7-e2c8-4aaf-86bf-880c523d437a#4-%EB%8D%B8%EB%A6%AC%EA%B2%8C%EC%9D%B4%ED%8A%B8%EB%A5%BC-%EC%82%AC%EC%9A%A9%ED%95%B4%EC%84%9C-%EC%95%A1%EC%85%98-%EC%99%84%EB%A3%8C-%EA%B0%90%EC%A7%80%ED%95%98%EA%B8%B0)
+5. [MoveAction에도 동일한 시스템 적용하기](https://claude.ai/chat/6c840fd7-e2c8-4aaf-86bf-880c523d437a#5-moveaction%EC%97%90%EB%8F%84-%EB%8F%99%EC%9D%BC%ED%95%9C-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EC%A0%81%EC%9A%A9%ED%95%98%EA%B8%B0)
+6. [BaseAction으로 공통 코드 통합하기](https://claude.ai/chat/6c840fd7-e2c8-4aaf-86bf-880c523d437a#6-baseaction%EC%9C%BC%EB%A1%9C-%EA%B3%B5%ED%86%B5-%EC%BD%94%EB%93%9C-%ED%86%B5%ED%95%A9%ED%95%98%EA%B8%B0)
+7. [빌트인 델리게이트 타입 사용하기 (Action, Func)](https://claude.ai/chat/6c840fd7-e2c8-4aaf-86bf-880c523d437a#7-%EB%B9%8C%ED%8A%B8%EC%9D%B8-%EB%8D%B8%EB%A6%AC%EA%B2%8C%EC%9D%B4%ED%8A%B8-%ED%83%80%EC%9E%85-%EC%82%AC%EC%9A%A9%ED%95%98%EA%B8%B0-action-func)
+
+---
+
+## 1. 문제 상황 파악하기
+
+### 현재 문제점
+
+- 게임에서 **이동(Move)**과 **회전(Spin)** 액션을 동시에 실행할 수 있음
+- 두 액션을 동시에 실행하면 게임이 깨짐
+- 예: 회전하면서 동시에 이동하려고 하면 이상하게 동작함
+
+### 해결 방법
+
+- **한 번에 하나의 액션만** 실행되도록 제한
+- 현재 액션이 실행 중일 때는 다른 액션을 받지 않음
+- 액션이 **완료**되면 다시 새로운 액션을 받을 수 있도록 함
+
+---
+
+## 2. Busy 상태 시스템 만들기
+
+### UnitActionSystem에 Busy 상태 추가
+
+```csharp
+public class UnitActionsSystem : MonoBehaviour
+{
+    // 현재 액션이 실행 중인지 추적하는 변수
+    private bool isBusy = false;
+
+    private void Update()
+    {
+        // ⭐ 현재 바쁜 상태라면 즉시 리턴 (새로운 액션 받지 않음)
+        if (isBusy)
+        {
+            return;
+        }
+
+        // 마우스 왼쪽 클릭 (이동)
+        if (Input.GetMouseButtonDown(0))
+        {
+            if (TryHnadleUnitSelection())
+            {
+                return;
+            }
+            GridPosition mouseGridPosition = LevelGrid.Instance.GetGridPosition(MouseWorld.GetPosition());
+
+            if (selectedUnit.GetMoveAction().IsValidActionGridPosition(mouseGridPosition))
+            {
+                SetBusy(); // ⭐ 이동 시작 전에 Busy 상태로 변경
+                selectedUnit.GetMoveAction().Move(mouseGridPosition);
+            }
+        }
+
+        // 마우스 오른쪽 클릭 (회전)
+        if(Input.GetMouseButtonDown(1))
+        {
+            if(selectedUnit != null)
+            {
+                SetBusy(); // ⭐ 회전 시작 전에 Busy 상태로 변경
+                selectedUnit.GetSpinAction().Spin();
+            }
+        }
+    }
+
+    // Busy 상태를 true로 설정
+    private void SetBusy()
+    {
+        isBusy = true;
+    }
+
+    // Busy 상태를 false로 해제
+    private void ClearBusy()
+    {
+        isBusy = false;
+    }
+}
+
+```
+
+### 동작 방식
+
+1. **액션 시작 시**: `SetBusy()` 호출 → `isBusy = true`
+2. **Update()에서 체크**: `isBusy`가 `true`면 새로운 입력 무시
+3. **액션 완료 시**: `ClearBusy()` 호출 → `isBusy = false` (아직 구현 안 됨)
+
+### 현재 문제점
+
+- `SetBusy()`는 호출되지만 **`ClearBusy()`를 호출하는 코드가 없음**
+- 한 번 액션을 실행하면 영원히 `isBusy = true` 상태로 남아있음
+- 더 이상 어떤 액션도 실행할 수 없게 됨
+
+### 해결책
+
+- 액션이 **완료되었을 때** 자동으로 `ClearBusy()`를 호출해야 함
+- 이를 위해 **델리게이트(Delegate)** 사용
+
+---
+
+## 3. 델리게이트(Delegate) 개념 이해하기
+
+### 델리게이트란?
+
+- **함수를 변수처럼 저장하고 전달할 수 있는 타입**
+- C#에서 함수를 다른 함수의 파라미터로 넘기거나, 변수에 저장할 때 사용
+- 콜백(Callback) 패턴을 구현할 때 핵심적으로 사용됨
+
+### 델리게이트 사용 시나리오
+
+1. **UnitActionSystem**이 SpinAction에게 회전을 요청
+2. 회전을 시작할 때 **"회전이 끝나면 이 함수를 호출해줘"**라고 함수 참조를 전달
+3. SpinAction은 회전이 끝나면 받은 함수를 호출
+4. 그 함수가 바로 `ClearBusy()` → Busy 상태 해제
+
+### 델리게이트 정의 방법
+
+```csharp
+// 델리게이트 타입 정의
+public delegate void SpinCompleteDelegate();
+
+// 이 델리게이트는:
+// - 반환값이 없음 (void)
+// - 파라미터도 없음 ()
+// - 이런 형태의 함수만 저장할 수 있음
+
+```
+
+### 델리게이트 타입 구성 요소
+
+1. **`public`**: 다른 클래스에서도 사용할 수 있도록 공개
+2. **`delegate`**: 델리게이트 타입임을 선언하는 키워드
+3. **`void`**: 이 델리게이트가 저장할 수 있는 함수의 반환 타입
+4. **`SpinCompleteDelegate`**: 델리게이트 타입의 이름
+5. **`()`**: 파라미터 목록 (비어있으면 파라미터 없음)
+
+### 델리게이트 사용 예시
+
+```csharp
+public class SpinAction : MonoBehaviour
+{
+    // 델리게이트 타입 정의
+    public delegate void SpinCompleteDelegate();
+
+    public void Spin(SpinCompleteDelegate onSpinComplete)
+    {
+        // onSpinComplete는 함수 참조를 저장하는 변수
+        // 회전 완료 시 이 함수를 호출할 예정
+    }
+}
+
+public class UnitActionsSystem : MonoBehaviour
+{
+    private void ClearBusy()
+    {
+        isBusy = false;
+    }
+
+    private void Update()
+    {
+        if(Input.GetMouseButtonDown(1))
+        {
+            if(selectedUnit != null)
+            {
+                SetBusy();
+                // ⭐ ClearBusy 함수의 참조를 전달 (괄호 없음!)
+                selectedUnit.GetSpinAction().Spin(ClearBusy);
+            }
+        }
+    }
+}
+
+```
+
+### 중요: 함수 참조 vs 함수 호출
+
+```csharp
+// ❌ 잘못된 방법: 함수를 즉시 호출
+Spin(ClearBusy());  // ClearBusy()가 바로 실행되고 그 결과(void)가 전달됨
+
+// ✅ 올바른 방법: 함수의 참조를 전달
+Spin(ClearBusy);    // ClearBusy라는 함수 자체를 전달, 나중에 호출됨
+
+```
+
+### 델리게이트와 접근 제한자
+
+```csharp
+public class UnitActionsSystem : MonoBehaviour
+{
+    // private 함수
+    private void ClearBusy()
+    {
+        isBusy = false;
+    }
+}
+
+public class SpinAction : MonoBehaviour
+{
+    private SpinCompleteDelegate onSpinComplete;
+
+    private void CompleteAction()
+    {
+        // ⭐ private 함수지만 델리게이트를 통해 호출 가능!
+        onSpinComplete();  // ClearBusy()가 실행됨
+    }
+}
+
+```
+
+**특이점**:
+
+- 일반적으로 `private` 함수는 다른 클래스에서 호출 불가
+- 하지만 델리게이트로 전달하면, 그 델리게이트를 통해 `private` 함수도 호출 가능
+- 함수 참조를 전달한 클래스가 허용했기 때문에 가능
+
+---
+
+## 4. 델리게이트를 사용해서 액션 완료 감지하기
+
+### SpinAction에 델리게이트 구현
+
+```csharp
+public class SpinAction : BaseAction
+{
+    // 1️⃣ 델리게이트 타입 정의
+    public delegate void SpinCompleteDelegate();
+
+    private float totalSpinAmount;
+    private SpinCompleteDelegate onSpinComplete; // 2️⃣ 델리게이트 변수
+
+    void Update()
+    {
+        if (!isActive)
+        {
+            return;
+        }
+
+        // 회전 처리
+        float spinAddAmount = 360f * Time.deltaTime;
+        transform.eulerAngles += new Vector3(0, spinAddAmount, 0);
+
+        totalSpinAmount += spinAddAmount;
+
+        if (totalSpinAmount >= 360f)
+        {
+            isActive = false;
+
+            // 4️⃣ 회전이 완료되면 델리게이트 호출
+            onSpinComplete();  // ⭐ ClearBusy()가 실행됨
+        }
+    }
+
+    // 3️⃣ 델리게이트를 파라미터로 받음
+    public void Spin(SpinCompleteDelegate onSpinComplete)
+    {
+        // 전달받은 함수 참조를 저장
+        this.onSpinComplete = onSpinComplete;
+        isActive = true;
+        totalSpinAmount = 0f;
+    }
+}
+
+```
+
+### 실행 흐름
+
+1. **UnitActionSystem**: `Spin(ClearBusy)` 호출
+2. **SpinAction**: `ClearBusy` 함수 참조를 `onSpinComplete`에 저장
+3. **SpinAction**: 360도 회전 완료
+4. **SpinAction**: `onSpinComplete()` 호출
+5. **UnitActionSystem**: `ClearBusy()` 실행 → `isBusy = false`
+
+### UnitActionSystem에서 사용
+
+```csharp
+private void Update()
+{
+    if (isBusy)
+    {
+        return;
+    }
+
+    if(Input.GetMouseButtonDown(1))
+    {
+        if(selectedUnit != null)
+        {
+            SetBusy();
+            // ⭐ ClearBusy 함수 참조를 전달
+            selectedUnit.GetSpinAction().Spin(ClearBusy);
+        }
+    }
+}
+
+```
+
+---
+
+## 5. MoveAction에도 동일한 시스템 적용하기
+
+### MoveAction에 델리게이트 추가
+
+```csharp
+public class MoveAction : BaseAction
+{
+    // 델리게이트 타입 정의
+    public delegate void MoveCompleteDelegate();
+
+    private Vector3 targetPosition;
+    private MoveCompleteDelegate onMoveComplete; // 델리게이트 변수
+
+    private void Update()
+    {
+        if(!isActive)
+        {
+            return;
+        }
+
+        float stoppingDistance = 0.5f;
+        Vector3 moveDirection = (targetPosition - transform.position).normalized;
+
+        if (Vector3.Distance(transform.position, targetPosition) > stoppingDistance)
+        {
+            // 이동 중
+            float moveSpeed = 4f;
+            transform.position += moveDirection * Time.deltaTime * moveSpeed;
+            unitAnimator.SetBool("IsWalking", true);
+        }
+        else
+        {
+            // 이동 완료
+            unitAnimator.SetBool("IsWalking", false);
+            isActive = false;
+
+            // ⭐ 이동이 완료되면 델리게이트 호출
+            onMoveComplete();  // ClearBusy() 실행
+        }
+
+        float rotationSpeed = 10f;
+        transform.forward = Vector3.Lerp(transform.forward, moveDirection, Time.deltaTime * rotationSpeed);
+    }
+
+    // 델리게이트를 파라미터로 받음
+    public void Move(GridPosition gridPosition, MoveCompleteDelegate onMoveComplete)
+    {
+        this.onMoveComplete = onMoveComplete;  // 함수 참조 저장
+        this.targetPosition = LevelGrid.Instance.GetWorldPosition(gridPosition);
+        isActive = true;
+    }
+}
+
+```
+
+### UnitActionSystem에서 Move 호출
+
+```csharp
+private void Update()
+{
+    if (isBusy)
+    {
+        return;
+    }
+
+    if (Input.GetMouseButtonDown(0))
+    {
+        if (TryHnadleUnitSelection())
+        {
+            return;
+        }
+
+        GridPosition mouseGridPosition = LevelGrid.Instance.GetGridPosition(MouseWorld.GetPosition());
+
+        if (selectedUnit.GetMoveAction().IsValidActionGridPosition(mouseGridPosition))
+        {
+            SetBusy();
+            // ⭐ ClearBusy 함수 참조를 전달
+            selectedUnit.GetMoveAction().Move(mouseGridPosition, ClearBusy);
+        }
+    }
+
+    if(Input.GetMouseButtonDown(1))
+    {
+        if(selectedUnit != null)
+        {
+            SetBusy();
+            selectedUnit.GetSpinAction().Spin(ClearBusy);
+        }
+    }
+}
+
+```
+
+---
+
+## 6. BaseAction으로 공통 코드 통합하기
+
+### 문제점
+
+- SpinAction과 MoveAction 모두 비슷한 델리게이트 코드 사용
+- 코드 중복 발생
+
+### 해결책
+
+- 공통 부모 클래스인 `BaseAction`에 델리게이트를 정의
+
+### BaseAction에 델리게이트 추가
+
+```csharp
+using System;  // ⭐ Action 타입 사용을 위해 필요
+
+public abstract class BaseAction : MonoBehaviour
+{
+    protected Unit unit;
+    protected bool isActive = false;
+
+    // ⭐ 모든 액션이 공통으로 사용할 델리게이트
+    protected Action onActionComplete;  // System.Action 타입
+
+    protected virtual void Awake()
+    {
+        unit = GetComponent<Unit>();
+    }
+}
+
+```
+
+### SpinAction에서 사용
+
+```csharp
+public class SpinAction : BaseAction
+{
+    // ❌ 더 이상 자체 델리게이트 정의 불필요
+    // public delegate void SpinCompleteDelegate();
+
+    private float totalSpinAmount;
+
+    void Update()
+    {
+        if (!isActive)
+        {
+            return;
+        }
+
+        float spinAddAmount = 360f * Time.deltaTime;
+        transform.eulerAngles += new Vector3(0, spinAddAmount, 0);
+
+        totalSpinAmount += spinAddAmount;
+
+        if (totalSpinAmount >= 360f)
+        {
+            isActive = false;
+
+            // ⭐ BaseAction의 onActionComplete 사용
+            onActionComplete();
+        }
+    }
+
+    // ⭐ System.Action 타입 사용
+    public void Spin(Action onActionComplete)
+    {
+        this.onActionComplete = onActionComplete;
+        isActive = true;
+        totalSpinAmount = 0f;
+    }
+}
+
+```
+
+### MoveAction에서 사용
+
+```csharp
+public class MoveAction : BaseAction
+{
+    // ❌ 더 이상 자체 델리게이트 정의 불필요
+
+    private Vector3 targetPosition;
+    [SerializeField] private Animator unitAnimator;
+
+    private void Update()
+    {
+        if(!isActive)
+        {
+            return;
+        }
+
+        float stoppingDistance = 0.5f;
+        Vector3 moveDirection = (targetPosition - transform.position).normalized;
+
+        if (Vector3.Distance(transform.position, targetPosition) > stoppingDistance)
+        {
+            float moveSpeed = 4f;
+            transform.position += moveDirection * Time.deltaTime * moveSpeed;
+            unitAnimator.SetBool("IsWalking", true);
+        }
+        else
+        {
+            unitAnimator.SetBool("IsWalking", false);
+            isActive = false;
+
+            // ⭐ BaseAction의 onActionComplete 사용
+            onActionComplete();
+        }
+
+        float rotationSpeed = 10f;
+        transform.forward = Vector3.Lerp(transform.forward, moveDirection, Time.deltaTime * rotationSpeed);
+    }
+
+    // ⭐ System.Action 타입 사용
+    public void Move(GridPosition gridPosition, Action onActionComplete)
+    {
+        this.onActionComplete = onActionComplete;
+        this.targetPosition = LevelGrid.Instance.GetWorldPosition(gridPosition);
+        isActive = true;
+    }
+}
+
+```
+
+---
+
+## 7. 빌트인 델리게이트 타입 사용하기 (Action, Func)
+
+### C#에서 제공하는 기본 델리게이트
+
+직접 델리게이트 타입을 정의하지 않고, C#이 기본 제공하는 델리게이트를 사용할 수 있습니다.
+
+### 1. Action 델리게이트
+
+```csharp
+using System;  // ⭐ 필수!
+
+// ✅ 기본 Action (파라미터 없음, 반환값 없음)
+Action myAction;
+// 위 코드는 아래와 동일:
+// public delegate void MyDelegate();
+
+// ✅ Action<int> (int 파라미터 1개, 반환값 없음)
+Action<int> actionWithInt;
+// 위 코드는 아래와 동일:
+// public delegate void MyDelegate(int value);
+
+// ✅ Action<int, bool> (int, bool 파라미터 2개, 반환값 없음)
+Action<int, bool> actionWithTwoParams;
+// 위 코드는 아래와 동일:
+// public delegate void MyDelegate(int value, bool flag);
+
+```
+
+**Action의 특징**:
+
+- **반환값이 항상 void**
+- 파라미터는 0개부터 여러 개까지 가능
+- 제네릭을 사용해서 파라미터 타입 지정
+
+### 2. Func 델리게이트
+
+```csharp
+using System;
+
+// ✅ Func<int> (파라미터 없음, int 반환)
+Func<int> funcReturnsInt;
+// 위 코드는 아래와 동일:
+// public delegate int MyDelegate();
+
+// ✅ Func<string, bool> (string 파라미터, bool 반환)
+Func<string, bool> funcStringToBool;
+// 위 코드는 아래와 동일:
+// public delegate bool MyDelegate(string input);
+
+// ✅ Func<int, float, string> (int, float 파라미터, string 반환)
+Func<int, float, string> funcWithTwoParams;
+// 위 코드는 아래와 동일:
+// public delegate string MyDelegate(int a, float b);
+
+```
+
+**Func의 특징**:
+
+- **반환값이 있음** (마지막 제네릭 타입이 반환 타입)
+- 파라미터는 0개부터 여러 개까지 가능
+- `Func<int>`는 "int를 반환하는 함수"
+- `Func<string, bool>`은 "string을 받아서 bool을 반환하는 함수"
+
+### EventHandler도 델리게이트
+
+```csharp
+// EventHandler의 실제 정의
+public delegate void EventHandler(object sender, EventArgs e);
+
+// 사용 예시
+public event EventHandler OnSelectedUnitChanged;
+
+// 이것도 결국 델리게이트!
+// - 반환값: void
+// - 파라미터: object, EventArgs
+
+```
+
+### 우리 프로젝트에서의 사용
+
+```csharp
+// ❌ 직접 정의한 델리게이트
+public delegate void SpinCompleteDelegate();
+private SpinCompleteDelegate onSpinComplete;
+
+// ✅ Action 사용 (더 간단!)
+using System;
+protected Action onActionComplete;
+
+// 둘 다 동일한 기능:
+// - 반환값 없음 (void)
+// - 파라미터 없음
+
+```
+
+### 언제 어떤 델리게이트를 사용할까?
+
+1. **반환값 없음 + 파라미터 없음** → `Action`
+2. **반환값 없음 + 파라미터 있음** → `Action<T1, T2, ...>`
+3. **반환값 있음** → `Func<T1, T2, ..., TResult>`
+4. **특별한 경우 (이벤트 등)** → 직접 정의하거나 `EventHandler` 사용
+
+---
+
+## 🎯 전체 시스템 동작 흐름 정리
+
+### 1. 회전 액션 실행
+
+```
+[사용자] 마우스 오른쪽 클릭
+    ↓
+[UnitActionSystem] isBusy 체크 → false (가능)
+    ↓
+[UnitActionSystem] SetBusy() 호출 → isBusy = true
+    ↓
+[UnitActionSystem] Spin(ClearBusy) 호출
+    ↓
+[SpinAction] ClearBusy 함수 참조를 onActionComplete에 저장
+    ↓
+[SpinAction] isActive = true로 설정, 회전 시작
+    ↓
+[SpinAction] Update()에서 매 프레임 회전
+    ↓
+[SpinAction] 360도 회전 완료
+    ↓
+[SpinAction] onActionComplete() 호출
+    ↓
+[UnitActionSystem] ClearBusy() 실행 → isBusy = false
+    ↓
+[시스템] 다시 새로운 액션 받을 수 있음
+
+```
+
+### 2. 회전 중 이동 시도
+
+```
+[사용자] 회전 중에 마우스 왼쪽 클릭 (이동 시도)
+    ↓
+[UnitActionSystem] isBusy 체크 → true (불가능)
+    ↓
+[UnitActionSystem] return → 이동 명령 무시
+    ↓
+[SpinAction] 계속 회전 진행
+
+```
+
+---
+
+## 📝 핵심 개념 요약
+
+### 1. Busy State Pattern
+
+- **목적**: 한 번에 하나의 액션만 실행
+- **방법**: `isBusy` 플래그로 상태 관리
+- **SetBusy()**: 액션 시작 시 호출
+- **ClearBusy()**: 액션 완료 시 호출
+
+### 2. Delegate (델리게이트)
+
+- **정의**: 함수를 변수처럼 저장하고 전달할 수 있는 타입
+- **용도**: 콜백 함수 구현 (액션 완료 알림)
+- **사용법**:
+  - 함수 참조 전달: `Spin(ClearBusy)` ✅
+  - 함수 호출 아님: `Spin(ClearBusy())` ❌
+
+### 3. Action vs Func
+
+- **Action**: 반환값 없음 (void)
+- **Func**: 반환값 있음
+- 둘 다 C#에서 기본 제공하는 델리게이트 타입
+
+### 4. 코드 재사용
+
+- 공통 코드는 **BaseAction**에 정의
+- 상속받은 클래스들이 공통 기능 사용
+- 코드 중복 제거
+
+---
+
+이제 게임은 한 번에 하나의 액션만 실행하며, 각 액션이 완료되면 자동으로 다음 액션을 받을 수 있는 안정적인 시스템을 갖추게 되었습니다! 🎮

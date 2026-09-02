@@ -1,0 +1,1901 @@
+---
+title: 'EcommerceProject -6-1'
+date: '2026-09-02'
+category: '풀스택/프로젝트 정리'
+tags: ['풀스택', '프로젝트 정리']
+draft: false
+summary: ''
+---
+
+# 채팅 기능 작성
+
+# 웹소켓이란?
+
+```jsx
+웹소켓은 웹 애플리케이션에서 실시간으로 데이터를 주고받을 수 있는 기술로, HTTP 프로토콜을 확장하여 양방향 통신을 지원한다.
+
+HTTP 통신은 클라이언트가 서버에 요청을 보내면, 서버가 응답을 보내고 나면 연결이 끊어지는 일반적인 방식을 사용한다.
+
+이는 클라이언트에서 서버로의 단방향 통신으로 제한되어 있다. 그러나 웹소켓은 이와 다르게 클라이언트와 서버 간에 연결을 유지하고 있으며, 한 번 연결을 설정하면 지속적으로 데이터를 주고받을 수 있다. 이를 통해 실시간으로 데이터를 전송하고 받을 수 있다.
+
+웹소켓은 HTTP와 비슷한 프로토콜을 사용하지만, 초기 연결 시에는 HTTP를 통해 웹소켓 연결을 설정한다. 그러나 이후에는 HTTP와는 다른 프로토콜을 사용하여 데이터를 주고받는다. 이를 통해 HTTP의 제약을 극복하고 실시간으로 데이터를 전송할 수 있는 것이다.
+
+예를 들어, 온라인 채팅 애플리케이션을 생각해보자 HTTP를 사용하여 채팅 메시지를 보내고 받을 경우, 메시지가 전송되고 응답이 올 때까지 기다려야 한다.
+
+그러나 웹소켓을 사용하면 채팅 메시지를 보내면 서버가 즉시 그 메시지를 받아 다른 사용자들에게 전달할 수 있다. 이러한 특성은 실시간 채팅, 주식 시장 정보 업데이트, 온라인 게임 등의 애플리케이션에서 매우 유용하다.
+
+따라서 웹소켓은 HTTP보다 훨씬 빠르고 효율적으로 실시간 데이터 통신을 가능하게 한다.
+```
+
+## ShopInboxPage.jsx 추가
+
+```jsx
+샵에서 메세지를 받아서 볼 수 있는 부분이다 ( app.js 에 추가해주는것도 잊지말자 )
+```
+
+```jsx
+import React from 'react'
+import DashboardHeader from '../../components/Shop/Layout/DashboardHeader'
+import DashboardSideBar from '../../components/Shop/Layout/DashboardSideBar'
+import DashboardMessages from '../../components/Shop/DashboardMessages'
+
+const ShopInboxPage = () => {
+  return (
+    <div>
+      <DashboardHeader />
+      <div className="flex w-full items-start justify-between">
+        <div className="800px:w-[330px] w-[80px]">
+          <DashboardSideBar active={8} />
+        </div>
+        <DashboardMessages />
+      </div>
+    </div>
+  )
+}
+
+export default ShopInboxPage
+```
+
+## DashboardMessages.jsx 작성
+
+```jsx
+샵에서 메세지를 볼수있는 컴포넌트다
+
+( MessageList 에 const [user, setUser] = useState(null); 의 null 을 하니까 괜찮아졌다 )
+```
+
+```jsx
+import axios from 'axios' // axios를 가져옴
+import React, { useRef, useState } from 'react' // React 및 관련 훅들을 가져옴
+import { useEffect } from 'react' // useEffect 훅을 가져옴
+import { useDispatch, useSelector } from 'react-redux' // useDispatch 및 useSelector를 가져옴
+import { useNavigate } from 'react-router-dom' // useNavigate 훅을 가져옴
+import { AiOutlineArrowRight, AiOutlineSend } from 'react-icons/ai' // react-icons에서 필요한 아이콘을 가져옴
+import styles from '../../styles/styles' // 스타일 시트를 가져옴
+import { TfiGallery } from 'react-icons/tfi' // react-icons에서 필요한 아이콘을 가져옴
+import socketIO from 'socket.io-client' // socket.io-client를 가져옴
+import { format } from 'timeago.js' // timeago.js의 format 함수를 가져옴
+
+// 소켓 서버의 엔드포인트 및 소켓 ID 설정
+const ENDPOINT = 'http://localhost:4000/'
+const socketId = socketIO(ENDPOINT, { transports: ['websocket'] })
+
+// 대시보드 메시지 컴포넌트
+const DashboardMessages = () => {
+  // Redux store에서 판매자 정보 및 대화 목록을 가져옴
+  const { seller } = useSelector((state) => state.seller)
+  const [conversations, setConversations] = useState([]) // 대화 목록 상태
+  const [arrivalMessage, setArrivalMessage] = useState(null) // 도착한 메시지 상태
+  const [currentChat, setCurrentChat] = useState() // 현재 대화 상태
+  const [messages, setMessages] = useState([]) // 메시지 목록 상태
+  const [userData, setUserData] = useState(null) // 사용자 데이터 상태
+  const [newMessage, setNewMessage] = useState('') // 새 메시지 상태
+  const [onlineUsers, setOnlineUsers] = useState([]) // 온라인 사용자 목록 상태
+  const [activeStatus, setActiveStatus] = useState(false) // 활성 상태 상태
+  const [open, setOpen] = useState(false) // 열린 상태 상태
+  const scrollRef = useRef(null) // 스크롤 참조
+
+  // 소켓으로부터 메시지 받기
+  useEffect(() => {
+    socketId.on('getMessage', (data) => {
+      setArrivalMessage({
+        sender: data.senderId,
+        text: data.text,
+        createdAt: Date.now(),
+      })
+    })
+  }, [])
+
+  // 도착한 메시지를 메시지 목록에 추가
+  useEffect(() => {
+    arrivalMessage &&
+      currentChat?.members.includes(arrivalMessage.sender) &&
+      setMessages((prev) => [...prev, arrivalMessage])
+  }, [arrivalMessage, currentChat])
+
+  // 대화 목록 가져오기
+  useEffect(() => {
+    const getConversation = async () => {
+      try {
+        const response = await axios.get(
+          `http://localhost:5000/api/v2/conversation/get-all-conversation-seller/${seller?._id}`,
+          {
+            withCredentials: true,
+          }
+        )
+
+        setConversations(response.data.conversations)
+      } catch (error) {
+        // 오류 처리
+      }
+    }
+    getConversation()
+  }, [seller, messages]) // 판매자 및 메시지 변경 시 호출
+
+  // 소켓에 판매자 추가 및 온라인 사용자 가져오기
+  useEffect(() => {
+    if (seller) {
+      const userId = seller?._id
+      socketId.emit('addUser', userId)
+      socketId.on('getUsers', (data) => {
+        setOnlineUsers(data)
+      })
+    }
+  }, [seller]) // 판매자 변경 시 호출
+
+  // 온라인 상태 확인
+  const onlineCheck = (chat) => {
+    const chatMembers = chat.members.find((member) => member !== seller?._id)
+    const online = onlineUsers.find((user) => user.userId === chatMembers)
+    return online ? true : false
+  }
+
+  // 메시지 가져오기
+  useEffect(() => {
+    const getMessage = async () => {
+      try {
+        const response = await axios.get(
+          `http://localhost:5000/api/v2/message/get-all-messages/${currentChat?._id}`
+        )
+        setMessages(response.data.messages)
+      } catch (error) {
+        // 오류 처리
+      }
+    }
+    getMessage()
+  }, [currentChat]) // 현재 대화 변경 시 호출
+
+  // 새 메시지 보내기
+  const sendMessageHandler = async (e) => {
+    e.preventDefault()
+
+    const message = {
+      sender: seller._id,
+      text: newMessage,
+      conversationId: currentChat._id,
+    }
+    const receiverId = currentChat.members.find((member) => member.id !== seller._id)
+
+    socketId.emit('sendMessage', {
+      senderId: seller._id,
+      receiverId,
+      text: newMessage,
+    })
+
+    try {
+      if (newMessage !== '') {
+        await axios
+          .post(`http://localhost:5000/api/v2/message/create-new-message`, message)
+          .then((res) => {
+            setMessages([...messages, res.data.message])
+            updateLastMessage()
+          })
+          .catch((error) => {
+            // 오류 처리
+          })
+      }
+    } catch (error) {
+      // 오류 처리
+    }
+  }
+
+  // 마지막 메시지 업데이트
+  const updateLastMessage = async () => {
+    socketId.emit('updateLastMessage', {
+      lastMessage: newMessage,
+      lastMessageId: seller._id,
+    })
+
+    await axios
+      .put(`http://localhost:5000/api/v2/conversation/update-last-message/${currentChat._id}`, {
+        lastMessage: newMessage,
+        lastMessageId: seller._id,
+      })
+      .then((res) => {
+        console.log(res.data.conversation)
+        setNewMessage('')
+      })
+      .catch((error) => {
+        // 오류 처리
+      })
+  }
+
+  // 메시지 스크롤
+  useEffect(() => {
+    // useEffect 훅을 사용하여 메시지가 업데이트될 때마다 스크롤을 자동으로 아래로 이동시킨다
+    scrollRef.current?.scrollIntoView({ beahaviour: 'smooth' })
+  }, [messages])
+
+  // UI 렌더링
+  return (
+    <div className="m-5 h-[85vh] w-[90%] overflow-y-scroll rounded bg-white">
+      {!open && (
+        <>
+          <h1 className="font-Poppins py-3 text-center text-[30px]">All Messages</h1>
+          {/* 모든 대화 목록 */}
+          {conversations &&
+            conversations.map((item, index) => (
+              <MessageList
+                data={item}
+                key={index}
+                index={index}
+                setOpen={setOpen}
+                setCurrentChat={setCurrentChat}
+                me={seller._id}
+                setUserData={setUserData}
+                userData={userData}
+                online={onlineCheck(item)}
+                setActiveStatus={setActiveStatus}
+              />
+            ))}
+        </>
+      )}
+
+      {open && (
+        <SellerInbox
+          setOpen={setOpen}
+          newMessage={newMessage}
+          setNewMessage={setNewMessage}
+          sendMessageHandler={sendMessageHandler}
+          messages={messages}
+          sellerId={seller._id}
+          userData={userData}
+          activeStatus={activeStatus}
+          scrollRef={scrollRef}
+          setMessages={setMessages}
+        />
+      )}
+    </div>
+  )
+}
+```
+
+```jsx
+// 대화 목록 컴포넌트
+const MessageList = ({
+  data,
+  index,
+  setOpen,
+  setCurrentChat,
+  me,
+  setUserData,
+  online,
+  setActiveStatus,
+}) => {
+  const [user, setUser] = useState(null) // 사용자 상태
+  const navigate = useNavigate() // 라우터 내비게이션 훅
+  const handleClick = (id) => {
+    // 클릭 핸들러
+    navigate(`/dashboard-messages?${id}`)
+    setOpen(true)
+  }
+  const [active, setActive] = useState(0) // 활성 상태 상태
+
+  // 사용자 정보 가져오기
+  useEffect(() => {
+    const userId = data.members.find((user) => user != me)
+    console.log('데이터는?', userId)
+
+    const getUser = async () => {
+      try {
+        const res = await axios.get(`http://localhost:5000/api/v2/user/user-info/${userId}`)
+        setUser(res.data.user)
+        console.log('res 는 ', res)
+      } catch (error) {
+        console.log(error)
+      }
+    }
+    getUser()
+  }, [me, data])
+
+  // 사용자 로그
+  useEffect(() => {
+    console.log('user:', user)
+  }, [user])
+
+  // UI 렌더링
+  return (
+    <div
+      className={`flex w-full p-3 px-3 ${
+        active === index ? 'bg-[#00000010]' : 'bg-transparent'
+      } cursor-pointer`}
+      onClick={(e) =>
+        setActive(index) ||
+        handleClick(data._id) ||
+        setCurrentChat(data) ||
+        setUserData(user) ||
+        setActiveStatus(online)
+      }
+    >
+      <div className="relative">
+        <img
+          src={`http://localhost:5000/${user?.avatar}`}
+          alt=""
+          className="h-[50px] w-[50px] rounded-full"
+        />
+        {online ? (
+          <div className="absolute top-[2px] right-[2px] h-[12px] w-[12px] rounded-full bg-green-400" />
+        ) : (
+          <div className="absolute top-[2px] right-[2px] h-[12px] w-[12px] rounded-full bg-[#c7b9b9]" />
+        )}
+      </div>
+      <div className="pl-3">
+        <h1 className="text-[18px]">{user?.name}</h1>
+        <p className="text-[16px] text-[#000c]">
+          {data?.lastMessageId !== user?._id ? 'You:' : user?.name.split(' ')[0] + ': '}{' '}
+          {data?.lastMessage}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// 판매자 인박스 컴포넌트
+const SellerInbox = ({
+  scrollRef,
+  setOpen,
+  newMessage,
+  setNewMessage,
+  sendMessageHandler,
+  messages,
+  sellerId,
+  userData,
+  activeStatus,
+}) => {
+  // UI 렌더링
+  return (
+    <div className="flex min-h-full w-full flex-col justify-between">
+      {/* 메시지 헤더 */}
+      <div className="flex w-full items-center justify-between bg-slate-200 p-3">
+        <div className="flex">
+          <img
+            src={`http://localhost:5000/${userData?.avatar}`}
+            alt=""
+            className="h-[60px] w-[60px] rounded-full"
+          />
+          <div className="pl-3">
+            <h1 className="text-[18px] font-[600]">{userData?.name}</h1>
+            <h1>{activeStatus ? 'Active Now' : ''}</h1>
+          </div>
+        </div>
+        <AiOutlineArrowRight size={20} className="cursor-pointer" onClick={() => setOpen(false)} />
+      </div>
+
+      {/* 메시지 목록 */}
+      <div className="h-[65vh] overflow-y-scroll px-3 py-3">
+        {messages &&
+          messages.map((item, index) => (
+            <div
+              className={`my-2 flex w-full ${
+                item.sender === sellerId ? 'justify-end' : 'justify-start'
+              }`}
+              ref={scrollRef}
+            >
+              {item.sender !== sellerId && (
+                <img
+                  src={`http://localhost:5000/${userData?.avatar}`}
+                  className="mr-3 h-[40px] w-[40px] rounded-full"
+                  alt=""
+                />
+              )}
+              <div>
+                <div
+                  className={`w-max rounded p-2 ${
+                    item.sender === sellerId ? 'bg-[#000]' : 'bg-[#38c776]'
+                  } h-min text-[#fff]`}
+                >
+                  <p>{item.text}</p>
+                </div>
+
+                <p className="pt-1 text-[12px] text-[#000000d3]">{format(item.createdAt)}</p>
+              </div>
+            </div>
+          ))}
+      </div>
+
+      {/* 메시지 입력 */}
+      <form
+        aria-required={true}
+        className="relative flex w-full items-center justify-between p-3"
+        onSubmit={sendMessageHandler}
+      >
+        <div className="w-[30px]">
+          <TfiGallery className="cursor-pointer" size={20} />
+        </div>
+        <div className="w-full">
+          <input
+            type="text"
+            required
+            placeholder="Enter your message..."
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            className={`${styles.input}`}
+          />
+          <input type="submit" value="Send" className="hidden" id="send" />
+          <label htmlFor="send">
+            <AiOutlineSend size={20} className="absolute top-5 right-4 cursor-pointer" />
+          </label>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+export default DashboardMessages // DashboardMessages를 내보냄
+```
+
+### 기능 정리
+
+```jsx
+**대화 목록 확인 및 메시지 전송 기능**
+
+// 대화 목록을 렌더링하고 메시지를 전송하는 함수
+return (
+  <div className="w-[90%] bg-white m-5 h-[85vh] overflow-y-scroll rounded">
+    {!open && (
+      <>
+        <h1 className="text-center text-[30px] py-3 font-Poppins">
+          모든 메세지
+        </h1>
+        {conversations &&
+          conversations.map((item, index) => (
+            <MessageList
+              data={item}
+              key={index}
+              index={index}
+              setOpen={setOpen}
+              setCurrentChat={setCurrentChat}
+              me={seller._id}
+              setUserData={setUserData}
+              userData={userData}
+              online={onlineCheck(item)}
+              setActiveStatus={setActiveStatus}
+            />
+          ))}
+      </>
+    )}
+    {/* DashboardMessages 컴포넌트에서 open 상태일 때 */}
+    {open && (
+      // SellerInbox 컴포넌트 렌더링
+      <SellerInbox
+        setOpen={setOpen}
+        newMessage={newMessage}
+        setNewMessage={setNewMessage}
+        sendMessageHandler={sendMessageHandler}
+        messages={messages}
+        sellerId={seller._id}
+        userData={userData}
+        activeStatus={activeStatus}
+        scrollRef={scrollRef}
+        setMessages={setMessages}
+      />
+    )}
+  </div>
+);
+
+* conversations 는 채팅방이다 이를 반복문으로 방들을 모두 출력하고 메세지를 불러온다
+
+대화 목록 렌더링: 대화 목록을 표시하고, 각 대화 항목( 방 )을 클릭할 때 해당 대화를 선택하여 메시지를 표시한다.
+
+메시지 전송: 사용자가 대화를 선택하고 메시지를 작성하면, 해당 메시지가 선택한 대화로 전송된다.
+
+상태 관리: 대화를 열거나 닫을 때에 대한 상태를 관리하여, 적절한 컴포넌트를 렌더링한다.
+
+SellerInbox 컴포넌트 렌더링: 대화를 열었을 때, 선택한 대화에 대한 메시지를 표시하고 새 메시지를 보낼 수 있는 SellerInbox 컴포넌트를 렌더링한다.
+
+요약하면, 이 코드는 대화 목록을 표시하고 사용자가 선택한 대화에 대한 메시지를 보내고 받는 기능을 구현한다.
+
+------------------------------------------------------------------------
+
+**실시간 메시지 수신 및 송신:**
+
+// Socket 구성 및 이벤트 처리
+const ENDPOINT = "http://localhost:4000/";
+const socketId = socketIO(ENDPOINT, { transports: ["websocket"] });
+
+// 메시지 수신 처리
+useEffect(() => {
+  socketId.on("getMessage", (data) => { // 소켓 객체에서 "getMessage" 이벤트를 수신하는 부분입니다. 새로운 메시지를 받았을 때 실행됨
+    setArrivalMessage({ // 함수를 호출하여 상태를 업데이트합니다. 이 함수는 이전 상태와 새로운 상태를 병합하여 새로운 값을 설정
+      sender: data.senderId,
+      text: data.text,
+      createdAt: Date.now(),
+    });
+  });
+}, []);
+
+// 메시지 송신 및 송신 상태 업데이트
+const sendMessageHandler = async (e) => {
+  e.preventDefault();
+  // 메시지 객체 생성
+  const message = {
+    sender: seller._id,
+    text: newMessage,
+    conversationId: currentChat._id,
+  };
+  // 수신자 ID 확인
+  const receiverId = currentChat.members.find(
+    (member) => member.id !== seller._id
+  );
+  // 소켓을 통해 메시지 전송
+  socketId.emit("sendMessage", {
+    senderId: seller._id,
+    receiverId,
+    text: newMessage,
+  });
+  try {
+    // 서버로 메시지 전송
+    if (newMessage !== "") {
+      const res = await axios.post(
+        `http://localhost:5000/api/v2/message/create-new-message`,
+        message
+      );
+      // 메시지 목록 업데이트
+      setMessages([...messages, res.data.message]);
+      // 마지막 메시지 업데이트 ( 나중에 방 선택에서 메세지 미리보기를 위해서 )
+      updateLastMessage();
+    }
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+위의 코드는 실시간 메시지 수신 및 송신을 담당하는 부분으로 구성되어 있다.
+
+Socket 구성 및 이벤트 처리:
+
+socketIO를 사용하여 소켓을 구성하고, ENDPOINT에 연결한다. WebSocket을 통해 통신한다.
+
+useEffect 훅을 사용하여 컴포넌트가 마운트될 때 한 번만 실행되는 메시지 수신 이벤트를 등록한다.
+
+메시지 수신 처리:
+
+getMessage 이벤트를 수신하면, 받은 데이터를 사용하여 도착한 메시지를 설정한다.
+
+도착한 메시지는 송신자 ID, 메시지 텍스트 및 생성 시간으로 구성된다.
+
+메시지 송신 및 송신 상태 업데이트:
+
+sendMessageHandler 함수는 메시지를 송신하는 역할을 합니다. 이 함수는 폼 제출 이벤트에 의해 호출된다.
+
+송신할 메시지 객체를 생성하고, 현재 선택된 대화의 ID를 포함한다.
+
+송신자와 수신자 ID를 확인하고, 이 정보를 사용하여 소켓을 통해 메시지를 전송한다.
+
+메시지가 성공적으로 전송되면, 서버로부터 반환된 응답을 통해 새로운 메시지를 상태에 추가하고, 마지막 메시지를 업데이트한다.
+
+만약 메시지가 비어있다면 전송을 하지 않는다.
+
+이러한 방식으로, 소켓을 사용하여 실시간으로 메시지를 수신하고 송신할 수 있으며, 메시지 송수신 상태를 적절하게 업데이트할 수 있다.
+
+------------------------------------------------------------------------
+
+**판매자의 온라인 상태 확인 및 사용자 목록 업데이트:**
+
+// 판매자의 온라인 상태 확인 및 사용자 목록 업데이트
+useEffect(() => {
+  if (seller) {
+    const userId = seller?._id;
+    // 사용자 추가 이벤트 송출
+    socketId.emit("addUser", userId);
+    // 사용자 목록 수신
+    socketId.on("getUsers", (data) => {
+      setOnlineUsers(data);
+    });
+  }
+}, [seller]);
+
+emit은 데이터를 전송하고 on은 데이터를 수신하는 데 사용된다. 이 두 메서드는 소켓 통신에서 메시지를 주고받는 데 사용된다.
+
+쉽게 말하면 on 은 get , emit 은 post
+
+------------------------------------------------------------------------
+
+**판매자가 선택한 대화에서 메시지 목록 가져오기 및 전송:**
+
+// 선택한 대화에서 메시지 목록 가져오기
+useEffect(() => {
+  const getMessage = async () => {
+    try {
+      const response = await axios.get(
+        `http://localhost:5000/api/v2/message/get-all-messages/${currentChat?._id}`
+      );
+      setMessages(response.data.messages);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+  getMessage();
+}, [currentChat]);
+
+이 코드는 선택한 대화의 ID를 기반으로 서버로부터 메시지를 가져와 컴포넌트의 상태로 설정하는 역할
+
+------------------------------------------------------------------------
+
+**메시지 스크롤**
+
+  // 메시지 스크롤
+  useEffect(() => { // useEffect 훅을 사용하여 메시지가 업데이트될 때마다 스크롤을 자동으로 아래로 이동시킨다
+    scrollRef.current?.scrollIntoView({ beahaviour: "smooth" });
+  }, [messages]);
+
+
+useEffect 훅을 사용하여 메시지가 업데이트될 때마다 스크롤을 자동으로 아래로 이동시킨다
+
+scrollRef.current:
+
+scrollRef는 컴포넌트 내의 스크롤 가능한 요소에 대한 참조를 가리키는 객체이다. current 속성을 통해 실제 DOM 요소에 접근할 수 있다.
+
+여기서는 scrollRef.current를 사용하여 실제 DOM 노드에 접근한다 ( 위에 ref 를 선언해놨다 scrollRef )
+
+scrollIntoView 메서드:
+
+scrollIntoView 메서드는 호출된 요소를 스크롤 가능한 부모 요소의 가장 가까운 가시 영역으로 스크롤한다.
+
+{ behavior: "smooth" }를 전달하여 스크롤이 부드럽게 이동하도록 설정한다.
+
+------------------------------------------------------------------------
+
+**온라인 상태 확인**
+
+특정 대화의 참여자 중 판매자가 아닌 다른 사용자가 온라인 상태인지 확인하는 함수이다
+
+  // 온라인 상태 확인
+  const onlineCheck = (chat) => {
+    const chatMembers = chat.members.find((member) => member !== seller?._id);
+    const online = onlineUsers.find((user) => user.userId === chatMembers);
+    return online ? true : false;
+  };
+
+onlineCheck 함수:
+
+onlineCheck 함수는 대화의 참여자 중 판매자가 아닌 다른 사용자가 온라인 상태인지 확인한다.
+
+chat.members.find() 메서드:
+
+chat 객체의 members 배열에서 판매자가 아닌 다른 사용자를 찾는다. 판매자의 ID(seller._id)를 제외하고 대화의 다른 참여자를 찾는다.
+
+onlineUsers.find() 메서드:
+
+onlineUsers 배열에서 판매자가 아닌 다른 사용자를 찾는다. onlineUsers 배열은 온라인 사용자 목록을 나타낸다.
+
+찾은 사용자의 userId가 이전에 찾은 대화의 다른 참여자와 일치하는지 확인하여 온라인 상태를 판별한다.
+
+온라인 상태 반환:
+
+만약 해당 사용자가 온라인 상태라면 true를 반환합니다. 그렇지 않으면 false를 반환한다.
+```
+
+# conversation.js ( 채팅방 ) 모델 추가
+
+```jsx
+채팅방을 만들때 사용할 스키마를 작성한다
+```
+
+```jsx
+// mongoose 패키지를 가져옵니다.
+const mongoose = require('mongoose')
+
+// 새로운 conversation 스키마를 정의합니다.
+const conversationSchema = new mongoose.Schema(
+  {
+    // 그룹의 제목을 나타내는 String 타입의 필드입니다.
+    groupTitle: {
+      type: String,
+    },
+    // 대화 참여자 목록을 나타내는 Array 타입의 필드입니다.
+    members: {
+      type: Array,
+    },
+    // 대화의 마지막 메시지를 나타내는 String 타입의 필드입니다.
+    lastMessage: {
+      type: String,
+    },
+    // 대화의 마지막 메시지의 ID를 나타내는 String 타입의 필드입니다.
+    lastMessageId: {
+      type: String,
+    },
+  },
+  // 스키마에 timestamps 옵션을 추가하여 생성 및 수정 날짜를 자동으로 기록합니다.
+  { timestamps: true }
+)
+
+// Conversation 모델을 생성하고 mongoose 모듈에 등록합니다.
+module.exports = mongoose.model('Conversation', conversationSchema)
+```
+
+# conversation.js 컨트롤러
+
+```jsx
+컨트롤러를 추가해준다 conversation.js 컨트롤러 이다  ( index.js 에 app.use 추가해주기 )
+
+```
+
+```jsx
+// 필요한 모듈 및 파일 가져오기
+const Conversation = require('../model/conversation') // Conversation 모델 가져오기
+const ErrorHandler = require('../util/ErrorHandler') // 오류 처리 유틸리티 가져오기
+const catchAsyncErrors = require('../middleware/catchAsyncErrors') // 비동기 오류 처리 미들웨어 가져오기
+const express = require('express') // Express 프레임워크 가져오기
+const { isSeller, isAuthenticated } = require('../middleware/auth') // 인증 관련 미들웨어 가져오기
+const router = express.Router() // Express 라우터 생성
+
+// 새 대화 생성 엔드포인트
+router.post(
+  '/create-new-conversation',
+  catchAsyncErrors(async (req, res, next) => {
+    try {
+      // 요청에서 그룹 제목, 사용자 ID 및 판매자 ID를 가져옵니다.
+      const { groupTitle, userId, sellerId } = req.body
+
+      // 해당 그룹 제목을 가진 대화가 이미 존재하는지 확인합니다.
+      const isConversationExist = await Conversation.findOne({ groupTitle })
+
+      // 대화가 이미 존재하는 경우, 해당 대화를 반환합니다.
+      if (isConversationExist) {
+        const conversation = isConversationExist
+        res.status(201).json({
+          success: true,
+          conversation,
+        })
+      }
+      // 대화가 존재하지 않는 경우, 새 대화를 생성하고 반환합니다.
+      else {
+        const conversation = await Conversation.create({
+          members: [userId, sellerId],
+          groupTitle: groupTitle,
+        })
+
+        res.status(201).json({
+          success: true,
+          conversation,
+        })
+      }
+    } catch (error) {
+      // 오류가 발생한 경우, ErrorHandler를 사용하여 오류를 처리합니다.
+      return next(new ErrorHandler(error.response.message), 500)
+    }
+  })
+)
+
+// 판매자 대화 목록 가져오기 엔드포인트
+router.get(
+  '/get-all-conversation-seller/:id',
+  isSeller, // 판매자 여부 확인 미들웨어 적용
+  catchAsyncErrors(async (req, res, next) => {
+    try {
+      // 해당 판매자 ID를 포함하는 대화 목록을 가져옵니다.
+      const conversations = await Conversation.find({
+        members: {
+          $in: [req.params.id], // 해당 ID를 포함하는 모든 멤버를 찾습니다.
+        },
+      }).sort({ updatedAt: -1, createdAt: -1 }) // 업데이트 및 생성 날짜에 따라 정렬합니다. MongoDB 쿼리에서 정렬 조건을 지정 , 1은 내림차순(DESC)을 나타낸다
+
+      res.status(201).json({
+        success: true,
+        conversations,
+      })
+    } catch (error) {
+      // 오류가 발생한 경우, ErrorHandler를 사용하여 오류를 처리합니다.
+      return next(new ErrorHandler(error), 500)
+    }
+  })
+)
+
+// 사용자 대화 목록 가져오기 엔드포인트
+router.get(
+  '/get-all-conversation-user/:id',
+  isAuthenticated, // 사용자 인증 확인 미들웨어 적용
+  catchAsyncErrors(async (req, res, next) => {
+    try {
+      // 해당 사용자 ID를 포함하는 대화 목록을 가져옵니다.
+      const conversations = await Conversation.find({
+        members: {
+          $in: [req.params.id], // 해당 ID를 포함하는 모든 멤버를 찾습니다.
+        },
+      }).sort({ updatedAt: -1, createdAt: -1 }) // 업데이트 및 생성 날짜에 따라 정렬합니다.
+
+      res.status(201).json({
+        success: true,
+        conversations,
+      })
+    } catch (error) {
+      // 오류가 발생한 경우, ErrorHandler를 사용하여 오류를 처리합니다.
+      return next(new ErrorHandler(error), 500)
+    }
+  })
+)
+
+// 대화의 마지막 메시지 업데이트 엔드포인트
+router.put(
+  '/update-last-message/:id',
+  catchAsyncErrors(async (req, res, next) => {
+    try {
+      // 요청에서 마지막 메시지 및 메시지 ID를 가져옵니다.
+      const { lastMessage, lastMessageId } = req.body
+
+      // 대화를 업데이트하고 결과를 반환합니다.
+      const conversation = await Conversation.findByIdAndUpdate(req.params.id, {
+        lastMessage,
+        lastMessageId,
+      })
+
+      res.status(201).json({
+        success: true,
+        conversation,
+      })
+    } catch (error) {
+      // 오류가 발생한 경우, ErrorHandler를 사용하여 오류를 처리합니다.
+      return next(new ErrorHandler(error), 500)
+    }
+  })
+)
+
+// 라우터를 내보냅니다.
+module.exports = router
+```
+
+# ProductDetails.jsx 의 handleMessageSubmit 을 수정
+
+```jsx
+메세지 보내기 버튼의 로직을 작성해준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381465/notion-blog/_/_/EcommerceProject/EcommerceProject_-6-1/Untitled.png)
+
+```jsx
+const handleMessageSubmit = async () => {
+    if (isAuthenticated) {
+      const groupTitle = data._id + user._id;
+      const userId = user._id;
+      const sellerId = data.shop._id;
+      await axios
+        .post(`http://localhost:5000/api/v2/conversation/create-new-conversation`, {
+          groupTitle,
+          userId,
+          sellerId,
+        })
+        .then((res) => {
+          navigate(`/inbox?${res.data.conversation._id}`);
+        })
+        .catch((error) => {
+          toast.error(error.response.data.message);
+        });
+    } else {
+      toast.error("메세지를 보내시려면 로그인하세요.");
+    }
+  }
+
+
+그룹 타이틀 생성:
+
+groupTitle 변수는 현재 사용자와 채팅할 대상인 판매자의 ID를 기반으로 생성된다. 이를 통해 대화의 그룹을 식별한다.
+
+데이터 준비:
+
+userId 변수에는 현재 사용자의 ID가, sellerId 변수에는 채팅할 대상 판매자의 ID가 할당된다.
+
+HTTP POST 요청:
+
+Axios를 사용하여 서버에 새로운 대화를 만들도록 요청한다. 생성된 그룹 타이틀과 사용자 및 판매자 ID가 요청 본문에 포함된다.
+
+응답 처리:
+
+요청이 성공하면 응답으로 받은 대화 ID를 사용하여 새로운 대화 페이지로 이동한다. 대화 ID는 URL 쿼리 매개변수로 추가된다.
+
+오류 처리:
+
+요청이 실패하면 오류 응답에 포함된 메시지를 사용하여 오류 메시지를 표시한다.
+
+이렇게 함으로써 사용자가 로그인되어 있으면 새로운 대화를 시작할 수 있으며, 그렇지 않은 경우에는 로그인하도록 유도된다.
+```
+
+# messages.js
+
+```jsx
+메세지를 만들 때 사용할 스키마를 작성한다
+```
+
+```jsx
+// 모듈을 가져오기 위해 mongoose 패키지를 불러옵니다.
+const mongoose = require('mongoose')
+
+// 메시지 스키마를 정의합니다.
+const messagesSchema = new mongoose.Schema(
+  {
+    // 대화 ID를 나타내는 문자열 타입 필드입니다.
+    conversationId: {
+      type: String,
+    },
+    // 메시지 텍스트를 나타내는 문자열 타입 필드입니다.
+    text: {
+      type: String,
+    },
+    // 메시지를 보낸 사용자를 나타내는 문자열 타입 필드입니다.
+    sender: {
+      type: String,
+    },
+    // 메시지에 첨부된 이미지 URL을 담는 배열 타입 필드입니다.
+    images: [
+      {
+        type: String,
+      },
+    ],
+  },
+  // timestamps 옵션을 사용하여 createdAt 및 updatedAt 필드를 자동으로 생성합니다.
+  { timestamps: true }
+)
+
+// Messages 모델을 정의하고 내보냅니다.
+module.exports = mongoose.model('Messages', messagesSchema)
+```
+
+# messages.js 컨트롤러 작성
+
+```jsx
+// 필요한 모듈 및 파일을 가져옵니다.
+const Messages = require('../model/messages')
+const ErrorHandler = require('../util/ErrorHandler')
+const catchAsyncErrors = require('../middleware/catchAsyncErrors')
+const express = require('express')
+const { upload } = require('../multer')
+
+// Express 라우터를 생성합니다.
+const router = express.Router()
+
+// 새로운 메시지를 생성하는 엔드포인트를 정의합니다.
+router.post(
+  '/create-new-message',
+  // 파일 업로드를 위한 미들웨어를 사용합니다.
+  upload.array('images'),
+  // 비동기 함수로 랩핑된 미들웨어를 사용합니다.
+  catchAsyncErrors(async (req, res, next) => {
+    try {
+      // 요청 데이터를 가져옵니다.
+      const messageData = req.body
+
+      // 이미지가 업로드되었는지 확인합니다.
+      if (req.files) {
+        const files = req.files
+        // 업로드된 이미지의 URL을 배열에 저장합니다.
+        const imageUrls = files.map((file) => `${file.fileName}`)
+        messageData.images = imageUrls
+      }
+
+      // 메시지 데이터에서 필요한 정보를 추출합니다.
+      messageData.conversationId = req.body.conversationId
+      messageData.sender = req.body.sender
+      messageData.text = req.body.text
+
+      // Messages 모델을 사용하여 새로운 메시지 객체를 생성합니다.
+      const message = new Messages({
+        conversationId: messageData.conversationId,
+        text: messageData.text,
+        sender: messageData.sender,
+        images: messageData.images ? messageData.images : undefined,
+      })
+
+      // 새로운 메시지를 저장합니다.
+      await message.save()
+
+      // 성공 응답을 반환합니다.
+      res.status(201).json({
+        success: true,
+        message,
+      })
+    } catch (error) {
+      // 에러가 발생한 경우 ErrorHandler를 사용하여 에러를 처리합니다.
+      return next(new ErrorHandler(error.response.message), 500)
+    }
+  })
+)
+
+// 대화 ID에 해당하는 모든 메시지를 가져오는 엔드포인트를 정의합니다.
+router.get(
+  '/get-all-messages/:id',
+  // 비동기 함수로 랩핑된 미들웨어를 사용합니다.
+  catchAsyncErrors(async (req, res, next) => {
+    try {
+      // 방 ID에 해당하는 모든 메시지를 조회합니다.
+      const messages = await Messages.find({
+        conversationId: req.params.id,
+      })
+
+      // 조회된 메시지 목록을 성공 응답으로 반환합니다.
+      res.status(201).json({
+        success: true,
+        messages,
+      })
+    } catch (error) {
+      // 에러가 발생한 경우 ErrorHandler를 사용하여 에러를 처리합니다.
+      return next(new ErrorHandler(error.response.message), 500)
+    }
+  })
+)
+
+// 라우터를 내보냅니다.
+module.exports = router
+```
+
+```jsx
+새로운 메시지를 생성하는 엔드포인트를 정의하는 라우터 핸들러
+
+router.post(
+  "/create-new-message",
+  // 파일 업로드를 위한 미들웨어를 사용합니다.
+  upload.array("images"),
+  // 비동기 함수로 랩핑된 미들웨어를 사용합니다.
+  catchAsyncErrors(async (req, res, next) => {
+    try {
+      // 요청 데이터를 가져옵니다.
+      const messageData = req.body;
+
+      // 이미지가 업로드되었는지 확인합니다.
+      if (req.files) {
+        const files = req.files;
+        // 업로드된 이미지의 URL을 배열에 저장합니다.
+        const imageUrls = files.map((file) => `${file.fileName}`);
+        messageData.images = imageUrls;
+      }
+
+      // 메시지 데이터에서 필요한 정보를 추출합니다.
+      messageData.conversationId = req.body.conversationId;
+      messageData.sender = req.body.sender;
+      messageData.text = req.body.text;
+
+      // Messages 모델을 사용하여 새로운 메시지 객체를 생성합니다.
+      const message = new Messages({
+        conversationId: messageData.conversationId,
+        text: messageData.text,
+        sender: messageData.sender,
+        images: messageData.images ? messageData.images : undefined,
+      });
+
+      // 새로운 메시지를 저장합니다.
+      await message.save();
+
+      // 성공 응답을 반환합니다.
+      res.status(201).json({
+        success: true,
+        message,
+      });
+    } catch (error) {
+      // 에러가 발생한 경우 ErrorHandler를 사용하여 에러를 처리합니다.
+      return next(new ErrorHandler(error.response.message), 500);
+    }
+  })
+);
+
+upload.array("images") 미들웨어:
+
+multer를 사용하여 파일 업로드를 처리하는 미들웨어이다. "images" 필드에 대한 파일 업로드를 처리한다
+
+메시지 데이터 처리:
+
+요청 데이터에서 필요한 정보를 추출하여 새로운 메시지 객체를 생성한다.
+
+이미지 파일이 업로드된 경우 해당 파일의 URL을 추출하여 메시지 객체에 추가한다.
+```
+
+# 프론트와 클라이언트 쪽에 폴더를 만들어준다 socket
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381465/notion-blog/_/_/EcommerceProject/EcommerceProject_-6-1/Untitled_1.png)
+
+```jsx
+소켓 폴더에 index.js 를 만들어준다
+```
+
+```jsx
+socket 폴더에 npm init 을 해서 초기화 시켜주고
+
+npm i express socket.io cors dotenv 를 설치해준다
+```
+
+```jsx
+그리고 package.json 에 start 를 추가해서 실행 방법을 설정해준다 ( 이렇게 하면 시작을 npm start 로 할 수 있다 )
+
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start" : "node index.js"
+  },
+```
+
+```jsx
+이제 index.js 에 내용을 작성해주고
+
+env 도 작성해준다
+
+이제 포트번호 4000번으로 실행하면 소켓 서버가 실행된다
+
+```
+
+# index.js 작성 ( 소켓 )
+
+```jsx
+const socketIO = require('socket.io') // socket.io 모듈을 가져옵니다.
+const http = require('http') // http 모듈을 가져옵니다.
+const express = require('express') // express 모듈을 가져옵니다.
+const cors = require('cors') // cors 모듈을 가져옵니다.
+const app = express() // express 애플리케이션을 생성합니다.
+const server = http.createServer(app) // express 애플리케이션을 기반으로 서버를 생성합니다.
+const io = socketIO(server) // 서버를 이용하여 socket.io 인스턴스를 생성합니다.
+
+require('dotenv').config({
+  // dotenv를 사용하여 환경 변수를 로드합니다.
+  path: './.env',
+})
+
+app.use(cors()) // CORS 미들웨어를 사용합니다.
+app.use(express.json()) // JSON 파싱 미들웨어를 사용합니다.
+
+app.get('/', (req, res) => {
+  // 루트 엔드포인트를 설정합니다.
+  res.send('Hello world from socket server!') // "Hello world from socket server!"를 응답으로 보냅니다.
+})
+
+let users = [] // 사용자 정보를 담는 배열을 초기화합니다.
+
+const addUser = (userId, socketId) => {
+  // 사용자를 추가하는 함수를 정의합니다.
+  !users.some((user) => user.userId === userId) && // 중복된 userId가 없는 경우에만 추가합니다.
+    users.push({ userId, socketId }) // 사용자 정보를 배열에 추가합니다.
+}
+
+const removeUser = (socketId) => {
+  // 사용자를 제거하는 함수를 정의합니다.
+  users = users.filter((user) => user.socketId !== socketId) // socketId에 해당하는 사용자를 제거합니다.
+}
+
+const getUser = (receiverId) => {
+  // 특정 사용자 정보를 가져오는 함수를 정의합니다.
+  return users.find((user) => user.userId === receiverId) // userId에 해당하는 사용자 정보를 반환합니다.
+}
+
+// 메시지 객체를 생성하는 함수를 정의합니다.
+const createMessage = ({ senderId, receiverId, text, images }) => ({
+  senderId,
+  receiverId,
+  text,
+  images,
+  seen: false, // 기본값으로 "seen" 속성을 false로 설정합니다. seen"은 메시지의 읽음 상태를 나타내는 속성입니다. 일반적으로 메시지를 읽은 경우에는 "seen" 속성이 true로 설정됩니다. 이렇게 함으로써 메시지를 읽은 시점을 추적하고 사용자에게 새로운 메시지가 도착했는지 여부를 알려줄 수 있습니다.
+})
+
+io.on('connection', (socket) => {
+  // 클라이언트와의 소켓 연결이 성립되었을 때의 이벤트 핸들러를 정의합니다.
+  // 클라이언트가 연결되었음을 콘솔에 출력합니다.
+  console.log(`a user is connected`)
+
+  // 클라이언트가 addUser 이벤트를 발생시킬 때의 이벤트 핸들러를 정의합니다.
+  socket.on('addUser', (userId) => {
+    // 새로운 사용자를 추가합니다.
+    addUser(userId, socket.id)
+    // 모든 클라이언트에게 사용자 목록을 업데이트합니다.
+    io.emit('getUsers', users)
+  })
+
+  // 클라이언트가 sendMessage 이벤트를 발생시킬 때의 이벤트 핸들러를 정의합니다.
+  socket.on('sendMessage', ({ senderId, receiverId, text, images }) => {
+    // 새로운 메시지 객체를 생성합니다.
+    const message = createMessage({ senderId, receiverId, text, images })
+
+    // 수신자의 소켓 정보를 가져옵니다.
+    const user = getUser(receiverId)
+
+    // 메시지를 수신자에게 전송합니다.
+    io.to(user?.socketId).emit('getMessage', message)
+  })
+
+  // 클라이언트가 messageSeen 이벤트를 발생시킬 때의 이벤트 핸들러를 정의합니다.
+  socket.on('messageSeen', ({ senderId, receiverId, messageId }) => {
+    // 메시지를 읽은 사용자의 소켓 정보를 가져옵니다.
+    const user = getUser(senderId)
+
+    // 메시지를 읽은 상태로 업데이트합니다.
+    if (messages[senderId]) {
+      const message = messages[senderId].find(
+        (message) => message.receiverId === receiverId && message.id === messageId
+      )
+      if (message) {
+        message.seen = true
+
+        // 메시지를 읽었음을 응답합니다.
+        io.to(user?.socketId).emit('messageSeen', {
+          senderId,
+          receiverId,
+          messageId,
+        })
+      }
+    }
+  })
+
+  // 클라이언트가 disconnect 이벤트를 발생시킬 때의 이벤트 핸들러를 정의합니다.
+  socket.on('disconnect', () => {
+    // 클라이언트가 연결을 끊었음을 콘솔에 출력합니다.
+    console.log(`a user disconnected!`)
+    // 사용자 목록에서 해당 사용자를 제거합니다.
+    removeUser(socket.id)
+    // 모든 클라이언트에게 사용자 목록을 업데이트합니다.
+    io.emit('getUsers', users)
+  })
+})
+
+// 서버를 시작하고 지정된 포트에서 수신 대기합니다.
+server.listen(process.env.PORT || 4000, () => {
+  console.log(`server is running on port ${process.env.PORT || 4000}`)
+})
+```
+
+```jsx
+소켓 식별자(Socket ID):
+
+소켓 식별자는 클라이언트 소켓이 서버에 연결될 때마다 할당되는 고유한 식별자이다.
+
+서버는 이를 사용하여 여러 연결된 클라이언트를 구분하고 메시지를 특정 클라이언트에게 보내거나 받을 수 있다.
+
+Socket.IO:
+
+Socket.IO는 웹 클라이언트와 서버 간의 실시간, 양방향 통신을 가능하게 하는 JavaScript 라이브러리이다.
+
+웹소켓(WebSocket) 연결을 처리하는 복잡성을 숨기고 실시간 애플리케이션을 구축하기 위한 사용자 친화적인 API를 제공한다.
+
+Socket.IO를 사용하면 서버와 클라이언트 모두에서 이벤트를 발생시키고 수신하여 실시간 데이터 교환을 용이하게 할 수 있다.
+
+또한 방 관리, 메시지 브로드캐스팅, 연결 관리 등의 기능을 처리한다.
+```
+
+# npm i socket.io-client 를 설치
+
+```jsx
+이제 클라이언트로 돌아가서 클라이언트에 npm i socket.io-client 를 설치해준다 그리고 소켓을 사용 가능하게 코드를 추가해준다
+```
+
+```jsx
+import socketIO from 'socket.io-client'
+import { format } from 'timeago.js'
+const ENDPOINT = 'http://localhost:4000/'
+const socketId = socketIO(ENDPOINT, { transports: ['websocket'] })
+```
+
+# timeago.js 를 설치
+
+```jsx
+timeago.js 를 설치해준다
+
+( 이는 상대적인 시간을 표시하는 라이브러리 방금 전", "1분 전", "1시간 전" 등과 같이 사람이 읽기 쉬운 형식으로 시간을 표시 )
+```
+
+# UserInbox.jsx 를 작성한다 ( 유저 메세지 부분 )
+
+```jsx
+import React, { useEffect, useRef, useState } from "react";
+import Header from "../components/Layout/Header"; // 헤더 컴포넌트를 불러옵니다.
+import { useSelector } from "react-redux"; // 리덕스의 상태를 읽어옵니다.
+import socketIO from "socket.io-client"; // 소켓 통신을 위한 라이브러리를 불러옵니다.
+import { format } from "timeago.js"; // 날짜 형식을 변환하기 위한 라이브러리를 불러옵니다.
+import axios from "axios"; // HTTP 요청을 보내기 위한 라이브러리를 불러옵니다.
+import { useNavigate } from "react-router-dom"; // React Router의 네비게이션 훅을 사용합니다.
+import { AiOutlineArrowRight, AiOutlineSend } from "react-icons/ai"; // 아이콘 컴포넌트를 불러옵니다.
+import { TfiGallery } from "react-icons/tfi"; // 아이콘 컴포넌트를 불러옵니다.
+import styles from "../styles/styles"; // 스타일 시트를 불러옵니다.
+const ENDPOINT = process.env.REACT_APP_SOCKET + "/"; // 소켓 서버의 엔드포인트를 환경 변수에서 가져옵니다.
+const socketId = socketIO(ENDPOINT, { transports: ["websocket"] }); // 웹소켓을 이용하여 소켓 연결을 수립합니다.
+
+const UserInbox = () => {
+  const { user } = useSelector((state) => state.user); // 리덕스 상태에서 사용자 정보를 가져옵니다.
+  const [conversations, setConversations] = useState([]); // 대화 목록을 관리하는 상태입니다.
+  const [arrivalMessage, setArrivalMessage] = useState(null); // 도착한 메시지를 관리하는 상태입니다.
+  const [currentChat, setCurrentChat] = useState(); // 현재 대화 상대를 관리하는 상태입니다.
+  const [messages, setMessages] = useState([]); // 메시지 목록을 관리하는 상태입니다.
+  const [newMessage, setNewMessage] = useState(""); // 새로운 메시지를 관리하는 상태입니다.
+  const [userData, setUserData] = useState(null); // 사용자 정보를 관리하는 상태입니다.
+  const [onlineUsers, setOnlineUsers] = useState([]); // 온라인 사용자 목록을 관리하는 상태입니다.
+  const [activeStatus, setActiveStatus] = useState(false); // 사용자의 온라인 상태를 관리하는 상태입니다.
+  const [open, setOpen] = useState(false); // 대화창이 열려있는지 여부를 관리하는 상태입니다.
+  const scrollRef = useRef(null); // 스크롤 위치를 관리하기 위한 Ref입니다.
+
+  // 새로운 메시지를 수신하는 이벤트 리스너를 설정합니다.
+  useEffect(() => {
+    socketId.on("getMessage", (data) => {
+      setArrivalMessage({
+        sender: data.senderId,
+        text: data.text,
+        createdAt: Date.now(),
+      });
+    });
+  }, []);
+
+  // 도착한 메시지를 처리하는 이펙트입니다. ( 새로운 메시지가 도착했을 때 해당 메시지를 현재 대화 상자의 메시지 목록에 추가하는 역할 )
+  useEffect(() => {
+    arrivalMessage &&
+      currentChat?.members.includes(arrivalMessage.sender) && // 도착한 메시지가 현재 보고 있는 대화 상자와 관련이 있는지 여부를 검사
+      setMessages((prev) => [...prev, arrivalMessage]); // 화 상자와 관련이 있다면, 이 메시지를 이전 메시지 목록에 추가하여 새로운 메시지를 업데이트합니다
+  }, [arrivalMessage, currentChat]);
+
+  // * 사용자 A가 사용자 B와의 대화 상자를 열어놓고 있다고 가정해봅시다. ( 대화상자 = 채팅방 )
+  // 이때 사용자 C가 메시지를 보냈습니다. 이 메시지의 발신자가 사용자 C이므로, 이 메시지가 현재 열려있는 대화 상자와 관련이 있는지 여부를 확인해야 합니다.
+  // 만약 메시지의 발신자인 사용자 C가 현재 열려있는 대화 상자의 참여자 중 하나라면, 이 메시지는 현재 보고 있는 대화 상자와 관련이 있다고 할 수 있습니다. 따라서 이런 경우에는 새로 도착한 메시지를 대화 상자에 표시하게 됩니다.
+
+  // 대화 목록을 가져오는 이펙트입니다.
+  useEffect(() => {
+    const getConversation = async () => {
+      try {
+        const resonse = await axios.get(
+          process.env.REACT_APP_BACKEND_URL +
+            `/conversation/get-all-conversation-user/${user?._id}`,
+          {
+            withCredentials: true,
+          }
+        );
+
+        setConversations(resonse.data.conversations);
+      } catch (error) {
+        // 오류 처리
+      }
+    };
+    getConversation();
+  }, [user, messages]);
+
+  // 사용자가 로그인되어 있을 때 소켓에 사용자를 추가하고 온라인 사용자 목록을 가져오는 이펙트입니다.
+  useEffect(() => {
+    if (user) {
+      const userId = user?._id;
+      socketId.emit("addUser", userId);  // 소켓 서버에 사용자를 등록하고
+      socketId.on("getUsers", (data) => { // 켓 서버로부터 온라인 사용자 목록을 받아와서 클라이언트에서 상태를 업데이트합니다. 이를 통해 온라인 사용자 목록을 동적으로 관리하고 실시간으로 업데이트할 수 있습니다.
+        setOnlineUsers(data); // 가져온 유저 목록을 넣어줌
+      });
+    }
+  }, [user]);
+
+  // 대화 상대의 온라인 상태를 확인하는 함수입니다.
+  const onlineCheck = (chat) => {
+    const chatMembers = chat.members.find((member) => member !== user?._id); // chatMembers 변수에는 현재 대화방의 멤버들 중에서 현재 사용자(user._id)와 다른 멤버의 ID가 저장됩니다. 즉, 자신을 제외한 대화방의 다른 참여자를 가져옵니다
+    const online = onlineUsers.find((user) => user.userId === chatMembers); // online 변수에는 onlineUsers 배열에서 chatMembers와 일치하는 사용자를 찾습니다. 이 배열은 온라인 상태인 사용자들의 목록을 가지고 있습니다. 따라서 online 변수에는 해당 대화 상대의 온라인 상태 정보가 저장
+
+    return online ? true : false; // online 변수가 존재하면(즉, 대화 상대가 온라인 상태일 경우) true를 반환하고, 그렇지 않으면 false를 반환
+  };
+
+  // 대화 메시지를 가져오는 이펙트입니다.
+  useEffect(() => {
+    const getMessage = async () => {
+      try {
+        const response = await axios.get(
+          process.env.REACT_APP_BACKEND_URL +
+            `/message/get-all-messages/${currentChat?._id}`
+        );
+        setMessages(response.data.messages);
+      } catch (error) {
+        console.log(error);
+      }
+    };
+    getMessage();
+  }, [currentChat]);
+
+  // 새로운 메시지를 전송하는 함수입니다.
+  const sendMessageHandler = async (e) => {
+    e.preventDefault();
+
+    const message = {
+      sender: user._id,
+      text: newMessage,
+      conversationId: currentChat._id,
+    };
+    const receiverId = currentChat.members.find(   // 현재 대화 상자의 참여자 중에서 현재 사용자(user)와 다른 참여자의 ID를 찾는 부분 ( 메시지를 받는 사람의 ID를 결정하기 위한 것 )
+      (member) => member !== user?._id  // receiverId에는 현재 대화 상자의 다른 참여자(수신자)의 ID가 저장되어 있습니다. 이것은 새로운 메시지를 보낼 때 수신자로 지정된다
+    );
+
+    socketId.emit("sendMessage", { // 메세지 보내기
+      senderId: user?._id,
+      receiverId,
+      text: newMessage,
+    });
+
+    try {
+      if (newMessage !== "") {
+        await axios
+          .post(
+            process.env.REACT_APP_BACKEND_URL + `/message/create-new-message`,
+            message
+          )
+          .then((res) => {
+            setMessages([...messages, res.data.message]);
+            updateLastMessage();
+          })
+          .catch((error) => {
+            console.log(error);
+          });
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+```
+
+```jsx
+  // 마지막 메시지를 업데이트하는 함수입니다.
+  const updateLastMessage = async () => {
+    socketId.emit("updateLastMessage", {
+      lastMessage: newMessage,
+      lastMessageId: user._id,
+    });
+
+    await axios
+      .put(
+        process.env.REACT_APP_BACKEND_URL +
+          `/conversation/update-last-message/${currentChat._id}`,
+        {
+          lastMessage: newMessage,
+          lastMessageId: user._id,
+        }
+      )
+      .then((res) => {
+        setNewMessage("");
+      })
+      .catch((error) => {
+        console.log(error);
+      });
+  };
+
+  // 메시지 스크롤을 자동으로 내리는 이펙트입니다.
+  useEffect(() => {
+    scrollRef.current?.scrollIntoView({ beahaviour: "smooth" });
+  }, [messages]);
+
+  return (
+    <div className="w-full">
+      {!open && (
+        <>
+          <Header />
+          <h1 className="text-center text-[30px] py-3 font-Poppins">
+            모든 메세지
+          </h1>
+          <div className="p-12">
+            {/* All messages list */} {/* 채팅방 출력하기 */}
+            {conversations &&
+              conversations.map((item, index) => (
+                <MessageList
+                  data={item}
+                  key={index}
+                  index={index}
+                  setOpen={setOpen}
+                  setCurrentChat={setCurrentChat}
+                  me={user?._id}
+                  setUserData={setUserData}
+                  userData={userData}
+                  online={onlineCheck(item)}
+                  setActiveStatus={setActiveStatus}
+                />
+              ))}
+          </div>
+        </>
+      )}
+
+      {open && (
+        <SellerInbox
+          setOpen={setOpen}
+          newMessage={newMessage}
+          setNewMessage={setNewMessage}
+          sendMessageHandler={sendMessageHandler}
+          messages={messages}
+          sellerId={user._id}
+          userData={userData}
+          activeStatus={activeStatus}
+          scrollRef={scrollRef}
+        />
+      )}
+    </div>
+  );
+};
+
+// 대화 목록을 표시하는 컴포넌트입니다.
+const MessageList = ({
+  data,
+  index,
+  setOpen,
+  setCurrentChat,
+  me,
+  setUserData,
+  userData,
+  online,
+  setActiveStatus,
+}) => {
+  const [active, setActive] = useState(0);
+  const [user, setUser] = useState([]);
+  const navigate = useNavigate();
+  const handleClick = (id) => { // 채팅방을 클릭해서
+    navigate(`/inbox?${id}`); //  대화 상자의 ID를 사용하여 URL을 변경하고(navigate 함수를 사용하여), 대화 상자를 열도록(setOpen 함수를 사용하여) 설정
+    setOpen(true);
+  };
+
+  useEffect(() => { // 채팅방의 다른 참여자(대화 상대)의 정보를 가져오는 코드
+    setActiveStatus(online);
+    const userId = data.members.find((user) => user !== me); // 대화 상자의 참여자 중 현재 사용자(me)와 다른 참여자의 ID를 찾습니다. 즉, 이 코드는 현재 대화 상자의 다른 참여자(대화 상대)의 ID를 가져옵니다.
+    const getUser = async () => {
+      try {
+        const res = await axios.get(
+          process.env.REACT_APP_BACKEND_URL + `/shop/get-shop-info/${userId}`
+        );
+
+        setUser(res.data.shop);
+      } catch (error) {
+        console.log(error);
+      }
+    };
+    getUser();
+  }, [me, data]);
+
+  return (
+    <div
+      className={`w-full flex p-3 px-3 ${
+        active === index ? "bg-[#00000010]" : "bg-transparent"
+      }  cursor-pointer`}
+      onClick={(e) =>
+        setActive(index) ||
+        handleClick(data._id) ||
+        setCurrentChat(data) ||
+        setUserData(user) ||
+        setActiveStatus(online)
+      }
+    >
+      {/* Displaying user avatar and online status */}
+      <div className="relative">
+        <img
+          src={
+            userData?.avatar
+              ? process.env.REACT_APP_BACKEND + `/${userData?.avatar}`
+              : process.env.REACT_APP_BACKEND + `/kakaoAvatar.jpg` // 기본 이미지 경로
+          }
+          alt=""
+          className="w-[50px] h-[50px] rounded-full"
+        />
+        {online ? (
+          <div className="w-[12px] h-[12px] bg-green-400 rounded-full absolute top-[2px] right-[2px]" />
+        ) : (
+          <div className="w-[12px] h-[12px] bg-[#c7b9b9] rounded-full absolute top-[2px] right-[2px]" />
+        )}
+      </div>
+      <div className="pl-3">
+        {/* Displaying user name and last message */}
+        <h1 className="text-[18px]">{userData?.name}</h1>
+        {data?.lastMessage ? (
+          <p className="text-[16px] text-[#000c]">
+            {data?.lastMessageId !== userData?._id
+              ? "You:"
+              : userData?.name.split(" ")[0] + ": "}{" "} {/*마지막 메시지의 발신자가 현재 사용자인지 확인하여 적절한 텍스트를 표시합니다. 만약 마지막 메시지의 발신자가 현재 사용자라면 "You:"를 표시하고, 그렇지 않으면 대화 상대의 이름과 콜론을 표시 */}
+            {data?.lastMessage}
+          </p>
+        ) : (
+          <p className="text-[16px] text-[#000c]">대화내용 없음</p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// 판매자와의 대화 창 컴포넌트입니다.
+const SellerInbox = ({
+  setOpen,
+  newMessage,
+  setNewMessage,
+  sendMessageHandler,
+  messages,
+  sellerId,
+  userData,
+  activeStatus,
+  scrollRef,
+}) => {
+  return (
+    <div className="w-[full] min-h-full flex flex-col justify-between p-5">
+      {/* Message header */}
+      <div className="w-full flex p-3 items-center justify-between bg-slate-200">
+        <div className="flex">
+          <img
+            src={
+              userData?.avatar
+                ? process.env.REACT_APP_BACKEND + `/${userData?.avatar}`
+                : process.env.REACT_APP_BACKEND + `/kakaoAvatar.jpg` // 기본 이미지 경로
+            }
+            alt=""
+            className="w-[60px] h-[60px] rounded-full"
+          />
+          <div className="pl-3">
+            <h1 className="text-[18px] font-[600]">{userData?.name}</h1>
+            <h1>{activeStatus ? "접속중" : ""}</h1>
+          </div>
+        </div>
+        {/* Close button */}
+        <AiOutlineArrowRight
+          size={20}
+          className="cursor-pointer"
+          onClick={() => setOpen(false)}
+        />
+      </div>
+
+      {/* Messages */}
+      <div className="px-3 h-[75vh] py-3 overflow-y-scroll">
+        {messages &&
+          messages.map((item, index) => (
+            <div
+              className={`flex w-full my-2 ${
+                item.sender === sellerId ? "justify-end" : "justify-start"
+              }`}
+              ref={scrollRef}
+            >
+              {/* Displaying user avatar */}
+              {item.sender !== sellerId && (
+                <img
+                  src={
+                    userData?.avatar
+                      ? process.env.REACT_APP_BACKEND + `/${userData?.avatar}`
+                      : process.env.REACT_APP_BACKEND + `/kakaoAvatar.jpg` // 기본 이미지 경로
+                  }
+                  className="w-[40px] h-[40px] rounded-full mr-3"
+                  alt=""
+                />
+              )}
+              <div>
+                {/* Displaying messages */}
+                <div
+                  className={`w-max p-2 rounded ${
+                    item.sender === sellerId ? "bg-[#000]" : "bg-[#38c776]"
+                  } text-[#fff] h-min`}
+                >
+                  <p>{item.text}</p>
+                </div>
+
+                <p className="text-[12px] text-[#000000d3] pt-1">
+                  {format(item.createdAt)}
+                </p>
+              </div>
+            </div>
+          ))}
+      </div>
+
+      {/* Send message input */}
+      <form
+        aria-required={true}
+        className="p-3 relative w-full flex justify-between items-center"
+        onSubmit={sendMessageHandler}
+      >
+        <div className="w-[30px]">
+          <TfiGallery className="cursor-pointer" size={20} />
+        </div>
+        <div className="w-full">
+          <input
+            type="text"
+            required
+            placeholder="메세지를 입력하세요"
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            className={`${styles.input}`}
+          />
+          <input type="submit" value="Send" className="hidden" id="send" />
+          <label htmlFor="send">
+            <AiOutlineSend
+              size={20}
+              className="absolute right-4 top-5 cursor-pointer"
+            />
+          </label>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+export default UserInbox;
+```
+
+```jsx
+상태(State) 초기화:
+
+const UserInbox = () => {
+  const { user } = useSelector((state) => state.user);
+  const [conversations, setConversations] = useState([]);
+  const [arrivalMessage, setArrivalMessage] = useState(null);
+  const [currentChat, setCurrentChat] = useState();
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [userData, setUserData] = useState(null);
+  const [onlineUsers, setOnlineUsers] = useState([]);
+  const [activeStatus, setActiveStatus] = useState(false);
+  const [open, setOpen] = useState(false);
+  const scrollRef = useRef(null);
+
+
+conversations: 대화 목록을 저장한다.
+arrivalMessage: 도착한 메시지를 저장한다.
+currentChat: 현재 대화 상대를 저장한다.
+messages: 대화 내용을 저장한다.
+newMessage: 새로 작성한 메시지를 저장한다.
+userData: 상대방의 정보를 저장한다.
+onlineUsers: 온라인 사용자 목록을 저장한다.
+activeStatus: 사용자의 온라인 상태를 저장한다.
+scrollRef: 메시지 스크롤을 관리하기 위한 참조를 저장한다.
+
+-----------------------------------------
+
+useEffect를 사용한 동작 설정:
+
+useEffect(() => {
+  // Socket.IO를 사용하여 새로운 메시지 수신을 처리합니다.
+}, []);
+
+useEffect(() => {
+  // 도착한 메시지를 처리하여 대화 목록에 추가합니다.
+}, [arrivalMessage, currentChat]);
+
+useEffect(() => {
+  // 사용자의 대화 목록을 가져와 설정합니다.
+}, [user, messages]);
+
+useEffect(() => {
+  // 사용자가 로그인하면 소켓에 사용자를 추가하고 온라인 사용자 목록을 가져옵니다.
+}, [user]);
+
+useEffect(() => {
+  // 현재 대화의 메시지를 가져와 설정합니다.
+}, [currentChat]);
+
+useEffect(() => {
+  // 새로운 메시지가 도착할 때마다 스크롤을 하단으로 이동시킵니다.
+}, [messages]);
+
+Socket.IO를 통한 메시지 수신 설정
+도착한 메시지 처리
+대화 목록 가져오기
+온라인 사용자 목록 가져오기
+대화 메시지 가져오기
+새로운 메시지 도착 시 스크롤 처리
+
+-----------------------------------------
+
+렌더링:
+
+return (
+  <div className="w-full">
+    {/* 대화 목록 화면 */}
+    {!open && (
+      <>
+        <Header />
+        <h1 className="text-center text-[30px] py-3 font-Poppins">
+          모든 메세지
+        </h1>
+        <div className="p-12">
+          {/* 대화 목록을 렌더링합니다. */}
+        </div>
+      </>
+    )}
+
+    {/* 대화창 화면 */}
+    {open && (
+      <SellerInbox
+        // SellerInbox 컴포넌트에 필요한 props를 전달합니다.
+      />
+    )}
+  </div>
+);
+
+대화 목록 화면과 대화창 화면을 조건부로 렌더링합니다.
+대화 목록은 conversations 배열을 매핑하여 렌더링합니다.
+대화창은 SellerInbox 컴포넌트로 대화 정보와 메시지를 전달합니다.
+
+SellerInbox 컴포넌트:
+SellerInbox 컴포넌트는 판매자와의 대화를 담당하는 부분입니다.
+메시지 헤더, 메시지 목록, 메시지 입력 창 등을 렌더링합니다.
+메시지 목록은 messages 배열을 매핑하여 렌더링합니다.
+메시지를 입력하고 전송할 수 있는 입력 창을 제공합니다.
+
+MessageList 컴포넌트:
+MessageList 컴포넌트는 대화 목록을 표시하는 부분입니다.
+각 대화 항목을 클릭하면 해당 대화창이 열리도록 합니다.
+사용자와 상대방의 프로필 이미지, 이름, 마지막 메시지 등을 표시합니다.
+온라인 상태에 따라 온라인/오프라인 상태를 표시합니다.
+
+-----------------------------------------
+
+메시지 전송 및 수신 처리:
+
+// 새로운 메시지 전송 처리
+const sendMessageHandler = async (e) => {
+  e.preventDefault();
+
+  const message = {
+    sender: user._id,
+    text: newMessage,
+    conversationId: currentChat._id,
+  };
+  const receiverId = currentChat.members.find(
+    (member) => member !== user?._id
+  );
+
+  // Socket.IO를 통해 메시지를 전송합니다.
+  socketId.emit("sendMessage", {
+    senderId: user?._id,
+    receiverId,
+    text: newMessage,
+  });
+
+  try {
+    if (newMessage !== "") {
+      // 새로운 메시지를 백엔드로 전송합니다.
+      const response = await axios.post(
+        process.env.REACT_APP_BACKEND_URL + `/message/create-new-message`,
+        message
+      );
+
+      // 전송에 성공하면 메시지 목록을 업데이트합니다.
+      setMessages([...messages, response.data.message]);
+
+      // 마지막 메시지 업데이트 요청을 백엔드로 전송합니다.
+      updateLastMessage();
+    }
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+// 마지막 메시지 업데이트 처리
+const updateLastMessage = async () => {
+  // Socket.IO를 통해 마지막 메시지 업데이트를 요청합니다.
+  socketId.emit("updateLastMessage", {
+    lastMessage: newMessage,
+    lastMessageId: user._id,
+  });
+
+  try {
+    // 백엔드로 마지막 메시지 업데이트를 요청합니다.
+    await axios.put(
+      process.env.REACT_APP_BACKEND_URL +
+        `/conversation/update-last-message/${currentChat._id}`,
+      {
+        lastMessage: newMessage,
+        lastMessageId: user._id,
+      }
+    );
+
+    // 메시지 입력창을 초기화합니다.
+    setNewMessage("");
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+-----------------------------------------
+
+같은 방에 접속하게 하는 원리
+
+주어진 코드에서는 Socket.IO를 사용하여 클라이언트가 같은 방에 접속하게 된다. 여기서 "같은 방에 접속하다"는 의미는 서버 측에서 클라이언트들을 동일한 그룹으로 그룹화하는 것을 의미한다. 이렇게 하면 해당 방에 속한 클라이언트끼리 메시지를 주고받을 수 있다.
+
+주요 접속 과정은 다음과 같다:
+
+클라이언트가 앱에 접속하면, 클라이언트는 Socket.IO를 사용하여 서버에 연결한다. 이때 클라이언트는 웹 소켓(WebSocket)을 통해 실시간 통신을 수행할 수 있다.
+
+클라이언트가 서버에 연결되면, 서버에서는 클라이언트의 연결을 확인하고 해당 클라이언트를 적절한 방 또는 그룹에 조인시킨다. 방 또는 그룹은 보통 특정 사용자 그룹 또는 특정 대화 상자(채팅방)와 관련된 클라이언트들로 구성된다.
+
+클라이언트가 특정 방에 조인되면, 해당 방에 속한 다른 클라이언트들과 실시간으로 메시지를 교환할 수 있다. 이를 통해 동일한 방에 속한 클라이언트들끼리 채팅이 가능해진다.
+
+클라이언트가 방에서 나가면, 서버는 해당 클라이언트를 방에서 제거하고 연결을 종료한다.
+
+이 과정에서 클라이언트가 서버에 방에 조인하는 부분은 일반적으로 Socket.IO의 socket.join() 메서드 또는 이와 유사한 메서드를 사용하여 이루어진다. 클라이언트는 서버에 특정 방에 조인하는 요청을 보내고, 서버는 이를 확인하고 해당 클라이언트를 방에 조인시킨다.
+
+주어진 코드에서는 서버 측에서 socketId.emit("addUser", userId)와 같은 방식으로 클라이언트가 방에 조인하는 부분이 이루어진다. 이를 통해 클라이언트는 해당 방에 접속하게 되고, 동일한 방에 속한 다른 클라이언트들과 실시간으로 메시지를 교환할 수 있다.
+```

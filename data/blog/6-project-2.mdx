@@ -1,0 +1,76 @@
+---
+title: '섹션 6: Project 2 시스템 통계 및 렌더러 프로세스'
+date: '2026-09-02'
+category: '풀스택/Electron'
+tags: ['풀스택', 'Electron']
+draft: false
+summary: ''
+---
+
+# { CPU 및 메모리 정보를 가져오기 }
+
+[https://app.notion.com](https://app.notion.com)
+
+```jsx
+💡 앱이 시스템 정보를 가져와 화면에 표시하는 과정은 다음과 같이 진행됩니다.
+
+1. node-os-utils 라이브러리를 사용하여 CPU 및 메모리 정보를 가져옴
+
+2. Electron의 ipcMain과 ipcRenderer를 이용해 메인 프로세스에서 정보를 가져와 렌더러 프로세스로 전달
+
+3. 렌더러 프로세스에서 받은 데이터를 HTML 요소에 표시
+```
+
+## 2️⃣ **메인 프로세스에서 CPU 및 메모리 정보 가져오기**
+
+```jsx
+메인 프로세스는 Electron의 핵심적인 역할을 하며,
+
+시스템 리소스와 직접 연결됩니다.
+
+우리는 node-os-utils 라이브러리를 사용하여 CPU 및 메모리 정보를 가져옵니다.
+```
+
+### 메인 프로세스 파일: `main.js`
+
+```jsx
+const osu = require('node-os-utils') // 시스템 정보 라이브러리
+const cpu = osu.cpu // CPU 관련 정보 가져오기
+const mem = osu.mem // 메모리 관련 정보 가져오기
+const os = osu.os // OS 관련 정보 가져오기
+const { app, BrowserWindow, ipcMain } = require('electron')
+
+let mainWindow
+
+function createMainWindow() {
+  mainWindow = new BrowserWindow({
+    title: 'SysTop',
+    width: 700,
+    height: 500,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+  })
+
+  mainWindow.loadFile('./app/index.html')
+}
+
+app.whenReady().then(createMainWindow)
+
+// 시스템 정보 제공 (렌더러 프로세스로 데이터 전송)
+ipcMain.handle('getComInfo', async () => {
+  const cpuModel = await cpu.model() // CPU 모델 이름 가져오기
+  const compName = await os.hostname() // 컴퓨터 이름 가져오기
+  const osInfo = `${os.type()} ${os.arch()}` // 운영체제 정보 가져오기
+  const memInfo = await mem.info() // 메모리 정보 가져오기
+
+  return {
+    model: cpuModel,
+    compName: compName,
+    osInfo: osInfo,
+    memInfo: memInfo,
+  }
+})
+```

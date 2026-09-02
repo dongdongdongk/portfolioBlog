@@ -1,0 +1,825 @@
+---
+title: 'Pager & 검색 만들기'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+- 과거 정리
+  ![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381054/notion-blog/_/_/Spring_/Pager_/Untitled.png)
+
+  ```jsx
+  DB 에서는 저부분을 **rownum** 이라고 부른다
+  ```
+
+  ![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381051/notion-blog/_/_/Spring_/Pager_/Untitled_1.png)
+
+  ```jsx
+  <select id="getBankBookList" parameterType="Pager" resultType="BankBookDTO">
+    SELECT * FROM //3. SELECT 모든 컬럼 FROM 아래 만들어둔 테이블 WHRER RowNum 이 startRow 부터
+    lastRow 사이에 (1-10 이면 페이지 10개씩 가지고 오는것) ( SELECT ROWNUM R, B.* FROM //2.RowNum R,
+    과 B의 모든컬럼을 FROM B라는 테이블에서 / 이걸 보여주는 화면을 view 라고 하고 이걸 다시 테이블로
+    만든다 ( SELECT * FROM BANKBOOK //1. BankBook 의 BookNum 을 정렬한뒤 이를 B 라는 테이블이라
+    명칭한다.
+    <include refid="searchCondition"></include> //서치때 설명 ORDER BY BOOKNUM DESC ) B ) WHERE R
+    BETWEEN #{startRow} AND #{lastRow}
+  </select>
+  ```
+
+  ![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381053/notion-blog/_/_/Spring_/Pager_/Untitled_2.png)
+  view 테이블
+  ![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381053/notion-blog/_/_/Spring_/Pager_/Untitled_3.png)
+
+  ```jsx
+  parameterType = pager 을 사용하기 위해서 typeAlias 등록을 잊지말자
+  ```
+
+  ## Pager & 검색
+
+  ```java
+  package com.iu.s1.util;
+
+  public class Pager {
+
+  	private Long bookNum;
+
+  	private Long num;
+
+  	//검색 종류(사용할 column)
+  	private String kind;
+  	//검색어
+  	private String search;
+
+  	//한 페이지에 출력할 row 갯수
+  	private Long perPage;
+
+  	//한블럭당 출력할 번호의 갯수
+  	private Long perBlock;
+
+  	//전체 page 갯수
+  	private Long totalPage;
+
+  	//Client가 보고싶은 페이지 번호(parameter)
+  	private Long page;
+
+  	//테이블에서 조회 할 시작번호
+  	private Long startRow;
+  	//테이블에서 조회 할 끝번호
+  	private Long lastRow;
+
+  	private Long startNum;
+  	private Long lastNum;
+
+  	private boolean before;
+  	private boolean after;
+
+
+
+  	public Pager() {
+  		this.perPage=10L;
+  	}
+
+
+  	//startRow, lastRow 계산하는 메서드
+  	public void makeRow() {
+  		this.startRow = (this.getPage()-1)*this.getPerPage()+1; // 10번 페이지라면 9
+  		this.lastRow = this.getPage()*this.getPerPage();
+  	}
+
+  	//startNum, lastNum
+  	public void makeNum(Long totalCount) {
+
+  		//1. 전체 row의 갯수 구하기
+  		//2. 총 page의 갯수 구하기
+  		//ex> totalCount가 135 getPerPage가 10이면 14개 페이지
+  		this.totalPage = totalCount/this.getPerPage();
+  		if(totalCount % this.getPerPage() != 0) {
+  			//totalPage = totalPage+1;
+  			//totalPage+=1;
+  			totalPage++;
+  		}
+  		if(this.getPage()>totalPage) {
+  			this.setPage(totalPage);
+
+  		}
+  		//3. 한 블럭에 출력할 번호의 갯수
+  		//1-5페이지
+
+
+  		//4. 총 블럭의 수 구하기
+  		//1-5페이지 구성하는 블럭 몇개?
+  		//14개의 페이지가 있으면 총 3개의 블럭
+  		Long totalBlock = totalPage / this.getPerBlock();
+  		if(totalPage % this.getPerBlock() != 0) {
+  			totalBlock++;
+  		}
+
+  		//5. page 번호로 현재 블럭 번호 구하기
+  		// page 1-5 curBlock=1
+  		// page 6-10 curBlock=2
+  		// page 11-15 curBlock=3
+  		Long curBlock = this.getPage() / this.getPerBlock();
+  		if(this.getPage() % this.getPerBlock() != 0) {
+  			curBlock++;
+  		}
+
+  		//6.curBlock의 시작번호와 끝번호를 계산
+  		/** curBlock	satartNum	lastNum
+  		 *  1			1			5
+  		 * 	2			6			10
+  		 *	3			11			15
+  		 */
+  		this.startNum=(curBlock-1)*(this.getPerBlock())+1;
+  		this.lastNum= this.getPerBlock()*curBlock;
+
+  		this.after=true;
+  		if(curBlock==totalBlock) {
+  			lastNum=totalPage;
+  			this.after=false;
+  		}
+
+  		if(curBlock==1) {
+  			this.before=true;
+  		}
+  	}
+
+
+  	public Long getNum() {
+  		return num;
+  	}
+  	public void setNum(Long num) {
+  		this.num = num;
+  	}
+
+  	public Long getBookNum() {
+  		return bookNum;
+  	}
+  	public void setBookNum(Long bookNum) {
+  		this.bookNum = bookNum;
+  	}
+
+  	public String getKind() {
+  		return kind;
+  	}
+  	public void setKind(String kind) {
+  		this.kind = kind;
+  	}
+
+  	public String getSearch() {
+  		if(search == null) {
+  			search="";
+  		}
+  		return search; //"%"+search+"%";
+  	}
+  	public void setSearch(String search) {
+  		this.search = search;
+  	}
+
+  	public Long getTotalPage() {
+  		return totalPage;
+  	}
+
+  	public Long getPerBlock() {
+  		if(this.perBlock == null || this.perBlock<1) {
+  			this.perBlock=5L;
+  		}
+
+  		return perBlock;
+  	}
+  	public void setPerBlock(Long perBlock) {
+  		this.perBlock = perBlock;
+  	}
+
+
+  	public Long getPerPage() {
+  		if(this.perPage==null || this.perPage ==0) {
+  			this.perPage=10L;
+  		}
+
+  		return perPage;
+  	}
+  	public void setPerPage(Long perPage) {
+  		this.perPage = perPage;
+  	}
+
+  	public Long getPage() {
+  		if(this.page==null || this.page<1) {
+  			this.page=1L;
+  		}
+  		return page;
+  	}
+  	public void setPage(Long page) {
+  		this.page = page;
+  	}
+
+  	public boolean isAfter() {
+  		return after;
+  	}
+
+  	public void setAfter(boolean after) {
+  		this.after = after;
+  	}
+
+  	public boolean isBefore() {
+  		return before;
+  	}
+
+  	public void setBefore(boolean before) {
+  		this.before = before;
+  	}
+
+  	public Long getStartNum() {
+  		return startNum;
+  	}
+
+  	public void setStartNum(Long startNum) {
+  		this.startNum = startNum;
+  	}
+
+  	public Long getLastNum() {
+  		return lastNum;
+  	}
+
+  	public void setLastNum(Long lastNum) {
+  		this.lastNum = lastNum;
+  	}
+
+  	public Long getStartRow() {
+  		return startRow;
+  	}
+  	public void setStartRow(Long startRow) {
+  		this.startRow = startRow;
+  	}
+
+  	public Long getLastRow() {
+  		return lastRow;
+  	}
+  	public void setLastRow(Long lastRow) {
+  		this.lastRow = lastRow;
+  	}
+
+  }
+  ```
+
+  ## Pager & 검색 JSP
+
+  ```java
+  <!-- 페이징 -->
+  		<div class="row">
+  			<nav aria-label="Page navigation example">
+  			  <ul class="pagination ">
+  			  <li class="page-item ">
+  			      <a class="page-link" href="#" aria-label="Previous" data-board-page="1">
+  			        <span aria-hidden="true">&laquo;</span>
+  			      </a>
+  			    </li>
+  			    <li class="page-item ${pager.before?'disabled':''}">
+  			      <a class="page-link" href="#" aria-label="Previous" data-board-page="${pager.startNum-1}">
+  			        <span aria-hidden="true">&lsaquo;</span>
+  			      </a>
+  			    </li>
+
+  			    <c:forEach begin="${pager.startNum}" end="${pager.lastNum}" var="i">
+  			    	<li class="page-item"><a class="page-link" href="#" data-board-page="${i}">${i}</a></li>
+  				</c:forEach>
+
+  			    <li class="page-item ${pager.after eq false ? 'disabled' : ''}"> <%--${pager.after eq false ? 'disabled' : ''} --%>
+  			      <a class="page-link" href="#" aria-label="Next" data-board-page="${pager.lastNum+1}">
+  			        <span aria-hidden="true">&rsaquo;</span>
+  			      </a>
+  			    </li><li class="page-item "> <%--${pager.after eq false ? 'disabled' : ''} --%>
+  			      <a class="page-link" href="#" aria-label="Next" data-board-page="${pager.totalPage}">
+  			        <span aria-hidden="true">&raquo;</span>
+  			      </a>
+  			    </li>
+  			  </ul>
+  			</nav>
+  		</div>
+
+  		<!-- 검색창 -->
+  		<div class="row">
+  			<form class="row g-3" action="./list" method="get" id="searchForm">
+  			<input type="hidden" name="page" value="1" id="page">
+  			<div class="col-auto">
+  			    <label for="kind" class="visually-hidden">Kind</label>
+  			    <select class="form-select" name="kind" id="kind" aria-label="Default select example">
+  				  <option value="title" ${pager.kind eq 'title'?'selected':''}>Title</option>
+  				  <option value="contents" ${pager.kind eq 'contents'?'selected':''}>Contents</option>
+  				  <option value="writer" ${pager.kind eq 'writer'?'selected':''}>Writer</option>
+  				</select>
+  			  </div>
+  			  <div class="col-auto">
+  			    <label for="search" class="visually-hidden">Search</label>
+  			    <input type="text" class="form-control" value="${pager.search}" name="search" id="search" placeholder="검색어를 입력하세요.">
+  			  </div>
+  			  <div class="col-auto">
+  			    <button type="submit" class="btn btn-primary mb-3">검색</button>
+  			  </div>
+  			</form>
+  		</div>
+  ```
+
+  ## Mapper
+
+  ```java
+  		<sql id="noticeCondition">
+    		<where>
+    			<if test="kind=='title'">
+    				TITLE LIKE '%' || #{search} || '%'
+    			</if>
+    			<if test="kind=='contents'">
+    				CONTENTS LIKE '%' || #{search} || '%'
+    			</if>
+    			<if test="kind=='writer'">
+    				WRITER LIKE '%' || #{search} || '%'
+    			</if>
+    		</where>
+    	</sql>
+
+    	<select id="getTotalCount" resultType="Long" parameterType="Pager">
+    		SELECT COUNT(NUM) FROM NOTICE
+    		<include refid="noticeCondition"></include>
+    	</select>
+
+    	<select id="getBoardList" resultType="NoticeDTO" parameterType="Pager">
+    		SELECT * FROM
+    		(
+    			SELECT ROWNUM R, C.* FROM
+    				(	SELECT * FROM NOTICE
+  					<include refid="noticeCondition"></include>
+  					ORDER BY NUM DESC
+  				) C
+  			)
+  			WHERE R BETWEEN #{startRow} AND #{lastRow}
+    	</select>
+  ```
+
+  ## Controller
+
+  ```java
+  @RequestMapping(value="list", method = RequestMethod.GET)
+  	public ModelAndView getBoardList(Pager pager) throws Exception{
+  		ModelAndView mv = new ModelAndView();
+  		List<BbsDTO> ar = noticeService.getBoardList(pager);
+
+  		mv.addObject("list", ar);
+  		mv.setViewName("board/list");
+  		return mv;
+  }
+  ```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381053/notion-blog/_/_/Spring_/Pager_/Untitled_4.png)
+
+```java
+Pager 클래스를 제작한다
+
+한 페이지에 출력할 row 갯수등 설정이 가능하다
+```
+
+```java
+package woo.edu.c.utill;
+
+public class Pager {
+
+	//검색 종류(사용할 column)
+	private String kind;
+	//검색어
+	private String search;
+
+	//한페이지에 출력할 ROW의 갯수
+	private Long perPage;
+
+	//한블럭당 출력할 번호의 갯수
+	private Long perBlock;
+
+	//전체 page 갯수
+	private Long totalPage;
+
+	//Client가 보고싶은 페이지 번호(parameter)
+	private Long page;
+
+	//Table에서 조회할 시작번호
+	private Long startRow;
+	//Table에서 조회할 끝번호
+	private Long lastRow;
+
+	//전체 row의 갯수를 담을 변수
+	//private Long totalCount;
+
+	private Long startNum;
+	private Long lastNum;
+
+	private boolean before;
+	private boolean after;
+
+	public Pager() {
+		this.perPage=10L;
+	}
+
+	//startRow, lastRow 계산 하는 메서드
+	public void makeRow() {
+		this.startRow = (this.getPage()-1)*this.getPerPage()+1;
+		this.lastRow = this.getPage()*this.getPerPage();
+	}
+
+	//startNum, lastNum
+	public void makeNum(Long totalCount) {
+
+		//1. 전체 row의 갯수 구하기
+		//2. 총 page의 갯수 구하기
+		this.totalPage = totalCount/this.getPerPage();
+		if(totalCount%this.getPerPage() != 0 ) {
+			//totalPage=totalPage+1;
+			//totalPage+=1;
+			totalPage++;
+		}
+		if(this.getPage()>totalPage) {
+			this.setPage(totalPage);
+		}
+		//3. 한 블럭에 출력할 번호의 갯수
+
+
+		//4. 총 블럭의 수 구하기
+		Long totalBlock = totalPage / this.getPerBlock();
+		if(totalPage % this.getPerBlock() != 0) {
+			totalBlock++;
+		}
+
+		//5. page 번호로 현재 블럭 번호 구하기
+		// page 1-5 curBlock 1
+		// page 6-10 curBlock 2
+		// page 11-15 curBlock 3
+		 Long curBlock=this.getPage() / this.getPerBlock();
+
+		 if(this.getPage() % this.getPerBlock() != 0) {
+			 curBlock++;
+		 }
+
+		 //6. curBlock의 시작번호와 끝번호를 계산
+		 /**	curBlock	startNum	lastNum
+		  * 	1			1			5
+		  * 	2			6			10
+		  * 	3			11			15
+		  */
+
+		 this.startNum=(curBlock-1)*this.getPerBlock()+1;
+		 this.lastNum=curBlock*this.getPerBlock();
+
+		 this.after=true;
+		 if(curBlock==totalBlock) {
+			 lastNum=totalPage;
+			 this.after=false;
+		 }
+
+		 if(curBlock==1) {
+			 this.before=true;
+		 }
+
+	}
+
+
+//	public Long getTotalCount() {
+//		return totalCount;
+//	}
+//
+//	public void setTotalCount(Long totalCount) {
+//		this.totalCount = totalCount;
+//	}
+
+
+
+
+
+	public Long getPerPage() {
+		if(this.perPage==null || this.perPage==0) {
+			this.perPage=10L;
+		}
+		return perPage;
+	}
+
+	public String getKind() {
+		return kind;
+	}
+
+	public void setKind(String kind) {
+		this.kind = kind;
+	}
+
+	public String getSearch() {
+		if(search == null) {
+			search="";
+		}
+		return search; //"%"+search+"%";
+	}
+
+	public void setSearch(String search) {
+		this.search = search;
+	}
+
+	public Long getTotalPage() {
+		return totalPage;
+	}
+
+	public Long getPerBlock() {
+		if(this.perBlock == null || this.perBlock<1) {
+			this.perBlock=5L;
+		}
+
+		return perBlock;
+	}
+
+	public void setPerBlock(Long perBlock) {
+		this.perBlock = perBlock;
+	}
+
+	public boolean isBefore() {
+		return before;
+	}
+
+	public void setBefore(boolean before) {
+		this.before = before;
+	}
+
+	public boolean isAfter() {
+		return after;
+	}
+
+	public void setAfter(boolean after) {
+		this.after = after;
+	}
+
+	public void setPerPage(Long perPage) {
+		this.perPage = perPage;
+	}
+	public Long getPage() {
+		if(this.page == null || this.page<1) {
+			this.page=1L;
+		}
+		return page;
+	}
+	public void setPage(Long page) {
+		this.page = page;
+	}
+	public Long getStartRow() {
+		return startRow;
+	}
+	public void setStartRow(Long startRow) {
+		this.startRow = startRow;
+	}
+	public Long getLastRow() {
+		return lastRow;
+	}
+	public void setLastRow(Long lastRow) {
+		this.lastRow = lastRow;
+	}
+
+	public Long getStartNum() {
+		return startNum;
+	}
+
+	public void setStartNum(Long startNum) {
+		this.startNum = startNum;
+	}
+
+	public Long getLastNum() {
+		return lastNum;
+	}
+
+	public void setLastNum(Long lastNum) {
+		this.lastNum = lastNum;
+	}
+
+
+
+
+
+}
+```
+
+```java
+매퍼를 제작한다
+
+아래 매퍼는 서치 부분도 포함되어 있다.
+```
+
+```java
+ 	<sql id="boardCondition">   // 서치에 사용하는 부분이다
+
+	  	<if test="kind == 'title'"> // <!-- kind 변수가 'title'인 경우 -->
+	  		WHERE TITLE LIKE '%' || #{search} || '%' // <!-- TITLE 컬럼에서 search 변수와 부분 일치하는 항목 검색 -->
+	  	</if>
+
+	  	<if test="kind == 'contents'">
+	  		WHERE CONTENTS LIKE '%' || #{search} || '%'
+	  	</if>
+
+	  	<if test="kind == 'writer'">
+	  		WHERE WRITER LIKE '%' || #{search} || '%'
+	  	</if>
+
+  	</sql>
+
+	<select id="getTotalCount" resultType="Long" parameterType="Pager"> // <!-- BOARD 테이블의 NUM 컬럼을 COUNT하여 전체 레코드 수를 가져옴 -->
+		SELECT COUNT(NUM) FROM BOARD
+
+		<include refid="boardCondition"></include> // <!-- 앞서 정의한 boardCondition SQL을 포함 (동적 조건 부분) -->
+	</select>
+
+	<select id="getBoardList" parameterType="Pager" resultType="boardVo">
+  		SELECT * FROM
+  			(
+	  			SELECT ROWNUM R, N.* FROM
+		  			(
+			  			SELECT NUM,
+							   TITLE,
+							   CONTENTS,
+							   WRITER,
+							   WRITEDAY
+						  FROM BOARD
+			  			<include refid="boardCondition"></include>
+			  			ORDER BY WRITEDAY DESC
+		  			) N
+  			)
+  			WHERE R BETWEEN #{startRow} AND #{lastRow} // <!-- ROWNUM 값을 사용하여 페이징을 구현, startRow에서 lastRow까지의 결과 반환 -->
+  	</select>
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381053/notion-blog/_/_/Spring_/Pager_/Untitled_5.png)
+
+```java
+@Override
+	public List<boardVo> getBoardList(Pager pager) {
+		return sql.selectList(namespace + ".getBoardList",pager);
+	}
+	@Override
+	public Long getTotalCount(Pager pager) {
+		return sql.selectOne(namespace + ".getTotalCount",pager);
+	}
+```
+
+```java
+DAO 부분을 작성해준다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381053/notion-blog/_/_/Spring_/Pager_/Untitled_6.png)
+
+```java
+@Override
+	public List<boardVo> getBoardList(Pager pager) {
+		pager.makeRow();
+
+		pager.makeNum(boardDao.getTotalCount(pager));
+
+
+		return boardDao.getBoardList(pager);
+	}
+```
+
+```java
+서비스 부분을 작성해 준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381054/notion-blog/_/_/Spring_/Pager_/Untitled_7.png)
+
+```java
+컨트롤러 부분을 작성한다.
+```
+
+```java
+// 게시글 리스트
+	@RequestMapping(value = "/board/boardList", method = RequestMethod.GET)
+	public ModelAndView boardList(Pager pager) throws Exception {
+		logger.info("/board/list");
+		ModelAndView mv = new ModelAndView();
+		List<boardVo> boardList = boardService.getBoardList(pager);
+		mv.addObject("boardList", boardList);
+		mv.setViewName("/board/boardList");
+		return mv;
+	}
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381054/notion-blog/_/_/Spring_/Pager_/Untitled_8.png)
+
+```java
+jsp 부분을 작성한다
+```
+
+```html
+서치 부분의 form 의 action 쪽을 엔드 포인트로 요청을 보내서 페이징을 실시한다 (서치를 없에도 form
+부분은 수정해서 작성 해줘야 한다)
+```
+
+```html
+	  	<!--서치 부분-->
+					<form class="row g-3 " action="./boardList" method="get" id="searchForm">
+						<div class="col-auto ml-auto">
+							<div class="input-group mb-4">
+								<input type="hidden" name="page" value="1" id="page">
+								<div class="col-auto">
+									<label for="kind" class="visually-hidden">Kind</label>
+									<select class="form-select wow fadeInUp" name="kind" id="kind"
+										aria-label="Default select example">
+										<option value="title" ${pager.kind eq 'title' ? 'selected' :''}>Title</option>
+										<option value="contents" ${pager.kind eq 'contents' ?'selected':''}>Contents
+										</option>
+										<option value="writer" ${pager.kind eq 'writer' ? 'selected' :''}>Writer
+										</option>
+									</select>
+								</div>
+								<input type="text" class="form-control mb-4"
+									value="${pager.search}" name="search" id="search" placeholder="검색어를 입력하세요">
+								<button type="submit" style="background: none; border: none; cursor: pointer;"
+									class="align-items-start">
+									<img src="/resources/images/search.png" alt="search" width="30" height="30"
+										class="mb-3 wow fadeInUp"
+										style="visibility: visible; animation-delay: 0.1s; animation-name: fadeInUp;">
+								</button>
+							</div>
+						</div>
+					</form>
+
+					<!-- 페이징 -->
+					<div class="row">
+						<nav aria-label="Page navigation example">
+							<ul class="pagination ">
+								<li class="page-item "><a class="page-link text-dark" href="#"
+										aria-label="Previous" data-board-page="1"> <span
+											aria-hidden="true">&laquo;</span>
+									</a></li>
+								<li class="page-item ${pager.before?'disabled':''}"><a
+										class="page-link text-dark" href="#" aria-label="Previous"
+										data-board-page="${pager.startNum-1}"> <span aria-hidden="true">&lsaquo;</span> <!--JSTL(JavaServer Pages Standard Tag Library)을 사용하여 이전 버튼이 비활성화되는 경우 "disabled" 클래스가 추가되도록함 -->
+									</a></li>
+
+								<c:forEach begin="${pager.startNum}" end="${pager.lastNum}" var="i"> <!--<c:forEach begin="${pager.startNum}" end="${pager.lastNum}" var="i">: JSTL의 <c:forEach>를 사용하여 페이지 번호를 동적으로 생성 -->
+									<li class="page-item"><a class="page-link text-dark" href="#"
+											data-board-page="${i}">${i}</a></li> <!--<a class="page-link text-dark" href="#" data-board-page="${i}">${i}</a>: 페이지 번호를 나타내는 링크를 생성하고, 클릭 시 해당 페이지로 이동하도록 함 -->
+								</c:forEach>
+
+								<li class="page-item ${pager.after eq false ? 'disabled' : ''}">
+									<%--${pager.after eq false ? 'disabled' : '' } --%> <a
+											class="page-link text-dark" href="#" aria-label="Next"
+											data-board-page="${pager.lastNum+1}"> <span
+												aria-hidden="true">&rsaquo;</span>
+										</a>
+								</li>
+								<li class="page-item ">
+									<%--${pager.after eq false ? 'disabled' : '' } --%> <a
+											class="page-link text-dark" href="#" aria-label="Next"
+											data-board-page="${pager.totalPage}"> <span
+												aria-hidden="true">&raquo;</span>
+										</a>
+								</li>
+							</ul>
+						</nav>
+					</div>
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381054/notion-blog/_/_/Spring_/Pager_/Untitled_9.png)
+
+```html
+js 파일을 작성 해 준다
+```
+
+```jsx
+const pl = document.getElementsByClassName('page-link')
+const searchForm = document.getElementById('searchForm')
+const page = document.getElementById('page')
+
+//for
+//for of --for(꺼낸타입명 변수명: Collection)
+
+for (let p of pl) {
+  p.addEventListener('click', function (e) {
+    let v = p.getAttribute('data-board-page')
+    console.log(v)
+    page.value = v
+    searchForm.submit()
+  })
+}
+
+let data = ''
+function setData(d) {
+  data = d
+}
+//js에서 EL을 사용할 수 없으므로 함수를 사용해
+//JSP에 있는 데이터를 가져올 수 있다.
+```
+
+```jsx
+서치 창에 보면
+
+<input type="hidden" name="page" value="1" id="page"> 가 숨겨져 있다
+
+여기에 클릭한 페이지 버튼의 값을 넣어서 보내줘서 원하는 페이지로 이동한다
+
+페이저 부분인데 여기의 data-board-page 부분의 값에 이동하고 싶은 페이지의 번호가 들어있다 클릭하면 위의 인풋의 value 값에 대입하고 submit 하여 이동
+
+<li class="page-item ${pager.before?'disabled':''}"><a class="page-link text-dark" href="#" aria-label="Previous" data-board-page="${pager.startNum-1}"> <span aria-hidden="true">&lsaquo;</span></a></li>
+
+form 부분이다 (id searchForm)
+
+<form class="row g-3 " action="./boardList" method="get" id="searchForm">
+```

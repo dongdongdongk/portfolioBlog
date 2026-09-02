@@ -1,0 +1,788 @@
+---
+title: 'BCh05 05 p278 서비스계층처리'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# 조회 화면에서 필요한 JPQL
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381230/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled.png)
+
+```java
+게시글 상세에 들어갔을 떄
+
+게시글 + 댓글 개수 + 회원 이렇게 3가지가 필요하다
+```
+
+## 게시물 상세 쿼리 작성 + 테스트
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381224/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_1.png)
+
+```java
+게시글 정보와 ,작성자 , 총 댓글 수를 bno 에 맞춰서 조회한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381227/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_2.png)
+
+```java
+게시글 상세 조회를 위해서 테스트를 실시
+```
+
+```java
+Hibernate:
+    select
+        board0_.bno as col_0_0_,
+        member1_.email as col_1_0_,
+        count(reply2_.rno) as col_2_0_,
+        board0_.bno as bno1_0_0_,
+        member1_.email as email1_1_1_,
+        board0_.moddate as moddate2_0_0_,
+        board0_.regdate as regdate3_0_0_,
+        board0_.content as content4_0_0_,
+        board0_.title as title5_0_0_,
+        board0_.writer_email as writer_e6_0_0_,
+        member1_.moddate as moddate2_1_1_,
+        member1_.regdate as regdate3_1_1_,
+        member1_.name as name4_1_1_,
+        member1_.password as password5_1_1_
+    from
+        board board0_
+    left outer join
+        member member1_
+            on board0_.writer_email=member1_.email
+    left outer join
+        reply reply2_
+            on (
+                reply2_.board_bno=board0_.bno
+            )
+    where
+        board0_.bno=?
+[Board(bno=100, title=Title...100, content=Content...100), Member(email=user100@aaa.com, password=123456, name=USER100), 2]
+```
+
+# 프로젝트 적용하기 - 게시물 등록
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381229/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_3.png)
+
+```java
+프로젝트 적용할 때는 게시글 등록부터 (1차도메인) 시작한다
+
+DTO 는 엔티티랑 약간 다른면이 있는데 DTO 는 화면쪽으로 설명하는게 편하다
+
+(DTO 는 화면에서 필요한 내용 위주로 작성하기 때문에 위의 내용처럼 필요한 데이터만 따로따로 다 분해 하는게 더 낫다)
+
+(이 모든건 화면 설계를 하면서 잡아줘야 나중에 수정도 적고 편하다 정리를 잘해주자 )
+```
+
+## BoardDTO 작성
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381229/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_4.png)
+
+```java
+DTO 패키지와 BoardDTO 를 작성해준다
+
+DTO 는 Getter,Setter 가 굉장히 자유로운 애들이라고 생각하면 편하다
+
+한번 쓰고 버리는 일회용 포장용지 같은 느낌으로 잡아준다
+```
+
+## Board dtoToEntity 작성
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381229/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_5.png)
+
+```java
+default Board dtoToEntity(BoardDTO dto){
+
+        Member member = Member.builder().email(dto.getWriterEmail()).build();
+
+        Board board = Board.builder()
+                .bno(dto.getBno())
+                .title(dto.getTitle())
+                .content(dto.getContent())
+                .writer(member)
+                .build();
+        return board;
+    }
+```
+
+```java
+service 영역을 만들어 준다
+
+BoardService 는 BoardDTO 를 엔티티로 바꿔주는 역할을 수행한다
+
+(인터페이스에서 default 로 생성)
+```
+
+[서비스 계층과 DTO](<BCh04%2005%20p158%20%EC%84%9C%EB%B9%84%EC%8A%A4%EA%B3%84%EC%B8%B5%EA%B3%BC%20DTO(1)%20022af846397741bba5543134b6e2ba75.md>)
+
+## 게시글 등록 메서드 작성
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381230/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_6.png)
+
+```java
+BoardServiceImpl 에서는 인터페이스에서 선언한 register (게시물 등록) 을
+
+아까만든 dtoToEntity 기능을 활용해서 구현해준다 (추상 메서드를 만들지 않는 전략 )
+```
+
+## 게시글 등록 테스트
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381230/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_7.png)
+
+```java
+@Test
+    public void testRegister() {
+        BoardDTO boardDTO = BoardDTO.builder()
+                .title("Test.....")
+                .content("Test.....")
+                .writerEmail("user55@aaa.com")
+                .build();
+        Long bno = boardService.register(boardDTO);
+    }
+```
+
+```java
+게시물 등록 서비스를 테스트한다
+```
+
+```java
+Hibernate:
+    select
+        member_.email,
+        member_.moddate as moddate2_1_,
+        member_.name as name4_1_,
+        member_.password as password5_1_
+    from
+        member member_
+    where
+        member_.email=?
+Hibernate:
+    insert
+    into
+        board
+        (moddate, regdate, content, title, writer_email)
+    values
+        (?, ?, ?, ?, ?)
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381230/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_8.png)
+
+### 인서트 인데 Select 를 먼저 하는이유
+
+```java
+Hibernate은 데이터베이스와 자바 객체를 연결해주는 도구인데,
+
+이 도구가 관련된 정보를 잘 다루려면 그 정보를 일시적으로 저장해두는데, 이게 바로 "영속성 컨텍스트"라고 하는 곳이다.
+
+그래서 Hibernate은 필요한 정보를 먼저 이 곳에 로딩해서 저장한다.
+
+그런데 외래 키 같은 걸 설정할 때, Hibernate은 저장된 정보를 활용해 데이터베이스에 물어보지 않고도 필요한 작업을 할 수 있다.
+
+이렇게 하면 불필요한 질문을 하지 않아도 되고, 정보를 효율적으로 다룰 수 있게 된다.
+
+그래서 Hibernate은 데이터베이스에 덜 물어보고도 똑똑하게 효율적으로 작업할 수 있게 되는것.
+
+( 이렇게 Select 와 insert 를 하는걸 엄격하게 락 이라고 하는데 이것도 원래는 트랜젝션 처리를 하는게 좋다 -- 나중에 더 상세하게 정리필요 )
+```
+
+# 게시물 목록 처리
+
+## PageRequestDTO 작성
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381230/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_9.png)
+
+```java
+@Builder
+@AllArgsConstructor
+@Data
+public class PageRequestDTO {
+
+    private int page;
+    private  int size;
+
+    public PageRequestDTO() {
+        this.page = 1;
+        this.size = 10;
+    }
+
+    public Pageable getPageable(Sort sort) {
+
+        return PageRequest.of(page -1, size, sort);
+
+    }
+}
+```
+
+```java
+파라미터와 페이징 결과를 처리하기 위해 PageRequestDTO 와 PageResultDTO 를 작성한다
+```
+
+## PageResultDTO 작성
+
+```java
+@Data
+public class PageResultDTO<DTO, EN> {
+
+    // DTO 리스트
+    private List<DTO> dtoList;
+
+    // 총 페이지 번호
+    private int totalPage;
+
+    // 현재 페이지 번호
+    private int page;
+
+    // 목록 사이즈
+    private int size;
+
+    // 시작 페이지 번호, 끝 페이지 번호
+    private int start, end;
+
+    // 이전, 다음
+    private boolean prev, next;
+
+    // 페이지 번호 목록
+    private  List<Integer> pageList;
+
+    // 생성자: Page<EN> 타입의 데이터와 매핑 함수(Function<EN, DTO>)를 받음
+    public PageResultDTO(Page<EN> result, Function<EN, DTO> fn) {
+
+        // result 내의 엔티티 데이터를 DTO로 변환하여 리스트로 저장
+        dtoList = result.stream().map(fn).collect(Collectors.toList());
+        // 총 페이지 수 설정
+        totalPage = result.getTotalPages();
+        // 페이지 번호 목록 생성
+        makePageList(result.getPageable());
+
+    }
+
+    // 현재 페이지 정보를 기반으로 페이지 번호 목록 생성
+    public void makePageList(Pageable pageable) {
+
+        this.page = pageable.getPageNumber() + 1; // 0부터 시작하므로 1을 추가
+        this.size = pageable.getPageSize();
+
+        //temp end page
+        int tempEnd = (int)(Math.ceil(page/10.0)) * 10;
+
+        start = tempEnd - 9;
+
+        prev = start > 1;
+
+        end = totalPage > tempEnd ? tempEnd : totalPage;
+
+        next = totalPage > tempEnd;
+
+        // 페이지 번호 목록 생성 (start부터 end까지)
+        pageList = IntStream.rangeClosed(start,end).boxed().collect(Collectors.toList());
+        // boxed() 는 IntStream 을 Integer 로 변환하여 List<Integer> pageList 에 수집 가능하도록 래퍼 객체로 바꿔준다
+    }
+}
+```
+
+## **Object[ ]을 DTO 로 변환하기**
+
+## 리스트 목록을 처리하기 위한 메서드 추가
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381224/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_10.png)
+
+```java
+게시글 목록을 처리하기 위한 메서드를 추가해준다
+```
+
+## Board **entityToDTO 작성**
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381225/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_11.png)
+
+```java
+default BoardDTO entityToDTO(Board board, Member member, Long replyCount) {
+
+        BoardDTO boardDTO = BoardDTO.builder()
+                .bno(board.getBno())
+                .title(board.getTitle())
+                .content(board.getContent())
+                .regDate(board.getRegDate())
+                .modDate(board.getModDate())
+                .writerEmail(member.getEmail())
+                .writerName(member.getName())
+                .replyCount(replyCount.intValue()) //int로 처리하도록
+                .build();
+
+        return boardDTO;
+
+    }
+```
+
+```java
+Board 엔티티를 DTO 로 변환하기 위한 코드를 작성한다
+
+게시글 목록을 출력하기 위해 Board, Member, replyCount (댓글 수 카운트) 를 받는다
+```
+
+## 리스트 목록 처리 구현 작성 (getList)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381225/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_12.png)
+
+```java
+@Override
+    public PageResultDTO<BoardDTO, Object[]> getList(PageRequestDTO pageRequestDTO) {
+
+        log.info(pageRequestDTO);
+
+        Function<Object[], BoardDTO> fn = (en -> entityToDTO((Board)en[0],(Member)en[1],(Long)en[2]));
+
+        Page<Object[]> result = boardRepository.getBoardWithReplyCount(
+                pageRequestDTO.getPageable(Sort.by("bno").descending()));
+
+        return new PageResultDTO<>(result, fn);
+    }
+}
+```
+
+```java
+getList 메서드를 호출해서 PageRequestDTO 파라미터를 받고
+
+Object[] 의
+
+0 번째 인덱스가 Board
+
+1 번째 인텍스가 Member
+
+2 번째 인덱스가 Long ( replyCount ) 이다
+
+그리고 getBoardWithReplyCount 메서드를 호출하여 페이징 처리된 결과를 가져온다. 이 때, pageRequestDTO를 이용하여 페이징 정보 및 정렬 정보를 적용한다
+
+이후
+
+return new PageResultDTO<>(result, fn);: PageResultDTO 객체를 생성하여 반환
+
+(페이징된 데이터 = result 데이터를 DTO로 변환하는 함수 = fn )
+
+PageResultDTO 는 result 와 fn 을 매개변수로 받는 생성자를 가지고 있다 (PageResultDTO 클래스 확인해봐라)
+
+    // 생성자: Page<EN> 타입의 데이터와 매핑 함수(Function<EN, DTO>)를 받음
+    public PageResultDTO(Page<EN> result, Function<EN, DTO> fn) {
+
+        // result 내의 엔티티 데이터를 DTO로 변환하여 리스트로 저장
+        dtoList = result.stream().map(fn).collect(Collectors.toList());
+        // 총 페이지 수 설정
+        totalPage = result.getTotalPages();
+        // 페이지 번호 목록 생성
+        makePageList(result.getPageable());
+
+    }
+
+이렇게 페이징된 데이터(result) 를 스트림으로 사용하고 데이터를 DTO로 변환하는 함수(fn) 를 .map 에 사용해서 엔티티객체를 DTO 로 바꾼다 그리고 이를 dtoList 에 저장한다
+
+```
+
+# 게시물 리스트 테스트
+
+```java
+게시물 목록 10개를 불러오는 테스트를 실시한다 (게시물은 게시물 내용 작성자 댓글 개수를 가져온다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381226/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_13.png)
+
+```java
+@Test
+    public void testList() {
+
+        PageRequestDTO pageRequestDTO = new PageRequestDTO();
+
+        PageResultDTO<BoardDTO, Object[]> result = boardService.getList(pageRequestDTO);
+
+        for (BoardDTO boardDTO : result.getDtoList()) {
+            System.out.println(boardDTO);
+        }
+
+    }
+```
+
+```java
+Hibernate:
+    select
+        board0_.bno as col_0_0_,
+        member1_.email as col_1_0_,
+        count(reply2_.rno) as col_2_0_,
+        board0_.bno as bno1_0_0_,
+        member1_.email as email1_1_1_,
+        board0_.moddate as moddate2_0_0_,
+        board0_.regdate as regdate3_0_0_,
+        board0_.content as content4_0_0_,
+        board0_.title as title5_0_0_,
+        board0_.writer_email as writer_e6_0_0_,
+        member1_.moddate as moddate2_1_1_,
+        member1_.regdate as regdate3_1_1_,
+        member1_.name as name4_1_1_,
+        member1_.password as password5_1_1_
+    from
+        board board0_
+    left outer join
+        member member1_
+            on board0_.writer_email=member1_.email
+    left outer join
+        reply reply2_
+            on (
+                reply2_.board_bno=board0_.bno
+            )
+    group by
+        board0_.bno
+    order by
+        board0_.bno desc limit ?
+Hibernate:
+    select
+        count(board0_.bno) as col_0_0_
+    from
+        board board0_
+    left outer join
+        member member1_
+            on board0_.writer_email=member1_.email
+    left outer join
+        reply reply2_
+            on (
+                reply2_.board_bno=board0_.bno
+            )
+    group by
+        board0_.bno
+BoardDTO(bno=101, title=Test....., content=Test....., writerEmail=user55@aaa.com, writerName=USER55, regDate=2023-11-19T16:53:06.170044, modDate=2023-11-19T16:53:06.170044, replyCount=0)
+BoardDTO(bno=100, title=Title...100, content=Content...100, writerEmail=user100@aaa.com, writerName=USER100, regDate=2023-11-17T00:21:24.884510, modDate=2023-11-17T00:21:24.884510, replyCount=2)
+BoardDTO(bno=99, title=Title...99, content=Content...99, writerEmail=user99@aaa.com, writerName=USER99, regDate=2023-11-17T00:21:24.879510, modDate=2023-11-17T00:21:24.879510, replyCount=5)
+BoardDTO(bno=98, title=Title...98, content=Content...98, writerEmail=user98@aaa.com, writerName=USER98, regDate=2023-11-17T00:21:24.875010, modDate=2023-11-17T00:21:24.875010, replyCount=4)
+BoardDTO(bno=97, title=Title...97, content=Content...97, writerEmail=user97@aaa.com, writerName=USER97, regDate=2023-11-17T00:21:24.870010, modDate=2023-11-17T00:21:24.870010, replyCount=6)
+BoardDTO(bno=96, title=Title...96, content=Content...96, writerEmail=user96@aaa.com, writerName=USER96, regDate=2023-11-17T00:21:24.864510, modDate=2023-11-17T00:21:24.864510, replyCount=3)
+BoardDTO(bno=95, title=Title...95, content=Content...95, writerEmail=user95@aaa.com, writerName=USER95, regDate=2023-11-17T00:21:24.858011, modDate=2023-11-17T00:21:24.858011, replyCount=0)
+BoardDTO(bno=94, title=Title...94, content=Content...94, writerEmail=user94@aaa.com, writerName=USER94, regDate=2023-11-17T00:21:24.852510, modDate=2023-11-17T00:21:24.852510, replyCount=4)
+BoardDTO(bno=93, title=Title...93, content=Content...93, writerEmail=user93@aaa.com, writerName=USER93, regDate=2023-11-17T00:21:24.847013, modDate=2023-11-17T00:21:24.847013, replyCount=3)
+BoardDTO(bno=92, title=Title...92, content=Content...92, writerEmail=user92@aaa.com, writerName=USER92, regDate=2023-11-17T00:21:24.841512, modDate=2023-11-17T00:21:24.841512, replyCount=5)
+```
+
+# 게시물 상세 조회
+
+## 게시물 상세 조회 JPQL 작성
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381225/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_14.png)
+
+## 게시물 상세 조회 메서드 작성
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381225/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_15.png)
+
+## 게시물 상세 조회 메서드 구현
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381227/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_16.png)
+
+```java
+//게시물 상세 조회
+    @Override
+    public BoardDTO get(Long bno) {
+
+        Object result = boardRepository.getBoardByBno(bno);
+
+        Object[] arr = (Object[]) result;
+
+        return entityToDTO((Board)arr[0], (Member)arr[1], (Long)arr[2]);
+    }
+```
+
+## 게시물 상세 조회 테스트
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381227/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_17.png)
+
+```java
+//게시물 상세조회 테스트
+    @Test
+    public void testGet() {
+
+        Long bno = 100L;
+
+        BoardDTO boardDTO = boardService.get(bno);
+
+        System.out.println(boardDTO);
+    }
+```
+
+```java
+Hibernate:
+    select
+        board0_.bno as col_0_0_,
+        member1_.email as col_1_0_,
+        count(reply2_.rno) as col_2_0_,
+        board0_.bno as bno1_0_0_,
+        member1_.email as email1_1_1_,
+        board0_.moddate as moddate2_0_0_,
+        board0_.regdate as regdate3_0_0_,
+        board0_.content as content4_0_0_,
+        board0_.title as title5_0_0_,
+        board0_.writer_email as writer_e6_0_0_,
+        member1_.moddate as moddate2_1_1_,
+        member1_.regdate as regdate3_1_1_,
+        member1_.name as name4_1_1_,
+        member1_.password as password5_1_1_
+    from
+        board board0_
+    left outer join
+        member member1_
+            on board0_.writer_email=member1_.email
+    left outer join
+        reply reply2_
+            on (
+                reply2_.board_bno=board0_.bno
+            )
+    where
+        board0_.bno=?
+BoardDTO(bno=100, title=Title...100, content=Content...100, writerEmail=user100@aaa.com, writerName=USER100, regDate=2023-11-17T00:21:24.884510, modDate=2023-11-17T00:21:24.884510, replyCount=2)
+```
+
+# 게시글 삭제
+
+```java
+게시글 삭제는 쉽지만 생각해야할 문제가 한가지 있다
+
+댓글도 함께 삭제가 진행 되어야 한다는 것이다
+
+* 게시물이 삭제되면 댓글 데이터가 FK로 참조할 수 없으므로 주의
+
+* FK쪽을 우선 삭제 후 PK쪽을 삭제 – 트랜잭션으로 처리
+```
+
+```java
+쿼리메서드로 작성 가능하지만 한번에 모두 삭제하려면 ( 여러번 나눠서 하나하나 삭제보다 )
+
+이렇게 쿼리로 작성하는게 좋다
+```
+
+## 게시글 삭제 쿼리 작성
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381227/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_18.png)
+
+```java
+@Modifying //  @Query 어노테이션으로 작성된 조회를 제외한 데이터에 변경이 일어나는 삽입('INSERT'), 수정('UPDATE'), 삭제('DELETE') 쿼리 메서드를 사용할 때 필요하다 (데이터베이스에 변경 작업을 수행한다는것)
+    @Query("delete from Reply r where r.board.bno = :bno")
+    void deleteByBno(Long bno);
+}
+```
+
+### @Modifying
+
+```java
+@Query 어노테이션으로 작성된 조회를 제외한 데이터에 변경이 일어나는 삽입('INSERT'), 수정('UPDATE'), 삭제('DELETE') 쿼리 메서드를 사용할 때 필요하다
+
+(데이터베이스에 변경 작업을 수행한다는것) (꼭 붙여주자)
+```
+
+## 게시글 삭제 메서드와 구현 작성하기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381227/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_19.png)
+
+```java
+게시물 삭제 메서드 작성
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381228/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_20.png)
+
+```java
+댓글 삭제를 위해서  리포지토리 주입
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381228/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_21.png)
+
+```java
+// 게시물 삭제기능 (댓글도 함께 지워짐)
+    @Transactional
+    @Override
+    public void removeWithReplies(Long bno) { // 삭제기능 구현 꼭 트랜잭션 추가
+
+        // 댓글부터 삭제
+        replyRepository.deleteByBno(bno);
+        // 게시글 삭제
+        boardRepository.deleteById(bno);
+
+    }
+```
+
+```java
+게시물 삭제 메서드 구현
+
+꼭 댓글부터 지워야 한다
+
+게시글 삭제는 ( JpaRepository 를 사용해서 )
+
+그리고 @Query 를 이용한 삭제기 때문에 꼭 트랜잭션을 사용해준다
+```
+
+## 게시글 삭제 테스트
+
+```java
+게시글과 댓글을 한번에 삭제하는 테스트를 진행한다
+```
+
+```java
+@Test
+    public void testRemove() {
+
+        Long bno = 1L;
+
+        boardService.removeWithReplies(bno);
+
+    }
+```
+
+```java
+Hibernate:
+    delete
+    from
+        reply
+    where
+        board_bno=?
+Hibernate:
+    select
+        board0_.bno as bno1_0_0_,
+        board0_.moddate as moddate2_0_0_,
+        board0_.regdate as regdate3_0_0_,
+        board0_.content as content4_0_0_,
+        board0_.title as title5_0_0_,
+        board0_.writer_email as writer_e6_0_0_
+    from
+        board board0_
+    where
+        board0_.bno=?
+Hibernate:
+    delete
+    from
+        board
+    where
+        bno=?
+```
+
+```java
+첫번째로 댓글을 삭제하고
+
+두번째로 bno 를 사용해서 게시글을 조회하고
+
+세번째로 게시글을 삭제한다
+```
+
+# 게시글 수정
+
+```java
+수정은 다른 파트보다 어려운 파트인데
+
+이유는
+
+건드려도 되는 부분과 건드리면 안되는 부분이 있기 때문이다 ( 예를들어 제목과 내용은 수정 가능하지만 작성자는 수정 불가 )
+```
+
+## 엔티티에 Setter 를 만들어 주기
+
+```java
+엔티티에 Setter 을 만들지 않는게 좋다고 하지만
+
+만들지 못한다 까지는 아니다 (가능하면 삼가 하라는 거다)
+
+(나중에 연관 관계가 복잡해지면 꼬일수도 있다)
+
+Board 엔티티에 제목을 수정하는, 내용을 수정하는 Setter 을 추가해준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381228/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_22.png)
+
+## 게시글 수정 서비스 작성
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381228/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_23.png)
+
+```java
+인터페이스에 메서드를 작성하고
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381228/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_24.png)
+
+```java
+// 게시글 수정
+    @Transactional
+    @Override
+    public void modify(BoardDTO boardDTO) {
+
+        // 게시물 ID로 게시물 조회
+        Optional<Board> optionalBoard = boardRepository.findById(boardDTO.getBno());
+
+        // 게시물이 존재하는 경우에만
+        if(optionalBoard.isPresent()){
+            // Optional에서 실제 Board 객체를 추출 ( get 메서드는 Optional 객체 안에 포함된 값을 반환하는 메서드)
+            Board board = optionalBoard.get();
+
+            board.changeContent(boardDTO.getContent());
+            board.changeTitle(boardDTO.getTitle());
+
+            boardRepository.save(board);
+        }
+    }
+```
+
+```java
+ServiceImpl 에서 구현해준다
+
+Board 엔티티의 Setter 을 호출해서 수정한다
+```
+
+## 게시글 수정 테스트
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381229/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_25.png)
+
+```java
+// 게시글 수정 테스트
+    @Test
+    public void testModify() {
+        BoardDTO boardDTO = BoardDTO.builder()
+                .bno(101L)
+                .title("Title...modify")
+                .content("Content...modify")
+                //pk writer 가 반드시 있어야 한다는걸 주의
+                .build();
+        boardService.modify(boardDTO);
+
+    }
+```
+
+```java
+게시글 수정 테스트를 실행한다
+```
+
+```java
+Hibernate:
+    select
+        board0_.bno as bno1_0_0_,
+        board0_.moddate as moddate2_0_0_,
+        board0_.regdate as regdate3_0_0_,
+        board0_.content as content4_0_0_,
+        board0_.title as title5_0_0_,
+        board0_.writer_email as writer_e6_0_0_
+    from
+        board board0_
+    where
+        board0_.bno=?
+Hibernate:
+    update
+        board
+    set
+        moddate=?,
+        content=?,
+        title=?,
+        writer_email=?
+    where
+        bno=?
+```
+
+## Save 없이도 저장가능
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381229/notion-blog/_/_/_/_/BCh05_05_p278_/Untitled_26.png)
+
+```java
+Save 를 주석처리 해도 신기하게 저장이 된다
+
+이는 엔티티의 값이 변화된걸 JPA 가 감지해서 자동으로 업데이트 하기 때문이다
+
+그러나 .save 저장을 해도 두번 저장되고 이러는 일은 없기 때문에 습관적으로 저장을 해주는게 좋다
+```

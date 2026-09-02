@@ -1,0 +1,2147 @@
+---
+title: '섹션 3: 벡터와 회전자 - 3'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { Vector 정규화 실습 - Actor 이동 }
+
+## 🎯 이번 실습 목표
+
+```
+✅ Actor 정리하기
+✅ Add Actor World Offset (이동)
+✅ Vector 정규화 사용
+✅ 드론이 목표를 향해 이동
+✅ 속도 조절하기
+```
+
+---
+
+## 🚁 드론 배치하기
+
+### BP_Drone 2개 만들기
+
+```
+Content Drawer → Blueprints
+  ↓
+BP_Drone 드래그
+  ↓
+이름: BP_Drone_1
+
+Alt + 드래그 복제
+  ↓
+자동 이름: BP_Drone_2
+```
+
+### 위치 조정
+
+```
+위로 이동 (공중에)
+E키로 회전
+  └─ DA_Loc1 바라보게
+      ↓
+완벽할 필요 없음!
+(예시일 뿐)
+```
+
+---
+
+## 🎯 목표 설정
+
+```
+드론 → DA_Loc1 향해 이동
+  ↓
+적이 플레이어 추적하듯!
+  ↓
+부드럽게 움직이기
+```
+
+---
+
+## 🔧 Add Actor World Offset
+
+### 핵심 개념
+
+```
+Actor를 조금씩 이동시키기
+  ↓
+Delta Location (이동량)
+  └─ Vector로 방향 + 거리
+```
+
+### 노드 찾기
+
+```
+BP_Drone_1 참조 드래그
+  ↓
+"add actor world offset" 검색
+  ↓
+[Add Actor World Offset]
+```
+
+### 구조
+
+```
+[Add Actor World Offset]
+  ├─ 실행 입력 ▶
+  ├─ Target (어느 Actor?)
+  ├─ Delta Location (어디로?)
+  └─ 실행 출력 ▶
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380716/notion-blog/_/_/_5_/_3_-_3/image.png)
+
+---
+
+## 🧪 테스트 1: 간단한 이동
+
+### X 방향 500 이동
+
+```
+Event BeginPlay ──▶── [Add Actor World Offset]
+                        ├─ Target: BP_Drone_1
+                        └─ Delta: (500, 0, 0)
+```
+
+### 결과
+
+```
+▶ 재생
+  ↓
+드론이 X 방향으로 500 이동! ✅
+  ↓
+한 번만 실행됨
+```
+
+### 다른 방향 테스트
+
+```
+Z 방향 위로:
+  └─ Delta: (0, 0, 500)
+      ↓
+  위로 올라감!
+
+X + Z 동시:
+  └─ Delta: (500, 0, 500)
+      ↓
+  대각선 위로!
+```
+
+---
+
+## 🔄 Event Tick에서 이동
+
+### Delta를 작게!
+
+```
+Event Tick ──▶── [Add Actor World Offset]
+                   └─ Delta: (1, 0, 0)
+```
+
+### 왜 작게?
+
+```
+1프레임 = 1/60초 (매우 짧음!)
+  ↓
+매 프레임마다 실행
+  ↓
+큰 값 쓰면 너무 빠름!
+  ↓
+1 유닛씩 = 부드러운 이동 ✅
+```
+
+### 테스트
+
+```
+▶ 재생
+  ↓
+드론이 X 방향으로 천천히 이동!
+  ↓
+Y 방향으로 바꾸면?
+  └─ Delta: (0, 1, 0)
+      ↓
+  Y 방향으로 이동!
+```
+
+---
+
+## 🎯 목표 방향으로 이동하기
+
+### 현재 문제
+
+```
+한 방향으로만 계속 이동
+  ↓
+DA_Loc1 향하려면?
+  ↓
+방향 벡터 필요!
+```
+
+### 방향 벡터 계산
+
+```
+목표 - 시작
+  ↓
+DA_Loc1 - BP_Drone_1
+  ↓
+드론 → 목표 방향!
+```
+
+### Blueprint
+
+```
+[Get Actor Location] DA_Loc1
+  ↓ (첫 번째)
+[Vector - Vector]
+  ↑ (두 번째)
+[Get Actor Location] BP_Drone_1
+  ↓
+Promote to Variable
+  ↓
+Drone_to_Loc
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380714/notion-blog/_/_/_5_/_3_-_3/image_1.png)
+
+---
+
+## ⚠️ 큰 문제 발생!
+
+### 그대로 사용하면?
+
+```
+Delta = Drone_to_Loc
+  ↓
+▶ 재생
+  ↓
+드론이 순식간에 사라짐! ❌
+```
+
+### 왜?
+
+```
+첫 프레임:
+  드론 → 목표까지 한 번에 이동
+    ↓
+  목표 위치 도달
+
+다음 프레임:
+  같은 벡터로 계속 이동
+    ↓
+  바닥 아래로...
+    ↓
+  무한히 멀어짐 ❌
+```
+
+### 확인하기
+
+```
+F키로 드론 추적
+  ↓
+엄청나게 빠르게 멀어짐!
+  ↓
+위치 값이 계속 증가
+```
+
+---
+
+## ✨ 해결: Normalize!
+
+### 필요한 것
+
+```
+같은 방향 ✅
+작은 크기 ✅
+  ↓
+정규화!
+```
+
+### Normalize 노드
+
+```
+Vector 값 드래그
+  ↓
+"normalize" 검색
+  ↓
+[Normalize (Vector)]
+  ├─ 입력: Vector
+  └─ 출력: Unit Vector (길이 1)
+```
+
+### Tolerance란?
+
+```
+Tolerance = 허용 오차
+  ↓
+벡터가 너무 작으면?
+  └─ 나눗셈 문제 발생
+      ↓
+  (0,0,0) 반환
+```
+
+### Blueprint 수정
+
+```
+[Vector - Vector]
+  ↓
+[Normalize]
+  ↓
+[Set Drone_to_Loc]
+```
+
+---
+
+## 🎮 정규화 테스트
+
+### 결과
+
+```
+▶ 재생
+  ↓
+드론이 천천히 이동! ✅
+  ├─ 방향: DA_Loc1 향함
+  └─ 속도: 프레임당 1 유닛
+```
+
+### 문제점
+
+```
+목표 도달 후에도 계속 이동
+  ↓
+왜? BeginPlay에서 방향 한 번만 계산
+  ↓
+괜찮음! (예시니까)
+```
+
+---
+
+## ⚡ 속도 조절하기
+
+### Vector × Float (곱셈)
+
+### 노드 만들기
+
+```
+Vector 드래그
+  ↓
+"*" 입력
+  ↓
+[Vector × Vector]
+  ↓
+두 번째 핀 우클릭
+  └─ Convert Pin
+      └─ Float (단정도)
+```
+
+### Float vs Float (Double)?
+
+```
+Float: 일반 소수 (빠름)
+Double: 더 정밀한 소수 (느림)
+  ↓
+대부분 Float 사용!
+```
+
+### 속도 2배
+
+```
+[Normalize]
+  ↓
+[× 2]
+  ↓
+길이 2인 벡터!
+  ↓
+2배 빠른 이동
+```
+
+### 속도 10배
+
+```
+[Normalize]
+  ↓
+[× 10]
+  ↓
+10배 빠른 이동!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380715/notion-blog/_/_/_5_/_3_-_3/image_2.png)
+
+---
+
+## 🚁 두 번째 드론 추가
+
+### 같은 과정 반복
+
+### 방향 벡터
+
+```
+[DA_Loc1 위치]
+  ↓
+[Vector - Vector]
+  ↑
+[BP_Drone_2 위치]
+  ↓
+[Normalize]
+  ↓
+Promote to Variable
+  ↓
+Drone_2_to_Loc
+```
+
+### 이동 적용
+
+```
+[Add Actor World Offset]
+  ├─ Target: BP_Drone_2
+  └─ Delta: Drone_2_to_Loc × 0.25
+```
+
+### 속도 차이
+
+```
+Drone 1: × 2 (빠름)
+Drone 2: × 0.25 (느림)
+  ↓
+다른 속도로 이동!
+```
+
+---
+
+## 🎯 최종 Blueprint 구조
+
+```
+Event BeginPlay ──▶── [방향 계산 & 정규화]
+                        ├─ Drone_1_to_Loc
+                        └─ Drone_2_to_Loc
+
+Event Tick ──▶── [Drone 1 이동]
+               │    └─ Delta: Drone_1_to_Loc × 2
+               │
+               └─── [Drone 2 이동]
+                     └─ Delta: Drone_2_to_Loc × 0.25
+```
+
+---
+
+## 💡 변수 단축키 정리
+
+### 기존 방법
+
+```
+변수 드래그
+  ↓
+Get/Set 선택
+  ↓
+연결
+```
+
+### 새 단축키 ⚡
+
+```
+Ctrl + 드래그
+  └─ Get 노드 자동
+
+Alt + 드래그
+  └─ Set 노드 자동
+```
+
+### 기억법
+
+```
+키보드 왼쪽부터:
+  Ctrl (첫 번째) → Get
+  Alt (두 번째) → Set
+```
+
+---
+
+## 🎓 배운 핵심 개념
+
+### Add Actor World Offset
+
+```
+Actor를 조금씩 이동
+  ├─ Target: 어떤 Actor
+  ├─ Delta: 어느 방향, 얼마나
+  └─ Tick에서 사용 = 부드러운 이동
+```
+
+### Normalize의 활용
+
+```
+방향 유지 + 크기 1
+  ↓
+× 속도 = 원하는 이동량
+  ↓
+속도 제어 쉬움!
+```
+
+### Event Tick 이동
+
+```
+매 프레임 실행
+  ├─ 작은 Delta 사용
+  └─ 부드러운 애니메이션
+```
+
+---
+
+## ⚠️ 중요한 점
+
+### 회전은 안 바뀜!
+
+```
+드론이 뒤로 이동해도
+  ↓
+회전은 그대로
+  ↓
+Add Actor World Offset은
+위치만 변경!
+```
+
+### 정규화 필수!
+
+```
+방향 벡터 그대로 사용 ❌
+  └─ 너무 빠름
+
+정규화 후 × 속도 ✅
+  └─ 제어 가능!
+```
+
+---
+
+## 📊 속도 비교
+
+```
+Unit Vector (길이 1):
+  └─ 프레임당 1 유닛
+
+× 2:
+  └─ 프레임당 2 유닛
+
+× 0.25:
+  └─ 프레임당 0.25 유닛
+
+× 10:
+  └─ 프레임당 10 유닛
+```
+
+---
+
+## 🎮 실전 활용
+
+### AI 추적
+
+```
+적 방향 계산
+  ↓
+정규화
+  ↓
+× AI 속도
+  ↓
+부드러운 추적!
+```
+
+### 발사체
+
+```
+목표 방향
+  ↓
+정규화
+  ↓
+× 총알 속도
+  ↓
+일정한 속도로 발사!
+```
+
+### 캐릭터 이동
+
+```
+입력 방향
+  ↓
+정규화
+  ↓
+× 이동 속도
+  ↓
+대각선도 같은 속도!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380715/notion-blog/_/_/_5_/_3_-_3/image_3.png)
+
+---
+
+**정규화로 완벽한 이동 제어!** 🎯
+
+# { Delta Time - 프레임 독립적 이동 }
+
+## 🎯 핵심 문제
+
+```
+현재 코드:
+  매 프레임마다 같은 양 이동
+  ↓
+문제: 프레임 속도에 따라 이동 속도 변함!
+  ↓
+프레임 속도 종속성 ❌
+```
+
+---
+
+## 📊 프레임 속도(FPS)란?
+
+### FPS 확인하기
+
+```
+뷰포트 좌측 상단
+  ↓
+햄버거 메뉴 ☰
+  ↓
+"Show FPS" 체크
+  ↓
+우측 상단에 표시!
+```
+
+### 표시 정보
+
+```
+FPS: 114 (초당 프레임 수)
+  ↓
+밑에 숫자: 8.7 ms (Delta Seconds)
+  ↓
+프레임 사이 시간!
+```
+
+---
+
+## ⚠️ 프레임 속도가 중요한 이유
+
+### 현재 상황
+
+```
+Event Tick 실행
+  ↓
+매 프레임마다 같은 거리 이동
+  ↓
+문제 발생!
+```
+
+### 시나리오 비교
+
+### 고성능 PC (120 FPS)
+
+```
+1초에 120번 이동
+  ├─ 프레임당 100 유닛
+  └─ 총 이동: 12,000 유닛/초
+```
+
+### 저성능 PC (30 FPS)
+
+```
+1초에 30번 이동
+  ├─ 프레임당 100 유닛
+  └─ 총 이동: 3,000 유닛/초
+      ↓
+4배 느림! ❌
+```
+
+---
+
+## 🧪 프레임 속도 제한 테스트
+
+### 프레임 속도 고정하기
+
+```
+Edit → Project Settings
+  ↓
+"framerate" 검색
+  ↓
+"Use Fixed Frame Rate" 체크
+  ↓
+Fixed Frame Rate: 30
+```
+
+### 30 FPS 테스트
+
+```
+▶ 재생
+  ↓
+드론이 매우 느리게 이동! 🐌
+  ↓
+오프셋을 자주 추가 안 함
+```
+
+### 15 FPS 테스트
+
+```
+Fixed Frame Rate: 15
+  ↓
+▶ 재생
+  ↓
+FPS 빨간색 표시 (매우 나쁨)
+  ├─ 화면 끊김 (렉)
+  └─ 드론 정말 느리게 이동 ❌
+```
+
+---
+
+## 🔑 해결책: Delta Time
+
+### Delta Time이란?
+
+```
+Delta Seconds (Delta Time)
+  = 이전 프레임 이후 경과 시간
+  ↓
+프레임 사이의 시간!
+```
+
+### 작동 원리
+
+```
+고 FPS (빠름):
+  └─ Delta Time: 작음 (0.008초)
+
+저 FPS (느림):
+  └─ Delta Time: 큼 (0.033초)
+```
+
+---
+
+## 💡 Delta Time 적용
+
+### 공식
+
+```
+이동량 = 방향 × 속도 × Delta Time
+  ↓
+프레임 속도 보정!
+```
+
+### 왜 작동하나?
+
+### 시나리오 1: 고 FPS
+
+```
+속도: 100 유닛/초
+Delta: 0.008초
+  ↓
+이동: 100 × 0.008 = 0.8 유닛
+  ↓
+1초에 125번 실행
+  ↓
+총: 0.8 × 125 = 100 유닛/초 ✅
+```
+
+### 시나리오 2: 저 FPS
+
+```
+속도: 100 유닛/초
+Delta: 0.033초
+  ↓
+이동: 100 × 0.033 = 3.3 유닛
+  ↓
+1초에 30번 실행
+  ↓
+총: 3.3 × 30 = 100 유닛/초 ✅
+```
+
+---
+
+## 🔧 Blueprint 구현
+
+### Event Tick의 Delta Seconds
+
+```
+[Event Tick]
+  └─ Delta Seconds (출력 핀)
+      ↓
+프레임 사이 경과 시간!
+```
+
+### 곱셈 노드 추가
+
+### 방법 1: Delta Seconds 드래그
+
+```
+Delta Seconds 드래그
+  ↓
+"*" 입력
+  ↓
+[Float × Float]
+  ↓
+두 번째 핀 우클릭
+  └─ Convert Pin → Vector
+```
+
+### 방법 2: Vector에서 시작
+
+```
+Vector 드래그
+  ↓
+"*" 입력
+  ↓
+[Vector × Vector]
+  ↓
+두 번째 핀 우클릭
+  └─ Convert Pin → Float
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380715/notion-blog/_/_/_5_/_3_-_3/image_4.png)
+
+---
+
+## 📝 Drone 1 수정
+
+### Before (프레임 종속)
+
+```
+[Drone_to_Loc × 2]
+  ↓
+[Add Actor World Offset]
+  └─ Delta Location
+```
+
+### After (프레임 독립)
+
+```
+[Drone_to_Loc × 100]
+  ↓
+[× Delta Seconds]
+  ↓
+[Add Actor World Offset]
+  └─ Delta Location
+```
+
+### 속도 의미 변경
+
+```
+Before:
+  × 2 = 프레임당 2 유닛
+
+After:
+  × 100 = 초당 100 유닛 ✅
+  ↓
+훨씬 명확!
+```
+
+---
+
+## 🧪 테스트 결과
+
+### 15 FPS (느림)
+
+```
+▶ 재생
+  ↓
+화면 끊김 (지연)
+  BUT
+드론 속도는 정상! ✅
+  ↓
+초당 100 유닛 유지
+```
+
+### 60 FPS (보통)
+
+```
+▶ 재생
+  ↓
+부드러운 움직임 ✅
+초당 100 유닛 유지
+```
+
+### 120 FPS (빠름)
+
+```
+▶ 재생
+  ↓
+매우 부드러움 ✅
+초당 100 유닛 유지
+  ↓
+프레임 속도 독립 달성! 🎉
+```
+
+---
+
+## 📝 Drone 2도 수정
+
+### Blueprint
+
+```
+[Drone_2_to_Loc × 200]
+  ↓ (초당 200 유닛)
+[× Delta Seconds]
+  ↓
+[Add Actor World Offset]
+  └─ Delta Location
+```
+
+### 결과
+
+```
+Drone 1: 초당 100 유닛
+Drone 2: 초당 200 유닛
+  ↓
+프레임 속도 관계없이
+일정한 속도! ✅
+```
+
+---
+
+## 🎯 Get World Delta Seconds
+
+### 더 깔끔한 방법
+
+```
+전선 연결 대신
+  ↓
+우클릭
+  ↓
+"get world delta seconds" 검색
+  ↓
+[Get World Delta Seconds]
+```
+
+### 장점
+
+```
+✅ 전선 없이 깔끔
+✅ 어디서든 사용 가능
+✅ 같은 값 반환
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380715/notion-blog/_/_/_5_/_3_-_3/image_5.png)
+
+---
+
+## 📊 완전한 Blueprint 구조
+
+```
+Event Tick
+  ↓
+[Get World Delta Seconds] ─┬─▶ [Drone 1 이동]
+                           │     ├─ 방향: Normalize
+                           │     ├─ 속도: × 100
+                           │     └─ Delta: × Delta Seconds
+                           │
+                           └─▶ [Drone 2 이동]
+                                 ├─ 방향: Normalize
+                                 ├─ 속도: × 200
+                                 └─ Delta: × Delta Seconds
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### 프레임 속도 종속성
+
+```
+Frame Rate Dependency
+  ↓
+프레임 속도에 따라
+게임 속도가 바뀜
+  ↓
+나쁜 디자인! ❌
+```
+
+### 프레임 속도 독립성
+
+```
+Frame Rate Independence
+  ↓
+프레임 속도 관계없이
+일정한 게임 속도
+  ↓
+좋은 디자인! ✅
+```
+
+---
+
+## 📐 수학적 이해
+
+### 공식 정리
+
+```
+이동 거리 = 속도 × 시간
+  ↓
+Distance = Speed × Time
+  ↓
+Delta Location = Speed × Delta Time
+```
+
+### 예시
+
+```
+속도: 100 유닛/초
+시간: 0.016초 (60 FPS)
+  ↓
+이동: 100 × 0.016 = 1.6 유닛
+```
+
+---
+
+## 🎮 실전 활용
+
+### 모든 이동에 적용!
+
+```
+✅ 캐릭터 이동
+✅ 적 AI 이동
+✅ 발사체
+✅ 카메라 이동
+✅ 애니메이션
+  ↓
+항상 Delta Time 곱하기!
+```
+
+### 언제 사용?
+
+```
+Event Tick에서
+프레임마다 변화하는 것:
+  ├─ 위치
+  ├─ 회전
+  ├─ 크기
+  └─ 색상
+      ↓
+모두 Delta Time 필수!
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 항상 곱해야 함!
+
+```
+Event Tick 사용 시
+  ↓
+변화량 × Delta Seconds
+  ↓
+필수! ⚠️
+```
+
+### 안 곱하면?
+
+```
+프레임 속도에 따라
+  ├─ 고성능 PC: 빠름
+  └─ 저성능 PC: 느림
+      ↓
+불공평한 게임! ❌
+```
+
+---
+
+## 🎓 용어 정리
+
+```
+FPS (Frames Per Second)
+  └─ 초당 프레임 수
+
+Delta Time / Delta Seconds
+  └─ 프레임 사이 시간
+
+Frame Rate Dependency
+  └─ 프레임 속도 종속성
+
+Frame Rate Independence
+  └─ 프레임 속도 독립성
+```
+
+---
+
+## 📊 속도 단위 변경
+
+### Before (프레임당)
+
+```
+× 2 = 프레임당 2 유닛
+  ↓
+프레임 속도 따라 변함 ❌
+```
+
+### After (초당)
+
+```
+× 100 = 초당 100 유닛
+  ↓
+일정한 속도 ✅
+  ↓
+더 직관적!
+```
+
+---
+
+## 💡 핵심 요약
+
+### 필수 공식
+
+```
+Delta Location =
+  방향(Normalize) × 속도 × Delta Time
+```
+
+### 왜 중요한가?
+
+```
+✅ 모든 PC에서 같은 속도
+✅ 공정한 게임 플레이
+✅ 예측 가능한 동작
+✅ 전문적인 게임 개발
+```
+
+**Delta Time은 게임 개발의 기본!** ⏱️
+
+# { Rotator - 회전 정보 저장 }
+
+## 🎯 Rotator란?
+
+```
+Vector = 위치/방향
+Rotator = 회전
+  ↓
+3가지 회전 정보 저장:
+  ├─ Roll (굴림)
+  ├─ Pitch (피치)
+  └─ Yaw (요)
+```
+
+---
+
+## ✈️ 비행기로 이해하기
+
+### 비행기의 로컬 축
+
+```
+       ↑ Z (위)
+       |
+       |
+  ←────●────→ Y (오른쪽)
+      /
+     / X (앞)
+    ↙
+
+X축: Forward (앞)
+Y축: Right (오른쪽)
+Z축: Up (위)
+```
+
+---
+
+## 🔄 3가지 회전
+
+### 1️⃣ Yaw (요) - Z축 회전
+
+### 평면도 (위에서 봄)
+
+```
+    위에서 본 모습
+        ↑ X
+        |
+    ←───●───→ Y
+        |
+      (Z축 보임)
+
+Z축 중심으로 회전
+  ↓
+좌우로 회전! ◀▶
+```
+
+### 예시
+
+```
+비행기: 좌우로 방향 전환
+사람: 고개 좌우로 흔들기 (No!)
+  ↓
+"아니요" 하는 동작
+```
+
+---
+
+### 2️⃣ Pitch (피치) - Y축 회전
+
+### 측면도 (옆에서 봄)
+
+```
+    옆에서 본 모습
+        ↑ Z
+       /
+      /
+     ●────→ X
+     |
+   (Y축 보임)
+
+Y축 중심으로 회전
+  ↓
+위아래로 회전! ▲▼
+```
+
+### 예시
+
+```
+비행기: 기수 위아래로 기울임
+사람: 고개 위아래로 끄덕임 (Yes!)
+  ↓
+"네" 하는 동작
+```
+
+---
+
+### 3️⃣ Roll (롤) - X축 회전
+
+### 정면도 (앞에서 봄)
+
+```
+    앞에서 본 모습
+        ↑ Z
+        |
+    ←───●───→ Y
+      (X축 보임)
+
+X축 중심으로 회전
+  ↓
+좌우로 기울기! ↶↷
+```
+
+### 예시
+
+```
+비행기: 좌우로 기울임 (배럴롤)
+사람: 고개 좌우로 갸우뚱
+  ↓
+"잘 모르겠어요" 하는 동작
+```
+
+---
+
+## 📊 회전 요약표
+
+```
+┌──────┬────────┬────────┬────────────┐
+│ 이름 │   축   │  동작  │    예시    │
+├──────┼────────┼────────┼────────────┤
+│ Yaw  │ Z축 ↕  │ 좌우   │ 고개 No    │
+│Pitch │ Y축 ←→ │ 위아래 │ 고개 Yes   │
+│ Roll │ X축 ⊙  │ 기울기 │ 갸우뚱     │
+└──────┴────────┴────────┴────────────┘
+```
+
+---
+
+## 🧭 각 축 중심 회전 이해
+
+### Yaw (Z축)
+
+```
+Z축을 중심으로 빙글빙글
+  ↓
+    ⟲
+   ╱│╲
+  ╱ │ ╲
+ ╱  Z  ╲
+
+수평 회전!
+```
+
+### Pitch (Y축)
+
+```
+Y축을 중심으로 앞뒤
+  ↓
+    ⤴
+    |
+  ──●──
+    |
+    ⤵
+
+상하 회전!
+```
+
+### Roll (X축)
+
+```
+X축을 중심으로 굴림
+  ↓
+    ↶
+  ──●──→
+    ↷
+
+측면 회전!
+```
+
+---
+
+## 📐 Rotator 구조
+
+### 데이터 타입
+
+```
+Rotator = (Roll, Pitch, Yaw)
+  ├─ Roll: X축 회전 (도)
+  ├─ Pitch: Y축 회전 (도)
+  └─ Yaw: Z축 회전 (도)
+```
+
+### 단위
+
+```
+각도 = Degrees (도)
+  ├─ 0° ~ 360°
+  └─ 음수도 가능
+```
+
+---
+
+## 💡 실제 값 예시
+
+### 45도 회전들
+
+```
+Pitch 45도 위로:
+  Rotator = (0, 45, 0)
+
+Roll 45도 오른쪽:
+  Rotator = (45, 0, 0)
+
+Yaw 45도 우회전:
+  Rotator = (0, 0, 45)
+```
+
+### 복합 회전
+
+```
+모두 45도:
+  Rotator = (45, 45, 45)
+  ↓
+3방향 동시 회전!
+```
+
+---
+
+## 🎮 게임에서의 활용
+
+### 캐릭터
+
+```
+좌우 보기 (마우스 X)
+  └─ Yaw 변경
+
+위아래 보기 (마우스 Y)
+  └─ Pitch 변경
+
+기울기 (거의 안 씀)
+  └─ Roll 변경
+```
+
+### 비행기/드론
+
+```
+조종간 좌우
+  └─ Roll
+
+조종간 앞뒤
+  └─ Pitch
+
+방향타 좌우
+  └─ Yaw
+```
+
+---
+
+## 🔄 Unreal Engine에서
+
+### Blueprint 색상
+
+```
+Rotator 핀 = 파란색 🔵
+Vector 핀 = 노란색 🟡
+  ↓
+구분 쉬움!
+```
+
+### 주요 노드들
+
+```
+Get Actor Rotation
+  └─ Actor의 회전 가져오기
+
+Set Actor Rotation
+  └─ Actor의 회전 설정
+
+Find Look At Rotation
+  └─ 목표를 바라보는 회전 계산
+```
+
+---
+
+## 🧠 기억하는 법
+
+### 사람 머리로 연습
+
+```
+Yaw (Z축):
+  └─ 고개 좌우 (No) ↔
+
+Pitch (Y축):
+  └─ 고개 위아래 (Yes) ↕
+
+Roll (X축):
+  └─ 고개 갸우뚱 (?) ↶↷
+```
+
+### 비행기 기억법
+
+```
+Yaw: 방향 전환 (좌우 선회)
+Pitch: 상승/하강 (기수 각도)
+Roll: 옆으로 기울기 (배럴롤)
+```
+
+---
+
+## 📊 좌표계 뷰
+
+### 평면도 (Top View)
+
+```
+보이는 축: X, Y
+회전 축: Z
+회전 이름: Yaw
+
+  Y ←
+  ↑
+  |
+  ●──→ X
+```
+
+### 측면도 (Side View)
+
+```
+보이는 축: X, Z
+회전 축: Y
+회전 이름: Pitch
+
+  Z ↑
+    |
+    ●──→ X
+```
+
+### 정면도 (Front View)
+
+```
+보이는 축: Y, Z
+회전 축: X
+회전 이름: Roll
+
+  Z ↑
+    |
+  ──●── Y
+```
+
+---
+
+## 🎯 Vector vs Rotator
+
+```
+Vector (노란색):
+  ├─ X, Y, Z (위치/방향)
+  ├─ 크기 있음
+  └─ 정규화 가능
+
+Rotator (파란색):
+  ├─ Roll, Pitch, Yaw (회전)
+  ├─ 각도 (도)
+  └─ -180° ~ 180°
+```
+
+---
+
+## 💡 실전 팁
+
+### 회전 순서
+
+```
+보통 적용 순서:
+  1. Yaw (좌우)
+  2. Pitch (위아래)
+  3. Roll (기울기)
+```
+
+### 주의사항
+
+```
+⚠️ 360° = 0°
+⚠️ -90° = 270°
+⚠️ 순서가 중요함!
+```
+
+---
+
+## 📝 핵심 정리
+
+### 3가지 회전
+
+```
+Yaw (Z축): 좌우 회전 (No)
+Pitch (Y축): 위아래 회전 (Yes)
+Roll (X축): 기울기 회전 (?)
+```
+
+### Rotator 구조
+
+```
+Rotator = (Roll, Pitch, Yaw)
+  └─ 각도로 저장 (Degrees)
+```
+
+### 기억법
+
+```
+비행기를 떠올리자!
+  ├─ Yaw: 방향 전환
+  ├─ Pitch: 상승/하강
+  └─ Roll: 옆으로 기울기
+```
+
+**Rotator로 완벽한 회전 제어!** 🔄
+
+# { Rotator 실습 - Actor 회전시키기 }
+
+## 🎯 이번 실습 목표
+
+```
+✅ Add Actor World Rotation
+✅ Add Local Rotation
+✅ World vs Local 차이 이해
+✅ Component별 회전
+✅ Make Rotator 사용
+✅ 타입 시스템 이해 ⭐
+```
+
+---
+
+## 🔄 Add Actor World Rotation
+
+### Yaw 회전 테스트
+
+### Drone 2 회전시키기
+
+```
+Event Tick ──▶── [Add Actor World Rotation]
+                   ├─ Target: BP_Drone_2
+                   └─ Delta Rotation: ?
+```
+
+### Rotator 입력 확인
+
+```
+Delta Rotation 핀 위 마우스
+  ├─ X = Roll
+  ├─ Y = Pitch
+  └─ Z = Yaw
+```
+
+---
+
+## 🔧 Split Struct Pin (구조 핀 분할)
+
+### 왜 필요한가?
+
+```
+Rotator 전체 대신
+개별 값만 설정하고 싶을 때!
+```
+
+### 사용법
+
+```
+Delta Rotation 핀 우클릭
+  ↓
+"Split Struct Pin"
+  ↓
+롤, 피치, 요 개별 입력!
+```
+
+### 분할 후
+
+```
+[Add Actor World Rotation]
+  ├─ Delta Rotation Roll (X)
+  ├─ Delta Rotation Pitch (Y)
+  └─ Delta Rotation Yaw (Z)
+```
+
+---
+
+## ⏱️ Delta Time 적용
+
+### 프레임 독립적 회전
+
+### 초당 360도 회전
+
+```
+[Get World Delta Seconds]
+  ↓
+[× 360]
+  ↓
+[Add Actor World Rotation]
+  └─ Yaw
+
+```
+
+### 계산
+
+```
+360도/초 × Delta Seconds
+  ↓
+프레임당 회전량
+  ↓
+프레임 속도 독립! ✅
+
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380715/notion-blog/_/_/_5_/_3_-_3/image_6.png)
+
+---
+
+## 🌐 World Rotation vs Local Rotation
+
+### World Rotation
+
+```
+Add Actor World Rotation
+  ├─ 월드 공간 기준 회전
+  ├─ Root Component에 적용
+  └─ Actor 전체 회전
+```
+
+### Local Rotation
+
+```
+Add Local Rotation
+  ├─ 로컬 공간 기준 회전
+  ├─ 특정 Component에 적용
+  └─ Component별 개별 회전
+```
+
+---
+
+## 🎯 Component 시스템 이해
+
+### BP_Drone 구조
+
+```
+BP_Drone (Actor)
+  └─ Scene (Root Component)
+      └─ DronMesh (Static Mesh Component)
+```
+
+### Component 계층
+
+```
+Scene Component
+  ├─ 보이지 않음
+  ├─ Root 역할
+  └─ 자식들 포함
+
+DronMesh
+  ├─ Scene에 부착
+  ├─ 실제 보이는 부분
+  └─ Offset 가능
+```
+
+---
+
+## ⚠️ 타입 시스템 이해 (중요!)
+
+### 문제 발생 상황
+
+### World Rotation 사용 시
+
+```
+[DronMesh] 드래그
+  ↓
+[Add Actor World Rotation] 연결 시도
+  ↓
+연결 안 됨! ❌
+```
+
+### 왜 안 되나?
+
+### 타입 불일치
+
+```
+Add Actor World Rotation:
+  └─ Target: Actor 타입 요구
+
+DronMesh:
+  └─ StaticMeshComponent 타입
+      ↓
+타입이 다름! ❌
+```
+
+### 타입 계층 이해
+
+```
+Actor
+  └─ 가장 상위 타입
+  └─ BP_Drone_2 ✅
+
+SceneComponent
+  └─ Component 기본 타입
+  └─ Scene ✅
+
+StaticMeshComponent
+  └─ SceneComponent 상속
+  └─ DronMesh ✅
+```
+
+---
+
+## ✅ 해결: Local Rotation 사용
+
+### 왜 작동하나?
+
+### Add Local Rotation
+
+```
+Target: SceneComponent 타입
+  ↓
+StaticMeshComponent도 SceneComponent!
+  ↓
+상속 관계 ✅
+  ↓
+DronMesh 연결 가능!
+```
+
+### 상속 관계
+
+```
+SceneComponent (부모)
+  ↑
+  | 상속
+  |
+StaticMeshComponent (자식)
+  ↓
+자식은 부모 타입으로 사용 가능!
+```
+
+---
+
+## 🔍 Component 참조 가져오기
+
+### Scene Component
+
+```
+[BP_Drone_2 Reference]
+  ↓ 드래그
+"scene" 검색
+  ↓
+[Get Scene (Inherited)]
+  └─ Root Component 참조
+```
+
+### DronMesh Component
+
+```
+[BP_Drone_2 Reference]
+  ↓ 드래그
+"dronmesh" 검색
+  ↓
+[Get DronMesh]
+  └─ Mesh Component 참조
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380716/notion-blog/_/_/_5_/_3_-_3/image_7.png)
+
+---
+
+## 🎨 Component 회전 실험
+
+### Scene만 회전
+
+```
+[Add Local Rotation]
+  ├─ Target: Scene Component
+  └─ Yaw: 360 × Delta Seconds
+      ↓
+Root + 자식 모두 회전!
+```
+
+### DronMesh만 회전
+
+```
+[Add Local Rotation]
+  ├─ Target: DronMesh
+  └─ Yaw: 360 × Delta Seconds
+      ↓
+Mesh만 회전!
+(Root는 그대로)
+```
+
+---
+
+## 🌍 Component Offset
+
+### Level에서 Offset 설정
+
+### Component 선택
+
+```
+BP_Drone_2 선택
+  ↓
+Details 패널
+  ↓
+Components 섹션
+  ├─ Scene (Root)
+  └─ DronMesh
+```
+
+### Mesh Offset
+
+```
+DronMesh 선택
+  ↓
+Transform → Location
+  ↓
+X: 100 (앞으로 이동)
+  ↓
+Root에서 벗어남!
+```
+
+### 결과
+
+```
+▶ 재생
+  ↓
+DronMesh가 Root에서 떨어져서
+궤도처럼 회전! 🌍
+```
+
+---
+
+## 🔄 복합 회전
+
+### Scene + Mesh 동시 회전
+
+### Scene 회전 (Yaw)
+
+```
+[Add Local Rotation]
+  ├─ Target: Scene
+  └─ Yaw: 360 × Delta
+```
+
+### Mesh 회전 (Pitch)
+
+```
+[Add Local Rotation]
+  ├─ Target: DronMesh
+  └─ Pitch: 360 × Delta
+```
+
+### 결과
+
+```
+행성 공전 + 자전
+  ├─ Scene: 큰 원 회전
+  └─ Mesh: 스스로 회전
+```
+
+---
+
+## 📐 Make Rotator 노드
+
+### 언제 사용?
+
+```
+분할된 핀 대신
+Rotator 전체로 전달하고 싶을 때!
+```
+
+### 사용법
+
+### Recombine (재결합)
+
+```
+분할된 핀 우클릭
+  ↓
+"Recombine Struct Pin"
+  ↓
+다시 Rotator 핀으로!
+```
+
+### Make Rotator
+
+```
+우클릭 → "make rotator"
+  ↓
+[Make Rotator]
+  ├─ Roll: 0
+  ├─ Pitch: 0
+  └─ Yaw: 360 × Delta
+      ↓
+  Rotator 반환
+```
+
+### 연결
+
+```
+[Make Rotator]
+  ↓
+[Add Local Rotation]
+  └─ Delta Rotation
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380716/notion-blog/_/_/_5_/_3_-_3/image_8.png)
+
+---
+
+## 🎯 타입별 노드 정리
+
+### Actor 레벨 노드
+
+```
+Add Actor World Offset
+  └─ Target: Actor
+
+Add Actor World Rotation
+  └─ Target: Actor
+      ↓
+BP_Drone_2 같은 Actor만! ✅
+```
+
+### Component 레벨 노드
+
+```
+Add Local Offset
+  └─ Target: SceneComponent
+
+Add Local Rotation
+  └─ Target: SceneComponent
+      ↓
+Scene, DronMesh 등 Component! ✅
+```
+
+---
+
+## 🔍 타입 체크 방법
+
+### 핀 색상
+
+```
+파란색: Actor
+초록색: Object (Component 포함)
+노란색: Vector
+연보라: Rotator
+```
+
+### 연결 전 확인
+
+```
+핀 위에 마우스
+  ↓
+"Target: Actor" 또는
+"Target: SceneComponent"
+  ↓
+타입 확인!
+```
+
+---
+
+## 💡 Make Vector도 있어요!
+
+### 같은 원리
+
+```
+[Make Vector]
+  ├─ X
+  ├─ Y
+  └─ Z
+      ↓
+  Vector 반환
+```
+
+---
+
+## 📊 실습 Blueprint 구조
+
+### 완성 예시
+
+```
+Event Tick
+  ↓
+[Get World Delta Seconds] ──┬─▶ [Drone 1 이동]
+                            │
+                            ├─▶ [Drone 2 회전]
+                            │     ├─ Scene: Yaw
+                            │     └─ Mesh: Pitch
+                            │
+                            └─▶ [Make Rotator]
+                                  └─ Local Rotation
+```
+
+---
+
+## 🎓 핵심 개념 정리
+
+### World vs Local
+
+```
+World:
+  ├─ 월드 기준
+  ├─ Root에 적용
+  └─ Actor 전체
+
+Local:
+  ├─ 로컬 기준
+  ├─ Component 선택
+  └─ 개별 제어
+```
+
+### 타입 시스템
+
+```
+Actor ≠ Component
+  ↓
+Actor 노드 → Actor만
+Component 노드 → Component만
+  ↓
+상속 관계 확인 필요!
+```
+
+---
+
+## 🔧 문제 해결 가이드
+
+### 연결 안 될 때
+
+### 1단계: 타입 확인
+
+```
+Target 핀 마우스 올리기
+  ↓
+Actor? SceneComponent?
+```
+
+### 2단계: 참조 타입 확인
+
+```
+BP_Drone_2: Actor ✅
+Scene: SceneComponent ✅
+DronMesh: StaticMeshComponent ✅
+```
+
+### 3단계: 올바른 노드 선택
+
+```
+Actor → World 노드
+Component → Local 노드
+```
+
+---
+
+## ⚠️ 자주 하는 실수
+
+### 실수 1: Component에 World 노드
+
+```
+[DronMesh] → [Add Actor World Rotation]
+  ↓
+타입 불일치! ❌
+```
+
+### 해결
+
+```
+[DronMesh] → [Add Local Rotation]
+  ↓
+타입 맞음! ✅
+```
+
+### 실수 2: Component 이동 vs Actor 이동
+
+```
+Details에서 Component 선택 이동
+  ↓
+Actor 안 움직임!
+Component만 Offset!
+```
+
+### 주의
+
+```
+Actor 이동:
+  └─ Outliner에서 선택
+
+Component 이동:
+  └─ Details → Components 선택
+```
+
+---
+
+## 🎯 실전 활용
+
+### 터렛 회전
+
+```
+Base (Scene): Yaw 회전
+  └─ Gun (Mesh): Pitch 회전
+      ↓
+상하좌우 독립 조준!
+```
+
+### 바퀴 회전
+
+```
+Car Body: 이동
+  └─ Wheel: Roll 회전
+      ↓
+바퀴만 회전!
+```
+
+---
+
+## 📝 핵심 요약
+
+### World Rotation
+
+```
+✅ Actor 전체 회전
+✅ World 공간 기준
+✅ Root Component 대상
+```
+
+### Local Rotation
+
+```
+✅ Component 개별 회전
+✅ Local 공간 기준
+✅ 특정 Component 대상
+```
+
+### 타입 시스템 ⭐
+
+```
+✅ Actor ≠ Component
+✅ 상속 관계 이해
+✅ 올바른 노드 선택
+✅ 타입 불일치 주의!
+```
+
+### Make Rotator
+
+```
+✅ Float → Rotator 변환
+✅ 개별 값으로 생성
+✅ Make Vector도 동일
+```
+
+**타입을 이해하면 모든 게 쉬워진다!** 🎯

@@ -1,0 +1,1883 @@
+---
+title: 'EcommerceProject -6'
+date: '2026-09-02'
+category: '풀스택/프로젝트 정리'
+tags: ['풀스택', '프로젝트 정리']
+draft: false
+summary: ''
+---
+
+# profileContent.jsx AllRefundOrders수정 ( 환불 요청 내역 확인 )
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381465/notion-blog/_/_/EcommerceProject/EcommerceProject_-6/Untitled.png)
+
+```jsx
+import React, { useState } from 'react'
+import { AiOutlineArrowRight, AiOutlineCamera, AiOutlineDelete } from 'react-icons/ai'
+import { useDispatch, useSelector } from 'react-redux'
+import styles from '../../styles/styles'
+import { DataGrid } from '@material-ui/data-grid'
+import { Button } from '@material-ui/core'
+import { Link } from 'react-router-dom'
+import { toast } from 'react-toastify'
+import { MdTrackChanges } from 'react-icons/md'
+import { RxCross1 } from 'react-icons/rx'
+import { Country, State } from 'country-state-city'
+import { useEffect } from 'react'
+import axios from 'axios'
+import {
+  deleteUserAddress,
+  loadUser,
+  updateUserAddress,
+  updateUserInformation,
+} from '../../redux/user/userAction'
+import { getAllOrdersOfUser } from '../../redux/order/orderAction'
+
+// 프로필 컨텐츠 컴포넌트
+const ProfileContent = ({ active }) => {
+  // Redux로부터 사용자 정보와 상태를 가져옴
+  const { user, error, successMessage } = useSelector((state) => state.user)
+  // 사용자 정보의 필드를 수정하기 위한 상태 변수들
+  const [name, setName] = useState(user && user.name)
+  const [email, setEmail] = useState(user && user.email)
+  const [phoneNumber, setPhoneNumber] = useState(user && user.phoneNumber)
+  const [password, setPassword] = useState('')
+  const [avatar, setAvatar] = useState(null)
+  const dispatch = useDispatch()
+
+  // 에러 및 성공 메시지 처리를 위한 useEffect
+  useEffect(() => {
+    if (error) {
+      toast.error(error)
+      dispatch({ type: 'clearErrors' })
+    }
+    if (successMessage) {
+      toast.success(successMessage)
+      dispatch({ type: 'clearMessages' })
+    }
+  }, [error, successMessage])
+
+  // 사용자 정보 업데이트를 위한 핸들러 함수
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    try {
+      await dispatch(updateUserInformation({ name, email, phoneNumber, password }))
+      await dispatch(loadUser())
+      toast.success('사용자 정보 업데이트 성공!')
+    } catch (error) {
+      toast.error('사용자 정보 업데이트 실패!')
+    }
+  }
+
+  // 아바타 변경을 위한 핸들러 함수
+  const handleImage = async (e) => {
+    const file = e.target.files[0]
+    setAvatar(file)
+
+    const formData = new FormData()
+    formData.append('image', e.target.files[0])
+
+    try {
+      await axios.put(`http://localhost:5000/api/v2/user/update-avatar`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        withCredentials: true,
+      })
+      dispatch(loadUser())
+      toast.success('아바타 변경 성공!')
+    } catch (error) {
+      toast.error(error)
+    }
+  }
+
+  return (
+    <div className="w-full">
+      {/* 프로필 정보 표시 및 수정 폼 */}
+      {active === 1 && (
+        <>
+          <div className="flex w-full justify-center">
+            <div className="relative">
+              <img
+                src={`http://localhost:5000/${user?.avatar}`}
+                className="h-[150px] w-[150px] rounded-full border-[3px] border-[#3ad132] object-cover"
+                alt=""
+              />
+              <div className="absolute right-[5px] bottom-[5px] flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-full bg-[#E3E9EE]">
+                <input type="file" id="image" className="hidden" onChange={handleImage} />
+                <label htmlFor="image">
+                  <AiOutlineCamera />
+                </label>
+              </div>
+            </div>
+          </div>
+          <br />
+          <br />
+          <div className="w-full px-5">
+            <form onSubmit={handleSubmit} aria-required={true}>
+              <div className="800px:flex block w-full pb-3">
+                <div className="800px:w-[50%] w-[100%]">
+                  <label className="block pb-2">이름</label>
+                  <input
+                    type="text"
+                    className={`${styles.input} 800px:mb-0 mb-4 !w-[95%]`}
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </div>
+                <div className="800px:w-[50%] w-[100%]">
+                  <label className="block pb-2">이메일 주소</label>
+                  <input
+                    type="text"
+                    className={`${styles.input} 800px:mb-0 mb-1 !w-[95%]`}
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="800px:flex block w-full pb-3">
+                <div className="800px:w-[50%] w-[100%]">
+                  <label className="block pb-2">전화번호</label>
+                  <input
+                    type="number"
+                    className={`${styles.input} 800px:mb-0 mb-4 !w-[95%]`}
+                    required
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                  />
+                </div>
+
+                <div className="800px:w-[50%] w-[100%]">
+                  <label className="block pb-2">비밀번호</label>
+                  <input
+                    type="password"
+                    className={`${styles.input} 800px:mb-0 mb-4 !w-[95%]`}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+              </div>
+              <input
+                className={`mt-8 h-[40px] w-[250px] cursor-pointer rounded-[3px] border border-[#3a24db] text-center text-[#3a24db]`}
+                required
+                value="업데이트"
+                type="submit"
+              />
+            </form>
+          </div>
+        </>
+      )}
+
+      {/* 주문 목록 표시 */}
+      {active === 2 && (
+        <div>
+          <AllOrders />
+        </div>
+      )}
+
+      {/* 환불된 주문 목록 표시 */}
+      {active === 3 && (
+        <div>
+          <AllRefundOrders />
+        </div>
+      )}
+
+      {/* 주문 추적 페이지 */}
+      {active === 5 && (
+        <div>
+          <TrackOrder />
+        </div>
+      )}
+
+      {/* 비밀번호 변경 폼 */}
+      {active === 6 && (
+        <div>
+          <ChangePassword />
+        </div>
+      )}
+
+      {/* 사용자 주소 목록 및 추가/삭제 기능 */}
+      {active === 7 && (
+        <div>
+          <Address />
+        </div>
+      )}
+    </div>
+  )
+}
+
+// 모든 주문 목록을 표시하는 컴포넌트
+const AllOrders = () => {
+  const { user } = useSelector((state) => state.user)
+  const { orders } = useSelector((state) => state.orders)
+  const dispatch = useDispatch()
+
+  useEffect(() => {
+    dispatch(getAllOrdersOfUser(user._id))
+  }, [])
+
+  // 표시할 테이블 컬럼 정의
+  const columns = [
+    { field: 'id', headerName: '주문 ID', minWidth: 150, flex: 0.7 },
+    {
+      field: 'status',
+      headerName: '상태',
+      minWidth: 130,
+      flex: 0.7,
+      cellClassName: (params) => {
+        return params.getValue(params.id, 'status') === '배송 완료' ? 'greenColor' : 'redColor'
+      },
+    },
+    { field: 'itemsQty', headerName: '상품 수량', type: 'number', minWidth: 130, flex: 0.7 },
+    { field: 'total', headerName: '총액', type: 'number', minWidth: 130, flex: 0.8 },
+    {
+      field: ' ',
+      flex: 1,
+      minWidth: 150,
+      headerName: '',
+      type: 'number',
+      sortable: false,
+      renderCell: (params) => {
+        return (
+          <>
+            <Link to={`/user/order/${params.id}`}>
+              <Button>
+                <AiOutlineArrowRight size={20} />
+              </Button>
+            </Link>
+          </>
+        )
+      },
+    },
+  ]
+
+  // 표시할 행 데이터 구성
+  const row = []
+  orders &&
+    orders.forEach((item) => {
+      row.push({
+        id: item._id,
+        itemsQty: item.cart.length,
+        total: item.totalPrice + '원 ',
+        status: item.status,
+      })
+    })
+
+  return (
+    <div className="pt-1 pl-8">
+      <DataGrid rows={row} columns={columns} pageSize={10} disableSelectionOnClick autoHeight />
+    </div>
+  )
+}
+
+// 환불된 주문 목록을 표시하는 컴포넌트
+const AllRefundOrders = () => {
+  const { user } = useSelector((state) => state.user)
+  const { orders } = useSelector((state) => state.orders)
+  const dispatch = useDispatch()
+
+  useEffect(() => {
+    dispatch(getAllOrdersOfUser(user._id))
+  }, [])
+
+  // 환불 대상 주문 필터링
+  const eligibleOrders = orders && orders.filter((item) => item.status === '환불 처리 중')
+
+  // 표시할 테이블 컬럼 정의
+  const columns = [
+    { field: 'id', headerName: 'Order ID', minWidth: 150, flex: 0.7 },
+    {
+      field: 'status',
+      headerName: 'Status',
+      minWidth: 130,
+      flex: 0.7,
+      cellClassName: (params) => {
+        return params.getValue(params.id, 'status') === '배송 완료' ? 'greenColor' : 'redColor'
+      },
+    },
+    { field: 'itemsQty', headerName: 'Items Qty', type: 'number', minWidth: 130, flex: 0.7 },
+    { field: 'total', headerName: 'Total', type: 'number', minWidth: 130, flex: 0.8 },
+    {
+      field: ' ',
+      flex: 1,
+      minWidth: 150,
+      headerName: '',
+      type: 'number',
+      sortable: false,
+      renderCell: (params) => {
+        return (
+          <>
+            <Link to={`/user/order/${params.id}`}>
+              <Button>
+                <AiOutlineArrowRight size={20} />
+              </Button>
+            </Link>
+          </>
+        )
+      },
+    },
+  ]
+
+  // 표시할 행 데이터 구성
+  const row = []
+  eligibleOrders &&
+    eligibleOrders.forEach((item) => {
+      row.push({
+        id: item._id,
+        itemsQty: item.cart.length,
+        total: item.totalPrice + ' 원',
+        status: item.status,
+      })
+    })
+
+  return (
+    <div className="pt-1 pl-8">
+      <DataGrid rows={row} columns={columns} pageSize={10} autoHeight disableSelectionOnClick />
+    </div>
+  )
+}
+```
+
+```jsx
+// 주문 추적 컴포넌트
+const TrackOrder = () => {
+  const { user } = useSelector((state) => state.user);
+  const { orders } = useSelector((state) => state.orders);
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    dispatch(getAllOrdersOfUser(user._id));
+  }, []);
+
+  // 표시할 테이블 컬럼 정의
+  const columns = [
+    { field: "id", headerName: "Order ID", minWidth: 150, flex: 0.7 },
+    { field: "status", headerName: "Status", minWidth: 130, flex: 0.7,
+      cellClassName: (params) => {
+        return params.getValue(params.id, "status") === "배송 완료"
+          ? "greenColor"
+          : "redColor";
+      },
+    },
+    { field: "itemsQty", headerName: "Items Qty", type: "number", minWidth: 130, flex: 0.7 },
+    { field: "total", headerName: "Total", type: "number", minWidth: 130, flex: 0.8 },
+    { field: " ", flex: 1, minWidth: 150, headerName: "", type: "number", sortable: false,
+      renderCell: (params) => {
+        return (
+          <>
+            <Link to={`/user/track/order/${params.id}`}>
+              <Button>
+                <MdTrackChanges size={20} />
+              </Button>
+            </Link>
+          </>
+        );
+      },
+    },
+  ];
+
+  // 표시할 행 데이터 구성
+  const row = [];
+  orders && orders.forEach((item) => {
+    row.push({
+      id: item._id,
+      itemsQty: item.cart.length,
+      total: item.totalPrice + " 원",
+      status: item.status,
+    });
+  });
+
+  return (
+    <div className="pl-8 pt-1">
+      <DataGrid
+        rows={row}
+        columns={columns}
+        pageSize={10}
+        disableSelectionOnClick
+        autoHeight
+      />
+    </div>
+  );
+};
+
+// 비밀번호 변경 컴포넌트
+const ChangePassword = () => {
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  // 비밀번호 변경 요청 핸들러
+  const passwordChangeHandler = async (e) => {
+    e.preventDefault();
+
+    await axios
+      .put(
+        `http://localhost:5000/api/v2/user/update-user-password`,
+        { oldPassword, newPassword, confirmPassword },
+        { withCredentials: true }
+      )
+      .then((res) => {
+        toast.success(res.data.message);
+        setOldPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      })
+      .catch((error) => {
+        toast.error(error.response.data.message);
+      });
+  };
+  return (
+    <div className="w-full px-5">
+      <h1 className="block text-[25px] text-center font-[600] text-[#000000ba] pb-2">
+        비밀번호 변경
+      </h1>
+      <div className="w-full">
+        <form
+          aria-required
+          onSubmit={passwordChangeHandler}
+          className="flex flex-col items-center"
+        >
+          <div className=" w-[100%] 800px:w-[50%] mt-5">
+            <label className="block pb-2">기존 비밀번호 입력</label>
+            <input
+              type="password"
+              className={`${styles.input} !w-[95%] mb-4 800px:mb-0`}
+              required
+              value={oldPassword}
+              onChange={(e) => setOldPassword(e.target.value)}
+            />
+          </div>
+          <div className=" w-[100%] 800px:w-[50%] mt-2">
+            <label className="block pb-2">새 비밀번호 입력</label>
+            <input
+              type="password"
+              className={`${styles.input} !w-[95%] mb-4 800px:mb-0`}
+              required
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
+          </div>
+          <div className=" w-[100%] 800px:w-[50%] mt-2">
+            <label className="block pb-2">새 비밀번호 확인</label>
+            <input
+              type="password"
+              className={`${styles.input} !w-[95%] mb-4 800px:mb-0`}
+              required
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+            />
+            <input
+              className={`w-[95%] h-[40px] border border-[#3a24db] text-center text-[#3a24db] rounded-[3px] mt-8 cursor-pointer`}
+              required
+              value="수정"
+              type="submit"
+            />
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// 사용자 주소 관리 컴포넌트
+const Address = () => {
+  const [open, setOpen] = useState(false);
+  const [country, setCountry] = useState("");
+  const [city, setCity] = useState("");
+  const [zipCode, setZipCode] = useState();
+  const [address1, setAddress1] = useState("");
+  const [address2, setAddress2] = useState("");
+  const [addressType, setAddressType] = useState("");
+  const { user } = useSelector((state) => state.user);
+  const dispatch = useDispatch();
+
+  // 주소 유형 데이터
+  const addressTypeData = [
+    { name: "기본" },
+    { name: "집" },
+    { name: "회사" },
+  ];
+
+  // 주소 추가/수정 제출 핸들러
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (addressType === "" || country === "" || city === "") {
+      toast.error("모든 필드를 입력하세요!");
+    } else {
+      console.log(country, city, address1, address2, zipCode, addressType);
+      dispatch(
+        updateUserAddress({
+          country,
+          city,
+          address1,
+          address2,
+          zipCode,
+          addressType,
+        })
+      );
+      setOpen(false);
+      setCountry("");
+      setCity("");
+      setAddress1("");
+      setAddress2("");
+      setZipCode(null);
+      setAddressType("");
+    }
+  };
+
+  // 주소 삭제 핸들러
+  const handleDelete = (item) => {
+    const id = item._id;
+    dispatch(deleteUserAddress(id));
+  };
+
+```
+
+```jsx
+  // 주소 목록 및 추가/삭제 기능 렌더링
+  return (
+    <div className="w-full px-5">
+      {/* 주소 추가 모달 */}
+      {open && (
+        <div className="fixed w-full h-screen bg-[#0000004b] top-0 left-0 flex items-center justify-center ">
+          <div className="w-[35%] h-[80vh] bg-white rounded shadow relative overflow-y-scroll">
+            <div className="w-full flex justify-end p-3">
+              <RxCross1
+                size={30}
+                className="cursor-pointer"
+                onClick={() => setOpen(false)}
+              />
+            </div>
+            <h1 className="text-center text-[25px] font-Poppins">
+              새 주소 추가
+            </h1>
+            <div className="w-full">
+              <form aria-required onSubmit={handleSubmit} className="w-full">
+                <div className="w-full block p-4">
+                  <div className="w-full pb-2">
+                    <label className="block pb-2">국가</label>
+                    <select
+                      name=""
+                      id=""
+                      value={country}
+                      onChange={(e) => setCountry(e.target.value)}
+                      className="w-[95%] border h-[40px] rounded-[5px]"
+                    >
+                      <option value="" className="block border pb-2">
+                        국가를 선택하세요
+                      </option>
+                      {Country &&
+                        Country.getAllCountries().map((item) => (
+                          <option
+                            className="block pb-2"
+                            key={item.isoCode}
+                            value={item.name}
+                          >
+                            {item.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  <div className="w-full pb-2">
+                    <label className="block pb-2">도시</label>
+                    <input
+                      type="text"
+                      className="w-[95%] border h-[40px] rounded-[5px] text-[14px] px-3 py-2"
+                      required
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                    />
+                  </div>
+                  <div className="w-full pb-2">
+                    <label className="block pb-2">우편번호</label>
+                    <input
+                      type="number"
+                      className="w-[95%] border h-[40px] rounded-[5px] text-[14px] px-3 py-2"
+                      required
+                      value={zipCode}
+                      onChange={(e) => setZipCode(e.target.value)}
+                    />
+                  </div>
+                  <div className="w-full pb-2">
+                    <label className="block pb-2">주소 1</label>
+                    <input
+                      type="text"
+                      className="w-[95%] border h-[40px] rounded-[5px] text-[14px] px-3 py-2"
+                      required
+                      value={address1}
+                      onChange={(e) => setAddress1(e.target.value)}
+                    />
+                  </div>
+                  <div className="w-full pb-2">
+                    <label className="block pb-2">주소 2</label>
+                    <input
+                      type="text"
+                      className="w-[95%] border h-[40px] rounded-[5px] text-[14px] px-3 py-2"
+                      value={address2}
+                      onChange={(e) => setAddress2(e.target.value)}
+                    />
+                  </div>
+                  <div className="w-full pb-2">
+                    <label className="block pb-2">주소 유형</label>
+                    <select
+                      name=""
+                      id=""
+                      value={addressType}
+                      onChange={(e) => setAddressType(e.target.value)}
+                      className="w-[95%] border h-[40px] rounded-[5px] text-[14px] px-3 py-2"
+                    >
+                      <option value="" className="block border pb-2">
+                        주소 유형을 선택하세요
+                      </option>
+                      {addressTypeData.map((item, index) => (
+                        <option key={index} value={item.name}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="w-full pb-2 flex justify-end">
+                    <Button
+                      className="bg-[#f73471] text-white rounded-[5px] p-2 text-center"
+                      type="submit"
+                    >
+                      추가
+                    </Button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 주소 목록 */}
+      <h1 className="block text-[25px] text-center font-[600] text-[#000000ba] pb-2">
+        주소 목록
+      </h1>
+      <div className="w-full">
+        <table className="w-full table-auto">
+          <thead>
+            <tr className="bg-[#f73471] text-white">
+              <th className="border">국가</th>
+              <th className="border">도시</th>
+              <th className="border">우편번호</th>
+              <th className="border">주소1</th>
+              <th className="border">주소2</th>
+              <th className="border">주소 유형</th>
+              <th className="border">작업</th>
+            </tr>
+          </thead>
+          <tbody>
+            {user &&
+              user.addresses &&
+              user.addresses.map((item, index) => (
+                <tr key={index}>
+                  <td className="border">{item.country}</td>
+                  <td className="border">{item.city}</td>
+                  <td className="border">{item.zipCode}</td>
+                  <td className="border">{item.address1}</td>
+                  <td className="border">{item.address2}</td>
+                  <td className="border">{item.addressType}</td>
+                  <td className="border">
+                    <Button
+                      onClick={() => handleDelete(item)}
+                      className="bg-[#f73471] text-white rounded-[5px] p-1 text-center"
+                    >
+                      <AiOutlineDelete />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="w-full flex justify-end mt-2">
+        <Button
+          onClick={() => setOpen(true)}
+          className="bg-[#f73471] text-white rounded-[5px] p-2 text-center"
+        >
+          주소 추가
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+export default ProfileContent;
+```
+
+```jsx
+const AllRefundOrders = () => {
+  // Redux에서 상태와 액션을 사용합니다.
+  const { user } = useSelector((state) => state.user);
+  const { orders } = useSelector((state) => state.orders);
+  const dispatch = useDispatch();
+
+  // 컴포넌트가 마운트될 때 사용자의 모든 주문을 가져옵니다.
+  useEffect(() => {
+    dispatch(getAllOrdersOfUser(user._id));
+  }, []);
+
+  // "환불 처리 중" 상태인 주문만 필터링합니다.
+  const eligibleOrders =
+    orders && orders.filter((item) => item.status === "환불 처리 중");
+
+  // DataGrid에 표시할 열을 정의합니다.
+  const columns = [
+    { field: "id", headerName: "주문 ID", minWidth: 150, flex: 0.7 },
+    {
+      field: "status",
+      headerName: "상태",
+      minWidth: 130,
+      flex: 0.7,
+      cellClassName: (params) => {
+        return params.getValue(params.id, "status") === "배송 완료"
+          ? "greenColor"
+          : "redColor";
+      },
+    },
+    {
+      field: "itemsQty",
+      headerName: "상품 수량",
+      type: "number",
+      minWidth: 130,
+      flex: 0.7,
+    },
+    {
+      field: "total",
+      headerName: "총액",
+      type: "number",
+      minWidth: 130,
+      flex: 0.8,
+    },
+    {
+      field: " ",
+      flex: 1,
+      minWidth: 150,
+      headerName: "",
+      type: "number",
+      sortable: false,
+      renderCell: (params) => {
+        return (
+          <>
+            <Link to={`/user/order/${params.id}`}>
+              <Button>
+                <AiOutlineArrowRight size={20} />
+              </Button>
+            </Link>
+          </>
+        );
+      },
+    },
+  ];
+
+  // DataGrid의 행 데이터를 준비합니다.
+  const row = [];
+  eligibleOrders &&
+    eligibleOrders.forEach((item) => {
+      row.push({
+        id: item._id,
+        itemsQty: item.cart.length,
+        total: item.totalPrice + " 원",
+        status: item.status,
+      });
+    });
+
+  // 필터링된 주문을 포함한 DataGrid 컴포넌트를 반환합니다.
+  return (
+    <div className="pl-8 pt-1">
+      <DataGrid
+        rows={row}
+        columns={columns}
+        pageSize={10}
+        autoHeight
+        disableSelectionOnClick
+      />
+    </div>
+  );
+};
+
+AllRefundOrders 컴포넌트는 사용자의 환불 처리 중인 주문 목록을 표시하는 기능을 담당한다. 이 컴포넌트의 주요 내용과 기능은 다음과 같다:
+
+Redux 상태 및 액션 사용:
+
+useSelector를 사용하여 Redux 스토어에서 사용자와 주문 상태를 가져온다. 또한 useDispatch를 사용하여 Redux 액션을 디스패치한다.
+
+주문 목록 가져오기:
+
+useEffect 훅을 사용하여 컴포넌트가 마운트될 때 사용자의 모든 주문을 가져오는 getAllOrdersOfUser 액션을 디스패치한다.
+
+환불 처리 중인 주문 필터링:
+
+가져온 주문 목록에서 상태가 "환불 처리 중"인 주문만 필터링한다.
+
+주문 목록 표시:
+
+Material-UI의 DataGrid를 사용하여 주문 목록을 표시합니다. 표에는 주문 ID, 상태, 상품 수량, 총액 및 상세 보기 링크가 표시된다.
+
+또한 상태에 따라서 표시되는 색상이 달라진다.
+
+상세 보기 링크:
+
+각 주문에 대한 상세 보기 링크를 제공한다. 이 링크를 클릭하면 해당 주문의 세부 정보를 확인할 수 있다.
+
+따라서 이 컴포넌트는 사용자의 환불 처리 중인 주문을 확인하고, 이를 표시하여 사용자가 해당 주문에 대한 상세 정보를 확인할 수 있도록 한다.
+```
+
+# 주문 추적 상세 페이지 작성
+
+```jsx
+유저의 주문추적 에서 아이콘을 클릭하여 상세 페이지로 이동한다
+
+상세 페이지에서는 상황에 따라서 문구가 다르게 출력된다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381464/notion-blog/_/_/EcommerceProject/EcommerceProject_-6/Untitled_1.png)
+
+## TrackOrderPage.jsx
+
+```jsx
+import React from 'react'
+import Header from '../components/Layout/Header'
+import Footer from '../components/Layout/Footer'
+import TrackOrder from '../components/Profile/TrackOrder'
+
+const TrackOrderPage = () => {
+  return (
+    <div>
+      <Header />
+      <TrackOrder />
+      <Footer />
+    </div>
+  )
+}
+
+export default TrackOrderPage
+```
+
+## TrackOrder.jsx
+
+```jsx
+import React, { useEffect } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { useParams } from 'react-router-dom'
+import { getAllOrdersOfUser } from '../../redux/order/orderAction'
+
+// 주문 상태를 추적하는 컴포넌트입니다.
+const TrackOrder = () => {
+  // Redux의 상태와 액션을 사용합니다.
+  const { orders } = useSelector((state) => state.orders) // Redux 스토어에서 주문 상태를 가져옵니다.
+  const { user } = useSelector((state) => state.user) // Redux 스토어에서 사용자 정보를 가져옵니다.
+  const dispatch = useDispatch() // Redux 액션을 디스패치하기 위한 dispatch 함수를 가져옵니다.
+
+  const { id } = useParams() // URL에서 파라미터로 전달된 주문 ID를 가져옵니다.
+
+  // 컴포넌트가 마운트될 때, 해당 사용자의 모든 주문을 가져옵니다.
+  useEffect(() => {
+    dispatch(getAllOrdersOfUser(user._id)) // getAllOrdersOfUser 액션을 사용하여 사용자의 모든 주문을 가져옵니다.
+  }, [dispatch]) // dispatch가 변경될 때마다 재호출됩니다.
+
+  // 주문 ID에 해당하는 주문 데이터를 찾습니다.
+  const data = orders && orders.find((item) => item._id === id)
+
+  // 주문 상태에 따라 화면에 적절한 메시지를 표시합니다.
+  return (
+    <div className="flex h-[80vh] w-full items-center justify-center">
+      <>
+        {data && data?.status === '처리 중' ? (
+          <h1 className="text-[20px]">주문이 상점에서 처리 중입니다..</h1>
+        ) : data?.status === '배송 파트너로 이관됨' ? (
+          <h1 className="text-[20px]">상품이 배송 파트너에게 이관되었습니다..</h1>
+        ) : data?.status === '발송 중' ? (
+          <h1 className="text-[20px]">상품이 배송 배송원과 함께 이동 중입니다..</h1>
+        ) : data?.status === '수령함' ? (
+          <h1 className="text-[20px]">
+            상품이 귀하의 도시에 도착했습니다. 곧 배송원이 전달할 것입니다..
+          </h1>
+        ) : data?.status === '배송 중' ? (
+          <h1 className="text-[20px]">당사 배송원이 주문을 전달하러 가고 있습니다.</h1>
+        ) : data?.status === '배송 완료' ? (
+          <h1 className="text-[20px]">상품이 배송되었습니다!</h1>
+        ) : data?.status === '환불 처리 중' ? (
+          <h1 className="text-[20px]">환불 처리 중입니다!</h1>
+        ) : data?.status === '환불 완료' ? (
+          <h1 className="text-[20px]">환불이 성공했습니다!</h1>
+        ) : null}
+      </>
+    </div>
+  )
+}
+
+export default TrackOrder
+```
+
+```jsx
+Redux 연결 및 액션 디스패치:
+
+주문 상태 및 사용자 정보를 Redux 스토어에서 가져오기 위해 useSelector 훅을 사용하고, 액션을 디스패치하기 위해 useDispatch 훅을 사용한다.
+
+URL 파라미터 추출:
+
+useParams 훅을 사용하여 URL에서 주문 ID를 추출한다.
+
+주문 데이터 가져오기:
+
+useEffect 훅을 사용하여 컴포넌트가 마운트될 때 사용자의 모든 주문을 가져온다.
+
+주문 상태에 따른 메시지 표시:
+
+주문 데이터가 로드되면 해당 주문의 상태를 확인하고, 각 상태에 따른 적절한 메시지를 화면에 표시한다.
+```
+
+# 환불 페이지 ShopAllRefunds.jsx 작성
+
+```jsx
+유저 프로필에서 환불 신청을 확인 가능한 페이지를 작성해준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381464/notion-blog/_/_/EcommerceProject/EcommerceProject_-6/Untitled_2.png)
+
+```jsx
+ 환불 페이지 ShopAllRefunds.jsx 를 만들어준다 그리고 거기 사용할 AllRefundOrders 컴포넌트 를 만들어준다
+
+이렇게 하면 유저 프로필에서 환불 현황을 확인 가능하다
+```
+
+## ShopAllRefunds.jsx 작성
+
+```jsx
+import React from 'react'
+import DashboardHeader from '../../components/Shop/Layout/DashboardHeader'
+import DashboardSideBar from '../../components/Shop/Layout/DashboardSideBar'
+import AllRefundOrders from '../../components/Shop/AllRefundOrders'
+
+const ShopAllRefunds = () => {
+  return (
+    <div>
+      <DashboardHeader />
+      <div className="flex w-full justify-between">
+        <div className="800px:w-[330px] w-[80px]">
+          <DashboardSideBar active={10} />
+        </div>
+        <div className="flex w-full justify-center">
+          <AllRefundOrders />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default ShopAllRefunds
+```
+
+## AllRefundOrders.jsx 작성
+
+```jsx
+import { Button } from '@material-ui/core'
+import { DataGrid } from '@material-ui/data-grid'
+import React, { useEffect } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { Link } from 'react-router-dom'
+import Loader from '../Layout/Loader'
+import { getAllOrdersOfShop } from '../../redux/order/orderAction'
+import { AiOutlineArrowRight } from 'react-icons/ai'
+
+// 모든 환불 주문을 표시하는 컴포넌트입니다.
+const AllRefundOrders = () => {
+  // Redux의 상태와 액션을 사용합니다.
+  const { orders, isLoading } = useSelector((state) => state.orders) // Redux 스토어에서 주문 상태와 로딩 상태를 가져옵니다.
+  const { seller } = useSelector((state) => state.seller) // Redux 스토어에서 판매자 정보를 가져옵니다.
+  const dispatch = useDispatch() // Redux 액션을 디스패치하기 위한 dispatch 함수를 가져옵니다.
+
+  // 컴포넌트가 마운트될 때, 해당 판매자의 모든 주문을 가져옵니다.
+  useEffect(() => {
+    dispatch(getAllOrdersOfShop(seller._id)) // getAllOrdersOfShop 액션을 사용하여 해당 판매자의 모든 주문을 가져옵니다.
+  }, [dispatch]) // dispatch가 변경될 때마다 재호출됩니다.
+
+  // 환불 주문만 필터링합니다.
+  const refundOrders =
+    orders && orders.filter((item) => item.status === '환불 처리 중' || item.status === '환불 완료')
+
+  // 데이터 그리드의 열 구성을 정의합니다.
+  const columns = [
+    { field: 'id', headerName: '주문 ID', minWidth: 150, flex: 0.7 }, // 주문 ID 열
+    {
+      field: 'status',
+      headerName: '상태',
+      minWidth: 130,
+      flex: 0.7,
+      // 상태에 따라 셀의 클래스를 동적으로 설정합니다.
+      cellClassName: (params) => {
+        return params.getValue(params.id, 'status') === '배송 완료' ? 'greenColor' : 'redColor'
+      },
+    },
+    {
+      field: 'itemsQty',
+      headerName: '상품 수량',
+      type: 'number',
+      minWidth: 130,
+      flex: 0.7,
+    },
+    {
+      field: 'total',
+      headerName: '총액',
+      type: 'number',
+      minWidth: 130,
+      flex: 0.8,
+    },
+    {
+      field: ' ',
+      flex: 1,
+      minWidth: 150,
+      headerName: '',
+      type: 'number',
+      sortable: false,
+      // 링크를 포함한 버튼 셀을 렌더링합니다.
+      renderCell: (params) => {
+        return (
+          <>
+            <Link to={`/order/${params.id}`}>
+              <Button>
+                <AiOutlineArrowRight size={20} />
+              </Button>
+            </Link>
+          </>
+        )
+      },
+    },
+  ]
+
+  // 데이터 그리드의 행 데이터를 구성합니다.
+  const row = []
+  refundOrders &&
+    refundOrders.forEach((item) => {
+      row.push({
+        id: item._id, // 주문 ID
+        itemsQty: item.cart.length, // 주문에 포함된 상품 수량
+        total: item.totalPrice + ' 원', // 주문 총액
+        status: item.status, // 주문 상태
+      })
+    })
+
+  // 로딩 중일 때는 로더를 표시하고, 그렇지 않으면 데이터 그리드를 표시합니다.
+  return (
+    <>
+      {isLoading ? ( // 로딩 중이면 로더를 표시합니다.
+        <Loader />
+      ) : (
+        <div className="mx-8 mt-10 w-full bg-white pt-1">
+          <DataGrid
+            rows={row} // 행 데이터
+            columns={columns} // 열 구성
+            pageSize={10} // 페이지 크기
+            disableSelectionOnClick // 클릭 시 선택 비활성화
+            autoHeight // 자동 높이 조정
+          />
+        </div>
+      )}
+    </>
+  )
+}
+
+export default AllRefundOrders
+```
+
+# DashBoardHero ( 데쉬보드 메인 컴포넌트 작성 )
+
+```jsx
+데시보드에서 전체적인 상황을 확인 가능한 컴포넌트를 작성한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381464/notion-blog/_/_/EcommerceProject/EcommerceProject_-6/Untitled_3.png)
+
+```jsx
+import React, { useEffect, useState } from 'react'
+import { AiOutlineArrowRight, AiOutlineMoneyCollect } from 'react-icons/ai'
+import styles from '../../styles/styles'
+import { Link } from 'react-router-dom'
+import { MdBorderClear } from 'react-icons/md'
+import { useDispatch, useSelector } from 'react-redux'
+import { getAllOrdersOfShop } from '../../redux/order/orderAction'
+import { getAllProductsShop } from '../../redux/product/productAction'
+import { Button } from '@material-ui/core'
+import { DataGrid } from '@material-ui/data-grid'
+
+// 대시보드의 주요 정보와 최근 주문을 표시하는 컴포넌트입니다.
+const DashboardHero = () => {
+  const dispatch = useDispatch() // Redux 액션을 디스패치하기 위한 dispatch 함수를 가져옵니다.
+  const { orders } = useSelector((state) => state.orders) // Redux 스토어에서 주문 상태를 가져옵니다.
+  const { seller } = useSelector((state) => state.seller) // Redux 스토어에서 판매자 정보를 가져옵니다.
+  const { products } = useSelector((state) => state.product) // Redux 스토어에서 상품 상태를 가져옵니다.
+  const [deliveredOrder, setDeliveredOrder] = useState(orders && orders) // "배송 완료"된 주문을 상태로 관리합니다.
+
+  // 컴포넌트가 마운트될 때, 해당 판매자의 모든 주문과 상품을 가져옵니다.
+  useEffect(() => {
+    dispatch(getAllOrdersOfShop(seller._id)) // getAllOrdersOfShop 액션을 사용하여 해당 판매자의 모든 주문을 가져옵니다.
+    dispatch(getAllProductsShop(seller._id)) // getAllProductsShop 액션을 사용하여 해당 판매자의 모든 상품을 가져옵니다.
+
+    const orderData = orders && orders.filter((item) => item.status === '배송 완료') // "배송 완료"된 주문만 필터링합니다.
+    setDeliveredOrder(orderData) // "배송 완료"된 주문 상태를 상태로 설정합니다.
+  }, [dispatch]) // dispatch가 변경될 때마다 재호출됩니다.
+
+  // "배송 완료"된 주문의 총 수익을 계산합니다.
+  const totalEarningWithoutTax = deliveredOrder
+    ? deliveredOrder.reduce((acc, item) => acc + item.totalPrice, 0)
+    : 0
+
+  // 서비스 수수료를 계산합니다.
+  const serviceCharge = totalEarningWithoutTax ? totalEarningWithoutTax * 0.1 : 0
+
+  // 이용 가능한 잔액을 계산합니다.
+  const availableBalance = (totalEarningWithoutTax - serviceCharge).toFixed(2) || 0
+
+  // 데이터 그리드의 열 구성을 정의합니다.
+  const columns = [
+    { field: 'id', headerName: '주문 ID', minWidth: 150, flex: 0.7 }, // 주문 ID 열
+    {
+      field: 'status',
+      headerName: '상태',
+      minWidth: 130,
+      flex: 0.7,
+      // 상태에 따라 셀의 클래스를 동적으로 설정합니다.
+      cellClassName: (params) => {
+        return params.getValue(params.id, 'status') === '배송 완료' ? 'greenColor' : 'redColor'
+      },
+    },
+    {
+      field: 'itemsQty',
+      headerName: '상품 수량',
+      type: 'number',
+      minWidth: 130,
+      flex: 0.7,
+    },
+    {
+      field: 'total',
+      headerName: '총액',
+      type: 'number',
+      minWidth: 130,
+      flex: 0.8,
+    },
+    {
+      field: ' ',
+      flex: 1,
+      minWidth: 150,
+      headerName: '',
+      type: 'number',
+      sortable: false,
+      // 링크를 포함한 버튼 셀을 렌더링합니다.
+      renderCell: (params) => {
+        return (
+          <>
+            <Link to={`/dashboard/order/${params.id}`}>
+              <Button>
+                <AiOutlineArrowRight size={20} />
+              </Button>
+            </Link>
+          </>
+        )
+      },
+    },
+  ]
+
+  // 데이터 그리드의 행 데이터를 구성합니다.
+  const row = []
+  orders &&
+    orders.forEach((item) => {
+      row.push({
+        id: item._id, // 주문 ID
+        itemsQty: item.cart.reduce((acc, item) => acc + item.qty, 0), // 주문에 포함된 상품 수량
+        total: item.totalPrice + ' 원', // 주문 총액
+        status: item.status, // 주문 상태
+      })
+    })
+
+  // 대시보드 화면을 렌더링합니다.
+  return (
+    <div className="w-full p-8">
+      {/* 개요 섹션 */}
+      <h3 className="font-Poppins pb-2 text-[22px]">개요</h3>
+      <div className="800px:flex block w-full items-center justify-between">
+        {/* 계정 잔액 섹션 */}
+        <div className="800px:w-[30%] mb-4 min-h-[20vh] w-full rounded bg-white px-2 py-5 shadow">
+          <div className="flex items-center">
+            <AiOutlineMoneyCollect size={30} className="mr-2" fill="#00000085" />
+            <h3
+              className={`${styles.productTitle} !text-[18px] leading-5 !font-[400] text-[#00000085]`}
+            >
+              계정 잔액 <span className="text-[16px]">(10% 서비스 수수료 포함)</span>
+            </h3>
+          </div>
+          <h5 className="pt-2 pl-[36px] text-[22px] font-[500]">${availableBalance}</h5>
+          <Link to="/dashboard-withdraw-money">
+            <h5 className="pt-4 pl-[2] text-[#077f9c]">출금</h5>
+          </Link>
+        </div>
+
+        {/* 모든 주문 섹션 */}
+        <div className="800px:w-[30%] mb-4 min-h-[20vh] w-full rounded bg-white px-2 py-5 shadow">
+          <div className="flex items-center">
+            <MdBorderClear size={30} className="mr-2" fill="#00000085" />
+            <h3
+              className={`${styles.productTitle} !text-[18px] leading-5 !font-[400] text-[#00000085]`}
+            >
+              모든 주문
+            </h3>
+          </div>
+          <h5 className="pt-2 pl-[36px] text-[22px] font-[500]">{orders && orders.length}</h5>
+          <Link to="/dashboard-orders">
+            <h5 className="pt-4 pl-2 text-[#077f9c]">주문 보기</h5>
+          </Link>
+        </div>
+
+        {/* 모든 상품 섹션 */}
+        <div className="800px:w-[30%] mb-4 min-h-[20vh] w-full rounded bg-white px-2 py-5 shadow">
+          <div className="flex items-center">
+            <AiOutlineMoneyCollect size={30} className="mr-2" fill="#00000085" />
+            <h3
+              className={`${styles.productTitle} !text-[18px] leading-5 !font-[400] text-[#00000085]`}
+            >
+              모든 상품
+            </h3>
+          </div>
+          <h5 className="pt-2 pl-[36px] text-[22px] font-[500]">{products && products.length}</h5>
+          <Link to="/dashboard-products">
+            <h5 className="pt-4 pl-2 text-[#077f9c]">상품 보기</h5>
+          </Link>
+        </div>
+      </div>
+
+      <br />
+
+      {/* 최근 주문 섹션 */}
+      <h3 className="font-Poppins pb-2 text-[22px]">최근 주문</h3>
+      <div className="min-h-[45vh] w-full rounded bg-white">
+        {/* 최근 주문 데이터 그리드 */}
+        <DataGrid
+          rows={row} // 행 데이터
+          columns={columns} // 열 구성
+          pageSize={10} // 페이지 크기
+          disableSelectionOnClick // 클릭 시 선택 비활성화
+          autoHeight // 자동 높이 조정
+        />
+      </div>
+    </div>
+  )
+}
+
+export default DashboardHero
+```
+
+```jsx
+Redux 연결 및 액션 디스패치:
+
+주문, 판매자, 상품 상태를 Redux 스토어에서 가져오기 위해 useSelector 훅을 사용하고, 액션을 디스패치하기 위해 useDispatch 훅을 사용합니다.
+
+주문 데이터 및 주문 상태 업데이트:
+
+컴포넌트가 마운트될 때 해당 판매자의 모든 주문을 가져오고, "배송 완료"된 주문만 필터링하여 상태로 관리합니다.
+
+수익 및 잔액 계산:
+
+"배송 완료"된 주문의 총 수익을 계산하고, 서비스 수수료를 적용하여 이용 가능한 잔액을 계산합니다.
+
+데이터 그리드 설정:
+
+주문 데이터를 표시하기 위해 DataGrid 컴포넌트를 설정합니다.
+
+대시보드 화면 렌더링:
+
+계정 잔액, 모든 주문 및 상품 수와 링크, 그리고 최근 주문을 표시하는 섹션을 렌더링합니다.
+
+---------------------------------------------------------------------------------
+
+reduce 가 들어간 부분을 더 상세하게 설명하자면
+
+이 코드는 orders 배열의 각 주문을 반복하고, 주문 ID, 상품 총 수량, 총 가격, 상태 등과 같은 관련 정보를 추출하여 객체로 형식화하고,
+
+이를 row 배열에 추가
+
+const row = [];
+orders && orders.forEach((item) => {
+    row.push({
+        id: item._id, // 주문 ID
+        itemsQty: item.cart.reduce((acc, item) => acc + item.qty, 0), // 주문에 포함된 상품 수량
+        total: item.totalPrice + "원", // 주문 총액
+        status: item.status, // 주문 상태
+      });
+});
+
+const row = [];:
+
+row라는 빈 배열을 선언. 이 배열은 각 주문의 형식화된 데이터를 저장할 것
+
+orders && orders.forEach((item) => { ... });:
+
+이 부분은 orders 배열이 존재하는지 확인한 후, forEach 메서드를 사용하여 orders 배열의 각 항목(주문)을 반복한다.
+
+row.push({ ... });:
+
+forEach 루프 내에서 각 주문에 대해 새로운 객체를 생성하고, 이를 row 배열에 추가한다.
+
+itemsQty:
+
+item.cart.reduce((acc, item) => acc + item.qty, 0),: 이 코드는 주문에 포함된 상품의 총 수량을 계산한다.
+
+여기서 item.cart는 주문에 포함된 상품들을 담고 있는 배열입니다. reduce 메서드는
+
+cart 배열의 각 상품(item)을 순회하고 그 수량(item.qty)을 누적하여 acc 변수에 저장합니다. 누적기(acc)의 초기값은 0이다.
+
+```
+
+# ShopProfileData.jsx 수정
+
+```jsx
+상점의 삼품 데이터 진행중인 이벤트 상점 리뷰등을 확인 가능하게 만들어준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381464/notion-blog/_/_/EcommerceProject/EcommerceProject_-6/Untitled_4.png)
+
+```jsx
+import React, { useEffect, useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { Link, useParams } from 'react-router-dom'
+import { getAllProductsShop } from '../../redux/product/productAction' // 상품 액션을 가져옵니다.
+import { getAllEventsShop } from '../../redux/event/eventAction' // 이벤트 액션을 가져옵니다.
+import styles from '../../styles/styles' // 스타일을 가져옵니다.
+import Ratings from '../Products/Ratings' // 상품 평점 컴포넌트를 가져옵니다.
+import ProductCard from '../Route/ProductCard' // 상품 카드 컴포넌트를 가져옵니다.
+
+// 상점 프로필 데이터 컴포넌트
+const ShopProfileData = ({ isOwner }) => {
+  const { products } = useSelector((state) => state.product) // Redux 스토어에서 상품 정보를 가져옵니다.
+  const { events } = useSelector((state) => state.event) // Redux 스토어에서 이벤트 정보를 가져옵니다.
+  const { seller } = useSelector((state) => state.seller) // Redux 스토어에서 판매자 정보를 가져옵니다.
+  const { id } = useParams() // URL에서 id 매개변수를 가져옵니다.
+  const dispatch = useDispatch() // useDispatch 훅을 사용하여 디스패치 함수를 가져옵니다.
+
+  // 컴포넌트가 마운트될 때 상품 및 이벤트 정보를 가져오는 효과
+  useEffect(() => {
+    dispatch(getAllProductsShop(id)) // 해당 상점의 모든 상품을 가져오는 액션을 디스패치합니다.
+    dispatch(getAllEventsShop(seller._id)) // 해당 판매자의 모든 이벤트를 가져오는 액션을 디스패치합니다.
+  }, [dispatch]) // 디스패치 함수가 업데이트될 때마다 useEffect가 실행됩니다.
+
+  const [active, setActive] = useState(1) // 활성 탭 상태를 관리하는 상태 변수
+
+  // 모든 리뷰를 하나의 배열로 평탄화합니다.
+  const allReviews = products && products.map((product) => product.reviews).flat()
+
+  return (
+    <div className="w-full">
+      <div className="flex w-full items-center justify-between">
+        {/* 탭 목록을 보여줍니다. */}
+        <div className="flex w-full">
+          <div className="flex items-center" onClick={() => setActive(1)}>
+            <h5
+              className={`text-[20px] font-[600] ${
+                active === 1 ? 'text-red-500' : 'text-[#333]'
+              } cursor-pointer pr-[20px]`}
+            >
+              상점 제품
+            </h5>
+          </div>
+          <div className="flex items-center" onClick={() => setActive(2)}>
+            <h5
+              className={`text-[20px] font-[600] ${
+                active === 2 ? 'text-red-500' : 'text-[#333]'
+              } cursor-pointer pr-[20px]`}
+            >
+              진행 중인 이벤트
+            </h5>
+          </div>
+
+          <div className="flex items-center" onClick={() => setActive(3)}>
+            <h5
+              className={`text-[20px] font-[600] ${
+                active === 3 ? 'text-red-500' : 'text-[#333]'
+              } cursor-pointer pr-[20px]`}
+            >
+              상점 리뷰
+            </h5>
+          </div>
+        </div>
+        {/* 판매자 본인이면 대시보드로 이동하는 버튼을 표시합니다. */}
+        <div>
+          {isOwner && (
+            <div>
+              <Link to="/dashboard">
+                <div className={`${styles.button} h-[42px] !rounded-[4px]`}>
+                  <span className="text-[#fff]">대시보드로 이동</span>
+                </div>
+              </Link>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <br />
+      {/* 활성 탭에 따라 상점 제품을 보여줍니다. */}
+      {active === 1 && (
+        <div className="mb-12 grid grid-cols-1 gap-[20px] border-0 md:grid-cols-2 md:gap-[25px] lg:grid-cols-3 lg:gap-[25px] xl:grid-cols-4 xl:gap-[20px]">
+          {products &&
+            products.map((i, index) => <ProductCard data={i} key={index} isShop={true} />)}
+        </div>
+      )}
+
+      {/* 활성 탭에 따라 진행 중인 이벤트를 보여줍니다. */}
+      {active === 2 && (
+        <div className="w-full">
+          <div className="mb-12 grid grid-cols-1 gap-[20px] border-0 md:grid-cols-2 md:gap-[25px] lg:grid-cols-3 lg:gap-[25px] xl:grid-cols-4 xl:gap-[20px]">
+            {events &&
+              events.map((i, index) => (
+                <ProductCard data={i} key={index} isShop={true} isEvent={true} />
+              ))}
+          </div>
+          {/* 이벤트가 없는 경우 메시지를 표시합니다. */}
+          {events && events.length === 0 && (
+            <h5 className="w-full py-5 text-center text-[18px]">
+              이 상점에 대한 이벤트가 없습니다!
+            </h5>
+          )}
+        </div>
+      )}
+
+      {/* 활성 탭에 따라 상점 리뷰를 보여줍니다. */}
+      {active === 3 && (
+        <div className="w-full">
+          {allReviews &&
+            allReviews.map((item, index) => (
+              <div className="my-4 flex w-full" key={index}>
+                <img
+                  src={`http://localhost:5000/${item.user.avatar}`}
+                  className="h-[50px] w-[50px] rounded-full"
+                  alt=""
+                />
+                <div className="pl-2">
+                  <div className="flex w-full items-center">
+                    <h1 className="pr-2 font-[600]">{item.user.name}</h1>
+                    <Ratings rating={item.rating} />
+                  </div>
+                  <p className="font-[400] text-[#000000a7]">{item?.comment}</p>
+                  <p className="text-[14px] text-[#000000a7]">{'2일 전'}</p>
+                </div>
+              </div>
+            ))}
+          {/* 리뷰가 없는 경우 메시지를 표시합니다. */}
+          {allReviews && allReviews.length === 0 && (
+            <h5 className="w-full py-5 text-center text-[18px]">이 상점에 대한 리뷰가 없습니다!</h5>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default ShopProfileData // 상점 프로필 데이터 컴포넌트를 내보냅니다.
+```
+
+```jsx
+products && products.map((product) => product.reviews).flat();
+
+flat() 메서드는 ES10(ECMAScript 2019)에 추가된 배열 메서드로,
+
+중첩된 배열을 평탄화하여 단일 배열로 만든다.
+
+이 메서드는 인수로 깊이(depth)를 지정할 수 있다.
+
+만약 깊이를 지정하지 않거나 기본값 1을 사용하면 1차원 배열로 평탄화된다
+
+예를들어
+
+const arrayOfArrays = [[1, 2, 3], [4, 5], [6, 7, 8]]; 이런 배열이 있다면 flat() 을 사용해서
+
+const flattenedArray = arrayOfArrays.flat();
+console.log(flattenedArray); // 출력: [1, 2, 3, 4, 5, 6, 7, 8]
+
+이렇게 만드는게 가능하다  내부 배열을 모두 합쳐서 하나의 배열로 만드는 것
+```
+
+# shopSettingPage 작성
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381464/notion-blog/_/_/EcommerceProject/EcommerceProject_-6/Untitled_5.png)
+
+```jsx
+이 부분은 샵 판매자의 내용을 수정 가능하게 만들어 주는 부분이다
+```
+
+## shopSettingPage 작성
+
+```jsx
+import React from 'react'
+import Footer from '../../components/Layout/Footer'
+import ShopSettings from '../../components/Shop/ShopSettings'
+import DashboardHeader from '../../components/Shop/Layout/DashboardHeader'
+import DashboardSideBar from '../../components/Shop/Layout/DashboardSideBar'
+
+const ShopSettingsPage = () => {
+  return (
+    <div>
+      <DashboardHeader />
+      <div className="flex w-full items-start justify-between">
+        <div className="800px:w-[330px] w-[80px]">
+          <DashboardSideBar active={11} />
+        </div>
+        <ShopSettings />
+      </div>
+    </div>
+  )
+}
+
+export default ShopSettingsPage
+```
+
+## ShopSettings.jsx 작성
+
+```jsx
+import React, { useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { AiOutlineCamera } from 'react-icons/ai'
+import styles from '../../styles/styles'
+import axios from 'axios'
+import { loadSeller } from '../../redux/seller/sellerAction'
+import { toast } from 'react-toastify'
+
+const ShopSettings = () => {
+  // Redux의 useSelector 훅을 사용하여 상점 정보를 가져옴
+  const { seller } = useSelector((state) => state.seller)
+
+  // 상태 변수들을 초기화
+  const [avatar, setAvatar] = useState()
+  const [name, setName] = useState(seller && seller.name)
+  const [description, setDescription] = useState(
+    seller && seller.description ? seller.description : ''
+  )
+  const [address, setAddress] = useState(seller && seller.address)
+  const [phoneNumber, setPhoneNumber] = useState(seller && seller.phoneNumber)
+  const [zipCode, setZipcode] = useState(seller && seller.zipCode)
+
+  const dispatch = useDispatch()
+
+  // 이미지 업로드 핸들러
+  const handleImage = async (e) => {
+    e.preventDefault()
+    const file = e.target.files[0]
+    setAvatar(file)
+
+    // 이미지를 포함한 FormData 객체 생성
+    const formData = new FormData()
+    formData.append('image', e.target.files[0])
+
+    try {
+      // axios를 사용하여 이미지를 업로드
+      await axios.put(`http://localhost:5000/api/v2/shop/update-shop-avatar`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        withCredentials: true,
+      })
+
+      // Redux 상태 업데이트를 위해 loadSeller 액션 호출
+      dispatch(loadSeller())
+      // 성공 메시지 표시
+      toast.success('아바타가 성공적으로 업데이트되었습니다!')
+    } catch (error) {
+      // 에러 메시지 표시
+      toast.error(error.response.data.message)
+    }
+  }
+
+  // 상점 정보 업데이트 핸들러
+  const updateHandler = async (e) => {
+    e.preventDefault()
+
+    try {
+      // axios를 사용하여 상점 정보를 업데이트
+      await axios.put(
+        `http://localhost:5000/api/v2/shop/update-seller-info`,
+        {
+          name,
+          address,
+          zipCode,
+          phoneNumber,
+          description,
+        },
+        { withCredentials: true }
+      )
+
+      // Redux 상태 업데이트를 위해 loadSeller 액션 호출
+      dispatch(loadSeller())
+      // 성공 메시지 표시
+      toast.success('상점 정보가 성공적으로 업데이트되었습니다!')
+    } catch (error) {
+      // 에러 메시지 표시
+      toast.error(error.response.data.message)
+    }
+  }
+
+  return (
+    <div className="flex min-h-screen w-full flex-col items-center">
+      <div className="800px:w-[80%] my-5 flex w-full flex-col justify-center">
+        <div className="flex w-full items-center justify-center">
+          <div className="relative">
+            {/* 아바타 이미지 표시 */}
+            <img
+              src={avatar ? URL.createObjectURL(avatar) : `http://localhost:5000/${seller.avatar}`}
+              alt=""
+              className="h-[200px] w-[200px] cursor-pointer rounded-full"
+            />
+            {/* 이미지 업로드 버튼 */}
+            <div className="absolute right-[15px] bottom-[10px] flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-full bg-[#E3E9EE]">
+              <input type="file" id="image" className="hidden" onChange={handleImage} />
+              <label htmlFor="image">
+                <AiOutlineCamera />
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* 상점 정보 입력 폼 */}
+        <form
+          aria-aria-required={true}
+          className="flex flex-col items-center"
+          onSubmit={updateHandler}
+        >
+          {/* 상점 이름 입력란 */}
+          <div className="800px:w-[50%] mt-5 flex w-[100%] flex-col items-center">
+            <div className="w-full pl-[3%]">
+              <label className="block pb-2">상점 이름</label>
+            </div>
+            <input
+              type="name"
+              placeholder={`${seller.name}`}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className={`${styles.input} 800px:mb-0 mb-4 !w-[95%]`}
+              required
+            />
+          </div>
+          {/* 상점 설명 입력란 */}
+          <div className="800px:w-[50%] mt-5 flex w-[100%] flex-col items-center">
+            <div className="w-full pl-[3%]">
+              <label className="block pb-2">상점 설명</label>
+            </div>
+            <input
+              type="name"
+              placeholder={`${seller?.description ? seller.description : '상점 설명을 입력하세요'}`}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className={`${styles.input} 800px:mb-0 mb-4 !w-[95%]`}
+            />
+          </div>
+          {/* 상점 주소 입력란 */}
+          <div className="800px:w-[50%] mt-5 flex w-[100%] flex-col items-center">
+            <div className="w-full pl-[3%]">
+              <label className="block pb-2">상점 주소</label>
+            </div>
+            <input
+              type="name"
+              placeholder={seller?.address}
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              className={`${styles.input} 800px:mb-0 mb-4 !w-[95%]`}
+              required
+            />
+          </div>
+          {/* 상점 전화번호 입력란 */}
+          <div className="800px:w-[50%] mt-5 flex w-[100%] flex-col items-center">
+            <div className="w-full pl-[3%]">
+              <label className="block pb-2">상점 전화번호</label>
+            </div>
+            <input
+              type="number"
+              placeholder={seller?.phoneNumber}
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              className={`${styles.input} 800px:mb-0 mb-4 !w-[95%]`}
+              required
+            />
+          </div>
+          {/* 상점 우편번호 입력란 */}
+          <div className="800px:w-[50%] mt-5 flex w-[100%] flex-col items-center">
+            <div className="w-full pl-[3%]">
+              <label className="block pb-2">상점 우편번호</label>
+            </div>
+            <input
+              type="number"
+              placeholder={seller?.zipCode}
+              value={zipCode}
+              onChange={(e) => setZipcode(e.target.value)}
+              className={`${styles.input} 800px:mb-0 mb-4 !w-[95%]`}
+              required
+            />
+          </div>
+          {/* 상점 정보 업데이트 버튼 */}
+          <div className="800px:w-[50%] mt-5 flex w-[100%] flex-col items-center">
+            <input
+              type="submit"
+              value="상점 업데이트"
+              className={`${styles.input} 800px:mb-0 mb-4 !w-[95%]`}
+              required
+              readOnly
+            />
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+export default ShopSettings
+```
+
+```jsx
+유저 정보를 수정하는것과 원리는 똑같다
+
+( 모델에서 폰 번호를 Number 로 해놔서 오류가 생겼었다 String 으로 해주자 숫자로 저장할때 맨 앞의 0을 제거하게 된다  )
+
+업데이트를 위해서 shop 컨트롤러에 관련된 컨트롤러를 작성해준다 /update-shop-avatar, /update-seller-info
+```
+
+# 잠깐! 새로고침 하지 않고 사용자 정보를 업데이트 할 수 있는 부분을 ProfileContent 유저 정보 업데이트 부분에 적어놓았다
+
+```jsx
+const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      // 사용자 정보 업데이트
+      await dispatch(updateUserInformation({ name, email, phoneNumber, password }));
+
+      // 사용자 정보 다시 가져오기
+      await dispatch(loadUser());
+
+      // 화면 다시 렌더링을 위한 동작 수행
+      // 예: 상태 업데이트, 필요한 동작 수행 등
+
+      toast.success("사용자 정보 업데이트 성공!");
+    } catch (error) {
+      toast.error("사용자 정보 업데이트 실패!");
+    }
+  };
+
+이 부분을 확인하자
+
+아님 shopSettings.jsx 의
+
+ const updateHandler = async (e) => {
+    e.preventDefault();
+
+    await axios.put(`http://localhost:5000/api/v2/shop/update-seller-info`, {
+        name,
+        address,
+        zipCode,
+        phoneNumber,
+        description,
+    }, {withCredentials: true}).then((res) => {
+        toast.success("상점 정보가 성공적으로 업데이트되었습니다!");
+        dispatch(loadSeller());
+    }).catch((error)=> {
+        toast.error(error.response.data.message);
+    })
+  };
+
+이부분을 확인해주자
+
+```
+
+```jsx
+업데이트 한 뒤 다시 디스패치 해서 불러와주면 새로고침이 된다
+```
+
+# 출금 페이지 작성
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381465/notion-blog/_/_/EcommerceProject/EcommerceProject_-6/Untitled_6.png)
+
+```jsx
+상점 출금 페이지를 만들기 위해서 아래 컴포넌트를 추가해준다 이는 특별한 기능은 없는것 같다..?
+```
+
+## WithdrawMoney.jsx
+
+```jsx
+import React, { useEffect, useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { getAllOrdersOfShop } from '../../redux/order/orderAction' // 주문 액션을 가져옵니다.
+import styles from '../../styles/styles' // 스타일을 가져옵니다.
+
+// 출금 화면 컴포넌트
+const WithdrawMoney = () => {
+  const dispatch = useDispatch() // useDispatch 훅을 사용하여 디스패치 함수를 가져옵니다.
+  const { orders } = useSelector((state) => state.orders) // Redux 스토어에서 주문 정보를 가져옵니다.
+  const { seller } = useSelector((state) => state.seller) // Redux 스토어에서 판매자 정보를 가져옵니다.
+  const [deliveredOrder, setDeliveredOrder] = useState(null) // 배송 완료된 주문을 저장할 상태를 선언합니다.
+
+  useEffect(() => {
+    dispatch(getAllOrdersOfShop(seller._id)) // 해당 판매자의 모든 주문을 가져오는 액션을 디스패치합니다.
+
+    // 주문 중 배송 완료된 주문만 필터링하여 상태에 저장합니다.
+    const orderData = orders && orders.filter((item) => item.status === '배송 완료')
+    setDeliveredOrder(orderData)
+  }, [dispatch]) // 디스패치 함수가 업데이트될 때마다 useEffect가 실행됩니다.
+
+  // 세금 제외 수입 계산
+  const totalEarningWithoutTax =
+    deliveredOrder && deliveredOrder.reduce((acc, item) => acc + item.totalPrice, 0)
+
+  // 서비스 수수료 계산
+  const serviceCharge = totalEarningWithoutTax * 0.1
+
+  // 사용 가능 잔액 계산
+  const availableBalance = (totalEarningWithoutTax - serviceCharge).toFixed(2)
+
+  return (
+    <div className="h-[90vh] w-full p-8">
+      <div className="flex h-full w-full flex-col items-center justify-center rounded bg-white">
+        {/* 사용 가능한 잔액을 화면에 표시합니다. */}
+        <h5 className="pb-4 text-[20px]">사용 가능한 잔액: ${availableBalance}</h5>
+        {/* 출금하기 버튼을 화면에 표시합니다. */}
+        <div className={`${styles.button} !h-[42px] !rounded text-white`}>출금하기</div>
+      </div>
+    </div>
+  )
+}
+
+export default WithdrawMoney // 출금 화면 컴포넌트를 내보냅니다.
+```
+
+```jsx
+reduce() 메서드는 배열의 각 요소에 대해 주어진 콜백 함수를 실행하여 하나의 결과값을 반환
+
+reduce() 메서드는 초기값 0을 가지는 누산기 acc와 배열의 각 요소 item에 대해 실행된다.
+
+각 주문 항목의 totalPrice를 acc에 더해나간다.
+
+최종적으로 모든 항목이 처리된 후 누산기 acc에는 모든 주문의 총 가격이 합산되어 있다.
+```
+
+## ShopWithdrawMoney.jsx
+
+```jsx
+import React from 'react'
+import DashboardHeader from '../../components/Shop/Layout/DashboardHeader'
+import WithdrawMoney from '../../components/Shop/WithdrawMoney'
+import DashboardSideBar from '../../components/Shop/Layout/DashboardSideBar'
+
+const ShopWithDrawMoneyPage = () => {
+  return (
+    <div>
+      <DashboardHeader />
+      <div className="flex w-full items-start justify-between">
+        <div className="800px:w-[330px] w-[80px]">
+          <DashboardSideBar active={7} />
+        </div>
+        <WithdrawMoney />
+      </div>
+    </div>
+  )
+}
+
+export default ShopWithDrawMoneyPage
+```

@@ -1,0 +1,2263 @@
+---
+title: '4'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 🎮 Blueprint와 Animation Blueprint 연동하기 }
+
+## 🎯 목표
+
+BP_F18의 Pitch 값을 ABP_F18로 전달
+
+- Blueprint 변수 생성
+- Animation Blueprint에서 접근
+- Elevator가 실시간으로 움직이도록
+
+---
+
+## 💡 핵심 원리: 데이터 흐름 이해
+
+### 전체 데이터 흐름
+
+```
+1. 플레이어 입력
+   W/S 키 누름
+   ↓
+2. BP_F18 (게임 로직)
+   IA_Pitch → Set Pitch Input
+   ↓
+   Pitch_Value 변수에도 저장
+   ↓
+3. ABP_F18 (애니메이션)
+   BP_F18의 Pitch_Value 가져오기
+   ↓
+4. Transform (Modify) Bone
+   Elevator 회전 적용
+   ↓
+5. 화면
+   Elevator가 움직이는 모습 표시
+```
+
+**왜 이런 복잡한 과정인가?**
+
+```
+Blueprint와 Animation Blueprint는:
+  완전히 분리된 시스템
+  ↓
+Blueprint:
+  - 게임 로직
+  - 물리 제어
+  - 입력 처리
+
+Animation Blueprint:
+  - 애니메이션만
+  - 뼈대 제어
+  - 시각적 표현
+
+연결 필요:
+  변수를 통한 데이터 전달 ✅
+```
+
+---
+
+## 🔧 1단계: BP_F18에 변수 생성
+
+### Pitch_Value 변수 생성
+
+```
+BP_F18 → Variables 패널
+  ↓
++ 버튼 클릭
+  ↓
+이름: Pitch_Value
+타입: Float
+기본값: 0.0
+```
+
+**왜 같은 이름인가?**
+
+```
+ABP_F18에도 Pitch_Value 존재
+  ↓
+같은 이름 사용:
+  - 헷갈리지 않음
+  - 용도가 명확
+  - 디버깅 쉬움 ✅
+
+주의:
+  - 서로 다른 변수!
+  - 단지 이름만 같음
+  - 값은 별도로 관리
+```
+
+---
+
+## 🔧 2단계: IA_Pitch에 변수 저장 추가
+
+### Triggered 이벤트 수정
+
+```
+기존:
+  [IA_Pitch] Triggered
+    ↓
+  [Set Pitch Input]
+    └─ Pitch: Action Value
+
+추가:
+  [IA_Pitch] Triggered
+    ↓
+  Action Value
+    ├────────────────────┐
+    ↓                    ↓
+  [SET] Pitch_Value   [Set Pitch Input]
+    (변수 저장)         (엔진 제어)
+```
+
+**왜 두 곳에 연결하나?**
+
+```
+Set Pitch Input:
+  - Vehicle Movement 제어
+  - 실제 비행 움직임
+
+SET Pitch_Value:
+  - 변수에 값 저장
+  - Animation Blueprint에서 사용
+  ↓
+둘 다 필요! ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380602/notion-blog/_/_/BG/4/image.png)
+
+### Completed 이벤트도 수정
+
+```
+[IA_Pitch] Completed
+  ↓
+0.0 (상수)
+  ├────────────────────┐
+  ↓                    ↓
+[SET] Pitch_Value   [Set Pitch Input]
+```
+
+**왜 둘 다 0으로?**
+
+```
+Set Pitch Input (0):
+  - 회전 멈춤
+
+SET Pitch_Value (0):
+  - Elevator 중립 위치로
+  ↓
+완전한 중립 복귀 ✅
+```
+
+---
+
+## 🔧 3단계: ABP_F18에서 BP_F18 참조 얻기
+
+### Event Blueprint Begin Play 사용
+
+```
+ABP_F18 → Event Graph
+  ↓
+Event Blueprint Begin Play 이미 존재
+```
+
+**Event Blueprint Begin Play란?**
+
+```
+Animation Blueprint 전용 BeginPlay
+  ↓
+차이점:
+  - Event BeginPlay: Actor용
+  - Event Blueprint Begin Play: Animation용
+
+실행 시점:
+  Animation Blueprint 시작 시 1회
+  ↓
+  초기화에 적합 ✅
+```
+
+---
+
+## 🔧 4단계: Try Get Pawn Owner 노드
+
+### 노드 추가
+
+```
+[Event Blueprint Begin Play]
+  ↓
+[Try Get Pawn Owner]
+```
+
+**Try Get Pawn Owner란?**
+
+```
+기능:
+  이 Animation Blueprint를 소유한
+  Pawn(조종 가능한 객체)을 가져옴
+  ↓
+  F18 비행기가 소유자
+  ↓
+  BP_F18을 반환
+
+왜 "Try"인가?
+  - 실패할 수 있음
+  - 소유자 없을 수도 있음
+  - 안전한 접근 방식 ✅
+```
+
+---
+
+## 🔧 5단계: Cast To BP_F18 노드
+
+### Casting(형변환) 필요성
+
+```
+Try Get Pawn Owner 반환값:
+  타입: Pawn (일반적인 Pawn)
+  ↓
+문제:
+  일반 Pawn에는 Pitch_Value 없음!
+  ↓
+해결:
+  BP_F18 타입으로 변환 필요
+```
+
+### Cast To 노드 추가
+
+```
+[Try Get Pawn Owner] Return Value
+  ↓
+[Cast To BP_F18]
+  ├─ Object: Return Value
+  ├─ As BP_F18 (성공 시 출력)
+  └─ Cast Failed (실패 시)
+```
+
+**Casting(형변환)이란?**
+
+```
+비유:
+  "이게 사과인가?" 확인하고 변환
+  ↓
+일반 과일 → 사과로 명확히 지정
+  ↓
+사과의 기능 사용 가능
+
+실제:
+  일반 Pawn → BP_F18로 변환
+  ↓
+  BP_F18의 변수(Pitch_Value) 접근 가능 ✅
+
+실패하면?
+  - Cast Failed 핀 실행
+  - 안전한 에러 처리
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380599/notion-blog/_/_/BG/4/image_1.png)
+
+---
+
+## 🔧 6단계: BP_F18을 변수로 저장
+
+### Promote to Variable
+
+```
+[Cast To BP_F18] As BP_F18 핀
+  ↓
+우클릭 → Promote to Variable
+  ↓
+이름: BP_F18
+```
+
+**왜 변수로 저장하나?**
+
+```
+저장 안 하면:
+  - 매번 Try Get Pawn Owner 호출
+  - 매번 Cast 필요
+  - 비효율적 ❌
+
+저장하면:
+  - 1회만 가져옴 (BeginPlay)
+  - 이후 변수만 사용
+  - 효율적 ✅
+```
+
+### 노드 구조
+
+```
+[Event Blueprint Begin Play]
+  ↓
+[Try Get Pawn Owner]
+  ↓
+[Cast To BP_F18]
+  ↓
+[SET] BP_F18 (변수 저장)
+```
+
+---
+
+## 🔧 7단계: Event Blueprint Update Animation에서 사용
+
+### Update Animation 이벤트란?
+
+```
+Animation Blueprint의 Event Tick
+  ↓
+매 프레임 실행 (초당 60회)
+  ↓
+실시간 업데이트에 사용
+```
+
+**왜 BeginPlay가 아닌 Update Animation인가?**
+
+```
+BeginPlay:
+  - 1회만 실행
+  - 초기화용
+  - 값 변화 감지 못함 ❌
+
+Update Animation:
+  - 매 프레임 실행
+  - 실시간 감지
+  - 값 변화 즉시 반영 ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380601/notion-blog/_/_/BG/4/image_2.png)
+
+---
+
+## 🔧 8단계: Is Valid 체크
+
+### 노드 구성
+
+```
+[Event Blueprint Update Animation]
+  ↓
+[GET] BP_F18 (저장한 변수)
+  ↓
+[Is Valid]
+  ├─ Is Valid (성공)
+  └─ Is Not Valid (실패)
+```
+
+**Is Valid 노드란?**
+
+```
+기능: 객체가 유효한지 확인
+  ↓
+유효함 (Valid):
+  - 객체 존재
+  - 메모리에 있음
+  - 사용 가능 ✅
+
+무효함 (Not Valid):
+  - null/없음
+  - 삭제됨
+  - 사용 불가 ❌
+```
+
+**왜 필요한가?**
+
+```
+가능한 문제 상황:
+  - BP_F18이 아직 생성 안 됨
+  - 게임 중 삭제됨
+  - Cast 실패
+
+Is Valid 없이 접근 시:
+  - 크래시 발생 ❌
+
+Is Valid로 확인:
+  - 안전한 접근
+  - 에러 방지 ✅
+```
+
+---
+
+## 🔧 9단계: Pitch_Value 가져오기 및 설정
+
+### 노드 구성
+
+```
+[Is Valid] Is Valid 핀
+  ↓
+[GET] BP_F18 변수
+  ↓
+[Get Pitch Value] (BP_F18의 변수)
+  ↓
+[SET] Pitch_Value (ABP_F18의 변수)
+```
+
+**데이터 흐름 상세**
+
+```
+1. BP_F18.Pitch_Value (게임 로직 변수)
+   값: 플레이어 입력 (-1.0 ~ 1.0)
+   ↓
+2. 매 프레임 복사
+   ↓
+3. ABP_F18.Pitch_Value (애니메이션 변수)
+   값: BP_F18과 동일
+   ↓
+4. AnimGraph에서 사용
+   Transform (Modify) Bone의 입력
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380601/notion-blog/_/_/BG/4/image_3.png)
+
+---
+
+## 🔧 10단계: 값 증폭 (Multiply)
+
+### 문제점
+
+```
+BP_F18.Pitch_Value:
+  범위: -1.0 ~ 1.0
+  ↓
+Elevator 회전:
+  -1도 ~ 1도
+  ↓
+너무 작아서 안 보임 ❌
+```
+
+### 해결: Multiply 추가
+
+```
+AnimGraph:
+
+[GET] Pitch_Value
+  ↓
+[Multiply] × 10
+  ↓
+[Transform (Modify) Bone] Rotation Y
+  ↓
+결과: -10도 ~ 10도 (더 명확 ✅)
+```
+
+**배수 조정**
+
+```
+× 5: 작은 움직임
+× 10: 적당 ✅
+× 20: 큰 움직임
+× 30: 과도함
+
+실제 비행기 참고하여 조정
+```
+
+---
+
+## 🔧 11단계: 테스트
+
+### 동작 확인
+
+```
+게임 실행
+  ↓
+W 키 누름:
+  - Pitch_Value = 1.0
+  - Elevator 회전: +10도
+  - 기수 올라감 ✅
+
+S 키 누름:
+  - Pitch_Value = -1.0
+  - Elevator 회전: -10도
+  - 기수 내려감 ✅
+```
+
+---
+
+## ⚠️ 발견된 문제: 스냅 현상
+
+### 스냅(Snap)이란?
+
+```
+W 누름 → 즉시 10도
+S 누름 → 즉시 -10도
+  ↓
+부드럽지 않음
+순간이동처럼 보임 ❌
+```
+
+**왜 스냅 현상이 발생하나?**
+
+```
+현재 구조:
+  Pitch_Value 변경
+  ↓
+  즉시 Rotation Y에 반영
+  ↓
+  중간 과정 없음
+  ↓
+  뚝뚝 끊김
+
+해결 필요:
+  FInterp To 같은 보간 ✅
+```
+
+---
+
+## 📝 핵심 정리
+
+### Event Graph 최종 구조
+
+```
+=== 초기화 (1회) ===
+[Event Blueprint Begin Play]
+  ↓
+[Try Get Pawn Owner]
+  ↓
+[Cast To BP_F18]
+  ↓
+[SET] BP_F18 변수
+
+=== 업데이트 (매 프레임) ===
+[Event Blueprint Update Animation]
+  ↓
+[GET] BP_F18
+  ↓
+[Is Valid]
+  ↓ (Is Valid)
+[Get Pitch Value] (BP_F18의 변수)
+  ↓
+[SET] Pitch_Value (ABP_F18의 변수)
+```
+
+### AnimGraph 구조
+
+```
+[GET] Pitch_Value
+  ↓
+[Multiply] × 10
+  ↓
+[Transform (Modify) Bone]
+  ├─ Bone: lf_elevator_jnt
+  └─ Rotation Y (Pitch): Pitch_Value × 10
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### 1. Try Get Pawn Owner
+
+```
+역할: 소유자 가져오기
+반환: 일반 Pawn 타입
+안전: 실패 가능성 고려 ✅
+```
+
+### 2. Cast To
+
+```
+역할: 타입 변환
+효과: 특정 클래스의 기능 접근
+필수: 다른 Blueprint 변수 접근 시 ✅
+```
+
+### 3. Is Valid
+
+```
+역할: null 체크
+효과: 크래시 방지
+중요: 매우 안전한 프로그래밍 ✅
+```
+
+### 4. Update Animation vs BeginPlay
+
+```
+BeginPlay:
+  - 초기화
+  - 1회 실행
+  - 참조 저장
+
+Update Animation:
+  - 업데이트
+  - 매 프레임
+  - 값 동기화 ✅
+```
+
+---
+
+## 🎯 핵심 포인트
+
+**3가지 필수 노드:**
+
+```
+1. Try Get Pawn Owner
+   → 소유자 찾기
+
+2. Cast To
+   → 타입 변환
+
+3. Is Valid
+   → 안전성 확인
+```
+
+**변수 저장 이유:**
+
+```
+BeginPlay에서 1회 가져오기
+  ↓
+Update Animation에서 계속 사용
+  ↓
+효율적! ✅
+```
+
+이제 **Blueprint와 Animation이 연동**되었습니다! 🚀
+
+# { 🎮 모든 조종면에 애니메이션 적용하기 }
+
+## 🎯 목표
+
+나머지 Elevator와 Aileron에도 동일한 애니메이션 적용
+
+- 오른쪽 Elevator
+- 좌측 Aileron (안쪽, 바깥쪽)
+- 우측 Aileron (안쪽, 바깥쪽)
+
+---
+
+## 🔧 1단계: 오른쪽 Elevator 추가
+
+### 노드 복제
+
+```
+왼쪽 Elevator 노드 선택
+  ↓
+Ctrl + C (복사)
+  ↓
+Ctrl + V (붙여넣기)
+  ↓
+연결:
+  이전 노드 → 새 노드 → 다음 노드
+```
+
+### Bone 변경
+
+```
+복제된 노드 선택
+  ↓
+Details 패널 → Bone to Modify
+  ↓
+lf_elevator_jnt → rt_elevator_jnt
+```
+
+### 테스트
+
+```
+컴파일 → 게임 실행
+  ↓
+W/S 누르면:
+  양쪽 Elevator 모두 회전 ✅
+```
+
+---
+
+## 🔧 2단계: 좌측 Aileron 추가
+
+### 2개 노드 복제
+
+```
+Elevator 노드 2개 선택
+  ↓
+Ctrl + C → Ctrl + V
+  ↓
+이유: Aileron은 안쪽(inner), 바깥쪽(outer) 2개
+```
+
+### Bone 설정
+
+```
+첫 번째 노드:
+  Bone: lf_aileron_inner_jnt (왼쪽 안쪽)
+
+두 번째 노드:
+  Bone: lf_aileron_outer_jnt (왼쪽 바깥쪽)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380601/notion-blog/_/_/BG/4/image_4.png)
+
+---
+
+## 🔧 3단계: 우측 Aileron 추가
+
+### 노드 복제
+
+```
+좌측 Aileron 2개 선택
+  ↓
+Ctrl + C → Ctrl + V
+```
+
+### Bone 설정
+
+```
+첫 번째 노드:
+  Bone: rt_aileron_inner_jnt (오른쪽 안쪽)
+
+두 번째 노드:
+  Bone: rt_aileron_outer_jnt (오른쪽 바깥쪽)
+```
+
+---
+
+## 📝 최종 구조
+
+### Transform (Modify) Bone 6개
+
+```
+1. lf_elevator_jnt (왼쪽 승강타)
+2. rt_elevator_jnt (오른쪽 승강타)
+3. lf_aileron_inner_jnt (왼쪽 보조익 안)
+4. lf_aileron_outer_jnt (왼쪽 보조익 밖)
+5. rt_aileron_inner_jnt (오른쪽 보조익 안)
+6. rt_aileron_outer_jnt (오른쪽 보조익 밖)
+```
+
+### 공통 입력
+
+```
+모든 노드에 동일한 값 연결:
+  Pitch_Value × 10
+  ↓
+6개 노드 모두 같이 움직임 ✅
+```
+
+---
+
+## ⚠️ 발견된 문제
+
+### 스냅 현상
+
+```
+W 누름 → 즉시 회전
+S 누름 → 즉시 회전
+  ↓
+부드럽지 않음 ❌
+  ↓
+해결: FInterp To 필요 (다음 강의)
+```
+
+---
+
+## 💡 핵심 팁
+
+### 복제의 효율성
+
+```
+같은 설정 반복:
+  - 복사 & 붙여넣기
+  - Bone만 변경
+  - 빠르고 정확 ✅
+```
+
+### 연결 정리
+
+```
+Multiply 노드 공유:
+  - 모든 조종면이 동일한 값 사용
+  - 일관된 움직임
+  - 관리 편리 ✅
+```
+
+---
+
+## 🔜 다음 단계
+
+**부드러운 회전 구현:**
+
+- FInterp To 사용
+- 점진적 변화
+- 현실적인 움직임
+
+모든 조종면이 작동하지만, **아직 너무 즉각적**입니다! 다음에 개선합니다. 🛩️
+
+# { 🎮 부드러운 조종면 애니메이션 구현하기 (FInterp To) }
+
+## 🎯 목표
+
+즉각적인 회전을 부드러운 애니메이션으로 개선
+
+- FInterp To로 점진적 변화
+- Timeline으로 중립 복귀
+- 자연스러운 조종 느낌
+
+---
+
+## ⚠️ 현재 문제점
+
+### 스냅 현상
+
+```
+W 누름:
+  Pitch_Value: 0 → 1 (즉시)
+  ↓
+  Elevator가 뚝 하고 회전 ❌
+
+S 누름:
+  Pitch_Value: 1 → -1 (즉시)
+  ↓
+  역시 뚝 하고 회전 ❌
+
+비현실적이고 어색함
+```
+
+---
+
+## 💡 핵심 개념: FInterp To
+
+### FInterp To란?
+
+```
+Float Interpolation To (부동소수점 보간)
+  ↓
+기능:
+  현재값에서 목표값까지
+  시간에 따라 부드럽게 변화
+
+비유:
+  엘리베이터처럼 천천히 이동
+  (계단처럼 뚝뚝 끊기지 않음)
+```
+
+**입력 파라미터:**
+
+```
+Current (현재값):
+  - 지금 어디에 있는가?
+  - Pitch_Value (GET)
+
+Target (목표값):
+  - 어디로 가야 하는가?
+  - Action Value (1 또는 -1)
+
+Delta Time (델타 타임):
+  - 이전 프레임 이후 경과 시간
+  - Get World Delta Seconds
+
+Interp Speed (보간 속도):
+  - 얼마나 빠르게 변할까?
+  - 5.0 (적당한 속도)
+```
+
+**작동 원리:**
+
+```
+매 프레임마다:
+  1. 현재값과 목표값의 차이 계산
+  2. 차이 × Interp Speed × Delta Time
+  3. 조금씩 목표에 가까워짐
+
+예시:
+  Current: 0
+  Target: 1
+  Speed: 5
+  ↓
+  프레임 1: 0.08
+  프레임 2: 0.15
+  프레임 3: 0.21
+  ...
+  최종: 1.0 ✅
+```
+
+---
+
+## 🔧 1단계: Triggered 이벤트에 FInterp To 추가
+
+### 노드 구성
+
+```
+[IA_Pitch] Triggered
+  ↓
+[GET] Pitch_Value (현재값)
+  ↓
+[FInterp To]
+  ├─ Current: Pitch_Value
+  ├─ Target: Action Value
+  ├─ Delta Time: Get World Delta Seconds
+  └─ Interp Speed: 5.0
+  ↓
+Return Value
+  ├────────────────────┐
+  ↓                    ↓
+[SET] Pitch_Value   [Set Pitch Input]
+```
+
+### 왜 이 구조인가?
+
+```
+Triggered는 매 프레임 실행:
+  ↓
+1. 현재 Pitch_Value 읽기
+2. FInterp To로 조금씩 증가
+3. 새 값을 다시 Pitch_Value에 저장
+4. 동시에 엔진에도 전달
+  ↓
+매 프레임 조금씩 변화 = 부드러움 ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380601/notion-blog/_/_/BG/4/image_5.png)
+
+---
+
+## 🔧 2단계: 첫 번째 테스트
+
+### 결과 확인
+
+```
+W 누름:
+  0 → 1로 부드럽게 증가 ✅
+
+S 누름:
+  1 → -1로 부드럽게 변화 ✅
+
+하지만...
+```
+
+### 발견된 문제
+
+```
+키 떼기 (Completed):
+  1 → 0으로 즉시 변화 ❌
+  ↓
+  갑자기 뚝 하고 중립으로 복귀
+  ↓
+  여전히 어색함
+```
+
+**왜 이런 문제가 생기나?**
+
+```
+Triggered 이벤트:
+  - 키 누르는 동안 매 프레임 실행
+  - FInterp To가 계속 작동 ✅
+
+Completed 이벤트:
+  - 키 떼는 순간 1회만 실행
+  - FInterp To가 1번만 작동
+  - 즉시 0 설정됨 ❌
+```
+
+---
+
+## 🔧 3단계: Timeline 추가 (핵심!)
+
+### Timeline이란?
+
+```
+시간에 따른 이벤트 실행 도구
+  ↓
+특징:
+  - 지정 시간 동안 실행
+  - Update 핀: 매 프레임 실행
+  - Finished 핀: 종료 시 1회
+```
+
+### PitchToZero Timeline 생성
+
+```
+Completed 이벤트에서 드래그
+  ↓
+검색: Add Timeline
+  ↓
+이름: PitchToZero
+```
+
+### Timeline 설정
+
+```
+PitchToZero 더블클릭
+  ↓
+Length: 2.0 초
+  ↓
+Track 추가 안 함 (비워둠)
+  ↓
+닫기
+```
+
+**왜 Track을 추가 안 하나?**
+
+```
+Track:
+  - 값의 변화 곡선 정의
+  - 예: 0→1 애니메이션
+
+우리는:
+  - Update 핀만 필요
+  - 매 프레임 실행만 원함
+  - FInterp To가 값 계산 담당 ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380601/notion-blog/_/_/BG/4/image_6.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380602/notion-blog/_/_/BG/4/image_7.png)
+
+---
+
+## 🔧 4단계: Timeline Update에 FInterp To 연결
+
+### 노드 구성
+
+```
+[PitchToZero] Update 핀
+  ↓
+[GET] Pitch_Value
+  ↓
+[FInterp To]
+  ├─ Current: Pitch_Value
+  ├─ Target: 0.0 (← 중립!)
+  ├─ Delta Time: Get World Delta Seconds
+  └─ Interp Speed: 5.0
+  ↓
+Return Value
+  ├────────────────────┐
+  ↓                    ↓
+[SET] Pitch_Value   [Set Pitch Input]
+```
+
+### Completed 이벤트 수정
+
+```
+[IA_Pitch] Completed
+  ↓
+[PitchToZero] Play
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380602/notion-blog/_/_/BG/4/image_8.png)
+
+---
+
+## 🔧 5단계: 작동 원리 상세
+
+### Timeline의 마법
+
+```
+Play 실행:
+  ↓
+2초 동안:
+  Update 핀을 매 프레임 실행
+  ↓
+  FInterp To가 매 프레임 작동
+  ↓
+  Pitch_Value가 점진적으로 0으로
+  ↓
+2초 후 Finished 실행 (현재 미사용)
+```
+
+**매 프레임 실행 예시:**
+
+```
+60 FPS 기준:
+  2초 = 120 프레임
+  ↓
+Update가 120번 실행
+  ↓
+FInterp To가 120번 작동
+  ↓
+매우 부드러운 변화 ✅
+```
+
+---
+
+## ⚠️ 새로운 문제 발견
+
+### 빠른 입력 전환 시 문제
+
+```
+시나리오:
+  1. W 누름 (상승 시작)
+  2. W 떼기 (Timeline 시작)
+  3. 즉시 S 누름 (하강 시도)
+
+결과:
+  거의 움직이지 않음 ❌
+
+원인:
+  Timeline이 아직 실행 중
+  ↓
+  Triggered의 FInterp와 충돌
+  ↓
+  서로 다른 방향으로 당김
+```
+
+---
+
+## 🔧 6단계: Timeline Stop 추가
+
+### Triggered Started에 Stop 추가
+
+```
+[IA_Pitch] Started (← Triggered 아님!)
+  ↓
+[PitchToZero] Stop
+  ↓
+기존 노드들...
+```
+
+**Started vs Triggered 차이:**
+
+```
+Started:
+  - 키를 누르는 순간 1회
+  - Timeline 정지에 적합 ✅
+
+Triggered:
+  - 누르는 동안 매 프레임
+  - Timeline을 매 프레임 정지? 비효율
+```
+
+### 작동 원리
+
+```
+W 떼기:
+  Timeline 시작 (0으로 복귀 중)
+  ↓
+S 누름:
+  Started → Timeline 즉시 정지
+  ↓
+  Triggered → 새로운 목표(-1)로
+  ↓
+  충돌 없음 ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380602/notion-blog/_/_/BG/4/image_9.png)
+
+---
+
+## 🔧 7단계: Play from Start로 변경
+
+### 문제 상황
+
+```
+Timeline 중간에 정지:
+  Progress: 1.5초/2.0초
+  ↓
+다시 Play:
+  1.5초부터 재개
+  ↓
+  0.5초만 실행되고 끝남 ❌
+```
+
+### 해결: Play from Start
+
+```
+[IA_Pitch] Completed
+  ↓
+[PitchToZero] Play from Start (← Play 대신!)
+```
+
+**Play from Start란?**
+
+```
+Timeline을 항상 처음부터 시작
+  ↓
+진행 상태 무시
+  ↓
+매번 2초 전체 실행 보장 ✅
+```
+
+---
+
+## 📝 최종 노드 구조
+
+### Triggered 이벤트
+
+```
+[IA_Pitch] Started
+  ↓
+[PitchToZero] Stop (Timeline 정지)
+
+[IA_Pitch] Triggered
+  ↓
+[FInterp To]
+  ├─ Current: Pitch_Value
+  ├─ Target: Action Value
+  ├─ Delta Time: Get World Delta Seconds
+  └─ Interp Speed: 5.0
+  ↓
+[SET] Pitch_Value + [Set Pitch Input]
+```
+
+### Completed 이벤트
+
+```
+[IA_Pitch] Completed
+  ↓
+[PitchToZero] Play from Start
+  ↓
+[Update] 핀 (매 프레임)
+  ↓
+[FInterp To]
+  ├─ Current: Pitch_Value
+  ├─ Target: 0.0
+  ├─ Delta Time: Get World Delta Seconds
+  └─ Interp Speed: 5.0
+  ↓
+[SET] Pitch_Value + [Set Pitch Input]
+```
+
+---
+
+## ✅ 최종 테스트
+
+### 모든 시나리오 확인
+
+```
+1. W 누름:
+   0 → 1로 부드럽게 상승 ✅
+
+2. W 떼기:
+   1 → 0으로 부드럽게 복귀 ✅
+
+3. W → 떼기 → 즉시 S:
+   Timeline 정지 → -1로 부드럽게 ✅
+
+4. 빠른 W-S 반복:
+   모두 부드럽게 반응 ✅
+
+5. 공중에서 테스트:
+   Elevator/Aileron 아름답게 움직임 ✅
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### 1. FInterp To의 활용
+
+```
+목적: 부드러운 값 변화
+조건: 매 프레임 실행 필요
+  ↓
+Triggered: 키 누를 때
+Timeline: 키 뗄 때 (중립 복귀)
+```
+
+### 2. Timeline의 역할
+
+```
+Completed는 1회만 실행
+  ↓
+FInterp To는 매 프레임 필요
+  ↓
+Timeline으로 해결:
+  Update 핀 = 매 프레임 실행 ✅
+```
+
+### 3. Started의 중요성
+
+```
+Timeline 충돌 방지
+  ↓
+새 입력 시 즉시 정지
+  ↓
+깔끔한 전환 ✅
+```
+
+### 4. Play from Start
+
+```
+항상 처음부터 시작
+  ↓
+일관된 2초 실행
+  ↓
+예측 가능한 동작 ✅
+```
+
+---
+
+## 🎯 핵심 요약
+
+**3가지 핵심 노드:**
+
+```
+1. FInterp To
+   → 부드러운 변화
+
+2. Timeline
+   → Completed에서 매 프레임 실행
+
+3. Stop
+   → Timeline 충돌 방지
+```
+
+**이벤트 구분:**
+
+```
+Started: Timeline 정지 (1회)
+Triggered: 목표로 이동 (매 프레임)
+Completed: Timeline 시작 (1회)
+```
+
+---
+
+## 💡 추가 팁
+
+### Interp Speed 조정
+
+```
+5.0: 적당한 속도 ✅
+10.0: 빠른 반응 (민첩)
+2.0: 느린 반응 (안정적)
+
+비행기 타입에 따라 조정
+```
+
+### Timeline Length
+
+```
+2.0초: 여유로운 복귀
+1.0초: 빠른 복귀
+3.0초: 느긋한 복귀
+
+상황에 맞게 조정
+```
+
+이제 **완벽하게 부드러운 조종**이 가능합니다! 🛩️✨
+
+# { 🎮 Roll (굴림) 제어 구현하기 }
+
+## 🎯 목표
+
+전투기 좌우 굴림(Roll) 조종 구현
+
+- A 키: 왼쪽으로 굴림
+- D 키: 오른쪽으로 굴림
+- Pitch와 동일한 방식
+
+---
+
+## 💡 핵심 개념: Roll이란?
+
+### 3가지 회전축
+
+```
+Pitch (피치): Y축 - 상하 회전 ✅ (이미 구현)
+Yaw (요): Z축 - 좌우 회전 (다음에)
+Roll (롤): X축 - 굴림 회전 ✅ (이번 강의)
+```
+
+**Roll 비유:**
+
+```
+비행기를 앞에서 봤을 때
+  ↓
+왼쪽 날개 아래, 오른쪽 날개 위
+  = 왼쪽으로 기울어짐
+  ↓
+바렐 롤 (Barrel Roll) 같은 동작
+```
+
+---
+
+## 🔧 1단계: Input Action 생성
+
+### IA_Roll 생성
+
+```
+Input 폴더 → 우클릭
+  ↓
+Input → Input Action
+  ↓
+이름: IA_Roll
+```
+
+### Value Type 설정
+
+```
+IA_Roll 더블클릭
+  ↓
+Value Type: Axis1D
+  ↓
+저장 & 닫기
+```
+
+**왜 Axis1D?**
+
+```
+Pitch와 동일한 이유:
+  - 왼쪽(-1) / 중립(0) / 오른쪽(+1)
+  - 방향과 강도 표현
+  - 조이스틱 대응 가능 ✅
+```
+
+---
+
+## 🔧 2단계: IMC 매핑
+
+### D 키 매핑
+
+```
+IMC_FighterJet 열기
+  ↓
++ Mapping → IA_Roll
+  ↓
+키: D
+  ↓
+기본값: 1.0 (오른쪽 굴림)
+```
+
+### A 키 매핑 (음수)
+
+```
++ 버튼으로 추가 매핑
+  ↓
+키: A
+  ↓
+Modifiers → + Add → Negate
+```
+
+**매핑 결과:**
+
+```
+D 키: +1.0 → 오른쪽 굴림
+A 키: -1.0 → 왼쪽 굴림
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380599/notion-blog/_/_/BG/4/image_10.png)
+
+---
+
+## 🔧 3단계: Blueprint 구성
+
+### Triggered 이벤트
+
+```
+[IA_Roll] Triggered
+  ↓
+[Set Roll Input]
+  ├─ Target: Vehicle Movement Component
+  └─ Roll: Action Value
+```
+
+### 테스트 (Print String)
+
+```
+임시로 확인:
+  [IA_Roll] Triggered
+    ↓
+  [Print String]
+    └─ In String: Action Value
+
+결과:
+  D 누름: "1.0" 표시 ✅
+  A 누름: "-1.0" 표시 ✅
+```
+
+---
+
+## 🔧 4단계: 첫 번째 테스트
+
+### 게임 실행
+
+```
+Shift로 가속 → 이륙
+  ↓
+D 키 누름:
+  오른쪽으로 굴림 시작
+  ↓
+하지만 D 키 떼도:
+  계속 굴림 ❌
+```
+
+**왜 멈추지 않나?**
+
+```
+Set Roll Input (1.0)
+  ↓
+Roll 값이 1.0으로 고정
+  ↓
+키를 떼도 여전히 1.0
+  ↓
+계속 회전 ❌
+
+Pitch와 동일한 문제!
+```
+
+---
+
+## 🔧 5단계: Completed 이벤트 추가
+
+### 중립 복귀
+
+```
+[IA_Roll] Completed
+  ↓
+[Set Roll Input]
+  ├─ Target: Vehicle Movement Component
+  └─ Roll: 0.0
+```
+
+### 노드 복사 방법
+
+```
+Set Roll Input 노드 선택
+  ↓
+Ctrl + C (복사)
+  ↓
+Ctrl + V (붙여넣기)
+  ↓
+Completed 이벤트에 연결
+  ↓
+Roll 값을 0.0으로 변경
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380600/notion-blog/_/_/BG/4/image_11.png)
+
+---
+
+## ✅ 최종 테스트
+
+### 동작 확인
+
+```
+게임 실행 → 이륙
+  ↓
+D 누름:
+  오른쪽으로 굴림 ✅
+
+D 떼기:
+  굴림 멈춤 ✅
+
+A 누름:
+  왼쪽으로 굴림 ✅
+
+A 떼기:
+  굴림 멈춤 ✅
+
+W/S + A/D 조합:
+  동시 조작 가능 ✅
+```
+
+---
+
+## 📝 핵심 정리
+
+### 전체 노드 구조
+
+```
+IA_Roll:
+  ├─ D: +1.0
+  └─ A: -1.0 (Negate)
+
+Blueprint:
+  [Triggered]
+    → Set Roll Input (Action Value)
+
+  [Completed]
+    → Set Roll Input (0.0)
+```
+
+### Pitch와 Roll 비교
+
+```
+동일한 패턴:
+  1. Input Action (Axis1D)
+  2. IMC 매핑 (하나는 Negate)
+  3. Triggered → Set Input
+  4. Completed → 0으로 복귀
+
+차이점:
+  - Pitch: Set Pitch Input
+  - Roll: Set Roll Input
+  - 회전축만 다름
+```
+
+---
+
+## 💡 Roll의 실제 동작 원리
+
+### 실제 비행기에서
+
+```
+오른쪽 굴림:
+  - 왼쪽 Aileron: 위로
+  - 오른쪽 Aileron: 아래로
+  ↓
+  양력 차이 발생
+  ↓
+  오른쪽으로 기울어짐 ✅
+
+왼쪽 굴림:
+  - 왼쪽 Aileron: 아래로
+  - 오른쪽 Aileron: 위로
+  ↓
+  왼쪽으로 기울어짐 ✅
+```
+
+**Elevator와 Aileron 조합:**
+
+```
+Roll 시:
+  Elevator도 함께 움직임
+  ↓
+  더 효과적인 회전
+  ↓
+  다음 강의에서 애니메이션 구현!
+```
+
+---
+
+## 💡 추가 설명
+
+### Roll의 중요성
+
+```
+Pitch만으로는:
+  - 상하 움직임만 가능
+  - 선회(Turn) 불가능
+
+Roll 추가:
+  - 기울인 후 Pitch
+  - 선회 가능 ✅
+  - 자유로운 비행
+```
+
+## 🎯 핵심 요약
+
+**Roll 구현 완료:**
+
+```
+✅ IA_Roll 생성 (Axis1D)
+✅ A/D 키 매핑 (Negate)
+✅ Set Roll Input
+✅ Completed로 중립 복귀
+✅ 자유로운 굴림 가능
+```
+
+**Pitch + Roll:**
+
+```
+W/S: 상하 조종
+A/D: 좌우 굴림
+  ↓
+기본적인 비행 제어 완성!
+```
+
+이제 **3차원 자유 비행**이 가능합니다! 🛩️
+
+# { 🎮 Roll 시각화 - Elevator와 Aileron 애니메이션 구현하기 }
+
+## 🎯 목표
+
+Roll 조작 시 Elevator와 Aileron이 반대 방향으로 움직이도록 구현
+
+- 왼쪽/오른쪽 조종면이 반대로 회전
+- 실제 비행기처럼 작동
+- Roll_Value 변수 활용
+
+---
+
+## 💡 핵심 개념: Roll 시각화 원리
+
+### 실제 비행기의 Roll 동작
+
+```
+오른쪽 굴림 (D 키):
+  왼쪽 조종면: 위로 ↑
+  오른쪽 조종면: 아래로 ↓
+  ↓
+  양력 차이 발생
+  ↓
+  오른쪽으로 기울어짐
+
+왼쪽 굴림 (A 키):
+  왼쪽 조종면: 아래로 ↓
+  오른쪽 조종면: 위로 ↑
+  ↓
+  왼쪽으로 기울어짐
+```
+
+**핵심: 좌우가 반대로 움직여야 함!**
+
+---
+
+## 🔧 1단계: BP_F18에 Roll_Value 변수 생성
+
+### 변수 생성
+
+```
+BP_F18 → Variables
+  ↓
++ 버튼
+  ↓
+이름: Roll_Value
+타입: Float
+기본값: 0.0
+```
+
+---
+
+## 🔧 2단계: IA_Roll에 변수 저장 추가
+
+### Triggered 이벤트
+
+```
+[IA_Roll] Triggered
+  ↓
+Action Value
+  ├────────────────────┐
+  ↓                    ↓
+[SET] Roll_Value    [Set Roll Input]
+```
+
+### Alt 드래그 단축키
+
+```
+변수를 드래그하면서:
+  ↓
+Alt 키 누른 채로 놓기
+  ↓
+자동으로 SET 노드 생성 ✅
+
+빠른 작업 팁!
+```
+
+### Completed 이벤트
+
+```
+[IA_Roll] Completed
+  ↓
+[SET] Roll_Value: 0.0 (Alt 드래그)
+  ↓
+[Set Roll Input]: 0.0
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380600/notion-blog/_/_/BG/4/image_12.png)
+
+---
+
+## 🔧 3단계: ABP_F18 Event Graph에서 Roll_Value 가져오기
+
+### 노드 구성
+
+```
+[Event Blueprint Update Animation]
+  ↓
+기존 Is Valid 체크 후
+  ↓
+[GET] BP_F18
+  ↓
+[Get Roll Value]
+  ↓
+우클릭 → Promote to Variable
+  ↓
+이름: Roll_Value (ABP_F18의 변수)
+```
+
+**데이터 흐름:**
+
+```
+BP_F18.Roll_Value (게임 로직)
+  ↓
+매 프레임 복사
+  ↓
+ABP_F18.Roll_Value (애니메이션)
+  ↓
+AnimGraph에서 사용
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380600/notion-blog/_/_/BG/4/image_13.png)
+
+---
+
+## 🔧 4단계: AnimGraph 노드 복제
+
+### Pitch 노드에 주석 추가
+
+```
+Pitch용 Transform (Modify) Bone 6개 선택
+  ↓
+우클릭 → Add Comment
+  ↓
+이름: "PITCH"
+```
+
+### Roll용 노드 복제
+
+```
+6개 노드 모두 선택
+  ↓
+Ctrl + C (복사)
+  ↓
+Ctrl + V (붙여넣기)
+  ↓
+연결:
+  이전 Pitch 노드들 → 새 Roll 노드들 → Output
+```
+
+---
+
+## 🔧 5단계: Elevator 설정 (핵심!)
+
+### 왜 Pitch 값을 변경하나?
+
+**중요한 개념:**
+
+```
+Roll_Value를 사용하지만
+  ↓
+변경하는 것은 Pitch (Y축 회전)!
+  ↓
+이유:
+  - Elevator는 상하로만 움직임
+  - Roll(X축) 회전은 비현실적
+  - Pitch 회전이 올바름 ✅
+```
+
+**비유:**
+
+```
+잘못된 생각:
+  "Roll 값이니까 Roll 축으로 회전?"
+  ↓
+  Elevator가 옆으로 눕는 이상한 모습 ❌
+
+올바른 방법:
+  "Roll을 만들기 위해 Pitch 축으로 회전"
+  ↓
+  Elevator가 위/아래로 움직임 ✅
+```
+
+### 왼쪽 Elevator 설정
+
+```
+Transform (Modify) Bone
+  ├─ Bone: lf_elevator_jnt
+  └─ Rotation Y (Pitch):
+      [Roll_Value] × 10
+```
+
+### 오른쪽 Elevator 설정 (반대!)
+
+```
+Transform (Modify) Bone
+  ├─ Bone: rt_elevator_jnt
+  └─ Rotation Y (Pitch):
+      [Roll_Value] × -10 (← 음수!)
+```
+
+**작동 예시:**
+
+```
+D 키 누름:
+  Roll_Value = 1.0
+  ↓
+왼쪽 Elevator:
+  1.0 × 10 = +10도 (위로)
+
+오른쪽 Elevator:
+  1.0 × -10 = -10도 (아래로)
+  ↓
+오른쪽으로 기울어짐 ✅
+```
+
+---
+
+## 🔧 6단계: Aileron 설정
+
+### 좌측 Aileron (안쪽, 바깥쪽)
+
+```
+lf_aileron_inner_jnt:
+  Rotation Y (Pitch): Roll_Value × 10
+
+lf_aileron_outer_jnt:
+  Rotation Y (Pitch): Roll_Value × 10
+```
+
+### 우측 Aileron (안쪽, 바깥쪽)
+
+```
+rt_aileron_inner_jnt:
+  Rotation Y (Pitch): Roll_Value × -10
+
+rt_aileron_outer_jnt:
+  Rotation Y (Pitch): Roll_Value × -10
+```
+
+---
+
+## 📝 최종 노드 구조
+
+### AnimGraph 전체
+
+```
+PITCH (주석):
+  6개 Transform (Modify) Bone
+  └─ Pitch_Value × 10 / × -10
+
+ROLL (주석):
+  6개 Transform (Modify) Bone
+  └─ Roll_Value × 10 / × -10
+
+연결:
+  Wheel Controller
+    ↓
+  PITCH 노드들
+    ↓
+  ROLL 노드들
+    ↓
+  Component To Local
+    ↓
+  Output Pose
+```
+
+### 좌우 구분
+
+```
+왼쪽 조종면 (3개):
+  ├─ lf_elevator_jnt: × 10
+  ├─ lf_aileron_inner_jnt: × 10
+  └─ lf_aileron_outer_jnt: × 10
+
+오른쪽 조종면 (3개):
+  ├─ rt_elevator_jnt: × -10
+  ├─ rt_aileron_inner_jnt: × -10
+  └─ rt_aileron_outer_jnt: × -10
+```
+
+---
+
+## ✅ 테스트 결과
+
+### 동작 확인
+
+```
+D 키 누름:
+  왼쪽 조종면: 위로 ↑
+  오른쪽 조종면: 아래로 ↓
+  ↓
+  오른쪽으로 굴림 ✅
+
+A 키 누름:
+  왼쪽 조종면: 아래로 ↓
+  오른쪽 조종면: 위로 ↑
+  ↓
+  왼쪽으로 굴림 ✅
+```
+
+---
+
+## ⚠️ 발견된 문제
+
+### 스냅 현상
+
+```
+D/A 누름:
+  조종면이 즉시 회전 ❌
+  ↓
+부드럽지 않음
+  ↓
+Pitch와 동일한 문제
+```
+
+**해결 방법 (다음 과제):**
+
+```
+1. FInterp To 추가
+2. Timeline 사용
+3. Roll_Value도 부드럽게 변화
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Roll vs Pitch 혼동 주의!
+
+**Roll_Value ≠ Roll 회전**
+
+```
+Roll_Value:
+  - 입력값 (A/D 키)
+  - -1 ~ 1 범위
+
+Rotation Y (Pitch):
+  - 실제 회전축
+  - Elevator/Aileron 움직임
+  ↓
+Roll을 만들기 위해
+Pitch 축으로 회전! ✅
+```
+
+### 음수 곱하기의 중요성
+
+```
+× 10:
+  Roll_Value 1 → +10도
+
+× -10:
+  Roll_Value 1 → -10도
+  ↓
+반대 방향 회전 구현 ✅
+
+둘 다 × 10이면:
+  같은 방향으로 회전
+  ↓
+  Roll 효과 없음 ❌
+```
+
+### Alt 드래그 단축키
+
+```
+변수 드래그 + Alt:
+  → SET 노드 자동 생성
+
+변수 드래그 (일반):
+  → GET/SET 선택 메뉴
+
+시간 절약 팁! ✅
+```
+
+---
+
+## 🎯 핵심 요약
+
+**구현 완료:**
+
+```
+✅ Roll_Value 변수 생성
+✅ ABP_F18에 전달
+✅ 6개 조종면에 적용
+✅ 좌우 반대 회전 (× 10, × -10)
+✅ 실제 비행기처럼 작동
+```
+
+**핵심 포인트:**
+
+```
+1. Roll_Value를 사용
+2. Rotation Y (Pitch)를 변경
+3. 좌우 반대 (음수 곱하기)
+```
+
+이제 Roll 시각화가 **완벽하게 작동**합니다! (부드럽게 만들기만 남음) 🛩️
+
+# { 🎮 부드러운 Roll 애니메이션 구현하기 (FInterp To + Timeline) }
+
+## 🎯 목표
+
+Roll 조작을 부드럽게 만들기
+
+- FInterp To로 점진적 변화
+- Timeline으로 중립 복귀
+- Pitch와 동일한 패턴 적용
+
+---
+
+## 🔧 1단계: Triggered에 FInterp To 추가
+
+### 노드 구성
+
+```
+[IA_Roll] Triggered
+  ↓
+[GET] Roll_Value (현재값)
+  ↓
+[FInterp To]
+  ├─ Current: Roll_Value
+  ├─ Target: Action Value
+  ├─ Delta Time: Get World Delta Seconds
+  └─ Interp Speed: 5.0
+  ↓
+Return Value
+  ├────────────────────┐
+  ↓                    ↓
+[SET] Roll_Value    [Set Roll Input]
+```
+
+**Pitch와 완전히 동일한 구조! ✅**
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380600/notion-blog/_/_/BG/4/image_14.png)
+
+---
+
+## 🔧 2단계: Started에 Timeline Stop 추가
+
+### Timeline 생성
+
+```
+[IA_Roll] Completed에서 드래그
+  ↓
+Add Timeline
+  ↓
+이름: RollToZero
+  ↓
+설정:
+  - Length: 2.0초
+  - Track 없음
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380600/notion-blog/_/_/BG/4/image_15.png)
+
+### Started 이벤트
+
+```
+[IA_Roll] Started
+  ↓
+[RollToZero] Stop
+  ↓
+기존 Triggered 노드들...
+```
+
+---
+
+## 🔧 3단계: Completed에 Timeline 연결
+
+### 노드 구성
+
+```
+[IA_Roll] Completed
+  ↓
+[RollToZero] Play from Start
+  ↓
+[Update] 핀 (매 프레임)
+  ↓
+[FInterp To]
+  ├─ Current: Roll_Value
+  ├─ Target: 0.0 (← 중립!)
+  ├─ Delta Time: Get World Delta Seconds
+  └─ Interp Speed: 5.0
+  ↓
+Return Value
+  ├────────────────────┐
+  ↓                    ↓
+[SET] Roll_Value    [Set Roll Input]
+```
+
+**Pitch와 완전히 동일! ✅**
+
+---
+
+## 📝 최종 구조 정리
+
+### IA_Roll 이벤트 전체
+
+```
+=== Started (1회) ===
+[IA_Roll] Started
+  ↓
+[RollToZero] Stop
+
+=== Triggered (매 프레임) ===
+[IA_Roll] Triggered
+  ↓
+[FInterp To]
+  Current: Roll_Value
+  Target: Action Value
+  Speed: 5.0
+  ↓
+[SET] Roll_Value
+[Set Roll Input]
+
+=== Completed (1회) ===
+[IA_Roll] Completed
+  ↓
+[RollToZero] Play from Start
+  ↓
+[Update] (매 프레임, 2초 동안)
+  ↓
+[FInterp To]
+  Current: Roll_Value
+  Target: 0.0
+  Speed: 5.0
+  ↓
+[SET] Roll_Value
+[Set Roll Input]
+```
+
+---
+
+## ✅ 테스트 결과
+
+### 모든 동작 확인
+
+```
+D 누름:
+  0 → 1로 부드럽게 ✅
+
+D 떼기:
+  1 → 0으로 부드럽게 ✅
+
+A 누름:
+  0 → -1로 부드럽게 ✅
+
+D → 떼기 → 즉시 A:
+  Timeline 정지 → 부드럽게 전환 ✅
+
+비행 테스트:
+  조종면이 아름답게 움직임 ✅
+```
+
+---
+
+## 💡 Pitch vs Roll 비교
+
+### 완전히 동일한 패턴!
+
+```
+Pitch:
+  - IA_Pitch
+  - Pitch_Value
+  - Set Pitch Input
+  - PitchToZero Timeline
+
+Roll:
+  - IA_Roll
+  - Roll_Value
+  - Set Roll Input
+  - RollToZero Timeline
+
+→ 구조가 똑같음! ✅
+```
+
+**학습 효과:**
+
+```
+Pitch를 이해했다면
+  ↓
+Roll은 복사 & 이름만 변경
+  ↓
+빠른 구현 가능!
+```
+
+---
+
+## 🎯 핵심 요약
+
+**3축 제어 패턴:**
+
+```
+Pitch (Y축):
+  W/S → Pitch_Value → Elevator
+
+Roll (X축):
+  A/D → Roll_Value → Elevator + Aileron
+
+Yaw (Z축):
+  Q/E → Yaw_Value → Rudder (다음 과제)
+```
+
+**공통 구조:**
+
+```
+1. Input Action (Axis1D)
+2. IMC 매핑 (하나는 Negate)
+3. FInterp To (Triggered)
+4. Timeline (Completed)
+5. Started에 Stop
+6. 모두 동일한 패턴! ✅
+```
+
+이제 **완벽한 Roll 제어**가 완성되었습니다! 🛩️✨

@@ -1,0 +1,471 @@
+---
+title: '5단원: Game Parameter 사용하기'
+date: '2026-09-02'
+category: '게임 개발/WWISE'
+tags: ['게임 개발', 'WWISE']
+draft: false
+summary: ''
+---
+
+## { 📌 5단원: Game Parameter 사용하기 }
+
+### 🎯 학습 목표
+
+- **체력 게이지 대신 사운드로 피드백 제공**
+  → 체력이 낮아질수록 심장 박동 소리가 커져서 플레이어가 긴장감을 느끼고, 굳이 화면 게이지를 보지 않아도 상태를 알 수 있음.
+
+### 🧩 핵심 개념
+
+- **Game Parameter (RTPC, Real Time Parameter Control)**
+  - 게임 내의 **수치 값(변화하는 값)**을 오디오에 연결해 실시간으로 변화를 주는 방식.
+  - 적용 가능한 예시:
+    - 캐릭터 **체력(HP)** → 심장 박동 소리 크기 변화
+    - 자동차 **속도** → 엔진 사운드 피치 변화
+    - **시간(낮/밤)** → 환경음 변화
+    - **미션 진행도** → 음악 강도 변화
+
+### 🛠️ 실습에서 배우는 기술
+
+1. **WAV 파일 가져오기**
+   - 심장 박동 같은 소리를 오디오 파일로 프로젝트에 추가.
+2. **사운드 반복 재생**
+   - 심장 박동 소리가 계속 이어지도록 루프(loop) 설정.
+3. **게임 매개 변수와 연결하기**
+   - 캐릭터의 체력 수치를 Game Parameter로 받아서, 그 값에 따라 심장 박동 소리의 볼륨(또는 속도)을 변화시킴.
+   - 예: 체력이 높을 때 → 소리 작음, 체력이 낮을 때 → 소리 큼.
+4. **그래프 뷰에서 RTPC 확인하기**
+   - 체력 값과 사운드 속성(볼륨, 피치 등)의 관계를 곡선 그래프로 설정.
+   - 시뮬레이션하면서 체력 수치 변화를 직접 들어볼 수 있음.
+5. **Transport Control에서 RTPC 테스트**
+   - 게임 실행 없이 툴 내에서 파라미터를 조절해 실제로 사운드가 어떻게 변하는지 실험.
+
+---
+
+✅ **정리**:
+
+이번 단원은 **게임 수치(예: 체력) → Game Parameter(RTPC) → 사운드 실시간 변화**라는 흐름을 배우는 것.
+
+즉, "숫자가 변하면 소리도 변한다"는 개념을 이해하고 적용하는 단계.
+
+---
+
+# {🎮 Game Parameter 만들기}
+
+## 📋 목차
+
+1. [Game Parameter 개념 이해하기](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#game-parameter-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Wwise에서 Game Parameter 생성하기](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#wwise%EC%97%90%EC%84%9C-game-parameter-%EC%83%9D%EC%84%B1%ED%95%98%EA%B8%B0)
+3. [범위(Min/Max)와 단위 설정](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#%EB%B2%94%EC%9C%84minmax%EC%99%80-%EB%8B%A8%EC%9C%84-%EC%84%A4%EC%A0%95)
+4. [Default 값의 의미와 설정](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#default-%EA%B0%92%EC%9D%98-%EC%9D%98%EB%AF%B8%EC%99%80-%EC%84%A4%EC%A0%95)
+5. [Cube 게임에 PlayerHealth 적용하기](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#cube-%EA%B2%8C%EC%9E%84%EC%97%90-playerhealth-%EC%A0%81%EC%9A%A9%ED%95%98%EA%B8%B0)
+6. [Game Parameter와 사운드 연결하기](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#game-parameter%EC%99%80-%EC%82%AC%EC%9A%B4%EB%93%9C-%EC%97%B0%EA%B2%B0%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. Game Parameter 개념 이해하기
+
+- **Game Parameter란?**
+  - 게임에서 특정 수치를 **실시간으로 Wwise에 전달**하여, 그 값에 따라 오디오가 변화하도록 하는 시스템.
+  - 예:
+    - 플레이어 체력(0~100)
+    - 자동차 속도(0~300)
+    - 환경 요소(바람 세기, 조명 밝기 등)
+- **특징**
+  - 수치 범위는 개발자가 자유롭게 지정 가능.
+  - Wwise 오디오 이벤트와 연결되어 값에 따라 **사운드의 볼륨, 피치, 이펙트** 등이 달라짐.
+  - "게임과 오디오의 다리 역할"이라고 이해하면 됨.
+
+---
+
+## 2. Wwise에서 Game Parameter 생성하기
+
+1. **Wwise 실행** 후 강의에서 제공한 **Module 5 프로젝트 파일 열기**
+2. **Project Explorer → Game Syncs 탭 선택**
+3. **Game Parameters 폴더 → Default Work Unit 선택**
+4. 상단에서 **Create new 'Game Parameter' 버튼 클릭**
+5. 새로 만들어진 오브젝트의 이름을 **`PlayerHealth`** 로 변경
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380568/notion-blog/_/WWISE/Wwise_/5_Game_Parameter_/image.png)
+
+```csharp
+새로운 파라미터 만들기
+```
+
+---
+
+## 3. 범위(Min/Max)와 단위 설정
+
+- **Min / Max 값**
+  - 전달 가능한 값의 최소, 최대 범위를 정의.
+  - 예: 자동차 속도라면 `0~300`, 체력이라면 `0~100`.
+- **Cube 게임에서는?**
+  - 체력 게이지가 `0~100`으로 이미 맞아있음 → 기본값 그대로 사용.
+- **옵션 정리**
+  - **Min**: 최저값. (보통 체력 0, 속도 0)
+  - **Max**: 최고값. (체력 100, 속도 300 등)
+  - **Units(단위)**: 선택적으로 단위를 정의할 수 있음. (예: km/h, %, dB 등)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380566/notion-blog/_/WWISE/Wwise_/5_Game_Parameter_/image_1.png)
+
+---
+
+## 4. Default 값의 의미와 설정
+
+- **Default 값이란?**
+  - 게임에서 값이 전달되지 않았을 때 Wwise가 자동으로 사용할 기준값.
+  - 일종의 "안전 장치" 역할.
+- **Cube 게임 적용**
+  - `PlayerHealth`의 Default 값을 **100**으로 설정 → 게임 시작 시 체력이 가득 찬 상태로 인식.
+
+---
+
+## 5. Cube 게임에 PlayerHealth 적용하기
+
+- Cube의 체력 게이지는 0~100 범위를 사용.
+- `PlayerHealth` Game Parameter를 통해 **실시간 체력 수치**가 Wwise에 전달됨.
+- 이 값에 따라 **심장 박동 사운드의 강도나 속도**가 변할 수 있도록 설계할 수 있음.
+
+---
+
+## 6. Game Parameter와 사운드 연결하기
+
+1. **사운드 리소스 가져오기**
+   - 예: 심장 박동 사운드 (Heartbeat.wav)
+2. **심장 박동 사운드와 PlayerHealth 연결**
+   - `PlayerHealth` 값이 낮아질수록:
+     - **볼륨** ↑ (더 크게 들림)
+     - **템포/피치** ↑ (더 빠르게 들림 → 긴장감 유발)
+   - `PlayerHealth` 값이 높을 때는 → 사운드가 작거나 거의 들리지 않음.
+
+- **개념적으로**
+  - PlayerHealth 값 = 플레이어 상태 지표
+  - 오디오 = 시각적 체력 게이지를 보완하는 **청각적 피드백**
+
+---
+
+✅ **정리 포인트**
+
+- Game Parameter는 **게임 수치를 오디오 시스템에 연결하는 통로**.
+- **Min/Max** 범위는 값의 한계, **Default 값**은 안전한 기본 상태.
+- Cube 게임에서는 `PlayerHealth (0~100)`를 사용, Default는 100으로 설정.
+- 실제 적용 예시: 체력이 낮아질수록 심장 박동 소리가 점점 빨라지고 크게 들림.
+
+---
+
+# { 🎵 사운드를 가져오고 반복 설정하기 }
+
+## 📋 목차
+
+1. [오디오 파일 가져오기](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#%EC%98%A4%EB%94%94%EC%98%A4-%ED%8C%8C%EC%9D%BC-%EA%B0%80%EC%A0%B8%EC%98%A4%EA%B8%B0)
+2. [Sound SFX 오브젝트 생성 확인](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#sound-sfx-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%EC%83%9D%EC%84%B1-%ED%99%95%EC%9D%B8)
+3. [Loop(반복 재생) 설정하기](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#loop%EB%B0%98%EB%B3%B5-%EC%9E%AC%EC%83%9D-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+4. [RTPC 개념 이해하기](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#rtpc-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+5. [Voice Volume과 PlayerHealth 연결하기](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#voice-volume%EA%B3%BC-playerhealth-%EC%97%B0%EA%B2%B0%ED%95%98%EA%B8%B0)
+6. [RTPC 곡선 기본 구조 이해하기](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#rtpc-%EA%B3%A1%EC%84%A0-%EA%B8%B0%EB%B3%B8-%EA%B5%AC%EC%A1%B0-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. 오디오 파일 가져오기
+
+- **개념**
+  게임에서 사용할 **외부 오디오 파일(예: 심장 박동 소리)**을 **Wwise 프로젝트 내부로 가져오는 과정**.
+  가져오지 않으면 Wwise에서 관리 및 재생이 불가능합니다.
+- **절차**
+  1. `Project Explorer → Audio 탭` 선택
+  2. `Module 5/Audio files for Module 5` 폴더에서 `Heartbeat.wav` 파일 찾기
+  3. `Actor-Mixer Hierarchy → Default Work Unit`으로 드래그 앤 드롭
+  4. `Audio File Importer` 창 → **Import 버튼 클릭**
+
+---
+
+## 2. Sound SFX 오브젝트 생성 확인
+
+- **개념**
+  오디오 파일을 가져오면 Wwise 내부에 해당 소리를 관리하는 **Sound SFX 오브젝트**가 생성됩니다.
+  이 오브젝트는 단순히 **“이 소리는 어떤 방식으로 재생된다”**를 정의합니다.
+- **결과**
+  `Heartbeat`라는 새로운 **Sound SFX 오브젝트**가 `Default Work Unit` 안에 생김.
+- **특징**
+  - 이 파일은 **약 30초짜리 심장 박동 사운드**
+  - 나중에 **Event로 호출**되어 재생됨
+  - 단순히 한 번만 재생하면 효과가 약하므로, **무한 반복(loop)**이 필요
+
+---
+
+## 3. Loop(반복 재생) 설정하기
+
+- **개념**
+  특정 사운드를 **원하는 동안 계속 재생되게 하는 설정**.
+  기본적으로 사운드는 **한 번만 재생 후 종료**되므로 Loop 옵션이 필요합니다.
+- **절차**
+  1. `Default Work Unit → Heartbeat 오브젝트` 선택
+  2. `Property Editor` 열기 → `Sound SFX` 탭 선택
+  3. `Loop` 옵션에서 **Enable 체크**
+  4. **Loop Infinite**가 기본값 → 즉, 무한 반복
+- **옵션 설명**
+  - **Loop Disable**: 1회만 재생 후 종료
+  - **Loop Enable (x번)**: 지정한 횟수만큼 반복
+  - **Loop Infinite**: 종료 조건이 오기 전까지 무한 재생
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380566/notion-blog/_/WWISE/Wwise_/5_Game_Parameter_/image_2.png)
+
+---
+
+## 4. RTPC 개념 이해하기
+
+- **RTPC (Real-Time Parameter Control)**
+  - 실시간으로 **게임 내 변수(Game Parameter)**를 오디오 속성(볼륨, 피치 등)에 연결하여 동적으로 제어하는 시스템.
+  - 예: **PlayerHealth 값(100~0)** → **Heartbeat 볼륨(-200dB ~ 0dB)**
+- **왜 필요한가?**
+  - 심장 박동 사운드가 항상 들리면 **거슬림** → 체력이 낮을 때만 점점 커지게 만들어야 함
+  - 이를 위해 **PlayerHealth**와 **Heartbeat 볼륨**을 RTPC로 연결
+
+---
+
+## 5. Voice Volume과 PlayerHealth 연결하기
+
+- **절차**
+  1. Heartbeat 오브젝트 선택 → `Property Editor`
+  2. `RTPC 탭` 열기 (더블 클릭 → 그래프 확대 가능)
+  3. **Y축 설정**: `Voice Volume` 선택
+     - 오디오의 최종 출력 볼륨을 제어하는 옵션
+     - dB 단위 (0 dB = 원래 크기, -200 dB = 완전 무음)
+  4. **X축 설정**: `Game Parameters → PlayerHealth` 선택
+     - PlayerHealth 값(100 = 최대 체력, 0 = 죽음)을 X축으로 설정
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380566/notion-blog/_/WWISE/Wwise_/5_Game_Parameter_/image_3.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380567/notion-blog/_/WWISE/Wwise_/5_Game_Parameter_/image_4.png)
+
+---
+
+## 6. RTPC 곡선 기본 구조 이해하기
+
+- **그래프 설명**
+  - X축 = PlayerHealth (0 ~ 100)
+  - Y축 = Voice Volume (-200 dB ~ 0 dB)
+  - 빨간 대각선 = 기본 RTPC 곡선
+- **기본 곡선 동작**
+  - 체력이 **높을수록 볼륨이 커짐** (반대 방향)
+  - → 하지만 우리가 원하는 것은 **체력이 낮아질수록 볼륨이 커지는 효과**
+  - → 따라서 **다음 섹션에서 곡선을 조정**해야 함
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380567/notion-blog/_/WWISE/Wwise_/5_Game_Parameter_/image_5.png)
+
+---
+
+✅ 정리하면, 이번 단계에서는:
+
+- 오디오 파일 가져오기 → SFX 오브젝트 생성 → 무한 반복 설정
+- PlayerHealth와 Heartbeat를 연결 → RTPC 그래프 구성
+- 아직 기본 곡선은 반대로 되어 있음 → **다음 단계에서 수정 필요**
+
+---
+
+# { 🎚 RTPC 곡선 설정과 사운드 표현 심화 }
+
+## 📋 목차
+
+1. [RTPC 개념 이해하기](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#rtpc-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [곡선(Point Curve) 조정하기](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#%EA%B3%A1%EC%84%A0point-curve-%EC%A1%B0%EC%A0%95%ED%95%98%EA%B8%B0)
+3. [기준점(Point) 추가와 옵션](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#%EA%B8%B0%EC%A4%80%EC%A0%90point-%EC%B6%94%EA%B0%80%EC%99%80-%EC%98%B5%EC%85%98)
+4. [곡선 타입(Curve Type) 선택하기](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#%EA%B3%A1%EC%84%A0-%ED%83%80%EC%9E%85curve-type-%EC%84%A0%ED%83%9D%ED%95%98%EA%B8%B0)
+5. [Transport Control로 테스트하기](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#transport-control%EB%A1%9C-%ED%85%8C%EC%8A%A4%ED%8A%B8%ED%95%98%EA%B8%B0)
+6. [Low-pass Filter(로우패스 필터) 개념](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#low-pass-filter%EB%A1%9C%EC%9A%B0%ED%8C%A8%EC%8A%A4-%ED%95%84%ED%84%B0-%EA%B0%9C%EB%85%90)
+7. [Voice LPF 매핑하기](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#voice-lpf-%EB%A7%A4%ED%95%91%ED%95%98%EA%B8%B0)
+8. [곡선 확대/축소 및 단축키](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#%EA%B3%A1%EC%84%A0-%ED%99%95%EB%8C%80%EC%B6%95%EC%86%8C-%EB%B0%8F-%EB%8B%A8%EC%B6%95%ED%82%A4)
+
+---
+
+## 1. RTPC 개념 이해하기
+
+- **RTPC (Real-Time Parameter Control)**
+  → 게임 내 변수(예: PlayerHealth)를 Wwise의 사운드 속성과 연결하여 **실시간으로 사운드를 제어**하는 기능.
+- 이번 예제에서는:
+  - **PlayerHealth** (체력) ↔ **Heartbeat 사운드 볼륨 & 필터**
+
+---
+
+## 2. 곡선(Point Curve) 조정하기
+
+- 곡선은 RTPC 값(가로축, X)과 사운드 속성 값(세로축, Y)을 연결하는 그래프.
+- 이번 목표:
+  - 체력이 **50 이상일 때는 심장 박동이 안 들리고**
+  - 체력이 **50 이하로 떨어지면 볼륨이 점차 증가**
+
+---
+
+## 3. 기준점(Point) 추가와 옵션
+
+- **양 끝점 이동**:
+  - 오른쪽 기준점을 아래로 드래그 → 전체 볼륨이 -200dB 차감 → 사실상 **무음 상태**.
+- **새 기준점 추가**:
+  - X ≈ 50 지점 더블 클릭 → 새로운 기준점 생성.
+- **좌표 직접 입력**:
+  - 왼쪽 기준점 선택 → `Y: 0` 입력 → 해당 위치에서 출력 값 고정.
+
+📌 결과:
+
+- 체력이 **50 이상 → 볼륨 변화 없음**
+- 체력이 **50 미만 → 볼륨이 점차 증가**
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380567/notion-blog/_/WWISE/Wwise_/5_Game_Parameter_/image_6.png)
+
+---
+
+## 4. 곡선 타입(Curve Type) 선택하기
+
+- 기준점 사이 선형(직선) 연결 외에도, **다양한 내장 곡선**을 사용할 수 있음.
+- 이번 예제에서 사용:
+  - **Exponential (Base 3)**
+  - 특징: 체력이 50 이하로 떨어질 때 **빠르게 증가 후, 0에 가까워질수록 점진적으로 증가**.
+- 다른 옵션:
+  - Linear (기본, 직선 변화)
+  - Logarithmic / Exponential (감각적으로 더 자연스러운 오디오 변화)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380567/notion-blog/_/WWISE/Wwise_/5_Game_Parameter_/image_7.png)
+
+---
+
+## 5. Transport Control로 테스트하기
+
+- **Transport Control 창**에서 Heartbeat 오브젝트 재생.
+- **RTPC 탭에서 PlayerHealth 커서**를 좌우로 드래그 → 체력 변화에 따른 실제 사운드 확인.
+
+---
+
+## 6. Low-pass Filter(로우패스 필터) 개념
+
+- **Low-pass Filter (LPF)**: 설정된 주파수 이하의 소리만 통과.
+- 효과:
+  - LPF 값이 높을수록 → 높은 주파수 차단 → **소리가 둔탁/어둡게 들림**.
+  - LPF 값이 낮을수록 → 고주파 포함 → **소리가 선명**.
+- **Wwise LPF 값 범위**:
+  - `0` = 필터 없음 (모든 주파수 통과, 원래 소리)
+  - `100` = 모든 주파수 차단 (무음)
+
+---
+
+## 7. Voice LPF 매핑하기
+
+- 동일한 **PlayerHealth Game Parameter**를 **Volume**뿐 아니라 **Voice LPF**에도 매핑 가능.
+- 두 곡선이 동시에 존재:
+  - 빨간 선 = Volume
+  - 파란 선 = LPF
+- 설정 과정:
+  1. **[>>] 버튼 클릭 → PlayerHealth 매개변수 선택**
+  2. 속성: **Voice LPF** 매핑
+  3. 곡선 편집:
+     - 오른쪽 끝 점을 위로 올려서 **모든 주파수 차단** 상태로 시작
+     - X ≈ 60 지점에 기준점 추가 → Y 최상단으로 끌어올림
+     - 결과:
+       - 체력이 낮을수록 → 필터 점점 열려서 소리가 선명해짐
+       - 체력이 높을수록 → 소리가 둔탁하거나 안 들림
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380567/notion-blog/_/WWISE/Wwise_/5_Game_Parameter_/image_8.png)
+
+---
+
+## 8. 곡선 확대/축소 및 단축키
+
+- 곡선 편집 시 세밀하게 보기 위해 **확대/축소 단축키** 활용:
+  - `+ / -` 버튼: 세로/가로 확대 축소
+  - 가운데 아이콘 클릭: 전체 곡선 표시 (리셋)
+  - `Z + 드래그`: 영역 확대
+  - `CTRL + 마우스 휠`: 세로 확대/축소
+  - `CTRL + SHIFT + 마우스 휠`: 가로 확대/축소
+
+---
+
+✅ **정리 포인트**
+
+- RTPC 곡선은 게임 변수(체력 등)를 사운드 속성(볼륨/필터 등)에 연결하는 핵심 도구.
+- **곡선 편집**을 통해 “언제부터 사운드가 들릴지, 얼마나 빠르게 변할지” 제어 가능.
+- **Volume + LPF 동시 매핑**으로, 단순히 소리 크기뿐 아니라 **음질 변화**까지 플레이어에게 전달 가능.
+- **Exponential 곡선**은 긴박감을 표현할 때 유용.
+
+---
+
+# { 🎚 게임 매개 변수 변화 시뮬레이션 }
+
+## 📋 목차
+
+1. [Transport Control 개념](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#transport-control-%EA%B0%9C%EB%85%90)
+2. [Display RTPCs 버튼 사용하기](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#display-rtpcs-%EB%B2%84%ED%8A%BC-%EC%82%AC%EC%9A%A9%ED%95%98%EA%B8%B0)
+3. [PlayerHealth RTPC 값 조정하기](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#playerhealth-rtpc-%EA%B0%92-%EC%A1%B0%EC%A0%95%ED%95%98%EA%B8%B0)
+4. [사운드 재생/정지 방법](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#%EC%82%AC%EC%9A%B4%EB%93%9C-%EC%9E%AC%EC%83%9D%EC%A0%95%EC%A7%80-%EB%B0%A9%EB%B2%95)
+5. [실습 결과와 학습 포인트](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#%EC%8B%A4%EC%8A%B5-%EA%B2%B0%EA%B3%BC%EC%99%80-%ED%95%99%EC%8A%B5-%ED%8F%AC%EC%9D%B8%ED%8A%B8)
+6. [다음 단계 예고 – State 사용하기](https://www.notion.so/Section5-271e683f737e80e48403d8e95d701896#%EB%8B%A4%EC%9D%8C-%EB%8B%A8%EA%B3%84-%EC%98%88%EA%B3%A0--state-%EC%82%AC%EC%9A%A9%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. Transport Control 개념
+
+- **Transport Control**: Wwise에서 사운드를 직접 재생/정지하고 매개변수 변화에 따른 결과를 **실시간으로 테스트**할 수 있는 패널.
+- 주요 기능:
+  - 재생 / 정지 (Play / Stop)
+  - RTPC 매개변수 값 모니터링
+  - 실시간 슬라이더 조절
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380568/notion-blog/_/WWISE/Wwise_/5_Game_Parameter_/image_9.png)
+
+---
+
+## 2. Display RTPCs 버튼 사용하기
+
+- Transport Control 패널 내에 **Display RTPCs 버튼** 존재.
+- 클릭 시:
+  - 현재 오브젝트에 연결된 RTPC(Game Parameter)와 **실시간 값**이 표시됨.
+- 이번 실습에서는 **PlayerHealth RTPC**와 연결된 값 확인 가능.
+
+---
+
+## 3. PlayerHealth RTPC 값 조정하기
+
+- Transport Control에서 **PlayerHealth 슬라이더**를 직접 움직여 볼 수 있음.
+- 효과:
+  - 체력이 감소할수록 **볼륨 곡선**과 **LPF 곡선**이 적용되어 → 소리가 **점점 커지고 더 선명**하게 들림.
+- 실제 게임 상황을 흉내 내며 테스트 가능.
+
+---
+
+## 4. 사운드 재생/정지 방법
+
+- 일반 Play 버튼: 여러 번 클릭하면 동일 사운드가 **중첩 재생**될 수 있음.
+- 해결 방법:
+  - **스페이스바** 사용 → 재생과 정지를 **토글 방식**으로 수행.
+  - 한 번 누르면 재생, 다시 누르면 정지 → 중복 재생 문제 방지.
+
+---
+
+## 5. 실습 결과와 학습 포인트
+
+- 지금까지 배운 것:
+  - **심장 박동 사운드**를 무한 반복 재생.
+  - **RTPC 곡선(Volume + LPF)** 을 사용해 → 체력이 낮아질수록 **더 크게, 더 선명하게** 표현.
+- 핵심 기술 요약:
+  1. **RTPC 곡선**으로 게임 변수(체력) ↔ 사운드 속성(볼륨/필터) 연결.
+  2. **Graph View**와 **Transport Control**에서 각각 테스트 가능.
+  3. 청각적 피드백을 통해 플레이어에게 긴박감을 전달.
+- 이 기술은 단순한 체력 표현뿐 아니라:
+  - 스태미나, 마나, 주변 위험도, 환경 변화 등 **다양한 게임 변수와 사운드 연결**에 활용 가능.
+
+---
+
+## 6. 다음 단계 예고 – State 사용하기
+
+- **다음 6단원: State 사용하기**
+  - 상황(State)에 따라 사운드가 달라지도록 설정.
+  - 예:
+    - Wwizard가 패배 → **심장 박동 완전히 멈춤**
+    - 새로운 맵 로드 → **심장 박동 다시 재개**
+  - Cube 게임에도 적용 → 플레이 상황 반응 확인 가능.
+
+---
+
+✅ **정리 포인트**
+
+- RTPC는 **“연속적인 값 변화”**를 사운드 속성에 연결.
+- Transport Control은 **실시간 테스트 도구**로, 곡선 결과를 체감할 수 있음.
+- 이번 단계에서 **체력과 사운드 간 관계 설정**을 완성했고,
+- 다음 단계에서는 **상태 전환(State)** 을 이용한 **사운드 흐름 제어**를 배우게 됨.

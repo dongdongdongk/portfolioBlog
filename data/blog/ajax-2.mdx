@@ -1,0 +1,363 @@
+---
+title: 'Ajax 사용방법'
+date: '2026-09-02'
+category: '풀스택/JavaScript'
+tags: ['풀스택', 'JavaScript']
+draft: false
+summary: ''
+---
+
+# **AJAX 개념과 형태**
+
+```jsx
+동적으로 데이터를 가져오는 작업들
+
+Ajax는 웹 페이지 전체를 다시 로딩하지 않고도, 웹 페이지의 일부분만을 갱신할 수 있다.
+
+즉 Ajax를 이용하면 백그라운드 영역에서 서버와 통신하여, 그 결과를 웹 페이지의 일부분에만 표시할 수 있다.
+
+이때 서버와는 다음과 같은 다양한 형태의 데이터를 주고받을 수 있다.
+
+ - JSON
+
+ - XML
+
+ - HTML
+
+ - 텍스트 파일 등
+```
+
+## **Ajax의 특징**
+
+```jsx
+1. 웹 페이지 전체를 다시 로딩하지 않고도, 웹 페이지의 일부분만을 갱신할 수 있다.
+
+2. 웹 페이지가 로드된 후에 서버로 데이터 요청을 보낼 수 있다.
+
+3. 웹 페이지가 로드된 후에 서버로부터 데이터를 받을 수 있다.
+
+4. 백그라운드 영역에서 서버로 데이터를 보낼 수 있다.
+
+• 순수 javascript를 이용한 ajax는 브라우저 마다 사용방법이 달라 브라우저 마다 다른형태로 구현해야 하는 부담이 있다.
+
+• jQuery AJAX의 경우 $.ajax()함수를 이용해서 모든 브라우저에서 돌아 가도록 구현 할 수 있다.
+
+• $.ajax()로 모든 AJAX형태를 구현할 수 있고 좀더 쉽게 구현 할 수 있도록  load, get, post, getjson, getxml를 구현하였다.
+```
+
+# 1.기본 Ajax 형태
+
+```java
+// 방법1 예전방식
+$.ajax({
+    url: "/send", // 데이터를 요청할 url
+    type: "GET",   // GET, POST, DELETE, PATCH, PUT 등
+    data : data, // 변수에 담긴 데이터를 서버로 전송하는 부분을 나타내며, 실제 데이터는 JSON 형식이나 맵으로 작성되어야 합니다
+    success: function(result){ // 요청에 성공했을때 실행되고 서버에서 받은 데이터를 확인할수 있다
+    	console.log(result);
+	},
+  	error: function(){
+		console.log("에러발생");
+  	}
+})
+
+
+// 방법2 추천방식
+$.ajax({
+	url: "/send",
+	type: "GET",
+	data : data,
+})
+.done(function(result){ // 요청에 성공했을때 실행
+	console.log(result);
+})
+.fail(function(){
+	console.log("에러발생");
+})
+```
+
+## 데이터 반환 예제
+
+```jsx
+서버에서 아래와 같은 형태의 컨트롤러가 있다면
+```
+
+```jsx
+@Controller
+public class ExampleController {
+
+    @GetMapping("/data")
+    @ResponseBody
+    public String getData() {
+        // 간단한 문자열 데이터를 반환하는 예제
+        return "Hello, this is data from the server!";
+    }
+}
+```
+
+```jsx
+클라이언트 쪽에서 ajax 로 컨트롤러를 호출하고 이후 요청이 성공했을 때 return 값의 "Hello, this is data from the server!" 를 받아 ajax 의 success 의 data 에 넣어준다
+```
+
+```jsx
+$.ajax({
+  url: '/data', // 스프링 컨트롤러에 요청을 보낼 경로
+  type: 'GET', // GET 요청
+  success: function (data) {
+    // 요청에 성공했을때 실행되고 서버에서 받은 데이터를 확인할수 있다
+    console.log('서버에서 받은 데이터:', data)
+  },
+  error: function () {
+    console.log('에러발생')
+  },
+})
+```
+
+## **dataType, contentType, JSON.stringify() 설명**
+
+```jsx
+$.ajax({
+  url: '/signup',
+  data: JSON.stringify(data),
+  type: 'post',
+  dataType: 'json',
+  contentType: 'application/json; charset=utf-8',
+})
+  .done(function (result) {
+    console.log('회원가입 완료')
+  })
+  .fail(function (xhr, status, errorThrown) {
+    console.log('회원가입 실패')
+  })
+```
+
+### **dataType**
+
+```jsx
+dataType : 서버에서 어떤 타입을 받을 것인지를 의미합니다. 생략했을경우에는 jQuery가 자동으로 결정합니다.
+
+- dataType의 종류 -
+
+* xml - XML문서
+* html - HTML을 텍스트 테이터로 여기에 script태그가 포함된 경우 처리가 실행됩니다.
+* script - JavaScript코드를 텍스트 데이터로
+* json - JSON형식 데이터로 평가하고 JavaScript의 개체로 변환합니다.
+* text - 일반 텍스트
+```
+
+### data
+
+```jsx
+변수에 담긴 데이터를 서버로 전송하는 부분을 나타내며, 실제 데이터는 JSON 형식이나 맵으로 작성되어야 합니다
+
+ex) 이름은 vo 컬럼과 같게 해주자
+data: {
+         calDay: dayValue,
+         calMonth: monthValue,
+	       calYear: yearValue
+       },
+```
+
+### **contentType**
+
+```jsx
+서버로 데이터를 보낼때에 어떤타입으로 보낼것인지를 지정합니다.
+
+application/json; charset-utf-8이 흔이쓰이고  디폴트 값은 application/x-www-form-urlencoded; charset=utf-8입니다.
+```
+
+### **JSON.stringify()**
+
+```jsx
+먼저 JSON은 일반적으로 데이터를 저장하거나 전송할 때 많이 사용되는 데이터 교환 방식인데 Javascript에서 객체를 만들 때 사용하는 표현식을 의미합니다.
+
+json 형태로 데이터를 생성하고 console.log()를 찍어보면 Object 가 찍히고 Object라는 객체 안에 저장한 데이터들이 있는 것을 확인할 수 있습니다.
+
+JSON stringify는 이런 객체를 json 문자열로 변환하는 역할을 합니다.
+
+* 메서드 안에 넣고 싶은 javascript 값이나 객체를 넣으면 JSON 형태의 문자열 값을 반환해 줍니다.
+```
+
+```jsx
+위에 예시에서는 contentType을 application/json으로 설정했기때문에 data의 값을 json구조로 보내줘야 하기때문에
+
+JSON객체의 stringify()메서드를 활용해서 json구조로 변경해서 보내는것을 볼 수 있습니다.
+```
+
+# 2.컨트롤러 에서 데이터 받기
+
+## jsp
+
+```java
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Insert title here</title>
+
+<script type="text/javascript" src="http://code.jquery.com/jquery-latest.min.js"></script>
+</head>
+<body>
+
+	<span>에이작스 테스트</span>
+
+	<input type="text" class="name">
+	<button>전송</button>
+
+	<script>
+
+	$("button").click(function(){       //버튼을 클릭했을 때
+		const data = {                    //data 변수 선언하고 name 에 class naem 의 값을 넣어준다
+			name : $(".name").val()
+		};
+
+
+		$.ajax({                          // 컨트롤러으 /send 에 data 를 보내준다
+			url: "/send",
+			type: "GET",
+			data : data,
+		})
+		.done(function(result){
+			console.log(result);
+		})
+		.fail(function(){
+			console.log("에러발생");
+		})
+	})
+
+	</script>
+
+</body>
+</html>
+```
+
+## Controller
+
+```java
+@Controller
+public class AjaxTest {
+
+	@GetMapping("/ajaxTest")
+	public String ajaxTest() {
+		return "ajaxTest";
+	}
+
+
+    // ajax 요청을 받는곳
+	@ResponseBody
+	@GetMapping("/send")
+	public String send(String name) {
+		System.out.println("name = " + name);
+
+		return "안녕하세요 " + name + "님";
+	}
+
+}
+```
+
+```java
+Mapping을 ajax type과 맞춰주고(get) @ResponseBody를 붙여준다
+
+컨트롤러는 요청이 들어오면 return 값을 viewResolver로 전달 => 알맞는 화면을 보여주는데
+
+@ResponseBody 어노테이션을 붙이면
+
+return 값을 MessageConerveter로 전달 => 값이 String이면 String으로 객체이면 JSON으로 변환후 응답해준다
+```
+
+### String으로 return 했을때
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381255/notion-blog/_/JavaScript/JavaScript_/Ajax_/Untitled.png)
+
+### Object로 return 했을때
+
+```java
+	@ResponseBody
+	@GetMapping("/send")
+	public Map<String, String> send(String name) {
+
+		Map<String, String> map = new HashMap<>();
+
+		map.put("msg1", "안녕하세요1");
+		map.put("msg2", "안녕하세요2");
+		map.put("msg3", "안녕하세요3");
+
+		return map;
+	}
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381255/notion-blog/_/JavaScript/JavaScript_/Ajax_/Untitled_1.png)
+
+# 배열을 서버로 전달
+
+```java
+배열을 서버로 전달하고 싶을때는 Ajax 에 traditional : true 를 추가해주면 된다
+```
+
+## jsp
+
+```java
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Insert title here</title>
+
+<script type="text/javascript" src="http://code.jquery.com/jquery-latest.min.js"></script>
+</head>
+<body>
+
+	<span>에이작스 테스트</span>
+
+	<input type="text" class="name1">
+	<input type="text" class="name2">
+	<input type="text" class="name3">
+	<button>전송</button>
+
+	<script>
+
+	$("button").click(function(){
+		const data = {
+			name : [
+				$(".name1").val(),  // 안녕하세요
+				$(".name2").val(),  // 테스트
+				$(".name3").val()   // 입니다
+				]
+		};
+
+		$.ajax({
+			url: "/send",
+			type: "GET",
+			data : data,
+			traditional : true // 추가
+		})
+		.done(function(result){
+			console.log(result);
+		})
+		.fail(function(){
+			console.log("에러발생");
+		})
+	})
+
+	</script>
+
+</body>
+</html>
+```
+
+## Controller
+
+```java
+	@ResponseBody
+	@GetMapping("/send")
+	public void send(String[] name) {
+
+		System.out.println(Arrays.toString(name));
+
+	}
+    // 결과 [안녕하세요, 테스트, 입니다]
+```

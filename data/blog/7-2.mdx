@@ -1,0 +1,1672 @@
+---
+title: '섹션 7: 악성 봇 마무리 및 보스전 - 2'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 🎯 Widget Blueprint로 십자선 만들기 }
+
+## 📌 이 강의의 목표
+
+Widget Blueprint를 사용하여 화면에 십자선 HUD를 표시합니다.
+
+- Widget Blueprint 생성
+- Overlay와 Image 위젯 사용
+- 십자선 UI 구성
+- 뷰포트에 추가
+- 카메라 오프셋 조정
+
+---
+
+## ⚠️ 현재 문제점
+
+### 문제 1: 메시가 시야 방해
+
+```
+메시가 화면 중앙
+  ↓
+십자선 없음
+  ↓
+조준이 어려움 😕
+```
+
+### 문제 2: 정확한 조준 불가능
+
+```
+어디를 쏘는지 모름
+  └─ 십자선 필요!
+```
+
+---
+
+## 💡 해결책: Widget Blueprint
+
+### Widget이란?
+
+```
+Widget = HUD 요소
+  ├─ 십자선
+  ├─ 체력 바
+  ├─ 점수
+  └─ 미니맵 등
+```
+
+**HUD**: Head-Up Display (화면에 표시되는 UI)
+
+---
+
+## 🎨 1단계: Texture Migration
+
+### 충돌 테스트 프로젝트에서 가져오기
+
+```
+CollisionTest 프로젝트 열기
+  ↓
+Assets/Textures 폴더
+  ├─ T_Crosshair_Center (중앙 점)
+  ├─ T_Crosshair_Left (왼쪽 선)
+  ├─ T_Crosshair_Right (오른쪽 선)
+  ├─ T_Crosshair_Top (위쪽 선)
+  └─ T_Crosshair_Bottom (아래쪽 선)
+```
+
+### Migration
+
+```
+Textures 폴더 우클릭
+  ↓
+Asset Actions → Migrate
+  ↓
+OK 클릭
+  ↓
+RogueBots/Content 폴더 선택
+```
+
+**결과**: Textures 폴더가 복사됨!
+
+---
+
+## 🛠️ 2단계: Widget Blueprint 생성
+
+### UI 폴더 생성
+
+```
+Blueprints 폴더
+  ↓
+우클릭 → New Folder
+  └─ Name: UI
+```
+
+### Widget Blueprint 생성
+
+```
+UI 폴더 안
+  ↓
+우클릭 → User Interface → Widget Blueprint
+  ↓
+Parent Class: User Widget (기본값)
+  ↓
+Name: WBP_OverlayHUD
+```
+
+**명명 규칙**: WBP\_ (Widget Blueprint)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380737/notion-blog/_/_/_5_/_7_-_2/image.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380734/notion-blog/_/_/_5_/_7_-_2/image_1.png)
+
+---
+
+## 🎨 3단계: Widget Designer
+
+### Widget Blueprint 구조
+
+```
+WBP_OverlayHUD 열기
+  ├─ Designer 탭 (비주얼 디자인)
+  └─ Graph 탭 (기능 구현)
+```
+
+**현재 작업**: Designer 탭 사용!
+
+### 패널 설명
+
+```
+왼쪽: Palette (위젯 목록)
+가운데: Canvas (디자인 영역)
+오른쪽: Details (속성 편집)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380735/notion-blog/_/_/_5_/_7_-_2/image_2.png)
+
+---
+
+## 🧩 4단계: Overlay 위젯
+
+### 왜 Overlay?
+
+```
+Image 직접 추가
+  └─ 화면 전체로 늘어남
+      └─ 여러 이미지 겹칠 수 없음 ✗
+
+Overlay 사용
+  └─ 여러 위젯 겹칠 수 있음 ✅
+```
+
+### Overlay 추가
+
+```
+Palette 패널
+  ↓
+"Overlay" 검색
+  ↓
+Canvas로 드래그
+```
+
+**Overlay**: 자식 위젯들을 겹쳐서 배치하는 컨테이너
+
+---
+
+## 🖼️ 5단계: 중앙 점 추가
+
+### Image 위젯 추가
+
+```
+Palette 패널
+  ↓
+"Image" 검색
+  ↓
+Overlay 위로 드래그
+
+```
+
+**주의**: Overlay 위에 드래그해야 함!
+
+### Image 설정
+
+### 1. Hierarchy에서 이름 변경
+
+```
+Image → Image_Crosshair_Center
+```
+
+### 2. Brush - Image 설정
+
+```
+Details 패널
+  ↓
+Appearance → Brush
+  ↓
+Image 드롭다운
+  └─ T_Crosshair_Center 선택
+```
+
+**Brush**: 이미지의 외관 속성 (텍스처, 색상 등)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380735/notion-blog/_/_/_5_/_7_-_2/image_3.png)
+
+### 3. Alignment 설정
+
+```
+Details 패널
+  ↓
+Slot (Canvas Panel Slot)
+  ↓
+Padding 섹션 아래
+  ├─ Horizontal Alignment: Center
+  └─ Vertical Alignment: Center
+```
+
+**Alignment**: 위젯 정렬 방식
+
+---
+
+## 📐 Alignment 옵션 설명
+
+### Horizontal Alignment
+
+```
+옵션:
+  ├─ Left: 왼쪽 정렬
+  ├─ Center: 중앙 정렬
+  ├─ Right: 오른쪽 정렬
+  └─ Fill: 늘어남
+```
+
+### Vertical Alignment
+
+```
+옵션:
+  ├─ Top: 위쪽 정렬
+  ├─ Center: 중앙 정렬
+  ├─ Bottom: 아래쪽 정렬
+  └─ Fill: 늘어남
+```
+
+---
+
+## 🎨 6단계: 나머지 이미지 추가
+
+### 왼쪽 선
+
+```
+Image 드래그 → Overlay
+  ↓
+이름: Image_Crosshair_Left
+  ↓
+Brush - Image: T_Crosshair_Left
+  ↓
+Alignment: Center, Center
+```
+
+### 오른쪽 선
+
+```
+Image 드래그 → Overlay
+  ↓
+이름: Image_Crosshair_Right
+  ↓
+Brush - Image: T_Crosshair_Right
+  ↓
+Alignment: Center, Center
+```
+
+### 위쪽 선
+
+```
+Image 드래그 → Overlay
+  ↓
+이름: Image_Crosshair_Top
+  ↓
+Brush - Image: T_Crosshair_Top
+  ↓
+Alignment: Center, Center
+```
+
+### 아래쪽 선
+
+```
+Image 드래그 → Overlay
+  ↓
+이름: Image_Crosshair_Bottom
+  ↓
+Brush - Image: T_Crosshair_Bottom
+  ↓
+Alignment: Center, Center
+```
+
+**결과**: 십자선 완성! ✅
+
+---
+
+## 🎮 7단계: 뷰포트에 추가
+
+### BP_BotPawn Event BeginPlay
+
+```
+Event BeginPlay
+  ↓
+Create Widget
+  ↓
+Add to Viewport
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380735/notion-blog/_/_/_5_/_7_-_2/image_4.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380736/notion-blog/_/_/_5_/_7_-_2/image_5.png)
+
+### 노드 설명
+
+### Create Widget
+
+```
+역할: Widget Blueprint 인스턴스 생성
+입력:
+  ├─ Class: WBP_OverlayHUD
+  └─ Owning Player: (비워둠)
+출력: User Widget (생성된 위젯)
+```
+
+**비유**: Spawn Actor와 비슷 (Widget용)
+
+### Class 설정
+
+```
+Create Widget 노드
+  ↓
+Class 드롭다운
+  └─ WBP_OverlayHUD 선택
+```
+
+### Owning Player
+
+```
+의미: 이 위젯의 소유 플레이어
+현재: 비워둠 (자동으로 설정됨)
+```
+
+### Add to Viewport
+
+```
+역할: 위젯을 화면에 표시
+입력: User Widget (Create Widget 결과)
+```
+
+**중요**: Create만 하면 안 보임!
+**Add to Viewport 필수!**
+
+### 연결
+
+```
+Event BeginPlay
+  ↓
+Create Widget
+  ├─ Class: WBP_OverlayHUD
+  └─ Return Value → Add to Viewport
+```
+
+---
+
+## 🧪 테스트
+
+### 결과
+
+```
+Play 실행
+  ↓
+십자선 표시! ✅
+```
+
+**하지만**: 메시가 여전히 방해 😕
+
+---
+
+## 📷 8단계: 카메라 오프셋
+
+### 문제
+
+```
+메시가 화면 중앙
+  └─ 십자선 가림
+      └─ 시야 방해
+```
+
+### 해결: Socket Offset
+
+```
+BP_BotPawn
+  ↓
+SpringArm 선택
+  ↓
+Details 패널
+  └─ Camera Settings
+      └─ Socket Offset
+```
+
+### Socket Offset이란?
+
+```
+Socket Offset
+  └─ Spring Arm 끝에서의 오프셋
+      └─ 카메라 위치 조정
+
+vs
+
+Location Offset
+  └─ Spring Arm 자체 이동
+```
+
+**장점**: Spring Arm 기능 유지하면서 카메라만 이동!
+
+### 설정
+
+```
+Socket Offset
+  ├─ X: 0
+  ├─ Y: 0
+  └─ Z: 45
+```
+
+**Z: 45**: 위로 45 유닛 이동
+
+---
+
+## 🧪 테스트 결과
+
+### 성공!
+
+```
+Play 실행
+  ↓
+메시가 십자선 아래로!
+  └─ 시야 확보 ✅
+```
+
+---
+
+## ⚠️ 새로운 문제 발견
+
+### 조준 불일치
+
+```
+십자선 위치 ≠ 발사체 방향
+  ↓
+조준이 빗나감 😕
+```
+
+### 원인
+
+```
+카메라 위치 변경
+  ↓
+FireRifle의 Forward Vector
+  └─ 카메라 방향이 아님
+      └─ 메시 방향!
+```
+
+**해결**: 다음 강의에서!
+
+---
+
+## 🔧 9단계: BP_Bot 테스트 비활성화
+
+### 문제
+
+```
+테스트 중
+  └─ BP_Bot이 계속 공격
+      └─ 테스트 어려움
+```
+
+### 해결
+
+```
+BP_Bot Event Graph
+  ↓
+SpawnBlasterBeam 함수 호출 찾기
+  ↓
+연결 해제 (임시)
+```
+
+**용도**: 조준 테스트하기 위해
+
+---
+
+## 📊 Widget Blueprint 구조 정리
+
+### Hierarchy
+
+```
+Canvas Panel
+  └─ Overlay
+      ├─ Image_Crosshair_Center
+      ├─ Image_Crosshair_Left
+      ├─ Image_Crosshair_Right
+      ├─ Image_Crosshair_Top
+      └─ Image_Crosshair_Bottom
+```
+
+### 각 Image 설정
+
+```
+공통 설정:
+  ├─ Horizontal Alignment: Center
+  ├─ Vertical Alignment: Center
+  └─ Brush Image: 각자 다른 텍스처
+```
+
+---
+
+## 💡 Widget 위젯 종류
+
+### Overlay
+
+```
+역할: 자식 위젯들을 겹쳐서 배치
+용도: 여러 UI 요소 겹칠 때
+```
+
+### Canvas Panel
+
+```
+역할: 자유롭게 위젯 배치
+용도: 절대 위치 지정
+```
+
+### Image
+
+```
+역할: 텍스처 표시
+속성:
+  ├─ Brush: 외관 (텍스처, 색상)
+  └─ Alignment: 정렬 방식
+```
+
+### Horizontal/Vertical Box
+
+```
+역할: 위젯을 가로/세로로 정렬
+용도: 버튼 나열, 리스트 등
+```
+
+---
+
+## 📝 핵심 개념 정리
+
+### Widget Blueprint
+
+```
+화면에 표시되는 UI 요소
+  ├─ Designer: 비주얼 디자인
+  └─ Graph: 기능 구현
+```
+
+### Create Widget
+
+```
+Widget 인스턴스 생성
+  └─ Spawn Actor와 비슷 (Widget용)
+```
+
+### Add to Viewport
+
+```
+Widget을 화면에 표시
+  └─ 이거 안 하면 안 보임!
+```
+
+### Socket Offset
+
+```
+Spring Arm 끝에서의 오프셋
+  └─ 카메라 위치만 조정
+```
+
+---
+
+## 🎯 실전 팁
+
+### Widget 명명 규칙
+
+```
+WBP_[용도]
+  ├─ WBP_MainMenu
+  ├─ WBP_PauseMenu
+  ├─ WBP_HealthBar
+  └─ WBP_Inventory
+```
+
+### Image 명명 규칙
+
+```
+Image_[설명]
+  ├─ Image_Crosshair_Center
+  ├─ Image_HealthBar
+  └─ Image_Icon_Weapon
+```
+
+### Alignment 선택
+
+```
+중앙 배치
+  └─ Center, Center
+
+좌상단 배치
+  └─ Left, Top
+
+우하단 배치
+  └─ Right, Bottom
+```
+
+---
+
+## 🔧 노드 흐름도 분석
+
+### Widget 생성 흐름
+
+```
+Event BeginPlay
+  │
+  └── Create Widget
+        │
+        ├── Class: WBP_OverlayHUD (어떤 Widget?)
+        ├── Owning Player: (누구 것?)
+        │
+        └── Return Value (생성된 Widget)
+              │
+              └── Add to Viewport
+                    │
+                    └── (화면에 표시!)
+```
+
+### 각 노드 역할
+
+### Event BeginPlay
+
+```
+언제: 게임 시작 시
+역할: 초기화 시작점
+```
+
+### Create Widget
+
+```
+입력:
+  ├─ Class (Widget Blueprint Class)
+  │   └─ 어떤 Widget을 만들지
+  │
+  └─ Owning Player (Player Controller)
+      └─ 누구의 Widget인지
+
+출력:
+  └─ Return Value (User Widget)
+      └─ 생성된 Widget 인스턴스
+```
+
+**Class 예시**: WBP_OverlayHUD
+
+### Add to Viewport
+
+```
+입력:
+  └─ Target (User Widget)
+      └─ 어떤 Widget을 추가할지
+
+역할:
+  └─ Widget을 화면에 표시
+```
+
+**주의**: 이거 없으면 Widget 생성만 되고 안 보임!
+
+---
+
+## 📚 용어 정리
+
+| 용어             | 설명                               |
+| ---------------- | ---------------------------------- |
+| Widget Blueprint | UI 요소를 만드는 Blueprint         |
+| HUD              | Head-Up Display (화면 UI)          |
+| Overlay          | 여러 위젯을 겹쳐 배치하는 컨테이너 |
+| Canvas Panel     | 자유롭게 위젯 배치하는 컨테이너    |
+| Image Widget     | 텍스처를 표시하는 위젯             |
+| Brush            | 이미지의 외관 속성                 |
+| Alignment        | 위젯 정렬 방식                     |
+| Create Widget    | Widget 인스턴스 생성 노드          |
+| Add to Viewport  | Widget을 화면에 표시               |
+| Socket Offset    | Spring Arm 끝의 오프셋             |
+| Owning Player    | Widget 소유 플레이어               |
+
+---
+
+## 🔧 실습 체크리스트
+
+```
+✅ Texture Migration
+✅ UI 폴더 생성
+✅ WBP_OverlayHUD 생성
+✅ Overlay 위젯 추가
+✅ 5개 Image 위젯 추가
+✅ 각 Image 설정
+   ├─ 이름 변경
+   ├─ Texture 설정
+   └─ Alignment: Center
+✅ BP_BotPawn BeginPlay
+   ├─ Create Widget
+   └─ Add to Viewport
+✅ Socket Offset Z: 45
+✅ BP_Bot 공격 비활성화
+✅ 테스트
+```
+
+---
+
+## 💡 최종 요약
+
+### 문제
+
+```
+메시가 시야 방해
+  └─ 조준 어려움
+```
+
+### 해결
+
+```
+1. Widget Blueprint 생성
+   └─ 십자선 UI
+
+2. Create Widget + Add to Viewport
+   └─ 화면에 표시
+
+3. Socket Offset
+   └─ 카메라 위로 이동
+```
+
+### 결과
+
+```
+십자선 표시 ✅
+메시가 아래로 ✅
+시야 확보 ✅
+```
+
+### 남은 문제
+
+```
+조준 불일치
+  └─ 다음 강의에서 해결!
+```
+
+---
+
+## 🎓 보너스: Widget 종류
+
+### 주요 Widget들
+
+```
+Layout (배치)
+  ├─ Overlay: 겹쳐서
+  ├─ Canvas Panel: 자유롭게
+  ├─ Horizontal Box: 가로로
+  └─ Vertical Box: 세로로
+
+Content (내용)
+  ├─ Image: 그림
+  ├─ Text: 글자
+  └─ Progress Bar: 진행 바
+
+Interactive (상호작용)
+  ├─ Button: 버튼
+  ├─ Slider: 슬라이더
+  └─ Checkbox: 체크박스
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380736/notion-blog/_/_/_5_/_7_-_2/image_6.png)
+
+# { 🎯 Line Trace로 정확한 조준 구현 }
+
+## 📌 이 강의의 목표
+
+Line Trace를 사용하여 십자선이 가리키는 위치로 정확하게 발사체를 날립니다.
+
+- Line Trace 개념
+- 카메라에서 Line Trace 발사
+- Hit Result 처리
+- 발사체 방향 설정
+
+---
+
+## ⚠️ 현재 문제점
+
+### 조준 불일치
+
+```
+십자선 위치 ≠ 발사체 방향
+  ↓
+카메라는 위로
+메시는 앞으로
+  ↓
+발사체는 메시 Forward Vector
+  ↓
+빗나감! 😱
+```
+
+### 테스트
+
+```
+봇 조준
+  ↓
+발사
+  ↓
+봇 아래로 날아감
+  └─ 빗나감!
+```
+
+---
+
+## 💡 해결책: Line Trace
+
+### 원리
+
+```
+1. 화면 중앙(십자선)에서 Line Trace
+   ↓
+2. Hit Point 획득
+   ↓
+3. 발사체를 Hit Point 방향으로 발사
+   ↓
+4. 정확한 조준! ✅
+```
+
+### Line Trace란?
+
+```
+보이지 않는 선을 쏴서
+  ↓
+충돌 확인
+  ↓
+Hit 정보 반환
+```
+
+**용도**: 조준, 시선 체크, 레이캐스트
+
+---
+
+## 🔧 1단계: Collision Preset 수정
+
+### 문제 확인
+
+```
+BP_Bot
+  └─ BotMesh
+      └─ Collision Preset: EnemyMesh
+          └─ Visibility → Ignore ✗
+```
+
+**문제**: Line Trace가 Visibility Channel 사용
+**BP_Bot이 Ignore면 Line Trace가 통과!**
+
+### 해결
+
+```
+Project Settings
+  ↓
+Engine → Collision
+  ↓
+Presets → EnemyMesh
+  ↓
+Edit 클릭
+  ↓
+Visibility → Block ✅
+```
+
+**Accept 클릭!**
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380736/notion-blog/_/_/_5_/_7_-_2/image_7.png)
+
+---
+
+## 🎨 2단계: Line Trace 구성
+
+### FireRifle 함수 시작 부분
+
+```
+FireRifle 함수 열기
+  ↓
+맨 앞에 Line Trace 추가
+  └─ 다른 것보다 먼저!
+```
+
+### Start 위치: 카메라
+
+```
+Camera
+  ↓
+Get World Location
+```
+
+### Get World Location
+
+```
+역할: Scene Component의 월드 위치 가져오기
+Target: Camera (Scene Component)
+출력: Vector (X, Y, Z)
+```
+
+**의미**: 화면 중앙 = 카메라 위치
+
+---
+
+## 🔍 3단계: Debug Sphere (Start)
+
+### 시작점 시각화
+
+```
+Camera → Get World Location
+  ↓
+Draw Debug Sphere
+  ├─ Center: Camera Location
+  ├─ Radius: 5
+  ├─ Line Color: Red
+  ├─ Duration: 60
+  └─ Thickness: 0
+```
+
+### Draw Debug Sphere
+
+```
+역할: 디버그용 구체 그리기
+입력:
+  ├─ Center: Vector (구체 중심)
+  ├─ Radius: Float (반지름)
+  ├─ Line Color: Color (색상)
+  ├─ Duration: Float (표시 시간)
+  └─ Thickness: Float (선 두께)
+```
+
+**용도**: 위치 확인용 (개발 전용)
+
+---
+
+## 📏 4단계: End 위치 계산
+
+### 계산식
+
+```
+End = Camera Location + (Forward Vector × Distance)
+```
+
+### 노드 구조
+
+```
+Camera → Get World Location (시작점)
+  +
+Camera → Get Forward Vector × TraceDistance
+  ↓
+End 위치
+```
+
+### Get Forward Vector
+
+```
+역할: Scene Component의 앞쪽 방향 가져오기
+Target: Camera
+출력: Vector (방향, 길이 = 1)
+```
+
+**Unit Vector**: 길이가 1인 방향 벡터
+
+### Multiply (Vector × Float)
+
+```
+노드: Vector * Float
+입력:
+  ├─ A: Forward Vector (방향)
+  └─ B: TraceDistance (거리)
+출력: 스케일된 벡터
+```
+
+**결과**: Forward × 5000 = 앞으로 5000 유닛
+
+### Add (Vector + Vector)
+
+```
+노드: Vector + Vector
+입력:
+  ├─ A: Camera Location (시작)
+  └─ B: Forward × Distance (오프셋)
+출력: 최종 위치
+```
+
+**결과**: 카메라에서 앞으로 5000 유닛 떨어진 위치
+
+---
+
+## 📦 5단계: TraceDistance 변수
+
+### 변수 생성
+
+```
+Multiply 결과의 Float 핀
+  ↓
+우클릭 → Promote to Variable
+  ↓
+Name: TraceDistance
+Type: Float
+Category: Combat
+Default: 5000
+```
+
+### 왜 변수로?
+
+```
+하드코딩 ✗
+  └─ 수정 어려움
+
+변수 ✓
+  └─ Details 패널에서 쉽게 조정
+```
+
+---
+
+## 🎨 6단계: TraceEnd 로컬 변수
+
+### 로컬 변수 생성
+
+```
+Add 결과 (End 위치)
+  ↓
+우클릭 → Promote to Variable
+  ↓
+Name: TraceEnd
+Scope: Local (함수 내부만)
+```
+
+### 로컬 vs 일반 변수
+
+```
+로컬 변수
+  └─ 함수 내부에서만 사용
+      └─ 다른 곳에서 안 보임
+
+일반 변수
+  └─ 클래스 전체에서 사용
+      └─ 어디서나 접근 가능
+```
+
+---
+
+## 🔍 7단계: Debug Sphere (End)
+
+### 끝점 시각화
+
+```
+TraceEnd
+  ↓
+Draw Debug Sphere
+  ├─ Center: TraceEnd
+  ├─ Radius: 20 (더 큼)
+  ├─ Line Color: Orange
+  ├─ Duration: 60
+  └─ Thickness: 0
+```
+
+**크기를 크게**: 멀리 있어서 잘 보이게!
+
+---
+
+## 🎯 8단계: Line Trace By Channel
+
+### 노드 추가
+
+```
+우클릭
+  ↓
+"Line Trace By Channel" 검색
+```
+
+### 입력 설정
+
+```
+Line Trace By Channel
+  ├─ Start: Camera Location
+  ├─ End: TraceEnd
+  ├─ Trace Channel: Visibility
+  ├─ Trace Complex: False (Simple만)
+  ├─ Actors to Ignore: (비어있음)
+  ├─ Draw Debug Type: For Duration
+  ├─ Draw Time: 60
+  └─ Ignore Self: True ✓
+```
+
+---
+
+## 📊 Line Trace By Channel 파라미터 설명
+
+### Start
+
+```
+의미: Line Trace 시작 위치
+입력: Vector
+예: Camera World Location
+```
+
+### End
+
+```
+의미: Line Trace 끝 위치
+입력: Vector
+예: TraceEnd (5000 유닛 앞)
+```
+
+### Trace Channel
+
+```
+의미: 어떤 Channel로 검사할지
+옵션:
+  ├─ Visibility (기본)
+  └─ Camera
+```
+
+**Visibility**: 대부분의 물체가 Block
+
+### Trace Complex
+
+```
+의미: Complex Collision 사용 여부
+옵션:
+  ├─ True: Triangle Mesh 검사 (느림)
+  └─ False: Simple Collision 검사 (빠름)
+```
+
+**권장**: False (Simple만)
+
+### Actors to Ignore
+
+```
+의미: 무시할 액터 배열
+입력: Array<Actor>
+예: [자기 자신, 팀원 등]
+```
+
+### Ignore Self
+
+```
+의미: 자기 자신 무시
+입력: Boolean
+설정: True ✓
+```
+
+**중요**: 자기 자신에게 맞지 않게!
+
+### Draw Debug Type
+
+```
+의미: 디버그 표시 방식
+옵션:
+  ├─ None: 안 그림
+  ├─ For One Frame: 1프레임만
+  ├─ For Duration: 지정 시간
+  └─ Persistent: 계속
+```
+
+**선택**: For Duration (60초)
+
+### Draw Time
+
+```
+의미: 디버그 표시 시간
+입력: Float (초)
+설정: 60
+```
+
+---
+
+## 📤 Line Trace 출력
+
+### Return Value (Boolean)
+
+```
+True: 뭔가 Hit함
+False: 아무것도 안 Hit함
+```
+
+### Out Hit (Hit Result)
+
+```
+구조체: Hit에 대한 모든 정보
+포함:
+  ├─ Blocking Hit: Boolean (차단 Hit?)
+  ├─ Impact Point: Vector (Hit 위치)
+  ├─ Hit Actor: Actor (Hit된 액터)
+  └─ 기타 많은 정보...
+```
+
+---
+
+## 🧪 첫 테스트
+
+### 결과
+
+```
+Play 실행
+  ↓
+발사
+  ↓
+Debug 확인
+  ├─ 빨간 구체: 카메라 위치
+  ├─ 빨간 선: Line Trace
+  ├─ 작은 사각형: Hit Point
+  └─ 주황 구체: TraceEnd
+```
+
+**성공**: Line Trace 작동! ✅
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380736/notion-blog/_/_/_5_/_7_-_2/image_8.png)
+
+---
+
+## 🎯 9단계: Hit Result 처리
+
+### 문제
+
+```
+하늘을 보고 쏘면?
+  └─ 아무것도 안 Hit
+      └─ Hit Result 비어있음
+```
+
+### 두 가지 경우
+
+```
+Hit 있음 (Blocking Hit = True)
+  └─ Impact Point 사용
+
+Hit 없음 (Blocking Hit = False)
+  └─ TraceEnd 사용
+```
+
+---
+
+## 🔀 10단계: Select Vector 사용
+
+### Select Vector 노드
+
+```
+역할: 조건에 따라 A 또는 B 선택
+입력:
+  ├─ Pick A: Boolean (조건)
+  ├─ A: Vector (True일 때)
+  └─ B: Vector (False일 때)
+출력:
+  └─ Return Value: A 또는 B
+```
+
+### 로직
+
+```
+Select Vector
+  ├─ Pick A: Blocking Hit
+  ├─ A: Impact Point (Hit 있을 때)
+  └─ B: TraceEnd (Hit 없을 때)
+      ↓
+      SET TraceEnd (결과)
+```
+
+---
+
+## 🧩 Select Vector 작동 원리
+
+### 조건 True
+
+```
+Blocking Hit = True
+  ↓
+바닥에 Hit함
+  ↓
+Select Vector → Impact Point
+  ↓
+SET TraceEnd = Impact Point
+```
+
+**결과**: TraceEnd가 Hit 지점으로 업데이트!
+
+### 조건 False
+
+```
+Blocking Hit = False
+  ↓
+하늘로 쏨 (Hit 없음)
+  ↓
+Select Vector → TraceEnd
+  ↓
+SET TraceEnd = TraceEnd (그대로)
+```
+
+**결과**: TraceEnd 변경 없음!
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380736/notion-blog/_/_/_5_/_7_-_2/image_9.png)
+
+---
+
+## 📊 노드 흐름도
+
+### 전체 흐름
+
+```
+Line Trace By Channel
+  │
+  ├── Out Hit
+  │     └── Break Hit Result
+  │           ├── Blocking Hit (Boolean)
+  │           └── Impact Point (Vector)
+  │
+  └── Select Vector
+        ├── Pick A: Blocking Hit
+        ├── A: Impact Point
+        └── B: TraceEnd
+              │
+              └── SET TraceEnd
+```
+
+### Break Hit Result
+
+```
+역할: Hit Result 구조체 분해
+입력: Hit Result
+출력:
+  ├─ Blocking Hit: Boolean
+  ├─ Initial Overlap: Boolean
+  ├─ Impact Point: Vector
+  ├─ Hit Actor: Actor
+  └─ 기타...
+```
+
+---
+
+## 🚀 11단계: 발사체 방향 설정
+
+### 목표
+
+```
+발사체가 TraceEnd를 향하게
+  └─ Spawn 시 Rotation 설정
+```
+
+### 기존 Spawn
+
+```
+Spawn Actor
+  ├─ Class: BP_PlayerBlasterBeam
+  └─ Spawn Transform
+      ├─ Location: Socket Location
+      └─ Rotation: Socket Rotation ✗
+```
+
+**문제**: Socket Rotation은 메시 방향!
+
+---
+
+## 🔧 12단계: Find Look at Rotation
+
+### 노드 추가
+
+```
+우클릭
+  ↓
+"Find Look at Rotation" 검색
+```
+
+### Find Look at Rotation
+
+```
+역할: A에서 B를 보는 Rotation 계산
+입력:
+  ├─ Start: Vector (시작점)
+  └─ Target: Vector (목표점)
+출력:
+  └─ Return Value: Rotator (방향)
+```
+
+### 설정
+
+```
+Find Look at Rotation
+  ├─ Start: Socket Location
+  └─ Target: TraceEnd
+      ↓
+      Spawn Transform Rotation
+
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380734/notion-blog/_/_/_5_/_7_-_2/image_10.png)
+
+---
+
+## 🧩 노드 구조 분석
+
+### Get Socket Transform
+
+```
+역할: 소켓의 Transform 가져오기
+입력:
+  ├─ Target: Bot Mesh
+  ├─ Socket Name: "Rifle_L" 또는 "Rifle_R"
+  └─ Transform Space: RTS World
+출력:
+  ├─ Return Value Location: Vector
+  ├─ Return Value Rotation: Rotator
+  └─ Return Value Scale: Vector
+```
+
+**우클릭 → Split Struct Pin**: 분해
+
+### Spawn Actor 최종 설정
+
+```
+Spawn Actor BP_PlayerBlasterBeam
+  ├─ Spawn Transform Location
+  │   └─ Socket Location
+  │
+  ├─ Spawn Transform Rotation
+  │   └─ Find Look at Rotation
+  │         ├─ Start: Socket Location
+  │         └─ Target: TraceEnd
+  │
+  └─ Spawn Transform Scale
+      └─ 1, 1, 1 (기본)
+```
+
+---
+
+## 🔄 전체 로직 흐름
+
+### FireRifle 함수 전체
+
+```
+1. Camera → Get World Location (Start)
+
+2. Camera → Get Forward Vector × TraceDistance
+   + Camera Location
+   = TraceEnd (초기값)
+
+3. Line Trace By Channel
+   ├─ Start: Camera Location
+   └─ End: TraceEnd
+
+4. Break Hit Result
+   └─ Blocking Hit, Impact Point
+
+5. Select Vector
+   ├─ Pick A: Blocking Hit
+   ├─ A: Impact Point
+   └─ B: TraceEnd
+       ↓
+       SET TraceEnd (최종값)
+
+6. Get Socket Transform
+   └─ Socket Location, Rotation
+
+7. Find Look at Rotation
+   ├─ Start: Socket Location
+   └─ Target: TraceEnd
+       ↓
+       Rotation 계산
+
+8. Spawn Actor
+   ├─ Location: Socket Location
+   └─ Rotation: Find Look at Rotation 결과
+
+9. Spawn System at Location (효과)
+
+10. Play Sound at Location (소리)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380734/notion-blog/_/_/_5_/_7_-_2/image_11.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380734/notion-blog/_/_/_5_/_7_-_2/image_12.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380735/notion-blog/_/_/_5_/_7_-_2/image_13.png)
+
+---
+
+## 🧪 최종 테스트
+
+### 결과
+
+```
+Play 실행
+  ↓
+봇 조준 (십자선)
+  ↓
+발사
+  ↓
+정확히 명중! 🎯
+```
+
+**성공!**
+
+---
+
+## 💡 핵심 개념 정리
+
+### Line Trace
+
+```
+보이지 않는 선을 쏴서
+  ↓
+충돌 검사
+  ↓
+Hit 정보 반환
+```
+
+### Hit Result 처리
+
+```
+Hit 있음 → Impact Point 사용
+Hit 없음 → TraceEnd 사용
+```
+
+### Find Look at Rotation
+
+```
+Start 위치에서
+Target을 보는 방향 계산
+  ↓
+발사체 방향 설정
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380736/notion-blog/_/_/_5_/_7_-_2/image_6.png)
+
+---
+
+## 📚 주요 노드 정리
+
+| 노드                  | 역할                        |
+| --------------------- | --------------------------- |
+| Get World Location    | Scene Component의 월드 위치 |
+| Get Forward Vector    | Scene Component의 앞쪽 방향 |
+| Draw Debug Sphere     | 디버그 구체 그리기          |
+| Line Trace By Channel | 선으로 충돌 검사            |
+| Break Hit Result      | Hit Result 구조체 분해      |
+| Select Vector         | 조건에 따라 Vector 선택     |
+| Find Look at Rotation | A에서 B를 보는 Rotation     |
+| Get Socket Transform  | 소켓의 Transform 가져오기   |
+
+---
+
+## 🎯 실전 팁
+
+### Debug 활용
+
+```
+Draw Debug Sphere
+  └─ 위치 확인
+
+Draw Debug Type
+  └─ Line Trace 시각화
+```
+
+### TraceDistance 조정
+
+```
+가까운 게임: 1000~3000
+먼 게임: 5000~10000
+```
+
+### Trace Channel 선택
+
+```
+Visibility
+  └─ 일반적인 물체
+
+Camera
+  └─ 카메라 전용
+
+Custom
+  └─ 게임 특화
+```
+
+---
+
+## 🔧 실습 체크리스트
+
+```
+✅ EnemyMesh Preset → Visibility Block
+✅ Camera Get World Location
+✅ Draw Debug Sphere (Start)
+✅ Get Forward Vector × TraceDistance
+✅ TraceEnd 변수 생성 (로컬)
+✅ Draw Debug Sphere (End)
+✅ Line Trace By Channel 설정
+✅ Break Hit Result
+✅ Select Vector로 TraceEnd 업데이트
+✅ Get Socket Transform Split
+✅ Find Look at Rotation
+✅ Spawn Actor Rotation 연결
+✅ 테스트
+```
+
+---
+
+## 💡 최종 요약
+
+### 문제
+
+```
+발사체가 메시 방향으로만 날아감
+  └─ 십자선과 불일치
+```
+
+### 해결
+
+```
+1. Line Trace로 십자선 위치 검사
+2. Hit Point 획득
+3. 발사체를 Hit Point 방향으로
+```
+
+### 결과
+
+```
+십자선 = 실제 착탄점
+  └─ 정확한 조준! 🎯
+```
+
+---
+
+## 🎓 보너스: Line Trace 종류
+
+### By Channel
+
+```
+특정 Channel로 검사
+  └─ Visibility, Camera
+```
+
+### By Object Type
+
+```
+특정 Object Type으로 검사
+  └─ Pawn, WorldStatic
+```
+
+### For Objects
+
+```
+여러 Object Type으로 검사
+  └─ [Pawn, Enemy, PhysicsBody]
+```
+
+### Multi
+
+```
+경로의 모든 Hit 반환
+  └─ 관통 효과 구현
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380735/notion-blog/_/_/_5_/_7_-_2/image_14.png)

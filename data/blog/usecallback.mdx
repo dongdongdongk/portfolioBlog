@@ -1,0 +1,233 @@
+---
+title: 'useCallback'
+date: '2026-09-02'
+category: '프론트/React'
+tags: ['프론트', 'React']
+draft: false
+summary: ''
+---
+
+# **useCallback**
+
+## 개념
+
+```jsx
+UseCallback 메모이제이션된 콜백 함수, 즉 이미 생성된 함수를 반환하는 리액트 훅이다.
+
+useMemo 는 특정 결과값을 재사용 할 때 사용하는 반면, useCallback 은 특정 함수를 새로 만들지 않고 재사용하고 싶을때 사용한다.
+```
+
+```jsx
+함수를 선언하는 것 자체는 사실 메모리도,
+
+CPU 도 리소스를 많이 차지 하는 작업은 아니기 때문에 함수를 새로 선언한다고 해서 그 자체 만으로 큰 부하가 생길일은 없지만,
+
+한번 만든 함수를 필요할때만 새로 만들고 재사용하는 것은 여전히 중요하다.
+```
+
+## **메모이제이션**
+
+```jsx
+메모이 제이션이란?
+
+값비싼 함수 호출의 결과를 캐싱하고 동일한 입력이 다시 발생할 때 캐싱된 결과를 반환하는 프로그래밍 기술이다.
+
+이 기술은 동일한 입력으로 여러 번 호출되는 함수 또는 컴포넌트가 있을 때 React에서 유용할 수 있다.
+```
+
+```jsx
+즉, 메모이제이션을 사용하면 동일한 결과를 불필요하게 계산하지 않고, 캐싱된 결과를 반환할 수 있다.
+```
+
+## **React 대표 메모이제이션**
+
+```jsx
+useCallback, useMemo를 사용하면 메모이제이션 훅을 통해 성능을 향상시키고 코드의 복잡성을 줄일 수 있다.
+```
+
+# **useCallback 사용방법**
+
+```jsx
+const memoizedCallback = useCallback(() => {
+  doSomething(a, b)
+}, [a, b])
+
+useCallback 의존성 배열에 있는 상태나 props가 변경되지 않는다면, 해당 함수는 다시 생성되지 않는다.
+```
+
+```jsx
+콜백 함수:
+
+useCallback 훅의 첫 번째 인자로 전달한 함수는 메모이제이션되어 저장된다.
+
+이 함수는 이전에 생성된 것과 동일한 함수를 사용할 수 있게 한다.
+
+의존성 배열:
+
+두 번째 인자로 전달한 의존성 배열에 있는 값들이 변경될 때까지 콜백 함수가 저장되어 있다.
+
+이 배열에 포함된 상태나 props가 변경되지 않으면, useCallback은 이전에 저장된 함수를 그대로 반환한다.
+```
+
+```jsx
+만약 useCallback을 사용하지 않는다면, 아래와 같은 함수는 컴포넌트가 렌더링 될 때마다 새롭게 생성된다.
+
+const sum = () => x + y
+
+하지만, useCallback을 사용하면 컴포넌트가 다시 렌더링 되더라도,
+
+해당 함수가 의존하고 있는 값들이 바뀌지 않는다면 함수를 새로 생성하지 않고 기존 함수를 계속 반환한다.
+
+const add = useCallback(() => x + y, [x, y])
+```
+
+## 예제
+
+```jsx
+const [x, setX] = useState(0)
+const [y, setY] = useState(0)
+
+const add = useCallback(() => x + y, [x, y])
+
+// 이후에 x와 y를 변경하는 코드가 있다고 가정하면:
+setX(5)
+setY(3)
+```
+
+```jsx
+이 코드는 x와 y라는 두 개의 변수를 사용하여 합을 구하는 함수를 add라는 콜백 함수로 정의한다.
+
+그리고 useCallback 훅을 사용하여 이 함수를 메모이제이션한다. 두 번째 매개변수로 전달된 배열 [x, y]은 이 함수가 의존하는 값들을 나타낸다.
+
+이 경우 x와 y가 변경되면서 add 함수가 호출될 때, useCallback에 의해 이전에 생성된 함수가 재사용된다.
+
+새로운 함수가 생성되지 않고 이전에 메모이제이션된 함수가 그대로 반환된다.
+
+이것이 useCallback의 주요 역할 중 하나이다. 함수의 재생성을 방지하고 불필요한 렌더링을 줄여 성능을 최적화한다.
+```
+
+### 각 인자 설명
+
+```jsx
+인자 1번은 함수의 정의를 포함하고 있다.
+
+이 함수는 x와 y 값을 사용하여 합을 계산한다. 이 함수가 add 변수에 할당된다.
+
+( useCallback 함수에 전달되는 함수의 정의이다. 이것은 x와 y를 매개변수로 받아서 그 합을 반환하는 함수이다.
+
+이 함수는 add라는 이름의 변수에 할당된다 )
+
+인자 2번은 의존성 배열을 나타낸다.
+
+이 배열 안에 있는 값들이 변경될 때마다 함수가 재생성된다.
+
+여기서는 x와 y가 의존성 배열로 지정되어 있으므로, x나 y 값이 변경될 때마다 함수가 새로 생성된다.
+```
+
+## **자바스크립트 함수의 동등성**
+
+```jsx
+자바스크립트에서 함수는 객체로 취급이 되기때문에, 함수를 동일하게 만들어도 메모리 주소가 다르면 다른 함수로 간주한다.
+
+바로 메모리 주소에 의한 참조 비교가 일어나기 때문인데,
+
+콘솔창에서 아래와 같이 동일한 코드의 함수를 작성하고 === 연산자로 비교를 해보면 false가 반환된다.
+```
+
+```jsx
+const add1 = () => x + y
+const add2 = () => x + y
+add1 === add2
+false
+```
+
+```jsx
+만약 특정 함수를 다른 함수의 인자로 넘기거나, 자식 컴포넌트의 props로 넘길 때 함수의 참조가 달라서 예상하지 못한 성능 문제가 생길 수 있다.
+
+이 경우, useCallback을 이용해 함수를 특정 조건이 변경되지 않는 이상 재생성하지 못하게 제한하여 함수 동등성을 보장할 수 있다.
+
+(만약 리액트가 함수가 동등하지 않다고 판단한다면 상황에 따라 성능이 악화되거나, 무한루프에 빠지는 등의 문제를 겪을 수 있다.)
+```
+
+## **useEffect를 통해서 해결할 수 있지 않나 ?**
+
+```jsx
+useEffect의 의존성 배열을 이용해서 특정 값을 선언하게 되면 그때마다 함수를 불러오게 되어서 문제가 해결되지 않을까 ?
+```
+
+```jsx
+import React, { useState, useEffect } from 'react'
+
+function Profile({ id }) {
+  const [data, setData] = useState(null)
+
+  const fetchData = () =>
+    fetch(`https://test-api.com/data/${id}`)
+      .then((response) => response.json())
+      .then(({ data }) => data)
+
+  useEffect(() => {
+    fetchData().then((data) => setData(data))
+  }, [fetchData])
+
+  // ...
+}
+```
+
+```jsx
+BUT !!
+
+언뜻 보면 페이지가 마운트 되었을 때 데이터 가져오는 fetchData 함수를 호출해 데이터를 잘 가져오는 듯 보인다.
+
+하지만, 위에서 설명한듯이 함수의 동등성 문제 때문에 예상치 못한 무한루프에 빠지게 된다.
+
+fetchData는 함수이기 때문에 id 값에 관계없이 컴포넌트가 렌더링 될 때마다 새로운 참조값으로 변경이 된다.
+
+함수가 변경되었으므로, 매번 useEffect가 실행되어 다시 렌더링이 되고 무한루프에 빠지게 된다.
+```
+
+## **이를 useCallback을 통해서 해결 할 수 있게 된다.**
+
+```jsx
+import React, { useState, useEffect } from 'react'
+
+function Profile({ id }) {
+  const [data, setData] = useState(null)
+
+  const fetchData = useCallback(
+    () =>
+      fetch(`https://test-api.com/data/${id}`)
+        .then((response) => response.json())
+        .then(({ data }) => data),
+    [id]
+  )
+
+  useEffect(() => {
+    fetchData().then((data) => setData(data))
+  }, [fetchData])
+
+  // ...
+}
+```
+
+```jsx
+이렇게 useCallback 훅을 사용하면, 컴포넌트가 다시 렌더링 되더라도 fetchData 함수의 참조값을 동일하게 유지시킨다.
+
+따라서, useEffect에 의존성 배열 값에 있는 fetchData 함수는 id 값이 변경되지 않는 한, 재호출되지 않는다.
+```
+
+## **useCallback 주의할 점**
+
+```jsx
+useCallback 훅으로 함수 재생성을 방지하고, 참조 동등성을 보장하여 성능을 향상시킬 순 있다.
+
+하지만 모든 함수마다 useCallback을 사용하는 것은 오히려 성능을 악화시키고 가독성을 해칠 수 있다.
+
+가끔 React 컴포넌트 내에서 선언하는 모든 함수에 useCallback를 사용하는 경우가 있다.
+
+일반적으로 소프트웨어의 성능 최적화에는 그에 상응하는 대가가 있는데,
+
+(예를 들어 코드가 복잡해지거나 메모리를 사용하거나,
+
+유지보수가 어려워지는 등) 모든 함수에 useCallback을 사용하는 것은 오히려 성능을 악화시킬 수 있다.
+```

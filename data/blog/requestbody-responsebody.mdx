@@ -1,0 +1,242 @@
+---
+title: '@RequestBody / @ResponseBody 어노테이션'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# 필요한 이유?
+
+```java
+웹페이지에서 json으로 요청한(request) 파라미터를 java 에서 받으려면 java Object로의 변환이 일어나야 한다
+
+response 시에도 java Object를 json으로 변환이 필요하다.
+
+위 역할을 해주는 것이 ResponseBody / RequestBody이다. 두 어노테이션을 통해 JSON이나 key/value, XML 형태로 데이터를 송수신 할 수 있다.
+```
+
+# 요청(request)/응답(response)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381125/notion-blog/_/_/_/_RequestBody_ResponseBody_/Untitled.png)
+
+```java
+클라이언트에서 서버로 통신하는 메시지를 요청(request) 메시지
+
+서버에서 클라이언트로 통신하는 메시지를 응답(response) 메시지 라고 한다.
+```
+
+```java
+웹에서 화면전환(새로고침) 없이 이루어지는 동작들은 대부분 비동기 통신으로 이루어진다.
+
+비동기통신을 하기위해서는 클라이언트에서 서버로 요청 메세지를 보낼 때, 본문에 데이터를 담아서 보내야 하고,
+
+서버에서 클라이언트로 응답을 보낼때에도 본문에 데이터를 담아서 보내야 한다.
+
+**이 본문이 바로 body 이다.
+
+즉, 요청본문 requestBody, 응답본문 responseBody 을 담아서 보내야 한다.**
+
+이때 본문에 담기는 데이터 형식은 여러가지 형태가 있겠지만 가장 대표적으로 사용되는 것이 JSON 이다.
+
+즉, 비동기식 클라-서버 통신을 위해 JSON 형식의 데이터를 주고받는 것이다.
+```
+
+# @RequestBody,@ResponseBody
+
+## @RequestBody
+
+```java
+@RequestBody
+HTTP body 안에 JSON을 VO에 맵핑하는 스프링 어노테이션
+
+HTTP 요청을 자바 객체로 전달받을 수 있다.
+
+일반적인 GET/POST의 요청 파라미터라면 @RequestBody를 사용할 일이 없을 것이다.
+
+반면에 xml이나 json기반의 메시지를 사용하는 요청의 경우에 이 방법이 매우 유용하다.
+
+HTTP 요청의 바디내용을 통째로 자바객체로 변환해서 매핑된 메소드 파라미터로 전달해준다.
+
+@RequestBody은 위의 설명에 덧붙여 언제쓰는지 이렇게 쓸 수 있을 것 같다.
+
+HTTP 요청 몸체는 언제쓸까? ajax통신과 같은 경우에 쓴다.
+
+그러니까 HTTP 요청 몸체를 자바 객체로 변환한다는 말의 의미는
+
+ajax와 통신할때 var param = {"memberId":memberId, "memberPass":inputPass}와 같은 (JSON 타입)
+
+파라미터를 컨트롤러에 보내면 저 어노테이션을 통해 자바 객체로 바꿔쓸 수 있고,(이렇게 안쓰면 에러남)
+
+그래서 MemberVO과 알아서 자동으로 바인딩된다는 의미이다.
+
+즉, ajax에서 파라미터를 받아올때 컨트롤러에서 저 어노테이션을 쓰면 되는구나, 라고 이해하면 쉽다.
+```
+
+### 예제
+
+```java
+@Controller
+public class UserController {
+
+    @RequestMapping(value = "/ajaxTest.do", method = RequestMethod.POST)
+    @ResponseBody
+    public ResponseEntity<Map<String, String>> ajaxTest(@RequestBody UserVO getUserVO) throws Exception {
+        // 클라이언트에서 전달된 데이터를 사용
+        String userId = getUserVO.getId();
+
+        // 응답 데이터 생성
+        Map<String, String> response = new HashMap<>();
+        response.put("message", "성공적으로 데이터를 받았습니다. 사용자 ID: " + userId);
+
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+}
+```
+
+```jsx
+!DOCTYPE html>
+<html>
+<head>
+    <title>Ajax 예시</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <button id="sendRequest">서버에 데이터 보내기</button>
+    <div id="result"></div>
+
+    <script>
+        $(document).ready(function() {
+            $("#sendRequest").click(function() {
+                var dataToSend = {
+                    id: 123,
+                    name: "John Doe"
+                };
+
+                // Ajax 요청 보내기
+                $.ajax({
+                    url: "/ajaxTest.do",
+                    type: "POST",
+                    contentType: "application/json;charset=UTF-8",
+                    data: JSON.stringify(dataToSend),
+                    success: function(response) {
+                        // 서버에서 받은 응답을 처리
+                        $("#result").html("서버 응답: " + response.message);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
+```
+
+## @ResponseBody
+
+```java
+@ResponseBody
+VO객체를 JSON으로 바꿔서 HTTP body에 담는 스프링 어노테이션
+
+메서드의 return 값을 HTTP Response body에 담는 역할을 한다.
+
+@ResponseBody는 위의 설명에 덧붙여 언제쓰는지 이렇게 쓸 수 있을 것 같다.
+
+자바 객체를 HTTP 요청 몸체로 변환한다는 말이 어렵지만
+
+그냥 리턴값을 쓸때 매핑URL이름이 아니라, 그 자체의 String이 결과가 된다는 점을 알면 된다.
+
+즉, 저 어노테이션을 쓰면 return "/result"는 컨트롤러에서 /result라는 url을 찾으라는 의미가 아니라
+
+"/result"라는 String을 반환하라는 것이다.
+
+즉, 내가 어떤 상황으로 인해 url을 통해 뷰로 가는게 아니라 Stirng 자체를 반환하고 싶을때 쓰면된다.
+```
+
+### 예제
+
+```java
+@ResponseBody
+@RequestMapping(value = "/ajaxTest.do")
+public UserVO ajaxTest() throws Exception {
+
+  UserVO userVO = new UserVO();
+  userVO.setId("테스트");
+
+  return userVO;
+}
+```
+
+```jsx
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ajax 예시</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <button id="getData">데이터 가져오기</button>
+    <div id="result"></div>
+
+    <script>
+        $(document).ready(function() {
+            $("#getData").click(function() {
+                // Ajax 요청 보내기
+                $.ajax({
+                    url: "/ajaxTest.do",
+                    type: "GET",
+                    dataType: "json", // 서버가 JSON 응답을 반환한다고 명시
+                    success: function(response) {
+                        // 서버에서 받은 JSON 응답을 처리
+                        var id = response.id;
+                        $("#result").html("서버 응답: 사용자 ID - " + id);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
+```
+
+# @RestController
+
+## @RestController
+
+```java
+@RestController
+매번 메소드마다 @ResponseBody를 써주기 귀찮을 때 RestController를 써준다면 리턴값에 자동으로 ResponseBody가 붙어 리턴 되기 때문에 별도로 쓰지 않아도 HTTP Response body에 자동으로 자바 객체가 매핑되어 전달된다.
+
+즉, Controller + ReqeustBody 이다.
+
+@Controller와는 다르게 @RestController는 리턴값에 자동으로 @ResponseBody가 붙게되어 별도 어노테이션을 명시해주지 않아도 HTTP 응답데이터(body)에 자바 객체가 매핑되어 전달 된다.
+
+@Controller인 경우에 바디를 자바객체로 받기 위해서는 @ResponseBody 어노테이션을 반드시 명시해주어야한다.
+```
+
+### 사용예시
+
+```java
+비동기 통신에 사용되기 때문에 주로 Ajax통신에 많이 사용됨.
+
+다음 예시의 메서드는 Json타입의 Ajax데이터를 파라미터 boardVO로 받아 가공 후 다시 JSON 형태로 리턴하는 메서드이다.
+
+	@ResponseBody
+	@RequestMapping(value = "/{boardNo}", method = RequestMethod.PUT)
+	public String test(@PathVariable("boardNo") int boardNo ,@RequestBody BoardVO boardVO){
+			boardVO.setName("예시입니당.");
+            return boardVO.getName;
+	}
+```
+
+# @RequestBody / @ResponseBody 최종 정리
+
+```java
+**클라이언트에서 -> 서버로** @RequestBody
+
+필요한 데이터를 요청하기 위해 JSON 데이터를 요청 본문에 담아서 서버로 보내면, 서버에서는 @RequestBody 어노테이션을 사용하여 HTTP 요청 본문에 담긴 값들을 자바객체로 변환시켜, 객체에 저장한다.
+
+**서버에서 -> 클라이언트로** @ResponseBody
+
+응답 데이터를 전송하기 위해 @ResponseBody 어노테이션을 사용하여 자바 객체를 HTTP 응답 본문의 객체로 변환하여 클라이언트로 전송한다.
+```

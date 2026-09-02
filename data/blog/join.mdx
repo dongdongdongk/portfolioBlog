@@ -1,0 +1,302 @@
+---
+title: '오라클-join'
+date: '2026-09-02'
+category: '백엔드/Database'
+tags: ['백엔드', 'Database']
+draft: false
+summary: ''
+---
+
+```sql
+조인은 두 개의 테이블을 서로 묶어서 하나의 결과를 만들어 내는 것을 말한다.
+INNER JOIN(내부 조인)은 두 테이블을 조인할 때, 두 테이블에 모두 지정한 열의 데이터가 있어야 한다.
+OUTER JOIN(외부 조인)은 두 테이블을 조인할 때, 1개의 테이블에만 데이터가 있어도 결과가 나온다.
+CROSS JOIN(상호 조인)은 한쪽 테이블의 모든 행과 다른 쪽 테이블의 모든 행을 조인하는 기능이다.
+SELF JOIN(자체 조인)은 자신이 자신과 조인한다는 의미로, 1개의 테이블을 사용한다.
+```
+
+```sql
+Join 조건
+	1. ON
+		- 조인 조건 명시
+		- () 생략 가능
+		- 컬럼명이 다를 수 도 있음
+		- AND 연산자를 사용가능
+
+	2. USING
+		- 조인 조건의 컬럼명이 같을 경우 ON 대신 사용
+		- USING(조인조건으로 사용할 컬럼명)
+		- 테이블은 명시하지 않음  : USING(D.DEPARTMENT_ID) X, USING(DEPARTMENT_ID) O
+		- 공통 컬럼명이 조인 조건이 되었을 경우 SELECT에 사용 할 때는 테이블명을 명시 하지 않음
+		- AND 연산자 사용 불가능
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380953/notion-blog/_/Database/Oracle/_-join/Untitled.png)
+
+```sql
+1. Inner Join
+	 - 조인 조건을 만족하는 컬럼 기준 조회
+	 - 테이블간의 공통 컬럼의 값이 같은 것을 연결하는 조인 방법
+	 - NULL은 조회결과에서 제외
+
+**문법**
+
+**SELECT <열 목록>
+ FROM <첫 번째 테이블>
+          INNER JOIN <두 번째 테이블>
+          ON <조인될 조건>
+ [WHERE 검색 조건]**   -- 없어도 상관없음
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380952/notion-blog/_/Database/Oracle/_-join/Untitled_1.png)
+
+위의 예제는 EMP 테이블과 DEPT 테이블을 조인(내부 조인)하여 DEPT 테이블의 DNAME(부서명)을 조회한 쿼리이다.
+
+조인(INNER JOIN)은 메인 테이블과 조인 테이블에 조인 칼럼(deptno)의 값이 **동시에 존재해야** 조회가 된다.
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380951/notion-blog/_/Database/Oracle/_-join/Untitled_2.png)
+
+위의 조인 구조를 보면 EMP 테이블의 **"GENT"**
+는 DEPT 테이블과 조인이 안되었기 때문에 데이터 조회에서 제외된다
+
+```sql
+**예제**
+
+-- 사원 번호가 100인 사원의 이름, 부서명 출력
+-- 서로다른 테이블의 컬럼을 한번에 보고싶을때 사용
+-- WHERE 에도 사용가능 AND로 ON에 합쳐서 사용가능
+SELECT E.FIRST_NAME , D.DEPARTMENT_NAME, E.DEPARTMENT_ID
+FROM EMPLOYEES E
+	 INNER JOIN
+	 DEPARTMENTS D
+	 ON (E.DEPARTMENT_ID = D.DEPARTMENT_ID AND E.EMPLOYEE_ID = 100) --WHERE 에도 사용가능
+WHERE E.EMPLOYEE_ID = 100;
+
+--------------------------------------------------------------------------------------
+
+-- NATURAL JOIN --- 조인 조건의 컬럼명 같을 경우 사용하는 JOIN
+								-- 조인 조건을 명시하지 않음
+SELECT FIRST_NAME , DEPARTMENT_NAME, DEPARTMENT_ID
+FROM EMPLOYEES E
+	 NATURAL JOIN
+	 DEPARTMENTS D
+WHERE EMPLOYEE_ID = 100;
+
+--------------------------------------------------------------------------------------
+
+--부서번호가 30번인 부서에 근무하는 사원의 정보(이름,월급,부서명,부서id,도시명,나라명,대륙명) 출력
+SELECT E.FIRST_NAME, E.SALARY, D.DEPARTMENT_ID, D.DEPARTMENT_NAME, L.CITY, C.COUNTRY_NAME,r.REGION_NAME
+FROM DEPARTMENTS D
+	 INNER JOIN
+	 EMPLOYEES E
+	 ON (E.DEPARTMENT_ID = D.DEPARTMENT_ID)
+	 INNER JOIN
+	 LOCATIONS L
+	 ON (D.LOCATION_ID = L.LOCATION_ID)
+	 INNER JOIN
+	 COUNTRIES C
+	 ON (L.COUNTRY_ID = C.COUNTRY_ID)
+	 INNER JOIN
+	 REGIONS R
+	 ON (c.REGION_ID = r.REGION_ID)
+WHERE D.DEPARTMENT_ID = 30;
+```
+
+```sql
+쿼리문 예제
+
+SELECT customers.customer_name, orders.order_date
+FROM customers
+INNER JOIN orders ON customers.customer_id = orders.customer_id;
+
+1. customers와 orders 테이블을 customer_id 컬럼을 기준으로 Inner Join
+
+2. customers 테이블의 customer_name 컬럼과 orders 테이블의 order_date 컬럼을 출력
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380951/notion-blog/_/Database/Oracle/_-join/Untitled_3.png)
+
+```sql
+
+Outer Join
+	- 조인 조건을 만족하지 않는 경우에 조회가 X
+	- 조인 조건을 만족하지 않더라도 조회 하고자 하는 경우
+	- 데이터가 있는 방향을 지정
+	- 테이블이 선언된 순서
+	- 왼쪽에 데이터가 있는 경우   : LEFT
+	- 오른쪽에 데이터가 있는 경우 : RIGHT
+	- 두 방향 전부               : FULL
+	- 단, FULL Join은  ANSI 표준 문법에만 존재 함
+		Oracle 문법에는 X
+
+LEFT OUTER JOIN: 왼쪽 테이블의 모든 값이 출력되는 조인
+RIGHT OUTER JOIN: 오른쪽 테이블의 모든 값이 출력되는 조인
+FULL OUTER JOIN: 왼쪽 또는 오른쪽 테이블의 모든 값이 출력되는 조인
+
+**문법
+
+SELECT <열 목록>
+ FROM <첫 번째 테이블(LEFT 테이블)>
+          <LEFT | RIGHT | FULL> OUTER JOIN <두 번째 테이블(RIGHT 테이블)>
+           ON <조인될 조건>
+ [WHERE 검색 조건]**
+```
+
+```sql
+**예제**
+
+SELECT D.DEPARTMENT_NAME, E.FIRST_NAME , E.SALARY , E.HIRE_DATE
+FROM DEPARTMENTS D
+	 LEFT OUTER JOIN
+	 EMPLOYEES E
+	 ON (D.MANAGER_ID = E.EMPLOYEE_ID);
+```
+
+## LEFT OUTER JOIN
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380951/notion-blog/_/Database/Oracle/_-join/Untitled_4.png)
+
+**조인 테이블의 값이 존재하지 않아도**
+ 메인 테이블의 데이터가 조회된다. 조인 테이블의 값을 가져오지 못하면 NULL로 표시된다.
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380951/notion-blog/_/Database/Oracle/_-join/Untitled_5.png)
+
+## RIGHT OUTER JOIN
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380953/notion-blog/_/Database/Oracle/_-join/Untitled_6.png)
+
+RIGHT OUTER JOIN은 LEFT OUTER JOIN과 동일한 아우터 조인이며, 다른 점은 오른쪽(RIGHT) 테이블이 메인 테이블이 된다.
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380953/notion-blog/_/Database/Oracle/_-join/Untitled_7.png)
+
+## FULL OUTER JOIN
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380953/notion-blog/_/Database/Oracle/_-join/Untitled_8.png)
+
+풀 아우터 조인은 ANSI JOIN에서만 사용 가능하고 Oracle Join에서는 사용할 수 없다. 자주 사용하는 조인 방법은 아니기 때문에 개념만 이해하자
+
+```sql
+Natural Join
+	- Inner Join과 비슷
+	- 조인 조건의 컬럼명 같을 경우 사용하는 JOIN
+	- 조인 조건을 명시하지 않음
+	- 공통 컬럼명이 조인 조건이 되었을 경우 SELECT에 사용 할 때는 테이블명을 명시 하지 않음
+
+Self Join
+	- 같은 테이블을 JOIN
+	- A 테이블과 A 테이블을 JOIN
+	- 별칭을 이용해서 다른 테이블로 인식
+	- SELF 키워드는 없음
+	- 일반적인 JOIN 키워드 사용
+
+CARTESIAN JOIN(CROSS JOIN)
+	- 조인 조건이 없을 때 또는 잘못 적용 했을 때
+	- ON 조건이 없는 경우(안쓴 경우)
+```
+
+- JOIN 예제
+
+  ```sql
+  ---JOIN	---------------------------------------------------------------
+  --FROM 에는 하나만 올 수 있지만 오라클에서는 두가지 사용가능
+  SELECT DEPARTMENT_NAME, FIRST_NAME
+  FROM DEPARTMENTS, EMPLOYEES;
+
+  -- 사원 번호가 100인 사원의 이름, 부서명 출력
+  -- 서로다른 테이블의 컬럼을 한번에 보고싶을때 사용
+  -- WHERE 에도 사용가능 AND로 ON에 합쳐서 사용가능
+  SELECT E.FIRST_NAME , D.DEPARTMENT_NAME, E.DEPARTMENT_ID
+  FROM EMPLOYEES E
+  	 INNER JOIN
+  	 DEPARTMENTS D
+  	 ON (E.DEPARTMENT_ID = D.DEPARTMENT_ID AND E.EMPLOYEE_ID = 100)
+  WHERE E.EMPLOYEE_ID = 100;
+
+  -- NATURAL JOIN
+  SELECT FIRST_NAME , DEPARTMENT_NAME, DEPARTMENT_ID
+  FROM EMPLOYEES E
+  	 NATURAL JOIN
+  	 DEPARTMENTS D
+  WHERE EMPLOYEE_ID = 100;
+
+  --부서번호가 30번인 부서에 근무하는 사원의 정보(이름,월급,부서명,부서id,도시명,나라명,대륙명) 출력
+  SELECT E.FIRST_NAME, E.SALARY, D.DEPARTMENT_ID, D.DEPARTMENT_NAME, L.CITY, C.COUNTRY_NAME,r.REGION_NAME
+  FROM DEPARTMENTS D
+  	 INNER JOIN
+  	 EMPLOYEES E
+  	 ON (E.DEPARTMENT_ID = D.DEPARTMENT_ID)
+  	 INNER JOIN
+  	 LOCATIONS L
+  	 ON (D.LOCATION_ID = L.LOCATION_ID)
+  	 INNER JOIN
+  	 COUNTRIES C
+  	 ON (L.COUNTRY_ID = C.COUNTRY_ID)
+  	 INNER JOIN
+  	 REGIONS R
+  	 ON (c.REGION_ID = r.REGION_ID)
+  WHERE D.DEPARTMENT_ID = 30;
+
+  ---------------------------------------------------------------------------------------------------------------
+  SELECT
+  FROM EMPLOYEES E
+  	 INNER JOIN
+  	 DEPARTMENTS
+
+
+  ----USING
+  -- JOIN 조건 중 컬럼명이 같을경우 사용
+  --USING에 사용한 컬럼명은 사용시 테이블명의 식별자를 사용하지 않는다.
+
+  SELECT E.FIRST_NAME , D.DEPARTMENT_NAME, DEPARTMENT_ID
+  FROM EMPLOYEES E
+  	 INNER JOIN
+  	 DEPARTMENTS D
+  	 USING(DEPARTMENTS_ID -- AND E.EMPLOYEE_ID --USING에서는 AND 사용불가)
+  WHERE E.EMPLOYEE_ID = 100;
+
+  -- 30번 부서에 근무하는 사원들 중, 가장 월급이 많은 사원의 월급보다 많이 받는 사원들의
+  -- 이름, 월급, 부서명, 도시명을 출력
+  SELECT E.FIRST_NAME , E.SALARY , D.DEPARTMENT_NAME , L.CITY
+  FROM EMPLOYEES E
+  	 INNER JOIN
+  	 DEPARTMENTS D
+  	 USING (DEPARTMENTS_ID)
+  	 INNER JOIN
+  	 LOCATIONS L
+  	 USING (LOCATIONS_ID)
+  WHERE E.SALARY > (
+  					SELECT MAX(SALARY)
+  					FROM EMPLOYEES
+  					WHERE DEPARTMENT_ID = 30
+  				 )
+
+  -- 사원들의 이름, 월급, 입사일, 매니저의 이름, 매니저의 월급, 매니저의 입사일
+  -- SELF JOIN 문법은 아닌 개념 (EMPLOYEES 2번)
+  SELECT E.FIRST_NAME, E.SALARY,E.HIRE_DATE, M.FIRST_NAME , M.SALARY , M.HIRE_DATE
+  FROM EMPLOYEES E
+  	 INNER JOIN
+  	 EMPLOYEES M
+  	 ON (E.MANAGER_ID = M.EMPLOYEE_ID);
+
+  -- 부서명, 부서관리자의 이름, 월급, 입사일
+  -- Outer join
+
+  SELECT D.DEPARTMENT_NAME, E.FIRST_NAME , E.SALARY , E.HIRE_DATE
+  FROM DEPARTMENTS D
+  	 LEFT OUTER JOIN
+  	 EMPLOYEES E
+  	 ON (D.MANAGER_ID = E.EMPLOYEE_ID);
+
+  ---최소 급여가 8200, 최대급여 16000 사이에 속하는 job_title 과 사원의 id,급여
+  -- 대부분의 join 은 equal JOIN
+  SELECT E.EMPLOYEE_ID , E.SALARY , j.JOB_TITLE
+  FROM EMPLOYEES E
+  	 INNER JOIN
+  	 JOBS J
+  	 ON E.SALARY BETWEEN 8200 AND 16000;
+
+  SELECT FIRST_NAME ,
+  FROM EMPLOYEES
+  WHERE DEPARTMENT_ID = 30;
+
+  ```

@@ -1,0 +1,184 @@
+---
+title: '@Transactional'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+```java
+트랜잭션은 데이터베이스의 상태를 변화시키기 위해
+
+수행하는 일련의 작업들을 하나의 단위로 묶어서 처리하는 것
+
+@Transactional 어노테이션을 사용하면 해당 메소드는 하나의 트랜잭션 단위로 처리됨.
+
+즉, 메소드 내에서 수행된 모든 작업이 성공적으로 처리되면 DB에 commit이 되고,
+
+만약 예외가 발생하면 rollback이 되어 모든 작업이 취소됨
+```
+
+## 1. 트랜잭션 롤백 처리
+
+```java
+@Service
+public class OrderService {
+
+    @Autowired
+    private OrderDAO orderDAO;
+
+    @Transactional(rollbackFor = Exception.class)
+    public void saveOrder(Order order) throws Exception {
+        orderDAO.insertOrder(order);
+        orderDAO.insertOrderItem(order.getOrderItems());
+    }
+}
+```
+
+```java
+예시 코드는 주문 정보를 저장할 때 사용됨.
+
+@Transactional(rollbackFor = Exception.class) 어노테이션은 메소드가 실행되는 도중에
+
+예외가 발생하면 해당 메소드에서 실행한 모든 데이터베이스 작업을 롤백시키는 역할을 함.
+
+따라서 예외 발생 시 주문 정보와 관련된 모든 데이터가 롤백됨.
+```
+
+## 2. 여러 메소드의 트랜잭션 묶기
+
+### 예제1
+
+```java
+@Service
+@Transactional
+public class UserService {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    public void updateUsers(List<User> users) {
+        for (User user : users) {
+            userRepository.save(user);
+        }
+    }
+
+    public void deleteUsers(List<User> users) {
+        for (User user : users) {
+            userRepository.delete(user);
+        }
+    }
+
+}
+```
+
+```java
+UserService 클래스에서 updateUsers()와 deleteUsers() 메소드를 사용하여
+
+여러 개의 User 객체를 업데이트하고, 삭제하는 예제.
+
+UserService 클래스에 @Transactional 어노테이션을 추가하여 이들 메소드를
+
+하나의 트랜잭션으로 묶어 처리할 수 있다.
+```
+
+### 예제2
+
+```java
+@Service
+@Transactional
+public class UserService {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    public void updateUsers(List<User> users) {
+        for (User user : users) {
+            userRepository.save(user);
+        }
+    }
+
+    public void deleteUsers(List<User> users) {
+        for (User user : users) {
+            userRepository.delete(user);
+        }
+    }
+
+    public void updateAndDeleteUsers(List<User> updateUsers, List<User> deleteUsers) {
+        updateUsers(updateUsers);
+        deleteUsers(deleteUsers);
+    }
+
+}
+```
+
+```java
+위 코드는 updateAndDeleteUsers() 메소드를 추가하여,
+
+updateUsers()와 deleteUsers() 메소드를 순서대로 호출하여
+
+하나의 트랜잭션으로 묶어 처리하는 예제이다.
+```
+
+### 예제3
+
+```java
+@Service
+public class UserService {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Transactional
+    public void updateUsers(List<User> users) {
+        for (User user : users) {
+            userRepository.save(user);
+        }
+    }
+
+    @Transactional
+    public void deleteUsers(List<User> users) {
+        for (User user : users) {
+            userRepository.delete(user);
+        }
+    }
+
+}
+```
+
+```java
+위 코드는 updateUsers()와 deleteUsers() 메소드에
+
+@Transactional 어노테이션을 직접 추가하는 예제이다.
+
+이 경우에도 updateUsers()와 deleteUsers() 메소드가 각각 하나의 트랜잭션으로 처리된다.
+```
+
+## 3. 읽기 전용 트랜잭션 설정
+
+```java
+@Service
+public class ProductService {
+
+    @Autowired
+    private ProductDAO productDAO;
+
+    @Transactional(readOnly = true)
+    public List<Product> getAllProducts() {
+        return productDAO.selectAllProducts();
+    }
+}
+```
+
+```java
+위의 예시 코드는 데이터베이스에 쓰는 작업이 아닌 읽기 작업만 수행하는 경우,
+
+@Transactional(readOnly = true) 어노테이션을 사용해 읽기 전용 트랜잭션을 설정한다.
+
+이렇게 설정한 메소드에서는 데이터베이스의 데이터를 읽기만 하고 변경하지 않으므로,
+
+해당 메소드에서 수행한 작업은 롤백할 필요가 없다.
+
+따라서 성능 향상을 위해 읽기 전용 트랜잭션을 사용하는 것이 좋다.
+```

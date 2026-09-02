@@ -1,0 +1,424 @@
+---
+title: '7단원: Game Sync 프로파일링'
+date: '2026-09-02'
+category: '게임 개발/WWISE'
+tags: ['게임 개발', 'WWISE']
+draft: false
+summary: ''
+---
+
+# { 🎧 Game Sync 프로파일링 이해하기 }
+
+## 📋 목차
+
+1. [Game Sync와 사운드 관계](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#game-sync%EC%99%80-%EC%82%AC%EC%9A%B4%EB%93%9C-%EA%B4%80%EA%B3%84)
+2. [여러 값이 동시에 사운드에 영향을 줄 때 문제](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#%EC%97%AC%EB%9F%AC-%EA%B0%92%EC%9D%B4-%EB%8F%99%EC%8B%9C%EC%97%90-%EC%82%AC%EC%9A%B4%EB%93%9C%EC%97%90-%EC%98%81%ED%96%A5%EC%9D%84-%EC%A4%84-%EB%95%8C-%EB%AC%B8%EC%A0%9C)
+3. [Wwise 레이아웃 재배치하기](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#wwise-%EB%A0%88%EC%9D%B4%EC%95%84%EC%9B%83-%EC%9E%AC%EB%B0%B0%EC%B9%98%ED%95%98%EA%B8%B0)
+4. [Voice Profiler로 속성 값 확인하기](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#voice-profiler%EB%A1%9C-%EC%86%8D%EC%84%B1-%EA%B0%92-%ED%99%95%EC%9D%B8%ED%95%98%EA%B8%B0)
+5. [Profiler 레이아웃으로 게임 호출 모니터링하기](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#profiler-%EB%A0%88%EC%9D%B4%EC%95%84%EC%9B%83%EC%9C%BC%EB%A1%9C-%EA%B2%8C%EC%9E%84-%ED%98%B8%EC%B6%9C-%EB%AA%A8%EB%8B%88%ED%84%B0%EB%A7%81%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. Game Sync와 사운드 관계
+
+- **Game Sync**란: 게임에서 발생하는 특정 값(상태, 변수 등)에 따라 오디오가 동적으로 반응하도록 연결하는 시스템.
+- Cube 게임 예시:
+  - **심장 박동 사운드**
+    - 볼륨은 두 가지 값에 영향을 받음
+      1. 플레이어가 **살아 있는지/패배했는지** 여부 (State)
+      2. 플레이어의 **체력(PlayerHealth)** (RTPC)
+  - **발자국 사운드**
+    - 플레이어가 걷는 **표면 종류(Surface Type)**에 따라 달라짐 (Switch)
+
+👉 여러 Game Sync가 동시에 사운드에 영향을 주면, 왜 특정 사운드가 의도와 다르게 들리는지 이해하기 어려워질 수 있음.
+
+---
+
+## 2. 여러 값이 동시에 사운드에 영향을 줄 때 문제
+
+- 사운드가 **제대로 안 들리거나**, **예상과 다르게 작동**할 때 원인이 무엇인지 추적이 필요함.
+- 예시 문제:
+  - 심장 박동 소리가 아예 안 들린다 → 체력이 0인데 PlayerLife State도 패배 상태라서 둘이 충돌했을 가능성.
+  - 발자국 소리가 특정 표면에서만 안 난다 → Switch 값이 잘못 들어왔을 수 있음.
+- 이런 문제를 빠르게 찾아내려면 **프로파일링 도구**를 사용해야 함.
+
+---
+
+## 3. Wwise 레이아웃 재배치하기
+
+- **레이아웃(Layout)**: Wwise에서 창(탭) 구성을 어떻게 배치할지 정의한 것.
+- 필요성:
+  - **여러 속성을 동시에** 보면서 문제를 진단해야 하는 경우가 많음.
+  - 예를 들어, **심장 박동 오브젝트의 볼륨 속성**과 **Game Sync 적용 상태**를 나란히 보고 싶을 때.
+- 방법:
+  - 두 개의 속성 탭(Properties)을 동시에 열 수 있도록 레이아웃을 변경.
+  - 예시: 한쪽은 Actor-Mixer Hierarchy 속성, 다른 한쪽은 State/RTPC 탭.
+
+---
+
+## 4. Voice Profiler로 속성 값 확인하기
+
+- **Voice Profiler**: 실제 게임 플레이 중 재생되는 사운드의 속성 값을 실시간으로 확인하는 기능.
+- 주요 확인 가능 항목:
+  - 현재 어떤 사운드가 재생 중인지
+  - 적용된 RTPC 값이 얼마인지
+  - State/ Switch 값이 정상적으로 반영되고 있는지
+- 활용 예시:
+  - "심장 박동 소리가 너무 작게 들린다" → Voice Profiler에서 RTPC 값이 체력에 맞게 적용되고 있는지 확인.
+
+---
+
+## 5. Profiler 레이아웃으로 게임 호출 모니터링하기
+
+- **Profiler 레이아웃**: 게임이 실행되는 동안 Wwise와 연결해 **게임 호출(Game Calls)**을 모니터링하는 기능 제공.
+- 모니터링 가능한 요소:
+  - **Event 호출 기록** (Play, Stop 등)
+  - **RTPC 값 변화** (체력 수치가 정확히 전달되는지)
+  - **State 전환** (Alive ↔ Defeated가 정상적으로 바뀌는지)
+  - **Switch 변경** (Surface Type이 올바르게 전달되는지)
+- 장점:
+  - "게임에서 값이 Wwise로 잘 전달되고 있는지"를 바로 확인 가능.
+  - 문제의 원인이 **게임 쪽 코드 전달 문제인지**, **Wwise 내 설정 문제인지** 빠르게 구분할 수 있음.
+
+---
+
+✅ **정리**
+
+- Cube 게임에서 사운드는 여러 Game Sync 값(State, RTPC, Switch)에 의해 제어된다.
+- 값이 복잡하게 얽히면, 사운드 문제의 원인을 찾기 어려움.
+- 이를 해결하기 위해 **Wwise 레이아웃 재배치, Voice Profiler, Profiler 레이아웃**을 활용하여 실시간으로 확인하고 디버깅한다.
+
+---
+
+# { 🎵 뷰 재배치하기 – RTPC와 State 동시 확인 }
+
+## 📋 목차
+
+1. [심장 박동 사운드에 영향을 주는 요소](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#%EC%8B%AC%EC%9E%A5-%EB%B0%95%EB%8F%99-%EC%82%AC%EC%9A%B4%EB%93%9C%EC%97%90-%EC%98%81%ED%96%A5%EC%9D%84-%EC%A3%BC%EB%8A%94-%EC%9A%94%EC%86%8C)
+2. [Cube 실행과 프로젝트 파일 열기](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#cube-%EC%8B%A4%ED%96%89%EA%B3%BC-%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8-%ED%8C%8C%EC%9D%BC-%EC%97%B4%EA%B8%B0)
+3. [Heartbeat 사운드 오브젝트 선택하기](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#heartbeat-%EC%82%AC%EC%9A%B4%EB%93%9C-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%EC%84%A0%ED%83%9D%ED%95%98%EA%B8%B0)
+4. [States 탭을 새 창으로 열기](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#states-%ED%83%AD%EC%9D%84-%EC%83%88-%EC%B0%BD%EC%9C%BC%EB%A1%9C-%EC%97%B4%EA%B8%B0)
+5. [RTPC 탭 열기](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#rtpc-%ED%83%AD-%EC%97%B4%EA%B8%B0)
+6. [탭 도킹으로 뷰 재배치하기](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#%ED%83%AD-%EB%8F%84%ED%82%B9%EC%9C%BC%EB%A1%9C-%EB%B7%B0-%EC%9E%AC%EB%B0%B0%EC%B9%98%ED%95%98%EA%B8%B0)
+7. [뷰 크기 조정하기](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#%EB%B7%B0-%ED%81%AC%EA%B8%B0-%EC%A1%B0%EC%A0%95%ED%95%98%EA%B8%B0)
+8. [기본 레이아웃으로 복원하기](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#%EA%B8%B0%EB%B3%B8-%EB%A0%88%EC%9D%B4%EC%95%84%EC%9B%83%EC%9C%BC%EB%A1%9C-%EB%B3%B5%EC%9B%90%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. 심장 박동 사운드에 영향을 주는 요소
+
+- **RTPC (Real-Time Parameter Control)**
+  → 플레이어의 **체력 값**에 따라 심장 박동 사운드의 크기·속도 등이 변합니다.
+- **State (상태 시스템)**
+  → 플레이어가 **살아 있는지 / 패배했는지** 여부에 따라 사운드가 재생되거나 멈춥니다.
+
+즉, **심장 박동 사운드 = RTPC(체력) + State(생존 여부)의 조합**
+
+👉 그래서 두 개의 뷰를 동시에 확인하는 것이 편리합니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380573/notion-blog/_/WWISE/Wwise_/7_Game_Sync_/image.png)
+
+```csharp
+새로운 창 열기
+```
+
+---
+
+## 2. Cube 실행과 프로젝트 파일 열기
+
+1. **Cube 실행** → 나중에 연결 테스트를 위해 미리 실행해 둡니다.
+2. **Wwise 실행** → 프로젝트 파일 열기
+   - 반드시 `Module 7 프로젝트 파일`을 확인해야 합니다.
+
+---
+
+## 3. Heartbeat 사운드 오브젝트 선택하기
+
+- 경로: `Project Explorer > Actor-Mixer Hierarchy > Default Work Unit > Heartbeat Sound SFX`
+- 이렇게 하면 **심장 박동 사운드 오브젝트**를 편집할 수 있습니다.
+
+---
+
+## 4. States 탭을 새 창으로 열기
+
+1. 기본 편집기에서 **States 탭 선택**
+2. **Open in New Window 버튼 클릭**
+   - → States 탭이 별도의 창으로 분리되어 나옵니다.
+
+---
+
+## 5. RTPC 탭 열기
+
+- 다시 기본 편집기에서 **RTPC 탭 선택**
+- 이제 **States 창**과 **RTPC 창**을 동시에 띄운 상태가 됩니다.
+
+---
+
+## 6. 탭 도킹으로 뷰 재배치하기
+
+- 현재는 창이 두 개로 분리되어 있어 불편합니다.
+- **Heartbeat - States 창을 Wwise 메인 창으로 드래그**
+  - 드래그하면 **가능한 도킹 위치**가 파란색으로 표시됩니다.
+  - 기본 편집기 **상단 탭 영역**에 놓으면 됩니다.
+
+---
+
+## 7. 뷰 크기 조정하기
+
+- 도킹 후, **창 사이 구분선(경계선)을 드래그**해서 원하는 크기로 조정할 수 있습니다.
+- 이렇게 하면 RTPC와 State를 **한 화면에서 동시에 확인** 가능합니다.
+
+---
+
+## 8. 기본 레이아웃으로 복원하기
+
+작업 후 원래의 Wwise 레이아웃으로 돌아갈 수도 있습니다.
+
+1. 메뉴 바 → **Layouts > Reset Factory Layout** 클릭
+2. 대화 상자에서 **Select All 선택**
+3. **Reset Layouts 클릭**
+4. 변경 사항을 확인하려면 **Yes 클릭**
+
+👉 이렇게 하면 Wwise가 **처음 설치된 기본 레이아웃 상태**로 돌아갑니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380570/notion-blog/_/WWISE/Wwise_/7_Game_Sync_/image_1.png)
+
+```csharp
+두개의 영향을 받으니 두가지 모두 보기 좋게 창을 제어하는 방법을 배운거다
+```
+
+---
+
+📌 **핵심 개념 요약**
+
+- 심장 박동 사운드는 **RTPC(체력)**와 **State(생존 여부)** 두 가지 값의 영향을 동시에 받음.
+- RTPC와 State를 **동시에 모니터링**하기 위해 뷰를 재배치함.
+- States 탭을 새 창으로 열고, RTPC와 함께 도킹해 배치.
+- 필요 시 언제든지 **기본 레이아웃으로 초기화 가능**.
+
+---
+
+# { 🎧 Voice Profiler 사용하기 }
+
+## 📋 목차
+
+1. [Voice Profiler 개념 이해하기](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#voice-profiler-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Voice Inspector Data 활성화하기](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#voice-inspector-data-%ED%99%9C%EC%84%B1%ED%99%94%ED%95%98%EA%B8%B0)
+3. [Transport Control 추가하기](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#transport-control-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+4. [Voice Monitor 캡처 및 그래프 확인](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#voice-monitor-%EC%BA%A1%EC%B2%98-%EB%B0%8F-%EA%B7%B8%EB%9E%98%ED%94%84-%ED%99%95%EC%9D%B8)
+5. [RTPC(PlayerHealth) 값 조정하기](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#rtpcplayerhealth-%EA%B0%92-%EC%A1%B0%EC%A0%95%ED%95%98%EA%B8%B0)
+6. [Voice Explorer와 Voice Inspector 활용](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#voice-explorer%EC%99%80-voice-inspector-%ED%99%9C%EC%9A%A9)
+7. [Driver(드라이버) 확인하기](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#driver%EB%93%9C%EB%9D%BC%EC%9D%B4%EB%B2%84-%ED%99%95%EC%9D%B8%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. Voice Profiler 개념 이해하기
+
+- **Voice Profiler**는 **실시간으로 보이스(소리의 볼륨/재생 상태)를 추적하고 분석**할 수 있는 도구.
+- 심장 박동 사운드처럼 **RTPC(실시간 매개 변수)**, **State(상태)** 등 여러 요인에 영향을 받는 사운드의 동작을 시각적으로 확인할 수 있음.
+- 특히 “왜 소리가 들리지 않는가?” 같은 문제 상황에서 **원인을 추적하는 진단 도구** 역할을 함.
+
+---
+
+## 2. Voice Inspector Data 활성화하기
+
+1. 메뉴 바 → **Layouts > Voice Profiler** 클릭
+   - Voice Profiler 전용 레이아웃이 열림.
+2. 기어 버튼 (Alt+G) 클릭 → **Profiler Settings 대화 상자** 열기
+3. **Voice Inspector Data** 옵션 선택 후 OK 클릭
+   - 이렇게 해야 Voice Profiler가 데이터를 수집 가능.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380571/notion-blog/_/WWISE/Wwise_/7_Game_Sync_/image_2.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380571/notion-blog/_/WWISE/Wwise_/7_Game_Sync_/image_3.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380572/notion-blog/_/WWISE/Wwise_/7_Game_Sync_/image_4.png)
+
+---
+
+## 3. Transport Control 추가하기
+
+- Voice Profiler 레이아웃에는 **Transport Control**이 기본 포함되어 있지 않음.
+- 사운드를 직접 재생/정지하려면 수동으로 추가해야 함.
+
+**추가 방법**
+
+1. 메뉴 바 → **Views > Transport Control (Shift+T)**
+2. 새 창이 뜨면 → `Heartbeat - Transport Control` 탭을 Voice Explorer 아래로 드래그
+3. 파란색 도킹 영역이 나타나면 놓기
+4. 구분선을 드래그해 크기를 조정
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380572/notion-blog/_/WWISE/Wwise_/7_Game_Sync_/image_5.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380572/notion-blog/_/WWISE/Wwise_/7_Game_Sync_/image_6.png)
+
+```csharp
+이런식으로 나타남
+```
+
+---
+
+## 4. Voice Monitor 캡처 및 그래프 확인
+
+1. **Start Capture 버튼** 클릭
+   - Voice Profiler가 오디오 데이터를 기록 시작.
+2. Transport Control → **Play 버튼(스페이스바)** 클릭
+   - Heartbeat 사운드 재생 시도.
+3. 현재는 소리가 안 들리고, 그래프 변화 없음 → 이유는 **RTPC 곡선 설정 때문**.
+   - PlayerHealth 값이 50~100일 때는 볼륨 -200dB → **완전히 무음 처리됨**.
+   - PlayerHealth 값이 50 이하로 떨어져야 점차 0dB(정상 볼륨)으로 올라옴.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380572/notion-blog/_/WWISE/Wwise_/7_Game_Sync_/image_7.png)
+
+---
+
+## 5. RTPC(PlayerHealth) 값 조정하기
+
+1. Transport Control에서 **PlayerLife State = Alive**로 설정
+2. **Display RTPCs 버튼** 클릭 → PlayerHealth 값 슬라이더 표시
+3. PlayerHealth 값을 **50 이하로 천천히 낮추기**
+   - 그래프 선이 상승 → 볼륨 커짐
+   - 실제로 **심장 박동 소리 들림**
+4. 체력을 줄이는 속도에 따라 곡선 모양이 다르게 나타남 → 실시간 곡선 반응 확인 가능.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380572/notion-blog/_/WWISE/Wwise_/7_Game_Sync_/image_8.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380573/notion-blog/_/WWISE/Wwise_/7_Game_Sync_/image_9.png)
+
+---
+
+## 6. Voice Explorer와 Voice Inspector 활용
+
+- **Voice Explorer**에서 `Heartbeat` 행 선택
+- **Voice Inspector (왼쪽 창)**
+  - 현재 Sound SFX 오브젝트의 볼륨, 필터 값이 **사각형 다이어그램**으로 표시
+  - Heartbeat가 **Master Audio Bus**를 통해 라우팅됨 확인 가능
+- 오디오 라우팅 개념은 이후 12단원에서 더 자세히 다룸.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380571/notion-blog/_/WWISE/Wwise_/7_Game_Sync_/image_10.png)
+
+---
+
+## 7. Driver(드라이버) 확인하기
+
+- **Voice Inspector (오른쪽 창)** → 현재 보이스 볼륨에 영향을 주는 기능 목록 표시
+- 이 기능들이 바로 **Driver(드라이버)**
+  - 예: State, RTPC, Bus Routing 등
+- 만약 소리가 재생되지 않으면, **어떤 Driver가 원인인지** 추적할 수 있음 → 디버깅에 매우 유용.
+
+---
+
+✅ 마지막으로
+
+- Transport Control에서 **Stop 버튼** 클릭 → Heartbeat 정지
+- **Stop Capture 버튼** 클릭 → 데이터 캡처 종료
+
+---
+
+정리하면, 이번 강의는 **Voice Profiler로 심장 박동 사운드가 RTPC와 State 값에 따라 어떻게 반응하는지 시각적으로 확인하는 방법**을 다루고 있어요.
+
+즉, 단순히 "들린다/안 들린다" 확인이 아니라, **왜 안 들리는지**, **어떤 값이 소리에 영향을 주는지**를 추적하는 게 핵심입니다.
+
+---
+
+# { 🎛 Profiler에서 Game Syncs 보기 }
+
+## 📋 목차
+
+1. [Profiler 레이아웃 이해하기](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#profiler-%EB%A0%88%EC%9D%B4%EC%95%84%EC%9B%83-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Display Options(디스플레이 옵션)으로 필터링](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#display-options%EB%94%94%EC%8A%A4%ED%94%8C%EB%A0%88%EC%9D%B4-%EC%98%B5%EC%85%98%EC%9C%BC%EB%A1%9C-%ED%95%84%ED%84%B0%EB%A7%81)
+3. [게임과의 원격 연결(Remote Connect)](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#%EA%B2%8C%EC%9E%84%EA%B3%BC%EC%9D%98-%EC%9B%90%EA%B2%A9-%EC%97%B0%EA%B2%B0remote-connect)
+4. [Capture(캡처) 기능 사용하기](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#capture%EC%BA%A1%EC%B2%98-%EA%B8%B0%EB%8A%A5-%EC%82%AC%EC%9A%A9%ED%95%98%EA%B8%B0)
+5. [Switch와 State 동작 확인하기](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#switch%EC%99%80-state-%EB%8F%99%EC%9E%91-%ED%99%95%EC%9D%B8%ED%95%98%EA%B8%B0)
+6. [캡처 중지와 정리](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#%EC%BA%A1%EC%B2%98-%EC%A4%91%EC%A7%80%EC%99%80-%EC%A0%95%EB%A6%AC)
+7. [다음 단원 준비하기](https://www.notion.so/Section7-271e683f737e8065b4bed07195bd87c2#%EB%8B%A4%EC%9D%8C-%EB%8B%A8%EC%9B%90-%EC%A4%80%EB%B9%84%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. Profiler 레이아웃 이해하기
+
+- **개념**
+  - Profiler는 게임 실행 중 발생하는 **실시간 오디오 이벤트와 Game Sync 동작**을 모니터링할 수 있는 레이아웃입니다.
+  - RTPC, Switch, State, 이벤트 호출 같은 다양한 데이터를 확인할 수 있습니다.
+  - 디버깅과 최적화, 동작 검증에 핵심적으로 사용됩니다.
+- **실습**
+  - 메뉴 바에서 **`Layouts > Profiler`** 선택
+  - Profiler 레이아웃이 열리면 기본적으로 여러 정보가 표시됩니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380571/notion-blog/_/WWISE/Wwise_/7_Game_Sync_/image_11.png)
+
+---
+
+## 2. Display Options(디스플레이 옵션)으로 필터링
+
+- **개념**
+  - Profiler는 표시할 수 있는 데이터가 매우 많습니다.
+  - 특정 항목만 보이도록 **Display Options**에서 필터링해 필요 없는 정보를 제거할 수 있습니다.
+  - 이번 실습에서는 **Game Sync 관련 정보만 집중**합니다.
+- **실습**
+  1. Profiler 레이아웃의 왼쪽 상단 **Capture Log** 창에서 **Display options 버튼** 클릭
+  2. `Capture Log Display Options` 대화 상자가 열림
+  3. **States와 Switches만 남기고**, 나머지 모든 체크박스 해제
+  4. 대화 상자 닫기
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380571/notion-blog/_/WWISE/Wwise_/7_Game_Sync_/image_12.png)
+
+---
+
+## 3. 게임과의 원격 연결(Remote Connect)
+
+- **개념**
+  - Wwise Profiler는 **게임 실행 환경(예: Cube 게임)**과 직접 연결해야 데이터(이벤트 호출, Game Sync 변화)를 받을 수 있습니다.
+  - 이 과정을 **Remote Connection**이라고 부릅니다.
+- **실습**
+  1. Wwise 툴바에서 **Connect to Remote Platform (Shift+H)** 클릭
+  2. Remote Connections 대화 상자에서:
+     - (1) 연결할 **컴퓨터 선택**
+     - (2) **Start capture on connect** 체크 (연결 즉시 캡처 시작)
+     - (3) **Connect 버튼 클릭**
+
+---
+
+## 4. Capture(캡처) 기능 사용하기
+
+- **개념**
+  - Capture는 게임과 Wwise 간의 통신 로그(오디오 이벤트, Game Sync 호출 등)를 기록하는 기능입니다.
+  - 연결 시 자동으로 시작할 수도 있고, 수동으로 시작/중지할 수도 있습니다.
+- **실습**
+  - Cube 게임을 실행하고, 캐릭터를 움직여 보면서 이벤트가 발생하도록 합니다.
+  - Wwise에서는 자동으로 Capture Log가 기록됩니다.
+
+---
+
+## 5. Switch와 State 동작 확인하기
+
+- **개념**
+  - **Switch**: 오브젝트의 상태나 상황에 따라 다른 사운드를 재생하도록 만드는 Game Sync (예: 걷는 표면에 따라 다른 발자국 소리)
+  - **State**: 게임의 전역적 상태를 반영하는 Game Sync (예: 플레이어가 살아있음 vs 패배 상태)
+  - Profiler를 통해 **게임에서 실제로 어떤 Switch/State가 호출되었는지** 확인할 수 있습니다.
+- **실습**
+  - Cube에서 캐릭터를 움직이면 Wwise의 **Capture Log**에 Switch 호출 기록이 나타납니다.
+  - 예: “플레이어가 어떤 표면 위에 있는지” → Switch 호출 확인 가능
+
+---
+
+## 6. 캡처 중지와 정리
+
+- **개념**
+  - 캡처는 필요한 데이터가 모였을 때 중지할 수 있습니다.
+  - 정지 후 캡처 로그를 분석하거나 저장할 수 있습니다.
+- **실습**
+  - 툴바에서 **Stop Capture 버튼** 클릭
+
+---
+
+## 7. 다음 단원 준비하기
+
+- **실습**
+  - 메뉴 바에서 **Layouts > Designer** 클릭 → 다시 Designer 레이아웃으로 돌아감
+  - Cube 게임 종료:
+    - **Esc 키 → 방향키로 quit 선택 → Enter**
+
+---
+
+👉 이렇게 하면 **Profiler를 사용하여 Game Syncs(Switch, State) 동작을 실시간으로 확인하고 검증**할 수 있습니다.

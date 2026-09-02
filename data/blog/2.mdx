@@ -1,0 +1,2710 @@
+---
+title: '2'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 🎮 바퀴 애니메이션 및 회전 구현하기 }
+
+## 🎯 목표
+
+정지된 바퀴에 회전 애니메이션 추가
+
+- 비행기 이동 시 바퀴가 함께 회전
+- Vehicle Animation Blueprint 사용
+- 물리 엔진과 연동된 자연스러운 회전
+
+---
+
+## ⚠️ 발견된 문제점
+
+### 현재 상황
+
+```
+게임 실행 → Shift로 이동
+  ↓
+비행기는 앞으로 이동
+  ↓
+바퀴는 회전하지 않음 (정지 상태)
+  ↓
+비현실적이고 이상해 보임
+```
+
+### 왜 바퀴가 안 움직이나?
+
+```
+✅ 물리 엔진 활성화됨
+✅ Vehicle Movement Component 설정 완료
+✅ 바퀴 설정도 완료
+  ↓
+하지만 바퀴 회전 애니메이션이 없음!
+  ↓
+애니메이션 Blueprint 필요
+```
+
+---
+
+## 💡 핵심 개념: Vehicle Animation Instance
+
+### Animation Blueprint란?
+
+```
+캐릭터의 걷기/뛰기 애니메이션처럼
+바퀴의 회전 애니메이션을 제어하는 시스템
+
+일반 Animation Blueprint:
+  - 캐릭터 동작 제어
+  - 걷기, 뛰기, 점프 등
+
+Vehicle Animation Instance:
+  - 바퀴 회전 제어
+  - 물리 엔진과 자동 연동
+  - 속도에 따라 자동 회전
+```
+
+### Skeletal Mesh의 이해
+
+```
+F18 전투기 = Skeletal Mesh (뼈대 메쉬)
+  ↓
+Skeletal Mesh란?
+  - 내부에 "뼈대(Bone)" 구조가 있는 3D 모델
+  - 각 부분(바퀴, 날개 등)이 개별적으로 움직일 수 있음
+  - Animation Blueprint로 제어 가능
+
+예시:
+  캐릭터 팔 = 뼈대로 연결 → 팔을 구부림
+  전투기 바퀴 = 뼈대로 연결 → 바퀴를 회전
+```
+
+---
+
+## 🔧 1단계: Vehicle Animation Blueprint 생성
+
+### 생성 경로
+
+```
+Content Drawer
+  ↓
+FighterJet 폴더 → Blueprint 폴더
+  ↓
+우클릭 → Blueprint Class
+  ↓
+All Classes 검색창에 입력
+```
+
+### 클래스 선택
+
+```
+검색: Vehicle Animation Instance
+  ↓
+선택: Vehicle Animation Instance
+  ↓
+이름: ABP_F18
+  (ABP = Animation BluePrint의 약자)
+```
+
+**Vehicle Animation Instance란?**
+
+```
+기능: 바퀴가 있는 탈것 전용 애니메이션 클래스
+제공:
+  ├─ 자동 바퀴 회전 계산
+  ├─ 물리 엔진과 연동
+  └─ 속도에 따른 회전 속도 조절
+
+차량용 특화 기능:
+  - 일반 Animation Blueprint보다 간편
+  - 바퀴 회전을 자동으로 처리
+  - 복잡한 계산 불필요
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380592/notion-blog/_/_/BG/2/image.png)
+
+---
+
+## 🔧 2단계: Skeleton 설정
+
+### ⚠️ 주의사항
+
+```
+ABP_F18 생성 직후 더블클릭 금지!
+  ↓
+이유: Skeleton(뼈대) 설정 안 됨
+  ↓
+에러 메시지: "No Skeleton selected"
+```
+
+### Skeleton 설정 방법
+
+```
+ABP_F18 우클릭 (또는 선택 후 Details 패널)
+  ↓
+Skeleton 항목 찾기
+  ↓
+드롭다운 클릭 → F18_Skeleton 선택
+  ↓
+이제 더블클릭으로 열기 가능
+```
+
+**Skeleton이란?**
+
+```
+3D 모델의 뼈대 구조 정보
+  ├─ 어떤 부분이 움직일 수 있는지 정의
+  ├─ 바퀴, 날개, 문 등의 연결 정보
+  └─ Animation Blueprint가 제어할 대상
+
+예시:
+  캐릭터 Skeleton: 머리, 팔, 다리 뼈대
+  F18 Skeleton: 바퀴, 랜딩기어 등 뼈대
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380589/notion-blog/_/_/BG/2/image_1.png)
+
+---
+
+## 🔧 3단계: F18에 Animation Blueprint 연결
+
+### 연결 방법
+
+```
+BP_F18 블루프린트 열기
+  ↓
+Components 패널에서 Mesh (F18_Skeletal_Mesh) 선택
+  ↓
+Details 패널 → Animation 섹션
+  ↓
+Animation Class → ABP_F18 선택
+```
+
+### 빠른 방법 (강의에서 사용)
+
+```
+Content Drawer에서 ABP_F18 선택
+  ↓
+옆의 화살표(→) 아이콘 클릭
+  ↓
+자동으로 해당 항목이 설정됨
+```
+
+**화살표 아이콘 기능**
+
+```
+Content Drawer에서 선택한 에셋을
+현재 열려있는 설정창에 바로 적용하는 단축 기능
+
+시간 절약:
+  - 수동으로 찾아서 선택할 필요 없음
+  - 클릭 한 번으로 즉시 적용
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380591/notion-blog/_/_/BG/2/image_2.png)
+
+---
+
+## 🔧 4단계: Animation Blueprint 노드 구성
+
+### ABP_F18 열기
+
+```
+더블클릭으로 Animation Blueprint 에디터 열기
+  ↓
+Event Graph 또는 AnimGraph 표시
+```
+
+### 필수 노드 구성
+
+```
+[Mesh Space Ref Pose]
+  ↓
+[Wheel Controller]
+  ↓
+[Component To Local]
+  ↓
+[Output Pose]
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380591/notion-blog/_/_/BG/2/image_3.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380591/notion-blog/_/_/BG/2/image_4.png)
+
+### 각 노드 설명
+
+**1. Mesh Space Ref Pose**
+
+```
+기능: 전투기 골격 메쉬의 기본 자세 정보 제공
+
+제공 정보:
+  ├─ 각 뼈대의 위치
+  ├─ 각 뼈대의 회전값
+  └─ 메쉬의 기준 상태
+
+왜 필요한가?
+  - 바퀴를 회전시키려면 기준 위치가 필요
+  - "원래 위치"를 알아야 "회전 후 위치" 계산 가능
+```
+
+**2. Wheel Controller**
+
+```
+기능: 바퀴가 있는 차량 전용 자동 회전 제어 노드
+
+자동 처리 기능:
+  ├─ Vehicle Movement Component에서 속도 정보 가져오기
+  ├─ 속도에 따라 바퀴 회전 속도 자동 계산
+  ├─ 각 바퀴별로 개별 회전 적용
+  └─ 핸드브레이크 시 회전 정지
+
+매우 편리한 이유:
+  - 복잡한 수식 계산 불필요
+  - 자동으로 물리 엔진과 동기화
+  - 노드 하나로 모든 바퀴 제어
+```
+
+**3. Component To Local**
+
+```
+기능: 좌표 공간 변환
+
+변환 과정:
+  Component Space (컴포넌트 공간)
+    ↓
+  Local Space (로컬 공간)
+    ↓
+  최종 애니메이션 출력
+
+왜 필요한가?
+  - Wheel Controller는 Component Space에서 작동
+  - Output은 Local Space가 필요
+  - 좌표계 변환이 필수
+```
+
+**좌표 공간이란?**
+
+```
+Local Space (로컬 공간):
+  - 객체 자신을 중심으로 한 좌표
+  - 예: "바퀴의 중심에서 얼마나 떨어졌나"
+
+Component Space (컴포넌트 공간):
+  - 부모 컴포넌트 기준 좌표
+  - 예: "전투기 전체에서 바퀴의 위치"
+
+World Space (월드 공간):
+  - 게임 월드 전체 기준 좌표
+  - 예: "맵의 어느 위치에 있나"
+```
+
+---
+
+## ✅ 테스트 결과
+
+### 컴파일 및 실행
+
+```
+ABP_F18 저장 및 컴파일
+  ↓
+BP_F18도 컴파일
+  ↓
+게임 실행
+```
+
+### 동작 확인
+
+```
+Shift 키로 가속
+  ↓
+비행기 이동 시작
+  ↓
+바퀴가 함께 회전! ✅
+  ↓
+속도에 비례한 회전 속도
+```
+
+### Space로 핸드브레이크 테스트
+
+```
+Space 키 누름
+  ↓
+비행기 정지
+  ↓
+바퀴 회전도 멈춤 ✅
+```
+
+---
+
+## ⚠️ 새로운 문제 발견
+
+### 앞바퀴 각도 문제
+
+```
+현재 상황:
+  앞바퀴가 하늘을 향함
+  ↓
+이유: Wheel Radius(바퀴 반지름) 설정 오류
+  ↓
+앞바퀴와 뒷바퀴의 크기가 다름
+```
+
+### 임시 해결 시도
+
+**시도 1: 앞바퀴 반지름 35로 변경**
+
+```
+BP_F18 → Vehicle Movement Component
+  ↓
+Wheels 설정 → 앞바퀴
+  ↓
+BP_F18_Wheel → Radius: 35
+  ↓
+결과:
+  - 앞바퀴: 조금 내려감
+  - 뒷바퀴: 땅속으로 들어감 ❌
+```
+
+**시도 2: 앞바퀴 반지름 25로 변경**
+
+```
+Radius: 25 (더 작게)
+  ↓
+결과:
+  - 앞바퀴: 땅에 닿음 ✅
+  - 뒷바퀴: 더 깊이 박힘 ❌
+  - 전체적으로 이상해 보임
+```
+
+---
+
+## 📝 핵심 정리
+
+### 구현한 기능
+
+```
+Vehicle Animation Blueprint 생성
+  ↓
+Skeleton 설정
+  ↓
+F18에 연결
+  ↓
+노드 구성 (자동 바퀴 회전)
+  ↓
+테스트 완료 ✅
+```
+
+### 노드 작동 흐름
+
+```
+Mesh Space Ref Pose (기본 자세)
+  ↓
+Wheel Controller (자동 회전 계산)
+  ├─ Vehicle Movement에서 속도 가져오기
+  ├─ 각 바퀴 회전 속도 계산
+  └─ 자동으로 회전 적용
+  ↓
+Component To Local (좌표 변환)
+  ↓
+Output Pose (최종 애니메이션)
+```
+
+### 해결해야 할 문제
+
+```
+앞바퀴와 뒷바퀴의 크기가 다름
+  ↓
+하나의 Wheel 클래스로 통일 불가
+  ↓
+해결 방법: 앞바퀴 전용 Wheel 클래스 생성 필요
+```
+
+---
+
+## 🔜 다음 과제
+
+### 별도 Wheel 클래스 생성
+
+```
+현재:
+  BP_F18_Wheel (앞/뒤 공용)
+  ├─ Radius: 하나의 값
+  └─ 앞/뒤 바퀴에 동일 적용 → 문제 발생
+
+개선:
+  BP_F18_Wheel_Front (앞바퀴 전용)
+  ├─ Radius: 25 (앞바퀴 크기)
+
+  BP_F18_Wheel_Rear (뒷바퀴 전용)
+  ├─ Radius: 35 (뒷바퀴 크기)
+
+결과:
+  각 바퀴에 맞는 크기 적용 가능
+```
+
+---
+
+## 💡 추가 설명
+
+### Animation Blueprint의 강력함
+
+```
+직접 구현한다면:
+  1. 바퀴 속도 계산
+  2. 회전 각도 계산
+  3. 각 바퀴에 개별 적용
+  4. 물리 엔진과 동기화
+  5. 핸드브레이크 처리
+  → 복잡한 수학과 코딩 필요
+
+Wheel Controller 노드:
+  1. 노드 하나 연결
+  → 모든 것이 자동 처리 ✅
+```
+
+### 좌표 공간 변환의 중요성
+
+```
+잘못된 좌표 공간 사용:
+  - 바퀴가 이상한 위치에 표시
+  - 회전이 엉뚱한 방향으로 발생
+  - 애니메이션 깨짐
+
+올바른 변환 (Component To Local):
+  - 정확한 위치에 표시
+  - 올바른 회전 적용
+  - 부드러운 애니메이션
+```
+
+### Wheel Radius의 의미
+
+```
+Radius (반지름):
+  바퀴의 중심에서 끝까지의 거리
+
+영향:
+  ├─ 바퀴가 땅에 얼마나 닿는지
+  ├─ 차체 높이
+  └─ 물리 충돌 계산
+
+잘못 설정 시:
+  - 너무 크면: 바퀴가 공중에 뜸
+  - 너무 작으면: 차체가 땅에 박힘
+```
+
+### 실제 게임 개발 팁
+
+```
+복잡한 탈것 제작 시:
+  ├─ 각 부품별로 별도 클래스 생성
+  ├─ 앞바퀴, 뒷바퀴 분리
+  ├─ 좌측, 우측 바퀴 분리 (필요시)
+  └─ 세밀한 조정 가능
+
+간단한 탈것:
+  - 하나의 Wheel 클래스로 통일
+  - 빠른 프로토타입에 적합
+```
+
+# { 🎮 앞바퀴/뒷바퀴 별도 클래스로 문제 해결하기 }
+
+## 🎯 목표
+
+앞바퀴와 뒷바퀴의 크기 차이 해결
+
+- 앞바퀴 전용 Wheel 클래스 생성
+- 뒷바퀴 전용 Wheel 클래스 생성
+- 각각 적절한 반지름 값 설정
+
+---
+
+## 💡 문제 분석
+
+### 왜 별도 클래스가 필요한가?
+
+```
+현재 상황:
+  BP_F18_Wheel (하나의 클래스)
+  ├─ Radius: 25
+  └─ 모든 바퀴에 동일 적용
+  ↓
+문제:
+  - 앞바퀴: 25 → 적합 ✅
+  - 뒷바퀴: 25 → 너무 작음 ❌
+  ↓
+해결책:
+  앞바퀴용 클래스 (Radius: 25~28)
+  뒷바퀴용 클래스 (Radius: 35~40)
+```
+
+---
+
+## 🔧 1단계: 뒷바퀴 클래스 복제
+
+### 복제 방법
+
+```
+Content Drawer → FighterJet → Blueprint
+  ↓
+BP_F18_Wheel 선택
+  ↓
+Ctrl + D (복제 단축키)
+  ↓
+이름 변경
+```
+
+### 이름 설정
+
+```
+원본 클래스:
+  BP_F18_Wheel → BP_F18_Wheel_Front (앞바퀴)
+
+복제된 클래스:
+  New_BP_F18_Wheel → BP_F18_Wheel_Rear (뒷바퀴)
+```
+
+**Front vs Rear**
+
+```
+Front (프론트):
+  - 앞쪽을 의미
+  - 전면, 정면
+  - 앞바퀴
+
+Rear (리어):
+  - 뒤쪽을 의미
+  - 후면, 후방
+  - 뒷바퀴
+```
+
+---
+
+## 🔧 2단계: 각 클래스의 반지름 설정
+
+### 앞바퀴 설정
+
+```
+BP_F18_Wheel_Front 더블클릭
+  ↓
+Details 패널
+  ↓
+Wheel Radius: 25
+  ↓
+컴파일
+```
+
+### 뒷바퀴 설정
+
+```
+BP_F18_Wheel_Rear 더블클릭
+  ↓
+Details 패널
+  ↓
+Wheel Radius: 40
+  ↓
+컴파일
+```
+
+**Wheel Radius (바퀴 반지름)**
+
+```
+작은 값 (25):
+  - 바퀴가 작아짐
+  - 차체가 낮아짐
+  - 앞바퀴에 적합
+
+큰 값 (40):
+  - 바퀴가 커짐
+  - 차체가 높아짐
+  - 뒷바퀴에 적합
+```
+
+---
+
+## 🔧 3단계: 어느 바퀴가 앞/뒤인지 확인
+
+### 문제 상황
+
+```
+Vehicle Movement Component의 Wheels 배열:
+  [0] Wheel
+  [1] Wheel
+  [2] Wheel
+  [3] Wheel
+  ↓
+어느 것이 앞바퀴? 어느 것이 뒷바퀴?
+  ↓
+Skeleton을 확인해야 함!
+```
+
+### Skeleton 확인 방법
+
+```
+BP_F18 → Components 패널
+  ↓
+Mesh (F18_Skeletal_Mesh) 선택
+  ↓
+Viewport에서 Skeleton 표시
+  ↓
+뼈대 구조 확인
+```
+
+### 뼈대 이름으로 판별
+
+```
+Skeleton 뼈대 이름:
+  ├─ Wheel_joint_LF → 앞바퀴 (Left Front)
+  ├─ Wheel_joint_?? → 뒷바퀴
+  ├─ Wheel_joint_?? → 뒷바퀴
+  └─ Wheel_joint_?? → 뒷바퀴
+
+LF = Left Front (왼쪽 앞)
+  ↓
+나머지는 뒷바퀴임을 확인
+```
+
+**뼈대 이름 규칙 (일반적)**
+
+```
+LF = Left Front (왼쪽 앞)
+RF = Right Front (오른쪽 앞)
+LR = Left Rear (왼쪽 뒤)
+RR = Right Rear (오른쪽 뒤)
+
+이 강의의 경우:
+  - 뼈대 이름이 명확하지 않음
+  - 직접 확인하여 판별
+```
+
+---
+
+## 🔧 4단계: Wheel 클래스 할당
+
+### Vehicle Movement Component 설정
+
+```
+BP_F18 → Vehicle Movement Component
+  ↓
+Details 패널 → Wheels 섹션
+  ↓
+각 바퀴에 적절한 클래스 할당
+```
+
+### 설정 내용
+
+```
+Wheels 배열:
+  [0] Wheel_joint_LF (앞바퀴)
+      └─ Wheel Class: BP_F18_Wheel_Front
+
+  [1] Wheel_joint_?? (뒷바퀴)
+      └─ Wheel Class: BP_F18_Wheel_Rear
+
+  [2] Wheel_joint_?? (뒷바퀴)
+      └─ Wheel Class: BP_F18_Wheel_Rear
+
+  [3] Wheel_joint_?? (뒷바퀴)
+      └─ Wheel Class: BP_F18_Wheel_Rear
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380591/notion-blog/_/_/BG/2/image_5.png)
+
+---
+
+## ✅ 1차 테스트 결과
+
+### 확인 사항
+
+```
+게임 실행
+  ↓
+비행기 확인
+  ↓
+결과:
+  - 앞바퀴: 땅에 닿음 ✅
+  - 뒷바퀴: 땅에 닿음 ✅
+  - 모든 바퀴가 올바른 위치
+```
+
+---
+
+## 🔧 5단계: 미세 조정
+
+### 최적값 찾기
+
+```
+초기 설정:
+  앞바퀴: 25
+  뒷바퀴: 40
+  ↓
+조정 후:
+  앞바퀴: 28 (약간 증가)
+  뒷바퀴: 35 (약간 감소)
+```
+
+### 조정 방법
+
+```
+BP_F18_Wheel_Front 열기
+  ↓
+Wheel Radius: 25 → 28
+  ↓
+컴파일
+
+BP_F18_Wheel_Rear 열기
+  ↓
+Wheel Radius: 40 → 35
+  ↓
+컴파일
+```
+
+**왜 미세 조정이 필요한가?**
+
+```
+처음 값:
+  - 대략적인 추정
+  - 실제 테스트 필요
+
+조정 후:
+  - 시각적으로 더 자연스러움
+  - 물리적으로 안정적
+  - 게임에서 더 좋아 보임
+```
+
+---
+
+## ✅ 최종 테스트
+
+### 종합 확인
+
+```
+게임 실행
+  ↓
+Shift로 가속
+  ↓
+확인 사항:
+```
+
+**1. 바퀴 위치**
+
+```
+앞바퀴: 땅에 완벽하게 닿음 ✅
+뒷바퀴: 땅에 완벽하게 닿음 ✅
+차체: 적절한 높이 유지 ✅
+```
+
+**2. 바퀴 회전**
+
+```
+이동 시:
+  - 모든 바퀴가 부드럽게 회전 ✅
+  - 속도에 비례한 회전 속도 ✅
+  - 애니메이션 자연스러움 ✅
+```
+
+**3. 브레이크 테스트**
+
+```
+Ctrl 키 (일반 브레이크):
+  - 스로틀 감소 ✅
+  - 바퀴 회전 감속 ✅
+  - 부드러운 정지 ✅
+```
+
+**4. 핸드브레이크 테스트**
+
+```
+Space 키 (핸드브레이크):
+  - 즉시 정지 ✅
+  - 바퀴 회전 멈춤 ✅
+  - 완전 정지 가능 ✅
+```
+
+---
+
+## 📝 핵심 정리
+
+### 문제 해결 과정
+
+```
+1. 문제 발견
+   한 가지 Wheel 클래스로 모든 바퀴 제어
+   → 크기 차이로 문제 발생
+
+2. 원인 분석
+   앞바퀴와 뒷바퀴의 크기가 다름
+   → 각각 다른 Radius 필요
+
+3. 해결 방법
+   별도 Wheel 클래스 생성
+   → Front / Rear 분리
+
+4. 구현
+   Ctrl+D로 복제
+   → 각각 다른 Radius 설정
+
+5. 적용
+   Skeleton 확인
+   → 올바른 클래스 할당
+
+6. 최적화
+   값 미세 조정
+   → 완벽한 결과
+```
+
+### 최종 설정값
+
+```
+BP_F18_Wheel_Front (앞바퀴)
+  └─ Radius: 28
+
+BP_F18_Wheel_Rear (뒷바퀴)
+  └─ Radius: 35
+
+적용 위치:
+  앞바퀴 1개 → Front 클래스
+  뒷바퀴 3개 → Rear 클래스
+```
+
+---
+
+## 💡 추가 설명
+
+### Ctrl+D 복제의 장점
+
+```
+장점:
+  ├─ 빠른 복제
+  ├─ 모든 설정 유지
+  ├─ 필요한 부분만 수정
+  └─ 시간 절약
+
+처음부터 새로 만들기와 비교:
+  - 복제: 1분 소요
+  - 새로 만들기: 5~10분 소요
+```
+
+### Skeleton 확인의 중요성
+
+```
+잘못된 할당 시:
+  앞바퀴에 뒷바퀴 클래스 적용
+  ↓
+  - 앞부분이 너무 높아짐
+  - 뒷부분이 너무 낮아짐
+  - 비행기가 기울어짐
+  - 물리 계산 오류
+
+올바른 할당:
+  Skeleton으로 정확히 확인
+  ↓
+  - 각 바퀴에 적절한 클래스
+  - 균형 잡힌 자세
+  - 정상적인 물리 작동
+```
+
+### 미세 조정의 필요성
+
+```
+이론적 값 (계산):
+  - 정확하지 않을 수 있음
+  - 3D 모델의 특성 고려 필요
+
+실제 테스트:
+  - 눈으로 직접 확인
+  - 게임 플레이로 검증
+  - 반복 조정으로 최적화
+```
+
+### 실전 개발 팁
+
+```
+복잡한 탈것 제작 시:
+  ├─ 앞/뒤 바퀴 분리
+  ├─ 좌/우 바퀴 분리 (필요시)
+  ├─ 서스펜션 별도 설정
+  └─ 각 부품별 세밀한 조정
+
+간단한 프로토타입:
+  - 하나의 클래스로 시작
+  - 문제 발견 시 분리
+  - 점진적 개선
+```
+
+---
+
+## 🎉 완성된 시스템
+
+### 구현 완료 기능
+
+```
+✅ 스로틀 제어 (Shift)
+✅ 일반 브레이크 (Ctrl)
+✅ 핸드브레이크 (Space)
+✅ 바퀴 회전 애니메이션
+✅ 앞/뒷바퀴 크기 최적화
+✅ 물리 엔진 완벽 연동
+```
+
+### 작동하는 전체 시스템
+
+```
+조작:
+  Shift → 가속
+  Ctrl → 감속
+  Space → 정지
+
+시각:
+  바퀴 회전 애니메이션
+  속도에 따른 회전 속도
+  브레이크 시 정지
+
+물리:
+  앞바퀴 Radius: 28
+  뒷바퀴 Radius: 35
+  완벽한 지면 접촉
+  안정적인 움직임
+```
+
+---
+
+# { 🎮 엔진 화염 VFX (시각 효과) 추가하기 }
+
+## 🎯 목표
+
+스로틀 값에 따라 엔진에서 불꽃이 나오도록 구현
+
+- 가속 시: 화염 크기 증가
+- 감속 시: 화염 크기 감소
+- Niagara Particle System 사용
+
+---
+
+## 💡 핵심 개념
+
+### VFX (Visual Effects)란?
+
+```
+게임에서 보이는 시각적 효과
+  ├─ 불꽃, 연기, 폭발
+  ├─ 마법 이펙트
+  ├─ 날씨 효과 (비, 눈)
+  └─ 이 강의: 제트 엔진 화염
+
+목적:
+  - 게임을 더 생생하게
+  - 상태를 시각적으로 표현
+  - 플레이어에게 피드백 제공
+```
+
+### Niagara Particle System이란?
+
+```
+언리얼 엔진의 파티클(입자) 효과 시스템
+  ↓
+Particle (파티클):
+  - 작은 입자들의 집합
+  - 수백~수천 개가 모여 하나의 효과 생성
+  - 예: 불꽃 = 수많은 작은 불똥들
+
+Niagara:
+  - 언리얼의 최신 파티클 시스템
+  - 강력하고 유연한 제어
+  - GPU 가속으로 성능 우수
+```
+
+---
+
+## 🔧 1단계: Socket 위치 확인
+
+### Socket이란?
+
+```
+3D 모델에서 특정 위치를 표시하는 마커
+
+용도:
+  ├─ 무기 장착 위치
+  ├─ 이펙트 생성 위치
+  ├─ 캐릭터 손/발 위치
+  └─ 이 강의: 엔진 위치
+
+장점:
+  - 정확한 위치 지정
+  - 모델과 함께 움직임
+  - 수동 좌표 입력 불필요
+```
+
+### Skeleton에서 Socket 확인
+
+```
+BP_F18 → Components 패널
+  ↓
+Mesh (F18_Skeletal_Mesh) 선택
+  ↓
+Viewport에서 W 키 누르기 (이동 도구)
+  ↓
+Socket 표시됨
+```
+
+### 엔진 Socket 확인
+
+```
+발견된 Socket:
+  ├─ LTE_Engine (Left Engine - 왼쪽 엔진)
+  └─ RT_Engine (Right Engine - 오른쪽 엔진)
+
+위치:
+  전투기 뒤쪽 배기구
+  ↓
+  여기서 불꽃이 나와야 함
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380593/notion-blog/_/_/BG/2/image_6.png)
+
+---
+
+## 🔧 2단계: Niagara Particle System 추가
+
+### 컴포넌트 추가 방법
+
+```
+BP_F18 → Components 패널
+  ↓
+Mesh 선택 (중요: Mesh의 자식으로 추가)
+  ↓
++ Add 버튼 클릭
+  ↓
+검색: Niagara Particle System
+```
+
+### 두 개의 컴포넌트 생성
+
+```
+1. Niagara Particle System
+   └─ 이름: Left_Engine
+
+2. Niagara Particle System (Ctrl+D로 복제)
+   └─ 이름: Right_Engine
+```
+
+**왜 두 개가 필요한가?**
+
+```
+전투기에는 엔진이 2개
+  ↓
+각 엔진마다 독립적인 화염 필요
+  ↓
+왼쪽 엔진용 1개 + 오른쪽 엔진용 1개
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380592/notion-blog/_/_/BG/2/image_7.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380592/notion-blog/_/_/BG/2/image_8.png)
+
+---
+
+## 🔧 3단계: Niagara System Asset 설정
+
+### 에셋 할당
+
+```
+Left_Engine 선택
+  ↓
+Details 패널 → Niagara System Asset
+  ↓
+NS_Engine_F18 선택
+
+Right_Engine 선택
+  ↓
+Details 패널 → Niagara System Asset
+  ↓
+NS_Engine_F18 선택
+```
+
+**동시 선택으로 빠르게 설정**
+
+```
+Ctrl 누른 채로
+  Left_Engine + Right_Engine 선택
+  ↓
+Details 패널에서 한 번에 설정
+  ↓
+Niagara System Asset: NS_Engine_F18
+```
+
+### NS_Engine_F18이란?
+
+```
+미리 만들어진 제트 엔진 화염 효과
+  ├─ 불꽃 모양
+  ├─ 연기 효과
+  ├─ 열 왜곡 효과
+  └─ 제트 엔진에 최적화됨
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380592/notion-blog/_/_/BG/2/image_9.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380589/notion-blog/_/_/BG/2/image_10.png)
+
+---
+
+## 🔧 4단계: Socket에 부착
+
+### 현재 문제점
+
+```
+Niagara System 추가됨
+  ↓
+하지만 위치가 잘못됨
+  ↓
+방향도 반대
+  ↓
+Socket에 부착 필요
+```
+
+### Socket 부착 방법
+
+**Left_Engine 설정**
+
+```
+Left_Engine 선택
+  ↓
+Details 패널 → Sockets 섹션
+  ↓
+Parent Socket 검색
+  ↓
+선택: LT_Engine (왼쪽 엔진 소켓)
+```
+
+**Right_Engine 설정**
+
+```
+Right_Engine 선택
+  ↓
+Details 패널 → Sockets 섹션
+  ↓
+Parent Socket 검색
+  ↓
+선택: RT_Engine (오른쪽 엔진 소켓)
+```
+
+**Parent Socket이란?**
+
+```
+부모 Socket에 연결
+  ↓
+효과:
+  - Socket 위치에 자동 배치
+  - Socket과 함께 이동/회전
+  - 수동 위치 조정 불필요
+```
+
+---
+
+## 🔧 5단계: 방향 수정 (회전)
+
+### 문제 상황
+
+```
+Socket에 부착됨 ✅
+  ↓
+하지만 방향이 반대 ❌
+  ↓
+화염이 앞쪽으로 나옴 (뒤로 나와야 함)
+```
+
+### 회전 수정
+
+```
+Left_Engine + Right_Engine 동시 선택
+  ↓
+Details 패널 → Transform → Rotation
+  ↓
+Z축(Roll): 180도
+```
+
+**회전축 이해**
+
+```
+X축 (Pitch): 위아래 회전
+Y축 (Yaw): 좌우 회전
+Z축 (Roll): 바퀴 굴리듯 회전
+
+이 경우:
+  Z축 180도 = 완전히 뒤집기
+  ↓
+  화염 방향이 반대로 변경
+  ↓
+  뒤쪽으로 분사 ✅
+```
+
+---
+
+## ✅ 기본 설정 완료 테스트
+
+### 확인 사항
+
+```
+컴파일 → 저장 → 게임 실행
+  ↓
+비행기 확인
+  ↓
+결과:
+  - 양쪽 엔진에서 화염 발생 ✅
+  - 올바른 위치 ✅
+  - 올바른 방향 ✅
+```
+
+### 현재 문제점
+
+```
+화염이 항상 최대 크기
+  ↓
+스로틀과 무관하게 일정
+  ↓
+개선 필요: 스로틀 값에 따라 변화
+```
+
+---
+
+## 🔧 6단계: User Parameter 이해
+
+### User Parameter란?
+
+```
+Niagara System의 조절 가능한 설정값
+
+예시:
+  ├─ Scale: 크기
+  ├─ Color: 색상
+  ├─ Speed: 속도
+  └─ Lifetime: 지속 시간
+
+용도:
+  - 외부에서 실시간 조정 가능
+  - Blueprint에서 제어 가능
+  - 같은 효과를 다양하게 사용
+```
+
+### Scale Parameter 확인
+
+```
+Right_Engine 선택
+  ↓
+Details 패널 → User Parameters 섹션
+  ↓
+Scale 항목 확인
+```
+
+### Scale 테스트
+
+```
+X축 값 변경:
+  0.1 → 매우 작은 화염
+  0.5 → 작은 화염
+  1.0 → 기본 크기 (최대)
+  2.0 → 더 큰 화염
+
+Y축, Z축:
+  - 변경하면 이상하게 보임
+  - 1.0으로 유지 권장
+```
+
+**Vector3 타입**
+
+```
+Scale = Vector3 (벡터3)
+  ├─ X: 앞뒤 크기
+  ├─ Y: 좌우 크기
+  └─ Z: 상하 크기
+
+Vector3란?
+  - 3개의 숫자로 구성 (X, Y, Z)
+  - 3차원 공간의 크기나 위치 표현
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380590/notion-blog/_/_/BG/2/image_11.png)
+
+---
+
+## 🔧 7단계: 기본값 설정
+
+### 초기 상태 설정
+
+```
+Left_Engine + Right_Engine 선택
+  ↓
+User Parameters → Scale
+  ↓
+X: 0
+Y: 1 (또는 2)
+Z: 1 (또는 2)
+```
+
+**왜 X만 0으로?**
+
+```
+X축: 앞뒤 길이 (화염의 세기)
+  - 0 = 화염 없음
+  - 스로틀에 따라 변경될 값
+
+Y, Z축: 좌우/상하 크기
+  - 1 또는 2 유지
+  - 화염의 폭 유지
+```
+
+---
+
+## 🔧 8단계: Function 생성
+
+### Function이란?
+
+```
+반복되는 작업을 하나로 묶는 기능
+
+장점:
+  ├─ 코드 재사용
+  ├─ 관리 편리
+  ├─ 가독성 향상
+  └─ 나중에 수정 쉬움
+
+예시:
+  매 프레임마다 화염 크기 업데이트
+  ↓
+  Function으로 묶어서 관리
+```
+
+### Function 생성 방법
+
+```
+BP_F18 → Event Graph
+  ↓
+Functions 패널 → + 버튼
+  ↓
+이름: VFX_Throttle_Management
+  (VFX 스로틀 관리)
+```
+
+**좋은 Function 이름 짓기**
+
+```
+VFX_Throttle_Management
+  ├─ VFX: 시각 효과 관련
+  ├─ Throttle: 스로틀 제어
+  └─ Management: 관리/업데이트
+
+명확한 이름:
+  - 기능을 한눈에 파악
+  - 나중에 찾기 쉬움
+  - 협업 시 이해 쉬움
+```
+
+---
+
+## 🔧 9단계: Event Tick과 Function 연결
+
+### Event Tick이란?
+
+```
+매 프레임마다 자동으로 실행되는 이벤트
+
+실행 빈도:
+  - 60 FPS: 초당 60번
+  - 30 FPS: 초당 30번
+  - 프레임레이트에 따라 변동
+
+용도:
+  - 실시간 업데이트 필요한 작업
+  - 화면 갱신이 필요한 계산
+  - 이 강의: 화염 크기 실시간 조정
+```
+
+### 연결 방법
+
+```
+Event Graph
+  ↓
+Event Tick 노드 (기본 제공)
+  ↓
+VFX_Throttle_Management Function 호출
+  ↓
+연결 완료
+```
+
+### 노드 구조
+
+```
+[Event Tick]
+  ↓
+[VFX_Throttle_Management]
+```
+
+**왜 Function을 거치나?**
+
+```
+직접 Event Tick에 연결:
+  - Event Tick이 복잡해짐
+  - 여러 기능 섞임
+  - 관리 어려움
+
+Function 사용:
+  - Event Tick은 깔끔하게
+  - 각 기능은 Function으로 분리
+  - 관리/수정 쉬움
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380590/notion-blog/_/_/BG/2/image_12.png)
+
+---
+
+## 🔧 10단계: Set Vector Parameter 구성
+
+### VFX_Throttle_Management Function 내부 작업
+
+**1. 엔진 컴포넌트 가져오기**
+
+```
+Left_Engine 컴포넌트 드래그 → Function으로
+Right_Engine 컴포넌트 드래그 → Function으로
+```
+
+**2. Set Vector Parameter 노드 추가**
+
+```
+Left_Engine에서 드래그
+  ↓
+검색: Set Vector Parameter
+  ↓
+Right_Engine도 동일
+```
+
+### Set Vector Parameter 노드란?
+
+```
+기능: Niagara System의 Vector 타입 파라미터 설정
+
+입력:
+  ├─ Target: 대상 Niagara System
+  ├─ Parameter Name: 변경할 파라미터 이름
+  └─ Parameter Value: 새로운 값 (Vector3)
+
+출력:
+  Niagara System의 파라미터가 실시간 업데이트
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380590/notion-blog/_/_/BG/2/image_13.png)
+
+---
+
+## 🔧 11단계: Parameter 연결
+
+### Parameter Name 설정
+
+```
+Left_Engine → Set Vector Parameter
+  ├─ Override Instance Parameters: 체크 해제
+  └─ Parameter Name: "Scale"
+
+Right_Engine → Set Vector Parameter
+  ├─ Override Instance Parameters: 체크 해제
+  └─ Parameter Name: "Scale"
+```
+
+**Override Instance Parameters란?**
+
+```
+체크 시:
+  - 이 인스턴스만 설정 변경
+  - 다른 곳에 영향 없음
+
+체크 해제 (권장):
+  - 이미 컴포넌트에서 설정했으므로 불필요
+  - 더 간단하게 작동
+```
+
+### Parameter Value 설정
+
+**Make Vector 노드 사용**
+
+```
+우클릭 → Make Vector
+  ↓
+입력값:
+  ├─ X: ? (스로틀 값 연결 예정)
+  ├─ Y: 1.0
+  └─ Z: 1.0
+  ↓
+Set Vector Parameter의 Parameter Value에 연결
+```
+
+**Break Vector vs Make Vector**
+
+```
+Break Vector:
+  Vector3 → X, Y, Z로 분해
+  (Vector를 개별 값으로)
+
+Make Vector:
+  X, Y, Z → Vector3로 결합
+  (개별 값을 Vector로)
+```
+
+---
+
+## 🔧 12단계: 스로틀 값 연결
+
+### Throttle Value 가져오기
+
+```
+Throttle Value 변수 (GET)
+  ↓
+Make Vector의 X 입력에 연결
+  ↓
+Y: 1.0
+Z: 1.0
+```
+
+### 노드 구조
+
+```
+[GET] Throttle Value
+  ↓
+[Make Vector]
+  ├─ X: Throttle Value (0~1)
+  ├─ Y: 1.0
+  └─ Z: 1.0
+  ↓
+[Set Vector Parameter] → Left_Engine
+  └─ Parameter Name: "Scale"
+
+(Right_Engine도 동일 구조)
+```
+
+---
+
+## ✅ 1차 테스트
+
+### 테스트 실행
+
+```
+컴파일 → 저장 → 게임 실행
+  ↓
+Shift 키로 가속
+  ↓
+결과 확인
+```
+
+### 동작 확인
+
+```
+초기 상태:
+  스로틀: 0 → 화염 없음 ✅
+
+Shift 누름:
+  스로틀: 0 → 1 증가
+  화염: 천천히 커짐 ✅
+
+Ctrl 누름:
+  스로틀: 1 → 0 감소
+  화염: 천천히 작아짐 ✅
+```
+
+### 발견된 문제
+
+```
+화염이 너무 작음
+  ↓
+스로틀 최대(1.0)일 때도 작게 보임
+  ↓
+Scale 값 증폭 필요
+```
+
+---
+
+## 🔧 13단계: Scale 값 증폭 (Multiply)
+
+### Multiply 노드 추가
+
+```
+Throttle Value와 Make Vector 사이에
+  ↓
+Multiply (* 곱하기) 노드 추가
+```
+
+### 노드 구조
+
+```
+[GET] Throttle Value
+  ↓
+[Multiply] × 2.0 (배수 조절 가능)
+  ↓
+[Make Vector] X 입력
+  ↓
+[Set Vector Parameter]
+```
+
+### Multiply (곱하기)란?
+
+```
+기능: 값을 배수로 증가
+
+예시:
+  Throttle Value: 0.5
+  × 2.0
+  = 1.0 (2배 증폭)
+
+  Throttle Value: 1.0
+  × 2.0
+  = 2.0 (최대일 때 2배 크기)
+```
+
+### 배수 조정
+
+```
+× 1.0: 원래 크기 (너무 작음)
+× 2.0: 2배 크기 (적당)
+× 3.0: 3배 크기 (더 큼)
+× 5.0: 5배 크기 (매우 큼)
+
+원하는 시각적 효과에 따라 조절
+```
+
+---
+
+## ✅ 최종 테스트
+
+### 완성된 시스템 테스트
+
+```
+컴파일 → 저장 → 게임 실행
+  ↓
+다양한 조작 테스트
+```
+
+### 테스트 시나리오
+
+**1. 정지 상태**
+
+```
+스로틀: 0
+화염: 없음 ✅
+```
+
+**2. 가속**
+
+```
+Shift 키 누르기
+  ↓
+스로틀: 0 → 1.0 증가
+  ↓
+화염: 작음 → 최대 크기
+  ↓
+부드럽게 커짐 ✅
+```
+
+**3. 감속**
+
+```
+Ctrl 키 누르기
+  ↓
+스로틀: 1.0 → 0 감소
+  ↓
+화염: 최대 → 사라짐
+  ↓
+부드럽게 작아짐 ✅
+```
+
+**4. 중간 스로틀**
+
+```
+Shift 살짝만 누름
+  ↓
+스로틀: 0.5
+  ↓
+화염: 중간 크기
+  ↓
+스로틀에 비례 ✅
+```
+
+---
+
+## 📝 핵심 정리
+
+### 구현한 시스템
+
+```
+Niagara Particle System 추가
+  ↓
+Socket에 부착
+  ↓
+Function으로 관리
+  ↓
+Event Tick에서 매 프레임 업데이트
+  ↓
+스로틀 값에 따라 실시간 크기 조절
+```
+
+### 전체 노드 흐름
+
+```
+[Event Tick] (매 프레임 실행)
+  ↓
+[VFX_Throttle_Management] Function
+  ↓
+  [GET] Throttle Value (현재 스로틀)
+    ↓
+  [Multiply] × 2.0 (크기 증폭)
+    ↓
+  [Make Vector]
+    ├─ X: Throttle × 2
+    ├─ Y: 1.0
+    └─ Z: 1.0
+    ↓
+  [Set Vector Parameter]
+    ├─ Target: Left_Engine
+    ├─ Parameter Name: "Scale"
+    └─ Parameter Value: Vector
+
+  (Right_Engine도 동일)
+```
+
+### 최종 설정값
+
+```
+Niagara System:
+  └─ NS_Engine_F18
+
+Sockets:
+  ├─ Left_Engine → LT_Engine
+  └─ Right_Engine → RT_Engine
+
+Rotation:
+  └─ Z: 180도
+
+Scale Parameter:
+  ├─ X: Throttle Value × 2
+  ├─ Y: 1.0
+  └─ Z: 1.0
+
+Update:
+  └─ Event Tick (매 프레임)
+```
+
+---
+
+## 💡 추가 설명
+
+### Event Tick의 성능 고려
+
+```
+Event Tick = 매우 자주 실행
+  ↓
+주의사항:
+  - 무거운 계산 지양
+  - 필요한 작업만 수행
+  - 함수로 분리하여 관리
+
+이 강의:
+  - 간단한 Vector 설정만
+  - 성능 영향 미미 ✅
+```
+
+### Vector Parameter의 활용
+
+```
+Scale 외에도 다양한 파라미터:
+  ├─ Color (Vector3: R, G, B)
+  ├─ Velocity (Vector3: 속도)
+  ├─ Direction (Vector3: 방향)
+  └─ Offset (Vector3: 위치 오프셋)
+
+확장 가능성:
+  - 스로틀에 따라 색상 변경
+  - 속도에 따라 방향 조정
+  - 더 복잡한 효과 구현
+```
+
+### Socket의 강력함
+
+```
+Socket 사용 장점:
+  ├─ 자동 위치 추적
+  ├─ 모델 애니메이션과 동기화
+  ├─ 좌표 계산 불필요
+  └─ 수정 시 편리함
+
+예시:
+  엔진이 움직이면 (애니메이션)
+  ↓
+  Socket도 함께 이동
+  ↓
+  화염도 자동으로 따라감
+```
+
+### Multiply의 실용성
+
+```
+간단한 값 조정:
+  - 슬라이더처럼 배수 조절
+  - 실시간 테스트 가능
+  - 아티스트도 쉽게 조정
+
+Promote to Variable (변수화):
+  - Multiply 값을 변수로 만들기
+  - Details 패널에서 조정 가능
+  - 리컴파일 없이 변경
+```
+
+---
+
+# { 🎮 엔진 사운드 시스템 구현하기 }
+
+## 🎯 목표
+
+스로틀 값에 따라 엔진 소리가 변하도록 구현
+
+- 가속 시: 소리 크기 & 음높이 증가
+- 감속 시: 소리 크기 & 음높이 감소
+- MetaSound 시스템 사용
+
+---
+
+## 💡 핵심 개념
+
+### MetaSound란?
+
+```
+언리얼 엔진의 고급 오디오 시스템
+  ↓
+특징:
+  ├─ Blueprint처럼 노드 기반
+  ├─ 실시간 오디오 제어 가능
+  ├─ 파라미터 조절 가능
+  └─ 복잡한 사운드 구현
+
+기존 사운드 시스템과 차이:
+  - 단순 재생만: Sound Cue
+  - 복잡한 제어: MetaSound ✅
+```
+
+### 왜 사운드가 필요한가?
+
+```
+현재:
+  시각적 피드백만 있음 (화염 VFX)
+  ↓
+문제:
+  - 귀로 듣는 피드백 없음
+  - 몰입감 부족
+  ↓
+해결:
+  스로틀에 반응하는 엔진 사운드
+  ↓
+  시각 + 청각 피드백 = 완벽한 몰입감
+```
+
+---
+
+## 🔧 1단계: 폴더 구조 생성
+
+### 정리된 폴더 구조의 중요성
+
+```
+프로젝트가 커질수록:
+  - 파일이 수백~수천 개
+  - 정리 안 하면 찾기 어려움
+  - 협업 시 혼란
+
+해결책:
+  - 기능별 폴더 분리
+  - 명확한 이름 사용
+  - 일관된 구조 유지
+```
+
+### 폴더 생성
+
+```
+Content Drawer → FighterJet 폴더
+  ↓
+우클릭 → New Folder
+  ↓
+이름: Sound
+```
+
+---
+
+## 🔧 2단계: MetaSound 생성
+
+### 생성 방법
+
+```
+Sound 폴더에서 우클릭
+  ↓
+Audio → MetaSound Source
+  ↓
+이름: MS_Jet_Engine
+  (MS = MetaSound의 약자)
+```
+
+**MetaSound Source란?**
+
+```
+MetaSound의 한 종류
+  ↓
+Source (소스):
+  - 소리의 출발점
+  - 3D 공간에서 재생 가능
+  - 게임 오브젝트에 부착 가능
+
+다른 타입들:
+  - MetaSound Patch: 사운드 처리 효과
+  - MetaSound Source: 실제 재생용 (이 강의)
+```
+
+---
+
+## 🔧 3단계: MetaSound 에디터 이해
+
+### 에디터 열기
+
+```
+MS_Jet_Engine 더블클릭
+  ↓
+MetaSound 에디터 표시
+```
+
+### 에디터 구조
+
+```
+Blueprint와 유사:
+  ├─ 노드 기반 시스템
+  ├─ 입력/출력 핀 연결
+  ├─ 실행 흐름 제어
+  └─ 파라미터 노출
+
+차이점:
+  - 오디오 전용
+  - 실시간 오디오 처리
+  - 재생 테스트 가능
+```
+
+---
+
+## 🔧 4단계: Wave Player 노드 설정
+
+### Wave Player란?
+
+```
+기능: 오디오 파일을 재생하는 노드
+  ↓
+입력:
+  ├─ Wave Asset: 재생할 오디오 파일
+  ├─ On Play: 재생 시작 신호
+  └─ Pitch Shift: 음높이 조절
+
+출력:
+  ├─ Out Mono: 모노 오디오 출력
+  ├─ On Finished: 재생 완료 신호
+  └─ On Looped: 반복 재생 신호
+```
+
+### 오디오 파일 선택
+
+```
+Wave Player 노드
+  ↓
+Details 패널 → Wave Asset
+  ↓
+선택: Jet_Engine (제트 엔진 사운드)
+```
+
+### 재생 테스트 (실패)
+
+```
+Play 버튼 클릭
+  ↓
+아무 소리도 안 남 ❌
+  ↓
+이유: 출력단에 연결 안 됨
+```
+
+---
+
+## 🔧 5단계: 출력 연결
+
+### Mono Mixer 노드란?
+
+```
+기능: 여러 오디오를 믹싱하는 노드
+  ↓
+입력:
+  ├─ In 0, In 1: 오디오 입력 (최대 2개)
+  ├─ Gain 0, Gain 1: 각 입력의 볼륨
+  └─ 여러 소리를 섞을 수 있음
+
+출력:
+  └─ Out: 믹싱된 오디오
+```
+
+### 연결 구조
+
+```
+[Wave Player]
+  ├─ Out Mono
+  ↓
+[Mono Mixer (2)]
+  ├─ In 0
+  ↓
+[Output] (최종 출력)
+```
+
+### 재생 테스트 (성공)
+
+```
+Play 버튼 클릭
+  ↓
+제트 엔진 소리 재생 ✅
+  ↓
+하지만 한 번만 재생되고 끝남
+
+```
+
+---
+
+## 🔧 6단계: 반복 재생 설정
+
+### Loop 옵션 활성화
+
+```
+Wave Player 노드
+  ↓
+Details 패널 → Loop 체크박스
+  ↓
+체크 ✅
+```
+
+**Loop (루프)란?**
+
+```
+기능: 오디오 끝까지 재생 → 처음부터 다시 재생
+  ↓
+효과:
+  - 끊임없이 반복
+  - 엔진 소리에 필수
+  - 한 번만 재생 X, 계속 재생 ✅
+
+실제 엔진:
+  - 시동 걸면 계속 돌아감
+  - Loop로 재현
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380590/notion-blog/_/_/BG/2/image_14.png)
+
+---
+
+## 🔧 7단계: 볼륨 제어를 위한 파라미터 생성
+
+### Promote to Graph Input
+
+```
+Mono Mixer → Gain 0 핀
+  ↓
+우클릭 → Promote to Graph Input
+  ↓
+이름: Gain (또는 Volume)
+```
+
+**Promote to Graph Input이란?**
+
+```
+내부 값을 외부에서 제어 가능하게 만드는 기능
+  ↓
+Before:
+  - Gain 값이 노드 내부에 고정
+  - Blueprint에서 변경 불가
+
+After:
+  - Gain이 입력 파라미터로 노출
+  - Blueprint에서 실시간 변경 가능 ✅
+```
+
+### 파라미터 범위 설정
+
+```
+Inputs 패널에서 Gain 클릭
+  ↓
+Details 패널 → Default Value
+  ↓
+범위 설정:
+  ├─ Min: 0.5
+  ├─ Max: 2.0
+  └─ Default: 0.5
+```
+
+**왜 이 범위인가?**
+
+```
+0.5 (최소):
+  - 스로틀 0일 때
+  - 엔진이 꺼진 상태는 아님
+  - 아이들링(공회전) 소리 유지
+
+2.0 (최대):
+  - 스로틀 최대일 때
+  - 기본값의 4배 볼륨
+  - 강력한 엔진 소리
+```
+
+---
+
+## 🔧 8단계: 음높이(Pitch) 제어 추가
+
+### Gain을 Pitch Shift에도 연결
+
+```
+[Gain] 입력 파라미터
+  ├─ → Mono Mixer의 Gain 0
+  └─ → Wave Player의 Pitch Shift
+```
+
+**Pitch Shift란?**
+
+```
+기능: 음의 높이를 변경
+  ↓
+효과:
+  - 값이 클수록: 높은 음 (빠른 회전)
+  - 값이 작을수록: 낮은 음 (느린 회전)
+
+실제 엔진:
+  - RPM 높음 = 높은 음
+  - RPM 낮음 = 낮은 음
+  ↓
+  스로틀 증가 = Pitch 증가로 재현
+```
+
+### 테스트
+
+```
+Play 버튼 클릭
+  ↓
+Gain 슬라이더 조절
+  ↓
+결과:
+  - 볼륨 변화 ✅
+  - 음높이 변화 ✅
+```
+
+---
+
+## 🔧 9단계: Pitch 효과 증폭
+
+### Multiply 노드 추가
+
+```
+[Gain] 입력
+  ↓
+[Multiply] × 2.0
+  ↓
+[Wave Player] Pitch Shift
+```
+
+### 배수 테스트
+
+```
+× 2.0:
+  - Gain 0.5 → Pitch 1.0
+  - Gain 2.0 → Pitch 4.0
+  - 적당한 변화 ✅
+
+× 4.0:
+  - 너무 극단적
+  - 비현실적 ❌
+
+최종 선택: × 2.0
+
+```
+
+**왜 Multiply가 필요한가?**
+
+```
+Gain만 연결:
+  - 0.5~2.0 범위
+  - Pitch 변화 미미
+  - 차이 느끼기 어려움
+
+Multiply 추가:
+  - 0.5 × 2 = 1.0
+  - 2.0 × 2 = 4.0
+  - 명확한 차이 ✅
+```
+
+---
+
+## 🔧 10단계: Blueprint에 Audio Component 추가
+
+### 컴포넌트 추가
+
+```
+BP_F18 → Components 패널
+  ↓
+Mesh 선택 (자식으로 추가)
+  ↓
++ Add → Audio
+  ↓
+이름: Jet_Engine
+```
+
+### MetaSound 할당
+
+```
+Jet_Engine 컴포넌트 선택
+  ↓
+Details 패널 → Sound
+  ↓
+선택: MS_Jet_Engine
+```
+
+**Audio Component란?**
+
+```
+기능: 게임 오브젝트에 소리 추가
+  ↓
+특징:
+  ├─ 3D 공간 사운드
+  ├─ 거리에 따라 볼륨 감소
+  ├─ 실시간 제어 가능
+  └─ MetaSound 재생 가능
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380590/notion-blog/_/_/BG/2/image_15.png)
+
+---
+
+## 🔧 11단계: VFX Function에 사운드 제어 추가
+
+### Set Float Parameter 노드 추가
+
+```
+VFX_Throttle_Management Function 내부
+  ↓
+Jet_Engine 컴포넌트 드래그
+  ↓
+검색: Set Float Parameter
+```
+
+### Set Float Parameter 노드란?
+
+```
+기능: Audio Component의 Float 파라미터 변경
+  ↓
+입력:
+  ├─ Target: 대상 Audio Component
+  ├─ In Name: 파라미터 이름
+  └─ In Float: 새로운 값
+
+출력:
+  Audio Component의 파라미터가 실시간 업데이트
+```
+
+### ⚠️ 주의: 올바른 노드 선택
+
+```
+검색 결과에 여러 개 표시:
+  ├─ Set Float Parameter (Vector 타입) - 노란색 ❌
+  └─ Set Float Parameter (Float 타입) - 파란색 ✅
+
+올바른 선택:
+  - 파란색 핀이 있는 노드
+  - Float 타입 전용
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380591/notion-blog/_/_/BG/2/image_16.png)
+
+---
+
+## 🔧 12단계: 파라미터 연결
+
+### 기본 연결
+
+```
+[Jet_Engine] Audio Component
+  ↓
+[Set Float Parameter]
+  ├─ Target: Jet_Engine
+  ├─ In Name: "Gain"
+  └─ In Float: Throttle Value
+```
+
+### 노드 구조
+
+```
+VFX_Throttle_Management Function:
+
+[Left_Engine VFX 제어]
+[Right_Engine VFX 제어]
+  ↓
+[Set Float Parameter] Jet_Engine
+  ├─ In Name: "Gain"
+  └─ In Float: Throttle Value
+```
+
+---
+
+## ✅ 1차 테스트
+
+### 테스트 실행
+
+```
+컴파일 → 저장 → 게임 실행
+  ↓
+Shift로 가속
+  ↓
+결과 확인
+```
+
+### 동작 확인
+
+```
+Shift 누름:
+  - 소리 커짐 ✅
+  - 음높이 올라감 ✅
+
+Ctrl 누름:
+  - 소리 작아짐 ✅
+  - 음높이 내려감 ✅
+```
+
+### 발견된 문제
+
+```
+변화가 너무 작음
+  ↓
+스로틀 0일 때: 소리가 너무 작거나 없음
+  ↓
+기본값 조정 필요
+```
+
+---
+
+## 🔧 13단계: 기본값 추가 (Offset)
+
+### Add 노드 추가
+
+```
+Throttle Value와 Set Float Parameter 사이에
+  ↓
+[Add] + 0.5 노드 추가
+```
+
+### 노드 구조
+
+```
+[GET] Throttle Value (0~1)
+  ↓
+[Add] + 0.5
+  ↓
+결과: 0.5~1.5
+  ↓
+[Set Float Parameter]
+  └─ In Float: 0.5~1.5
+```
+
+**왜 0.5를 더하나?**
+
+```
+Before:
+  스로틀 0 → Gain 0 → 소리 없음 ❌
+  스로틀 1 → Gain 1 → 약간 커짐
+
+After:
+  스로틀 0 → Gain 0.5 → 최소 볼륨 유지 ✅
+  스로틀 1 → Gain 1.5 → 충분히 큼 ✅
+
+효과:
+  - 항상 기본 소리 유지
+  - 완전히 조용해지지 않음
+  - 더 자연스러운 엔진 소리
+```
+
+---
+
+## 🔧 14단계: MetaSound 기본값 조정
+
+### 입력 파라미터 기본값 변경
+
+```
+MS_Jet_Engine 열기
+  ↓
+Inputs 패널 → Gain 선택
+  ↓
+Details 패널 → Default: 0.5
+```
+
+### 왜 기본값을 0.5로?
+
+```
+Blueprint에서 전달:
+  최소값 0.5 (스로틀 0일 때)
+  ↓
+MetaSound 기본값:
+  0.5로 설정
+  ↓
+일치:
+  - Blueprint와 MetaSound 동기화
+  - 예측 가능한 동작
+  - 디버깅 쉬움
+```
+
+---
+
+## ✅ 최종 테스트
+
+### 완성된 시스템 테스트
+
+```
+컴파일 → 저장 → 게임 실행
+  ↓
+종합 확인
+```
+
+### 테스트 시나리오
+
+**1. 정지 상태**
+
+```
+스로틀: 0
+  ↓
+VFX: 화염 없음
+Audio: 낮은 아이들링 소리 ✅
+```
+
+**2. 가속**
+
+```
+Shift 키 누르기
+  ↓
+스로틀: 0 → 1.0 증가
+  ↓
+VFX: 화염 커짐
+Audio:
+  - 볼륨 증가 ✅
+  - 음높이 증가 ✅
+  - 부드러운 변화 ✅
+```
+
+**3. 감속**
+
+```
+Ctrl 키 누르기
+  ↓
+스로틀: 1.0 → 0 감소
+  ↓
+VFX: 화염 작아짐
+Audio:
+  - 볼륨 감소 ✅
+  - 음높이 감소 ✅
+  - 부드러운 변화 ✅
+```
+
+**4. 중간 스로틀**
+
+```
+Shift 살짝만 누름
+  ↓
+스로틀: 0.5
+  ↓
+VFX: 중간 크기 화염
+Audio: 중간 볼륨 & 음높이 ✅
+```
+
+---
+
+## 📝 핵심 정리
+
+### 구현한 시스템
+
+```
+MetaSound 생성
+  ├─ Wave Player (제트 엔진 사운드)
+  ├─ Loop 설정 (반복 재생)
+  ├─ Gain 파라미터 (볼륨 제어)
+  └─ Pitch Shift (음높이 제어)
+  ↓
+Blueprint 연결
+  ├─ Audio Component 추가
+  ├─ Set Float Parameter로 제어
+  └─ Throttle Value 연동
+  ↓
+완성: 스로틀 반응형 엔진 사운드
+```
+
+### 전체 노드 흐름
+
+**MetaSound 내부**
+
+```
+[Wave Player] Jet_Engine (Loop)
+  ├─ Out Mono
+  ↓
+[Mono Mixer]
+  ├─ In 0
+  ├─ Gain 0 ← [Gain] 파라미터
+  ↓
+[Output]
+
+[Gain] 파라미터
+  ├─ → Mono Mixer Gain 0 (볼륨)
+  ├─ → Multiply × 2
+  └─ → Wave Player Pitch Shift (음높이)
+```
+
+**Blueprint 내부**
+
+```
+VFX_Throttle_Management Function:
+
+[GET] Throttle Value
+  ↓
+[Add] + 0.5
+  ↓
+[Set Float Parameter]
+  ├─ Target: Jet_Engine
+  ├─ In Name: "Gain"
+  └─ In Float: Throttle + 0.5
+```
+
+### 최종 설정값
+
+```
+MetaSound:
+  ├─ Loop: Enabled
+  ├─ Gain Range: 0.5~2.0
+  ├─ Gain Default: 0.5
+  └─ Pitch Multiplier: × 2.0
+
+Blueprint:
+  ├─ Throttle Value: 0~1
+  ├─ Offset: + 0.5
+  └─ Final Gain: 0.5~1.5
+```
+
+---
+
+## 💡 추가 설명
+
+### MetaSound vs Sound Cue
+
+```
+Sound Cue (기존 시스템):
+  ├─ 간단한 사운드 재생
+  ├─ 기본적인 믹싱
+  └─ 제한적인 제어
+
+MetaSound (최신 시스템):
+  ├─ 복잡한 오디오 처리
+  ├─ 실시간 파라미터 제어
+  ├─ DSP 효과 추가
+  └─ 더 강력하고 유연함 ✅
+```
+
+### Mono vs Stereo
+
+```
+Mono (모노):
+  - 단일 채널
+  - 공간감 적음
+  - 파일 크기 작음
+  - 3D 사운드에 적합 ✅
+
+Stereo (스테레오):
+  - 좌/우 2채널
+  - 공간감 풍부
+  - 파일 크기 2배
+  - 음악에 적합
+
+엔진 소리:
+  - Mono 사용 권장
+  - 3D 위치 기반 재생
+  - Audio Component가 공간감 제공
+```
+
+### Gain vs Volume
+
+```
+기술적으로는 다르지만 비슷:
+
+Gain (게인):
+  - 신호 증폭
+  - Linear 값 (선형)
+  - 0.5 = 절반, 2.0 = 2배
+
+Volume (볼륨):
+  - 인간이 느끼는 소리 크기
+  - dB (데시벨) 단위
+  - 로그 스케일
+
+MetaSound:
+  - Gain이라 부르지만
+  - 실제로는 Volume 제어
+```
+
+### Loop의 중요성
+
+```
+Loop 없이:
+  - 소리 한 번 재생 → 끝
+  - 다시 재생 필요
+  - 끊김 현상
+  - 비현실적
+
+Loop 있음:
+  - 자동 반복
+  - 끊김 없음
+  - 연속적인 소리
+  - 실제 엔진과 유사 ✅
+```
+
+---
+
+## 💡 실전 팁
+
+### 사운드 최적화
+
+```
+거리 감쇠 설정:
+  - Audio Component → Attenuation
+  - 멀리서는 작게
+  - 가까이서는 크게
+
+최대 인스턴스:
+  - 동시 재생 제한
+  - 성능 향상
+  - 중요한 소리 우선
+
+볼륨 밸런싱:
+  - 다른 효과음과 균형
+  - 배경음악 고려
+  - 반복 테스트로 조정
+```
+
+### MetaSound 활용
+
+```
+추가 파라미터:
+  - RPM에 따른 세밀한 제어
+  - 데미지 상태 반영
+  - 고도에 따른 변화
+
+DSP 효과:
+  - Reverb (공간감)
+  - EQ (음색 조정)
+  - Distortion (왜곡)
+
+동적 믹싱:
+  - 상황에 따른 볼륨 자동 조절
+  - 중요한 소리 강조
+  - 배경 소리 자동 감소
+```

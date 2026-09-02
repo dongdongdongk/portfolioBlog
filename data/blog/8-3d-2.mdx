@@ -1,0 +1,2385 @@
+---
+title: '섹션 8: 제트팩 저니 - 제트팩을 이용한 3D 플랫폼 게임 - 2'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 🎮 게임패드(콘솔 컨트롤러) 입력 추가 }
+
+## 🎯 목표
+
+Xbox/PlayStation 컨트롤러 입력을 간단하게 추가합니다.
+
+---
+
+## ⚙️ 설정 방법
+
+### 1. IA_Look에 오른쪽 스틱 추가
+
+```
+IMC_KickActions 열기
+  ↓
+IA_Look 매핑 확장
+  ↓
++ 버튼 → Gamepad → Right Thumbstick 2D-Axis
+
+2개 Modifier 추가:
+  ├─ Dead Zone (표류 방지)
+  └─ Negate Y축 (상하 반전)
+```
+
+### 2. IA_Move에 왼쪽 스틱 추가
+
+```
+IA_Move 매핑 확장
+  ↓
++ 버튼 → Gamepad → Left Thumbstick 2D-Axis
+
+1개 Modifier 추가:
+  └─ Dead Zone (표류 방지)
+```
+
+### 3. IA_Jump에 A 버튼 추가
+
+```
+IA_Jump 매핑 확장
+  ↓
++ 버튼 → Gamepad → Face Button Bottom
+(Xbox A 버튼, PlayStation X 버튼)
+```
+
+---
+
+## 🔧 핵심 개념
+
+### Dead Zone이란?
+
+```
+문제:
+스틱을 안 눌러도 미세한 입력 발생
+  ↓
+캐릭터가 저절로 움직임 (표류)
+
+해결:
+Dead Zone = 임계값 이하 입력 무시
+  ↓
+표류 방지
+```
+
+### 압력 감도
+
+```
+키보드:
+  └─ 0 또는 1 (눌림/안눌림)
+
+게임패드 스틱:
+  └─ 0~1 사이 값 (압력 정도)
+
+장점:
+  ├─ 천천히 이동 가능
+  └─ 걷기/달리기 섞기 가능
+```
+
+---
+
+## 💡 장점
+
+```
+✅ 기존 코드 변경 불필요
+✅ IMC에만 추가하면 됨
+✅ 키보드/게임패드 동시 사용
+✅ 콘솔 출시 대비
+```
+
+**게임패드 없어도 괜찮음 - 나중에 필요하면 추가 가능!** 🎮
+
+# { 🎬 Animation Blueprint 기초 - 애니메이션 시스템 시작 }
+
+## 🎯 이번 강의 목표
+
+Animation Blueprint를 생성하고 기본 애니메이션을 재생합니다.
+움직임에 따라 유휴/달리기 애니메이션을 자동 전환합니다.
+
+---
+
+## 📝 현재 문제점
+
+```
+현재 상태:
+BP_Kicks가 A-Pose (T-Pose)로 서있음
+  ↓
+움직여도 포즈 변화 없음
+  ↓
+애니메이션 필요!
+```
+
+---
+
+## 🎨 애니메이션 에셋 확인
+
+### 프로젝트에 있는 애니메이션
+
+```
+Content/Kicks/Animations/
+  ├─ A_Kix_Idle (유휴 자세)
+  ├─ A_Kix_RunForward (달리기)
+  ├─ A_Kix_Jump (점프)
+  └─ ... (기타)
+
+네이밍:
+A_ = Animation Sequence
+```
+
+### Animation Sequence란?
+
+```
+정의:
+녹화된 뼈대 움직임 데이터
+
+특징:
+  ├─ 시작부터 끝까지 정해진 동작
+  ├─ 반복 재생 가능 (Loop)
+  └─ Skeletal Mesh에 적용
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380752/notion-blog/_/_/_5_/_8_-_3D_-_2/image.png)
+
+### 애니메이션 확인
+
+```
+A_Kix_Idle 더블클릭
+  ↓
+Animation Editor 실행
+  ↓
+Viewport에서 애니메이션 재생 확인
+
+Asset Details:
+  └─ Loop: ✅ (체크 시 반복 재생)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380746/notion-blog/_/_/_5_/_8_-_3D_-_2/image_1.png)
+
+---
+
+## 🔧 단일 애니메이션 재생 (간단한 방법)
+
+### Mesh에 직접 할당
+
+```
+BP_Kicks 열기
+  ↓
+Mesh 선택
+  ↓
+Details → Animation 섹션
+  ↓
+Animation Mode: Use Animation Asset
+  ↓
+Anim to Play: A_Kix_Idle 선택
+  ↓
+✅ Looping
+✅ Playing
+```
+
+**결과**
+
+```
+Idle 애니메이션만 재생
+  ↓
+움직여도 계속 Idle
+  ↓
+제한적! 실전에서 사용 안 함
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380748/notion-blog/_/_/_5_/_8_-_3D_-_2/image_2.png)
+
+---
+
+## 🎬 Animation Blueprint 생성
+
+### 1. 블루프린트 생성
+
+```
+Content/Blueprints/Kicks/
+  ↓
+우클릭 → Animation → Animation Blueprint
+  ↓
+선택:
+  ├─ Skeleton: SKEL_Kicks
+  └─ Parent Class: AnimInstance (기본)
+  ↓
+이름: ABP_Kicks
+
+네이밍:
+ABP_ = Animation Blueprint
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380751/notion-blog/_/_/_5_/_8_-_3D_-_2/image_3.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380751/notion-blog/_/_/_5_/_8_-_3D_-_2/image_4.png)
+
+### 2. Animation Blueprint 구조
+
+```
+ABP_Kicks 열면 3개 패널:
+
+┌─────────────────────────────────┐
+│ Viewport (좌상)                 │
+│ - 애니메이션 미리보기           │
+├─────────────────────────────────┤
+│ Event Graph (탭)                │
+│ - 데이터 수집 및 계산           │
+├─────────────────────────────────┤
+│ Anim Graph (탭)                 │
+│ - 포즈 선택 및 블렌딩           │
+├─────────────────────────────────┤
+│ Asset Browser (우하)            │
+│ - 사용 가능한 애니메이션 목록   │
+└─────────────────────────────────┘
+```
+
+---
+
+## 🎨 Anim Graph - 포즈 선택
+
+### Output Pose 노드
+
+```
+Anim Graph에 기본 생성:
+
+[?] → [Output Pose]
+
+Output Pose:
+  └─ 최종적으로 캐릭터에 적용될 포즈
+
+Result 입력:
+  └─ Animation Pose 타입
+      (어떤 애니메이션을 재생할지)
+```
+
+### Sequence Player 추가
+
+```
+Asset Browser
+  ↓
+A_Kix_Idle 드래그 → Anim Graph
+  ↓
+Sequence Player 노드 생성
+
+[A_Kix_Idle Sequence Player] → [Output Pose]
+```
+
+**Sequence Player란?**
+
+```
+기능:
+특정 Animation Sequence를 재생하는 노드
+
+출력:
+  └─ Animation Pose (포즈 데이터)
+
+설정:
+  ├─ Sequence: 재생할 애니메이션
+  └─ Loop Animation: 반복 여부
+```
+
+### 컴파일 및 확인
+
+```
+Compile 버튼 클릭
+  ↓
+Viewport에서 Idle 애니메이션 재생 확인
+
+⚠️ Loop Animation 체크해야 반복 재생
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380751/notion-blog/_/_/_5_/_8_-_3D_-_2/image_5.png)
+
+---
+
+## 🔗 Character에 적용
+
+### Animation Mode 변경
+
+```
+BP_Kicks 열기
+  ↓
+Mesh 선택
+  ↓
+Details → Animation
+  ↓
+Animation Mode:
+  Use Animation Asset → Use Animation Blueprint
+  ↓
+Anim Class: ABP_Kicks 선택
+```
+
+**Play 테스트**
+
+```
+Play 누르면
+  ↓
+Idle 애니메이션 재생!
+  ↓
+하지만 움직여도 계속 Idle...
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380752/notion-blog/_/_/_5_/_8_-_3D_-_2/image_6.png)
+
+---
+
+## 🔄 Event Graph - 데이터 수집
+
+### Blueprint Update Animation 이벤트
+
+```
+Event Graph에 기본 생성:
+
+[Event Blueprint Update Animation]
+
+기능:
+매 프레임 실행 (Actor의 Tick과 유사)
+  ↓
+애니메이션 업데이트 전에 실행
+  ↓
+여기서 데이터 수집/계산
+```
+
+### Pawn Owner 가져오기
+
+```
+우클릭 → Try Get Pawn Owner
+
+기능:
+이 Animation BP를 사용하는 Pawn 반환
+
+반환값:
+  └─ BP_Kicks (우리 캐릭터)
+```
+
+### 움직임 감지 - Is Velocity Zero
+
+**전체 흐름**
+
+```
+[Event Blueprint Update Animation]
+  ↓
+[Try Get Pawn Owner]
+  ↓
+[Get Movement Component]
+  ↓
+[Get Velocity] (속도 벡터)
+  ↓
+[Vector Is Zero] (속도가 0인가?)
+  ↓
+[SET Is Velocity Zero] (변수에 저장)
+```
+
+**각 단계 설명**
+
+```
+1. Get Movement Component
+   Pawn → Movement Component 가져오기
+
+2. Get Velocity
+   Movement Component의 Velocity 속성
+   └─ Vector 타입 (방향 + 속도)
+
+3. Vector Is Zero
+   입력: Vector
+   출력: Bool
+   기능: Vector가 (0,0,0)인지 확인
+
+4. Is Velocity Zero 변수
+   타입: Bool
+   의미:
+     ├─ True: 정지 중
+     └─ False: 이동 중
+```
+
+---
+
+## 📊 변수 생성 및 저장
+
+### Is Velocity Zero 변수
+
+```
+Vector Is Zero 결과 핀
+  ↓
+우클릭 → Promote to Variable
+  ↓
+이름: Is Velocity Zero
+
+카테고리: (기본값)
+타입: Boolean
+```
+
+**매 프레임 업데이트**
+
+```
+Event Blueprint Update Animation (매 프레임)
+  ↓
+계산: 현재 속도가 0인가?
+  ↓
+저장: Is Velocity Zero 변수에
+  ↓
+Anim Graph에서 사용 가능
+```
+
+---
+
+## 🎭 Blend Poses by Bool - 조건부 블렌딩
+
+### 노드 추가
+
+```
+Anim Graph에서 우클릭
+  ↓
+"Blend Poses by bool" 검색
+  ↓
+노드 생성
+
+[Blend Poses by bool] → [Output Pose]
+```
+
+### 입력 이해
+
+```
+Blend Poses by bool:
+
+입력:
+  ├─ True Pose: 조건이 참일 때 포즈
+  ├─ False Pose: 조건이 거짓일 때 포즈
+  ├─ Active Value: Bool (조건)
+  ├─ True Blend Time: True로 전환 시간
+  └─ False Blend Time: False로 전환 시간
+
+출력:
+  └─ Result Pose
+```
+
+### 연결하기
+
+**True Pose (정지 시)**
+
+```
+A_Kix_Idle Sequence Player
+  ↓
+True Pose
+
+✅ Loop Animation 체크
+```
+
+**False Pose (이동 시)**
+
+```
+A_Kix_RunForward Sequence Player
+  ↓
+False Pose
+
+✅ Loop Animation 체크
+```
+
+**Active Value (조건)**
+
+```
+Is Velocity Zero (변수)
+  ↓
+드래그 → Active Value
+
+의미:
+  ├─ True (속도 0): Idle 재생
+  └─ False (이동 중): Run 재생
+```
+
+---
+
+## ⏱️ Blend Time - 전환 속도
+
+### 설정값 의미
+
+```
+Blend Time = 전환에 걸리는 시간 (초)
+
+예:
+  ├─ 0.0: 즉시 전환 (뚝뚝 끊김)
+  ├─ 0.1: 매우 빠른 전환 (권장)
+  ├─ 0.5: 부드러운 전환
+  └─ 2.0: 매우 느린 전환 (어색함)
+
+권장값: 0.1 ~ 0.3
+```
+
+### 테스트
+
+```
+Blend Time: 0.1 설정
+  ↓
+Compile & Save
+  ↓
+Play 테스트:
+  ├─ 정지 시: Idle 애니메이션
+  └─ 이동 시: Run 애니메이션
+
+부드럽게 전환됨!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380752/notion-blog/_/_/_5_/_8_-_3D_-_2/image_7.png)
+
+---
+
+## 🔍 전체 작동 원리
+
+### 데이터 흐름
+
+```
+게임 실행 중 매 프레임:
+
+1. Event Graph (데이터 수집)
+   ↓
+   Movement Component의 Velocity 확인
+   ↓
+   Is Velocity Zero 변수 업데이트
+
+2. Anim Graph (포즈 선택)
+   ↓
+   Is Velocity Zero 변수 확인
+   ↓
+   True → Idle Pose
+   False → Run Pose
+   ↓
+   Blend Time 동안 부드럽게 전환
+   ↓
+   Output Pose → Character Mesh
+```
+
+### 시각화
+
+```
+Character 움직임
+  ↓
+Movement Component 속도 변화
+  ↓
+Animation BP 감지
+  ├─ Event Graph: 속도 → 변수
+  └─ Anim Graph: 변수 → 포즈 선택
+  ↓
+Mesh에 적용
+  ↓
+부드러운 애니메이션 전환
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Animation Blueprint 역할
+
+```
+역할 분담:
+
+Character Blueprint:
+  └─ 움직임 로직 (이동, 점프 등)
+
+Animation Blueprint:
+  └─ 애니메이션 선택 및 재생
+
+분리의 장점:
+  ├─ 코드 정리
+  ├─ 재사용 가능
+  └─ 애니메이터와 프로그래머 협업 용이
+```
+
+### Event Graph vs Anim Graph
+
+```
+Event Graph:
+  ├─ 언제: 매 프레임
+  ├─ 역할: 데이터 수집 및 계산
+  └─ 예: 속도, 공중 여부, 방향 등
+
+Anim Graph:
+  ├─ 언제: 애니메이션 업데이트 시
+  ├─ 역할: 포즈 선택 및 블렌딩
+  └─ 예: Idle, Run, Jump 포즈 결정
+```
+
+### Sequence Player
+
+```
+기능:
+단일 Animation Sequence 재생
+
+설정:
+  ├─ Sequence: 재생할 애니메이션
+  ├─ Loop: 반복 여부
+  └─ Play Rate: 재생 속도
+
+출력:
+  └─ Animation Pose
+```
+
+### Blend Poses by Bool
+
+```
+기능:
+Bool 값에 따라 2개 포즈 중 선택
+
+장점:
+  └─ 부드러운 전환 (Blend Time)
+
+단점:
+  └─ 2개 포즈만 가능
+
+해결:
+  └─ Blend Space 사용 (다음 강의)
+```
+
+---
+
+## 📝 용어 정리
+
+| 용어                             | 설명                                  |
+| -------------------------------- | ------------------------------------- |
+| Animation Blueprint              | 애니메이션 로직을 담당하는 블루프린트 |
+| Animation Sequence               | 녹화된 애니메이션 데이터              |
+| Sequence Player                  | Animation Sequence를 재생하는 노드    |
+| Output Pose                      | 최종적으로 적용될 포즈                |
+| Blend                            | 두 애니메이션을 부드럽게 섞기         |
+| Blend Time                       | 블렌딩에 걸리는 시간                  |
+| Event Blueprint Update Animation | 매 프레임 실행되는 이벤트             |
+| Try Get Pawn Owner               | Animation BP 소유자 Pawn 가져오기     |
+| Velocity                         | 속도 벡터 (방향 + 속도)               |
+| Vector Is Zero                   | 벡터가 0인지 확인                     |
+
+---
+
+## ⚠️ 주의사항
+
+### Loop Animation 체크
+
+```
+❌ Loop 미체크:
+   1번만 재생 후 멈춤
+
+✅ Loop 체크:
+   계속 반복 재생
+
+Idle, Run 등 지속 동작은
+반드시 Loop 체크!
+```
+
+### Blend Time 적절히 설정
+
+```
+너무 짧음 (0.0):
+  └─ 뚝뚝 끊김
+
+너무 김 (2.0):
+  └─ 반응 느림, 어색함
+
+적절한 값 (0.1~0.3):
+  └─ 부드럽고 자연스러움
+```
+
+### Compile 잊지 않기
+
+```
+Anim Graph 수정 후
+  ↓
+반드시 Compile
+  ↓
+안 하면 변경사항 적용 안 됨
+```
+
+---
+
+## 🎯 현재 상태
+
+### 완성된 것
+
+```
+✅ Animation Blueprint 생성
+✅ Idle 애니메이션 재생
+✅ Run 애니메이션 재생
+✅ 움직임에 따라 자동 전환
+✅ 부드러운 블렌딩
+```
+
+### 남은 문제
+
+```
+❌ 점프 애니메이션 없음
+❌ 이동 속도에 따른 변화 없음
+   (걷기/달리기 구분)
+❌ 방향 전환 애니메이션 없음
+
+다음: Blend Space로 해결
+```
+
+---
+
+## 🎯 다음 단계
+
+```
+현재:
+  └─ Bool로 2개 포즈만 전환
+      (Idle ↔ Run)
+
+다음:
+  └─ Blend Space
+      ├─ 속도에 따라 부드럽게 변화
+      ├─ 걷기 → 달리기 자연스럽게
+      └─ 더 복잡한 애니메이션 시스템
+```
+
+---
+
+## ✅ 체크리스트
+
+**Animation Blueprint 생성**
+
+- [ ] ABP_Kicks 생성
+- [ ] SKEL_Kicks 선택
+
+**Anim Graph 설정**
+
+- [ ] A_Kix_Idle Sequence Player
+- [ ] A_Kix_RunForward Sequence Player
+- [ ] 두 노드 Loop Animation 체크
+- [ ] Blend Poses by bool 추가
+- [ ] Output Pose 연결
+
+**Event Graph 설정**
+
+- [ ] Try Get Pawn Owner
+- [ ] Get Movement Component
+- [ ] Get Velocity
+- [ ] Vector Is Zero
+- [ ] Is Velocity Zero 변수 생성
+
+**Character 적용**
+
+- [ ] BP_Kicks Mesh 선택
+- [ ] Animation Mode: Use Animation Blueprint
+- [ ] Anim Class: ABP_Kicks
+
+**테스트**
+
+- [ ] 정지 시 Idle 재생
+- [ ] 이동 시 Run 재생
+- [ ] 부드러운 전환
+
+**다음 강의: Blend Space!** 🎨
+
+# { 🎨 Blend Space - 속도에 따른 애니메이션 블렌딩 }
+
+## 🎯 이번 강의 목표
+
+Blend Space를 만들어 속도에 따라 Idle → Walk → Run 애니메이션을 부드럽게 전환합니다.
+게임패드 압력 감도에 맞춰 자연스러운 애니메이션을 구현합니다.
+
+---
+
+## 🔍 현재 문제점
+
+### Bool 방식의 한계
+
+```
+현재 시스템:
+Is Velocity Zero (Bool)
+  ├─ True: Idle
+  └─ False: Run
+
+문제:
+  ├─ 걷기 애니메이션 없음
+  ├─ 속도 차이 무시
+  └─ 0 또는 100만 존재
+```
+
+### 게임패드 압력 감도 문제
+
+```
+게임패드 스틱:
+  ├─ 살짝 누름: 천천히 이동
+  └─ 끝까지 누름: 빠르게 이동
+
+하지만 애니메이션:
+  └─ 항상 Run (부자연스러움!)
+
+원하는 것:
+  ├─ 천천히 = Walk
+  └─ 빠르게 = Run
+```
+
+---
+
+## 🎨 Blend Space란?
+
+### 정의
+
+```
+Blend Space:
+여러 애니메이션을 값에 따라
+부드럽게 섞는 시스템
+
+예:
+속도 0 → Idle
+속도 100 → Walk
+속도 300 → Run
+속도 150 → Walk + Run 혼합
+```
+
+### 일반 Blend Space vs 1D Blend Space
+
+```
+Blend Space (2D):
+  ├─ 가로축: 예) 속도
+  └─ 세로축: 예) 방향
+
+  2개 값으로 애니메이션 선택
+  (더 복잡한 시스템)
+
+Blend Space 1D:
+  └─ 가로축만: 예) 속도
+
+  1개 값으로 애니메이션 선택
+  (우리가 사용할 것)
+```
+
+---
+
+## 🔧 Blend Space 생성
+
+### 1. 에셋 생성
+
+```
+Content/Kicks/Animations/
+  ↓
+우클릭 → Animation → Legacy → Blend Space 1D
+  ↓
+Skeleton: SKEL_Kicks 선택
+  ↓
+이름: BS_IdleWalkRun
+
+네이밍:
+BS_ = Blend Space
+```
+
+**왜 Legacy의 1D?**
+
+```
+일반 Blend Space:
+  └─ 2개 축 (2차원 그리드)
+
+Blend Space 1D:
+  └─ 1개 축 (1차원 선)
+
+우리는 속도 1개만 사용
+  ↓
+1D로 충분
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380752/notion-blog/_/_/_5_/_8_-_3D_-_2/image_8.png)
+
+---
+
+## ⚙️ Blend Space 설정
+
+### 1. 가로축 설정
+
+**BS_IdleWalkRun 열기**
+
+```
+Asset Details (우측)
+  ↓
+Axis Settings
+  ↓
+Horizontal Axis 확장
+  ↓
+Name: "None" → "Speed" 변경
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380752/notion-blog/_/_/_5_/_8_-_3D_-_2/image_9.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380746/notion-blog/_/_/_5_/_8_-_3D_-_2/image_10.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380748/notion-blog/_/_/_5_/_8_-_3D_-_2/image_11.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380747/notion-blog/_/_/_5_/_8_-_3D_-_2/image_12.png)
+
+```csharp
+이건 1D 가 아니라 기본 블랜드 스페이스고 하나만 사용하도록 설
+```
+
+**최대값 설정**
+
+```
+Maximum Axis Value: 600
+
+이유:
+BP_Kicks → CharacterMovement
+  └─ Max Walk Speed: 600
+
+600이 최대 속도이므로
+축도 600까지 설정
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380747/notion-blog/_/_/_5_/_8_-_3D_-_2/image_13.png)
+
+### 2. 애니메이션 배치
+
+**Grid에 애니메이션 드래그**
+
+```
+Asset Browser (우하)에서:
+
+1. A_Kix_Idle
+   └─ Speed 0 위치에 배치
+
+2. A_Kix_WalkForward
+   └─ Speed 170 위치에 배치
+
+3. A_Kix_RunForward
+   └─ Speed 300 위치에 배치
+```
+
+**배치 팁**
+
+```
+Shift 키 누른 채 드래그:
+  └─ 그리드에 스냅 (정확한 위치)
+
+Ctrl 키 누른 채 좌우 드래그:
+  └─ 미리보기 (어떻게 보이는지)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380747/notion-blog/_/_/_5_/_8_-_3D_-_2/image_14.png)
+
+---
+
+## 🔢 적절한 속도 값 찾기
+
+### 문제: Walk 애니메이션 속도
+
+```
+Walk 애니메이션이 자연스러우려면:
+캐릭터 이동 속도 = 애니메이션 속도
+
+너무 빠름: 발이 미끄러짐
+너무 느림: 발이 미끄러짐
+```
+
+### 해결: 실제 속도 측정
+
+**ABP_Kicks Event Graph**
+
+```
+[Event Blueprint Update Animation]
+  ↓
+[Get Movement Component]
+  ↓
+[Get Velocity] (속도 벡터)
+  ↓
+[Vector Length XY] (XY 평면 속도)
+  ↓
+[Print String] (화면에 출력)
+```
+
+## 🔍 노드 기능 요약
+
+## Event Blueprint Update Animation
+
+```
+매 프레임마다 자동 실행
+(Actor의 Event Tick과 동일)
+```
+
+## Get Movement Component
+
+```
+입력: Pawn
+출력: Movement Component
+
+Pawn의 이동 컴포넌트를 가져옴
+```
+
+## Get Velocity
+
+```
+입력: Movement Component
+출력: Vector (X, Y, Z)
+
+현재 이동 속도 벡터 반환
+- X: 좌우 속도
+- Y: 전후 속도
+- Z: 상하 속도
+```
+
+## Vector Length XY
+
+```
+입력: Vector (X, Y, Z)
+출력: Float
+
+공식: √(X² + Y²)
+Z축을 제외한 XY 평면의 길이 계산
+→ 지면 이동 속도만
+```
+
+## Print String
+
+```
+입력: String (자동 변환 가능)
+출력: 화면 좌측 상단에 텍스트 표시
+
+디버깅/테스트용 (나중에 제거)
+```
+
+**왜 Vector Length XY?**
+
+```
+Velocity = (X, Y, Z) 벡터
+  ├─ X: 좌우
+  ├─ Y: 전후
+  └─ Z: 상하 (점프 등)
+
+지면 이동은 XY만 필요
+  ↓
+Vector Length XY 사용
+  └─ Z 제외, XY만 계산
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380747/notion-blog/_/_/_5_/_8_-_3D_-_2/image_15.png)
+
+### 테스트로 값 찾기
+
+```
+Play → 게임패드로 천천히 이동
+  ↓
+화면에 속도 표시
+  ↓
+Walk 애니메이션이 자연스러울 때 숫자 확인
+  ↓
+예: 168 정도
+
+이 값을 Blend Space에 사용!
+```
+
+---
+
+## 🗂️ 변수 최적화 - Store Essential Variables
+
+### 문제: 매 프레임 반복 작업
+
+```
+현재:
+매 프레임마다
+  ├─ Try Get Pawn Owner
+  ├─ Cast to Character
+  └─ Get Movement Component
+
+비효율적!
+```
+
+### 해결: 초기화 시 한 번만
+
+**Event Blueprint Initialize Animation**
+
+```
+이벤트:
+게임 시작 시 1번만 실행
+(BeginPlay와 유사)
+
+목적:
+자주 쓰는 값 미리 저장
+```
+
+**Blueprint 구현**
+
+```
+[Event Blueprint Initialize Animation]
+  ↓
+[Try Get Pawn Owner]
+  ↓
+[Cast to Character]
+  ├─ As Character → [SET Character] (변수 저장)
+  └─ ↓
+     [Get Character Movement]
+     └─ [SET Character Movement] (변수 저장)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380748/notion-blog/_/_/_5_/_8_-_3D_-_2/image_16.png)
+
+### 변수 생성
+
+**1. Character 변수**
+
+```
+Cast to Character 결과
+  ↓
+우클릭 → Promote to Variable
+  ↓
+이름: Character
+타입: Character (Object Reference)
+```
+
+**2. Character Movement 변수**
+
+```
+Get Character Movement 결과
+  ↓
+우클릭 → Promote to Variable
+  ↓
+이름: Character Movement
+타입: Character Movement Component
+```
+
+### 함수로 정리
+
+```
+선택 → 우클릭 → Collapse to Function
+  ↓
+이름: Store Essential Variables
+
+결과:
+[Event Blueprint Initialize Animation]
+  ↓
+[Store Essential Variables] (함수)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380748/notion-blog/_/_/_5_/_8_-_3D_-_2/image_17.png)
+
+---
+
+## 📊 Ground Speed 변수
+
+### Ground Speed란?
+
+```
+지면에서의 수평 이동 속도
+
+계산:
+Velocity의 XY 길이만
+(Z축 제외)
+```
+
+### Blueprint 구현
+
+**Event Blueprint Update Animation**
+
+```
+매 프레임:
+
+[Event Blueprint Update Animation]
+  ↓
+[GET Character Movement] (변수)
+  ↓
+[Is Valid] (유효성 검사)
+  └─ Valid ↓
+     [Get Velocity]
+     ↓
+     [Vector Length XY]
+     ↓
+     [SET Ground Speed] (변수에 저장)
+```
+
+### 각 노드 설명
+
+**1. GET Character Movement**
+
+```
+기능:
+저장된 변수 가져오기
+
+드래그 방법:
+Variables 패널에서 드래그
+  ↓
+GET 선택
+```
+
+**2. Is Valid**
+
+```
+기능:
+객체가 Null이 아닌지 확인
+
+필요한 이유:
+Character Movement가 없을 수도
+  ↓
+크래시 방지
+```
+
+**변환 방법**
+
+```
+Character Movement 변수 드래그
+  ↓
+우클릭
+  ↓
+Convert to Validated Get
+```
+
+**3. Get Velocity**
+
+```
+기능:
+Movement Component의 현재 속도
+
+반환:
+Vector (X, Y, Z)
+  ├─ X: 좌우 속도
+  ├─ Y: 전후 속도
+  └─ Z: 상하 속도
+```
+
+**4. Vector Length XY**
+
+```
+기능:
+XY 평면에서의 벡터 길이 계산
+
+입력:
+Vector (X, Y, Z)
+
+출력:
+Float (XY 평면 속도)
+
+계산식:
+√(X² + Y²)
+
+왜 XY만?
+  ├─ Z는 점프/낙하
+  └─ 지면 이동 속도만 필요
+```
+
+**5. SET Ground Speed**
+
+```
+기능:
+계산된 속도를 변수에 저장
+
+타입:
+Float
+
+사용처:
+Anim Graph의 Blend Space
+
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380748/notion-blog/_/_/_5_/_8_-_3D_-_2/image_18.png)
+
+---
+
+## 🎬 Anim Graph에 적용
+
+### Blend Space 노드 사용
+
+```
+Asset Browser
+  ↓
+BS_IdleWalkRun 드래그 → Anim Graph
+  ↓
+[BS_IdleWalkRun] → [Output Pose]
+```
+
+### Ground Speed 연결
+
+```
+Variables 패널
+  ↓
+Ground Speed 드래그
+  ↓
+GET 선택
+  ↓
+Speed 입력에 연결
+
+[GET Ground Speed] → [BS IdleWalkRun Speed]
+                     → [Output Pose]
+```
+
+### 기존 노드 제거
+
+```
+삭제할 것:
+  ├─ Blend Poses by bool
+  ├─ A_Kix_Idle Sequence Player
+  ├─ A_Kix_RunForward Sequence Player
+  └─ Is Velocity Zero (변수도)
+
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380748/notion-blog/_/_/_5_/_8_-_3D_-_2/image_19.png)
+
+---
+
+## 🎮 작동 원리 정리
+
+### 전체 흐름
+
+```
+━━━━━━━ 초기화 (1번만) ━━━━━━━
+
+Event Blueprint Initialize Animation
+  ↓
+Try Get Pawn Owner
+  ↓
+Cast to Character → Character 변수 저장
+  ↓
+Get Character Movement → Character Movement 변수 저장
+
+━━━━━━━ 매 프레임 ━━━━━━━
+
+Event Blueprint Update Animation
+  ↓
+Character Movement (변수)
+  ↓
+Is Valid?
+  └─ Yes ↓
+     Get Velocity
+     ↓
+     Vector Length XY
+     ↓
+     Ground Speed 변수 저장
+
+━━━━━━━ Anim Graph ━━━━━━━
+
+Ground Speed (변수)
+  ↓
+BS_IdleWalkRun (Blend Space)
+  ├─ Speed 0: Idle
+  ├─ Speed 170: Walk
+  └─ Speed 300: Run
+  ↓
+부드럽게 블렌딩된 포즈
+  ↓
+Output Pose → Character Mesh
+```
+
+### 속도별 애니메이션
+
+```
+Ground Speed = 0:
+  └─ 100% Idle
+
+Ground Speed = 85:
+  └─ 50% Idle + 50% Walk
+
+Ground Speed = 170:
+  └─ 100% Walk
+
+Ground Speed = 235:
+  └─ 50% Walk + 50% Run
+
+Ground Speed = 300+:
+  └─ 100% Run
+```
+
+---
+
+## ⚙️ 애니메이션 속도 조정
+
+### 문제: Run 애니메이션이 느림
+
+```
+캐릭터 이동 속도 600
+  ↓
+Run 애니메이션 재생
+  ↓
+발이 미끄러짐 (속도 안 맞음)
+```
+
+### 해결: Play Rate Scale
+
+```
+A_Kix_RunForward 열기
+  ↓
+Asset Details
+  ↓
+Play Rate Scale: 1.65
+
+의미:
+원본보다 1.65배 빠르게 재생
+  ↓
+캐릭터 이동 속도와 일치
+```
+
+**적절한 값 찾기**
+
+```
+1. Play Rate 조정
+2. Play 테스트
+3. 발 미끄러짐 확인
+4. 반복
+
+목표: 발이 땅에 정확히 닿기
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380749/notion-blog/_/_/_5_/_8_-_3D_-_2/image_20.png)
+
+---
+
+## 🔧 Mesh 위치 미세 조정
+
+### 문제: 발이 땅에 파묻힘
+
+```
+Walk 애니메이션 시
+  ↓
+발이 약간 땅속으로
+```
+
+### 해결
+
+```
+BP_Kicks → Mesh 선택
+  ↓
+Location Z: -73 → -70 (약간 위로)
+  ↓
+Play 테스트 반복
+
+원칙:
+땅에 약간 떠있어도 OK
+땅속 파묻히면 NG
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Blend Space
+
+```
+정의:
+값에 따라 여러 애니메이션을 섞는 시스템
+
+장점:
+  ├─ 부드러운 전환
+  ├─ 무한한 중간 상태
+  └─ 압력 감도 대응
+
+사용:
+속도, 방향, 각도 등
+```
+
+### Vector Length XY
+
+```
+기능:
+3D 벡터의 XY 평면 길이
+
+공식:
+√(X² + Y²)
+
+사용 이유:
+  ├─ Z축 제외 (점프 속도 제외)
+  └─ 수평 이동 속도만
+```
+
+### Event Blueprint Initialize Animation
+
+```
+타이밍:
+Animation BP 생성 시 1번
+
+용도:
+  ├─ 필수 변수 초기화
+  ├─ 캐싱할 값 저장
+  └─ 반복 작업 제거
+
+Actor의 BeginPlay와 유사
+```
+
+### Validated Get
+
+```
+기능:
+Is Valid 체크 포함 변수 가져오기
+
+출력:
+  ├─ Is Valid: 변수 값
+  └─ Is Not Valid: 실행 안 함
+
+안전성:
+Null 객체 접근 방지
+```
+
+---
+
+## 📝 용어 정리
+
+| 용어                                 | 설명                                |
+| ------------------------------------ | ----------------------------------- |
+| Blend Space                          | 값에 따라 애니메이션을 섞는 시스템  |
+| Blend Space 1D                       | 1개 축으로 블렌딩 (우리가 사용)     |
+| Ground Speed                         | 지면에서의 수평 이동 속도           |
+| Vector Length XY                     | XY 평면의 벡터 길이                 |
+| Play Rate Scale                      | 애니메이션 재생 속도 배율           |
+| Store Essential Variables            | 필수 변수를 초기화 시 저장하는 함수 |
+| Event Blueprint Initialize Animation | Animation BP 시작 이벤트            |
+| Validated Get                        | Is Valid 체크 포함 변수 가져오기    |
+
+---
+
+## ⚠️ 주의사항
+
+### Blend Space 축 범위
+
+```
+Maximum Axis Value:
+Max Walk Speed와 일치시키기
+
+안 맞으면:
+  └─ 최대 속도에 도달 못 함
+```
+
+### 애니메이션 배치 순서
+
+```
+Blend Space에서:
+  ├─ 왼쪽 (낮은 값): 느린 동작
+  └─ 오른쪽 (높은 값): 빠른 동작
+
+논리적 순서 유지!
+```
+
+### Play Rate 과도하게 조정 금지
+
+```
+❌ 2.0 이상: 부자연스러움
+✅ 1.2~1.7: 자연스러움
+
+실제 테스트가 중요!
+```
+
+### Is Valid 항상 사용
+
+```
+변수 사용 전:
+  ├─ Is Valid 체크
+  └─ 안전성 확보
+
+특히:
+Object Reference 타입
+```
+
+---
+
+## ✅ 체크리스트
+
+**Blend Space 생성**
+
+- [ ] BS_IdleWalkRun 생성
+- [ ] Horizontal Axis 이름: Speed
+- [ ] Maximum: 600
+- [ ] Idle (0), Walk (170), Run (300) 배치
+
+**변수 최적화**
+
+- [ ] Store Essential Variables 함수
+- [ ] Character 변수
+- [ ] Character Movement 변수
+- [ ] Event Blueprint Initialize Animation 연결
+
+**Ground Speed 계산**
+
+- [ ] Event Blueprint Update Animation
+- [ ] Get Velocity
+- [ ] Vector Length XY
+- [ ] Ground Speed 변수 생성
+- [ ] Validated Get 사용
+
+**Anim Graph 적용**
+
+- [ ] BS_IdleWalkRun 노드 추가
+- [ ] Ground Speed 연결
+- [ ] Output Pose 연결
+- [ ] 기존 노드 제거
+
+**최적화**
+
+- [ ] Run 애니메이션 Play Rate 조정
+- [ ] Mesh 위치 미세 조정
+- [ ] Blend 자연스러움 확인
+
+**테스트**
+
+- [ ] 정지: Idle
+- [ ] 천천히 이동: Walk
+- [ ] 빠르게 이동: Run
+- [ ] 부드러운 전환
+- [ ] 발 미끄러지지 않음
+
+**다음 강의: 점프 애니메이션!** 🦘
+
+# { 🦘 점프 애니메이션 - State Machine 구현 }
+
+## 🎯 이번 강의 목표
+
+State Machine을 만들어 점프 애니메이션을 구현합니다.
+Jump Start → Jump Mid → Jump End → Idle로 자연스럽게 전환합니다.
+
+---
+
+## 🎬 점프 애니메이션 구조
+
+### 왜 3개로 나뉘어 있나?
+
+```
+점프 = 3단계:
+  ├─ A_Kix_JumpStart (시작)
+  ├─ A_Kix_JumpMid (공중)
+  └─ A_Kix_JumpEnd (착지)
+```
+
+**이유**
+
+```
+평지 점프:
+  └─ 짧은 시간 (Start → End)
+
+높은 곳에서 떨어질 때:
+  └─ 긴 낙하 (Start → Mid 반복 → End)
+
+공중 시간이 다양함
+  ↓
+Mid는 반복 가능해야 함
+  ↓
+3개로 분리
+```
+
+---
+
+## 📊 Is In Air 변수 추가
+
+### Event Graph 정리
+
+**1. 함수로 정리**
+
+```
+기존 코드 선택
+  ↓
+우클릭 → Collapse to Function
+  ↓
+이름: Update Animation Variables
+
+효과:
+Event Graph 깔끔해짐
+```
+
+**2. Sequence 노드**
+
+```
+기능:
+여러 작업을 순차적으로 실행
+
+구조:
+[시작] → [Sequence]
+           ├─ Then 0 (첫 번째 작업)
+           └─ Then 1 (두 번째 작업)
+```
+
+### Is In Air 변수 생성
+
+**Blueprint**
+
+```
+Update Animation Variables 함수 내부:
+
+[입력]
+  ↓
+[Sequence]
+  ├─ Then 0 → Ground Speed 저장
+  └─ Then 1 → Is In Air 저장
+```
+
+**Then 1 구현**
+
+```
+[Character Movement] (변수)
+  ↓
+[Is Falling] (함수)
+  ↓
+[SET Is In Air] (변수 저장)
+```
+
+### 각 노드 설명
+
+**Is Falling**
+
+```
+기능:
+캐릭터가 공중에 있는지 확인
+
+입력:
+Movement Component
+
+출력:
+Bool
+  ├─ True: 공중 (점프 or 낙하)
+  └─ False: 지면
+
+정확한 이름:
+점프뿐 아니라 낙하도 포함
+```
+
+**Is In Air 변수**
+
+```
+타입: Boolean
+
+의미:
+  ├─ True: 공중에 있음
+  └─ False: 지면에 있음
+
+사용처:
+State Machine 전환 조건
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380749/notion-blog/_/_/_5_/_8_-_3D_-_2/image_21.png)
+
+---
+
+## 🎨 State Machine이란?
+
+### 문제: Bool로는 부족
+
+```
+현재:
+Blend Poses by bool
+  ├─ True: ?
+  └─ False: Idle/Walk/Run
+
+점프는 3단계:
+  ├─ Start
+  ├─ Mid
+  └─ End
+
+Bool로는 처리 불가!
+```
+
+### 해결: State Machine
+
+```
+State Machine:
+여러 "상태"를 가지고
+조건에 따라 전환하는 시스템
+
+상태(State):
+  └─ 특정 애니메이션 재생
+
+전환(Transition):
+  └─ 상태 간 이동 규칙
+```
+
+---
+
+## 🔧 State Machine 생성
+
+### 1. Anim Graph에서 생성
+
+```
+Anim Graph에서 우클릭
+  ↓
+"State Machine" 검색
+  ↓
+Add New State Machine
+  ↓
+이름: Locomotion
+
+[Locomotion] → [Output Pose]
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380749/notion-blog/_/_/_5_/_8_-_3D_-_2/image_22.png)
+
+**Locomotion이란?**
+
+```
+Locomotion = 이동
+
+캐릭터의 모든 이동 애니메이션
+(Idle, Walk, Run, Jump 등)을
+관리하는 State Machine
+```
+
+### 2. State Machine 열기
+
+```
+Locomotion 노드 더블클릭
+  ↓
+State Machine 내부 열림
+
+새 탭 생성:
+  ├─ Anim Graph (기존)
+  └─ Locomotion (새로 생성)
+
+탭 간 전환 가능
+```
+
+---
+
+## 🏃 State 추가
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380749/notion-blog/_/_/_5_/_8_-_3D_-_2/image_23.png)
+
+### Entry 노드
+
+```
+Entry:
+시작점
+
+게임 시작 시
+여기서 시작
+```
+
+### 1. IdleWalkRun State
+
+**생성**
+
+```
+우클릭 → Add State
+  ↓
+이름: IdleWalkRun
+```
+
+**Entry 연결**
+
+```
+Entry에서 드래그
+  ↓
+IdleWalkRun에 드롭
+  ↓
+화살표 생성 (자동 전환)
+```
+
+**내용 채우기**
+
+```
+IdleWalkRun 더블클릭
+  ↓
+내부 열림
+  ↓
+BS_IdleWalkRun 드래그
+  ↓
+Ground Speed 연결
+  ↓
+Result 연결
+```
+
+**정리**
+
+```
+None 축 숨기기:
+  ├─ BS_IdleWalkRun 선택
+  ├─ Details → None
+  └─ Expose as Pin 해제
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380749/notion-blog/_/_/_5_/_8_-_3D_-_2/image_24.png)
+
+---
+
+## 🦘 점프 State들 추가
+
+### 2. JumpStart State
+
+**생성 (방법 1)**
+
+```
+우클릭 → Add State
+  ↓
+이름: JumpStart
+```
+
+**생성 (방법 3 - 빠른 방법)**
+
+```
+Asset Browser
+  ↓
+A_Kix_JumpStart 드래그
+  ↓
+State Machine에 드롭
+  ↓
+자동으로 State 생성
+  (애니메이션도 자동 연결)
+```
+
+**설정**
+
+```
+JumpStart 더블클릭
+  ↓
+A_Kix_JumpStart 이미 있음
+  ↓
+Result에 연결 확인
+```
+
+### 3. JumpMid State
+
+**생성**
+
+```
+A_Kix_JumpMid 드래그
+  ↓
+State Machine에 드롭
+  ↓
+이름: JumpMid
+```
+
+**Loop 설정**
+
+```
+JumpMid 더블클릭
+  ↓
+A_Kix_JumpMid 노드 선택
+  ↓
+Details
+  ↓
+Loop Animation: ✅ 체크
+
+이유:
+공중에 오래 있을 수 있으므로
+계속 반복 재생 필요
+```
+
+### 4. JumpEnd State
+
+```
+A_Kix_JumpEnd 드래그
+  ↓
+State Machine에 드롭
+  ↓
+이름: JumpEnd
+```
+
+---
+
+## 🔄 Transition Rule - 전환 규칙
+
+### 1. IdleWalkRun → JumpStart
+
+**전환 생성**
+
+```
+IdleWalkRun에서 드래그
+  ↓
+JumpStart에 드롭
+  ↓
+화살표 생성 (Transition)
+```
+
+**규칙 설정**
+
+```
+화살표 더블클릭
+  ↓
+Transition Rule 열림
+  ↓
+[Result] 노드 있음 (Bool)
+```
+
+**조건**
+
+```
+[GET Is In Air] → [Result]
+
+의미:
+Is In Air가 True일 때
+  ↓
+JumpStart로 전환
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380751/notion-blog/_/_/_5_/_8_-_3D_-_2/image_25.png)
+
+### 2. JumpStart → JumpMid
+
+**전환 생성**
+
+```
+JumpStart → JumpMid
+화살표 드래그
+```
+
+**자동 전환 설정**
+
+```
+화살표 선택 (더블클릭 X)
+  ↓
+Details 패널
+  ↓
+Automatic Rule Based on Sequence Player in State
+  ✅ 체크
+
+의미:
+JumpStart 애니메이션 끝나면
+  ↓
+자동으로 JumpMid로 전환
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380751/notion-blog/_/_/_5_/_8_-_3D_-_2/image_26.png)
+
+**Automatic Rule이란?**
+
+```
+시퀀스 플레이어가 끝나면 자동 전환
+
+장점:
+  └─ 별도 조건 필요 없음
+
+언제 사용:
+  └─ 애니메이션 끝 = 전환 조건
+```
+
+### 3. JumpMid → JumpEnd
+
+**전환 생성**
+
+```
+JumpMid → JumpEnd
+화살표 드래그
+```
+
+**조건**
+
+```
+화살표 더블클릭
+  ↓
+[GET Is In Air]
+  ↓
+[NOT] (부정 노드)
+  ↓
+[Result]
+
+의미:
+Is In Air가 False일 때
+(= 땅에 닿았을 때)
+  ↓
+JumpEnd로 전환
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380751/notion-blog/_/_/_5_/_8_-_3D_-_2/image_27.png)
+
+**NOT 노드**
+
+```
+기능:
+Bool 값 반전
+
+입력 → 출력:
+  ├─ True → False
+  └─ False → True
+
+사용 이유:
+땅에 닿았을 때 = Is In Air가 False
+  ↓
+False일 때 전환하려면
+  ↓
+NOT으로 반전해서 True로 만듦
+
+```
+
+### 4. JumpEnd → IdleWalkRun
+
+**전환 생성**
+
+```
+JumpEnd → IdleWalkRun
+화살표 드래그
+```
+
+**자동 전환**
+
+```
+화살표 선택
+  ↓
+Details
+  ↓
+Automatic Rule Based on Sequence Player
+  ✅ 체크
+
+의미:
+착지 애니메이션 끝나면
+  ↓
+자동으로 Idle/Walk/Run으로
+```
+
+---
+
+## 🎨 애니메이션 최적화
+
+### JumpStart 속도 조정
+
+**문제: 너무 느림**
+
+```
+JumpStart 애니메이션이
+실제 점프보다 느림
+```
+
+**해결**
+
+```
+JumpStart State 열기
+  ↓
+A_Kix_JumpStart 노드 선택
+  ↓
+Details
+  ↓
+Play Rate: 1.65
+
+효과: 1.65배 빠르게 재생
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380751/notion-blog/_/_/_5_/_8_-_3D_-_2/image_28.png)
+
+### JumpStart 시작 위치 조정
+
+**문제: 초반부 불필요**
+
+```
+애니메이션 앞부분
+  ↓
+준비 동작 (안 필요)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380751/notion-blog/_/_/_5_/_8_-_3D_-_2/image_29.png)
+
+**해결**
+
+```
+A_Kix_JumpStart 노드 선택
+  ↓
+Details
+  ↓
+Start Position: 0.22
+
+의미:
+0.22초부터 재생 시작
+  ↓
+준비 동작 스킵
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380752/notion-blog/_/_/_5_/_8_-_3D_-_2/image_30.png)
+
+### JumpEnd 최적화
+
+**Play Rate**
+
+```
+A_Kix_JumpEnd 노드
+  ↓
+Play Rate: 1.5
+```
+
+**Start Position**
+
+```
+Start Position: 0.12
+
+효과:
+착지 초반 스킵
+  ↓
+더 빠른 전환
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380752/notion-blog/_/_/_5_/_8_-_3D_-_2/image_31.png)
+
+---
+
+## 🔍 전체 State Machine 흐름
+
+### 시각화
+
+```
+Entry → IdleWalkRun
+         ↓ (Is In Air = True)
+      JumpStart
+         ↓ (애니메이션 끝)
+      JumpMid (Loop)
+         ↓ (Is In Air = False)
+      JumpEnd
+         ↓ (애니메이션 끝)
+      IdleWalkRun
+```
+
+### 상황별 흐름
+
+**평지 점프**
+
+```
+1. 지면에서 대기 (IdleWalkRun)
+2. 스페이스바 누름
+3. Is In Air = True
+4. JumpStart (0.3초)
+5. 자동 전환
+6. JumpMid (0.2초)
+7. 땅 닿음 → Is In Air = False
+8. JumpEnd (0.3초)
+9. IdleWalkRun 복귀
+```
+
+**높은 곳에서 낙하**
+
+```
+1. 걷다가 절벽에서 떨어짐
+2. Is In Air = True
+3. JumpStart
+4. JumpMid (Loop 계속 반복)
+   ├─ 3초간 낙하
+   └─ Mid 계속 재생
+5. 땅 닿음
+6. JumpEnd
+7. IdleWalkRun
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### State Machine
+
+```
+정의:
+여러 상태를 가지고
+조건에 따라 전환
+
+구성 요소:
+  ├─ State: 특정 애니메이션
+  └─ Transition: 전환 규칙
+
+장점:
+  ├─ 복잡한 애니메이션 관리
+  ├─ 직관적인 시각화
+  └─ 조건부 전환
+```
+
+### State (상태)
+
+```
+하나의 애니메이션 또는
+애니메이션 조합
+
+내부:
+  └─ 포즈 생성 노드들
+      (Sequence Player, Blend Space 등)
+
+출력:
+  └─ Result (Animation Pose)
+```
+
+### Transition (전환)
+
+```
+State 간 이동 규칙
+
+화살표 = Transition
+
+조건:
+  ├─ Bool 변수
+  ├─ 애니메이션 종료
+  └─ 기타 조건
+```
+
+### Automatic Rule
+
+```
+기능:
+애니메이션 끝나면 자동 전환
+
+설정:
+Transition 선택
+  ↓
+Automatic Rule... 체크
+
+편리함:
+별도 조건 코드 불필요
+```
+
+### NOT Boolean
+
+```
+기능:
+Bool 값 반전
+
+True → False
+False → True
+
+용도:
+"아닐 때" 조건 만들기
+```
+
+---
+
+## 📝 용어 정리
+
+| 용어            | 설명                                    |
+| --------------- | --------------------------------------- |
+| State Machine   | 여러 상태와 전환 규칙을 관리하는 시스템 |
+| State           | 특정 애니메이션을 재생하는 상태         |
+| Transition      | 상태 간 전환                            |
+| Transition Rule | 전환 조건                               |
+| Entry           | State Machine 시작점                    |
+| Is Falling      | 공중에 있는지 확인하는 함수             |
+| Automatic Rule  | 애니메이션 종료 시 자동 전환            |
+| NOT Boolean     | Bool 값 반전 노드                       |
+| Sequence        | 여러 작업 순차 실행 노드                |
+| Locomotion      | 이동 애니메이션 전체                    |
+
+---
+
+## ⚠️ 주의사항
+
+### Loop Animation 체크
+
+```
+JumpMid는 반드시:
+Loop Animation ✅
+
+이유:
+공중에 오래 있을 수 있음
+  ↓
+반복 재생 필요
+```
+
+### Automatic Rule 사용
+
+```
+애니메이션 끝 = 전환 조건
+  ↓
+Automatic Rule 사용
+
+직접 조건 만들 필요 없음
+```
+
+### NOT 사용 주의
+
+```
+Is In Air = False일 때 전환
+  ↓
+NOT 사용해서 True로 변환
+  ↓
+Result에 연결
+
+이중 부정 주의!
+```
+
+### Play Rate 과도 조정 금지
+
+```
+❌ 3.0 이상: 부자연스러움
+✅ 1.2~2.0: 적절
+
+테스트 필수
+```
+
+---
+
+### 점프 흐름
+
+```
+지면 → 스페이스바 → Start → Mid → 착지 → End → 지면
+```
+
+---

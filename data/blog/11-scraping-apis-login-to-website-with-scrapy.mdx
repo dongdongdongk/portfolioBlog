@@ -1,0 +1,397 @@
+---
+title: '섹션 11: Scraping APIs & Login to website with Scrapy'
+date: '2026-09-02'
+category: '기타, 사용 적음/크롤링 & 파이썬'
+tags: ['기타, 사용 적음', '크롤링 & 파이썬']
+draft: false
+summary: ''
+---
+
+# API 를 활용해서 스크래핑 하기 ( Scraping APIs - Building the Spider )
+
+```python
+Quotes to Scrape라는 웹사이트의 API를 스크레이핑하는 방법을 다룬다.
+
+API 스크레이핑은 HTML 마크업 대신 JSON 파일을 파싱하여 데이터를 추출하는 방식이다.
+```
+
+## 1. 웹사이트 소개 및 API 스크레이핑 준비
+
+```python
+웹사이트: Quotes to Scrape
+
+특징: 무한 스크롤링 기능을 통해 페이지를 내려가면 더 많은 인용문이 로드됨.
+```
+
+## 2. 네트워크 요청 분석
+
+```python
+1. 웹사이트 검사: 웹사이트에서 마우스 오른쪽 버튼 클릭 후 '검사' 선택.
+
+2. 네트워크 탭 선택: 네트워크 탭에서 'XHR' 옵션 선택.
+
+3. 페이지 새로고침: Ctrl + R을 눌러 페이지를 새로고침.
+
+4. 요청 분석: quotes?page=1이라는 요청을 찾고, 이를 클릭하여 요청 URL과 응답 내용을 확인.
+
+		요청 URL: http://quotes.toscrape.com/api/quotes?page=1
+
+		응답: JSON 형식으로 quotes와 has_next 등의 키 포함.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380909/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_11_Scraping_APIs_Login_to_website_with_Scrapy/Untitled.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380907/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_11_Scraping_APIs_Login_to_website_with_Scrapy/Untitled_1.png)
+
+## 3. Scrapy 프로젝트 설정
+
+### 1. **새 프로젝트 생성**
+
+```python
+새 프로젝트 생성
+
+(my_scrapy_venv) C:\Users\dhk93\firstproject>scrapy startproject api_project
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380908/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_11_Scraping_APIs_Login_to_website_with_Scrapy/Untitled_2.png)
+
+### 2. **새 스파이더 생성**
+
+```python
+새 spider 생성 ( http 지워주는거 꼭 기억하자 )
+
+새로 만든 프로젝트 내부로 cd 로 이동한 뒤 새 spider 작성
+
+(my_scrapy_venv) C:\Users\dhk93\firstproject\api_project> scrapy genspider quotes quotes.toscrape.com/scroll
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380908/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_11_Scraping_APIs_Login_to_website_with_Scrapy/Untitled_3.png)
+
+### **3. 스파이더 코드 수정**: 생성된 스파이더 파일(`quotes.py`)을 열고 다음과 같이 수정.
+
+```python
+import scrapy
+import json
+
+class QuotesSpider(scrapy.Spider):
+    name = "quotes"  # 스파이더의 이름 정의. 스크래피 커맨드를 실행할 때 이 이름을 사용하여 스파이더를 실행함.
+    allowed_domains = ["quotes.toscrape.com"]  # 스크레이핑을 허용하는 도메인 설정.
+    start_urls = ["https://quotes.toscrape.com/api/quotes?page=1"]  # 스크레이핑을 시작할 URL 설정.
+
+    def parse(self, response):
+        # 응답 본문을 JSON 형식으로 로드하여 파싱.
+        json_response = json.loads(response.body)
+        # JSON 응답에서 'quotes' 키를 가져와서 해당 데이터를 quotes 변수에 저장.
+        quotes = json_response.get('quotes')
+        # quotes 리스트의 각 인용문(quote)에 대해 반복.
+        for quote in quotes:
+            # 각 인용문에서 'author' 키의 'name', 'tags' 키, 'text' 키의 값을 딕셔너리 형태로 yield.
+            yield {
+                'author' : quote.get('author').get('name'),  # 인용문 작성자의 이름을 가져옴.
+                'tag' : quote.get('tags'),  # 인용문과 관련된 태그를 가져옴.
+                'quotes' : quote.get('text'),  # 인용문 텍스트를 가져옴.
+            }
+```
+
+### 무한 스크롤 원리
+
+```python
+무한 스크롤을 하기 때문에 Fetch/XHR 을 확인해서  API 요청을 확인하고 그걸 start_urls 에 넣어줘야 한다
+
+무한 스크롤은 내리면 계속 새로운 page 1, 2, 3, 4  이렇게 요청이 가는 형식이다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380908/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_11_Scraping_APIs_Login_to_website_with_Scrapy/Untitled_4.png)
+
+# API 를 이용해서 스크래핑 페이지 네이션 ( Scraping APIs - Dealing with Pagination )
+
+```python
+ API를 사용하여 Quotes to Scrape 웹사이트의 여러 페이지에서 데이터를 스크래핑하는 작업을 수행한다.
+
+ has_next 값을 통해 페이지네이션을 처리하고, 다음 페이지로 이동하여 데이터를 계속 수집한다.
+```
+
+## 1. 개발자 도구의 네트워크 탭을 사용하여 페이지네이션 이해하기
+
+```python
+1. 네트워크 탭 열기:
+
+	페이지에서 오른쪽 클릭 -> "검사" 선택 -> 네트워크 탭 클릭.
+
+2. 무한 스크롤 작동 방식 이해:
+
+	페이지를 스크롤하면서 페이지 2와 페이지 3의 요청을 확인.
+
+	페이지 2와 3의 응답에서 has_next가 true로 설정된 것을 확인.
+
+	계속 스크롤하여 페이지 10까지 도달하면 has_next가 false로 설정된 것을 확인.
+
+	이 요소를 통해 페이지네이션을 처리할 수 있음.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380908/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_11_Scraping_APIs_Login_to_website_with_Scrapy/Untitled_5.png)
+
+## 2. 코드 작성
+
+```python
+import scrapy
+import json
+
+class QuotesSpider(scrapy.Spider):
+    name = "quotes"  # 스파이더 이름 설정
+    allowed_domains = ["quotes.toscrape.com"]  # 스크레이핑을 허용하는 도메인
+    start_urls = ["https://quotes.toscrape.com/api/quotes?page=1"]  # 시작 URL 설정
+
+    def parse(self, response):
+        # 응답을 JSON 형식으로 파싱
+        json_response = json.loads(response.body)
+        quotes = json_response.get('quotes')  # 'quotes' 키에서 데이터 가져오기
+
+        # 각 인용문을 딕셔너리 형태로 수집하여 yield
+        for quote in quotes:
+            yield {
+                'author': quote.get('author').get('name'),  # 인용문 작성자 이름
+                'tag': quote.get('tags'),  # 인용문 태그
+                'quotes': quote.get('text'),  # 인용문 텍스트
+            }
+
+        # 다음 페이지가 있는지 확인
+        has_next = json_response.get('has_next')
+        if has_next:
+            # 다음 페이지 번호 계산
+            next_page_number = json_response.get('page') + 1
+            # 다음 페이지 URL 생성
+            next_page_url = f"https://quotes.toscrape.com/api/quotes?page={next_page_number}"
+            # 다음 페이지 요청 생성 및 콜백 함수 설정
+            yield scrapy.Request(url=next_page_url, callback=self.parse)
+```
+
+## 페이지네이션 처리 코드 분석
+
+```python
+1. has_next 변수 생성:
+
+	JSON 응답에서 has_next 값을 가져옴.
+
+	has_next = json_response.get('has_next')
+
+
+
+2. 다음 페이지 번호 계산:
+
+	현재 페이지 번호에 1을 더하여 다음 페이지 번호를 계산.
+
+	next_page_number = json_response.get('page') + 1
+
+
+
+3. 다음 페이지 요청 생성:
+
+	F-string을 사용하여 다음 페이지의 URL을 생성.
+
+	next_page_url = f"https://quotes.toscrape.com/api/quotes?page={next_page_number}"
+	yield scrapy.Request(url=next_page_url, callback=self.parse)
+
+
+	* callback은 다음 페이지를 요청할 때 어떤 함수가 응답을 처리할지 지정하는 데 사용
+
+
+4. 터미널에서 다음 명령어를 실행하여 스파이더를 실행하고 결과를 JSON 파일로 저장.
+
+	scrapy crawl quotes -o quotes_pagination.json
+```
+
+# 로그인 하고 웹사이트 스크래핑 하기 ( Login to website - Building the Spider )
+
+## 1. 로그인 시도
+
+```python
+1. 사용자명과 비밀번호를 입력한다 (예: admin/admin2).
+
+2. '로그인' 버튼을 클릭하기 전에 이전 요청을 모두 지운다.
+
+3. 로그인 버튼을 클릭한다.
+
+4. 첫 번째 요청을 선택하고, 'Headers' 탭에서 요청 URL, 요청 방식(POST), 상태 코드(302)를 확인한다.
+
+5. 'Form Data' 섹션에서 CSRF 토큰, 사용자명, 비밀번호를 확인한다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380908/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_11_Scraping_APIs_Login_to_website_with_Scrapy/Untitled_6.png)
+
+## 2. CSRF 토큰 동적 생성 확인
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380909/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_11_Scraping_APIs_Login_to_website_with_Scrapy/Untitled_7.png)
+
+```python
+CSRF 토큰 확인
+
+1. 새 탭을 열고 quotes.toscrape.com/login으로 이동합니다.
+
+2. 개발자 도구를 열고 사용자명 입력란을 검사합니다.
+
+3. csrf_token 값을 확인합니다.
+
+4. 페이지를 새로고침하여 토큰 값이 동적으로 변경되는지 확인합니다.
+```
+
+## 3. 스파이더 생성 및 로그인 구현
+
+```python
+스파이더 생성
+
+scrapy genspider quotes_login quotes.toscrape.com
+```
+
+### 스파이더 코드 작성
+
+```python
+import scrapy
+from scrapy import FormRequest # 폼에 값을 넣기 위해서 임포트
+
+class QuotesLoginSpider(scrapy.Spider):
+    name = "quotes_login"  # Spider의 이름
+    allowed_domains = ["quotes.toscrape.com"]  # 크롤링을 허용할 도메인 리스트
+    start_urls = ["https://quotes.toscrape.com/login"]  # 시작 URL 리스트
+
+    def parse(self, response):
+        # 로그인 페이지에서 CSRF 토큰을 가져오기 위한 XPath 쿼리
+        csrf_token = response.xpath("//input[@name ='csrf_token']//@value").get()
+
+        # FormRequest.from_response를 사용하여 로그인 요청 생성
+        yield FormRequest.from_response(
+            response,
+            formxpath='//form',  # 로그인 폼의 XPath
+            formdata={
+                'csrf_token': csrf_token,  # CSRF 토큰을 포함한 폼 데이터
+                'username': 'admin',  # 로그인할 사용자명
+                'password': 'admin'  # 로그인할 비밀번호
+            },
+            callback=self.after_login  # 로그인 후 실행할 콜백 함수 지정
+        )
+
+    def after_login(self, response):
+        # 로그인 성공 여부를 확인하기 위한 XPath 쿼리
+        if response.xpath("//a[@href='/logout']//text()").get():
+            print('로그인 성공')  # 로그인 성공 메시지 출력
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380909/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_11_Scraping_APIs_Login_to_website_with_Scrapy/Untitled_8.png)
+
+## CSRF 토근이란? CSRF 토큰 확인 및 동작 원리
+
+### CSRF 공격이란?
+
+```python
+CSRF 공격은 악의적인 웹사이트가 사용자를 속여 사용자가 원하지 않는 요청을 특정 웹사이트에 보내도록 하는 공격이다.
+
+예를 들어, 당신이 은행 웹사이트에 로그인한 상태에서 다른 악성 웹사이트를 방문하게 되면,
+
+그 악성 웹사이트가 당신을 대신하여 은행에 돈을 이체하는 요청을 보낼 수 있다.
+```
+
+### CSRF 토큰이란?
+
+```python
+CSRF 토큰은 이러한 공격을 방지하기 위해 사용되는 보안 장치이다.
+
+서버는 각 사용자에게 고유한 토큰(특수 코드)을 생성하고, 클라이언트가 서버에 요청을 보낼 때마다 이 토큰을 함께 보내도록 요구한다.
+```
+
+### CSRF 토큰의 작동 방식
+
+```python
+토큰 생성 및 전송:
+
+사용자가 로그인하거나 폼을 열 때 서버는 고유한 CSRF 토큰을 생성하여 사용자에게 전달한다.
+
+이 토큰은 페이지의 숨겨진 필드에 포함된다.
+
+예를 들어, 로그인 페이지의 HTML 코드에 다음과 같이 포함될 수 있다:
+
+<input type="hidden" name="csrf_token" value="a1b2c3d4e5f6g7h8i9j0">
+```
+
+```python
+요청 시 토큰 포함:
+
+사용자가 폼을 제출할 때, 브라우저는 이 토큰을 서버로 함께 보낸다.
+
+즉, 사용자가 폼을 제출하면 서버는 토큰을 확인하여 요청이 유효한지 판단한다.
+
+<form method="POST" action="/login">
+    <input type="hidden" name="csrf_token" value="a1b2c3d4e5f6g7h8i9j0">
+    <input type="text" name="username">
+    <input type="password" name="password">
+    <button type="submit">로그인</button>
+</form>
+```
+
+```python
+서버에서 토큰 검증:
+
+서버는 클라이언트로부터 받은 요청을 처리하기 전에, 요청에 포함된 CSRF 토큰이 서버가 발급한 토큰과 일치하는지 확인한다.
+
+일치하면 요청을 처리하고, 일치하지 않으면 요청을 거부한다.
+```
+
+### CSRF 공격 시나리오
+
+```python
+1. 은행 웹사이트:
+
+	당신은 은행 웹사이트에 로그인하여 계좌 정보를 보고 있습니다.
+
+	예를 들어, 은행 웹사이트 주소는 bank.com입니다.
+
+2. 악성 웹사이트:
+
+	당신은 인터넷을 사용하다가 악성 웹사이트를 방문하게 됩니다.
+
+	이 웹사이트는 겉으로 보기엔 정상적인 사이트처럼 보이지만, 실제로는 악성 코드를 포함하고 있습니다.
+
+	예를 들어, 악성 웹사이트 주소는 malicious.com입니다.
+
+
+
+CSRF 공격 예시
+
+
+1. 은행 웹사이트에 로그인:
+
+	당신은 bank.com에 로그인하여 은행 계좌를 확인하고 있습니다.
+
+2. 악성 웹사이트 방문:
+
+	이제 다른 탭에서 malicious.com이라는 웹사이트를 방문합니다.
+
+	이 웹사이트는 악의적인 코드를 포함하고 있습니다.
+
+3. 악성 웹사이트의 작동 방식:
+
+	malicious.com은 당신이 이미 bank.com에 로그인한 상태라는 것을 악용합니다.
+
+	이 사이트는 당신이 알지 못하는 사이에, 은행 웹사이트(bank.com)로 돈을 이체하는 요청을 자동으로 보냅니다.
+
+
+4. 요청 전송:
+
+	malicious.com은 다음과 같은 숨겨진 폼을 가지고 있을 수 있습니다:
+
+	<form id="csrf_form" method="POST" action="https://bank.com/transfer">
+    <input type="hidden" name="account_number" value="attacker_account">
+    <input type="hidden" name="amount" value="1000">
+	</form>
+	<script>
+	    document.getElementById('csrf_form').submit();
+	</script>
+
+	이 폼은 자동으로 제출되어 bank.com에 돈을 이체하는 요청을 보냅니다.
+
+
+5. 은행 서버의 반응:
+
+	이 요청에는 올바른 CSRF 토큰이 포함되지 않았기 때문에, 은행 서버는 요청을 거부하고 공격을 차단합니다.
+
+	만약 CSRF 토큰이 없었다면, 은행 서버는 요청이 유효한 것인지 알 수 없어서 당신의 돈을 공격자의 계좌로 이체했을 것입니다.
+```

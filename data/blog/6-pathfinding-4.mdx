@@ -1,0 +1,2091 @@
+---
+title: '섹션 6: Pathfinding - 4'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+# { 🎯 A\* 알고리즘에 장애물(Obstacles) 추가하기 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380476/notion-blog/_/3D_/_/_6_Pathfinding_-_4/image.png)
+
+이번 강의는 A\* 경로찾기 알고리즘에 장애물을 추가하여 특정 노드를 지나갈 수 없도록 만드는 방법을 다룹니다.
+
+---
+
+## 📋 목차
+
+1. [Setup 함수로 Grid 파라미터 중앙화하기](https://claude.ai/chat/4f58a89d-8002-49dc-9f67-7d808f252d60#1-setup-%ED%95%A8%EC%88%98%EB%A1%9C-grid-%ED%8C%8C%EB%9D%BC%EB%AF%B8%ED%84%B0-%EC%A4%91%EC%95%99%ED%99%94%ED%95%98%EA%B8%B0)
+2. [Script Execution Order 설정하기](https://claude.ai/chat/4f58a89d-8002-49dc-9f67-7d808f252d60#2-script-execution-order-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+3. [PathNode에 isWalkable 기능 추가하기](https://claude.ai/chat/4f58a89d-8002-49dc-9f67-7d808f252d60#3-pathnode%EC%97%90-iswalkable-%EA%B8%B0%EB%8A%A5-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+4. [FindPath 알고리즘에 장애물 체크 로직 추가하기](https://claude.ai/chat/4f58a89d-8002-49dc-9f67-7d808f252d60#4-findpath-%EC%95%8C%EA%B3%A0%EB%A6%AC%EC%A6%98%EC%97%90-%EC%9E%A5%EC%95%A0%EB%AC%BC-%EC%B2%B4%ED%81%AC-%EB%A1%9C%EC%A7%81-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+5. [수동으로 장애물 테스트하기](https://claude.ai/chat/4f58a89d-8002-49dc-9f67-7d808f252d60#5-%EC%88%98%EB%8F%99%EC%9C%BC%EB%A1%9C-%EC%9E%A5%EC%95%A0%EB%AC%BC-%ED%85%8C%EC%8A%A4%ED%8A%B8%ED%95%98%EA%B8%B0)
+6. [장애물 프리팹 만들기](https://claude.ai/chat/4f58a89d-8002-49dc-9f67-7d808f252d60#6-%EC%9E%A5%EC%95%A0%EB%AC%BC-%ED%94%84%EB%A6%AC%ED%8C%B9-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+7. [Raycast를 이용한 자동 장애물 감지 시스템](https://claude.ai/chat/4f58a89d-8002-49dc-9f67-7d808f252d60#7-raycast%EB%A5%BC-%EC%9D%B4%EC%9A%A9%ED%95%9C-%EC%9E%90%EB%8F%99-%EC%9E%A5%EC%95%A0%EB%AC%BC-%EA%B0%90%EC%A7%80-%EC%8B%9C%EC%8A%A4%ED%85%9C)
+8. [Raycast Offset 문제 해결하기](https://claude.ai/chat/4f58a89d-8002-49dc-9f67-7d808f252d60#8-raycast-offset-%EB%AC%B8%EC%A0%9C-%ED%95%B4%EA%B2%B0%ED%95%98%EA%B8%B0)
+9. [LayerMask로 장애물 필터링하기](https://claude.ai/chat/4f58a89d-8002-49dc-9f67-7d808f252d60#9-layermask%EB%A1%9C-%EC%9E%A5%EC%95%A0%EB%AC%BC-%ED%95%84%ED%84%B0%EB%A7%81%ED%95%98%EA%B8%B0)
+10. [자동 장애물 감지 테스트](https://claude.ai/chat/4f58a89d-8002-49dc-9f67-7d808f252d60#10-%EC%9E%90%EB%8F%99-%EC%9E%A5%EC%95%A0%EB%AC%BC-%EA%B0%90%EC%A7%80-%ED%85%8C%EC%8A%A4%ED%8A%B8)
+
+---
+
+## 1. Setup 함수로 Grid 파라미터 중앙화하기
+
+### 📌 개념: 코드 중복 제거와 단일 진실 공급원(Single Source of Truth)
+
+현재 `LevelGrid`와 `Pathfinding` 스크립트 모두에서 그리드의 width, height, cellSize를 각각 정의하고 있습니다. 이렇게 되면:
+
+- 값을 변경할 때 두 곳 모두 수정해야 함
+- 실수로 값이 달라질 수 있음
+- 유지보수가 어려워짐
+
+**해결책**: `LevelGrid`에서 값을 정의하고, `Pathfinding`은 `Setup()` 함수를 통해 받아오도록 변경합니다.
+
+### 🔧 Pathfinding 클래스에 Setup 함수 추가
+
+```csharp
+public class Pathfinding : MonoBehaviour
+{
+    // 기존 필드들...
+    private int width;
+    private int height;
+    private float cellSize;
+
+    // Setup 함수 추가
+    public void Setup(int width, int height, float cellSize)
+    {
+        // 전달받은 파라미터를 클래스 필드에 저장
+        this.width = width;
+        this.height = height;
+        this.cellSize = cellSize;
+
+        // 이제 저장된 값들을 사용하여 GridSystem 생성
+        gridSystem = new GridSystem<PathNode>(
+            width,    // 저장된 width 사용
+            height,   // 저장된 height 사용
+            cellSize, // 저장된 cellSize 사용
+            (GridSystem<PathNode> g, GridPosition gridPosition) => new PathNode(gridPosition)
+        );
+
+        // 디버그 오브젝트 생성
+        gridSystem.CreateDebugObjects(gridDebugObjectPrefab);
+    }
+}
+```
+
+**주요 포인트**:
+
+- `this.width = width`: 파라미터로 받은 width를 클래스의 멤버 변수에 저장
+- 이후 모든 코드에서 이 저장된 값을 사용
+
+### 🔧 LevelGrid 클래스에서 Setup 호출
+
+```csharp
+public class LevelGrid : MonoBehaviour
+{
+    // SerializeField로 Inspector에서 설정 가능하게 변경
+    [SerializeField] private int width;
+    [SerializeField] private int height;
+    [SerializeField] private float cellSize;
+
+    void Awake()
+    {
+        // Instance 설정 및 GridSystem 생성
+        // ... (기존 코드)
+
+        gridSystem = new GridSystem<GridObject>(
+            width,    // SerializeField로 설정된 값 사용
+            height,   // SerializeField로 설정된 값 사용
+            cellSize, // SerializeField로 설정된 값 사용
+            (GridSystem<GridObject> g, GridPosition gridPosition) => new GridObject(g, gridPosition)
+        );
+    }
+
+    private void Start()
+    {
+        // Pathfinding에 그리드 파라미터 전달
+        Pathfinding.Instance.Setup(width, height, cellSize);
+    }
+}
+```
+
+**왜 Start()에서 호출하나요?**
+
+- `Awake()`는 스크립트가 활성화될 때 가장 먼저 실행
+- `Start()`는 `Awake()` 이후, 첫 프레임 업데이트 전에 실행
+- `Pathfinding.Instance`는 `Pathfinding`의 `Awake()`에서 설정되므로, `LevelGrid`의 `Start()`에서 접근하면 안전
+
+### 🎮 Inspector 설정
+
+Unity Editor에서:
+
+1. LevelGrid 게임오브젝트 선택
+2. Inspector에서 값 설정:
+   - Width: 10
+   - Height: 10
+   - Cell Size: 2
+
+---
+
+## 2. Script Execution Order 설정하기
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380476/notion-blog/_/3D_/_/_6_Pathfinding_-_4/image_1.png)
+
+### 📌 개념: 스크립트 실행 순서의 중요성
+
+Unity에서 여러 스크립트가 있을 때, 어떤 순서로 `Awake()`와 `Start()`가 실행될지 보장되지 않습니다.
+
+**문제 상황**:
+
+- 다른 스크립트의 `Start()`에서 `Pathfinding.Instance.FindPath()`를 호출할 수 있음
+- 하지만 `Pathfinding.Setup()`이 아직 실행되지 않았다면?
+- 그리드가 초기화되지 않아 NullReferenceException 발생!
+
+### 🔧 Script Execution Order 설정 방법
+
+1. **Unity Editor 메뉴**:
+   - Edit → Project Settings 선택
+2. **Script Execution Order 탭**:
+   - 왼쪽 메뉴에서 "Script Execution Order" 찾기
+3. **스크립트 추가**:
+   - "+" 버튼 클릭
+   - `LevelGrid` 스크립트 추가
+   - `Pathfinding` 스크립트 추가
+4. **실행 순서 설정**:
+   - 두 스크립트를 "Default Time" **위로** 드래그
+   - "Default Time"은 값 0을 의미
+   - 100 정도로 설정하면 다른 모든 스크립트보다 먼저 실행됨
+
+**실행 흐름**:
+
+```
+-100: LevelGrid.Awake() 실행
+-100: Pathfinding.Awake() 실행
+-100: LevelGrid.Start() 실행 → Pathfinding.Setup() 호출
+  0:  다른 모든 스크립트의 Awake() 실행
+  0:  다른 모든 스크립트의 Start() 실행
+```
+
+### ✅ 테스트
+
+플레이 버튼을 눌러 확인:
+
+- 에러 없이 실행되는지 확인
+- 마우스 클릭해서 이동 작동 확인
+- T 키 눌러 경로 표시 작동 확인
+
+---
+
+## 3. PathNode에 isWalkable 기능 추가하기
+
+### 📌 개념: 노드의 이동 가능 여부
+
+경로찾기에서 각 노드는 "지나갈 수 있는가?"라는 정보가 필요합니다.
+
+- **Walkable(이동 가능)**: 캐릭터가 지나갈 수 있는 타일
+- **Unwalkable(이동 불가)**: 벽, 장애물 등으로 막힌 타일
+
+### 🔧 PathNode 클래스에 isWalkable 필드 추가
+
+```csharp
+public class PathNode
+{
+    private GridPosition gridPosition;
+    private int gCost;
+    private int hCost;
+    private int fCost;
+    private PathNode cameFromPathNode;
+
+    // 이동 가능 여부를 나타내는 필드
+    // 기본값은 true (이동 가능)
+    private bool isWalkable = true;
+
+    public PathNode(GridPosition gridPosition)
+    {
+        this.gridPosition = gridPosition;
+    }
+
+    // isWalkable 값을 읽기 위한 메서드
+    public bool IsWalkable()
+    {
+        return isWalkable;
+    }
+
+    // isWalkable 값을 변경하기 위한 메서드
+    public void SetIsWalkable(bool isWalkable)
+    {
+        this.isWalkable = isWalkable;
+    }
+}
+```
+
+**왜 기본값이 true인가요?**
+
+- 대부분의 타일은 이동 가능
+- 장애물이 있는 특정 타일만 false로 변경
+- 이렇게 하면 코드가 간단해짐
+
+---
+
+## 4. FindPath 알고리즘에 장애물 체크 로직 추가하기
+
+### 📌 개념: A\* 알고리즘에서 이동 불가 노드 처리
+
+A\* 알고리즘은 시작점에서 목표점까지 가장 짧은 경로를 찾습니다. 이동 불가능한 노드는:
+
+1. **탐색하지 않음**: 이웃 노드로 고려하지 않음
+2. **Closed List에 추가**: 다시 확인하지 않도록 처리
+
+### 🔧 FindPath 메서드 수정
+
+```csharp
+public List<GridPosition> FindPath(GridPosition startGridPosition, GridPosition endGridPosition)
+{
+    // ... (초기화 코드)
+
+    while (openList.Count > 0)
+    {
+        PathNode currentNode = GetLowestFCostPathNode(openList);
+
+        if (currentNode == endNode)
+        {
+            return CalculatePath(endNode);
+        }
+
+        openList.Remove(currentNode);
+        closedList.Add(currentNode);
+
+        // 현재 노드의 이웃 노드들을 순회
+        foreach (PathNode neighbourNode in GetNeighbourList(currentNode))
+        {
+            // 체크 1: 이미 Closed List에 있는가?
+            if (closedList.Contains(neighbourNode))
+            {
+                continue; // 이미 처리된 노드는 건너뜀
+            }
+
+            // 체크 2: 이동 가능한 노드인가?
+            if (!neighbourNode.IsWalkable())
+            {
+                // 이동 불가능한 노드 처리:
+                // 1. Closed List에 추가하여 다시 확인하지 않도록 함
+                closedList.Add(neighbourNode);
+                // 2. continue로 이후 처리를 건너뜀
+                continue;
+            }
+
+            // 이동 가능한 노드만 여기까지 도달
+            // G Cost 계산 및 경로 업데이트...
+            int tentativeGCost =
+                currentNode.GetGCost() +
+                CalculateDistance(currentNode.GetGridPosition(), neighbourNode.GetGridPosition());
+
+            if (tentativeGCost < neighbourNode.GetGCost())
+            {
+                neighbourNode.SetCameFromPathNode(currentNode);
+                neighbourNode.SetGCost(tentativeGCost);
+                neighbourNode.SetHCost(CalculateDistance(neighbourNode.GetGridPosition(), endGridPosition));
+                neighbourNode.CalculateFCost();
+
+                if (!openList.Contains(neighbourNode))
+                {
+                    openList.Add(neighbourNode);
+                }
+            }
+        }
+    }
+
+    return null; // 경로를 찾지 못함
+}
+
+```
+
+**핵심 로직 설명**:
+
+1. **이웃 노드 순회**: 현재 노드 주변 8방향(상하좌우+대각선)을 확인
+2. **Closed List 체크**: 이미 처리된 노드는 다시 보지 않음
+3. **isWalkable 체크**:
+   - `!neighbourNode.IsWalkable()`: 이동 불가능하면
+   - Closed List에 추가하고 continue
+4. **경로 계산**: 이동 가능한 노드만 경로 계산 진행
+
+---
+
+## 5. 수동으로 장애물 테스트하기
+
+### 📌 개념: 코드 검증을 위한 수동 테스트
+
+자동 시스템을 만들기 전에, 수동으로 특정 노드를 이동 불가로 설정하여 로직이 제대로 작동하는지 확인합니다.
+
+### 🔧 Setup 함수에 테스트 코드 추가
+
+```csharp
+public void Setup(int width, int height, float cellSize)
+{
+    this.width = width;
+    this.height = height;
+    this.cellSize = cellSize;
+
+    gridSystem = new GridSystem<PathNode>(
+        width, height, cellSize,
+        (GridSystem<PathNode> g, GridPosition gridPosition) => new PathNode(gridPosition)
+    );
+
+    gridSystem.CreateDebugObjects(gridDebugObjectPrefab);
+
+    // 테스트: 특정 노드를 이동 불가로 설정
+    // 그리드 위치 (1, 0)을 이동 불가로 설정
+    GetNode(1, 0).SetIsWalkable(false);
+
+    // 그리드 위치 (1, 1)도 이동 불가로 설정
+    GetNode(1, 1).SetIsWalkable(false);
+}
+
+// 헬퍼 메서드: x, z 좌표로 노드 가져오기
+private PathNode GetNode(int x, int z)
+{
+    return gridSystem.GetGridObject(new GridPosition(x, z));
+}
+
+```
+
+### ✅ 테스트 시나리오
+
+**그리드 설정** (width=10, height=10, cellSize=2):
+
+```
+  0 1 2 3 4 5 6 7 8 9
+0 □ ■ □ □ □ □ □ □ □ □  ← (1,0) 이동 불가
+1 □ ■ □ □ □ □ □ □ □ □  ← (1,1) 이동 불가
+2 □ □ □ □ □ □ □ □ □ □
+...
+```
+
+**예상 경로**:
+
+- 시작: (0, 0)
+- 목표: (2, 2)
+- 예상 경로: (0,0) → (0,1) → (0,2) → (1,2) → (2,2)
+  - (1,0)과 (1,1)을 피해서 돌아감
+
+**플레이 모드에서 테스트**:
+
+1. 플레이 버튼 클릭
+2. 마우스를 (2, 2) 위치에 놓기
+3. T 키 눌러 경로 표시
+4. 경로가 장애물을 피해가는지 확인
+
+---
+
+## 6. 장애물 프리팹 만들기
+
+### 📌 개념: 재사용 가능한 장애물 오브젝트
+
+이제 실제 게임에서 사용할 장애물 프리팹을 만들어봅시다. 프리팹의 장점:
+
+- 여러 곳에 재사용 가능
+- 한 번 수정하면 모든 인스턴스에 적용
+- 레벨 디자인이 쉬워짐
+
+### 🎨 Polygon Prototype Pack 에셋 사용
+
+**에셋 위치**:
+
+- Project 창 → Polygon Prototype Pack → Prefabs → Buildings → Simple
+
+**사용할 프리팹**:
+
+- "1x3" 벽 프리팹 (간단한 벽 모양)
+
+### 🔧 벽 오브젝트 설정하기
+
+### 1단계: Scene에 배치
+
+```
+1. Simple 폴더에서 "1x3" 프리팹을 Scene으로 드래그
+2. Hierarchy에 "1x3" 게임오브젝트 생성됨
+```
+
+### 2단계: Transform 조정
+
+```
+Inspector에서 Transform 컴포넌트:
+
+Position: (그리드에 맞게 배치)
+Rotation: (필요시 회전)
+
+Scale:
+- X: 4     (벽의 길이)
+- Y: 10    (벽의 높이 - 더 두껍게)
+- Z: 1     (벽의 두께)
+```
+
+**왜 Scale을 조정하나요?**
+
+- Y를 10으로 늘려 벽을 더 두껍게 만듦
+- Raycast가 감지하기 쉬워짐
+- 시각적으로 명확한 장애물 표시
+
+### 3단계: Collider 확인
+
+**중요**: Raycast는 Collider가 있어야 감지합니다!
+
+```
+Inspector에서 확인:
+- Box Collider 컴포넌트가 있는지 확인
+- 없다면: Add Component → Physics → Box Collider 추가
+
+Collider 시각화:
+1. Scene 뷰 상단 Gizmos 버튼 확인
+2. 메시(Mesh)를 비활성화하면 Collider만 보임 (초록색 선)
+```
+
+### 4단계: Layer 설정
+
+Raycast로 장애물만 감지하려면 별도의 Layer가 필요합니다.
+
+**Layer 추가**:
+
+```
+1. Inspector 상단 Layer 드롭다운 클릭
+2. "Add Layer..." 선택
+3. 빈 슬롯에 "Obstacles" 입력
+```
+
+**Layer 할당**:
+
+```
+1. 벽 오브젝트 선택
+2. Inspector 상단 Layer → "Obstacles" 선택
+3. 자식 오브젝트도 변경할지 묻는 팝업:
+   - "Yes, change children" 선택
+```
+
+### 🎯 프리팹으로 저장
+
+```
+1. Project 창에서 Prefabs 폴더 만들기 (없다면)
+2. Hierarchy의 "1x3" 오브젝트를 Prefabs 폴더로 드래그
+3. "Original Prefab" 선택
+4. Hierarchy와 Project 창에서 이름을 "Wall"로 변경
+```
+
+**프리팹 장점**:
+
+- 이제 벽을 여러 개 만들 때 이 프리팹만 드래그하면 됨
+- 프리팹 하나만 수정하면 모든 벽이 동시에 업데이트
+- 레벨 디자인 속도 향상
+
+---
+
+## 7. Raycast를 이용한 자동 장애물 감지 시스템
+
+### 📌 개념: Raycast란?
+
+**Raycast (광선 투사)**:
+
+- 특정 지점에서 특정 방향으로 보이지 않는 광선을 쏨
+- 광선이 Collider와 충돌하면 충돌 정보를 반환
+- FPS 게임의 총알, 시야 체크, 장애물 감지 등에 사용
+
+**우리의 전략**:
+
+```
+1. 그리드의 모든 칸(GridPosition)을 순회
+2. 각 칸의 월드 좌표를 가져옴
+3. 그 좌표에서 Raycast를 쏨
+4. Obstacles Layer의 Collider와 충돌하면
+5. 해당 PathNode를 isWalkable = false로 설정
+```
+
+### 🔧 Setup 함수에 Raycast 로직 추가
+
+```csharp
+public void Setup(int width, int height, float cellSize)
+{
+    this.width = width;
+    this.height = height;
+    this.cellSize = cellSize;
+
+    gridSystem = new GridSystem<PathNode>(
+        width, height, cellSize,
+        (GridSystem<PathNode> g, GridPosition gridPosition) => new PathNode(gridPosition)
+    );
+
+    gridSystem.CreateDebugObjects(gridDebugObjectPrefab);
+
+    // 수동 테스트 코드 제거
+    // GetNode(1, 0).SetIsWalkable(false);
+    // GetNode(1, 1).SetIsWalkable(false);
+
+    // 자동 장애물 감지 시작
+    // 모든 그리드 위치를 순회
+    for (int x = 0; x < width; x++)
+    {
+        for (int z = 0; z < height; z++)
+        {
+            // 현재 그리드 위치
+            GridPosition gridPosition = new GridPosition(x, z);
+
+            // 그리드 위치의 월드 좌표를 가져옴
+            Vector3 worldPosition = LevelGrid.Instance.GetWorldPosition(gridPosition);
+
+            // Raycast 오프셋 거리 설정
+            float raycastOffsetDistance = 5f;
+
+            // Physics.Raycast 실행
+            if (Physics.Raycast(
+                worldPosition + Vector3.down * raycastOffsetDistance,  // 시작 위치 (아래로 오프셋)
+                Vector3.up,                                            // 방향 (위로)
+                raycastOffsetDistance * 2,                             // 거리
+                obstaclesLayerMask))                                   // Layer Mask
+            {
+                // Raycast가 무언가에 충돌했음 = 장애물이 있음
+                // 해당 노드를 이동 불가로 설정
+                GetNode(x, z).SetIsWalkable(false);
+            }
+            // 충돌하지 않으면 기본값 true 유지 (이동 가능)
+        }
+    }
+}
+
+```
+
+**코드 상세 설명**:
+
+1. **이중 for 루프**:
+
+   ```csharp
+   for (int x = 0; x < width; x++)
+       for (int z = 0; z < height; z++)
+   ```
+
+   - width = 10, height = 10이면 총 100개 칸 검사
+   - x=0,z=0 → x=0,z=1 → ... → x=9,z=9 순서로
+
+2. **월드 좌표 가져오기**:
+
+   ```csharp
+   Vector3 worldPosition = LevelGrid.Instance.GetWorldPosition(gridPosition);
+   ```
+
+   - GridPosition(그리드 좌표)를 Vector3(월드 좌표)로 변환
+   - 예: GridPosition(1,0) → Vector3(2, 0, 0) (cellSize=2일 때)
+
+3. **Raycast 파라미터**:
+
+   ```csharp
+   Physics.Raycast(origin, direction, distance, layerMask)
+   ```
+
+   - `origin`: 광선의 시작점
+   - `direction`: 광선이 날아가는 방향
+   - `distance`: 광선의 최대 길이
+   - `layerMask`: 어떤 Layer의 오브젝트와 충돌 검사할지
+
+4. **반환값**:
+   - `true`: 광선이 Collider와 충돌함 → 장애물 있음
+   - `false`: 충돌 없음 → 장애물 없음
+
+---
+
+## 8. Raycast Offset 문제 해결하기
+
+### 📌 개념: Raycast의 내부 시작점 문제
+
+**문제 상황**:
+
+```
+┌─────────────┐
+│   Collider  │  ← 벽의 Collider
+│      •      │  ← worldPosition (y=0)
+└─────────────┘
+      ↑
+   Raycast 시작점이 Collider 내부에 있음!
+```
+
+**Unity의 Raycast 규칙**:
+
+- Raycast의 **시작점이 Collider 내부**에 있으면 충돌 감지 **안 됨**
+- 반드시 Collider **외부**에서 시작해야 함
+
+**우리의 상황**:
+
+- 그리드의 월드 좌표는 바닥(y=0) 근처
+- 벽 오브젝트도 바닥(y=0)에 배치됨
+- 시작점이 벽 Collider 내부에 위치할 가능성 높음
+
+### 🔧 해결책 1: Offset을 이용한 회피
+
+```csharp
+float raycastOffsetDistance = 5f;
+
+// 시작점: worldPosition에서 아래로 5유닛 이동
+Vector3 origin = worldPosition + Vector3.down * raycastOffsetDistance;
+
+// 방향: 위쪽으로
+Vector3 direction = Vector3.up;
+
+// 거리: 오프셋의 2배 (아래로 5 + 위로 10 = 총 5유닛 위까지)
+float distance = raycastOffsetDistance * 2;
+
+if (Physics.Raycast(origin, direction, distance, obstaclesLayerMask))
+{
+    // 장애물 감지
+}
+```
+
+**시각적 설명**:
+
+```
+      ↑ 10 유닛 (위로)
+┌─────┼─────┐
+│  Collider │
+│     •     │ ← worldPosition (y=0)
+└───────────┘
+      •       ← 시작점 (y=-5)
+      ↓ 5 유닛 (아래로 오프셋)
+```
+
+**동작 원리**:
+
+1. 시작점을 worldPosition보다 5유닛 아래로 설정
+2. 위쪽 방향으로 10유닛(5\*2)만큼 Raycast
+3. Collider 외부에서 시작하므로 정상 감지
+4. 최종적으로 worldPosition 위치의 장애물을 감지
+
+### 🔧 해결책 2: Query Hit Backfaces 옵션
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380476/notion-blog/_/3D_/_/_6_Pathfinding_-_4/image_2.png)
+
+**Physics Settings 조정**:
+
+```
+1. Edit → Project Settings 메뉴
+2. Physics 탭 선택
+3. "Query Hit Backfaces" 체크박스 활성화
+```
+
+**Query Hit Backfaces란?**:
+
+- Collider의 뒷면(backface)도 감지할지 여부
+- 활성화하면: Collider 내부에서 시작해도 충돌 감지됨
+- 비활성화(기본값): Collider 외부에서만 감지
+
+**장단점 비교**:
+
+| 방법                | 장점                                   | 단점                 |
+| ------------------- | -------------------------------------- | -------------------- |
+| Offset 사용         | 더 명확한 동작, Physics 설정 안 건드림 | 코드가 약간 복잡     |
+| Query Hit Backfaces | 코드 간단                              | 프로젝트 전체에 영향 |
+
+**강의에서는 Offset 방식 사용**: 더 명확하고 예측 가능한 동작
+
+---
+
+## 9. LayerMask로 장애물 필터링하기
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380476/notion-blog/_/3D_/_/_6_Pathfinding_-_4/image_3.png)
+
+### 📌 개념: LayerMask의 필요성
+
+Scene에는 다양한 오브젝트가 있습니다:
+
+- 바닥 (Floor)
+- 캐릭터 (Units)
+- UI 요소
+- 장애물 (Obstacles)
+
+**문제**: Raycast가 모든 Collider와 충돌하면?
+
+- 바닥과 충돌 → 모든 칸이 이동 불가로 판정
+- 캐릭터와 충돌 → 캐릭터 위치가 이동 불가로 판정
+- 원하지 않는 결과!
+
+**해결책**: LayerMask로 "Obstacles" Layer만 감지하도록 필터링
+
+### 🔧 LayerMask 필드 추가
+
+```csharp
+public class Pathfinding : MonoBehaviour
+{
+    // ... 다른 필드들
+
+    // SerializeField: Inspector에서 설정 가능
+    // LayerMask: 어떤 Layer를 대상으로 할지 설정
+    [SerializeField] private LayerMask obstaclesLayerMask;
+
+    public void Setup(int width, int height, float cellSize)
+    {
+        // ... 그리드 생성 코드
+
+        for (int x = 0; x < width; x++)
+        {
+            for (int z = 0; z < height; z++)
+            {
+                // ... 월드 좌표 계산
+
+                // Raycast에 LayerMask 전달
+                if (Physics.Raycast(
+                    worldPosition + Vector3.down * raycastOffsetDistance,
+                    Vector3.up,
+                    raycastOffsetDistance * 2,
+                    obstaclesLayerMask))  // ← LayerMask 사용
+                {
+                    GetNode(x, z).SetIsWalkable(false);
+                }
+            }
+        }
+    }
+}
+```
+
+### 🎮 Inspector에서 LayerMask 설정
+
+```
+1. Hierarchy에서 Pathfinding 게임오브젝트 선택
+2. Inspector에서 "Obstacles Layer Mask" 필드 찾기
+3. 드롭다운 클릭
+4. "Obstacles"만 체크
+5. 다른 Layer들은 모두 체크 해제
+
+```
+
+**LayerMask의 동작**:
+
+- 체크된 Layer의 오브젝트만 Raycast와 충돌
+- "Obstacles" Layer의 오브젝트만 감지됨
+- 다른 Layer(Default, UI 등)는 무시됨
+
+---
+
+## 10. 자동 장애물 감지 테스트
+
+### 🎮 벽 배치하기
+
+**Scene 설정**:
+
+```
+1. Project 창에서 Wall 프리팹 찾기
+2. Scene 뷰로 드래그하여 배치
+3. Transform 조정:
+   - Position: 그리드 칸 중앙에 정렬
+   - 예: (2, 0, 0) 위치에 배치하면 GridPosition(1,0) 차지
+```
+
+**여러 개 배치하기**:
+
+```
+1. 첫 번째 벽 선택
+2. Ctrl+D (복제)
+3. 다른 위치로 이동
+4. Transform에서 Rotation Y를 90°로 회전 (가로 배치)
+5. Scale 조정으로 크기 변경 가능
+```
+
+### ✅ 테스트 시나리오
+
+**테스트 1: 단순 회피**
+
+```
+벽 배치: (2, 0) 위치
+
+경로 테스트:
+1. 플레이 모드 실행
+2. 마우스를 (3, 0) 위치에 놓기
+3. T 키 눌러 경로 표시
+
+예상 결과:
+(0,0) → (0,1) → (1,1) → (2,1) → (3,1) → (3,0)
+벽을 우회하는 경로 생성
+
+```
+
+**테스트 2: 복잡한 장애물**
+
+```
+벽 배치:
+- Wall1: (2, 0) - 세로
+- Wall2: (4, 2) - 가로 (회전)
+
+경로 테스트:
+1. 마우스를 (5, 5) 위치에
+2. T 키로 경로 표시
+
+예상 결과:
+두 벽을 모두 피해가는 최단 경로 생성
+
+```
+
+### 🔍 디버깅 팁
+
+**경로가 이상하게 나오면?**:
+
+1. **벽 위치 확인**:
+   - Scene 뷰에서 Grid Debug Objects 보기
+   - 벽이 그리드 칸 중앙에 정확히 위치하는지 확인
+2. **Collider 확인**:
+   - Inspector에서 Box Collider 컴포넌트 확인
+   - Scene 뷰에서 Collider Gizmo(초록색 선) 보기
+3. **Layer 확인**:
+   - 벽의 Layer가 "Obstacles"인지 확인
+   - Pathfinding의 LayerMask가 "Obstacles"만 체크되어 있는지 확인
+4. **Raycast 시각화** (고급):
+
+   ```csharp
+   // Setup 함수의 Raycast 부분에 추가
+   Debug.DrawRay(
+       worldPosition + Vector3.down * raycastOffsetDistance,
+       Vector3.up * raycastOffsetDistance * 2,
+       Color.red,
+       10f  // 10초간 표시
+   );
+   ```
+
+   - Scene 뷰에서 빨간 선으로 Raycast 경로를 볼 수 있음
+
+### 🎉 완성!
+
+**구현된 기능**:
+
+1. ✅ PathNode에 isWalkable 속성 추가
+2. ✅ FindPath 알고리즘이 이동 불가 노드 회피
+3. ✅ Raycast로 자동 장애물 감지
+4. ✅ LayerMask로 특정 오브젝트만 필터링
+5. ✅ 레벨 디자인을 위한 Wall 프리팹
+
+**다음 단계**:
+
+- 더 복잡한 레벨 디자인
+- 다양한 장애물 추가
+- 동적 장애물 (움직이거나 생성/제거되는 장애물)
+
+---
+
+## 📚 핵심 개념 정리
+
+### A\* 알고리즘의 장애물 처리
+
+- **Open List**: 탐색할 후보 노드들
+- **Closed List**: 이미 탐색한 노드들
+- **Walkable Check**: 이웃 노드가 이동 가능한지 확인
+- **Skip Logic**: 이동 불가 노드는 Closed List에 넣고 건너뜀
+
+### Raycast의 핵심
+
+- **Origin**: 광선의 시작점
+- **Direction**: 광선의 방향
+- **Distance**: 광선의 길이
+- **LayerMask**: 충돌 검사할 Layer 필터
+- **Return**: true/false로 충돌 여부 반환
+
+### Script Execution Order
+
+- **Awake**: 스크립트 활성화 시 즉시 실행
+- **Start**: 첫 프레임 전에 실행
+- **Script Execution Order**: 실행 순서를 명시적으로 제어
+- **의존성 관리**: 초기화 순서가 중요한 스크립트 관리
+
+### LayerMask 활용
+
+- **필터링**: 특정 Layer만 검사
+- **성능**: 불필요한 충돌 검사 제거
+- **명확성**: 코드의 의도를 명확히 함
+
+이제 장애물이 있는 완전한 경로찾기 시스템이 완성되었습니다!
+
+# { 🗺️ Pathfinding 맵 구성과 Grid Debug 시스템 }
+
+벽, 문, 기둥을 배치하여 맵을 만들고, Pathfinding이 올바르게 작동하는지 시각적으로 확인하는 Debug 시스템을 구축합니다.
+
+---
+
+## 📋 목차
+
+1. [Pathfinding 테스트와 Canvas 설정](https://claude.ai/chat/9da2e074-6b29-47fd-9c24-388dd817ccdb#1-pathfinding-%ED%85%8C%EC%8A%A4%ED%8A%B8%EC%99%80-canvas-%EC%84%A4%EC%A0%95)
+2. [Unity 스냅(Snap) 기능 활용하기](https://claude.ai/chat/9da2e074-6b29-47fd-9c24-388dd817ccdb#2-unity-%EC%8A%A4%EB%83%85snap-%EA%B8%B0%EB%8A%A5-%ED%99%9C%EC%9A%A9%ED%95%98%EA%B8%B0)
+3. [벽과 문 배치하기](https://claude.ai/chat/9da2e074-6b29-47fd-9c24-388dd817ccdb#3-%EB%B2%BD%EA%B3%BC-%EB%AC%B8-%EB%B0%B0%EC%B9%98%ED%95%98%EA%B8%B0)
+4. [정확한 Grid 배치와 시각화](https://claude.ai/chat/9da2e074-6b29-47fd-9c24-388dd817ccdb#4-%EC%A0%95%ED%99%95%ED%95%9C-grid-%EB%B0%B0%EC%B9%98%EC%99%80-%EC%8B%9C%EA%B0%81%ED%99%94)
+5. [Grid 크기 조정과 최종 정리](https://claude.ai/chat/9da2e074-6b29-47fd-9c24-388dd817ccdb#5-grid-%ED%81%AC%EA%B8%B0-%EC%A1%B0%EC%A0%95%EA%B3%BC-%EC%B5%9C%EC%A2%85-%EC%A0%95%EB%A6%AC)
+
+---
+
+## 1. Pathfinding 테스트와 Canvas 설정
+
+### 기본 테스트
+
+- 기본 시작 위치는 `(0, 0)` 좌표
+- 마우스를 목표 지점에 놓고 **T키** 누르면 경로 계산
+- 장애물을 자동으로 피해서 목적지까지 이동
+
+### Canvas 클릭 문제 해결
+
+- Canvas가 마우스 입력을 가로막는 문제 발생
+- **해결**: Hierarchy에서 Canvas 선택 → Inspector 상단 버튼 클릭 → **untouchable** 상태로 변경
+
+---
+
+## 2. Unity 스냅(Snap) 기능 활용하기
+
+### 스냅 기능이란?
+
+오브젝트를 일정 간격으로 자동 정렬하는 기능 (예: 1 unit씩, 90도씩)
+
+### 활성화 방법
+
+1. Scene View 상단 툴바에서 **Global** 모드로 설정
+2. **자석 아이콘** 클릭하여 활성화
+3. Grid Size는 **1 unit**으로 설정
+
+### 사용법
+
+- **기본 드래그**: 1 unit씩 이동
+- **Control + 드래그**: 0.25 unit씩 미세 조정
+- **회전 시 Control**: 정확히 90도씩 회전
+
+### ⚠️ 중요 규칙
+
+- **X축과 Z축**만 사용
+- **Y축은 절대 건드리지 않기** (높이 변경 방지)
+
+---
+
+## 4. 정확한 Grid 배치와 시각화
+
+### 정확한 배치가 중요한 이유
+
+- Pathfinding은 각 Grid Cell 중앙에서 Raycast 검사
+- 오브젝트가 어긋나면 잘못된 판정 발생
+
+### 배치 방법
+
+- **Control 키 + 드래그**로 0.25 unit씩 정확히 이동
+- Scene View 조명 끄기 (오른쪽 상단 햇빛 아이콘) → Grid 선이 선명해짐
+
+### Walkable 시각화 시스템
+
+**Sprite 추가**:
+
+1. PathfindingGridDebugObject Prefab 열기
+2. 2D Object > Sprite > Square 생성
+3. Rotation X = **90도** (바닥과 평행)
+4. Position Y = **0.1** (바닥에서 살짝 띄움)
+5. Scale X=2, Y=2, Z=0
+6. 이름을 **"IsWalkable"**로 변경
+
+**Script 수정**:
+
+```csharp
+public class PathfindingGridDebugObject : GridDebugObject
+{
+    [SerializeField] private TextMeshPro gCostText;
+    [SerializeField] private TextMeshPro hCostText;
+    [SerializeField] private TextMeshPro fCostText;
+    // 새로 추가
+    [SerializeField] private SpriteRenderer isWalkableSpriteRenderer;
+
+    private PathNode pathNode;
+
+    public override void SetGridObject(object gridObject)
+    {
+        base.SetGridObject(gridObject);
+        pathNode = (PathNode)gridObject;
+    }
+
+    protected override void Update()
+    {
+        base.Update();
+        // Cost 텍스트 업데이트
+        gCostText.text = pathNode.GetGCost().ToString();
+        hCostText.text = pathNode.GetHCost().ToString();
+        fCostText.text = pathNode.GetFCost().ToString();
+
+        // Walkable 여부에 따라 색상 변경
+        // Inline if: (조건) ? 참일때 : 거짓일때
+        isWalkableSpriteRenderer.color = pathNode.IsWalkable() ? Color.green : Color.red;
+    }
+}
+
+```
+
+**동작 원리**:
+
+- `pathNode.IsWalkable()` 체크
+- 이동 가능 → **초록색**
+- 이동 불가 → **빨간색**
+
+**Inspector 연결**:
+
+- PathfindingGridDebugObject Prefab 선택
+- IsWalkable Sprite Renderer 필드에 IsWalkable 오브젝트 드래그
+
+---
+
+## 5. Grid 크기 조정과 최종 정리
+
+### Grid 크기 확장
+
+**문제**: 맵이 Grid 범위를 벗어남
+
+**해결**:
+
+```csharp
+// LevelGrid Script에서
+private int width = 20;   // 기존보다 증가
+private int height = 30;  // 기존보다 증가
+
+```
+
+### 테스트 확인
+
+- **빨간색**: 벽, 기둥 (Unwalkable)
+- **초록색**: 빈 공간 (Walkable)
+- 마우스 클릭 + T키로 경로 테스트 → 초록색 영역만 통과하는지 확인
+
+### Debug 정리
+
+**Walkable Sprite 끄기**:
+
+- PathfindingGridDebugObject Prefab에서 IsWalkable 오브젝트 비활성화
+
+**숫자 Text 끄기**:
+
+- Pathfinding Script에서 Debug Object 생성 코드 주석 처리
+
+### Hierarchy 정리
+
+1. 빈 GameObject 생성 → **"Level Parts"** 이름 변경
+2. Transform Reset (Position 0,0,0)
+3. 모든 Wall, Door, Column을 Level Parts의 자식으로 드래그
+4. 조명 다시 활성화
+
+---
+
+## 🎯 핵심 요약
+
+**배운 내용**:
+
+- Snap 시스템으로 정확한 배치
+- Door는 Collider 제거, Column은 Collider 유지
+- Inline if문으로 색상 시각화
+- Grid 크기는 맵에 맞게 조정
+
+**다음 강의**: Unit이 경로를 따라 실제로 이동하도록 구현
+
+# { 🎯 유닛 이동에 길찾기(Pathfinding) 적용하기 }
+
+이번 강의는 A\* 길찾기 알고리즘을 유닛의 이동 액션에 통합하여 장애물을 회피하면서 목적지까지 이동할 수 있도록 구현하는 내용입니다. 단순히 직선 이동이 아닌, 벽과 장애물을 지능적으로 우회하는 경로를 찾아 이동하게 됩니다.
+
+---
+
+## 📋 목차
+
+1. [현재 문제점 파악하기](https://claude.ai/chat/664fd518-4e0a-49d7-9558-4cc490c458be#1-%ED%98%84%EC%9E%AC-%EB%AC%B8%EC%A0%9C%EC%A0%90-%ED%8C%8C%EC%95%85%ED%95%98%EA%B8%B0)
+2. [단일 위치를 리스트로 리팩토링하기](https://claude.ai/chat/664fd518-4e0a-49d7-9558-4cc490c458be#2-%EB%8B%A8%EC%9D%BC-%EC%9C%84%EC%B9%98%EB%A5%BC-%EB%A6%AC%EC%8A%A4%ED%8A%B8%EB%A1%9C-%EB%A6%AC%ED%8C%A9%ED%86%A0%EB%A7%81%ED%95%98%EA%B8%B0)
+3. [리스트 기반 이동 로직 구현하기](https://claude.ai/chat/664fd518-4e0a-49d7-9558-4cc490c458be#3-%EB%A6%AC%EC%8A%A4%ED%8A%B8-%EA%B8%B0%EB%B0%98-%EC%9D%B4%EB%8F%99-%EB%A1%9C%EC%A7%81-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+4. [Pathfinding을 MoveAction에 통합하기](https://claude.ai/chat/664fd518-4e0a-49d7-9558-4cc490c458be#4-pathfinding%EC%9D%84-moveaction%EC%97%90-%ED%86%B5%ED%95%A9%ED%95%98%EA%B8%B0)
+5. [이동 가능 위치 검증 추가하기](https://claude.ai/chat/664fd518-4e0a-49d7-9558-4cc490c458be#5-%EC%9D%B4%EB%8F%99-%EA%B0%80%EB%8A%A5-%EC%9C%84%EC%B9%98-%EA%B2%80%EC%A6%9D-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+6. [경로 존재 여부 확인하기](https://claude.ai/chat/664fd518-4e0a-49d7-9558-4cc490c458be#6-%EA%B2%BD%EB%A1%9C-%EC%A1%B4%EC%9E%AC-%EC%97%AC%EB%B6%80-%ED%99%95%EC%9D%B8%ED%95%98%EA%B8%B0)
+7. [경로 길이 계산 및 검증하기](https://claude.ai/chat/664fd518-4e0a-49d7-9558-4cc490c458be#7-%EA%B2%BD%EB%A1%9C-%EA%B8%B8%EC%9D%B4-%EA%B3%84%EC%82%B0-%EB%B0%8F-%EA%B2%80%EC%A6%9D%ED%95%98%EA%B8%B0)
+8. [ShootAction에 장애물 감지 추가하기](https://claude.ai/chat/664fd518-4e0a-49d7-9558-4cc490c458be#8-shootaction%EC%97%90-%EC%9E%A5%EC%95%A0%EB%AC%BC-%EA%B0%90%EC%A7%80-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+9. [적 AI의 Pathfinding 동작 확인](https://claude.ai/chat/664fd518-4e0a-49d7-9558-4cc490c458be#9-%EC%A0%81-ai%EC%9D%98-pathfinding-%EB%8F%99%EC%9E%91-%ED%99%95%EC%9D%B8)
+
+---
+
+## 1. 현재 문제점 파악하기
+
+### 문제 상황
+
+현재 게임에서 유닛이 이동할 때 **직선 경로**로만 움직입니다. 벽이나 장애물이 있어도 무시하고 관통해서 이동하는 문제가 있습니다.
+
+### 테스트로 확인하기
+
+```
+1. 플레이어 유닛 옆에 기둥(Column)을 배치
+2. 게임 실행 후 기둥 너머의 타일을 클릭
+3. 결과: 유닛이 벽을 관통해서 이동함
+```
+
+**원인**: 유닛의 MoveAction이 Pathfinding 시스템을 사용하지 않고 목표 지점으로 직진하기 때문입니다.
+
+### 기존 테스트 코드 제거
+
+Pathfinding을 테스트하기 위해 만들었던 임시 코드는 이제 필요 없으므로 제거합니다.
+
+```csharp
+// Testing 스크립트에서 모든 Pathfinding 테스트 코드 제거
+// 이제 실제 MoveAction에서 Pathfinding을 사용할 것이므로
+```
+
+---
+
+## 2. 단일 위치를 리스트로 리팩토링하기
+
+### 왜 리팩토링이 필요한가?
+
+현재 MoveAction은 **하나의 목표 위치(Vector3 targetPosition)**만 저장합니다. 하지만 Pathfinding은 **여러 경유지를 거쳐 가는 경로(List<GridPosition>)**를 반환합니다.
+
+예를 들어:
+
+- **직선 이동**: 시작점 → 목표점 (2개 지점)
+- **우회 경로**: 시작점 → 경유지1 → 경유지2 → 경유지3 → 목표점 (5개 지점)
+
+따라서 단일 Vector3가 아닌 **Vector3 리스트**로 변경해야 합니다.
+
+### 변수 타입 변경
+
+```csharp
+// 기존 코드
+private Vector3 targetPosition;
+
+// 변경 후
+private List<Vector3> positionList; // 여러 위치를 순차적으로 저장
+```
+
+### Awake 함수 제거
+
+기존에는 Awake에서 targetPosition을 초기화했지만, 이제는 액션을 실행할 때(TakeAction) 리스트를 만들므로 필요 없습니다.
+
+```csharp
+// 삭제: private void Awake() { ... }
+// TakeAction에서 positionList를 초기화할 것
+```
+
+---
+
+## 3. 리스트 기반 이동 로직 구현하기
+
+### 현재 위치 인덱스 추가
+
+여러 경유지를 순서대로 방문하려면 "지금 몇 번째 지점으로 가고 있는지" 추적해야 합니다.
+
+```csharp
+private int currentPositionIndex; // 현재 목표로 하는 위치의 인덱스
+```
+
+### TakeAction 수정
+
+액션을 시작할 때 positionList를 초기화하고 인덱스를 0으로 설정합니다.
+
+```csharp
+public override void TakeAction(GridPosition gridPosition, Action onActionComplete)
+{
+    // 임시로 하나의 위치만 넣어서 기존 동작 유지 (나중에 Pathfinding 결과로 교체)
+    positionList = new List<Vector3>();
+    positionList.Add(LevelGrid.Instance.GetWorldPosition(gridPosition));
+
+    currentPositionIndex = 0; // 첫 번째 위치부터 시작
+
+    OnStartMoving?.Invoke(this, EventArgs.Empty);
+    ActionStart(onActionComplete);
+}
+
+```
+
+### Update 함수 수정
+
+이제 **현재 인덱스의 위치**를 목표로 이동하고, 도착하면 **다음 인덱스로 넘어갑니다**.
+
+```csharp
+private void Update()
+{
+    if (!isActive)
+    {
+        return;
+    }
+
+    float stoppingDistance = 0.1f;
+
+    // 현재 목표 위치 = positionList의 현재 인덱스 위치
+    Vector3 targetPosition = positionList[currentPositionIndex];
+
+    Vector3 moveDirection = (targetPosition - transform.position).normalized;
+
+    // 회전 처리 (목표 방향을 바라보도록)
+    float rotationSpeed = 10f;
+    transform.forward = Vector3.Lerp(transform.forward, moveDirection, Time.deltaTime * rotationSpeed);
+
+    // 목표 지점까지의 거리 확인
+    if (Vector3.Distance(transform.position, targetPosition) > stoppingDistance)
+    {
+        // 아직 멀다 → 계속 이동
+        float moveSpeed = 4f;
+        transform.position += moveDirection * Time.deltaTime * moveSpeed;
+    }
+    else
+    {
+        // 목표 지점 도착 → 다음 위치로 인덱스 증가
+        currentPositionIndex++;
+
+        // 모든 위치를 다 방문했는지 확인
+        if (currentPositionIndex >= positionList.Count)
+        {
+            // 마지막 위치까지 도착 → 액션 완료
+            OnStopMoving?.Invoke(this, EventArgs.Empty);
+            ActionComplete();
+        }
+    }
+}
+
+```
+
+**동작 흐름**:
+
+1. 첫 번째 위치(인덱스 0)로 이동
+2. 도착하면 인덱스를 1로 증가
+3. 두 번째 위치로 이동
+4. 모든 위치를 방문할 때까지 반복
+5. 마지막 위치 도착 시 액션 완료
+
+### 테스트
+
+이 시점에서는 아직 Pathfinding을 사용하지 않지만, 리스트 구조로 동작하는지 확인합니다. 여전히 벽을 관통하지만, 이동 자체는 정상 작동해야 합니다.
+
+---
+
+## 4. Pathfinding을 MoveAction에 통합하기
+
+### Pathfinding.FindPath 함수 이해
+
+Pathfinding 스크립트에는 경로를 계산하는 함수가 있습니다:
+
+```csharp
+public List<GridPosition> FindPath(GridPosition startGridPosition, GridPosition endGridPosition, out int pathLength)
+```
+
+**입력**:
+
+- `startGridPosition`: 시작 그리드 위치
+- `endGridPosition`: 목표 그리드 위치
+
+**출력**:
+
+- `List<GridPosition>`: 시작부터 목표까지의 그리드 위치 경로
+- `out int pathLength`: 경로의 총 비용(거리)
+
+### TakeAction에서 Pathfinding 호출
+
+```csharp
+public override void TakeAction(GridPosition gridPosition, Action onActionComplete)
+{
+    // 1. Pathfinding으로 경로 계산
+    List<GridPosition> pathGridPositionList = Pathfinding.Instance.FindPath(
+        unit.GetGridPosition(),  // 시작 위치 = 이 유닛의 현재 위치
+        gridPosition,            // 목표 위치 = 클릭한 위치
+        out int pathLength       // 경로 길이 (지금은 안 씀)
+    );
+
+    // 2. 인덱스 초기화
+    currentPositionIndex = 0;
+
+    // 3. GridPosition 리스트를 Vector3 리스트로 변환
+    positionList = new List<Vector3>();
+
+    foreach (GridPosition pathGridPosition in pathGridPositionList)
+    {
+        // 각 그리드 위치를 월드 좌표로 변환해서 추가
+        positionList.Add(LevelGrid.Instance.GetWorldPosition(pathGridPosition));
+    }
+
+    OnStartMoving?.Invoke(this, EventArgs.Empty);
+    ActionStart(onActionComplete);
+}
+
+```
+
+**변환 과정**:
+
+- Pathfinding은 `GridPosition`(그리드 좌표, 예: x=5, z=3)으로 경로를 반환
+- MoveAction은 `Vector3`(월드 좌표, 예: x=5.0, y=0, z=3.0)로 이동
+- 따라서 각 GridPosition을 LevelGrid를 통해 Vector3로 변환
+
+### 테스트
+
+```
+1. 기둥을 유닛 옆에 배치
+2. 기둥 너머를 클릭
+3. 결과: 유닛이 기둥을 우회해서 목표 지점으로 이동!
+```
+
+**작동 원리**:
+
+- Pathfinding이 장애물을 피하는 경로를 계산
+- positionList에 여러 경유지가 저장됨
+- Update에서 각 경유지를 순차적으로 방문
+
+### 액션 포인트 임시 증가 (테스트용)
+
+먼 거리를 테스트하기 위해 액션 포인트를 일시적으로 늘립니다.
+
+```csharp
+// Unit 스크립트에서
+private int actionPoints = 9; // 원래는 2, 테스트용으로 9로 증가
+```
+
+이제 유닛이 맵 반대편까지 장애물을 우회하며 이동할 수 있습니다.
+
+---
+
+## 5. 이동 가능 위치 검증 추가하기
+
+### 새로운 문제점
+
+현재는 **빈 공간이면 무조건 이동 가능**한 것으로 표시됩니다. 하지만 다음과 같은 문제가 있습니다:
+
+1. **걸어갈 수 없는 타일**: 장애물 위의 타일도 유효한 것으로 표시됨
+2. **경로 없는 타일**: 벽에 막혀 도달할 수 없는 타일도 유효한 것으로 표시됨
+3. **너무 먼 타일**: 실제 경로는 매우 길지만 직선 거리로만 판단
+
+### IsWalkable 검증 추가
+
+먼저 타일 자체가 걸어갈 수 있는지 확인해야 합니다.
+
+### Pathfinding에 IsWalkableGridPosition 함수 추가
+
+```csharp
+// Pathfinding.cs
+public bool IsWalkableGridPosition(GridPosition gridPosition)
+{
+    // 해당 그리드 위치의 PathNode를 가져와서 IsWalkable 속성 반환
+    return gridSystem.GetGridObject(gridPosition).IsWalkable();
+}
+```
+
+**설명**:
+
+- Pathfinding 시스템은 각 타일마다 PathNode를 가지고 있음
+- Setup 시 Raycast로 장애물이 있는 타일은 `IsWalkable = false`로 설정됨
+- 이 함수는 특정 그리드 위치가 걸어갈 수 있는지 여부를 반환
+
+### MoveAction 검증 로직에 추가
+
+```csharp
+public override List<GridPosition> GetValidActionGridPositionList()
+{
+    List<GridPosition> validGridPositionList = new List<GridPosition>();
+    GridPosition unitGridPosition = unit.GetGridPosition();
+
+    for (int x = -maxMoveDistance; x <= maxMoveDistance; x++)
+    {
+        for (int z = -maxMoveDistance; z <= maxMoveDistance; z++)
+        {
+            GridPosition offsetGridPosition = new GridPosition(x, z);
+            GridPosition testGridPosition = unitGridPosition + offsetGridPosition;
+
+            // 기존 검증들
+            if (!LevelGrid.Instance.IsValidGridPosition(testGridPosition))
+            {
+                continue; // 맵 범위 밖
+            }
+
+            if (unitGridPosition == testGridPosition)
+            {
+                continue; // 현재 위치
+            }
+
+            if (LevelGrid.Instance.HasAnyUnitOnGridPosition(testGridPosition))
+            {
+                continue; // 다른 유닛이 있음
+            }
+
+            // 새로 추가: 걸어갈 수 있는 타일인지 확인
+            if (!Pathfinding.Instance.IsWalkableGridPosition(testGridPosition))
+            {
+                continue; // 장애물이 있는 타일
+            }
+
+            validGridPositionList.Add(testGridPosition);
+        }
+    }
+
+    return validGridPositionList;
+}
+
+```
+
+### 테스트
+
+```
+1. 기둥 위의 타일 확인
+2. 결과: 더 이상 유효한 이동 위치로 표시되지 않음
+3. 클릭해도 에러 없음 (이미 유효하지 않으므로 클릭 자체가 안 됨)
+```
+
+---
+
+## 6. 경로 존재 여부 확인하기
+
+### 도달 불가능한 위치 문제
+
+타일이 걸어갈 수는 있지만, **벽에 완전히 막혀서 경로가 없는 경우**가 있습니다.
+
+예시:
+
+```
+■ ■ ■ ■ ■
+■ X   O ■  (X=유닛, O=목표, ■=벽)
+■ ■ ■ ■ ■
+```
+
+목표 타일(O)은 walkable이지만, 벽으로 둘러싸여 있어 도달 불가능합니다.
+
+### Pathfinding에 HasPath 함수 추가
+
+```csharp
+// Pathfinding.cs
+public bool HasPath(GridPosition startGridPosition, GridPosition endGridPosition)
+{
+    // FindPath를 호출해서 경로를 계산
+    // 경로가 있으면 List<GridPosition> 반환, 없으면 null 반환
+    return FindPath(startGridPosition, endGridPosition, out int pathLength) != null;
+}
+```
+
+**동작 원리**:
+
+- FindPath 함수는 경로를 찾으면 `List<GridPosition>`을 반환
+- 경로를 찾지 못하면 `null`을 반환
+- `!= null` 체크로 경로 존재 여부를 bool로 반환
+
+### MoveAction 검증 로직에 추가
+
+```csharp
+public override List<GridPosition> GetValidActionGridPositionList()
+{
+    List<GridPosition> validGridPositionList = new List<GridPosition>();
+    GridPosition unitGridPosition = unit.GetGridPosition();
+
+    for (int x = -maxMoveDistance; x <= maxMoveDistance; x++)
+    {
+        for (int z = -maxMoveDistance; z <= maxMoveDistance; z++)
+        {
+            GridPosition offsetGridPosition = new GridPosition(x, z);
+            GridPosition testGridPosition = unitGridPosition + offsetGridPosition;
+
+            // 이전 검증들...
+            if (!LevelGrid.Instance.IsValidGridPosition(testGridPosition))
+            {
+                continue;
+            }
+
+            if (unitGridPosition == testGridPosition)
+            {
+                continue;
+            }
+
+            if (LevelGrid.Instance.HasAnyUnitOnGridPosition(testGridPosition))
+            {
+                continue;
+            }
+
+            if (!Pathfinding.Instance.IsWalkableGridPosition(testGridPosition))
+            {
+                continue;
+            }
+
+            // 새로 추가: 경로가 존재하는지 확인
+            if (!Pathfinding.Instance.HasPath(unitGridPosition, testGridPosition))
+            {
+                continue; // 도달할 수 없는 위치
+            }
+
+            validGridPositionList.Add(testGridPosition);
+        }
+    }
+
+    return validGridPositionList;
+}
+```
+
+### 테스트
+
+```
+1. 유닛을 벽으로 둘러싸인 영역 근처에 배치
+2. 벽 너머의 고립된 타일 확인
+3. 결과: 더 이상 유효한 위치로 표시되지 않음
+```
+
+---
+
+## 7. 경로 길이 계산 및 검증하기
+
+### 직선 거리 vs 실제 경로 문제
+
+현재 `maxMoveDistance`는 **직선 거리**로만 체크합니다.
+
+```
+상황:
+- 유닛 위치: (0, 0)
+- 목표 위치: (2, 0)
+- 직선 거리: 2칸
+- 실제 경로: 벽을 우회해서 10칸
+
+현재: 2칸이므로 이동 가능 (X)
+원하는 결과: 10칸이므로 이동 불가능 (O)
+```
+
+### 문제의 원인
+
+```csharp
+// 현재 검증 로직
+int testDistance = Mathf.Abs(x) + Mathf.Abs(z);
+if (testDistance > maxMoveDistance)
+{
+    continue; // 직선 거리만 체크
+}
+```
+
+이 방식은 장애물이 없을 때는 정확하지만, 우회 경로가 필요한 경우 부정확합니다.
+
+### 경로 비용(Path Cost) 이해
+
+Pathfinding에서 각 이동에는 비용이 있습니다:
+
+- **직선 이동**: 비용 = 10 (MOVE_STRAIGHT_COST)
+- **대각선 이동**: 비용 = 14 (MOVE_DIAGONAL_COST, √2 ≈ 1.4를 10배)
+
+예시:
+
+```
+경로: (0,0) → (1,0) → (2,0)
+비용: 10 + 10 = 20
+```
+
+**왜 10을 곱하나?**
+정수로 계산하기 위해서입니다. 소수점(1.0, 1.4)보다 정수(10, 14)가 연산이 빠르고 정확합니다.
+
+### FindPath 함수 수정 - 경로 길이 반환
+
+```csharp
+// Pathfinding.cs
+public List<GridPosition> FindPath(GridPosition startGridPosition, GridPosition endGridPosition, out int pathLength)
+{
+    // ... 경로 찾기 알고리즘 ...
+
+    if (currentNode == endNode)
+    {
+        // 경로를 찾았을 때: endNode의 F Cost가 총 경로 비용
+        pathLength = endNode.GetFCost();
+        return CalculatePath(endNode);
+    }
+
+    // ... 계속 탐색 ...
+
+    // 경로를 찾지 못했을 때
+    pathLength = 0;
+    return null;
+}
+```
+
+**설명**:
+
+- `out int pathLength`: 함수가 추가로 정수 값을 반환하는 방법
+- `endNode.GetFCost()`: 최종 노드의 총 비용 = 시작부터 끝까지의 이동 비용
+- 경로가 없으면 0을 반환
+
+### 기존 호출 부분 수정
+
+`out` 매개변수를 추가했으므로 FindPath를 호출하는 모든 곳을 수정해야 합니다.
+
+```csharp
+// HasPath 함수 수정
+public bool HasPath(GridPosition startGridPosition, GridPosition endGridPosition)
+{
+    // pathLength 변수 추가 (사용하지 않지만 필수)
+    return FindPath(startGridPosition, endGridPosition, out int pathLength) != null;
+}
+
+// MoveAction의 TakeAction 수정
+public override void TakeAction(GridPosition gridPosition, Action onActionComplete)
+{
+    List<GridPosition> pathGridPositionList = Pathfinding.Instance.FindPath(
+        unit.GetGridPosition(),
+        gridPosition,
+        out int pathLength // 변수 추가 (여기서는 사용 안 함)
+    );
+
+    // ... 나머지 코드 ...
+}
+```
+
+### GetPathLength 함수 추가
+
+경로 길이만 필요한 경우를 위한 편의 함수입니다.
+
+```csharp
+// Pathfinding.cs
+public int GetPathLength(GridPosition startGridPosition, GridPosition endGridPosition)
+{
+    // FindPath를 호출하고 pathLength만 반환
+    FindPath(startGridPosition, endGridPosition, out int pathLength);
+    return pathLength;
+}
+```
+
+### MoveAction에 경로 길이 검증 추가
+
+```csharp
+public override List<GridPosition> GetValidActionGridPositionList()
+{
+    List<GridPosition> validGridPositionList = new List<GridPosition>();
+    GridPosition unitGridPosition = unit.GetGridPosition();
+
+    for (int x = -maxMoveDistance; x <= maxMoveDistance; x++)
+    {
+        for (int z = -maxMoveDistance; z <= maxMoveDistance; z++)
+        {
+            GridPosition offsetGridPosition = new GridPosition(x, z);
+            GridPosition testGridPosition = unitGridPosition + offsetGridPosition;
+
+            // 이전 검증들...
+            if (!LevelGrid.Instance.IsValidGridPosition(testGridPosition))
+            {
+                continue;
+            }
+
+            if (unitGridPosition == testGridPosition)
+            {
+                continue;
+            }
+
+            if (LevelGrid.Instance.HasAnyUnitOnGridPosition(testGridPosition))
+            {
+                continue;
+            }
+
+            if (!Pathfinding.Instance.IsWalkableGridPosition(testGridPosition))
+            {
+                continue;
+            }
+
+            if (!Pathfinding.Instance.HasPath(unitGridPosition, testGridPosition))
+            {
+                continue;
+            }
+
+            // 새로 추가: 실제 경로 길이 확인
+            int pathfindingDistanceMultiplier = 10; // 비용 계산 시 사용한 10배수
+
+            // 실제 경로 비용 계산
+            int actualPathLength = Pathfinding.Instance.GetPathLength(unitGridPosition, testGridPosition);
+
+            // maxMoveDistance도 같은 비율로 곱해서 비교
+            if (actualPathLength > maxMoveDistance * pathfindingDistanceMultiplier)
+            {
+                continue; // 경로가 너무 길면 제외
+            }
+
+            validGridPositionList.Add(testGridPosition);
+        }
+    }
+
+    return validGridPositionList;
+}
+```
+
+**비교 방식**:
+
+```
+maxMoveDistance = 4
+pathfindingDistanceMultiplier = 10
+
+허용 거리 = 4 * 10 = 40
+
+예시 1: 직선 2칸 이동
+실제 비용 = 10 + 10 = 20
+20 < 40 → 이동 가능 ✓
+
+예시 2: 우회 경로 6칸 이동
+실제 비용 = 10 * 6 = 60
+60 > 40 → 이동 불가 ✗
+```
+
+### 테스트
+
+```
+1. 유닛 옆에 긴 벽 배치
+2. 벽 너머의 가까운 타일 확인
+3. 결과: 직선 거리는 가깝지만 우회 경로가 길면 유효하지 않음
+4. 여러 턴에 걸쳐 조금씩 이동하면 최종적으로 도달 가능
+```
+
+---
+
+## 8. ShootAction에 장애물 감지 추가하기
+
+### 사격도 벽을 관통하는 문제
+
+현재 ShootAction도 벽을 무시하고 발사됩니다. 이동은 Pathfinding으로 해결했지만, 사격은 직선으로 진행되므로 **Raycast**로 해결해야 합니다.
+
+### Raycast 개념
+
+**Raycast**: 한 점에서 특정 방향으로 광선을 쏴서 무엇과 충돌하는지 감지하는 기술
+
+```
+유닛 ----광선----> 벽 (X) 충돌!
+유닛 ----광선----> 적 (O) 충돌 없음 (적은 장애물 아님)
+```
+
+### ShootAction 검증 로직 수정
+
+```csharp
+// ShootAction.cs
+public List<GridPosition> GetValidActionGridPositionList(GridPosition unitGridPosition)
+{
+    List<GridPosition> validGridPositionList = new List<GridPosition>();
+
+    for (int x = -maxShootDistance; x <= maxShootDistance; x++)
+    {
+        for (int z = -maxShootDistance; z <= maxShootDistance; z++)
+        {
+            GridPosition offsetGridPosition = new GridPosition(x, z);
+            GridPosition testGridPosition = unitGridPosition + offsetGridPosition;
+
+            // 기존 검증들
+            if (!LevelGrid.Instance.IsValidGridPosition(testGridPosition))
+            {
+                continue;
+            }
+
+            int testDistance = Mathf.Abs(x) + Mathf.Abs(z);
+            if (testDistance > maxShootDistance)
+            {
+                continue;
+            }
+
+            if (!LevelGrid.Instance.HasAnyUnitOnGridPosition(testGridPosition))
+            {
+                continue;
+            }
+
+            Unit targetUnit = LevelGrid.Instance.GetUnitAtGridPosition(testGridPosition);
+
+            if (targetUnit.IsEnemy() == unit.IsEnemy())
+            {
+                continue; // 아군은 공격 불가
+            }
+
+            // 새로 추가: Raycast로 장애물 확인
+            // unitGridPosition을 World Position으로 변환
+            Vector3 unitWorldPosition = LevelGrid.Instance.GetWorldPosition(unitGridPosition);
+
+            // 사격 방향 계산
+            Vector3 shootDir = (targetUnit.GetWorldPosition() - unitWorldPosition).normalized;
+
+            // 어깨 높이 설정 (낮은 장애물은 넘어서 쏠 수 있도록)
+            float unitShoulderHeight = 1.7f;
+
+            // Raycast 실행
+            if (Physics.Raycast(
+                unitWorldPosition + Vector3.up * unitShoulderHeight, // 시작 위치 (어깨 높이)
+                shootDir,                                           // 방향
+                Vector3.Distance(unitWorldPosition, targetUnit.GetWorldPosition()), // 거리
+                obstaclesLayerMask))                               // 감지할 레이어
+            {
+                continue; // 장애물에 막혔으면 제외
+            }
+
+            validGridPositionList.Add(testGridPosition);
+        }
+    }
+
+    return validGridPositionList;
+}
+```
+
+### Raycast 매개변수 설명
+
+```csharp
+Physics.Raycast(
+    origin,          // 광선 시작 위치
+    direction,       // 광선 방향
+    maxDistance,     // 최대 거리
+    layerMask        // 어떤 레이어만 감지할지
+)
+```
+
+**각 매개변수 상세**:
+
+1. **origin (시작 위치)**:
+
+```csharp
+unitWorldPosition + Vector3.up * unitShoulderHeight
+```
+
+- 유닛의 바닥 위치에서 시작하면 안 됨
+- 1.7m 위(어깨 높이)에서 시작
+- 이유: 낮은 상자나 바리케이드는 넘어서 쏠 수 있어야 함
+
+1. **direction (방향)**:
+
+```csharp
+Vector3 shootDir = (targetUnit.GetWorldPosition() - unitWorldPosition).normalized;
+
+```
+
+- 유닛에서 목표까지의 방향 벡터
+- `.normalized`: 방향만 유지하고 길이는 1로 만듦
+
+1. **maxDistance (최대 거리)**:
+
+```csharp
+Vector3.Distance(unitWorldPosition, targetUnit.GetWorldPosition())
+
+```
+
+- 유닛과 목표 사이의 정확한 거리
+- 목표 너머까지 체크할 필요 없음
+
+1. **layerMask (레이어 마스크)**:
+
+```csharp
+[SerializeField] private LayerMask obstaclesLayerMask;
+
+```
+
+- Inspector에서 "Obstacles" 레이어 선택
+- 유닛이나 바닥은 감지하지 않고, 벽과 장애물만 감지
+
+### 변수 선언
+
+```csharp
+// ShootAction.cs 클래스 상단
+[SerializeField] private LayerMask obstaclesLayerMask; // Inspector에서 설정
+private float unitShoulderHeight = 1.7f; // 어깨 높이 (상수로 정의)
+```
+
+### Inspector 설정
+
+```
+1. Unit Prefab을 열기
+2. ShootAction 컴포넌트 찾기
+3. Obstacles Layer Mask 필드에서 "Obstacles" 레이어 선택
+4. Prefab 저장
+```
+
+### 중요한 버그 수정
+
+기존 코드에서 실수가 있었습니다:
+
+```csharp
+// 잘못된 코드
+Vector3 unitWorldPosition = unit.GetWorldPosition(); // 항상 실제 유닛 위치 사용
+
+// 올바른 코드
+Vector3 unitWorldPosition = LevelGrid.Instance.GetWorldPosition(unitGridPosition); // 매개변수로 받은 위치 사용
+
+```
+
+**왜 중요한가?**`GetValidActionGridPositionList(GridPosition unitGridPosition)`는 매개변수로 그리드 위치를 받습니다. 적 AI가 "만약 여기로 이동하면 어디를 쏠 수 있을까?"를 시뮬레이션할 때 사용하기 때문에, 실제 유닛 위치가 아닌 **가상의 위치**를 기준으로 계산해야 합니다.
+
+### 테스트
+
+```
+1. 유닛과 적 사이에 벽 배치
+2. 사격 가능한 타겟 확인
+3. 결과: 벽에 막힌 적은 더 이상 타겟으로 표시되지 않음
+4. 벽을 우회해서 시야가 확보되면 사격 가능
+```
+
+---
+
+## 9. 적 AI의 Pathfinding 동작 확인
+
+### 적 AI도 자동으로 작동
+
+MoveAction을 수정했으므로 적 AI도 자동으로 Pathfinding을 사용합니다.
+
+### 테스트 시나리오
+
+```
+초기 설정:
+- 적 유닛을 벽 너머에 배치
+- 플레이어와 적 사이에 긴 벽 설치
+- 액션 포인트를 2로 복구 (테스트 완료)
+
+동작 확인:
+1. 턴 종료
+2. 적 유닛이 벽을 우회해서 이동
+3. 사격 거리 안에 들어오면 발사
+```
+
+### 결과
+
+```
+1. 적이 벽을 관통하지 않고 우회 경로를 찾음
+2. 플레이어에게 가까워질 때까지 이동
+3. 사격 거리 내에 들어오면 공격
+```
+
+**동작 원리**:
+
+- 적 AI는 `MoveAction.GetValidActionGridPositionList()`를 사용
+- 이 함수가 이미 Pathfinding을 고려하므로 AI도 자동으로 지능적으로 이동
+- `ShootAction.GetValidActionGridPositionList()`도 장애물을 체크하므로 벽 너머는 쏘지 않음
+
+---
+
+## 🎯 전체 구조 정리
+
+### 1. 데이터 흐름
+
+```
+사용자 입력 (타일 클릭)
+    ↓
+MoveAction.TakeAction(gridPosition)
+    ↓
+Pathfinding.FindPath(start, end)
+    ↓
+List<GridPosition> 경로 반환
+    ↓
+List<Vector3> 월드 좌표로 변환
+    ↓
+Update()에서 순차적 이동
+    ↓
+모든 지점 도달 시 ActionComplete()
+```
+
+### 2. 검증 흐름
+
+```
+GetValidActionGridPositionList() 호출
+    ↓
+모든 타일 순회
+    ↓
+각 타일에 대해:
+    1. 맵 범위 내인가?
+    2. 현재 위치가 아닌가?
+    3. 다른 유닛이 없는가?
+    4. IsWalkable인가? (장애물 없음)
+    5. HasPath인가? (도달 가능)
+    6. GetPathLength < maxDistance인가? (거리 제한 내)
+    ↓
+모든 조건 통과 → 유효한 위치 리스트 반환
+```
+
+### 3. 핵심 함수들
+
+**Pathfinding.cs**:
+
+- `FindPath()`: A\* 알고리즘으로 경로 계산, pathLength 반환
+- `IsWalkableGridPosition()`: 타일이 걷기 가능한지 확인
+- `HasPath()`: 경로가 존재하는지 확인
+- `GetPathLength()`: 경로의 총 비용 반환
+
+**MoveAction.cs**:
+
+- `TakeAction()`: Pathfinding으로 경로 계산 후 이동 시작
+- `Update()`: positionList의 각 위치를 순차적으로 방문
+- `GetValidActionGridPositionList()`: 6단계 검증으로 유효한 위치 필터링
+
+**ShootAction.cs**:
+
+- `GetValidActionGridPositionList()`: Raycast로 장애물 체크 추가
+
+---
+
+## 💡 핵심 개념 요약
+
+### 1. List 기반 이동
+
+**단일 목표 → 경유지 리스트**:
+
+- 직선 이동: [시작, 목표]
+- 우회 경로: [시작, 경유1, 경유2, 경유3, 목표]
+- currentPositionIndex로 현재 목표 추적
+
+### 2. Pathfinding 통합
+
+**GridPosition → Vector3 변환**:
+
+```csharp
+List<GridPosition> path = Pathfinding.FindPath(start, end);
+foreach (GridPosition gp in path)
+{
+    positionList.Add(LevelGrid.Instance.GetWorldPosition(gp));
+}
+```
+
+### 3. 다층 검증
+
+**6단계 필터링**:
+
+1. IsValidGridPosition (맵 범위)
+2. 현재 위치 제외
+3. HasAnyUnitOnGridPosition (점유 확인)
+4. IsWalkableGridPosition (장애물 확인)
+5. HasPath (도달 가능성)
+6. GetPathLength (거리 제한)
+
+### 4. Out 매개변수
+
+**여러 값 반환하기**:
+
+```csharp
+// 함수 정의
+public List<GridPosition> FindPath(..., out int pathLength)
+{
+    pathLength = 계산값;
+    return 경로;
+}
+
+// 함수 호출
+List<GridPosition> path = FindPath(start, end, out int length);
+// path와 length 둘 다 사용 가능
+
+```
+
+### 5. Raycast
+
+**직선 장애물 감지**:
+
+```csharp
+bool blocked = Physics.Raycast(
+    시작위치,    // 유닛 어깨 높이
+    방향,        // 목표 방향
+    거리,        // 유닛-목표 거리
+    레이어마스크  // Obstacles만
+);
+
+```
+
+---
+
+## 🎓 학습 포인트
+
+### 1. 리팩토링의 중요성
+
+단일 값(Vector3)을 리스트로 변경하면서도 기존 동작을 유지한 후, 점진적으로 Pathfinding을 통합했습니다. **작은 단계로 나누어 개발**하면 버그를 쉽게 찾을 수 있습니다.
+
+### 2. 검증의 층층이
+
+단순히 "빈 칸"만 체크하는 것이 아니라:
+
+- 물리적 장애물 (IsWalkable)
+- 논리적 도달 가능성 (HasPath)
+- 자원 제약 (거리 제한)
+
+을 모두 고려해야 완벽한 게임 로직이 됩니다.
+
+### 3. 일관성 유지
+
+MoveAction을 수정하자 적 AI도 자동으로 개선되었습니다. **공통 함수(GetValidActionGridPositionList)를 잘 설계**하면 전체 시스템이 일관되게 작동합니다.
+
+### 4. 성능 고려
+
+```csharp
+// GetValidActionGridPositionList에서 매 타일마다:
+Pathfinding.GetPathLength() 호출
+    ↓
+내부적으로 FindPath() 전체 실행
+    ↓
+O(N²) 알고리즘
+
+```
+
+현재는 괜찮지만, 맵이 크거나 유닛이 많으면 **캐싱**이나 **점진적 계산** 같은 최적화가 필요할 수 있습니다.
+
+---
+
+이제 유닛들이 장애물을 지능적으로 우회하며 이동하고, 벽에 막힌 적은 사격하지 않는 완성도 높은 턴제 전략 게임이 되었습니다!

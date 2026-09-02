@@ -1,0 +1,548 @@
+---
+title: '섹션 5: Introduction to Selenium'
+date: '2026-09-02'
+category: '기타, 사용 적음/크롤링 & 파이썬'
+tags: ['기타, 사용 적음', '크롤링 & 파이썬']
+draft: false
+summary: ''
+---
+
+# 자바스크립트 사용 사이트 확인하기 ( How to Identify Java Script Driven Websites )
+
+```python
+자바스크립트를 사용하는 사이트를 확인하려면
+
+개발자 도구에서 설정으로 들어간뒤 자바스크립트를 disable 해주고 사이트를 확인한다
+```
+
+# 셀레니움 설치 ( Installing Selenium and ChromeDriver )
+
+[**섹션 10. 셀레니움(selenium) 웹 드라이버 옵션 추가**](<../%EC%8B%A4%EC%8A%B5%EC%9C%BC%EB%A1%9C%20%EB%81%9D%EC%9E%A5%EB%82%B4%EB%8A%94%20%EC%9B%B9%20%ED%81%AC%EB%A1%A4%EB%A7%81%EA%B3%BC%20%EC%9B%B9%20%ED%8E%98%EC%9D%B4%EC%A7%80%20%EC%9E%90%EB%8F%99%ED%99%94%20&%20%EC%8B%A4%EC%A0%84%20%ED%99%9C%EC%9A%A9/%EC%84%B9%EC%85%98%2010%20%EC%85%80%EB%A0%88%EB%8B%88%EC%9B%80(selenium)%20%EC%9B%B9%20%EB%93%9C%EB%9D%BC%EC%9D%B4%EB%B2%84%20%EC%98%B5%EC%85%98%20%EC%B6%94%EA%B0%80%200ef46bbd636f4d03a5e2a33814f482f7.md>)
+
+```python
+위의 내용을 참고하자
+```
+
+# 버튼 클릭해보기 ( Clicking on a Button )
+
+```python
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+
+options = Options()
+
+options.add_experimental_option("detach", True)
+
+website = 'https://www.adamchoi.co.uk/overs/detailed'
+
+driver = webdriver.Chrome(options=options)
+
+driver.get(website)
+
+all_matches_button = driver.find_element(By.XPATH,'//label[@analytics-event="All matches"]')
+
+all_matches_button.click()
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380915/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_5_Introduction_to_Selenium/Untitled.png)
+
+```python
+xpath 를 이용해서 속성을 선택해서 버튼을 클릭하게 하였다
+
+개발자 도구를 켜서 알맞은 요소를 선택하도록 xpath 를 작성하고 복사한뒤 붙여 넣으면 쉽다
+```
+
+```python
+더 상세한 최신 내용은 공식 문서를 참조해서 알아보자
+```
+
+[Web elements](https://www.selenium.dev/documentation/webdriver/elements/)
+
+# 테이블 추출하기 ( Extracting Data from a Table )
+
+```python
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+# Chrome 옵션 설정 (브라우저를 닫지 않도록 설정)
+options = Options()
+options.add_experimental_option("detach", True)
+
+# 스크랩할 웹사이트 URL
+website = 'https://www.adamchoi.co.uk/overs/detailed'
+
+# Chrome WebDriver 객체 생성
+driver = webdriver.Chrome(options=options)
+
+# 웹사이트 열기
+driver.get(website)
+
+# 'All matches' 버튼을 XPATH를 통해 찾아 클릭 (모든 경기 데이터를 로드)
+all_matches_button = driver.find_element(By.XPATH, '//label[@analytics-event="All matches"]')
+all_matches_button.click()
+
+# 'tr' 요소가 나타날 때까지 최대 10초 대기 (경기 데이터 로드 완료를 기다림)
+WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, 'tr')))
+
+# 모든 'tr' 요소를 찾아 리스트로 저장 (경기 데이터의 각 행)
+matches = driver.find_elements(By.TAG_NAME, 'tr')
+
+# 각 경기 데이터 행을 순회
+for match in matches:
+    # 첫 번째 'td' 요소를 찾아 날짜를 저장 (각 경기의 날짜)
+    date = match.find_element(By.XPATH, './td[1]')
+    # 두 번째 'td' 요소를 찾아 홈팀을 저장 (각 경기의 홈팀)
+    home_team = match.find_element(By.XPATH, './td[2]')
+    # 세 번째 'td' 요소를 찾아 점수를 저장 (각 경기의 점수)
+    score = match.find_element(By.XPATH, './td[3]')
+    # 네 번째 'td' 요소를 찾아 상대팀을 저장 (각 경기의 상대팀)
+    away_team = match.find_element(By.XPATH, './td[4]')
+
+    # 각 경기의 데이터를 출력
+    print("날짜", date.text)
+    print("홈팀", home_team.text)
+    print("점수", score.text)
+    print("상대팀", away_team.text)
+    print(" ")
+    print(" ")
+
+# 주의: 코드 실행 후 driver.quit()을 통해 드라이버를 종료할 수 있음
+# driver.quit()
+
+```
+
+```python
+1. 모든 'tr' 요소를 찾아 리스트로 저장:
+
+matches = driver.find_elements(By.TAG_NAME, 'tr'): 'tr' 태그를 가진 모든 요소를 찾아 리스트에 저장. 각 'tr'은 경기 데이터를 나타냄.
+
+2. 각 경기 데이터를 순회하며 정보 추출 및 출력:
+
+각 'tr' 요소(경기 데이터 행)마다 내부의 'td' 요소를 찾아 날짜, 홈팀, 점수, 상대팀 정보를 추출.
+
+print 문을 통해 각 경기의 정보를 출력.
+
+* xpath 는 인덱스 0 부터가 아니라 1 부터다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380914/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_5_Introduction_to_Selenium/Untitled_1.png)
+
+# 요소 기다리게 하기 ( WebDriverWait, expected_conditions)
+
+## WebDriverWait
+
+```python
+WebDriverWait는 주어진 조건이 충족될 때까지 대기하는 기능을 제공한다.
+
+대기 시간은 최대 대기 시간과 간격을 설정할 수 있으며, 설정한 조건이 충족되면 즉시 다음 단계로 넘어간다.
+```
+
+```python
+from selenium.webdriver.support.ui import WebDriverWait
+
+* 임포트 해줘야한다
+```
+
+## expected_conditions
+
+```python
+expected_conditions (또는 EC)는 Selenium에서 자주 사용되는 여러 가지 조건을 미리 정의해 놓은 모듈이다.
+
+이 조건들은 웹 페이지의 요소가 특정 상태가 될 때까지 대기하는 데 사용된다.
+```
+
+### expected_conditions에는 다양한 조건 소개
+
+```python
+presence_of_element_located(locator): 지정된 요소가 DOM에 존재하는지 확인
+
+visibility_of_element_located(locator): 지정된 요소가 DOM에 존재하고, 표시되는지 확인
+
+element_to_be_clickable(locator): 지정된 요소가 표시되고, 클릭할 수 있는 상태인지 확인
+
+text_to_be_present_in_element(locator, text_): 지정된 요소에 특정 텍스트가 포함되어 있는지 확인
+```
+
+## 예제
+
+```python
+# 'tr' 요소가 나타날 때까지 최대 10초 대기
+WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, 'tr')))
+
+1. WebDriverWait 객체 생성: WebDriverWait(driver, 10)은 최대 10초 동안 기다리겠다는 의미
+
+2. until 메서드 사용: until 메서드는 특정 조건이 충족될 때까지 대기한다.
+
+	 여기서는 EC.presence_of_element_located((By.TAG_NAME, 'tr')) 조건이 충족될 때까지 대기한다.
+
+3. 조건 충족 시 다음 단계 실행: tr 요소가 DOM에 존재하게 되면, WebDriverWait은 대기를 멈추고
+
+		다음 코드(모든 tr 요소를 찾고 텍스트를 출력하는 코드)를 실행한다.
+```
+
+### 예제 1: 요소가 클릭 가능할 때까지 대기하기
+
+```python
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+options = Options()
+options.add_experimental_option("detach", True)
+
+driver = webdriver.Chrome(options=options)
+driver.get('https://example.com')  # 실제 테스트할 웹사이트 URL
+
+# 특정 버튼이 클릭 가능할 때까지 최대 10초 대기
+button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, 'myButton')))
+
+# 버튼 클릭
+button.click()
+
+driver.quit()
+```
+
+### 예제 2: 텍스트가 특정 요소에 나타날 때까지 대기하기
+
+```python
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+options = Options()
+options.add_experimental_option("detach", True)
+
+driver = webdriver.Chrome(options=options)
+driver.get('https://example.com')  # 실제 테스트할 웹사이트 URL
+
+# 특정 텍스트가 특정 요소에 나타날 때까지 최대 10초 대기
+element = WebDriverWait(driver, 10).until(
+    EC.text_to_be_present_in_element((By.ID, 'myElement'), 'Expected Text')
+)
+
+print('텍스트가 나타났습니다!')
+
+driver.quit()
+```
+
+### 예제 3: 요소가 보일 때까지 대기하기
+
+```python
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+options = Options()
+options.add_experimental_option("detach", True)
+
+driver = webdriver.Chrome(options=options)
+driver.get('https://example.com')  # 실제 테스트할 웹사이트 URL
+
+# 특정 요소가 보일 때까지 최대 10초 대기
+element = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.ID, 'myElement')))
+
+print('요소가 보입니다!')
+
+driver.quit()
+```
+
+### 예제 4: 여러 요소가 나타날 때까지 대기하기
+
+```python
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+options = Options()
+options.add_experimental_option("detach", True)
+
+driver = webdriver.Chrome(options=options)
+driver.get('https://example.com')  # 실제 테스트할 웹사이트 URL
+
+# 여러 요소가 나타날 때까지 최대 10초 대기
+elements = WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.CLASS_NAME, 'myClass')))
+
+for element in elements:
+    print(element.text)
+
+driver.quit()
+```
+
+### 예제 5: 알림이 나타날 때까지 대기하기
+
+```python
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+options = Options()
+options.add_experimental_option("detach", True)
+
+driver = webdriver.Chrome(options=options)
+driver.get('https://example.com')  # 실제 테스트할 웹사이트 URL
+
+# 알림이 나타날 때까지 최대 10초 대기
+alert = WebDriverWait(driver, 10).until(EC.alert_is_present())
+
+# 알림 텍스트 출력
+print(alert.text)
+
+# 알림 확인
+alert.accept()
+
+driver.quit()
+```
+
+# CSV 파일로 출력하기 ( Exporting Data to a CSV File with Pandas )
+
+## 전체 코드
+
+```jsx
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+import pandas as pd
+from selenium.webdriver.support import expected_conditions as EC
+
+# 셀레니움 옵션 설정
+options = Options()
+options.add_experimental_option("detach", True)
+
+# 크롤링할 웹사이트 URL
+website = 'https://www.adamchoi.co.uk/overs/detailed'
+
+# 웹드라이버 초기화 (크롬)
+driver = webdriver.Chrome(options=options)
+
+# 웹사이트 열기
+driver.get(website)
+
+# "All matches" 버튼 찾기
+all_matches_button = driver.find_element(By.XPATH,'//label[@analytics-event="All matches"]')
+
+# "All matches" 버튼 클릭
+all_matches_button.click()
+
+# 'tr' 요소가 나타날 때까지 최대 10초 대기
+WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, 'tr')))
+
+# 모든 경기 데이터를 저장할 리스트 초기화
+dates = []
+home_teams = []
+scores = []
+away_teams = []
+
+# 모든 경기 데이터를 찾기
+matches = driver.find_elements(By.TAG_NAME, 'tr')
+
+# 각 경기 데이터를 추출하여 리스트에 추가
+for match in matches:
+    # 각 열의 데이터를 추출
+    date = match.find_element(By.XPATH, './td[1]').text
+    home_team = match.find_element(By.XPATH, './td[2]').text
+    score = match.find_element(By.XPATH, './td[3]').text
+    away_team = match.find_element(By.XPATH, './td[4]').text
+
+    # 데이터를 리스트에 추가
+    dates.append(date)
+    home_teams.append(home_team)
+    scores.append(score)
+    away_teams.append(away_team)
+
+# 데이터 프레임 생성
+df = pd.DataFrame({'date': dates, 'home_team': home_teams, 'score': scores, 'away_team': away_teams})
+
+# 데이터 프레임을 CSV 파일로 저장
+df.to_csv('경기결과.csv', index=False)
+
+# 데이터 프레임 출력 (옵션)
+print(df)
+
+```
+
+## **Pandas 설치 및 가져오기**
+
+```jsx
+Pandas 설치
+
+pip install pandas
+```
+
+```jsx
+import pandas as pd
+```
+
+## **데이터 프레임 생성하기**
+
+```jsx
+Pandas에서 데이터를 관리하려면 데이터 프레임(DataFrame)을 사용
+
+데이터 프레임은 엑셀의 스프레드시트와 비슷한 구조
+```
+
+### **딕셔너리를 사용한 데이터 프레임 생성**
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380914/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_5_Introduction_to_Selenium/Untitled_2.png)
+
+```jsx
+딕셔너리를 사용하여 데이터 프레임을 생성할 수 있다.
+
+딕셔너리는 키( 열 이름 ) 와 값 ( 행 ) 으로 이루어져 있으며, 값은 리스트 형태이다.
+
+date: dates
+
+컬럼이름 date 값 dates
+```
+
+```jsx
+# 데이터 프레임 생성
+df = pd.DataFrame({'date': dates, 'home_team': home_teams, 'score': scores, 'away_team': away_teams})
+```
+
+## **데이터 프레임 출력하기**
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380915/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_5_Introduction_to_Selenium/Untitled_3.png)
+
+```jsx
+# CSV 파일로 저장
+df.to_csv('경기결과.csv', index=False)
+
+# 데이터 프레임 출력 (옵션)
+print(df)
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380915/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_5_Introduction_to_Selenium/Untitled_4.png)
+
+# 드롭 다운 메뉴 선택하기 ( Selecting Elements within a Dropdown )
+
+```jsx
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support.ui import Select
+import pandas as pd
+from selenium.webdriver.support import expected_conditions as EC
+
+# 셀레니움 옵션 설정
+options = Options()
+options.add_experimental_option("detach", True)
+
+# 크롤링할 웹사이트 URL 설정
+website = 'https://www.adamchoi.co.uk/overs/detailed'
+
+# 웹드라이버 초기화 (크롬)
+driver = webdriver.Chrome(options=options)
+
+# 웹사이트 열기
+driver.get(website)
+
+# "All matches" 버튼 찾기
+all_matches_button = driver.find_element(By.XPATH, '//label[@analytics-event="All matches"]')
+
+# "All matches" 버튼 클릭
+all_matches_button.click()
+
+# 'tr' 요소가 나타날 때까지 최대 10초 대기
+WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, 'tr')))
+
+# 드롭다운 메뉴 셀렉트
+dropdown = Select(driver.find_element(By.ID, 'country'))
+
+# 드롭다운에서 'Spain' 선택
+dropdown.select_by_visible_text('Spain')
+
+# 'tr' 요소가 다시 나타날 때까지 최대 10초 대기 (스페인 경기 데이터 로딩 대기)
+WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, 'tr')))
+
+# 모든 경기 데이터를 저장할 리스트 초기화
+dates = []
+home_teams = []
+scores = []
+away_teams = []
+
+# 모든 경기 데이터를 추출
+matches = driver.find_elements(By.TAG_NAME, 'tr')
+
+# 각 경기 데이터를 추출하여 리스트에 추가
+for match in matches:
+    date = match.find_element(By.XPATH, './td[1]').text
+    home_team = match.find_element(By.XPATH, './td[2]').text
+    score = match.find_element(By.XPATH, './td[3]').text
+    away_team = match.find_element(By.XPATH, './td[4]').text
+
+    dates.append(date)
+    home_teams.append(home_team)
+    scores.append(score)
+    away_teams.append(away_team)
+    print(date)
+    print(home_team)
+    print(score)
+    print(away_team)
+    print(" ")
+
+# 데이터 프레임 생성
+df = pd.DataFrame({'date': dates, 'home_team': home_teams, 'score': scores, 'away_team': away_teams})
+
+# CSV 파일로 저장
+df.to_csv('Spain.csv', index=False)
+
+# 데이터 프레임 출력 (옵션)
+print(df)
+
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380915/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_5_Introduction_to_Selenium/Untitled_5.png)
+
+```jsx
+드롭다운 메뉴를 선택하기 위해서는 Select 클래스를 사용한다.
+
+이 클래스는 selenium.webdriver.support.ui 모듈에 포함되어 있다.
+
+드롭다운 메뉴를 선택하는 과정은 다음과 같다:
+```
+
+```jsx
+# 드롭다운 메뉴를 찾기 위해 먼저 요소를 검색합니다. 여기서는 드롭다운 메뉴의 ID가 'country'인 요소를 찾습니다.
+dropdown = Select(driver.find_element(By.ID, 'country'))
+
+# 'Spain'이라는 텍스트가 표시된 옵션을 드롭다운 메뉴에서 선택합니다.
+dropdown.select_by_visible_text('Spain')
+```
+
+```jsx
+1. 드롭다운 메뉴 요소 찾기:
+
+먼저, 드롭다운 메뉴 요소를 찾는다.
+
+find_element 메소드를 사용하여 드롭다운 메뉴의 HTML 요소를 찾아야 한다.
+
+이 예제에서는 드롭다운 메뉴의 id 속성을 사용하여 요소를 찾는다.
+
+2. Select 객체 생성:
+
+드롭다운 메뉴 요소를 찾은 후, 이 요소를 Select 클래스의 인스턴스로 만든다.
+
+이를 통해 드롭다운 메뉴와 상호작용할 수 있다.
+
+3. 옵션 선택:
+
+드롭다운 메뉴에서 특정 옵션을 선택하기 위해 select_by_visible_text 메소드를 사용한다.
+
+이 메소드는 옵션의 표시된 텍스트를 기준으로 옵션을 선택한다.
+```

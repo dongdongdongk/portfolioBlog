@@ -1,0 +1,467 @@
+---
+title: '섹션 9: Project #3: Building Crawlers with Scrapy'
+date: '2026-09-02'
+category: '기타, 사용 적음/크롤링 & 파이썬'
+tags: ['기타, 사용 적음', '크롤링 & 파이썬']
+draft: false
+summary: ''
+---
+
+```python
+이번 섹션에서는 Scrapy의 Crawl Spider 템플릿을 사용하여 스파이더를 생성하고,
+
+이를 이용해 웹사이트에서 데이터를 수집하는 방법을 배워본다.
+
+Crawl Spider는 기본 템플릿보다 더 고급 기능을 제공하여 링크 추적 및 데이터 수집을 더 효과적으로 수행할 수 있다.
+
+* CrawlSpider 장점
+
+1. 자동 링크 추출: 규칙(Rule)을 정의하여 자동으로 링크를 추출하고 따라간다
+
+2. 복잡한 크롤링 로직 단순화: 여러 페이지를 순회해야 할 때 코드를 간결하게 유지할 수 있다.
+
+3. 효율적인 대규모 크롤링: 많은 페이지를 크롤링할 때 유용하다.
+
+4. 필터링 기능: allow, deny 패턴을 사용해 특정 URL만 크롤링할 수 있다.
+
+5. 콜백 함수 지정: 각 규칙에 대해 다른 처리 방식을 적용할 수 있다.
+```
+
+# 크롤러 룰 사용하기 ( Crawler - Rules )
+
+## 사용 가능한 템플릿 확인
+
+```python
+scrapy genspider -l ( 영어 l 임)
+
+를 입력하면 사용 가능한 템플릿을 볼 수 있다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380922/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_9_Project_3_Building_Crawlers_with_Scrapy/Untitled.png)
+
+## Crawl Spider 생성
+
+```python
+Crawl Spider 템플릿을 사용하여 새 스파이더를 생성
+
+genspider -t crawl transcripts subslikescript.com/movies
+
+genspider -t crawl (파일명) (홈페이지 주소 http 제거)
+```
+
+## Crawl Spider의 구성 요소
+
+### 1.Rule 객체
+
+```python
+Rule 객체는 CrawlSpider에서 링크 추적 규칙을 정의하는 데 사용
+
+이를 통해 스파이더가 특정 조건에 맞는 링크를 추적하고, 추적된 링크의 응답을 처리하는 방식을 설정할 수 있다.
+
+기본적으로 Rule 객체는 세 가지 주요 인수를 가진다: allow, callback, follow.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380920/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_9_Project_3_Building_Crawlers_with_Scrapy/Untitled_1.png)
+
+```python
+rules = (Rule(LinkExtractor(allow=r"Items/"), callback="parse_item", follow=True),)
+```
+
+### callback
+
+```python
+callback은 추적된 링크의 응답을 처리할 메서드를 지정한다.
+
+이 메서드는 문자열로 지정되어야 한다. 추적된 페이지에서 데이터를 추출하는 역할을 한다.
+```
+
+```python
+callback='parse_item'
+
+추적된 링크의 응답은 parse_item 메서드에서 처리된다.
+```
+
+### follow
+
+```python
+follow는 불리언 값으로, True로 설정하면 추적된 링크에서 다시 추적할 링크를 계속해서 추적한다.
+
+기본적으로 True로 설정되어 있다
+```
+
+```python
+follow=True
+
+추적된 링크에서 다시 링크를 추적한다.
+```
+
+### 2.Link Extractor 객체
+
+```python
+LinkExtractor 객체는 특정 조건에 맞는 링크를 추출하는 데 사용된다.
+
+Rule 객체와 함께 사용되며, 어떤 링크를 추출할지 또는 추출하지 않을지를 설정할 수 있다.
+```
+
+### allow
+
+```python
+allow는 정규 표현식을 사용하여 추출할 링크를 지정한다. 이 정규 표현식에 맞는 링크만 추출된다.
+```
+
+```python
+LinkExtractor(allow=r'/items/')
+
+URL에 /items/가 포함된 링크만 추출된다
+```
+
+### deny
+
+```python
+deny는 정규 표현식을 사용하여 추출하지 않을 링크를 지정한다. 이 정규 표현식에 맞는 링크는 추출되지 않는다.
+```
+
+```python
+LinkExtractor(deny=r'/exclude/')
+
+URL에 /exclude/가 포함된 링크는 추출되지 않는다.
+```
+
+### restrict_xpaths
+
+```python
+restrict_xpaths는 XPath 표현식을 사용하여 특정 영역의 링크만 추출하도록 제한한다. 주어진 XPath에 일치하는 영역 내의 링크만 추출된다.
+```
+
+```python
+LinkExtractor(restrict_xpaths='//div[@class="content"]')
+
+HTML 문서에서 class="content"인 div 내부의 링크만 추출된다.
+```
+
+## 예제
+
+```python
+룰에서 그 페이지의 a 태그의 링크를 전부 검색한다고 설정해주고
+
+callback 을 이용해 parse_item 을 호출해 모든 링크의 제목,플룻,대본을 추출해줬다
+```
+
+```python
+import scrapy
+from scrapy.linkextractors import LinkExtractor
+from scrapy.spiders import CrawlSpider, Rule
+
+# 'TranscriptsSpider'라는 CrawlSpider 클래스 정의
+class TranscriptsSpider(CrawlSpider):
+    name = "transcripts"  # 스파이더의 이름
+    allowed_domains = ["subslikescript.com"]  # 크롤링할 도메인
+    start_urls = ["https://subslikescript.com/movies"]  # 시작 URL
+
+    custom_settings = {
+        'DOWNLOAD_DELAY': 0.5,  # 다운로드 요청 간의 지연 시간을 0.5초로 설정
+    }
+
+    # 크롤링 규칙 설정: 'scripts-list' 클래스의 'ul' 안에 있는 모든 'a' 태그 링크 추출, 추출된 링크를 'parse_item' 메서드로 처리하고, 계속해서 링크를 추적
+    rules = (Rule(LinkExtractor(restrict_xpaths=("//ul[@class='scripts-list']//a")), callback="parse_item", follow=True),)
+
+    # 추출된 링크의 응답을 처리하는 메서드
+    def parse_item(self, response):
+        # 'main-article' 클래스의 'article' 요소를 선택
+        article = response.xpath("//article[@class='main-article']")
+        yield {
+            'title': article.xpath("./h1/text()").get(),  # 제목 추출
+            'plot': article.xpath("./p/text()").get(),  # 플롯 추출
+            'transcript': article.xpath("./div[@class='full-script']/text()").getall(),  # 전체 대본 추출
+            'url': response.url,  # 현재 페이지 URL
+        }
+```
+
+```python
+
+rules = (Rule(LinkExtractor(restrict_xpaths=("//ul[@class='scripts-list']//a")), callback="parse_item", follow=True),)
+
+이 부분에서 링크 a 를 추적하고 @href 를 하지 않아도 링크가 추출되는 이유는 자동으로 href 특성을 검색하기 때문이다
+```
+
+# 크롤러 페이지 네이션 사용하기 ( Crawler - Pagination )
+
+```python
+import scrapy
+from scrapy.linkextractors import LinkExtractor
+from scrapy.spiders import CrawlSpider, Rule
+
+class TranscriptsSpider(CrawlSpider):
+    # Spider의 이름을 정의합니다.
+    name = "transcripts"
+
+    # 크롤링할 도메인을 설정합니다.
+    allowed_domains = ["subslikescript.com"]
+
+    # 크롤링을 시작할 URL을 설정합니다.
+    start_urls = ["https://subslikescript.com/movies_letter-X"]
+
+    # 커스텀 설정을 정의합니다. 여기서는 다운로드 지연을 0.5초로 설정합니다.
+    custom_settings = {
+        "DOWNLOAD_DELAY": 0.5,  # 다운로드 지연을 0.5초로 설정합니다.
+    }
+
+    # 크롤링 규칙을 정의합니다.
+    rules = (
+        # 첫 번째 Rule: 영화 리스트 페이지에서 영화 상세 페이지로 가는 링크를 추출합니다.
+        Rule(
+            LinkExtractor(restrict_xpaths=("//ul[@class='scripts-list']//a")),  # 링크 추출기 설정
+            callback="parse_item",  # 추출한 링크의 응답을 처리할 콜백 함수 설정
+            follow=True,  # 추적된 링크를 계속 추적하도록 설정
+        ),
+        # 두 번째 Rule: '다음' 페이지로 이동하는 링크를 추출합니다.
+        Rule(
+            LinkExtractor(restrict_xpaths=(("//a[@rel='next'][1]"))),  # '다음' 페이지 링크 추출기 설정 , 생략 되었지만 규칙에 follow true 가 있기 때문에 추출한 뒤 다음 페이지로 이동한다
+        ),
+    )
+
+    # 추출한 페이지에서 데이터를 파싱하는 메서드입니다.
+    def parse_item(self, response):
+        # 기사 요소를 XPath로 선택합니다.
+        article = response.xpath("//article[@class='main-article']")
+
+        # 선택한 기사에서 제목, 줄거리, URL을 추출합니다.
+        yield {
+            "title": article.xpath("./h1/text()").get(),  # 제목 추출
+            "plot": article.xpath("./p/text()").get(),    # 줄거리 추출
+            # "transcript": article.xpath("./div[@class='full-script']/text()").getall(),  # 스크립트 추출 (주석 처리됨)
+            "url": response.url,  # 현재 페이지의 URL 추출
+        }
+
+```
+
+## 크롤링 스파이더를 사용한 페이지네이션 처리
+
+### 페이지네이션 바 확인
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380922/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_9_Project_3_Building_Crawlers_with_Scrapy/Untitled_2.png)
+
+```python
+웹사이트 접속:
+
+크롤링할 웹사이트에 접속한다.
+
+페이지네이션 바 확인:
+
+페이지 하단에 페이지네이션 바가 있는지 확인한다. 여기서 '다음 페이지' 버튼을 찾아 클릭하거나 링크를 추적할 필요가 있다.
+
+다음 페이지 버튼 검사:
+
+'다음 페이지' 버튼을 검사하여 rel="next" 속성을 확인한다.
+
+XPath 빌드:
+
+이전에 만든 XPath를 기반으로 rel="next" 속성을 가진 a 태그를 찾는 XPath를 만든다.
+
+("//a[@rel='next'][1]")
+```
+
+### 새로운 규칙 추가
+
+```python
+rules = (
+    # 첫 번째 규칙: 영화 리스트 페이지에서 영화 상세 페이지로 가는 링크 추출
+    Rule(
+        LinkExtractor(restrict_xpaths=("//ul[@class='scripts-list']//a")),
+        callback="parse_item",
+        follow=True,
+    ),
+    # 두 번째 규칙: 다음 페이지로 이동하는 링크 추출
+    Rule(
+        LinkExtractor(restrict_xpaths=(("//a[@rel='next'][1]"))),
+    ),
+)
+
+규칙 복제:
+
+기존의 첫 번째 규칙을 복제한다.
+
+XPath 변경:
+
+새로 만든 XPath를 사용한다.
+
+callback과 follow 인수 제거:
+
+두 번째 규칙에서는 callback과 follow 인수를 제거한다.
+
+첫 번째 규칙에서 이미 callback을 parse_item으로 설정했기 때문에 두 번째 규칙에서는 필요하지 않는다
+```
+
+## 룰을 사용할때 Xpath 를 [1]인덱스로 사용할때 주의할점
+
+```python
+    rules = (
+        Rule(
+            LinkExtractor(restrict_xpaths=("//ul[@class='scripts-list']//a")),
+            callback="parse_item",
+            follow=True,
+        ),
+        Rule(
+            LinkExtractor(restrict_xpaths=(("//a[@rel='next'][1]"))),
+        ),
+    )
+
+
+    또 callback 과 follow 를 쓰지 않아도 괜찮은 이유는 앞에 룰에 이미 작성했기 때문이다
+
+    * 이때 Rule 의 순서는 중요하다
+
+    * xpath 에서 [1] 와 같은 인덱스 기능을 사용하게 되면 () 를 xpath 전체에 붙여줘야 한다 그리고 시작이 0 이 아니라 1이다
+```
+
+```python
+scrapy crawl transcripts -o transcripts_letter_x.json
+
+위의 코드를 입력해 json 으로 파일을 저장한다
+```
+
+## 클릭이 없는데 어떻게 페이지를 이동해 다니는가?
+
+## TranscriptsSpider의 동작 순서
+
+### **1. 스파이더 시작**:
+
+```jsx
+Scrapy는 start_urls에 정의된 URL(즉, https://subslikescript.com/movies_letter-X)로부터 크롤링을 시작한다.
+```
+
+### **2. 초기 요청 생성 및 처리**:
+
+```jsx
+Scrapy는 start_urls에 정의된 각 URL로 HTTP 요청을 보낸다.
+
+받은 응답(response)은 설정된 규칙에 따라 처리된다.
+```
+
+### **3. 영화 리스트 페이지에서 상세 페이지로 이동**:
+
+```python
+Rule 1: LinkExtractor(restrict_xpaths=("//ul[@class='scripts-list']//a"))
+	이 규칙은 영화 리스트 페이지에서 각 영화 상세 페이지로 가는 링크를 추출합니다.
+
+	//ul[@class='scripts-list']//a XPath 표현식은 영화 리스트에서 각 영화로 가는 링크를 선택합니다.
+
+	추출된 각 링크에 대해 새로운 요청을 생성합니다.
+
+	생성된 요청의 응답(response)은 callback="parse_item"에 설정된 parse_item 메서드로 전달됩니다.
+
+* 생략 되었지만 규칙에 follow true 가 있기 때문에 추출한 뒤 다음 페이지로 이동한다
+```
+
+# 유저 에이전트 ( Crawler - Changing User-Agent )
+
+## 첫번째 방법
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380922/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_9_Project_3_Building_Crawlers_with_Scrapy/Untitled_3.png)
+
+```python
+settings 파일의 USER AGENT 를 수정해서 해결한다
+```
+
+## 두번째 방법
+
+```python
+import scrapy
+from scrapy.linkextractors import LinkExtractor
+from scrapy.spiders import CrawlSpider, Rule
+
+class TranscriptsSpider(CrawlSpider):
+    # Spider의 이름을 정의합니다.
+    name = "transcripts"
+
+    # 크롤링할 도메인을 설정합니다.
+    allowed_domains = ["subslikescript.com"]
+
+    # User-Agent 설정. 웹사이트가 봇 접근을 차단하지 않도록 사용자의 브라우저인 것처럼 가장합니다.
+    user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+
+    # 시작 URL을 설정하는 메서드입니다. Scrapy는 이 메서드를 호출하여 크롤링을 시작합니다.
+    def start_requests(self):
+        # User-Agent를 포함하여 첫 번째 요청을 생성합니다.
+        yield scrapy.Request(url="https://subslikescript.com/movies_letter-X", headers={'user-agent': self.user_agent})
+
+    # 크롤링 커스텀 설정을 정의합니다.
+    custom_settings = {
+        "DOWNLOAD_DELAY": 0.3,  # 다운로드 지연을 0.3초로 설정하여 서버에 과부하를 주지 않도록 합니다.
+    }
+
+    # 크롤링 규칙을 정의합니다.
+    rules = (
+        # 첫 번째 Rule: 영화 리스트 페이지에서 영화 상세 페이지로 가는 링크를 추출합니다.
+        Rule(
+            LinkExtractor(restrict_xpaths=("//ul[@class='scripts-list']//a")),  # 링크 추출기 설정
+            callback="parse_item",  # 추출한 링크의 응답을 처리할 콜백 함수 설정
+            follow=True,  # 추적된 링크를 계속 추적하도록 설정
+            process_request='set_user_agent'  # 각 요청에 User-Agent를 설정하는 메서드
+        ),
+        # 두 번째 Rule: '다음' 페이지로 이동하는 링크를 추출합니다.
+        Rule(
+            LinkExtractor(restrict_xpaths=(("//a[@rel='next'][1]"))),  # '다음' 페이지 링크 추출기 설정
+        ),
+    )
+
+    # 각 요청에 User-Agent를 설정하는 메서드입니다.
+    def set_user_agent(self, request, spider):
+        # 요청 헤더에 User-Agent를 설정합니다.
+        request.headers['User-Agent'] = self.user_agent
+        return request
+
+    # 추출한 페이지에서 데이터를 파싱하는 메서드입니다.
+    def parse_item(self, response):
+        # 기사 요소를 XPath로 선택합니다.
+        article = response.xpath("//article[@class='main-article']")
+
+        # 선택한 기사에서 제목, 줄거리, URL, User-Agent를 추출합니다.
+        yield {
+            "title": article.xpath("./h1/text()").get(),  # 제목 추출
+            "plot": article.xpath("./p/text()").get(),    # 줄거리 추출
+            # "transcript": article.xpath("./div[@class='full-script']/text()").getall(),  # 스크립트 추출 (주석 처리됨)
+            "url": response.url,  # 현재 페이지의 URL 추출
+            'user-agent': response.request.headers['User-Agent'],  # 요청 헤더의 User-Agent를 추출
+        }
+```
+
+```python
+스파이더 내부의 코드를 변경해서 useragent 를 변경한다
+
+1. user_agent 변수를 추가한다
+
+   user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+
+2. def start_requests 메서드를 추가한다 시작 URL을 설정하는 메서드 이고 예전 start_urls 변수는 삭제해준다
+
+	 첫 번째 요청을 생성하며, headers 매개변수를 통해 User-Agent를 포함 시킨다
+
+
+
+3. rule 에 process_request='set_user_agent' 추가 해준다 이는 각 요청에 User-Agent를 설정한다.
+
+4. def set_user_agent 메서드를 작성해준다
+
+	 self: TranscriptsSpider 클래스의 인스턴스를 가리킨다. ( self는 메서드를 호출한 인스턴스를 가리킨다 )
+
+   request: 웹페이지 요청 객체이다. 여기에 헤더를 추가하거나 수정할 수 있다.
+
+   spider: 현재 크롤러의 인스턴스를 가리킨다. 이 예제에서는 사용되지 않지만 필요할 때 사용할 수 있다.
+
+
+
+   request.headers['User-Agent']: 요청 헤더의 User-Agent 항목을 설정한다.
+
+
+   self.user_agent: 클래스 속성으로 설정된 User-Agent 문자열이다.
+
+   실제 브라우저의 User-Agent 문자열을 사용하여 웹사이트가 요청을 브라우저로 인식하게 한다.
+
+
+   * self 는 한마디로 TranscriptsSpider 다 여기의 메서드를 호출해서 (self ( TranscriptsSpider ) 의 .user_agent 변수 ) 사용한다
+
+     TranscriptsSpider.user_agent 같은것
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380922/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_9_Project_3_Building_Crawlers_with_Scrapy/Untitled_4.png)

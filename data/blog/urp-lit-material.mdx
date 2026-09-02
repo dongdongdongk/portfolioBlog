@@ -1,0 +1,83 @@
+---
+title: 'URP Lit Material 만들기'
+date: '2026-09-02'
+category: '게임 개발/유니티 개인 정리'
+tags: ['게임 개발', '유니티 개인 정리']
+draft: false
+summary: ''
+---
+
+## URP (Universal Render Pipeline) 에서
+
+**MetalTilesSolded** PBR 텍스처 세트 사용법
+_(Unity 2023 LTS 기준, URP 14+)_
+
+---
+
+### 1. 텍스처 임포트 설정 (한 번만 하면 끝)
+
+| 파일명                            | URP 슬롯           | **Texture Type** | **sRGB** | **Alpha** | 비고                           |
+| --------------------------------- | ------------------ | ---------------- | -------- | --------- | ------------------------------ |
+| MetalTilesSolded_basecolor        | **Base Map**       | **Default**      | 체크     | –         | 색상                           |
+| MetalTilesSolded_metallic         | **Metallic** (R)   | **Default**      | 해제     | –         | 금속도                         |
+| MetalTilesSolded_roughness        | **Smoothness** (A) | **Default**      | 해제     | **필수**  | **Roughness → Invert → Alpha** |
+| MetalTilesSolded_ambientocclusion | **Occlusion** (G)  | **Default**      | 해제     | –         | AO (선택)                      |
+| MetalTilesSolded_normalogl        | **Normal Map**     | **Normal Map**   | 해제     | –         | **OGL** 버전 사용              |
+| MetalTilesSolded_height           | **Height**         | **Default**      | 해제     | –         | Parallax 사용 시 (선택)        |
+
+> 핵심: Roughness → Smoothness 변환
+>
+> 1. Photoshop/GIMP → roughness 열기 → **Invert** (Ctrl + I)
+> 2. metallic 파일 열기 → **Alpha 채널에 붙여넣기** → 저장 → Unity **재임포트**
+
+---
+
+### 2. URP Lit Material 만들기 (3분)
+
+1. **Project 창** → 우클릭 → **Create → Material**
+   → 이름: MAT_MetalTilesSolded
+2. **Inspector** → **Shader** → **Universal Render Pipeline/Lit**
+3. 텍스처 드래그 (아래 순서대로)
+
+| 슬롯              | 드래그할 텍스처                                 |
+| ----------------- | ----------------------------------------------- |
+| **Base Map**      | MetalTilesSolded_basecolor                      |
+| **Metallic Map**  | MetalTilesSolded_metallic (R 채널 자동 사용)    |
+| **Normal Map**    | MetalTilesSolded_normalogl                      |
+| **Occlusion Map** | MetalTilesSolded_ambientocclusion (G 채널 자동) |
+| **Height Map**    | MetalTilesSolded_height (Parallax 사용 시)      |
+
+> Smoothness는 Metallic Map의 Alpha가 자동으로 사용됩니다.
+> → 별도 슬롯 없음! (URP Lit은 Metallic + Alpha = Smoothness)
+
+---
+
+### 3. 메쉬에 적용 & 테스트
+
+1. 씬에 **Plane** 또는 **Cube** 넣기
+2. **Mesh Renderer → Materials** → MAT_MetalTilesSolded 드래그
+3. **Directional Light** + **Reflection Probe** 추가 (금속 반사 보이게)
+4. **Play** → 금속 타일이 **빛 반사 + 거칠기** 잘 보이면 성공!
+
+---
+
+### 4. URP 전용 팁 (성능 & 퀄리티)
+
+| 기능                          | 설정 방법                                                                                                |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **Parallax (높이감)**         | Material → **Surface Options → Height Map** 체크 → **Parallax** 슬라이더 조정                            |
+| **Clear Coat (광택 코팅)**    | **Surface Options → Clear Coat** 체크 → Metallic Map **B 채널**에 코팅 마스크                            |
+| **텍스처 패킹 (성능 최적화)** | Metallic (R) + Smoothness (A) + Occlusion (G) → **하나의 RGBA 텍스처**로 합치기 (Substance Painter 추천) |
+| **MipMap**                    | 모든 텍스처 **Generate Mip Maps** 체크 (필수)                                                            |
+
+---
+
+### 5. 자주 하는 실수 & 해결법
+
+| 문제                    | 원인                   | 해결                               |
+| ----------------------- | ---------------------- | ---------------------------------- |
+| **재질이 회색/검정**    | Metallic Map sRGB 체크 | **sRGB 해제**                      |
+| **매끄러움 이상함**     | Roughness 그대로 사용  | **Invert → Alpha**                 |
+| **노말 뒤집힘**         | DirectX 노말 사용      | normalogl 파일 사용                |
+| **반사 안 보임**        | Reflection Probe 없음  | **Scene → Add → Reflection Probe** |
+| **빌드 시 텍스처 깨짐** | Compression 낮음       | **Compression → High Quality**     |

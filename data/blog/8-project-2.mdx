@@ -1,0 +1,622 @@
+---
+title: '섹션 8: Project 2 트레이 아이콘 설정 및 마무리'
+date: '2026-09-02'
+category: '풀스택/Electron'
+tags: ['풀스택', 'Electron']
+draft: false
+summary: ''
+---
+
+# { Electron 앱에서 트레이 아이콘 추가 및 클릭 이벤트 설정 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381251/notion-blog/_/Electron/Electron_From_Scratch_JavaScript_/_8_Project_2_/image.png)
+
+## 1. 트레이 아이콘 준비 및 추가
+
+```jsx
+16x16 크기의 tray_icon.png 파일을 프로젝트 내 assets/icons 폴더에 배치
+
+path 모듈을 사용하여 아이콘 경로 설정
+
+new Tray(iconPath)를 사용하여 트레이 아이콘 생성
+```
+
+```jsx
+const path = require('path')
+const { app, BrowserWindow, Tray } = require('electron')
+
+let mainWindow
+let tray
+
+function createMainWindow() {
+  mainWindow = new BrowserWindow({
+    width: 700,
+    height: 500,
+    icon: path.join(__dirname, 'assets', 'icons', 'icon.png'),
+    resizable: false,
+    show: false, // 앱 실행 시 창을 숨김 상태로 시작
+    opacity: 0.9, // 창을 약간 투명하게 설정
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  })
+
+  mainWindow.loadFile('./app/index.html')
+}
+
+app.on('ready', () => {
+  createMainWindow()
+
+  // 트레이 아이콘 추가
+  const iconPath = path.join(__dirname, 'assets', 'icons', 'tray_icon.png')
+  tray = new Tray(iconPath)
+
+  // 트레이 아이콘 클릭 이벤트
+  tray.on('click', () => {
+    if (mainWindow.isVisible()) {
+      mainWindow.hide()
+    } else {
+      mainWindow.show()
+    }
+  })
+})
+```
+
+## 2. 트레이 아이콘 클릭 이벤트 설정
+
+```jsx
+트레이 아이콘을 클릭하면 창이 표시되거나 숨겨짐
+
+tray.on('click', () => { ... })을 활용하여 이벤트 처리
+```
+
+```jsx
+tray.on('click', () => {
+  if (mainWindow.isVisible()) {
+    mainWindow.hide()
+  } else {
+    mainWindow.show()
+  }
+})
+```
+
+## 3. 앱 실행 시 메인 윈도우 숨기기
+
+```jsx
+show: false 설정을 추가하여 앱 실행 시 창을 숨김 상태로 시작
+
+아이콘을 클릭하면 창이 표시되도록 변경
+```
+
+```jsx
+mainWindow = new BrowserWindow({
+  width: 700,
+  height: 500,
+  show: false, // 처음에는 숨김 상태
+})
+```
+
+## 4. 창 투명도 조절
+
+```jsx
+opacity: 0.9 설정을 추가하여 창을 약간 투명하게 설정
+```
+
+```jsx
+mainWindow = new BrowserWindow({
+  width: 700,
+  height: 500,
+  opacity: 0.9, // 반투명 효과 적용
+})
+```
+
+# { 트레이 아이콘의 컨텍스트 메뉴 및 닫기 동작 처리 }
+
+## 1. 트레이 아이콘의 컨텍스트 메뉴 추가
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381251/notion-blog/_/Electron/Electron_From_Scratch_JavaScript_/_8_Project_2_/image_1.png)
+
+```jsx
+우클릭 이벤트 추가: tray.on('right-click', callback)을 사용하여 우클릭 시 컨텍스트 메뉴가 나타나도록 설정.
+
+메뉴 생성: Menu.buildFromTemplate([])을 사용하여 트레이 아이콘의 컨텍스트 메뉴를 생성.
+
+앱 종료 옵션 추가:
+
+		label: 'Quit'로 표시.
+
+		click 이벤트에서 app.isQuitting = true를 설정한 후 app.quit() 호출.
+```
+
+```jsx
+tray.on('right-click', () => {
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Quit',
+      click: () => {
+        app.isQuitting = true
+        app.quit()
+      },
+    },
+  ])
+  tray.popUpContextMenu(contextMenu)
+})
+```
+
+## 2. X 버튼을 눌렀을 때 창을 숨기고 앱이 종료되지 않도록 처리
+
+```jsx
+mainWindow.on('close', callback) 이벤트를 사용하여 창 닫기 동작을 제어.
+
+app.isQuitting이 true가 아닐 경우 창을 숨기고 종료를 방지.
+
+* 이 코드에서는 return true;가 사실상 필요하지 않습니다.
+
+	Electron의 close 이벤트 핸들러에서 return 값은 사용되지 않기 때문입니다.
+```
+
+```jsx
+mainWindow.on('close', (e) => {
+  if (!app.isQuitting) {
+    e.preventDefault()
+    mainWindow.hide()
+  }
+  return true
+})
+```
+
+## 3. 창 숨긴 후 다시 트레이 아이콘을 클릭하면 창이 다시 나타나도록 설정
+
+```jsx
+tray.on('click', callback)을 사용하여 클릭 시 창을 보이거나 숨김.
+```
+
+```jsx
+tray.on('click', () => {
+  if (mainWindow.isVisible()) {
+    mainWindow.hide()
+  } else {
+    mainWindow.show()
+  }
+})
+```
+
+# { `nav` 토글로 숨기기 }
+
+```jsx
+응용 가능 아이디어
+
+다크 모드 토글 (body.classList.toggle('dark-mode'))
+
+사이드바 열고 닫기
+
+설정 메뉴 열기
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381251/notion-blog/_/Electron/Electron_From_Scratch_JavaScript_/_8_Project_2_/image_2.png)
+
+## 1. **메뉴에서 클릭 이벤트가 발생**
+
+```jsx
+메인 프로세스에서는 View 메뉴 항목에 Toggle Navigation 항목이 있습니다.
+
+사용자가 이 메뉴 항목을 클릭하면, 아래 코드에 의해 nav:toggle 이벤트가 렌더러 프로세스에 전송됩니다.
+```
+
+```jsx
+{
+  label: 'Toggle Navigation',
+  click: () => mainWindow.webContents.send('nav:toggle')  // 클릭하면 이벤트 전송
+}
+```
+
+```jsx
+mainWindow.webContents.send('nav:toggle'): 이 부분이 렌더러 프로세스에 nav:toggle이라는 이벤트를 전송하는 역할을 합니다.
+
+즉, 메뉴에서 "Toggle Navigation"을 클릭하면 nav:toggle 이벤트가 렌더러로 전달됩니다.
+```
+
+## 2. 프리로드로 이벤트 전달
+
+```jsx
+const { contextBridge, ipcRenderer } = require('electron')
+
+contextBridge.exposeInMainWorld('electron', {
+  getComInfo: () => ipcRenderer.invoke('getComInfo'),
+  getCpuUsage: () => ipcRenderer.invoke('getCpuUsage'),
+  getUptime: () => ipcRenderer.invoke('getUptime'),
+
+  // 이벤트 리스너 추가 (렌더러에서 `on` 메서드 사용 가능)
+  on: (channel, callback) => {
+    ipcRenderer.on(channel, (event, data) => callback(data))
+  },
+
+  send: (channel, data) => {
+    ipcRenderer.send(channel, data)
+  },
+})
+```
+
+```jsx
+on:
+
+		on 메서드는 메인 프로세스에서 보내는 이벤트를 렌더러 프로세스에서 처리할 수 있게 해줍니다.
+
+		ipcRenderer.on(channel, callback)을 사용하여 메인 프로세스에서 전송한 이벤트를 수신하고,
+
+		callback(data)로 데이터를 렌더러 프로세스로 전달합니다.
+
+send:
+
+		send 메서드는 렌더러 프로세스에서 메인 프로세스로 데이터를 보낼 때 사용됩니다.
+
+		ipcRenderer.send(channel, data)를 호출하여 메인 프로세스로 메시지를 보냅니다.
+```
+
+## 2. **렌더러에서 이벤트를 수신**
+
+```jsx
+렌더러 프로세스에서는 preload.js 또는 renderer.js에서 nav:toggle 이벤트를 받고 처리합니다.
+
+이때 중요한 부분은 **window.electron.on('nav:toggle', ...)**입니다.
+
+이렇게 하면 메인 프로세스에서 보내는 nav:toggle 이벤트를 렌더러가 수신할 수 있게 됩니다
+```
+
+```jsx
+window.electron.on('nav:toggle', () => {
+  let nav = document.getElementById('nav') // 'nav' 요소 찾기
+  if (nav) {
+    nav.classList.toggle('hide') // 'hide' 클래스를 토글해서 숨기거나 보이게 하기
+  }
+})
+```
+
+# { 앱 리팩토링 1 }
+
+```jsx
+기존 main.js가 너무 길어져서 유지보수하기 어려운 상태입니다.
+
+이를 해결하기 위해 MainWindow 클래스를 분리하는 리팩토링을 진행했습니다
+```
+
+## 1. `MainWindow.js` 파일을 생성하여 코드 분리
+
+### (1) 기존 `main.js`의 코드에서 `BrowserWindow` 관련 코드 분리
+
+```jsx
+기존 main.js에서는 BrowserWindow를 직접 생성하고 여러 옵션을 설정했습니다.
+```
+
+기존 코드 (리팩토링 전 `main.js` 부분)
+
+```jsx
+const { BrowserWindow } = require('electron') // BrowserWindow 모듈 가져오기
+
+function createMainWindow() {
+  mainWindow = new BrowserWindow({
+    title: 'SysTop',
+    width: isDev ? 700 : 355,
+    height: 500,
+    icon: './assets/icons/icon.png',
+    resizable: isDev ? true : false,
+    opacity: 0.9,
+    backgroundColor: 'white',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+  })
+
+  mainWindow.loadFile('./app/index.html')
+
+  if (isDev) {
+    mainWindow.webContents.openDevTools()
+  }
+}
+```
+
+```jsx
+✔️ 문제점: main.js에 많은 코드가 들어가 있어 가독성이 떨어짐
+
+✔️ 해결 방법: MainWindow.js를 새로 만들어 BrowserWindow 관련 코드를 클래스로 분리
+```
+
+### (2) `MainWindow.js` 파일 생성 및 코드 이동
+
+```jsx
+새 파일을 만들고 BrowserWindow를 상속받는 MainWindow 클래스를 생성했습니다.
+```
+
+`MainWindow.js` (리팩토링 후)
+
+```jsx
+const { BrowserWindow } = require('electron')
+const path = require('path')
+
+class MainWindow extends BrowserWindow {
+  constructor(file, isDev) {
+    super({
+      title: 'SysTop',
+      width: isDev ? 700 : 355,
+      height: 500,
+      icon: './assets/icons/icon.png',
+      resizable: isDev ? true : false,
+      opacity: 0.9,
+      backgroundColor: 'white',
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: path.join(__dirname, 'preload.js'),
+      },
+    })
+
+    // HTML 파일 로드
+    this.loadFile(file)
+
+    // 개발 모드일 경우 DevTools 열기
+    if (isDev) {
+      this.webContents.openDevTools()
+    }
+  }
+}
+
+module.exports = MainWindow // MainWindow 클래스 내보내기
+```
+
+```jsx
+BrowserWindow를 직접 사용하지 않고 MainWindow 클래스를 만들어 상속
+
+super()를 사용하여 BrowserWindow 설정을 그대로 전달
+
+loadFile(file)을 내부에서 호출하도록 변경
+
+isDev 값을 받아 개발 모드일 경우 DevTools 자동 실행
+
+💡 super()는 부모 클래스의 생성자(constructor)를 실행하는 역할을 한다!
+💡 MainWindow에서 super({...})를 호출하면 BrowserWindow의 설정을 그대로 가져와 사용할 수 있다
+```
+
+## 2. `main.js`에서 `MainWindow.js` 사용하도록 수정
+
+```jsx
+기존 main.js에서는 BrowserWindow를 직접 사용했지만, 이제 MainWindow 클래스를 가져와서 사용합니다.
+```
+
+`main.js` 변경 내용
+
+```jsx
+const { app, Menu, ipcMain, Tray } = require('electron')
+const MainWindow = require('./MainWindow') // MainWindow 불러오기
+const path = require('path')
+const Store = require('./store')
+
+process.env.NODE_ENV = 'development'
+
+const isDev = process.env.NODE_ENV !== 'production'
+const isMac = process.platform === 'darwin'
+
+let mainWindow
+let tray
+
+// 설정 저장을 위한 Store 인스턴스 생성
+const store = new Store({
+  configName: 'user-settings',
+  defaults: {
+    settings: {
+      cpuOverload: 80,
+      alertFrequency: 5,
+    },
+  },
+})
+
+function createMainWindow() {
+  mainWindow = new MainWindow('./app/index.html', isDev) // 기존 BrowserWindow 대신 MainWindow 사용
+}
+
+app.on('ready', () => {
+  createMainWindow()
+
+  mainWindow.webContents.on('dom-ready', () => {
+    mainWindow.webContents.send('settings:get', store.get('settings'))
+  })
+
+  const mainMenu = Menu.buildFromTemplate(menu)
+  Menu.setApplicationMenu(mainMenu)
+
+  mainWindow.on('close', (e) => {
+    if (!app.isQuitting) {
+      e.preventDefault()
+      mainWindow.hide()
+    }
+  })
+
+  const icon = path.join(__dirname, 'assets', 'icons', 'tray_icon.png')
+  tray = new Tray(icon)
+
+  tray.on('click', () => {
+    mainWindow.isVisible() ? mainWindow.hide() : mainWindow.show()
+  })
+
+  tray.on('right-click', () => {
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: 'Quit',
+        click: () => {
+          app.isQuitting = true
+          app.quit()
+        },
+      },
+    ])
+    tray.popUpContextMenu(contextMenu)
+  })
+})
+```
+
+```jsx
+BrowserWindow 대신 MainWindow를 사용
+
+MainWindow를 생성할 때 isDev 값을 전달하도록 변경
+
+MainWindow를 가져왔으므로 BrowserWindow 관련 코드 삭제
+```
+
+# { 트레이 아이콘 리팩토링 }
+
+## 리팩토링 목표
+
+```jsx
+✅ 트레이 기능을 별도의 클래스로 분리하여 코드 정리
+✅ 가독성 개선: main.js가 깔끔하게 유지되도록 변경
+✅ 재사용 가능한 구조로 변경
+```
+
+## 기존 코드 (`main.js`)에서 트레이 관련 코드 추출
+
+```jsx
+기존에는 main.js에서 트레이를 직접 생성하고 관리하고 있었음.
+```
+
+```jsx
+const { app, Menu, Tray } = require('electron')
+const path = require('path')
+
+let tray
+
+app.on('ready', () => {
+  const icon = path.join(__dirname, 'assets', 'icons', 'tray_icon.png')
+
+  tray = new Tray(icon)
+
+  tray.setToolTip('SysTop')
+
+  tray.on('click', () => {
+    if (mainWindow.isVisible()) {
+      mainWindow.hide()
+    } else {
+      mainWindow.show()
+    }
+  })
+
+  tray.on('right-click', () => {
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: 'Quit',
+        click: () => {
+          app.isQuitting = true
+          app.quit()
+        },
+      },
+    ])
+    tray.popUpContextMenu(contextMenu)
+  })
+})
+```
+
+```jsx
+tray 관련 코드가 main.js 내부에 직접 포함되어 있음
+
+tray 관련 이벤트 핸들러도 main.js에 있어서 혼잡
+```
+
+## `AppTray.js` 파일 생성하여 트레이 관련 코드 분리
+
+```jsx
+트레이 관련 코드만 따로 관리할 수 있도록 AppTray.js 클래스를 생성
+```
+
+```jsx
+const { app, Menu, Tray } = require('electron')
+
+class AppTray extends Tray {
+  constructor(icon, mainWindow) {
+    super(icon)
+    this.mainWindow = mainWindow
+
+    this.setToolTip('SysTop')
+
+    // ✅ 화살표 함수 사용 → this 유지됨
+    this.on('click', this.onClick)
+    this.on('right-click', this.onRightClick)
+  }
+
+  onClick = () => {
+    if (this.mainWindow.isVisible()) {
+      this.mainWindow.hide()
+    } else {
+      this.mainWindow.show()
+    }
+  }
+
+  onRightClick = () => {
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: 'Quit',
+        click: () => {
+          app.isQuitting = true
+          app.quit()
+        },
+      },
+    ])
+    this.popUpContextMenu(contextMenu)
+  }
+}
+
+module.exports = AppTray
+```
+
+```jsx
+Tray 클래스를 상속받아 AppTray 클래스를 생성
+
+onClick과 onRightClick을 메서드로 따로 분리
+
+화살표 함수(=>) 사용하여 자동으로 this 유지
+
+setToolTip()을 사용하여 툴팁 설정
+```
+
+## `main.js`에서 `AppTray.js` 사용하도록 수정
+
+```jsx
+기존의 트레이 관련 코드를 삭제하고, AppTray.js 클래스를 사용하도록 변경
+```
+
+```jsx
+const { app, BrowserWindow, Menu } = require('electron')
+const path = require('path')
+const AppTray = require('./AppTray') // ✅ 새로운 트레이 클래스 추가
+
+let mainWindow
+let tray
+
+function createMainWindow() {
+  mainWindow = new BrowserWindow({
+    width: 800,
+    height: 600,
+    webPreferences: {
+      nodeIntegration: true,
+    },
+  })
+
+  mainWindow.loadURL('file://' + __dirname + '/index.html')
+}
+
+app.on('ready', () => {
+  createMainWindow()
+
+  const icon = path.join(__dirname, 'assets', 'icons', 'tray_icon.png')
+
+  // ✅ 새롭게 만든 AppTray 클래스 사용
+  tray = new AppTray(icon, mainWindow)
+})
+```
+
+```jsx
+main.js에서 Tray 관련 코드를 삭제
+
+AppTray 클래스를 모듈로 불러와서(require("./AppTray")) 사용
+
+트레이 인스턴스를 new AppTray(icon, mainWindow)로 생성
+```

@@ -1,0 +1,576 @@
+---
+title: '스타일 적용하기'
+date: '2026-09-02'
+category: '풀스택/The Web Developer 부트캠프 2022'
+tags: ['풀스택', 'The Web Developer 부트캠프 2022']
+draft: false
+summary: ''
+---
+
+# 이미지 추가하기
+
+## 모델 수정하기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381413/notion-blog/_/The_Web_Developer_2022/node_js/_/Untitled.png)
+
+```jsx
+이미지를 추가하기 위해서 campground 모델을 업데이트 해준다
+```
+
+## 시드 파일 수정
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381412/notion-blog/_/The_Web_Developer_2022/node_js/_/Untitled_1.png)
+
+```jsx
+const mongoose = require('mongoose')
+const cities = require('./cities')
+const { places, descriptors } = require('./seedHelpers')
+const Campground = require('../models/campground')
+
+mongoose.connect('mongodb://localhost:27017/yelp-camp', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+
+const db = mongoose.connection
+
+db.on('error', console.error.bind(console, 'connection error:'))
+db.once('open', () => {
+  console.log('Database connected')
+})
+
+const sample = (array) => array[Math.floor(Math.random() * array.length)]
+
+const seedDB = async () => {
+  await Campground.deleteMany({}) // 모두 삭제 후 진행
+  for (let i = 0; i < 50; i++) {
+    // 50 개의 랜덤 데이터를 시드에서 가져와서 생성
+    const random1000 = Math.floor(Math.random() * 1000)
+    const price = Math.floor(Math.random() * 20) + 10
+    const camp = new Campground({
+      location: `${cities[random1000].city}, ${cities[random1000].state}`,
+      title: `${sample(descriptors)} ${sample(places)}`,
+      image: 'https://source.unsplash.com/collection/483251',
+      description: 'Demo Description',
+      price,
+    })
+    await camp.save()
+  }
+}
+
+seedDB().then(() => {
+  // 완료 후 DB 닫기
+  mongoose.connection.close()
+})
+```
+
+```jsx
+그리고 데이터베이스에 새로운 이미지와 가격 데이터를 넣어주기 위해서 시드 파일을 수정해주고
+
+실행시켜 준다
+
+( 이미지는 호출할때 마다 다른 이미지가 나오는 주소를 입력해줬다 )
+```
+
+## 캠프 디테일 스타일
+
+```jsx
+import { useEffect, useState } from 'react'
+import { useParams, Link, Navigate, useNavigate } from 'react-router-dom'
+import axios from 'axios'
+
+const CampGroundDetail = () => {
+  const params = useParams()
+  const [camp, setCamp] = useState({})
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await axios.get(`http://localhost:4000/campground/${params.id}`)
+        setCamp(response.data)
+      } catch (error) {
+        console.log('FAIL LOAD CAMPGROUND DETAIL')
+        setCamp([])
+      }
+    }
+    fetchData()
+  }, [])
+
+  const deleteCamp = async () => {
+    try {
+      await axios.delete(`http://localhost:4000/campground/${params.id}`)
+      navigate('/campground')
+    } catch (error) {
+      console.error('DELETE FAIL', error)
+    }
+  }
+
+  return (
+    <>
+      {camp ? (
+        <div>
+          <h1>{camp.title}</h1>
+          <h2>{camp.location}</h2>
+          <img src={camp.image} alt="" />
+          <p>{camp.description}</p>
+        </div>
+      ) : (
+        <p>캠프를 불러오는 중입니다...</p>
+      )}
+      <Link to={'/campground'}>홈으로</Link>
+      <Link to={`/campground/${params.id}/edit`}>캠프수정</Link>
+      <button type="button" onClick={deleteCamp}>
+        삭제하기
+      </button>
+    </>
+  )
+}
+
+export default CampGroundDetail
+```
+
+```jsx
+디테일에 출력되게 코드를 수정해준다
+```
+
+## 캠프 메인 리스트 스타일
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381412/notion-blog/_/The_Web_Developer_2022/node_js/_/Untitled_2.png)
+
+```jsx
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import axios from 'axios'
+
+const CampGround = () => {
+  const [camp, setCamp] = useState([])
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await axios.get('http://localhost:4000/campground')
+        setCamp(response.data)
+      } catch (error) {
+        console.error('FAIL LOAD CAMPGROUND DATA')
+        setCamp([])
+      }
+    }
+
+    fetchData()
+  }, [])
+
+  return (
+    <>
+      <h1>CampGround</h1>
+      <ul>
+        {camp.map((camp) => (
+          <div className="card" key={camp._id}>
+            <div className="row">
+              <div className="col-mb-4">
+                <img className="img-fluid" alt="" src={camp.image} />
+              </div>
+              <div className="col-md-8">
+                <div className="card-body">
+                  <h5 className="card-title">{camp.title}</h5>
+                  <p className="card-text">{camp.description}</p>
+                  <p className="card-text">
+                    <small className="text-muted">{camp.location}</small>
+                  </p>
+                  <Link to={`/campground/${camp._id}`}>
+                    <button className="btn btn-primary">View</button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          // <li key={camp.id}>
+          // <Link to={`/campground/${camp._id}`}>{camp.title}</Link>
+          // </li>
+        ))}
+      </ul>
+    </>
+  )
+}
+
+export default CampGround
+```
+
+```jsx
+캠프 메인 리스트를 수정해준다
+```
+
+## 캠프 추가 스타일
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381412/notion-blog/_/The_Web_Developer_2022/node_js/_/Untitled_3.png)
+
+```jsx
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import axios from 'axios'
+
+const CampGroundAdd = () => {
+  const navigate = useNavigate()
+  //상태 초기화
+  const [formData, setFormData] = useState({
+    title: '',
+    location: '',
+  })
+
+  // 입력값 변경 핸들러
+  const handleChange = (e) => {
+    const { name, value } = e.target
+    setFormData((prevDate) => ({
+      ...prevDate,
+      [name]: value,
+    }))
+  }
+
+  // 폼 제출 핸들러
+  const onSubmitHandler = async (e) => {
+    e.preventDefault()
+
+    //폼 데이터 전송
+    try {
+      await axios.post('http://localhost:4000/campground/new', formData)
+      navigate('/campground')
+    } catch (error) {
+      console.error('SAVE FAIL', error)
+    }
+  }
+
+  return (
+    <>
+      <div className="row">
+        <h1 className="text-center">CampGroundAdd</h1>
+        <div className="offset-3 col-6">
+          <form onSubmit={onSubmitHandler}>
+            <div className="mb-3">
+              <label className="form-label" htmlFor="title">
+                Title
+              </label>
+              <input
+                className="form-control"
+                type="text"
+                name="title"
+                id="title"
+                value={formData.title}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="mb-3">
+              <label className="form-label" htmlFor="location">
+                Location
+              </label>
+              <input
+                className="form-control"
+                type="text"
+                name="location"
+                id="location"
+                value={formData.location}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="mb-3">
+              <label className="form-label" htmlFor="image">
+                Image
+              </label>
+              <input
+                className="form-control"
+                type="text"
+                name="image"
+                id="image"
+                value={formData.image}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="mb-3">
+              <label className="form-label" htmlFor="price">
+                Campground Price
+              </label>
+              <div className="input-group">
+                <span className="input-group-text" id="price-label">
+                  $
+                </span>
+                <input
+                  type="text"
+                  className="form-control"
+                  id="price"
+                  name="price"
+                  placeholder="0.00"
+                  aria-label="price"
+                  aria-describedby="price-label"
+                  value={formData.price}
+                  onChange={handleChange}
+                />
+              </div>
+            </div>
+            <div className="mb-3">
+              <label className="form-label" htmlFor="description">
+                Description
+              </label>
+              <textarea
+                className="form-control"
+                type="text"
+                name="description"
+                id="description"
+                value={formData.description}
+                onChange={handleChange}
+              ></textarea>
+            </div>
+            <div className="mb-3">
+              <button className="btn btn-success" type="submit" value="submit">
+                AddCampGround
+              </button>
+            </div>
+          </form>
+          <Link to={'/campground'}>All Campground</Link>
+        </div>
+      </div>
+    </>
+  )
+}
+
+export default CampGroundAdd
+```
+
+## 캠프 업데이트 스타일
+
+```jsx
+import { useState, useEffect } from 'react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
+import axios from 'axios'
+
+const CampGroundUpdate = () => {
+  const params = useParams()
+  const navigate = useNavigate()
+
+  // 상태초기화
+  const [formData, setFormData] = useState({
+    title: '',
+    location: '',
+  })
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await axios.get(`http://localhost:4000/campground/${params.id}`)
+        console.log(params.id)
+        setFormData(response.data)
+      } catch (error) {
+        console.error('CAMP LOAD FAIL')
+      }
+    }
+    fetchData()
+  }, [params.id])
+
+  // 입력값 변경 시 상태 업데이트
+  const handleChange = (e) => {
+    const { name, value } = e.target
+    setFormData((prevData) => ({
+      ...prevData,
+      [name]: value,
+    }))
+  }
+
+  // 폼 제출 핸들러
+  const onSubmitHandler = async (e) => {
+    e.preventDefault()
+
+    // 폼 데이터 전송
+    try {
+      await axios.put(`http://localhost:4000/campground/${params.id}`, formData)
+      navigate('/campground')
+    } catch (error) {
+      console.error('SAVE FAIL', error)
+    }
+  }
+
+  return (
+    <>
+      <div className="row">
+        <h1 className="text-center">CampGroundUpdate</h1>
+        <div className="offset-3 col-6">
+          <form onSubmit={onSubmitHandler}>
+            <div className="mb-3">
+              <label className="form-label" htmlFor="title">
+                Title
+              </label>
+              <input
+                className="form-control"
+                type="text"
+                name="title"
+                id="title"
+                value={formData.title}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="mb-3">
+              <label className="form-label" htmlFor="location">
+                Location
+              </label>
+              <input
+                className="form-control"
+                type="text"
+                name="location"
+                id="location"
+                value={formData.location}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="mb-3">
+              <label className="form-label" htmlFor="image">
+                Image
+              </label>
+              <input
+                className="form-control"
+                type="text"
+                name="image"
+                id="image"
+                value={formData.image}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="mb-3">
+              <label className="form-label" htmlFor="price">
+                Campground Price
+              </label>
+              <div className="input-group">
+                <span className="input-group-text" id="price-label">
+                  $
+                </span>
+                <input
+                  type="text"
+                  className="form-control"
+                  id="price"
+                  name="price"
+                  placeholder="0.00"
+                  aria-label="price"
+                  aria-describedby="price-label"
+                  value={formData.price}
+                  onChange={handleChange}
+                />
+              </div>
+            </div>
+            <div className="mb-3">
+              <label className="form-label" htmlFor="description">
+                Description
+              </label>
+              <textarea
+                className="form-control"
+                type="text"
+                name="description"
+                id="description"
+                value={formData.description}
+                onChange={handleChange}
+              ></textarea>
+            </div>
+            <div className="mb-3">
+              <button className="btn btn-success" type="submit" value="submit">
+                AddCampGround
+              </button>
+            </div>
+          </form>
+          <Link to={'/campground'}>All Campground</Link>
+        </div>
+      </div>
+    </>
+  )
+}
+
+export default CampGroundUpdate
+```
+
+## 캠프 디테일 페이지 스타일
+
+```jsx
+import { useEffect, useState } from 'react'
+import {
+  MDBCard,
+  MDBCardImage,
+  MDBCardBody,
+  MDBCardTitle,
+  MDBCardText,
+  MDBCardLink,
+  MDBListGroup,
+  MDBListGroupItem,
+  MDBRipple,
+  MDBBtn,
+} from 'mdb-react-ui-kit'
+import { useParams, Link, Navigate, useNavigate } from 'react-router-dom'
+import axios from 'axios'
+import { Button } from 'bootstrap'
+
+const CampGroundDetail = () => {
+  const params = useParams()
+  const [camp, setCamp] = useState({})
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await axios.get(`http://localhost:4000/campground/${params.id}`)
+        setCamp(response.data)
+      } catch (error) {
+        console.log('FAIL LOAD CAMPGROUND DETAIL')
+        setCamp([])
+      }
+    }
+    fetchData()
+  }, [])
+
+  const deleteCamp = async () => {
+    try {
+      await axios.delete(`http://localhost:4000/campground/${params.id}`)
+      navigate('/campground')
+    } catch (error) {
+      console.error('DELETE FAIL', error)
+    }
+  }
+
+  return (
+    <>
+      {camp ? (
+        <div className="row">
+          <div className="offset-3 col-6">
+            <MDBCard>
+              <MDBRipple rippleColor="light" rippleTag="div" className="bg-image hover-overlay">
+                <MDBCardImage src={camp.image} fluid alt="..." />
+                <a>
+                  <div
+                    className="mask"
+                    style={{ backgroundColor: 'rgba(251, 251, 251, 0.15)' }}
+                  ></div>
+                </a>
+              </MDBRipple>
+              <MDBCardBody>
+                <MDBCardTitle>{camp.title}</MDBCardTitle>
+                <MDBCardText>{camp.description}</MDBCardText>
+              </MDBCardBody>
+              <MDBListGroup flush>
+                <MDBListGroupItem className="text-muted">{camp.location}</MDBListGroupItem>
+                <MDBListGroupItem>${camp.price}/night</MDBListGroupItem>
+                <MDBListGroupItem>Vestibulum at eros</MDBListGroupItem>
+              </MDBListGroup>
+              <MDBCardBody>
+                <Link to={`/campground/${params.id}/edit`}>
+                  <MDBBtn className="btn-info me-2">Edit</MDBBtn>
+                </Link>
+                <MDBBtn onClick={deleteCamp} className="btn-danger">
+                  Delete
+                </MDBBtn>
+              </MDBCardBody>
+            </MDBCard>
+            <Link to={'/campground'}>Back To CampGround</Link>
+          </div>
+        </div>
+      ) : (
+        <p>캠프를 불러오는 중입니다...</p>
+      )}
+    </>
+  )
+}
+
+export default CampGroundDetail
+```

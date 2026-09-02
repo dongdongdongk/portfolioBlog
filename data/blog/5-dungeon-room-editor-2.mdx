@@ -1,0 +1,605 @@
+---
+title: '섹션 5: Dungeon Room Editor - 2 -'
+date: '2026-09-02'
+category: '게임 개발/2D 로그라이크 던전 슈팅 게임'
+tags: ['게임 개발', '2D 로그라이크 던전 슈팅 게임']
+draft: false
+summary: ''
+---
+
+# { RoomNodeGraphEditor 방 노드 간 부모-자식 관계를 설정, 연결 화살표 표시 }
+
+```csharp
+이 강의는 Unity에서 RoomNodeGraphEditor를 통해 방 노드 간 부모-자식 관계를 설정하고,
+
+이를 시각적으로 연결선과 화살표로 표시하는 과정을 다룹니다.
+```
+
+## 1. 개요 및 주요 개념
+
+```csharp
+RoomNodeGraphEditor:
+
+		Unity 에디터 창에서 방 노드 그래프를 시각적으로 편집하는 도구.
+
+		사용자는 마우스로 노드를 생성하고, 드래그하여 부모-자식 관계를 설정하며, 연결선과 화살표로 관계를 표시할 수 있습니다.
+
+RoomNodeSO:
+
+		각 방 노드를 나타내는 스크립터블 오브젝트. 노드의 고유 ID, 부모/자식 노드 ID 리스트, 노드 타입 등을 저장.
+
+RoomNodeGraphSO:
+
+		전체 노드 그래프를 관리하는 스크립터블 오브젝트. 노드 리스트와 ID를 키로 하는 딕셔너리를 포함.
+
+핵심 기능:
+
+		마우스로 노드 생성 및 드래그를 통한 관계 설정.
+
+		노드 간 연결선과 방향성을 나타내는 화살표 렌더링.
+
+		딕셔너리를 활용한 효율적인 노드 검색.
+
+		에디터에서 변경 사항 실시간 반영.
+
+목표:
+
+		던전 빌더에서 방(예: 큰 방, 복도)을 계층적으로 연결. 현재는 다중 부모를 지원하지만, 단일 부모 제약을 추가할 계획.
+```
+
+## 2. 코드 구조 및 구현 단계
+
+### (1) RoomNodeSO 클래스
+
+```csharp
+역할: 개별 방 노드를 정의하며, 부모와 자식 노드의 ID를 리스트로 저장합니다.
+```
+
+```csharp
+public string id; // 노드의 고유 ID (GUID 기반)
+public List<string> parentRoomNodeIDList = new List<string>(); // 부모 노드 ID 리스트
+public List<string> childRoomNodeIDList = new List<string>(); // 자식 노드 ID 리스트
+public RoomNodeGraphSO roomNodeGraph; // 소속된 그래프
+public RoomNodeTypeSO roomNodeType; // 노드 타입 (예: 큰 방, 복도)
+public RoomNodeTypeListSO roomNodeTypeList; // 노드 타입 목록
+```
+
+### 주요 메서드
+
+### AddChildRoomNodeIDToRoomNode
+
+```csharp
+/// <summary>
+/// Add childID to the node (returns true if the node has been added, false otherwise)
+/// </summary>
+public bool AddChildRoomNodeIDToRoomNode(string childID)
+{
+    childRoomNodeIDList.Add(childID);
+    return true;
+}
+```
+
+```csharp
+기능: childID를 childRoomNodeIDList에 추가하여 자식 노드 관계를 설정.
+
+입력값: childID (자식 노드의 ID, 문자열).
+
+동작: 리스트에 ID를 추가하고 true 반환. 현재는 유효성 검사 없음.
+
+특징: 중복 추가나 자기 참조(노드가 자신을 자식으로 추가) 가능.
+```
+
+### AddParentRoomNodeIDToRoomNode
+
+```csharp
+/// <summary>
+/// Add parentID to the node (returns true if the node has been added, false otherwise)
+/// </summary>
+public bool AddParentRoomNodeIDToRoomNode(string parentID)
+{
+    parentRoomNodeIDList.Add(parentID);
+    return true;
+}
+```
+
+```csharp
+기능: parentID를 parentRoomNodeIDList에 추가하여 부모 노드 관계를 설정.
+
+입력값: parentID (부모 노드의 ID, 문자열).
+
+동작: 리스트에 ID를 추가하고 true 반환. 유효성 검사 없음.
+
+특징: 다중 부모 추가 가능, 단일 부모 제약 미구현.
+```
+
+```csharp
+설명:
+
+		두 메서드는 #if UNITY_EDITOR로 감싸져 있어 에디터에서만 실행.
+
+		리스트 기반 설계로 다중 부모/자식을 지원하지만, 던전 빌더에서는 단일 부모만 허용할 계획.
+
+		강의에서 HideInInspector 속성을 제거하여 인스펙터에서 ID 리스트 확인 가능.
+```
+
+### (2) RoomNodeGraphSO 클래스
+
+```csharp
+역할: 전체 노드 그래프를 관리하며, 노드 리스트와 ID 기반 딕셔너리를 유지.
+```
+
+### 주요 변수:
+
+```csharp
+public RoomNodeTypeListSO roomNodeTypeList; // 노드 타입 목록
+public List<RoomNodeSO> roomNodeList = new List<RoomNodeSO>(); // 모든 노드 리스트
+public Dictionary<string, RoomNodeSO> roomNodeDictionary = new Dictionary<string, RoomNodeSO>(); // ID로 노드 검색
+public RoomNodeSO roomNodeToDrawLineFrom = null; // 연결선 시작 노드
+public Vector2 linePosition; // 연결선 위치
+```
+
+### 주요 메서드:
+
+### Awake()
+
+```csharp
+private void Awake()
+{
+    LoadRoomNodeDictionary();
+}
+```
+
+```csharp
+초기화 시 딕셔너리를 로드.
+```
+
+### LoadRoomNodeDictionary()
+
+```csharp
+/// <summary>
+/// roomNodeList에 있는 노드들을 순회하여 roomNodeDictionary에 노드 ID와 노드 객체를 저장합니다.
+/// </summary>
+private void LoadRoomNodeDictionary()
+{
+    // 딕셔너리를 초기화하여 기존 데이터를 모두 제거
+    roomNodeDictionary.Clear();
+
+    // roomNodeList에 있는 각 RoomNodeSO 객체를 순회
+    foreach (RoomNodeSO node in roomNodeList)
+    {
+        // 노드의 고유 ID를 키로, 노드 객체를 값으로 딕셔너리에 추가
+        roomNodeDictionary[node.id] = node;
+    }
+}
+```
+
+```csharp
+노드 리스트를 순회하며 roomNodeDictionary에 노드 ID와 노드를 추가.
+
+딕셔너리는 빠른 노드 검색을 위해 사용.
+```
+
+### OnValidate():
+
+```csharp
+public void OnValidate()
+{
+    LoadRoomNodeDictionary();
+}
+```
+
+```csharp
+에디터에서 변경(노드 추가/삭제) 시 딕셔너리를 갱신.
+```
+
+### SetNodeToDrawConnectionLineFrom
+
+```csharp
+public void SetNodeToDrawConnectionLineFrom(RoomNodeSO node, Vector2 position)
+{
+    roomNodeToDrawLineFrom = node;
+    linePosition = position;
+}
+```
+
+```csharp
+연결선 드래그 시작 시 시작 노드와 위치 설정.
+```
+
+```csharp
+설명:
+
+		roomNodeDictionary는 ID를 키로 노드를 빠르게 조회.
+
+		OnValidate로 에디터 변경 사항을 실시간 반영.
+
+		[CreateAssetMenu] 속성으로 에디터에서 "Room Node Graph" 생성 가능.
+```
+
+## (3) RoomNodeGraphEditor 클래스
+
+```csharp
+역할: Unity 에디터 창에서 노드 그래프를 렌더링하고 사용자 입력을 처리.
+```
+
+### 주요 변수
+
+```csharp
+private const float connectingLineArrowSize = 6f; // 화살표 크기
+```
+
+### 주요 메서드
+
+### OnGUI()
+
+```csharp
+/// <summary>
+/// Unity 에디터 창에서 방 노드 그래프를 렌더링하고 이벤트를 처리합니다.
+/// </summary>
+private void OnGUI()
+{
+    // 현재 선택된 RoomNodeGraphSO가 있을 경우에만 그래프를 렌더링
+    if (currentRoomNodeGraph != null)
+    {
+        // 마우스로 드래그 중인 연결선을 그림
+        DrawDraggedLine();
+
+        // 마우스 및 키보드 이벤트를 처리 (예: 클릭, 드래그, 마우스 놓기)
+        ProcessEvents(Event.current);
+
+        // 노드 간 연결선과 화살표를 그림
+        DrawRoomConnections();
+
+        // 방 노드들을 화면에 그림
+        DrawRoomNodes();
+    }
+
+    // GUI 상태가 변경되었으면 에디터 창을 다시 그림
+    if (GUI.changed) Repaint();
+}
+```
+
+```csharp
+에디터 창을 렌더링. 드래그 선, 이벤트 처리, 연결선, 노드 순으로 그림.
+```
+
+### CreateRoomNode()
+
+```csharp
+/// <summary>
+/// 마우스 위치에 새로운 방 노드를 생성하고, 현재 그래프에 추가합니다.
+/// </summary>
+/// <param name="mousePositionObject">마우스 위치 (Vector2로 캐스팅 필요)</param>
+/// <param name="roomNodeType">생성할 노드의 타입 (예: 큰 방, 복도)</param>
+private void CreateRoomNode(object mousePositionObject, RoomNodeTypeSO roomNodeType)
+{
+    // object 타입의 마우스 위치를 Vector2로 변환
+    Vector2 mousePosition = (Vector2)mousePositionObject;
+
+    // 새로운 RoomNodeSO 인스턴스를 생성 (스크립터블 오브젝트)
+    RoomNodeSO roomNode = ScriptableObject.CreateInstance<RoomNodeSO>();
+
+    // 현재 그래프의 노드 리스트에 새 노드를 추가
+    currentRoomNodeGraph.roomNodeList.Add(roomNode);
+
+    // 노드의 초기 설정: 위치, 크기, 소속 그래프, 노드 타입 지정
+    roomNode.Initialise(new Rect(mousePosition, new Vector2(nodeWidth, nodeHeight)), currentRoomNodeGraph, roomNodeType);
+
+    // 새 노드를 현재 그래프 에셋의 하위 에셋으로 추가
+    AssetDatabase.AddObjectToAsset(roomNode, currentRoomNodeGraph);
+
+    // 변경된 에셋을 저장
+    AssetDatabase.SaveAssets();
+
+    // 그래프의 노드 딕셔너리를 갱신
+    currentRoomNodeGraph.OnValidate();
+}
+```
+
+```csharp
+마우스 위치에 노드 생성, 그래프에 추가, 에셋 저장, 딕셔너리 갱신.
+```
+
+### ProcessMouseUpEvent()
+
+```csharp
+/// <summary>
+/// 마우스 오른쪽 버튼을 놓는 이벤트를 처리하여 노드 간 부모-자식 관계를 설정합니다.
+/// </summary>
+/// <param name="currentEvent">현재 마우스 이벤트 정보</param>
+private void ProcessMouseUpEvent(Event currentEvent)
+{
+    // 오른쪽 마우스 버튼(1번)이고, 연결선을 그리기 시작한 노드가 있을 경우
+    if (currentEvent.button == 1 && currentRoomNodeGraph.roomNodeToDrawLineFrom != null)
+    {
+        // 마우스 위치에 있는 노드를 확인
+        RoomNodeSO roomNode = IsMouseOverRoomNode(currentEvent);
+
+        // 마우스가 노드 위에 있으면
+        if (roomNode != null)
+        {
+            // 시작 노드에 대상 노드를 자식으로 추가
+            if (currentRoomNodeGraph.roomNodeToDrawLineFrom.AddChildRoomNodeIDToRoomNode(roomNode.id))
+            {
+                // 대상 노드에 시작 노드를 부모로 추가
+                roomNode.AddParentRoomNodeIDToRoomNode(currentRoomNodeGraph.roomNodeToDrawLineFrom.id);
+            }
+        }
+
+        // 드래그 상태를 초기화 (연결선 그리기 종료)
+        ClearLineDrag();
+    }
+}
+```
+
+```csharp
+오른쪽 마우스 버튼을 놓을 때, 드래그 대상 노드가 있으면 부모-자식 관계 설정.
+
+시작 노드에 자식 ID 추가, 대상 노드에 부모 ID 추가.
+```
+
+### DrawRoomConnections()
+
+```csharp
+/// <summary>
+/// 모든 방 노드의 부모-자식 관계를 순회하여 연결선과 화살표를 그립니다.
+/// </summary>
+private void DrawRoomConnections()
+{
+    // 현재 그래프의 모든 노드를 순회
+    foreach (RoomNodeSO roomNode in currentRoomNodeGraph.roomNodeList)
+    {
+        // 노드에 자식 노드 ID가 하나 이상 있는 경우
+        if (roomNode.childRoomNodeIDList.Count > 0)
+        {
+            // 각 자식 노드 ID를 순회
+            foreach (string childRoomNodeID in roomNode.childRoomNodeIDList)
+            {
+                // 딕셔너리에 자식 노드 ID가 존재하는지 확인
+                if (currentRoomNodeGraph.roomNodeDictionary.ContainsKey(childRoomNodeID))
+                {
+                    // 부모 노드와 자식 노드 간 연결선을 그림
+                    DrawConnectionLine(roomNode, currentRoomNodeGraph.roomNodeDictionary[childRoomNodeID]);
+
+                    // GUI 상태가 변경되었음을 표시 (화면 갱신 요청)
+                    GUI.changed = true;
+                }
+            }
+        }
+    }
+}
+```
+
+```csharp
+노드 리스트를 순회하며 자식 노드가 있으면 연결선 그림.
+```
+
+### DrawConnectionLine()
+
+```csharp
+/// <summary>
+/// 부모 노드와 자식 노드 간 연결선과 방향성 화살표를 그립니다.
+/// </summary>
+/// <param name="parentRoomNode">부모 노드</param>
+/// <param name="childRoomNode">자식 노드</param>
+private void DrawConnectionLine(RoomNodeSO parentRoomNode, RoomNodeSO childRoomNode)
+{
+    // 부모 노드의 중심 위치 (연결선 시작점)
+    Vector2 startPosition = parentRoomNode.rect.center;
+
+    // 자식 노드의 중심 위치 (연결선 끝점)
+    Vector2 endPosition = childRoomNode.rect.center;
+
+    // 시작점과 끝점의 중간점 계산
+    Vector2 midPosition = (endPosition + startPosition) / 2f;
+
+    // 연결선의 방향 벡터 (끝점 - 시작점)
+    Vector2 direction = endPosition - startPosition;
+
+    // 화살표 꼬리 첫 번째 점: 중간점에서 방향 벡터에 수직인 벡터를 빼서 계산
+    Vector2 arrowTailPoint1 = midPosition - new Vector2(-direction.y, direction.x).normalized * connectingLineArrowSize;
+
+    // 화살표 꼬리 두 번째 점: 중간점에서 방향 벡터에 수직인 벡터를 더해 계산
+    Vector2 arrowTailPoint2 = midPosition + new Vector2(-direction.y, direction.x).normalized * connectingLineArrowSize;
+
+    // 화살표 머리 점: 중간점에서 방향 벡터를 따라 이동
+    Vector2 arrowHeadPoint = midPosition + direction.normalized * connectingLineArrowSize;
+
+    // 화살표 첫 번째 선분: 머리에서 꼬리 첫 번째 점까지 (Bezier 곡선으로 직선 그림)
+    Handles.DrawBezier(arrowHeadPoint, arrowTailPoint1, arrowHeadPoint, arrowTailPoint1, Color.white, null, connectingLineWidth);
+
+    // 화살표 두 번째 선분: 머리에서 꼬리 두 번째 점까지
+    Handles.DrawBezier(arrowHeadPoint, arrowTailPoint2, arrowHeadPoint, arrowTailPoint2, Color.white, null, connectingLineWidth);
+
+    // 메인 연결선: 시작점에서 끝점까지 직선
+    Handles.DrawBezier(startPosition, endPosition, startPosition, endPosition, Color.white, null, connectingLineWidth);
+
+    // GUI 상태가 변경되었음을 표시 (화면 갱신 요청)
+    GUI.changed = true;
+}
+```
+
+```csharp
+부모-자식 노드 간 연결선과 화살표를 그림.
+
+화살표 계산:
+
+		1. 중간점: (startPosition + endPosition) / 2
+
+		2. 방향 벡터: endPosition - startPosition
+
+		3. 수직 벡터: (-direction.y, direction.x).normalized로 계산.
+
+		4. 화살표 꼬리: 중간점 ± 수직 벡터 * connectingLineArrowSize.
+
+		5. 화살표 머리: 중간점 + 방향 벡터 * connectingLineArrowSize.
+
+		6. Handles.DrawBezier로 선과 화살표 렌더링.
+```
+
+## 3. 동작 흐름
+
+```csharp
+1. 노드 생성:
+
+		사용자가 마우스로 노드 생성 요청 → CreateRoomNode 호출.
+
+		RoomNodeSO 인스턴스 생성, 그래프의 roomNodeList에 추가, 에셋 저장.
+
+		OnValidate로 딕셔너리 갱신.
+
+2. 연결선 드래그:
+
+		오른쪽 마우스 버튼으로 노드에서 드래그 시작 → roomNodeToDrawLineFrom 설정.
+
+		드래그 중 DrawDraggedLine으로 임시 선 렌더링.
+
+3. 부모-자식 관계 설정:
+
+		드래그 후 마우스 놓기 → ProcessMouseUpEvent 호출.
+
+		대상 노드가 유효하면:
+
+				시작 노드에서 AddChildRoomNodeIDToRoomNode 호출하여 자식 ID 추가.
+
+				대상 노드에서 AddParentRoomNodeIDToRoomNode 호출하여 부모 ID 추가.
+
+4. 연결선 렌더링:
+
+		DrawRoomConnections로 노드 리스트 순회.
+
+		자식 ID가 있으면 DrawConnectionLine 호출하여 선과 화살표 그림.
+
+5. 딕셔너리 관리:
+
+		노드 추가/변경 시 LoadRoomNodeDictionary로 딕셔너리 갱신.
+
+		roomNodeDictionary로 ID 기반 빠른 노드 접근.
+```
+
+## **4. 시연 및 결과**
+
+```csharp
+강의 시연:
+
+		새 RoomNodeGraph 생성, 큰 방과 복도 노드 추가.
+
+		큰 방에서 복도로 드래그 → 연결선과 화살표 렌더링.
+
+		인스펙터에서 확인:
+
+				큰 방의 childRoomNodeIDList에 복도 ID 추가.
+
+				복도의 parentRoomNodeIDList에 큰 방 ID 추가.
+
+결과:
+
+		노드 생성, 관계 설정, 연결선 렌더링 성공.
+
+		화살표로 부모(큰 방) → 자식(복도) 방향성 명확히 표시.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380411/notion-blog/_/2D_/_5_Dungeon_Room_Editor_-_2_-/image.png)
+
+```csharp
+노드를 연결 하니까 자식 리스트에 추가됨
+
+Small Room -> Medium Room 노드를 연결하니까 자식 리스트에 추가되었다
+
+반대로 미디엄 룸에서 스몰룸으로 연결하면 부모 리스트로 추가된다
+
+쉽게 설명하면    오른쪽 노드의 자식으로 등록  ->  왼쪽 노드의 부모로 등록
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380410/notion-blog/_/2D_/_5_Dungeon_Room_Editor_-_2_-/image_1.png)
+
+```csharp
+서로 연결이 가능해졌다 자동으로 부모 자식 관계도 생겨난다
+
+( 현재는 두개의 부모도 연결 가능하게 해놨지만 이번 우리 게임에서는 이걸 막을 예정이다 )
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380410/notion-blog/_/2D_/_5_Dungeon_Room_Editor_-_2_-/image_2.png)
+
+```csharp
+화살표를 그리는 공식 ( 크게 필요는 없다 )
+
+방향성을 나타내는 "V"자 모양.
+
+중간점(midPosition)에서 방향 벡터와 수직 벡터를 사용해 세 점 계산.
+
+머리 점은 자식 방향, 꼬리 점은 좌우로 퍼짐.
+
+꼬리 점:
+
+		arrowTailPoint1 = midPosition - 수직 벡터 * 크기: 중간점에서 수직 방향으로 이동.
+
+		arrowTailPoint2 = midPosition + 수직 벡터 * 크기: 반대 방향 이동.
+
+머리 점:
+
+		arrowHeadPoint = midPosition + direction.normalized * 크기: 중간점에서 방향 벡터를 따라 이동.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380410/notion-blog/_/2D_/_5_Dungeon_Room_Editor_-_2_-/image_3.png)
+
+```csharp
+노드에 화살표 방향이 생겼다.
+```
+
+# { Room Node Graph Editor 개선 ( 선택된 노드에 GUI 스타일 추가, 입구 노드(Entrance Node) 자동 생성 }
+
+## 강의 내용 정리
+
+```csharp
+이 강의에서는 Unity에서 Room Node Graph Editor를 개선하여 다음과 같은 기능을 추가합니다:
+
+1. 첫 번째 방 노드 생성 시 입구 노드(Entrance Node) 자동 생성
+
+2. 연결된 노드 또는 입구 노드를 잠금(Lock) 처리
+
+3. 선택된 노드에 적용할 새로운 GUI 스타일 추가
+
+4. 노드 선택/해제 기능 및 Inspector 선택 변경 처리 구현
+```
+
+## 1. 입구 노드(Entrance Node) 자동 생성
+
+```csharp
+목표
+
+		첫 번째 방 노드가 생성될 때, 자동으로 입구 노드(isEntrance)를 고정된 위치(200, 200)에 생성.
+
+		이후 요청된 위치에 기본 노드(isNone)를 생성.
+
+구현
+
+		위치: RoomNodeGraphEditor.CreateRoomNode
+
+
+		로직:
+
+				currentRoomNodeGraph.roomNodeList.Count == 0을 확인하여 노드 리스트가 비어 있는지 체크.
+
+				비어 있다면, 입구 노드를 (200, 200)에 생성.
+
+				이후 기본 노드 생성 로직을 이어서 실행.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380410/notion-blog/_/2D_/_5_Dungeon_Room_Editor_-_2_-/image_4.png)
+
+```csharp
+처음에는 입구가 생기고 연결뒤에는 드롭 박스가 사라진다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380411/notion-blog/_/2D_/_5_Dungeon_Room_Editor_-_2_-/image_5.png)
+
+```csharp
+노드 클릭하면 주변에 색이 들어오게 변경
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380411/notion-blog/_/2D_/_5_Dungeon_Room_Editor_-_2_-/image_6.png)
+
+```csharp
+프로젝트 에셋에
+```

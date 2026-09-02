@@ -1,0 +1,3095 @@
+---
+title: '섹션 5: Shooter Sam - 5'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 총을 손에 붙이기 }
+
+## 🎯 이번에 할 것
+
+바닥에 있던 총을 **캐릭터 손에 딱 붙여서** 들고 있게 만듭니다!
+
+```
+Before: 총이 바닥에 떨어져 있음 (0, 0, 0)
+After: 총이 손에 딱 붙어서 따라다님 ✨
+```
+
+---
+
+## 🧩 전체 과정 (큰 그림)
+
+```
+1. 캐릭터 메시의 기본 무기 숨기기
+2. 스켈레톤에 소켓(Socket) 만들기
+3. 총을 소켓에 붙이기
+4. 위치 미세 조정
+```
+
+**비유:**
+
+- 소켓 = 손에 붙은 자석
+- 총 = 자석에 달라붙는 물건
+- 손이 움직이면 총도 자동으로 따라감!
+
+---
+
+## 📝 Step 1: 기본 무기 숨기기
+
+### 문제 상황
+
+캐릭터 메시에 이미 총이 그려져 있어요!
+
+```
+캐릭터 메시
+  └─ weapon_r (무기 뼈대)
+      └─ 그려진 총 👈 이게 보임
+```
+
+우리가 만든 총을 들게 하려면 **이 기본 무기를 숨겨야** 합니다.
+
+---
+
+### 1-1: 무기 뼈대 찾기
+
+**Content Browser:**
+
+```
+Paragon 폴더
+  → Heroes
+  → Wraith
+  → Wraith_Skeleton (스켈레톤 더블클릭)
+```
+
+**Skeleton Tree 패널에서:**
+
+```
+스크롤 다운
+  → "weapon_r" 찾기
+  → 클릭하면 뷰포트에서 위치 표시됨
+```
+
+**weapon_r = 무기 오른손 (weapon right)**
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380658/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_5/image.png)
+
+---
+
+### 1-2: C++ 코드로 숨기기
+
+**ShooterSamCharacter.cpp - BeginPlay:**
+
+```cpp
+void AShooterSamCharacter::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // ===== 기본 무기 숨기기 =====
+    GetMesh()->HideBoneByName("weapon_r", EPhysBodyOp::PBO_None);
+
+    // ... 총 생성 코드 ...
+}
+```
+
+**코드 설명:**
+
+```cpp
+GetMesh()
+```
+
+- 캐릭터의 스켈레탈 메시 가져오기
+- 캐릭터 클래스가 제공하는 헬퍼 함수
+
+```cpp
+->HideBoneByName("weapon_r", EPhysBodyOp::PBO_None)
+```
+
+- `HideBoneByName` = 특정 뼈대를 숨기는 함수
+- `"weapon_r"` = 숨길 뼈대 이름
+- `EPhysBodyOp::PBO_None` = 물리 옵션 (지금은 없음)
+
+---
+
+### 보너스: Enum(열거형) 설명
+
+**EPhysBodyOp가 뭔가요?**
+
+```cpp
+enum class EPhysBodyOp
+{
+    PBO_None = 0,      // 아무것도 안 함
+    PBO_Term = 1,      // 종료
+    PBO_MAX = 2        // 최대값
+};
+```
+
+**Enum = 미리 정의된 선택지들**
+
+**비유:**
+
+```
+메뉴판 같은 것:
+- 작은 사이즈
+- 중간 사이즈
+- 큰 사이즈
+
+대신 0, 1, 2 숫자 쓰는 것보다 의미가 명확!
+```
+
+**사용 방법:**
+
+```cpp
+// Enum 타입::값
+EPhysBodyOp::PBO_None
+
+// 범위 확인 연산자 (::) 사용
+```
+
+**다른 예시:**
+
+```cpp
+ETriggerEvent::Started    // 입력 시작
+ETriggerEvent::Triggered  // 입력 중
+ETriggerEvent::Completed  // 입력 끝
+```
+
+---
+
+## 🔌 Step 2: 소켓(Socket) 만들기
+
+### Socket이 뭔가요?
+
+**Socket = 뼈대에 물건을 붙일 수 있는 지점**
+
+```
+손 뼈대 (weapon_r)
+  └─ Socket (WeaponSocket) 👈 여기에 총 붙일 거예요
+      └─ 총이 딱 달라붙음!
+```
+
+**비유:**
+
+- 뼈대 = 막대기
+- 소켓 = 막대기에 붙은 자석
+- 총 = 자석에 달라붙는 물건
+
+손이 움직이면 → 뼈대 움직임 → 소켓 움직임 → 총 따라감!
+
+---
+
+### 2-1: 소켓 생성
+
+**Wraith_Skeleton 열어서:**
+
+```
+1. Skeleton Tree에서 "weapon_r" 찾기
+2. 우클릭 → "Add Socket" 클릭
+3. 새로 생긴 소켓 선택
+4. 우클릭 → "Rename Socket"
+5. 이름: "WeaponSocket"
+6. 저장!
+```
+
+**완성된 구조:**
+
+```
+Skeleton Tree
+  └─ weapon_r (뼈대)
+      └─ WeaponSocket (소켓) ✨
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380657/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_5/image_1.png)
+
+---
+
+### Socket 이름 짓기 팁
+
+**CamelCase 사용:**
+
+```
+✅ WeaponSocket
+✅ RightHandSocket
+✅ BackpackSocket
+
+❌ weapon_socket (언더스코어 말고)
+❌ weaponsocket (대문자 구분 없으면 읽기 어려움)
+```
+
+---
+
+## 🔗 Step 3: 총을 소켓에 붙이기
+
+### 3-1: AttachToComponent 사용
+
+**ShooterSamCharacter.cpp - BeginPlay:**
+
+```cpp
+void AShooterSamCharacter::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // 기본 무기 숨기기
+    GetMesh()->HideBoneByName("weapon_r", EPhysBodyOp::PBO_None);
+
+    // 총 생성
+    Gun = GetWorld()->SpawnActor<AGun>(GunClass);
+
+    if (Gun)
+    {
+        Gun->SetOwner(this);
+
+        // ===== 총을 손에 붙이기! =====
+        Gun->AttachToComponent(
+            GetMesh(),                                    // 어디에?
+            FAttachmentTransformRules::KeepRelativeTransform,  // 어떻게?
+            TEXT("WeaponSocket")                          // 어느 소켓?
+        );
+    }
+}
+```
+
+---
+
+### 3-2: 코드 완벽 이해하기
+
+**파라미터 1: GetMesh()**
+
+```cpp
+GetMesh()
+```
+
+- 캐릭터의 스켈레탈 메시
+- 여기에 소켓이 있음
+
+---
+
+**파라미터 2: FAttachmentTransformRules**
+
+```cpp
+FAttachmentTransformRules::KeepRelativeTransform
+```
+
+**Transform Rules = 붙일 때 위치/회전 규칙**
+
+**종류:**
+
+**1. KeepRelativeTransform** (우리가 사용)
+
+```
+로컬 좌표 유지
+총의 (0, 0, 0) → 소켓의 (0, 0, 0)
+
+비유:
+손에 딱 맞춰서 붙이기
+```
+
+**2. KeepWorldTransform**
+
+```
+월드 좌표 유지
+총이 있던 월드 위치 그대로
+
+비유:
+총이 바닥에 있었으면 바닥에 그대로
+(손에 안 붙음!)
+```
+
+**3. SnapToTargetXXX**
+
+```
+대상에 딱 맞춰서 스냅
+크기도 조정
+```
+
+**우리가 KeepRelativeTransform 쓰는 이유:**
+
+```
+총을 (0, 0, 0) 로컬 위치에 배치
+→ 소켓 위치에 딱 맞춰짐
+→ 손과 함께 움직임 ✨
+```
+
+---
+
+**파라미터 3: 소켓 이름**
+
+```cpp
+TEXT("WeaponSocket")
+```
+
+- 방금 만든 소켓 이름
+- 정확히 일치해야 함!
+
+---
+
+### SetupAttachment vs AttachToComponent
+
+**SetupAttachment (생성자에서)**
+
+```cpp
+// 컴포넌트 생성할 때
+Mesh->SetupAttachment(SceneRoot);
+```
+
+- 블루프린트가 만들어질 때 연결
+- 정적인 구조
+
+**AttachToComponent (런타임에서)**
+
+```cpp
+// 게임 중에 붙이기
+Gun->AttachToComponent(GetMesh(), ...);
+```
+
+- 게임이 실행되는 중에 연결
+- 동적으로 붙였다 뗐다 가능
+
+**비유:**
+
+- SetupAttachment = 공장에서 조립
+- AttachToComponent = 사용자가 장착
+
+---
+
+## 🎨 Step 4: 위치 미세 조정
+
+### 문제: 총이 정확히 안 맞아요!
+
+게임 실행 후 F8 눌러보면:
+
+```
+총 손잡이가 손에서 살짝 떨어져 있음 🤔
+```
+
+**왜 그런가요?**
+
+- 소켓은 weapon_r 뼈대 중심에 있음
+- 총의 중심도 (0, 0, 0)
+- 하지만 총 손잡이는 중심에서 떨어진 곳에 있음!
+
+---
+
+### 4-1: 게임 중에 위치 조정
+
+**Play 버튼 → F8로 벗어나기**
+
+```
+1. World Outliner에서 "Rifle" 찾기
+2. 선택
+3. Details → Mesh 컴포넌트 선택
+4. Location 값 조정:
+   - Position Snap 끄기
+   - W키 눌러서 위치 툴
+   - 손에 맞게 드래그
+5. 최종 위치: 약 (-2, -11, 0)
+6. Location 우클릭 → Copy
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380658/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_5/image_2.png)
+
+---
+
+### 4-2: 블루프린트에 영구 저장
+
+**게임 종료하면 위치가 리셋됩니다!**
+
+**BP_Rifle 열기:**
+
+```
+1. Components → Mesh 선택
+2. Details → Transform → Location
+3. 복사한 값 붙여넣기
+4. Compile & Save
+```
+
+**이제 완성!** ✅
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380658/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_5/image_3.png)
+
+---
+
+### SceneRoot를 만든 이유!
+
+**이제 이해되죠?**
+
+```
+SceneRoot (소켓에 붙음, 위치 고정)
+  └─ Mesh (위치 조정 가능!)
+```
+
+**만약 Mesh가 바로 루트였다면:**
+
+```
+Mesh (소켓에 붙음)
+  └─ 위치 조정하면 소켓에서 떨어짐 ❌
+```
+
+**SceneRoot 덕분에:**
+
+```
+SceneRoot는 소켓에 딱 붙어있고
+Mesh만 상대적으로 이동 가능! ✅
+```
+
+---
+
+## 📚 핵심 개념 정리
+
+### Socket (소켓)
+
+뼈대에 물건을 붙이는 지점
+
+```
+weapon_r (뼈대)
+  └─ WeaponSocket (소켓)
+      └─ Gun (붙은 액터)
+```
+
+### HideBoneByName
+
+특정 뼈대를 안 보이게 만듦
+
+```cpp
+GetMesh()->HideBoneByName("weapon_r", EPhysBodyOp::PBO_None);
+```
+
+### AttachToComponent
+
+액터를 컴포넌트에 붙이기
+
+```cpp
+Actor->AttachToComponent(Target, Rules, SocketName);
+```
+
+### Enum (열거형)
+
+미리 정의된 선택지
+
+```cpp
+EPhysBodyOp::PBO_None
+ETriggerEvent::Started
+```
+
+### Transform Rules
+
+붙일 때 위치/회전 처리 방식
+
+```cpp
+KeepRelativeTransform   // 로컬 좌표 유지
+KeepWorldTransform      // 월드 좌표 유지
+SnapToTarget...         // 대상에 스냅
+```
+
+---
+
+## 🎯 전체 흐름 정리
+
+```
+[게임 시작부터 총 발사까지]
+
+1. BeginPlay 실행
+    ↓
+2. 기본 무기(weapon_r) 숨기기
+    ↓
+3. 새 총(Gun) 스폰
+    ↓
+4. 총의 주인 설정 (SetOwner)
+    ↓
+5. 총을 WeaponSocket에 붙이기
+    ↓
+6. Mesh 위치 오프셋 적용
+    ↓
+7. 총이 손에 딱 붙어있음!
+    ↓
+8. 플레이어 마우스 클릭
+    ↓
+9. Gun->PullTrigger() 호출
+    ↓
+10. "Bang!" 출력
+```
+
+---
+
+## 🚀 다음 단계
+
+**다음 강의에서:**
+
+1. **Line Trace (레이캐스트)**
+   - 총알이 날아가는 경로 계산
+   - 무엇을 맞췄는지 감지
+2. **총구 이펙트**
+   - 총을 쏠 때 불꽃 효과
+   - 사운드 재생
+3. **총알 궤적**
+   - 날아가는 총알 시각화
+   - 파티클 이펙트
+
+---
+
+## 💡 실전 팁
+
+### 다른 무기 추가하기
+
+**1단계: 소켓 재사용**
+
+```
+weapon_r → WeaponSocket
+  ├─ BP_Rifle (소총)
+  ├─ BP_Shotgun (샷건)
+  └─ BP_Sword (검)
+
+같은 소켓에 다른 무기 붙이면 됨!
+```
+
+**2단계: 위치 개별 조정**
+
+```
+BP_Rifle → Mesh Location: (-2, -11, 0)
+BP_Shotgun → Mesh Location: (-3, -8, 2)
+BP_Sword → Mesh Location: (0, -15, 5)
+
+무기마다 모양이 다르니 위치도 다름
+```
+
+---
+
+### 무기 교체 시스템
+
+```cpp
+void SwitchWeapon(TSubclassOf<AGun> NewGunClass)
+{
+    // 1. 기존 총 제거
+    if (Gun)
+    {
+        Gun->Destroy();
+    }
+
+    // 2. 새 총 생성
+    Gun = GetWorld()->SpawnActor<AGun>(NewGunClass);
+
+    // 3. 손에 붙이기
+    if (Gun)
+    {
+        Gun->SetOwner(this);
+        Gun->AttachToComponent(
+            GetMesh(),
+            FAttachmentTransformRules::KeepRelativeTransform,
+            TEXT("WeaponSocket")
+        );
+    }
+}
+```
+
+---
+
+### 양손 무기
+
+```
+weapon_l (왼손 소켓)
+weapon_r (오른손 소켓)
+
+이도류 캐릭터:
+  ├─ 왼손에 검
+  └─ 오른손에 검
+```
+
+---
+
+## 🐛 문제 해결
+
+### 총이 손에 안 붙어요!
+
+**체크리스트:**
+
+1. **소켓 이름 확인**
+
+   ```
+   스켈레톤: "WeaponSocket"
+   코드: TEXT("WeaponSocket")
+   → 정확히 일치해야 함!
+   ```
+
+2. **소켓이 제대로 만들어졌나요?**
+
+   ```
+   Skeleton Tree에서 확인
+   weapon_r → WeaponSocket 있나요?
+   ```
+
+3. **스켈레톤 저장했나요?**
+
+   ```
+   소켓 만든 후 Save 버튼!
+   ```
+
+4. **AttachToComponent 호출했나요?**
+
+   ```cpp
+   Gun->AttachToComponent(...);
+   ```
+
+---
+
+### 총이 이상한 곳에 붙어요!
+
+**Transform Rules 확인:**
+
+```cpp
+// ✅ 올바른 방법
+KeepRelativeTransform
+
+// ❌ 잘못된 방법
+KeepWorldTransform  // 월드 좌표 유지하면 손에 안 붙음
+```
+
+---
+
+### 기본 무기가 안 사라져요!
+
+**뼈대 이름 확인:**
+
+```cpp
+// 대소문자 정확히!
+GetMesh()->HideBoneByName("weapon_r", ...);
+
+// ❌ 틀린 예
+"Weapon_R"  // 대문자
+"weapon_right"  // 다른 이름
+```
+
+---
+
+# { 플레이어 시점(Viewpoint) 구하기 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380658/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_5/image_4.png)
+
+## 🎯 이번에 할 것
+
+총을 쏠 때 **어디를 보고 있는지** 알아내는 방법을 배웁니다!
+
+```
+플레이어가 보는 방향
+    ↓
+카메라 시점
+    ↓
+총알이 날아갈 방향!
+```
+
+---
+
+## 🤔 왜 시점이 필요한가요?
+
+### 총 쏘기의 원리
+
+**두 가지 방법:**
+
+**방법 1: 실제 총알 발사 (Projectile)**
+
+```
+총 → 총알 오브젝트 생성 → 물리로 날아감
+```
+
+- 현실적이지만 느림
+- 총알이 너무 빨라서 어차피 안 보임
+- 불필요하게 복잡
+
+**방법 2: Line Trace (우리가 사용할 방법)** ✅
+
+```
+시작점 → 끝점까지 선 그리기 → 맞은 거 감지
+```
+
+- 빠르고 효율적
+- 총알이 빛의 속도로 이동
+- 대부분의 슈팅 게임이 사용
+
+**비유:**
+
+```
+방법 1 = 진짜 종이비행기 날리기
+방법 2 = 레이저 포인터 쏘기 (즉시 도달!)
+```
+
+---
+
+## 🎮 Line Trace의 시작점 선택
+
+### 두 가지 옵션
+
+**옵션 1: 총 끝에서 발사**
+
+```
+        카메라 (플레이어가 보는 시점)
+           ↑
+           |
+         캐릭터
+          / \
+         /총 \ ← 총 끝에서 발사
+        /     \
+       적
+```
+
+**문제점:**
+
+- 플레이어는 카메라로 보는데
+- 총은 다른 각도에 있음
+- 조준이 매우 어려움!
+
+**옵션 2: 카메라에서 발사** ✅
+
+```
+        카메라 (여기서 발사!)
+         ╲
+          ╲
+           ╲
+            ╲→ 적 (명중!)
+```
+
+**장점:**
+
+- 십자선과 정확히 일치
+- 조준이 쉬움
+- 게임이 훨씬 재밌음!
+
+**단점:**
+
+- 비현실적 (총에서 안 나감)
+- 하지만 아무도 모름 😎
+
+---
+
+### 실제 게임들도 이렇게 만듭니다!
+
+**대부분의 FPS/TPS 게임:**
+
+- Call of Duty
+- Fortnite
+- Apex Legends
+- 등등...
+
+**모두 카메라에서 Line Trace!**
+
+---
+
+## 📝 Step 1: Controller 변수 추가
+
+### Controller가 뭔가요?
+
+**Controller = 캐릭터를 조종하는 두뇌**
+
+```
+Controller
+    ↓
+  캐릭터
+    ↓
+  움직임/회전
+```
+
+**종류:**
+
+- **PlayerController**: 사람이 조종
+- **AIController**: 컴퓨터가 조종
+
+**왜 필요한가요?**
+
+```
+Controller가 카메라 시점 정보를 가지고 있음!
+→ Controller에게 물어봐야 함
+```
+
+---
+
+### 1-1: Gun 클래스에 Controller 변수 추가
+
+**Gun.h:**
+
+```cpp
+UCLASS()
+class SHOOTERSAM_API AGun : public AActor
+{
+    GENERATED_BODY()
+
+public:
+    // ... 기존 코드 ...
+
+    // ===== Controller 변수 추가 =====
+    AController* OwnerController;
+
+    void PullTrigger();
+};
+```
+
+**코드 설명:**
+
+```cpp
+AController* OwnerController;
+```
+
+- `AController*` = Controller 타입 포인터
+- `OwnerController` = 이 총의 주인 Controller
+- 나중에 시점 정보를 가져올 때 사용
+
+---
+
+## 🔗 Step 2: Controller 할당하기
+
+### 2-1: 캐릭터 BeginPlay에서 설정
+
+**ShooterSamCharacter.cpp - BeginPlay:**
+
+```cpp
+void AShooterSamCharacter::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // 기본 무기 숨기기
+    GetMesh()->HideBoneByName("weapon_r", EPhysBodyOp::PBO_None);
+
+    // 총 생성
+    Gun = GetWorld()->SpawnActor<AGun>(GunClass);
+
+    if (Gun)
+    {
+        Gun->SetOwner(this);
+
+        // ===== Controller 전달 =====
+        Gun->OwnerController = GetController();
+
+        Gun->AttachToComponent(
+            GetMesh(),
+            FAttachmentTransformRules::KeepRelativeTransform,
+            TEXT("WeaponSocket")
+        );
+    }
+}
+```
+
+**코드 설명:**
+
+```cpp
+Gun->OwnerController = GetController();
+```
+
+**GetController():**
+
+- 캐릭터 클래스가 제공하는 함수
+- 이 캐릭터를 조종하는 Controller 반환
+- 플레이어면 PlayerController
+- AI면 AIController
+
+**전체 의미:**
+
+```
+"총아, 너를 조종하는 Controller는 나(캐릭터)의 Controller야!"
+```
+
+---
+
+## 👁️ Step 3: 시점 가져오기
+
+### 3-1: GetPlayerViewPoint 함수
+
+**Gun.cpp - PullTrigger:**
+
+```cpp
+void AGun::PullTrigger()
+{
+    // Controller 있는지 확인
+    if (OwnerController)
+    {
+        // 시점 정보를 담을 변수들
+        FVector ViewpointLocation;
+        FRotator ViewpointRotation;
+
+        // Controller에게 시점 정보 요청!
+        OwnerController->GetPlayerViewPoint(
+            ViewpointLocation,    // 위치가 여기에 저장됨
+            ViewpointRotation     // 회전이 여기에 저장됨
+        );
+    }
+}
+```
+
+---
+
+### 코드 완벽 이해하기
+
+**Step 1: 변수 선언**
+
+```cpp
+FVector ViewpointLocation;
+FRotator ViewpointRotation;
+```
+
+**FVector = 3D 위치**
+
+```cpp
+FVector(X, Y, Z)
+예: (100, 200, 300)
+```
+
+**FRotator = 3D 회전**
+
+```cpp
+FRotator(Pitch, Yaw, Roll)
+- Pitch: 위/아래 (고개 끄덕임)
+- Yaw: 좌/우 (고개 좌우)
+- Roll: 기울기 (고개 갸우뚱)
+```
+
+---
+
+**Step 2: GetPlayerViewPoint 호출**
+
+```cpp
+OwnerController->GetPlayerViewPoint(ViewpointLocation, ViewpointRotation);
+```
+
+**이 함수의 특별한 점:**
+
+**참조(Reference) 매개변수 사용!**
+
+```cpp
+// 일반 함수:
+int GetNumber()
+{
+    return 5;  // 하나만 반환
+}
+
+// GetPlayerViewPoint:
+void GetPlayerViewPoint(FVector& Location, FRotator& Rotation)
+{
+    Location = 카메라위치;   // 두 개 다 수정!
+    Rotation = 카메라회전;
+}
+```
+
+**참조(&)의 의미:**
+
+```
+값 복사 X
+원본 변수 직접 수정 O
+```
+
+**비유:**
+
+```
+일반 매개변수 = 복사본 주기
+  함수(복사본);
+  복사본만 바뀜, 원본은 그대로
+
+참조 매개변수 = 원본 주기
+  함수(원본&);
+  원본이 바뀜!
+```
+
+**그림으로 이해:**
+
+```cpp
+FVector ViewpointLocation;  // 빈 상자
+FRotator ViewpointRotation; // 빈 상자
+
+GetPlayerViewPoint(ViewpointLocation, ViewpointRotation);
+// 함수가 상자 안을 채워줌!
+
+// 이제 사용 가능:
+ViewpointLocation   // (100, 50, 200)
+ViewpointRotation   // (0, 90, 0)
+```
+
+---
+
+### GetPlayerViewPoint의 동작
+
+**PlayerController인 경우:**
+
+```
+카메라 위치 반환
+→ 우리가 보는 화면의 시점
+```
+
+**AIController인 경우:**
+
+```
+캐릭터 눈(Eye Socket) 위치 반환
+→ 적이 보는 시점
+```
+
+**결과:**
+
+```
+플레이어든 AI든 상관없이 작동!
+→ 적도 나중에 총 쏠 수 있음
+```
+
+---
+
+## 🎨 Step 4: 시점 시각화하기 (디버그)
+
+### 4-1: DrawDebugCamera 사용
+
+**Gun.cpp - PullTrigger:**
+
+```cpp
+void AGun::PullTrigger()
+{
+    if (OwnerController)
+    {
+        FVector ViewpointLocation;
+        FRotator ViewpointRotation;
+
+        OwnerController->GetPlayerViewPoint(
+            ViewpointLocation,
+            ViewpointRotation
+        );
+
+        // ===== 시점 시각화 =====
+        DrawDebugCamera(
+            GetWorld(),              // 어느 월드에?
+            ViewpointLocation,       // 어디에?
+            ViewpointRotation,       // 어떤 방향?
+            90,                      // FOV (시야각)
+            2,                       // 크기
+            FColor::Red,             // 색상
+            true                     // 계속 보이기
+        );
+    }
+}
+```
+
+---
+
+### 코드 파라미터 설명
+
+**1. GetWorld()**
+
+```cpp
+GetWorld()
+```
+
+- 현재 게임 월드
+- 어디에 그릴지
+
+**2. ViewpointLocation**
+
+```cpp
+ViewpointLocation
+```
+
+- 카메라 위치
+- 어디에 그릴지
+
+**3. ViewpointRotation**
+
+```cpp
+ViewpointRotation
+```
+
+- 카메라 방향
+- 어느 방향 보는지
+
+**4. FOV (Field of View)**
+
+```cpp
+90
+```
+
+- 시야각 (도 단위)
+- 90도 = 일반적인 시야
+
+**5. Scale**
+
+```cpp
+2
+```
+
+- 카메라 모양 크기
+- 기본값(1)은 너무 작아서 2로
+
+**6. Color**
+
+```cpp
+FColor::Red
+```
+
+- 빨간색
+- 잘 보이게!
+
+**7. bPersistentLines**
+
+```cpp
+true
+```
+
+- 계속 보이기
+- false면 1프레임만 보임
+
+---
+
+## ✅ 테스트하기
+
+### 1. 컴파일
+
+```
+Visual Studio: Ctrl + Shift + B
+```
+
+### 2. Play 버튼
+
+### 3. 마우스 왼쪽 클릭!
+
+### 4. 결과 확인
+
+**빨간 카메라 모양이 보이나요?** 🎉
+
+```
+        📹 ← 빨간 카메라
+       / \
+      /   \
+   십자선 중앙!
+```
+
+---
+
+### 관찰할 점
+
+**1. 카메라가 십자선 중앙에!**
+
+```
+십자선 = 시점 표시
+카메라 = 실제 시점
+→ 정확히 일치!
+```
+
+**2. 움직여도 따라옴**
+
+```
+좌우 보기 → 카메라 회전
+위아래 보기 → 카메라 기울임
+```
+
+**3. 가끔 약간 어긋남**
+
+```
+이유: 스프링 암의 카메라 지연
+→ 조금 기다리면 정확히 맞음
+→ 걱정 마세요!
+```
+
+---
+
+## 📚 핵심 개념 정리
+
+### Controller
+
+캐릭터를 조종하는 두뇌
+
+```cpp
+PlayerController  // 플레이어 조종
+AIController      // AI 조종
+```
+
+### GetController()
+
+캐릭터의 Controller 가져오기
+
+```cpp
+AController* MyController = GetController();
+```
+
+### GetPlayerViewPoint
+
+카메라 시점 정보 가져오기
+
+```cpp
+FVector Location;
+FRotator Rotation;
+GetPlayerViewPoint(Location, Rotation);
+```
+
+### 참조 매개변수 (&)
+
+원본 변수를 직접 수정
+
+```cpp
+void Function(Type& Variable)
+{
+    Variable = 새값;  // 원본이 바뀜!
+}
+```
+
+### DrawDebugCamera
+
+카메라 모양 그리기 (디버그용)
+
+```cpp
+DrawDebugCamera(World, Location, Rotation, FOV, Scale, Color, Persistent);
+```
+
+---
+
+## 🎯 전체 흐름 정리
+
+```
+[마우스 클릭부터 시점 시각화까지]
+
+1. 플레이어 마우스 클릭
+    ↓
+2. Shoot() 함수 호출
+    ↓
+3. Gun->PullTrigger() 호출
+    ↓
+4. OwnerController 확인
+    ↓
+5. GetPlayerViewPoint 호출
+    ↓
+6. ViewpointLocation, ViewpointRotation 채워짐
+    ↓
+7. DrawDebugCamera로 시각화
+    ↓
+8. 빨간 카메라 보임!
+```
+
+---
+
+## 🚀 다음 단계
+
+**다음 강의에서:**
+
+1. **Line Trace 구현**
+
+   ```cpp
+   // 시작점: ViewpointLocation
+   // 방향: ViewpointRotation
+   // 끝점: 시작점 + 방향 * 거리
+   ```
+
+2. **충돌 감지**
+
+   ```
+   Line Trace → 적 맞음?
+   → 데미지 적용!
+   ```
+
+3. **총구 이펙트**
+
+   ```
+   발사 시:
+   - 불꽃 효과
+   - 사운드
+   - 카메라 흔들림
+   ```
+
+---
+
+## 💡 실전 팁
+
+### PlayerController vs AIController
+
+```cpp
+// 플레이어인지 확인
+APlayerController* PC = Cast<APlayerController>(OwnerController);
+if (PC)
+{
+    // 플레이어 전용 로직
+    // 예: 카메라 흔들림
+}
+
+// AI인지 확인
+AAIController* AI = Cast<AAIController>(OwnerController);
+if (AI)
+{
+    // AI 전용 로직
+    // 예: 조준 보정
+}
+```
+
+---
+
+### 디버그 그리기 함수들
+
+```cpp
+// 선 그리기
+DrawDebugLine(World, Start, End, Color, Persistent);
+
+// 구 그리기
+DrawDebugSphere(World, Location, Radius, Segments, Color, Persistent);
+
+// 박스 그리기
+DrawDebugBox(World, Location, Extent, Color, Persistent);
+
+// 화살표 그리기
+DrawDebugDirectionalArrow(World, Start, End, Size, Color, Persistent);
+
+// 카메라 그리기 (우리가 사용)
+DrawDebugCamera(World, Location, Rotation, FOV, Scale, Color, Persistent);
+```
+
+**유용한 디버그 팁:**
+
+- 개발 중에는 계속 켜두기
+- 릴리즈 빌드에서는 자동으로 제거됨
+- #if WITH_EDITOR로 감싸면 에디터에서만
+
+---
+
+## 🐛 문제 해결
+
+### 카메라가 안 보여요!
+
+**체크리스트:**
+
+1. **OwnerController가 null인가요?**
+
+   ```cpp
+   if (OwnerController)
+   {
+       UE_LOG(LogTemp, Warning, TEXT("Controller OK!"));
+   }
+   else
+   {
+       UE_LOG(LogTemp, Error, TEXT("Controller NULL!"));
+   }
+   ```
+
+2. **GetController() 호출했나요?**
+
+   ```cpp
+   // BeginPlay에서
+   Gun->OwnerController = GetController();
+   ```
+
+3. **DrawDebugCamera include 했나요?**
+
+   ```cpp
+   #include "DrawDebugHelpers.h"
+   ```
+
+---
+
+### 카메라가 이상한 곳에 그려져요!
+
+**Spring Arm 지연 때문일 수 있습니다:**
+
+```
+해결법:
+1. 조금 기다린 후 쏘기
+2. 또는 Spring Arm 설정:
+   - Camera Lag Speed 높이기
+   - Enable Camera Lag 끄기
+```
+
+---
+
+### 참조 매개변수 이해 안 돼요!
+
+**쉬운 예시:**
+
+```cpp
+// 값 복사 (일반)
+void AddOne(int number)
+{
+    number = number + 1;  // 복사본만 바뀜
+}
+
+int x = 5;
+AddOne(x);
+// x는 여전히 5
+
+// 참조 (원본 수정)
+void AddOne(int& number)  // & 주목!
+{
+    number = number + 1;  // 원본이 바뀜!
+}
+
+int x = 5;
+AddOne(x);
+// x는 이제 6
+```
+
+**GetPlayerViewPoint도 마찬가지:**
+
+```cpp
+FVector Location;  // 빈 변수
+
+// Location의 원본을 함수에 전달
+GetPlayerViewPoint(Location, Rotation);
+
+// 함수가 Location 안을 채움!
+// Location은 이제 카메라 위치를 담고 있음
+```
+
+---
+
+## 🎓 보너스: Line Trace 미리보기
+
+**다음 강의에서 할 것:**
+
+```cpp
+void AGun::PullTrigger()
+{
+    if (OwnerController)
+    {
+        FVector ViewpointLocation;
+        FRotator ViewpointRotation;
+        OwnerController->GetPlayerViewPoint(ViewpointLocation, ViewpointRotation);
+
+        // 끝점 계산
+        FVector End = ViewpointLocation + ViewpointRotation.Vector() * 10000;
+
+        // Line Trace 실행
+        FHitResult Hit;
+        bool bHit = GetWorld()->LineTraceSingleByChannel(
+            Hit,
+            ViewpointLocation,  // 시작
+            End,                // 끝
+            ECollisionChannel::ECC_GameTraceChannel1
+        );
+
+        if (bHit)
+        {
+            // 뭔가 맞음!
+            AActor* HitActor = Hit.GetActor();
+            // 데미지 적용...
+        }
+    }
+}
+```
+
+---
+
+# { Line Trace로 총알 쏘기 }
+
+## 🎯 이번에 할 것
+
+카메라 시점에서 **Line Trace (선 추적)** 를 쏴서 무엇을 맞췄는지 감지합니다!
+
+```
+카메라 시점
+    ↓
+Line Trace 발사 (빛의 속도!)
+    ↓
+뭔가 맞음?
+    ↓
+빨간 구 표시!
+```
+
+---
+
+## 🤔 Line Trace가 뭔가요?
+
+### Line Trace = 보이지 않는 레이저
+
+**개념:**
+
+```
+시작점 ━━━━━━━━━━━━━━→ 끝점
+        (보이지 않는 선)
+
+선이 뭔가 맞으면?
+→ 충돌 정보 반환!
+```
+
+**비유:**
+
+```
+레이저 포인터를 쏘는 것과 같음
+- 즉시 도달 (빛의 속도)
+- 중간 과정 없음
+- 맞은 곳 감지
+```
+
+---
+
+### Shape Trace vs Line Trace
+
+**Shape Trace (이전에 배운 것):**
+
+```
+     ●  ← 구 모양이 날아감
+    ◯
+   ◯
+  ◯
+ ●
+```
+
+**Line Trace (이번에 배울 것):**
+
+```
+━━━━━━━━━━→  ← 선이 즉시 도달
+```
+
+**차이점:**
+
+- Shape Trace: 모양이 있음, 두께가 있음
+- Line Trace: 선만, 두께 없음, 더 빠름
+
+---
+
+## 📐 Line Trace의 구성 요소
+
+### 필요한 것들
+
+```
+1. 시작점 (Start)
+   → ViewpointLocation (카메라 위치)
+
+2. 끝점 (End)
+   → 시작점 + 방향 × 거리
+
+3. 추적 채널 (Trace Channel)
+   → 어떤 물체를 감지할지
+
+4. 무시 목록 (Ignore List)
+   → 무시할 액터들
+```
+
+---
+
+## 🎬 Step 1: Trace Channel 만들기
+
+### Trace Channel이 뭔가요?
+
+**Trace Channel = 충돌 감지 레이어**
+
+```
+Bullet 채널
+  ├─ 벽: 막음 ✅
+  ├─ 캐릭터: 막음 ✅
+  ├─ 트리거: 무시 ❌
+  └─ UI: 무시 ❌
+```
+
+**비유:**
+
+```
+채널 = 무전기 주파수
+- 특정 주파수로 신호 보냄
+- 받을 수 있는 것만 반응
+```
+
+---
+
+### 1-1: Trace Channel 생성
+
+**언리얼 에디터:**
+
+```
+1. Edit → Project Settings
+2. Engine → Collision
+3. Trace Channels 섹션
+4. "New Trace Channel" 클릭
+5. Name: "Bullet"
+6. Default Response: "Block" (막기)
+7. Accept
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380658/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_5/image_5.png)
+
+---
+
+### 1-2: Preset 설정
+
+**Collision Presets 섹션에서 각 타입 설정:**
+
+**차단할 것 (Block):**
+
+```
+✅ BlockAll
+✅ PhysicsActor
+✅ Destructible
+✅ InvisibleWall (보이지 않지만 막아야 함!)
+✅ Pawn
+
+```
+
+**무시할 것 (Ignore):**
+
+```
+❌ NoCollision
+❌ OverlapAll
+❌ Spectator (관전자)
+❌ CharacterMesh (캐릭터 메시)
+❌ Trigger (트리거)
+❌ UI
+
+```
+
+**왜 이렇게 설정하나요?**
+
+```
+벽/캐릭터 = 총알 막아야 함
+트리거/UI = 총알이 통과해야 함
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380657/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_5/image_6.png)
+
+---
+
+### 1-3: Config 파일에서 확인
+
+**프로젝트 폴더:**
+
+```
+Config 폴더
+  └─ DefaultEngine.ini 열기
+  └─ "Bullet" 검색
+```
+
+**찾은 내용:**
+
+```
++DefaultChannelResponses=(Channel=ECC_GameTraceChannel2,DefaultResponse=ECR_Block,bTraceType=True,Name="Bullet")
+```
+
+**중요한 부분:**
+
+```
+ECC_GameTraceChannel2  👈 이 값을 코드에서 사용!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380658/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_5/image_7.png)
+
+---
+
+## 💻 Step 2: MaxRange 변수 추가
+
+### MaxRange가 뭔가요?
+
+**MaxRange = 총알이 날아가는 최대 거리**
+
+```
+카메라 ━━━━━━━━━━→ 10,000 거리
+       MaxRange
+```
+
+---
+
+### 2-1: Gun.h에 변수 추가
+
+```cpp
+UCLASS()
+class SHOOTERSAM_API AGun : public AActor
+{
+    GENERATED_BODY()
+
+public:
+    // ... 기존 코드 ...
+
+    // ===== MaxRange 변수 추가 =====
+    UPROPERTY(EditAnywhere)
+    float MaxRange = 10000.f;  // 10,000 유닛
+
+    void PullTrigger();
+};
+```
+
+**코드 설명:**
+
+```cpp
+UPROPERTY(EditAnywhere)
+```
+
+- 블루프린트에서 수정 가능
+- 무기마다 다른 사거리 설정 가능
+
+```cpp
+float MaxRange = 10000.f;
+```
+
+- 기본값 10,000
+- 언리얼 유닛 (1 유닛 = 1cm)
+- 10,000 유닛 = 100미터
+
+**왜 이렇게 길게?**
+
+```
+실제 총알은 매우 멀리 날아감
+게임에서도 벽 뒤까지 감지하려면 길어야 함
+```
+
+---
+
+## 🔫 Step 3: Line Trace 구현
+
+### 3-1: 끝점 계산하기
+
+**Gun.cpp - PullTrigger:**
+
+```cpp
+void AGun::PullTrigger()
+{
+    // 1. 시점 정보 가져오기
+    FVector ViewpointLocation;
+    FRotator ViewpointRotation;
+    OwnerController->GetPlayerViewPoint(ViewpointLocation, ViewpointRotation);
+
+    // ===== 2. 끝점 계산 =====
+    FVector EndLocation = ViewpointLocation + ViewpointRotation.Vector() * MaxRange;
+}
+```
+
+---
+
+### 끝점 계산 완벽 이해
+
+**수식:**
+
+```cpp
+EndLocation = ViewpointLocation + ViewpointRotation.Vector() * MaxRange
+```
+
+**부분별로 쪼개기:**
+
+**1. ViewpointLocation (시작점)**
+
+```cpp
+ViewpointLocation  // 예: (100, 200, 300)
+```
+
+- 카메라 위치
+- 3D 좌표
+
+**2. ViewpointRotation.Vector() (방향)**
+
+```cpp
+ViewpointRotation.Vector()  // 예: (1, 0, 0)
+```
+
+- 회전을 방향 벡터로 변환
+- 길이가 1인 단위 벡터
+
+**회전 → 벡터 변환:**
+
+```
+회전 (Pitch:0, Yaw:90, Roll:0)
+  ↓ .Vector()
+방향 벡터 (0, 1, 0)  // 오른쪽 방향
+```
+
+**3. \* MaxRange (거리 곱하기)**
+
+```cpp
+방향벡터 * 10000
+예: (1, 0, 0) * 10000 = (10000, 0, 0)
+```
+
+- 방향에 거리를 곱함
+- 최종 벡터 길이 = MaxRange
+
+**4. + 시작점 (최종 위치)**
+
+```cpp
+(100, 200, 300) + (10000, 0, 0) = (10100, 200, 300)
+```
+
+- 시작점에서 방향으로 이동한 위치
+
+---
+
+### 시각적 이해
+
+```
+시작점: (0, 0, 0)
+방향: 앞쪽 (1, 0, 0)
+거리: 10000
+
+계산:
+(0,0,0) + (1,0,0) × 10000
+= (0,0,0) + (10000,0,0)
+= (10000, 0, 0)
+
+그림:
+시작 ━━━━━━━━━━→ 끝
+(0,0,0)      (10000,0,0)
+```
+
+---
+
+## 🎯 Step 4: Line Trace 실행
+
+### 4-1: Hit Result 준비
+
+```cpp
+void AGun::PullTrigger()
+{
+    // 시점, 끝점 계산...
+
+    // ===== Hit Result 변수 =====
+    FHitResult HitResult;
+}
+```
+
+**FHitResult = 충돌 정보 저장소**
+
+```cpp
+FHitResult HitResult;  // 빈 상자
+
+LineTrace(..., HitResult, ...);  // 함수가 채워줌
+
+// 이제 사용 가능:
+HitResult.ImpactPoint   // 맞은 위치
+HitResult.GetActor()    // 맞은 액터
+HitResult.BoneName      // 맞은 뼈대 이름
+// 등등...
+```
+
+---
+
+### 4-2: 무시 목록 설정
+
+```cpp
+// ===== 무시할 액터 설정 =====
+FCollisionQueryParams Params;
+Params.AddIgnoredActor(this);         // 총 자신
+Params.AddIgnoredActor(GetOwner());   // 총의 주인
+```
+
+**왜 무시해야 하나요?**
+
+```
+무시 안 하면:
+
+총 쏘기
+  ↓
+Line Trace 시작
+  ↓
+즉시 자기 자신(총)에 맞음! ❌
+  ↓
+캐릭터한테 안 맞고 자신한테 맞음
+```
+
+**무시하면:**
+
+```
+총 쏘기
+  ↓
+Line Trace 시작
+  ↓
+총, 캐릭터 통과 ✅
+  ↓
+벽이나 적에게 맞음!
+```
+
+---
+
+### 4-3: Line Trace 호출
+
+```cpp
+bool IsHit = GetWorld()->LineTraceSingleByChannel(
+    HitResult,              // 결과 저장할 곳
+    ViewpointLocation,      // 시작점
+    EndLocation,            // 끝점
+    ECC_GameTraceChannel2,  // Bullet 채널
+    Params                  // 무시 목록
+);
+```
+
+---
+
+### 파라미터 완벽 이해
+
+**1. HitResult (Out 파라미터)**
+
+```cpp
+FHitResult HitResult
+```
+
+- 충돌 정보가 여기에 저장됨
+- 참조로 전달 (원본 수정)
+
+**2. ViewpointLocation (시작)**
+
+```cpp
+ViewpointLocation
+```
+
+- Line Trace 시작점
+- 카메라 위치
+
+**3. EndLocation (끝)**
+
+```cpp
+EndLocation
+```
+
+- Line Trace 끝점
+- 시작점 + 방향 × 거리
+
+**4. ECC_GameTraceChannel2 (채널)**
+
+```cpp
+ECC_GameTraceChannel2
+```
+
+- Bullet 채널
+- Config 파일에서 확인한 값
+
+**5. Params (옵션)**
+
+```cpp
+Params
+```
+
+- 무시할 액터 목록
+- 추가 설정들
+
+---
+
+### 반환값
+
+```cpp
+bool IsHit = LineTraceSingleByChannel(...)
+```
+
+**IsHit 값:**
+
+```
+true  = 뭔가 맞음! ✅
+false = 아무것도 안 맞음 ❌
+```
+
+---
+
+## 🎨 Step 5: 충돌 지점 시각화
+
+### 5-1: 구 그리기
+
+```cpp
+if (IsHit)
+{
+    DrawDebugSphere(
+        GetWorld(),              // 어느 월드에?
+        HitResult.ImpactPoint,   // 어디에?
+        5.0f,                    // 반지름
+        16,                      // 세그먼트 (구 품질)
+        FColor::Red,             // 빨간색
+        true                     // 계속 보이기
+    );
+}
+```
+
+---
+
+### 코드 설명
+
+**if (IsHit)**
+
+```cpp
+if (IsHit)
+```
+
+- 뭔가 맞았을 때만 실행
+- 안 맞으면 구 안 그림
+
+**HitResult.ImpactPoint**
+
+```cpp
+HitResult.ImpactPoint
+```
+
+- 정확히 맞은 위치
+- FVector 타입
+
+**반지름 5.0f**
+
+```cpp
+5.0f
+```
+
+- 구 크기
+- 5 유닛 = 5cm
+
+**세그먼트 16**
+
+```cpp
+16
+```
+
+- 구를 이루는 선 개수
+- 많을수록 부드러움
+
+**true (Persistent)**
+
+```cpp
+true
+```
+
+- 계속 보이기
+- false면 1프레임만
+
+---
+
+---
+
+## 📚 핵심 개념 정리
+
+### Line Trace
+
+보이지 않는 선으로 충돌 감지
+
+```cpp
+LineTraceSingleByChannel(Hit, Start, End, Channel, Params)
+```
+
+### Trace Channel
+
+충돌 감지 레이어
+
+```
+Bullet 채널
+→ 무엇을 감지할지 설정
+```
+
+### FHitResult
+
+충돌 정보 저장
+
+```cpp
+HitResult.ImpactPoint  // 맞은 위치
+HitResult.GetActor()   // 맞은 액터
+```
+
+### FCollisionQueryParams
+
+Line Trace 옵션
+
+```cpp
+Params.AddIgnoredActor(Actor)  // 무시할 액터
+```
+
+### Rotator.Vector()
+
+회전을 방향 벡터로 변환
+
+```cpp
+FRotator → FVector (길이 1)
+```
+
+---
+
+## 🎯 전체 흐름 정리
+
+```
+[총 쏘기 전체 과정]
+
+1. 마우스 클릭
+    ↓
+2. PullTrigger 호출
+    ↓
+3. 시점 정보 가져오기
+   - ViewpointLocation
+   - ViewpointRotation
+    ↓
+4. 끝점 계산
+   - EndLocation = Start + Direction × MaxRange
+    ↓
+5. 무시 목록 설정
+   - 총, 캐릭터 무시
+    ↓
+6. Line Trace 실행
+   - 시작점 → 끝점
+    ↓
+7. 뭔가 맞음?
+   - Yes → 구 그리기
+   - No → 아무것도 안 함
+```
+
+---
+
+---
+
+## 💡 실전 팁
+
+### 다양한 Line Trace
+
+**LineTraceSingleByChannel**
+
+```cpp
+// 첫 번째로 맞은 것만
+LineTraceSingleByChannel(...)
+```
+
+**LineTraceMultiByChannel**
+
+```cpp
+// 선 위의 모든 것
+TArray<FHitResult> Hits;
+LineTraceMultiByChannel(Hits, ...)
+
+// 관통탄 만들 때 유용!
+```
+
+---
+
+### 무기별 사거리 설정
+
+```cpp
+// BP_Rifle
+MaxRange = 10000  // 100m
+
+// BP_Shotgun
+MaxRange = 2000   // 20m
+
+// BP_Sniper
+MaxRange = 50000  // 500m
+```
+
+---
+
+### Debug Line 그리기
+
+**Line Trace 경로 시각화:**
+
+```cpp
+DrawDebugLine(
+    GetWorld(),
+    ViewpointLocation,  // 시작
+    EndLocation,        // 끝
+    FColor::Green,      // 색상
+    false,              // 1프레임만
+    1.0f               // 1초 동안
+);
+```
+
+---
+
+## 🐛 문제 해결
+
+### Collision이 이상해요!
+
+**Preset 재확인:**
+
+```
+Project Settings
+→ Collision
+→ Preset
+→ 각 타입별로 Bullet 채널 확인
+```
+
+**예시:**
+
+```
+Pawn Preset:
+  Bullet: Block ✅
+
+Trigger Preset:
+  Bullet: Ignore ✅
+```
+
+---
+
+## 🎓 보너스: 고급 기능
+
+### Hit 정보 활용
+
+```cpp
+if (IsHit)
+{
+    // 맞은 액터
+    AActor* HitActor = HitResult.GetActor();
+
+    // 맞은 컴포넌트
+    UPrimitiveComponent* HitComp = HitResult.GetComponent();
+
+    // 맞은 뼈대 (캐릭터)
+    FName BoneName = HitResult.BoneName;
+
+    // 맞은 표면 방향
+    FVector Normal = HitResult.ImpactNormal;
+
+    // 관통 거리
+    float Distance = HitResult.Distance;
+}
+```
+
+---
+
+### 헤드샷 감지
+
+```cpp
+if (IsHit)
+{
+    FName BoneName = HitResult.BoneName;
+
+    if (BoneName == "head")
+    {
+        Damage *= 2;  // 헤드샷 2배 데미지!
+    }
+}
+```
+
+---
+
+### 벽 관통
+
+```cpp
+TArray<FHitResult> Hits;
+LineTraceMultiByChannel(Hits, ...);
+
+for (FHitResult& Hit : Hits)
+{
+    // 각 충돌에 데미지
+    ApplyDamage(Hit.GetActor());
+}
+```
+
+---
+
+# { 총 발사 이펙트 추가하기 }
+
+## 🎯 이번에 할 것
+
+총을 쏠 때 **멋진 시각 효과**를 추가합니다!
+
+```
+총 발사!
+  ├─ 총구 섬광 ✨ (총 끝에서 불꽃)
+  └─ 충격 효과 💥 (맞은 곳에서 폭발)
+```
+
+---
+
+## ✨ 파티클 이펙트가 뭔가요?
+
+### Particle Effect = 시각 효과
+
+**예시:**
+
+```
+불꽃 🔥
+연기 💨
+폭발 💥
+마법 효과 ✨
+```
+
+**비유:**
+
+```
+영화의 특수효과
+→ 총알은 안 보여도
+→ 효과로 느낌 전달!
+```
+
+---
+
+## 🔧 준비 작업
+
+### Step 1: Niagara 의존성 추가
+
+**왜 필요한가요?**
+
+**Cascade → Niagara**
+
+```
+Cascade: 옛날 파티클 시스템 (구식)
+Niagara: 새로운 파티클 시스템 (최신)
+```
+
+프로젝트의 파티클들이 Cascade로 되어있어서 변환 필요!
+
+---
+
+### 1-1: Build.cs 수정
+
+**ShooterSam.Build.cs 파일 열기:**
+
+```csharp
+PublicDependencyModuleNames.AddRange(new string[]
+{
+    "Core",
+    "CoreUObject",
+    "Engine",
+    "InputCore",
+    "EnhancedInput",
+    "Niagara"  // 👈 추가!
+});
+```
+
+**Niagara = 파티클 시스템 라이브러리**
+
+---
+
+### 1-2: 프로젝트 파일 재생성
+
+**언리얼 에디터:**
+
+```
+1. 에디터 종료
+2. 프로젝트 폴더로 이동
+3. .uproject 파일 우클릭
+4. "Generate Visual Studio project files" 클릭
+5. Visual Studio 다시 열기
+```
+
+**왜 필요한가요?**
+
+```
+Build.cs 변경
+  ↓
+프로젝트 설정 업데이트 필요
+  ↓
+재생성!
+```
+
+---
+
+### Step 2: Cascade를 Niagara로 변환
+
+### 2-1: 변환 플러그인 활성화
+
+**언리얼 에디터:**
+
+```
+1. Edit → Plugins
+2. 검색: "Niagara"
+3. "Niagara Cascade to Niagara Converter" 찾기
+4. 체크박스 클릭
+5. "Yes" (베타 경고 무시)
+6. "Restart Now" (재시작)
+```
+
+**베타 버전이지만 잘 작동합니다!** ✅
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380658/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_5/image_8.png)
+
+---
+
+### 2-2: 파티클 찾기
+
+**Content Browser:**
+
+```
+Paragon 폴더
+  → FX
+  → Abilities
+  → Basic
+  → Wraith
+```
+
+**찾을 파일:**
+
+```
+1. P_Wraith_Primary_MuzzleFlash (총구 섬광)
+2. FX_Hit_World (충격 효과)
+```
+
+---
+
+### 2-3: 변환하기
+
+**각 파티클마다:**
+
+```
+1. 우클릭
+2. "Niagara Actions"
+3. "Convert to Niagara System"
+4. 잠시 대기...
+5. 완료!
+```
+
+**변환된 파일 이름:**
+
+```
+P_Wraith_Primary_MuzzleFlash_Converted
+FX_Hit_World_Converted
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380658/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_5/image_9.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380657/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_5/image_10.png)
+
+---
+
+### 2-4: 충격파 모듈 끄기 (중요!)
+
+**왜 필요한가요?**
+
+변환 과정에서 "Shockwave" 모듈이 제대로 작동 안 함
+→ 이상하게 보임
+→ 꺼야 함!
+
+**각 변환된 파티클 열기:**
+
+```
+1. 더블클릭
+2. 오른쪽으로 스크롤
+3. "Shockwave" 노드 찾기
+4. 체크박스 해제 (비활성화)
+5. Save
+```
+
+**두 파티클 모두 해야 함:**
+
+- MuzzleFlash_Converted
+- Hit_World_Converted
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380657/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_5/image_11.png)
+
+---
+
+## 💻 Step 3: 총구 섬광 구현
+
+### 3-1: 헤더 파일 (Gun.h)
+
+```cpp
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameFramework/Actor.h"
+#include "NiagaraFunctionLibrary.h"  // 👈 추가
+#include "NiagaraComponent.h"        // 👈 추가
+#include "Gun.generated.h"
+
+UCLASS()
+class SHOOTERSAM_API AGun : public AActor
+{
+    GENERATED_BODY()
+
+public:
+    AGun();
+
+    // ===== 파티클 시스템 =====
+
+    // 총구 섬광 (컴포넌트)
+    UPROPERTY(VisibleAnywhere)
+    UNiagaraComponent* MuzzleFlashParticleSystem;
+
+    // 충격 효과 (에셋)
+    UPROPERTY(EditAnywhere)
+    UNiagaraSystem* ImpactParticleSystem;
+
+    // ... 기존 코드 ...
+};
+```
+
+---
+
+### 코드 설명
+
+**Include 추가:**
+
+```cpp
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraComponent.h"
+```
+
+**NiagaraFunctionLibrary:**
+
+- Niagara 함수들의 모음
+- 파티클 생성 함수 제공
+
+**NiagaraComponent:**
+
+- Niagara 컴포넌트 타입
+- 액터에 붙일 수 있는 파티클
+
+---
+
+**총구 섬광 변수:**
+
+```cpp
+UPROPERTY(VisibleAnywhere)
+UNiagaraComponent* MuzzleFlashParticleSystem;
+```
+
+**왜 Component인가요?**
+
+```
+총에 계속 붙어있어야 함
+→ 컴포넌트로 생성
+→ 필요할 때 활성화/비활성화
+```
+
+---
+
+**충격 효과 변수:**
+
+```cpp
+UPROPERTY(EditAnywhere)
+UNiagaraSystem* ImpactParticleSystem;
+```
+
+**왜 System인가요?**
+
+```
+맞은 곳마다 새로 생성
+→ 에셋만 있으면 됨
+→ 필요할 때 스폰
+```
+
+---
+
+### 3-2: 생성자 (Gun.cpp)
+
+```cpp
+AGun::AGun()
+{
+    PrimaryActorTick.bCanEverTick = true;
+
+    SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("Scene Root"));
+    SetRootComponent(SceneRoot);
+
+    Mesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Mesh"));
+    Mesh->SetupAttachment(SceneRoot);
+
+    // ===== 총구 섬광 생성 =====
+    MuzzleFlashParticleSystem = CreateDefaultSubobject<UNiagaraComponent>(TEXT("MuzzleFlash"));
+    MuzzleFlashParticleSystem->SetupAttachment(Mesh);
+}
+```
+
+**코드 설명:**
+
+```cpp
+CreateDefaultSubobject<UNiagaraComponent>(TEXT("MuzzleFlash"))
+```
+
+- Niagara 컴포넌트 생성
+- 이름: "MuzzleFlash"
+
+```cpp
+->SetupAttachment(Mesh)
+```
+
+- 총 메시에 붙이기
+- 총이 움직이면 따라감
+
+---
+
+### 3-3: BeginPlay
+
+```cpp
+void AGun::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // ===== 총구 섬광 비활성화 =====
+    MuzzleFlashParticleSystem->Deactivate();
+}
+```
+
+**왜 비활성화하나요?**
+
+```
+게임 시작 시:
+  활성화 상태 → 계속 재생 ❌
+  비활성화 상태 → 쏠 때만 재생 ✅
+```
+
+---
+
+### 3-4: PullTrigger
+
+```cpp
+void AGun::PullTrigger()
+{
+    // ===== 총구 섬광 활성화 =====
+    MuzzleFlashParticleSystem->Activate(true);
+
+    // ... Line Trace 코드 ...
+}
+```
+
+**파라미터 설명:**
+
+```cpp
+Activate(true)
+```
+
+- `true` = Reset (초기화)
+- 이미 재생 중이어도 다시 시작
+
+**왜 Reset이 필요한가요?**
+
+```
+빠르게 연사할 때:
+
+Reset 없으면:
+  첫 번째 재생 중
+  → 두 번째 무시됨 ❌
+
+Reset 있으면:
+  첫 번째 중단
+  → 두 번째 다시 시작 ✅
+```
+
+---
+
+## 🎨 Step 4: 블루프린트 설정
+
+### 4-1: 총구 섬광 설정
+
+**BP_Rifle 열기:**
+
+```
+1. Components 패널
+2. MuzzleFlashParticleSystem 선택
+3. Details → Niagara System Asset
+4. P_Wraith_Primary_MuzzleFlash_Converted 선택
+```
+
+---
+
+### 4-2: 위치 조정
+
+**총구 섬광이 총 끝에 와야 합니다!**
+
+**Top 뷰 확인:**
+
+```
+1. 뷰포트 왼쪽 위
+2. "Top" 선택
+3. 파티클이 총구 앞에 있는지 확인
+```
+
+**Front 뷰 확인:**
+
+```
+1. "Front" 선택
+2. 파티클이 정중앙에 있는지 확인
+```
+
+**위치 조정:**
+
+```
+Location:
+  X: 약 83
+  Y: 약 10.5
+  Z: 약간 조정
+
+총구보다 살짝 앞쪽!
+총 안쪽은 안 보기 좋음
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380657/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_5/image_12.png)
+
+---
+
+### 4-3: 회전 조정
+
+**테스트해보니 방향이 이상해요!**
+
+```
+Rotation:
+  X: 0
+  Y: 90  👈 90도 회전!
+  Z: 0
+```
+
+**왜 90도?**
+
+```
+파티클의 기본 방향과
+총의 방향이 다름
+→ 90도 돌려서 맞춤
+```
+
+---
+
+### 4-4: 테스트
+
+**Play → 마우스 클릭!**
+
+**총구에서 불꽃이 튀면 성공!** ✨
+
+---
+
+## 💥 Step 5: 충격 효과 구현
+
+### 5-1: 디버그 구 제거
+
+**Gun.cpp - PullTrigger:**
+
+```cpp
+if (IsHit)
+{
+    // ===== 기존 디버그 구 (주석 처리) =====
+    // DrawDebugSphere(GetWorld(), HitResult.ImpactPoint, 5.0f, 15, FColor::Red, true);
+
+    // ===== 충격 파티클 추가! =====
+}
+```
+
+---
+
+### 5-2: 충격 파티클 스폰
+
+```cpp
+if (IsHit)
+{
+    UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+        GetWorld(),                    // 어느 월드?
+        ImpactParticleSystem,          // 어떤 파티클?
+        HitResult.ImpactPoint,         // 어디에?
+        HitResult.ImpactNormal.Rotation()  // 어느 방향?
+    );
+}
+```
+
+---
+
+### 파라미터 완벽 이해
+
+**1. GetWorld()**
+
+```cpp
+GetWorld()
+```
+
+- 현재 게임 월드
+- 파티클 생성할 공간
+
+---
+
+**2. ImpactParticleSystem**
+
+```cpp
+ImpactParticleSystem
+```
+
+- 블루프린트에서 설정할 에셋
+- 어떤 파티클 효과를 쓸지
+
+---
+
+**3. HitResult.ImpactPoint**
+
+```cpp
+HitResult.ImpactPoint
+```
+
+- 정확히 맞은 위치
+- FVector 타입
+- Line Trace가 알려준 지점
+
+---
+
+**4. HitResult.ImpactNormal.Rotation()**
+
+```cpp
+HitResult.ImpactNormal.Rotation()
+```
+
+**분해해서 이해:**
+
+```cpp
+HitResult.ImpactNormal
+```
+
+- 맞은 표면의 **법선 벡터**
+- 표면에 수직인 방향
+
+**법선 벡터가 뭔가요?**
+
+```
+벽 면
+  ↑  ← 법선 (표면에 수직)
+  |
+━━━━━
+```
+
+```cpp
+.Rotation()
+```
+
+- 벡터를 회전으로 변환
+- 파티클이 표면 쪽을 향하게
+
+**왜 필요한가요?**
+
+```
+벽에 맞으면:
+  파티클이 벽 쪽 향함 ✅
+  (벽 안쪽으로 안 들어감)
+
+바닥에 맞으면:
+  파티클이 위쪽 향함 ✅
+  (바닥 아래로 안 들어감)
+```
+
+**시각적으로:**
+
+```
+총알 →  | 벽
+       💥 ← 파티클 (표면 방향)
+```
+
+---
+
+### 잘못된 코드 (강의의 실수)
+
+**강의 코드:**
+
+```cpp
+HitResult.ImpactPoint.Rotation()  // ❌ 틀림!
+```
+
+**문제:**
+
+```
+ImpactPoint = FVector (위치)
+→ 위치에는 .Rotation() 함수 없음!
+→ 컴파일 에러!
+```
+
+**올바른 코드:**
+
+```cpp
+HitResult.ImpactNormal.Rotation()  // ✅ 맞음!
+```
+
+---
+
+## 🎨 Step 6: 블루프린트 설정 (충격)
+
+### BP_Rifle 설정
+
+```
+1. BP_Rifle 열기
+2. Details 패널
+3. Impact Particle System
+4. FX_Hit_World_Converted 선택
+5. Compile & Save
+```
+
+---
+
+## ✅ 최종 테스트
+
+### 1. 컴파일
+
+```
+Visual Studio: Ctrl + Shift + B
+또는 언리얼: Live Coding
+```
+
+### 2. Play 버튼
+
+### 3. 총 쏘기!
+
+### 결과 확인
+
+**성공 조건:**
+
+```
+✅ 총구에서 불꽃 효과
+✅ 맞은 곳에서 폭발 효과
+✅ 디버그 구는 안 보임
+```
+
+---
+
+## 📚 핵심 개념 정리
+
+### Niagara vs Cascade
+
+```
+Cascade: 구식 파티클 시스템
+Niagara: 신식 파티클 시스템 (더 강력함)
+```
+
+### UNiagaraComponent
+
+액터에 붙는 파티클
+
+```cpp
+CreateDefaultSubobject<UNiagaraComponent>()
+SetupAttachment(Mesh)
+```
+
+### UNiagaraSystem
+
+스폰할 파티클 에셋
+
+```cpp
+UPROPERTY(EditAnywhere)
+UNiagaraSystem* Particle;
+```
+
+### Activate / Deactivate
+
+파티클 켜기/끄기
+
+```cpp
+Component->Deactivate();  // 끄기
+Component->Activate(true); // 켜기 (Reset)
+```
+
+### SpawnSystemAtLocation
+
+특정 위치에 파티클 생성
+
+```cpp
+UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+    World, System, Location, Rotation
+);
+```
+
+### ImpactNormal
+
+표면 법선 벡터
+
+```
+표면에 수직인 방향
+→ 파티클이 표면 향하게
+```
+
+---
+
+## 🎯 전체 흐름 정리
+
+```
+[총 쏘기 + 이펙트]
+
+1. 마우스 클릭
+    ↓
+2. PullTrigger 호출
+    ↓
+3. 총구 섬광 활성화 ✨
+    MuzzleFlashParticleSystem->Activate(true)
+    ↓
+4. Line Trace 실행
+    ↓
+5. 뭔가 맞음?
+    ↓
+6. Yes → 충격 파티클 스폰 💥
+    SpawnSystemAtLocation(...)
+    ↓
+7. 멋진 효과 재생!
+```
+
+---
+
+## 💡 실전 팁
+
+### 파티클 커스터마이징
+
+**Niagara 에디터에서:**
+
+```
+1. 파티클 더블클릭
+2. 모듈 수정:
+   - Spawn Rate (생성 속도)
+   - Lifetime (지속 시간)
+   - Size (크기)
+   - Color (색상)
+3. Save
+```
+
+---
+
+### 무기별 다른 효과
+
+**BP_Rifle:**
+
+```
+MuzzleFlash: 작은 불꽃
+ImpactParticle: 작은 폭발
+```
+
+**BP_Shotgun:**
+
+```
+MuzzleFlash: 큰 불꽃
+ImpactParticle: 넓은 파편
+```
+
+**BP_Sniper:**
+
+```
+MuzzleFlash: 강렬한 섬광
+ImpactParticle: 충격파
+```
+
+---
+
+### 성능 최적화
+
+**파티클이 많으면 느려져요!**
+
+**해결책:**
+
+1. **Maximum Particles 제한**
+
+   ```
+   Niagara System → Settings
+   → Max Particle Count: 100
+   ```
+
+2. **수명 짧게**
+
+   ```
+   Lifetime: 0.5초 (짧게)
+   → 빨리 사라짐
+   ```
+
+3. **거리에 따라 품질 조절**
+
+   ```
+   가까우면: 고품질
+   멀면: 저품질 또는 안 보임
+   ```
+
+---
+
+## 🎓 보너스: 고급 효과
+
+### 총알 궤적 (Tracer)
+
+**시작점에서 끝점까지 선:**
+
+```cpp
+UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+    GetWorld(),
+    TracerSystem,
+    ViewpointLocation,  // 시작
+    (EndLocation - ViewpointLocation).Rotation()
+);
+
+// 파티클 시스템에서:
+// - Beam 이미터 사용
+// - Start/End 포인트 설정
+```
+
+---
+
+### 탄피 배출
+
+**총 옆에서 탄피 튀어나옴:**
+
+```cpp
+UNiagaraComponent* ShellEject = CreateDefaultSubobject<UNiagaraComponent>(TEXT("ShellEject"));
+ShellEject->SetupAttachment(Mesh);
+// 총 옆쪽에 위치
+
+// PullTrigger에서:
+ShellEject->Activate(true);
+```
+
+---
+
+### 연기 효과
+
+**총구에서 연기:**
+
+```cpp
+// 쏜 후 잠시 연기
+UNiagaraFunctionLibrary::SpawnSystemAttached(
+    SmokeSystem,
+    Mesh,
+    TEXT("MuzzleSocket"),
+    ...
+);
+```
+
+---
+
+잘 따라오셨어요! 이제 총을 쏘면 멋진 시각 효과가 나타납니다!
+
+다음 강의에서는 사운드를 추가하고 데미지 시스템을 만들어볼게요! 🔫
+
+**혹시 막히는 부분 있으면 언제든 질문하세요!**

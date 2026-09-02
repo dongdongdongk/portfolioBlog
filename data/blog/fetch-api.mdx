@@ -1,0 +1,525 @@
+---
+title: 'Fetch API 사용법'
+date: '2026-09-02'
+category: '풀스택/JavaScript'
+tags: ['풀스택', 'JavaScript']
+draft: false
+summary: ''
+---
+
+# Fetch API 란?
+
+```sql
+fetch는 Ajax의 방식 중 하나이다 (최신 방식)
+
+fetch()는 구식 브라우저에선 지원하진 않지만(폴리필을 쓰면 사용 가능) 대부분의 모던 브라우저가 지원
+```
+
+# Fetch API 의 역사
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381261/notion-blog/_/JavaScript/JavaScript_/Fetch_API_/Untitled.png)
+
+```sql
+과거 초기 자바스크립트 에서 비동기 요청방식을 사용하려면 이렇게 긴 코드가 필요로 했다
+
+이런 긴 코드를 줄이기 위해서 나온것이 Ajax 였다
+```
+
+# Fetch() 기본 문법
+
+```jsx
+// 1. API 주소로 GET 또는 POST 요청을 보내는 fetch 함수 호출
+fetch("API 주소", {
+ method: "GET" // or "POST"
+ headers: {
+  "Content-Type": "application/json", //이는 JSON 데이터를 전송한다는 것을 나타냄. 즉, 서버에게 보내는 본문이 JSON 형식임을 알려줌
+ },
+ bodys: JSON.stringfy({  // 이 부분은 JavaScript 객체를 JSON 형식의 문자열로 변환(서보로 보내는 타입이 JSON 이기 때문에) , (클라이언트에서 서버로 전송하려는 데이터를 지정)
+   key: value,
+ })
+})
+// 2. 서버로부터 응답 데이터를 JSON 형식으로 변환하여 처리
+.then(response => response.json())
+// 3. JSON 데이터를 콘솔에 출력
+.then(response => console.log(response))
+// 4. 만약 오류가 발생하면 해당 오류를 콘솔에 출력
+.catch(err => console.log(err));
+```
+
+```jsx
+* fetch( ) 메서드에 첫 번째 파라미터는 API 주소, 두 번째 파라미터에는 request의 옵션(뒤에 나머지 method 등등)을 적용한다.
+
+* method의 종류는 기본적으로 GET, POST가 있는데 GET은 조회할 때 사용하며, POST는 생성할 때 사용한다.
+
+* headers에는 메타정보들이 들어간다.
+
+* bodys에는 body에 담아서 보내고 싶은 내용을 보여준다. 바디는 객체로 이루어져있어야 하며, 객체에서 키값은 내가 정하는 게 아니고 백엔드에서 요구하는 키값으로 정해서 보내줘야 한다.
+
+	(Vo와 바인딩 가능하도록) js 파일로 작업을 했기 때문에 JSON.stringfy() 방식을 사용하여 해당 내용을 JSON으로 바꿔준다.
+
+	response.json( )은 받아온 data는 json타입인데 자바스크립트에서 사용하기 위해 js형식으로 바꿔주는 역할을 한다.
+
+	catch는 요청에 대한 에러를 받는다.
+
+* then, catch 보다 async, await / try, catch를 사용하는 것이 최신 문법.
+
+* fetch는 기본적으로 CORS 요청이므로, 다른 도메인의 API를 사용할 때에는 서버 측에서 CORS를 허용해야 한다.
+```
+
+```jsx
+fetch() 를 이용하면 url을 통해 원하는 API의 결과값을 받아올 수 있다.
+
+콘솔창에 fetch를 입력하면 Promise 라는 결과가 반환된다 (정확히는 Promise 객체가 반환된다).
+```
+
+```jsx
+fetch('https://cataas.com/cat?json=true')
+// Promise {<pending>}
+```
+
+```jsx
+fetch('http://example.com/movies.json')
+  .then((response) => return response.json())
+  .then((data) => console.log(data));
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381261/notion-blog/_/JavaScript/JavaScript_/Fetch_API_/Untitled_1.png)
+
+```jsx
+이 결과값을 제대로 사용하거나 보기 위해서는 .json()을 사용하여 response를 JSON 으로 바꿔주고, 다시 .then()을 사용해 주어야 한다.
+
+* json() 메서드까지 사용해야 받아 온 데이터들이 정상적으로 보인다..!
+```
+
+## fetch 의 .then 상세 설명
+
+```jsx
+fetch에서는 주로 네트워크 요청이 성공했을 때 데이터를 처리하기 위해 .then()을 사용
+
+fetch로 생성한 Promise가 성공적으로 해결되었을 때, .then() 블록 내의 코드가 실행
+```
+
+```jsx
+fetch('https://api.example.com/data')
+  .then((response) => {
+    // 첫 번째 .then() 블록
+    if (!response.ok) {
+      throw new Error('Network response was not ok')
+    }
+    return response.json() // JSON 형식의 응답을 파싱하여 반환
+  })
+  .then((data) => {
+    // 두 번째 .then() 블록
+    console.log(data)
+  })
+  .catch((error) => {
+    // 실패한 경우 실행되는 .catch() 블록
+    console.error('Fetch error:', error)
+  })
+```
+
+```jsx
+.then()은 이전 Promise의 결과를 다음 .then()에 전달
+
+첫 번째 .then()에서는 HTTP 응답을 받아와서 JSON으로 파싱한 값을 반환하고,
+
+두 번째 .then()에서는 이전 .then()에서 반환된 JSON 데이터를 사용하여 작업을 수행
+```
+
+### .then 에서 return
+
+```jsx
+.then 블록 내에서 return 키워드를 사용하지 않으면,
+
+그 블록에서 반환되는 값은 undefined가 된다.
+
+Promise 체인에서 .then() 내에서 어떠한 값도 반환하지 않으면,
+
+이전 .then() 블록에서 반환된 값을 다음 .then()으로 전달할 방법이 없게된다
+
+then() 내에서 어떤 작업을 수행한 뒤 그 결과를 다음 .then()으로 전달하려면 **반드시 return을 사용해야한다**
+```
+
+## $.ajax 코드를 fetch 형태로 변환 예제
+
+```jsx
+$.ajax({
+  url: '/send', // 데이터를 요청할 url
+  type: 'GET', // GET, POST, DELETE, PATCH, PUT 등
+  data: data, // 변수에 담긴 데이터를 서버로 전송하는 부분을 나타내며, 실제 데이터는 JSON 형식이나 맵으로 작성되어야 합니다
+  success: function (result) {
+    // 요청에 성공했을때 실행되고 서버에서 받은 데이터를 확인할수 있다
+    console.log(result)
+  },
+  error: function () {
+    console.log('에러발생')
+  },
+})
+```
+
+```jsx
+fetch('/send', {
+  method: 'GET', // GET 요청
+  headers: {
+    'Content-Type': 'application/json', // JSON 데이터를 보낼 것을 명시
+  },
+  body: JSON.stringify(data), // 데이터를 JSON 형식으로 변환하여 요청 본문에 포함
+})
+  .then((response) => {
+    if (!response.ok) {
+      throw new Error('에러 발생') // 요청이 실패한 경우 오류를 throw
+    }
+    return response.json() // JSON 데이터로 변환
+  })
+  .then((result) => {
+    console.log(result) // 성공한 경우 결과를 콘솔에 출력
+  })
+  .catch((error) => {
+    console.error(error) // 에러 핸들링
+  })
+```
+
+# **작동 방식**
+
+## **프로토 타입**
+
+```java
+fetch(url, options)
+  .then((response) => console.log("response:", response))
+  .catch((error) => console.log("error:", error));
+```
+
+```java
+fetch() 함수는 첫번째 인자로 URL, 두번째 인자로 옵션 객체를 받고, Promise 타입의 객체를 반환한다.
+
+반환된 객체는 API 호출이 성공했을 경우에는 .then으로 resolve 객체를 리턴받고, 실패했을 경우에는 .catch로 reject 객체를 리턴받는다.
+```
+
+# **REST API**
+
+## **GET 요청**
+
+```jsx
+fetch('https://jsonplaceholder.typicode.com/posts/1', { method: 'GET' }).then((response) =>
+  console.log(response)
+) // 상태코드 및 Header에 대한 정보
+
+fetch('https://jsonplaceholder.typicode.com/posts/1')
+  .then((response) => response.json())
+  .then((data) => console.log(data)) //자바스크립트 객체 형식으로 변환된다.
+```
+
+```java
+fetch() 함수는 디폴트로 GET 방식으로 작동하고 GET 방식은 요청 전문을 받지 않기 때문에 옵션 인자가 필요없다.
+
+대부분의 REST API들은 JSON 형태의 데이터를 응답하기 때문에, 응답받은 response 객체는 역시 json() 메서드로 변형할 수 있다.
+
+이 메서드를 호출하면, response 객체로부터 JSON 형식의 응답을 자바스크립트 객체로 변환하여 얻을 수 있다.
+```
+
+## **POST 요청**
+
+```jsx
+fetch('https://jsonplaceholder.typicode.com/posts', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    title: 'Test',
+    body: 'I am testing!',
+    userId: 1,
+  }),
+})
+  .then((response) => response.json())
+  .then((data) => console.log(data))
+```
+
+```jsx
+GET 이외의 HTTP 메소드를 사용할 시 method 옵션을 명시해주어야 한다. headers에는 부가적인 정보가, body에는 POST로 보내는 데이터가 들어간다. headers에 JSON 형식을 사용한다고 알려주고 그에 맞게 body의 본문 전체를 JSON 형식으로 바꾸어 준다.
+
+* headers로 json 형식임을 알려주지 않으면 서버에서 못 읽는 문제가 생길 수 있다고 한다
+```
+
+## **PUT 요청**
+
+```jsx
+fetch('https://jsonplaceholder.typicode.com/posts', {
+  method: 'PUT',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    title: 'Test',
+    body: 'I am testing!',
+    userId: 1,
+  }),
+})
+  .then((response) => response.json())
+  .then((data) => console.log(data))
+```
+
+```jsx
+해당 url의 데이터를 수정하는 요청이다. 전체 데이터를 교체해버리기 때문에 부분만 수정하려면 UPDATE를 사용하자. 메소드만 다를 뿐 사실상 POST와 비슷하다.
+```
+
+## **DELETE**
+
+```jsx
+fetch('https://jsonplaceholder.typicode.com/posts/1', {
+  method: 'DELETE',
+})
+  .then((response) => response.json())
+  .then((data) => console.log(data))
+```
+
+```jsx
+해당 url의 데이터를 지워버리라는 요청이다. 보낼 데이터가 없으니 메소드만 명시해주면 된다.
+```
+
+# Promise 란?
+
+```sql
+비동기 프로그래밍을 더 쉽고 효과적으로 다룰 수 있도록 도와주는 개념
+```
+
+```sql
+Promise는 크게 세 가지 상태를 가진다
+
+1. 대기(Pending): Promise 객체가 생성되고 아직 약속이 이행되지 않은 상태입니다. ( Promise 객체 생성)
+
+2. 이행(Fulfilled): 약속이 성공적으로 이행된 상태입니다. 즉, 비동기 작업이 성공적으로 완료되었습니다. (성공)
+
+3. 거부(Rejected): 약속이 실패한 상태입니다. 비동기 작업이 문제가 발생하여 완료되지 못했습니다. (오류)
+```
+
+## **Promise 예제( 실제로 이렇게 사용은 거의 x)**
+
+```jsx
+function getData() {
+  return new Promise((resolve, reject) => {
+    // romise 생성자를 사용하여 새로운 Promise 객체를 생성 이 때, resolve와 reject 두 개의 함수를 가지는 콜백 함수를 전달
+    fetch('데이터url') // fetch API를 사용하여 지정된 URL에서 데이터를 가져옴
+      .then((response) => {
+        // 이전 fetch 호출에서 반환된 response를 처리하기 위해 then 블록을 연결
+        if (!response.ok) {
+          // response.ok는 HTTP 응답의 성공 여부를 나타내는 속성 여기서는 HTTP 상태 코드가 200에서 299 사이가 아닌 경우 (즉, 요청이 성공하지 않은 경우) 에러를 발생시키기 위해 체크
+          throw new Error('데이터 가져오기 실패') // throw 키워드를 사용하여 오류를 발생시킴, 데이터 가져오기 실패"라는 에러 메시지를 포함한 Error 객체를 생성
+        }
+        return response.json() // response.json()은 HTTP 응답에서 JSON 데이터를 추출하는 메소드
+      })
+      .then((data) => {
+        // 이전 .then 블록에서 반환된 JSON 데이터를 처리하기 위해 then 블록을 연결
+        resolve(data) // 비동기 작업이 성공적으로 완료되었으므로 resolve 함수를 호출하여 Promise를 성공 상태로 만듭니다. data는 비동기 작업 결과로 해결된 데이터
+      })
+      .catch((error) => {
+        // 동기 작업 중에 발생한 오류를 처리하기 위해 .catch 블록을 연결
+        reject(error) // 실패 시 reject 호출
+      })
+  })
+}
+
+getData() // getData() 함수를 호출하여 데이터를 가져오는 비동기 작업을 시작
+  .then((data) => {
+    // 비동기 작업이 성공하면 .then() 블록에서 data를 출력
+    console.log(data)
+  })
+  .catch((err) => {
+    // 만약 오류가 발생하면 .catch() 블록에서 오류 메시지(err)를 출력
+    console.error('오류 발생:', err)
+  })
+```
+
+```jsx
+Promise 객체를 생성할 때, 인자로 전달한 함수는 두 개의 파라미터 resolve와 reject를 가지고 있음 (return new Promise((resolve, reject))
+
+이 함수 내에서 비동기 작업을 수행한 후에 작업이 성공적으로 완료되면 resolve 함수를 호출하여 Promise를 성공 상태로 만들고,
+
+작업이 실패하면 reject 함수를 호출하여 Promise를 실패 상태로 만듬
+```
+
+## 실제로 사용되는 Fetch 형태 ( Promise 사용)
+
+```jsx
+위의 Promise 예제처럼 new Promise 객체를 만들기보다 아래 예제와 같이 사용되는 사례가 많다. fetch 함수는 url로 요청을 보낸 결과로 Promise 객체를 반환한다.
+```
+
+```jsx
+fetch('데이터url') // 지정된 URL에서 데이터를 가져오려고 시도
+  .then((response) => {
+    // fetch 함수가 반환하는 Promise를 통해, HTTP 응답 객체(response)를 처리하기 위해 .then 블록을 연결
+    return response.json() // response.json()은 HTTP 응답에서 JSON 데이터를 추출하는 메서드 이 메서드를 호출하여 JSON 데이터를 추출하고, 이 값을 반환
+  })
+  .then((data) => {
+    // 이전 .then 블록에서 반환된 JSON 데이터(data)를 처리하기 위해 .then 블록을 연결
+    console.log(data)
+  })
+  .catch((err) => {
+    // 비동기 작업 중에 발생한 오류를 처리하기 위해 .catch 블록을 연결
+    console.log(err)
+  })
+```
+
+```jsx
+fetch API는 네트워크 오류 또는 HTTP 오류 응답을 자동으로 처리하여 catch 블록으로 오류를 전달
+
+그러므로 별도로 reject를 호출할 필요가 없음
+
+코드에서 catch 블록은 fetch나 JSON 파싱 중에 발생한 오류를 캐치하며, 이미 포함되어 있음 별도의 reject, resolve 가 필요하지 않음
+```
+
+## **Promise 객체를 사용하는 이유**
+
+```jsx
+JavaScript에는 동기 작업과 비동기 작업이 있는데, 비동기로 처리되는 작업의 결과를 사용하기 위해 Promise 객체를 사용한다.
+
+비동기 작업이 끝난 후의 결과를 이용해서 작업을 수행하려면 Promise 객체의 콜백함수로 작업을 지정해줘야 한다.
+
+그래야 ‘순서를 보장’ 받을수 있다. 이러한 콜백함수가 너무 많아지면, 수정이 복잡해지고 코드의 가독성도 떨어지게 되는데 이를 ‘콜백지옥’이라고 한다.
+
+콜백지옥을 방지하기 위해 then()을 이어붙여 콜백함수 작업을 처리할 수 있도록 만들 수 있다.
+```
+
+### 콜백 지옥의 예시 (그냥 재미로 볼 것)
+
+```jsx
+위의 코드에서는 fetchData, processData, saveData 함수가 순차적으로 호출되어야 하며,
+
+각 함수가 비동기 작업을 수행한 후에 다음 함수를 호출해야 합니다. 이런 중첩된 콜백 함수들 때문에 코드가 들여쓰기로 인해 가독성이 떨어지고 코드의 복잡성이 증가합니다.
+
+이런 문제를 해결하기 위해 Promise와 then()을 사용하면 코드를 보다 구조화하고 가독성을 높일 수 있습니다.
+```
+
+```jsx
+function fetchData(callback) { // fetchData 함수는 데이터를 가져오는 비동기 작업을 수행하고, 그 작업이 완료되면 콜백 함수를 호출
+  setTimeout(() => { // setTimeout 함수를 사용하여 시뮬레이션한 것처럼 1초 후에 "데이터를 가져옴"이라는 메시지를 출력하는 부분이 비동기 작업을 나타냄 이 코드는 실제로는 데이터를 가져오는 비동기 작업을 수행하는 대신, 타이머를 사용하여 1초 후에 콜백 함수를 호출하는 예제
+    console.log('데이터를 가져옴');
+    callback(); // callback은 fetchData 함수를 호출할 때 인자로 전달되는 함수 이 함수는 fetchData 함수 내에서 실행되며, 비동기 작업이 완료되었음을 나타내기 위해 사용
+  }, 1000);
+}
+
+function processData(data, callback) { // processData 함수는 데이터 처리 작업을 수행하고, 그 작업이 완료되면 다시 콜백 함수를 호출
+  setTimeout(() => {
+    console.log('데이터 처리 완료');
+    callback();
+  }, 1000);
+}
+
+function saveData(data, callback) { // saveData 함수도 데이터 저장 작업을 수행하고, 완료 후에 다시 콜백 함수를 호출
+  setTimeout(() => {
+    console.log('데이터 저장 완료');
+    callback();
+  }, 1000);
+}
+
+fetchData(() => {  // 중첩된 콜백 함수들이 많아지면 코드가 복잡해지고 유지 보수가 어려워짐 이런 상황을 해결하기 위해 Promise나 async/await와 같은 비동기 처리 방법을 사용
+  processData({}, () => {
+    saveData({}, () => {
+      console.log('모든 작업 완료');
+    });
+  });
+});
+
+Promise 사용
+
+function fetchData() {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      console.log('데이터를 가져옴');
+      resolve({});
+    }, 1000);
+  });
+}
+
+function processData(data) {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      console.log('데이터 처리 완료');
+      resolve({});
+    }, 1000);
+  });
+}
+
+function saveData(data) {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      console.log('데이터 저장 완료');
+      resolve({});
+    }, 1000);
+  });
+}
+
+fetchData()
+  .then((data) => processData(data))
+  .then((data) => saveData(data))
+  .then(() => {
+    console.log('모든 작업 완료');
+  })
+  .catch((error) => {
+    console.error('오류 발생:', error);
+  });
+```
+
+## Promise 의 형태 (실제 이렇게 사용 많이 x)
+
+```jsx
+const myPromise = new Promise((resolve, reject) => {
+  // 비동기 작업을 수행하는 코드
+  // 작업이 성공하면 resolve() 호출
+  // 작업이 실패하면 reject() 호출
+})
+
+myPromise
+  .then((result) => {
+    // 작업이 성공했을 때 실행되는 코드
+    console.log('성공:', result)
+  })
+  .catch((error) => {
+    // 작업이 실패했을 때 실행되는 코드
+    console.error('실패:', error)
+  })
+```
+
+# **async/await(가장 많이 사용하는 방법)**
+
+```jsx
+Promise를 더 쉽게 다룰 수 있도록 도와주는 JavaScript의 기능 중 하나
+
+JavaScript에서 비동기 코드를 작성하고 다루는 더 간편하고 가독성 좋은 방법을 제공하는 기능입니다.
+
+이를 통해 비동기 작업을 동기적으로 보이도록 작성할 수 있으며, 오류 처리도 편리하게 할 수 있습니다.
+```
+
+## 사용방법
+
+```jsx
+먼저, async 함수를 선언하고 그 안에서 await를 사용하여 fetch를 호출합니다.
+
+fetch는 서버에서 데이터를 가져오는 비동기 작업을 수행합니다. 아래는 기본적인 사용 예제입니다
+```
+
+```jsx
+async function fetchData() {
+  try {
+    const response = await fetch('https://api.example.com/data') // 비동기로 데이터를 가져옴
+    if (!response.ok) {
+      throw new Error('데이터를 가져오는 데 문제가 발생했습니다.')
+    }
+
+    const data = await response.json() // JSON 데이터로 변환
+    console.log(data) // 데이터 출력 또는 다른 처리 수행
+  } catch (error) {
+    console.error('오류:', error) // 오류 처리
+  }
+}
+
+fetchData()
+```
+
+```jsx
+1. 위의 코드에서 fetchData 함수는 async로 선언되어 있으므로 await를 사용하여 비동기 작업인 fetch를 호출하고 서버에서 데이터를 가져옵니다.
+
+2. 그리고 response의 ok 속성을 확인하여 HTTP 응답이 성공적인지 확인하고, 그렇지 않은 경우 오류를 던집니다.
+
+3. 그 다음, response.json()을 사용하여 JSON 데이터로 변환하고 해당 데이터를 처리하거나 출력할 수 있습니다. 마지막으로 try...catch 블록을 사용하여 오류를 처리합니다.
+```

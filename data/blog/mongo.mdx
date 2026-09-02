@@ -1,0 +1,461 @@
+---
+title: 'Mongo 와 데이터 연결하기'
+date: '2026-09-02'
+category: '풀스택/The Web Developer 부트캠프 2022'
+tags: ['풀스택', 'The Web Developer 부트캠프 2022']
+draft: false
+summary: ''
+---
+
+# 몽구스 버전 7로 다음 코드 문제 해결
+
+```jsx
+참고: 몽구스 버전 7로 다음 코드 문제 해결
+다음에 진행할 동영상 강의에 관한 중요 참고 사항이 있습니다.
+
+이 참고 사항에 언급된 코드를 찾아 이해하려면 다음 동영상 강의를 끝까지 시청하시기 바랍니다.
+
+최신 몽구스 버전 7을 사용하는 경우 다음 동영상의 코드를 작성할 때 오류가 발생할 수 있습니다. TypeError: Invalid schema configuration: `false` is not a valid type at path `id`.
+
+해결 방법:
+
+다음에 진행할 동영상 강의의 후반부에서는 models/user.js 코드에서 userSchema라는 몽구스 스키마의 addresses 배열에 다음 코드 라인을 사용합니다.
+
+      _id: {id: false},
+이 라인을 추가할 때 앱에 위와 같은 오류 메시지가 표시되면, 최신 몽구스 7 모듈 버전을 사용 중이라는 의미입니다.
+
+이 문제를 해결하려면 { _id: false } 구문의 id앞에 밑줄_ 을 추가해 라인을 수정하세요. 즉, 라인을 다음과 같이 작성합니다.
+
+      _id: {_id: false},
+이와 관련된 몽구스 버전 7 오류가 해결됩니다.
+
+다른 해결 방법:
+
+다음에 진행할 동영상 강의에서 호환성 문제를 방지하고 콜트(Colt)의 코드를 정확히 사용하기 위해, 다음 npm 명령을 사용해 7.0.0 미만의 몽구스 버전을 설치하면 오류가 발생하지 않습니다.
+
+npm install mongoose@"<7.0.0"
+
+(명령을 위에 표시된 대로 정확히 입력하거나 복사해서 붙여넣으세요)
+```
+
+# One to Few 관계
+
+```jsx
+one-to-few 관계는 주로 사용자나 계정과 같은 주체에 속한 몇 개의 관련 항목이 있는 경우를 의미한다.
+
+( 예를 들어, 사용자가 여러 주소를 가지고 있다 )
+
+이때, 각 사용자 문서에 주소를 배열로 저장하는 방법이 있다.
+
+배열 안에는 주소의 세부 정보가 들어가며, 이러한 방식으로 관련된 정보를 하나의 문서에 모두 저장할 수 있다.
+
+주로 사용자가 소유한 몇 개의 주소와 같이 개수가 적을 때 사용된다.
+```
+
+```jsx
+// 모델 정의
+
+// 사용자 모델
+const User = {
+  userID: 1,
+  username: 'john_doe',
+  email: 'john@example.com',
+  addresses: [
+    {
+      addressID: 101,
+      street: '123 Main St',
+      city: 'Cityville',
+      zipCode: '12345',
+    },
+    // 다른 주소들...
+  ],
+}
+
+// 주소 추가 함수
+const addAddress = (user, newAddress) => {
+  user.addresses.push(newAddress)
+}
+
+// 예제 사용
+
+// 초기 사용자
+const initialUser = {
+  userID: 1,
+  username: 'john_doe',
+  email: 'john@example.com',
+  addresses: [
+    {
+      addressID: 101,
+      street: '123 Main St',
+      city: 'Cityville',
+      zipCode: '12345',
+    },
+    {
+      addressID: 102,
+      street: '456 Oak St',
+      city: 'Townsville',
+      zipCode: '67890',
+    },
+    // 다른 주소들...
+  ],
+}
+
+// 새로운 주소
+const newAddress = {
+  addressID: 103,
+  street: '789 Pine St',
+  city: 'Villageton',
+  zipCode: '54321',
+}
+
+// 새로운 주소 추가
+addAddress(initialUser, newAddress)
+
+// 결과 확인
+console.log(initialUser)
+```
+
+## 문서 id 자동생성
+
+```jsx
+const mongoose = require('mongoose')
+
+mongoose.connect('mongodb://localhost:27017/relationshipDemo') // 몽구스를 이용해서 몽고DB 연결
+
+// 연결 확인 코드
+const db = mongoose.connection // MongoDB 연결에 대한 정보를 얻는다. 이 정보를 db 변수에 할당
+db.on('error', console.error.bind(console, 'connection error'), {
+  useNewUrlParser: true, // 최신 버전의 드라이버와의 호환성을 유지
+  useUnifiedTopology: true,
+})
+db.once('open', () => {
+  // 한 번만 실행되는 이벤트 리스너 등록 MongoDB에 성공적으로 연결되었을 때 메세지
+  console.log('Database connected')
+})
+
+const userSchema = new mongoose.Schema({
+  first: String,
+  last: String,
+  addresses: [
+    {
+      _id: { _id: false }, // 자동으로 생성되는 id 끄기
+      street: String,
+      city: String,
+      state: String,
+      county: String,
+    },
+  ],
+})
+
+const User = mongoose.model('User', userSchema)
+
+const makeUser = async () => {
+  const u = new User({
+    first: 'Harry',
+    last: 'Potter',
+  })
+  u.addresses.push({
+    street: '123 sesame St.',
+    city: 'New York',
+    state: 'NY',
+    county: 'USA',
+  })
+  const res = await u.save()
+  console.log(res)
+}
+
+makeUser()
+```
+
+```jsx
+위와 같이 스키마를 생성하면
+
+사용자 문서 내 주소 스키마에 자동으로 주소가 생겨난다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381385/notion-blog/_/The_Web_Developer_2022/node_js/Mongo_/Untitled.png)
+
+```jsx
+여기서 _id : {_id : false}
+
+를 스키마 작성시 추가해주면 자동으로 id 가 생성되는걸 막을 수 있다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381383/notion-blog/_/The_Web_Developer_2022/node_js/Mongo_/Untitled_1.png)
+
+# One to Many 관계
+
+```jsx
+
+"one to few", "one to many", "one to bajillions"는 모두 "one to many" 관계의 다양한 구현을 나타내는것이다
+
+데이터 크기를 "Small", "Medium", "Large"로 나눈다면,
+
+"Medium"에 해당하는 방식이 "one to many"이다.
+
+ 이 방식은 일반적으로 부모 문서 안에 정보를 직접적으로 임베드하는 대신(one to few 처럼 내부에 넣는것),
+
+참조하는 레퍼런스를 다른 곳에 정의된 문서에 임베드하거나 저장한다.
+
+일반적으로는 객체 ID를 사용하며, 이는 SQL과 유사한 방식이다.
+```
+
+## 기본적인 형태
+
+```jsx
+// Farm 모델 정의
+const farmSchema = new Schema({
+  name: String,
+  city: String,
+  products: [
+    {
+      // 객체 ID 를 사용하여 임베드, 연결
+      type: Schema.Types.ObjectId,
+      ref: 'Product',
+    },
+  ],
+})
+```
+
+## 전체 예제
+
+```jsx
+const mongoose = require('mongoose')
+const Schema = mongoose.Schema // mongoose.Schema 를 짧게 하려고 다시 Schema 로 지정
+
+// Product 모델 정의
+const productSchema = new Schema({
+  name: String,
+  price: Number,
+  season: {
+    type: String,
+    enum: ['Spring', 'Summer', 'Fall', 'Winter'],
+  },
+})
+
+const Product = mongoose.model('Product', productSchema)
+
+// Farm 모델 정의
+const farmSchema = new Schema({
+  name: String,
+  city: String,
+  products: [
+    {
+      // 객체 ID 를 사용하여 임베드, 연결 ( 각 상품의 타입을 객체 ID로 설정해주기 )
+      type: Schema.Types.ObjectId,
+      ref: 'Product', // ref 옵션을 통해서 Mongoose에게 채우기(population) 작업 시 사용할 모델을 알려줍
+    },
+  ],
+})
+
+const Farm = mongoose.model('Farm', farmSchema)
+
+// 새 농장과 상품 생성 및 연결
+async function createFarm() {
+  const melon = await Product.findOne({ name: 'Goddess Melon' })
+  const watermelon = await Product.findOne({ name: 'Sugar Baby Watermelon' })
+
+  const farm = new Farm({ name: 'Full Belly Farms', city: 'California' })
+  farm.products.push(melon)
+  farm.products.push(watermelon)
+
+  await farm.save()
+  console.log(farm)
+}
+
+// 위에서 정의한 함수 호출
+createFarm()
+```
+
+```jsx
+ref: 'Product'는 products 배열 내의 각 요소가 'Product' 모델을 참조한다는 것을 의미한다.
+
+참조한 모델의 이름과 일치:
+
+ref에 사용된 문자열은 참조하는 모델의 이름과 일치해야 한다. 여기서는 'Product'로 설정되어 있으므로,
+
+'Product'라는 이름의 Mongoose 모델을 참조하게 된다.
+```
+
+## 실제로는 id 가 저장됨
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381383/notion-blog/_/The_Web_Developer_2022/node_js/Mongo_/Untitled_2.png)
+
+```jsx
+const makeFarm = async () => {
+  const farm = new Farm({ name: 'Full belly Farms', city: 'Guinda, CA' })
+  const melon = await Product.findOne({ name: 'Goddess Melong' })
+  farm.products.push(melon)
+  await farm.save()
+}
+
+makeFarm()
+```
+
+```jsx
+실제로 위의 코드를 실행하면
+
+product 에 push 로 집어넣은 melon 이 id 만 있는걸 확인 가능하다
+
+즉, Mongo에서는 객체 ID 말고는 상품 자체에 대한 정보가 없는것
+
+이렇게 ObjectId만 "products" 배열에 있지만 이를 기반으로 내용을 확인 가능하다
+```
+
+## id 배열만 있으면 내부 내용 확인 불가
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381383/notion-blog/_/The_Web_Developer_2022/node_js/Mongo_/Untitled_3.png)
+
+```jsx
+위와 같이 Farm 에서 name 이 Full belly Farms 인 문서를 찾으면
+
+ObjectId 배열로 데이터가 들어가 있다
+
+이렇게 되어있으면 내부의 내용을 확인할수가 없다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381383/notion-blog/_/The_Web_Developer_2022/node_js/Mongo_/Untitled_4.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381385/notion-blog/_/The_Web_Developer_2022/node_js/Mongo_/Untitled_5.png)
+
+## populate()
+
+```jsx
+이때 이 메서드를 사용하면 내부의 내용을 채워넣게 되는데
+
+아까전에 스키마에서 정의할 때 사용했던
+
+ref 의 내용을 적어주면 된다
+
+이 ref를 통해서 Mongoose에게 이게 객체 ID의 배열임을 알려주고
+
+각각 이 product 모델에 연결되어 있다고 알려준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381385/notion-blog/_/The_Web_Developer_2022/node_js/Mongo_/Untitled_6.png)
+
+```jsx
+const farm = await Farm.findOne({name : 'Full belly Farms'});
+    const melon = await Product.findOne({name :'Goddess Melong2' });
+    farm.products.push(melon)
+    await farm.save()
+}
+
+Farm.findOne({name : 'Full belly Farms' })
+    .populate('products')                   // populate 사용하기
+    .then(farm => console.log(farm));
+```
+
+```jsx
+주의 할 점은 populate 에 넣는 문자가 ref 에 적은 컬렉션을 적는게 아니라
+
+스키마를 정의할 때 적어주었던 문서명 (Documents) 를 적어주어야 한다는것이다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381385/notion-blog/_/The_Web_Developer_2022/node_js/Mongo_/Untitled_7.png)
+
+```jsx
+이렇게 필요한 데이터를 불러오기 해서 사용하는 이유는
+
+필요한 페이지나 순간에만 채워넣어 사용하기 때문이다
+
+( 다른 모든 정보는 다 바꿔도 상품들은 바꾸지 않을 거라면 그 항목은 해당 쿼리에는 상품을 채워 넣을 필요가 없기때문 )
+```
+
+# one to bajillion
+
+```jsx
+데이터의 양이 아주 많을 때는 부모에 대한 레퍼런스를 자식에 저장하는 게 여기의 ID 목록처럼
+
+자식에 대한 레퍼런스를 부모에 저장하는 것보다 더 효율적일 때가 많다
+
+one to bajillion 관계는 하나의 데이터와 매우 많은 자식 문서 또는 항목이 연결된 관계를 나타낸다.
+
+예시로는 Twitter에서 모든 트윗을 하나의 사용자로 임베드하는 경우가 있다 ( 몇년을 사용한 사용자의 많은 양의 데이터 )
+
+* 한마디로 유저가 부모인데 자식인 tweet 에 user 을 임베드 한다는거
+
+	간단히 말하면, "사용자에 대한 정보를 각 트윗에 직접 저장하는 것"
+
+	즉, 트윗이라는 개별 데이터에 해당 트윗을 올린 사용자의 정보를 복사해서 넣는 것이 아니라,
+
+	사용자를 참조하는 ID나 다른 방식으로 직접 해당 사용자의 정보를 트윗에 저장하는 방법을 말한다.
+
+	이렇게 하면 특정 트윗을 조회할 때 해당 트윗에 속한 사용자의 정보를 바로 얻을 수 있어서 데이터를 효율적으로 사용할 수 있다.
+```
+
+## **문제점 및 효율적인 해결 방법**
+
+```jsx
+사용자 중 일부는 매우 많은 트윗을 가지고 있을 수 있으며, 페이지에 표시할 때 일부만 필요하다 ( 스크롤의 한계 )
+
+자식에 대한 레퍼런스를 부모에 저장하는 것보다, 부모에 대한 레퍼런스를 자식에 저장하는 것이 더 효율적일 수 있다
+
+이를 통해 각 자식은 필요한 정보를 참조할 수 있고, 일부만 필요한 경우 전체 데이터를 불러올 필요가 없다.
+```
+
+```jsx
+const mongoose = require('mongoose')
+
+mongoose.connect('mongodb://localhost:27017/relationshipDemo')
+
+const db = mongoose.connection
+db.on('error', console.error.bind(console, 'connection error'), {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+db.once('open', () => {
+  console.log('Database connected')
+})
+
+// 사용자 스키마 정의
+const userSchema = new mongoose.Schema({
+  username: String,
+  age: Number,
+})
+// 트윗 스키마 정의
+const tweetSchema = new mongoose.Schema({
+  text: String,
+  likes: Number,
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+})
+
+// 사용자와 트윗 모델 생성
+const User = mongoose.model('User', userSchema)
+const Tweet = mongoose.model('Tweet', tweetSchema)
+
+// 비동기 함수로 사용자와 트윗 생성 및 저장
+// tweet , user 만들기
+// const makeTweets = async () => {
+//     const user = new User({username : 'Dongk', age : 64})
+//     const tweet1 = new Tweet({text : 'omg', likes : 5})
+//     tweet1.user = user;
+//     user.save();
+//     tweet1.save();
+// }
+
+// makeTweets();
+
+// tweet 찾기 ( 모든속성)
+// const findTweet = async () => {
+//     const t = await Tweet.findOne({})
+//         .populate('user')
+//     console.log(t);
+// }
+
+// 원하는 속성만 가져오기
+const findTweet = async () => {
+  const t = await Tweet.findOne({}).populate('user', 'username')
+  console.log(t)
+}
+
+findTweet()
+```
+
+# 몽고 DB를 설계하는 6가지 룰
+
+[6 Rules of Thumb for MongoDB Schema Design | MongoDB Blog](https://www.mongodb.com/blog/post/6-rules-of-thumb-for-mongodb-schema-design)
+
+```jsx
+나중에 정리하기
+```

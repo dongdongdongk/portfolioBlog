@@ -1,0 +1,608 @@
+---
+title: 'Claude Code Skills 완전 가이드'
+date: '2026-09-02'
+category: 'AI/AI 에이전트 사용법'
+tags: ['AI', 'AI 에이전트 사용법']
+draft: false
+summary: ''
+---
+
+# Claude Code Skills 완전 가이드
+
+> 공식 문서 + 커뮤니티 실전 사례 기반 | 2026년 2월 기준
+
+---
+
+## Skills가 뭔지 한 줄로 설명하면
+
+**"내가 따로 호출하지 않아도, Claude가 상황을 보고 알아서 꺼내 쓰는 전문 지식 패키지"**
+
+예를 들어 "PDF 분석해줘"라고 말하는 순간, Claude가 pdf 스킬을 자동으로 로드해서
+그 스킬에 담긴 방법으로 처리해요. 내가 따로 명령할 필요가 없어요.
+
+---
+
+## Commands vs Subagents vs Skills — 딱 한 번만 구분
+
+| 도구          | 비유      | 작동 방식                           | 호출        |
+| ------------- | --------- | ----------------------------------- | ----------- |
+| **Commands**  | 단축키    | 내가 `/명령어`로 직접 실행          | 수동        |
+| **Subagents** | 전문 직원 | Claude가 판단해서 위임, 독립적 실행 | 자동/명시적 |
+| **Skills**    | 매뉴얼    | Claude가 맥락 보고 자동 로드        | 자동 (배경) |
+
+> **핵심 차이**: Skills는 "어떻게 할지 아는 것"이고, Subagents는 "누가 할지"예요.
+> 같은 reviewer 에이전트가 code-review 스킬을 참고해서 작업하는 식으로 함께 써요.
+
+---
+
+## Skills가 왜 필요한가 — 진짜 문제 해결
+
+Claude Code를 쓰다 보면 이런 상황이 생겨요:
+
+- 매번 "우리 프로젝트는 TypeScript 쓰고, 함수는 50줄 이하로..."를 반복 설명
+- 문서 작업할 때마다 "제목은 ## 형식으로, 마지막엔 예제 코드..."를 다시 입력
+- PR 리뷰 기준이 사람마다 달라서 일관성이 없음
+
+Skills는 이런 반복을 없애줘요. 한 번 만들어두면 영구적으로 동작해요.
+
+---
+
+## PART 1 — Skills 동작 원리 이해하기
+
+### 어떻게 자동으로 로드되나요?
+
+```
+세션 시작
+    ↓
+Claude가 .claude/skills/ 폴더를 스캔
+    ↓
+각 스킬의 name + description만 미리 읽음 (본문은 아직 X)
+    ↓
+대화 중 관련 상황 감지
+    ↓
+해당 스킬의 SKILL.md 전체 내용 로드
+    ↓
+스킬에 담긴 지침으로 작업 수행
+```
+
+이걸 **Progressive Disclosure(점진적 공개)** 라고 해요.
+처음엔 목차만 보다가, 필요할 때 해당 챕터를 펼치는 방식이에요.
+덕분에 수십 개 스킬을 만들어도 컨텍스트 창이 꽉 차지 않아요.
+
+### description이 핵심인 이유
+
+Claude는 `description`만 보고 "이 스킬을 지금 써야 하나"를 결정해요.
+본문 내용은 스킬이 선택된 이후에야 읽혀요.
+
+**나쁜 description 예시**:
+
+```
+PDF를 처리하는 스킬입니다.
+```
+
+→ 너무 모호해서 언제 써야 할지 Claude가 판단 못 함
+
+**좋은 description 예시**:
+
+```
+PDF 파일 분석, 텍스트 추출, 표 파싱, 페이지 병합에 사용.
+"PDF", "pdf 파일", "문서 읽어줘" 등의 요청에 반응.
+```
+
+→ 구체적인 트리거 상황과 키워드를 포함
+
+---
+
+## PART 2 — Skills 폴더 구조
+
+### 기본 구조 (단순형)
+
+```
+.claude/skills/
+└── 스킬이름/
+    └── SKILL.md          ← 필수, 이것만 있어도 됨
+```
+
+### 고급 구조 (파일 포함형)
+
+```
+.claude/skills/
+└── 스킬이름/
+    ├── SKILL.md           ← 필수: 지침 + frontmatter
+    ├── templates/
+    │   └── output.md      ← 출력 템플릿
+    ├── examples/
+    │   └── sample.md      ← 입출력 예시
+    ├── references/
+    │   └── guide.md       ← 상세 참고 문서
+    └── scripts/
+        └── process.sh     ← 실행 가능한 스크립트
+```
+
+`SKILL.md`가 필수이고, 나머지는 필요할 때만 추가해요.
+
+---
+
+## PART 3 — SKILL.md 작성법
+
+### 기본 구조
+
+```markdown
+---
+name: 스킬이름
+description: 언제, 어떤 상황에서 이 스킬을 쓸지 설명. 트리거 키워드 포함.
+allowed-tools: Read, Write, Bash
+version: 1.0.0
+---
+
+# 스킬 제목
+
+여기부터 Claude에게 줄 지침을 씁니다.
+무엇을, 어떻게, 어떤 형식으로 할지 상세하게 작성해요.
+```
+
+### frontmatter 필드 설명
+
+| 필드                       | 필수?   | 설명                                      |
+| -------------------------- | ------- | ----------------------------------------- |
+| `name`                     | ✅ 필수 | 스킬 식별자. `/name`으로도 호출 가능      |
+| `description`              | ✅ 필수 | Claude가 자동 로드 여부를 판단하는 핵심   |
+| `allowed-tools`            | 선택    | 이 스킬 실행 중 허용할 도구 목록          |
+| `version`                  | 선택    | 버전 관리                                 |
+| `disable-model-invocation` | 선택    | `true`면 내가 직접 호출해야만 작동        |
+| `user-invocable`           | 선택    | `false`면 Claude만 사용 가능 (내가 못 씀) |
+| `context`                  | 선택    | `fork` 설정 시 별도 컨텍스트에서 실행     |
+
+---
+
+## PART 4 — 실전 스킬 예시 4개
+
+### 📝 코드 문서화 스킬
+
+폴더: `.claude/skills/code-docs/SKILL.md`
+
+````markdown
+---
+name: code-docs
+description: 함수, 클래스, 모듈에 문서 주석 추가 요청 시 사용.
+  "주석 달아줘", "문서화", "JSDoc", "docstring" 키워드에 반응.
+  새 코드 작성 후 문서가 없을 때 자동 적용 권장.
+allowed-tools: Read, Write, Glob
+---
+
+# 코드 문서화 가이드
+
+## 기본 원칙
+
+- 무엇을 하는지(what)보다 왜 하는지(why)를 설명
+- 파라미터와 반환값은 반드시 명시
+- 예외 상황(throws)도 기재
+
+## TypeScript/JavaScript — JSDoc 형식
+
+```typescript
+/**
+ * 사용자 ID로 사용자 정보를 조회합니다.
+ *
+ * @param userId - 조회할 사용자의 고유 ID
+ * @returns 사용자 객체, 없으면 null
+ * @throws {DatabaseError} DB 연결 실패 시
+ *
+ * @example
+ * const user = await getUserById('user_123');
+ */
+```
+````
+
+## Python — Docstring 형식
+
+```python
+def get_user_by_id(user_id: str) -> Optional[User]:
+    """
+    사용자 ID로 사용자 정보를 조회합니다.
+
+    Args:
+        user_id: 조회할 사용자의 고유 ID
+
+    Returns:
+        사용자 객체, 없으면 None
+
+    Raises:
+        DatabaseError: DB 연결 실패 시
+    """
+```
+
+## 규칙
+
+- 기존 주석 스타일 유지 (없으면 위 형식 사용)
+- 자명한 코드에 불필요한 주석 금지 (`i++ # i를 1 증가` 같은 것)
+- 변경된 함수 목록을 작업 후 요약 제공
+
+````
+
+---
+
+### 🔍 PR 리뷰 스킬
+
+폴더: `.claude/skills/pr-review/SKILL.md`
+
+```markdown
+---
+name: pr-review
+description: PR 검토, 코드 리뷰, 변경사항 분석 요청 시 사용.
+  "PR", "리뷰", "커밋 전 확인", "변경사항 봐줘" 키워드에 반응.
+allowed-tools: Read, Bash, Grep, Glob
+disable-model-invocation: true
+---
+
+# PR 리뷰 체크리스트
+
+리뷰는 중요도 순서대로 진행합니다.
+
+## 🔴 1단계: 버그 & 보안 (필수 수정)
+- [ ] null/undefined 참조 가능성
+- [ ] SQL Injection, XSS 취약점
+- [ ] 인증/인가 누락
+- [ ] 민감 정보 하드코딩 (API 키, 비밀번호)
+- [ ] 처리되지 않은 예외
+
+## 🟡 2단계: 성능 & 품질 (권장)
+- [ ] N+1 쿼리 패턴
+- [ ] 불필요한 반복 연산
+- [ ] 메모리 누수 가능성
+- [ ] 중복 코드 (3회 이상 반복)
+
+## 🟢 3단계: 가독성 (선택)
+- [ ] 변수/함수 이름이 의도를 표현하는가
+- [ ] 함수가 한 가지 일만 하는가
+- [ ] 테스트가 새 로직을 커버하는가
+
+## 출력 형식
+````
+
+## PR 리뷰 결과
+
+### 🔴 필수 수정 (N건)
+
+1. [파일:줄] 문제 설명 → 수정 방법
+
+### 🟡 권장 개선 (N건)
+
+...
+
+### 🟢 잘된 부분
+
+...
+
+```
+
+사소한 스타일 지적은 하지 않습니다. 버그와 보안에 집중합니다.
+```
+
+---
+
+### 🧪 테스트 전략 스킬
+
+폴더: `.claude/skills/test-strategy/SKILL.md`
+
+````markdown
+---
+name: test-strategy
+description: 테스트 코드 작성, 테스트 전략 수립, 커버리지 분석 요청 시 사용.
+  "테스트", "jest", "unit test", "커버리지" 키워드에 반응.
+allowed-tools: Read, Write, Bash, Glob
+---
+
+# 테스트 작성 전략
+
+## 테스트 우선순위
+
+1. 핵심 비즈니스 로직 (버그 발생 시 치명적인 것)
+2. 외부 API 연동 (Mock 처리)
+3. 유틸리티 함수 (경계값 포함)
+4. UI 컴포넌트 (사용자 인터랙션 위주)
+
+## 테스트 구조 — AAA 패턴
+
+```javascript
+test('이메일이 없으면 회원가입에 실패해야 한다', () => {
+  // Arrange (준비)
+  const userData = { name: '홍길동', password: '1234' }
+
+  // Act (실행)
+  const result = () => registerUser(userData)
+
+  // Assert (검증)
+  expect(result).toThrow('이메일은 필수입니다')
+})
+```
+````
+
+## 경계값 테스트 체크리스트
+
+모든 함수에서 아래를 반드시 테스트:
+
+- 빈 값 (null, undefined, '', [])
+- 최솟값/최댓값
+- 음수 (숫자 파라미터)
+- 매우 긴 문자열
+- 특수문자 포함
+
+## 작업 완료 기준
+
+- 작성 후 `npm test` 실행해서 통과 확인
+- 실패하면 수정 후 재실행
+- 커버리지 80% 이상 목표
+
+````
+
+---
+
+### 📦 Git 커밋 스킬
+
+폴더: `.claude/skills/git-commit/SKILL.md`
+
+```markdown
+---
+name: git-commit
+description: git 커밋, 커밋 메시지 작성, 변경사항 정리 요청 시 사용.
+  "커밋", "commit", "git" 키워드에 반응.
+  자동 커밋은 위험하므로 disable-model-invocation 설정.
+allowed-tools: Bash(git diff:*), Bash(git status:*), Bash(git add:*), Bash(git commit:*)
+disable-model-invocation: true
+---
+
+# Git 커밋 가이드
+
+## 커밋 전 체크 (아래 발견 시 커밋 중단)
+- `console.log`, `print()` 디버그 코드
+- `TODO`, `FIXME`, `HACK` 주석
+- 하드코딩된 API 키, 비밀번호
+- `DEBUG = true`, `test_mode = 1`
+- 주석 처리된 코드 블록
+
+## 커밋 메시지 형식 (Conventional Commits)
+````
+
+타입: 한 줄 요약 (50자 이하)
+
+상세 설명 (필요 시, 72자 이하)
+
+```
+
+타입 목록:
+- `feat`: 새 기능
+- `fix`: 버그 수정
+- `refactor`: 기능 변경 없는 코드 개선
+- `test`: 테스트 추가/수정
+- `docs`: 문서만 변경
+- `chore`: 빌드, 설정 파일 변경
+
+예시:
+```
+
+feat: 사용자 프로필 이미지 업로드 기능 추가
+
+- S3 연동으로 이미지 저장
+- 5MB 크기 제한 및 유효성 검사
+- 업로드 실패 시 재시도 로직 포함
+
+```
+
+## 실행 순서
+1. `git diff --staged` 로 변경사항 확인
+2. 체크리스트 검사
+3. 문제 없으면 커밋 실행
+4. 문제 있으면 목록 보여주고 중단
+```
+
+---
+
+## PART 5 — 글로벌 vs 프로젝트 스킬
+
+```bash
+# 프로젝트 전용 스킬 (팀원과 공유, git에 포함)
+.claude/skills/스킬이름/SKILL.md
+
+# 개인 글로벌 스킬 (모든 프로젝트에서 사용)
+~/.claude/skills/스킬이름/SKILL.md
+```
+
+**무엇을 어디에 두나?**
+
+| 스킬 종류                   | 위치                |
+| --------------------------- | ------------------- |
+| 팀 코딩 컨벤션, PR 기준     | 프로젝트 (.claude/) |
+| 개인 작업 방식, 문서 템플릿 | 글로벌 (~/.claude/) |
+| 회사 보안 정책, 공통 규칙   | 프로젝트 (.claude/) |
+
+---
+
+## PART 6 — 고급 기능
+
+### 6-1. 인자 전달 ($ARGUMENTS)
+
+스킬에도 인자를 넘길 수 있어요.
+
+```markdown
+---
+name: fix-issue
+description: GitHub 이슈 번호를 받아 해당 버그를 수정합니다.
+disable-model-invocation: true
+---
+
+GitHub 이슈 #$ARGUMENTS 를 수정합니다.
+
+1. 이슈 설명을 읽고 재현 조건 파악
+2. 관련 코드 탐색
+3. 수정 후 테스트 실행
+```
+
+```bash
+# 사용법
+/fix-issue 123
+```
+
+### 6-2. 안전한 읽기 전용 스킬
+
+```markdown
+---
+name: safe-reader
+description: 파일을 읽고 분석할 때 사용. 쓰기 작업이 없어야 할 때.
+allowed-tools: Read, Grep, Glob
+---
+
+코드를 분석하되 파일을 수정하지 않습니다.
+분석 결과만 보고합니다.
+```
+
+### 6-3. 독립 실행 스킬 (context: fork)
+
+메인 대화와 분리된 환경에서 실행하고 싶을 때:
+
+```markdown
+---
+name: codebase-research
+description: 코드베이스 구조 파악, 특정 패턴 탐색 요청 시 사용.
+context: fork
+agent: general-purpose
+---
+
+다음 작업을 수행하고 결과를 요약해서 반환합니다:
+
+1. 전체 파일 구조 파악
+2. 주요 모듈과 의존성 관계 분석
+3. 핵심 로직 흐름 정리
+
+결과는 간결한 마크다운으로 정리해주세요.
+```
+
+메인 컨텍스트를 오염시키지 않고 탐색 작업을 분리할 수 있어요.
+
+### 6-4. 스킬 권한 제어
+
+특정 스킬만 허용하거나 금지하려면 `/permissions` 설정:
+
+```
+# 특정 스킬만 허용
+Skill(commit)
+Skill(review-pr *)
+
+# 특정 스킬 금지 (배포는 내가 직접)
+Skill(deploy *)
+```
+
+---
+
+## PART 7 — 스킬 작성 팁
+
+**1. description에 트리거 키워드를 명시하세요**
+
+```yaml
+# 나쁜 예
+description: 코드를 검토합니다.
+
+# 좋은 예
+description: PR 검토, 코드 품질 분석, 보안 검사 요청 시 사용.
+  "리뷰", "review", "PR", "확인해줘" 키워드에 반응.
+  커밋 전이나 기능 완성 후 자동 제안 가능.
+```
+
+**2. SKILL.md는 500줄 이하로 유지하세요**
+
+길어지면 `references/` 폴더에 분리해서 링크로 참조해요.
+
+```markdown
+# 상세 SQL 최적화 패턴
+
+자세한 내용은 references/sql-patterns.md 참조.
+```
+
+**3. 예시를 넣으면 퀄리티가 올라가요**
+
+Claude는 패턴 인식을 잘 해서, 입출력 예시가 있으면 훨씬 일관된 결과를 내요.
+
+**4. 너무 많이 만들지 마세요**
+
+스킬이 많아지면 description이 겹쳐서 Claude가 어떤 걸 써야 할지 헷갈려요.
+처음엔 3~5개로 시작해서 필요할 때 추가하는 방식이 좋아요.
+
+**5. 자동 호출이 부담스러운 건 잠그세요**
+
+배포, 커밋처럼 Claude가 멋대로 실행하면 위험한 스킬은 반드시:
+
+```yaml
+disable-model-invocation: true
+```
+
+---
+
+## PART 8 — 처음 시작할 때 추천 순서
+
+```
+Step 1 (오늘)
+  → code-docs 스킬 하나 만들기
+  → 기존 파일 열고 "/code-docs 이 파일 문서화해줘" 테스트
+
+Step 2 (3일 후)
+  → pr-review 스킬 추가
+  → 실제 PR 전에 써보기
+
+Step 3 (1주 후)
+  → git-commit 스킬로 커밋 안전장치 적용
+  → description 수정하면서 자동 트리거 정교화
+
+Step 4 (이후)
+  → 불편한 게 생길 때마다 스킬 추가
+  → 쓰면서 SKILL.md 내용 계속 다듬기
+```
+
+---
+
+## PART 9 — 자주 묻는 것들
+
+**Q. 스킬을 만들었는데 Claude가 자동으로 안 써요**
+
+description을 더 구체적으로 고쳐보세요. 트리거 상황과 키워드를 명시하면 돼요.
+
+**Q. 스킬과 Commands 중 뭘 써야 하나요?**
+
+자동으로 켜져야 하는 것 → Skills, 내가 직접 실행하는 것 → Commands
+
+**Q. 파일 수정하고 바로 적용되나요?**
+
+네, 다음 대화부터 즉시 반영돼요. 세션 재시작 불필요.
+
+**Q. Skills를 Claude.ai 웹에서도 쓸 수 있나요?**
+
+네! Skills는 Claude Code, Claude.ai, Claude Desktop에서 모두 작동하는 오픈 표준이에요.
+Claude.ai에서는 Settings → Features → Skills에서 업로드할 수 있어요.
+
+**Q. 스크립트(.sh, .py)를 스킬에 넣어도 되나요?**
+
+네, `scripts/` 폴더에 넣고 SKILL.md에서 참조하면 돼요.
+단, 신뢰할 수 없는 소스의 스킬은 설치하지 마세요 — 코드가 실행되니까요.
+
+---
+
+## 이전 Commands 파일과의 호환성
+
+기존에 `.claude/commands/review.md`가 있다면 그대로 작동해요.
+Skills로 마이그레이션하면 supporting files, 자동 로드 등 추가 기능을 쓸 수 있어요.
+
+```bash
+# 기존 방식 (여전히 작동)
+.claude/commands/review.md
+
+# 권장 방식 (더 많은 기능)
+.claude/skills/review/SKILL.md
+```
+
+---
+
+## 참고 링크
+
+- [공식 Skills 문서](https://code.claude.com/docs/en/skills)
+- [Anthropic Skills 만드는 법](https://claude.com/blog/how-to-create-skills-key-steps-limitations-and-examples)
+- [커뮤니티 Skills 모음](https://github.com/ComposioHQ/awesome-claude-skills)
+- [Agent Skills 오픈 표준](https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills)

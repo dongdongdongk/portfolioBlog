@@ -1,0 +1,359 @@
+---
+title: 'P2 ch5 p124_스프링 MVC 흐름'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# **DD(Deployment Descriptor : 배포서술자)**
+
+```java
+WEB-INF폴더 아래 web.xml이라는 파일명으로 항상 존재해야 하며 서버 시작시 메모리에 로딩된다.
+```
+
+## web.xml
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381161/notion-blog/_/_/_/_/P2_ch5_p124_MVC_/Untitled.png)
+
+```java
+서블릿과 관련된 설정이 있는곳이다
+
+여기는 스프링과 관련된 중요한 설정 2가지가 들어가 있다.
+```
+
+```java
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app version="2.5" xmlns="http://java.sun.com/xml/ns/javaee"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://java.sun.com/xml/ns/javaee https://java.sun.com/xml/ns/javaee/web-app_2_5.xsd">
+
+	<!-- The definition of the Root Spring Container shared by all Servlets and Filters -->
+	<context-param>
+		<param-name>contextConfigLocation</param-name>
+		<param-value>/WEB-INF/spring/root-context.xml</param-value>
+	</context-param>
+
+	<!-- Creates the Spring Container shared by all Servlets and Filters -->
+	<listener>
+		<listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+	</listener>
+
+	<!-- Processes application requests -->
+	<servlet>
+		<servlet-name>appServlet</servlet-name>
+		<servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+		<init-param>
+			<param-name>contextConfigLocation</param-name>
+			<param-value>/WEB-INF/spring/appServlet/servlet-context.xml</param-value>
+		</init-param>
+		<load-on-startup>1</load-on-startup>
+	</servlet>
+
+	<servlet-mapping>
+		<servlet-name>appServlet</servlet-name>
+		<url-pattern>/</url-pattern>
+	</servlet-mapping>
+
+</web-app>
+```
+
+### 1.ContextLoaderListener
+
+```java
+첫번째는 ContextLoaderListener다 서블릿에 리스너는 여러가지 있다
+
+그중 하나인 ContextLoaderListener 는 프로젝트가 실행될때
+
+	<!-- The definition of the Root Spring Container shared by all Servlets and Filters -->
+	<context-param>
+		<param-name>contextConfigLocation</param-name>
+		<param-value>/WEB-INF/spring/root-context.xml</param-value>
+	</context-param>
+
+이 부분을 읽어들인다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381156/notion-blog/_/_/_/_/P2_ch5_p124_MVC_/Untitled_1.png)
+
+```java
+스프링을 실행하는 존재
+
+* ApplicationContext => WebApplicationContext
+
+같이 연동되는 방식으로 동작하기 때문에 설정을 분리해도 통합해서 사용가능
+(ApplicationContext.xml 은 root-context.xml + servlet-context.xml 이라고 생각하면 편하다)
+
+실행하면 처음에 root-context.xml 이 실행되고 (Spring Bean 에 관련된 설정들)
+
+다음으로 servlet-context.xml 이 실행된다
+
+그리고 우리가 사용할때는 두가지가 합쳐져 있는 형태로 동작하게 된다
+```
+
+### **Application Context**
+
+```java
+* Web Application 최상단에 위치하고 있는 Context
+
+* Spring에서 ApplicationContext란 BeanFactory를 상속받고 있는 Context
+
+* Spring에서 root-context.xml, applicationContext.xml 파일은 ApplicationContext 생성 시 필요한 설정정보를 담은 파일 (Bean 선언 등..)
+
+* Spring에서 생성되는 Bean에 대한 IoC Container (또는 Bean Container)
+
+* 특정 Servlet설정과 관계 없는 설정을 한다 (@Service, @Repository, @Configuration, @Component)
+
+* 서로 다른 여러 Servlet에서 공통적으로 공유해서 사용할 수 있는 Bean을 선언한다.
+
+* Application Context에 정의된 Bean은 Servlet Context에 정의 된 Bean을 사용할 수 없다
+```
+
+### **Servlet-Context (servlet-context.xml)**
+
+```java
+* Servlet 단위로 생성되는 context
+
+* Spring에서 servlet-context.xml 파일은 DispatcherServlet 생성 시에 필요한 설정 정보를 담은 파일 (Interceptor, Bean생성, ViewResolver등..)
+
+* URL설정이 있는 Bean을 생성 (@Controller, Interceptor)
+
+* Application Context를 자신의 부모 Context로 사용한다.
+
+* Application Context와 Servlet Context에 같은 id로 된 Bean이 등록 되는 경우, Servlet Context에 선언된 Bean을 사용한다.
+
+* Bean 찾는 순서
+		* Servlet Context에서 먼저 찾는다.
+
+		* 만약 Servlet Context에서 bean을 못찾는 경우 Application Context에 정의된 bean을 찾는다.
+
+* Servlet Context에 정의된 Bean은 Application Context의 Bean을 사용할 수 있다.
+```
+
+# 모델2 방식과 스프링 MVC
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381160/notion-blog/_/_/_/_/P2_ch5_p124_MVC_/Untitled_2.png)
+
+```java
+MVC 이렇게 분리하는 가장 큰 이유는 URL 을 분리하기 위해서다
+
+사용자가 어떤 URL 을 요청했을 때 URL 과 로직을 묶어서 분리시키면 나중에 화면을 분리하기 쉬워진다
+```
+
+# 스프링 MVC의 기본 흐름
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381160/notion-blog/_/_/_/_/P2_ch5_p124_MVC_/Untitled_3.png)
+
+## DispatcherServlet(web.xml)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381160/notion-blog/_/_/_/_/P2_ch5_p124_MVC_/Untitled_4.png)
+
+```java
+/  루트로 들어오는 모든 URL 은 DispatcherServlet 을 거쳐서 동작한다는 뜻이다
+
+이때 아래를 보면 <param-value>/WEB-INF/spring/appServlet/servlet-context.xml</param-value> 즉  servlet-context.xml  을 사용한다고 되어있다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381160/notion-blog/_/_/_/_/P2_ch5_p124_MVC_/Untitled_5.png)
+
+```java
+servlet-context.xml 를 보면
+
+<context:component-scan base-package="org.zerock.controller" /> 전에 배웠던 어노테이션이 있는 애들을 빈에 등록해주는 스캔 기능도 보인다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381161/notion-blog/_/_/_/_/P2_ch5_p124_MVC_/Untitled_6.png)
+
+```java
+예전 프로젝트 예제를 보면 프로젝트 전체를 스캔해서 어노테이션을 통한 Bean 등록을 찾는다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381161/notion-blog/_/_/_/_/P2_ch5_p124_MVC_/Untitled_7.png)
+
+```java
+보면 홈 컨트롤러에 s가 붙어있고(Bean 으로 관리되고 있다는 뜻) @Controller 가 붙어있는것을 볼 수 있다
+```
+
+## HandlerMapping, HandlerAdapter
+
+```java
+URL 을 어떻게 처리 해줄것인지 방식을 처리 해주는것 (유연함을 위해)
+
+그것에 대한 어탭터 HandlerAdapter
+```
+
+## ViewResolver
+
+```java
+View 를 어떻게 해석할지에 대한 설정을 적어둔다
+
+servlet-context.xml 을 보면
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381161/notion-blog/_/_/_/_/P2_ch5_p124_MVC_/Untitled_8.png)
+
+```java
+<beans:property name="prefix" value="/WEB-INF/views/" /> 앞에다 /WEB-INF/views/ 를 붙이겠다
+
+<beans:property name="suffix" value=".jsp" /> 뒤에다 .jsp 를 붙이겠다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381161/notion-blog/_/_/_/_/P2_ch5_p124_MVC_/Untitled_9.png)
+
+```java
+예시로 홈 컨트롤러를 보면 String 으로 home 이 리턴되면 뷰 리졸브 설정대로
+
+/WEB-INF/views/home.jsp 이렇게 변하는것이다
+```
+
+# Controller
+
+```java
+* HttpServletRequest, HttpServletResponse를 거의 사용할 필요 없이 필요한 기능 구현 (저수준 많이 사용할 일이 없다) (파라미터를 자동으로 수입해줌)
+
+* 다양한 타입의 파라미터 처리, 다양한 타입의 리턴 타입 사용 가능
+
+* GET 방식, POST 방식 등 전송 방식에 대한 처리를 어노테이션으로 처리 가능 (@RequestMapping 은 3버전 이후는 @GetMapping 등)
+
+* 상속/인터페이스 방식 대신에 어노테이션만으로도 필요한 설정 가능
+```
+
+# @Controller, @RequestMapping
+
+```java
+* @Controller – 해당 클래스의 인스턴스를 스프링의 빈으로 등록하고 컨트롤러로 사용
+
+	<component-scan>과 같이 활용
+
+* @RequestMapping – 특정한 URI에 대한 처리를 해당 컨트롤러나 메서드에서 처리
+
+	@Controller
+	@RequestMapping("/sample/*")
+	public class SampleController {
+ 
+	}
+```
+
+# 컨트롤러의 파라미터 수집
+
+```java
+* 스프링 MVC의 컨트롤러는 메서드의 파라미터를 자동으로 수집, 변환하는 편리한 기능을 제공
+
+* Java Beans 규칙에 맞게 작성되어야 한다.
+
+	* 생성자가 없거나 빈 생성자
+
+	* 올바른 규칙으로 만들어진 Getter/Setter
+
+@Data
+public class SampleDTO {
+ 
+  private String name;
+  private int age;
+}
+
+@GetMapping("/ex01")
+  public String ex01(SampleDTO dto) {
+ 
+    log.info("" + dto);
+ 
+    return "ex01";
+  }
+```
+
+# @ModelAttribute
+
+```java
+* 컨트롤러에서 메서드의 파라미터는 기본자료형을 제외한 객체형 타입은 다시 화면으로 전달
+
+* @ModelAttribute는 명시적으로 화면에 전달되도록 지정
+
+* 꼭 모델이 필요한게 아니라 없이도 객체를 전달 가능하다 (그냥 SampleDTO 만 써버려도 전달 된다)
+
+아래 예시를 보면 page 로 ${} 에 사용할 수 있게 @ModelAttribute(“page”)로 이름을 바꿨다
+```
+
+```java
+@GetMapping("/ex04")
+  public String ex04(SampleDTO dto, @ModelAttribute(“page”) int page) {
+ 
+    log.info("dto: " + dto);
+    log.info("page: " + page);
+ 
+    return "/sample/ex04";
+}
+
+<h2>SAMPLEDTO   ${sampleDTO }</h2>
+<h2>PAGE ${page }</h2>
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381157/notion-blog/_/_/_/_/P2_ch5_p124_MVC_/Untitled_10.png)
+
+## 실습
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381157/notion-blog/_/_/_/_/P2_ch5_p124_MVC_/Untitled_11.png)
+
+```java
+SampleDTO 를 제작한다
+```
+
+### 파라미터 수집과 변환
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381157/notion-blog/_/_/_/_/P2_ch5_p124_MVC_/Untitled_12.png)
+
+```java
+@RequestMapping("/sample/*") 을 사용하면 엔드 포인트 주소에 일일이 sample 을 붙여줄 필요가 없어진다
+
+http://localhost:8080/sample/ex01?name=AAA&age=10 이런식으로 임의로 url 을 보내면
+
+아래와 같은 결과가 나온다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381157/notion-blog/_/_/_/_/P2_ch5_p124_MVC_/Untitled_13.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381157/notion-blog/_/_/_/_/P2_ch5_p124_MVC_/Untitled_14.png)
+
+**@RequestParam , @PathVariable**
+
+```java
+@RequestParam 을 사용한 예제는 알아서 링크보고 확인
+```
+
+### 리스트 배열 처리
+
+```java
+동일한 이름의 파라미터가 여러 개 전달되는 경우에는 ArrayList<> 등을 이용해서 처리한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381158/notion-blog/_/_/_/_/P2_ch5_p124_MVC_/Untitled_15.png)
+
+```java
+http://localhost:8080/sample/ex02List?ids=111&ids=222&ids=333 로 같은 이름의 파라미터를 보내면
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381159/notion-blog/_/_/_/_/P2_ch5_p124_MVC_/Untitled_16.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381158/notion-blog/_/_/_/_/P2_ch5_p124_MVC_/Untitled_17.png)
+
+```java
+ex02Array 의 배열도 동일하게 처리 가능하다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381158/notion-blog/_/_/_/_/P2_ch5_p124_MVC_/Untitled_18.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381158/notion-blog/_/_/_/_/P2_ch5_p124_MVC_/Untitled_19.png)
+
+### 객체 리스트
+
+```java
+전달하는 데이터가 SampleDTO 같이 객체 타입이고
+
+SampleDTO 를 여러개 받아서 처리하고 싶다면
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381160/notion-blog/_/_/_/_/P2_ch5_p124_MVC_/Untitled_20.png)
+
+```java
+SampleDTOList 클래스를 만들어주고
+```

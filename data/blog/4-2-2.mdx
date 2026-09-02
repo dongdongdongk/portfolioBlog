@@ -1,0 +1,1611 @@
+---
+title: '섹션 4 - 2'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+# { 🚀 로켓 추진기와 파티클 시스템 제어하기 }
+
+이번 강의는 **Unity의 입력 시스템(Input System)** 을 이용해 플레이어 우주선을 **좌우·상하로 부드럽게 이동**시키고, 코드 구조화(메서드 추출)와 직렬화된 필드(SerializedField)를 활용하여 제어 속도를 인스펙터에서 조정하는 방법을 다뤘습니다. 이 개념은 이후 로켓 추진기 파티클 시스템을 제어할 때도 그대로 응용됩니다.
+
+---
+
+## 📋 목차
+
+1. [Unity 입력 시스템 개념](https://www.notion.so/4-275e683f737e803bafa4f014f6c318ca#unity-%EC%9E%85%EB%A0%A5-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B0%9C%EB%85%90)
+2. [Vector2 입력값 처리와 이동 계산](https://www.notion.so/4-275e683f737e803bafa4f014f6c318ca#vector2-%EC%9E%85%EB%A0%A5%EA%B0%92-%EC%B2%98%EB%A6%AC%EC%99%80-%EC%9D%B4%EB%8F%99-%EA%B3%84%EC%82%B0)
+3. [controlSpeed와 Time.deltaTime의 개념](https://www.notion.so/4-275e683f737e803bafa4f014f6c318ca#controlspeed%EC%99%80-timedeltatime%EC%9D%98-%EA%B0%9C%EB%85%90)
+4. [localPosition으로 이동 제어하기](https://www.notion.so/4-275e683f737e803bafa4f014f6c318ca#localposition%EC%9C%BC%EB%A1%9C-%EC%9D%B4%EB%8F%99-%EC%A0%9C%EC%96%B4%ED%95%98%EA%B8%B0)
+5. [상하 이동 추가하기 (도전 과제 해결)](https://www.notion.so/4-275e683f737e803bafa4f014f6c318ca#%EC%83%81%ED%95%98-%EC%9D%B4%EB%8F%99-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0-%EB%8F%84%EC%A0%84-%EA%B3%BC%EC%A0%9C-%ED%95%B4%EA%B2%B0)
+6. [코드 구조화: 메서드 추출과 유지보수](https://www.notion.so/4-275e683f737e803bafa4f014f6c318ca#%EC%BD%94%EB%93%9C-%EA%B5%AC%EC%A1%B0%ED%99%94-%EB%A9%94%EC%84%9C%EB%93%9C-%EC%B6%94%EC%B6%9C%EA%B3%BC-%EC%9C%A0%EC%A7%80%EB%B3%B4%EC%88%98)
+7. [인스펙터에서 속도 조정하기](https://www.notion.so/4-275e683f737e803bafa4f014f6c318ca#%EC%9D%B8%EC%8A%A4%ED%8E%99%ED%84%B0%EC%97%90%EC%84%9C-%EC%86%8D%EB%8F%84-%EC%A1%B0%EC%A0%95%ED%95%98%EA%B8%B0)
+8. [실습 결과 및 다음 단계](https://www.notion.so/4-275e683f737e803bafa4f014f6c318ca#%EC%8B%A4%EC%8A%B5-%EA%B2%B0%EA%B3%BC-%EB%B0%8F-%EB%8B%A4%EC%9D%8C-%EB%8B%A8%EA%B3%84)
+
+---
+
+## 1. Unity 입력 시스템 개념
+
+- **Input System 패키지**: Unity의 최신 입력 처리 방식. 액션 맵(Action Map)과 바인딩을 통해 키보드, 게임패드 등 다양한 입력 장치를 통합적으로 관리.
+- **InputValue**: UnityEngine.InputSystem에서 제공. 입력 이벤트가 발생할 때 전달되는 구조체로, `value.Get<Vector2>()` 를 통해 2차원 입력값을 받을 수 있음.
+- 액션 맵의 **OnMove 함수**를 PlayerMovement 클래스에 연결 → 입력 이벤트가 발생하면 Vector2 값을 movement 변수에 저장.
+
+---
+
+## 2. Vector2 입력값 처리와 이동 계산
+
+- **Vector2**: X축(좌우), Y축(상하) 이동값을 동시에 표현.
+  - `movement.x`: -1(왼쪽) ~ +1(오른쪽)
+  - `movement.y`: -1(아래) ~ +1(위쪽)
+- 이 값을 통해 프레임마다 이동할 오프셋을 계산:
+  ```csharp
+  float xOffset = movement.x * controlSpeed * Time.deltaTime;
+  float yOffset = movement.y * controlSpeed * Time.deltaTime;
+  ```
+
+---
+
+## 3. controlSpeed와 Time.deltaTime의 개념
+
+- **controlSpeed (float)**: 우주선 이동 속도. `[SerializeField]` 로 선언 → **인스펙터에서 실시간으로 조정 가능**.
+- **Time.deltaTime**: 이전 프레임과 현재 프레임 사이의 시간 간격(초).
+  - 곱해 주면 프레임 속도와 무관하게 일정한 속도로 이동.
+  - 예: 60 FPS와 120 FPS 환경에서도 같은 속도로 보임.
+
+---
+
+## 4. localPosition으로 이동 제어하기
+
+- **transform.localPosition**: 현재 오브젝트의 위치를 **부모 오브젝트 기준**으로 가져오고 설정.
+- 우주선 이동 코드는 다음과 같이 작성:
+  ```csharp
+  transform.localPosition = new Vector3(
+      transform.localPosition.x + xOffset,
+      transform.localPosition.y + yOffset,
+      0f
+  );
+  ```
+- **Z값**은 0으로 고정 → 2D 평면 상에서만 이동하도록 설정.
+- 이 방식은 **물리 엔진과 충돌 처리 없이 직접 변환값만 갱신**하기 때문에 단순하고 빠름.
+
+---
+
+## 5. 상하 이동 추가하기 (도전 과제 해결)
+
+- 기존 좌우 이동 로직을 복사해 **yOffset**을 계산하도록 수정.
+- **movement.y** 값을 사용해 상하 이동 처리:
+  ```csharp
+  float yOffset = movement.y * controlSpeed * Time.deltaTime;
+  ```
+- 이를 localPosition의 Y 값에 더해줌.
+
+---
+
+## 6. 코드 구조화: 메서드 추출과 유지보수
+
+- Update()에 모든 코드를 직접 작성하면 가독성이 떨어짐.
+- VS Code의 **Extract Method** 기능으로 이동 로직을 별도의 메서드(`ProcessTranslation`)로 추출.
+- 유지보수 이점:
+  - 이동 로직이 한 곳에만 존재 → 버그 수정 및 기능 확장 용이.
+  - 차후 회전 로직(ProcessRotation)이나 파티클 제어(ProcessParticles) 같은 기능을 쉽게 추가 가능.
+
+---
+
+## 7. 인스펙터에서 속도 조정하기
+
+- `[SerializeField]` 사용 → private 변수라도 인스펙터에서 노출.
+- 게임 실행 중 **controlSpeed** 값을 10 → 30 → 50으로 변경하며 이동 속도를 테스트.
+- **Play Mode** 종료 후 변경값을 잊지 말고 다시 저장해야 함(Play Mode에서는 값이 초기화될 수 있음).
+
+---
+
+## 8. 실습 결과 및 다음 단계
+
+- **결과**: 우주선이 좌우·상하로 부드럽게 이동하며, 카메라 고정 덕분에 마치 중심을 향해 조준하는 듯한 느낌이 연출됨.
+- **다음 단계**:
+  - 이동뿐만 아니라 **회전과 파티클 시스템**(로켓 추진기 불꽃)까지 제어할 예정.
+  - 메인 엔진과 사이드 추진기 파티클 시스템을 사용해 시각적 완성도를 높이는 작업으로 이어짐.
+
+```csharp
+using UnityEngine;
+using UnityEngine.InputSystem;
+
+public class PlayerMovement : MonoBehaviour
+{
+    [SerializeField] float controlSpeed = 10f;
+
+    Vector2 movement;
+    void Update()
+    {
+        ProcessTranslation();
+    }
+
+    public void OnMove(InputValue value)
+    {
+        movement =value.Get<Vector2>();
+    }
+
+    private void ProcessTranslation()
+    {
+        float xOffset = movement.x * controlSpeed * Time.deltaTime;
+
+        float yOffset = movement.y * controlSpeed * Time.deltaTime;
+
+        transform.localPosition = new Vector3(transform.localPosition.x + xOffset, transform.localPosition.y + yOffset, 0f);
+    }
+}
+
+```
+
+---
+
+### ✅ **핵심 요약**
+
+- **Input System**과 **Vector2 입력값**을 활용해 우주선의 XY축 이동 구현.
+- **controlSpeed × Time.deltaTime** → 프레임 속도에 독립적인 이동.
+- **localPosition**으로 부모 기준 좌표 이동.
+- 메서드 추출(`ProcessTranslation`)과 `[SerializeField]` → **코드 유지보수성과 편의성 향상**.
+- 인스펙터에서 속도를 실시간 조절하며 최적의 움직임 테스트 완료.
+- 이 방식은 다음 강의에서 다룰 **로켓 추진기 파티클 시스템 제어**의 기반이 됨.
+
+---
+
+# { 🚀 플레이어 우주선 이동 제한하기 – Mathf.Clamp 활용 }
+
+이번 강의에서는 **플레이어 우주선이 화면 밖으로 나가지 않도록 이동 범위를 제한**하는 방법을 배웠습니다. 핵심은 Unity의 **`Mathf.Clamp()` 메소드**를 사용해 플레이어 위치를 특정 범위 내에 고정시키는 것입니다. 아래는 강의의 개념, 단계, 코드 흐름을 모두 정리한 내용입니다.
+
+---
+
+## 📋 목차
+
+1. [Clamp 개념 이해하기](https://www.notion.so/4-275e683f737e803bafa4f014f6c318ca#1-clamp-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [x축 이동 제한 구현](https://www.notion.so/4-275e683f737e803bafa4f014f6c318ca#2-x%EC%B6%95-%EC%9D%B4%EB%8F%99-%EC%A0%9C%ED%95%9C-%EA%B5%AC%ED%98%84)
+3. [y축 이동 제한 구현](https://www.notion.so/4-275e683f737e803bafa4f014f6c318ca#3-y%EC%B6%95-%EC%9D%B4%EB%8F%99-%EC%A0%9C%ED%95%9C-%EA%B5%AC%ED%98%84)
+4. [Unity 에디터에서 테스트 및 값 조정](https://www.notion.so/4-275e683f737e803bafa4f014f6c318ca#4-unity-%EC%97%90%EB%94%94%ED%84%B0%EC%97%90%EC%84%9C-%ED%85%8C%EC%8A%A4%ED%8A%B8-%EB%B0%8F-%EA%B0%92-%EC%A1%B0%EC%A0%95)
+5. [의도치 않은 움직임 방지 – 부모 오브젝트 초기화](https://www.notion.so/4-275e683f737e803bafa4f014f6c318ca#5-%EC%9D%98%EB%8F%84%EC%B9%98-%EC%95%8A%EC%9D%80-%EC%9B%80%EC%A7%81%EC%9E%84-%EB%B0%A9%EC%A7%80--%EB%B6%80%EB%AA%A8-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%EC%B4%88%EA%B8%B0%ED%99%94)
+6. [최종 코드](https://www.notion.so/4-275e683f737e803bafa4f014f6c318ca#6-%EC%B5%9C%EC%A2%85-%EC%BD%94%EB%93%9C)
+
+---
+
+## 1. Clamp 개념 이해하기
+
+- **Mathf.Clamp(value, min, max)**
+  - 특정 값(`value`)이 **min**과 **max** 사이에 있도록 고정하는 Unity의 수학 함수.
+  - `value < min` → 자동으로 **min**으로 설정.
+  - `value > max` → 자동으로 **max**로 설정.
+  - 예: `Mathf.Clamp(12, 0, 10)` → 결과: **10**
+- **사용 이유**:
+  플레이어 우주선이 **게임 뷰의 경계를 벗어나지 않도록** x축과 y축의 위치를 제한.
+
+---
+
+## 2. x축 이동 제한 구현
+
+1. **이동 계산을 정리하기 위해 변수를 분리**
+   - 기존 코드에서 `transform.localPosition.x + xOffset` 부분을 잘라서 `rawXPos` 변수에 저장.
+2. **Clamp 적용**
+   - `float clampedXPos = Mathf.Clamp(rawXPos, -xClampRange, xClampRange);`
+   - xClampRange ~ xClampRange 사이에서만 x좌표가 유지됨.
+3. **직렬화 필드 생성**
+   - 인스펙터에서 쉽게 조정하기 위해:
+     ```csharp
+     [SerializeField] float xClampRange = 5f;
+     ```
+   - 테스트 후 적절한 값으로 조정 (예: 30~35).
+
+---
+
+## 3. y축 이동 제한 구현
+
+1. **x축과 동일한 방식으로 y축 코드 복사**
+2. 변수 이름 변경:
+   - `yOffset`, `rawYPos`, `clampedYPos`
+3. **Clamp 적용**
+
+   ```csharp
+   float clampedYpos = Mathf.Clamp(rawYpos, -yClampRange, yClampRange);
+   ```
+
+4. **직렬화 필드 추가**
+
+   ```csharp
+   [SerializeField] float yClampRange = 5f;
+   ```
+
+5. z축은 고정 → `transform.localPosition = new Vector3(clampedXpos, clampedYpos, 0f);`
+
+---
+
+## 4. Unity 에디터에서 테스트 및 값 조정
+
+- **재생(Play) 모드**에서 플레이어 우주선을 움직여 확인.
+- 범위가 너무 좁거나 넓으면 인스펙터에서 **xClampRange**와 **yClampRange** 값을 조절.
+  - 예:
+    - X축: 35
+    - Y축: 20 (16:9 화면 비율 기준으로 적당).
+- 테스트 중 플레이어의 움직임이 살짝 화면을 벗어나게 설정하면 자연스러워 보임.
+
+---
+
+## 5. 의도치 않은 움직임 방지 – 부모 오브젝트 초기화
+
+- **Player Rig**(부모 오브젝트)의 위치가 `(0,0,0)`인지 확인.
+- 모델이나 파티클이 부모 오브젝트에서 오프셋이 있으면 **Clamp 결과가 어긋날 수 있음**.
+- 이동 제한이 잘못 적용되면 **부모-자식 관계와 로컬 좌표를 다시 확인**.
+
+---
+
+## 6. 최종 코드
+
+```csharp
+using UnityEngine;
+using UnityEngine.InputSystem;
+
+public class PlayerMovement : MonoBehaviour
+{
+    [SerializeField] float controlSpeed = 10f;   // 우주선 이동 속도
+    [SerializeField] float xClampRange = 35f;    // X축 제한 범위
+    [SerializeField] float yClampRange = 20f;    // Y축 제한 범위
+
+    Vector2 movement;
+
+    void Update()
+    {
+        ProcessTranslation();
+    }
+
+    // 입력 시스템의 Move 액션과 연결
+    public void OnMove(InputValue value)
+    {
+        movement = value.Get<Vector2>();
+    }
+
+    private void ProcessTranslation()
+    {
+        // X축 이동 제한
+        float xOffset = movement.x * controlSpeed * Time.deltaTime;
+        float rawXpos = transform.localPosition.x + xOffset;
+        float clampedXpos = Mathf.Clamp(rawXpos, -xClampRange, xClampRange);
+
+        // Y축 이동 제한
+        float yOffset = movement.y * controlSpeed * Time.deltaTime;
+        float rawYpos = transform.localPosition.y + yOffset;
+        float clampedYpos = Mathf.Clamp(rawYpos, -yClampRange, yClampRange);
+
+        // 위치 적용 (Z축은 고정)
+        transform.localPosition = new Vector3(clampedXpos, clampedYpos, 0f);
+    }
+}
+
+```
+
+---
+
+### ✅ **핵심 정리**
+
+- `Mathf.Clamp()`는 값의 범위를 제한하는 데 사용.
+- X축과 Y축 각각의 범위를 직렬화된 변수로 관리 → Unity 인스펙터에서 실시간 조정 가능.
+- Clamp를 적용하기 전에 **Raw 값**(계산된 위치)을 별도 변수에 저장 → 가독성과 유지보수성 향상.
+- 부모 오브젝트의 위치를 `(0,0,0)`으로 초기화해 Clamp 효과가 올바르게 작동하도록 주의.
+- 테스트하며 **화면 비율**(예: 16:9)에 맞게 clamp 범위를 미세 조정.
+
+이 과정을 통해 **플레이어 우주선이 화면 밖으로 나가지 않고, 자연스러운 움직임**을 구현할 수 있습니다.
+
+---
+
+# { 🚀 플레이어 우주선 회전과 쿼터니언(Quaternion) 이해하기 }
+
+이번 강의에서는 **플레이어의 움직임에 따라 우주선을 회전**시키는 방법을 배우고, 이를 통해 **쿼터니언(Quaternion)** 과 **오일러 각(Euler Angle)**, 그리고 **롤(Roll), 피치(Pitch), 요(Yaw)** 개념을 이해합니다. 주 초점은 **z축 회전(롤)** 을 사용해 우주선을 좌우로 기울이는 작업입니다.
+
+---
+
+## 📋 목차
+
+1. [롤, 피치, 요 개념과 축 이해하기](https://www.notion.so/4-275e683f737e803bafa4f014f6c318ca#%EB%A1%A4-%ED%94%BC%EC%B9%98-%EC%9A%94-%EA%B0%9C%EB%85%90%EA%B3%BC-%EC%B6%95-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [쿼터니언과 오일러 각 개념](https://www.notion.so/4-275e683f737e803bafa4f014f6c318ca#%EC%BF%BC%ED%84%B0%EB%8B%88%EC%96%B8%EA%B3%BC-%EC%98%A4%EC%9D%BC%EB%9F%AC-%EA%B0%81-%EA%B0%9C%EB%85%90)
+3. [Unity에서 회전 순서의 중요성](https://www.notion.so/4-275e683f737e803bafa4f014f6c318ca#unity%EC%97%90%EC%84%9C-%ED%9A%8C%EC%A0%84-%EC%88%9C%EC%84%9C%EC%9D%98-%EC%A4%91%EC%9A%94%EC%84%B1)
+4. [PlayerMovement 스크립트 수정 및 롤 적용](https://www.notion.so/4-275e683f737e803bafa4f014f6c318ca#playermovement-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%88%98%EC%A0%95-%EB%B0%8F-%EB%A1%A4-%EC%A0%81%EC%9A%A9)
+5. [롤 강도 제어를 위한 직렬화된 필드 추가](https://www.notion.so/4-275e683f737e803bafa4f014f6c318ca#%EB%A1%A4-%EA%B0%95%EB%8F%84-%EC%A0%9C%EC%96%B4%EB%A5%BC-%EC%9C%84%ED%95%9C-%EC%A7%81%EB%A0%AC%ED%99%94%EB%90%9C-%ED%95%84%EB%93%9C-%EC%B6%94%EA%B0%80)
+6. [movement.x를 사용한 동적 롤 회전 구현](https://www.notion.so/4-275e683f737e803bafa4f014f6c318ca#movementx%EB%A5%BC-%EC%82%AC%EC%9A%A9%ED%95%9C-%EB%8F%99%EC%A0%81-%EB%A1%A4-%ED%9A%8C%EC%A0%84-%EA%B5%AC%ED%98%84)
+7. [현재 문제점과 다음 단계(보간 처리)](https://www.notion.so/4-275e683f737e803bafa4f014f6c318ca#%ED%98%84%EC%9E%AC-%EB%AC%B8%EC%A0%9C%EC%A0%90%EA%B3%BC-%EB%8B%A4%EC%9D%8C-%EB%8B%A8%EA%B3%84%EB%B3%B4%EA%B0%84-%EC%B2%98%EB%A6%AC)
+
+---
+
+## 1. 롤, 피치, 요 개념과 축 이해하기
+
+- **롤(Roll)** : 우주선이 **앞뒤 방향을 축**으로 좌우로 기울어지는 회전 → **파란 축(z)** 기준.
+- **피치(Pitch)** : 우주선이 **좌우 방향을 축**으로 앞뒤로 고개를 끄덕이는 회전 → **x축** 기준.
+- **요(Yaw)** : 우주선이 **위아래 축**을 기준으로 좌우를 향하는 회전 → **y축(초록)** 기준.
+
+> 💡 기억하기 쉬운 팁
+>
+> - **롤**: 비행기 날개를 기울일 때
+> - **피치**: 앞뒤로 기수의 방향을 올리고 내릴 때
+> - **요**: 방향타로 좌우 회전할 때
+
+---
+
+## 2. 쿼터니언과 오일러 각 개념
+
+- **쿼터니언(Quaternion)**
+  - Unity에서 회전을 수학적으로 표현하는 방식.
+  - 짐벌락(Gimbal Lock) 문제를 피하기 위해 사용.
+  - 내부적으로는 복잡하지만, “회전을 인코딩하는 방법” 정도로 이해하면 충분.
+- **오일러 각(Euler Angle)**
+  - 사람이 직관적으로 이해하기 쉬운 **x, y, z 값**으로 회전을 나타냄.
+  - 발음은 **‘오일러’**(Euler).
+  - Unity에서는 `Quaternion.Euler(x, y, z)` 로 쿼터니언을 쉽게 생성할 수 있음.
+
+---
+
+## 3. Unity에서 회전 순서의 중요성
+
+- **회전 적용 순서에 따라 결과가 달라짐**.
+- 예:
+  1. **피치 후 롤** → 정상적으로 보임.
+  2. **롤 후 피치** → 모든 축 값이 엉뚱하게 변형됨.
+- 💡 **Tip**: 실수하면 `Ctrl+Z` 로 되돌리고 Transform의 값을 0으로 초기화하세요.
+
+---
+
+## 4. PlayerMovement 스크립트 수정 및 롤 적용
+
+1. **새 메서드 생성**
+
+   ```csharp
+   void ProcessRotation()
+   {
+       Quaternion targetRotation = Quaternion.Euler(0f, 0f, 45f); // 임시 매직 넘버
+       transform.localRotation = targetRotation;
+   }
+   ```
+
+   - **45°** 를 z축에 고정 → 우주선이 왼쪽으로 기울어짐.
+   - `Update()` 메서드에서 매 프레임 `ProcessRotation()` 호출.
+
+2. **테스트 결과**
+   - 실행 시 우주선이 **z축 45°** 위치로 스냅(snap).
+   - 왼쪽(-45°)과 오른쪽(45°)은 서로 반대 방향 기울기임.
+
+---
+
+## 5. 롤 강도 제어를 위한 직렬화된 필드 추가
+
+- Inspector에서 쉽게 조절하도록 **SerializedField** 추가.
+  ```csharp
+  [SerializeField] float controlRollFactor = 20f;
+  ```
+- **이점**: 코드 수정 없이 인스펙터에서 회전 각도를 조절 가능.
+- 기존 매직 넘버 `45` → `controlRollFactor` 로 교체.
+
+---
+
+## 6. movement.x를 사용한 동적 롤 회전 구현
+
+- **목표**: 플레이어 입력 방향(movement.x)에 따라 회전 각도를 동적으로 변경.
+- movement.x 값 특징:
+  - 왼쪽 이동 → 음수(-1)
+  - 오른쪽 이동 → 양수(1)
+- 구현 코드:
+  ```csharp
+  void ProcessRotation()
+  {
+      Quaternion targetRotation = Quaternion.Euler(
+          0f,
+          0f,
+          -controlRollFactor * movement.x // 부호 반전
+      );
+      transform.localRotation = targetRotation;
+  }
+  ```
+- **결과**:
+  - 왼쪽 입력 → 우주선이 부드럽게 왼쪽으로 롤.
+  - 오른쪽 입력 → 우주선이 오른쪽으로 롤.
+  - 입력이 0일 때 → 자동으로 0°로 돌아감.
+
+---
+
+## 7. 현재 문제점과 다음 단계(보간 처리)
+
+- 현재 상태:
+  - 입력 시 **즉시 스냅** → 좌우로 갑자기 튀는 듯한 움직임.
+- 해결 계획:
+  - **선형 보간(Lerp)** 또는 **Slerp** 사용 → 회전이 부드럽게 전환되도록 개선.
+  - 다음 강의에서 이 작업을 다룰 예정.
+
+---
+
+## ✅ 요약
+
+- **롤, 피치, 요**는 각각 z, x, y축 회전을 의미.
+- Unity는 회전을 **쿼터니언**으로 관리하지만 **오일러 각**으로 쉽게 변환 가능.
+- **회전 순서**는 결과에 큰 영향을 주므로 주의 필요.
+- ( 회전 순서는 **먼저 돌린 축이 기준이 되어 좌표계 자체가 바뀌기 때문에**, 같은 각도를 적용해도 순서를 바꾸면 오브젝트가 완전히 다른 방향을 바라보게 됩니다.)
+- `Quaternion.Euler` 과 **movement.x** 입력 값을 활용해 **좌우 롤 효과**를 구현.
+- Inspector에서 제어 가능한 `controlRollFactor` 로 회전 강도를 유연하게 조절.
+- 현재는 스냅 회전 → 다음 단계에서 보간으로 부드럽게 개선 예정.
+
+---
+
+# { 🚀 Lerp(선형 보간법)과 우주선 회전 제어하기 }
+
+이번 강의에서는 **Lerp(Linear Interpolation, 선형 보간법)** 개념을 배우고, `Quaternion.Lerp`를 사용하여 **플레이어 우주선을 부드럽게 회전**시키는 방법을 다룹니다. 또한, Unity의 `Time.deltaTime`과 `SerializeField`를 활용해 자연스러운 움직임을 만드는 방법을 설명합니다.
+
+---
+
+## 📋 목차
+
+1. [Lerp 개념 이해하기](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#lerp-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Quaternion.Lerp와 Slerp 비교](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#quaternionlerp%EC%99%80-slerp-%EB%B9%84%EA%B5%90)
+3. [PlayerMovement 코드 구조와 변수 설명](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#playermovement-%EC%BD%94%EB%93%9C-%EA%B5%AC%EC%A1%B0%EC%99%80-%EB%B3%80%EC%88%98-%EC%84%A4%EB%AA%85)
+4. [우주선 회전 로직 구현하기](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#%EC%9A%B0%EC%A3%BC%EC%84%A0-%ED%9A%8C%EC%A0%84-%EB%A1%9C%EC%A7%81-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+5. [Time.deltaTime과 rotationSpeed의 역할](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#timedeltatime%EA%B3%BC-rotationspeed%EC%9D%98-%EC%97%AD%ED%95%A0)
+6. [Lerp 사용 시 주의할 점](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#lerp-%EC%82%AC%EC%9A%A9-%EC%8B%9C-%EC%A3%BC%EC%9D%98%ED%95%A0-%EC%A0%90)
+7. [실행 결과와 응용](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#%EC%8B%A4%ED%96%89-%EA%B2%B0%EA%B3%BC%EC%99%80-%EC%9D%91%EC%9A%A9)
+
+---
+
+## 1. Lerp 개념 이해하기
+
+- **Lerp(Linear Interpolation, 선형 보간법)**
+  - 점 **A**와 **B** 사이의 값을 일정한 비율로 계산하여 중간값을 구하는 기법.
+  - 일반적인 형태:
+    ```
+    Lerp(A, B, t) → A와 B 사이를 t(0~1) 비율로 이동
+    ```
+  - **예시**:
+    - `Mathf.Lerp` : 숫자 값 보간 (예: 색상, 위치 값 등).
+    - `Color.Lerp` : 색상 보간.
+    - `Quaternion.Lerp` : 회전 값 보간.
+- **사용 목적**
+  - 위치 이동, 색상 변화, 오브젝트 회전 등에서 **부드럽고 자연스러운 전환 효과**를 줄 때 사용.
+
+---
+
+## 2. Quaternion.Lerp와 Slerp 비교
+
+| 함수                 | 특징                                                                   |
+| -------------------- | ---------------------------------------------------------------------- |
+| **Quaternion.Lerp**  | 두 회전값 사이를 직선적으로 보간 → 빠르고 단순.                        |
+| **Quaternion.Slerp** | 구면 선형 보간 → 보다 자연스러운 곡선을 따라 움직임, 더 사실적인 회전. |
+
+> 이번 강의에서는 빠르고 단순한 Lerp를 사용. Slerp는 필요할 때 더 부드러운 곡선 회전을 줄 수 있습니다.
+
+---
+
+## 3. PlayerMovement 코드 구조와 변수 설명
+
+```csharp
+[SerializeField] float controllRollFactor = 20f; // 좌우 입력에 따라 회전 각도를 결정
+[SerializeField] float rotationSpeed = 10f;     // 회전 속도 제어 (Lerp 보간 속도)
+
+Vector2 movement; // 입력 값을 저장하는 변수
+```
+
+- **movement** : `Input System`에서 가져온 2D 이동 입력 값(`x`: 좌우, `y`: 상하).
+- **controllRollFactor** : 입력값을 회전 각도로 변환할 때의 배율.
+- **rotationSpeed** : `Lerp` 보간 속도. 값이 클수록 빠르게 회전.
+
+---
+
+## 4. 우주선 회전 로직 구현하기
+
+```csharp
+void ProcessRotation()
+{
+    // 목표 회전값 계산
+    Quaternion targetRotation = Quaternion.Euler(
+        0f,                       // Pitch (앞뒤) → 아직 사용하지 않음
+        0f,                       // Yaw (좌우 회전) → 아직 사용하지 않음
+        -controllRollFactor * movement.x // Roll (좌우 기울기)
+    );
+
+    // 현재 회전에서 목표 회전으로 부드럽게 보간
+    transform.localRotation = Quaternion.Lerp(
+        transform.localRotation,  // 현재 회전
+        targetRotation,           // 목표 회전
+        rotationSpeed * Time.deltaTime // 보간 속도
+    );
+}
+```
+
+- **Quaternion.Euler** : 입력한 x, y, z 각도로 회전 값을 생성.
+- **movement.x** : 플레이어 입력을 받아 좌우 기울기(Roll)를 결정.
+- 부호 : 입력 방향을 반대로 적용해 자연스러운 조작감을 구현.
+
+---
+
+## 5. Time.deltaTime과 rotationSpeed의 역할
+
+- **Time.deltaTime** : 프레임 간 경과 시간. 프레임 속도에 관계없이 **항상 일정한 속도로** 회전하도록 보정.
+- **rotationSpeed** : Lerp 보간의 속도를 조절하는 값.
+  - 값이 크면 → 더 빠르게 목표 회전에 도달.
+  - 값이 작으면 → 느리고 부드러운 회전.
+
+---
+
+## 6. Lerp 사용 시 주의할 점
+
+1. **부동 소수점 정밀도 문제**
+   - Lerp는 무한히 목표에 접근하지만, 아주 작은 오차 때문에 **완벽히 도달하지 못할 수도 있음**.
+   - 해결법: 충분히 가까워지면 직접 목표값으로 설정하거나 일정 허용 오차를 둠.
+2. **프레임마다 매번 보간**
+   - 매 프레임마다 `Lerp`를 수행하면, 시작 지점에서 빨리 움직이고 끝에서 느려지는 특성이 나타남.
+   - 이 동작은 자연스러운 감속 효과를 주므로 이번 강의에서는 그대로 사용.
+
+---
+
+## 7. 실행 결과와 응용
+
+- **실행 시 결과**
+  - 플레이어 우주선이 **입력에 따라 부드럽게 회전**하고, 목표 각도에 가까워질수록 속도가 서서히 감소.
+  - **롤(Roll)** 뿐만 아니라 **피치(Pitch)**, **요(Yaw)**에도 같은 로직을 적용할 수 있음.
+- **응용 아이디어**
+  - **피치(Pitch)** : `movement.y` 값을 사용해 위·아래 기울기 추가.
+  - **Slerp** : 보다 사실적인 회전 곡선을 원할 때 적용.
+  - **색상 보간** : 엔진 불꽃 색상 변화 같은 시각적 효과에 `Color.Lerp` 사용.
+
+---
+
+### ✅ **정리**
+
+- **Lerp** : 두 값(A, B) 사이를 일정 비율로 보간 → 자연스러운 전환 효과.
+- **Quaternion.Lerp** : 회전에 사용 → 빠르고 단순한 보간 방식.
+- `rotationSpeed`와 `Time.deltaTime`을 조합하여 프레임 속도와 관계없이 부드럽고 일정한 회전을 구현.
+- Lerp의 특성(빠르게 시작→느리게 끝남)과 부동 소수점 문제를 이해하고, 필요에 따라 보완.
+- 피치와 요 등 다른 축에도 확장 가능 → 다양한 우주선 조작 감각을 만들 수 있음.
+
+---
+
+# { 🚀 우주선 피치(Pitch) 회전과 Lerp 보간 처리 구현하기 }
+
+이번 강의는 **우주선의 위/아래 움직임에 따른 피치(Pitch) 회전**을 구현하는 과제 형식으로 진행되었습니다.
+
+Lerp(선형 보간법)를 사용해 부드럽게 회전시키는 방법, X축 회전 값의 방향성, 그리고 Unity의 `Transform`과 입력값을 연결하는 개념을 함께 다룹니다.
+
+---
+
+## 📋 목차
+
+1. [피치(Pitch)와 롤(Roll) 개념 이해하기](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#%ED%94%BC%EC%B9%98pitch%EC%99%80-%EB%A1%A4roll-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [SerializeField로 조정 가능한 회전 계수 만들기](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#serializefield%EB%A1%9C-%EC%A1%B0%EC%A0%95-%EA%B0%80%EB%8A%A5%ED%95%9C-%ED%9A%8C%EC%A0%84-%EA%B3%84%EC%88%98-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+3. [X축 회전 방향과 값 범위 결정하기](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#x%EC%B6%95-%ED%9A%8C%EC%A0%84-%EB%B0%A9%ED%96%A5%EA%B3%BC-%EA%B0%92-%EB%B2%94%EC%9C%84-%EA%B2%B0%EC%A0%95%ED%95%98%EA%B8%B0)
+4. [Lerp를 사용한 부드러운 회전 적용하기](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#lerp%EB%A5%BC-%EC%82%AC%EC%9A%A9%ED%95%9C-%EB%B6%80%EB%93%9C%EB%9F%AC%EC%9A%B4-%ED%9A%8C%EC%A0%84-%EC%A0%81%EC%9A%A9%ED%95%98%EA%B8%B0)
+5. [코드 정리: PlayerMovement 클래스 업데이트](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#%EC%BD%94%EB%93%9C-%EC%A0%95%EB%A6%AC-playermovement-%ED%81%B4%EB%9E%98%EC%8A%A4-%EC%97%85%EB%8D%B0%EC%9D%B4%ED%8A%B8)
+6. [추가 팁: 요(Yaw) 수정 아이디어](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#%EC%B6%94%EA%B0%80-%ED%8C%81-%EC%9A%94yaw-%EC%88%98%EC%A0%95-%EC%95%84%EC%9D%B4%EB%94%94%EC%96%B4)
+
+---
+
+## 1. 피치(Pitch)와 롤(Roll) 개념 이해하기
+
+- **Pitch(피치)** : 오브젝트의 **X축**을 기준으로 위/아래로 기울어지는 회전.
+  - 비행기의 **기수 들림**과 같음.
+  - ↑ 입력 시 기수가 **위로 올라가는 것처럼 보이지만**, Unity의 회전값은 음수 방향으로 이동.
+  - ↓ 입력 시 기수가 **아래로 내려가는 것처럼 보이지만**, Unity의 회전값은 양수 방향.
+- **Roll(롤)** : 오브젝트의 **Z축**을 기준으로 좌/우로 기울어지는 회전.
+  - 비행기의 **날개가 좌우로 기울어지는 것**과 같음.
+  - 좌/우 입력(x축)을 Z축 회전에 곱해서 제어.
+
+> ❗ 중요: Unity의 Transform 회전값은 화면에서 보이는 방향과 부호가 직관적이지 않을 수 있으므로, 직접 테스트하며 부호를 조정해야 합니다.
+
+---
+
+## 2. SerializeField로 조정 가능한 회전 계수 만들기
+
+- 강의에서는 회전 강도를 유연하게 조절하기 위해 **`[SerializeField] float`** 사용.
+- **controlRollFactor** → 좌/우 기울기(Z축).
+- **controlPitchFactor** → 위/아래 기울기(X축).
+- Unity 인스펙터에서 값 변경 가능 → 즉석에서 감도를 조정해 테스트 가능.
+
+예시 초기값:
+
+```csharp
+[SerializeField] float controlRollFactor = 20f;  // 좌우 롤 강도
+[SerializeField] float controlPitchFactor = 18f; // 위아래 피치 강도
+[SerializeField] float rotationSpeed = 10f;      // Lerp 속도
+```
+
+---
+
+## 3. X축 회전 방향과 값 범위 결정하기
+
+- **값 방향**
+  - 위쪽 이동(↑) → **음수 방향**
+  - 아래쪽 이동(↓) → **양수 방향**
+- **추천 범위** : ±15 ~ ±20 정도
+  - 과도한 값은 우주선이 지나치게 기울어 **부자연스러운 움직임**을 보일 수 있음.
+  - 적절한 범위에서 실험하여 자연스러운 값을 찾기.
+
+---
+
+## 4. Lerp를 사용한 부드러운 회전 적용하기
+
+- `Quaternion.Lerp` → 현재 회전값과 목표 회전값 사이를 **선형 보간**하여 부드러운 애니메이션 효과 제공.
+- 공식:
+  ```csharp
+  transform.localRotation = Quaternion.Lerp(
+      transform.localRotation,   // 현재 회전
+      targetRotation,           // 목표 회전
+      rotationSpeed * Time.deltaTime // 보간 속도
+  );
+  ```
+- 이 방식 덕분에 입력이 갑자기 0으로 돌아와도 회전이 **자연스럽게 복귀**됨.
+
+---
+
+## 5. 코드 정리: PlayerMovement 클래스 업데이트
+
+최종 `ProcessRotation()` 구조:
+
+```csharp
+void ProcessRotation()
+{
+    // 피치: Y입력 → X축 회전 (위/아래)
+    float pitch = -controlPitchFactor * movement.y;
+
+    // 롤: X입력 → Z축 회전 (좌/우)
+    float roll = -controlRollFactor * movement.x;
+
+    // 목표 회전 생성
+    Quaternion targetRotation = Quaternion.Euler(pitch, 0f, roll);
+
+    // 부드럽게 보간
+    transform.localRotation = Quaternion.Lerp(
+        transform.localRotation,
+        targetRotation,
+        rotationSpeed * Time.deltaTime
+    );
+}
+```
+
+📌 **핵심 포인트**
+
+- `movement.y`와 `movement.x`는 Input System의 이동 벡터 값.
+- **음수 부호(-)** 를 붙여 방향을 반전시켜 실제 화면과 직관적으로 맞춤.
+- Roll과 Pitch를 **각각 별도의 float**으로 선언 → 코드 가독성과 유지보수 용이.
+
+---
+
+## 6. 추가 팁: 요(Yaw) 수정 아이디어
+
+- 일부 **레일 슈터 게임**에서는 총알이 우주선이 바라보는 방향으로만 발사됨.
+- 그럴 경우 **Yaw(요)** (Y축 회전)도 입력값이나 커서 위치를 반영해 수정하면 더 사실적인 조작감 구현 가능.
+- 이번 강의에서는 요를 구현하지 않고, 나중 단계에서 커서 방향과 총알 발사를 연동할 예정.
+
+---
+
+## ✅ 정리
+
+- **Pitch(피치)** = X축 회전 → 위/아래 움직임.
+- **Roll(롤)** = Z축 회전 → 좌/우 기울기.
+- SerializeField로 **회전 계수**를 만들어 Inspector에서 쉽게 조정.
+- `Quaternion.Lerp`로 회전을 **부드럽게 보간**하여 자연스러운 애니메이션 구현.
+- 테스트 시 회전 값 범위를 15~20 정도로 설정하면 가장 자연스러운 동작.
+- Yaw는 이후 커서 기반 사격 메커니즘을 구현할 때 고려할 수 있음.
+
+이 강의는 **기본 회전 제어의 핵심 원리**(입력 → 회전 → 보간)를 학습하는 단계였으며, 이후 사격 방향과 커서 제어로 발전시킬 수 있는 기반을 마련했습니다.
+
+---
+
+# { 🚀 레이저 파티클 시스템 구성 및 제어하기 }
+
+이번 강의에서는 **우주선의 레이저 효과를 구현하기 위해 파티클 시스템을 설정하고 제어하는 방법**을 다룹니다. 프리팹을 인스턴스화하는 방식 대신, **입자 시스템에 콜라이더를 부착하여 레이저를 발사**하도록 만들었습니다.
+
+---
+
+## 📋 목차
+
+1. [파티클 시스템 개념 및 설정 방식](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#1-%ED%8C%8C%ED%8B%B0%ED%81%B4-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B0%9C%EB%85%90-%EB%B0%8F-%EC%84%A4%EC%A0%95-%EB%B0%A9%EC%8B%9D)
+2. [레이저 파티클 시스템 생성 및 구조 설정](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#2-%EB%A0%88%EC%9D%B4%EC%A0%80-%ED%8C%8C%ED%8B%B0%ED%81%B4-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EC%83%9D%EC%84%B1-%EB%B0%8F-%EA%B5%AC%EC%A1%B0-%EC%84%A4%EC%A0%95)
+3. [Shape과 크기/속성 조정](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#3-shape%EA%B3%BC-%ED%81%AC%EA%B8%B0%EC%86%8D%EC%84%B1-%EC%A1%B0%EC%A0%95)
+4. [재질(Material) 생성 및 적용](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#4-%EC%9E%AC%EC%A7%88material-%EC%83%9D%EC%84%B1-%EB%B0%8F-%EC%A0%81%EC%9A%A9)
+5. [렌더러(Renderer)와 방출(Emission) 세부 설정](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#5-%EB%A0%8C%EB%8D%94%EB%9F%ACrenderer%EC%99%80-%EB%B0%A9%EC%B6%9Cemission-%EC%84%B8%EB%B6%80-%EC%84%A4%EC%A0%95)
+6. [트레일(Trails) 모듈 활용](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#6-%ED%8A%B8%EB%A0%88%EC%9D%BCtrails-%EB%AA%A8%EB%93%88-%ED%99%9C%EC%9A%A9)
+7. [시뮬레이션 공간과 발사 위치 조정](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#7-%EC%8B%9C%EB%AE%AC%EB%A0%88%EC%9D%B4%EC%85%98-%EA%B3%B5%EA%B0%84%EA%B3%BC-%EB%B0%9C%EC%82%AC-%EC%9C%84%EC%B9%98-%EC%A1%B0%EC%A0%95)
+8. [충돌(Collision) 모듈 설정](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#8-%EC%B6%A9%EB%8F%8Ccollision-%EB%AA%A8%EB%93%88-%EC%84%A4%EC%A0%95)
+9. [최종 조정 및 테스트](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#9-%EC%B5%9C%EC%A2%85-%EC%A1%B0%EC%A0%95-%EB%B0%8F-%ED%85%8C%EC%8A%A4%ED%8A%B8)
+
+---
+
+## 1. 파티클 시스템 개념 및 설정 방식
+
+- **파티클 시스템(Particle System)** : 게임에서 **불꽃, 연기, 레이저, 먼지** 등과 같은 시각 효과를 표현하는 모듈.
+- **프리팹 방식 vs 파티클 방식**
+  - **프리팹 Instantiate** : 매번 레이저 프리팹을 생성/삭제하는 전통적인 방법.
+  - **파티클 시스템** : 하나의 시스템이 빠른 입자들을 발사해 성능과 제어가 용이.
+- 이번 강의에서는 **파티클 시스템 + 개별 입자 충돌 처리** 방식을 사용.
+
+---
+
+## 2. 레이저 파티클 시스템 생성 및 구조 설정
+
+1. **Hierarchy**에서 **플레이어 우주선(Player Rig)** 선택.
+2. 마우스 우클릭 → **Effects → Particle System** 생성 → 이름을 **Laser**로 변경.
+3. **Laser**를 플레이어 우주선의 **자식 오브젝트**로 설정 → 우주선 움직임에 따라 함께 이동.
+4. 게임 뷰를 보기 쉽게 **공간 확보** 후 파티클 시스템 모듈 탐색.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380425/notion-blog/_/3D_/3D_/_4_-_2/image.png)
+
+---
+
+## 3. Shape과 크기/속성 조정
+
+- **Shape**:
+  - 기본 Cone(원뿔) → **Radius**를 `0` 또는 0에 가깝게 → **직선 발사 효과**.
+- **Start Size (시작 크기)**: `3` → 입자 시각화 강화.
+- **Duration (지속 시간)**: `1` → 루프(Looping) 상태 유지.
+- **Start Lifetime (수명)**: 입자가 사라지기 전 존재하는 시간 (`5`초 예시).
+- **Start Speed (속도)**: `300` → 멀리 날아가도록 조정. (후에 `800`으로 가속)
+- **Emission (방출)**: 발사 빈도 조정. 기본 `10` → `5`로 감소.
+
+---
+
+## 4. 재질(Material) 생성 및 적용
+
+1. 제공된 **GDTV 폴더**(Particle Sprites PNG 3종) 가져오기.
+2. **Material 생성** → 이름: `Laser`.
+3. Shader 설정: **Universal Render Pipeline → Particles → Unlit** (외부 광원 영향 없음).
+4. **Base Map**에 원형 PNG 드래그 → 표면 타입을 **Opaque → Transparent**로 변경.
+5. Emission(방출) 활성화 → 스포이드로 우주선 파란색 추출 → 강도(Intensity) 증가.
+6. 같은 방식으로 **Laser Head / Laser Trail** 재질 복제 및 제작.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380422/notion-blog/_/3D_/3D_/_4_-_2/image_1.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380423/notion-blog/_/3D_/3D_/_4_-_2/image_2.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380424/notion-blog/_/3D_/3D_/_4_-_2/image_3.png)
+
+---
+
+## 5. 렌더러(Renderer)와 방출(Emission) 세부 설정
+
+- **Renderer 모듈**에서 새로 만든 Laser 재질 적용.
+- **렌더 모드(Render Mode)**:
+  - 기본값 Billboard → **항상 카메라를 향하도록 설정** (3D 레이저 착시).
+  - 필요 시 **Horizontal Billboard** 또는 **Vertical Billboard**로 변경 가능.
+- 재질 적용 후 **투명도(Alpha)** 조정 → 머리 입자를 투명하게 하여 흔적만 남김.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380424/notion-blog/_/3D_/3D_/_4_-_2/image_4.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380424/notion-blog/_/3D_/3D_/_4_-_2/image_5.png)
+
+---
+
+## 6. 트레일(Trails) 모듈 활용
+
+- **Trails 활성화** → 기본 보라색(재질 없음) → Laser Trail 재질 적용.
+- **Trail Lifetime**: 0.1 → 너무 길면 .01 등으로 단축.
+- 헤드 입자 + 트레일 입자를 분리하여 더 깔끔한 긴 레이저 효과 구현.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380424/notion-blog/_/3D_/3D_/_4_-_2/image_6.png)
+
+---
+
+## 7. 시뮬레이션 공간과 발사 위치 조정
+
+- **Simulation Space**:
+  - 기본 Local → **World Space**로 변경 → 우주선 회전/이동 중에도 레이저가 독립적으로 움직임.
+- 레이저 위치 조정:
+  - 우주선의 **앞부분(총구 위치)** 로 이동.
+  - Scene 뷰에서 파란 축(Z) 방향으로 살짝 앞으로 이동.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380424/notion-blog/_/3D_/3D_/_4_-_2/image_7.png)
+
+---
+
+## 8. 충돌(Collision) 모듈 설정
+
+1. **Collision 모듈 활성화** → **Planes → World**로 설정.
+2. **Lifetime Loss**: `1` → 충돌 시 즉시 파괴.
+3. 튕김 방지: **Damping(감쇠)**을 `1`로 설정 → 부딪힐 때 속도를 완전히 없애 벽 튕김 방지.
+4. 현재 우주선은 콜라이더가 없으므로 충돌하지 않지만, 지형은 충돌 처리됨.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380425/notion-blog/_/3D_/3D_/_4_-_2/image_8.png)
+
+---
+
+## 9. 최종 조정 및 테스트
+
+- Start Speed를 `800`, Start Size를 `5`로 변경 → 더 빠르고 굵은 레이저 구현.
+- 게임 뷰에서 실행 → 레이저가 **독립적으로 빠르게 발사되고, 지형에 부딪히면 소멸**하는지 확인.
+- 트레일 길이, 발사 빈도, 색상, 크기 등을 자유롭게 조절 → 자신만의 스타일로 실험.
+- **도전 과제**:
+  - 최소 5~10분 동안 파티클 시스템의 다양한 모듈(Noise, Color over Lifetime 등)을 탐색.
+  - 원하는 레이저 효과를 직접 제작.
+
+---
+
+### ✅ 핵심 정리
+
+- **프리팹 방식보다 파티클 시스템을 사용하는 이유**: 성능과 제어가 더 용이.
+- **Shape → Radius 0**: 완전한 직선 발사.
+- **World Space 시뮬레이션**: 우주선 회전에 영향받지 않음.
+- **Emission/Speed 조정**: 발사 빈도와 반응성 제어.
+- **Material & Emission 설정**: 빛나고 투명한 레이저 연출.
+- **Collision 모듈**: 지형과의 상호작용으로 게임 플레이 강화.
+
+이로써 **레이저 파티클 시스템**의 개념, 구성, 시각 효과, 물리 상호작용까지 모두 학습했습니다.
+
+- 추가 설명
+
+### 🖌 **Renderer = 물체의 표면**
+
+- **Renderer**는 “이 오브젝트를 어떻게 화면에 그릴지”를 담당하는 **화면 출력 담당자**예요.
+- 입자 시스템(Particle System)에서는 `Renderer` 모듈이 **각 입자의 표면 모양과 스타일**을 결정합니다.
+- 하지만 Renderer 혼자서는 색이나 질감을 알 수 없어요.
+
+---
+
+### 🎨 **Material = 표면을 꾸미는 페인트/스킨**
+
+- \*Material(재질)**은 **색, 질감(Texture), 광택, 투명도, 발광\*\* 같은 시각 효과를 담은 “설명서”입니다.
+- 예:
+  - 붉은 금속 느낌 → 금속 셰이더 + 빨간색.
+  - 반투명 파란 레이저 → 파란색 + 투명 셰이더 + 발광 설정.
+
+---
+
+### 🔗 **연결 과정 (Renderer ↔ Material)**
+
+1. **Renderer 모듈**의 **Material 슬롯** = “페인트칠할 공간”.
+2. **Project 창**에서 만든 Material을 **드래그 앤 드롭** → 해당 Material의 속성이 입자(또는 메시)에 적용.
+3. Renderer는 **이 Material의 속성**(색, 투명도, 방출 등)을 참고하여 입자를 화면에 그림.
+
+---
+
+### 💡 **입자 시스템에서 두 개 이상의 Material**
+
+- Renderer에 **Material 배열**을 넣을 수 있습니다.
+- 예를 들어:
+  - **첫 번째 Material** → 입자의 “머리” (투명하게 만들어서 보이지 않게).
+  - **두 번째 Material** → “트레일”만 보이도록 설정.
+- 이렇게 하면 **하나의 파티클 시스템**으로도 복잡한 효과를 만들 수 있어요.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380425/notion-blog/_/3D_/3D_/_4_-_2/image_9.png)
+
+---
+
+### ✅ **핵심 요약**
+
+- **Renderer** = 입자나 오브젝트를 **화면에 그리는 도화지**.
+- **Material** = 색, 질감, 투명도 등 **그림의 스타일을 정의한 페인트**.
+- **연결 방법** = Material을 Renderer의 슬롯에 **드래그해서 부착** → Renderer가 Material을 참고하여 화면에 표현.
+- 여러 Material을 사용하면 하나의 입자 시스템에서 **다양한 부분(머리, 꼬리 등)**에 다른 효과를 줄 수 있음.
+
+---
+
+# { 🚀 로켓 추진기와 파티클 시스템 제어하기 }
+
+이번 강의에서는 **플레이어 우주선의 무기 발사(레이저)**를 **Input System(액션 맵)**과 **파티클 시스템(Particle System)**을 이용해 제어하는 방법을 다룹니다. 핵심 목표는 **사용자가 입력한 버튼(예: 왼쪽 마우스 버튼)**을 누르고 있을 때만 레이저 파티클이 발사되고, 버튼에서 손을 떼면 발사가 멈추도록 구현하는 것입니다. 이 과정에서 **액션 맵 설정**, **C# 스크립트 작성**, **Emission 모듈 제어**, **PressAndRelease 상호작용 활용** 같은 개념들이 등장합니다.
+
+---
+
+## 📋 목차
+
+1. [파티클 시스템과 Emission 모듈 개념 이해](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#1-%ED%8C%8C%ED%8B%B0%ED%81%B4-%EC%8B%9C%EC%8A%A4%ED%85%9C%EA%B3%BC-emission-%EB%AA%A8%EB%93%88-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4)
+2. [액션 맵에서 Fire 액션 생성 및 입력 바인딩](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#2-%EC%95%A1%EC%85%98-%EB%A7%B5%EC%97%90%EC%84%9C-fire-%EC%95%A1%EC%85%98-%EC%83%9D%EC%84%B1-%EB%B0%8F-%EC%9E%85%EB%A0%A5-%EB%B0%94%EC%9D%B8%EB%94%A9)
+3. [PlayerWeapon 스크립트 생성 및 구조 설계](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#3-playerweapon-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%83%9D%EC%84%B1-%EB%B0%8F-%EA%B5%AC%EC%A1%B0-%EC%84%A4%EA%B3%84)
+4. [버튼 누르고 있을 때만 발사되도록 bool 제어하기](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#4-%EB%B2%84%ED%8A%BC-%EB%88%84%EB%A5%B4%EA%B3%A0-%EC%9E%88%EC%9D%84-%EB%95%8C%EB%A7%8C-%EB%B0%9C%EC%82%AC%EB%90%98%EB%8F%84%EB%A1%9D-bool-%EC%A0%9C%EC%96%B4%ED%95%98%EA%B8%B0)
+5. [PressAndRelease 상호작용을 사용한 개선](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#5-pressandrelease-%EC%83%81%ED%98%B8%EC%9E%91%EC%9A%A9%EC%9D%84-%EC%82%AC%EC%9A%A9%ED%95%9C-%EA%B0%9C%EC%84%A0)
+6. [레이저 파티클 Emission 모듈 제어](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#6-%EB%A0%88%EC%9D%B4%EC%A0%80-%ED%8C%8C%ED%8B%B0%ED%81%B4-emission-%EB%AA%A8%EB%93%88-%EC%A0%9C%EC%96%B4)
+7. [테스트 및 문제 해결 과정](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#7-%ED%85%8C%EC%8A%A4%ED%8A%B8-%EB%B0%8F-%EB%AC%B8%EC%A0%9C-%ED%95%B4%EA%B2%B0-%EA%B3%BC%EC%A0%95)
+
+---
+
+## 1. 파티클 시스템과 Emission 모듈 개념 이해
+
+- **Particle System**: 불꽃, 연기, 추진 화염 같은 시각 효과를 만드는 유니티의 시각적 시스템.
+- **Emission 모듈**: 파티클이 **언제, 얼마나** 생성될지를 제어.
+  - `enabled = true`: 입자가 계속 방출.
+  - `enabled = false`: 입자 방출 중지.
+- **핵심 개념**:
+  - 플레이어 입력값에 따라 Emission 모듈의 `enabled` 상태를 켜거나 꺼서 레이저 발사를 제어한다.
+
+---
+
+## 2. 액션 맵에서 Fire 액션 생성 및 입력 바인딩
+
+1. **PlayerControl(Input Action Asset)** → 기존 액션 맵 사용.
+2. `+` 버튼으로 **Fire**라는 새 액션 생성.
+3. **Action Type**: 기본 `Button` 유지.
+4. **Binding**:
+   - Listen 기능을 사용하거나 수동으로 **Mouse → Left Button**을 선택.
+   - 왼쪽 마우스 버튼 외에도 스페이스바 같은 키를 사용할 수도 있음.
+5. **Interactions(상호작용)**: 초기에는 기본값(PressOnly) 사용. 이후 개선 단계에서 PressAndRelease로 변경.
+
+---
+
+## 3. PlayerWeapon 스크립트 생성 및 구조 설계
+
+1. **Scripts 폴더**에서 `Create → C# Script → PlayerWeapon`.
+2. **Player Ship** 오브젝트에 PlayerWeapon 컴포넌트를 추가.
+3. Player Input 컴포넌트와 같은 게임 오브젝트에 연결 → 액션 맵과 자동 연동.
+4. 불필요한 `Start()`와 `Update()` 제거 후 직접 작성.
+5. `OnFire(InputValue value)` 메서드 추가:
+   - Input System이 Fire 액션을 실행할 때마다 자동 호출됨.
+   - `value.isPressed`로 현재 버튼 상태(bool)를 가져옴.
+
+---
+
+## 4. 버튼 누르고 있을 때만 발사되도록 bool 제어하기
+
+- 클래스 상단에 상태 저장용 변수 추가:
+  ```csharp
+  bool isFiring = false;
+  ```
+- `OnFire`에서 입력 값에 따라 bool 갱신:
+  ```csharp
+  void OnFire(InputValue value) {
+      isFiring = value.isPressed;
+  }
+  ```
+- `Update()`에서 매 프레임 발사 여부를 확인:
+  ```csharp
+  void Update() {
+      ProcessFiring();
+  }
+  ```
+- `ProcessFiring()` 함수에서 bool을 사용:
+  ```csharp
+  void ProcessFiring() {
+      if (isFiring) {
+          Debug.Log("Fire");
+      }
+  }
+  ```
+
+---
+
+## 5. PressAndRelease 상호작용을 사용한 개선
+
+- 문제 상황:
+  - PressOnly 상태에서는 **버튼을 놓을 때** 별도 이벤트가 발생하지 않아 `isFiring`이 계속 `true`.
+- 해결:
+  - PlayerControl의 Fire 액션 속성 → **Interactions → Press** → **Press Behavior: PressAndRelease**로 변경.
+  - 이제 버튼을 놓으면 자동으로 `OnFire`가 다시 호출되어 `value.isPressed`가 `false`로 전달됨.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380422/notion-blog/_/3D_/3D_/_4_-_2/image_10.png)
+
+---
+
+## 6. 레이저 파티클 Emission 모듈 제어
+
+1. PlayerWeapon 클래스에 레이저 파티클 오브젝트를 노출:
+
+   ```csharp
+   [SerializeField] GameObject laser;
+   ```
+
+2. Inspector에서 Laser 파티클 시스템을 PlayerWeapon의 `laser` 필드에 드래그.
+3. Emission 모듈을 가져와서 enabled 상태를 제어:
+
+   ```csharp
+   void ProcessFiring() {
+       var emissionModule = laser.GetComponent<ParticleSystem>().emission;
+       emissionModule.enabled = isFiring;
+   }
+   ```
+
+   - **var 사용 이유**: `ParticleSystem.EmissionModule`은 긴 이름이므로, var로 간결하게 작성.
+   - Emission 모듈의 타입은 내부 구조체라 직접 수정할 수 없고, 반환된 복사본에서 enabled 값을 변경하는 방식 사용.
+
+---
+
+## 7. 테스트 및 문제 해결 과정
+
+1. 유니티에서 실행 후 왼쪽 마우스를 눌렀을 때:
+   - 콘솔에 “Fire” 로그 → 레이저 파티클 방출.
+2. 마우스를 놓으면:
+   - Emission 모듈이 꺼지고 발사 중지.
+3. Laser GameObject를 할당하지 않으면 오류 발생 → 반드시 Inspector에서 연결 필요.
+4. 정상 동작 후, 추가적으로 **이중 레이저** 같은 변형도 가능.
+
+---
+
+## ✅ 정리 (핵심 개념 요약)
+
+- **Input System**의 액션 맵을 활용해 **Fire 액션**을 만들고, PlayerWeapon 스크립트에서 **OnFire(InputValue)** 메서드로 입력을 처리.
+- 버튼 입력 상태(`isPressed`)를 bool 변수에 저장 후, **Update()**에서 매 프레임 확인.
+- **PressAndRelease** 상호작용으로 버튼 해제 시점을 정확히 감지.
+- **ParticleSystem.EmissionModule.enabled**를 사용해 파티클 방출을 제어.
+- Inspector에서 **레이저 파티클 오브젝트를 직렬화 필드에 연결**해야 올바르게 작동.
+
+이로써 플레이어 입력과 파티클 시스템을 연결해, **마우스 클릭으로 레이저를 발사하고 손을 떼면 발사가 중단되는 시스템**을 완성했습니다.
+
+---
+
+# { 🚀 플레이어 우주선의 **이중 레이저 발사** 구현과 배열/foreach 개념 정리 }
+
+이번 강의는 **두 개의 레이저를 나란히 발사**하도록 설정하고, **배열(Array)**과 **foreach 반복문**을 사용해 깔끔하게 제어하는 방법을 다룹니다.
+
+---
+
+## 📋 목차
+
+1. [씬(Scene) 구성 및 프리팹(Prefab) 설정](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#%EC%94%ACscene-%EA%B5%AC%EC%84%B1-%EB%B0%8F-%ED%94%84%EB%A6%AC%ED%8C%B9prefab-%EC%84%A4%EC%A0%95)
+2. [배열(Array) 개념과 C# 배열 사용법](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#%EB%B0%B0%EC%97%B4array-%EA%B0%9C%EB%85%90%EA%B3%BC-c-%EB%B0%B0%EC%97%B4-%EC%82%AC%EC%9A%A9%EB%B2%95)
+3. [Unity Inspector에서 배열에 오브젝트 할당하기](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#unity-inspector%EC%97%90%EC%84%9C-%EB%B0%B0%EC%97%B4%EC%97%90-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%ED%95%A0%EB%8B%B9%ED%95%98%EA%B8%B0)
+4. [foreach 반복문 개념과 사용법](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#foreach-%EB%B0%98%EB%B3%B5%EB%AC%B8-%EA%B0%9C%EB%85%90%EA%B3%BC-%EC%82%AC%EC%9A%A9%EB%B2%95)
+5. [PlayerWeapon 스크립트 상세 코드 분석](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#playerweapon-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%83%81%EC%84%B8-%EC%BD%94%EB%93%9C-%EB%B6%84%EC%84%9D)
+6. [최종 동작 테스트와 주의 사항](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#%EC%B5%9C%EC%A2%85-%EB%8F%99%EC%9E%91-%ED%85%8C%EC%8A%A4%ED%8A%B8%EC%99%80-%EC%A3%BC%EC%9D%98-%EC%82%AC%ED%95%AD)
+
+---
+
+## 1. 씬(Scene) 구성 및 프리팹(Prefab) 설정
+
+### 🛠 단계별 설정
+
+1. **프리팹 생성**
+   - 기존 레이저 오브젝트를 **Assets → Prefabs** 폴더로 드래그해 프리팹으로 만듭니다.
+   - 프리팹을 사용하면 여러 위치에서 같은 설정을 쉽게 재사용할 수 있음.
+2. **레이저 복제**
+   - **Ctrl + D** 로 레이저를 복제.
+   - 하나를 왼쪽으로 `x = -5`, 다른 하나를 오른쪽으로 `x = 5`로 이동.
+   - 이름을 각각 **Left Laser**, **Right Laser**로 변경해 관리하기 쉽게 설정.
+3. **방출(Emission) 모듈 활성화**
+   - 두 레이저의 Particle System 컴포넌트에서 **Emission 모듈**을 활성화하면, 두 개 모두 올바르게 발사됨.
+
+---
+
+## 2. 배열(Array) 개념과 C# 배열 사용법
+
+- **배열이란?**
+  - "여러 데이터를 하나의 변수에 묶어 저장하는 상자"
+  - **변수**가 하나의 값을 담는 상자라면, **배열**은 상자들을 보관하는 더 큰 상자.
+- **배열의 특징**
+  - 같은 데이터 타입만 저장 가능 (예: `int[]`, `float[]`, `string[]`, `GameObject[]`).
+  - **0 기반 인덱스** 사용 → 첫 번째 값은 `0`, 두 번째는 `1`, 세 번째는 `2`.
+
+### ✍ 예제: 문자열 배열
+
+```csharp
+string[] names = { "Rick", "Stephen", "Superman" };
+Debug.Log(names[2]); // Superman 출력
+```
+
+---
+
+## 3. Unity Inspector에서 배열에 오브젝트 할당하기
+
+1. Player Ship을 선택 → **PlayerWeapon** 스크립트를 확인.
+2. **Lasers 배열**이 비어 있음.
+3. 할당 방법:
+   - (방법 1) **+ 버튼**으로 요소 추가 → Left/Right Laser를 하나씩 드래그.
+   - (방법 2, 더 빠름) **두 개의 레이저 오브젝트를 계층에서 함께 선택** → Lasers 필드로 한 번에 드래그.
+4. Left Laser를 먼저, Right Laser를 두 번째로 순서대로 넣는 것이 관리에 좋음.
+
+---
+
+## 4. foreach 반복문 개념과 사용법
+
+- **foreach란?**
+  - **컬렉션**(배열, 리스트 등)의 모든 항목을 자동으로 순회하는 반복문.
+  - 문법:
+    ```csharp
+    foreach (GameObject item in things)
+    {
+        item.DoSomething();
+    }
+    ```
+  - 의미: `things` 컬렉션의 모든 **item**에 대해 중괄호 안의 작업을 수행.
+- **명명 규칙**: 복수형-단수형을 짝지어 사용 → `foreach(GameObject laser in lasers)`
+
+---
+
+## 5. PlayerWeapon 스크립트 상세 코드 분석
+
+```csharp
+public class PlayerWeapon : MonoBehaviour
+{
+    [SerializeField] GameObject[] lasers; // 🔹 두 개의 레이저를 배열로 보관
+    bool isFiring = false; // 🔹 발사 여부 추적
+
+    void Update()
+    {
+        ProcessFiring(); // 🔹 매 프레임 발사 상태 확인
+    }
+
+    void OnFire(InputValue value) // 🔹 입력 시스템 이벤트
+    {
+        isFiring = value.isPressed; // 🔹 버튼 눌림 여부 저장
+    }
+
+    void ProcessFiring()
+    {
+        // 🔹 배열의 모든 레이저를 순회하며 발사 상태를 업데이트
+        foreach (GameObject laser in lasers)
+        {
+            var emissionModule = laser.GetComponent<ParticleSystem>().emission;
+            emissionModule.enabled = isFiring; // 🔹 isFiring이 true면 발사
+        }
+    }
+}
+```
+
+### 🔑 핵심 개념
+
+- **[SerializeField]** : Inspector에서 private 필드를 보이게 해 Unity 편집기로 직접 설정 가능.
+- **InputValue** : 새로운 Unity Input System의 입력 이벤트 값.
+- **ParticleSystem.emission** : 파티클 방출 모듈 제어. `enabled = true` → 파티클 방출 시작.
+
+---
+
+## 6. 최종 동작 테스트와 주의 사항
+
+1. **테스트**
+   - 게임 실행 후 **Left Laser**와 **Right Laser**가 동시에 발사되는지 확인.
+   - 마우스 왼쪽 버튼을 누르면 두 레이저가 켜지고, 떼면 꺼져야 함.
+2. **주의할 점**
+   - Lasers 배열에 오브젝트를 드래그하지 않으면 Null Reference 오류 발생.
+   - 배열 순서를 잘못 넣어도 기능적으로 문제없지만, 관리와 디버깅 편의를 위해 순서를 유지.
+   - foreach 사용 시 컬렉션이 null일 경우 반복문 실행 전 null 체크 필요.
+
+---
+
+### ✅ **정리**
+
+- **Prefab**을 활용해 같은 레이저를 쉽게 복제하고 재사용.
+- \*배열(Array)\*\*을 사용해 두 개 이상의 오브젝트를 효율적으로 관리.
+- **foreach 반복문**으로 코드 중복 없이 모든 레이저의 상태를 제어.
+- Inspector에서 드래그 앤 드롭으로 빠르게 배열을 설정할 수 있음.
+- `ParticleSystem.emission`을 사용해 레이저 발사 여부를 제어.
+
+> 이번 강의 핵심: 배열과 foreach를 활용하면 다수의 오브젝트를 깔끔하고 유지보수하기 쉽게 제어할 수 있다.
+
+---
+
+# { 🎯 **UI 캔버스와 마우스 위치를 따라가는 십자선(Crosshair) 설정하기 }**
+
+이번 강의에서는 **UI(Canvas)** 시스템을 사용해 **마우스 위치를 실시간으로 따라다니는 십자선(Crosshair)** 을 구현했습니다. 이를 통해 **2D UI 요소와 마우스 입력 처리, Rect Transform의 개념**을 함께 이해할 수 있습니다.
+
+---
+
+## 📋 **목차**
+
+1. [Crosshair PNG 가져오기 및 스프라이트 설정](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#crosshair-png-%EA%B0%80%EC%A0%B8%EC%98%A4%EA%B8%B0-%EB%B0%8F-%EC%8A%A4%ED%94%84%EB%9D%BC%EC%9D%B4%ED%8A%B8-%EC%84%A4%EC%A0%95)
+2. [UI 캔버스 생성과 구조 이해하기](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#ui-%EC%BA%94%EB%B2%84%EC%8A%A4-%EC%83%9D%EC%84%B1%EA%B3%BC-%EA%B5%AC%EC%A1%B0-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+3. [Crosshair 이미지 추가 및 Rect Transform 이해](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#crosshair-%EC%9D%B4%EB%AF%B8%EC%A7%80-%EC%B6%94%EA%B0%80-%EB%B0%8F-rect-transform-%EC%9D%B4%ED%95%B4)
+4. [Canvas Scaler와 화면 해상도 대응](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#canvas-scaler%EC%99%80-%ED%99%94%EB%A9%B4-%ED%95%B4%EC%83%81%EB%8F%84-%EB%8C%80%EC%9D%91)
+5. [Crosshair을 마우스 위치에 따라 움직이기](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#crosshair%EC%9D%84-%EB%A7%88%EC%9A%B0%EC%8A%A4-%EC%9C%84%EC%B9%98%EC%97%90-%EB%94%B0%EB%9D%BC-%EC%9B%80%EC%A7%81%EC%9D%B4%EA%B8%B0)
+6. [기본 커서 비활성화](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#%EA%B8%B0%EB%B3%B8-%EC%BB%A4%EC%84%9C-%EB%B9%84%ED%99%9C%EC%84%B1%ED%99%94)
+7. [전체 흐름 요약](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#%EC%A0%84%EC%B2%B4-%ED%9D%90%EB%A6%84-%EC%9A%94%EC%95%BD)
+
+---
+
+## 1. **Crosshair PNG 가져오기 및 스프라이트 설정**
+
+- 리소스 탭에서 **Crosshair PNG** 다운로드 후 **프로젝트의 GDTV Assets 폴더**에 추가.
+- **Inspector 설정 변경:**
+  - **Texture Type** → `Default` ➡️ **Sprite (2D and UI)** 로 변경.
+  - **Sprite Mode** → `Single` 로 설정.
+  - 변경 후 **Apply** 클릭 → 게임 뷰에서 PNG를 스프라이트로 사용할 수 있음.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380423/notion-blog/_/3D_/3D_/_4_-_2/image_11.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380423/notion-blog/_/3D_/3D_/_4_-_2/image_12.png)
+
+---
+
+## 2. **UI 캔버스 생성과 구조 이해하기**
+
+- **Hierarchy** 창 → **우클릭 > UI > Canvas** → 이름: `UI Canvas`.
+- **화면 공간 오버레이(Screen Space - Overlay)** 모드:
+  - 항상 **카메라 뷰 최상단**에 렌더링되어 모든 월드 공간 오브젝트 위에 표시됨.
+  - 점수 UI, Crosshair 등 HUD 요소 관리에 적합.
+
+---
+
+## 3. **Crosshair 이미지 추가 및 Rect Transform 이해**
+
+- **UI Canvas 우클릭 > UI > Image** → 이름: `Crosshair`.
+- **Sprite 필드**에 Crosshair PNG 드래그 → 게임 화면에 십자선 표시.
+- **Rect Transform vs Transform 차이점**:
+  - **Rect Transform**: UI 전용 좌표계, 크기·피벗·앵커를 활용해 화면 배치 제어.
+  - **Transform**: 일반 월드 공간 오브젝트의 위치·회전·스케일만 제어.
+- Rect Transform 덕분에 **화면 좌표(Input.mousePosition)** 와 쉽게 연동 가능.
+
+---
+
+## 4. **Canvas Scaler와 화면 해상도 대응**
+
+- **Canvas Scaler 컴포넌트** → **UI Scale Mode** 변경:
+  - `Constant Pixel Size` ➡️ **Scale With Screen Size**.
+  - **Reference Resolution** → 1920×1080 (16:9 비율).
+  - 화면 확대/축소 또는 다른 모니터에서도 Crosshair 크기 유지 가능.
+- **자주 발생하는 문제**:
+  - 자유 비율에서 Crosshair가 어긋날 수 있음 → 16:9로 전환하면 해결.
+  - 재생 모드에서는 정상 동작.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380423/notion-blog/_/3D_/3D_/_4_-_2/image_13.png)
+
+---
+
+## 5. **Crosshair을 마우스 위치에 따라 움직이기**
+
+### 📄 **PlayerWeapon.cs (핵심 코드)**
+
+```csharp
+[SerializeField] RectTransform crosshair;
+
+void Update()
+{
+    ProcessFiring();
+    MoveCrosshair();
+}
+
+void MoveCrosshair()
+{
+    crosshair.position = Input.mousePosition;
+}
+```
+
+- `crosshair.position = Input.mousePosition;`
+  → **스크린 좌표계(mousePosition)** 를 Rect Transform 위치에 직접 매핑.
+- **RectTransform** 을 사용했기 때문에 화면 공간 오버레이 캔버스에서 자연스럽게 마우스 위치와 십자선이 일치.
+
+---
+
+## 6. **기본 커서 비활성화**
+
+- 게임 중 기본 커서가 Crosshair 위에 겹쳐 보이지 않도록 처리.
+- **Start() 메서드**에 추가:
+
+```csharp
+void Start()
+{
+    Cursor.visible = false;
+}
+```
+
+- **주의:**
+  - Unity 에디터에서는 **창을 클릭해 포커스** 해야만 커서가 사라짐.
+  - **빌드된 게임 실행 시** 자동으로 커서가 비활성화됨.
+
+---
+
+## 7. **전체 흐름 요약**
+
+1. Crosshair PNG를 Sprite(2D and UI)로 설정하고 Apply.
+2. UI Canvas 생성 → Screen Space Overlay 모드 사용.
+3. Crosshair 이미지를 Canvas의 자식으로 추가하고 Rect Transform 이해.
+4. Canvas Scaler → Scale With Screen Size, 해상도 1920×1080 설정.
+5. PlayerWeapon.cs에서 RectTransform을 참조해 `crosshair.position = Input.mousePosition` 구현.
+6. Start()에서 `Cursor.visible = false`로 기본 커서 제거.
+7. 실행하면 마우스를 움직일 때 Crosshair 이미지가 **마우스 위치를 실시간으로 따라다님**.
+
+---
+
+### ✅ **핵심 개념 정리**
+
+- **UI Canvas(Screen Space Overlay)**: 모든 월드 오브젝트 위에 항상 표시되는 UI 컨테이너.
+- **Rect Transform**: UI 전용 좌표/크기 제어 컴포넌트. Transform과 달리 앵커, 피벗 기반으로 동작.
+- **Canvas Scaler**: 다양한 해상도와 화면 비율에서 UI 크기와 위치를 일관되게 유지.
+- **Input.mousePosition**: 현재 마우스의 스크린 좌표를 반환 → Rect Transform 위치 이동에 활용.
+- **Cursor.visible**: 게임 플레이 중 기본 커서를 보이지 않게 설정.
+
+이 과정을 통해 **UI 시스템과 입력 처리의 연계**, **Rect Transform의 특징**, **해상도 대응 UI 설계**까지 한 번에 학습할 수 있습니다.
+
+---
+
+# { 🚀 ScreenToWorldPoint를 활용한 레이저 조준 기준점 설정하기 }
+
+이번 강의는 **카메라 화면(Screen) 좌표를 월드(World) 좌표로 변환**하는 `Camera.ScreenToWorldPoint`를 사용하여, **커서를 따라 움직이는 목표 지점(Target Point)** 을 만들고, 이후 레이저를 그 지점을 향해 조준할 수 있도록 설정하는 내용을 다룹니다. 이 과정은 레이저 발사 방향을 정교하게 제어할 수 있도록 **조준 기준점을 설정**하는 핵심 단계입니다.
+
+---
+
+## 📋 목차
+
+1. [ScreenToWorldPoint 개념 이해하기](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#screentoworldpoint-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [목표 지점(Target Point) 오브젝트 생성 및 설정](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#%EB%AA%A9%ED%91%9C-%EC%A7%80%EC%A0%90target-point-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%EC%83%9D%EC%84%B1-%EB%B0%8F-%EC%84%A4%EC%A0%95)
+3. [PlayerWeapon 스크립트 수정](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#playerweapon-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%88%98%EC%A0%95)
+4. [Crosshair 이동 및 Target Point 갱신 로직 구현](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#crosshair-%EC%9D%B4%EB%8F%99-%EB%B0%8F-target-point-%EA%B0%B1%EC%8B%A0-%EB%A1%9C%EC%A7%81-%EA%B5%AC%ED%98%84)
+5. [동작 확인 및 디버깅 팁](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#%EB%8F%99%EC%9E%91-%ED%99%95%EC%9D%B8-%EB%B0%8F-%EB%94%94%EB%B2%84%EA%B9%85-%ED%8C%81)
+6. [핵심 개념 요약](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#%ED%95%B5%EC%8B%AC-%EA%B0%9C%EB%85%90-%EC%9A%94%EC%95%BD)
+
+---
+
+## 1. ScreenToWorldPoint 개념 이해하기
+
+- **문제 상황**: 화면 상에서 커서는 2D 좌표 `(x, y)`로 움직이지만, 실제 게임 월드에서 레이저는 **3D 공간** 속 특정 지점을 향해야 합니다.
+- **해결 방법**: `Camera.ScreenToWorldPoint(Vector3 screenPosition)`
+  - 화면(Screen) 좌표 `(x, y)`와 **z 거리 값**(카메라로부터 떨어진 거리)을 받아서, 월드 좌표 `(x, y, z)`로 변환해 줌.
+  - z 값은 반드시 지정해야 하며, 이는 **레이저를 얼마나 멀리 조준할지**를 결정.
+  - 예:
+    ```csharp
+    Vector3 worldPos = Camera.main.ScreenToWorldPoint(
+        new Vector3(Input.mousePosition.x, Input.mousePosition.y, 100f)
+    );
+    ```
+  - 위 코드에서 `100f`는 카메라에서 100 유닛 떨어진 곳에 해당.
+
+---
+
+## 2. 목표 지점(Target Point) 오브젝트 생성 및 설정
+
+1. **Player Rig 선택 후 우클릭 → 3D Object → Sphere 생성**.
+2. 이름을 **Target Point**로 변경.
+3. **Player Rig 최상단**(Camera 위)으로 드래그.
+4. 위치는 임시로 아무 데나 두고, 크기를 크게 확대 (**10,10,10**) → 확인용.
+5. **빨간색 재질(Material)** 생성 및 적용:
+   - Assets → Materials → 우클릭 → `Create → Material`.
+   - 이름: `Red`.
+   - 알록달록하고 **보기 싫은 빨간색**으로 설정 → 디버깅할 때 쉽게 눈에 띄게.
+
+📌 **참고**: 이 빨간 공은 **디버깅용**이므로 최종 게임에서는 Mesh Renderer를 꺼서 안 보이게 할 예정.
+
+---
+
+## 3. PlayerWeapon 스크립트 수정
+
+- **필드 추가**:
+  ```csharp
+  [SerializeField] Transform targetPoint;   // 목표 지점
+  [SerializeField] float targetDistance = 100f; // 카메라에서 떨어진 거리
+  ```
+- **Update()에서 호출**:
+  ```csharp
+  void Update() {
+      ProcessFiring();      // 레이저 발사 처리
+      MoveCrosshair();      // 십자선 이동 처리
+      MoveTargetPoint();    // 목표 지점 이동 처리
+  }
+  ```
+- **MoveTargetPoint 메소드 구현**:
+  ```csharp
+  void MoveTargetPoint() {
+      Vector3 targetPointPosition = new Vector3(
+          Input.mousePosition.x,
+          Input.mousePosition.y,
+          targetDistance
+      );
+      targetPoint.position = Camera.main.ScreenToWorldPoint(targetPointPosition);
+  }
+  ```
+
+---
+
+## 4. Crosshair 이동 및 Target Point 갱신 로직 구현
+
+- **Crosshair 이동** (`RectTransform` 기반 UI 십자선):
+  ```csharp
+  void MoveCrosshair() {
+      crosshair.position = Input.mousePosition;
+  }
+  ```
+- **Target Point 이동**: 위에서 만든 `MoveTargetPoint()`를 매 프레임 호출 → **커서와 같은 x, y**를 사용하되, z는 `targetDistance` 유지.
+- 이렇게 하면 빨간 공(Target Point)이 **커서를 따라다니고**, **카메라와 일정한 거리**를 유지.
+
+---
+
+## 5. 동작 확인 및 디버깅 팁
+
+1. **Unity 에디터**에서 PlayerWeapon 컴포넌트를 가진 오브젝트를 선택 → **targetPoint 필드에 빨간 공을 드래그**.
+2. **게임 실행 후 커서를 움직여 보기** → 빨간 공이 커서를 따라 움직이면 성공.
+3. 너무 가까워서 이상하게 보인다면 **targetDistance 값을 250 정도로 증가**.
+4. 디버깅 완료 후:
+   - Target Point의 **Mesh Renderer 비활성화** → 게임 화면에서 안 보이도록.
+   - 단축키 `Ctrl + Shift + P`(또는 에디터 설정에 따라 다를 수 있음)으로 장면 뷰를 일시 정지하여 위치를 확인 가능.
+
+---
+
+## 6. 핵심 개념 요약
+
+- **ScreenToWorldPoint**: 화면 좌표를 월드 좌표로 변환하는 메소드.
+- **Z 거리 값(targetDistance)**: 카메라와의 거리를 결정, 조준 정확도를 위해 중요.
+- **Target Point**: 레이저가 향할 기준점 → 커서를 따라 움직이며 항상 같은 z 거리 유지.
+- **Crosshair**: UI 십자선 → 단순히 커서 위치에 배치하여 시각적 피드백 제공.
+- **디버깅 기법**: 크기 확대, 빨간 재질 적용, Mesh Renderer 끄기, 일시 정지 단축키 활용.
+- **실전 활용**: 이후 레이저 시스템에서 `targetPoint.position`을 참조하여 **레이저 방향을 설정**하면 정확한 조준 발사가 가능.
+
+---
+
+✅ **이 강의의 핵심 목표**: **2D 마우스 입력 → 3D 공간의 목표 지점**으로 변환하는 법을 배우고, 이를 통해 레이저 조준 시스템을 준비하는 것.
+
+이 과정을 이해하면 **미래의 레이저 발사 구현**이나 **다양한 3D 오브젝트 조준 시스템**에 그대로 응용할 수 있습니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380423/notion-blog/_/3D_/3D_/_4_-_2/image_14.png)
+
+---
+
+# { 🚀 벡터 산술을 활용한 레이저 조준과 파티클 시스템 제어하기 }
+
+이번 강의는 **벡터 연산(Vector Arithmetic)**을 사용해 **두 개의 레이저 파티클 시스템**이 멀리 떨어진 목표(Target Point)를 정확히 가리키도록 구현하는 과정과, 이 과정에서 필요한 Unity의 기본 메서드와 개념을 다룹니다. 또한 장면(Scene) 설정에서 불필요한 **Sphere Collider**를 제거해 다른 충돌이나 트리거 간섭을 방지하는 방법도 포함되어 있습니다.
+
+---
+
+## 📋 목차
+
+1. [불필요한 콜라이더 정리하기](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#%EB%B6%88%ED%95%84%EC%9A%94%ED%95%9C-%EC%BD%9C%EB%9D%BC%EC%9D%B4%EB%8D%94-%EC%A0%95%EB%A6%AC%ED%95%98%EA%B8%B0)
+2. [벡터 산술(Vector Arithmetic) 기본 이해](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#%EB%B2%A1%ED%84%B0-%EC%82%B0%EC%88%A0vector-arithmetic-%EA%B8%B0%EB%B3%B8-%EC%9D%B4%ED%95%B4)
+3. [Unity의 벡터 관련 메서드 활용](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#unity%EC%9D%98-%EB%B2%A1%ED%84%B0-%EA%B4%80%EB%A0%A8-%EB%A9%94%EC%84%9C%EB%93%9C-%ED%99%9C%EC%9A%A9)
+4. [레이저 조준을 위한 AimLasers() 구현](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#%EB%A0%88%EC%9D%B4%EC%A0%80-%EC%A1%B0%EC%A4%80%EC%9D%84-%EC%9C%84%ED%95%9C-aimlasers-%EA%B5%AC%ED%98%84)
+5. [플레이어 우주선 vs 레이저 위치 비교 테스트](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#%ED%94%8C%EB%A0%88%EC%9D%B4%EC%96%B4-%EC%9A%B0%EC%A3%BC%EC%84%A0-vs-%EB%A0%88%EC%9D%B4%EC%A0%80-%EC%9C%84%EC%B9%98-%EB%B9%84%EA%B5%90-%ED%85%8C%EC%8A%A4%ED%8A%B8)
+6. [업데이트 주기와 테스트](https://www.notion.so/4-2-277e683f737e806f9f83f895aecfbd14#%EC%97%85%EB%8D%B0%EC%9D%B4%ED%8A%B8-%EC%A3%BC%EA%B8%B0%EC%99%80-%ED%85%8C%EC%8A%A4%ED%8A%B8)
+
+---
+
+## 1. 불필요한 콜라이더 정리하기
+
+- **이유**: 장면 뷰(Scene View)에 매달려 있던 **Sphere Collider**가 나중에 다른 오브젝트와 충돌(Physics)이나 트리거(Trigger)로 간섭할 수 있음.
+- **작업**:
+  - Player Rig의 목표 지점(Target Point)에서 **Mesh Renderer**는 이미 비활성화했지만, **Sphere Collider**는 완전히 삭제(Delete) → 더 이상 간섭 없음.
+
+---
+
+## 2. 벡터 산술(Vector Arithmetic) 기본 이해
+
+- **벡터(Vector)**: 크기와 방향을 모두 가지는 값. 3D 공간에서는 `Vector3(x, y, z)` 로 표현.
+- **벡터 뺄셈(Vector Subtraction)**:
+  - `Vector3 result = pointB - pointA;`
+  - 이 연산은 **A에서 B로 가는 방향**을 나타내는 새 벡터를 생성.
+  - 이 벡터는 크기(거리)와 방향을 동시에 포함.
+- **게임 개발에서 사용되는 이유**:
+  - **조준 방향** 계산 (예: 레이저, 미사일 발사).
+  - **거리 측정** (두 지점 사이의 거리).
+
+> 💡 핵심 기억법:
+>
+> - 특정 지점에서 다른 지점으로 **가리키고 싶다면**
+>   - `끝점 - 시작점` 순으로 뺄셈.
+>   - ex) `fireDirection = targetPoint.position - laser.transform.position;`
+
+---
+
+## 3. Unity의 벡터 관련 메서드 활용
+
+- **`Vector3.Distance(a, b)`** : 두 지점 사이의 거리를 반환.
+- **`Quaternion.LookRotation(direction)`** : 주어진 방향 벡터를 바라보도록 회전을 계산.
+- **문제 해결 팁**:
+  - 자동 완성이 안 될 경우 → `System.Numerics` 네임스페이스가 불필요하게 추가되어 Unity의 `Quaternion`과 충돌할 수 있음.
+  - 해결법: **System.Numerics 삭제** → Unity의 `Quaternion` 사용 가능.
+
+---
+
+## 4. 레이저 조준을 위한 AimLasers() 구현
+
+### 4-1. 기본 구조
+
+```csharp
+void AimLasers()
+{
+    foreach (GameObject laser in lasers)
+    {
+        // 1. 방향 벡터 계산
+        Vector3 fireDirection = targetPoint.position - this.transform.position;
+
+        // 2. 목표 방향을 바라보는 회전 값 계산
+        Quaternion rotationToTarget = Quaternion.LookRotation(fireDirection);
+
+        // 3. 레이저의 회전을 목표 방향으로 설정
+        laser.transform.rotation = rotationToTarget;
+    }
+}
+```
+
+### 4-2. 단계별 개념
+
+1. **방향 벡터(fireDirection) 계산**
+   - `targetPoint.position - this.transform.position`
+   - 현재 우주선(또는 레이저 위치)에서 목표까지 가는 방향.
+2. **Quaternion.LookRotation() 사용**
+   - 방향 벡터를 회전 값(Quaternion)으로 변환.
+   - 레이저의 정면이 fireDirection을 바라보게 됨.
+3. **레이저 회전 적용**
+   - `laser.transform.rotation = rotationToTarget;`
+   - 각 레이저의 회전을 목표 방향으로 갱신.
+
+---
+
+## 📌 비유로 이해하기
+
+1. **화살표(벡터)** : "저기 적이 있는 방향"이라는 정보만 가지고 있음.
+2. **회전 값(Quaternion)** : Unity에서 오브젝트를 실제로 그 방향으로 **돌릴 때** 필요한 정보.
+3. `Quaternion.LookRotation()` :
+   - 화살표(방향)만 보고
+   - “오브젝트를 어느 각도로 돌려야 그 화살표 방향을 바라볼 수 있는지”를 계산해 줌.
+
+## ✨ 아주 단순한 비유
+
+- **벡터** = “저기 오른쪽 45° 위쪽 방향이야”라고 알려주는 지도.
+- **Quaternion.LookRotation()** = “그럼 네 몸을 오른쪽 45° 위쪽으로 돌려 줄게”라고 대신 계산해 주는 도우미.
+
+---
+
+## 🔎 핵심 요약
+
+- Unity는 회전을 **Quaternion(쿼터니언)**이라는 특수한 수학 형식으로 다룸.
+- `LookRotation()`은 **벡터 방향 → Quaternion 회전 값**으로 변환해 주는 함수.
+- 이렇게 하면 복잡한 수학 없이 **오브젝트가 특정 방향을 바라보도록** 쉽게 조준할 수 있음.
+
+---
+
+## 5. 플레이어 우주선 vs 레이저 위치 비교 테스트
+
+- **방법 1 (레이저 개별 위치 사용)**
+  - `fireDirection = targetPoint.position - laser.transform.position;`
+  - 각 레이저의 위치를 기준으로 계산 → 결과적으로 두 레이저가 목표로 수렴하며 **약간 교차**하는 모습.
+- **방법 2 (플레이어 우주선 위치 사용)**
+  - `fireDirection = targetPoint.position - transform.position;`
+  - 모든 레이저가 플레이어 중심을 기준으로 목표를 향해 나란히 발사됨.
+- **테스트 결과**:
+  - 두 방법 모두 가능하며, 어느 것이 더 자연스러운지는 **게임 디자인 취향**에 따라 결정.
+
+---
+
+## 6. 업데이트 주기와 테스트
+
+- **Update()에서 AimLasers() 호출**
+  - 매 프레임마다 레이저의 조준이 갱신되어 마우스 위치(=목표) 변화를 즉각 반영.
+- **테스트 과정**:
+  1. 게임 뷰 확대 후 **Play 버튼** 클릭.
+  2. 마우스를 멀리 이동 → 레이저가 정확히 목표 방향으로 회전.
+  3. 플레이어 우주선의 Transform을 기준으로 계산했을 때 레이저가 더 평행하게 보임.
+  4. 마우스 위치와 목표 거리(`targetDistance`)를 조정해 발사 방향을 추가 조율.
+
+---
+
+## ✅ 최종 개념 정리
+
+- **벡터 뺄셈**은 두 지점 간의 방향과 거리를 얻는 핵심 도구.
+- \*Quaternion.LookRotation()**을 통해 벡터 방향을 **회전 값\*\*으로 변환하여 오브젝트를 조준시킬 수 있음.
+- 불필요한 **Collider**는 삭제해 충돌 간섭을 방지.
+- 레이저의 위치와 우주선 위치 중 어떤 기준을 사용할지는 결과를 보고 선택.
+- `Update()`에서 매 프레임 갱신 → 부드러운 조준 효과 달성.
+
+> 이 강의를 통해 벡터 산술의 기본과 Unity의 회전 처리 방식을 이해하면, 레이저뿐만 아니라 미사일, 포탑, 카메라 등 다양한 조준 시스템에 응용할 수 있습니다.
+
+- 추가
+
+### 📌 벡터(Vector)가 뭐냐면
+
+- **화살표 같은 것**이에요.
+  - **위치(점)** 두 개가 있으면 → 그 두 점을 잇는 **방향**과 **길이**(거리)를 가진 화살표를 만들 수 있어요.
+  - 예: 게임 화면에서 플레이어와 적이 있다고 하면, 적이 어디 있는지를 **화살표**로 표시하는 것.
+
+---
+
+### 🏹 벡터 뺄셈이란?
+
+- **끝점 - 시작점** = 두 점을 잇는 **방향 화살표**
+- 공식처럼 보이지만 사실은 **“B에서 A로 가려면 어느 쪽으로 얼마나 가야 하는지”**를 알려주는 방법이에요.
+
+### 예시 1) 게임 속 상황으로 생각해 보기
+
+1. **플레이어**가 (2, 1) 좌표에 있고,
+2. **적**이 (5, 4) 좌표에 있다면,
+3. 적 - 플레이어 = `(5-2, 4-1)` → `(3, 3)`
+   - 이 `(3,3)`이 바로 **플레이어에서 적 쪽으로 향하는 화살표**예요.
+   - “오른쪽으로 3, 위로 3만큼 가면 적이 있어!” 라는 의미.
+
+---
+
+### 예시 2) 일상에서 비유
+
+- 친구 집을 찾는 상황:
+  - **A(너)**: “나는 학교 운동장에 있어.”
+  - **B(친구 집)**: “내 집은 운동장에서 동쪽으로 3블록, 북쪽으로 3블록이야.”
+  - **친구 집 위치 - 네 위치** = “어느 쪽으로, 얼마나 걸어야 할지”를 알려주는 것 = **벡터 뺄셈**.
+
+---
+
+### 🎮 게임 개발에서 쓰이는 이유
+
+1. **조준 방향 계산**
+   - 레이저, 미사일, 총알이 “어느 쪽으로 날아가야 하는지”를 계산.
+2. **거리 확인**
+   - 플레이어와 적이 얼마나 떨어져 있는지 알 수 있음.
+
+---
+
+### ✨ 핵심 포인트
+
+- **벡터는 “방향과 거리”를 가진 화살표**.
+- **벡터 뺄셈은 “어느 쪽으로, 얼마나 가야 하는지”를 구하는 방법**.
+- 외워야 할 건 한 줄!
+  > “끝점 - 시작점 = 방향”
+  >
+  > 게임에서 총을 쏠 때 → `목표 위치 - 현재 위치`.
+
+이렇게만 이해해도 조준이나 거리 계산 같은 게임 수학의 기초를 충분히 따라갈 수 있어요.

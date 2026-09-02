@@ -1,0 +1,264 @@
+---
+title: 'BCh04 08 p186 목록페이지/등록처리'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# 컨트롤러와 화면 처리
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381213/notion-blog/_/_/_/_/BCh04_08_p186_/Untitled.png)
+
+```java
+package org.zerock.guestbook.controller;
+
+@Controller
+@RequestMapping("/guestbook")
+@Log4j2
+@RequiredArgsConstructor
+public class GuestbookController {
+
+    private final GuestbookService service;
+
+    @GetMapping("/list")
+    public void list(@ModelAttribute PageRequestDTO pageRequestDTO, Model model) {
+        log.info("list..........." + pageRequestDTO);
+				// 실제 "result" 에 있는건 PageResultDTO
+        model.addAttribute("result", service.getList(pageRequestDTO));
+    }
+}
+```
+
+```java
+list 페이지로 가기 위해서 컨트롤러를 수정 해준다
+
+* 서비스를 주입 받을 수 있도록 @RequiredArgsConstructor ,  private final GuestbookService service; 를 작성해주고
+
+* 현재 파라미터로 받는 pageRequestDTO 에 페이지 번호, 페이지 사이즈 등등 정보를 담고있다 (화면에서 넘어온)
+
+* model.addAttribute("result", service.getList(pageRequestDTO)); 여기서 실제로 "result" 에 추가되는건 PageResultDTO 이다 (변환해서 돌아오기 때문에)
+
+	(목록 데이터도 다 DTO 로 바껴있고 페이지 번호도 다 들어가 있다)
+
+* @ModelAttribute 자동으로 pageRequestDTO 를 model 에 추가해주지만 @RequestParam 과 혼동 등을 피하기 위해서 그냥 작성해주자 (속성이 적으면 생략)
+```
+
+## 화면 리스트 출력
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381211/notion-blog/_/_/_/_/BCh04_08_p186_/Untitled_1.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381212/notion-blog/_/_/_/_/BCh04_08_p186_/Untitled_2.png)
+
+```java
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
+<th:block th:replace="~{/layout/basic::setContent(~{this::content} )}">
+
+    <th:block th:fragment="content">
+        <h1>GuestBook List Page</h1>
+        <table class="table table-striped">
+            <thead>
+            <tr>
+                <th scope="col">#</th>
+                <th scope="col">Title</th>
+                <th scope="col">Writer</th>
+                <th scope="col">Regdate</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="dto : ${result.dtoList}">
+                <th scope="row">[[${dto.gno}]]</th>
+                <td>[[${dto.title}]]</td>
+                <td>[[${dto.writer}]]</td>
+                <td>[[${#temporals.format(dto.regDate,'yyyy/MM/dd')}]]</td>
+            </tr>
+
+            </tbody>
+        </table>
+    </th:block>
+</th:block>
+</html>
+```
+
+```java
+특별한 내용은 없다
+
+* <td>[[${#temporals.format(dto.regDate,'yyyy/MM/dd')}]]</td> 부분은 라이브러리를 사용하고 있다는걸 기억
+
+* <th:block th:replace="~{/layout/basic::setContent(~{this::content} )}"> 는 이 페이지를 basic 으로 replace 하고 이 페이지의 th:fragment="content" 를 받아서 basic 의 content 부분에 넣는다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381212/notion-blog/_/_/_/_/BCh04_08_p186_/Untitled_3.png)
+
+## 하단 페이저 처리
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381212/notion-blog/_/_/_/_/BCh04_08_p186_/Untitled_4.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381212/notion-blog/_/_/_/_/BCh04_08_p186_/Untitled_5.png)
+
+```java
+<!--페이저-->
+        <ul class="pagination h-100 justify-content-center align-items-center">
+            <li class="page-item" th:if="${result.prev}">
+                <a class="page-link" th:href="@{/guestbook/list(page = ${result.start - 1})}" tabindex="-1">Previous</a>
+            </li>
+            <li th:class="'page-item' +' '+ ${result.page == page ? 'active':''}" th:each="page : ${result.pageList}">
+                <a class="page-link" th:href="@{/guestbook/list(page = ${page})}">
+                    [[${page}]]
+                </a>
+            </li>
+            <li class="page-item" th:if="${result.next}">
+                <a class="page-link" th:href="@{/guestbook/list(page = ${result.end + 1})}">Next</a>
+            </li>
+        </ul>
+```
+
+```java
+페이저는 예를들어
+
+/guestbook/list?page=5 같은 경우 5 페이지가 출력 되어야 한다
+
+* <li class="page-item" th:if="${result.prev}"> 이 부분은 만약 result.prev 값이 있으면 표시 없으면 표시하지 않는다  (end 또한 마찬가지)
+
+* <li th:class="'page-item' +' '+ ${result.page == page ? 'active':''}" 이 부분을 보면 현재 페이지(클릭한 페이지) 는 active 라는 클래스를 추가하여 파란색으로 불이 들어오게 한다
+```
+
+### active 못하는 오류
+
+```java
+위의 코드를 작성하기 전에는 <li th:class="'page-item' + ${result.page == page ? 'active ':''}" 이렇게 작성했었다
+
+이렇게 하니 page-item 뒤에 바짝 붙어나와 page-itemactive 이렇게 나와서 현재 페이지에 파란불이 들어와야 하는데 들어오지 않았다
+
+<li th:class="'page-item' +' '+ ${result.page == page ? 'active':''} 그래서 중간에 공백 하나를 넣어줬더니 실행 되었다 ( + ' ' +)
+```
+
+# 등록 페이지와 등록 처리
+
+```java
+* 화면에서 POST 방식으로 전달된 데이터들을 GuestbookDTO 로 처리하고
+
+* 서비스 계층에서 GuestbookDTO 를 Guestbook 엔티티 객체로 처리
+
+* 등록 후에는 redirect 한 후에 모달 창을 이용해서 등록 처리 결과를 보여주는 방식
+```
+
+## 등록 컨트롤러
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381213/notion-blog/_/_/_/_/BCh04_08_p186_/Untitled_6.png)
+
+```java
+컨트롤러에 등록 창으로 이동할 수 있는 기능 & 등록 내용 form 으로 보낼 수 있는 기능도 추가
+
+RedirectAttributes redirectAttributes 부분을 보면 리다이렉트 할 때 "msg" 에 gno 를 담아서 보낸다
+
+이렇게 하면 리다이렉트 된 페이지에서 값을 사용할 수 있다
+```
+
+## 등록 페이지
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381213/notion-blog/_/_/_/_/BCh04_08_p186_/Untitled_7.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381213/notion-blog/_/_/_/_/BCh04_08_p186_/Untitled_8.png)
+
+```java
+form 을 통해서 (th:action) 내용을 등록한다 (특별한건 없음)
+```
+
+## 등록 서비스
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381213/notion-blog/_/_/_/_/BCh04_08_p186_/Untitled_9.png)
+
+```java
+전에 작성해둔 서비스 단을 통해서 변환, 등록 과정 실행
+```
+
+## 리다이렉트 이후 등록번호 출력 모달 추가
+
+```java
+컨트롤러에서 RedirectAttributes 객체를 이용해서 리다이렉트 한 페이지에서 값을 출력한다
+
+* RedirectAttributes 객체의 addFlashAttribute() 메서드와 addAttribute() 메서드의 차이점은 다음과 같다
+
+1) addFlashAttribute()
+
+addFlashAttribute는 리다이렉션 후에 일회성으로만 사용 가능한 데이터를 전달할 때 쓴다.
+
+이 데이터는 한 번만 읽을 수 있으며, 한 번 읽으면 자동으로 삭제 된다.
+
+이 메서드를 사용하면 URL에 노출되지 않고, 세션을 통해 데이터가 전달된다.
+
+redirectAttributes.addFlashAttribute("message", "일회성 데이터");
+
+2) addAttribute()
+
+addAttribute는 리다이렉션 후에도 여러 번 사용 가능한 데이터를 전달하는 데 사용된다.
+
+데이터는 URL에 쿼리 매개변수로 노출되므로 보안에 유의해야 한다.
+
+세션을 통해 데이터를 전달하지 않고, URL에 노출되므로 주로 적은 양의 간단한 데이터를 전달할 때 사용된다.
+
+redirectAttributes.addAttribute("key", "값");
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381211/notion-blog/_/_/_/_/BCh04_08_p186_/Untitled_10.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381212/notion-blog/_/_/_/_/BCh04_08_p186_/Untitled_11.png)
+
+```java
+th:inline = "javascript" 를 이용해서 값을 받는데 이상하게 모달이 출력되지 않는데 ( 모달창 자체가 문제인듯 )
+
+얼럿으로 출력하는 임시방편으로 해결했다
+```
+
+```java
+<!--Modal-->
+        <div class="modal showing" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Modal title</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p></p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary">Save changes</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script th:inline="javascript">
+
+                let msg = [[${msg}]];
+                console.log(msg);
+
+                if (msg) {
+                    alert("등록 번호" + [[${msg}]])
+                    console.log("모달 진입");
+                    // 모달 열기
+                    let modal = document.querySelector(".modal");
+                    modal.classList.add("show");
+
+                    // Close 버튼에 이벤트 리스너 추가
+                    let closeModalButton = modal.querySelector(".btn-close");
+                    closeModalButton.addEventListener("click", function() {
+                        modal.classList.remove("show");
+                    });
+
+                    // Close 버튼 외의 부분을 클릭하면 모달 닫기
+                    window.addEventListener("click", function(event) {
+                        if (event.target === modal) {
+                            modal.classList.remove("show");
+                        }
+                    });
+                }
+
+        </script>
+```

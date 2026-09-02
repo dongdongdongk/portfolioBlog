@@ -1,0 +1,254 @@
+---
+title: 'MyBatis'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# resultMap 사용 이유
+
+```java
+1. resultMap을 사용하면 복잡한 쿼리 결과를 간단하게 객체에 매핑할 수 있어서 코드의 가독성과
+
+유지보수성이 좋아짐
+
+2. resultMap을 사용하면 객체에 매핑될 컬럼 이름을 지정할 수 있고, 복잡한 매핑 규칙도
+
+쉽게 구현할 수 있다.
+
+3. Join 을 사용할 때 꼭 사용하게 된다.
+
+따라서 resultMap은 개발자가 쿼리 결과를 객체에 매핑할 때 매우 유용한 기능
+```
+
+# Mapping 매핑
+
+```sql
+1. 위와 같은 sql 문 결과가 있다고 하면
+
+SELECT num, title, writer, contents, regDate, hit, depth FROM qna WHERE num = #{num}
+```
+
+```sql
+
+2. 결과를 매핑할 QnaDTO 클래스는 다음과 같이 필드를 가지고 있을 것
+
+public class QnaDTO {
+    private int num;
+    private String title;
+    private String writer;
+    private String contents;
+    private Date regDate;
+    private int hit;
+    private int depth;
+
+    // getter, setter, toString 생략
+}
+```
+
+```sql
+3. <resultMap> 태그를 사용하여 SQL문의 결과와 QnaDTO 클래스의 필드 간의 매핑 정보를 정의함
+
+이렇게 <resultMap> 태그를 사용하여 매핑 정보를 정의하면, MyBatis는 SQL 문의 결과를 읽어와 매핑 정보에 따라 객체의 필드에 값을 저장한다.
+
+<resultMap type="QnaDTO" id="qnaResultMap">
+    <id column="num" property="num" />
+    <result column="title" property="title" />
+    <result column="writer" property="writer" />
+    <result column="contents" property="contents" />
+    <result column="regDate" property="regDate" />
+    <result column="hit" property="hit" />
+    <result column="depth" property="depth" />
+</resultMap>
+
+```
+
+## 엘리먼트 기능
+
+```sql
+type 은 매핑 결과가 담길 DTO의 타입
+
+id 는 resultMap을 구별하는 이름으로 unique 해야함
+
+<id>는 primary key에 해당하는 컬럼을 설정하는 엘리먼트
+
+column 속성은 테이블의 컬럼 명
+
+property 속성은 조회 결과가 매핑될 DTO의 속성 이름
+
+<result>는 primary key가 아닌 일반 컬럼에 대한 매핑을 처리
+```
+
+## resultMap 사용 방법
+
+```sql
+resultMap을 사용할 때는 returnType 대신 resultMap 속성에 사용하려는 resultMap의 id를 넘겨주면 된다.
+
+<select id="selectRange" resultMap="countryBase" parameterType="map">   // resultMap 의 id 는 contryBase
+    select * from country limit #{from}, #{perPage}
+</select>
+```
+
+### Join 시 주의 할 점
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381119/notion-blog/_/_/_-Spring_boot/MyBatis/Untitled.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381118/notion-blog/_/_/_-Spring_boot/MyBatis/Untitled_1.png)
+
+```jsx
+join 을 사용할 시 조인을 사용하는 VO 에 List<> 를 만들어 줘야한다
+```
+
+# **Association과 Collection**
+
+세 개의 도메인으로 예를 들어 생각
+
+> Artist - Album - Song
+
+```sql
+1. Artist는 여러개의 앨범을 낼 수 있다  -  1:N
+
+2. Album 안에는 여러 개의 Song이 있다  -  1:N
+```
+
+> 만약 특정한 seq번호가 3인 앨범의 정보와 아티스트, 앨범 A에 수록된 곡을 알고 싶다면 어떻게 해야할까?
+
+```sql
+1. select로 seq번호가 3인 앨범 정보를 가져온다.
+
+2. Artist는 seq번호로 JOIN을 이용해 가져온다.
+
+3. Song은 seq번호로 가져오면 되는데, 여러 개의 결과값이 있다.
+
+4. Dao에서 Song을 가져오는 로직을 만든다.
+
+5. 그럼 List로 받아서 비즈니스 로직을 작성한다.
+
+6. 데이터 한번 가져오는데 DB 접근은 두번 한다.
+
+7. 코드는 지저분하다.
+```
+
+> Association과 Collection 을 이용하면 기존 보다 훨씬 편하게 코드를 짤 수 있다. 훨씬 편리하고, 효율적이다.
+
+## Association (has one **일대일 관계**)
+
+```sql
+앨범 입장에서는 아티스트는 하나만 존재한다.
+
+따라서, MyBatis 내 resultMap 내부에서 association을 활용해 데이터를 가져올 수 있다.
+```
+
+```sql
+select를 이용한 방법
+
+<resultMap id="albumResultMap" type="com.devop.test.core.entity.album.Album">
+      ..(생략)
+    <association column="artist_seq" property="artist" select="[1] : selectArtistByPrimaryKey"/>
+      ..(생략)
+</resultMap>
+
+<select id="[1] : selectArtistByPrimaryKey" resultMap="artistResultMap" parameterType="java.lang.Long">
+  select seq, name, debut_date
+  from artists
+  where seq = #{seq, jdbcType=BIGINT}
+</select>
+```
+
+## **Collection (has many, 일대다 관계)**
+
+```sql
+Album은 하나인데 노래는 여러 곡이 존재한다.
+
+따라서 **Collection** 사용 가능
+```
+
+```sql
+<resultMap type="QnaDTO" id="getBoardDetailResult">
+  		<id column="num" property="num"/>
+  		<result column="title" property="title"/>
+  		<result column="writer" property="writer"/>
+  		<result column="contents" property="contents"/>
+  		<result column="regDate" property="regDate"/>
+  		<result column="hit" property="hit"/>
+  		<result column="depth" property="depth"/>
+
+  		<collection property="boardFileDTOs" javaType="List" ofType="BoardFileDTO">
+  			<id column="fileNum" property="fileNum"/>
+  			<result column="fileName" property="fileName"/>
+  			<result column="oriName" property="oriName"/>
+  		</collection>
+
+</resultMap>
+
+****
+collection 태그를 사용하여 boardFileDTOs 필드와 SQL 문의 결과의 BoardFileDTO 객체들 간의 매핑 정보를 정의하고 있음
+```
+
+### <**Collection>** 엘리먼트 기능
+
+```sql
+property: 매핑할 필드 이름을 지정
+
+javaType: 매핑할 필드의 자바 타입을 지정
+
+ofType: 1:N 관계를 매핑할 객체의 클래스 타입을 지정
+```
+
+### <**Collection> 을 사용시 주의점**
+
+```java
+1대N 관계에서는 forEach 를 두번 사용해줘야 한다.
+```
+
+```java
+																	<div class="card-body">
+                                        <c:forEach var="request" items="${request}">
+                                            <c:forEach var="request2" items="${request.reservedVOS}">
+
+                                        <!-- Item 1-->
+                                        <div class="d-flex align-items-center justify-content-between mb-4">
+                                            <div class="d-flex align-items-center flex-shrink-0 me-3">
+                                                <div class="avatar avatar-xl me-3 bg-gray-200"><img
+                                                        class="avatar-img img-fluid"
+                                                        src="/assets/img/illustrations/profiles/profile-1.png" alt=""/>
+                                                </div>
+                                                <div class="d-flex flex-column fw-bold">
+                                                    <a class="text-dark line-height-normal mb-1" href="#!">청소${request.scheduleNumber}팀</a>
+                                                    <div class="small text-muted line-height-normal">${request2.roomNumber}</div>
+                                                </div>
+                                            </div>
+                                            <div class="dropdown no-caret">
+                                                <button class="btn btn-transparent-dark btn-icon dropdown-toggle"
+                                                        id="dropdownPeople1" type="button" data-bs-toggle="dropdown"
+                                                        aria-haspopup="true" aria-expanded="false"><i
+                                                        data-feather="more-vertical"></i></button>
+                                                <div class="dropdown-menu dropdown-menu-end animated--fade-in-up"
+                                                     aria-labelledby="dropdownPeople1">
+                                                    <a class="dropdown-item" href="#!">Action</a>
+                                                    <a class="dropdown-item" href="#!">Another action</a>
+                                                    <a class="dropdown-item" href="#!">Something else here</a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                            </c:forEach>
+                                        </c:forEach>
+                                    </div>
+```
+
+```sql
+resultMap = 메인 select문의 resultType과 연동
+
+<result> 메인 select 문의 컬럼들
+
+<collection>
+  - column : 서브 select문의 where 조건에 들어감
+  - property : 메인 VO에 서브VO를 받아오는 List
+  - javaType : 파라미터 객체의 타입
+  - ofType : 서브VO 연결
+  - select : 서브select문의 ID
+```
+
+MyBatis 실습

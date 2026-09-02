@@ -1,0 +1,93 @@
+---
+title: '댓글 드롭다운 만들기'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381059/notion-blog/_/_/Spring_/_/Untitled.png)
+
+```java
+처음에 3개의 리뷰만 보여주고 이후 리뷰 더보기 를 누를 때 마다 3개씩 추가적으로 슬라이드 다운으로 나타나는 기능
+```
+
+# 1. 제이 쿼리를 추가해준다
+
+```java
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+
+꼭 추가해줄 필요는 없지만 (바닐라 자바 스크립트로 변경 해줘도 괜찮다) 일단 사용
+```
+
+# 2. jsp 코드 작성
+
+```java
+<div class="card mt-2">
+                <h6>리뷰</h6>
+                <hr>
+                <div class="comment-section">
+                    <div id="reviewsContainer">
+                        <c:forEach var="storeCommentList" items="${storeCommentList}" varStatus="status">  // 현재 반복의 인덱스와 같은 루프 반복에 대한 추가 정보를 제공
+                            <div class="review" style="display: ${status.index < 3 ? 'block' : 'none'}">  // 3항 연산자를 사용해서 스타일에서 디스플레이로 3 보다 작으면 참으로 block(표시) 거짓이면 none (숨기고 공간차지 x) (css 문법임)
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="d-flex flex-row align-items-center">
+                                        <img src="/img/userImg.png" class="rounded-circle profile-image oriImg">
+                                        <div class="d-flex flex-column ml-1 comment-profile">
+                                            <c:choose>
+                                                <c:when test="${storeCommentList.rating eq '맛있다'}">
+                                                    <div class="comment-ratings"><i class="fa fa-star"></i> <i class="fa fa-star"></i> <i
+                                                            class="fa fa-star"></i>
+                                                    </div>
+                                                </c:when>
+                                                <c:when test="${storeCommentList.rating eq '괜찮다'}">
+                                                    <div class="comment-ratings"><i class="fa fa-star"></i> <i class="fa fa-star"></i>
+                                                    </div>
+                                                </c:when>
+                                                <c:otherwise>
+                                                    <div class="comment-ratings"><i class="fa fa-star"></i>
+                                                    </div>
+                                                </c:otherwise>
+                                            </c:choose>
+                                            <span class="username">${storeCommentList.userName}</span>
+                                        </div>
+                                    </div>
+                                    <div class="date">
+                                        <span class="text-muted">${storeCommentList.date}</span>
+                                    </div>
+                                </div>
+                                <div class="contents">${storeCommentList.contents}</div>
+                                <hr>
+                            </div>
+                        </c:forEach>
+                    </div>
+                    <button id="loadMoreBtn" class="btn btn-primary mt-2">리뷰 더보기</button>  //리뷰 더 보기 버튼
+                </div>
+            </div>
+```
+
+# 3. 자바 스크립트 작성
+
+```jsx
+<script>
+    $(document).ready(function () {   // 페이지 불러오면 바로 시작
+        let visibleReviews = 3;
+        let totalReviews = $(".review").length;     // 총 리뷰 숫자는 class review 컨테이너의 숫자
+
+        if (visibleReviews >= totalReviews) {  // 현재 보이는 리뷰 버튼이 totalReviews 버튼을 넘어서면 리뷰 더보기 버튼을 숨기는 기능 (처음 페이지에 들어왔을 때 3개 이하면 버튼이 없어지도록
+            $("#loadMoreBtn").hide();
+        }
+
+        $("#loadMoreBtn").click(function () {
+            $(".review:hidden").slice(0, 3).slideDown();  // 현재 숨겨져 있는 "review"의 모든 요소를 선택 (CSS의 display: none)
+																													// slice(0, 3): 인덱스 0부터 인덱스 3까지의 요소를 선택 즉 컬렉션에서 처음 세 개의 숨겨진 요소를 선택 .slideDown() 으로 숨겨진 요소 아래로 슬라이드 애니메이션으로 나타나게 하는 기능
+
+            visibleReviews += 3;                          // 버튼 클릭 때 마다 3씩 더하기
+            if (visibleReviews >= totalReviews) {         // 최대 리뷰 숫자를 넘어서면 버튼 숨기기
+                $("#loadMoreBtn").hide();
+            }
+        });
+    });
+</script>
+```

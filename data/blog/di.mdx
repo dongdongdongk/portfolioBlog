@@ -1,0 +1,159 @@
+---
+title: '스프링 DI(의존성주입)'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# **의존성 주입?**
+
+```java
+의존성 주입에서 의존성이란
+```
+
+```java
+public class BugService {
+    public void countLeg(){
+        BugRepository bug = new Fly();
+        bug.legCount();
+    }
+}
+```
+
+```java
+위처럼 new 를통해 직접 객체를 생성하면 이 BugService 는 Fly클래스에 의존이 되어버린다.
+
+내가 Fly가 아니라 다른 객체를 사용하고싶어도 코드를 수정하기전까진 불가능하다.
+
+그래서 요런 의존성을 없애기위해 의존성을 주입 받아서 사용하는데
+
+코드상 객체를 직접적으로 만드는게아닌 객체의 밖에서 객체를 넣어주는(주입) 방식이 의존성 주입 이다.
+```
+
+```java
+public class BugService {
+    private BugRepository bugRepository;
+
+    public BugService(BugRepository bugRepository){
+        this.bugRepository = bugRepository;
+    }
+
+    public void countLeg(){
+        bugRepository.legCount();
+    }
+}
+```
+
+```java
+이렇게 생성자로 어떤 객체를 받아서 BugRepository를 생성해주면 의존성을 주입 받았다고 할 수 있다.
+
+Fly를 생성하고싶으면 생성자로 Fly를 넘겨주면되고 LadyBug를 생성하고싶으면 생성자로 LadyBug를 넘겨주면 된다.
+```
+
+```java
+@Test
+    public void testLeg(){
+        BugRepository bug = new LadyBug(); // Fly(), Mantis()... 등등
+        BugService bugService = new BugService(bug); //bugService의 생성자로 의존성주입!
+        bugService.countLeg();
+    }
+```
+
+```java
+이렇게 BugService에 넘겨주는 객체에따라 의존성을 주입받을수 있다.
+```
+
+# **의존성주입 방법**
+
+```java
+의존성을 주입받는 방법은 위설명처럼 생성자를 이용한 방법이 있고, Field변수에 주입하는법, setter 메소드를 이용하여 주입하는 방법이있다.
+
+* 생성자를 이용
+
+* Field변수를 이용
+
+* setter를 이용
+```
+
+## **1. 생성자를 이용한 방법**
+
+```java
+@Service
+public class BugService {
+
+    private BugRepository bugRepository;
+
+    public BugService(BugRepository bugRepository){
+        this.bugRepository = bugRepository;
+    }
+}
+```
+
+```java
+생성자를 이용한 의존성 주입 방법이다, 생성자가 단 하나일경우 어노테이션을 별도로 달지 않아도 의존성 주입이 된다. 현재 가장 권장하는 방법이라고 한다.
+```
+
+## **2. Field변수를 이용한 방법**
+
+```java
+@Service
+public class BugService {
+    @Autowired
+    private BugRepository bugRepository;
+}
+```
+
+```java
+@Autowired 간단하다
+```
+
+## **3. setter를 이용한 방법**
+
+```java
+@Service
+public class BugService {
+
+    private BugRepository bugRepository;
+
+    @Autowired
+    public void setBugRepository(BugRepository bugRepository) {
+        this.bugRepository = bugRepository;
+    }
+}
+```
+
+```java
+이전 버전까진 권장하는 방법이었다고 한다.
+```
+
+# **의존객체의 구현체가 여러개일경우**
+
+```java
+객체를 주입받을때 주입받는 레퍼런스의 구현체가 여러개일경우, 어떤 빈을 주입받아야할지 알수없는 문제가 발생한다.
+```
+
+![Untitled](<%EC%8A%A4%ED%94%84%EB%A7%81%20DI(%EC%9D%98%EC%A1%B4%EC%84%B1%EC%A3%BC%EC%9E%85)/Untitled.png>)
+
+```java
+이런경우에는 주입받을 클래스에가서 @Primary 어노테이션을 달아주거나, @Qualifier 를 이용하여 해결할수있다.
+```
+
+![Untitled](<%EC%8A%A4%ED%94%84%EB%A7%81%20DI(%EC%9D%98%EC%A1%B4%EC%84%B1%EC%A3%BC%EC%9E%85)/Untitled%201.png>)
+
+```java
+@Primary 를 이용한 주입
+```
+
+![Untitled](<%EC%8A%A4%ED%94%84%EB%A7%81%20DI(%EC%9D%98%EC%A1%B4%EC%84%B1%EC%A3%BC%EC%9E%85)/Untitled%202.png>)
+
+![Untitled](<%EC%8A%A4%ED%94%84%EB%A7%81%20DI(%EC%9D%98%EC%A1%B4%EC%84%B1%EC%A3%BC%EC%9E%85)/Untitled%203.png>)
+
+```java
+@Qualifier 를 이용한 주입
+```
+
+```java
+둘다 비슷하지만 Primary를 이용하는 방법이 더 안전한 방법이라고 한다.
+```

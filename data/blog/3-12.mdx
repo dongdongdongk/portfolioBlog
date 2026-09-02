@@ -1,0 +1,245 @@
+---
+title: '3'
+date: '2026-09-02'
+category: '프론트/React Native'
+tags: ['프론트', 'React Native']
+draft: false
+summary: ''
+---
+
+# { 🔍 검색 화면 가이드 }
+
+> useAppwrite 훅 + 카테고리 필터 + 폭포수 레이아웃
+
+---
+
+## 📋 이번 강의에서 만드는 것
+
+```
+검색 화면 (search.tsx)
+├── FlatList (2열 폭포수 레이아웃)
+│   ├── ListHeaderComponent
+│   │   ├── 제목 + CartButton
+│   │   ├── <SearchBar />
+│   │   └── <Filter categories={...} />
+│   ├── renderItem: <MenuCard />
+│   └── ListEmptyComponent: "No results"
+│
+lib/useAppwrite.ts   ← 범용 데이터 페칭 훅 (부동산 앱 useFetch와 동일 개념)
+```
+
+---
+
+## 1. useAppwrite 훅 — 전체 코드 + 주석
+
+부동산 앱의 `useAppwrite`와 동일한 개념입니다. 다른 앱에서도 재사용 가능한 범용 훅입니다.
+
+```tsx
+// lib/useAppwrite.ts
+
+import { useCallback, useEffect, useState } from 'react'
+import { Alert } from 'react-native'
+
+// T: 반환될 데이터 타입 (예: MenuItem[], Category[])
+// P: 함수에 넘길 파라미터 타입 (예: { category: string, query: string })
+const useAppwrite = <T, P extends Record<string, string | number>>({
+  fn, // 실행할 Appwrite 함수
+  params = {} as P, // 기본 파라미터
+  skip = false, // true면 마운트 시 자동 실행 안 함
+}) => {
+  const [data, setData] = useState<T | null>(null)
+  const [loading, setLoading] = useState(!skip) // skip이면 로딩 false로 시작
+  const [error, setError] = useState<string | null>(null)
+
+  // useCallback: fn이 바뀌지 않는 한 같은 함수 참조 유지 (불필요한 재생성 방지)
+  const fetchData = useCallback(
+    async (fetchParams: P) => {
+      setLoading(true)
+      setError(null)
+      try {
+        const result = await fn({ ...fetchParams })
+        setData(result)
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred'
+        setError(errorMessage)
+        Alert.alert('Error', errorMessage)
+      } finally {
+        setLoading(false)
+      }
+    },
+    [fn]
+  )
+
+  // 컴포넌트 마운트 시 자동 실행 (skip이 false일 때만)
+  useEffect(() => {
+    if (!skip) fetchData(params)
+  }, [])
+
+  // 새 파라미터로 다시 데이터 가져오기
+  const refetch = async (newParams?: P) => await fetchData(newParams!)
+
+  return { data, loading, error, refetch }
+}
+
+export default useAppwrite
+```
+
+---
+
+## 2. 검색 화면 전체 코드 + 주석
+
+```tsx
+// app/(tabs)/search.tsx
+
+import { FlatList, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useLocalSearchParams } from "expo-router";
+import { useEffect } from "react";
+import cn from "clsx";
+
+import useAppwrite from "@/lib/useAppwrite";
+import { getCategories, getMenu } from "@/lib/appwrite";
+import CartButton from "@/components/CartButton";
+import MenuCard from "@/components/MenuCard";
+import Filter from "@/components/Filter";
+import SearchBar from "@/components/SearchBar";
+import { MenuItem } from "@/types";
+
+const Search = () => {
+  // URL 파라미터에서 검색어/카테고리 읽기
+  const { category, query } = useLocalSearchParams<{
+    query: string;
+    category: string;
+  }>();
+
+  // 메뉴 데이터 가져오기
+  const { data, refetch, loading } = useAppwrite({
+    fn: getMenu,
+    params: { category, query, limit: 6 },
+  });
+
+  // 카테고리 데이터 가져오기 (params 없음 → 전체 조회)
+  const { data: categories } = useAppwrite({ fn: getCategories });
+
+  // URL 파라미터(검색어/카테고리)가 바뀔 때마다 메뉴 데이터 재조회
+  useEffect(() => {
+    refetch({ category, query, limit: 6 });
+  }, [category, query]);
+
+  return (
+    <SafeAreaView className="bg-white h-full">
+      <FlatList
+        data={data}
+        numColumns={2}
+        // 폭포수 레이아웃: 짝수 인덱스는 위, 홀수 인덱스는 아래
+        renderItem={({ item, index }) => {
+          const isFirstRightColItem = index % 2 === 0;
+          return (
+            <View className={cn(
+              "flex-1 max-w-[48%]",
+              !isFirstRightColItem ? "mt-10" : "mt-0"
+              // 홀수(오른쪽 열) 아이템은 위에서 40px 내려서 폭포수 효과
+            )}>
+              <MenuCard item={item as MenuItem} />
+            </View>
+          );
+        }}
+        keyExtractor={(item) => item.$id}
+        columnWrapperClassName="gap-7"
+        contentContainerClassName="gap-7 px-5 pb-32"
+
+        ListHeaderComponent={() => (
+          <View className="my-5 gap-5">
+            {/* 제목 + 장바구니 버튼 */}
+            <View className="flex-between flex-row w-full">
+              <View className="flex-start">
+                <Text className="small-bold uppercase text-primary">Search</Text>
+                <Text className="paragraph-semibold text-dark-100">
+                  Find your favorite food
+                </Text>
+              </View>
+              <CartButton />
+            </View>
+
+            {/* 검색바 */}
+            <SearchBar />
+
+            {/* 카테고리 필터 */}
+            <Filter categories={categories!} />
+          </View>
+        )}
+
+        {/* 데이터 없을 때 */}
+        ListEmptyComponent={() => !loading && <Text>No results</Text>}
+      />
+    </SafeAreaView>
+  );
+};
+
+export default Search;
+```
+
+---
+
+## 3. 폭포수(Waterfall) 레이아웃
+
+```
+일반 2열 그리드:          폭포수 레이아웃:
+┌──────┐ ┌──────┐       ┌──────┐
+│  0   │ │  1   │       │  0   │ ┌──────┐
+└──────┘ └──────┘       └──────┘ │  1   │
+┌──────┐ ┌──────┐       ┌──────┐ └──────┘
+│  2   │ │  3   │       │  2   │ ┌──────┐
+└──────┘ └──────┘       └──────┘ │  3   │
+                                  └──────┘
+```
+
+```tsx
+// index % 2 === 0: 짝수 인덱스 (왼쪽 열) → margin 없음
+// index % 2 !== 0: 홀수 인덱스 (오른쪽 열) → mt-10으로 아래로 이동
+
+const isFirstRightColItem = index % 2 === 0;
+
+className={cn(
+  "flex-1 max-w-[48%]",
+  !isFirstRightColItem ? "mt-10" : "mt-0"
+)}
+```
+
+---
+
+## 4. 같은 화면에서 useAppwrite 두 번 호출
+
+```tsx
+// 한 화면에서 여러 API를 동시에 호출할 수 있음
+const { data, refetch, loading } = useAppwrite({ fn: getMenu, params: { category, query } })
+const { data: categories } = useAppwrite({ fn: getCategories })
+//            ↑ data → categories로 이름 바꿔서 충돌 방지
+
+// useAppwrite를 반복해서 호출하면 각각 독립적인 로딩/에러 상태를 가짐
+```
+
+---
+
+## 5. Appwrite 인덱스 설정 (검색 기능 필수)
+
+`Query.search()`를 쓰려면 Appwrite 대시보드에서 인덱스를 먼저 만들어야 합니다. (부동산 앱에서도 동일)
+
+```
+menu 컬렉션 → Indexes → Create Index
+  이름: index_1
+  타입: Full Text
+  속성: name
+  정렬: ASC
+```
+
+---
+
+## 🔑 핵심 요약
+
+1. **`useAppwrite` 훅** = 로딩/에러/데이터/리페치를 한 번에 관리하는 범용 훅
+2. **같은 화면에서 두 번 호출** = `data: categories`처럼 이름 바꿔서 독립적으로 사용
+3. **`useEffect` + `useLocalSearchParams`** = URL 파라미터 변경 시 자동 재조회
+4. **폭포수 레이아웃** = 홀수 인덱스 아이템에 `mt-10` 적용으로 오른쪽 열을 아래로 내림
+5. **`max-w-[48%]`** = `numColumns={2}` + 여백을 고려한 적절한 최대 너비 값
+6. **Full Text 인덱스** = `Query.search()` 사용 전 Appwrite 대시보드에서 반드시 생성

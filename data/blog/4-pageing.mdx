@@ -1,0 +1,135 @@
+---
+title: '4. Pageing 처리와 검색'
+date: '2026-09-02'
+category: '기타, 사용 적음/국비'
+tags: ['기타, 사용 적음', '국비']
+draft: false
+summary: ''
+---
+
+```jsx
+A. 일정한 갯수만큼 DB에서 조회
+
+1. 한 페이지에 몇개씩 조회
+	ex) 10개
+
+2. DB 10개를 조회할 Query문 생성
+
+	1) 정렬
+			SELECT * FROM BANKBOOK WHERE BOOKNUMBER>0 ORDER BY BOOKNUMBER DESC
+
+	2) rownum 가상의 컬럼으로 추가
+			SELECT rownum R, B.* FROM
+			(SELECT * FROM BANKBOOK WHERE BOOKNUMBER>0 ORDER BY BOOKNUMBER DESC) B
+
+	3) R 가상의 컬럼을 이용해서 원하는 수 조회
+			SELECT * FROM
+				(SELECT rownum R, B.* FROM
+				(SELECT * FROM BANKBOOK WHERE BOOKNUMBER>0 ORDER BY BOOKNUMBER DESC) B)
+			WHERE R between 1 and 10
+
+3. page 번호로 조건식에 사용할 rownum(R)의 값을 계산하는 식 생성
+		perPage  : 한 페이지에 보여줄 Data(row)의 갯수
+		page     : page번호
+		startRow : rwonum(R) 첫번째 값
+		lastRow  : rwonum(R) 마지막 값
+		- WHERE R between startRow and lastrow
+
+	page          startRow          lastRow
+	1             1                 10(5)
+	2             11(6)             20(10)
+	3             21                30
+	4             31                40
+
+	perPage  = 10(5)
+	startRow =  (page-1)*perPage+1
+	lastRow  = page * perPage
+
+B. JSP에 page 번호 출력
+
+	1. 총 row의 갯수 구하기
+			Long totalCount=410;
+
+	2. 총 페이지 갯수 구하기
+			Long totalPage = totalCount/this.getPerPage();
+			if(totalCount%this.getPage() != 0) {
+				totalPage++;
+			}
+
+	3. 한 Block 당 숫자의 갯수
+			Long perBlock=10;
+
+	4. 전체 Block의 갯수 구하기
+			Long totalBlock=totalPage/perBlock;
+			if(totalPage%totalBlock != 0) {
+				totalBlock++;
+			}
+
+		5. page번호로 현재 몇번째 Block인지 계산
+				- 현재 Block의 시작번호와 끝번호를 계산 준비
+		   1번 : 1 - 10
+		   2번 : 11 - 20
+
+		   page			BLOCK
+		   1				1
+		 	 2        1
+		   ...
+		   9        1
+		  10        1
+		  11        2
+		  20        2
+		  21        3
+		Long curBlock = this.getPage()/perBlock;
+		if(this.getPage()%perBlock != 0) {
+			curBlock++;
+		}
+
+ 6. curBlock로 startNum, lastNum 구하기
+			curBlock	startNum	lastNum
+			1			1			10
+		  2			11			20
+
+
+		this.startNum=(curBlock-1)*perBlock+1;
+		this.lastNum=curBlock*perBlock;
+
+	7. 이전, 다음 블럭 유무
+		- 이전 : 현재 블럭이 1번이면 이전이 없어야 하고 아니면 있어야 한다
+		- 다음 : 현재 블럭이 마지막이면 다음이 없어야 하고 아니면 있어야 한다
+
+		this.pre=false;
+		if(curBlock>1) {
+			//현재 block이 2, 3, 4 ....
+			this.pre=true;
+		}
+
+		this.next=false;
+		if(totalBlock > curBlock) {
+			this.next=true;
+		}
+
+	8. 현재 블럭이 마지막 블럭번호와 같다면
+		if(curBlock == totalBlock) {
+			this.lastNum=totalPage;
+		}
+```
+
+###
+
+### 검색
+
+```jsx
+
+- 클라이언트가 검색어를 입력하면 DB에서 검색어가 포함된 row를 찾기
+- 검색어를 어떤 컬럼에 찾는지 설정
+
+'%검색어%'
+1. 연결연산자 이용 : '%' || #{search} || '%'  => '%' || '검색어' || '%' => '%검색어%'
+2. getter 이용    : 앞뒤로 %를 붙여 넣기
+		//검색어가 없으면 search=null
+		if(this.search==null) {
+			this.search="";
+		}
+
+
+```

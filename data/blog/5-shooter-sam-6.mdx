@@ -1,0 +1,3063 @@
+---
+title: '섹션 5: Shooter Sam - 6'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 데미지 시스템 구현하기 }
+
+## 🎯 이번에 할 것
+
+총에 맞으면 **실제로 데미지를 받도록** 만듭니다!
+
+```
+총 발사
+    ↓
+Line Trace로 맞음
+    ↓
+데미지 적용! 💥
+    ↓
+"Damage taken: 10" 로그 출력
+```
+
+---
+
+## 💥 데미지 시스템이란?
+
+### 언리얼의 데미지 시스템
+
+**구조:**
+
+```
+공격자 (Attacker)
+    ↓
+ApplyDamage() 함수 호출
+    ↓
+피해자 (Victim)
+    ↓
+OnTakeAnyDamage 델리게이트 발동
+    ↓
+피해자가 반응!
+```
+
+---
+
+## 📝 Step 1: 총 데미지 변수 추가
+
+### 1-1: Gun.h에 변수 추가
+
+```cpp
+UCLASS()
+class SHOOTERSAM_API AGun : public AActor
+{
+    GENERATED_BODY()
+
+public:
+    // ... 기존 코드 ...
+
+    // ===== 데미지 변수 추가 =====
+    UPROPERTY(EditAnywhere)
+    float BulletDamage = 10.f;
+
+    void PullTrigger();
+};
+```
+
+**코드 설명:**
+
+```cpp
+UPROPERTY(EditAnywhere)
+```
+
+- 블루프린트에서 수정 가능
+- 무기마다 다른 데미지 설정 가능
+
+```cpp
+float BulletDamage = 10.f;
+```
+
+- 기본 데미지: 10
+- f = float 타입 명시
+
+**무기별 데미지 예시:**
+
+```
+권총: 10
+소총: 25
+샷건: 50
+저격총: 100
+```
+
+---
+
+## 🔫 Step 2: 데미지 적용하기
+
+### 2-1: Include 추가
+
+**Gun.cpp 상단:**
+
+```cpp
+#include "Gun.h"
+#include "Kismet/GameplayStatics.h"  // 👈 추가!
+```
+
+**GameplayStatics = 게임플레이 유틸리티 함수 모음**
+
+포함된 함수들:
+
+- ApplyDamage (데미지 적용)
+- SpawnActor (액터 생성)
+- PlaySound (사운드 재생)
+- 등등...
+
+---
+
+### 2-2: PullTrigger에서 데미지 적용
+
+**Gun.cpp - PullTrigger:**
+
+```cpp
+void AGun::PullTrigger()
+{
+    MuzzleFlashParticleSystem->Activate(true);
+
+    if (OwnerController)
+    {
+        // 시점, Line Trace 코드...
+
+        if (IsHit)
+        {
+            // 파티클 효과...
+
+            // ===== 데미지 적용 시작 =====
+
+            // 1. 맞은 액터 가져오기
+            AActor* HitActor = HitResult.GetActor();
+
+            // 2. 액터가 유효한지 확인
+            if (HitActor)
+            {
+                // 3. 데미지 적용!
+                UGameplayStatics::ApplyDamage(
+                    HitActor,           // 누구에게?
+                    BulletDamage,       // 얼마나?
+                    OwnerController,    // 누가?
+                    this,               // 무엇으로?
+                    UDamageType::StaticClass()  // 어떤 타입?
+                );
+            }
+        }
+    }
+}
+```
+
+---
+
+### 코드 완벽 이해하기
+
+**Step 1: 맞은 액터 가져오기**
+
+```cpp
+AActor* HitActor = HitResult.GetActor();
+```
+
+**HitResult에 뭐가 들어있나요?**
+
+```cpp
+HitResult.ImpactPoint    // 맞은 위치
+HitResult.ImpactNormal   // 표면 방향
+HitResult.GetActor()     // 맞은 액터 👈 이거!
+HitResult.GetComponent() // 맞은 컴포넌트
+HitResult.BoneName       // 맞은 뼈대
+```
+
+**GetActor() 반환값:**
+
+```
+맞은 게 액터면: 액터 포인터 반환
+맞은 게 없으면: nullptr 반환
+```
+
+---
+
+**Step 2: 유효성 검사**
+
+```cpp
+if (HitActor)
+```
+
+**왜 체크하나요?**
+
+```
+벽에 맞음 → 벽은 Geometry (액터 아님)
+→ HitActor = nullptr
+→ 체크 안 하면 크래시!
+```
+
+**안전한 코드:**
+
+```cpp
+if (HitActor)  // nullptr 체크
+{
+    // 실제로 액터를 맞췄을 때만 실행
+}
+```
+
+---
+
+**Step 3: ApplyDamage 함수**
+
+```cpp
+UGameplayStatics::ApplyDamage(
+    HitActor,
+    BulletDamage,
+    OwnerController,
+    this,
+    UDamageType::StaticClass()
+);
+```
+
+---
+
+### ApplyDamage 파라미터 완벽 분석
+
+**파라미터 1: DamagedActor**
+
+```cpp
+HitActor
+```
+
+- **누구에게** 데미지를 줄까?
+- Line Trace로 맞은 액터
+
+**예시:**
+
+```
+적 캐릭터를 맞춤
+→ HitActor = 적 캐릭터
+```
+
+---
+
+**파라미터 2: Damage**
+
+```cpp
+BulletDamage
+```
+
+- **얼마나** 데미지를 줄까?
+- float 값 (10.0f)
+
+**예시:**
+
+```
+BulletDamage = 10
+→ 체력 10 깎임
+```
+
+---
+
+**파라미터 3: EventInstigator (Controller)**
+
+```cpp
+OwnerController
+```
+
+- **누가** 데미지를 줬나?
+- 공격자의 Controller
+
+**왜 Controller인가요?**
+
+```
+Controller = 조종자 (두뇌)
+- 플레이어면: PlayerController
+- AI면: AIController
+
+총을 쏜 "사람" 또는 "AI"를 가리킴
+```
+
+**용도:**
+
+```cpp
+// 나중에 킬 로그에 사용
+if (Player->IsDead())
+{
+    ShowKillMessage(EventInstigator, Player);
+    // "Player1 killed Player2"
+}
+```
+
+---
+
+**파라미터 4: DamageCauser (Actor)**
+
+```cpp
+this
+```
+
+- **무엇으로** 데미지를 줬나?
+- 데미지를 일으킨 액터
+- 이 경우: 총(Gun) 자체
+
+**EventInstigator vs DamageCauser:**
+
+```
+EventInstigator (Controller):
+→ 누가 쏘았나? (플레이어/AI)
+→ 책임자
+
+DamageCauser (Actor):
+→ 무엇으로 쏘았나? (총/폭탄)
+→ 도구
+```
+
+**예시:**
+
+```
+플레이어(Controller)가
+  ↓
+총(Actor)을 사용해서
+  ↓
+적을 공격함
+
+EventInstigator = 플레이어 Controller
+DamageCauser = 총 Actor
+```
+
+---
+
+**파라미터 5: DamageType**
+
+```cpp
+UDamageType::StaticClass()
+```
+
+- **어떤 타입**의 데미지인가?
+- 데미지 종류 구분
+
+**DamageType의 용도:**
+
+```cpp
+// 방어구가 특정 타입만 막음
+if (DamageType == FireDamage)
+{
+    if (HasFireResistance)
+    {
+        Damage *= 0.5f;  // 불 저항 50%
+    }
+}
+```
+
+**우리는 기본 타입 사용:**
+
+```cpp
+UDamageType::StaticClass()
+```
+
+- 가장 기본적인 데미지 타입
+- 특별한 속성 없음
+
+---
+
+### StaticClass()가 뭔가요?
+
+**StaticClass() = 클래스 정보 가져오기**
+
+```cpp
+UDamageType::StaticClass()
+```
+
+**의미:**
+
+```
+"UDamageType의 클래스 정보를 줘"
+
+인스턴스 X → 클래스 자체의 정보 O
+```
+
+**비유:**
+
+```
+사과 하나(인스턴스)가 아니라
+"사과"라는 개념 자체(클래스)
+```
+
+**다른 예시:**
+
+```cpp
+// 클래스 정보 얻기
+UClass* MyClass = AActor::StaticClass();
+
+// 해당 클래스로 액터 생성
+SpawnActor<AActor>(MyClass);
+```
+
+---
+
+## 📡 Step 3: 데미지 받기 (Delegate)
+
+### Delegate가 뭔가요?
+
+**Delegate = 이벤트 알림 시스템**
+
+```
+A: "나 데미지 받으면 알려줘!"
+B: "OK!"
+    ↓
+(데미지 발생)
+    ↓
+B: "A야! 데미지 받았어!"
+A: "알았어, 처리할게!"
+```
+
+**코드로:**
+
+```cpp
+// 구독 (Subscribe)
+OnTakeAnyDamage.AddDynamic(this, &MyFunction);
+
+// 데미지 받으면 자동으로 MyFunction 호출됨!
+```
+
+---
+
+### 3-1: Delegate 시그니처 확인
+
+**어떤 함수를 바인딩해야 하나요?**
+
+**방법:**
+
+```
+1. Ctrl + OnTakeAnyDamage 클릭
+2. DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_FiveParams 찾기
+3. 파라미터 확인
+```
+
+**시그니처:**
+
+```cpp
+DECLARE_DYNAMIC_MULTICAST_SPARSE_DELEGATE_FiveParams(
+    FTakeAnyDamageSignature,           // 델리게이트 이름
+    AActor, OnTakeAnyDamage,           // 소속 클래스
+    AActor*, DamagedActor,             // 파라미터 1
+    float, Damage,                     // 파라미터 2
+    const UDamageType*, DamageType,    // 파라미터 3
+    AController*, InstigatedBy,        // 파라미터 4
+    AActor*, DamageCauser             // 파라미터 5
+);
+```
+
+**이 정보를 바탕으로 함수 만들기!**
+
+---
+
+### 3-2: 헤더 파일 (ShooterSamCharacter.h)
+
+```cpp
+UCLASS()
+class AShooterSamCharacter : public ACharacter
+{
+    GENERATED_BODY()
+
+public:
+    // ... 기존 코드 ...
+
+protected:
+    virtual void BeginPlay() override;
+
+    // ===== 데미지 받는 함수 =====
+    UFUNCTION()
+    void OnDamageTaken(
+        AActor* DamagedActor,
+        float Damage,
+        const UDamageType* DamageType,
+        AController* InstigatedBy,
+        AActor* DamageCauser
+    );
+};
+```
+
+**코드 설명:**
+
+```cpp
+UFUNCTION()
+```
+
+- 델리게이트에 바인딩하려면 필수!
+- 언리얼 리플렉션 시스템에 등록
+
+**파라미터:**
+
+- 델리게이트 시그니처와 **정확히 일치**해야 함
+- 순서, 타입, const 모두 같아야 함
+
+---
+
+### 3-3: 구현 파일 (ShooterSamCharacter.cpp)
+
+**BeginPlay에서 바인딩:**
+
+```cpp
+void AShooterSamCharacter::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // ===== 데미지 델리게이트 바인딩 =====
+    OnTakeAnyDamage.AddDynamic(this, &AShooterSamCharacter::OnDamageTaken);
+
+    // ... 기존 코드 (무기 숨기기, 총 생성 등) ...
+}
+```
+
+**AddDynamic 설명:**
+
+```cpp
+OnTakeAnyDamage.AddDynamic(this, &AShooterSamCharacter::OnDamageTaken);
+```
+
+**파라미터 1: this**
+
+```
+어떤 객체의 함수?
+→ 이 캐릭터 자신
+```
+
+**파라미터 2: 함수 주소**
+
+```cpp
+&AShooterSamCharacter::OnDamageTaken
+```
+
+- `&` = 주소 연산자
+- `클래스::함수명` = 멤버 함수 지정
+
+**전체 의미:**
+
+```
+"이 캐릭터가 데미지 받으면
+ 이 캐릭터의 OnDamageTaken 함수를 호출해줘!"
+```
+
+---
+
+**OnDamageTaken 구현:**
+
+```cpp
+void AShooterSamCharacter::OnDamageTaken(
+    AActor* DamagedActor,
+    float Damage,
+    const UDamageType* DamageType,
+    AController* InstigatedBy,
+    AActor* DamageCauser
+)
+{
+    // 로그 출력
+    UE_LOG(LogTemp, Display, TEXT("Damage taken: %f"), Damage);
+}
+```
+
+**파라미터 활용:**
+
+```cpp
+DamagedActor    // 데미지 받은 액터 (나 자신)
+Damage          // 데미지 양 (10.0f)
+DamageType      // 데미지 타입 (UDamageType)
+InstigatedBy    // 공격한 Controller
+DamageCauser    // 공격한 액터 (총)
+```
+
+---
+
+## ✅ 테스트하기
+
+### 1. 컴파일
+
+```
+Visual Studio: Ctrl + Shift + B
+```
+
+### 2. Play 버튼
+
+### 3. Output Log 열기
+
+```
+Window → Developer Tools → Output Log
+```
+
+### 4. 캐릭터 쏘기!
+
+### 결과 확인
+
+**로그가 보이나요?**
+
+```
+LogTemp: Display: Damage taken: 10.000000
+```
+
+**성공!** 🎉
+
+---
+
+## 📚 핵심 개념 정리
+
+### ApplyDamage
+
+액터에게 데미지 주기
+
+```cpp
+UGameplayStatics::ApplyDamage(Target, Amount, Instigator, Causer, Type);
+```
+
+### OnTakeAnyDamage
+
+데미지 받았을 때 발동되는 델리게이트
+
+```cpp
+OnTakeAnyDamage.AddDynamic(this, &MyClass::MyFunction);
+```
+
+### Delegate (델리게이트)
+
+이벤트 알림 시스템
+
+```
+구독 → 이벤트 발생 → 자동 호출
+```
+
+### EventInstigator vs DamageCauser
+
+```
+EventInstigator: 누가? (Controller)
+DamageCauser: 무엇으로? (Actor)
+```
+
+### UFUNCTION()
+
+델리게이트에 바인딩할 함수 표시
+
+```cpp
+UFUNCTION()
+void OnDamageTaken(...);
+```
+
+### StaticClass()
+
+클래스 정보 가져오기
+
+```cpp
+UDamageType::StaticClass()
+```
+
+---
+
+## 🎯 전체 흐름 정리
+
+```
+[데미지 시스템 전체 흐름]
+
+1. 게임 시작
+    ↓
+2. BeginPlay
+    ↓
+3. OnTakeAnyDamage 델리게이트에 OnDamageTaken 바인딩
+    ↓
+4. 플레이어가 총 발사
+    ↓
+5. Line Trace로 적 맞음
+    ↓
+6. HitActor 가져오기
+    ↓
+7. ApplyDamage 호출
+    ↓
+8. 언리얼 엔진이 OnTakeAnyDamage 델리게이트 발동
+    ↓
+9. OnDamageTaken 함수 자동 호출
+    ↓
+10. "Damage taken: 10" 로그 출력
+```
+
+---
+
+## 💡 실전 팁
+
+### 데미지 타입 활용
+
+**커스텀 데미지 타입 만들기:**
+
+```cpp
+// MyDamageType.h
+UCLASS()
+class UMyFireDamage : public UDamageType
+{
+    GENERATED_BODY()
+
+public:
+    UPROPERTY(EditAnywhere)
+    float BurnDuration = 3.0f;
+};
+```
+
+**사용:**
+
+```cpp
+UGameplayStatics::ApplyDamage(
+    HitActor,
+    Damage,
+    Controller,
+    this,
+    UMyFireDamage::StaticClass()  // 커스텀 타입!
+);
+```
+
+**받는 쪽에서 구분:**
+
+```cpp
+void OnDamageTaken(..., const UDamageType* DamageType, ...)
+{
+    if (DamageType->IsA(UMyFireDamage::StaticClass()))
+    {
+        // 불 데미지 특수 처리
+        StartBurning();
+    }
+}
+```
+
+---
+
+### 무기별 데미지 설정
+
+**블루프린트에서:**
+
+```
+BP_Rifle:
+  BulletDamage = 10
+
+BP_Shotgun:
+  BulletDamage = 50
+
+BP_Sniper:
+  BulletDamage = 100
+```
+
+---
+
+### 헤드샷 시스템
+
+```cpp
+void AGun::PullTrigger()
+{
+    if (IsHit)
+    {
+        float FinalDamage = BulletDamage;
+
+        // 헤드샷 체크
+        if (HitResult.BoneName == "head")
+        {
+            FinalDamage *= 2.0f;  // 2배 데미지!
+        }
+
+        UGameplayStatics::ApplyDamage(
+            HitActor,
+            FinalDamage,  // 조정된 데미지
+            ...
+        );
+    }
+}
+```
+
+---
+
+### 데미지 정보 더 활용하기
+
+```cpp
+void OnDamageTaken(
+    AActor* DamagedActor,
+    float Damage,
+    const UDamageType* DamageType,
+    AController* InstigatedBy,
+    AActor* DamageCauser
+)
+{
+    // 누가 쏘았는지 확인
+    if (InstigatedBy)
+    {
+        FString ShooterName = InstigatedBy->GetName();
+        UE_LOG(LogTemp, Warning, TEXT("%s shot me!"), *ShooterName);
+    }
+
+    // 무엇으로 맞았는지 확인
+    if (DamageCauser)
+    {
+        FString WeaponName = DamageCauser->GetName();
+        UE_LOG(LogTemp, Warning, TEXT("Hit by %s"), *WeaponName);
+    }
+
+    // 데미지 로그
+    UE_LOG(LogTemp, Display, TEXT("Damage: %f"), Damage);
+}
+```
+
+---
+
+### 팀 구분 (아군 사격 방지)
+
+```cpp
+void OnDamageTaken(
+    AActor* DamagedActor,
+    float Damage,
+    const UDamageType* DamageType,
+    AController* InstigatedBy,
+    AActor* DamageCauser
+)
+{
+    // 같은 팀이면 데미지 무시
+    if (IsSameTeam(InstigatedBy))
+    {
+        return;  // 아무것도 안 함
+    }
+
+    // 다른 팀만 데미지 적용
+    Health -= Damage;
+}
+```
+
+---
+
+### 벽은 왜 안 되나요?
+
+**질문:**
+
+```
+"벽을 쏘면 왜 데미지 로그가 안 나와요?"
+```
+
+**답변:**
+
+```
+벽 = Geometry Brush
+→ 액터가 아님
+→ OnTakeAnyDamage 델리게이트 없음
+→ 데미지 시스템 작동 안 함
+```
+
+**해결:**
+
+```
+벽을 Static Mesh Actor로 만들기
+→ 액터가 됨
+→ 델리게이트 바인딩 가능
+→ 데미지 받을 수 있음
+```
+
+---
+
+# { 체력 시스템 구현하기 }
+
+## 🎯 이번에 할 것
+
+캐릭터에 **체력(Health) 시스템**을 추가합니다!
+
+```
+체력: 100
+    ↓
+데미지 10 받음
+    ↓
+체력: 90
+    ↓
+... (반복)
+    ↓
+체력: 0 → 사망! 💀
+```
+
+---
+
+## ❤️ 체력 시스템이란?
+
+### 기본 개념
+
+**체력 = 생명력**
+
+```
+체력 > 0  → 살아있음 ✅
+체력 = 0  → 죽음 ☠️
+```
+
+**게임 흐름:**
+
+```
+1. 게임 시작: 체력 100
+2. 공격받음: 체력 -10
+3. 체력 확인: 아직 살아있음
+4. 반복...
+5. 체력 0: 사망 처리
+```
+
+---
+
+## 📝 Step 1: 체력 변수 추가
+
+### 1-1: 헤더 파일 (ShooterSamCharacter.h)
+
+```cpp
+UCLASS()
+class AShooterSamCharacter : public ACharacter
+{
+    GENERATED_BODY()
+
+public:
+    // ... 기존 코드 ...
+
+    // ===== 체력 시스템 변수 =====
+
+    // 최대 체력
+    UPROPERTY(EditAnywhere)
+    float MaxHealth = 100.f;
+
+    // 현재 체력
+    UPROPERTY(VisibleAnywhere)
+    float Health;
+
+    // 생존 여부
+    UPROPERTY(VisibleAnywhere)
+    bool IsAlive = true;
+};
+```
+
+---
+
+### 변수 설명
+
+**1. MaxHealth (최대 체력)**
+
+```cpp
+UPROPERTY(EditAnywhere)
+float MaxHealth = 100.f;
+```
+
+**역할:**
+
+- 시작할 때 체력
+- 기본값: 100
+
+**왜 EditAnywhere?**
+
+```
+블루프린트에서 수정 가능
+→ 캐릭터마다 다른 최대 체력 설정
+
+예시:
+  일반 적: MaxHealth = 100
+  보스: MaxHealth = 1000
+  플레이어: MaxHealth = 200
+```
+
+---
+
+**2. Health (현재 체력)**
+
+```cpp
+UPROPERTY(VisibleAnywhere)
+float Health;
+```
+
+**역할:**
+
+- 지금 남은 체력
+- 데미지 받으면 줄어듦
+- 초기값 없음 (BeginPlay에서 설정)
+
+**왜 VisibleAnywhere?**
+
+```
+EditAnywhere 아님!
+→ 블루프린트에서 보기만 가능
+→ 수정은 코드로만
+
+이유: 현재 체력은 게임 중에 계속 바뀜
+→ 초기값 설정은 의미 없음
+```
+
+---
+
+**3. IsAlive (생존 여부)**
+
+```cpp
+UPROPERTY(VisibleAnywhere)
+bool IsAlive = true;
+```
+
+**역할:**
+
+- 살아있는지 여부
+- true = 살아있음
+- false = 죽음
+
+**왜 필요한가요?**
+
+```
+체력 0이 되면:
+  IsAlive = false로 변경
+
+이후 데미지 받아도:
+  if (!IsAlive) return;  // 무시!
+
+죽은 캐릭터는 더 이상 데미지 안 받음
+```
+
+**기본값 true:**
+
+```
+게임 시작 = 살아있음
+```
+
+---
+
+## 🎬 Step 2: 체력 초기화
+
+### 2-1: BeginPlay
+
+```cpp
+void AShooterSamCharacter::BeginPlay()
+{
+    Super::BeginPlay();
+
+    OnTakeAnyDamage.AddDynamic(this, &AShooterSamCharacter::OnDamageTaken);
+
+    // ===== 체력 초기화 =====
+    Health = MaxHealth;
+
+    // ... 기존 코드 (무기 숨기기, 총 생성 등) ...
+}
+```
+
+**왜 BeginPlay에서?**
+
+```
+생성자(Constructor):
+  클래스 만들 때 한 번
+
+BeginPlay:
+  게임 시작할 때마다
+
+체력은 게임 시작마다 초기화!
+```
+
+**Health = MaxHealth 의미:**
+
+```
+MaxHealth = 100 (블루프린트 설정)
+    ↓
+Health = 100 (게임 시작 시)
+    ↓
+체력 가득 찬 상태로 시작!
+```
+
+---
+
+## 💔 Step 3: 데미지 처리
+
+### 3-1: OnDamageTaken 수정
+
+```cpp
+void AShooterSamCharacter::OnDamageTaken(
+    AActor* DamagedActor,
+    float Damage,
+    const UDamageType* DamageType,
+    AController* InstigatedBy,
+    AActor* DamageCauser
+)
+{
+    // ===== 1. 생존 확인 =====
+    if (!IsAlive) return;
+
+    // ===== 2. 디버그 로그 =====
+    UE_LOG(LogTemp, Display, TEXT("Damage taken: %f"), Damage);
+
+    // ===== 3. 체력 감소 =====
+    Health -= Damage;
+
+    // ===== 4. 사망 처리 =====
+    if (Health <= 0.f)
+    {
+        IsAlive = false;
+        Health = 0.f;
+
+        // 충돌 끄기
+        GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+        // 사망 로그
+        UE_LOG(LogTemp, Display, TEXT("Character died: %s"), *GetActorNameOrLabel());
+    }
+}
+```
+
+---
+
+### 코드 한 줄씩 완벽 이해
+
+**Step 1: 생존 확인**
+
+```cpp
+if (!IsAlive) return;
+```
+
+**의미:**
+
+```
+if (!IsAlive)  // IsAlive가 false면
+    return;     // 함수 종료
+```
+
+**왜 필요한가요?**
+
+```
+죽은 캐릭터가 또 맞으면?
+→ 이미 죽었으니 무시!
+→ return으로 함수 종료
+→ 아래 코드 실행 안 됨
+
+살아있으면?
+→ 조건 통과
+→ 계속 진행
+```
+
+---
+
+**Step 2: 디버그 로그**
+
+```cpp
+UE_LOG(LogTemp, Display, TEXT("Damage taken: %f"), Damage);
+```
+
+**개발 중 확인용:**
+
+```
+데미지가 제대로 적용되는지 확인
+나중에 삭제 가능
+```
+
+---
+
+**Step 3: 체력 감소**
+
+```cpp
+Health -= Damage;
+```
+
+**복합 대입 연산자:**
+
+```cpp
+// 이 둘은 같은 의미:
+Health -= Damage;
+Health = Health - Damage;
+```
+
+**예시:**
+
+```
+Health = 100
+Damage = 10
+
+Health -= Damage;
+→ Health = 100 - 10
+→ Health = 90
+```
+
+**다른 복합 연산자:**
+
+```cpp
++=  // 더하기
+-=  // 빼기
+*=  // 곱하기
+/=  // 나누기
+
+예:
+Health += 20;  // 회복
+Ammo -= 1;     // 탄약 소모
+Damage *= 2;   // 데미지 2배
+```
+
+---
+
+**Step 4: 사망 확인**
+
+```cpp
+if (Health <= 0.f)
+```
+
+**왜 <= (작거나 같음)?**
+
+```
+만약 = (같음)만 체크하면:
+
+Health = 100
+Damage = 150
+Health = 100 - 150 = -50
+
+if (Health == 0)  // -50 ≠ 0
+    // 실행 안 됨!
+    // 죽지 않음! ❌
+
+if (Health <= 0)  // -50 ≤ 0
+    // 실행됨!
+    // 제대로 죽음! ✅
+```
+
+**안전한 체크:**
+
+```cpp
+<=  // 0 이하면 모두 죽음
+==  // 정확히 0만 죽음 (위험!)
+```
+
+---
+
+**Step 5: 사망 처리**
+
+```cpp
+IsAlive = false;
+Health = 0.f;
+```
+
+**IsAlive = false:**
+
+```
+더 이상 데미지 안 받음
+(맨 위 if (!IsAlive) return 때문)
+```
+
+**Health = 0.f:**
+
+```
+과잉 데미지 방지
+
+예:
+  Health = 10
+  Damage = 50
+  Health = 10 - 50 = -40 ❌
+
+Health = 0으로 고정:
+  체력이 음수 안 되게!
+  UI 표시할 때 깔끔
+```
+
+---
+
+**Step 6: 충돌 끄기**
+
+```cpp
+GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+```
+
+**왜 충돌을 끄나요?**
+
+```
+죽은 캐릭터:
+  충돌 있으면:
+    - 다른 캐릭터가 못 지나감
+    - 총알이 막힘
+    - 이상함!
+
+  충돌 끄면:
+    - 통과 가능 ✅
+    - 총알도 통과 ✅
+    - 자연스러움!
+```
+
+**GetCapsuleComponent():**
+
+```
+캐릭터의 충돌 컴포넌트
+→ 원기둥 모양
+→ 충돌 감지에 사용
+```
+
+**ECollisionEnabled 옵션:**
+
+```cpp
+NoCollision           // 충돌 완전 끔
+QueryOnly             // 감지만 (물리 X)
+PhysicsOnly           // 물리만 (감지 X)
+QueryAndPhysics       // 둘 다
+```
+
+---
+
+**Step 7: 사망 로그**
+
+```cpp
+UE_LOG(LogTemp, Display, TEXT("Character died: %s"), *GetActorNameOrLabel());
+```
+
+**GetActorNameOrLabel():**
+
+```
+액터 이름 가져오기
+→ FString 반환
+```
+
+- **연산자:**
+
+```cpp
+*GetActorNameOrLabel()
+```
+
+- FString을 const TCHAR\*로 변환
+- UE_LOG에서 문자열 출력하려면 필요
+
+**출력 예시:**
+
+```
+Character died: BP_ShooterSamCharacter_C_0
+또는
+Character died: Enemy1
+```
+
+---
+
+## 📚 핵심 개념 정리
+
+### Health System 3요소
+
+```
+MaxHealth: 최대 체력
+Health: 현재 체력
+IsAlive: 생존 여부
+```
+
+### 복합 대입 연산자
+
+```cpp
+Health -= Damage;  // Health = Health - Damage
+```
+
+### <= vs ==
+
+```
+<= : 0 이하 (안전) ✅
+== : 정확히 0만 (위험) ❌
+```
+
+### return
+
+함수 즉시 종료
+
+```cpp
+if (!IsAlive) return;  // 죽었으면 종료
+```
+
+### SetCollisionEnabled
+
+충돌 켜기/끄기
+
+```cpp
+NoCollision  // 충돌 끔
+```
+
+### GetActorNameOrLabel
+
+액터 이름 가져오기
+
+```cpp
+*GetActorNameOrLabel()  // FString → TCHAR*
+```
+
+---
+
+## 🎯 전체 흐름 정리
+
+```
+[체력 시스템 전체 흐름]
+
+1. 게임 시작
+    ↓
+2. BeginPlay
+    ↓
+3. Health = MaxHealth (100)
+    IsAlive = true
+    ↓
+4. 총에 맞음
+    ↓
+5. OnDamageTaken 호출
+    ↓
+6. IsAlive 확인 (true → 진행)
+    ↓
+7. Health -= Damage (100 → 90)
+    ↓
+8. Health <= 0? (No → 계속)
+    ↓
+... 반복 ...
+    ↓
+10번째 맞음:
+    ↓
+Health -= 10 (10 → 0)
+    ↓
+Health <= 0? (Yes!)
+    ↓
+IsAlive = false
+Health = 0
+충돌 끔
+로그 출력
+    ↓
+11번째 맞음:
+    ↓
+OnDamageTaken 호출
+    ↓
+IsAlive 확인 (false)
+    ↓
+return (종료) → 데미지 안 받음!
+```
+
+---
+
+## 💡 실전 팁
+
+### 체력 회복
+
+```cpp
+void Heal(float Amount)
+{
+    if (!IsAlive) return;  // 죽으면 회복 안 됨
+
+    Health += Amount;
+
+    // 최대 체력 넘지 않게
+    if (Health > MaxHealth)
+    {
+        Health = MaxHealth;
+    }
+}
+```
+
+**또는 Clamp 사용:**
+
+```cpp
+void Heal(float Amount)
+{
+    if (!IsAlive) return;
+
+    Health = FMath::Clamp(Health + Amount, 0.f, MaxHealth);
+    //       최소값 0, 최대값 MaxHealth 사이로 제한
+}
+```
+
+---
+
+### 체력 퍼센트 계산
+
+```cpp
+float GetHealthPercent() const
+{
+    return Health / MaxHealth;
+}
+```
+
+**사용:**
+
+```cpp
+// UI 체력바
+float Percent = GetHealthPercent();  // 0.0 ~ 1.0
+HealthBar->SetPercent(Percent);
+
+// 색상 변경
+if (Percent < 0.3f)
+{
+    HealthBar->SetColor(FColor::Red);    // 30% 이하: 빨강
+}
+else if (Percent < 0.6f)
+{
+    HealthBar->SetColor(FColor::Yellow); // 60% 이하: 노랑
+}
+else
+{
+    HealthBar->SetColor(FColor::Green);  // 그 외: 초록
+}
+```
+
+---
+
+### 무적 시간 (Invincibility)
+
+```cpp
+// 헤더
+UPROPERTY()
+bool bIsInvincible = false;
+
+UPROPERTY()
+FTimerHandle InvincibilityTimer;
+
+// cpp
+void OnDamageTaken(...)
+{
+    if (!IsAlive || bIsInvincible) return;  // 무적이면 무시!
+
+    Health -= Damage;
+
+    if (Health > 0)
+    {
+        // 피격 후 1초 무적
+        bIsInvincible = true;
+        GetWorld()->GetTimerManager().SetTimer(
+            InvincibilityTimer,
+            [this]() { bIsInvincible = false; },
+            1.0f,
+            false
+        );
+    }
+}
+```
+
+---
+
+### 다양한 사망 처리
+
+```cpp
+if (Health <= 0.f)
+{
+    IsAlive = false;
+    Health = 0.f;
+
+    // 충돌 끄기
+    GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+    // 물리 활성화 (래그돌)
+    GetMesh()->SetSimulatePhysics(true);
+
+    // 컨트롤러 분리
+    DetachFromControllerPendingDestroy();
+
+    // 5초 후 제거
+    SetLifeSpan(5.0f);
+
+    // 사망 애니메이션 재생 (다음 강의)
+    // PlayDeathAnimation();
+}
+```
+
+---
+
+### 부위별 데미지
+
+```cpp
+void OnDamageTaken(
+    AActor* DamagedActor,
+    float Damage,
+    const UDamageType* DamageType,
+    AController* InstigatedBy,
+    AActor* DamageCauser
+)
+{
+    if (!IsAlive) return;
+
+    // 헤드샷이면 즉사
+    if (LastHitBone == "head")
+    {
+        Health = 0.f;
+    }
+    else
+    {
+        Health -= Damage;
+    }
+
+    // 사망 처리
+    if (Health <= 0.f)
+    {
+        // ...
+    }
+}
+```
+
+---
+
+### 방어력 시스템
+
+```cpp
+UPROPERTY(EditAnywhere)
+float Armor = 50.f;
+
+void OnDamageTaken(...)
+{
+    if (!IsAlive) return;
+
+    float FinalDamage = Damage;
+
+    // 방어력이 있으면 먼저 깎임
+    if (Armor > 0)
+    {
+        float ArmorAbsorbed = FMath::Min(Armor, Damage);
+        Armor -= ArmorAbsorbed;
+        FinalDamage -= ArmorAbsorbed;
+    }
+
+    // 남은 데미지를 체력에서 깎음
+    Health -= FinalDamage;
+
+    if (Health <= 0.f)
+    {
+        // 사망 처리
+    }
+}
+```
+
+---
+
+### 체력 상태에 따른 효과
+
+```cpp
+void OnDamageTaken(...)
+{
+    if (!IsAlive) return;
+
+    float PreviousHealth = Health;
+    Health -= Damage;
+
+    // 상태 변화 체크
+    if (PreviousHealth > MaxHealth * 0.5f && Health <= MaxHealth * 0.5f)
+    {
+        // 체력 50% 이하로 떨어짐
+        OnHealthBelowHalf();  // 특수 이펙트, 대사 등
+    }
+
+    if (Health <= 0.f)
+    {
+        // 사망 처리
+    }
+}
+
+void OnHealthBelowHalf()
+{
+    // 피 흘리는 이펙트
+    // "으윽..." 대사
+    // 움직임 느려짐
+}
+```
+
+---
+
+### 디버그 표시
+
+```cpp
+void OnDamageTaken(...)
+{
+    if (!IsAlive) return;
+
+    Health -= Damage;
+
+    // 화면에 데미지 숫자 표시
+    DrawDebugString(
+        GetWorld(),
+        GetActorLocation() + FVector(0, 0, 100),
+        FString::Printf(TEXT("-%d"), (int32)Damage),
+        nullptr,
+        FColor::Red,
+        2.0f,
+        true
+    );
+
+    if (Health <= 0.f)
+    {
+        // 사망 처리
+    }
+}
+```
+
+---
+
+# { 사망 애니메이션 구현하기 }
+
+## 🎯 이번에 할 것
+
+캐릭터가 죽으면 **사망 애니메이션**을 재생합니다!
+
+```
+체력 0
+    ↓
+사망!
+    ↓
+쓰러지는 애니메이션 재생 💀
+```
+
+---
+
+## 🎬 사망 애니메이션 찾기
+
+### 파라곤 폴더 확인
+
+**Content Browser:**
+
+```
+Paragon 폴더
+  → Heroes
+  → Wraith
+  → Animations
+  → "Death" 검색
+```
+
+**찾은 애니메이션:**
+
+```
+Death_Backward  // 뒤로 쓰러짐
+Death_Forward   // 앞으로 쓰러짐 ← 이걸 사용!
+```
+
+---
+
+## 📝 Step 1: IsAlive 변수 노출
+
+### 왜 필요한가요?
+
+**현재 상황:**
+
+```cpp
+// ShooterSamCharacter.h
+bool IsAlive = true;
+```
+
+**문제:**
+
+```
+C++에만 있음
+→ 애니메이션 블루프린트에서 못 봄 ❌
+```
+
+**해결:**
+
+```
+블루프린트에서도 볼 수 있게!
+→ UPROPERTY 추가
+```
+
+---
+
+### 1-1: 코드 수정
+
+**ShooterSamCharacter.h:**
+
+```cpp
+UCLASS()
+class AShooterSamCharacter : public ACharacter
+{
+    GENERATED_BODY()
+
+public:
+    // ... 기존 코드 ...
+
+    // ===== IsAlive를 블루프린트에 노출 =====
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Health")
+    bool IsAlive = true;
+};
+```
+
+**코드 설명:**
+
+```cpp
+UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+```
+
+**VisibleAnywhere:**
+
+- 에디터에서 볼 수 있음
+- 수정은 못 함 (코드에서만 변경)
+
+**BlueprintReadOnly:**
+
+- 블루프린트에서 읽기 가능
+- Get 노드 사용 가능
+- Set 노드는 사용 불가
+
+**왜 ReadOnly?**
+
+```
+IsAlive는 체력 시스템이 관리
+→ 블루프린트에서 함부로 바꾸면 안 됨
+→ 읽기만 가능하게!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380660/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_6/image.png)
+
+---
+
+## 🎭 Step 2: State Machine 만들기
+
+### State Machine이 뭔가요?
+
+**State Machine = 상태 관리 시스템**
+
+```
+상태 1: 살아있음
+    ↓ (조건 만족)
+상태 2: 죽음
+```
+
+---
+
+### 2-1: Main State Machine 생성
+
+**애니메이션 블루프린트 열기:**
+
+```
+ABP_ShooterSamCharacter (또는 사용 중인 애님 BP)
+```
+
+**AnimGraph 탭:**
+
+```
+1. 빈 곳에 우클릭
+2. "State Machine" 검색
+3. "Add New State Machine" 클릭
+4. 이름: "Main"
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380658/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_6/image_1.png)
+
+---
+
+### 2-2: Main State Machine 구조
+
+**Main을 더블클릭:**
+
+```
+Entry (시작점)
+  ↓
+Alive (살아있는 상태)
+  ↕ (전환)
+Dead (죽은 상태)
+```
+
+**상태 추가:**
+
+```
+1. 빈 곳에 우클릭
+2. "Add State" 클릭
+3. 이름: "Alive"
+
+4. 다시 우클릭
+5. "Add State" 클릭
+6. 이름: "Dead"
+```
+
+**Entry 연결:**
+
+```
+Entry 노드에서 드래그
+→ Alive로 연결
+(게임 시작 = 살아있는 상태)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380660/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_6/image_2.png)
+
+---
+
+### 2-3: 변수 생성
+
+**Variables 패널:**
+
+```
+1. "+" 버튼 클릭
+2. 이름: "IsDead"
+3. 타입: Boolean
+4. 기본값: false
+```
+
+**왜 IsDead인가요?**
+
+```
+C++: IsAlive (살아있는지?)
+애님 BP: IsDead (죽었는지?)
+
+반대 개념!
+나중에 변환함
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380660/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_6/image_3.png)
+
+---
+
+### 2-4: 전환(Transition) 만들기
+
+**Alive → Dead 전환:**
+
+```
+1. Alive 노드에서 Dead로 드래그
+2. 전환 규칙 더블클릭
+3. Result 노드에 IsDead 연결
+```
+
+**그래프:**
+
+```
+Get IsDead
+    ↓
+  Result
+
+의미: IsDead가 true면 전환!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380660/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_6/image_4.png)
+
+---
+
+**Dead → Alive 전환:**
+
+```
+1. Dead 노드에서 Alive로 드래그
+2. 전환 규칙 더블클릭
+3. Result 노드에 NOT IsDead 연결
+```
+
+**그래프:**
+
+```
+Get IsDead
+    ↓
+  NOT (부정)
+    ↓
+  Result
+
+의미: IsDead가 false면 전환!
+(죽었다가 부활)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380660/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_6/image_5.png)
+
+---
+
+### NOT 연산자란?
+
+**NOT = 반대로 바꾸기**
+
+```
+true  → NOT → false
+false → NOT → true
+```
+
+**예시:**
+
+```
+IsDead = true
+NOT IsDead = false
+
+IsDead = false
+NOT IsDead = true
+```
+
+**그래프에서:**
+
+```
+Get IsDead 우클릭
+→ "Convert to NOT"
+또는
+검색: "NOT Boolean"
+```
+
+---
+
+## 💀 Step 3: Dead 상태 설정
+
+### 3-1: 사망 애니메이션 추가
+
+**Dead 상태 더블클릭:**
+
+```
+1. Asset Browser에서 "Death" 검색
+2. "Death_Forward" 드래그
+3. Output Animation Pose에 연결
+```
+
+---
+
+### 3-2: 반복 끄기 (중요!)
+
+**Death_Forward 노드 선택:**
+
+```
+Details 패널:
+  ☐ Loop Animation (체크 해제!)
+```
+
+**왜 꺼야 하나요?**
+
+```
+Loop 켜져있으면:
+  사망 → 일어남 → 사망 → 일어남 (반복)
+
+Loop 끄면:
+  사망 → 멈춤 (마지막 프레임에서 정지)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380660/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_6/image_6.png)
+
+---
+
+## 🏃 Step 4: Alive 상태 설정
+
+### 4-1: 기존 애니메이션 이동
+
+**AnimGraph 탭으로 이동:**
+
+```
+현재 구조:
+Locomotion State Machine
+    ↓
+Aim Offset
+    ↓
+Output Pose
+```
+
+**모두 선택:**
+
+```
+Ctrl + 클릭으로 다 선택
+또는
+마우스 드래그로 박스 선택
+```
+
+**잘라내기:**
+
+```
+Ctrl + X
+```
+
+---
+
+### 4-2: Alive 상태에 붙여넣기
+
+**Main State Machine → Alive 더블클릭:**
+
+```
+Ctrl + V (붙여넣기)
+```
+
+**연결:**
+
+```
+Locomotion State Machine
+    ↓
+Aim Offset
+    ↓
+Output Animation Pose
+```
+
+**의미:**
+
+```
+살아있을 때:
+  - 이동 애니메이션
+  - 조준 오프셋
+  - 모두 정상 작동!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380660/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_6/image_7.png)
+
+---
+
+## 🔗 Step 5: 최종 연결
+
+### 5-1: AnimGraph 정리
+
+**AnimGraph 탭:**
+
+```
+현재 상태:
+  비어있음 (다 잘라냈으니까)
+
+해야 할 것:
+  Main State Machine 연결
+```
+
+**Main State Machine 드래그:**
+
+```
+Output Pose에 연결
+```
+
+**최종 구조:**
+
+```
+Main State Machine
+    ↓
+Output Pose
+```
+
+---
+
+### 5-2: 컴파일 & 테스트
+
+**Compile 버튼:**
+
+```
+미리보기에서 확인:
+  - IsDead = false: 정상 애니메이션
+  - IsDead = true: 사망 애니메이션
+```
+
+---
+
+## 🔄 Step 6: Event Graph 연결
+
+### 왜 필요한가요?
+
+**현재 상황:**
+
+```
+C++: IsAlive (살아있는지)
+애님 BP: IsDead (죽었는지)
+
+둘이 연결 안 됨!
+```
+
+**해야 할 것:**
+
+```
+매 프레임마다:
+  C++의 IsAlive 읽기
+  → 반대로 변환
+  → IsDead에 저장
+```
+
+---
+
+### 6-1: Event Graph 구현
+
+**Event Graph 탭으로 이동:**
+
+**기존 구조:**
+
+```
+Event Blueprint Update Animation
+    ↓
+Sequence
+    ↓
+Then 0: Try Get Pawn Owner
+Then 1: (속도 계산)
+Then 2: (각도 계산)
+```
+
+---
+
+**Sequence에 핀 추가:**
+
+```
+Sequence 노드 선택
+→ 우클릭
+→ "Add Pin"
+→ Then 3 생성!
+```
+
+---
+
+**Then 3 연결:**
+
+```
+1. Try Get Pawn Owner 복사
+    ↓
+2. Cast to ShooterSamCharacter
+    ↓
+3. Get Is Alive
+    ↓
+4. NOT (반전)
+    ↓
+5. Set IsDead
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380660/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_6/image_8.png)
+
+---
+
+### 노드별 상세 설명
+
+**1. Try Get Pawn Owner**
+
+```
+현재 애니메이션의 주인 가져오기
+→ Pawn 타입 반환
+```
+
+**2. Cast to ShooterSamCharacter**
+
+```
+검색: "Cast to ShooterSamCharacter"
+
+Pawn → ShooterSamCharacter로 변환
+```
+
+**Cast가 뭔가요?**
+
+```
+Cast = 타입 변환
+
+Pawn (부모 타입)
+    ↓ Cast
+ShooterSamCharacter (자식 타입)
+
+성공하면: Exec 핀 실행
+실패하면: 아무것도 안 함
+```
+
+**왜 Cast가 필요한가요?**
+
+```
+Try Get Pawn Owner:
+  → Pawn* 반환
+
+하지만 IsAlive는:
+  → ShooterSamCharacter에만 있음!
+
+그래서 Cast 필요:
+  Pawn → ShooterSamCharacter
+```
+
+---
+
+**3. Get Is Alive**
+
+```
+Cast 성공 후:
+  → As Shooter Sam Character 핀
+  → 여기서 드래그
+  → "Get Is Alive"
+```
+
+**결과:**
+
+```
+IsAlive = true (살아있음)
+또는
+IsAlive = false (죽음)
+```
+
+---
+
+**4. NOT**
+
+```
+Get Is Alive 우클릭
+→ "Convert to NOT Boolean"
+```
+
+**변환:**
+
+```
+IsAlive = true
+  → NOT
+  → false (IsDead에 넣을 값)
+
+IsAlive = false
+  → NOT
+  → true (IsDead에 넣을 값)
+```
+
+---
+
+**5. Set IsDead**
+
+```
+좌측 Variables 패널:
+  IsDead 드래그
+  → "Set IsDead" 선택
+
+NOT의 결과를 IsDead에 연결
+```
+
+---
+
+### 최종 그래프
+
+```
+Sequence → Then 3
+    ↓
+Try Get Pawn Owner
+    ↓
+Cast to ShooterSamCharacter
+    ↓ (성공 시)
+Get Is Alive
+    ↓
+NOT
+    ↓
+Set IsDead
+```
+
+---
+
+## 📚 핵심 개념 정리
+
+### State Machine
+
+상태 관리 시스템
+
+```
+상태 1 ↔ 상태 2
+조건에 따라 전환
+```
+
+### State (상태)
+
+특정 애니메이션 세트
+
+```
+Alive: 이동, 점프 등
+Dead: 사망 애니메이션
+```
+
+### Transition (전환)
+
+상태 변경 규칙
+
+```
+조건이 true면 전환
+```
+
+### Loop Animation
+
+애니메이션 반복 여부
+
+```
+true: 반복
+false: 한 번만 (사망용)
+```
+
+### Cast
+
+타입 변환
+
+```
+부모 타입 → 자식 타입
+성공/실패 처리
+```
+
+### NOT 연산자
+
+불린 값 반전
+
+```
+true → false
+false → true
+```
+
+---
+
+## 🎯 전체 흐름 정리
+
+```
+[사망 애니메이션 재생 과정]
+
+1. 게임 중 매 프레임마다:
+    ↓
+2. Event Blueprint Update Animation
+    ↓
+3. Sequence → Then 3 실행
+    ↓
+4. Pawn Owner 가져오기
+    ↓
+5. ShooterSamCharacter로 Cast
+    ↓
+6. IsAlive 값 읽기 (C++)
+    ↓
+7. NOT으로 반전
+    ↓
+8. IsDead에 저장 (애님 BP)
+    ↓
+9. Main State Machine 확인:
+   IsDead = false? → Alive 상태
+   IsDead = true? → Dead 상태로 전환!
+    ↓
+10. Dead 상태에서:
+    Death_Forward 애니메이션 재생
+    ↓
+11. 사망 애니메이션 끝
+    → 마지막 프레임에서 정지
+```
+
+---
+
+## 💡 실전 팁
+
+### 다양한 사망 애니메이션
+
+**랜덤 선택:**
+
+```
+Dead 상태에서:
+
+Random Selector 노드
+    ├─ Death_Forward (50%)
+    ├─ Death_Backward (30%)
+    └─ Death_Headshot (20%)
+```
+
+---
+
+### 방향에 따른 사망
+
+```
+// C++에서 총알 방향 저장
+UPROPERTY(BlueprintReadOnly)
+FVector LastHitDirection;
+
+void OnDamageTaken(...)
+{
+    LastHitDirection = GetActorForwardVector();
+}
+```
+
+**애님 BP에서:**
+
+```
+앞에서 맞음?
+  → Death_Backward
+
+뒤에서 맞음?
+  → Death_Forward
+
+옆에서 맞음?
+  → Death_Side
+```
+
+---
+
+### 래그돌(Ragdoll)
+
+```cpp
+// Dead 상태에서
+void AShooterSamCharacter::OnDeath(AActor* Killer)
+{
+    // 애니메이션 대신 물리로
+    GetMesh()->SetSimulatePhysics(true);
+    GetMesh()->SetCollisionEnabled(ECollisionEnabled::PhysicsOnly);
+
+    // 충돌 끄기
+    GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+}
+```
+
+---
+
+### 부활 시스템
+
+**조건:**
+
+```
+- 아이템 사용
+- 팀원이 살림
+- 리스폰
+```
+
+**구현:**
+
+```cpp
+void Revive()
+{
+    if (!IsAlive)
+    {
+        IsAlive = true;
+        Health = MaxHealth / 2;  // 절반 체력으로 부활
+
+        // 충돌 다시 켜기
+        GetCapsuleComponent()->SetCollisionEnabled(
+            ECollisionEnabled::QueryAndPhysics
+        );
+    }
+}
+```
+
+**애니메이션:**
+
+```
+Dead → Alive 전환에:
+  Revive 애니메이션 추가
+```
+
+---
+
+### 사망 시 카메라 전환
+
+```cpp
+void AShooterSamCharacter::OnDeath(AActor* Killer)
+{
+    // 컨트롤러 분리
+    DetachFromControllerPendingDestroy();
+
+    // 관전 모드로
+    APlayerController* PC = Cast<APlayerController>(GetController());
+    if (PC)
+    {
+        PC->StartSpectatingOnly();
+    }
+}
+```
+
+---
+
+### 사망 카운트 표시
+
+```cpp
+void AShooterSamCharacter::OnDeath(AActor* Killer)
+{
+    // HUD 업데이트
+    AMyHUD* HUD = GetHUD();
+    if (HUD)
+    {
+        if (Killer)
+        {
+            FString KillerName = Killer->GetName();
+            HUD->ShowDeathMessage(KillerName);
+            // "You were killed by Player1"
+        }
+    }
+}
+```
+
+---
+
+### 사망 시 아이템 드랍
+
+```cpp
+void AShooterSamCharacter::OnDeath(AActor* Killer)
+{
+    // 무기 떨어뜨리기
+    if (Gun)
+    {
+        Gun->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+        Gun->SetActorEnableCollision(true);
+        Gun->GetMesh()->SetSimulatePhysics(true);
+    }
+
+    // 탄약 팩 생성
+    SpawnPickup(AmmoPack, GetActorLocation());
+}
+```
+
+---
+
+# { 함수 오버로딩 (Function Overloading) }
+
+## 🎯 함수 오버로딩이란?
+
+**같은 이름의 함수를 여러 개 만들되, 파라미터만 다르게!**
+
+```cpp
+// 같은 이름 "Add"
+int Add(int a, int b);           // 버전 1
+int Add(int a, int b, int c);    // 버전 2
+int Add(int a, int b, int c, int d);  // 버전 3
+
+// 호출 시 자동으로 선택됨!
+Add(1, 2);        // 버전 1 호출
+Add(1, 2, 3);     // 버전 2 호출
+Add(1, 2, 3, 4);  // 버전 3 호출
+```
+
+---
+
+## 🤔 왜 필요한가요?
+
+### 오버로딩 없이 (❌ 나쁜 방법)
+
+```cpp
+int Add2(int a, int b)
+{
+    return a + b;
+}
+
+int Add3(int a, int b, int c)
+{
+    return a + b + c;
+}
+
+int Add4(int a, int b, int c, int d)
+{
+    return a + b + c + d;
+}
+
+// 사용:
+Add2(1, 2);        // 함수 이름 외워야 함 😵
+Add3(1, 2, 3);     // 이름 또 외워야 함 😵
+Add4(1, 2, 3, 4);  // 또... 😵
+```
+
+**문제점:**
+
+```
+1. 함수 이름 너무 많음
+2. 외우기 어려움
+3. 본질적으로 같은 일 하는데 이름만 다름
+4. 코드 가독성 떨어짐
+```
+
+---
+
+### 오버로딩 사용 (✅ 좋은 방법)
+
+```cpp
+// 같은 이름!
+int Add(int a, int b)
+{
+    return a + b;
+}
+
+int Add(int a, int b, int c)
+{
+    return a + b + c;
+}
+
+int Add(int a, int b, int c, int d)
+{
+    return a + b + c + d;
+}
+
+// 사용:
+Add(1, 2);        // ✅ 간단!
+Add(1, 2, 3);     // ✅ 직관적!
+Add(1, 2, 3, 4);  // ✅ 쉬움!
+```
+
+**장점:**
+
+```
+1. 함수 이름 하나만 기억
+2. 파라미터 개수만 다르게 호출
+3. 코드가 깔끔하고 읽기 쉬움
+4. 같은 일 하는 함수는 같은 이름!
+```
+
+---
+
+## 📝 오버로딩 규칙
+
+### 무엇으로 구분하나요?
+
+**파라미터 리스트(매개변수 목록)만 달라야 함!**
+
+```cpp
+// ✅ 올바른 오버로딩
+void Print(int x);              // 정수 1개
+void Print(float x);            // 실수 1개
+void Print(int x, int y);       // 정수 2개
+void Print(string text);        // 문자열 1개
+void Print(int x, string text); // 정수 + 문자열
+```
+
+---
+
+### 파라미터 개수로 구분
+
+```cpp
+void Foo(int a);           // 파라미터 1개
+void Foo(int a, int b);    // 파라미터 2개
+void Foo(int a, int b, int c);  // 파라미터 3개
+```
+
+---
+
+### 파라미터 타입으로 구분
+
+```cpp
+void Foo(int x);      // 정수
+void Foo(float x);    // 실수
+void Foo(string x);   // 문자열
+void Foo(bool x);     // 불린
+```
+
+---
+
+### 파라미터 순서로 구분
+
+```cpp
+void Foo(int x, float y);    // 정수, 실수
+void Foo(float x, int y);    // 실수, 정수 (순서 다름!)
+```
+
+---
+
+### ❌ 안 되는 것들
+
+**반환 타입만 다른 것:**
+
+```cpp
+// ❌ 컴파일 에러!
+int Foo(int x);
+float Foo(int x);  // 파라미터 같은데 반환 타입만 다름
+```
+
+**파라미터 이름만 다른 것:**
+
+```cpp
+// ❌ 컴파일 에러!
+void Foo(int x);
+void Foo(int y);  // 이름만 다름, 타입은 같음
+```
+
+**const만 다른 것 (일부 경우):**
+
+```cpp
+// ⚠️ 주의: 포인터/레퍼런스는 가능, 값은 불가능
+void Foo(int x);
+void Foo(const int x);  // ❌ 에러
+
+void Foo(int* x);
+void Foo(const int* x); // ✅ OK
+```
+
+---
+
+## 💻 실전 예제
+
+### 예제 1: Print 함수
+
+```cpp
+// 다양한 타입 출력
+void Print(int x)
+{
+    UE_LOG(LogTemp, Display, TEXT("Int: %d"), x);
+}
+
+void Print(float x)
+{
+    UE_LOG(LogTemp, Display, TEXT("Float: %f"), x);
+}
+
+void Print(FString text)
+{
+    UE_LOG(LogTemp, Display, TEXT("String: %s"), *text);
+}
+
+void Print(bool x)
+{
+    UE_LOG(LogTemp, Display, TEXT("Bool: %s"), x ? TEXT("true") : TEXT("false"));
+}
+
+// 사용:
+Print(42);              // Int: 42
+Print(3.14f);           // Float: 3.14
+Print(TEXT("Hello"));   // String: Hello
+Print(true);            // Bool: true
+```
+
+---
+
+### 예제 2: Spawn 함수
+
+```cpp
+// 위치만
+AActor* Spawn(TSubclassOf<AActor> Class)
+{
+    return GetWorld()->SpawnActor<AActor>(Class);
+}
+
+// 위치 + 회전
+AActor* Spawn(TSubclassOf<AActor> Class, FVector Location, FRotator Rotation)
+{
+    return GetWorld()->SpawnActor<AActor>(Class, Location, Rotation);
+}
+
+// 위치 + 회전 + 충돌 설정
+AActor* Spawn(
+    TSubclassOf<AActor> Class,
+    FVector Location,
+    FRotator Rotation,
+    ESpawnActorCollisionHandlingMethod CollisionHandling
+)
+{
+    FActorSpawnParameters Params;
+    Params.SpawnCollisionHandlingOverride = CollisionHandling;
+    return GetWorld()->SpawnActor<AActor>(Class, Location, Rotation, Params);
+}
+
+// 사용:
+Spawn(EnemyClass);  // 기본 위치에 생성
+Spawn(EnemyClass, Location, Rotation);  // 특정 위치에 생성
+Spawn(EnemyClass, Location, Rotation, AlwaysSpawn);  // 충돌 무시
+```
+
+---
+
+### 예제 3: Damage 함수
+
+```cpp
+// 기본 데미지
+void ApplyDamage(AActor* Target, float Amount)
+{
+    UGameplayStatics::ApplyDamage(
+        Target,
+        Amount,
+        nullptr,
+        this,
+        UDamageType::StaticClass()
+    );
+}
+
+// 데미지 + 공격자
+void ApplyDamage(AActor* Target, float Amount, AController* Attacker)
+{
+    UGameplayStatics::ApplyDamage(
+        Target,
+        Amount,
+        Attacker,
+        this,
+        UDamageType::StaticClass()
+    );
+}
+
+// 데미지 + 공격자 + 데미지 타입
+void ApplyDamage(
+    AActor* Target,
+    float Amount,
+    AController* Attacker,
+    TSubclassOf<UDamageType> DamageType
+)
+{
+    UGameplayStatics::ApplyDamage(
+        Target,
+        Amount,
+        Attacker,
+        this,
+        DamageType
+    );
+}
+
+// 사용:
+ApplyDamage(Enemy, 10.f);  // 기본 데미지
+ApplyDamage(Enemy, 10.f, Controller);  // 공격자 포함
+ApplyDamage(Enemy, 10.f, Controller, FireDamage);  // 불 데미지
+```
+
+---
+
+## 🔍 언리얼에서 오버로딩 찾기
+
+### 방법 1: 자동완성 창
+
+```cpp
+GetWorld()->GetTimerManager().SetTimer(
+    // 여기서 괄호 열면:
+    // "2 of 12" 같은 표시가 보임
+```
+
+**화살표 키:**
+
+```
+↑ ↓ 키로 다른 오버로드 확인 가능!
+```
+
+---
+
+### 방법 2: Ctrl + 클릭
+
+```cpp
+SetTimer  // Ctrl + 클릭
+```
+
+**결과:**
+
+```
+헤더 파일로 이동
+→ 모든 오버로드 선언 확인 가능
+```
+
+---
+
+### 방법 3: 문서 검색
+
+```
+1. docs.unrealengine.com
+2. "FTimerManager SetTimer" 검색
+3. 모든 오버로드 목록 확인
+```
+
+---
+
+## 🎓 SetTimer 오버로드 예제
+
+**언리얼의 SetTimer 함수는 12개 오버로드!**
+
+### 주요 버전들:
+
+**1. 함수 포인터 버전:**
+
+```cpp
+void SetTimer(
+    FTimerHandle& InOutHandle,
+    TFunction<void()> Callback,
+    float Rate,
+    bool bLoop
+);
+```
+
+**2. 델리게이트 버전:**
+
+```cpp
+void SetTimer(
+    FTimerHandle& InOutHandle,
+    FTimerDelegate const& Delegate,
+    float Rate,
+    bool bLoop
+);
+```
+
+**3. 멤버 함수 버전:**
+
+```cpp
+template<class UserClass>
+void SetTimer(
+    FTimerHandle& InOutHandle,
+    UserClass* Object,
+    void (UserClass::*Function)(),
+    float Rate,
+    bool bLoop
+);
+```
+
+**사용 예:**
+
+```cpp
+FTimerHandle Handle;
+
+// 람다 사용
+GetWorld()->GetTimerManager().SetTimer(
+    Handle,
+    []() { UE_LOG(LogTemp, Warning, TEXT("Timer!")); },
+    1.0f,
+    true
+);
+
+// 멤버 함수 사용
+GetWorld()->GetTimerManager().SetTimer(
+    Handle,
+    this,
+    &AMyActor::MyFunction,
+    1.0f,
+    true
+);
+```
+
+---
+
+## 💡 실전 팁
+
+### 기본값으로 더 간단하게
+
+**오버로딩 대신 기본값 사용:**
+
+```cpp
+// 오버로딩 (여러 함수)
+void Spawn(TSubclassOf<AActor> Class);
+void Spawn(TSubclassOf<AActor> Class, FVector Location);
+void Spawn(TSubclassOf<AActor> Class, FVector Location, FRotator Rotation);
+
+// 기본값 (한 함수)
+void Spawn(
+    TSubclassOf<AActor> Class,
+    FVector Location = FVector::ZeroVector,
+    FRotator Rotation = FRotator::ZeroRotator
+);
+
+// 둘 다 가능:
+Spawn(MyClass);  // 기본값 사용
+Spawn(MyClass, Location);  // 위치만 지정
+Spawn(MyClass, Location, Rotation);  // 모두 지정
+```
+
+---
+
+### 언제 오버로딩, 언제 기본값?
+
+**오버로딩 사용:**
+
+```
+- 파라미터 타입이 다를 때
+- 내부 로직이 완전히 다를 때
+- 파라미터 순서가 다를 때
+```
+
+**기본값 사용:**
+
+```
+- 파라미터 타입이 같을 때
+- 단순히 선택적 파라미터일 때
+- 내부 로직이 비슷할 때
+```
+
+---
+
+### 좋은 오버로딩 설계
+
+**원칙:**
+
+```cpp
+// ✅ 좋은 예: 직관적
+void Move(FVector Direction);           // 방향으로 이동
+void Move(FVector Direction, float Speed);  // 속도 추가
+void Move(FVector From, FVector To);    // 시작-끝 지점
+
+// ❌ 나쁜 예: 헷갈림
+void Move(float X, float Y);
+void Move(float Speed, float Direction);  // 순서 애매
+```
+
+---
+
+## 📚 핵심 개념 정리
+
+### 함수 오버로딩
+
+같은 이름, 다른 파라미터
+
+```cpp
+void Foo(int x);
+void Foo(float x);
+void Foo(int x, int y);
+```
+
+### 오버로드 선택 기준
+
+컴파일러가 자동으로 선택
+
+```
+호출 시 전달된 파라미터 타입/개수/순서
+→ 가장 일치하는 오버로드 자동 선택
+```
+
+### 구분 요소
+
+```
+✅ 파라미터 개수
+✅ 파라미터 타입
+✅ 파라미터 순서
+❌ 반환 타입
+❌ 파라미터 이름
+```
+
+---
+
+## 🎯 요약
+
+**함수 오버로딩 = 같은 이름, 다른 파라미터**
+
+**장점:**
+
+```
+1. 코드 가독성 향상
+2. 직관적인 API
+3. 유연한 사용
+```
+
+**규칙:**
+
+```
+- 파라미터가 달라야 함
+- 반환 타입만 다르면 안 됨
+- 컴파일러가 자동으로 선택
+```
+
+**실전에서:**
+
+```
+- 언리얼 엔진이 많이 사용
+- SetTimer, SpawnActor 등
+- 자신의 함수에도 적용 가능
+```
+
+---

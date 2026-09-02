@@ -1,0 +1,293 @@
+---
+title: '섹션 8: Scrapy를 사용하여 여러 페이지 처리하기'
+date: '2026-09-02'
+category: '기타, 사용 적음/크롤링 & 파이썬'
+tags: ['기타, 사용 적음', '크롤링 & 파이썬']
+draft: false
+summary: ''
+---
+
+```python
+import scrapy
+
+class AudibleSpider(scrapy.Spider):
+    # 스파이더 이름을 정의합니다.
+    name = "audible"
+    # 스파이더가 크롤링할 수 있는 도메인을 정의합니다.
+    allowed_domains = ["www.audible.com"]
+    # 크롤링을 시작할 URL을 정의합니다.
+    start_urls = ["https://www.audible.com/search"]
+
+    # 스파이더가 페이지를 크롤링할 때 호출되는 함수입니다.
+    def parse(self, response):
+        # Audible 웹페이지에서 제품 컨테이너를 찾기 위한 XPath 쿼리입니다.
+        product_container = response.xpath('//div[@class="adbl-impression-container "]//li[contains(@class, "productListItem")]')
+
+        # 각 제품 컨테이너에 대해 반복합니다.
+        for product in product_container:
+            # 제품 컨테이너 내에서 책 제목을 찾기 위한 XPath 쿼리입니다.
+            book_title = product.xpath('.//h3[contains(@class, "bc-heading")]//a/text()').get()
+            # 제품 컨테이너 내에서 저자 이름을 찾기 위한 XPath 쿼리입니다.
+            book_author = product.xpath('.//li[contains(@class, "authorLabel")]//span//a/text()').getall()
+            # 제품 컨테이너 내에서 책 길이를 찾기 위한 XPath 쿼리입니다.
+            book_length = product.xpath('.//li[contains(@class, "runtimeLabel")]//span/text()').get()
+
+            # 수집한 데이터를 딕셔너리 형태로 반환합니다.
+            yield {
+                'title' : book_title,  # 책 제목
+                'author' : book_author,  # 저자 이름
+                'length' : book_length,  # 책 길이
+            }
+```
+
+# 스파이더 생성하기 ( Building The Spider )
+
+## 스파이더 생성 및 설정
+
+```python
+터미널에서 다음 명령어를 실행하여 스파이더를 생성
+
+scrapy genspider (스파이더 이름) (주소 http 뺴주고)
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380920/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_8_Scrapy_/Untitled.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380919/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_8_Scrapy_/Untitled_1.png)
+
+```python
+scrapy genspider audible www.audible.com/search
+
+위의 코드를 입력해서 스파이더를 생성해준다 (프로젝트 폴더에)
+```
+
+## xpath 로 요소들 선택하기
+
+```python
+개발자 도구를 사용해서 xpath 를 작성해서 원하는 요소를 선택하도록 한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380920/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_8_Scrapy_/Untitled_2.png)
+
+## // 와 / 의 차이
+
+```python
+// 는 아래 자손 모두에서 찾는거고 ( 중간에 div 가 더 있어도 아래의 모든 내용을 찾는다 )
+
+/ 는 직계 자손만 찾도록 한다
+```
+
+## 데이터 추출 실행
+
+```python
+터미널에서 다음 명령어를 실행하여 데이터를 추출
+
+scrapy crawl audible
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380920/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_8_Scrapy_/Untitled_3.png)
+
+## 데이터 CSV 파일로 저장
+
+```python
+추출된 데이터를 CSV 파일로 저장
+
+scrapy crawl audible -o audible_onepage.csv
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380920/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_8_Scrapy_/Untitled_4.png)
+
+## 오류 발생
+
+```python
+오류가 생기면 거의 대부분의 문제는 xpath 를 잘못 작성해서 그런거니 xpath 를 제대로 다시 작성해보자
+```
+
+# 페이지 네이션 ( Pagination )
+
+```python
+import scrapy
+
+class AudibleSpider(scrapy.Spider):
+    name = "audible"  # 스파이더의 이름 정의. 실행 시 이 이름으로 스파이더를 호출할 수 있음
+    allowed_domains = ["www.audible.com"]  # 크롤링을 허용할 도메인 목록
+    start_urls = ["https://www.audible.com/search"]  # 스파이더가 시작할 URL 목록
+
+    def parse(self, response):
+        # 제품 목록을 포함하는 컨테이너를 XPath로 선택
+        product_container = response.xpath('//div[@class="adbl-impression-container "]//li[contains(@class, "productListItem")]')
+
+        # 각 제품에 대해 필요한 정보를 추출
+        for product in product_container:
+            book_title = product.xpath('.//h3[contains(@class, "bc-heading")]//a/text()').get()  # 책 제목 추출
+            book_author = product.xpath('.//li[contains(@class, "authorLabel")]//span//a/text()').getall()  # 저자 정보 추출
+            book_length = product.xpath('.//li[contains(@class, "runtimeLabel")]//span/text()').get()  # 책 길이(시간) 정보 추출
+
+            # 추출한 정보를 딕셔너리 형태로 반환
+            yield {
+                'title': book_title,
+                'author': book_author,
+                'length': book_length,
+            }
+
+        # 페이지네이션 요소를 선택
+        pagination = response.xpath('//ul[contains(@class, "pagingElements")]')
+        # 다음 페이지의 URL을 추출
+        next_page_url = pagination.xpath('.//span[contains(@class, "nextButton")]//a//@href').get()
+        # 다음 페이지 버튼의 비활성화 여부를 확인
+        button_disabled = pagination.xpath('.//span[contains(@class , "nextButton")]/a/@aria-disabled').get()
+
+        # 다음 페이지 URL이 있고, 버튼이 비활성화되어 있지 않으면 다음 페이지로 이동
+        if next_page_url and button_disabled == None:
+            yield response.follow(url=next_page_url, callback=self.parse)
+```
+
+```python
+아래 부분을 조금더 상세하게 설명하자면
+
+        if next_page_url and button_disabled == None:
+            yield response.follow(url=next_page_url, callback=self.parse)
+
+
+if next_page_url and button_disabled == None: 다음 페이지가 존재하고 버튼이 활성화되어 있으면,
+
+다음 페이지로 이동한다. response.follow를 사용하여 새로운 요청을 보내고 parse 메서드를 다시 호출한다.
+
+url=next_page_url: 다음 페이지로 이동하기 위한 URL
+
+callback=self.parse: 새로운 페이지가 로드된 후 호출할 콜백 함수이다. 이 경우, self.parse가 콜백 함수로 지정되어있다.
+```
+
+### 콜백 함수 (callback=self.parse)
+
+```python
+callback: 특정 작업이 완료된 후 호출될 함수를 지정한다.
+
+여기서 callback은 새로운 페이지가 로드된 후 실행될 함수를 의미한다.
+
+self.parse: 현재 클래스의 parse 메서드를 콜백 함수로 지정한다.
+
+즉, 다음 페이지가 로드되면 parse 메서드가 다시 호출되어 데이터를 추출하는 작업을 반복하게 된다.
+```
+
+# 유저 에이전트 변경하기 ( Changing User-Agent )
+
+```python
+웹사이트는 종종 기본 User-Agent를 통해 스크래핑을 감지한다.
+
+따라서 User-Agent를 변경하여 마치 브라우저에서 요청하는 것처럼 보이도록 하는 것이 중요하다.
+```
+
+## User-Agent 확인하기
+
+```python
+scrapy shell "https://www.audible.com/search"
+
+터미널에서 위의 내용을 입력하고
+
+request.headers
+
+를 입력해서 userAgent 를 찾는다
+```
+
+```python
+현재 유저 에이전트를 확인하면 scrapy 로 나오는것을 확인 가능하다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380920/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_8_Scrapy_/Untitled_5.png)
+
+## 브라우저에서 User-Agent 확인
+
+```python
+브라우저에서 개발자 도구를 활용해서 User_Agent 를 찾는다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380920/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_8_Scrapy_/Untitled_6.png)
+
+## settings.py 파일에서 변경
+
+```python
+Scrapy 프로젝트의 settings.py 파일을 열고
+
+User-Agent 값을 설정하는 부분을 찾아 변경한다
+```
+
+### User-Agent 변경
+
+```python
+이 부분을 변경하거나 아래 DEFAULT_REQUEST_HEADERS 를 변경해준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380920/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_8_Scrapy_/Untitled_7.png)
+
+### DEFAULT_REQUEST_HEADERS 변경
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380920/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_8_Scrapy_/Untitled_8.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380920/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_8_Scrapy_/Untitled_9.png)
+
+## 코드에서 User-Agent 변경
+
+```python
+import scrapy
+
+class AudibleSpider(scrapy.Spider):
+    name = "audible"  # 스파이더의 이름 정의
+    allowed_domains = ["www.audible.com"]  # 크롤링을 허용할 도메인 목록
+    start_urls = ["https://www.audible.com/search"]  # 시작할 URL 목록
+
+    def start_requests(self):
+        # 첫 요청을 생성하여 User-Agent 헤더를 설정
+        yield scrapy.Request(
+            url="https://www.audible.com/search",
+            callback=self.parse,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+            },
+        )
+
+    def parse(self, response):
+        # 제품 컨테이너를 선택하는 XPath
+        product_container = response.xpath(
+            '//div[@class="adbl-impression-container "]//li[contains(@class, "productListItem")]'
+        )
+
+        # 각 제품에 대해 데이터 추출
+        for product in product_container:
+            book_title = product.xpath(
+                './/h3[contains(@class, "bc-heading")]//a/text()'
+            ).get()  # 책 제목을 추출
+            book_author = product.xpath(
+                './/li[contains(@class, "authorLabel")]//span//a/text()'
+            ).getall()  # 책 저자를 추출 (여러 저자일 경우 모두 추출)
+            book_length = product.xpath(
+                './/li[contains(@class, "runtimeLabel")]//span/text()'
+            ).get()  # 책 길이를 추출
+
+            # 추출한 데이터를 딕셔너리 형태로 yield
+            yield {
+                "title": book_title,
+                "author": book_author,
+                "length": book_length,
+                "User-Agent": response.request.headers["User-Agent"],  # 요청의 User-Agent 헤더 값 포함
+            }
+
+        # 페이지네이션을 위한 XPath 선택자
+        pagination = response.xpath('//ul[contains(@class, "pagingElements")]')
+        next_page_url = pagination.xpath(
+            './/span[contains(@class, "nextButton")]//a//@href'
+        ).get()  # 다음 페이지 URL 추출
+        button_disabled = pagination.xpath(
+            './/span[contains(@class , "nextButton")]/a/@aria-disabled'
+        ).get()  # 다음 페이지 버튼의 비활성화 상태 확인
+
+        # 다음 페이지 URL이 존재하고, 버튼이 비활성화되지 않은 경우 다음 페이지로 이동
+        if next_page_url and button_disabled == None:
+            yield response.follow(
+                url=next_page_url,
+                callback=self.parse,
+                headers={
+                    "User-Agent": response.request.headers["User-Agent"].decode("utf-8")
+                },  # User-Agent 헤더를 설정하여 다음 페이지 요청 생성
+            )
+
+```

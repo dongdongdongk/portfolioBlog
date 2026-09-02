@@ -1,0 +1,396 @@
+---
+title: '섹션 8. 쿠팡 제품 검색 결과 크롤링'
+date: '2026-09-02'
+category: '기타, 사용 적음/크롤링 & 파이썬'
+tags: ['기타, 사용 적음', '크롤링 & 파이썬']
+draft: false
+summary: ''
+---
+
+```python
+ip 를 막는 사이트도 있으니 ip 를 우회해서 시도하는걸 추천한다
+```
+
+```python
+
+ExpressVPN
+https://www.expressvpn.com/kr/order
+
+CyberGhost VPN
+https://www.cyberghostvpn.com/ko_KR/offer/access?coupon=2Y2Mb&brand=safetydetectives&aff_sub=eyJwaWQiOiI0fHBfTFZPM0tXVzlJS1FUMiIsImNpZCI6IjR8cF9MVk8zS1dXOUlLUVQyfDF8MTYxNSIsInMiOjR9&aff_sub2=jeivbiicp0.3&noForceCondition=true&aff_id=15307&source=mainKO
+
+hide.me
+https://hide.me/en/promotion/vpnmentor/?friend=vpnMentor&banner=3622e812&chan=org
+
+Proton VPN
+https://protonvpn.com/free-vpn?url_id=397&utm_campaign=ww-all-2c-vpn-gro_aff-g_acq-partners_program&utm_source=aid-tune-1005&utm_medium=link&utm_term=free_vpn_landing&utm_content=26
+
+nord VPN ( 유료중에는 쓸만하다고 )
+
+ipwork
+
+protonvpn ( 일본으로 우회 하는걸 추천 )
+https://protonvpn.com/free-vpn
+```
+
+# 쿠팡 크롤링을 위한 기본 설정
+
+```python
+import requests
+from bs4 import BeautifulSoup
+
+headers = {
+    "User-Agent" : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+}
+
+cookie = {"a" : "b"}
+
+base_url = "https://www.coupang.com/np/search?component=&q="
+
+keyword = input("검색할 상품을 입력하세요 : ")
+
+search_url = base_url + keyword
+
+req = requests.get(search_url, timeout=5, headers=headers, cookies=cookie) #마냥 기다릴순 없기 때문에 5초
+
+print(req.status_code) #응답 확인
+
+# html = req.text
+
+# soup = BeautifulSoup(html, "html.parser")
+```
+
+```python
+응답이 제대로 오는지 확인하기 위해서 status_code 를 사용해서 200이 뜨는지 확인하고 있다
+
+그리고 timeout=5 를 사용해서 마냥 기다릴순 없으니 5초를 기다리게 해줬다
+```
+
+## 서치 주소 수정
+
+```python
+https://www.coupang.com/np/search?component=&q=모니터channel=user
+
+이런 형태로 검색을 하지만 뒤를 지워서 접속해도 접속이 가능하니 뒤에 채널부분은 삭제해주자
+
+https://www.coupang.com/np/search?component=&q=모니터
+```
+
+## 요청에 쿠키를 더하기
+
+```python
+요청에 쿠키를 더해서 접속하게 해줬다
+
+쿠팡측에서 쿠키가 없으면 접속을 차단하고 있는데 간단하게 임의의 쿠키를 추가해서 접속 가능하게 해줬다 # cookie = {"a" : "b"}
+
+# req = requests.get(search_url, timeout=5, headers=headers, cookies=cookie)
+
+이런 부분은 알 수 있는 방법이 있는건 아니고 이렇게 저렇게 시도해보고 알아낼 수 있는 부분이다
+```
+
+# 제품정보 클래스 알아내고 광고제품 제거
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380942/notion-blog/_/_/_/_8_/Untitled.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380941/notion-blog/_/_/_/_8_/Untitled_1.png)
+
+```python
+광고 제품들은 search-product  search-product__ad-badge 라고 클래스에 search-product__ad-badge 가 추가적으로 포함되어 있다.
+
+그리고 일반 제품은 단지 search-product 만 클래스에 가지고 있다
+
+( search-product 를 따옴표까지 묶어서 개발자 도구에서 검색해보면 제대로 상품수에 맞게 나오는지 확인 가능하다 )
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380941/notion-blog/_/_/_/_8_/Untitled_2.png)
+
+```python
+# items = soup.select(".search-product") 이렇게 하면 50개
+
+그러나 serch-product 클래스를 활용해서 상품을 선택해보면 30 개가 나와야 하는데 50 개 이상 나오게 된다
+
+그 이유는 쿠팡은 비슷한 클래스를 많이 사용해서 위와 같이 중복되게 사용하는 클래스가 많기 때문이다
+
+```
+
+## [class= ] 사용
+
+```python
+items = soup.select("[class=search-product]") # 이 방법을 사용해서 정확하게 어떤 클래스를 가져올지 정해줄 수 있다 ( 뒤에 다른 클래스가 붙지 않도록 )
+
+위와 같이 정확하게 search-product 인 클래스만 가져와서 ( 뒤에 다른 클래스가 없는 )
+
+상품을 선택하게 해준다면 문제가 해결된다
+```
+
+# 로켓 배송 상품의 제품명,상품 링크, 썸네일 url 가격 가져오기
+
+```python
+import requests
+from bs4 import BeautifulSoup
+
+headers = {
+    "User-Agent" : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+}
+
+cookie = {"a" : "b"}
+
+base_url = "https://www.coupang.com/np/search?component=&q="
+
+keyword = input("검색할 상품을 입력하세요 : ")
+
+search_url = base_url + keyword
+
+req = requests.get(search_url, timeout=5, headers=headers, cookies=cookie) #마냥 기다릴순 없기 때문에 5초
+
+# print(req.status_code) #응답 확인
+
+html = req.text
+
+soup = BeautifulSoup(html, "html.parser")
+
+# items = soup.select(".search-product") 이게 아니라
+
+items = soup.select("[class=search-product]") # 이 방법을 사용해서 정확하게 어떤 클래스를 가져올지 정해줄 수 있다 ( 뒤에 다른 클래스가 붙지 않도록 )
+
+rank = 1
+for item in items:
+     badge_rocket = item.select_one(".badge.rocket")
+     if not badge_rocket:
+          continue
+     name = item.select_one(".name")
+     price = item.select_one(".price-value")
+     thumb = item.select_one(".search-product-wrap-img")
+     link = item.select_one("a")['href']
+
+     print(f"{rank}위")
+     print(name.text)
+     print(f"{price.text}원")
+     print(f"https://coupang.com{link}")
+     if thumb.get("data-img-src"):
+          print(f"http:{thumb.get("data-img-src")}")
+     else:
+        print(f"http:{thumb["src"]}")
+     print()
+
+     rank += 1
+```
+
+```python
+로켓 상품의 제품명 가격 링크 이미지 등 을 가져와본다
+
+로켓 상품만 가져오는 방법은
+
+if not badge_rocket:
+          continue
+
+조건문과 continue 를 사용해서 badge_roket 클래스를 포함하고 있는것만 출력하도록 해준다
+```
+
+## 이상한 이미지 링크를 가져오는 문제
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380941/notion-blog/_/_/_/_8_/Untitled_3.png)
+
+```python
+이미지를 가져와서 출력해보면 이미지 링크가 잘못나와 출력되지 않는 문제가 있다
+
+( thumbnail 이 아니라 img gif 이런 링크로 나온다 )
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380941/notion-blog/_/_/_/_8_/Untitled_4.png)
+
+```python
+위와 같이 src 속성을 사용해서 이미지를 가져온다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380941/notion-blog/_/_/_/_8_/Untitled_5.png)
+
+```python
+우리가 실제로 get 요청으로 받아오는 소스는 위와 같다
+
+( 페이지 소스 보기로 보면 보인다 )
+
+개발자 도구로 보는 소스는 화면이 완전히 만들어 졌을 떄 코드를 보여주는것
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380942/notion-blog/_/_/_/_8_/Untitled_6.png)
+
+```python
+페이지 소스의 data-img-src 를 확인해보면 알맞게 이미지가 출력되는걸 알 수 있다
+```
+
+```python
+     if thumb.get("data-img-src"):
+          print(f"http:{thumb.get("data-img-src")}")
+     else:
+        print(f"http:{thumb["src"]}")
+```
+
+```python
+이렇게 기본적으로는 페이지 소스 보기에서 찾은 썸네일 클래스에 주소를 가져와서 사용하고 ( 만들어진 페이지 소스에는 없을수도 있으니까 get으로 none 이 면 오류가 뜬다)
+
+만약 없다면 thumb 의 src 를 가져와서 사용한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380942/notion-blog/_/_/_/_8_/Untitled_7.png)
+
+```python
+최종 출력
+```
+
+# 상품 썸네일 전체 다운받기
+
+```python
+import requests
+from bs4 import BeautifulSoup
+
+headers = {
+    "User-Agent" : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+}
+
+cookie = {"a" : "b"}
+
+base_url = "https://www.coupang.com/np/search?component=&q="
+
+keyword = input("검색할 상품을 입력하세요 : ")
+
+search_url = base_url + keyword
+
+req = requests.get(search_url, timeout=5, headers=headers, cookies=cookie) #마냥 기다릴순 없기 때문에 5초
+
+# print(req.status_code) #응답 확인
+
+html = req.text
+
+soup = BeautifulSoup(html, "html.parser")
+
+# items = soup.select(".search-product") 이게 아니라
+
+items = soup.select("[class=search-product]") # 이 방법을 사용해서 정확하게 어떤 클래스를 가져올지 정해줄 수 있다 ( 뒤에 다른 클래스가 붙지 않도록 )
+
+rank = 1
+for item in items:
+     badge_rocket = item.select_one(".badge.rocket")
+     if not badge_rocket:
+          continue
+     name = item.select_one(".name")
+     price = item.select_one(".price-value")
+     thumb = item.select_one(".search-product-wrap-img")
+     link = item.select_one("a")['href']
+
+     print(f"{rank}위")
+     print(name.text)
+     print(f"{price.text}원")
+     print(f"https://coupang.com{link}")
+     if thumb.get("data-img-src"):
+        img_url = f"http:{thumb.get("data-img-src")}"
+     else:
+        img_url = f"http:{thumb["src"]}"
+     print(img_url)
+     print()
+
+     img_req = requests.get(img_url)
+
+     with open(f"{rank}.jpg","wb") as f:
+         f.write(img_req.content)
+     rank += 1
+```
+
+```python
+이미지를 다운받아본다 ( 너무 자주하면 차단 당하니 조심하자 )
+```
+
+```python
+     if thumb.get("data-img-src"):
+        img_url = f"http:{thumb.get("data-img-src")}"
+     else:
+        img_url = f"http:{thumb["src"]}"
+     print(img_url)
+
+위와 같이 약간의 리팩토링을 해주고 ( img_url 로 출력해주기 )
+```
+
+## 이미지 다운받기
+
+```python
+1. img_url 변수에 이미지의 URL이 저장됩니다.
+
+2. requests.get() 함수를 사용하여 해당 URL에 GET 요청을 보냅니다. 이를 통해 이미지 데이터를 가져옵니다.
+
+3. img_req.content를 사용하여 응답으로 받은 이미지 데이터를 가져옵니다.
+
+4. open() 함수를 사용하여 파일을 엽니다. 이때, "wb" 모드로 파일을 열어야 하며, 이는 이진 파일 쓰기 모드를 의미합니다.
+
+5. with 문을 사용하여 파일 객체를 생성하고, 해당 파일 객체를 f 변수에 할당합니다.
+
+6. f.write() 메서드를 사용하여 이미지 데이터를 파일에 씁니다. 이때, img_req.content를 사용하여 가져온 이미지 데이터를 파일에 씁니다.
+
+7. 파일을 닫습니다.
+
+이러한 과정을 통해 이미지를 다운로드하고, 해당 이미지를 현재 작업 중인 디렉토리에 저장합니다.
+
+각 이미지의 이름은 순위에 따라 "{rank}.jpg" 형식으로 지정됩니다.
+```
+
+## 이미지 다운로드 개념
+
+```python
+import requests  # requests 라이브러리를 가져옵니다. 이 라이브러리를 사용하여 웹 페이지에서 데이터를 가져올 것입니다.
+
+# 이미지 URL
+img_url = "https://example.com/image.jpg"  # 이미지의 URL을 img_url 변수에 저장합니다.
+
+# 이미지 다운로드
+img_req = requests.get(img_url)  # requests.get() 함수를 사용하여 이미지의 URL에서 이미지 데이터를 가져옵니다. 이를 img_req 변수에 저장합니다.
+
+# 이미지 데이터를 파일에 씁니다.
+with open("image.jpg", "wb") as f:  # "image.jpg"라는 이름의 파일을 바이너리 쓰기 모드("wb")로 엽니다. 파일을 열 때 "with" 문을 사용하면 파일을 자동으로 닫을 수 있습니다.
+    f.write(img_req.content)  # 이미지 데이터를 파일에 씁니다.
+
+print("이미지 저장이 완료되었습니다.")  # 이미지 저장이 완료되었다는 메시지를 출력합니다.
+```
+
+```python
+1. requests 라이브러리를 사용하여 웹 서버에 GET 요청을 보냅니다. 이를 통해 원격 서버에서 이미지 데이터를 가져옵니다.
+
+2. 가져온 이미지 데이터는 img_req 변수에 저장됩니다.
+
+3. open() 함수를 사용하여 현재 작업 중인 디렉토리에 "image.jpg"라는 파일을 바이너리 쓰기 모드("wb")로 엽니다.
+
+( "wb" 모드로 파일을 열면 이미지 데이터를 바이너리 형식으로 파일에 쓸 수 있습니다.
+
+이미지 파일은 텍스트 파일이 아니기 때문에 바이너리 모드로 열어야 합니다. )
+
+4. with 문을 사용하여 파일을 열면, 블록 내의 코드가 실행된 후에는 파일이 자동으로 닫힙니다. 이를 통해 파일을 닫아주는 번거로움을 줄일 수 있습니다.
+
+5. f.write() 메서드를 사용하여 img_req.content에서 가져온 이미지 데이터를 파일에 씁니다.
+
+with 문을 사용하면 파일을 열고 작업이 끝난 후에 자동으로 파일을 닫아줍니다.
+
+with 문은 파일을 열 때마다 블록을 만들고, 블록이 끝날 때 해당 파일에 대한 리소스를 해제하므로 파일을 명시적으로 닫아주지 않아도 됩니다.
+```
+
+## 다른 경로에 저장하기
+
+```python
+import requests
+
+# 이미지 URL
+img_url = "https://example.com/image.jpg"
+
+# 이미지 다운로드
+img_req = requests.get(img_url)
+
+# 파일 경로 설정
+file_path = "C:/Users/username/Documents/image.jpg"
+
+# 이미지 데이터를 파일에 씁니다.
+with open(file_path, "wb") as f:
+    f.write(img_req.content)
+
+print("이미지 저장이 완료되었습니다.")
+```
+
+```python
+ile_path 변수에 이미지 파일의 저장 경로를 지정합니다. 그리고 이 경로를 open() 함수에 전달하여 이미지를 해당 경로에 저장
+```

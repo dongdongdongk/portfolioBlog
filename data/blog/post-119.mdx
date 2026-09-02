@@ -1,0 +1,468 @@
+---
+title: '프론트에서 서버에 데이터 요청하는 방법'
+date: '2026-09-02'
+category: '풀스택/The Web Developer 부트캠프 2022'
+tags: ['풀스택', 'The Web Developer 부트캠프 2022']
+draft: false
+summary: ''
+---
+
+# 프론트에서 서버에 데이터 요청하는 방법
+
+```jsx
+클라이언트와 서버 폴더를 만들어준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381423/notion-blog/_/The_Web_Developer_2022/REACT/_/Untitled.png)
+
+## 서버 생성
+
+```jsx
+1. npm init 으로 package.json 생성
+
+2. 익스프레스 설치
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381423/notion-blog/_/The_Web_Developer_2022/REACT/_/Untitled_1.png)
+
+```jsx
+익스프레스 설치후 server 폴더에 app.js 를 만들어주고
+
+센터코드를 복사해서 붙여넣어준다 ( 뒤에 코드를 살짝 수정해서 콜백함수를 만들어서 서버 시작을 확인해준다 )
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381423/notion-blog/_/The_Web_Developer_2022/REACT/_/Untitled_2.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381423/notion-blog/_/The_Web_Developer_2022/REACT/_/Untitled_3.png)
+
+```jsx
+post 를 사용하려면 body 파싱이 필요하기 때문에 공식 문서에서 파싱코드를 찾아서 넣어준다
+```
+
+## todoList 추가 , 조회 작성
+
+```jsx
+const express = require('express')
+const app = express()
+const bodyParser = require('body-parser')
+
+app.use(bodyParser.json())
+app.use(bodyParser.urlencoded({ extended: true }))
+
+let id = 2
+const todoList = [
+  {
+    id: 1,
+    text: '할일 1',
+    done: false,
+  },
+]
+
+app.get('/api/todo', (req, res) => {
+  res.json(todoList)
+})
+
+app.post('/api/todo', (req, res) => {
+  const { text, done } = req.body
+  todoList.push({
+    id: id++,
+    text,
+    done,
+  })
+  return res.send('success')
+})
+
+app.listen(3000, () => {
+  console.log('Server Start')
+})
+```
+
+```jsx
+todoList 를 작성하고 조회와 추가 기능을 추가해준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381423/notion-blog/_/The_Web_Developer_2022/REACT/_/Untitled_4.png)
+
+```jsx
+주소로 조회를 하면 위와 같이 데이터를 확인 가능하다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381426/notion-blog/_/The_Web_Developer_2022/REACT/_/Untitled_5.png)
+
+```jsx
+postman 을 사용하여 데이터를 보내 데이터가 추가되는걸 확인한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381428/notion-blog/_/The_Web_Developer_2022/REACT/_/Untitled_6.png)
+
+```jsx
+바로 get 요청을 보내서 추가된걸 확인한다
+```
+
+## 프론트 제작하기
+
+```jsx
+npx create-react-app . ( . 잊지말기 )
+
+을 사용해서 client 에 리액트를 설치해준다
+
+그리고 필요없는 test 로고 css 파일들을 지워준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381433/notion-blog/_/The_Web_Developer_2022/REACT/_/Untitled_7.png)
+
+```jsx
+그리고 App.js 를 수정하고
+
+npm start 를 터미널에 입력해서 화면을 출력해본다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381433/notion-blog/_/The_Web_Developer_2022/REACT/_/Untitled_8.png)
+
+```jsx
+화면이 잘 출력되는걸 확인 가능하다
+
+그리고 새로고침을 하면 .....
+```
+
+## CORS 에러
+
+```jsx
+개발자 도구를 들어가보면
+
+에러가 발생해 있다 ( network 쪽도 마찬가지다 )
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381433/notion-blog/_/The_Web_Developer_2022/REACT/_/Untitled_9.png)
+
+### CORS 오류가 생긴이유?
+
+```jsx
+현재 상황은
+
+Client : localhost:3000 ( react 개발서버가 )
+
+Server : localhost:4000
+
+이렇게 되면 두 서버는 오리진이 다르다 ( 오리진이라는 거는 host 와 port 를 포함한 데이터의 출저를 의미하는 거다 )
+
+오리진이 다르다는건
+
+구글과 네이버 같은거다 서로가 서로의 데이터를 막 꺼내간다면 큰 문제다 그래서 일단 막는다가 기본이다
+
+그래서 해결을 하려면 CORS 정책을 풀어줘야 하는데 은행을 예로들면 창구 직원(서버)이 돈을(데이터를) 줄지말지 정하는거지
+
+우리(클라이언트)가 정하는게 아니다
+
+그렇기 때문에 서버에서 CORS 를 풀어야한다
+
+```
+
+### 해결방법
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381432/notion-blog/_/The_Web_Developer_2022/REACT/_/Untitled_10.png)
+
+```jsx
+npm 에 접속해서 cors 를 풀어주는 라이브러리를 서버에 설치한다
+
+설치한뒤 공식 문서대로 서버에 코드를 넣어주면
+```
+
+```jsx
+const express = require('express')
+const app = express()
+const bodyParser = require('body-parser')
+const cors = require('cors') // cors 추가
+
+app.use(cors()) // cors
+app.use(bodyParser.json())
+app.use(bodyParser.urlencoded({ extended: true }))
+
+let id = 2
+const todoList = [
+  {
+    id: 1,
+    text: '할일 1',
+    done: false,
+  },
+]
+
+app.get('/api/todo', (req, res) => {
+  res.json(todoList)
+})
+
+app.post('/api/todo', (req, res) => {
+  const { text, done } = req.body
+  todoList.push({
+    id: id++,
+    text,
+    done,
+  })
+  return res.send('success')
+})
+
+app.listen(4000, () => {
+  console.log('Server Start')
+})
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381434/notion-blog/_/The_Web_Developer_2022/REACT/_/Untitled_11.png)
+
+```jsx
+데이터가 잘 넘어왔다
+```
+
+## 데이터 출력하기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381434/notion-blog/_/The_Web_Developer_2022/REACT/_/Untitled_12.png)
+
+```jsx
+import { useEffect, useState } from 'react'
+
+function App() {
+  const [todoList, setTodoList] = useState([])
+
+  useEffect(() => {
+    fetch('http://localhost:4000/api/todo')
+      .then((response) => response.json())
+      .then((data) => setTodoList(data))
+  }, [])
+
+  return (
+    <div className="App">
+      <h1>todoList</h1>
+      {todoList.map((todo) => (
+        <div key={todo.id}>
+          <div>{todo.id}</div>
+          <div>{todo.text}</div>
+          <div>{todo.done ? 'Y' : 'N'}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export default App
+```
+
+```jsx
+데이터를 출력하기 위한 코드를 작성한다
+
+처음에는 useEffect 를 사용하지 않았는데 무한으로 호출되는 상황이 발생했다
+
+( 호출을 하고 setTodoList 의 값을 바꾸면서 다시 렌더링이 시작되서 다시 불러오면서 호출되고 반복 반복 )
+
+( 처음에 useState 에 null 을 넣어줬는데 오류가 발생했다 [] 같은 빈 배열을 넣어주든가 하자 )
+```
+
+## 데이터 추가하기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381435/notion-blog/_/The_Web_Developer_2022/REACT/_/Untitled_13.png)
+
+```jsx
+import { useEffect, useState } from 'react'
+
+function App() {
+  const [todoList, setTodoList] = useState([])
+
+  useEffect(() => {
+    fetch('http://localhost:4000/api/todo')
+      .then((response) => response.json())
+      .then((data) => setTodoList(data))
+  }, [])
+
+  const onSubmitHandler = (e) => {
+    e.preventDefault()
+    const text = e.target.text.value
+    const done = e.target.done.checked
+    fetch('http://localhost:4000/api/todo', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text,
+        done,
+      }),
+    })
+  }
+
+  return (
+    <div className="App">
+      <h1>todoList</h1>
+      {/* 데이터 입력 */}
+      <form onSubmit={onSubmitHandler}>
+        <input name="text" />
+        <input name="done" type="checkbox" />
+        <input type="submit" value="추가" />
+      </form>
+
+      {todoList.map((todo) => (
+        <div key={todo.id} style={{ display: 'flex' }}>
+          <div>{todo.id}</div>
+          <div>{todo.text}</div>
+          <div>{todo.done ? 'Y' : 'N'}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export default App
+```
+
+```jsx
+데이터를 추가하는 코드를 작성한다
+
+이벤트 핸들러와 <form> 을 사용해서 데이터를 전송한다
+
+( submit 버튼이 input 으로 사용될 수 있다는게 신기하다 )
+
+지금 이 코드의 문제점은 데이터를 추가하면 바로 화면에 나타나지 않는다는거다
+```
+
+### 오류 개선 + 리팩토링
+
+```jsx
+import { useEffect, useState } from 'react'
+
+function App() {
+  const [todoList, setTodoList] = useState([])
+
+  // 재사용을 위해서 함수를 따로 빼줬다
+  const fetchData = () => {
+    fetch('http://localhost:4000/api/todo')
+      .then((response) => response.json())
+      .then((data) => setTodoList(data))
+  }
+
+  // 이제 함수를 받아서 실행
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  const onSubmitHandler = (e) => {
+    e.preventDefault()
+    const text = e.target.text.value
+    const done = e.target.done.checked
+    fetch('http://localhost:4000/api/todo', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text,
+        done,
+      }),
+    }).then(() => fetchData()) // 요청이 끝나면 다시 랜더링
+  }
+
+  return (
+    <div className="App">
+      <h1>todoList</h1>
+      {/* 데이터 입력 */}
+      <form onSubmit={onSubmitHandler}>
+        <input name="text" />
+        <input name="done" type="checkbox" />
+        <input type="submit" value="추가" />
+      </form>
+
+      {todoList.map((todo) => (
+        <div key={todo.id} style={{ display: 'flex' }}>
+          <div>{todo.id}</div>
+          <div>{todo.text}</div>
+          <div>{todo.done ? 'Y' : 'N'}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export default App
+```
+
+```jsx
+화면이 바로 나타나게 해줬고 이 과정에서 같은 함수가 중복되게 되어
+
+리팩토링을 진행하였다
+```
+
+## Axios 를 활용한 리팩토링
+
+```jsx
+npm i axios
+
+를 입력해 클라이언트에 axios 를 설치해준다
+```
+
+### axios 로 변환
+
+```jsx
+// 재사용을 위해서 함수를 따로 빼줬다
+	 const fetchData = () => {
+    axios.get('http://localhost:4000/api/todo')
+    .then((res) =>{setTodoList(res.data);
+    });
+  };
+
+    // fetch('http://localhost:4000/api/todo')
+    //   .then((response) => response.json())
+    //   .then((data) => setTodoList(data));
+  };
+```
+
+### async, await 리팩토링
+
+```jsx
+가독성을 더 올려주기 위해서 await 문법을 사용해서 다시 리팩토링 해준다
+```
+
+```jsx
+const fetchData = async () => {
+  const response = await axios.get('http://localhost:4000/api/todo')
+  setTodoList(response.data)
+}
+```
+
+```jsx
+    const onSubmitHandler = (e) => {
+      e.preventDefault();
+      const text = e.target.text.value;
+      const done = e.target.done.checked;
+      fetch('http://localhost:4000/api/todo',{
+        method : 'POST',
+        headers : {
+          'Content-Type' : 'application/json',
+        },
+        body : JSON.stringify({
+          text,
+          done,
+        }),
+      }).then(() => fetchData()); // 요청이 끝나면 다시 랜더링
+     }
+
+		*수정 후
+
+     const onSubmitHandler = async (e) => {
+      e.preventDefault();
+      const text = e.target.text.value;
+      const done = e.target.done.checked;
+
+      await axios.post('http://localhost:4000/api/todo',{text, done});
+      fetchData();
+     };
+```
+
+```jsx
+두번쨰 인자에 데이터를 넣는곳을 적어주고
+
+fetch 에서 직렬화 해줬던 부분 헤더,메소드,바디 등등 전부 생략 가능해서 굉장히 편하다
+```
+
+```jsx
+이런 crud 를 더 하기쉽게 customhook 으로 뺄 수 있다
+
+리액트 쿼리라는 라이브러리가 이미 있기 때문에 나중에 시간이 괜찮으면 사용해보자
+
+( 로딩중 처리 , 에러처리 등등 더 추가해주기 )
+```

@@ -1,0 +1,620 @@
+---
+title: 'Express 와 Mongo 연결하기'
+date: '2026-09-02'
+category: '풀스택/The Web Developer 부트캠프 2022'
+tags: ['풀스택', 'The Web Developer 부트캠프 2022']
+draft: false
+summary: ''
+---
+
+## **농장 모델 생성**
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381379/notion-blog/_/The_Web_Developer_2022/node_js/Express_Mongo_/Untitled.png)
+
+```jsx
+const mongoose = require('mongoose')
+const { Schema } = mongoose
+const farmSchema = new Schema({
+  name: {
+    type: String,
+    required: [true, 'Farm must have a name!'],
+  },
+  city: {
+    type: String,
+  },
+  email: {
+    type: String,
+    required: [true, 'email required'],
+  },
+  products: [
+    {
+      type: Schema.Types.ObjectId,
+      ref: 'Product',
+    },
+  ],
+})
+
+const Farm = mongoose.model('Farm', farmSchema)
+
+module.exports = Farm
+```
+
+```jsx
+farmSchema를 정의
+
+farm.js 파일에서는 농장 모델에 상품을 배열로 추가
+
+이렇게 하면 한 농장에 여러 상품을 추가할 수 있다.
+```
+
+## 상품 모델
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381375/notion-blog/_/The_Web_Developer_2022/node_js/Express_Mongo_/Untitled_1.png)
+
+```jsx
+const mongoose = require('mongoose')
+const { Schema } = mongoose // 몽구스를 요청, DB연결은 필요없다 index 에서 요청할거니까
+
+// 상품 스키마 정의
+const productSchema = new Schema({
+  name: {
+    type: String,
+    required: [true, 'name cannot be blank'],
+  },
+  price: {
+    type: Number,
+    required: true,
+    min: 0,
+  },
+  category: {
+    type: String,
+    lowercase: true,
+    enum: ['fruit', 'vegetable', 'dairy'],
+  },
+  farm: {
+    // 농장 모델과 쌍방 관계 설정
+    type: Schema.Types.ObjectId,
+    ref: 'Farm',
+  },
+})
+
+// 모델 정의
+const Product = mongoose.model('Product', productSchema)
+
+// 모델을 다른곳에서 사용 가능하게 익스포트
+module.exports = Product
+```
+
+```jsx
+product.js 파일에서는 상품 모델에 농장과의 관계를 설정한다
+
+이렇게 하면 각 상품은 특정 농장을 참조하게 된다
+```
+
+## **쌍방 관계의 활용**
+
+```jsx
+이제 쌍방 관계가 형성되었으므로 농장과 상품 간의 관계를 활용하여 대시보드나 다양한 페이지에서 필요한 정보를 얻을 수 있다.
+
+예를 들어, 특정 농장의 모든 상품을 보여주는 페이지 등을 구현할 수 있다.
+
+이렇게 쌍방 관계를 설정하면 농장과 상품 간의 유기적인 연결이 이루어져 더 효과적인 데이터 관리가 가능해진다.
+
+* 쌍방 관계는 데이터 일관성과 효율적인 데이터 관리를 제공하지만,
+
+	모델의 복잡성과 성능 저하, 유지보수 어려움 등의 단점도 고려해야 한다.
+
+	적절한 상황에서 적절히 사용하는 것이 중요
+```
+
+# Farm, Product 쌍방향 저장 시키기
+
+```jsx
+이제 양방향으로 스키마를 만들었으니
+
+양쪽 모두에 삽입해준 모델을 저장 해보도록 한다
+```
+
+## 라우터 설정
+
+```jsx
+계획은 농장 페이지에서 상품 등록 페이지로 이동하는거다
+
+farmProductAddPage 를 만들고
+
+농장의 id 를 가지고 등록 페이지로 이동한다 ( :id ) ( 농장 페이지에서 이동하니까 id 를 가지고 갈 수 있다 )
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381377/notion-blog/_/The_Web_Developer_2022/node_js/Express_Mongo_/Untitled_2.png)
+
+## 농장 에서 이동한 상품 등록 페이지 (리액트)
+
+```jsx
+import axios from 'axios'
+import React, { useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+const FarmProductAddPage = () => {
+  const navigate = useNavigate()
+  const params = useParams() //  Url 의 농장 id 를 사용하기 위한 params
+
+  // 상태 초기화
+  const [formData, setFormData] = useState({
+    name: '',
+    price: '',
+    category: 'fruit', // 기본값 설정
+  })
+  const [error, setError] = useState(null)
+
+  // 입력값 변경 시 상태 업데이트
+  const handleChange = (e) => {
+    const { name, value } = e.target
+    setFormData((prevData) => ({
+      ...prevData,
+      [name]: value,
+    }))
+  }
+
+  console.log(params.id)
+
+  // 폼 제출 핸들러
+  const onSubmitHandler = async (e) => {
+    e.preventDefault()
+
+    // 폼 데이터 전송
+    try {
+      await axios.post(`http://localhost:4000/farm/${params.id}/products/new`, formData) // 농장을 포함한 상품 등록을 위해서 농장 id 가 포함된 라우터 주소로 요청을 보낸다
+      navigate('/farm')
+    } catch (error) {
+      console.error('상품 추가 중 오류 발생:', error)
+      setError(error.message)
+    }
+  }
+
+  return (
+    <>
+      {error ? (
+        <p>Error : {error} </p>
+      ) : (
+        <div>
+          <h1>FarmProductAddPage</h1>
+          <form onSubmit={onSubmitHandler}>
+            <label htmlFor="name">ProductName</label>
+            <input
+              type="text"
+              name="name"
+              id="name"
+              value={formData.name}
+              onChange={handleChange}
+            />
+            <label htmlFor="price">Price</label>
+            <input
+              type="number"
+              name="price"
+              id="price"
+              value={formData.price}
+              onChange={handleChange}
+            />
+            <label htmlFor="category">Category</label>
+            <select name="category" id="category" value={formData.category} onChange={handleChange}>
+              <option value="fruit">fruit</option>
+              <option value="vegetable">vegetable</option>
+              <option value="dairy">dairy</option>
+            </select>
+            <input type="submit" value="상품추가" />
+          </form>
+        </div>
+      )}
+    </>
+  )
+}
+
+export default FarmProductAddPage
+```
+
+## 쌍방향 저장 라우터
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381377/notion-blog/_/The_Web_Developer_2022/node_js/Express_Mongo_/Untitled_3.png)
+
+```jsx
+// 농장에 상품 등록
+app.post(
+  '/farm/:id/products/new',
+  wrapAsync(async (req, res, next) => {
+    const { id } = req.params
+    const farm = await Farm.findById(id)
+    const { name, price, category } = req.body
+    const product = new Product({ name, price, category })
+    farm.products.push(product) // farm 에 product 넣어주기
+    product.farm = farm // product 에 farm 넣어주기 양방향이니 둘다 해줘야한다
+    await farm.save()
+    await product.save()
+    res.send(farm)
+  })
+)
+```
+
+```jsx
+주소의 id 를 req.params 를 통해 가져오고 ( 농장 id)
+
+그걸로 농장 데이터를 찾는다 (findId)
+
+그리고 폼에서 제출된 req.body 의 상품 정보들을 product 에 저장하고
+
+farm 에 push 로 상품 정보를 넣어준다  ( farm 에서 product 는 배열이니까 (One-to-Many) push 로 넣는것 )
+
+이후 product 에도 farm 의 정보를 넣어준다 ( farm 은 하나기 때문에 .farm 으로 간단하게 넣어준다
+
+그리고 save()
+```
+
+## 결과
+
+```jsx
+저장된 product
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381377/notion-blog/_/The_Web_Developer_2022/node_js/Express_Mongo_/Untitled_4.png)
+
+```jsx
+저장된 farm
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381378/notion-blog/_/The_Web_Developer_2022/node_js/Express_Mongo_/Untitled_5.png)
+
+# 페이지에 출력하기
+
+## 상품 페이지에 농장 출력하기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381378/notion-blog/_/The_Web_Developer_2022/node_js/Express_Mongo_/Untitled_6.png)
+
+```jsx
+farm 이 출력되는 상품 페이지
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381378/notion-blog/_/The_Web_Developer_2022/node_js/Express_Mongo_/Untitled_7.png)
+
+```jsx
+// 상품 상세 조회
+app.get(
+  '/products/:id',
+  wrapAsync(async (req, res, next) => {
+    const { id } = req.params
+    const product = await Product.findById(id).populate('farm')
+    if (!product) {
+      throw new AppError('Product Not Found', 404)
+    }
+    res.send(product)
+  })
+)
+```
+
+```jsx
+현재는 id 만 보이고 있기 때문에 채워넣기를 해줘야 한다
+
+.populate(필드명) 을 해서 데이터를 전부 불러오도록 한다
+
+* 여기서 populate('farm', name) 이런식으로 원하는 데이터만 골라서 가져오는것도 가능
+```
+
+```jsx
+import axios from 'axios'
+import { useEffect, useState } from 'react'
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
+
+const ProductDetailPage = () => {
+  const params = useParams()
+  const [product, setProduct] = useState(null)
+  const [error, setError] = useState(null)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    fetch(`http://localhost:4000/products/${params.id}`)
+      .then((response) => response.json())
+      .then((data) => setProduct(data))
+      .catch((error) => {
+        console.error('상품 정보를 불러오는 데 실패했습니다.', error)
+        setError(error.message)
+      })
+  }, [params.id])
+  const deleteProduct = async () => {
+    try {
+      await axios.delete(`http://localhost:4000/product/${params.id}`)
+      navigate('/products')
+    } catch (error) {
+      console.error('DELETE FAIL', error)
+    }
+  }
+
+  return (
+    <div>
+      {error && <p>Error : {error} </p>}
+      {product ? (
+        <>
+          <h1>{product.name}</h1>
+          <ul>
+            <li>Price : {product.price}</li>
+            <li>Farm : {product.farm.name}</li>
+            <Link to={`/products?category=${product.category}`}>Category : {product.category}</Link>
+          </ul>
+        </>
+      ) : (
+        <p>상품 정보를 불러오는 중입니다...</p>
+      )}
+      <Link to={'/products'}>홈으로</Link>
+      <Link to={`/product/${params.id}/edit`}>상품수정</Link>
+      <button type="button" onClick={deleteProduct}>
+        삭제하기
+      </button>
+    </div>
+  )
+}
+
+export default ProductDetailPage
+```
+
+```jsx
+<li>Farm : {product.farm.name}</li>
+
+이런식으로 농장의 이름을 출력해준다
+```
+
+## 농장에 상품 리스트 출력해주기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381378/notion-blog/_/The_Web_Developer_2022/node_js/Express_Mongo_/Untitled_8.png)
+
+```jsx
+농장에 출력되는 상품 리스트
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381378/notion-blog/_/The_Web_Developer_2022/node_js/Express_Mongo_/Untitled_9.png)
+
+```jsx
+농장에도 populate 를 사용해서 채워주기를 해준다
+```
+
+```jsx
+import axios from 'axios'
+import { useEffect, useState } from 'react'
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
+
+const FarmDetailPage = () => {
+  const params = useParams()
+  const [farm, setFarm] = useState(null)
+  const [error, setError] = useState(null)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    fetch(`http://localhost:4000/farm/${params.id}`)
+      .then((response) => response.json())
+      .then((data) => setFarm(data))
+      .catch((error) => {
+        console.error('농장 정보를 불러오는 데 실패했습니다.', error)
+        setError(error.message)
+      })
+  }, [params.id])
+
+  return (
+    <div>
+      {error && <p>Error : {error} </p>}
+      {farm ? (
+        <>
+          <h1>{farm.name}</h1>
+          <ul>
+            <li>city : {farm.city}</li>
+            <li>Price : {farm.email}</li>
+          </ul>
+          <h2>Products</h2>
+          {farm.products.map((product) => (
+            <div key={product._id}>
+              <h3>Name: {product.name}</h3>
+              <p>Price: {product.price}</p>
+              <p>Category: {product.category}</p>
+            </div>
+          ))}
+        </>
+      ) : (
+        <p>상품 정보를 불러오는 중입니다...</p>
+      )}
+      <Link to={'/farm'}>홈으로</Link>
+    </div>
+  )
+}
+
+export default FarmDetailPage
+```
+
+```jsx
+;<h2>Products</h2>
+{
+  farm.products.map((product) => (
+    <div key={product._id}>
+      <h3>Name: {product.name}</h3>
+      <p>Price: {product.price}</p>
+      <p>Category: {product.category}</p>
+    </div>
+  ))
+}
+```
+
+```jsx
+위와 같이 map 을 이용해서 farm 의 products 리스트를 출력해준다
+```
+
+# 삭제 처리
+
+```jsx
+만약 farm 이 지워진다면?
+
+그럼 내부의 상품들도 모두 지워지는게 맞을것이다
+
+그 방법을 알아본다
+```
+
+## 첫번째 방법 ( 수동 삭제 )
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381376/notion-blog/_/The_Web_Developer_2022/node_js/Express_Mongo_/Untitled_10.png)
+
+```jsx
+app.delete(
+  '/farm/:id',
+  wrapAsync(async (req, res, next) => {
+    const { id } = req.params
+
+    // 해당 Farm의 products를 먼저 찾아서 삭제
+    const farm = await Farm.findById(id)
+    const productIds = farm.products.map((product) => product._id) // 각 product 객체에서 _id 속성을 추출하는 화살표 함수
+
+    // products가 비어있지 않으면 해당 상품들 삭제
+    if (productIds.length > 0) {
+      // Product 컬렉션에서 _id 값이 productIds 배열에 속한 값 중 하나인 모든 문서를 삭제
+      await Product.deleteMany({ _id: { $in: productIds } })
+    }
+
+    // Farm 삭제
+    await Farm.findByIdAndDelete(id)
+
+    res.send({ message: '농장 및 농장에 속한 상품들을 삭제했습니다.' })
+  })
+)
+```
+
+```jsx
+위와 같이 Farm 의 id 를 찾아서 삭제를 하면서
+
+Farm 에 포함되어 있는 products 의 배열을 모두 삭제해주면 모든 내용이 지워진다
+
+* $in은 MongoDB 쿼리 언어에서 사용되는 연산자 중 하나이다.
+
+이 연산자는 배열에 속한 값들 중 하나라도 조건을 만족하는 문서를 검색하는 데 사용된다
+```
+
+## 두번째 방법 ( 미들웨어 사용하기 )
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381376/notion-blog/_/The_Web_Developer_2022/node_js/Express_Mongo_/Untitled_11.png)
+
+```jsx
+몽구스 공식 문서에 들어가서 findByIdAndDelete() 에 들어가보면
+
+middleware findOneAndDelete() 를 사용한다고 한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381376/notion-blog/_/The_Web_Developer_2022/node_js/Express_Mongo_/Untitled_12.png)
+
+```jsx
+몽구스에 미들웨어를 작성해준다
+
+익스프레스의 미들웨어와 비슷하지만 실질적으론 전혀 무관하고 상관없다
+
+pre 는 삭제 전에 실행되는것이고
+
+post 는 삭제 후에 실행되는 것 이다
+
+* 여기서 pre 의 data 는 실제 데이터가 아니라 함수이다 반면 post 는 데이터이다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381376/notion-blog/_/The_Web_Developer_2022/node_js/Express_Mongo_/Untitled_13.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381376/notion-blog/_/The_Web_Developer_2022/node_js/Express_Mongo_/Untitled_14.png)
+
+```jsx
+결과적으로는 위의 첫번째 예시와 비슷하게
+```
+
+```jsx
+farmSchema.post('findOneAndDelete', async function (farm) {
+  if (farm.products.length) {
+    const res = await Product.deleteMany({ _id: { $in: farm.products } })
+    console.log(res)
+  }
+})
+```
+
+```jsx
+미들웨어를 사용해서 삭제 후 post 미들웨어로
+
+farm 의 products 의 배열의 길이가 존재하면 ( 데이터가 존재하면 )
+
+Farm 에 포함되어 있는 products 의 배열을 모두 삭제해준다
+
+res 를 통해서 몇개가 삭제되고 등 더 상세한 정보를 내보낼 수 있다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381377/notion-blog/_/The_Web_Developer_2022/node_js/Express_Mongo_/Untitled_15.png)
+
+```jsx
+4개 삭제
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381377/notion-blog/_/The_Web_Developer_2022/node_js/Express_Mongo_/Untitled_16.png)
+
+```jsx
+삭제 후 결과 출력
+
+* findByIdAndDelete 말고 다른걸 사용한다면 다른 미들웨어를 사용할수도 있다
+
+	공식 문서를 확인하자
+```
+
+# 쿼리 미들웨어와 문서 미들웨어
+
+```jsx
+쿼리 미들웨어와 문서 미들웨어는 Mongoose에서 데이터베이스 작업을 수행하기 전이나 후에 특정 동작을 정의할 수 있는 기능이다
+```
+
+## **쿼리 미들웨어(Query Middleware):**
+
+```jsx
+**역할:**
+
+쿼리 미들웨어는 데이터베이스 쿼리가 실행되기 전이나 후에 특정 작업을 수행할 수 있게 해준다.
+
+**예시:**
+
+특정 쿼리가 실행되기 전에 데이터를 가공하거나, 쿼리의 결과를 처리할 수 있다.
+```
+
+```jsx
+const farmSchema = new mongoose.Schema({
+  name: String,
+  // 다른 필드들...
+})
+
+// 쿼리 미들웨어 설정 (pre 함수 사용)
+farmSchema.pre('findOneAndDelete', async function (next) {
+  // 쿼리 실행 전 작업
+  console.log('삭제 전 미들웨어 동작')
+  next()
+})
+```
+
+## **문서 미들웨어(Document Middleware):**
+
+```jsx
+**역할:**
+
+문서 미들웨어는 MongoDB 문서(레코드)가 저장되기 전이나 후에 특정 작업을 수행할 수 있게 해줍니다.
+
+**예시:**
+
+문서가 저장되기 전에 필드를 가공하거나, 저장 후에 다른 동작을 수행할 수 있습니다.
+```
+
+```jsx
+const farmSchema = new mongoose.Schema({
+  name: String,
+  // 다른 필드들...
+})
+
+// 문서 미들웨어 설정 (pre 함수 사용)
+farmSchema.pre('save', async function (next) {
+  // 문서 저장 전 작업
+  console.log('저장 전 미들웨어 동작')
+  next()
+})
+```
+
+```jsx
+위의 예제에서 'findOneAndDelete'는 쿼리 미들웨어의 예시이며,
+
+'save'는 문서 미들웨어의 예시이다. 이러한 미들웨어를 사용하면 데이터베이스 작업 전후에 원하는 로직을 추가하여 데이터를 보다 유연하게 다룰 수 있다.
+```

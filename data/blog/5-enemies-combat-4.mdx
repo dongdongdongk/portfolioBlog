@@ -1,0 +1,2870 @@
+---
+title: '섹션 5: Enemies & Combat - 4'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+# { 🎮 Unity 턴제 전략 게임 - 액션 카메라 시스템 구현하기 }
+
+이번 강의는 슈팅 액션 시 동적인 액션 카메라를 구현하여 게임을 더욱 역동적으로 만드는 방법을 다룹니다. Cinemachine을 활용하여 카메라 전환과 포지셔닝을 자동화하고, 이벤트 시스템을 통해 액션 시작/종료 시점에 카메라를 제어합니다.
+
+---
+
+## 📋 목차
+
+1. [액션 카메라 시스템 기본 설정](https://claude.ai/chat/98658e6d-b743-4a4f-8d86-2a1f1c34c1b9#1-%EC%95%A1%EC%85%98-%EC%B9%B4%EB%A9%94%EB%9D%BC-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B8%B0%EB%B3%B8-%EC%84%A4%EC%A0%95)
+2. [CameraManager와 이벤트 시스템 구축](https://claude.ai/chat/98658e6d-b743-4a4f-8d86-2a1f1c34c1b9#2-cameramanager%EC%99%80-%EC%9D%B4%EB%B2%A4%ED%8A%B8-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B5%AC%EC%B6%95)
+3. [이벤트 타이밍 최적화](https://claude.ai/chat/98658e6d-b743-4a4f-8d86-2a1f1c34c1b9#3-%EC%9D%B4%EB%B2%A4%ED%8A%B8-%ED%83%80%EC%9D%B4%EB%B0%8D-%EC%B5%9C%EC%A0%81%ED%99%94)
+4. [액션 타입별 카메라 제어](https://claude.ai/chat/98658e6d-b743-4a4f-8d86-2a1f1c34c1b9#4-%EC%95%A1%EC%85%98-%ED%83%80%EC%9E%85%EB%B3%84-%EC%B9%B4%EB%A9%94%EB%9D%BC-%EC%A0%9C%EC%96%B4)
+5. [카메라 블렌딩 속도 조정](https://claude.ai/chat/98658e6d-b743-4a4f-8d86-2a1f1c34c1b9#5-%EC%B9%B4%EB%A9%94%EB%9D%BC-%EB%B8%94%EB%A0%8C%EB%94%A9-%EC%86%8D%EB%8F%84-%EC%A1%B0%EC%A0%95)
+6. [카메라 위치 계산 - 벡터 수학](https://claude.ai/chat/98658e6d-b743-4a4f-8d86-2a1f1c34c1b9#6-%EC%B9%B4%EB%A9%94%EB%9D%BC-%EC%9C%84%EC%B9%98-%EA%B3%84%EC%82%B0---%EB%B2%A1%ED%84%B0-%EC%88%98%ED%95%99)
+7. [카메라 회전 및 최종 테스트](https://claude.ai/chat/98658e6d-b743-4a4f-8d86-2a1f1c34c1b9#7-%EC%B9%B4%EB%A9%94%EB%9D%BC-%ED%9A%8C%EC%A0%84-%EB%B0%8F-%EC%B5%9C%EC%A2%85-%ED%85%8C%EC%8A%A4%ED%8A%B8)
+
+---
+
+## 1. 액션 카메라 시스템 기본 설정
+
+### 문제점 인식 및 목적
+
+현재 게임은 오버헤드 카메라를 사용하여 전체 전장을 보기에는 좋지만, 슈팅 액션의 디테일을 제대로 보여주지 못합니다. 액션 카메라는 슈팅 액션 발생 시 자동으로 유닛의 어깨 높이로 전환되어 시네마틱한 앵글을 제공합니다.
+
+### Cinemachine 가상 카메라 복제
+
+Hierarchy에서 기존 Cinemachine Virtual Camera를 복제(`Ctrl + D`)하고 이름을 **"Action Virtual Camera"**로 변경합니다. 이 카메라는 스크립트에서 직접 제어할 것이므로 **Follow**와 **Look At** 필드를 모두 제거합니다(필드 클릭 후 `Delete` 키).
+
+### 카메라 위치 설정 방법
+
+- **방법 1**: Scene 뷰에서 원하는 위치 조정 후 `Ctrl + Shift + F` 단축키
+- **방법 2**: GameObject → Align With View 메뉴 사용
+
+### Priority 시스템 이해하기
+
+Cinemachine의 Priority 값은 어떤 카메라를 활성화할지 결정합니다. 숫자가 높을수록 우선순위가 높습니다.
+
+- **메인 카메라**: Priority **10** (기본 오버헤드 뷰)
+- **액션 카메라**: Priority **20** (슈팅 액션 시 활성화)
+
+카메라 전환은 GameObject의 활성화/비활성화로 처리하며, Cinemachine이 자동으로 부드러운 블렌딩을 처리합니다. Inspector에서 Action Virtual Camera를 비활성화하여 게임 시작 시 메인 카메라가 활성화되도록 합니다.
+
+---
+
+## 2. CameraManager와 이벤트 시스템 구축
+
+### CameraManager 스크립트 생성
+
+**CameraManager** 스크립트를 생성하고, 빈 GameObject에 부착합니다(Transform Reset).
+
+```csharp
+using System;
+using UnityEngine;
+
+public class CameraManager : MonoBehaviour
+{
+    // Inspector에서 액션 카메라 GameObject 할당
+    // [SerializeField]: private 필드를 Inspector에 노출
+    [SerializeField] private GameObject actionCameraGameObject;
+
+    // 액션 카메라 활성화 - GameObject 활성화로 카메라 전환
+    private void ShowActionCamera()
+    {
+        actionCameraGameObject.SetActive(true);
+    }
+
+    // 액션 카메라 비활성화 - 메인 카메라로 복귀
+    private void HideActionCamera()
+    {
+        actionCameraGameObject.SetActive(false);
+    }
+}
+
+```
+
+Inspector에서 **Action Camera Game Object** 필드에 Action Virtual Camera를 할당합니다.
+
+### BaseAction에 제네릭 이벤트 추가
+
+모든 액션 타입을 단일 이벤트로 처리하는 가장 범용적인 방식을 사용합니다.
+
+```csharp
+public abstract class BaseAction : MonoBehaviour
+{
+    // 모든 액션 시작 시 발생하는 정적 이벤트
+    // static: 클래스의 모든 인스턴스가 공유하는 이벤트
+    public static event EventHandler OnAnyActionStarted;
+
+    // 모든 액션 완료 시 발생하는 정적 이벤트
+    public static event EventHandler OnAnyActionCompleted;
+
+    protected Unit unit;
+    protected bool isActive = false;
+    protected Action onActionComplete;
+
+    protected virtual void Awake()
+    {
+        unit = GetComponent<Unit>();
+    }
+
+    protected void ActionStart(Action onActionComplete)
+    {
+        isActive = true;
+        this.onActionComplete = onActionComplete;
+
+        // 이벤트 발생: 구독자가 있을 때만 호출
+        // ?. (null-conditional operator): NullReferenceException 방지
+        // this: 어떤 액션이 이벤트를 발생시켰는지 전달
+        OnAnyActionStarted?.Invoke(this, EventArgs.Empty);
+    }
+
+    protected void ActionComplete()
+    {
+        isActive = false;
+        onActionComplete();
+
+        OnAnyActionCompleted?.Invoke(this, EventArgs.Empty);
+    }
+
+    // 액션 소유 유닛 접근 메서드
+    public Unit GetUnit()
+    {
+        return unit;
+    }
+}
+
+```
+
+**핵심 개념**:
+
+- `static`: 모든 ShootAction, MoveAction 인스턴스가 하나의 이벤트 공유
+- `?.Invoke`: 구독자가 있을 때만 호출하여 안전성 확보
+- `EventHandler`: .NET 표준 이벤트 델리게이트 (시그니처: `void Method(object sender, EventArgs e)`)
+
+---
+
+## 3. 이벤트 타이밍 최적화
+
+### ActionStart 호출 타이밍의 중요성
+
+이벤트는 '이미 발생한 일'을 알리는 것입니다. `OnActionStarted` 이벤트는 액션이 완전히 초기화된 후 발생해야 합니다. 카메라 매니저가 이벤트를 받을 때 액션의 모든 데이터가 준비되어 있어야 합니다.
+
+### ShootAction 수정
+
+**수정 전** (잘못된 예시):
+
+```csharp
+public override void TakeAction(GridPosition gridPosition, Action onActionComplete)
+{
+    // 잘못된 위치: 초기화 시작 시점에 호출
+    ActionStart(onActionComplete);
+
+    targetUnit = LevelGrid.Instance.GetUnitAtGridPosition(gridPosition);
+    state = State.Aiming;
+    // ...
+}
+```
+
+**수정 후** (올바른 예시):
+
+```csharp
+public override void TakeAction(GridPosition gridPosition, Action onActionComplete)
+{
+    // 1. 먼저 모든 초기화 수행
+    targetUnit = LevelGrid.Instance.GetUnitAtGridPosition(gridPosition);
+    state = State.Aiming;
+    float aimingStateTime = 1f;
+    stateTimer = aimingStateTime;
+    canShootBullet = true;
+
+    // 2. 모든 초기화 완료 후 마지막에 ActionStart 호출
+    // 이제 이벤트 리스너가 완전히 준비된 액션 데이터에 접근 가능
+    ActionStart(onActionComplete);
+}
+```
+
+### MoveAction과 SpinAction도 동일하게 수정
+
+TakeAction() 메서드의 **마지막 줄**에 ActionStart()를 배치합니다.
+
+**원칙**: 초기화는 먼저, 이벤트 발생은 나중에
+
+### ShootAction에 Getter 메서드 추가
+
+카메라 위치 계산에 필요한 유닛 정보를 노출합니다.
+
+```csharp
+public class ShootAction : BaseAction
+{
+    private Unit targetUnit;
+
+    // 타겟 유닛을 외부에서 접근할 수 있도록 public getter 추가
+    // 캡슐화 유지: private 필드는 보호하면서 읽기 전용 접근만 허용
+    public Unit GetTargetUnit()
+    {
+        return targetUnit;
+    }
+}
+```
+
+BaseAction의 `GetUnit()` 메서드는 이미 구현되어 있습니다.
+
+---
+
+## 4. 액션 타입별 카메라 제어
+
+### CameraManager에서 이벤트 리스닝
+
+```csharp
+using System;
+using UnityEngine;
+
+public class CameraManager : MonoBehaviour
+{
+    [SerializeField] private GameObject actionCameraGameObject;
+
+    private void Start()
+    {
+        // 이벤트 구독
+        // += 연산자: 이벤트에 메서드를 등록
+        BaseAction.OnAnyActionStarted += BaseAction_OnAnyActionStarted;
+        BaseAction.OnAnyActionCompleted += BaseAction_OnAnyActionCompleted;
+
+        // 게임 시작 시 액션 카메라 확실히 비활성화
+        HideActionCamera();
+    }
+
+    // 액션 시작 시 호출되는 이벤트 핸들러
+    // sender: 이벤트를 발생시킨 액션 객체 (ShootAction, MoveAction 등)
+    private void BaseAction_OnAnyActionStarted(object sender, EventArgs e)
+    {
+        // switch expression으로 타입 기반 분기
+        switch(sender)
+        {
+            // case [타입] [변수명]: 타입 패턴 매칭
+            // 1. sender가 ShootAction인지 확인
+            // 2. 맞으면 자동 캐스팅하여 shootAction 변수에 저장
+            case ShootAction shootAction:
+                // ShootAction인 경우에만 실행
+                // 다른 액션(MoveAction, SpinAction)은 액션 카메라 미사용
+
+                // 유닛 정보 가져오기
+                Unit shooterUnit = shootAction.GetUnit();
+                Unit targetUnit = shootAction.GetTargetUnit();
+
+                // 카메라 위치 계산 (다음 섹션)
+
+                break;
+        }
+    }
+
+    // 액션 완료 시 호출되는 이벤트 핸들러
+    private void BaseAction_OnAnyActionCompleted(object sender, EventArgs e)
+    {
+        switch(sender)
+        {
+            case ShootAction shootAction:
+                // ShootAction 완료 시 액션 카메라 숨김
+                // Priority가 낮은 메인 카메라로 자동 전환
+                HideActionCamera();
+                break;
+        }
+    }
+
+    private void ShowActionCamera()
+    {
+        actionCameraGameObject.SetActive(true);
+    }
+
+    private void HideActionCamera()
+    {
+        actionCameraGameObject.SetActive(false);
+    }
+}
+
+```
+
+### Switch Expression의 장점
+
+- **타입 패턴 매칭**: 타입 확인과 캐스팅을 동시에 수행
+- **확장성**: 새로운 액션 타입에 쉽게 카메라 로직 추가 가능
+- **간결성**: 기존 if-else 방식보다 읽기 쉬움
+
+### 전체 흐름 정리
+
+1. 슈팅 액션 시작 → `BaseAction.OnAnyActionStarted` 이벤트 발생
+2. CameraManager 감지 → ShootAction 확인 → 액션 카메라 활성화
+3. Cinemachine 자동 블렌딩 (Priority 20으로 전환)
+4. 슈팅 애니메이션 재생 (Aiming → Shooting → Cooloff)
+5. 슈팅 액션 완료 → `BaseAction.OnAnyActionCompleted` 이벤트 발생
+6. 액션 카메라 비활성화 → 메인 카메라 복귀 (Priority 10)
+
+---
+
+## 5. 카메라 블렌딩 속도 조정
+
+### 문제점 발견
+
+첫 테스트에서 카메라 전환이 너무 느립니다(기본값 2초). 액션의 흐름이 끊기고 게임이 답답하게 느껴집니다.
+
+### Cinemachine Brain 설정 변경
+
+1. Hierarchy에서 **Main Camera** 선택
+2. Inspector에서 **Cinemachine Brain** 컴포넌트 확인
+3. **Default Blend** 섹션:
+   - Blend Time: **0.2초**로 변경 (기존 2초)
+   - Blend Type: **Ease In Out** 유지
+
+### 블렌드 타입 설명
+
+- **Ease In Out**: 전환 시작 시 천천히, 중간에 빠르게, 끝날 때 천천히 (가장 자연스러움)
+- **Cut**: 블렌드 없이 즉시 전환 (순간 이동 효과)
+- **Linear**: 일정한 속도로 전환
+
+### Custom Blend (선택사항)
+
+각 카메라 전환마다 다른 블렌드 설정이 필요할 때 사용합니다. 예를 들어, 슈팅 액션은 0.1초로 빠르게, 폭발 액션은 0.5초로 천천히 전환하고 싶을 때입니다.
+
+**설정 방법**:
+
+1. Default Blend 드롭다운에서 **Custom Blends** 선택
+2. **Create Asset** 버튼 클릭
+3. Blend List에 카메라 쌍과 블렌드 설정 추가
+
+이번 프로젝트에서는 모든 전환이 동일한 속도여도 되므로 Default Blend만 사용합니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380475/notion-blog/_/3D_/_/_5_Enemies_Combat_-_4/image.png)
+
+---
+
+## 6. 카메라 위치 계산 - 벡터 수학
+
+### 어깨 높이 측정 및 설정
+
+Unit Prefab에서 빈 GameObject를 생성하여 Y축을 조정하면서 어깨 높이를 측정합니다. 약 **1.6 ~ 1.7** 정도가 적당합니다.
+
+```csharp
+case ShootAction shootAction:
+    Unit shooterUnit = shootAction.GetUnit();
+    Unit targetUnit = shootAction.GetTargetUnit();
+
+    // 어깨 높이 벡터
+    // Vector3.up = (0, 1, 0) - Unity의 위쪽 방향 벡터
+    // Vector3.up * 1.7f = (0, 1.7, 0) - Y축으로 1.7 유닛 상승
+    Vector3 cameraCharacterHeight = Vector3.up * 1.7f;
+
+```
+
+**Unity의 기본 방향 벡터들**:
+
+- `Vector3.up` = `(0, 1, 0)` (위), `Vector3.down` = `(0, -1, 0)` (아래)
+- `Vector3.right` = `(1, 0, 0)` (오른쪽), `Vector3.left` = `(-1, 0, 0)` (왼쪽)
+- `Vector3.forward` = `(0, 0, 1)` (앞), `Vector3.back` = `(0, 0, -1)` (뒤)
+
+### 슈팅 방향 벡터 계산
+
+```csharp
+    // 슈터에서 타겟으로의 방향 벡터
+    // 벡터 빼기: 목표 위치 - 시작 위치 = 방향 벡터
+    // normalized: 방향은 유지하고 크기를 1로 만듦 (단위 벡터)
+    Vector3 shootDir = (targetUnit.GetWorldPosition() - shooterUnit.GetWorldPosition()).normalized;
+
+```
+
+**정규화(Normalized)의 이유**:
+
+- 방향만 필요하고 거리는 중요하지 않음
+- 슈터와 타겟이 10m든 100m든 동일한 카메라 위치 유지
+- 일정한 크기의 오프셋 적용에 유용
+
+**벡터 수학 예시**:
+
+```csharp
+// A에서 B로의 방향 벡터 = B - A
+Vector3 A = new Vector3(1, 0, 1);  // 슈터 위치
+Vector3 B = new Vector3(5, 0, 3);  // 타겟 위치
+Vector3 direction = B - A;         // (4, 0, 2)
+
+// 정규화
+Vector3 v = new Vector3(3, 0, 4);
+float magnitude = v.magnitude;  // 크기 = 5 (√(3²+4²))
+Vector3 normalized = v.normalized;  // (0.6, 0, 0.8) - 크기가 1
+
+```
+
+### 어깨 오프셋 계산 - Quaternion 회전
+
+```csharp
+    // 어깨 오프셋 거리
+    float shoulderOffsetAmount = 0.5f;
+
+    // shootDir을 Y축 기준 90도 회전 (오른쪽 방향으로 전환)
+    // Quaternion.Euler(0, 90, 0): Y축 기준 90도 회전을 나타내는 쿼터니언
+    // 쿼터니언 * 벡터: 벡터에 회전 적용
+    // 결과에 shoulderOffsetAmount를 곱해서 오프셋 거리 조정
+    Vector3 shoulderOffset = Quaternion.Euler(0, 90, 0) * shootDir * shoulderOffsetAmount;
+
+```
+
+**Quaternion 개념**:
+
+- 3D 공간에서 회전을 표현하는 수학적 개념 (4개의 숫자 x, y, z, w)
+- Euler 각도보다 안정적 (짐벌 락 문제 없음)
+- `Quaternion.Euler(0, 90, 0)`: Y축 기준 90도 회전
+
+**왜 90도인가?**:
+
+- `shootDir`는 앞쪽(타겟 방향)을 향함
+- 90도 회전하면 오른쪽을 향함
+- 오른쪽 어깨에 카메라를 두기 위함
+
+**시각적 설명**:
+
+```
+슈터에서 타겟 방향 (shootDir): ↑
+90도 회전 후 (오른쪽):          →
+최종 카메라 위치:     [슈터] → [카메라]
+                              (오른쪽 어깨 뒤)
+```
+
+### 최종 카메라 위치 계산
+
+```csharp
+    // 최종 카메라 위치 = 슈터 위치 + 높이 + 오프셋 + 뒤로 이동
+    // 여러 벡터를 더해서 최종 위치를 구함
+    Vector3 actionCameraPosition =
+        shooterUnit.GetWorldPosition() +      // 슈터 발 위치 (기준점)
+        cameraCharacterHeight +               // 어깨 높이로 상승 (0, 1.7, 0)
+        shoulderOffset +                      // 오른쪽으로 이동 (회전된 방향 * 0.5)
+        (shootDir * -1);                      // 뒤로 물러남 (-1 곱하면 방향 반전)
+
+    // 계산된 위치를 액션 카메라의 Transform에 적용
+    actionCameraGameObject.transform.position = actionCameraPosition;
+
+```
+
+**각 요소의 역할**:
+
+1. `shooterUnit.GetWorldPosition()`: 슈터의 발 위치 (모든 계산의 기준점)
+2. `cameraCharacterHeight`: Y축으로 1.7 유닛 상승 (어깨 높이)
+3. `shoulderOffset`: 오른쪽으로 0.5 유닛 이동 (어깨 옆)
+4. `shootDir * -1`: 뒤쪽으로 1 유닛 이동 (슈터 뒤에 배치)
+
+**실제 계산 예시**:
+
+```
+슈터 위치: (5, 0, 5)
+타겟 위치: (8, 0, 5)
+
+shootDir = (3, 0, 0).normalized = (1, 0, 0)
+cameraCharacterHeight = (0, 1.7, 0)
+shoulderOffset = Quaternion.Euler(0,90,0) * (1,0,0) * 0.5
+               = (0, 0, 1) * 0.5 = (0, 0, 0.5)
+shootDir * -1 = (-1, 0, 0)
+
+최종 위치 = (5, 0, 5) + (0, 1.7, 0) + (0, 0, 0.5) + (-1, 0, 0)
+          = (4, 1.7, 5.5)
+
+```
+
+---
+
+## 7. 카메라 회전 및 최종 테스트
+
+### LookAt으로 카메라 회전 설정
+
+```csharp
+    // 카메라가 타겟의 어깨 높이를 바라보도록 설정
+    // Transform.LookAt: Transform을 특정 위치를 바라보도록 자동 회전
+    actionCameraGameObject.transform.LookAt(
+        targetUnit.GetWorldPosition() + cameraCharacterHeight
+    );
+
+    // 액션 카메라 활성화
+    ShowActionCamera();
+    break;
+
+```
+
+**LookAt 메서드**:
+
+- 현재 위치에서 target 위치로의 방향 벡터를 계산
+- 이 방향이 Transform의 forward(앞쪽)가 되도록 회전 계산
+- Transform.rotation을 자동으로 설정
+
+**왜 cameraCharacterHeight를 더하는가?**:
+
+- `GetWorldPosition()`은 유닛의 발 위치 반환
+- 카메라가 발을 바라보면 시야각이 이상함
+- 타겟의 어깨 높이를 바라보도록 높이 추가
+
+### 최종 완성 코드
+
+```csharp
+private void BaseAction_OnAnyActionStarted(object sender, EventArgs e)
+{
+    switch(sender)
+    {
+        case ShootAction shootAction:
+            // 1. 유닛 정보 가져오기
+            Unit shooterUnit = shootAction.GetUnit();
+            Unit targetUnit = shootAction.GetTargetUnit();
+
+            // 2. 높이 설정
+            Vector3 cameraCharacterHeight = Vector3.up * 1.7f;
+
+            // 3. 슈팅 방향 계산
+            Vector3 shootDir = (targetUnit.GetWorldPosition() - shooterUnit.GetWorldPosition()).normalized;
+
+            // 4. 어깨 오프셋 계산
+            float shoulderOffsetAmount = 0.5f;
+            Vector3 shoulderOffset = Quaternion.Euler(0, 90, 0) * shootDir * shoulderOffsetAmount;
+
+            // 5. 최종 위치 계산
+            Vector3 actionCameraPosition =
+                shooterUnit.GetWorldPosition() +
+                cameraCharacterHeight +
+                shoulderOffset +
+                (shootDir * -1);
+
+            // 6. 카메라 위치 설정
+            actionCameraGameObject.transform.position = actionCameraPosition;
+
+            // 7. 카메라 회전 설정
+            actionCameraGameObject.transform.LookAt(
+                targetUnit.GetWorldPosition() + cameraCharacterHeight
+            );
+
+            // 8. 액션 카메라 활성화
+            ShowActionCamera();
+            break;
+    }
+}
+
+```
+
+### 테스트 결과
+
+1. Unity Editor에서 Play 실행
+2. 유닛 선택 → 슈팅 액션 선택 → 적 유닛 클릭
+3. **결과**: 카메라가 슈터 뒤 어깨 높이로 이동하여 타겟을 바라봄 ✓
+4. 슈팅 애니메이션 재생 (Aiming → Shooting → Cooloff)
+5. 완료 후 자동으로 메인 카메라로 복귀 ✓
+
+### 조정 옵션
+
+**블렌드 속도 조정**:
+
+```csharp
+// Cinemachine Brain → Default Blend → Blend Time
+// 더 빠른 전환: 0.1 ~ 0.15
+// 더 부드러운 전환: 0.3 ~ 0.5
+
+```
+
+**어깨 오프셋 조정**:
+
+```csharp
+// 더 오른쪽으로: 0.7f
+// 덜 오른쪽으로: 0.3f
+float shoulderOffsetAmount = 0.5f;
+
+```
+
+**카메라 거리 조정**:
+
+```csharp
+// 슈터로부터 더 멀리: (shootDir * -2)
+// 슈터에 더 가깝게: (shootDir * -0.5)
+(shootDir * -1)
+
+```
+
+**State 타이밍 조정** (ShootAction의 NextState 메서드):
+
+```csharp
+private void NextState()
+{
+    switch (state)
+    {
+        case State.Aiming:
+            state = State.Shooting;
+            float shootStateTime = 0.2f;  // 조준 시간 증가 (기본 0.1f)
+            stateTimer = shootStateTime;
+            break;
+
+        case State.Shooting:
+            state = State.Cooloff;
+            float cooloffStateTime = 0.8f;  // 쿨다운 증가 (기본 0.5f)
+            stateTimer = cooloffStateTime;
+            break;
+
+        case State.Cooloff:
+            ActionComplete();
+            break;
+    }
+}
+
+```
+
+### 시스템 확장성
+
+**다른 액션에 카메라 추가**:
+
+```csharp
+private void BaseAction_OnAnyActionStarted(object sender, EventArgs e)
+{
+    switch(sender)
+    {
+        case ShootAction shootAction:
+            // 슈팅 액션 카메라 로직
+            break;
+
+        case GrenadeAction grenadeAction:
+            // 수류탄 액션용 카메라 로직
+            // 높은 각도에서 던지는 모습 보여주기
+            break;
+
+        case MeleeAction meleeAction:
+            // 근접 공격용 카메라 로직
+            // 더 가까이서 액션 보여주기
+            break;
+    }
+}
+
+```
+
+### 최종 정리
+
+**구현된 기능**:
+
+- ✓ Cinemachine을 활용한 동적 카메라 시스템
+- ✓ 이벤트 기반 카메라 전환
+- ✓ 자동 카메라 포지셔닝 및 회전
+- ✓ 부드러운 블렌딩 효과
+- ✓ 확장 가능한 구조
+
+**코드의 장점**:
+
+- **깔끔한 구조**: CameraManager가 모든 카메라 로직 관리
+- **이벤트 기반**: 결합도가 낮고 유지보수 용이
+- **확장 가능**: 새로운 액션 타입에 쉽게 카메라 추가
+- **수학적 정확성**: 벡터 수학으로 정밀한 카메라 배치
+
+**학습한 개념**:
+
+- Cinemachine Priority 시스템과 블렌딩
+- 정적 이벤트 패턴
+- Switch Expression과 타입 패턴 매칭
+- 벡터 수학 (덧셈, 정규화)
+- Quaternion을 이용한 벡터 회전
+- Transform.LookAt 활용
+
+이제 게임에 역동적인 액션 카메라가 추가되어 전투 장면이 훨씬 생동감 있게 표현됩니다! 🎮📹
+
+# { 🎨 Grid Visual 시스템 최적화와 색상 기능 추가하기 }
+
+이번 강의는 Grid Visual 시스템의 성능을 최적화하고, 액션별로 다른 색상을 표시하는 기능을 구현합니다.
+
+---
+
+## 📋 목차
+
+1. [Grid Visual의 문제점 파악하기](https://claude.ai/chat/f826476d-4a9a-4454-8ccd-86da0699d8e9#1-grid-visual%EC%9D%98-%EB%AC%B8%EC%A0%9C%EC%A0%90-%ED%8C%8C%EC%95%85%ED%95%98%EA%B8%B0)
+2. [이벤트 기반 업데이트로 변경하기](https://claude.ai/chat/f826476d-4a9a-4454-8ccd-86da0699d8e9#2-%EC%9D%B4%EB%B2%A4%ED%8A%B8-%EA%B8%B0%EB%B0%98-%EC%97%85%EB%8D%B0%EC%9D%B4%ED%8A%B8%EB%A1%9C-%EB%B3%80%EA%B2%BD%ED%95%98%EA%B8%B0)
+3. [Unit 이동 이벤트 추가하기](https://claude.ai/chat/f826476d-4a9a-4454-8ccd-86da0699d8e9#3-unit-%EC%9D%B4%EB%8F%99-%EC%9D%B4%EB%B2%A4%ED%8A%B8-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+4. [이벤트 순서 오류 수정하기](https://claude.ai/chat/f826476d-4a9a-4454-8ccd-86da0699d8e9#4-%EC%9D%B4%EB%B2%A4%ED%8A%B8-%EC%88%9C%EC%84%9C-%EC%98%A4%EB%A5%98-%EC%88%98%EC%A0%95%ED%95%98%EA%B8%B0)
+5. [색상 시스템 설계하기](https://claude.ai/chat/f826476d-4a9a-4454-8ccd-86da0699d8e9#5-%EC%83%89%EC%83%81-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EC%84%A4%EA%B3%84%ED%95%98%EA%B8%B0)
+6. [GridVisualType Enum과 Struct 만들기](https://claude.ai/chat/f826476d-4a9a-4454-8ccd-86da0699d8e9#6-gridvisualtype-enum%EA%B3%BC-struct-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+7. [Material 참조 시스템 구현하기](https://claude.ai/chat/f826476d-4a9a-4454-8ccd-86da0699d8e9#7-material-%EC%B0%B8%EC%A1%B0-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+8. [액션별 색상 적용하기](https://claude.ai/chat/f826476d-4a9a-4454-8ccd-86da0699d8e9#8-%EC%95%A1%EC%85%98%EB%B3%84-%EC%83%89%EC%83%81-%EC%A0%81%EC%9A%A9%ED%95%98%EA%B8%B0)
+9. [Enum 사용 시 주의사항](https://claude.ai/chat/f826476d-4a9a-4454-8ccd-86da0699d8e9#9-enum-%EC%82%AC%EC%9A%A9-%EC%8B%9C-%EC%A3%BC%EC%9D%98%EC%82%AC%ED%95%AD)
+10. [Shoot Action 사거리 표시 기능](https://claude.ai/chat/f826476d-4a9a-4454-8ccd-86da0699d8e9#10-shoot-action-%EC%82%AC%EA%B1%B0%EB%A6%AC-%ED%91%9C%EC%8B%9C-%EA%B8%B0%EB%8A%A5)
+11. [최종 테스트 및 완성](https://claude.ai/chat/f826476d-4a9a-4454-8ccd-86da0699d8e9#11-%EC%B5%9C%EC%A2%85-%ED%85%8C%EC%8A%A4%ED%8A%B8-%EB%B0%8F-%EC%99%84%EC%84%B1)
+
+---
+
+## 1. Grid Visual의 문제점 파악하기
+
+### 현재 문제점
+
+Grid Visual 시스템은 현재 **매 프레임마다 업데이트**되고 있습니다.
+
+```csharp
+private void Update()
+{
+    UpdateGridVisual();  // 매 프레임 실행 - 비효율적!
+}
+```
+
+**문제가 되는 이유:**
+
+- 아무것도 변하지 않을 때도 계속 업데이트됨
+- 불필요한 연산 낭비
+- 성능에 부정적 영향
+
+### 언제 업데이트가 필요한가?
+
+실제로 Grid Visual이 업데이트되어야 하는 경우는 두 가지뿐입니다:
+
+1. **선택된 액션이 변경될 때** (Move → Shoot 등)
+2. **유닛이 그리드 위치를 이동할 때**
+
+이 두 경우에만 업데이트하도록 **이벤트 기반 시스템**으로 변경해야 합니다.
+
+---
+
+## 2. 이벤트 기반 업데이트로 변경하기
+
+### UnitActionSystem의 이벤트 활용
+
+UnitActionSystem에는 이미 액션 변경 이벤트가 존재합니다:
+
+```csharp
+// UnitActionSystem.cs에 이미 존재하는 이벤트
+public event EventHandler OnSelectedActionChanged;
+```
+
+### GridSystemVisual에서 이벤트 구독하기
+
+```csharp
+using System;  // EventArgs를 사용하기 위해 추가
+
+public class GridSystemVisual : MonoBehaviour
+{
+    private void Start()
+    {
+        // 기존 초기화 코드...
+
+        // 액션 변경 이벤트 구독
+        UnitActionsSystem.Instance.OnSelectedActionChanged +=
+            UnitActionsSystem_OnSelectedActionChanged;
+
+        // 초기 그리드 표시
+        UpdateGridVisual();
+    }
+
+    // 이벤트 핸들러 함수
+    private void UnitActionsSystem_OnSelectedActionChanged(object sender, EventArgs e)
+    {
+        UpdateGridVisual();  // 액션이 변경될 때만 업데이트
+    }
+
+    // Update 함수는 제거
+    // private void Update()
+    // {
+    //     UpdateGridVisual();
+    // }
+}
+```
+
+**코드 설명:**
+
+- `OnSelectedActionChanged` 이벤트에 핸들러 함수 연결
+- 선택된 액션이 바뀔 때만 `UpdateGridVisual()` 호출
+- 매 프레임 업데이트하던 `Update()` 함수는 주석 처리하거나 삭제
+
+---
+
+## 3. Unit 이동 이벤트 추가하기
+
+### LevelGrid에 이벤트 생성
+
+유닛이 그리드 위치를 이동할 때 알림을 받기 위한 이벤트를 만듭니다:
+
+```csharp
+public class LevelGrid : MonoBehaviour
+{
+    // 유닛이 그리드 위치를 이동했을 때 발생하는 이벤트
+    public event EventHandler OnAnyUnitMovedGridPosition;
+
+    // 유닛이 그리드 위치를 이동했을 때 호출되는 함수
+    public void UnitMovedGridPosition(Unit unit, GridPosition fromGridPosition, GridPosition toGridPosition)
+    {
+        // 이전 위치에서 유닛 제거
+        RemoveUnitAtGridPosition(fromGridPosition, unit);
+
+        // 새 위치에 유닛 추가
+        AddUnitAtGridPosition(toGridPosition, unit);
+
+        // 이벤트 발생 - 구독자들에게 알림
+        OnAnyUnitMovedGridPosition?.Invoke(this, EventArgs.Empty);
+    }
+}
+
+```
+
+**코드 설명:**
+
+- `OnAnyUnitMovedGridPosition`: 어떤 유닛이든 이동했을 때 발생하는 이벤트
+- `?.Invoke()`: null이 아닐 때만 이벤트 실행 (안전한 호출)
+- `EventArgs.Empty`: 추가 데이터가 필요 없으므로 빈 EventArgs 전달
+
+### GridSystemVisual에서 구독하기
+
+```csharp
+private void Start()
+{
+    // 기존 코드...
+
+    // 유닛 이동 이벤트 구독
+    LevelGrid.Instance.OnAnyUnitMovedGridPosition +=
+        LevelGrid_OnAnyUnitMovedGridPosition;
+}
+
+// 이벤트 핸들러
+private void LevelGrid_OnAnyUnitMovedGridPosition(object sender, EventArgs e)
+{
+    UpdateGridVisual();  // 유닛이 이동했을 때만 업데이트
+}
+
+```
+
+---
+
+## 4. 이벤트 순서 오류 수정하기
+
+### 발견된 버그
+
+테스트 중 유닛을 이동시키면 이동 범위가 **한 박자 늦게** 업데이트되는 버그가 발견되었습니다.
+
+**문제 상황:**
+
+- 유닛을 2칸 위로 이동 → 이동 범위가 즉시 업데이트되지 않음
+- 뒤로 이동할 때 → 범위가 늘어났다가 줄어드는 이상한 동작
+
+### 원인 분석
+
+문제는 `Unit.cs`의 Update 함수에 있었습니다:
+
+```csharp
+// Unit.cs - 문제가 있는 코드
+private void Update()
+{
+    GridPosition newGridPosition = LevelGrid.Instance.GetGridPosition(transform.position);
+
+    if (newGridPosition != gridPosition)
+    {
+        // 여기서 이벤트 발생
+        LevelGrid.Instance.UnitMovedGridPosition(this, gridPosition, newGridPosition);
+
+        // 그 다음에 위치 업데이트 - 순서가 잘못됨!
+        gridPosition = newGridPosition;
+    }
+}
+
+```
+
+**문제점:**
+
+1. `UnitMovedGridPosition()` 호출 → 이벤트 발생
+2. 이벤트에서 `UpdateGridVisual()` 호출
+3. 하지만 이 시점에 `gridPosition`은 아직 **이전 위치**
+4. 그래서 이동 범위 계산이 잘못됨
+
+### 해결 방법
+
+이벤트를 발생시키기 **전에** 위치를 업데이트해야 합니다:
+
+```csharp
+// Unit.cs - 수정된 코드
+private void Update()
+{
+    GridPosition newGridPosition = LevelGrid.Instance.GetGridPosition(transform.position);
+
+    if (newGridPosition != gridPosition)
+    {
+        // 1. 먼저 이전 위치 저장
+        GridPosition oldGridPosition = gridPosition;
+
+        // 2. 현재 위치 업데이트
+        gridPosition = newGridPosition;
+
+        // 3. 그 다음에 이벤트 발생 (이미 위치가 업데이트된 상태)
+        LevelGrid.Instance.UnitMovedGridPosition(this, oldGridPosition, newGridPosition);
+    }
+}
+
+```
+
+**수정 내용:**
+
+- `oldGridPosition` 변수에 이전 위치 저장
+- `gridPosition`을 먼저 새 위치로 업데이트
+- 그 후에 이벤트 발생
+- 이제 이벤트가 발생했을 때 유닛의 위치는 이미 새 위치로 업데이트된 상태
+
+---
+
+## 5. 색상 시스템 설계하기
+
+### 목표
+
+각 액션마다 다른 색상의 그리드를 표시하고 싶습니다:
+
+- **Move Action** → 흰색 (White)
+- **Spin Action** → 파란색 (Blue)
+- **Shoot Action** → 빨간색 (Red)
+
+### 구현 방법 고민
+
+**방법 1: ScriptableObject 사용**
+
+- 각 타입별로 Material을 저장하는 ScriptableObject 생성
+- 더 복잡하지만 확장성이 좋음
+
+**방법 2: Enum + List 사용** ✅ (선택)
+
+- Enum으로 타입 정의
+- List로 Material 참조 관리
+- 더 간단하고 직관적
+
+---
+
+## 6. GridVisualType Enum과 Struct 만들기
+
+### Enum 정의
+
+```csharp
+// GridSystemVisual.cs
+public enum GridVisualType
+{
+    White,      // 흰색 - Move Action용
+    Blue,       // 파란색 - Spin Action용
+    Red,        // 빨간색 - Shoot Action용
+    Yellow      // 노란색 - 나중에 사용할 색
+}
+
+```
+
+**Enum이란?**
+
+- 연관된 상수들의 집합
+- 코드의 가독성을 높임
+- 타입 안전성 제공
+
+### Struct 정의
+
+Enum 타입과 Material을 함께 묶어주는 구조체:
+
+```csharp
+[Serializable]  // Unity Inspector에 표시되도록 설정
+public struct GridVisualTypeMaterial
+{
+    public GridVisualType gridVisualType;  // 색상 타입
+    public Material material;              // 실제 Material 참조
+}
+
+```
+
+**코드 설명:**
+
+- `[Serializable]`: Unity가 Inspector에서 이 구조체를 보여주도록 함
+- `struct`: 가벼운 데이터 구조 (class보다 메모리 효율적)
+- 타입과 Material을 한 쌍으로 관리
+
+### List 변수 선언
+
+```csharp
+[SerializeField] private List<GridVisualTypeMaterial> gridVisualTypeMaterialList;
+```
+
+**Inspector에 표시되지 않는 문제:**
+
+- 처음에는 Inspector에 나타나지 않음
+- 이유: Unity는 기본적으로 custom struct를 serialize하지 않음
+- 해결: struct에 `[Serializable]` 특성 추가 (위에서 이미 추가함)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380475/notion-blog/_/3D_/_/_5_Enemies_Combat_-_4/image_1.png)
+
+---
+
+## 7. Material 참조 시스템 구현하기
+
+### Unity Editor에서 Material 설정
+
+1. **Material 4개 생성:**
+   - Grid_White (흰색)
+   - Grid_Blue (파란색)
+   - Grid_Red (빨간색)
+   - Grid_Yellow (노란색)
+2. **List에 추가:**
+   - Inspector에서 Size를 4로 설정
+   - Element 0: Type = White, Material = Grid_White
+   - Element 1: Type = Blue, Material = Grid_Blue
+   - Element 2: Type = Red, Material = Grid_Red
+   - Element 3: Type = Yellow, Material = Grid_Yellow
+
+### Material 검색 함수 구현
+
+```csharp
+// GridVisualType에 해당하는 Material을 찾아서 반환하는 함수
+private Material GetGridVisualTypeMaterial(GridVisualType gridVisualType)
+{
+    // List를 순회하면서 검색
+    foreach (GridVisualTypeMaterial gridVisualTypeMaterial in gridVisualTypeMaterialList)
+    {
+        // 타입이 일치하는지 확인
+        if (gridVisualTypeMaterial.gridVisualType == gridVisualType)
+        {
+            // 일치하면 해당 Material 반환
+            return gridVisualTypeMaterial.material;
+        }
+    }
+
+    // 찾지 못한 경우 - 이론적으로 발생하면 안 됨
+    Debug.LogError("Could not find GridVisualTypeMaterial for GridVisualType " + gridVisualType);
+    return null;
+}
+
+```
+
+**코드 설명:**
+
+- `foreach`: List의 모든 요소를 순회
+- 타입이 일치하는 요소를 찾으면 즉시 Material 반환
+- 못 찾으면 에러 로그 출력 (개발 중 문제 발견용)
+
+### GridSystemVisualSingle 수정
+
+개별 그리드 비주얼이 Material을 받아서 설정하도록 수정:
+
+```csharp
+public class GridSystemVisualSingle : MonoBehaviour
+{
+    [SerializeField] private MeshRenderer meshRenderer;
+
+    // Material을 받아서 표시하는 함수
+    public void Show(Material material)
+    {
+        meshRenderer.enabled = true;           // 렌더러 활성화
+        meshRenderer.material = material;      // Material 적용
+    }
+
+    public void Hide()
+    {
+        meshRenderer.enabled = false;  // 렌더러 비활성화
+    }
+}
+
+```
+
+### ShowGridPositionList 수정
+
+```csharp
+// 그리드 위치 리스트를 특정 색상으로 표시
+public void ShowGridPositionList(List<GridPosition> gridPositionList, GridVisualType gridVisualType)
+{
+    foreach (GridPosition gridPosition in gridPositionList)
+    {
+        // 각 그리드 위치의 비주얼에 Material 설정
+        gridSystemVisualSingleArray[gridPosition.x, gridPosition.z]
+            .Show(GetGridVisualTypeMaterial(gridVisualType));
+    }
+}
+
+```
+
+**코드 설명:**
+
+- 이제 `ShowGridPositionList`가 `GridVisualType`을 받음
+- 해당 타입의 Material을 찾아서 각 그리드에 적용
+
+---
+
+## 8. 액션별 색상 적용하기
+
+### UpdateGridVisual 함수 수정
+
+```csharp
+public void UpdateGridVisual()
+{
+    // 모든 그리드 숨기기
+    HideAllGridPosition();
+
+    // 현재 선택된 유닛과 액션 가져오기
+    Unit selectedUnit = UnitActionsSystem.Instance.GetSelectedUnit();
+    BaseAction selectedAction = UnitActionsSystem.Instance.GetSelectedAction();
+
+    // 기본값을 White로 설정
+    GridVisualType gridVisualType = GridVisualType.White;
+
+    // 액션 타입에 따라 색상 결정
+    switch (selectedAction)
+    {
+        case MoveAction moveAction:
+            gridVisualType = GridVisualType.White;  // 이동은 흰색
+            break;
+
+        case SpinAction spinAction:
+            gridVisualType = GridVisualType.Blue;   // 회전은 파란색
+            break;
+
+        case ShootAction shootAction:
+            gridVisualType = GridVisualType.Red;    // 사격은 빨간색
+            break;
+
+        default:
+            gridVisualType = GridVisualType.White;  // 기본값
+            break;
+    }
+
+    // 선택된 액션의 유효 위치를 해당 색상으로 표시
+    ShowGridPositionList(
+        selectedAction.GetValidActionGridPositionList(),
+        gridVisualType
+    );
+}
+
+```
+
+**코드 설명:**
+
+- `switch (selectedAction)`: 액션의 실제 타입을 체크
+- `case MoveAction moveAction:`: 패턴 매칭으로 타입 확인
+- 각 액션마다 다른 `GridVisualType` 할당
+- `default`: 예상치 못한 액션 타입에 대한 대비
+
+---
+
+## 9. Enum 사용 시 주의사항
+
+### Enum의 내부 동작 원리
+
+Enum은 내부적으로 **숫자 인덱스**를 사용합니다:
+
+```csharp
+public enum GridVisualType
+{
+    White,    // 내부적으로 0
+    Blue,     // 내부적으로 1
+    Red,      // 내부적으로 2
+    Yellow    // 내부적으로 3
+}
+```
+
+### 위험한 상황: 중간에 값 추가
+
+**잘못된 방법:**
+
+```csharp
+public enum GridVisualType
+{
+    White,      // 0
+    Blue,       // 1
+    Red,        // 2
+    RedSoft,    // 2 ← 중간에 추가! (Red가 3으로 밀림)
+    Yellow      // 3 → 4로 변경됨
+}
+```
+
+**문제점:**
+
+- Unity Inspector에는 **인덱스 번호**가 저장됨
+- Yellow를 선택했던 곳이 갑자기 RedSoft로 바뀜
+- 기존에 설정한 모든 값이 깨질 수 있음
+
+### 안전한 방법: 끝에 추가
+
+```csharp
+public enum GridVisualType
+{
+    White,
+    Blue,
+    Red,
+    Yellow,
+    RedSoft    // ✅ 항상 끝에 추가!
+}
+```
+
+**중요 규칙:**
+
+- Enum 값은 **항상 끝에 추가**
+- 기존 순서를 절대 변경하지 않기
+- 이미 사용 중인 enum이라면 더욱 주의
+
+---
+
+## 10. Shoot Action 사거리 표시 기능
+
+### 목표
+
+Shoot Action에서 두 가지 정보를 시각적으로 표시:
+
+1. **전체 사격 범위** (RedSoft - 반투명 빨강)
+2. **실제 사격 가능한 위치** (Red - 진한 빨강)
+
+### RedSoft Material 추가
+
+```csharp
+public enum GridVisualType
+{
+    White,
+    Blue,
+    Red,
+    RedSoft,   // 반투명 빨간색 추가
+    Yellow
+}
+```
+
+Material 설정:
+
+- Grid_RedSoft Material 생성
+- 알파값을 낮춰서 반투명하게 설정 (예: Alpha = 0.3)
+
+### ShowGridPositionRange 함수 구현
+
+```csharp
+// 특정 위치를 중심으로 원형 범위를 표시하는 함수
+private void ShowGridPositionRange(GridPosition gridPosition, int range, GridVisualType gridVisualType)
+{
+    // 범위 내의 모든 그리드 위치를 저장할 리스트
+    List<GridPosition> gridPositionList = new List<GridPosition>();
+
+    // X축 방향으로 순회 (-range ~ +range)
+    for (int x = -range; x <= range; x++)
+    {
+        // Z축 방향으로 순회 (-range ~ +range)
+        for (int z = -range; z <= range; z++)
+        {
+            // 테스트할 그리드 위치 계산
+            GridPosition testGridPosition = gridPosition + new GridPosition(x, z);
+
+            // 유효한 그리드 위치인지 확인
+            if (!LevelGrid.Instance.IsValidGridPosition(testGridPosition))
+            {
+                continue;  // 유효하지 않으면 건너뛰기
+            }
+
+            // 맨해튼 거리 계산 (원형 범위를 만들기 위함)
+            int testDistance = Mathf.Abs(x) + Mathf.Abs(z);
+            if (testDistance > range)
+            {
+                continue;  // 범위를 벗어나면 건너뛰기
+            }
+
+            // 조건을 통과한 위치는 리스트에 추가
+            gridPositionList.Add(testGridPosition);
+        }
+    }
+
+    // 리스트의 모든 위치를 지정된 색상으로 표시
+    ShowGridPositionList(gridPositionList, gridVisualType);
+}
+
+```
+
+**코드 설명:**
+
+1. **이중 for 루프:**
+   - `x`와 `z`를 `range`부터 `+range`까지 순회
+   - 사각형 영역을 만듦
+2. **IsValidGridPosition 체크:**
+   - 맵 밖의 위치는 제외
+3. **맨해튼 거리 계산:**
+   - `Mathf.Abs(x) + Mathf.Abs(z)`: 원점에서의 거리
+   - 사각형을 원형으로 변환
+   - 예: range=2일 때 거리가 2 이하인 위치만 선택
+4. **결과:**
+   - 원형 범위의 모든 유효한 그리드 위치가 리스트에 저장됨
+
+### ShootAction에서 최대 사거리 노출
+
+```csharp
+// ShootAction.cs
+public int GetMaxShootDistance()
+{
+    return maxShootDistance;  // private 변수를 public 함수로 노출
+}
+```
+
+### UpdateGridVisual에서 사거리 표시
+
+```csharp
+case ShootAction shootAction:
+    gridVisualType = GridVisualType.Red;  // 사격 가능 위치는 진한 빨강
+
+    // 전체 사격 범위를 반투명 빨강으로 표시
+    ShowGridPositionRange(
+        selectedUnit.GetGridPosition(),              // 유닛의 현재 위치
+        shootAction.GetMaxShootDistance(),           // 최대 사격 거리
+        GridVisualType.RedSoft                       // 반투명 빨강 사용
+    );
+    break;
+```
+
+**동작 순서:**
+
+1. 먼저 `ShowGridPositionRange`로 전체 범위를 RedSoft로 표시
+2. 그 다음 `ShowGridPositionList`로 실제 사격 가능한 위치를 Red로 표시
+3. 결과: 두 레이어가 겹쳐져서 범위와 타겟이 명확히 구분됨
+
+---
+
+## 11. 최종 테스트 및 완성
+
+### 테스트 시나리오
+
+1. **Move Action 테스트:**
+   - 유닛 선택 → 흰색 그리드 표시 확인
+   - 유닛 이동 → 이동 범위가 즉시 업데이트되는지 확인
+2. **Spin Action 테스트:**
+   - Spin 선택 → 파란색 그리드 표시 확인
+3. **Shoot Action 테스트:**
+   - Shoot 선택 → 반투명 빨강 범위 + 진한 빨강 타겟 확인
+   - 사거리 테스트를 위해 `maxShootDistance`를 2로 임시 변경
+   - 범위가 정확히 2칸인지 확인
+   - 테스트 후 다시 7로 복구
+
+### 성능 개선 효과
+
+**변경 전:**
+
+- 매 프레임 업데이트 (60 FPS 기준 초당 60회)
+- 아무 변화 없어도 계속 연산
+
+**변경 후:**
+
+- 액션 변경 시에만 업데이트 (초당 0~2회 정도)
+- 유닛 이동 시에만 업데이트
+- **약 95% 이상의 연산 감소**
+
+### 구현 완료 내용
+
+1. ✅ **성능 최적화:**
+   - 이벤트 기반 업데이트 시스템
+   - 불필요한 연산 제거
+2. ✅ **색상 시스템:**
+   - Enum + Struct를 이용한 확장 가능한 구조
+   - 액션별 다른 색상 표시
+3. ✅ **사거리 표시:**
+   - 원형 범위 계산 알고리즘
+   - 이중 레이어 시각화 (범위 + 타겟)
+4. ✅ **버그 수정:**
+   - 이벤트 순서 문제 해결
+   - 정확한 위치 업데이트
+
+### 코드 품질 향상
+
+- **가독성:** Enum 사용으로 코드 의도가 명확해짐
+- **확장성:** 새로운 색상 타입 추가가 쉬움
+- **유지보수:** 이벤트 기반으로 흐름 파악이 쉬움
+- **성능:** 필요할 때만 연산하여 효율적
+
+이제 Grid Visual 시스템은 효율적이면서도 시각적으로 풍부한 정보를 제공합니다!
+
+# { 🎮 적 AI 기본 로직 구현하기 }
+
+이번 강의는 적 캐릭터가 자동으로 행동을 선택하고 실행할 수 있도록 기본적인 AI 시스템을 구축하는 내용입니다. 상태 머신(State Machine)을 사용하여 적의 턴 관리를 체계적으로 처리하고, 모든 적 유닛을 추적·관리하는 UnitManager를 만들어 적들이 순차적으로 행동할 수 있게 만듭니다.
+
+---
+
+## 📋 목차
+
+1. [현재 문제점 파악하기](https://claude.ai/chat/fb8ed4fe-d7a1-4eff-b5f1-a63efe635048#1-%ED%98%84%EC%9E%AC-%EB%AC%B8%EC%A0%9C%EC%A0%90-%ED%8C%8C%EC%95%85%ED%95%98%EA%B8%B0)
+2. [상태 머신(State Machine) 개념과 구조](https://claude.ai/chat/fb8ed4fe-d7a1-4eff-b5f1-a63efe635048#2-%EC%83%81%ED%83%9C-%EB%A8%B8%EC%8B%A0state-machine-%EA%B0%9C%EB%85%90%EA%B3%BC-%EA%B5%AC%EC%A1%B0)
+3. [적 AI 상태 머신 구현하기](https://claude.ai/chat/fb8ed4fe-d7a1-4eff-b5f1-a63efe635048#3-%EC%A0%81-ai-%EC%83%81%ED%83%9C-%EB%A8%B8%EC%8B%A0-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+4. [UnitManager로 유닛 관리 시스템 만들기](https://claude.ai/chat/fb8ed4fe-d7a1-4eff-b5f1-a63efe635048#4-unitmanager%EB%A1%9C-%EC%9C%A0%EB%8B%9B-%EA%B4%80%EB%A6%AC-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+5. [스크립트 실행 순서 문제 해결하기](https://claude.ai/chat/fb8ed4fe-d7a1-4eff-b5f1-a63efe635048#5-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%8B%A4%ED%96%89-%EC%88%9C%EC%84%9C-%EB%AC%B8%EC%A0%9C-%ED%95%B4%EA%B2%B0%ED%95%98%EA%B8%B0)
+6. [적 행동 실행 로직 구현하기](https://claude.ai/chat/fb8ed4fe-d7a1-4eff-b5f1-a63efe635048#6-%EC%A0%81-%ED%96%89%EB%8F%99-%EC%8B%A4%ED%96%89-%EB%A1%9C%EC%A7%81-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0)
+7. [턴 종료 조건 처리하기](https://claude.ai/chat/fb8ed4fe-d7a1-4eff-b5f1-a63efe635048#7-%ED%84%B4-%EC%A2%85%EB%A3%8C-%EC%A1%B0%EA%B1%B4-%EC%B2%98%EB%A6%AC%ED%95%98%EA%B8%B0)
+8. [다중 적 유닛 테스트와 최종 검증](https://claude.ai/chat/fb8ed4fe-d7a1-4eff-b5f1-a63efe635048#8-%EB%8B%A4%EC%A4%91-%EC%A0%81-%EC%9C%A0%EB%8B%9B-%ED%85%8C%EC%8A%A4%ED%8A%B8%EC%99%80-%EC%B5%9C%EC%A2%85-%EA%B2%80%EC%A6%9D)
+
+---
+
+## 1. 현재 문제점 파악하기
+
+### 현재 상황
+
+- 적 캐릭터가 게임에 존재하고, 플레이어가 턴을 종료하면 적의 턴이 오지만
+- 적은 **아무 행동도 하지 않고** 단순히 2초를 기다린 후 턴을 종료함
+- 실제로 행동(SpinAction 등)을 수행하지 않음
+
+### 목표
+
+- 적이 자신의 턴에 **실제 행동을 수행**하도록 만들기
+- 복잡한 AI 로직을 추가하기 전에 **기본적인 구조**를 먼저 설정
+- 상태 관리를 통해 턴 진행을 체계적으로 제어
+
+---
+
+## 2. 상태 머신(State Machine) 개념과 구조
+
+### 상태 머신이란?
+
+- **상태 머신(State Machine)**: 객체가 가질 수 있는 여러 상태를 정의하고, 각 상태에서 특정 행동을 수행하도록 관리하는 패턴
+- 게임 AI에서 매우 자주 사용되는 패턴으로, 복잡한 행동을 명확하게 분리할 수 있음
+
+### 적 AI의 3가지 상태
+
+```csharp
+private enum State
+{
+    WaitingForEnemyTurn,  // 적 턴을 기다리는 상태 (플레이어 턴일 때)
+    TackingTurn,          // 적이 턴을 진행 중인 상태
+    Busy,                 // 적이 행동을 실행 중인 상태
+}
+```
+
+**각 상태의 역할:**
+
+1. **WaitingForEnemyTurn (대기 상태)**
+   - 플레이어가 턴을 진행하는 동안 적은 이 상태로 대기
+   - 아무 행동도 하지 않음
+   - 턴이 바뀌면 TackingTurn으로 전환
+2. **TackingTurn (턴 진행 상태)**
+   - 적의 턴이 시작되면 이 상태로 진입
+   - 타이머를 카운트다운하여 행동 사이의 간격을 둠
+   - 행동을 시도하면 Busy 상태로 전환
+3. **Busy (행동 실행 상태)**
+   - 실제로 행동(SpinAction 등)을 수행 중
+   - 행동이 완료되면 다시 TackingTurn으로 돌아감
+   - 더 이상 행동할 수 없으면 턴을 종료
+
+---
+
+## 3. 적 AI 상태 머신 구현하기
+
+### 상태 변수와 초기화
+
+```csharp
+private State state;        // 현재 상태를 저장하는 변수
+private float timer;        // 행동 간격을 위한 타이머
+
+private void Awake()
+{
+    // 게임 시작 시 플레이어가 먼저 턴을 가지므로
+    // 적은 대기 상태로 시작
+    state = State.WaitingForEnemyTurn;
+}
+```
+
+### Update에서 상태에 따른 행동 처리
+
+```csharp
+private void Update()
+{
+    // 플레이어 턴이면 적은 아무것도 하지 않음
+    if (TurnSystem.Instance.IsPlayerTurn())
+    {
+        return;
+    }
+
+    // 현재 상태에 따라 다른 로직 실행
+    switch (state)
+    {
+        case State.WaitingForEnemyTurn:
+            // 대기 상태: 아무것도 하지 않음
+            break;
+
+        case State.TackingTurn:
+            // 턴 진행 상태: 타이머 감소
+            timer -= Time.deltaTime;
+
+            if (timer <= 0f)  // 타이머가 다 되면
+            {
+                // 행동 시도
+                if (TryTakeEnemyAIAction(SetStateTakingTurn))
+                {
+                    state = State.Busy;  // 성공하면 Busy 상태로
+                }
+                else
+                {
+                    // 더 이상 행동할 수 없으면 턴 종료
+                    TurnSystem.Instance.NextTurn();
+                }
+            }
+            break;
+
+        case State.Busy:
+            // 행동 실행 중: 아무것도 하지 않음
+            // 행동이 끝나면 콜백으로 상태 변경
+            break;
+    }
+}
+```
+
+**타이머의 역할:**
+
+- `Time.deltaTime`: 이전 프레임과 현재 프레임 사이의 시간 (약 0.016초)
+- 매 프레임마다 타이머에서 시간을 빼서 카운트다운
+- 타이머가 0 이하가 되면 다음 행동 실행
+- **목적**: 적이 너무 빠르게 행동하지 않도록 간격을 둠 (자연스러운 플레이 경험)
+
+### 턴 변경 시 상태 전환
+
+```csharp
+private void Start()
+{
+    // 턴 변경 이벤트 구독
+    TurnSystem.Instance.OnTurnChanged += TurnSystem_OnTurnChanged;
+}
+
+private void TurnSystem_OnTurnChanged(object sender, EventArgs e)
+{
+    // 적의 턴이 되면
+    if (!TurnSystem.Instance.IsPlayerTurn())
+    {
+        state = State.TackingTurn;  // 턴 진행 상태로 전환
+        timer = 2f;                 // 2초 대기 후 첫 행동 시작
+    }
+}
+```
+
+### 행동 완료 후 상태 복귀 함수
+
+```csharp
+private void SetStateTakingTurn()
+{
+    timer = 0.5f;               // 다음 행동까지 0.5초 대기
+    state = State.TackingTurn;   // 다시 턴 진행 상태로
+}
+```
+
+**콜백 패턴의 이해:**
+
+- `SetStateTakingTurn`은 행동이 완료되면 호출되는 **콜백 함수**
+- 행동을 시작할 때 이 함수를 전달하여, 행동이 끝나면 자동으로 호출되게 함
+- 플레이어의 UnitActionSystem에서 사용한 `ClearBusy`와 같은 역할
+- 이를 통해 **행동 → 대기 → 다음 행동** 순환 구조를 만듦
+
+---
+
+## 4. UnitManager로 유닛 관리 시스템 만들기
+
+### UnitManager가 필요한 이유
+
+현재 문제:
+
+- 적 AI가 모든 적 유닛을 순회하면서 행동을 시켜야 함
+- 하지만 씬에 있는 모든 적 유닛 리스트가 없음
+- `GameObject.FindObjectsOfType` 같은 함수는 성능이 좋지 않음
+
+해결책:
+
+- **UnitManager**라는 중앙 관리자를 만들어 모든 유닛을 추적
+- 유닛이 생성/제거될 때 자동으로 리스트 업데이트
+
+### UnitManager 기본 구조
+
+```csharp
+public class UnitManager : MonoBehaviour
+{
+    // 싱글톤 패턴: 어디서든 접근 가능한 단 하나의 인스턴스
+    public static UnitManager Instance { get; private set; }
+
+    // 3개의 리스트로 유닛 분류 관리
+    private List<Unit> unitList;           // 모든 유닛
+    private List<Unit> friendlyUnitList;   // 아군 유닛만
+    private List<Unit> enemyUnitList;      // 적 유닛만
+```
+
+**3개 리스트를 사용하는 이유:**
+
+- `unitList`: 전체 유닛 관리 (게임 종료 조건 체크 등)
+- `friendlyUnitList`: 아군만 필요한 경우 (UI 표시, 특정 효과 등)
+- `enemyUnitList`: 적 AI가 자신의 유닛들에게 명령을 내릴 때
+
+### 싱글톤 패턴 구현
+
+```csharp
+private void Awake()
+{
+    // 이미 인스턴스가 존재하면 중복 생성 방지
+    if (Instance != null)
+    {
+        Debug.LogError("There is more than one UnitActionsSystem! " + transform + " - " + Instance);
+        Destroy(gameObject);
+        return;
+    }
+
+    // 인스턴스 설정
+    Instance = this;
+
+    // 리스트 초기화 (Awake에서 해야 Start 전에 준비됨)
+    unitList = new List<Unit>();
+    friendlyUnitList = new List<Unit>();
+    enemyUnitList = new List<Unit>();
+}
+```
+
+**Awake에서 리스트를 초기화하는 이유:**
+
+- `Awake`는 `Start`보다 먼저 실행됨
+- `Start`에서 유닛 이벤트를 구독하기 때문에, 그 전에 리스트가 준비되어 있어야 함
+
+### Unit 클래스에 이벤트 추가
+
+```csharp
+// Unit.cs
+public static event EventHandler OnAnyUnitSpawned;  // 유닛 생성 이벤트
+public static event EventHandler OnAnyUnitDead;     // 유닛 사망 이벤트
+```
+
+**static 이벤트를 사용하는 이유:**
+
+- 일반 이벤트: 특정 인스턴스의 이벤트 (예: "이 유닛"이 죽었을 때)
+- static 이벤트: 클래스 차원의 이벤트 (예: "어떤 유닛이든" 생성/사망했을 때)
+- UnitManager는 모든 유닛의 생성/사망을 감지해야 하므로 static 사용
+
+### 유닛 생성 이벤트 발생
+
+```csharp
+// Unit.cs - Start()
+private void Start()
+{
+    gridPosition = LevelGrid.Instance.GetGridPosition(transform.position);
+    LevelGrid.Instance.AddUnitAtGridPosition(gridPosition, this);
+
+    TurnSystem.Instance.OnTurnChanged += TurnSystem_OnTurnChanged;
+    healthSystem.OnDead += HealthSystem_OnDead;
+
+    // 유닛이 완전히 초기화된 후 생성 이벤트 발생
+    OnAnyUnitSpawned.Invoke(this, EventArgs.Empty);
+}
+```
+
+**EventArgs.Empty의 의미:**
+
+- `EventArgs`: 이벤트와 함께 전달할 추가 데이터
+- `Empty`: 추가 데이터가 없다는 의미
+- `this`: 이벤트를 발생시킨 유닛 자신을 sender로 전달
+
+### 유닛 사망 이벤트 발생
+
+```csharp
+// Unit.cs
+private void HealthSystem_OnDead(object sender, EventArgs e)
+{
+    LevelGrid.Instance.RemoveUnitAtGridPosition(gridPosition, this);
+    Destroy(gameObject);
+
+    // 오브젝트가 파괴되기 직전에 사망 이벤트 발생
+    OnAnyUnitDead.Invoke(this, EventArgs.Empty);
+}
+```
+
+### UnitManager에서 이벤트 구독 및 처리
+
+```csharp
+private void Start()
+{
+    // Unit 클래스의 static 이벤트 구독
+    Unit.OnAnyUnitSpawned += Unit_OnAnyUnitSpawned;
+    Unit.OnAnyUnitDead += Unit_OnAnyUnitDead;
+}
+
+private void Unit_OnAnyUnitSpawned(object sender, EventArgs e)
+{
+    // sender를 Unit 타입으로 변환
+    Unit unit = sender as Unit;
+
+    // 모든 유닛 리스트에 추가
+    unitList.Add(unit);
+
+    // 적/아군 구분하여 해당 리스트에 추가
+    if (unit.IsEnemy())
+    {
+        enemyUnitList.Add(unit);
+    }
+    else
+    {
+        friendlyUnitList.Add(unit);
+    }
+}
+```
+
+**`as` 키워드의 역할:**
+
+- `sender`는 `object` 타입 (가장 기본 타입)
+- `as Unit`: object를 Unit 타입으로 안전하게 변환
+- 변환 실패 시 예외 대신 `null` 반환
+
+```csharp
+private void Unit_OnAnyUnitDead(object sender, EventArgs e)
+{
+    Unit unit = sender as Unit;
+
+    // 모든 리스트에서 제거
+    unitList.Remove(unit);
+
+    if (unit.IsEnemy())
+    {
+        enemyUnitList.Remove(unit);
+    }
+    else
+    {
+        friendlyUnitList.Remove(unit);
+    }
+}
+```
+
+### 외부 접근용 공개 메서드
+
+```csharp
+// 각 리스트를 외부에서 읽기만 가능하도록 제공
+public List<Unit> GetUnits()
+{
+    return unitList;
+}
+
+public List<Unit> GetFriendlyUnitList()
+{
+    return friendlyUnitList;
+}
+
+public List<Unit> GetEnemyUnitList()
+{
+    return enemyUnitList;
+}
+```
+
+**왜 리스트를 직접 public으로 만들지 않나?**
+
+- `public List<Unit> enemyUnitList;` 이렇게 하면 외부에서 리스트를 직접 수정 가능
+- Get 메서드를 사용하면 읽기만 가능하도록 제어할 수 있음 (캡슐화)
+
+---
+
+## 5. 스크립트 실행 순서 문제 해결하기
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380475/notion-blog/_/3D_/_/_5_Enemies_Combat_-_4/image_2.png)
+
+### 문제 상황
+
+```
+1. Unit.Start()가 먼저 실행됨
+   → OnAnyUnitSpawned 이벤트 발생
+
+2. UnitManager.Start()가 나중에 실행됨
+   → 이벤트 구독 시작
+
+결과: 이미 발생한 이벤트를 놓침 → 유닛이 리스트에 추가되지 않음
+```
+
+### 스크립트 실행 순서 (Script Execution Order)
+
+Unity는 기본적으로 스크립트 실행 순서를 보장하지 않음:
+
+- 여러 스크립트의 `Awake`, `Start`가 임의의 순서로 실행될 수 있음
+- 이벤트 시스템에서는 **구독자가 먼저 준비되어야** 이벤트를 받을 수 있음
+
+### 해결 방법: Script Execution Order 설정
+
+Unity 에디터에서 설정:
+
+1. **Edit → Project Settings** 메뉴 열기
+2. **Script Execution Order** 항목 선택
+3. UnitManager 스크립트를 목록에 추가
+4. 실행 순서 값을 **음수**로 설정 (예: -100)
+
+```
+실행 순서 값:
+-100: UnitManager  ← 가장 먼저 실행
+   0: (기본값) Unit, EnemyAI 등
+```
+
+**실행 순서 값의 의미:**
+
+- 숫자가 작을수록 먼저 실행됨
+- 음수: 기본 스크립트들보다 먼저 실행
+- 양수: 기본 스크립트들보다 나중에 실행
+- 같은 값: 순서 보장 안 됨
+
+### 적용 후 실행 흐름
+
+```
+1. UnitManager.Awake() 실행
+   → 리스트 초기화
+
+2. UnitManager.Start() 실행
+   → 이벤트 구독 시작
+
+3. Unit.Start() 실행
+   → OnAnyUnitSpawned 발생
+   → UnitManager가 이벤트를 받아서 리스트에 추가
+```
+
+### 테스트 로그 추가
+
+```csharp
+// UnitManager.cs
+private void Unit_OnAnyUnitSpawned(object sender, EventArgs e)
+{
+    Unit unit = sender as Unit;
+
+    Debug.Log("Unit spawned: " + unit.name);  // 테스트용 로그
+
+    unitList.Add(unit);
+    // ... 나머지 코드
+}
+
+private void Unit_OnAnyUnitDead(object sender, EventArgs e)
+{
+    Unit unit = sender as Unit;
+
+    Debug.Log("Unit died: " + unit.name);  // 테스트용 로그
+
+    unitList.Remove(unit);
+    // ... 나머지 코드
+}
+```
+
+**테스트 결과:**
+
+- 게임 시작: "Unit spawned: Unit (Player)", "Unit spawned: Unit (Enemy)" 로그 확인
+- 적을 처치: "Unit died: Unit (Enemy)" 로그 확인
+- 모든 이벤트가 정상 작동 확인 후 로그 제거
+
+---
+
+## 6. 적 행동 실행 로직 구현하기
+
+### 기본 행동 시도 함수 - TryTakeEnemyAIAction (오버로드 1)
+
+```csharp
+// 모든 적 유닛을 순회하면서 행동 시도
+private bool TryTakeEnemyAIAction(Action onEnemyAIActionComplete)
+{
+    // UnitManager에서 적 유닛 리스트 가져오기
+    foreach (Unit enemyUnit in UnitManager.Instance.GetEnemyUnitList())
+    {
+        // 각 적 유닛에 대해 행동 시도
+        if (TryTakeEnemyAIAction(enemyUnit, onEnemyAIActionComplete))
+        {
+            return true;  // 한 유닛이라도 행동하면 성공
+        }
+    }
+    // 모든 적이 행동할 수 없으면 실패
+    return false;
+}
+```
+
+**함수 오버로딩(Overloading):**
+
+- 같은 이름의 함수를 여러 개 만들되, 매개변수만 다르게 설정
+- `TryTakeEnemyAIAction(콜백)` ← 모든 적 순회
+- `TryTakeEnemyAIAction(특정 유닛, 콜백)` ← 특정 적의 행동 시도
+- C#이 매개변수를 보고 자동으로 어느 함수를 호출할지 결정
+
+### 개별 유닛 행동 시도 - TryTakeEnemyAIAction (오버로드 2)
+
+```csharp
+private bool TryTakeEnemyAIAction(Unit enemyUnit, Action onEnemyAIActionComplete)
+{
+    // 1. 해당 유닛에서 SpinAction 컴포넌트 가져오기
+    SpinAction spinAction = enemyUnit.GetSpinAction();
+
+    // 2. 행동을 실행할 그리드 위치 결정 (자기 위치)
+    GridPosition actionGridPosition = enemyUnit.GetGridPosition();
+
+    // 3. 해당 위치에서 행동이 유효한지 검증
+    if (!spinAction.IsValidActionGridPosition(actionGridPosition))
+    {
+        return false;  // 유효하지 않으면 실패
+    }
+
+    // 4. 액션 포인트를 소모할 수 있는지 검증
+    if (!enemyUnit.TrySpendActionPointsToTakeAction(spinAction))
+    {
+        return false;  // 포인트가 부족하면 실패
+    }
+
+    // 5. 모든 검증 통과 → 실제 행동 실행
+    spinAction.TakeAction(actionGridPosition, onEnemyAIActionComplete);
+
+    return true;  // 성공
+}
+```
+
+**각 단계 상세 설명:**
+
+1. **SpinAction 가져오기**
+
+   ```csharp
+   SpinAction spinAction = enemyUnit.GetSpinAction();
+   ```
+
+   - 현재는 SpinAction만 사용하지만, 나중에 다른 행동도 추가 예정
+   - 각 유닛이 가진 행동 컴포넌트에 접근
+
+2. **그리드 위치 결정**
+
+   ```csharp
+   GridPosition actionGridPosition = enemyUnit.GetGridPosition();
+   ```
+
+   - SpinAction은 제자리에서 회전하므로 자신의 현재 위치가 타겟
+   - 다른 행동(이동, 공격 등)은 다른 위치를 타겟으로 할 수 있음
+
+3. **유효성 검증**
+
+   ```csharp
+   if (!spinAction.IsValidActionGridPosition(actionGridPosition))
+   ```
+
+   - 해당 위치에서 이 행동을 수행할 수 있는지 확인
+   - SpinAction은 항상 자기 위치에서 가능하므로 보통 true
+
+4. **액션 포인트 검증 및 소모**
+
+   ```csharp
+   if (!enemyUnit.TrySpendActionPointsToTakeAction(spinAction))
+   ```
+
+   - 행동에 필요한 포인트가 있는지 확인
+   - 있으면 포인트를 소모하고 true 반환
+   - 없으면 false 반환하여 행동 취소
+
+5. **행동 실행**
+
+   ```csharp
+   spinAction.TakeAction(actionGridPosition, onEnemyAIActionComplete);
+   ```
+
+   - 실제로 회전 애니메이션 시작
+   - 완료되면 `onEnemyAIActionComplete` 콜백 호출
+   - 이 콜백이 `SetStateTakingTurn`을 실행하여 다음 행동 준비
+
+### Unit 클래스의 행동 검증 메서드
+
+```csharp
+// Unit.cs
+public bool TrySpendActionPointsToTakeAction(BaseAction baseAction)
+{
+    // 포인트가 충분한지 먼저 확인
+    if (CanSpendActionPointsToTakeAction(baseAction))
+    {
+        // 충분하면 포인트 소모하고 true 반환
+        SpendActionPoints(baseAction.GetActionPointCost());
+        return true;
+    }
+    else
+    {
+        // 부족하면 false 반환
+        return false;
+    }
+}
+
+public bool CanSpendActionPointsToTakeAction(BaseAction baseAction)
+{
+    // 현재 포인트 >= 행동에 필요한 포인트
+    if (actionPoints >= baseAction.GetActionPointCost())
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+```
+
+**2단계 검증의 이유:**
+
+- `CanSpend`: 검증만 하고 상태 변경 없음 (UI 표시 등에 사용)
+- `TrySpend`: 검증 + 실제 포인트 소모 (실제 행동 시작 시 사용)
+
+---
+
+## 7. 턴 종료 조건 처리하기
+
+### 현재 문제점
+
+초기 구현에서는 행동이 완료된 후 턴이 자동 종료되지 않고 무한 루프에 빠짐:
+
+```
+1. 적이 SpinAction 실행 (포인트 2 → 1)
+2. 행동 완료, SetStateTakingTurn 호출
+3. 다시 TryTakeEnemyAIAction 호출
+4. 포인트 부족으로 false 반환
+5. 하지만 턴을 종료하지 않고 계속 대기
+6. 게임이 멈춤
+```
+
+### 함수명 변경: Take → Try
+
+```csharp
+// 변경 전
+private void TakeEnemyAIAction(Unit enemyUnit, Action onEnemyAIActionComplete)
+{
+    // 항상 성공한다고 가정
+}
+
+// 변경 후
+private bool TryTakeEnemyAIAction(Unit enemyUnit, Action onEnemyAIActionComplete)
+{
+    // 성공/실패를 bool로 반환
+}
+```
+
+**Try 접두사의 의미:**
+
+- C# 네이밍 규칙: "Try"로 시작하는 함수는 성공/실패를 bool로 반환
+- 예: `int.TryParse()`, `Dictionary.TryGetValue()` 등
+- 명확한 의미 전달: "시도했는데 실패할 수도 있다"
+
+### Update에서 턴 종료 처리
+
+```csharp
+case State.TackingTurn:
+    timer -= Time.deltaTime;
+
+    if (timer <= 0f)
+    {
+        // 행동 시도
+        if (TryTakeEnemyAIAction(SetStateTakingTurn))
+        {
+            // 성공: Busy 상태로 전환하여 행동 실행
+            state = State.Busy;
+        }
+        else
+        {
+            // 실패: 더 이상 행동할 수 없으므로 턴 종료
+            TurnSystem.Instance.NextTurn();
+        }
+    }
+    break;
+```
+
+**전체 흐름 이해:**
+
+```
+턴 시작 → TackingTurn 상태
+    ↓
+타이머 대기 (2초)
+    ↓
+행동 시도
+    ↓
+성공? → Busy → 행동 실행 → 완료 → SetStateTakingTurn → 다시 시도
+실패? → 모든 적이 포인트 없음 → NextTurn() 호출 → 플레이어 턴
+```
+
+### 왜 모든 적을 순회하나?
+
+```csharp
+foreach (Unit enemyUnit in UnitManager.Instance.GetEnemyUnitList())
+{
+    if (TryTakeEnemyAIAction(enemyUnit, onEnemyAIActionComplete))
+    {
+        return true;  // 첫 번째 성공한 유닛에서 멈춤
+    }
+}
+return false;  // 모두 실패
+
+```
+
+**순회 방식:**
+
+- 적 유닛 리스트를 앞에서부터 순서대로 확인
+- 첫 번째 유닛이 행동 가능하면 → 그 유닛이 행동하고 종료
+- 첫 번째 유닛이 포인트 없으면 → 두 번째 유닛 확인
+- 모든 유닛이 행동 불가능하면 → false 반환하여 턴 종료
+
+**공정성 문제:**
+
+- 현재는 항상 리스트의 첫 번째 적이 우선권을 가짐
+- 나중에 개선: 랜덤 순서, 우선순위 시스템 등 추가 가능
+
+---
+
+## 8. 다중 적 유닛 테스트와 최종 검증
+
+### 적 유닛 복제하여 배치
+
+Unity 에디터에서:
+
+1. 기존 적 유닛 선택
+2. Ctrl+D (Duplicate)로 복사
+3. Transform 위치를 다른 곳으로 변경 (예: X=10, Z=6)
+
+### 첫 번째 테스트: SpinAction 비용 2
+
+```csharp
+// SpinAction.cs
+private int actionPointCost = 2;  // 회전 한 번에 2포인트 소모
+```
+
+**테스트 시나리오:**
+
+```
+플레이어 턴 종료
+    ↓
+적1: 포인트 2 → SpinAction 1회 → 포인트 0
+    ↓
+적2: 포인트 2 → SpinAction 1회 → 포인트 0
+    ↓
+모든 적 포인트 소진 → 턴 종료 → 플레이어 턴
+```
+
+**예상 결과:**
+
+- 각 적이 한 번씩만 회전
+- 총 2번의 회전 후 턴 종료
+
+### 두 번째 테스트: SpinAction 비용 1
+
+```csharp
+// SpinAction.cs
+private int actionPointCost = 1;  // 회전 한 번에 1포인트만 소모
+```
+
+**테스트 시나리오:**
+
+```
+플레이어 턴 종료
+    ↓
+적1: 포인트 2 → Spin (1) → 포인트 1 → Spin (2) → 포인트 0
+    ↓
+적2: 포인트 2 → Spin (1) → 포인트 1 → Spin (2) → 포인트 0
+    ↓
+모든 적 포인트 소진 → 턴 종료
+```
+
+**예상 결과:**
+
+- 각 적이 두 번씩 회전
+- 총 4번의 회전 후 턴 종료
+
+### 타이머 간격의 역할
+
+```csharp
+// 턴 시작 시
+timer = 2f;  // 첫 행동까지 2초 대기
+
+// 행동 완료 후
+timer = 0.5f;  // 다음 행동까지 0.5초 대기
+```
+
+**사용자 경험 개선:**
+
+- 2초: 턴이 바뀌었다는 것을 플레이어가 인지할 시간
+- 0.5초: 행동 간 자연스러운 간격
+- 타이머 없이 즉시 실행하면 너무 빨라서 무슨 일이 일어났는지 파악 어려움
+
+### 최종 검증 항목
+
+✅ **단일 적 유닛:**
+
+- 턴 시작 시 2초 대기
+- 포인트가 있으면 회전
+- 포인트 소진 시 턴 종료
+
+✅ **다중 적 유닛:**
+
+- 각 적이 순서대로 행동
+- 한 적이 행동 후 0.5초 대기하고 다음 적 행동
+- 모든 적의 포인트 소진 시 턴 종료
+
+✅ **액션 포인트 시스템:**
+
+- 비용 2일 때: 각 적 1회 행동
+- 비용 1일 때: 각 적 2회 행동
+- 포인트 검증 정상 작동
+
+✅ **턴 순환:**
+
+- 적 턴 종료 → 플레이어 턴 자동 전환
+- 플레이어 턴 종료 → 적 턴 자동 전환
+- 무한 루프 없음
+
+---
+
+## 🎯 핵심 개념 정리
+
+### 1. 상태 머신 (State Machine)
+
+- 복잡한 행동을 명확한 상태들로 분리
+- 각 상태에서 허용되는 행동만 실행
+- 상태 전환 규칙을 명확히 정의
+
+### 2. 이벤트 기반 아키텍처
+
+- 유닛 생성/사망을 이벤트로 알림
+- UnitManager가 자동으로 리스트 업데이트
+- 느슨한 결합(Loose Coupling) 유지
+
+### 3. 싱글톤 패턴
+
+- 전역적으로 접근 가능한 관리자 클래스
+- 중복 생성 방지
+- 게임 전체의 상태 관리
+
+### 4. 콜백 패턴
+
+- 비동기 작업 완료를 알림
+- 행동 완료 → 자동으로 다음 단계 진행
+- 순환 구조 구현 (행동 → 대기 → 다음 행동)
+
+### 5. 반환값 활용
+
+- bool 반환: 성공/실패 명확히 전달
+- Try 접두사: 실패 가능성 암시
+- 조건부 로직의 명확성 향상
+
+---
+
+## 🔜 다음 단계 예고
+
+현재 구현된 AI는 매우 기본적:
+
+- 항상 SpinAction만 실행
+- 전략적 판단 없음
+- 플레이어 위치 무시
+
+**다음 강의에서 추가할 내용:**
+
+- 복잡한 의사결정 로직
+- 여러 행동 중 선택
+- 우선순위 시스템
+- 플레이어와의 상호작용 고려
+
+# { 🤖 Unity 턴제 전략 게임 - AI 시스템 구현하기 }
+
+이번 강의는 적 AI가 이동(Move)과 사격(Shoot) 액션을 지능적으로 선택하고 실행하도록 만드는 AI 시스템 구현에 대한 내용입니다.
+
+---
+
+## 📋 목차
+
+1. [AI 시스템 개요와 설계 철학](https://claude.ai/chat/5639c137-98c2-47cf-9d49-b291fb093191#1-ai-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B0%9C%EC%9A%94%EC%99%80-%EC%84%A4%EA%B3%84-%EC%B2%A0%ED%95%99)
+2. [EnemyAIAction 클래스 만들기](https://claude.ai/chat/5639c137-98c2-47cf-9d49-b291fb093191#2-enemyaiaction-%ED%81%B4%EB%9E%98%EC%8A%A4-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+3. [BaseAction에서 AI 액션 평가 시스템 구축](https://claude.ai/chat/5639c137-98c2-47cf-9d49-b291fb093191#3-baseaction%EC%97%90%EC%84%9C-ai-%EC%95%A1%EC%85%98-%ED%8F%89%EA%B0%80-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B5%AC%EC%B6%95)
+4. [SpinAction AI 구현](https://claude.ai/chat/5639c137-98c2-47cf-9d49-b291fb093191#4-spinaction-ai-%EA%B5%AC%ED%98%84)
+5. [ShootAction AI 구현 - 기본 점수](https://claude.ai/chat/5639c137-98c2-47cf-9d49-b291fb093191#5-shootaction-ai-%EA%B5%AC%ED%98%84---%EA%B8%B0%EB%B3%B8-%EC%A0%90%EC%88%98)
+6. [ShootAction에서 특정 위치의 타겟 수 계산](https://claude.ai/chat/5639c137-98c2-47cf-9d49-b291fb093191#6-shootaction%EC%97%90%EC%84%9C-%ED%8A%B9%EC%A0%95-%EC%9C%84%EC%B9%98%EC%9D%98-%ED%83%80%EA%B2%9F-%EC%88%98-%EA%B3%84%EC%82%B0)
+7. [MoveAction AI 구현 - 전술적 이동](https://claude.ai/chat/5639c137-98c2-47cf-9d49-b291fb093191#7-moveaction-ai-%EA%B5%AC%ED%98%84---%EC%A0%84%EC%88%A0%EC%A0%81-%EC%9D%B4%EB%8F%99)
+8. [EnemyAI에서 최적 액션 선택 로직](https://claude.ai/chat/5639c137-98c2-47cf-9d49-b291fb093191#8-enemyai%EC%97%90%EC%84%9C-%EC%B5%9C%EC%A0%81-%EC%95%A1%EC%85%98-%EC%84%A0%ED%83%9D-%EB%A1%9C%EC%A7%81)
+9. [ShootAction AI 고도화 - 체력 기반 우선순위](https://claude.ai/chat/5639c137-98c2-47cf-9d49-b291fb093191#9-shootaction-ai-%EA%B3%A0%EB%8F%84%ED%99%94---%EC%B2%B4%EB%A0%A5-%EA%B8%B0%EB%B0%98-%EC%9A%B0%EC%84%A0%EC%88%9C%EC%9C%84)
+10. [테스트 및 동작 확인](https://claude.ai/chat/5639c137-98c2-47cf-9d49-b291fb093191#10-%ED%85%8C%EC%8A%A4%ED%8A%B8-%EB%B0%8F-%EB%8F%99%EC%9E%91-%ED%99%95%EC%9D%B8)
+
+---
+
+## 1. AI 시스템 개요와 설계 철학
+
+### AI의 기본 동작 원리
+
+이전 강의에서는 적 AI가 SpinAction만 수행하는 매우 기본적인 형태였습니다. 이번에는 **액션 평가 시스템(Action Scoring System)**을 구현하여 AI가 상황에 맞는 최적의 행동을 선택하도록 만듭니다.
+
+### 핵심 개념: 액션 점수(Action Value)
+
+- **각 액션에 점수를 부여**: AI는 수행 가능한 모든 액션에 대해 점수를 계산합니다
+- **점수 계산 기준**:
+  - 해당 액션이 얼마나 유리한가?
+  - 전략적으로 얼마나 가치있는가?
+- **최고 점수 선택**: 모든 액션 중 가장 높은 점수를 가진 액션을 실행합니다
+
+### AI 복잡도에 대한 철학
+
+강사는 AI가 매우 복잡한 주제이며, 원한다면 한 강좌 전체를 할애할 수 있을 만큼 깊이 있는 분야라고 설명합니다. 이 강의에서는:
+
+- **적당한 복잡도**: 너무 단순하지도, 너무 복잡하지도 않은 수준
+- **확장 가능성**: 나중에 더 복잡한 로직을 쉽게 추가할 수 있는 구조
+- **실용성**: 게임이 살아있다고 느껴질 정도의 지능
+
+---
+
+## 2. EnemyAIAction 클래스 만들기
+
+### 새 스크립트 생성
+
+AI가 평가한 액션 정보를 담을 데이터 클래스를 만듭니다.
+
+```csharp
+public class EnemyAIAction
+{
+    // AI가 선택한 그리드 위치
+    public GridPosition gridPosition;
+
+    // 이 액션의 가치를 나타내는 점수
+    // 숫자가 높을수록 더 좋은 액션
+    public int actionValue;
+}
+```
+
+### 클래스 특징
+
+- **MonoBehaviour 상속 없음**: 게임 오브젝트에 붙일 필요가 없는 순수 데이터 클래스
+- **public 필드**: 간단한 데이터 컨테이너이므로 직접 접근 가능
+- **두 가지 핵심 정보**:
+  1. `gridPosition`: 어디로 이동/공격할 것인가
+  2. `actionValue`: 이 선택이 얼마나 좋은가
+
+---
+
+## 3. BaseAction에서 AI 액션 평가 시스템 구축
+
+### GetBestEnemyAIAction 메서드 구현
+
+모든 액션이 상속받는 BaseAction 클래스에 AI 평가 시스템을 추가합니다.
+
+```csharp
+public EnemyAIAction GetBestEnemyAIAction()
+{
+    // 모든 가능한 AI 액션을 저장할 리스트
+    List<EnemyAIAction> enemyAIActionList = new List<EnemyAIAction>();
+
+    // 이 액션으로 이동/공격 가능한 모든 그리드 위치 가져오기
+    List<GridPosition> validActionGridPositionList = GetValidActionGridPositionList();
+
+    // 각 유효한 위치에 대해
+    foreach(GridPosition gridPosition in validActionGridPositionList)
+    {
+        // 해당 위치에서의 AI 액션 평가 (각 자식 클래스에서 구현)
+        EnemyAIAction enemyAIAction = GetEnemyAIAction(gridPosition);
+
+        // 리스트에 추가
+        enemyAIActionList.Add(enemyAIAction);
+    }
+
+    // 액션이 하나라도 있으면
+    if (enemyAIActionList.Count > 0)
+    {
+        // actionValue 기준으로 내림차순 정렬
+        // (b.actionValue - a.actionValue)는 큰 값이 앞으로 오도록 함
+        enemyAIActionList.Sort((EnemyAIAction a, EnemyAIAction b) => b.actionValue - a.actionValue);
+
+        // 가장 높은 점수의 액션 반환 (정렬 후 첫 번째 요소)
+        return enemyAIActionList[0];
+    }
+    else
+    {
+        // 가능한 액션이 없으면 null 반환
+        return null;
+    }
+}
+
+```
+
+### 정렬 알고리즘 설명
+
+```csharp
+enemyAIActionList.Sort((EnemyAIAction a, EnemyAIAction b) => b.actionValue - a.actionValue);
+```
+
+- **람다 표현식 사용**: 익명 함수로 정렬 기준 정의
+- **비교 로직**:
+  - `b.actionValue - a.actionValue`가 양수면 → b가 더 큼 → b를 앞으로
+  - 음수면 → a가 더 큼 → a를 앞으로
+  - 0이면 → 같음 → 순서 유지
+- **결과**: actionValue가 큰 것부터 작은 순서로 정렬
+
+### 추상 메서드 선언
+
+각 액션 클래스가 반드시 구현해야 하는 메서드를 추가합니다.
+
+```csharp
+// abstract 키워드: 자식 클래스에서 반드시 구현해야 함
+public abstract EnemyAIAction GetEnemyAIAction(GridPosition gridPosition);
+```
+
+---
+
+## 4. SpinAction AI 구현
+
+### SpinAction의 AI 전략
+
+SpinAction은 디버그/테스트용 액션으로, AI가 선택하면 안 되는 액션입니다.
+
+```csharp
+public override EnemyAIAction GetEnemyAIAction(GridPosition gridPosition)
+{
+    return new EnemyAIAction
+    {
+        gridPosition = gridPosition,
+        actionValue = 0,  // 가장 낮은 점수
+    };
+}
+```
+
+### 설계 의도
+
+- **actionValue = 0**: 가능한 가장 낮은 점수
+- **의미**: "다른 액션이 전혀 없을 때만 이걸 해라"
+- **우선순위**: 이동이나 공격이 가능하면 절대 Spin을 선택하지 않음
+
+---
+
+## 5. ShootAction AI 구현 - 기본 점수
+
+### ShootAction의 기본 AI 전략
+
+사격이 가능하다면 최우선으로 실행해야 합니다.
+
+```csharp
+public override EnemyAIAction GetEnemyAIAction(GridPosition gridPosition)
+{
+    // gridPosition에 있는 적(플레이어) 유닛 가져오기
+    Unit targetUnit = LevelGrid.Instance.GetUnitAtGridPosition(gridPosition);
+
+    return new EnemyAIAction
+    {
+        gridPosition = gridPosition,
+        actionValue = 100,  // 높은 기본 점수
+    };
+}
+```
+
+### 설계 의도
+
+- **actionValue = 100**: 매우 높은 기본 점수
+- **의미**: "사격이 가능하면 무조건 사격해라"
+- **우선순위**: Move(이동)보다 Shoot(사격)을 우선
+
+---
+
+## 6. ShootAction에서 특정 위치의 타겟 수 계산
+
+### GetValidActionGridPositionList 오버로드
+
+MoveAction에서 "이동 후 몇 명을 공격할 수 있는지" 계산하기 위해 필요합니다.
+
+```csharp
+// 기존 메서드 - 현재 유닛 위치 기준
+public override List<GridPosition> GetValidActionGridPositionList()
+{
+    GridPosition unitGridPosition = unit.GetGridPosition();
+    return GetValidActionGridPositionList(unitGridPosition);
+}
+
+// 오버로드 메서드 - 임의의 위치 기준
+public List<GridPosition> GetValidActionGridPositionList(GridPosition unitGridPosition)
+{
+    List<GridPosition> validGridPositionList = new List<GridPosition>();
+
+    // maxShootDistance 범위 내의 모든 위치 검사
+    for (int x = -maxShootDistance; x <= maxShootDistance; x++)
+    {
+        for (int z = -maxShootDistance; z <= maxShootDistance; z++)
+        {
+            GridPosition offsetGridPosition = new GridPosition(x, z);
+            GridPosition testGridPosition = unitGridPosition + offsetGridPosition;
+
+            // 유효하지 않은 그리드 위치면 스킵
+            if (!LevelGrid.Instance.IsValidGridPosition(testGridPosition))
+            {
+                continue;
+            }
+
+            // 실제 거리 계산 (맨하탄 거리)
+            int testDistance = Mathf.Abs(x) + Mathf.Abs(z);
+            if (testDistance > maxShootDistance)
+            {
+                continue;
+            }
+
+            // 해당 위치에 유닛이 없으면 스킵
+            if (!LevelGrid.Instance.HasAnyUnitOnGridPosition(testGridPosition))
+            {
+                continue;
+            }
+
+            Unit targetUnit = LevelGrid.Instance.GetUnitAtGridPosition(testGridPosition);
+
+            // 아군이면 스킵 (적만 공격 가능)
+            if (targetUnit.IsEnemy() == unit.IsEnemy())
+            {
+                continue;
+            }
+
+            validGridPositionList.Add(testGridPosition);
+        }
+    }
+
+    return validGridPositionList;
+}
+```
+
+### GetTargetCountAtPosition 메서드
+
+특정 위치에서 공격 가능한 타겟 수를 반환합니다.
+
+```csharp
+public int GetTargetCountAtPosition(GridPosition gridPosition)
+{
+    // 해당 위치에서의 유효한 사격 대상 리스트를 가져와서 개수 반환
+    return GetValidActionGridPositionList(gridPosition).Count;
+}
+```
+
+---
+
+## 7. MoveAction AI 구현 - 전술적 이동
+
+### Unit에 ShootAction 노출
+
+MoveAction에서 ShootAction을 참조할 수 있도록 Unit 클래스에 getter 추가:
+
+```csharp
+public ShootAction GetShootAction()
+{
+    return shootAction;
+}
+```
+
+### MoveAction의 AI 전략
+
+단순히 랜덤하게 이동하는 것이 아니라, **가장 많은 적을 공격할 수 있는 위치**로 이동합니다.
+
+```csharp
+public override EnemyAIAction GetEnemyAIAction(GridPosition gridPosition)
+{
+    // 이 위치로 이동했을 때 공격 가능한 타겟 수 계산
+    int targetCountAtGridPosition = unit.GetShootAction().GetTargetCountAtPosition(gridPosition);
+
+    return new EnemyAIAction
+    {
+        gridPosition = gridPosition,
+        actionValue = targetCountAtGridPosition * 10,  // 타겟 수 × 10
+    };
+}
+```
+
+### 점수 계산 로직
+
+- **타겟 1명 있는 위치**: actionValue = 1 × 10 = **10점**
+- **타겟 2명 있는 위치**: actionValue = 2 × 10 = **20점**
+- **타겟 0명 있는 위치**: actionValue = 0 × 10 = **0점**
+
+### 전략적 의미
+
+1. **우선순위**: 많은 적을 공격할 수 있는 위치를 선호
+2. **Shoot vs Move 비교**:
+   - Shoot의 기본 점수 = 100
+   - Move의 최대 점수 = (타겟 수 × 10)
+   - 따라서 사격 가능하면 항상 사격 우선
+3. **Move 내 우선순위**: 2명 공격 가능 위치 > 1명 공격 가능 위치 > 0명 위치
+
+---
+
+## 8. EnemyAI에서 최적 액션 선택 로직
+
+### TryTakeEnemyAIAction 메서드 수정
+
+기존의 단순한 SpinAction 로직을 완전히 교체합니다.
+
+```csharp
+private bool TryTakeEnemyAIAction(Unit enemyUnit, Action onEnemyAIActionComplete)
+{
+    // 최고 점수의 AI 액션을 저장할 변수
+    EnemyAIAction bestEnemyAIAction = null;
+    BaseAction bestBaseAction = null;
+
+    // 이 적 유닛이 가진 모든 액션을 순회
+    foreach (BaseAction baseAction in enemyUnit.GetBaseActionArray())
+    {
+        // 1단계: 액션 포인트 체크
+        // 이 액션을 수행할 만큼의 액션 포인트가 있는지 확인
+        if (!enemyUnit.CanSpendActionPointsToTakeAction(baseAction))
+        {
+            continue;  // 액션 포인트 부족하면 다음 액션으로
+        }
+
+        // 2단계: 첫 번째 유효한 액션 처리
+        if (bestEnemyAIAction == null)
+        {
+            // 아직 비교 대상이 없으면 이것을 기준으로 설정
+            bestEnemyAIAction = baseAction.GetBestEnemyAIAction();
+            bestBaseAction = baseAction;
+        }
+        else
+        {
+            // 3단계: 더 좋은 액션 찾기
+            // 현재 액션의 최고 점수 계산
+            EnemyAIAction testEnemyAIAction = baseAction.GetBestEnemyAIAction();
+
+            // 유효하고 && 기존 최고점보다 높으면
+            if (testEnemyAIAction != null &&
+                testEnemyAIAction.actionValue > bestEnemyAIAction.actionValue)
+            {
+                // 새로운 최고 액션으로 갱신
+                bestEnemyAIAction = testEnemyAIAction;
+                bestBaseAction = baseAction;
+            }
+        }
+    }
+
+    // 4단계: 최종 액션 실행
+    // 유효한 액션이 있고 && 액션 포인트 소모 성공하면
+    if (bestEnemyAIAction != null &&
+        enemyUnit.TrySpendActionPointsToTakeAction(bestBaseAction))
+    {
+        // 선택된 최고 액션 실행
+        bestBaseAction.TakeAction(bestEnemyAIAction.gridPosition, onEnemyAIActionComplete);
+        return true;
+    }
+    else
+    {
+        // 실행할 수 있는 액션이 없음
+        return false;
+    }
+}
+```
+
+### 로직 흐름 상세 분석
+
+### 1단계: 액션 포인트 체크
+
+```csharp
+if (!enemyUnit.CanSpendActionPointsToTakeAction(baseAction))
+{
+    continue;
+}
+```
+
+- 액션 포인트가 부족한 액션은 평가조차 하지 않음
+- 효율성 향상
+
+### 2단계: 첫 번째 유효 액션
+
+```csharp
+if (bestEnemyAIAction == null)
+{
+    bestEnemyAIAction = baseAction.GetBestEnemyAIAction();
+    bestBaseAction = baseAction;
+}
+
+```
+
+- 비교 기준이 필요하므로 첫 번째로 발견한 유효 액션을 기준으로 설정
+
+### 3단계: 더 좋은 액션 탐색
+
+```csharp
+EnemyAIAction testEnemyAIAction = baseAction.GetBestEnemyAIAction();
+
+if (testEnemyAIAction != null &&
+    testEnemyAIAction.actionValue > bestEnemyAIAction.actionValue)
+{
+    bestEnemyAIAction = testEnemyAIAction;
+    bestBaseAction = baseAction;
+}
+```
+
+- 각 액션의 최고 점수를 계산하고
+- 현재 최고점보다 높으면 갱신
+
+### 4단계: 실행
+
+```csharp
+if (bestEnemyAIAction != null &&
+    enemyUnit.TrySpendActionPointsToTakeAction(bestBaseAction))
+{
+    bestBaseAction.TakeAction(bestEnemyAIAction.gridPosition, onEnemyAIActionComplete);
+    return true;
+}
+```
+
+- 최종 선택된 액션을 실제로 실행
+- 액션 포인트 소모 후 액션 수행
+
+---
+
+## 9. ShootAction AI 고도화 - 체력 기반 우선순위
+
+### 전략적 개선
+
+현재는 모든 적에게 100점을 부여하지만, 실제 전략 게임에서는 **약한 적을 먼저 처치**하는 것이 유리합니다.
+
+### Unit에 체력 정보 노출
+
+```csharp
+public float GetHealthNormalized()
+{
+    // HealthSystem에서 정규화된 체력 값 반환 (0.0 ~ 1.0)
+    return healthSystem.GetHealthNormalized();
+}
+```
+
+### 개선된 ShootAction AI
+
+```csharp
+public override EnemyAIAction GetEnemyAIAction(GridPosition gridPosition)
+{
+    // 공격 대상 유닛 가져오기
+    Unit targetUnit = LevelGrid.Instance.GetUnitAtGridPosition(gridPosition);
+
+    return new EnemyAIAction
+    {
+        gridPosition = gridPosition,
+        // 기본 100점 + (1 - 체력비율) × 100
+        actionValue = 100 + Mathf.RoundToInt((1 - targetUnit.GetHealthNormalized()) * 100f),
+    };
+}
+
+```
+
+### 점수 계산 상세 분석
+
+### 체력 100% 적
+
+```
+actionValue = 100 + (1 - 1.0) × 100
+            = 100 + 0 × 100
+            = 100 + 0
+            = 100점
+
+```
+
+### 체력 50% 적
+
+```
+actionValue = 100 + (1 - 0.5) × 100
+            = 100 + 0.5 × 100
+            = 100 + 50
+            = 150점
+
+```
+
+### 체력 10% 적
+
+```
+actionValue = 100 + (1 - 0.1) × 100
+            = 100 + 0.9 × 100
+            = 100 + 90
+            = 190점
+
+```
+
+### 전략적 효과
+
+1. **약한 적 우선**: 체력이 낮을수록 점수가 높음
+2. **완전 처치 우선**: 거의 죽어가는 적을 먼저 제거
+3. **전력 감소**: 적의 수를 빠르게 줄여 화력 감소
+4. **동점 방지**: `Mathf.RoundToInt`로 정수 변환
+
+### Mathf.RoundToInt 필요성
+
+```csharp
+Mathf.RoundToInt((1 - targetUnit.GetHealthNormalized()) * 100f)
+```
+
+- **actionValue는 int 타입**: 정수만 저장 가능
+- **GetHealthNormalized()는 float**: 0.0 ~ 1.0 사이의 실수
+- **반올림 필요**: 0.753 × 100 = 75.3 → 75 (int로 변환)
+
+---
+
+## 10. 테스트 및 동작 확인
+
+### 테스트 시나리오 1: 사격 우선순위
+
+**상황 설정**:
+
+- 플레이어 2명이 적 사거리 안에 있음
+- 적이 둘 다 공격 가능
+
+**예상 동작**:
+
+- 적이 즉시 사격 액션 선택
+- 이동하지 않고 바로 공격
+
+**결과**:
+
+- ✅ 적이 사격 액션 우선 실행
+- ✅ 액션 포인트가 있으면 연속 공격
+
+### 테스트 시나리오 2: 이동 후 사격
+
+**상황 설정**:
+
+- 적 1은 사거리 안에 플레이어 있음
+- 적 2는 사거리 밖에 있음 (거리 11칸)
+
+**예상 동작**:
+
+- 적 1: 즉시 사격
+- 적 2: 플레이어에게 접근 → 사거리 안 들어오면 사격
+
+**결과**:
+
+- ✅ 적 1이 먼저 사격
+- ✅ 적 2가 점진적으로 이동
+- ✅ 사거리 안에 들어오자마자 사격
+
+### 테스트 시나리오 3: 약한 적 우선 공격
+
+**상황 설정**:
+
+- 플레이어 A: 체력 100% (2타 맞은 상태)
+- 플레이어 B: 체력 100%
+- 적 2명 배치
+
+**예상 동작**:
+
+- 첫 번째 적이 플레이어 A 공격 (이미 데미지 입음)
+- 두 번째 적도 플레이어 A 공격 (더 약하므로)
+
+**결과**:
+
+- ✅ 두 적 모두 같은 타겟(더 약한 플레이어) 공격
+- ✅ 체력 기반 우선순위 정상 작동
+
+### 실제 게임 플레이 확인 사항
+
+강사가 실제로 테스트하며 확인한 내용:
+
+1. **사격 범위 확인**:
+   - 적과 플레이어 모두 사거리 7칸
+   - 맨하탄 거리로 계산됨
+2. **액션 포인트 관리**:
+   - 적이 액션 포인트 2개로 연속 행동
+   - 포인트 소진 시 턴 종료
+3. **이동 경로**:
+   - 적이 가장 많은 플레이어를 공격할 수 있는 위치로 이동
+   - 2명 공격 가능한 위치 > 1명 공격 가능한 위치
+4. **체력 기반 타겟팅**:
+   - 같은 위치에서 여러 타겟 공격 가능할 때
+   - 항상 체력이 낮은 적 우선 선택
+
+---
+
+## 🎯 핵심 개념 정리
+
+### 1. AI 평가 시스템 구조
+
+```
+BaseAction.GetBestEnemyAIAction()
+    ↓
+각 그리드 위치마다 GetEnemyAIAction() 호출
+    ↓
+actionValue 기준으로 정렬
+    ↓
+최고 점수 액션 반환
+```
+
+### 2. 액션별 우선순위
+
+```
+ShootAction: 100~200점 (체력 기반)
+MoveAction: 0~20점 (타겟 수 × 10)
+SpinAction: 0점 (최후의 수단)
+```
+
+### 3. 전략적 의사결정 흐름
+
+```
+1. 사격 가능? → Yes: 즉시 사격 (특히 약한 적)
+2. 사격 불가능? → 가장 많은 적 공격 가능한 위치로 이동
+3. 이동도 불가능? → SpinAction (실제로는 거의 발생 안 함)
+4. 아무것도 불가능? → 턴 종료
+```
+
+### 4. 확장성
+
+- 새로운 액션 추가 시 `GetEnemyAIAction()` 구현만 하면 됨
+- 액션별로 독립적인 점수 계산 로직 가능
+- 전체 시스템 수정 없이 각 액션의 AI 개선 가능
+
+---
+
+## 💡 강의 마무리
+
+강사의 핵심 메시지:
+
+1. **단순하지만 효과적**: 복잡한 AI 알고리즘 없이도 게임이 살아있게 느껴짐
+2. **확장 가능**: 각 액션의 점수 계산만 수정하면 더 똑똑해질 수 있음
+3. **학습 가치**: AI는 끝없이 깊게 공부할 수 있는 분야
+4. **다음 주제 예고**: 다음 강의에서는 **제네릭(Generics)**에 대해 배울 예정
+
+이제 적 AI가 전략적으로 이동하고, 약한 적을 우선 공격하며, 상황에 맞는 최적의 액션을 선택할 수 있게 되었습니다!

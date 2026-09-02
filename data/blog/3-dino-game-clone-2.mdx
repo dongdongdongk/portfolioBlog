@@ -1,0 +1,1164 @@
+---
+title: '섹션 3: Dino Game Clone - 2 -'
+date: '2026-09-02'
+category: '게임 개발/Game Development in JS TS - The Complete Guide (w_'
+tags: ['게임 개발', 'Game Development in JS TS - The Complete Guide (w_']
+draft: false
+summary: ''
+---
+
+# { Player 클래스를 별도 파일로 분리하기 }
+
+## 개념 이해: 왜 클래스를 분리해야 할까?
+
+```jsx
+게임을 개발할 때 코드 구조를 깔끔하게 유지하는 것이 중요합니다.
+
+특히, 여러 개의 게임 오브젝트(캐릭터, 배경 등)를 관리하다 보면 코드가 복잡해질 수 있습니다.
+
+Player 클래스를 별도의 파일로 분리하면 다음과 같은 장점이 있습니다:
+
+		코드 재사용성 증가: 플레이어 캐릭터와 관련된 로직을 한 곳에 모아 관리할 수 있습니다.
+
+		가독성 향상: 씬(Scene)과 캐릭터 로직을 분리해, 각각의 기능을 쉽게 이해할 수 있습니다.
+
+		유지보수 용이: 플레이어 로직을 수정할 때 씬 코드를 건드릴 필요가 없습니다.
+```
+
+## Step 1: Player 클래스를 생성하고 등록하기
+
+```jsx
+폴더 구조 만들기
+
+		src/entities/Player.ts 파일 생성
+
+		src 폴더 아래에 entities 폴더를 만들고, 그 안에 Player.ts 파일을 생성합니다.
+```
+
+```jsx
+Player 클래스 코드 작성
+
+		아래 코드는 Phaser의 Physics.Arcade.Sprite 클래스를 상속받아 Player 클래스를 정의하는 과정입니다.
+```
+
+```jsx
+// Player.ts
+export class Player extends Phaser.Physics.Arcade.Sprite {
+
+    constructor(scene: Phaser.Scene, x: number, y: number) {
+        // 부모 클래스(Sprite) 초기화
+        super(scene, x, y, "dino-idle");
+
+        // 씬에 이 스프라이트 추가
+        scene.add.existing(this);
+        // 물리 엔진에 이 스프라이트 등록
+        scene.physics.add.existing(this);
+
+        // 초기 설정 함수 호출
+        this.init();
+    }
+
+    // 초기 설정 함수
+    init() {
+        this
+            .setOrigin(0, 1)          // 스프라이트의 기준점을 설정
+            .setGravityY(5000)        // Y축으로 중력을 설정
+            .setCollideWorldBounds(true) // 화면 밖으로 나가지 않도록 설정
+            .setBodySize(44, 92);     // 충돌 박스 크기 설정
+    }
+}
+```
+
+### 왜 `existing`을 써야 할까?
+
+```jsx
+Phaser.GameObjects.Sprite와 같은 게임 오브젝트는 new 키워드로 직접 생성할 수 있습니다.
+
+하지만 생성만 한다고 해서 Phaser 씬이 해당 오브젝트를 자동으로 인식하거나 화면에 그려주지는 않습니다.
+
+**scene.add.existing()**을 호출해야 Phaser가 그 오브젝트를 관리하고 화면에 표시할 수 있습니다.
+```
+
+```jsx
+scene.add.sprite(x, y, key)	새로운 스프라이트를 생성하고 씬에 추가
+
+scene.add.existing(gameObject)	이미 생성된 오브젝트를 씬에 추가
+```
+
+```jsx
+**scene.add.existing(this)**는 이미 생성된 게임 오브젝트를 씬에 추가하는 메서드입니다.
+
+이 메서드를 호출해야 Phaser 씬이 해당 오브젝트를 관리하고, 화면에 그릴 수 있습니다.
+
+별도의 클래스로 오브젝트를 정의할 때 반드시 사용해야 합니다.
+```
+
+## Step 2: PlayScene에서 Player 클래스 사용하기
+
+```jsx
+이제 우리가 만든 Player 클래스를 PlayScene에서 가져와 사용해봅시다.
+```
+
+```jsx
+// PlayScene.ts
+import Phaser from "phaser";
+import { Player } from "../entities/Player";
+
+class PlayScene extends Phaser.Scene {
+
+    player: Player; // Player 클래스 타입의 변수 선언
+
+    constructor() {
+        super("PlayScene");
+    }
+
+    create() {
+        this.createEnvironment();
+        this.createPlayer();
+        this.registerPlayerControl();
+    }
+
+    // 플레이어 생성 함수
+    createPlayer() {
+        this.player = new Player(this, 0, this.gameHeight);
+    }
+
+    // 배경 생성 함수
+    createEnvironment() {
+        this.add.tileSprite(0, this.gameHeight, 88, 26, "ground").setOrigin(0, 1);
+    }
+
+    // 플레이어 점프 컨트롤 등록 함수
+    registerPlayerControl() {
+        const spaceBar = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+        spaceBar.on('down', () => {
+            this.player.setVelocityY(-1600); // SPACE 키를 누르면 점프
+        });
+    }
+
+    // 게임 높이 반환 함수
+    get gameHeight() {
+        return this.game.config.height as number;
+    }
+}
+
+export default PlayScene;
+
+```
+
+# { 게임 루프 (Game Loop)와 업데이트 이벤트 }
+
+## 1. Player 클래스 생성 및 구조 이해
+
+### 기존 방식과 클래스 방식의 차이점
+
+```jsx
+기존 방식에서는 다음과 같이 플레이어 캐릭터를 생성했습니다.
+
+하지만 이렇게 하면 플레이어 객체를 관리하기 어려워지고, 새로운 기능을 추가할 때마다 코드가 복잡해집니다.
+
+➡️ 해결 방법: Player라는 클래스를 만들고, 플레이어 관련 기능을 클래스 내부에 캡슐화합니다.
+```
+
+```jsx
+this.physics.add.sprite(x, y, 'dino-idle')
+```
+
+### Player 클래스 정의
+
+```jsx
+우리는 Player 클래스를 **Phaser의 Arcade.Sprite**를 확장해서 만들고 있습니다.
+```
+
+```jsx
+export class Player extends Phaser.Physics.Arcade.Sprite {
+
+    constructor(scene: Phaser.Scene, x: number, y: number) {
+        // Phaser.Sprite 생성자 호출
+        super(scene, x, y, "dino-idle");
+
+        // 씬과 물리 엔진에 플레이어 추가
+        scene.add.existing(this);
+        scene.physics.add.existing(this);
+
+        // 초기화 함수 호출
+        this.init();
+
+        // 씬의 업데이트 이벤트에 연결
+        this.scene.events.on(Phaser.Scenes.Events.UPDATE, this.update, this);
+    }
+
+    init() {
+        // 플레이어 초기 설정
+        this.setOrigin(0, 1)
+            .setGravityY(5000)
+            .setCollideWorldBounds(true)
+            .setBodySize(44, 92);
+    }
+
+    update() {
+        console.log('Player update');
+    }
+}
+
+```
+
+### 세부 설명
+
+```jsx
+✅ 생성자 (constructor)
+
+		scene: Phaser 씬 객체
+
+		x, y: 플레이어의 초기 위치
+
+		"dino-idle": 플레이어의 스프라이트 이미지 키
+
+생성자 내부 작업:
+
+		super(scene, x, y, "dino-idle"): Phaser의 스프라이트 생성자 호출.
+
+		scene.add.existing(this): 씬에 플레이어 스프라이트를 추가.
+
+		scene.physics.add.existing(this): 물리 엔진에 플레이어를 추가.
+
+		this.init(): 플레이어 초기 설정 함수 호출.
+
+
+씬의 업데이트 이벤트에 연결:
+
+		this.scene.events.on(...)을 통해 업데이트 이벤트와 update() 함수를 연결.
+```
+
+## 게임 루프 (Game Loop)와 업데이트 이벤트
+
+```jsx
+게임 루프란?
+
+모든 게임에는 **게임 루프 (Game Loop)**라는 것이 존재합니다.
+
+게임 루프는 게임이 실행되는 동안 반복적으로 호출되며, 게임 내 상태를 지속적으로 업데이트합니다.
+
+Phaser의 게임 루프는 기본적으로 초당 60번 실행되며, 이를 통해 게임이 부드럽게 동작할 수 있습니다.
+```
+
+## Phaser 씬의 update() 함수
+
+```jsx
+Phaser에서 씬은 기본적으로 update() 함수를 제공합니다.
+
+이 함수는 게임 루프가 실행될 때마다 호출되며,
+
+우리는 여기서 플레이어의 상태를 지속적으로 업데이트할 수 있습니다.
+```
+
+```jsx
+update() {
+    console.log('Updating...');
+}
+```
+
+## 플레이어의 입력 이벤트 처리
+
+```jsx
+플레이어가 키보드 입력으로 점프하거나 움직일 수 있도록 입력 이벤트를 처리해야 합니다.
+```
+
+### ✅ **기존 방식: 씬에서 입력 이벤트 처리**
+
+```jsx
+기존에는 씬 내부에서 입력 이벤트를 처리했습니다.
+
+하지만 이런 방식은 씬에 많은 코드가 몰리기 때문에 유지보수가 어렵습니다.
+```
+
+```jsx
+this.input.keyboard.on('keydown-SPACE', () => {
+  this.player.setVelocityY(-1600)
+})
+```
+
+### ✅ **개선된 방식: Player 클래스에서 입력 이벤트 처리**
+
+```jsx
+플레이어 입력 이벤트를 Player 클래스로 옮겨서 init() 함수 내에서 처리합니다.
+```
+
+```jsx
+init() {
+    this.setOrigin(0, 1)
+        .setGravityY(5000)
+        .setCollideWorldBounds(true)
+        .setBodySize(44, 92);
+
+    // 키보드 입력 이벤트 등록
+    this.scene.input.keyboard.on('keydown-SPACE', () => {
+        this.setVelocityY(-1600);
+    });
+}
+
+```
+
+## Player 클래스에서 Update() 처리
+
+```jsx
+Phaser의 **씬의 update()**와 별개로,
+
+**Player 클래스 자체의 update()**를 활용해 플레이어 상태를 업데이트할 수 있습니다.
+```
+
+```jsx
+코드 수정 내용:
+
+		씬에서 Player의 update()를 호출하지 않음.
+
+		대신 씬의 업데이트 이벤트에 Player의 update()를 등록.
+
+		이제 Player 클래스의 update() 함수가 자동으로 호출됩니다.
+```
+
+```jsx
+constructor(scene: Phaser.Scene, x: number, y: number) {
+    super(scene, x, y, "dino-idle");
+
+    scene.add.existing(this);
+    scene.physics.add.existing(this);
+
+    this.init();
+
+    // 씬의 업데이트 이벤트에 플레이어의 update() 등록
+    this.scene.events.on(Phaser.Scenes.Events.UPDATE, this.update, this);
+}
+
+```
+
+## 정리
+
+```jsx
+게임 루프	초당 60번 실행되며 게임 상태를 지속적으로 업데이트.
+
+클래스 캡슐화	Player 관련 기능을 클래스로 묶어 코드 관리가 쉬워짐.
+
+입력 이벤트 처리	키보드 입력 이벤트를 Player 클래스에서 처리.
+```
+
+# { Phaser에서 플레이어 점프 동작을 구현하기 업데이트 }
+
+## 1. **업데이트 루프와 키 입력 감지**
+
+```jsx
+업데이트 루프란?
+
+		게임 내에서 매 프레임마다 실행되는 함수로,
+
+		캐릭터의 움직임이나 상태를 지속적으로 확인하고 업데이트하는 역할을 합니다.
+
+키 입력을 처리하는 방법:
+
+		Phaser에서 키 입력을 감지하려면 CursorKeys 객체를 생성해야 합니다.
+
+		CursorKeys는 방향키(위, 아래, 왼쪽, 오른쪽),
+
+		space, shift 키를 관리할 수 있는 객체입니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380499/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_3_Dino_Game_Clone_-_2_-/image.png)
+
+## 2. **`CursorKeys` 생성**
+
+```jsx
+CursorKeys는 Phaser.Input.Keyboard.CursorKeys 타입입니다.
+
+생성 방법
+
+this.cursors = this.scene.input.keyboard.createCursorKeys();
+
+this.scene.input.keyboard를 통해 키보드 입력 시스템에 접근.
+
+createCursorKeys()로 CursorKeys 객체를 생성.
+```
+
+## 3. **`space` 키 이벤트 처리**
+
+```jsx
+키 이벤트:
+
+		space 키가 눌렸는지 확인하기 위해 Phaser.Input.Keyboard.JustDown 함수를 사용합니다.
+
+				JustDown(space)는 키를 누르는 순간 한 번만 true를 반환.
+
+				지속적으로 눌린 상태에서는 다시 true를 반환하지 않음
+
+				const isSpaceJustDown = Phaser.Input.Keyboard.JustDown(space);
+```
+
+```jsx
+비교: isDown vs. JustDown:
+
+		isDown: 키를 누르고 있는 동안 계속 true를 반환.
+
+		JustDown: 키를 누른 순간 한 번만 true를 반환.
+```
+
+## 4. **점프 구현**
+
+```jsx
+플레이어가 점프하려면 두 가지 조건을 만족해야 합니다:
+
+		space 키를 방금 눌렀는지 확인.
+
+		플레이어가 땅에 닿아 있는지 확인.
+
+땅에 닿아 있는지 확인 (onFloor):
+
+		Phaser.Physics.Arcade.Body 객체의 onFloor() 메서드를 사용.
+
+		onFloor는 현재 플레이어가 땅과 접촉 중인지 true 또는 false를 반환.
+
+		* 아래와 같이 body 에 마우스를 올려서 타입을 확인해본다
+
+		const onFloor = (this.body as Phaser.Physics.Arcade.Body).onFloor();
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380498/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_3_Dino_Game_Clone_-_2_-/image_1.png)
+
+```jsx
+점프 로직:
+
+		두 조건이 충족되면 점프를 실행.
+
+		점프 시 Y축 속도를 음수 방향으로 설정하여 위로 이동.
+
+		if (isSpaceJustDown && onFloor) {
+		    this.setVelocityY(-1600);
+		}
+```
+
+## 5. **문제 해결**
+
+```jsx
+문제: 키를 누르고 있는 동안 계속 점프하는 현상
+
+		해결: JustDown 함수를 사용하여 키를 누르는 순간 한 번만 동작하도록 설정.
+
+문제: 공중에서 점프가 가능
+
+		해결: onFloor를 사용해 플레이어가 땅에 있을 때만 점프 가능하도록 조건 추가.
+```
+
+## 정리
+
+```jsx
+CursorKeys는 키 입력을 관리하는 편리한 도구.
+
+JustDown은 키 입력이 한 번만 감지되도록 도와줌.
+
+onFloor는 물리 엔진을 통해 캐릭터가 땅에 닿아 있는지 확인.
+
+Phaser의 물리 엔진과 키 입력 시스템을 결합하여 간단하고 직관적인 점프 동작 구현 가능.
+```
+
+```jsx
+export class Player extends Phaser.Physics.Arcade.Sprite {
+    // Phaser의 Physics Arcade Sprite를 상속하여 플레이어 클래스를 만듭니다.
+
+    cursors: Phaser.Types.Input.Keyboard.CursorKeys;
+    // 플레이어가 키보드 입력을 받을 수 있도록 설정.
+    // CursorKeys는 방향키(위, 아래, 왼쪽, 오른쪽), space, shift 키를 다룰 수 있습니다.
+
+    constructor(scene: Phaser.Scene, x: number, y: number) {
+        // 생성자: 씬(scene), 초기 위치(x, y), 스프라이트 키("dino-idle")를 초기화.
+
+        super(scene, x, y, "dino-idle");
+        // Phaser.Sprite의 생성자를 호출하여 "dino-idle"이라는 이미지를 사용하는 스프라이트 생성.
+
+        scene.add.existing(this);
+        // 씬에 이 스프라이트를 추가하여 렌더링되도록 설정.
+
+        scene.physics.add.existing(this);
+        // 씬의 물리 시스템에 이 스프라이트를 추가하여 물리 계산을 적용.
+
+        this.init();
+        // 초기 설정을 수행하는 메서드 호출.
+
+        this.scene.events.on(Phaser.Scenes.Events.UPDATE, this.update, this);
+        // 매 프레임마다 업데이트를 호출하도록 씬의 이벤트에 연결.
+    }
+
+    init() {
+        // 초기화 메서드: 플레이어의 속성과 입력을 설정합니다.
+
+        this.cursors = this.scene.input.keyboard.createCursorKeys();
+        // CursorKeys 객체를 생성하여 키보드 입력을 받을 수 있도록 설정.
+
+        this
+            .setOrigin(0, 1)
+            // 플레이어의 기준점을 설정. (0, 1)은 왼쪽 하단을 기준으로 설정합니다.
+
+            .setGravityY(5000)
+            // 플레이어에 중력을 적용. Y축 방향으로 5000의 중력이 작용합니다.
+
+            .setCollideWorldBounds(true)
+            // 화면 밖으로 나가지 않도록 설정.
+
+            .setBodySize(44, 92);
+            // 플레이어의 충돌 영역 크기를 설정. 폭 44px, 높이 92px.
+    }
+
+    update() {
+        // 매 프레임마다 호출되는 업데이트 메서드.
+
+        const { space } = this.cursors;
+        // CursorKeys에서 space 키를 가져옵니다.
+
+        const isSpaceJustDown = Phaser.Input.Keyboard.JustDown(space);
+        // space 키가 방금 눌렸는지 확인.
+        // JustDown은 키를 누른 순간 한 번만 true를 반환합니다.
+
+        const onFloor = (this.body as Phaser.Physics.Arcade.Body).onFloor();
+        // 플레이어가 땅에 닿아 있는지 확인.
+        // `onFloor`는 플레이어의 충돌체(body)가 땅과 접촉 중일 때 true를 반환.
+
+        if (isSpaceJustDown && onFloor) {
+            // space 키를 방금 눌렀고(onFloor) 땅에 닿아 있다면:
+
+            this.setVelocityY(-1600);
+            // Y축 방향으로 -1600의 속도를 설정하여 위로 점프.
+        }
+    }
+}
+
+```
+
+# { "땅을 롤아웃하는 기능"을 추가하며 게임 시작 }
+
+## 1. **트리거란 무엇인가?**
+
+```jsx
+게임에서 트리거는 특정 조건을 충족하면 실행되는 이벤트를 말합니다.
+
+여기서는 공룡(플레이어)이 스타트 트리거(보이지 않는
+
+스프라이트)와 충돌하면 어떤 동작을 수행하는 코드를 작성하고 있습니다.
+```
+
+## 2. **트리거를 두 가지로 구분**
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380498/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_3_Dino_Game_Clone_-_2_-/image_2.png)
+
+```jsx
+"위쪽 트리거": 초기 위치가 y = 10인 트리거.
+
+"아래쪽 트리거": 초기 트리거가 충돌 후 공룡 아래로 이동한 트리거.
+```
+
+## 3. **위쪽 트리거 작동 방식**
+
+```jsx
+1. 플레이어가 y = 10에 위치한 위쪽 트리거와 충돌합니다.
+
+2. 위쪽 트리거의 충돌을 감지하고 다음 작업을 수행합니다:
+
+		트리거의 위치를 공룡 아래(x = 0, y = this.gameHeight)로 이동합니다.
+
+		이후 코드를 실행하지 않도록 return으로 함수 종료.
+```
+
+## 4. **아래쪽 트리거 작동 방식**
+
+```jsx
+공룡이 점프 후 아래로 떨어질 때, 공룡 아래로 이동된 트리거와 다시 충돌합니다.
+
+이때:
+
+		y = 10이 아니므로 위쪽 트리거 체크는 무시됩니다.
+
+		트리거를 화면 밖(x = 9999, y = 9999)으로 이동하여 완전히 제거합니다.
+
+		게임이 시작되었다는 의미로
+
+		콘솔에 메시지를 출력합니다: Roll out the ground and start the game.
+```
+
+## 6. Physics Overlap, reset **개념 설명**
+
+```jsx
+물리적 충돌(Physics Overlap):
+
+		this.physics.add.overlap는 두 객체가 겹칠 때 특정 동작을 실행하게 합니다.
+
+트리거의 좌표 변경:
+
+		body.reset(x, y)를 사용하면 객체의 위치를 즉시 변경할 수 있습니다.
+```
+
+```jsx
+// 트리거와 플레이어가 충돌할 때의 동작을 정의합니다.
+this.physics.add.overlap(this.startTrigger, this.player, () => {
+  // 현재 트리거의 y 좌표가 10인지 확인합니다. (위쪽 트리거)
+  if (this.startTrigger.y === 10) {
+    // 트리거를 공룡 아래로 이동시킵니다.
+    // x 좌표는 0으로 유지하고, y 좌표는 게임의 높이로 설정합니다.
+    this.startTrigger.body.reset(0, this.gameHeight)
+
+    // 콘솔에 메시지를 출력하여 위쪽 트리거가 충돌했음을 알립니다.
+    console.log('Triggering upper Trigger')
+
+    // 현재 함수의 실행을 종료하여 이후 코드를 실행하지 않습니다.
+    return
+  }
+
+  // 트리거가 위쪽에 없을 때 (아래쪽 트리거일 때)
+  // 트리거를 화면 밖으로 이동시켜 더 이상 사용할 수 없도록 설정합니다.
+  this.startTrigger.body.reset(9999, 9999)
+
+  // 콘솔에 메시지를 출력하여 게임이 시작되었음을 알립니다.
+  console.log('Roll out the ground and start the game')
+})
+```
+
+# { "바닥을 점진적으로 펼쳐 나가는 효과"를 구현 }
+
+## 바닥 타일의 생성
+
+```jsx
+**바닥(TileSprite)**은 반복되는 이미지를 사용하는 타일 스프라이트로, 게임 화면 아래에 배치됩니다.
+
+코드에서는 this.ground 변수를 사용해 바닥을 생성했습니다
+```
+
+```jsx
+this.ground = this.add.tileSprite(0, this.gameHeight, 88, 26, 'ground').setOrigin(0, 1)
+```
+
+```jsx
+tileSprite는 스프라이트의 가로 또는 세로 크기를 조정하면 자동으로 타일을 복제하여 채워주는 방식입니다.
+
+위치: (0, this.gameHeight)는 바닥이 화면 맨 아래에 배치되도록 설정합니다.
+
+크기: 88x26 크기의 타일이 생성됩니다.
+
+이미지: "ground"라는 이름의 이미지가 사용됩니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380498/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_3_Dino_Game_Clone_-_2_-/image_3.png)
+
+## 타임드 이벤트 (Timed Event)
+
+```jsx
+타임드 이벤트는 특정 시간 간격마다 반복적으로 실행되는 이벤트입니다.
+
+바닥이 점진적으로 펼쳐지는 효과는 타임드 이벤트를 이용해 구현했습니다
+```
+
+```jsx
+this.time.addEvent({
+  delay: 1000 / 60, // 1초를 60등분한 시간(16.66ms)
+  loop: true, // 반복 실행
+  callback: () => {
+    if (this.ground.width <= this.gameWidth) {
+      this.ground.width += 34 // 바닥의 가로 길이를 34픽셀씩 증가
+    }
+  },
+})
+```
+
+```jsx
+delay: 1초를 60등분한 16.66ms로 설정해 이벤트를 60FPS(초당 60 프레임)로 실행.
+
+loop: true로 설정해 이벤트가 반복 실행되도록 설정.
+
+callback: 바닥의 가로 길이를 증가시키는 함수.
+```
+
+## 조건부 실행
+
+```jsx
+바닥이 화면 전체를 덮을 때까지만 가로 길이를 증가시켜야 합니다.
+
+이를 위해 조건문을 추가했습니다
+```
+
+```jsx
+if (this.ground.width <= this.gameWidth) {
+  this.ground.width += 34
+}
+```
+
+```jsx
+this.ground.width: 현재 바닥의 가로 길이.
+
+this.gameWidth: 화면의 가로 길이.
+
+조건문에 따라 바닥 길이가 화면 길이에 도달하면 더 이상 증가하지 않습니다.
+```
+
+## 타임드 이벤트의 정지
+
+```jsx
+타임드 이벤트는 자동으로 종료되지 않으므로, 필요할 때 수동으로 멈추어야 합니다.
+
+다음 강의에서 설명하겠지만,
+
+이벤트 객체를 destroy() 메서드로 제거하면 더 이상 실행되지 않습니다:
+```
+
+```jsx
+event.destroy() // 이벤트를 중지
+```
+
+## 속도 조정
+
+```jsx
+바닥이 펼쳐지는 속도는 this.ground.width에 더해지는 값으로 조정됩니다.
+
+34라는 값을 2배로 늘리면 속도가 빨라지고, 2로 나누면 느려집니다
+```
+
+```jsx
+this.ground.width += 34 * 2 // 속도를 2배 빠르게
+```
+
+```jsx
+1초 동안 물건을 옮기는 상황을 생각해볼게요.
+
+한 번에 10개씩 물건을 옮기면 1초에 총 100개를 옮깁니다.
+
+한 번에 20개씩 옮기면 1초에 총 200개를 옮깁니다. → 더 빨라짐
+
+한 번에 5개씩 옮기면 1초에 총 50개를 옮깁니다. → 더 느려짐
+
+바닥이 펼쳐지는 속도도 이와 같은 원리로 조절됩니다
+```
+
+# { Ground의 롤아웃 개선 }
+
+```jsx
+**Ground(땅)**의 롤아웃 이벤트를 완전히 롤아웃되었을 때 중지하도록 설정.
+
+플레이어가 땅이 펼쳐지는 동안 앞으로 조금 이동하도록 설정하고, 이후 멈추게 함.
+```
+
+## 1. **Ground의 롤아웃 이벤트 중지**
+
+```jsx
+문제: 이전 코드에서는 Ground가 완전히 펼쳐져도 이벤트가 계속 호출됨.
+
+해결 방법:
+
+		1. 이벤트를 변수에 저장: 이벤트를 변수에 저장하면 이를 제어할 수 있음
+
+				const rollOutEvent = this.time.addEvent({ ... });
+
+
+		2. 이벤트 종료 조건 추가
+
+				Ground의 width가 게임 화면의 width보다 크거나 같아지면 이벤트를 종료.
+
+				if (this.ground.width >= this.gameWidth) {
+				    rollOutEvent.remove();
+				}
+
+
+		3. Ground의 크기를 정확히 게임 크기로 맞춤:
+
+				Ground의 width가 정확히 게임 화면의 width와 같아지도록 설정.
+
+
+				this.ground.width = this.gameWidth;
+```
+
+## 2. **플레이어를 앞으로 조금 이동**
+
+```jsx
+문제: 플레이어가 땅이 펼쳐질 때 아무 움직임이 없음.
+
+해결 방법:
+
+1. 땅이 펼쳐지는 동안 플레이어를 앞으로 밀기:
+
+		플레이어의 X축 속도를 80으로 설정.
+
+		this.player.setVelocityX(80);
+
+
+
+2. 롤아웃 완료 후 속도를 0으로 리셋
+
+		Ground가 완전히 펼쳐지면 플레이어의 속도를 다시 0으로 설정.
+
+		this.player.setVelocityX(0);
+```
+
+## 코드
+
+```jsx
+// 1. 이벤트를 생성하고 변수에 저장합니다.
+//    - 이 이벤트는 Ground(땅)를 롤아웃하는 역할을 합니다.
+//    - 'loop: true'로 설정되어 반복적으로 실행됩니다.
+const rollOutEvent = this.time.addEvent({
+  // 2. 이벤트가 실행되는 간격(Delay)을 설정합니다.
+  //    - 60FPS 기준으로 1초에 60번 실행되도록 설정한 것입니다.
+  delay: 1000 / 60,
+
+  // 3. 반복 실행 여부를 true로 설정합니다.
+  //    - 이 이벤트는 조건이 충족될 때까지 계속 실행됩니다.
+  loop: true,
+
+  // 4. 반복 실행될 때마다 호출되는 함수(Callback)입니다.
+  callback: () => {
+    // 5. 플레이어를 앞으로 이동시키기 위해 속도를 설정합니다.
+    //    - X축 방향으로 초당 80 픽셀 속도로 이동합니다.
+    this.player.setVelocity(80)
+
+    // 6. Ground의 너비를 늘립니다.
+    //    - 매 프레임마다 너비를 34 픽셀씩 증가시킵니다 (17 * 2).
+    this.ground.width += 17 * 2
+
+    // 7. Ground의 너비가 게임 화면 너비에 도달했는지 확인합니다.
+    if (this.ground.width >= this.gameWidth) {
+      // 8. Ground가 완전히 펼쳐졌다면 이벤트를 제거합니다.
+      //    - 이벤트가 더 이상 반복되지 않습니다.
+      rollOutEvent.remove()
+
+      // 9. 플레이어의 속도를 0으로 설정합니다.
+      //    - 플레이어가 더 이상 앞으로 움직이지 않도록 멈춥니다.
+      this.player.setVelocity(0)
+    }
+  },
+})
+```
+
+# { 러닝 애니메이션 구현 }
+
+## 1. 애니메이션을 위한 스프라이트 시트 이해
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380498/notion-blog/_/Game_Development_in_JS_TS_-_The_Complete_Guide_w_/_3_Dino_Game_Clone_-_2_-/image_4.png)
+
+```jsx
+스프라이트 시트는 여러 프레임(이미지)을 하나의 파일에 포함한 이미지이다.
+
+각 프레임의 너비와 높이를 알아야 Phaser가 이를 개별 프레임으로 잘라낼 수 있다.
+
+		예: dino-run.png의 크기: 352x94 (너비x높이)
+
+		프레임 수: 4 → 각 프레임의 크기: 352 ÷ 4 = 88 (너비), 높이는 94
+```
+
+## 2. PreloadScene에서 스프라이트 시트 로드
+
+```jsx
+Phaser에서 스프라이트 시트를 로드하려면 this.load.spritesheet 메서드를 사용:
+
+frameWidth와 frameHeight를 지정하여 각 프레임의 크기를 알려준다.
+```
+
+```jsx
+this.load.spritesheet('dino-run', 'assets/dino-run.png', {
+  frameWidth: 88,
+  frameHeight: 94,
+})
+```
+
+## 3. Player 클래스에서 애니메이션 등록
+
+```jsx
+Player 클래스에 registerAnimations 메서드를 생성:
+```
+
+```jsx
+registerAnimations() {
+    this.anims.create({
+        key: 'dino-run', // 애니메이션 키 (식별자)
+        frames: this.anims.generateFrameNumbers('dino-run', { start: 2, end: 3 }), // 프레임 범위 설정
+        frameRate: 10, // 초당 프레임 수
+        repeat: -1 // 무한 반복
+    });
+}
+```
+
+```jsx
+key: 애니메이션을 식별하는 이름.
+
+frames: 애니메이션에 사용할 프레임의 시작과 끝.
+
+frameRate: 초당 재생할 프레임 수.
+
+repeat: -1로 설정하면 무한 반복.
+```
+
+```jsx
+init 메서드에서 애니메이션 등록 메서드 호출:
+
+init() {
+    this.registerAnimations();
+}
+```
+
+## 4. 애니메이션 실행
+
+```jsx
+playRunAnimation 메서드 추가:
+
+true는 동일한 애니메이션이 이미 실행 중일 경우 호출을 무시하도록 한다.
+```
+
+```jsx
+playRunAnimation() {
+    this.play('dino-run', true); // 애니메이션 실행 (이미 실행 중이면 무시)
+}
+```
+
+```jsx
+PlayScene에서 플레이어가 러닝 애니메이션을 실행하도록 호출:
+```
+
+```jsx
+this.player.playRunAnimation()
+```
+
+## 5. 특정 프레임만 반복 재생
+
+```jsx
+특정 프레임만 반복하려면 start와 end 값을 조정:
+
+예: start: 2, end: 3은 마지막 두 프레임만 반복.
+```
+
+```jsx
+this.anims.create({
+  key: 'dino-run',
+  frames: this.anims.generateFrameNumbers('dino-run', { start: 2, end: 3 }),
+  frameRate: 20,
+  repeat: -1,
+})
+```
+
+## 6. 디버깅 및 주의점
+
+```jsx
+애니메이션 키(key)와 스프라이트 시트 키(dino-run)는 일치해야 한다.
+
+잘못된 키를 사용하면 애니메이션이 실행되지 않는다.
+
+결과
+
+플레이어가 특정 조건에서 러닝 애니메이션을 자연스럽게 반복하며 실행.
+
+초당 프레임 수(frameRate)와 반복 프레임 범위를
+
+조정하여 애니메이션의 속도와 자연스러움을 조정 가능.
+```
+
+# { 점프와 애니메이션 개선 }
+
+## 1. **문제 정의**
+
+```jsx
+기본 상태에서 문제점:
+
+		공중에 있을 때도 러닝 애니메이션(dino-run)이 재생된다.
+
+		점프 시 바닥 텍스처가 보이는 상태로 유지된다.
+
+		게임 시작 시 기본적으로 러닝 애니메이션이 재생된다.
+
+목표:
+
+		점프 중에는 러닝 애니메이션을 멈추고 특정 프레임으로 고정.
+
+		점프 중 바닥 텍스처를 제거.
+
+		초기 상태에서 러닝 애니메이션이 재생되지 않도록 설정.
+```
+
+## 2. **점프 상태 감지**
+
+```jsx
+점프 여부 확인 방법:
+
+		this.body.deltaAbsY() 메서드:
+
+				deltaAbsY()는 Y축의 이동량(절대값)을 반환한다.
+
+				값이 0이면 캐릭터가 정지한 상태.
+
+				값이 0보다 크면 캐릭터가 움직이고 있는 상태(예: 점프 또는 낙하).
+```
+
+## 3. **점프 중 애니메이션 처리**
+
+```jsx
+점프 상태일 때의 처리:
+
+1. this.anims.stop():
+
+		현재 재생 중인 애니메이션을 중지.
+
+2. this.setTexture('dino-run', 0):
+
+		텍스처를 dino-run의 첫 번째 프레임(0번 프레임)으로 설정.
+
+		점프 중 애니메이션이 멈추는 효과를 제공.
+
+점프 상태가 아닐 때의 처리:
+
+		this.playRunAnimation():
+
+				러닝 애니메이션(dino-run)을 재생.
+
+				정상적인 달리기 애니메이션 유지.
+```
+
+## 4. **구현 코드 요약**
+
+```jsx
+update() {
+    const { space } = this.cursors;
+    const isSpaceJustDown = Phaser.Input.Keyboard.JustDown(space);
+    const onFloor = (this.body as Phaser.Physics.Arcade.Body).onFloor();
+
+    if (isSpaceJustDown && onFloor) {
+        this.setVelocityY(-1600); // 점프
+    }
+
+    const isJumping = this.body.deltaAbsY() > 0; // 점프 여부 감지
+
+    if (isJumping) {
+        this.anims.stop(); // 애니메이션 정지
+        this.setTexture('dino-run', 0); // 첫 번째 프레임 고정
+    } else {
+        this.playRunAnimation(); // 달리기 애니메이션 재생
+    }
+}
+
+```
+
+## 5. **개념 이해**
+
+```jsx
+deltaAbsY()란?:
+
+		Y축에서 이동량(절대값)을 계산하는 메서드.
+
+		움직임(점프/낙하)이 감지되면 0이 아닌 값을 반환.
+
+		이를 통해 캐릭터가 공중에 있는 상태를 감지할 수 있다.
+
+텍스처 고정:
+
+		setTexture('textureKey', frameNumber):
+
+				특정 텍스처와 프레임을 강제로 설정.
+
+				점프 시 고정된 텍스처를 보여주는 데 사용.
+
+
+애니메이션 정지:
+
+		this.anims.stop():
+
+				현재 재생 중인 애니메이션을 중지.
+```
+
+# { 게임 시작 상태를 확인하도록 수정 }
+
+## 1. 문제 상황: 게임 시작 시 플레이어가 달리기 애니메이션 실행
+
+```jsx
+문제의 원인:
+
+		게임이 시작되면 Player 클래스의 update 메서드가 항상 호출됩니다.
+
+		update 메서드에서 플레이어가 점프하지 않고
+
+		바닥에 있으면 달리기 애니메이션을 재생하도록 되어 있습니다.
+
+		결과적으로, 게임이 시작되었는지 여부와 관계없이 달리기 애니메이션이 실행됩니다.
+```
+
+## 2. 해결 방법: 게임 시작 상태를 확인하도록 수정
+
+```jsx
+게임 시작 상태를 나타내는 isGameRunning 변수를 도입합니다.
+
+		이 변수는 게임이 실행 중인지 여부를 나타내는 불리언 값입니다.
+
+		초기 값은 false로 설정합니다. (게임 시작 전 상태)
+
+		특정 조건(게임 배경의 타일이 화면을 다 채웠을 때)이 충족되면 true로 변경합니다.
+```
+
+## 3. 변수 추가
+
+```jsx
+PlayScene 클래스에 isGameRunning 변수 추가:
+
+		this.isGameRunning = false;로 초기화합니다.
+
+		게임 시작 조건이 만족되면 true로 변경합니다
+```
+
+```jsx
+if (this.ground.width >= this.gameWidth) {
+  rollOutEvent.remove()
+  this.ground.width = this.gameWidth
+  this.player.setVelocity(0)
+  this.isGameRunning = true // 게임 실행 상태로 전환
+}
+```
+
+## 4. 플레이어에서 게임 상태 확인
+
+```jsx
+Player 클래스의 update 메서드 수정:
+
+		update 메서드에서 게임이 실행 중이 아닐 때는 아무 동작도 하지 않도록 합니다.
+
+				if (!(this.scene as any).isGameRunning) {
+				    return; // 게임이 실행 중이 아니면 업데이트 로직 실행 중단
+				}
+
+
+		이 코드는 isGameRunning이 false인 경우 return하여 이후 동작을 건너뜁니다.
+```
+
+## 5. TypeScript와 `scene` 간의 타입 문제 해결
+
+```jsx
+문제:
+
+		Player 클래스의 scene 속성은 기본적으로 Phaser의 Scene 타입입니다.
+
+		Phaser의 Scene에는 isGameRunning 속성이 정의되어 있지 않으므로
+
+		TypeScript가 오류를 발생시킵니다.
+
+해결 방법:
+
+		scene을 임시로 any 타입으로 캐스팅하여 오류를 무시합니다.
+
+				if (!(this.scene as any).isGameRunning) {
+				    return;
+				}
+
+		이 방식은 임시적인 해결책이며, 이후에는 타입 확장을 통해 더 안전하게 처리할 수 있습니다.
+```
+
+## 핵심 개념 정리
+
+```jsx
+게임 상태 관리:
+
+		isGameRunning과 같은 변수로 현재 게임 상태를 명확히 정의하고 관리해야 합니다.
+
+업데이트 조건 추가:
+
+		update 메서드에서 조건을 추가하여 불필요한 동작을 차단합니다.
+
+TypeScript 타입 확장:
+
+		Phaser 기본 타입을 확장하여 사용자 정의 속성을 안전하게 사용할 수 있도록 개선해야 합니다.
+
+		(임시로 any 타입을 사용한 방법은 단기적인 해결책입니다.)
+```

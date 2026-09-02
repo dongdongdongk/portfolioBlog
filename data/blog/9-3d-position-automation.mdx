@@ -1,0 +1,411 @@
+---
+title: '9단원: 3D Position Automation 사용하기'
+date: '2026-09-02'
+category: '게임 개발/WWISE'
+tags: ['게임 개발', 'WWISE']
+draft: false
+summary: ''
+---
+
+# { 🎧 3D Position Automation 사용하기 }
+
+## 📋 목차
+
+1. [3D Position Automation 개념 이해하기](https://www.notion.so/Section9-272e683f737e8070b92efee4efb897b8#3d-position-automation-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Cube 게임의 상황 설정](https://www.notion.so/Section9-272e683f737e8070b92efee4efb897b8#cube-%EA%B2%8C%EC%9E%84%EC%9D%98-%EC%83%81%ED%99%A9-%EC%84%A4%EC%A0%95)
+3. [보석 사운드 랜덤화 배경](https://www.notion.so/Section9-272e683f737e8070b92efee4efb897b8#%EB%B3%B4%EC%84%9D-%EC%82%AC%EC%9A%B4%EB%93%9C-%EB%9E%9C%EB%8D%A4%ED%99%94-%EB%B0%B0%EA%B2%BD)
+4. [좌표 정보 문제와 한계](https://www.notion.so/Section9-272e683f737e8070b92efee4efb897b8#%EC%A2%8C%ED%91%9C-%EC%A0%95%EB%B3%B4-%EB%AC%B8%EC%A0%9C%EC%99%80-%ED%95%9C%EA%B3%84)
+5. [리스너 상대적인 사운드 경로 만들기](https://www.notion.so/Section9-272e683f737e8070b92efee4efb897b8#%EB%A6%AC%EC%8A%A4%EB%84%88-%EC%83%81%EB%8C%80%EC%A0%81%EC%9D%B8-%EC%82%AC%EC%9A%B4%EB%93%9C-%EA%B2%BD%EB%A1%9C-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+6. [배울 수 있는 기술](https://www.notion.so/Section9-272e683f737e8070b92efee4efb897b8#%EB%B0%B0%EC%9A%B8-%EC%88%98-%EC%9E%88%EB%8A%94-%EA%B8%B0%EC%88%A0)
+
+---
+
+## 1. 3D Position Automation 개념 이해하기
+
+- **정의**
+  3D Position Automation은 **게임 내 오브젝트가 실제 좌표를 제공하지 않아도**,
+  **리스너(플레이어)**의 위치를 기준으로 **사운드의 상대적 위치와 경로를 자동화(Automation)하는 기능**입니다.
+- **핵심 아이디어**
+  - 일반적인 3D 사운드는 "Emitter(소리 발생 지점)"와 "Listener(플레이어)"의 좌표 관계로 위치가 정해짐.
+  - 하지만 오브젝트가 존재하지 않는 경우에는 이 정보를 줄 수 없음.
+  - 이때 Wwise가 리스너를 기준점으로 삼아, **사운드를 가상의 공간에 배치하고 움직이는 것처럼 설정**할 수 있음.
+
+---
+
+## 2. Cube 게임의 상황 설정
+
+- 게임 속 캐릭터 **Wwizard**가 **지팡이를 휘두르면** → **보석이 땅에 떨어져 부서지는 이벤트** 발생.
+- 이미 **3단원(적은 자원으로 다양한 소리 만들기)**에서
+  - 보석이 부서질 때 사운드를 **랜덤화(Randomization)** 해서 다양하게 들리도록 디자인한 경험이 있음.
+- 이번 단원에서는 이 랜덤 사운드에 **3D 위치 변화**를 더해 **더 현실적인 경험**을 만듦.
+
+---
+
+## 3. 보석 사운드 랜덤화 배경
+
+- 단순히 소리를 재생하면, 보석이 항상 같은 위치에서 부서지는 것처럼 들림.
+- 하지만 실제 상황에서는 보석이 **앞, 옆, 약간 먼 거리 등 다양한 위치**에 떨어질 수 있음.
+- 이번 학습 목표:
+  - **보석이 매번 다른 위치**에서 떨어지도록 소리를 랜덤화.
+  - 소리가 **특정 경로를 따라서 튕겨 나가는 느낌**을 줄 수 있도록 설계.
+
+---
+
+## 4. 좌표 정보 문제와 한계
+
+- 문제: **보석 오브젝트(Game Object)** 자체가 게임 안에 존재하지 않음.
+- 일반적인 경우라면, 오브젝트가 좌표(X, Y, Z)를 제공해야 → 그 좌표에 맞춰 사운드를 배치할 수 있음.
+- 하지만 여기서는 좌표 정보가 없기 때문에 **Emitter를 직접 둘 수 없음.**
+
+---
+
+## 5. 리스너 상대적인 사운드 경로 만들기
+
+- 해결책: **3D Position Automation**
+  - 리스너(플레이어)의 좌표는 항상 존재함.
+  - 따라서 보석 사운드를 "리스너 기준"으로 상대적인 경로를 미리 정의할 수 있음.
+  - 예:
+    - 리스너의 앞 2m 지점에서 시작 → 오른쪽으로 튕기며 이동 → 멀어지면서 사라짐.
+- 이렇게 하면 실제 보석 오브젝트가 없어도, **플레이어 입장에서 보석이 주변에 떨어지고 움직이는 듯한 공간적 경험**을 줄 수 있음.
+
+---
+
+## 6. 배울 수 있는 기술
+
+이 단원을 완료하면, 다음 기술을 익히게 됨:
+
+1. **리스너 기준의 상대적 좌표 설정**
+   - 실제 오브젝트가 없어도 사운드를 원하는 위치에 배치 가능.
+2. **미리 정의된 경로(Path) 만들기**
+   - 소리를 단순히 한 지점에 두는 게 아니라, **경로를 따라 움직이도록 설정** 가능.
+   - 예: 보석이 튀어 나가듯이 소리가 왼쪽 → 오른쪽 → 멀어짐.
+3. **랜덤성과 공간감을 동시에 연출**
+   - 매번 보석이 다른 지점에 떨어지고, 움직이는 듯한 **자연스러운 사운드 디자인** 가능.
+
+---
+
+👉 정리하면, **3D Position Automation**은
+
+- 오브젝트가 없어 좌표를 얻지 못하는 상황에서,
+- 리스너 기준으로 **사운드의 위치와 움직임을 직접 설계하는 기술**입니다.
+  이를 통해 보석이 실제로 존재하는 것처럼 **무작위 위치에 떨어지고, 경로를 따라 튕겨 나가는 효과**를 만들 수 있습니다.
+
+---
+
+# { 🎧 3D 사운드 공간화 구성하기 }
+
+## 📋 목차
+
+1. [Cube 실행 및 Wwise 연결하기](https://www.notion.so/Section9-272e683f737e8070b92efee4efb897b8#cube-%EC%8B%A4%ED%96%89-%EB%B0%8F-wwise-%EC%97%B0%EA%B2%B0%ED%95%98%EA%B8%B0)
+2. [Gem Drop 오브젝트 선택하기](https://www.notion.so/Section9-272e683f737e8070b92efee4efb897b8#gem-drop-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%EC%84%A0%ED%83%9D%ED%95%98%EA%B8%B0)
+3. [3D Spatialization 적용하기](https://www.notion.so/Section9-272e683f737e8070b92efee4efb897b8#3d-spatialization-%EC%A0%81%EC%9A%A9%ED%95%98%EA%B8%B0)
+   - Position + Orientation
+4. [Attenuation 설정 적용하기](https://www.notion.so/Section9-272e683f737e8070b92efee4efb897b8#attenuation-%EC%84%A4%EC%A0%95-%EC%A0%81%EC%9A%A9%ED%95%98%EA%B8%B0)
+   - Object_Attenuation ShareSet
+5. [3D Position 옵션 선택하기](https://www.notion.so/Section9-272e683f737e8070b92efee4efb897b8#3d-position-%EC%98%B5%EC%85%98-%EC%84%A0%ED%83%9D%ED%95%98%EA%B8%B0)
+   - Listener with Automation
+
+---
+
+## 1. Cube 실행 및 Wwise 연결하기
+
+- **Cube 실행하기**
+  - 게임 환경(Cube)을 먼저 실행해야 변경 사항을 실시간으로 테스트할 수 있음.
+- **Wwise에서 프로젝트 열기**
+  - *Module 9 프로젝트 파일*을 열어야 함.
+- **Cube와 연결하기**
+  - 연결을 통해 게임 안에서 오디오 변경 사항을 바로 확인 가능.
+
+---
+
+## 2. Gem Drop 오브젝트 선택하기
+
+- **위치**:
+  - Project Explorer → Audio 탭 →
+    `Actor-Mixer Hierarchy > Default Work Unit > Gem Drop Sequence Container` 선택.
+- 이 오브젝트는 **보석이 떨어지는 사운드**를 담당.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380577/notion-blog/_/WWISE/Wwise_/9_3D_Position_Automation_/image.png)
+
+---
+
+## 3. 3D Spatialization 적용하기
+
+- **Property Editor → Positioning 탭**으로 이동.
+- **3D Spatialization 목록**에서 →
+  - `Position + Orientation` 선택.
+
+📌 **개념 설명**:
+
+- _Position_: 소리가 공간 안에 **어디에서 나는지**를 정의.
+- _Orientation_: 소리가 **어느 방향을 향해 퍼지는지**를 정의.
+- 즉, 리스너(플레이어)가 위치와 방향에 따라 소리를 다르게 듣도록 만드는 것.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380574/notion-blog/_/WWISE/Wwise_/9_3D_Position_Automation_/image_1.png)
+
+---
+
+## 4. Attenuation 설정 적용하기
+
+- **Attenuation 그룹 → Set Attenuation 버튼** 클릭.
+- **Project Explorer - Browser** 창이 열림.
+- `Object_Attenuation` 선택 후 **OK** 클릭.
+
+📌 **개념 설명**:
+
+- Attenuation(감쇠)은 **거리에 따라 소리가 줄어드는 효과**.
+- 같은 ShareSet을 사용하면 여러 오브젝트가 **같은 거리 기반 사운드 감소 규칙**을 공유할 수 있음.
+- 여기서는 8단원에서 텔레포터에 적용했던 `Object_Attenuation` 설정이 보석에도 적용됨.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380574/notion-blog/_/WWISE/Wwise_/9_3D_Position_Automation_/image_2.png)
+
+---
+
+## 5. 3D Position 옵션 선택하기
+
+- **3D Position 목록 → `Listener with Automation` 선택.**
+
+📌 **개념 설명**:
+
+- _Listener with Automation_ = 사운드의 위치가 **리스너(플레이어)와의 관계**를 기준으로 자동 배치됨.
+- 이렇게 하면 보석이 떨어질 때 **플레이어 주변의 무작위 공간**에서 사운드가 재생되는 것처럼 표현 가능.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380575/notion-blog/_/WWISE/Wwise_/9_3D_Position_Automation_/image_3.png)
+
+---
+
+✅ 정리하면:
+
+- **Gem Drop 사운드**에 **3D Spatialization**(위치 + 방향)과 **Attenuation**(거리 감쇠)을 적용.
+- 기존 텔레포터와 동일한 감쇠 규칙을 사용해 일관된 거리 효과를 유지.
+- 마지막으로 **Listener with Automation**을 통해 사운드를 리스너 중심의 공간에 배치 → 매번 다르게 들리는 **자연스러운 3D 공간감** 구현.
+
+---
+
+# { 🎵 경로 만들기와 3D Automation 이해하기 }
+
+## 📋 목차
+
+1. [3D Automation 경로 개념](https://www.notion.so/Section9-272e683f737e8070b92efee4efb897b8#3d-automation-%EA%B2%BD%EB%A1%9C-%EA%B0%9C%EB%85%90)
+2. [Position Editor(3D Automation) 열기](https://www.notion.so/Section9-272e683f737e8070b92efee4efb897b8#position-editor3d-automation-%EC%97%B4%EA%B8%B0)
+3. [Paths 그룹에서 경로 추가하기](https://www.notion.so/Section9-272e683f737e8070b92efee4efb897b8#paths-%EA%B7%B8%EB%A3%B9%EC%97%90%EC%84%9C-%EA%B2%BD%EB%A1%9C-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+4. [그래프와 기준점(Point) 편집하기](https://www.notion.so/Section9-272e683f737e8070b92efee4efb897b8#%EA%B7%B8%EB%9E%98%ED%94%84%EC%99%80-%EA%B8%B0%EC%A4%80%EC%A0%90point-%ED%8E%B8%EC%A7%91%ED%95%98%EA%B8%B0)
+5. [타임라인(Timeline) 이해하기](https://www.notion.so/Section9-272e683f737e8070b92efee4efb897b8#%ED%83%80%EC%9E%84%EB%9D%BC%EC%9D%B8timeline-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+6. [Timeline 길이 조정하기](https://www.notion.so/Section9-272e683f737e8070b92efee4efb897b8#timeline-%EA%B8%B8%EC%9D%B4-%EC%A1%B0%EC%A0%95%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. 3D Automation 경로 개념
+
+- **3D Automation 경로**란?
+  → 사운드가 3D 공간 안에서 **움직이는 경로**를 정의하는 기능.
+- 게임 프로그래머와 추가 작업 없이도 **사운드 디자이너가 직접 공간 이동 효과**를 줄 수 있음.
+- 활용 예시:
+  - 새가 날아가는 경로에 따라 소리가 이동하는 효과
+  - 낡은 건물이 삐걱거릴 때 특정 위치에서 들리는 환경음
+  - 떨어지는 보석이 튀면서 **위치가 바뀌는 소리**
+
+---
+
+## 2. Position Editor(3D Automation) 열기
+
+- 실행 방법: **Property Editor → Edit the 3D Automation paths 버튼 클릭**
+- 열리면 **Position Editor** 창이 나타남.
+- 주요 역할:
+  - 사운드의 **이동 경로를 시각적으로 편집**
+  - 그래프와 타임라인으로 이동 경로와 시간 제어
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380575/notion-blog/_/WWISE/Wwise_/9_3D_Position_Automation_/image_4.png)
+
+---
+
+## 3. Paths 그룹에서 경로 추가하기
+
+- **Paths 그룹 → New 버튼 클릭**
+- 기능: 새로운 경로(Path)를 생성.
+- 결과:
+  - 그래프에 점(Point)이 추가됨.
+  - 이 점은 리스너(청자, Listener)의 중심을 기준으로 **사운드가 들려올 위치**를 나타냄.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380575/notion-blog/_/WWISE/Wwise_/9_3D_Position_Automation_/image_5.png)
+
+---
+
+## 4. 그래프와 기준점(Point) 편집하기
+
+- **기준점(Point) 드래그**
+  - 리스너와 가까운 위치나 다른 방향으로 이동 가능.
+  - 보석이 바닥에 떨어져 튕기는 느낌을 주기 위해 각기 다른 위치로 설정.
+- **더블 클릭으로 점 추가**
+  - 여러 점을 추가해 **사운드 이동 경로**를 구체적으로 만들 수 있음.
+  - 점들이 선(Line)으로 연결되어 실제 **사운드 이동 궤적**을 형성.
+
+---
+
+## 5. 타임라인(Timeline) 이해하기
+
+- 그래프 아래에는 **타임라인**이 존재.
+- 특징:
+  - 경로에 점을 추가할 때마다 타임라인에도 자동으로 기준점이 추가됨.
+  - **시간에 따라 사운드가 한 위치에서 다른 위치로 이동하는 과정**을 제어.
+- 활용:
+  - 짧게 떨어졌다가 튀는 보석 소리처럼 **시간적 제약이 있는 사운드 연출**에 필수.
+
+---
+
+## 6. Timeline 길이 조정하기
+
+- **Configure Timeline 버튼 클릭 → Length 속성 변경**
+- 예시:
+  - Length를 **2 seconds**로 변경 → 보석이 떨어지고 튀는 효과가 실제 길이에 맞게 조정됨.
+- 의미:
+  - 사운드의 공간 이동이 **현실적인 시간 안에서 완료**되도록 설정 가능.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380575/notion-blog/_/WWISE/Wwise_/9_3D_Position_Automation_/image_6.png)
+
+```csharp
+한마디로 전체 길이를 몇초 안에 끝낼지 ( 1초로 하면 1초만에 끝난다 )
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380575/notion-blog/_/WWISE/Wwise_/9_3D_Position_Automation_/image_7.png)
+
+```csharp
+Linermode 를 끄면 각 점들의 이동 시간을 직접 조절 가능하다
+```
+
+---
+
+👉 요약:
+
+이번 강의는 **사운드가 3D 공간에서 이동하는 경로를 직접 정의하고 시간까지 맞추는 방법**을 다룸.
+
+즉, 단순히 소리를 재생하는 게 아니라 **“소리가 공간에서 움직인다”**는 청각적 환상을 만들 수 있게 해줌.
+
+---
+
+# { 💎 경로 더 만들기와 무작위 경로 선택 }
+
+## 📋 목차
+
+1. [경로 복사하기](https://www.notion.so/Section9-272e683f737e8070b92efee4efb897b8#%EA%B2%BD%EB%A1%9C-%EB%B3%B5%EC%82%AC%ED%95%98%EA%B8%B0)
+2. [경로 붙여넣기](https://www.notion.so/Section9-272e683f737e8070b92efee4efb897b8#%EA%B2%BD%EB%A1%9C-%EB%B6%99%EC%97%AC%EB%84%A3%EA%B8%B0)
+3. [경로 수정하기](https://www.notion.so/Section9-272e683f737e8070b92efee4efb897b8#%EA%B2%BD%EB%A1%9C-%EC%88%98%EC%A0%95%ED%95%98%EA%B8%B0)
+4. [Random 및 Continuous 옵션](https://www.notion.so/Section9-272e683f737e8070b92efee4efb897b8#random-%EB%B0%8F-continuous-%EC%98%B5%EC%85%98)
+5. [Cube에서 테스트하기](https://www.notion.so/Section9-272e683f737e8070b92efee4efb897b8#cube%EC%97%90%EC%84%9C-%ED%85%8C%EC%8A%A4%ED%8A%B8%ED%95%98%EA%B8%B0)
+6. [학습 정리](https://www.notion.so/Section9-272e683f737e8070b92efee4efb897b8#%ED%95%99%EC%8A%B5-%EC%A0%95%EB%A6%AC)
+
+---
+
+## 1. 경로 복사하기
+
+- **목적**: 기존에 만든 `Gem Drop_Path`를 기반으로 여러 개의 변형된 경로를 빠르게 만들기 위함.
+- **방법**:
+  - `Gem Drop_Path`를 선택 → **우클릭 → Copy to Clipboard** 클릭
+  - 또는, **Paths 목록에서 선택 후 `Ctrl+C`** 입력
+
+📌 이렇게 하면 현재 설정된 경로가 클립보드에 저장됨.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380577/notion-blog/_/WWISE/Wwise_/9_3D_Position_Automation_/image_8.png)
+
+---
+
+## 2. 경로 붙여넣기
+
+- **목적**: 복사한 경로를 여러 개 추가해서 다양한 변화를 만들기 위함.
+- **방법**:
+  - `Ctrl+V`를 누르면 새 경로가 생성됨
+  - `Ctrl+V`를 **여섯 번 반복** → 총 6개의 새로운 경로가 추가됨
+  - 결과적으로 **원래 경로 1개 + 새 경로 6개 = 7개 경로** 확보
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380577/notion-blog/_/WWISE/Wwise_/9_3D_Position_Automation_/image_9.png)
+
+---
+
+## 3. 경로 수정하기
+
+- **목적**: 모든 경로가 똑같으면 의미가 없으므로, 각기 다른 움직임을 가지도록 조정.
+- **방법**:
+  - 경로를 선택 → 각 **점(Control Point)** 을 드래그해서 위치 변경
+  - 이 과정을 반복하여 **7개의 경로가 모두 다르게** 설정
+
+👉 이렇게 하면 보석이 떨어졌을 때 **매번 다른 튕김 경로**를 가질 수 있어 현실감 증가.
+
+## 4. Play Type 옵션
+
+사운드가 **여러 경로 중 어떤 순서로 선택되는지**를 제어하는 옵션. ( path 목록 중 랜덤 선택 )
+
+### 🔹 Sequence
+
+- 목록의 **처음부터 끝까지 순차적으로** 경로 재생
+- 마지막 경로가 끝나면 다시 처음으로 돌아감 (Loop)
+
+### 🔹 Random
+
+- **무작위(Random)** 순서로 경로 재생
+- 모든 경로가 한 번씩 재생될 때까지 중복 없이 섞어서 실행
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380574/notion-blog/_/WWISE/Wwise_/9_3D_Position_Automation_/image_10.png)
+
+---
+
+## 5. Play Mode 옵션
+
+사운드가 경로 위에서 **어떻게 재생되는지**를 제어하는 옵션.
+
+### 🔹 Continuous
+
+- 여러 경로가 **연속적으로 이어지면서** 하나 뒤 하나로 재생됨
+- 옵션:
+  - **Loop** → 전체 경로 목록을 무제한 반복
+  - **Transition time** → 경로 끝과 다음 경로 시작 사이의 **지연 시간(초)** 설정 (기본값: 1)
+
+### 🔹 Step
+
+- 경로 목록에서 **하나의 경로만** 재생
+- 옵션:
+  - **Use new path for each sound**
+    - 각 사운드 이벤트마다 새로운 경로를 강제로 사용
+    - `Continuous` 컨테이너 안에서도 각 사운드가 **다른 경로**를 사용할 수 있음
+    - 기본값: **false**
+
+---
+
+## 6. Graph View
+
+- 경로의 **2D 시각적 표현**을 보여주는 영역
+- 기능:
+  - 조종점(Control Point) 위치를 확인하고 조정 가능
+  - 반지름(Radius)과 원뿔형(Cone) 경계를 표시하여 **수평 축 상의 3D 감쇠**를 시뮬레이션
+
+---
+
+## 7. Cube에서 테스트하기
+
+- **방법**:
+  - Cube 실행 후 **얼음 보석 발사**
+  - 보석이 떨어지는 사운드 → 매번 다른 무작위 경로에서 들림
+  - 반복 테스트 시, 위치 변화가 잘 느껴짐
+- **종료 방법**:
+  - `Esc` → 방향키로 **quit(종료)** 선택 → `Enter`
+
+---
+
+## 8. 학습 정리
+
+이번 단원에서 배운 핵심은:
+
+> 게임이 직접 사운드 위치를 제공하지 않아도, Wwise에서 경로와 옵션을 활용해 사운드 이동을 제어할 수 있다.
+
+✅ 정리 포인트:
+
+1. 하나의 경로를 복사 → 여러 개 변형 경로 생성
+2. Play Type:
+   - **Sequence** → 순차 실행
+   - **Random** → 무작위 실행
+3. Play Mode:
+   - **Continuous** → 경로가 이어지며 재생 (Loop, Transition time 적용 가능)
+   - **Step** → 하나의 경로만 재생 (Use new path 옵션 사용 가능)
+4. Graph View로 경로와 감쇠 시각적 확인
+5. 결과: 보석 떨어질 때마다 **다양한 3D 위치 변화**가 사운드에 적용 → 현실감 있는 연출 완성
+
+---

@@ -1,0 +1,3543 @@
+---
+title: '2'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 🎮 Ping Pong Platform (왕복 플랫폼) 만들기 }
+
+## 🎯 목표
+
+게임 시작과 동시에 두 지점을 끊임없이 왕복하는 플랫폼 제작 + 부모 클래스 리팩토링
+
+---
+
+## 📋 전체 구조 개요
+
+```
+리팩토링 전
+  BP_Interactive_Platform
+    └─ BP_Floating_Platform (압력판으로 활성화)
+
+리팩토링 후
+  BP_Platform_Base (부모 클래스)
+    ├─ Interp Location (공통)
+    ├─ Interp Platform Location 함수 (공통)
+    ├─ BP_Floating_Platform (압력판 활성화)
+    └─ BP_Platform_PingPong (자동 왕복) ✨ 새로 추가
+```
+
+---
+
+## 🏗️ 1단계: 부모 클래스 리팩토링
+
+### 1-1. 문제 인식
+
+**현재 상황**
+
+```
+BP_Floating_Platform
+  ├─ Interp Location (자식에만 있음)
+  └─ Update Platform Location (자식에만 있음)
+
+문제점:
+  └─ 새 플랫폼 만들 때마다 반복 작업 필요
+```
+
+**해결책**
+
+```
+공통 기능을 부모로 이동
+  ├─ Interp Location → 부모
+  └─ Update Platform Location → 부모
+```
+
+### 1-2. Interp Location을 부모로 이동
+
+**작업**
+
+```
+BP_Interactive_Platform 열기
+  ↓
+Components 패널
+  ↓
+Add Component → Scene Component
+  └─ 이름: Interp Location
+```
+
+**결과 확인**
+
+```
+BP_Floating_Platform 열기
+  ↓
+Components 패널
+  └─ Interp Location 0 (자동 이름 변경됨)
+      ├─ 기존: Interp Location
+      └─ 새것: Interp Location (부모에서 상속)
+```
+
+💡 **왜 이름이 바뀌나?**
+
+- 부모와 자식에 같은 이름의 컴포넌트가 생김
+- 언리얼이 자동으로 "0"을 붙여서 구분
+- 중복 방지를 위한 자동 처리
+
+### 1-3. 참조 변경
+
+**작업**
+
+```
+BP_Floating_Platform
+  ↓
+Update Platform Location 함수
+  ↓
+Get World Location 노드
+  ├─ Target: Interp Location 0 ❌ (제거)
+  └─ Target: Interp Location ✅ (부모 것으로 변경)
+```
+
+**Interp Location 0 삭제**
+
+```
+Components 패널
+  └─ Interp Location 0 우클릭 → Delete
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380675/notion-blog/_/_/_5_/2/image.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380667/notion-blog/_/_/_5_/2/image_1.png)
+
+### 1-4. 레벨의 인스턴스 재설정
+
+**문제**
+
+```
+부모 클래스에 컴포넌트 추가
+  ↓
+레벨에 있는 인스턴스들의 Interp Location 위치 초기화됨
+  ↓
+다시 설정 필요
+```
+
+**작업**
+
+```
+레벨의 각 BP_Floating_Platform 선택
+  ↓
+Interp Location 선택
+  ↓
+원하는 위치로 이동 (다시 설정)
+
+```
+
+💡 **왜 초기화되나?**
+
+- 부모 클래스의 구조가 변경됨
+- 자식 인스턴스들이 새 부모 구조를 반영
+- Transform 값이 부모의 기본값으로 재설정
+
+---
+
+## 🔄 2단계: 함수를 부모로 이동
+
+### 2-1. 함수 이름 변경 이유
+
+**기존 이름**
+
+```
+Update Platform Location
+  └─ 의미: 플랫폼 위치 업데이트
+  └─ 모호함: "어떻게" 업데이트하는지 불명확
+```
+
+**새 이름**
+
+```
+Interp Platform Location
+  └─ 의미: 플랫폼 위치를 보간(Lerp)해서 이동
+  └─ 명확함: Interpolation(보간) 사용을 명시
+```
+
+💡 **Interp = Interpolation (보간)**
+
+- 두 값 사이를 부드럽게 전환
+- Lerp를 사용한다는 힌트
+
+### 2-2. 부모 클래스에 함수 생성
+
+**작업**
+
+```
+BP_Interactive_Platform (부모)
+  ↓
+Functions 패널 → + 버튼
+  ├─ 이름: Interp Platform Location
+  └─ 입력 추가
+      ├─ 이름: Alpha
+      └─ 타입: Float
+```
+
+**함수 내용**
+
+```
+BP_Floating_Platform의 Update Platform Location 복사
+  ↓
+BP_Interactive_Platform의 Interp Platform Location에 붙여넣기
+  ↓
+Alpha 입력 → Lerp의 Alpha에 연결
+```
+
+### 2-3. 자식에서 상속된 함수 호출
+
+**작업**
+
+```
+BP_Floating_Platform
+  ↓
+Float Timeline → Update 핀
+  ↓
+Interp Platform Location 검색
+  ├─ 함수 목록에 보이지 않음 (상속됨)
+  └─ "Call Function" → Interp Platform Location 선택
+```
+
+**노드 연결**
+
+```
+Float Timeline
+  ├─ Update → Interp Platform Location (상속 함수)
+  └─ Float 출력 → Alpha 입력
+```
+
+**기존 함수 삭제**
+
+```
+Functions 패널
+  └─ Update Platform Location 우클릭 → Delete
+```
+
+---
+
+## 📝 3단계: 클래스 이름 변경
+
+### 3-1. 명확한 명명
+
+**기존 이름**
+
+```
+BP_Interactive_Platform
+  └─ 문제: "상호작용 가능한" = 모호함
+  └─ 어떤 역할인지 불명확
+```
+
+**새 이름**
+
+```
+BP_Platform_Base
+  ├─ "Base" = 기본/부모 클래스임을 명시
+  └─ 다른 플랫폼들의 부모임을 명확히 표현
+```
+
+**작업**
+
+```
+Content Browser
+  └─ BP_Interactive_Platform 우클릭
+      └─ Rename → BP_Platform_Base
+```
+
+### 3-2. 폴더 정리
+
+**새 폴더 구조**
+
+```
+Blueprints
+  ├─ Interactables
+  │   └─ BP_Pressure_Plate (압력판)
+  │
+  └─ Platforms (새 폴더)
+      ├─ BP_Platform_Base (부모)
+      ├─ BP_Floating_Platform (자식 1)
+      └─ BP_Platform_PingPong (자식 2)
+```
+
+**이유**
+
+```
+압력판 ≠ 플랫폼
+  ├─ 압력판: 트리거 역할
+  └─ 플랫폼: 이동하는 발판
+
+→ 분리해서 관리
+```
+
+---
+
+## 🏓 4단계: Ping Pong Platform 생성
+
+### 4-1. 자식 클래스 생성
+
+**작업**
+
+```
+BP_Platform_Base 우클릭
+  ↓
+Create Child Blueprint Class
+  └─ 이름: BP_Platform_PingPong
+```
+
+**Ping Pong이란?**
+
+```
+탁구(卓球) = Table Tennis
+  ├─ 공이 왔다 갔다 함
+  └─ 플랫폼도 왔다 갔다 함
+
+왕복 운동의 은유
+```
+
+### 4-2. Timeline용 Curve 생성
+
+**새 Curve Asset**
+
+```
+Curves 폴더
+  ↓
+우클릭 → Miscellaneous → Curve → Curve Float
+  └─ 이름: Curve_Normalized_2s
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380669/notion-blog/_/_/_5_/2/image_2.png)
+
+**키 설정**
+
+```
+키 1
+  ├─ Time: 0.0
+  └─ Value: 0.0
+
+키 2
+  ├─ Time: 2.0
+  └─ Value: 1.0
+
+둘 다 선택 → 우클릭 → Auto
+```
+
+💡 **왜 2초?**
+
+- 3초는 Floating Platform용
+- 2초는 Ping Pong용 (더 빠른 왕복)
+- 속도 차별화
+
+### 4-3. PingPong Timeline 생성
+
+**작업**
+
+```
+BP_Platform_PingPong Event Graph
+  ↓
+Add Timeline
+  ├─ 이름: PingPong
+  └─ Length: 2.0
+```
+
+**Float Track 추가**
+
+```
+PingPong Timeline 편집
+  ↓
+Add Float Track
+  ├─ 이름: PingPong Alpha
+  └─ Dropdown → Curve_Normalized_2s
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380673/notion-blog/_/_/_5_/2/image_3.png)
+
+---
+
+## 🔄 5단계: 왕복 시스템 구현
+
+### 5-1. 왕복 로직 이해
+
+**단순 재생 (작동 안 함)**
+
+```
+Begin Play → Timeline Play
+  ↓
+0초 → 2초 재생
+  ↓
+끝 (멈춤) ❌
+```
+
+**원하는 동작**
+
+```
+0초 → 2초 (Forward)
+  ↓
+2초 → 0초 (Reverse)
+  ↓
+0초 → 2초 (Forward)
+  ↓
+무한 반복 ♾️
+```
+
+### 5-2. Custom Events 생성
+
+**Custom Event란?**
+
+```
+용도: 내가 만든 이벤트
+특징:
+  ├─ 다른 곳에서 호출 가능
+  ├─ 함수처럼 사용
+  └─ 이름으로 구분
+```
+
+**PingPong Forward 이벤트**
+
+```
+우클릭 → Add Custom Event
+  ├─ 이름: PingPong Forward
+  └─ 연결: PingPong → Play from Start
+```
+
+**PingPong Reverse 이벤트**
+
+```
+우클릭 → Add Custom Event
+  ├─ 이름: PingPong Reverse
+  └─ 연결: PingPong → Reverse from End
+```
+
+💡 **Play vs Play from Start**
+
+- Play: 현재 위치에서 재생
+- Play from Start: 항상 0초부터 재생
+
+💡 **Reverse vs Reverse from End**
+
+- Reverse: 현재 위치에서 역재생
+- Reverse from End: 항상 끝(2초)부터 역재생
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380675/notion-blog/_/_/_5_/2/image_4.png)
+
+### 5-3. Switch on Direction
+
+**Switch 노드란?**
+
+```
+용도: Enum 값에 따라 다른 경로 실행
+비유: if-else를 여러 개 나열한 것
+
+Direction Enum:
+  ├─ Forward → 정방향 완료
+  └─ Backward → 역방향 완료
+```
+
+**노드 구조**
+
+```
+PingPong Timeline → Finished
+  ↓
+Switch on ETimelineDirection
+  ├─ Selection: Direction
+  ├─ Forward → PingPong Reverse 호출
+  └─ Backward → PingPong Forward 호출
+```
+
+**작동 원리**
+
+```
+Step 1: Begin Play → PingPong Forward
+  ↓
+Step 2: Timeline 0→2초 재생 (Forward)
+  ↓
+Step 3: Finished 발동 + Direction = Forward
+  ↓
+Step 4: Switch → Forward 경로 선택
+  ↓
+Step 5: PingPong Reverse 호출
+  ↓
+Step 6: Timeline 2→0초 역재생 (Backward)
+  ↓
+Step 7: Finished 발동 + Direction = Backward
+  ↓
+Step 8: Switch → Backward 경로 선택
+  ↓
+Step 9: PingPong Forward 호출
+  ↓
+Step 10: Step 2로 돌아가서 무한 반복
+```
+
+### 5-4. Update 연결
+
+**노드 구조**
+
+```
+PingPong Timeline → Update
+  ↓
+Interp Platform Location (상속 함수)
+  ├─ Target: Self
+  └─ Alpha: PingPong Alpha
+```
+
+### 5-5. Begin Play 연결
+
+**노드 구조**
+
+```
+Event BeginPlay
+  ↓
+PingPong Forward (Custom Event 호출)
+```
+
+💡 **왜 PingPong Forward 호출?**
+
+- 왕복 사이클 시작
+- Forward → Reverse → Forward... 반복
+
+---
+
+## 🎯 6단계: 레벨 배치 및 테스트
+
+### 6-1. 배치
+
+**작업**
+
+```
+Content Browser
+  └─ BP_Platform_PingPong 드래그
+      └─ 레벨에 배치
+
+Interp Location 위치 조정
+  └─ 원하는 도착점으로 이동
+```
+
+### 6-2. 테스트
+
+**확인 사항**
+
+```
+✅ 게임 시작과 동시에 이동 시작
+✅ 2초에 걸쳐 Interp Location 도착
+✅ 다시 2초에 걸쳐 시작점으로 복귀
+✅ 끊임없이 왕복 반복
+```
+
+### 6-3. 속도 조정 (선택사항)
+
+**더 느리게 만들기**
+
+```
+PingPong Timeline
+  ├─ Length: 3.0으로 변경
+  └─ Float Track → Curve_Normalized_3s로 변경
+
+주의:
+  └─ Interp Location 위치 다시 설정 필요
+```
+
+---
+
+## 👁️ 7단계: Billboard Component (시각화 개선)
+
+### 7-1. 문제점
+
+**현재 상황**
+
+```
+Interp Location = Scene Component
+  ├─ 선택해야만 보임
+  └─ 다른 오브젝트 선택 시 안 보임
+```
+
+**불편함**
+
+```
+플랫폼 여러 개 배치 시
+  ├─ 어느 것이 어디로 가는지 모름
+  └─ 일일이 선택해서 확인 필요
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380675/notion-blog/_/_/_5_/2/image_5.png)
+
+### 7-2. Billboard Component란?
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380675/notion-blog/_/_/_5_/2/image_6.png)
+
+**Billboard Component**
+
+```
+개념: 항상 카메라를 향하는 2D 이미지
+용도:
+  ├─ 에디터에서만 보임 (게임 중엔 안 보임)
+  ├─ 위치 마커
+  └─ 시각적 가이드
+
+특징:
+  ├─ Scene Component + 스프라이트
+  └─ 선택 안 해도 항상 보임
+```
+
+**비유**
+
+```
+Scene Component = 투명한 마커
+Billboard Component = 깃발이 꽂힌 마커
+```
+
+### 7-3. Scene을 Billboard로 교체
+
+**단계 1: 기존 것 Deprecated 표시**
+
+```
+BP_Platform_Base
+  ↓
+Interp Location 선택
+  ↓
+이름 변경: Interp Location_dep
+```
+
+💡 **dep = deprecated (사용 중단)**
+
+- 곧 삭제될 것을 표시
+- 다른 곳에서 사용 중이므로 바로 삭제 불가
+- 참조 변경 후 삭제
+
+**단계 2: Billboard 추가**
+
+```
+Add Component → Billboard
+  └─ 이름: Interp Location (새 것)
+```
+
+**단계 3: 스프라이트 변경**
+
+```
+Details 패널
+  └─ Sprite
+      ├─ Show Engine Content 체크 ✅
+      └─ "target" 검색 → Target Icon 선택
+```
+
+**단계 4: 함수의 참조 변경**
+
+```
+Interp Platform Location 함수
+  ↓
+Get World Location
+  ├─ Target: Interp Location_dep ❌
+  └─ Target: Interp Location ✅
+```
+
+**단계 5: 기존 것 삭제**
+
+```
+Interp Location_dep 우클릭 → Delete
+  ├─ 에러 없으면: 다른 곳에서 안 씀 ✅
+  └─ 에러 있으면: 아직 어딘가 사용 중 ❌
+```
+
+### 7-4. 레벨 인스턴스 재설정
+
+**작업**
+
+```
+레벨의 모든 플랫폼 인스턴스 선택
+  ↓
+Interp Location (Billboard) 선택
+  ↓
+원하는 위치로 이동 (다시 설정)
+```
+
+**확인**
+
+```
+다른 오브젝트 선택해도
+  └─ Interp Location의 타겟 아이콘 보임 ✅
+```
+
+---
+
+## 🔍 작동 원리 완전 분석
+
+### 왕복 시스템 흐름도
+
+```
+┌──────────────────────────────────┐
+│      Event BeginPlay             │
+└────────────┬─────────────────────┘
+             │
+             ▼
+┌──────────────────────────────────┐
+│   PingPong Forward (호출)        │
+└────────────┬─────────────────────┘
+             │
+             ▼
+┌──────────────────────────────────┐
+│ Timeline Play from Start         │
+│ (0초부터 재생 시작)              │
+└────────────┬─────────────────────┘
+             │
+             ▼
+┌──────────────────────────────────┐
+│    Update 핀 (매 프레임)         │
+│  PingPong Alpha: 0 → 1           │
+│                                   │
+│  Interp Platform Location        │
+│  ├─ Lerp 계산                    │
+│  └─ Platform Mesh 이동           │
+└────────────┬─────────────────────┘
+             │
+             │ (2초 경과)
+             ▼
+┌──────────────────────────────────┐
+│    Finished 핀 발동              │
+│    Direction = Forward           │
+└────────────┬─────────────────────┘
+             │
+             ▼
+┌──────────────────────────────────┐
+│ Switch on ETimelineDirection     │
+│    Selection: Forward            │
+└────────────┬─────────────────────┘
+             │
+             ▼ (Forward 경로)
+┌──────────────────────────────────┐
+│   PingPong Reverse (호출)        │
+└────────────┬─────────────────────┘
+             │
+             ▼
+┌──────────────────────────────────┐
+│ Timeline Reverse from End        │
+│ (2초부터 역재생 시작)            │
+└────────────┬─────────────────────┘
+             │
+             ▼
+┌──────────────────────────────────┐
+│    Update 핀 (매 프레임)         │
+│  PingPong Alpha: 1 → 0           │
+│                                   │
+│  Interp Platform Location        │
+│  ├─ Lerp 계산                    │
+│  └─ Platform Mesh 이동           │
+└────────────┬─────────────────────┘
+             │
+             │ (2초 경과)
+             ▼
+┌──────────────────────────────────┐
+│    Finished 핀 발동              │
+│    Direction = Backward          │
+└────────────┬─────────────────────┘
+             │
+             ▼
+┌──────────────────────────────────┐
+│ Switch on ETimelineDirection     │
+│    Selection: Backward           │
+└────────────┬─────────────────────┘
+             │
+             ▼ (Backward 경로)
+┌──────────────────────────────────┐
+│   PingPong Forward (호출)        │
+│   → 처음으로 돌아가서 반복       │
+└──────────────────────────────────┘
+```
+
+### Timeline 재생 시각화
+
+```
+왕복 1회 (총 4초)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Forward 재생 (0→2초)
+━━━━━━━━━━━━━━
+0초          2초
+●──────────→ ★
+시작        도착
+PingPong Alpha: 0 → 1
+
+Reverse 재생 (2→0초)
+━━━━━━━━━━━━━━
+0초          2초
+★ ←──────────●
+복귀        출발
+PingPong Alpha: 1 → 0
+
+→ 무한 반복
+```
+
+---
+
+## 📊 핵심 개념 정리
+
+### Custom Event
+
+```
+개념: 사용자 정의 이벤트
+특징:
+  ├─ 이름으로 다른 곳에서 호출
+  ├─ 입력/출력 파라미터 가능
+  └─ 재사용 가능
+
+vs 함수:
+  ├─ 함수: 값 반환 가능, 지역 변수 사용
+  └─ Custom Event: 실행 흐름만, 네트워크 복제 가능
+```
+
+### Switch on Enum
+
+```
+용도: Enum 값에 따른 분기
+구조:
+  Switch
+    ├─ Selection: Enum 변수
+    ├─ 값1 경로
+    ├─ 값2 경로
+    └─ 값N 경로
+
+vs Branch:
+  ├─ Branch: True/False 두 갈래
+  └─ Switch: 여러 값에 따라 여러 갈래
+```
+
+### Billboard Component
+
+```
+용도: 에디터 전용 시각 마커
+특징:
+  ├─ 항상 카메라 방향
+  ├─ 게임 중엔 안 보임
+  ├─ 성능 영향 없음
+  └─ 레벨 디자인 도구
+
+활용:
+  ├─ 스폰 포인트
+  ├─ 웨이포인트
+  ├─ 목표 지점
+  └─ 경로 표시
+```
+
+---
+
+## ⚙️ 주요 설정값
+
+### Curve_Normalized_2s
+
+```
+Time 0.0 → Value 0.0
+Time 2.0 → Value 1.0
+Tangent: Auto
+```
+
+### PingPong Timeline
+
+```
+Length: 2.0초
+Loop: false (직접 제어)
+Auto Play: false
+Float Track: PingPong Alpha
+  └─ External Curve: Curve_Normalized_2s
+```
+
+### Billboard Sprite
+
+```
+Sprite: Target Icon
+Screen Size: 1.0 (기본값)
+Hidden in Game: true
+```
+
+---
+
+## 💡 주의사항 및 팁
+
+### 1. 부모 클래스 변경 시
+
+```
+항상 발생하는 일:
+  └─ 레벨 인스턴스의 값 초기화
+
+해결:
+  ├─ 변경 후 즉시 테스트
+  └─ 모든 인스턴스 재설정
+```
+
+### 2. Deprecated 처리
+
+```
+이유:
+  ├─ 바로 삭제 시 참조 끊김
+  └─ 참조 변경 후 안전하게 삭제
+
+방법:
+  ├─ 이름에 _dep 추가
+  ├─ 새 컴포넌트 추가
+  ├─ 참조 모두 변경
+  └─ 기존 것 삭제
+```
+
+### 3. Custom Event vs 함수
+
+```
+Custom Event 사용:
+  ├─ 재귀 호출 필요
+  ├─ 네트워크 복제 필요
+  └─ 비동기 실행 필요
+
+함수 사용:
+  ├─ 값 반환 필요
+  ├─ 지역 변수 필요
+  └─ 순수 계산만
+```
+
+### 4. Switch 최적화
+
+```
+방향이 2개뿐이면:
+  ├─ Branch 사용 가능
+  └─ Direction == Forward?
+
+방향이 3개 이상이면:
+  └─ Switch 사용 권장
+```
+
+### 5. Billboard 크기
+
+```
+너무 크면:
+  └─ 화면 가림
+
+너무 작으면:
+  └─ 보기 어려움
+
+적정 크기:
+  └─ Screen Size: 0.5~1.5
+```
+
+---
+
+## 🎓 디자인 패턴 분석
+
+### State Machine Pattern
+
+```
+왕복 시스템 = 상태 기계
+
+상태 1: Forward 재생 중
+  ├─ 조건: Finished + Direction == Forward
+  └─ 전환: Reverse 상태로
+
+상태 2: Reverse 재생 중
+  ├─ 조건: Finished + Direction == Backward
+  └─ 전환: Forward 상태로
+```
+
+### Template Method Pattern
+
+```
+부모 클래스 (BP_Platform_Base)
+  ├─ 공통 구조 정의
+  ├─ Interp Location
+  └─ Interp Platform Location
+
+자식 클래스들
+  ├─ BP_Floating_Platform
+  │   └─ Activate로 1회 이동
+  │
+  └─ BP_Platform_PingPong
+      └─ Begin Play로 무한 왕복
+```
+
+---
+
+## 🚀 확장 아이디어
+
+### 추가 가능한 플랫폼 타입
+
+```
+1. 회전 플랫폼
+   └─ Lerp (Rotator) 사용
+
+2. 다단계 플랫폼
+   └─ Interp Location 여러 개
+
+3. 속도 변화 플랫폼
+   └─ Curve 모양 변경
+
+4. 조건부 플랫폼
+   └─ 특정 조건에서만 이동
+
+5. 싱크 플랫폼
+   └─ 여러 플랫폼 동시 이동
+```
+
+### 왕복 시스템 개선
+
+```
+대기 시간 추가:
+  └─ Finished에서 Delay 삽입
+
+속도 점진적 변화:
+  └─ Ease In/Out Curve 사용
+
+사운드 효과:
+  └─ 방향 전환 시 Play Sound
+
+파티클 효과:
+  └─ 이동 중 Spawn Emitter
+```
+
+---
+
+## ✨ 완성된 시스템
+
+✅ 깔끔한 클래스 구조 (Base → 자식들)
+
+✅ 공통 기능 재사용 (Interp Location, 함수)
+
+✅ 압력판 활성화 플랫폼 (Floating)
+
+✅ 자동 왕복 플랫폼 (PingPong)
+
+✅ 시각화 개선 (Billboard Component)
+
+✅ 무한 반복 시스템 (Custom Events + Switch)
+
+✅ 확장 가능한 구조 (새 자식 쉽게 추가)
+
+✅ 명확한 명명 규칙 (Base, dep 등)
+
+---
+
+## 🎯 핵심 학습 내용
+
+1. **리팩토링의 중요성**
+   - 공통 기능은 부모로
+   - 코드 재사용 극대화
+2. **Custom Event 활용**
+   - 재귀적 호출 패턴
+   - 상태 전환 구현
+3. **Switch on Enum**
+   - 다중 분기 처리
+   - 깔끔한 로직
+4. **Billboard Component**
+   - 에디터 편의성 향상
+   - 시각적 가이드
+5. **클래스 설계**
+   - 명확한 역할 분리
+   - 확장 가능한 구조
+
+# { 🏗️ Level Instance & Packed Level Actor }
+
+## 🎯 목표
+
+레벨 구성 요소를 재사용 가능한 단위로 만들어 효율적으로 관리하고 최적화하기
+
+---
+
+## 📋 핵심 개념
+
+### Level Instance vs Packed Level Actor
+
+```
+Level Instance (레벨 인스턴스)
+  ├─ 개념: 다른 레벨에 포함할 수 있는 서브 레벨
+  ├─ 구성: 모든 종류의 액터 포함 가능
+  ├─ 최적화: 없음
+  └─ 용도: 복잡한 구조 재사용
+
+Packed Level Actor (패킹된 레벨 액터)
+  ├─ 개념: 최적화된 Blueprint 액터
+  ├─ 구성: Static Mesh만 포함 가능 ⚠️
+  ├─ 최적화: Instanced Static Mesh 사용 ✅
+  └─ 용도: 반복되는 지오메트리 최적화
+```
+
+---
+
+## 🔧 Level Instance 생성
+
+### 생성 방법
+
+```
+레벨에서 액터들 선택
+  ↓
+우클릭 → Level → Create Level Instance
+  ↓
+설정
+  ├─ External Actors: 선택한 것만 포함
+  └─ Pivot Type: Center, Min Z
+  ↓
+저장 위치 선택 (Maps 폴더)
+  ↓
+레벨 인스턴스 생성 완료
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380675/notion-blog/_/_/_5_/2/image_7.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380675/notion-blog/_/_/_5_/2/image_8.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380675/notion-blog/_/_/_5_/2/image_9.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380667/notion-blog/_/_/_5_/2/image_10.png)
+
+### 특징
+
+```
+생성 결과:
+  ├─ 개별 액터들이 하나의 레벨 인스턴스로 통합
+  ├─ .umap 파일로 저장
+  └─ 다른 레벨에서 재사용 가능
+
+아웃라이너:
+  └─ 레벨 아이콘으로 표시
+
+편집:
+  └─ 더블클릭 시 해당 레벨로 이동
+```
+
+💡 **비유**: 레고 블록 세트를 하나의 완성품으로 포장한 것
+
+---
+
+## 🎁 Packed Level Actor 생성
+
+### 생성 방법
+
+```
+레벨에서 Static Mesh 액터들 선택
+  ↓
+우클릭 → Level → Create Packed Level Actor
+  ↓
+설정
+  └─ External Actors: 선택 해제
+  ↓
+저장 (Blueprint 생성)
+  ↓
+Packed Level Actor 완성
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380669/notion-blog/_/_/_5_/2/image_11.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380669/notion-blog/_/_/_5_/2/image_12.png)
+
+### 핵심 차이점
+
+```
+일반 Static Mesh Actor
+  ├─ 각각 개별 Draw Call
+  ├─ 메모리 중복 사용
+  └─ 성능: 낮음
+
+Instanced Static Mesh (패킹 후)
+  ├─ 하나의 Draw Call로 통합
+  ├─ 리소스 공유 (Material, Mesh)
+  └─ 성능: 높음 ✅
+```
+
+### 제한사항
+
+```
+⚠️ Static Mesh만 포함 가능
+
+포함 불가:
+  ├─ Blueprint 액터
+  ├─ Light 액터
+  ├─ Trigger 볼륨
+  └─ 모든 동적 액터
+
+→ 순수 지오메트리만 사용 가능
+```
+
+---
+
+## 🎨 Instanced Static Mesh 원리
+
+### Draw Call 최적화
+
+```
+Before (개별 메시)
+━━━━━━━━━━━━━━━━━
+Mesh A (10개)
+  └─ Draw Call × 10 = 10
+
+Mesh B (5개)
+  └─ Draw Call × 5 = 5
+
+총 Draw Call: 15
+
+After (Instanced)
+━━━━━━━━━━━━━━━━━
+Mesh A Instances (10개)
+  └─ Draw Call × 1 = 1 ✅
+
+Mesh B Instances (5개)
+  └─ Draw Call × 1 = 1 ✅
+
+총 Draw Call: 2 (86% 감소!)
+```
+
+### 리소스 공유
+
+```
+같은 메시를 여러 번 사용할 때:
+
+일반 방식:
+  └─ 각 액터마다 메시 데이터 참조
+
+Instanced 방식:
+  ├─ 메시 데이터 1개만 메모리에 로드
+  ├─ Transform(위치, 회전, 크기)만 개별 저장
+  └─ GPU에서 한 번에 렌더링
+```
+
+💡 **비유**:
+
+- 일반 = 같은 책을 10권 사기
+- Instanced = 책 1권 사고 책갈피 10개 꽂기
+
+---
+
+## 📦 Migration (마이그레이션)
+
+### 다른 프로젝트에서 가져오기
+
+```
+원본 프로젝트 (Stacko Bot)
+  ↓
+에셋 선택 (BP_Structure_001, 002)
+  ↓
+우클릭 → Asset Actions → Migrate
+  ↓
+대상 선택: 현재 프로젝트의 Content 폴더
+  ↓
+의존성 자동 포함
+  ├─ Static Mesh
+  ├─ Materials
+  ├─ Textures
+  └─ 모든 참조 에셋
+  ↓
+중복 에셋 처리
+  └─ Apply to All → No (덮어쓰지 않음)
+```
+
+### Migration 장점
+
+```
+✅ 에셋과 모든 의존성 자동 복사
+✅ 폴더 구조 유지
+✅ 참조 관계 유지
+✅ 수동 작업 최소화
+```
+
+---
+
+## ✏️ Packed Level Actor 편집
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380669/notion-blog/_/_/_5_/2/image_13.png)
+
+### 레벨 내 편집 모드
+
+```
+일반 Blueprint:
+  우클릭 → Edit
+  └─ Blueprint Editor 열림
+
+Packed Level Actor:
+  우클릭 → Edit
+  └─ 레벨 내에서 편집 모드 진입 ✨
+```
+
+### 편집 기능
+
+```
+편집 모드에서 가능:
+  ├─ 개별 메시 선택
+  ├─ 이동/회전/크기 조정
+  ├─ 메시 추가/제거
+  └─ 구조 변경
+
+종료:
+  └─ Exit 버튼 → 변경사항 저장
+```
+
+### 인스턴스 업데이트
+
+```
+편집 후 저장하면:
+  ↓
+Blueprint 자체가 변경됨
+  ↓
+레벨의 모든 인스턴스에 반영 ✅
+```
+
+💡 **중요**:
+
+- Level Instance는 해당 레벨로 이동
+- Packed Level Actor는 현재 레벨에서 편집
+
+---
+
+## 🏗️ 실전 활용 예시
+
+### 반복되는 구조물
+
+```
+복도 (Catwalk)
+  ├─ 모듈형 벽 × 20개
+  ├─ 바닥 × 10개
+  └─ 기둥 × 8개
+
+→ Packed Level Actor로 생성
+  ├─ 한 번만 배치
+  ├─ 여러 곳에 재사용
+  └─ 성능 최적화
+```
+
+### 대형 구조물
+
+```
+거대한 건물
+  ├─ 수백 개의 메시
+  ├─ 복잡한 배치
+  └─ 반복 사용
+
+→ BP_Structure_001 같은 형태
+  ├─ 한 번 제작
+  ├─ 레벨 곳곳에 배치
+  └─ 일괄 수정 가능
+```
+
+---
+
+## 📊 성능 비교
+
+### Draw Call 측면
+
+```
+예시: 100개의 같은 기둥
+
+일반 Static Mesh:
+  └─ Draw Call: 100
+
+Instanced Static Mesh:
+  └─ Draw Call: 1
+
+성능 향상: 99%
+```
+
+### 메모리 측면
+
+```
+예시: 10MB 메시 × 50개
+
+일반 방식:
+  └─ 메모리: 10MB (공유 참조)
+  └─ Transform: 50개
+
+Instanced 방식:
+  └─ 메모리: 10MB (공유)
+  └─ Transform: 50개
+
+→ 메모리는 동일하지만 렌더링 효율 극대화
+```
+
+---
+
+## ⚙️ 사용 가이드라인
+
+### Level Instance 사용 시기
+
+```
+적합:
+  ├─ 다양한 액터 조합 (Blueprint, Light 등)
+  ├─ 완전한 씬 재사용
+  ├─ 서브 레벨 관리
+  └─ 협업 시 구역 분리
+
+부적합:
+  └─ 순수 성능 최적화 목적
+```
+
+### Packed Level Actor 사용 시기
+
+```
+적합:
+  ├─ 반복되는 Static Mesh 구조
+  ├─ 성능 최적화 필요
+  ├─ 건축물, 소품 세트
+  └─ 모듈형 레벨 디자인
+
+부적합:
+  ├─ 동적 요소 포함
+  ├─ Blueprint 로직 필요
+  └─ Light, Trigger 포함
+```
+
+---
+
+## 💡 핵심 정리
+
+### Level Instance
+
+```
+특징:
+  ✅ 모든 액터 포함 가능
+  ✅ 완전한 씬 재사용
+  ❌ 성능 최적화 없음
+
+용도:
+  └─ 복잡한 레벨 구성 요소 관리
+```
+
+### Packed Level Actor
+
+```
+특징:
+  ✅ Static Mesh만 (제한)
+  ✅ Instanced Mesh로 최적화
+  ✅ 레벨 내 편집 가능
+  ✅ 모든 인스턴스 동시 업데이트
+
+용도:
+  └─ 성능 중심의 지오메트리 재사용
+```
+
+### Instanced Static Mesh
+
+```
+원리:
+  ├─ 같은 메시는 데이터 1개만
+  ├─ Transform만 개별 저장
+  └─ GPU에서 한 번에 렌더링
+
+효과:
+  ├─ Draw Call 대폭 감소
+  └─ 렌더링 성능 향상
+```
+
+---
+
+## 🎓 Best Practices
+
+### 1. 적절한 도구 선택
+
+```
+Static Mesh만:
+  └─ Packed Level Actor
+
+복합 액터:
+  └─ Level Instance
+
+단순 재사용:
+  └─ Blueprint Class
+```
+
+### 2. 명명 규칙
+
+```
+Packed Level Actor:
+  └─ BPP_ 접두사 (Blueprint Packed)
+
+Level Instance:
+  └─ LI_ 접두사 (Level Instance)
+
+일반 Blueprint:
+  └─ BP_ 접두사
+```
+
+### 3. 폴더 구조
+
+```
+Content
+  ├─ Maps (레벨 파일)
+  │   └─ Level Instances
+  ├─ Blueprints
+  │   └─ PackedLevelActors
+  └─ Structures (구조물)
+```
+
+### 4. Migration 주의사항
+
+```
+✅ 의존성 확인
+✅ 중복 에셋 처리 방침 결정
+✅ 폴더 구조 유지
+❌ 무분별한 덮어쓰기
+```
+
+---
+
+## ⚠️ 주의사항
+
+### Packed Level Actor 제한
+
+```
+포함 불가능:
+  ├─ Blueprint 액터 ❌
+  ├─ Light ❌
+  ├─ Camera ❌
+  ├─ Trigger Volume ❌
+  └─ 모든 동적 요소 ❌
+
+→ 순수 장식용 지오메트리만
+```
+
+### 편집 시 영향 범위
+
+```
+Packed Level Actor 편집:
+  ↓
+Blueprint 자체 변경
+  ↓
+모든 인스턴스에 반영
+
+→ 신중하게 편집 필요
+```
+
+### 성능 오해
+
+```
+❌ 무조건 빠른 것이 아님
+✅ 같은 메시 반복 시에만 효과적
+
+단일 유니크 메시들:
+  └─ 일반 방식과 차이 없음
+```
+
+---
+
+## 🚀 활용 시나리오
+
+### 모듈형 레벨 디자인
+
+```
+1. 기본 모듈 제작
+   └─ 복도, 방, 계단 등
+
+2. Packed Level Actor로 변환
+   └─ 최적화 + 재사용성
+
+3. 레벨 조립
+   └─ 모듈 조합으로 레벨 구성
+
+4. 일괄 수정
+   └─ 한 곳만 수정해도 전체 반영
+```
+
+### 대규모 환경
+
+```
+도시 레벨:
+  ├─ 빌딩 → Packed Level Actor
+  ├─ 소품 세트 → Packed Level Actor
+  ├─ 도로 → Packed Level Actor
+  └─ 조합하여 도시 구성
+```
+
+---
+
+## ✨ 핵심 요약
+
+| 기능          | Level Instance | Packed Level Actor |
+| ------------- | -------------- | ------------------ |
+| **포함 가능** | 모든 액터      | Static Mesh만      |
+| **최적화**    | 없음           | Instancing         |
+| **편집**      | 별도 레벨      | 레벨 내 편집       |
+| **용도**      | 복잡한 씬      | 지오메트리         |
+| **성능**      | 일반           | 우수               |
+| **파일 타입** | .umap          | .uasset            |
+
+**선택 기준**:
+
+- 성능 우선 + Static Mesh만 → Packed Level Actor
+- 유연성 우선 + 복합 액터 → Level Instance
+
+# { 🎮 Win/Lose 시스템 구축 }
+
+## 🎯 목표
+
+게임의 승리/패배 조건을 Interface로 구현하고, 최적화된 방식으로 처리하기
+
+---
+
+## 📋 전체 시스템 개요
+
+```
+Win/Lose 시스템
+  ├─ BPI_WinLose Interface
+  │   ├─ Win Game 함수
+  │   └─ Lose Game 함수
+  │
+  ├─ BP_Kick (Interface 구현)
+  │   └─ 승리/패배 처리
+  │
+  ├─ BP_Lose_Box (패배 트리거)
+  │   └─ 떨어지면 Lose Game 호출
+  │
+  └─ BP_Win_Game_Actor (승리 트리거)
+      └─ 압력판 → Win Game 호출
+```
+
+---
+
+## 🔌 1단계: BPI_WinLose Interface 생성
+
+### 1-1. Interface 생성
+
+```
+Blueprints/Interfaces 폴더
+  ↓
+우클릭 → Blueprint Interface
+  └─ 이름: BPI_WinLose
+```
+
+### 1-2. 함수 추가
+
+```
+BPI_WinLose 열기
+  ↓
+Functions 패널
+  ├─ 기본 함수 이름 변경: Win Game
+  └─ + 버튼 → 새 함수: Lose Game
+```
+
+**Interface 함수 특징**
+
+```
+개념: 약속된 함수 시그니처
+내용: 비어있음 (각 클래스가 구현)
+목적: 느슨한 결합 (Loose Coupling)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380669/notion-blog/_/_/_5_/2/image_14.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380669/notion-blog/_/_/_5_/2/image_15.png)
+
+---
+
+## 👤 2단계: BP_Kick에 Interface 구현
+
+### 2-1. Interface 추가
+
+```
+BP_Kick 열기
+  ↓
+Class Settings
+  ↓
+Implemented Interfaces
+  └─ Add → BPI_WinLose
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380670/notion-blog/_/_/_5_/2/image_16.png)
+
+**여러 Interface 구현 가능**
+
+```
+BP_Kick가 구현하는 Interface:
+  ├─ BPI_Jetpack (기존)
+  └─ BPI_WinLose (새로 추가)
+
+→ 하나의 클래스가 여러 Interface 구현 가능 ✅
+```
+
+### 2-2. 함수 구현 (플레이스홀더)
+
+**Win Game 구현**
+
+```
+Interfaces 카테고리
+  └─ Win Game 더블클릭
+      ↓
+Print String
+  ├─ In String: "Won"
+  └─ Text Color: Green
+```
+
+**Lose Game 구현**
+
+```
+Interfaces 카테고리
+  └─ Lose Game 더블클릭
+      ↓
+Print String
+  ├─ In String: "Lost"
+  └─ Text Color: Red
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380669/notion-blog/_/_/_5_/2/image_17.png)
+
+💡 **플레이스홀더란?**
+
+- 임시로 넣어둔 코드
+- 나중에 실제 UI로 교체 예정
+- 현재는 작동 확인용
+
+---
+
+## 📦 3단계: BP_Lose_Box (패배 트리거) 생성
+
+### 3-1. Trigger Box 이해
+
+**Trigger Box란?**
+
+```
+개념: 겹침 감지용 미리 만들어진 클래스
+구성:
+  ├─ Box Component (충돌 감지)
+  └─ Billboard Component (시각 마커)
+
+장점:
+  ✅ 컴포넌트 추가 불필요
+  ✅ 기본 설정 완료
+  ✅ 빠른 제작
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380669/notion-blog/_/_/_5_/2/image_18.png)
+
+### 3-2. 자식 클래스 생성
+
+```
+Blueprints/Interactables 폴더
+  ↓
+우클릭 → Blueprint Class
+  ↓
+All Classes 검색
+  ├─ "Trigger Box" 검색
+  └─ Trigger Box 선택
+      ↓
+  이름: BP_Lose_Box (또는 BP_Death_Box)
+```
+
+### 3-3. Collision Preset 확인
+
+```
+BP_Lose_Box 열기
+  ↓
+CollisionComponent 선택
+  ↓
+Details 패널 → Collision
+  └─ Collision Presets: Trigger (기본값)
+```
+
+**Trigger Preset 설정**
+
+```
+Collision Enabled: Query Only
+Object Type: WorldDynamic
+Collision Responses:
+  ├─ Default: Overlap
+  └─ 모든 채널과 겹침
+```
+
+**더 나은 설정 (선택사항)**
+
+```
+Collision Presets: PressurePlate (커스텀)
+  └─ Pawn과만 겹침
+  └─ 불필요한 겹침 방지
+```
+
+### 3-4. Overlap 이벤트 구현
+
+**노드 구조**
+
+```
+Event ActorBeginOverlap
+  ├─ Other Actor: 겹친 액터
+  └─ 자동으로 생성된 이벤트
+  ↓
+Lose Game (Interface Message)
+  └─ Target: Other Actor
+```
+
+**Event ActorBeginOverlap**
+
+```
+용도: 이 액터와 다른 액터가 겹칠 때 발동
+출력:
+  └─ Other Actor: 겹친 상대방 액터
+
+vs Component Begin Overlap:
+  ├─ Actor: 액터 전체 레벨 이벤트
+  └─ Component: 특정 컴포넌트만
+```
+
+**Lose Game (Interface Message)**
+
+```
+노드 타입: Interface 함수 호출
+색상: 빨간색 (Interface)
+입력: Target (Other Actor)
+기능: Target이 BPI_WinLose 구현 시 Lose Game 호출
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380669/notion-blog/_/_/_5_/2/image_19.png)
+
+💡 **작동 원리**
+
+```
+플레이어가 박스와 겹침
+  ↓
+Event ActorBeginOverlap 발동
+  ↓
+Other Actor = BP_Kick (플레이어)
+  ↓
+BP_Kick의 Lose Game 함수 호출
+  ↓
+"Lost" 출력
+```
+
+---
+
+## 📐 4단계: Lose Box 레벨 배치
+
+### 4-1. 배치 및 크기 조정
+
+```
+BP_Lose_Box를 레벨에 드래그
+  ↓
+레벨 아래로 이동
+  ↓
+Viewport 상단: Perspective → Top (평면도)
+  ↓
+CollisionComponent 선택
+  ↓
+Details 패널 → Box Extent 조정
+  ├─ X: 레벨 전체 너비
+  ├─ Y: 레벨 전체 길이
+  └─ Z: 충분한 높이 (너무 높으면 플랫폼과 겹침)
+```
+
+**Box Extent란?**
+
+```
+개념: 박스의 반지름 (중심에서 끝까지)
+단위: Unreal Units
+
+예시:
+  Box Extent X = 1000
+  → 실제 너비 = 2000 (중심 기준 양쪽 1000씩)
+```
+
+### 4-2. 위치 확인
+
+```
+Perspective View로 복귀
+  ↓
+박스가 모든 플랫폼 아래에 있는지 확인
+  ├─ 너무 높으면: 플랫폼과 겹쳐서 즉시 패배
+  └─ 너무 낮으면: 레벨 밖으로 나가도 감지 못함
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380670/notion-blog/_/_/_5_/2/image_20.png)
+
+---
+
+## 🏆 5단계: BP_Win_Game_Actor 생성
+
+### 5-1. 개념 이해
+
+**왜 새 액터가 필요한가?**
+
+```
+압력판의 역할:
+  ├─ Activate Interface 호출
+  └─ 다양한 용도로 사용
+
+Win Game 액터:
+  ├─ Activate를 받으면
+  └─ 플레이어에게 Win Game 호출
+
+→ 역할 분리 (Single Responsibility)
+```
+
+### 5-2. 액터 생성
+
+```
+Blueprints/Interactables 폴더
+  ↓
+우클릭 → Blueprint Class → Actor
+  └─ 이름: BP_Win_Game_Actor
+```
+
+### 5-3. Interface 구현
+
+```
+BP_Win_Game_Actor 열기
+  ↓
+Class Settings
+  ↓
+Implemented Interfaces
+  └─ Add → BPI_Interact
+```
+
+**Activate 이벤트 구현 개요**
+
+```
+Activate (BPI_Interact)
+  ↓
+플레이어 찾기
+  ↓
+Win Game 호출 (BPI_WinLose)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380670/notion-blog/_/_/_5_/2/image_21.png)
+
+---
+
+## 🎯 6단계: Get All Actors of Class (기본 방식)
+
+### 6-1. 노드 구조
+
+```
+Event Activate
+  ↓
+Get All Actors of Class
+  ├─ Actor Class: BP_Kick
+  └─ Out Actors: BP_Kick 배열
+  ↓
+Get (배열 노드)
+  ├─ 인덱스: 0 (첫 번째)
+  └─ 반환: BP_Kick 인스턴스
+  ↓
+Branch
+  ├─ Condition: Is Valid Index?
+  └─ True → Win Game 호출
+```
+
+### 6-2. 각 노드 설명
+
+**Get All Actors of Class**
+
+```
+용도: 특정 클래스의 모든 액터 찾기
+입력:
+  └─ Actor Class: 찾을 클래스
+출력:
+  └─ Out Actors: 찾은 액터들의 배열
+
+특징:
+  ⚠️ 하드 레퍼런스 생성
+  ⚠️ 메모리 부담 증가
+```
+
+**Get (Array)**
+
+```
+용도: 배열에서 특정 인덱스 요소 가져오기
+입력:
+  ├─ Target: 배열
+  └─ Index: 인덱스 (0부터 시작)
+출력:
+  └─ 해당 인덱스의 요소
+```
+
+**Is Valid Index?**
+
+```
+용도: 배열 인덱스가 유효한지 확인
+입력:
+  ├─ Target: 배열
+  └─ Index to Test: 확인할 인덱스
+출력:
+  └─ Boolean (있으면 True)
+
+필요성:
+  └─ 빈 배열에서 Get 하면 크래시 방지
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380670/notion-blog/_/_/_5_/2/image_22.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380670/notion-blog/_/_/_5_/2/image_23.png)
+
+### 6-3. 문제점 발견
+
+**Size Map 확인**
+
+```
+BP_Win_Game_Actor 우클릭
+  → Size Map
+  ↓
+결과: 15.8 MB
+
+원인:
+  └─ BP_Kick 클래스의 하드 레퍼런스
+      ├─ 모든 메시, 텍스처, 사운드 등
+      └─ 사용하지 않아도 메모리 로드
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380670/notion-blog/_/_/_5_/2/image_24.png)
+
+💡 **하드 레퍼런스 문제**
+
+```
+BP_Win_Game_Actor 로드 시
+  ↓
+BP_Kick 클래스 전체 로드
+  ↓
+BP_Kick의 모든 의존성 로드
+  ├─ 캐릭터 메시
+  ├─ 애니메이션
+  ├─ 사운드
+  └─ 모든 관련 에셋
+
+→ 메모리 낭비!
+```
+
+---
+
+## 🚀 7단계: Soft Class Reference (최적화)
+
+### 7-1. 개념 이해
+
+**Hard Reference vs Soft Reference**
+
+```
+Hard Reference (하드 레퍼런스)
+  ├─ 즉시 로드
+  ├─ 항상 메모리에 상주
+  ├─ 크기: 큼 (의존성 포함)
+  └─ 사용: 자주 필요한 것
+
+Soft Reference (소프트 레퍼런스)
+  ├─ 필요할 때만 로드
+  ├─ 메모리 효율적
+  ├─ 크기: 작음 (경로만 저장)
+  └─ 사용: 가끔 필요한 것
+```
+
+**비유**
+
+```
+Hard Reference = 책을 항상 가방에 넣고 다님
+Soft Reference = 도서관 카드만 가지고 필요할 때 빌림
+```
+
+### 7-2. 변수를 Soft Class Reference로 변경
+
+**기존 방식**
+
+```
+Get All Actors of Class
+  └─ Actor Class: BP_Kick (직접 선택)
+      └─ 하드 레퍼런스 생성 ❌
+```
+
+**최적화 방식**
+
+```
+1. 변수로 승격
+   Get All Actors of Class 핀
+     ↓
+   우클릭 → Promote to Variable
+     └─ 이름: Kix Class
+
+2. 타입 변경
+   Variables 패널에서 Kix Class 선택
+     ↓
+   Details 패널 → Variable Type
+     └─ Soft Class Reference 체크 ✅
+
+3. 색상 변화
+   ├─ Hard Reference: 보라색
+   └─ Soft Reference: 분홍색 ✨
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380672/notion-blog/_/_/_5_/2/image_25.png)
+
+### 7-3. Async Load Class Asset
+
+**노드 구조**
+
+```
+Event Activate
+  ↓
+Async Load Class Asset
+  ├─ Asset Class: Kix Class (Soft Reference)
+  └─ Completed: 로딩 완료 시 실행
+      ↓
+      Class 출력: 로드된 클래스
+```
+
+**Async Load Class Asset**
+
+```
+용도: 클래스를 비동기로 로드
+특징:
+  ✅ 게임 멈춤 없음
+  ✅ 백그라운드에서 로딩
+  ✅ 완료되면 Completed 실행
+
+입력:
+  └─ Asset Class: Soft Class Reference
+
+출력:
+  ├─ Completed: 로딩 완료 핀
+  └─ Class: 로드된 실제 클래스
+```
+
+**비동기(Async)란?**
+
+```
+동기(Sync):
+  로딩 시작 → [멈춤] → 로딩 완료 → 진행
+
+비동기(Async):
+  로딩 시작 → 백그라운드 로딩
+  게임 진행 → 완료되면 콜백
+```
+
+### 7-4. 최적화된 전체 구조
+
+```
+Event Activate
+  ↓
+Async Load Class Asset
+  └─ Kix Class (Soft Reference)
+      ↓
+      Completed
+        ↓
+Get All Actors of Class
+  └─ Class (로드된 클래스)
+      ↓
+Get [0]
+  ↓
+Branch (Is Valid Index?)
+  ├─ True → Win Game
+  └─ False → (무시)
+```
+
+### 7-5. 결과 확인
+
+**Size Map 재확인**
+
+```
+BP_Win_Game_Actor 우클릭 → Size Map
+  ↓
+결과: 12 KB (99% 감소!)
+
+이유:
+  └─ BP_Kick 경로만 저장
+      └─ 문자열 정보만 (매우 가벼움)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380672/notion-blog/_/_/_5_/2/image_26.png)
+
+---
+
+## 🔧 8단계: Is Valid Class 추가 (안전성)
+
+### 8-1. 문제 인식
+
+```
+만약 Kix Class가 설정 안 되면?
+  ↓
+Async Load Class Asset 실행
+  ↓
+아무것도 로드 안 됨
+  ↓
+Get All Actors 실행 (null 클래스)
+  ↓
+빈 배열 반환
+  ↓
+에러는 없지만 작동 안 함
+```
+
+### 8-2. Is Valid Class 노드
+
+**노드 구조**
+
+```
+Event Activate
+  ↓
+Is Valid Class
+  ├─ Class: Kix Class
+  └─ Return Value: Boolean
+      ↓
+Branch
+  ├─ True → 이미 로드됨 → Get All Actors
+  └─ False → 로드 필요 → Async Load
+```
+
+**Is Valid Class**
+
+```
+용도: 클래스가 유효한지 확인
+입력:
+  └─ Class: 확인할 클래스 레퍼런스
+출력:
+  └─ Boolean
+
+True인 경우:
+  ├─ 클래스가 이미 로드됨
+  └─ 바로 사용 가능
+
+False인 경우:
+  ├─ 클래스가 로드 안 됨
+  └─ 로드 필요
+```
+
+### 8-3. 최종 최적화 구조
+
+```
+Event Activate
+  ↓
+Is Valid Class (Kix Class)
+  ↓
+Branch
+  ├─ True (이미 로드됨)
+  │   └─ Get All Actors of Class
+  │       └─ Class: Kix Class (해결됨)
+  │
+  └─ False (로드 필요)
+      └─ Async Load Class Asset
+          └─ Completed
+              └─ Get All Actors of Class
+                  └─ Class: 로드된 클래스
+
+공통 부분
+  ↓
+Get [0]
+  ↓
+Branch (Is Valid Index?)
+  └─ True → Win Game
+```
+
+### 8-4. 중복 제거 (Reroute Node)
+
+**문제**
+
+```
+Get All Actors of Class가 두 군데
+  ├─ True 경로
+  └─ False → Completed 경로
+
+→ 코드 중복
+```
+
+**해결: Reroute Node**
+
+```
+용도: 와이어 정리 및 재사용
+생성: 와이어에서 더블클릭
+특징:
+  ✅ 가독성 향상
+  ✅ 중복 제거
+  ✅ 유지보수 용이
+```
+
+**정리된 구조**
+
+```
+두 경로 모두
+  ↓
+Reroute Node (보라색 점)
+  ↓
+Get All Actors of Class (한 곳에만)
+  ↓
+나머지 로직
+```
+
+---
+
+## 🎮 9단계: 레벨 배치 및 연결
+
+### 9-1. Billboard Component 추가 (선택)
+
+```
+BP_Win_Game_Actor
+  ↓
+Components 패널
+  ↓
+Add Component → Billboard
+  └─ 시각적 마커 (에디터에서만 보임)
+```
+
+### 9-2. 레벨 배치
+
+```
+BP_Pressure_Plate 배치
+  └─ 레벨 끝 위치
+
+BP_Win_Game_Actor 배치
+  └─ 압력판 옆
+```
+
+### 9-3. 압력판 설정
+
+```
+압력판 선택
+  ↓
+Details 패널
+  ↓
+Actors to Activate
+  ├─ + 버튼
+  └─ Eyedropper → BP_Win_Game_Actor 선택
+```
+
+### 9-4. Kix Class 설정
+
+```
+BP_Win_Game_Actor 선택
+  ↓
+Details 패널
+  ↓
+Kix Class
+  └─ BP_Kick 선택
+```
+
+💡 **Soft Reference 설정**
+
+- Details 패널에서 직접 선택 가능
+- 에디터에서는 Hard처럼 보이지만
+- 런타임에는 Soft로 작동
+
+---
+
+## 🔍 노드 기능 완전 정리
+
+### 핵심 노드
+
+**Get All Actors of Class**
+
+```
+기능: 레벨의 모든 특정 클래스 액터 찾기
+입력: Actor Class
+출력: Out Actors (배열)
+주의: 하드 레퍼런스 생성 ⚠️
+용도: 레벨의 모든 인스턴스 필요 시
+```
+
+**Async Load Class Asset**
+
+```
+기능: 클래스를 비동기로 로드
+입력: Asset Class (Soft Reference)
+출력:
+  ├─ Completed (완료 시)
+  └─ Class (로드된 클래스)
+장점: 게임 멈춤 없음
+용도: Soft Reference 로딩
+```
+
+**Is Valid Class**
+
+```
+기능: 클래스가 유효한지(로드됐는지) 확인
+입력: Class
+출력: Boolean
+용도: 로드 여부 확인
+```
+
+**Get (Array)**
+
+```
+기능: 배열에서 요소 추출
+입력:
+  ├─ Target (배열)
+  └─ Index (인덱스)
+출력: 해당 요소
+```
+
+**Is Valid Index?**
+
+```
+기능: 배열 인덱스 유효성 검사
+입력:
+  ├─ Target (배열)
+  └─ Index to Test
+출력: Boolean
+용도: 안전한 배열 접근
+```
+
+**Win Game / Lose Game**
+
+```
+타입: Interface Message
+기능: Interface 함수 호출
+입력: Target (Interface 구현 액터)
+특징: 빨간색 노드
+```
+
+**Event ActorBeginOverlap**
+
+```
+타입: Event
+발동: 이 액터와 다른 액터 겹침
+출력:
+  └─ Other Actor (겹친 액터)
+용도: 트리거 구현
+```
+
+---
+
+## 📊 성능 비교
+
+### 메모리 사용량
+
+```
+하드 레퍼런스
+  └─ BP_Win_Game_Actor: 15.8 MB
+      └─ BP_Kick 전체 포함
+
+소프트 레퍼런스
+  └─ BP_Win_Game_Actor: 12 KB
+      └─ 경로 문자열만
+
+절감: 99.9%
+```
+
+### 로딩 시간
+
+```
+하드 레퍼런스
+  ├─ 레벨 로드 시 모두 로드
+  └─ 초기 로딩 느림
+
+소프트 레퍼런스
+  ├─ 필요할 때만 로드
+  └─ 초기 로딩 빠름
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Hard vs Soft Reference
+
+```
+언제 Hard 사용:
+  ├─ 항상 필요한 것
+  ├─ 자주 사용하는 것
+  └─ 빠른 접근 필요
+
+언제 Soft 사용:
+  ├─ 가끔 필요한 것
+  ├─ 조건부로 사용
+  └─ 메모리 절약 중요
+```
+
+### Interface 활용
+
+```
+장점:
+  ✅ 느슨한 결합
+  ✅ 확장성
+  ✅ 재사용성
+
+Win/Lose 시스템:
+  ├─ 다양한 트리거 가능
+  ├─ 다양한 결과 처리
+  └─ 쉬운 확장
+```
+
+### 비동기 로딩
+
+```
+필요성:
+  ├─ 게임 멈춤 방지
+  ├─ 부드러운 경험
+  └─ 대용량 에셋 처리
+
+주의:
+  └─ Completed 전까지 사용 불가
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 1. Soft Reference 설정
+
+```
+✅ Details 패널에서 직접 선택 가능
+✅ None으로 두면 Is Valid Class가 False
+❌ 런타임에 None이면 작동 안 함
+```
+
+### 2. 배열 접근
+
+```
+✅ 항상 Is Valid Index 확인
+❌ 직접 Get 하면 크래시 위험
+```
+
+### 3. Interface 구현
+
+```
+✅ 구현 안 한 액터에 호출해도 에러 없음
+✅ 조용히 무시됨
+❌ 디버깅 어려울 수 있음
+```
+
+### 4. Async 로딩
+
+```
+✅ Completed 핀에서만 사용
+❌ 로딩 중에 접근하면 null
+```
+
+---
+
+## 🎯 실전 활용
+
+### Win 조건 다양화
+
+```
+현재:
+  └─ 압력판 밟기
+
+확장 가능:
+  ├─ 모든 적 처치
+  ├─ 아이템 수집 완료
+  ├─ 특정 지점 도달
+  └─ 시간 내 완료
+```
+
+### Lose 조건 다양화
+
+```
+현재:
+  └─ 레벨 밖으로 떨어짐
+
+확장 가능:
+  ├─ 체력 0
+  ├─ 시간 초과
+  ├─ 적에게 닿음
+  └─ 함정 활성화
+```
+
+---
+
+## ✨ 최종 시스템 구조
+
+```
+승리 흐름
+━━━━━━━━━━━━━━━━━━
+압력판 밟음
+  ↓
+BP_Pressure_Plate
+  ↓
+Activate → BP_Win_Game_Actor
+  ↓
+Async Load (필요 시)
+  ↓
+Get BP_Kick 인스턴스
+  ↓
+Win Game → BP_Kick
+  ↓
+"Won" 출력
+
+패배 흐름
+━━━━━━━━━━━━━━━━━━
+레벨 밖 떨어짐
+  ↓
+BP_Lose_Box (Overlap)
+  ↓
+Lose Game → BP_Kick
+  ↓
+"Lost" 출력
+```
+
+---
+
+## 🎓 학습 포인트
+
+1. **Interface 패턴**
+   - 다형성 활용
+   - 느슨한 결합
+   - 확장 가능한 설계
+2. **메모리 최적화**
+   - Soft Reference 이해
+   - 하드 레퍼런스 문제 인식
+   - Size Map 활용
+3. **비동기 처리**
+   - Async Load 개념
+   - 게임 성능 개선
+   - 사용자 경험 향상
+4. **안전한 코딩**
+   - Is Valid 체크
+   - 배열 접근 검증
+   - 방어적 프로그래밍
+
+---
+
+## 🚀 다음 단계
+
+현재: 텍스트로 승패 표시
+다음: UI 위젯 제작
+├─ Win/Lose 화면
+├─ Restart 버튼
+└─ Quit 버튼
+
+# { 🎨 End Game Widget (승패 화면) 제작 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380672/notion-blog/_/_/_5_/2/image_27.png)
+
+## 🎯 목표
+
+승리/패배 시 표시할 UI 위젯을 만들고, 화면 중앙에 배치하기
+
+---
+
+## 📋 전체 시스템 구조
+
+```
+UI 시스템
+  ├─ 커스텀 폰트 임포트
+  ├─ WBP_End_Game 위젯 제작
+  │   ├─ Size Box (크기 고정)
+  │   ├─ Vertical/Horizontal Box (레이아웃)
+  │   ├─ Text Block (메시지)
+  │   └─ Buttons (Replay, Quit)
+  │
+  └─ BP_Kick에서 표시 로직
+      ├─ Soft Class Reference (최적화)
+      ├─ Async Load (비동기 로딩)
+      └─ 화면 중앙 배치
+```
+
+---
+
+## 🔤 1단계: 커스텀 폰트 임포트
+
+### 1-1. Google Fonts 다운로드
+
+```
+웹사이트: fonts.google.com
+  ↓
+폰트 검색 (예: Tiny5)
+  ↓
+Download Family
+  ↓
+.ttf 파일 획득
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380672/notion-blog/_/_/_5_/2/image_28.png)
+
+### 1-2. 언리얼로 임포트
+
+```
+Content Browser
+  ↓
+Fonts 폴더 생성
+  ↓
+.ttf 파일 드래그 & 드롭
+  ↓
+팝업: "Create new Font asset?"
+  └─ Yes 선택
+```
+
+**생성된 에셋**
+
+```
+결과:
+  ├─ Font Face (폰트 데이터)
+  └─ Font (언리얼 폰트 에셋)
+
+사용:
+  └─ Font 에셋을 Text에 적용
+```
+
+💡 **Font vs Font Face**
+
+- Font Face = 원본 폰트 파일
+- Font = 언리얼에서 사용 가능한 형태
+
+---
+
+## 📦 2단계: 위젯 레이아웃 시스템
+
+### 2-1. Size Box (크기 제어)
+
+**Size Box란?**
+
+```
+용도: 위젯의 고정 크기 지정
+장점:
+  ✅ Width/Height 직접 설정
+  ✅ Details 패널에서 쉽게 조정
+  ✅ 반응형 디자인 가능
+
+vs Canvas Panel:
+  ├─ Size Box: 크기만 고정
+  └─ Canvas Panel: 위치도 자유 배치 (성능 ↓)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380672/notion-blog/_/_/_5_/2/image_29.png)
+
+**설정 방법**
+
+```
+Size Box 배치
+  ↓
+Details 패널
+  ├─ Override Width: 체크 ✅ → 800
+  └─ Override Height: 체크 ✅ → 600
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380673/notion-blog/_/_/_5_/2/image_30.png)
+
+💡 **Canvas Panel 지양 이유**
+
+```
+Canvas Panel:
+  ├─ 자유 배치 가능
+  ├─ 클릭 & 드래그로 위치 조정
+  └─ 성능 부담 (렌더링 비용 높음)
+
+권장:
+  └─ Size Box + Overlay 조합 사용
+```
+
+### 2-2. Vertical Box (세로 배치)
+
+**Vertical Box란?**
+
+```
+용도: 위젯을 위→아래 순서로 나열
+특징:
+  ├─ 자동 정렬
+  ├─ 순서대로 쌓임
+  └─ 간격 조절 가능
+
+구조:
+  Vertical Box
+    ├─ Text Block (위)
+    └─ Horizontal Box (아래)
+```
+
+### 2-3. Horizontal Box (가로 배치)
+
+**Horizontal Box란?**
+
+```
+용도: 위젯을 왼쪽→오른쪽 순서로 나열
+활용: 버튼 나란히 배치
+
+구조:
+  Horizontal Box
+    ├─ Button (Replay)
+    └─ Button (Quit)
+```
+
+### 2-4. Box의 Fill 속성
+
+```
+Slot 설정
+  └─ Size → Fill 선택
+
+효과:
+  ├─ Auto: 콘텐츠 크기만큼
+  └─ Fill: 남은 공간 모두 차지
+
+예시:
+  Horizontal Box에 Button 2개
+    ├─ 둘 다 Fill
+    └─ 50:50 비율로 공간 분할
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380673/notion-blog/_/_/_5_/2/image_31.png)
+
+---
+
+## 🎨 3단계: UI 요소 구성
+
+### 3-1. Text Block (텍스트)
+
+**기본 설정**
+
+```
+Text Block 추가
+  ↓
+Details 패널
+  ├─ Text: "Menu Text" (플레이스홀더)
+  ├─ Font: Tiny5 (커스텀 폰트)
+  ├─ Size: 24
+  └─ Justification
+      └─ Horizontal: Center
+```
+
+**Justification이란?**
+
+```
+Horizontal Alignment: 가로 정렬
+  ├─ Left
+  ├─ Center (중앙)
+  └─ Right
+
+Vertical Alignment: 세로 정렬
+  ├─ Top
+  ├─ Center (중앙)
+  └─ Bottom
+```
+
+### 3-2. Button (버튼)
+
+**버튼 구조**
+
+```
+Button
+  └─ Text Block (자식 1개만 가능)
+      └─ 버튼 위에 표시될 텍스트
+```
+
+**Padding 설정**
+
+```
+Button 선택
+  ↓
+Details 패널 → Padding
+  └─ Uniform: 10 (모든 방향 동일)
+
+또는 개별 설정:
+  ├─ Left: 34
+  ├─ Right: 34
+  ├─ Top: 24
+  └─ Bottom: 24
+```
+
+**버튼 내 텍스트 설정**
+
+```
+Button의 자식 Text Block
+  ├─ Text: "Replay" 또는 "Quit"
+  ├─ Font: Tiny5
+  ├─ Size: 12
+  └─ Alignment: Center (가로, 세로)
+```
+
+### 3-3. Button Style (버튼 스타일)
+
+```
+Button 선택 → Style
+  ├─ Normal: 기본 상태
+  ├─ Hovered: 마우스 올렸을 때
+  ├─ Pressed: 클릭했을 때
+  └─ Disabled: 비활성화 상태
+
+각 상태별 설정 가능:
+  ├─ Tint (색상)
+  └─ Image (이미지)
+```
+
+---
+
+## 🖼️ 4단계: Overlay와 Image (배경)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380673/notion-blog/_/_/_5_/2/image_32.png)
+
+### 4-1. 문제점
+
+```
+Size Box에는 겹치기 불가
+  ↓
+Background Image 추가 불가
+```
+
+### 4-2. 해결: Wrap with Overlay
+
+**Wrap with란?**
+
+```
+기존 위젯을 다른 위젯으로 감싸기
+
+방법:
+  Size Box 우클릭
+    → Wrap With... → Overlay
+```
+
+**결과 구조**
+
+```
+Overlay (새로 생성)
+  └─ Size Box (기존)
+      └─ Vertical Box
+          └─ ...
+```
+
+### 4-3. Background Image 추가
+
+```
+Overlay에 Image 드래그
+  ↓
+계층 구조 조정
+  ├─ Image를 Size Box 위로 이동
+  └─ 순서가 시각적 깊이 결정
+```
+
+**Image 설정**
+
+```
+Image 선택
+  ↓
+Slot 설정
+  ├─ Horizontal: Fill
+  └─ Vertical: Fill
+
+Brush 설정
+  └─ Tint: 원하는 색상 (예: 파란색)
+```
+
+### 4-4. Border 효과 (테두리)
+
+```
+2개의 Image로 테두리 모방
+
+구조:
+  Overlay
+    ├─ Image (배경) - 진한 색
+    ├─ Image (전경) - 밝은 색
+    │   └─ Padding: 4 (사방)
+    └─ Size Box
+        └─ 내용물
+```
+
+**Padding 효과**
+
+```
+전경 Image에 Padding 적용
+  ↓
+배경 Image가 테두리처럼 보임
+```
+
+---
+
+## 🎮 5단계: Spacer (간격 조정)
+
+### Spacer Widget
+
+```
+용도: 위젯 사이 빈 공간 생성
+위치: Vertical Box 맨 위
+
+설정:
+  └─ Size: Vertical 크기 조정
+      └─ 메뉴를 아래로 밀어냄
+```
+
+---
+
+## 🔧 6단계: 위젯 표시 로직
+
+### 6-1. Set Menu Text 함수
+
+**목적**: 동적으로 텍스트 변경
+
+**Text Block을 변수로**
+
+```
+Designer 탭
+  ↓
+Menu Text Block 선택
+  ↓
+Details → Is Variable: 체크 ✅
+  └─ 이름: Menu Text
+```
+
+**함수 생성**
+
+```
+Graph 탭
+  ↓
+Functions → + 버튼
+  └─ 이름: Set Menu Text
+
+입력 추가:
+  ├─ 이름: Menu Text
+  └─ 타입: Text (분홍색)
+
+구현:
+  Menu Text (변수)
+    → Set Text (TextBlock)
+        └─ In Text: Menu Text (입력)
+```
+
+**Text vs String**
+
+```
+String (주황색):
+  └─ 코드용 문자열
+
+Text (분홍색):
+  ├─ 사용자에게 보이는 텍스트
+  ├─ 지역화 지원
+  └─ UI에 사용
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380673/notion-blog/_/_/_5_/2/image_33.png)
+
+---
+
+## 🚀 7단계: BP_Kick에서 위젯 표시
+
+### 7-1. 기본 구조 (Hard Reference)
+
+```
+Win Game / Lose Game 이벤트
+  ↓
+Create Widget
+  ├─ Class: WBP_End_Game
+  └─ Owning Player: Get Player Controller
+  ↓
+Add to Viewport
+  └─ 화면에 표시
+```
+
+**Create Widget**
+
+```
+용도: 위젯 인스턴스 생성
+입력:
+  ├─ Class: 위젯 클래스
+  └─ Owning Player: 소유 플레이어
+출력:
+  └─ Return Value: 생성된 위젯
+```
+
+**Add to Viewport**
+
+```
+용도: 위젯을 화면에 표시
+입력:
+  └─ Target: 표시할 위젯
+효과:
+  └─ 화면에 위젯 렌더링
+```
+
+### 7-2. 최적화: Soft Class Reference
+
+**문제점**
+
+```
+Hard Reference 사용 시
+  ↓
+WBP_End_Game 항상 메모리 로드
+  ↓
+게임 시작부터 불필요하게 메모리 차지
+```
+
+**해결책**
+
+```
+1. 변수로 승격
+   Create Widget의 Class 핀
+     → Promote to Variable
+     → 이름: End Game Widget Class
+
+2. Soft Reference로 변경
+   Variables 패널
+     → End Game Widget Class 선택
+     → Variable Type: Soft Class Reference ✅
+
+3. Async Load 사용
+   Async Load Class Asset
+     ├─ Asset Class: End Game Widget Class
+     └─ Completed: 로딩 완료 시
+```
+
+**Async Load Class Asset**
+
+```
+기능: 클래스를 비동기로 로드
+장점:
+  ✅ 게임 멈춤 없음
+  ✅ 필요할 때만 로드
+  ✅ 메모리 효율
+
+입력:
+  └─ Asset Class: Soft Class Reference
+
+출력:
+  ├─ Completed: 로딩 완료 핀
+  └─ Class: 로드된 클래스
+```
+
+### 7-3. 타입 특정화
+
+**문제**
+
+```
+Create Widget 반환 타입 = User Widget (일반)
+  ↓
+Set Menu Text 함수 접근 불가
+  (WBP_End_Game의 함수이므로)
+```
+
+**해결: 변수 타입 특정화**
+
+```
+End Game Widget Class 변수
+  ↓
+Variable Type 변경
+  ├─ Class: WBP_End_Game (구체적)
+  └─ Soft Class Reference: 체크 ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380674/notion-blog/_/_/_5_/2/image_34.png)
+
+**효과**
+
+```
+Soft Reference 해결 시
+  ↓
+Create Widget 반환
+  └─ WBP_End_Game (구체적 타입)
+      ↓
+  Set Menu Text 접근 가능 ✅
+
+```
+
+💡 **Casting 불필요**
+
+- 변수 타입을 구체적으로 지정
+- Create Widget이 그 타입으로 반환
+- 자동으로 함수 접근 가능
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380674/notion-blog/_/_/_5_/2/image_35.png)
+
+---
+
+## 📐 8단계: 화면 중앙 배치
+
+### 8-1. 문제점
+
+```
+Add to Viewport만 하면
+  ↓
+화면 왼쪽 위 (0, 0)에 표시
+  ↓
+중앙이 아님 ❌
+```
+
+### 8-2. Set Position in Viewport
+
+**노드 구조**
+
+```
+위젯 생성 후
+  ↓
+Set Position in Viewport
+  ├─ Target: 위젯
+  ├─ Position: Vector2D (위치)
+  └─ Remove DPI Scale: false
+```
+
+**Position 계산**
+
+```
+목표: 화면 중앙에 위젯 중앙 배치
+
+공식:
+  위치 = (화면 크기 / 2) - (위젯 크기 / 2)
+```
+
+### 8-3. Get Viewport Size
+
+```
+Get Viewport Size
+  ↓
+Return Value (Vector2D)
+  ├─ X: 화면 너비
+  └─ Y: 화면 높이
+  ↓
+Split Struct Pin
+  ↓
+각각 / 2 (화면 중심)
+```
+
+### 8-4. Size Box 크기 가져오기
+
+**Size Box를 변수로**
+
+```
+Designer 탭
+  ↓
+Size Box 선택
+  ↓
+Is Variable: 체크 ✅
+  └─ 이름: Size Box Root
+```
+
+**크기 가져오기**
+
+```
+Size Box Root
+  ↓
+Get Desired Size (원하는 크기)
+  ↓
+Return Value (Vector2D)
+  ├─ X: 위젯 너비
+  └─ Y: 위젯 높이
+
+```
+
+❌ **잘못된 방법**: Get Desired Size
+✅ **올바른 방법**: Get Width/Height Override
+
+**문제점**
+
+```
+Desired Size:
+  └─ 내부 콘텐츠가 원하는 크기
+  └─ Override 값 반영 안 됨
+```
+
+**해결**
+
+```
+Size Box Root
+  ├─ Get Width Override
+  └─ Get Height Override
+      ↓
+  실제 설정한 크기 반환 ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380674/notion-blog/_/_/_5_/2/image_36.png)
+
+### 8-5. 최종 계산
+
+```
+Position X = (ViewportSize.X / 2) - (WidthOverride / 2)
+Position Y = (ViewportSize.Y / 2) - (HeightOverride / 2)
+
+Vector2D 노드로 조합
+  ↓
+Set Position in Viewport
+```
+
+### 8-6. 순수 함수로 정리
+
+**Get Center for Size Box 함수**
+
+```
+입력:
+  └─ End Game Widget (WBP_End_Game)
+
+출력:
+  └─ Return Value (Vector2D)
+
+Pure Function: 체크 ✅
+  └─ 실행 핀 없음, 값만 반환
+```
+
+**Pure Function이란?**
+
+```
+특징:
+  ✅ 실행 핀 없음
+  ✅ 값만 계산해서 반환
+  ✅ 여러 곳에서 호출 가능
+  ✅ 부작용 없음
+
+vs 일반 함수:
+  ├─ 일반: 실행 흐름 필요
+  └─ Pure: 값만 필요할 때
+```
+
+---
+
+## 🧹 9단계: 코드 정리 (Macro)
+
+### 9-1. 중복 코드 문제
+
+```
+Win Game과 Lose Game
+  ↓
+거의 동일한 노드 구조
+  ↓
+차이점: 전달하는 텍스트만
+```
+
+### 9-2. Macro로 통합
+
+**Macro란?**
+
+```
+개념: 재사용 가능한 노드 그룹
+특징:
+  ✅ Async 노드 포함 가능 (함수 불가)
+  ✅ 입력/출력 정의 가능
+  ✅ 여러 곳에서 재사용
+
+vs Function:
+  ├─ Function: Async 불가, 값 반환
+  └─ Macro: Async 가능, 실행 흐름
+```
+
+**Macro 생성**
+
+```
+노드들 선택
+  ↓
+우클릭 → Collapse to Macro
+  └─ 이름: Show End Game Widget
+
+입력 추가:
+  ├─ 이름: Menu Text
+  └─ 타입: Text
+```
+
+### 9-3. 변수로 텍스트 관리
+
+```
+Win Game:
+  Show End Game Widget
+    └─ Menu Text: Win Text (변수)
+
+Lose Game:
+  Show End Game Widget
+    └─ Menu Text: Lose Text (변수)
+
+변수 설정:
+  ├─ Win Text: "Won"
+  └─ Lose Text: "Lost"
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380674/notion-blog/_/_/_5_/2/image_37.png)
+
+---
+
+## 📊 핵심 노드 정리
+
+### UI 위젯 노드
+
+**Create Widget**
+
+```
+용도: 위젯 인스턴스 생성
+입력: Class, Owning Player
+출력: 생성된 위젯
+참고: 화면에 표시는 별도
+```
+
+**Add to Viewport**
+
+```
+용도: 위젯을 화면에 표시
+입력: Target (위젯)
+위치: 기본 (0, 0)
+```
+
+**Set Position in Viewport**
+
+```
+용도: 위젯 위치 조정
+입력:
+  ├─ Position (Vector2D)
+  └─ Remove DPI Scale
+```
+
+**Set Text (TextBlock)**
+
+```
+용도: 텍스트 변경
+입력: In Text (Text 타입)
+타겟: Text Block 위젯
+```
+
+### 크기/위치 노드
+
+**Get Viewport Size**
+
+```
+용도: 화면 크기 가져오기
+출력: Vector2D (너비, 높이)
+활용: 중앙 배치 계산
+```
+
+**Get Width/Height Override**
+
+```
+용도: Size Box 설정 크기
+출력: Float
+대상: Size Box만
+```
+
+**Get Desired Size**
+
+```
+용도: 위젯이 원하는 크기
+주의: Override 반영 안 됨
+권장: Override Getter 사용
+```
+
+---
+
+## ⚙️ 위젯 설정 정리
+
+### Size Box
+
+```
+Override Width: 체크
+  └─ 800
+
+Override Height: 체크
+  └─ 600
+
+용도: 고정 크기 위젯
+```
+
+### Vertical Box
+
+```
+배치: 위→아래
+자식: 순서대로 쌓임
+Slot Size: Auto 또는 Fill
+```
+
+### Horizontal Box
+
+```
+배치: 왼쪽→오른쪽
+자식: 나란히 배치
+Slot Size: Fill (균등 분할)
+```
+
+### Button
+
+```
+Style:
+  ├─ Normal
+  ├─ Hovered
+  ├─ Pressed
+  └─ Disabled
+
+자식: Text Block 1개만
+```
+
+### Image
+
+```
+Slot:
+  ├─ Horizontal: Fill
+  └─ Vertical: Fill
+
+Brush:
+  └─ Tint: 색상
+
+Padding: 테두리 효과
+```
+
+### Spacer
+
+```
+크기 조절:
+  └─ Vertical/Horizontal Size
+
+용도: 간격 생성
+```
+
+---
+
+## 💡 핵심 개념
+
+### 1. 레이아웃 시스템
+
+```
+Canvas Panel (지양):
+  ├─ 자유 배치
+  └─ 성능 부담 ⚠️
+
+Size Box + Box (권장):
+  ├─ 구조화된 레이아웃
+  └─ 성능 우수 ✅
+```
+
+### 2. Wrap with Overlay
+
+```
+기존 위젯을 감싸서 기능 확장
+  ├─ 배경 추가
+  ├─ 효과 추가
+  └─ 계층 구조 유지
+```
+
+### 3. Pure Function
+
+```
+장점:
+  ✅ 실행 핀 불필요
+  ✅ 여러 곳 재사용
+  ✅ 깔끔한 그래프
+
+용도:
+  └─ 계산/변환 함수
+```
+
+### 4. Macro vs Function
+
+```
+Macro:
+  ✅ Async 가능
+  ✅ 복잡한 흐름
+  ❌ 리턴값 제한
+
+Function:
+  ❌ Async 불가
+  ✅ 명확한 리턴
+  ✅ 디버깅 쉬움
+```
+
+### 5. Soft Reference 활용
+
+```
+게임 시작 시:
+  └─ 경로만 저장 (메모리 ↓)
+
+위젯 필요 시:
+  └─ Async Load (게임 멈춤 없음)
+
+효과:
+  └─ 초기 로딩 빠름 ✅
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 1. Text Block 변수화
+
+```
+❌ 변수 체크 안 하면
+  └─ 코드에서 접근 불가
+
+✅ Is Variable 체크
+  └─ Set Text 가능
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380674/notion-blog/_/_/_5_/2/image_38.png)
+
+### 2. Desired Size 함정
+
+```
+❌ Get Desired Size
+  └─ Override 무시
+
+✅ Get Width/Height Override
+  └─ 실제 설정값
+```
+
+### 3. Image 순서
+
+```
+계층 구조 순서 = 렌더링 순서
+  ├─ 위쪽: 뒤에 그려짐
+  └─ 아래쪽: 앞에 그려짐
+```
+
+### 4. Canvas Panel 남용
+
+```
+모든 위젯에 사용 ❌
+  └─ 성능 저하
+
+필요한 경우만 사용 ✅
+  └─ 복잡한 자유 배치
+```
+
+---

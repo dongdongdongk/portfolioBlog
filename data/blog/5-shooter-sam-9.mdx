@@ -1,0 +1,2294 @@
+---
+title: '섹션 5: Shooter Sam - 9'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { Behavior Tree 시작하기 }
+
+## 🎯 이번에 할 것
+
+**Behavior Tree로 AI 시스템 업그레이드!**
+
+```
+기존: Tick에서 코드 작성
+    ↓
+새로운: Behavior Tree 사용
+    ↓
+더 강력하고 관리하기 쉬움! 🌲
+```
+
+---
+
+## 🤔 왜 Behavior Tree를 쓰나요?
+
+### 기존 방식 (AI Controller)
+
+**Tick 함수에 전부 작성:**
+
+```cpp
+void Tick(float DeltaTime)
+{
+    // 플레이어 찾기
+    // 시야 확인
+    // 이동
+    // 쏘기
+    // 순찰
+    // ... (계속 추가)
+}
+```
+
+**문제점:**
+
+```
+간단한 AI: OK ✅
+복잡한 AI: 관리 어려움 ❌
+
+코드가 길어짐
+→ 읽기 어려움
+→ 수정 어려움
+→ 버그 많아짐
+```
+
+---
+
+### Behavior Tree 방식
+
+**비주얼 노드 그래프:**
+
+```
+Root
+  ↓
+Sequence
+  ├─ Find Player
+  ├─ Check Line of Sight
+  ├─ Move To Player
+  └─ Shoot
+```
+
+**장점:**
+
+```
+✅ 시각적으로 보임
+✅ 이해하기 쉬움
+✅ 수정하기 쉬움
+✅ 재사용 가능
+✅ 복잡한 AI 가능
+```
+
+---
+
+## 🌲 Behavior Tree란?
+
+### 비유
+
+**의사 결정 트리:**
+
+```
+아침에 일어남
+    ↓
+배고픔?
+  ├─ Yes → 밥 먹기
+  └─ No → 안 먹기
+    ↓
+학교 가기
+```
+
+**AI도 마찬가지:**
+
+```
+게임 시작
+    ↓
+플레이어 보임?
+  ├─ Yes → 쫓아가기
+  │         ↓
+  │       가까움?
+  │         ├─ Yes → 쏘기
+  │         └─ No → 계속 이동
+  └─ No → 순찰하기
+```
+
+---
+
+## 📊 Behavior Tree 구성 요소
+
+### 2가지 주요 에셋
+
+**1. Behavior Tree (BT)**
+
+```
+AI의 "행동"
+→ 무엇을 할까?
+→ 이동, 공격, 순찰 등
+```
+
+**2. Blackboard (BB)**
+
+```
+AI의 "데이터"
+→ 어디로 갈까?
+→ 누구를 쫓을까?
+→ 위치, 타겟 등
+```
+
+---
+
+### 비유로 이해하기
+
+**요리사 (AI):**
+
+```
+Behavior Tree (레시피):
+  1. 재료 준비
+  2. 볶기
+  3. 간 맞추기
+  4. 완성
+
+Blackboard (재료):
+  - 양파 위치
+  - 불 온도
+  - 소금 양
+```
+
+---
+
+## 📝 Step 1: 기존 코드 주석 처리
+
+### Tick 코드 정리
+
+**ShooterAI.cpp:**
+
+```cpp
+void AShooterAI::Tick(float DeltaTime)
+{
+    /*
+    Super::Tick(DeltaTime);
+
+    APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
+
+    if (PlayerPawn)
+    {
+        if (LineOfSightTo(PlayerPawn))
+        {
+            SetFocus(PlayerPawn);
+            MoveToActor(PlayerPawn, 200.f);
+        }
+        else
+        {
+            ClearFocus(EAIFocusPriority::Gameplay);
+            StopMovement();
+        }
+    }
+    */
+}
+```
+
+**숨기기:**
+
+```
+Visual Studio:
+  왼쪽 "-" 버튼 클릭
+  → 코드 접기
+```
+
+---
+
+## 🎨 Step 2: Behavior Tree 만들기
+
+### 2-1: Behavior Tree 생성
+
+**Content/MyStuff/AI 폴더:**
+
+```
+1. 우클릭
+2. Artificial Intelligence
+3. "Behavior Tree" 선택
+4. 이름: "BT_EnemyAI"
+   (BT = Behavior Tree)
+5. 생성
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380663/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_9/image.png)
+
+---
+
+### 2-2: Blackboard 생성
+
+**같은 폴더에:**
+
+```
+1. 우클릭
+2. Artificial Intelligence
+3. "Blackboard" 선택
+4. 이름: "BB_EnemyAI"
+   (BB = Blackboard)
+5. 생성
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380662/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_9/image_1.png)
+
+---
+
+## 🔗 Step 3: Behavior Tree 연결
+
+### 3-1: Blackboard 연결
+
+**BT_EnemyAI 열기:**
+
+```
+1. Details 패널
+2. Behavior Tree 섹션
+3. Blackboard Asset
+4. BB_EnemyAI 선택
+
+(보통 자동으로 연결됨!)
+```
+
+**확인:**
+
+```
+우측 상단:
+  Behavior Tree 버튼
+  Blackboard 버튼
+  ← 전환 가능하면 연결됨!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380662/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_9/image_2.png)
+
+---
+
+### 3-2: AI Controller에 BT 추가
+
+**ShooterAI.h:**
+
+```cpp
+#pragma once
+
+#include "CoreMinimal.h"
+#include "AIController.h"
+#include "ShooterAI.generated.h"
+
+UCLASS()
+class SHOOTERSAM_API AShooterAI : public AAIController
+{
+    GENERATED_BODY()
+
+protected:
+    virtual void BeginPlay() override;
+
+    // ===== Behavior Tree 변수 =====
+    UPROPERTY(EditAnywhere)
+    class UBehaviorTree* EnemyAIBehaviorTree;
+};
+```
+
+---
+
+### 3-3: BeginPlay에서 실행
+
+**ShooterAI.cpp:**
+
+```cpp
+void AShooterAI::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // ===== Behavior Tree 실행 =====
+    if (EnemyAIBehaviorTree)
+    {
+        RunBehaviorTree(EnemyAIBehaviorTree);
+    }
+}
+```
+
+---
+
+### 코드 설명
+
+**변수 추가:**
+
+```cpp
+UPROPERTY(EditAnywhere)
+class UBehaviorTree* EnemyAIBehaviorTree;
+```
+
+- `class UBehaviorTree*`: 포인터 선언
+- `EditAnywhere`: 블루프린트에서 설정
+
+**유효성 확인:**
+
+```cpp
+if (EnemyAIBehaviorTree)
+```
+
+- nullptr 체크
+- 안전한 코딩
+
+**실행:**
+
+```cpp
+RunBehaviorTree(EnemyAIBehaviorTree);
+```
+
+- AI Controller의 함수
+- Behavior Tree 시작!
+
+---
+
+### 3-4: 블루프린트 설정
+
+**BP_ShooterAI 열기:**
+
+```
+1. Details 패널
+2. Enemy AI Behavior Tree
+3. BT_EnemyAI 선택
+4. Compile & Save
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380662/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_9/image_3.png)
+
+---
+
+## 🎮 Step 4: 첫 Behavior Tree 만들기
+
+### Behavior Tree 그래프
+
+**BT_EnemyAI 열기:**
+
+**구조:**
+
+```
+┌─────────┐
+│  Root   │  ← 시작점 (매 프레임 실행)
+└────┬────┘
+     ↓
+  (여기에 노드 연결)
+```
+
+---
+
+### 노드 종류
+
+**1. Composite (복합 노드)**
+
+```
+자식 노드들을 관리
+→ 어떤 순서로?
+→ 어떤 조건으로?
+
+종류:
+  - Sequence: 순차 실행
+  - Selector: 선택 실행
+  - Simple Parallel: 병렬 실행
+```
+
+**2. Task (작업 노드)**
+
+```
+실제 행동
+→ 이동하기
+→ 쏘기
+→ 대기하기
+```
+
+**3. Decorator (조건 노드)**
+
+```
+조건 검사
+→ 거리 확인
+→ 시야 확인
+(나중에 배움)
+```
+
+---
+
+### 4-1: Sequence 노드 추가
+
+**그래프에서 우클릭:**
+
+```
+1. Composites 섹션
+2. "Sequence" 선택
+3. Root에 연결
+```
+
+**Sequence = 순서대로 실행**
+
+```
+Sequence
+  ├─ 자식 1 실행
+  ├─ 자식 2 실행
+  └─ 자식 3 실행
+
+순서대로 하나씩!
+```
+
+---
+
+## 📍 Step 5: Blackboard에 위치 추가
+
+### 5-1: Vector Key 생성
+
+**Blackboard 탭 전환:**
+
+```
+1. 우측 상단 "Blackboard" 버튼
+2. Keys 패널에서 "New Key" 클릭
+3. "Vector" 선택
+4. 이름: "MoveToLocation"
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380662/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_9/image_4.png)
+
+---
+
+### 5-2: 기본값 설정
+
+**MoveToLocation 선택:**
+
+```
+Details 패널:
+  Key Type:
+    ☑ Use Default Value (체크!)
+
+    Default Value:
+      X: ???
+      Y: ???
+      Z: ???
+```
+
+---
+
+### 기본값 복사하기
+
+**월드에서 위치 복사:**
+
+```
+1. Player Start 선택
+2. 우클릭 → "Copy"
+3. Blackboard로 돌아가기
+4. Default Value에 우클릭
+5. "Paste"
+```
+
+**결과:**
+
+```
+Player Start 위치가
+MoveToLocation에 저장됨!
+```
+
+---
+
+## 🏃 Step 6: Move To Task 추가
+
+### 6-1: Task 노드 추가
+
+**Behavior Tree 탭:**
+
+```
+1. 그래프에서 우클릭
+2. Tasks 섹션
+3. "Move To" 선택
+4. Sequence에 연결
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380662/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_9/image_5.png)
+
+---
+
+### 6-2: Blackboard Key 설정 (중요!)
+
+**Move To 노드 선택:**
+
+```
+Details 패널:
+  Blackboard Key:
+    MoveToLocation 선택 ✅
+
+설정 안 하면:
+  AI가 안 움직임! ❌
+```
+
+---
+
+### 최종 구조
+
+```
+Root
+  ↓
+Sequence
+  ↓
+Move To
+  → Blackboard: MoveToLocation
+```
+
+**의미:**
+
+```
+1. Root 실행 (매 프레임)
+2. Sequence 실행
+3. Move To 실행
+   → MoveToLocation 위치로 이동
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380662/notion-blog/_/_/_5_C_/_5_Shooter_Sam_-_9/image_6.png)
+
+---
+
+## ✅ 테스트하기
+
+### 1. 저장
+
+```
+모든 에셋 저장:
+  - BT_EnemyAI
+  - BB_EnemyAI
+  - BP_ShooterAI
+```
+
+---
+
+### 2. Play
+
+**결과:**
+
+```
+적이 Player Start 위치로 이동! ✅
+→ 도착
+→ 멈춤
+```
+
+---
+
+### 3. 실시간 디버깅
+
+**BT_EnemyAI를 띄운 채로 Play:**
+
+```
+1. BT_EnemyAI 창 독립시키기 (Dock 해제)
+2. Play
+3. BT_EnemyAI 창 보기
+```
+
+**볼 수 있는 것:**
+
+```
+- 노드 실행 상태 (하이라이트)
+- 현재 실행 중인 노드
+- 성공/실패 표시
+```
+
+**상단 드롭다운:**
+
+```
+게임 내 모든 AI Controller 목록
+→ 선택해서 디버깅 가능
+```
+
+---
+
+## 📚 핵심 개념 정리
+
+### Behavior Tree
+
+AI 행동 정의
+
+```
+노드 그래프로 시각화
+Root → Composite → Task
+```
+
+### Blackboard
+
+AI 데이터 저장
+
+```
+변수 저장소
+위치, 타겟, 상태 등
+```
+
+### Root
+
+시작점
+
+```
+매 프레임 실행
+자식 노드로 전파
+```
+
+### Composite
+
+자식 관리
+
+```
+Sequence: 순차 실행
+Selector: 조건 선택
+```
+
+### Task
+
+실제 행동
+
+```
+Move To: 이동
+Wait: 대기
+Custom: 직접 만들기
+```
+
+### Blackboard Key
+
+데이터 연결
+
+```
+Task가 Blackboard 데이터 사용
+반드시 설정 필요!
+```
+
+---
+
+## 🎯 전체 흐름 정리
+
+```
+[Behavior Tree 실행 과정]
+
+1. 게임 시작
+    ↓
+2. AI Controller 생성
+    ↓
+3. BeginPlay 호출
+    ↓
+4. RunBehaviorTree(BT_EnemyAI)
+    ↓
+5. Blackboard 로드
+   - MoveToLocation 초기화
+    ↓
+6. 매 프레임:
+    ↓
+7. Root 노드 실행
+    ↓
+8. Sequence 노드 실행
+    ↓
+9. Move To 노드 실행
+   - MoveToLocation 읽기
+   - 해당 위치로 이동
+    ↓
+10. 도착하면 성공
+    ↓
+11. Sequence 완료
+    ↓
+12. 다음 프레임으로 (6번으로)
+```
+
+---
+
+## 💡 실전 팁
+
+### 여러 위치로 이동
+
+```
+Blackboard:
+  - Point1 (Vector)
+  - Point2 (Vector)
+  - Point3 (Vector)
+
+Behavior Tree:
+  Sequence
+    ├─ Move To (Point1)
+    ├─ Move To (Point2)
+    └─ Move To (Point3)
+
+→ 순서대로 순찰!
+```
+
+---
+
+### 디버깅 팁
+
+**노드 색깔:**
+
+```
+회색: 대기 중
+노란색: 실행 중
+초록색: 성공
+빨간색: 실패
+
+```
+
+**Blackboard 값 확인:**
+
+```
+Play 중:
+  Blackboard 탭
+  → 현재 값 실시간 확인
+```
+
+---
+
+### 성능 고려
+
+**Behavior Tree는:**
+
+```
+매 프레임 실행 ❌
+→ 너무 자주
+
+일정 간격으로 실행 ✅
+→ 성능 좋음
+(나중에 배움)
+```
+
+---
+
+## 🐛 문제 해결
+
+### AI가 안 움직여요!
+
+**체크리스트:**
+
+```
+1. BP_ShooterAI에 BT 설정했나?
+   → Enemy AI Behavior Tree
+
+2. Move To에 Key 설정했나?
+   → Blackboard Key: MoveToLocation
+
+3. Blackboard 연결됐나?
+   → BT Details → Blackboard Asset
+
+4. RunBehaviorTree 호출했나?
+   → BeginPlay에서 확인
+
+5. NavMesh 있나?
+   → P 키로 확인
+```
+
+---
+
+### Blackboard 연결 안 돼요!
+
+**해결:**
+
+```
+1. BT_EnemyAI 열기
+2. Details → Blackboard Asset
+3. 드롭다운 → BB_EnemyAI 수동 선택
+```
+
+---
+
+### 노드가 실행 안 돼요!
+
+**확인:**
+
+```
+1. Root에 연결됐나?
+2. Sequence에 연결됐나?
+3. 게임 실행 중 노드 색깔 확인
+```
+
+---
+
+# { Behavior Tree 초기화 시스템 }
+
+## 🎯 이번에 할 것
+
+**Game Mode에서 모든 AI를 한 번에 초기화!**
+
+```
+기존: 각 AI가 개별적으로 시작
+    ↓
+개선: Game Mode가 한 번에 시작
+    ↓
+효율적이고 관리하기 쉬움! 🎮
+```
+
+---
+
+## 🤔 왜 개선하나요?
+
+### 기존 방식의 문제점
+
+**각 AI의 BeginPlay:**
+
+```cpp
+void AShooterAI::BeginPlay()
+{
+    // 플레이어 찾기
+    APawn* Player = GetPlayerPawn(...);  // ← 문제!
+
+    // Behavior Tree 실행
+    RunBehaviorTree(BT);
+}
+```
+
+**적이 1000명이면?**
+
+```
+적 1: 플레이어 찾기 (GetPlayerPawn)
+적 2: 플레이어 찾기 (GetPlayerPawn)
+적 3: 플레이어 찾기 (GetPlayerPawn)
+...
+적 1000: 플레이어 찾기 (GetPlayerPawn)
+
+→ 1000번 반복! ❌
+→ 비효율적!
+```
+
+---
+
+### 개선된 방식
+
+**Game Mode에서 한 번만:**
+
+```cpp
+void GameMode::BeginPlay()
+{
+    // 1. 플레이어 찾기 (1번만!)
+    Player = GetPlayerPawn(...);
+
+    // 2. 모든 AI 찾기 (1번만!)
+    AllAI = GetAllActorsOfClass(AShooterAI);
+
+    // 3. 각 AI에게 플레이어 전달
+    for (AI in AllAI)
+    {
+        AI->StartBehaviorTree(Player);  // 이미 찾은 플레이어 전달!
+    }
+}
+```
+
+**장점:**
+
+```
+✅ GetPlayerPawn 1번만 호출
+✅ 중앙에서 관리
+✅ 효율적
+✅ 나중에 추가 설정 쉬움
+```
+
+---
+
+## 📝 Step 1: StartBehaviorTree 함수 만들기
+
+### 1-1: 헤더 파일 (ShooterAI.h)
+
+```cpp
+#pragma once
+
+#include "CoreMinimal.h"
+#include "AIController.h"
+#include "ShooterSamCharacter.h"  // 👈 Include 추가!
+#include "ShooterAI.generated.h"
+
+UCLASS()
+class SHOOTERSAM_API AShooterAI : public AAIController
+{
+    GENERATED_BODY()
+
+protected:
+    virtual void BeginPlay() override;
+
+public:
+    virtual void Tick(float DeltaTime) override;
+
+    // ===== Behavior Tree =====
+    UPROPERTY(EditAnywhere)
+    UBehaviorTree* EnemyAIBehaviorTree;
+
+    // ===== 캐릭터 포인터들 =====
+    AShooterSamCharacter* PlayerCharacter;   // 플레이어
+    AShooterSamCharacter* MyCharacter;       // 나 자신 (적)
+
+    // ===== 새 함수 =====
+    void StartBehaviorTree(AShooterSamCharacter* Player);
+};
+```
+
+---
+
+### 변수 설명
+
+**PlayerCharacter:**
+
+```cpp
+AShooterSamCharacter* PlayerCharacter;
+```
+
+**용도:**
+
+```
+플레이어 캐릭터 저장
+→ Behavior Tree에서 사용
+→ 쫓아갈 타겟
+```
+
+---
+
+**MyCharacter:**
+
+```cpp
+AShooterSamCharacter* MyCharacter;
+```
+
+**용도:**
+
+```
+AI가 조종하는 적 캐릭터
+→ 나 자신
+→ 매번 Cast 안 해도 됨!
+```
+
+---
+
+### 1-2: 구현 파일 (ShooterAI.cpp)
+
+```cpp
+void AShooterAI::StartBehaviorTree(AShooterSamCharacter* Player)
+{
+    if (EnemyAIBehaviorTree)
+    {
+        // 1. 내 캐릭터 가져오기
+        MyCharacter = Cast<AShooterSamCharacter>(GetPawn());
+
+        // 2. 플레이어 저장
+        if (Player)
+        {
+            PlayerCharacter = Player;
+        }
+
+        // 3. Behavior Tree 실행!
+        RunBehaviorTree(EnemyAIBehaviorTree);
+    }
+}
+```
+
+---
+
+### 코드 완벽 이해하기
+
+**Step 1: Behavior Tree 확인**
+
+```cpp
+if (EnemyAIBehaviorTree)
+```
+
+**의미:**
+
+```
+BT가 설정됐나?
+→ nullptr이면 실행 안 함
+→ 안전한 코딩
+```
+
+---
+
+**Step 2: 내 캐릭터 가져오기**
+
+```cpp
+MyCharacter = Cast<AShooterSamCharacter>(GetPawn());
+```
+
+**분해:**
+
+**GetPawn():**
+
+```cpp
+APawn* GetPawn()
+```
+
+- AI Controller가 조종하는 Pawn 반환
+- APawn\* 타입
+
+**Cast:**
+
+```cpp
+Cast<AShooterSamCharacter>(...)
+```
+
+- APawn* → AShooterSamCharacter*로 변환
+- 적 캐릭터 타입으로 변환
+
+**왜 필요한가요?**
+
+```
+GetPawn()은 APawn* 반환
+→ AShooterSamCharacter의 기능 못 씀
+
+Cast하면:
+→ AShooterSamCharacter* 얻음
+→ 모든 기능 사용 가능!
+```
+
+**MyCharacter에 저장:**
+
+```
+나중에 사용하려고
+→ 매번 Cast 안 해도 됨
+→ 효율적!
+```
+
+---
+
+**Step 3: 플레이어 저장**
+
+```cpp
+if (Player)
+{
+    PlayerCharacter = Player;
+}
+```
+
+**의미:**
+
+```
+Game Mode에서 전달받은 플레이어
+→ 멤버 변수에 저장
+→ Behavior Tree에서 사용!
+```
+
+---
+
+**Step 4: Behavior Tree 실행**
+
+```cpp
+RunBehaviorTree(EnemyAIBehaviorTree);
+```
+
+**이제 실행 준비 완료:**
+
+```
+✅ MyCharacter: 설정됨
+✅ PlayerCharacter: 설정됨
+✅ BehaviorTree: 설정됨
+
+→ 실행!
+```
+
+---
+
+## 🎮 Step 2: Game Mode 설정
+
+### 2-1: BeginPlay 추가 (헤더)
+
+**ShooterSamGameMode.h:**
+
+```cpp
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameFramework/GameModeBase.h"
+#include "ShooterSamGameMode.generated.h"
+
+UCLASS(abstract)
+class AShooterSamGameMode : public AGameModeBase
+{
+    GENERATED_BODY()
+
+public:
+    AShooterSamGameMode();
+
+protected:
+    // ===== BeginPlay 추가 =====
+    virtual void BeginPlay() override;
+};
+```
+
+---
+
+### 2-2: Include 추가 (구현)
+
+**ShooterSamGameMode.cpp:**
+
+```cpp
+#include "ShooterSamGameMode.h"
+#include "Kismet/GameplayStatics.h"    // 👈 추가
+#include "ShooterSamCharacter.h"       // 👈 추가
+#include "ShooterAI.h"                 // 👈 추가
+
+// ...
+```
+
+---
+
+### 2-3: BeginPlay 구현
+
+```cpp
+void AShooterSamGameMode::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // ===== 1. 플레이어 가져오기 =====
+    AShooterSamCharacter* Player = Cast<AShooterSamCharacter>(
+        UGameplayStatics::GetPlayerPawn(GetWorld(), 0)
+    );
+
+    // ===== 2. 모든 AI 가져오기 =====
+    TArray<AActor*> ShooterAIActors;
+    UGameplayStatics::GetAllActorsOfClass(
+        GetWorld(),
+        AShooterAI::StaticClass(),
+        ShooterAIActors
+    );
+
+    // ===== 3. 각 AI 초기화 (다음 강의) =====
+}
+```
+
+---
+
+## 🔍 코드 완벽 이해하기
+
+### Part 1: 플레이어 가져오기
+
+```cpp
+AShooterSamCharacter* Player = Cast<AShooterSamCharacter>(
+    UGameplayStatics::GetPlayerPawn(GetWorld(), 0)
+);
+```
+
+**단계별 분해:**
+
+**1단계: GetPlayerPawn**
+
+```cpp
+UGameplayStatics::GetPlayerPawn(GetWorld(), 0)
+```
+
+- 플레이어 Pawn 찾기
+- 반환: APawn\*
+
+**2단계: Cast**
+
+```cpp
+Cast<AShooterSamCharacter>(...)
+```
+
+- APawn* → AShooterSamCharacter*
+- 플레이어 캐릭터 타입으로 변환
+
+**3단계: 저장**
+
+```cpp
+AShooterSamCharacter* Player = ...
+```
+
+- 로컬 변수에 저장
+- 나중에 AI들에게 전달
+
+---
+
+### Part 2: 모든 AI 가져오기
+
+```cpp
+TArray<AActor*> ShooterAIActors;
+UGameplayStatics::GetAllActorsOfClass(
+    GetWorld(),
+    AShooterAI::StaticClass(),
+    ShooterAIActors
+);
+```
+
+---
+
+**Step 1: 배열 생성**
+
+```cpp
+TArray<AActor*> ShooterAIActors;
+```
+
+**TArray = 동적 배열**
+
+```cpp
+TArray<타입> 변수명;
+
+예:
+TArray<int> Numbers;        // 정수 배열
+TArray<FString> Names;      // 문자열 배열
+TArray<AActor*> Actors;     // 액터 포인터 배열
+```
+
+**ShooterAIActors:**
+
+```
+AActor* 타입의 배열
+→ AI Controller들 담을 그릇
+```
+
+---
+
+**Step 2: GetAllActorsOfClass**
+
+```cpp
+UGameplayStatics::GetAllActorsOfClass(
+    GetWorld(),                 // 어느 월드?
+    AShooterAI::StaticClass(),  // 어떤 클래스?
+    ShooterAIActors             // 어디에 저장? (Out 파라미터)
+);
+```
+
+**파라미터 설명:**
+
+**1. GetWorld()**
+
+```
+현재 게임 월드
+→ 어느 월드에서 찾을까?
+```
+
+**2. AShooterAI::StaticClass()**
+
+```cpp
+AShooterAI::StaticClass()
+```
+
+- AShooterAI 클래스 정보 반환
+- UClass\* 타입
+
+**StaticClass()가 뭔가요?**
+
+```
+클래스 자체의 정보
+→ "AShooterAI 타입 찾아줘"
+```
+
+**3. ShooterAIActors (Out 파라미터)**
+
+```
+결과가 여기에 저장됨
+→ 함수가 배열 채워줌
+```
+
+---
+
+**실행 후:**
+
+```cpp
+ShooterAIActors = {
+    ShooterAI_0,  // 적 1
+    ShooterAI_1,  // 적 2
+    ShooterAI_2,  // 적 3
+    ...
+}
+
+→ 레벨의 모든 AI Controller!
+```
+
+---
+
+## 📚 핵심 개념 정리
+
+### GetPawn
+
+AI가 조종하는 캐릭터
+
+```cpp
+APawn* pawn = GetPawn();
+```
+
+### Cast
+
+타입 변환
+
+```cpp
+AMyClass* obj = Cast<AMyClass>(baseObj);
+```
+
+### StaticClass
+
+클래스 정보
+
+```cpp
+UClass* classInfo = AMyClass::StaticClass();
+```
+
+### GetAllActorsOfClass
+
+특정 클래스의 모든 액터 찾기
+
+```cpp
+TArray<AActor*> actors;
+GetAllActorsOfClass(World, Class, actors);
+```
+
+### TArray
+
+동적 배열
+
+```cpp
+TArray<Type> array;
+array.Add(item);
+```
+
+### Out 파라미터
+
+함수가 채워주는 파라미터
+
+```cpp
+void GetData(TArray<int>& OutData)
+{
+    OutData.Add(1);
+    OutData.Add(2);
+}
+```
+
+---
+
+## 🎯 전체 흐름 정리
+
+```
+[AI 초기화 과정]
+
+1. 게임 시작
+    ↓
+2. GameMode::BeginPlay 호출
+    ↓
+3. 플레이어 찾기
+   - GetPlayerPawn
+   - Cast to ShooterSamCharacter
+   - Player 변수에 저장
+    ↓
+4. 모든 AI 찾기
+   - GetAllActorsOfClass
+   - AShooterAI 타입만
+   - ShooterAIActors 배열에 저장
+    ↓
+5. (다음 강의) 각 AI 초기화
+   - for문으로 반복
+   - StartBehaviorTree(Player) 호출
+    ↓
+6. AI마다:
+   - MyCharacter 설정
+   - PlayerCharacter 설정
+   - Behavior Tree 실행
+```
+
+---
+
+## 💡 실전 팁
+
+### 왜 멤버 변수로 저장?
+
+**MyCharacter를 멤버 변수로:**
+
+```cpp
+// ❌ 나쁜 예 (매번 Cast)
+void SomeFunction()
+{
+    AShooterSamCharacter* Char = Cast<AShooterSamCharacter>(GetPawn());
+    Char->DoSomething();
+}
+
+void AnotherFunction()
+{
+    AShooterSamCharacter* Char = Cast<AShooterSamCharacter>(GetPawn());
+    Char->DoSomethingElse();
+}
+
+// ✅ 좋은 예 (한 번만 Cast)
+void StartBehaviorTree(...)
+{
+    MyCharacter = Cast<AShooterSamCharacter>(GetPawn());  // 1번만!
+}
+
+void SomeFunction()
+{
+    MyCharacter->DoSomething();  // Cast 없이 바로 사용!
+}
+```
+
+---
+
+### Game Mode vs AI Controller
+
+**AI Controller의 BeginPlay:**
+
+```
+각 AI마다 개별 실행
+→ 1000개 AI = 1000번 실행
+```
+
+**Game Mode의 BeginPlay:**
+
+```
+게임당 1번만 실행
+→ 중앙에서 한 번에 관리
+```
+
+---
+
+### 언제 초기화하나?
+
+**Game Mode BeginPlay:**
+
+```
+게임 시작 시
+→ 모든 액터 생성된 후
+→ 초기화하기 좋은 타이밍
+```
+
+---
+
+## 🐛 문제 해결
+
+### Player가 nullptr이에요!
+
+**원인:**
+
+```
+Cast 실패
+→ GetPlayerPawn이 nullptr 반환
+→ 또는 타입이 안 맞음
+```
+
+**해결:**
+
+```cpp
+if (Player)
+{
+    // 안전하게 사용
+}
+```
+
+---
+
+### GetAllActorsOfClass 결과가 비어있어요!
+
+**원인:**
+
+```
+1. 레벨에 AI가 없음
+2. 클래스 타입 틀림
+3. BeginPlay 타이밍 문제
+```
+
+**확인:**
+
+```cpp
+UE_LOG(LogTemp, Warning, TEXT("Found %d AIs"), ShooterAIActors.Num());
+```
+
+---
+
+### MyCharacter가 nullptr이에요!
+
+**원인:**
+
+```
+GetPawn() 반환이 nullptr
+→ AI Controller가 Pawn 조종 안 함
+```
+
+**해결:**
+
+```
+BP_ShooterSamCharacter에서
+AI Controller Class 확인
+→ BP_ShooterAI로 설정됐나?
+```
+
+---
+
+## 🚀 다음 단계
+
+**다음 강의에서:**
+
+```cpp
+// ShooterAIActors 배열 반복
+for (AActor* Actor : ShooterAIActors)
+{
+    // Cast to AShooterAI
+    AShooterAI* AI = Cast<AShooterAI>(Actor);
+
+    if (AI)
+    {
+        // 각 AI 초기화!
+        AI->StartBehaviorTree(Player);
+    }
+}
+```
+
+**배울 것:**
+
+```
+1. for문 (범위 기반)
+2. 배열 순회
+3. 각 AI 초기화
+4. Behavior Tree 일괄 실행
+```
+
+---
+
+# { for 루프로 모든 AI 초기화 }
+
+## 🎯 이번에 할 것
+
+**for 루프로 모든 AI를 한 번에 초기화!**
+
+```
+AI 배열
+    ↓
+for 루프로 순회
+    ↓
+각 AI마다 StartBehaviorTree 호출
+    ↓
+모든 AI 활성화! 🤖
+```
+
+---
+
+## 🔄 while 루프 vs for 루프
+
+### while 루프 복습
+
+**먼저 while 루프로 작성:**
+
+```cpp
+// 1. 변수 선언
+int32 LoopIndex = 0;
+
+// 2. while 루프
+while (LoopIndex < ShooterAIActors.Num())
+{
+    // 배열 요소 가져오기
+    AActor* ShooterAIActor = ShooterAIActors[LoopIndex];
+
+    // 작업...
+
+    // 3. 증가
+    LoopIndex++;
+}
+```
+
+**구조:**
+
+```
+1. 변수 초기화 (밖에)
+2. 조건 (while 괄호 안)
+3. 증가 (루프 끝에)
+
+→ 세 부분이 분리됨
+```
+
+---
+
+### for 루프로 변환
+
+**같은 코드를 for 루프로:**
+
+```cpp
+for (int32 LoopIndex = 0; LoopIndex < ShooterAIActors.Num(); LoopIndex++)
+{
+    AActor* ShooterAIActor = ShooterAIActors[LoopIndex];
+
+    // 작업...
+}
+```
+
+**구조:**
+
+```
+for (초기화; 조건; 증가)
+     ①      ②    ③
+
+① 변수 선언
+② 반복 조건
+③ 매 반복마다 실행
+
+→ 세 부분이 한 줄에!
+```
+
+---
+
+## 📝 for 루프 문법
+
+### 기본 형태
+
+```cpp
+for (초기화; 조건; 증가)
+{
+    // 반복할 코드
+}
+```
+
+---
+
+### 각 부분 설명
+
+**1. 초기화 (Initialization)**
+
+```cpp
+int32 LoopIndex = 0
+```
+
+**의미:**
+
+```
+루프 시작 전 1번만 실행
+→ 카운터 변수 생성
+→ 초기값 설정
+```
+
+**예시:**
+
+```cpp
+int32 i = 0      // 0부터 시작
+int32 i = 1      // 1부터 시작
+int32 i = 10     // 10부터 시작
+```
+
+---
+
+**2. 조건 (Condition)**
+
+```cpp
+LoopIndex < ShooterAIActors.Num()
+```
+
+**의미:**
+
+```
+매 반복마다 체크
+→ true면 계속
+→ false면 종료
+```
+
+**예시:**
+
+```cpp
+i < 10       // i가 10 미만
+i <= 100     // i가 100 이하
+i != 5       // i가 5가 아님
+```
+
+---
+
+**3. 증가 (Increment)**
+
+```cpp
+LoopIndex++
+```
+
+**의미:**
+
+```
+매 반복 끝에 실행
+→ 보통 변수 증가
+→ 다음 반복 준비
+```
+
+**예시:**
+
+```cpp
+i++          // +1씩 증가
+i += 2       // +2씩 증가
+i--          // -1씩 감소
+```
+
+---
+
+### 실행 순서
+
+```cpp
+for (int32 i = 0; i < 3; i++)
+{
+    UE_LOG(LogTemp, Warning, TEXT("i = %d"), i);
+}
+```
+
+**단계별 실행:**
+
+```
+1. int32 i = 0 실행 (초기화, 1번만)
+    ↓
+2. i < 3 체크 (0 < 3 = true)
+    ↓
+3. 로그 출력: "i = 0"
+    ↓
+4. i++ 실행 (i = 1)
+    ↓
+5. i < 3 체크 (1 < 3 = true)
+    ↓
+6. 로그 출력: "i = 1"
+    ↓
+7. i++ 실행 (i = 2)
+    ↓
+8. i < 3 체크 (2 < 3 = true)
+    ↓
+9. 로그 출력: "i = 2"
+    ↓
+10. i++ 실행 (i = 3)
+    ↓
+11. i < 3 체크 (3 < 3 = false) ← 종료!
+```
+
+**출력:**
+
+```
+i = 0
+i = 1
+i = 2
+```
+
+---
+
+## 🎮 전체 코드 분석
+
+### GameMode BeginPlay 전체
+
+```cpp
+void AShooterSamGameMode::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // ===== 1. 플레이어 가져오기 =====
+    AShooterSamCharacter* Player = Cast<AShooterSamCharacter>(
+        UGameplayStatics::GetPlayerPawn(GetWorld(), 0)
+    );
+
+    // ===== 2. 모든 AI 가져오기 =====
+    TArray<AActor*> ShooterAIActors;
+    UGameplayStatics::GetAllActorsOfClass(
+        GetWorld(),
+        AShooterAI::StaticClass(),
+        ShooterAIActors
+    );
+
+    // ===== 3. for 루프로 각 AI 초기화 =====
+    for (int32 LoopIndex = 0; LoopIndex < ShooterAIActors.Num(); LoopIndex++)
+    {
+        // 3-1. 배열에서 액터 가져오기
+        AActor* ShooterAIActor = ShooterAIActors[LoopIndex];
+
+        // 3-2. AShooterAI로 캐스팅
+        AShooterAI* ShooterAI = Cast<AShooterAI>(ShooterAIActor);
+
+        // 3-3. 유효성 확인 후 초기화
+        if (ShooterAI)
+        {
+            ShooterAI->StartBehaviorTree(Player);
+        }
+    }
+}
+```
+
+---
+
+## 🔍 for 루프 부분 상세 분석
+
+### Step 1: for 루프 시작
+
+```cpp
+for (int32 LoopIndex = 0; LoopIndex < ShooterAIActors.Num(); LoopIndex++)
+```
+
+**분해:**
+
+**초기화:**
+
+```cpp
+int32 LoopIndex = 0
+```
+
+- 카운터 변수 생성
+- 0부터 시작
+
+**조건:**
+
+```cpp
+LoopIndex < ShooterAIActors.Num()
+```
+
+- `ShooterAIActors.Num()`: 배열 길이
+- 예: 배열에 3개 → Num() = 3
+- `LoopIndex < 3`: 0, 1, 2까지 반복
+
+**증가:**
+
+```cpp
+LoopIndex++
+```
+
+- 매 반복마다 +1
+- 0 → 1 → 2 → 3 (종료)
+
+---
+
+### Step 2: 배열 인덱싱
+
+```cpp
+AActor* ShooterAIActor = ShooterAIActors[LoopIndex];
+```
+
+**배열 인덱싱이란?**
+
+```cpp
+TArray<AActor*> ShooterAIActors = {AI_0, AI_1, AI_2};
+
+ShooterAIActors[0]  →  AI_0 (첫 번째)
+ShooterAIActors[1]  →  AI_1 (두 번째)
+ShooterAIActors[2]  →  AI_2 (세 번째)
+
+```
+
+**for 루프와 함께:**
+
+```
+반복 1: LoopIndex = 0
+  → ShooterAIActors[0]
+  → AI_0 가져옴
+
+반복 2: LoopIndex = 1
+  → ShooterAIActors[1]
+  → AI_1 가져옴
+
+반복 3: LoopIndex = 2
+  → ShooterAIActors[2]
+  → AI_2 가져옴
+```
+
+---
+
+### Step 3: Cast
+
+```cpp
+AShooterAI* ShooterAI = Cast<AShooterAI>(ShooterAIActor);
+```
+
+**왜 Cast?**
+
+```cpp
+// 배열 타입
+TArray<AActor*> ShooterAIActors;
+                ↑
+              AActor*
+
+// 우리가 원하는 타입
+AShooterAI*
+```
+
+**변환 과정:**
+
+```
+ShooterAIActor (AActor*)
+    ↓
+Cast<AShooterAI>(...)
+    ↓
+ShooterAI (AShooterAI*)
+```
+
+**왜 변수에 저장?**
+
+```cpp
+// ❌ 한 줄로 (읽기 어려움)
+if (Cast<AShooterAI>(ShooterAIActors[LoopIndex]))
+{
+    Cast<AShooterAI>(ShooterAIActors[LoopIndex])->StartBehaviorTree(Player);
+}
+
+// ✅ 변수 사용 (읽기 쉬움)
+AActor* ShooterAIActor = ShooterAIActors[LoopIndex];
+AShooterAI* ShooterAI = Cast<AShooterAI>(ShooterAIActor);
+if (ShooterAI)
+{
+    ShooterAI->StartBehaviorTree(Player);
+}
+```
+
+---
+
+### Step 4: 유효성 확인
+
+```cpp
+if (ShooterAI)
+{
+    ShooterAI->StartBehaviorTree(Player);
+}
+```
+
+**왜 확인?**
+
+```
+Cast 실패 가능성:
+  - 타입 안 맞음
+  - nullptr
+
+확인 안 하고 사용:
+  → nullptr->함수()
+  → 크래시! 💥
+
+확인하고 사용:
+  → 안전! ✅
+```
+
+**ShooterAIActor는 왜 안 확인?**
+
+```cpp
+AActor* ShooterAIActor = ShooterAIActors[LoopIndex];
+// 확인 안 함!
+
+AShooterAI* ShooterAI = Cast<AShooterAI>(ShooterAIActor);
+if (ShooterAI)  // 확인함!
+```
+
+**이유:**
+
+```
+ShooterAIActor가 nullptr이면:
+  → Cast도 nullptr 반환
+  → if (ShooterAI)에서 걸러짐
+
+중복 체크 불필요!
+```
+
+---
+
+### Step 5: 초기화
+
+```cpp
+ShooterAI->StartBehaviorTree(Player);
+```
+
+**각 AI마다 실행:**
+
+```
+AI_0->StartBehaviorTree(Player);
+  ↓
+AI_0.PlayerCharacter = Player;
+AI_0.MyCharacter = GetPawn();
+AI_0.RunBehaviorTree(BT);
+
+AI_1->StartBehaviorTree(Player);
+  ↓
+AI_1.PlayerCharacter = Player;
+AI_1.MyCharacter = GetPawn();
+AI_1.RunBehaviorTree(BT);
+
+AI_2->StartBehaviorTree(Player);
+  ↓
+AI_2.PlayerCharacter = Player;
+AI_2.MyCharacter = GetPawn();
+AI_2.RunBehaviorTree(BT);
+```
+
+---
+
+## 🎯 전체 실행 흐름
+
+```
+[게임 시작부터 AI 활성화까지]
+
+1. 게임 시작
+    ↓
+2. GameMode::BeginPlay 호출
+    ↓
+3. 플레이어 찾기
+   Player = GetPlayerPawn + Cast
+    ↓
+4. 모든 AI 찾기
+   ShooterAIActors = GetAllActorsOfClass
+   결과: [AI_0, AI_1, AI_2]
+    ↓
+5. for 루프 시작
+   LoopIndex = 0
+    ↓
+6. 첫 반복 (i=0):
+   ShooterAIActor = ShooterAIActors[0] (AI_0)
+   ShooterAI = Cast<AShooterAI>(AI_0)
+   ShooterAI->StartBehaviorTree(Player)
+    ↓
+7. LoopIndex++ (i=1)
+    ↓
+8. 두 번째 반복 (i=1):
+   ShooterAIActor = ShooterAIActors[1] (AI_1)
+   ShooterAI = Cast<AShooterAI>(AI_1)
+   ShooterAI->StartBehaviorTree(Player)
+    ↓
+9. LoopIndex++ (i=2)
+    ↓
+10. 세 번째 반복 (i=2):
+    ShooterAIActor = ShooterAIActors[2] (AI_2)
+    ShooterAI = Cast<AShooterAI>(AI_2)
+    ShooterAI->StartBehaviorTree(Player)
+    ↓
+11. LoopIndex++ (i=3)
+    ↓
+12. 조건 체크: 3 < 3 = false
+    ↓
+13. for 루프 종료
+    ↓
+14. 모든 AI 활성화 완료! ✅
+```
+
+---
+
+## 💡 디버그 로그 추가
+
+### 로그로 확인하기
+
+```cpp
+for (int32 LoopIndex = 0; LoopIndex < ShooterAIActors.Num(); LoopIndex++)
+{
+    AActor* ShooterAIActor = ShooterAIActors[LoopIndex];
+    AShooterAI* ShooterAI = Cast<AShooterAI>(ShooterAIActor);
+
+    if (ShooterAI)
+    {
+        // ===== 로그 추가 =====
+        UE_LOG(LogTemp, Display, TEXT("Starting BehaviorTree for %s"),
+            *ShooterAI->GetActorNameOrLabel());
+
+        ShooterAI->StartBehaviorTree(Player);
+    }
+}
+```
+
+**출력 예:**
+
+```
+Starting BehaviorTree for BP_ShooterAI_0
+Starting BehaviorTree for BP_ShooterAI_1
+Starting BehaviorTree for BP_ShooterAI_2
+```
+
+---
+
+## ✅ 테스트하기
+
+### 1. 적 복제하기
+
+**레벨에서:**
+
+```
+1. 기존 적 선택
+2. Alt + 드래그 (복제)
+3. 여러 위치에 배치
+
+예:
+  - 시작 지점 앞
+  - 복도 안
+  - 벽 뒤
+```
+
+---
+
+### 2. Play
+
+**확인 사항:**
+
+```
+✅ 모든 적이 활성화됨
+✅ 모든 적이 Player Start로 이동
+✅ 로그에 각 AI 이름 출력
+```
+
+**로그 확인:**
+
+```
+Output Log:
+  Starting BehaviorTree for BP_ShooterAI_0
+  Starting BehaviorTree for BP_ShooterAI_1
+  Starting BehaviorTree for BP_ShooterAI_2
+```
+
+---
+
+## 📚 핵심 개념 정리
+
+### for 루프
+
+```cpp
+for (초기화; 조건; 증가)
+{
+    // 반복 코드
+}
+```
+
+### 배열 인덱싱
+
+```cpp
+Array[Index]
+Array[0]  // 첫 번째
+Array[1]  // 두 번째
+```
+
+### Num()
+
+배열 길이
+
+```cpp
+Array.Num()  // 요소 개수
+```
+
+### while vs for
+
+```
+while: 조건만 체크
+for: 초기화 + 조건 + 증가 (한 줄에)
+```
+
+### Cast 필요성
+
+```
+AActor* → AShooterAI*
+타입 변환 필수
+```
+
+---
+
+## 💡 실전 팁
+
+### for 루프 vs while 루프
+
+**for 루프 사용:**
+
+```
+배열 순회
+정해진 횟수 반복
+카운터 필요
+→ 대부분의 경우!
+```
+
+**while 루프 사용:**
+
+```
+조건만 중요
+횟수 모름
+특수한 종료 조건
+→ 드문 경우
+```
+
+---
+
+### 범위 기반 for 루프 (C++11)
+
+**더 간단한 방법:**
+
+```cpp
+// 기존 방식
+for (int32 i = 0; i < ShooterAIActors.Num(); i++)
+{
+    AActor* Actor = ShooterAIActors[i];
+    // ...
+}
+
+// 범위 기반 (Range-based)
+for (AActor* Actor : ShooterAIActors)
+{
+    // 자동으로 순회!
+}
+```
+
+**장점:**
+
+```
+✅ 더 짧음
+✅ 인덱스 불필요
+✅ 읽기 쉬움
+```
+
+**적용:**
+
+```cpp
+for (AActor* ShooterAIActor : ShooterAIActors)
+{
+    AShooterAI* ShooterAI = Cast<AShooterAI>(ShooterAIActor);
+    if (ShooterAI)
+    {
+        ShooterAI->StartBehaviorTree(Player);
+    }
+}
+```
+
+---
+
+### 역순 반복
+
+**뒤에서부터:**
+
+```cpp
+for (int32 i = ShooterAIActors.Num() - 1; i >= 0; i--)
+{
+    AActor* Actor = ShooterAIActors[i];
+    // 마지막부터 첫 번째까지
+}
+```
+
+---
+
+### 2씩 증가
+
+```cpp
+for (int32 i = 0; i < 10; i += 2)
+{
+    // 0, 2, 4, 6, 8
+}
+```
+
+---
+
+## 🐛 문제 해결
+
+### for 루프가 실행 안 돼요!
+
+**확인:**
+
+```cpp
+ShooterAIActors.Num()  // 0이면 실행 안 됨
+
+UE_LOG(LogTemp, Warning, TEXT("AI Count: %d"), ShooterAIActors.Num());
+```
+
+---
+
+### Cast가 실패해요!
+
+**확인:**
+
+```cpp
+if (ShooterAI)
+{
+    // 여기 들어오나요?
+    UE_LOG(LogTemp, Warning, TEXT("Cast Success!"));
+}
+else
+{
+    UE_LOG(LogTemp, Error, TEXT("Cast Failed!"));
+}
+```
+
+---
+
+### 무한 루프!
+
+**원인:**
+
+```cpp
+for (int32 i = 0; i < 10; )  // 증가 없음!
+{
+    // i++가 없어서 무한 루프
+}
+```
+
+**해결:**
+
+```cpp
+for (int32 i = 0; i < 10; i++)  // i++ 필수!
+```
+
+---
+
+## 🚀 다음 단계
+
+**이제 할 수 있는 것:**
+
+```
+✅ 모든 AI 한 번에 초기화
+✅ for 루프 사용
+✅ 배열 순회
+✅ Cast와 유효성 확인
+```

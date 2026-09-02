@@ -1,0 +1,345 @@
+---
+title: 'Spring Form 과 검증 복제'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+```jsx
+Front 에서는 JS 검증
+Back 에서는 Spring 검증
+```
+
+## 1. Spring Form 검증 설정
+
+```jsx
+API 설정
+
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-validation</artifactId>
+</dependency>
+
+// porm.xml에 추가해준다.
+```
+
+## 2. Spring Form 사용 방법
+
+```jsx
+1. 입력 폼이 있는 JSP로 이동 전 Controller에서 Data가 없는 빈 VO객체를 Model 담아서 전송
+	@GetMapping("add")
+	public void setAdd(@ModelAttribute MemberVO memberVO)throws Exception{
+		//MemberVO memberVO = new MemberVO();
+		//model.addAttribute(memberVO);
+	}
+
+2. JSP에 form 태그를 HTML form 이 아니라 Spring form 태그 사용
+	1) JSP 선언부에 Spring form 태그를 사용할 수 있도록 taglib 추가
+	<%@ taglib prefix="form" uri="http://www.springframework.org/tags/form" %>
+
+	2) Spring Form Tag
+		<form:form action="./add" modelAttribute="memberVO" method="post" enctypye="">
+		- action은 생략 가능, 현재 URL이 action으로 지정
+		- modelAttribute 는 Controller에서 Model에 추가한 Bean의 속성명
+		- 속성명을 지정하지 않으면 클래스명의 첫글자를 소문자로 바꾼 것이 속성명으로 지정
+
+		<form:input path="">
+		- path     : Bean의 getter의 이름, HTML input 태그의 name과 비슷한 역할
+		- cssClass : css 사용을 위한 HTML의 class 속성
+
+		<form:errors path="id"></form:errors>
+		- Back-end에서 검증에 위반 되었을 경우 에러메세지 출력
+
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381125/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381119/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_1.png)
+
+```java
+//속성명은 클래스명의 첫글자를 소문자로 바꾼것
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381121/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_2.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381123/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_3.png)
+
+```java
+getMappoing 에 조인할 때 memberVO 를 매개변수에 넣어서 보내줌
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381124/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_4.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381124/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_5.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381124/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_6.png)
+
+```java
+스프링 폼 태그를 사용한다.
+
+클래스가 없어지고 cssClass 를 사용한다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381124/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_7.png)
+
+```java
+modelAttribute 가 가장 중요한 속성
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381125/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_8.png)
+
+```java
+클래스명 첫번째 글자를 소문자로 바꾼 이름
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381125/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_9.png)
+
+[https://app.notion.com](https://app.notion.com)
+
+```java
+modelAttribute 에 받아온 멤버명
+
+ex)noticeVO 에 title 멤버 가져오기
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381119/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_10.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381119/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_11.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381120/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_12.png)
+
+## 3. Form 검증
+
+```jsx
+1. Controller 메서드의 검증할 VO 앞에 @Valid 선언하면 검증을 실행
+2. 검증 결과를 BindingResult에 저장
+3. !!!!!!!!!!! 중요 !!!!!!!!!!!!!
+	 선언순서를 지켜 줘야 함
+	 @Valid vo, BindingResult
+
+@PostMapping("add")
+	public ModelAndView setAdd(@Valid MemberVO memberVO, BindingResult bindingResult, ModelAndView mv)throws Exception{
+
+		if(bindingResult.hasErrors()) {
+			//검증에 실패하면 회원가입하는 jsp로 foward
+			mv.setViewName("member/add");
+			return mv;
+		}
+
+		int result = memberService.setAdd(memberVO);
+
+		mv.setViewName("redirect:../");
+		return mv;
+	}
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381120/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_13.png)
+
+```java
+@Valid 가 검증하라
+
+@Valid 다음 BindingResult 가 꼭 올 수 있도록
+
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381120/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_14.png)
+
+```java
+실패 했을시 add 로 다시 이동
+```
+
+## 4. 검증 Annotation
+
+```jsx
+검증할 VO의 멤버변수 선언부에 작성
+
+참조 : https://beanvalidation.org/
+
+1. @NotEmpty          : Null 허용하지 않음, 공백문자 허용
+2. @NotBlank          : Null 허용하지 않음, 문자 1개이상 포함
+3. @NotNull           : Null 허용하지 않음
+4. @Null              : Null 허용 함
+5. @Max(value=지정값) : 최대지정값 보다 작거나 같은값들만 허용
+6. @Min(value=지정값) : 최소지정값 보다 크거나 같은값들만 허용
+7. @Size(max=값, min=값) : 문자열이나 배열 의 길이 가 min이상 max이하 허용
+8. @Pattern(regexp="정규표현식", flag="") : 정규표현식으로 검증
+9. @AssertFalse       : false 여부
+10. @AssertTrue       : true 여부
+11. @Future           : 미래 날짜 여부
+12. @Past             : 과거 날짜 여부
+13. @Email            : 이메일 형식
+14. @Length(min="값", max="값") : 문자열 길이 검증
+15. @Range(min="값", max="값")  : 숫자 범위 검증
+16. @URL              : URL 형식 검증
+
+@Pattern(regexp = "(?=.*[0-9])(?=.*[a-z])(?=.*\\\\W)(?=\\\\S+$).{6,12}")
+private String pw;
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381120/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_15.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381120/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_16.png)
+
+```java
+멤버변수 위에다가 알맞은 어노테이션을 선언
+```
+
+## 5. 검증 Message
+
+```jsx
+1. 검증 Annotation의 속성 message의 값을 변경
+
+@NotBlank(message = "ID는 꼭 필요해!!!")
+private String id;
+
+2. 검증 메세지를 message.properties에 등록 후 사용
+
+a. 검증Annotation=메세지
+b. 검증Annotation.멤버변수명=메세지
+c. 검증Annotation.vo명.멤버변수명=메세지
+
+우선순위 c>b>a>1
+
+3. message에 변수를 사용해서 출력 하는 경우
+	- 검증 Annotation의 속성의 인덱스 번호 이용
+	- 정해진 순서가 있음
+	- 코드 작성시 임의로 순서를 바꿀 수 없음
+
+	@Size(min=4, max=10)
+	private String pw;
+	{0}  : 멤버변수명
+	{1}  : max
+	{2}  : min
+
+	message.properties
+	Size.memberVO.pw={0}는 {2} 글자 이상 {1} 글자 이하여야 함
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381121/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_17.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381121/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_18.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381121/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_19.png)
+
+최소 최대 입력 검증
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381121/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_20.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381122/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_21.png)
+
+```java
+부트스트랩을 이용해서 꾸미는것도 가능
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381122/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_22.png)
+
+![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%2025.png>)
+
+```java
+검증 a
+```
+
+![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%2026.png>)
+
+```java
+검증 b. 더 세분화 해서 검증메세지 출력
+```
+
+```java
+검증 c. notice.vo.writter = 메세지  -  더더 세분화 해서 사용가능
+```
+
+![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%2027.png>)
+
+```java
+이러면 출력 x {0} , {1} 이 아니다.
+```
+
+![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%2028.png>)
+
+```java
+min , max 라고 {0}, {1} 이 되는게 아니라 각자 순서가 정해져있다 ex min = {2}
+```
+
+## 6. 사용자 정의 검증
+
+```jsx
+Annotation으로 검증하지 못하는 것들을 사용자 정의 코드로 작성
+
+1. 사용자 정의 검증을 할 메서드나 클래스를 생성
+	 a. 기존 service에 검증할 메서드를 선언
+	 b. 새로운 검증 클래스를 생성하고 메서드 선언
+
+-- 기존 service 메서드 선언
+	//사용자 정의 검증 메서드
+	public boolean getMemberError(MemberVO memberVO, BindingResult bindingResult)throws Exception{
+		boolean check=false;
+		//check=false : 검증성공(error 없음)
+		//check=true  : 검증실패(error 있음)
+
+		//1. annotation 검증
+		check = bindingResult.hasErrors();
+
+		//2. password가 일치하는지 검증
+		if(!memberVO.getPw().equals(memberVO.getPwCheck())) {
+			check=true;
+			//에러메세지
+			//bindingResult.rejectValue("멤버변수명(path)", "properties의key(코드)");
+			//.rejectValue 오류 메세지 출
+			bindingResult.rejectValue("pwCheck", "member.password.notEqual");
+
+		}
+
+		//3. id가 중복 인지 검증
+		int result = memberMapper.getIdCheck(memberVO);
+		if(result>0) {
+			check=true;
+			bindingResult.rejectValue("id", "member.id.equal");
+		}
+
+		return check;
+
+	}
+
+2. message.properties에 사용자 정의 메세지 코드 등록
+	 ### Custom message
+	 member.password.notEqual=Password가 일치하지 않습니다
+	 member.id.equal=이미사용중인 ID입니다
+
+3. Controller에서 사용자 정의 검증 메서드 호출
+	@PostMapping("add")
+	public ModelAndView setAdd(@Valid MemberVO memberVO, BindingResult bindingResult, ModelAndView mv)throws Exception{
+
+		boolean check = memberService.getMemberError(memberVO, bindingResult);
+		if(check) {
+			log.info("===== 검증 에러 발생 =====");
+			mv.setViewName("member/add");
+			return mv;
+		}
+		...
+
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381122/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_23.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381122/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_24.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381122/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_25.png)
+
+검증 메서드 생성
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381123/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_26.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381123/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_27.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381123/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_28.png)
+
+```java
+다른 언어 버전에도 다 붙여넣는다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381123/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_29.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381124/notion-blog/_/_/_-Spring_boot/Spring_Form_/Untitled_30.png)

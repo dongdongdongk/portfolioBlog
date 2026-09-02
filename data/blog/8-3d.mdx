@@ -1,0 +1,491 @@
+---
+title: '8단원: 3D 공간화 사용하기'
+date: '2026-09-02'
+category: '게임 개발/WWISE'
+tags: ['게임 개발', 'WWISE']
+draft: false
+summary: ''
+---
+
+# { 🎧 3D 공간화와 사운드 감쇠 시스템 이해하기 }
+
+## 📋 목차
+
+1. [3D 공간화란 무엇인가?](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#3d-%EA%B3%B5%EA%B0%84%ED%99%94%EB%9E%80-%EB%AC%B4%EC%97%87%EC%9D%B8%EA%B0%80)
+2. [텔레포터 사운드 문제점 이해하기](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#%ED%85%94%EB%A0%88%ED%8F%AC%ED%84%B0-%EC%82%AC%EC%9A%B4%EB%93%9C-%EB%AC%B8%EC%A0%9C%EC%A0%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+3. [감쇠(Attenuation) 개념과 거리 기반 변화](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#%EA%B0%90%EC%87%A0attenuation-%EA%B0%9C%EB%85%90%EA%B3%BC-%EA%B1%B0%EB%A6%AC-%EA%B8%B0%EB%B0%98-%EB%B3%80%ED%99%94)
+   - 3D Positioning
+   - Distance Attenuation Curve (거리 감쇠 곡선)
+4. [방향성 사운드 구현하기: 원뿔 감쇠](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#%EB%B0%A9%ED%96%A5%EC%84%B1-%EC%82%AC%EC%9A%B4%EB%93%9C-%EA%B5%AC%ED%98%84%ED%95%98%EA%B8%B0-%EC%9B%90%EB%BF%94-%EA%B0%90%EC%87%A0)
+   - Cone Attenuation (원뿔 감쇠)
+   - 각 옵션 설명 (내부 각도 / 외부 각도 / 외부 감쇠)
+5. [주파수 변화로 현실감 추가하기](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#%EC%A3%BC%ED%8C%8C%EC%88%98-%EB%B3%80%ED%99%94%EB%A1%9C-%ED%98%84%EC%8B%A4%EA%B0%90-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+6. [학습 목표 정리](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#%ED%95%99%EC%8A%B5-%EB%AA%A9%ED%91%9C-%EC%A0%95%EB%A6%AC)
+
+---
+
+## 1. 3D 공간화란 무엇인가?
+
+- **3D 공간화(Spatialization)** 는 소리가 공간 속에서 어디서 나는지, 얼마나 멀리 있는지, 어떤 방향에서 오는지를 청취자가 느낄 수 있도록 만드는 기술.
+- 게임에서는 이 기능을 활용해 플레이어가 특정 오브젝트(텔레포터, 적, 발자국 등)의 **위치와 방향**을 청각적으로 인식할 수 있음.
+
+---
+
+## 2. 텔레포터 사운드 문제점 이해하기
+
+- 현재 Cube 게임에서 텔레포터 사운드는 **맵이 로드되면 무한 반복**됨.
+- 하지만 문제점:
+  1. 플레이어가 **가까이 있어도** / **멀리 있어도** → **소리가 동일**하게 들림.
+  2. 텔레포터가 **어느 방향을 향하든** → **소리가 동일**하게 들림.
+
+👉 즉, 현실감이 떨어지고 “소리의 공간적 정보”가 부족함.
+
+---
+
+## 3. 감쇠(Attenuation) 개념과 거리 기반 변화
+
+사운드가 **리스너(플레이어)** 와의 거리에 따라 달라지도록 하는 핵심 기술.
+
+### 🔹 3D Positioning
+
+- Wwise에서 사운드를 **3D 공간화**로 설정해야 감쇠를 적용할 수 있음.
+- 기본값은 "2D (Non-spatialized)" → 리스너의 위치와 무관하게 동일한 소리.
+- "3D (Spatialized)" 로 설정하면 거리, 방향, 공간 효과를 적용할 수 있음.
+
+### 🔹 Distance Attenuation Curve (거리 감쇠 곡선)
+
+- 리스너와의 거리가 멀어질수록 **볼륨과 주파수가 줄어드는 방식**을 곡선으로 정의.
+- 주요 옵션:
+  - **Min Distance (최소 거리)**
+    - 이 거리 안에서는 사운드 볼륨이 **최대값(100%)** 유지됨.
+  - **Max Distance (최대 거리)**
+    - 이 거리 이상에서는 사운드 볼륨이 **0% 혹은 최소값**까지 감소.
+  - **Curve Shape (곡선 형태)**
+    - 선형, 로그, 커스텀 곡선 등 선택 가능 → 사운드가 줄어드는 방식을 조절.
+
+👉 예: 텔레포터에 가까이 다가갈수록 소리가 점점 커지고, 멀어지면 서서히 줄어듦.
+
+---
+
+## 4. 방향성 사운드 구현하기: 원뿔 감쇠
+
+소리를 단순히 거리로만 조절하는 게 아니라, **방향**에 따라 다르게 들리도록 설정.
+
+### 🔹 Cone Attenuation (원뿔 감쇠)
+
+- 특정 방향(예: 텔레포터 정면)을 기준으로 소리가 강하게 나오고,
+  그 외의 방향에서는 점점 소리가 약해지거나 먹먹하게 들림.
+
+### 🔹 Cone 옵션 설명
+
+1. **Inner Angle (내부 각도)**
+   - 이 각도 안에 있으면 사운드가 **최대 볼륨**으로 들림.
+   - 예: 텔레포터 정면 60° 각도 범위.
+2. **Outer Angle (외부 각도)**
+   - 이 각도를 넘으면 사운드가 **최소 볼륨** 혹은 감쇠된 상태로 들림.
+   - 예: 정면에서 벗어난 120° 이상 영역.
+3. **Outer Volume (외부 감쇠, dB)**
+   - Outer Angle 영역에서 얼마나 줄일지 설정.
+   - 6dB, -12dB 같은 값 사용 가능.
+
+👉 이렇게 설정하면, 텔레포터의 거울이 플레이어를 향하지 않을 때 사운드가 **먹먹하게 들리는 효과** 구현 가능.
+
+---
+
+## 5. 주파수 변화로 현실감 추가하기
+
+- 단순히 볼륨만 바뀌는 게 아니라, 거리에 따라 **주파수(Frequency)** 도 변화시킬 수 있음.
+- 가까울수록 소리가 선명하고, 멀수록 고음이 줄어들어 저음 위주의 "먹먹한 소리"가 됨.
+- 실제 생활에서 멀리 있는 소리가 낮게 들리는 효과를 모방.
+
+---
+
+## 6. 학습 목표 정리
+
+이 단원을 마치면 다음을 할 수 있음:
+
+1. **리스너와의 거리 변화** → 감쇠 곡선으로 사운드 크기와 선명도를 조절.
+2. **리스너와의 방향 변화** → 원뿔 감쇠(Cone Attenuation)로 방향성 사운드 구현.
+3. **현실감 추가** → 주파수 변화를 적용해 소리가 더 자연스럽게 들리도록 조정.
+
+---
+
+# { 🎧 감쇠(Attenuation) ShareSet 만들기 }
+
+## 📋 목차
+
+1. [Emitter와 Listener 개념](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#emitter%EC%99%80-listener-%EA%B0%9C%EB%85%90)
+2. [3D 공간화와 Attenuation 곡선](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#3d-%EA%B3%B5%EA%B0%84%ED%99%94%EC%99%80-attenuation-%EA%B3%A1%EC%84%A0)
+3. [ShareSet 개념과 필요성](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#shareset-%EA%B0%9C%EB%85%90%EA%B3%BC-%ED%95%84%EC%9A%94%EC%84%B1)
+4. [Cube 실행과 Wwise 프로젝트 연결](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#cube-%EC%8B%A4%ED%96%89%EA%B3%BC-wwise-%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8-%EC%97%B0%EA%B2%B0)
+5. [Teleporter 사운드에 3D Spatialization 적용하기](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#teleporter-%EC%82%AC%EC%9A%B4%EB%93%9C%EC%97%90-3d-spatialization-%EC%A0%81%EC%9A%A9%ED%95%98%EA%B8%B0)
+6. [Speaker Panning / 3D Spatialization Mix 옵션](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#speaker-panning--3d-spatialization-mix-%EC%98%B5%EC%85%98)
+7. [Attenuation ShareSet 생성 단계](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#attenuation-shareset-%EC%83%9D%EC%84%B1-%EB%8B%A8%EA%B3%84)
+8. [Attenuation Editor와 곡선 이해](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#attenuation-editor%EC%99%80-%EA%B3%A1%EC%84%A0-%EC%9D%B4%ED%95%B4)
+9. [Attenuation 곡선 종류](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#attenuation-%EA%B3%A1%EC%84%A0-%EC%A2%85%EB%A5%98)
+
+---
+
+## 1. Emitter와 Listener 개념
+
+- **Emitter (이미터)**
+  : 사운드를 발생시키는 모든 오브젝트.
+  (예: 발자국 소리, 배경음, 몬스터 소리 등)
+- **Listener (리스너)**
+  : 사운드를 듣는 주체.
+  보통 **플레이어 캐릭터**에 붙으며, 1인칭 게임에서는 주인공이 Listener 역할을 함.
+- 둘 다 **x, y, z 좌표**와 방향 정보를 가지고 있으며,
+  이 정보가 **실시간으로 Wwise 엔진에 전달**되어 소리의 위치와 방향을 반영함.
+
+---
+
+## 2. 3D 공간화와 Attenuation 곡선
+
+- **3D 공간화(Spatialization)**
+  : 게임 속 소리를 3차원적으로 들리게 만드는 과정.
+- 핵심은 **Attenuation Curve (감쇠 곡선)**
+  : 소리가 멀어질수록 어떻게 변할지를 결정하는 그래프.
+  - 주로 **볼륨 감소(거리 감쇠)**를 담당.
+  - 경우에 따라 팬(Panning), 필터, 로우패스 등도 곡선으로 적용 가능.
+
+---
+
+## 3. ShareSet 개념과 필요성
+
+- **ShareSet**
+  : 여러 오브젝트에서 **공통으로 사용하는 Attenuation 곡선**을 묶어둔 설정.
+- **이유**
+  - 물리 법칙은 모든 소리에 동일하게 적용되므로,
+    보통 게임 내 사운드에는 **같은 감쇠 곡선**을 쓰는 것이 효율적.
+  - 일괄 관리 가능 → 수정 시 모든 오브젝트에 반영됨.
+
+---
+
+## 4. Cube 실행과 Wwise 프로젝트 연결
+
+1. **Cube 실행** → Wwise와 연결 테스트 가능.
+2. **Wwise 프로젝트 열기** → _Module 8_ 프로젝트 파일 열기.
+3. **Cube와 연결** → 게임 실행 상태에서 변경 사항을 실시간 확인 가능.
+
+---
+
+## 5. Teleporter 사운드에 3D Spatialization 적용하기
+
+1. **Project Explorer > Audio 탭**
+
+   → `Actor-Mixer Hierarchy > Default Work Unit > Teleporter Sound SFX` 선택.
+
+2. **Property Editor > Positioning 탭** 열기.
+3. **3D Spatialization 설정**
+   - 옵션:
+     - **Position Only**
+     - **Position + Orientation** ✅ (이 강의에서 선택)
+     - **None**
+   - `Position + Orientation` → 소리 위치와 방향을 모두 반영하여 3D 공간감 강화.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380574/notion-blog/_/WWISE/Wwise_/8_3D_/image.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380573/notion-blog/_/WWISE/Wwise_/8_3D_/image_1.png)
+
+---
+
+## 6. Speaker Panning / 3D Spatialization Mix 옵션
+
+- 속성 이름: **Speaker Panning / 3D Spatialization Mix**
+- 의미:
+  - 두 방식을 섞어서 사용할 수 있게 함.
+  - **Speaker Panning**
+    - 단순히 스피커 볼륨/위치에 따라 소리 재생.
+    - 거리 감쇠나 방향성 반영 X.
+  - **3D Spatialization**
+    - 거리, 방향, 감쇠 등을 모두 반영하여 현실적인 공간감 제공.
+- **일반적인 사용법**
+  → 보통 둘 중 하나만 사용.
+  → 기본값 **100% (3D Spatialization 전용)** 그대로 두는 것이 권장됨.
+
+---
+
+## 7. Attenuation ShareSet 생성 단계
+
+1. **Property Editor > Attenuation 그룹** 이동.
+2. **More options 버튼 → New 클릭.**
+3. **New Attenuation 대화 상자** 열림.
+4. 이름 입력: `Object_Attenuation`
+5. **OK 클릭** → Teleporter 오브젝트에 자동 할당됨.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380573/notion-blog/_/WWISE/Wwise_/8_3D_/image_2.png)
+
+---
+
+## 8. Attenuation Editor와 곡선 이해
+
+- **Attenuation Editor**가 보조 편집기에 표시됨.
+- 기본 곡선은 **볼륨(Volume)** 제어.
+- 화면에 **빨간색 대각선 그래프**가 표시 → 거리가 멀어질수록 소리가 줄어듦.
+- **거리 계산 방식**
+  - Emitter(텔레포터)와 Listener(플레이어)의 **좌표(x, y, z)** 비교.
+  - 실제 물리적 거리 값에 따라 볼륨 결정.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380573/notion-blog/_/WWISE/Wwise_/8_3D_/image_3.png)
+
+---
+
+## 9. Attenuation 곡선 종류
+
+- Wwise에서 제공하는 **7가지 곡선** 존재.
+- 각 곡선은 다른 색상으로 표시됨.
+- (이 단계에서는 기본 곡선만 사용, 나중 실습에서 세부 곡선 편집 다룸)
+
+---
+
+✅ 이렇게 정리하면, 이번 단원은 "Attenuation ShareSet을 만들고 Teleporter 사운드에 적용해 3D 공간화 기반을 마련하는 과정"이라고 볼 수 있습니다.
+
+---
+
+# { 🎚 Attenuation 곡선 변경하기 }
+
+## 📋 목차
+
+1. [거리 단위 이해하기](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#%EA%B1%B0%EB%A6%AC-%EB%8B%A8%EC%9C%84-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Attenuation 그래프 구조](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#attenuation-%EA%B7%B8%EB%9E%98%ED%94%84-%EA%B5%AC%EC%A1%B0)
+3. [Max Distance 속성 변경하기](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#max-distance-%EC%86%8D%EC%84%B1-%EB%B3%80%EA%B2%BD%ED%95%98%EA%B8%B0)
+4. [Distance 매개 변수로 테스트하기](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#distance-%EB%A7%A4%EA%B0%9C-%EB%B3%80%EC%88%98%EB%A1%9C-%ED%85%8C%EC%8A%A4%ED%8A%B8%ED%95%98%EA%B8%B0)
+5. [곡선 기준점 추가와 볼륨 조정](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#%EA%B3%A1%EC%84%A0-%EA%B8%B0%EC%A4%80%EC%A0%90-%EC%B6%94%EA%B0%80%EC%99%80-%EB%B3%BC%EB%A5%A8-%EC%A1%B0%EC%A0%95)
+6. [Low-pass Filter 곡선 추가하기](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#low-pass-filter-%EA%B3%A1%EC%84%A0-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+7. [여러 곡선 동시 확인하기](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#%EC%97%AC%EB%9F%AC-%EA%B3%A1%EC%84%A0-%EB%8F%99%EC%8B%9C-%ED%99%95%EC%9D%B8%ED%95%98%EA%B8%B0)
+8. [곡선 전체 크기 조정하기](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#%EA%B3%A1%EC%84%A0-%EC%A0%84%EC%B2%B4-%ED%81%AC%EA%B8%B0-%EC%A1%B0%EC%A0%95%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. 거리 단위 이해하기
+
+- **Attenuation 곡선**을 설정하기 전, 게임 내에서 **거리 단위**가 무엇을 의미하는지 알아야 함.
+- 거리 단위는 게임 개발 단계에서 **게임의 스케일**에 따라 정해짐.
+  - 예: 개미 게임 → **밀리미터**
+  - 예: 우주 게임 → **광년**
+- Cube 게임에서는 **약 0.25m = 1 단위** 로 설정됨.
+
+---
+
+## 2. Attenuation 그래프 구조
+
+- **X축**: 거리 (Distance)
+- **Y축**: 출력값 (Output Bus Volume 또는 다른 속성)
+- 거리가 멀어질수록 **사운드 크기/특성**이 점차 줄어드는 구조.
+
+---
+
+## 3. Max Distance 속성 변경하기
+
+- `Max distance` = 그래프에 표시되는 거리의 범위를 설정하는 옵션.
+- **예시**: 보조 편집기에서 `Max distance`를 **50**으로 변경 → 그래프의 X축이 50 단위까지 표시됨.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380574/notion-blog/_/WWISE/Wwise_/8_3D_/image_4.png)
+
+---
+
+## 4. Distance 매개 변수로 테스트하기
+
+- **Transport Control → Play 버튼(스페이스바)** 로 Teleporter 사운드 재생.
+- Distance 매개 변수 커서를 좌우로 드래그하여 거리 변화가 소리에 주는 영향을 들어볼 수 있음.
+- **주의사항**:
+  - Teleporter 사운드는 **무한 반복 재생**으로 설정되어 있음 → 실습 시 편리.
+  - Play 버튼을 여러 번 누르면 사운드가 중복 재생될 수 있으므로 한 번만 실행.
+
+---
+
+## 5. 곡선 기준점 추가와 볼륨 조정
+
+- 사운드가 특정 거리에서 더 크게 감소하도록 곡선을 수정할 수 있음.
+- 방법:
+  1. 곡선 위를 **더블 클릭** → 새로운 기준점 생성.
+  2. 해당 기준점의 **X좌표 = 30**으로 설정.
+  3. **Output Bus Volume = -17 dB**로 설정.
+- 결과: 리스너가 텔레포터에서 30m 떨어지면 **볼륨이 급격히 줄어듦**.
+- 팁: X, Y 좌표 값을 직접 확인하면 정확히 설정 가능.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380574/notion-blog/_/WWISE/Wwise_/8_3D_/image_5.png)
+
+```csharp
+거리가 멀어질수록 볼륨이 작아진다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380574/notion-blog/_/WWISE/Wwise_/8_3D_/image_6.png)
+
+```csharp
+새로운 기준점을 만들고 x y 를 이용해서 정확하게 조절 가능
+```
+
+---
+
+## 6. Low-pass Filter 곡선 추가하기
+
+- 소리의 또 다른 중요한 변화 = **공기 중 전파 시 고주파 감소**.
+- Distance와 Low-pass filter 속성을 연결하여 재현 가능.
+- 방법:
+  1. **Distance 그룹**에서 `Low-pass filter` 속성 선택.
+  2. Curve 종류를 `Custom`으로 설정.
+- 이렇게 하면 거리와 함께 **고음이 점점 줄어드는 효과** 구현 가능.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380574/notion-blog/_/WWISE/Wwise_/8_3D_/image_7.png)
+
+---
+
+## 7. 여러 곡선 동시 확인하기
+
+- `Ctrl` 키를 누른 채로 `Volume` 속성을 함께 선택 → **두 곡선을 동시에 확인 가능**.
+- 단, **Y축 값은 한 번에 하나의 곡선만** 볼 수 있음.
+- 이 기능을 이용해 **Volume 감소와 Low-pass filter 감소를 비교**하며 조정 가능.
+
+---
+
+## 8. 곡선 전체 크기 조정하기
+
+- 경우에 따라 곡선 모양은 유지하되 **전체 스케일만 변경**하고 싶을 수 있음.
+- 방법: `Max distance` 값을 늘리거나 줄이면 전체 곡선이 새로운 범위에 맞춰 자동 조정됨.
+- 예시:
+  - `Max distance = 100`으로 변경 →
+    리스너가 텔레포터로부터 **60m 이상** 멀어지면 사운드가 대부분 줄어듦.
+
+---
+
+✅ 정리하면, Attenuation 곡선은 **소리의 거리감과 현실감을 구현하는 핵심 도구**입니다.
+
+- **거리 단위**를 이해해야 정확한 곡선 설계가 가능하고,
+- `Max distance`, `Output Bus Volume`, `Low-pass filter` 같은 속성들을 조합해 **볼륨 감소 + 고주파 감쇠** 효과를 사실적으로 구현할 수 있습니다.
+
+---
+
+# { 🎧 원뿔 감쇠와 방향성 사운드 이해하기 }
+
+## 📋 목차
+
+1. [원뿔 감쇠(Cone Attenuation) 개념](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#%EC%9B%90%EB%BF%94-%EA%B0%90%EC%87%A0cone-attenuation-%EA%B0%9C%EB%85%90)
+2. [Cone Preview 이해하기](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#cone-preview-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+3. [Cone Attenuation 속성들](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#cone-attenuation-%EC%86%8D%EC%84%B1%EB%93%A4)
+   - [Cone Inner Angle](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#cone-inner-angle)
+   - [Cone Outer Angle](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#cone-outer-angle)
+   - [Cone LPF (Low Pass Filter)](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#cone-lpf-low-pass-filter)
+4. [리스너 위치와 사운드 변화](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#%EB%A6%AC%EC%8A%A4%EB%84%88-%EC%9C%84%EC%B9%98%EC%99%80-%EC%82%AC%EC%9A%B4%EB%93%9C-%EB%B3%80%ED%99%94)
+5. [실습 단계 요약](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#%EC%8B%A4%EC%8A%B5-%EB%8B%A8%EA%B3%84-%EC%9A%94%EC%95%BD)
+6. [Cube 게임에서 확인하기](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#cube-%EA%B2%8C%EC%9E%84%EC%97%90%EC%84%9C-%ED%99%95%EC%9D%B8%ED%95%98%EA%B8%B0)
+7. [정리](https://www.notion.so/Section8-271e683f737e80548d6afc00838ac1cc#%EC%A0%95%EB%A6%AC)
+
+---
+
+## 1. 원뿔 감쇠(Cone Attenuation) 개념
+
+- **Cone Attenuation**은 사운드의 방향성을 표현하는 기능.
+- 단순히 거리에 따라 소리가 줄어드는 것(거리 감쇠, Distance Attenuation)만이 아니라, **이미터(Emitter)가 어느 방향을 바라보는지**에 따라 소리가 다르게 들리도록 만듦.
+- 예시:
+  - **앞을 바라볼 때** → 소리가 정상적으로 잘 들림.
+  - **뒤를 바라볼 때** → 소리가 작아지거나 뭉개짐.
+
+---
+
+## 2. Cone Preview 이해하기
+
+- Wwise 편집기에서 **Cone Preview**를 보면 원의 중앙이 **사운드 이미터**.
+- 리스너(플레이어 위치)는 원 안의 **점(dot)**으로 표시됨.
+
+Cone Preview의 영역:
+
+- **위쪽 파이 모양 영역 (정면 방향)**
+  - 리스너가 정면에 있을 때 → 사운드 속성에 변화 없음.
+- **아래쪽 파이 모양 영역 (후면 방향)**
+  - 리스너가 후면에 있을 때 → Cone 속성에 설정된 값 적용 (예: LPF 값 적용).
+- **좌우 전환 영역**
+  - 정면 ↔ 후면 사이를 이동할 때 → 설정된 값이 점진적으로 바뀜.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380574/notion-blog/_/WWISE/Wwise_/8_3D_/image_8.png)
+
+```csharp
+가운데가 이미터 ( 소리가 나는 물체 ) 이고 점이 리스너이다
+```
+
+---
+
+## 3. Cone Attenuation 속성들
+
+원뿔 감쇠에는 여러 속성이 있으며, 방향성과 사운드 변화를 제어함.
+
+### 🔹 Cone Inner Angle
+
+- 정면에서 **영향을 받지 않는 영역의 각도**.
+- 이 각도 안에서는 사운드가 원래대로 들림.
+- 기본적으로 "앞을 보고 있는 영역"이라고 이해하면 됨.
+
+### 🔹 Cone Outer Angle
+
+- **전환 구역의 끝 각도**.
+- Inner Angle과 Outer Angle 사이가 **전환 영역(Transition Zone)**.
+- 이 구역에서는 점차적으로 Cone 속성이 적용됨.
+- Outer Angle이 커질수록 전환 구역이 넓어짐.
+  - 예: Outer = 180° → 좌우에 45°씩 전환 구역이 생김.
+
+### 🔹 Cone LPF (Low Pass Filter)
+
+- **후면에서 적용되는 로우패스 필터 값**.
+- LPF는 **고주파를 깎아내는 효과** → 소리가 “뭉개진 듯” 들리게 함.
+- 리스너가 이미터 뒤에 있을 때만 적용됨.
+- 값 예시:
+  - LPF = 50 → 뒷면에서 소리가 탁하고 둔하게 들림.
+
+---
+
+## 4. 리스너 위치와 사운드 변화
+
+Cone Preview에서 점(리스너)을 움직이면:
+
+- **정면** → 원래 소리 유지.
+- **전환 구역** → 점점 필터 값 적용 (소리가 조금씩 변함).
+- **후면** → Cone LPF 값이 완전히 적용되어 소리가 뭉개짐.
+
+---
+
+## 5. 실습 단계 요약
+
+1. **Cone Use 체크** → Cone 기능 활성화.
+2. **Cone LPF 값 50으로 설정** → 후면 소리 뭉개짐 적용.
+3. **Cone Preview에서 점을 후면으로 이동** → 소리 변화 확인.
+4. **선을 -105도로 드래그** → 리스너를 전환 구역에 위치시킴.
+5. **Cone Outer Angle = 180° 설정** → 좌우에 전환 구역 생성.
+6. **Transport Control → Stop 버튼** → 사운드 정지.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380575/notion-blog/_/WWISE/Wwise_/8_3D_/image_9.png)
+
+```csharp
+Cone Use 활성화
+
+**Cone LPF 값 50으로 설정 등등**
+```
+
+```csharp
+버그가 있는건지 프리뷰에서 바로 소리가 변화를 느끼기 어렵다 ( 게임에서는 확인 가능 )
+
+프리퓨에서 수정 후 거리 그래프에서 조절을 해줘야 변화가 느껴진다 ( 포럼을 확인하니 버그 맞는듯 )
+```
+
+---
+
+## 6. Cube 게임에서 확인하기
+
+1. **맵 리로드**: Esc → load map → `map metl3`.
+2. 텔레포터 근처 이동.
+3. 테스트:
+   - **가까이/멀어질 때** → 거리 감쇠 곡선 효과 확인.
+   - **텔레포터 회전할 때** → Cone Attenuation 효과(앞/뒤 방향성 차이) 확인.
+
+---
+
+## 7. 정리
+
+- **Attenuation 곡선**: 거리 기반 소리 감쇠.
+- **Cone Attenuation**: 방향 기반 소리 감쇠.
+- **Inner Angle & Outer Angle** → 전환 구역 조절.
+- **LPF 값** → 후면 소리를 뭉개서 현실감을 강화.
+- 게임 내에서는 **거리 + 방향**이 동시에 작용하여 더 현실적인 3D 사운드가 구현됨.
+
+---
+
+👉 이렇게 정리하면, 단순히 “설정했다”가 아니라 **각 옵션이 왜 있고, 실제로 어떤 효과를 주는지**를 이해하면서 공부할 수 있어요.

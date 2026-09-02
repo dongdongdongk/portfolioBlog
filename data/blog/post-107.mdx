@@ -1,0 +1,804 @@
+---
+title: '에러 처리'
+date: '2026-09-02'
+category: '풀스택/The Web Developer 부트캠프 2022'
+tags: ['풀스택', 'The Web Developer 부트캠프 2022']
+draft: false
+summary: ''
+---
+
+# Express 앱의 오류 처리
+
+```jsx
+대개의 서버가 가동 중일 때 발생한 오류의 원인은 둘 중 하나이다
+
+1. MongoDB 외 다양한 DB와 연결하거나 인터랙션할 때
+
+2. API, 외부 서비스, 라이브러리와 연결하거나 인터랙션할 때 발생한 불완전 데이터 때문
+```
+
+```jsx
+Express에 내장된 오류 핸들러가 앱에서 발생한 모든 오류를 처리한다
+
+Express는 라우트나 미들웨어에서 발견된 모든 오류를 처리하여 기본적으로 상태 코드 500으로 응답한다
+
+( HTML 페이지를 통해서 (오류 났을때 브라우저에 보여주는 스텍트레이서) )
+```
+
+# **오류 핸들러 작성**
+
+```jsx
+Express에서는 오류 처리 미들웨어 함수를 정의할 수 있음.
+
+오류 처리 함수를 만들 때 네 개의 인수를 전달해야 함: err, req, res, next.
+
+이 변수들을 정의해야 오류 처리 미들웨어로 인식됨.
+
+보통 app.use 아래에 위치시키며, 콜백 함수 내에서 적절한 로깅 또는 처리를 수행함.
+```
+
+# 오류 핸들러 예제
+
+```jsx
+const express = require('express')
+const app = express()
+const morgan = require('morgan')
+
+const AppError = require('./AppError')
+
+// Morgan 미들웨어를 사용하여 요청 로그를 기록
+app.use(morgan('tiny'))
+
+// 모든 요청에 대해 현재 시간을 기록하고 요청 메서드와 경로를 출력하는 미들웨어
+app.use((req, res, next) => {
+  req.requestTime = Date.now()
+  console.log(req.method, req.path)
+  next()
+})
+
+// '/dogs' 경로에 대한 미들웨어. "I LOVE DOGS!!"를 출력하고 다음 미들웨어로 이동
+app.use('/dogs', (req, res, next) => {
+  console.log('I LOVE DOGS!!')
+  next()
+})
+
+// 비밀번호를 확인하는 미들웨어
+const verifyPassword = (req, res, next) => {
+  const { password } = req.query
+  if (password === 'chickennugget') {
+    next()
+  } else {
+    // AppError를 활용하여 사용자 정의 오류를 생성하고 401 상태 코드로 응답
+    throw new AppError('Password required', 401)
+  }
+}
+
+// 홈 페이지 라우트. 현재 요청 시간을 출력
+app.get('/', (req, res) => {
+  console.log(`REQUEST DATE: ${req.requestTime}`)
+  res.send('HOME PAGE!')
+})
+
+// '/error' 경로에서 오류를 인위적으로 발생시키는 라우트
+app.get('/error', (req, res) => {
+  // 정의되지 않은 변수 'chicken'으로 인한 오류 발생
+  chicken.fly()
+})
+
+// '/dogs' 경로에서 "WOOF WOOF!"를 출력하는 라우트
+app.get('/dogs', (req, res) => {
+  console.log(`REQUEST DATE: ${req.requestTime}`)
+  res.send('WOOF WOOF!')
+})
+
+// '/secret' 경로에서 비밀번호 확인 후 시크릿 내용을 출력하는 라우트
+app.get('/secret', verifyPassword, (req, res) => {
+  res.send('MY SECRET IS: Sometimes I wear headphones in public so I dont have to talk to anyone')
+})
+
+// '/admin' 경로에서 403 상태 코드로 "You are not an Admin!" 오류를 발생시키는 라우트
+app.get('/admin', (req, res) => {
+  throw new AppError('You are not an Admin!', 403)
+})
+
+// 404 Not Found 처리 미들웨어
+app.use((req, res) => {
+  res.status(404).send('NOT FOUND!')
+})
+
+// 오류 처리 미들웨어. 발생한 오류를 콘솔에 출력하고 다음 미들웨어로 전달
+app.use((err, req, res, next) => {
+  console.log('******************************************')
+  console.log('*****************ERROR*****************')
+  console.log('******************************************')
+  console.log(err)
+  next(err) // 기본에러 핸들러를 사용 next 에 (err) 필수
+})
+
+// 에러 처리를 마무리하는 미들웨어. 상태 코드와 메시지를 응답으로 전송
+// 주석 처리된 부분은 다른 방식으로 에러를 처리하는 예시
+// app.use((err, req, res, next) => {
+//     const { status = 500, message = 'Something Went Wrong' } = err;
+//     res.status(status).send(message);
+// });
+
+// 서버를 3000번 포트에서 실행
+app.listen(3000, () => {
+  console.log('App is running on localhost:3000')
+})
+```
+
+```jsx
+**오류 핸들러 예제 구현**
+
+맨 아래 app.use를 이용하여 오류 처리 미들웨어를 정의함.
+
+이 미들웨어는 콘솔에 오류 메시지를 출력함.
+
+오류를 일으키지 않는 라우트인 '/'로 가면 아무 것도 출력되지 않음.
+
+오류가 있는 라우트인 '/error'로 가면 오류 메시지와 상태 코드 500이 출력됨.
+
+( 다른 미들웨어와 마찬가지로 next를 호출하지 않으면 코드가 끝난다 그러면 내장된 오류 핸들러 기능으로 응답할 수 없다 )
+
+**기본 오류 핸들러 우회**
+
+기본 오류 핸들러를 사용하고 싶을 때는 next를 호출하여 오류를 전달함.
+
+단, **반드시 next에 err를 전달해야** Express가 오류를 인식함.
+
+이를 통해 사용자 정의 오류 핸들러와 Express 기본 오류 핸들러를 조합하여 사용 가능함.
+
+**Express 내장 오류 핸들러**
+
+Express의 내장 오류 핸들러는 디폴트로 동작하며, 코드에서 발생한 오류를 처리함.
+
+next에 오류를 전달하면 Express는 해당 오류를 처리하고 내장 오류 핸들러로 전달함.
+
+Express의 디폴트 오류 핸들러는 스택 추적과 함께 HTML 응답을 생성함.
+
+**커스텀 오류 핸들러 활용**
+
+사용자 정의 오류 핸들러를 통해 스택 추적, 상태 코드 등을 커스터마이징할 수 있음.
+
+오류 핸들러에는 반드시 next를 호출하여 다음 미들웨어로 전달해야 함.
+
+비동기적 오류 처리 및 Mongoose 등 라이브러리에서 발생한 오류도 효과적으로 처리 가능함.
+```
+
+# 사용자 지정 오류 클래스
+
+## Express에서 오류를 다루기 어려운 점
+
+```jsx
+Express에서 오류를 다루는 것은 어려운 점이 있다.
+
+이는 처리하는 방법이 한 가지뿐이 아니라 다양하기 때문이다.
+
+Express는 간결하고 유연한 프레임워크로 소개되었으며, 개발자들은 권한을 가지고 앱을 제작할 수 있다.
+
+그러나 때로는 단일 방법으로 앱을 만들기 보다는 방향이 주어질 때 편리할 수 있다.
+```
+
+## 커스텀 오류 클래스 사용
+
+```jsx
+Express에서 오류 처리의 일반적인 패턴 중 하나는 커스텀 오류 클래스를 사용하는 것이다.
+
+대부분의 경우 Express 앱에서 생성된 오류를 확인하고 특정 상태 코드와 메시지로 응답하는 것이 일반적이다.
+
+주로 400번대 또는 500번대 상태 코드를 처리하며, 예를 들면 500은 서버 문제를 나타내고 401은 권한이 없음을 의미한다.
+
+Express에서 상태 코드를 처리할 때 각 코드에는 다른 의미가 있으며,
+
+이를 능숙하게 처리해야 한다. 이를 위해 커스텀 오류 클래스를 사용하여 앱 오류나 Express 오류를 생성할 수 있다.
+
+이렇게 하면 상태 코드와 메시지를 쉽게 설정할 수 있다
+```
+
+### index.js
+
+```jsx
+const express = require('express')
+const app = express()
+const morgan = require('morgan')
+
+const AppError = require('./AppError')
+
+app.use(morgan('tiny'))
+
+app.use((req, res, next) => {
+  req.requestTime = Date.now()
+  console.log(req.method, req.path)
+  next()
+})
+
+// '/admin' 경로에 대한 GET 요청을 처리하는 라우트 핸들러를 추가합니다.
+app.get('/admin', (req, res) => {
+  // AppError를 활용하여 'You are not an Admin!' 메시지와 상태 코드 403으로 예외를 발생시킵니다.
+  throw new AppError('You are not an Admin!', 403)
+})
+app.use((req, res) => {
+  res.status(404).send('NOT FOUND!')
+})
+
+// 오류 핸들러 미들웨어를 추가합니다.
+app.use((err, req, res, next) => {
+  // 오류 객체에서 상태 코드와 메시지를 추출합니다. 디폴트 값은 500과 'Something Went Wrong'입니다.
+  const { status = 500, message = 'Something Went Wrong' } = err
+  // 상태 코드와 메시지로 응답합니다.
+  res.status(status).send(message)
+})
+
+app.listen(3000, () => {
+  console.log('App is running on localhost:3000')
+})
+```
+
+### AppError 클래스
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381413/notion-blog/_/The_Web_Developer_2022/node_js/_/Untitled.png)
+
+```jsx
+// AppError 클래스를 정의합니다. 이 클래스는 Error 클래스를 확장합니다.
+class AppError extends Error {
+  // constructor 메서드를 정의합니다. 이 메서드는 객체를 생성할 때 호출됩니다. (생성자)
+  constructor(message, status) {
+    // 부모 클래스인 Error 클래스의 constructor를 호출합니다.
+    super()
+    // 현재 객체의 message 속성을 전달받은 message 값으로 설정합니다.
+    this.message = message
+    // 현재 객체의 status 속성을 전달받은 status 값으로 설정합니다.
+    this.status = status
+  }
+}
+
+// AppError 클래스를 모듈로 내보냅니다.
+module.exports = AppError
+```
+
+```jsx
+AppError 클래스는 JavaScript의 내장 클래스인 Error를 확장하여 정의되었다.
+
+이로써 사용자 정의 오류를 만들 수 있게 되었다.
+
+클래스는 생성자 메서드(constructor)를 가지고 있으며, 이 메서드는 오류 객체를 생성할 때 호출된다.
+
+생성자 메서드는 오류 메시지(message)와 상태 코드(status)를 매개변수로 받아, 오류 객체의 속성으로 설정한다.
+```
+
+## **Express의 디폴트 오류 핸들러**
+
+```jsx
+// 오류 핸들러 미들웨어를 추가합니다.
+app.use((err, req, res, next) => {
+  // 오류 객체에서 상태 코드와 메시지를 추출합니다. 디폴트 값은 500과 'Something Went Wrong'입니다.
+  const { status = 500, message = 'Something Went Wrong' } = err
+  // 상태 코드와 메시지로 응답합니다.
+  res.status(status).send(message)
+})
+```
+
+```jsx
+오류 객체를 가져와서 status 를 status 에 message 를 message 에 넣어서 응답한다
+
+( 기본 값으로는 500 과 'Something Went Wrong' 이라는 메세지를 넣어놨다 )
+```
+
+# Temp
+
+```jsx
+예전에 사용했던 farmStand ( Mongoose_Express ) 를 사용해서 비동기 오류 핸들링을 실습한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381412/notion-blog/_/The_Web_Developer_2022/node_js/_/Untitled_1.png)
+
+```jsx
+서버에 예전에 사용했던 AppError 에러 핸들러 클래스를 작성하고
+```
+
+```jsx
+const express = require('express')
+const cors = require('cors')
+const bodyParser = require('body-parser')
+const app = express()
+const AppError = require('./AppError')
+
+app.use(cors()) // cors
+app.use(express.urlencoded({ extended: true }))
+app.use(express.json()) // 쿼리스트링
+// getting-started.js
+const mongoose = require('mongoose')
+
+// Product 모델 요청
+const Product = require('./models/product')
+
+main().catch((err) => console.log(err))
+
+async function main() {
+  await mongoose.connect('mongodb://127.0.0.1:27017/farmStand') // 마지막 부분이 DB명
+  console.log('Mongo Connect Success')
+}
+// 삼품 조회
+app.get('/products', async (req, res) => {
+  const { category } = req.query
+  let products
+  console.log('category' + category)
+  if (category) {
+    // 카테고리가 제공된 경우 해당 카테고리에 속한 상품을 조회
+    products = await Product.find({ category })
+  } else {
+    // 카테고리가 제공되지 않은 경우 모든 상품 조회
+    products = await Product.find({})
+  }
+  console.log(products)
+  res.send(products)
+})
+
+// 상품 상세 조회
+app.get('/products/:id', async (req, res) => {
+  const { id } = req.params
+  const product = await Product.findById(id)
+  console.log(product)
+  res.send(product)
+})
+
+// 상품 추가 (필요없을듯)
+app.get('/product/new', async (req, res) => {
+  console.log('UPDATE PAGE')
+})
+
+// 상품 추가
+app.post('/product/new', async (req, res) => {
+  const newProduct = new Product(req.body)
+  await newProduct.save()
+  res.send('making your product')
+})
+
+// 상품 업데이트
+app.get('/product/:id/edit', async (req, res) => {
+  const product = await Product.findById(id)
+  res.send(product)
+})
+
+// 상품 업데이트
+app.put('/product/:id', async (req, res) => {
+  const { id } = req.params
+
+  try {
+    // findByIdAndUpdate 대신 findById 와 save 를 사용하여 업데이트
+    const product = await Product.findById(id)
+
+    if (!product) {
+      return res.status(404).send('상품을 찾을 수 없습니다.')
+    }
+
+    // 업데이트할 데이터 적용
+    product.set(req.body)
+
+    // 업데이트된 상품 저장
+    await product.save()
+
+    // 업데이트된 상품을 클라이언트에게 보냄
+    res.send(product)
+  } catch (error) {
+    console.error('상품 업데이트 중 오류 발생:', error)
+    res.status(500).send('상품 업데이트 중 오류 발생')
+  }
+})
+
+// 상품 삭제
+app.delete('/product/:id', async (req, res) => {
+  const { id } = req.params
+  try {
+    const result = await Product.deleteOne({ _id: id })
+    // 삭제 성공 여부에 따라 응답
+    if (result.deletedCount > 0) {
+      res.status(200).send('DELETE SUCCESS')
+    } else {
+      res.status(404).send('ID NOT FOUND')
+    }
+  } catch (error) {
+    console.error('DELETE FAIL')
+    res.status(500).send('DELETE FAIL')
+  }
+})
+
+// 기본 오류 처리 미들웨어
+app.use((err, req, res, next) => {
+  const { status = 500, message = 'Something went wrong' } = err
+  res.status(status).send(message)
+})
+
+app.listen(4000, () => {
+  console.log('Success')
+})
+```
+
+```jsx
+const AppError = require('./AppError'); 를 통해서 AppError 모듈을 설정해주고
+
+맨아래 하단에 기본 오류 처리 미들웨어를 작성한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381412/notion-blog/_/The_Web_Developer_2022/node_js/_/Untitled_2.png)
+
+```jsx
+이후 위와 같이 상품을 찾지 못했을 때 404 오류를 보내려고 하자 터미널에서 오류가 발생한다
+
+이는 위의 함수는 비동기 함수이기 때문이다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381412/notion-blog/_/The_Web_Developer_2022/node_js/_/Untitled_3.png)
+
+```jsx
+위와 같이 next() 를 매개변수와 함수에 사용해서
+
+next() 로  기본 에러핸들 미들웨어로 전달 해줘야한다
+```
+
+# 비동기 오류 처리 더 알아보기
+
+```jsx
+이전에 비동기 함수에서 몇 개의 조건을 확인했었는데
+
+이 경우에서는 데이터베이스에서 상품을 찾으면 잘 넘어가고
+
+찾지 못하면 이 오류로 next를 호출했다
+
+이 패턴은 우리가 직접 오류를 생성하는 경우에는 유용하고 괜찮은데
+
+( 예를 들어, 상품이 없으면 이걸 하고 사용자에게 권한이 없으면 next new AppError를 띄울 때 )
+
+하지만 Mongoose에서 오는 오류의 경우나 코드를 망쳐서 생긴 우연한 오류 등 실제로 next를
+
+호출하지 않았는데 뭔가 잘못되는 경우엔 어떨까?
+
+( 예를 들어, 모델에 대한 유효성 검사 (required)
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381413/notion-blog/_/The_Web_Developer_2022/node_js/_/Untitled_4.png)
+
+```jsx
+const express = require('express')
+const cors = require('cors')
+const bodyParser = require('body-parser')
+const app = express()
+const AppError = require('./AppError')
+
+app.use(cors()) // cors
+app.use(express.urlencoded({ extended: true }))
+app.use(express.json()) // 쿼리스트링
+// getting-started.js
+const mongoose = require('mongoose')
+
+// Product 모델 요청
+const Product = require('./models/product')
+
+main().catch((err) => console.log(err))
+
+async function main() {
+  await mongoose.connect('mongodb://127.0.0.1:27017/farmStand') // 마지막 부분이 DB명
+  console.log('Mongo Connect Success')
+}
+
+// 상품 추가
+app.post('/product/new', async (req, res, next) => {
+  try {
+    const newProduct = new Product(req.body)
+    await newProduct.save()
+    res.send('making your product')
+  } catch (error) {
+    const customError = new AppError('Failed to fetch data', 500)
+    next(customError)
+  }
+})
+
+// 상품 상세 조회
+app.get('/products/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params
+    const product = await Product.findById(id)
+    if (!product) {
+      throw new AppError('Product Not Found', 404)
+    }
+    res.send(product)
+  } catch (error) {
+    next(error)
+  }
+})
+
+app.use((err, req, res, next) => {
+  const { status = 500, message = 'Something went wrong' } = err
+  res.status(status).send(message)
+})
+
+app.listen(4000, () => {
+  console.log('Success')
+})
+```
+
+```jsx
+상품을 추가 할 때
+
+유효성 검사에서 오류가 발생하면 try catch 를사용하고 next(error) 로
+
+아래 기본 에러핸들링 미들웨어로 error 를 보낸다
+
+* 단순 순수 get ( 리액트에서는 라우터로 해결하니 필요없지만 ) 는
+
+	try catch 가 필요없다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381413/notion-blog/_/The_Web_Developer_2022/node_js/_/Untitled_5.png)
+
+```jsx
+포스트맨을 활용해서 확인한다
+```
+
+```jsx
+import axios from 'axios'
+import React, { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+const ProductAddPage = () => {
+  const navigate = useNavigate()
+
+  // 상태 초기화
+  const [formData, setFormData] = useState({
+    name: '',
+    price: '',
+    category: 'fruit', // 기본값 설정
+  })
+  const [error, setError] = useState(null)
+
+  // 입력값 변경 시 상태 업데이트
+  const handleChange = (e) => {
+    const { name, value } = e.target
+    setFormData((prevData) => ({
+      ...prevData,
+      [name]: value,
+    }))
+  }
+
+  // 폼 제출 핸들러
+  const onSubmitHandler = async (e) => {
+    e.preventDefault()
+
+    // 폼 데이터 전송
+    try {
+      await axios.post('http://localhost:4000/product/new', formData)
+      navigate('/products')
+    } catch (error) {
+      console.error('상품 추가 중 오류 발생:', error)
+      setError(error.message)
+    }
+  }
+
+  return (
+    <>
+      {error ? (
+        <p>Error : {error} </p>
+      ) : (
+        <div>
+          <h1>ProductAddPage</h1>
+          <form onSubmit={onSubmitHandler}>
+            <label htmlFor="name">ProductName</label>
+            <input
+              type="text"
+              name="name"
+              id="name"
+              value={formData.name}
+              onChange={handleChange}
+            />
+            <label htmlFor="price">Price</label>
+            <input
+              type="number"
+              name="price"
+              id="price"
+              value={formData.price}
+              onChange={handleChange}
+            />
+            <label htmlFor="category">Category</label>
+            <select name="category" id="category" value={formData.category} onChange={handleChange}>
+              <option value="fruit">fruit</option>
+              <option value="vegetable">vegetable</option>
+              <option value="dairy">dairy</option>
+            </select>
+            <input type="submit" value="상품추가" />
+          </form>
+        </div>
+      )}
+    </>
+  )
+}
+
+export default ProductAddPage
+```
+
+```jsx
+const [error, setError] = useState(null);
+
+state 설정과 return 부분에
+
+{error ? <p>Error : {error} </p> :
+
+3항 연산자로 에러가 있을때 출력되게 한다
+```
+
+# 정리
+
+# 비동기 유틸리티 정의하기
+
+```jsx
+Express에서 쓰는 거의 모든 게 비동기 함수라서 다 try로 감싸주고 끝에 catch 처리를 한 다음
+
+next를 호출하고 오류를 전달하는 작업이 상당히 번거롭다
+
+**Wrap Async Function** 함수를 만들고 함수에 콜백 전체( 라우터 엔드포인 뒤의 async 부분부터 전부 )
+
+를 전달한다 그러면 굉장히 작업이 간단해지는 게
+
+그냥 그 함수 안에서 이 코드를 가져다가
+
+오류가 발생되면 모두 catch해서 next로 전달하기만 하면 된다
+```
+
+```jsx
+// 상품 상세 조회
+app.get('/products/:id', async (req,res, next) => {
+    try{
+        const { id } = req.params;
+        const product = await Product.findById(id)
+        if(!product){
+            throw new AppError('Product Not Found', 404);
+        }
+        res.send(product);
+
+    } catch(error){
+        next(error);
+    }
+});
+
+* 수정
+
+// 상품 상세 조회
+app.get('/products/:id',wrapAsync (async (req, res, next) => {
+    const { id } = req.params;
+    const product = await Product.findById(id)
+    if (!product) {
+        throw new AppError('Product Not Found', 404);
+    }
+    res.send(product);
+}));
+```
+
+```jsx
+위의 코드의 try catch 를 모두 지우고
+
+새로운 함수 wrapAsync 로 async 함수를 감싸준다
+
+wrapAsync는 함수 하나를 반환할 텐데 그 함수가 우리가 전달한
+
+async 함수를 호출할 거다 이 함수는 비동기 함수라서
+
+Promise를 반환하는데 그러면 이 함수에서 .catch를 호출할 수 있다
+```
+
+## **Wrap Async Function 생성**
+
+```jsx
+function wrapAsync(fn) {
+  return function (req, res, next) {
+    fn(req, res, next).catch((e) => next(e))
+  }
+}
+```
+
+```jsx
+wrapAsync 함수는 비동기 함수를 감싸는 함수이다.
+
+전달된 함수 fn은 Express의 미들웨어나 라우트 핸들러이다.
+
+반환된 함수는 (req, res, next)를 인자로 받아 해당 함수 내에서 fn을 호출한다.
+
+비동기 함수 안에서 발생한 오류는 .catch(e => next(e))를 통해 Express의 오류 핸들러로 전달된다.
+
+* Express 5에서는 자동으로 비동기 함수에서 발생하는 오류를 처리해주므로 wrapAsync 사용이 줄어들 것으로 예상
+```
+
+```jsx
+상품 추가 예제
+```
+
+```jsx
+// 상품 추가
+app.post(
+  '/product/new',
+  wrapAsync(async (req, res, next) => {
+    const newProduct = new Product(req.body)
+    await newProduct.save()
+    res.send('making your product')
+  })
+)
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381413/notion-blog/_/The_Web_Developer_2022/node_js/_/Untitled_6.png)
+
+# Mongoose 오류
+
+```jsx
+Mongoose에는 문제의 종류에 따라 발생시키는 다양한 오류가 있다
+
+오류 핸들러가 실행되고 Mongoose에서 온 기본 메시지를 가져다가 이걸 그냥 전송하는거다
+
+하지만 그냥 기본 메시지를 가져다가 res.send로 처리하는 대신에 커스텀 피드백을 만들고 싶을 수 있다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381416/notion-blog/_/The_Web_Developer_2022/node_js/_/Untitled_7.png)
+
+```jsx
+모델 "Product"에 대한 "_id" 경로에서 "fdkljafkldma;mfkdla;fj" 값에 대한 객체 ID로의 캐스트가 실패했습니다.
+
+이건 여러 다른 종류의 Mongoose 오류입이다
+
+Mongoose에는 별개의 종류 및 카테고리의 오류들이 있다
+
+사실 모든 Mongoose 오류에는 name이라는 특성이 있다
+
+그럼 여기에 새로운 오류 처리 미들웨어를 추가해서
+
+오류의 이름을 기록할 수 있도록 만들어서 뭘 지칭하는지 여기서 볼 수 있게 해보자
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381416/notion-blog/_/The_Web_Developer_2022/node_js/_/Untitled_8.png)
+
+```jsx
+위와 같이 중간에 기록용으로 사용할 에러 핸들러를 만들고
+
+next(err) 를 통해 기본 에러 핸들러를 사용하도록 해본다 그리고 위의 오류를 다시
+
+실행하고 터미널을 보면
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381416/notion-blog/_/The_Web_Developer_2022/node_js/_/Untitled_9.png)
+
+```jsx
+유효성 검사에 실패하면
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381414/notion-blog/_/The_Web_Developer_2022/node_js/_/Untitled_10.png)
+
+```jsx
+이런 다양한 종류의 오류가 있다
+```
+
+## 커스텀 메세지 넣기
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381415/notion-blog/_/The_Web_Developer_2022/node_js/_/Untitled_11.png)
+
+```jsx
+const handleValidationError = (err) => {
+  console.log(err)
+  return new AppError('Validation Failed...', 404)
+}
+
+app.use((err, req, res, next) => {
+  console.log(err.name)
+  if (err.name === 'ValidationError') err = handleValidationError(err)
+  next(err)
+})
+```
+
+```jsx
+위와 같이 err 의 name 이 같다면
+
+함수를 실행하는걸로 커스텀 메세지를 설정 가능하다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381415/notion-blog/_/The_Web_Developer_2022/node_js/_/Untitled_12.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381415/notion-blog/_/The_Web_Developer_2022/node_js/_/Untitled_13.png)
+
+```jsx
+또는 그냥 아예 스키마를 설정할 때 메세지를 설정도 가능하다
+```

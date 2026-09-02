@@ -1,0 +1,599 @@
+---
+title: '동적 페이지 크롤링'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# 1. **Selenium 라이브러리 적용**
+
+```java
+웹 브라우저의 자동화를 가능하게 하고 다양한 도구와 라이브러리를 지원함
+
+(웹 페이지 클릭, 파일 저장 등등 굉장히 다양한 기능을 지원한다)
+```
+
+# 2. **크롬 드라이버 (Chrome Driver) 설치**
+
+[ChromeDriver - WebDriver for Chrome - Downloads](https://chromedriver.chromium.org/downloads)
+
+```java
+셀레니움을 사용하기 위해서는 크롬(Chrome)과 크롬 드라이버(Chrome Driver)를 설치해야 한다.
+
+
+
+개발하려는 환경의 크롬이 설치되어 있지 않다면 크롬과 드라이버를 설치하자.
+
+설치할 때 주의사항으로는 크롬과 드라이버의 버전이 동일해야 한다.
+
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381058/notion-blog/_/_/Spring_/Spring_Selenium/_/Untitled.png)
+
+```java
+
+현재 사용 중인 크롬의 버전 정보 확인하는 방법은
+
+크롬 설정 > Chrome 정보 탭에서 확인이 가능하다.
+```
+
+## 3. 라이브러리 추가하기
+
+```java
+<dependency>
+    <groupId>org.seleniumhq.selenium</groupId>
+    <artifactId>selenium-java</artifactId>
+    <version>4.6.0</version>
+</dependency>
+```
+
+## 4. 코드 작성
+
+### 기본 예제
+
+```java
+import org.openqa.selenium.*;
+
+import org.openqa.selenium.chrome.*;
+
+import org.junit.Test;
+
+public class GettingStarted {
+
+@Test
+
+public void testGoogleSearch() throws InterruptedException {
+
+  System.setProperty("webdriver.chrome.driver", "/path/to/chromedriver");      // 뒷쪽에 내 크롬 드라이버 경로를 적어준다
+
+	WebDriver driver = new ChromeDriver();             // 드라이버 객체 생성 (창을 켜지 않는다 같은 옵션을 추가할 때 는 옵션 객체를 만들어서 매개변수로 넣어준다)
+
+  driver.get("http://www.google.com/");              // 이동할 URL 입력
+
+  Thread.sleep(5000);  // 창이 켜지고 5초간 대기
+
+  WebElement searchBox = driver.findElement(By.name("q")); //q 라는 이름을 가진 요소 검색
+
+  searchBox.sendKeys("ChromeDriver");
+
+  searchBox.submit();
+
+  Thread.sleep(5000);  // Let the user actually see something!
+
+  driver.quit();
+
+ }
+
+}
+```
+
+### 응용 예제
+
+```java
+public List<StoreVO> getStoreList() throws Exception {
+        //drvier 설정 뒷쪽 내 크롬드라이버exe 위치
+        System.setProperty("webdriver.chrome.driver","D:\\chromedriver_win32\\chromedriver.exe");
+
+        //옵션 생성(URL data 문제 때문에 추가)
+        ChromeOptions options = new ChromeOptions();   //옵션 객체를 만들어 주고
+        options.addArguments("--remote-allow-origins=*");  // 내용을 추가한 뒤
+        WebDriver driver = new ChromeDriver(options);    // 객체에 매개 변수로 넣어준다
+
+//        WebDriver driver = new ChromeDriver();        // 옵션이 없을시 매개변수 없이 객체생성
+
+        //브라우저 켜지는 창 숨기는 옵션 추가
+//        options.addArguments("headless");      // 두개다 해줘야 한다
+//        WebDriver driver = null;
+
+        //크롬실행 객체 만들기
+//        driver = new ChromeDriver(options);
+
+        //URL 접속(접속할 곳 적어주기)
+        driver.get("https://www.bluer.co.kr/search?tabMode=multi&query=%EA%B0%95%EC%84%9C%EA%B5%AC%20%ED%99%94%EA%B3%A1%EB%8F%99&foodType=&foodTypeDetail=&feature=&location=&locationDetail=&area=&areaDetail=&ribbonType=&priceRange=&year=&evaluate=&sort=&listType=&isSearchName=false&searchMode=location&zone1=&zone2=&zone2Lat=&zone2Lng=");
+
+        List<StoreVO> storeVOList = new ArrayList<>();
+        //조건이 성립할때까지 기다림 조건이 성립하지 않으면 설정된 시간만큼 기다림
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(60));
+        //클릭이가능할때까지 대기
+//        wait.until(ExpectedConditions.elementToBeClickable(By.id("btn-sync")));
+        log.error("::::::::::{}:::::::::::", driver.getPageSource());
+        System.out.println(driver);
+
+				//창이 뜨고 바로 꺼지지 않게 5초정도 대기
+				Thread.sleep(5000);
+//
+//        //click
+//        driver.findElement(By.xpath("//*[@id=\"btn-sync\"]")).click();
+//
+//        //텍스트가 "최신정보"가 될때까지 대기
+//        wait = new WebDriverWait(driver, Duration.ofSeconds(60));
+//        wait.until(ExpectedConditions.textToBe(By.id("btn-sync"), "최신정보"));
+//
+//        WebElement element =  driver.findElement(By.className("col-lg-8"));	//ID 정보
+
+        // 드라이버 종료
+        driver.quit();
+
+//        return storeVOList;
+        return storeVOList;
+    }
+}
+```
+
+### 응용예제2
+
+```java
+public List<StoreCommentVO> getStoreComment(String storeURL) throws Exception {
+        //drvier 설정 뒷쪽 내 크롬드라이버exe 위치
+        System.setProperty("webdriver.chrome.driver","C:\\chromedriver_win32\\chromedriver.exe");
+
+//        //옵션 생성 (크롬 드라이버 버전 문제가 있는듯 data;
+        ChromeOptions options = new ChromeOptions();
+        options.addArguments("--remote-allow-origins=*");
+        //창 숨기는 옵션 추가 (댓글이 뜨지 않는 문제가 있었는데 이걸로 해결 댓글에 이미지가 포함되서 인듯)
+        options.addArguments("--disable-popup-blocking");       //팝업안띄움
+        options.addArguments("headless");                       //브라우저 안띄움
+//        options.addArguments("--disable-gpu");			//gpu 비활성화
+        options.addArguments("--blink-settings=imagesEnabled=false"); //이미지 다운 안받음
+//      크롬실행 객체 만들기
+        WebDriver driver = new ChromeDriver(options);
+//        WebDriver driver = new ChromeDriver();
+
+        try {
+            //URL 접속(접속할 곳 적어주기)
+            driver.get(storeURL);
+            // WebDriver가 요소를 찾을 때, 요소가 로드되기를 기다리는 최대 시간을 지정 implicitlyWait은 암묵적 대기를 설정하는 메서드이며, 10과 TimeUnit.SECONDS는 대기 시간을 설정하는 인자
+            driver.manage().timeouts().implicitlyWait(10, TimeUnit.SECONDS);
+
+            List<StoreCommentVO> commentList = new ArrayList<>();
+            //조건이 성립할때까지 기다림 조건이 성립하지 않으면 설정된 시간만큼 기다림 wait 객체 생성
+//          WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(60)); //조건 성립 x시 6초 대기
+
+            //class 이름 , 에 더보기 라는 값이 생성 될 떄 까지 대기
+//           wait.until(ExpectedConditions.textToBe(By.className("RestaurantReviewList__MoreReviewButton"), "더보기"));
+            //액션 추가 (움직이게 하는 기능) 액션 객체 생성
+            Actions actions = new Actions(driver);
+            //화면을 end 버튼으로 내리고 더보기 버튼 클릭 반복 (댓글을 전부 불러오기 위한 기능)
+            for (int i = 1; i <= 6; i++) {
+                WebElement moreButton = driver.findElement(By.className("RestaurantReviewList__MoreReviewButton"));
+                //너무 빨리 내리니까 댓글을 못읽는다...
+                Thread.sleep(2000);
+                actions.sendKeys(Keys.PAGE_DOWN).perform();
+                Thread.sleep(1000);
+                actions.sendKeys(Keys.PAGE_DOWN).perform();
+                // 버튼이 없을 때 반복문을 빠져나가서 시간초과 오류 잡는기능
+                if (moreButton != null && moreButton.isDisplayed()) {
+                    actions.moveToElement(moreButton).click();
+                } else {
+                    break;
+                }
+//                actions.moveToElement(driver.findElement(By.className("RestaurantReviewList__MoreReviewButton"))).click();
+            }
+
+            List<WebElement> elements = driver.findElements(By.cssSelector("a.RestaurantReviewItem__Link"));
+            for (WebElement element : elements) {
+                StoreCommentVO storeCommentVO = new StoreCommentVO();
+                String userName = element.findElement(By.className("RestaurantReviewItem__UserNickName")).getText();
+                storeCommentVO.setUserName(userName);
+                String contents = element.findElement(By.className("RestaurantReviewItem__ReviewText")).getText();
+                storeCommentVO.setContents(contents);
+                String rating = element.findElement(By.className("RestaurantReviewItem__RatingText")).getText();
+                storeCommentVO.setRating(rating);
+                String date = element.findElement(By.className("RestaurantReviewItem__ReviewDate")).getText();
+                storeCommentVO.setDate(date);
+
+                log.error("유저네임 : " + userName);
+                log.error("콘텐츠 : " + contents);
+                log.error("레이팅 : " + rating);
+                log.error("날짜 : " + date);
+                commentList.add(storeCommentVO);
+            }
+
+            //클릭이가능할때까지 대기
+//        wait.until(ExpectedConditions.elementToBeClickable(By.id("btn-sync")));
+//        System.out.println(driver);
+//        Thread.sleep(5000);
+//
+//        //click
+//        driver.findElement(By.xpath("//*[@id=\"btn-sync\"]")).click();
+//
+//        //텍스트가 "최신정보"가 될때까지 대기
+//        wait = new WebDriverWait(driver, Duration.ofSeconds(60));
+//
+//        WebElement element =  driver.findElement(By.className("col-lg-8"));	//ID 정보
+
+            // 드라이버 종료
+            return commentList;
+
+        } finally {
+            driver.quit();
+        }
+    }
+```
+
+## 네이버 자동 로그인 만들다 실패
+
+```java
+package com.example.pocketcu;
+
+import lombok.extern.log4j.Log4j2;
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.interactions.Actions;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
+import org.springframework.context.annotation.Bean;
+import org.springframework.stereotype.Component;
+
+import java.time.Duration;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+@Log4j2
+@Component
+public class PocketController {
+
+    public void startCuReservation()
+    {
+        //drvier 설정 뒷쪽 내 크롬드라이버exe 위치
+        System.setProperty("webdriver.chrome.driver","C:\\chromedriver_win32\\chromedriver.exe");
+
+        ChromeOptions options = new ChromeOptions();
+        options.addArguments("--remote-allow-origins=*");
+//        options.addArguments("--disable-extensions");
+//        options.addArguments("--disable-gpu");
+        //창 숨기는 옵션 추가 (댓글이 뜨지 않는 문제가 있었는데 이걸로 해결 댓글에 이미지가 포함되서 인듯)
+//        options.addArguments("--disable-popup-blocking");       //팝업안띄움
+//        options.addArguments("headless");                       //브라우저 안띄움
+//        options.addArguments("--disable-gpu");			//gpu 비활성화
+//        options.addArguments("--blink-settings=imagesEnabled=false"); //이미지 다운 안받음
+//      크롬실행 객체 만들기
+        WebDriver driver = new ChromeDriver(options);
+
+        try {
+            //URL 접속(접속할 곳 적어주기)
+//            driver.get("https://www.pocketcu.co.kr/product/detail/2023110035021?store_cd=&cateTyp=&chldMealEvtYn=&isNetYn=Y");
+            driver.get("https://www.pocketcu.co.kr/product/detail/2023100034162?store_cd=&cateTyp=&chldMealEvtYn=&isNetYn=Y");
+            //
+            driver.manage().timeouts().implicitlyWait(1000000, TimeUnit.SECONDS);
+
+            //조건이 성립할때까지 기다림 조건이 성립하지 않으면 설정된 시간만큼 기다림 wait 객체 생성
+             WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(60)); //조건 성립 x시 6초 대기
+
+            //class 이름 , 에 더보기 라는 값이 생성 될 떄 까지 대기
+//           wait.until(ExpectedConditions.textToBe(By.className("RestaurantReviewList__MoreReviewButton"), "더보기"));
+            //액션 추가 (움직이게 하는 기능) 액션 객체 생성
+            Actions actions = new Actions(driver);
+            //구매하기 버튼 클릭
+            driver.findElement(By.cssSelector(".btn_wrap.basic .btn.bg_37d.h_60")).click();
+            log.info("구매하기 성공");
+//            wait.until(ExpectedConditions.elementToBeClickable(By.className("btn_cart")));
+//            log.info("장바구니 성공");
+//            driver.findElement(By.className("btn_cart")).click();
+
+            // "alert_pop" 섹션이 나타날 때까지 대기
+            wait.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector(".alert_pop.on")));
+            log.info("요소 나타남");
+            driver.findElement(By.cssSelector(".alert_pop.on button[button-type='confirm']")).click();
+
+            log.info("로그인 시작");
+            wait.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector("li.naver a.go_view")));
+            driver.findElement(By.cssSelector("li.naver a.go_view")).click();
+
+            log.info("네이버 로그인 이동");
+
+            // 현재 창의 핸들을 저장
+            String mainWindowHandle = driver.getWindowHandle();
+
+            // 새로 열린 창의 핸들을 찾음
+            Set<String> allWindowHandles = driver.getWindowHandles();
+            String newWindowHandle = allWindowHandles.stream().filter(handle -> !handle.equals(mainWindowHandle)).findFirst().orElseThrow();
+
+            // 새로운 창으로 전환
+            driver.switchTo().window(newWindowHandle);
+
+            try {
+                Thread.sleep(1000); // 1초 대기
+            } catch (InterruptedException e) {
+                e.printStackTrace(); // InterruptedException 처리
+            }
+
+            // 아이디 입력
+            WebElement idInput = driver.findElement(By.id("id"));
+            idInput.sendKeys("dhk939393");
+
+            // 비밀번호 입력
+            WebElement pwInput = driver.findElement(By.id("pw"));
+            pwInput.sendKeys("kim14582367");
+
+            // 로그인 버튼 클릭
+            WebElement loginButton = driver.findElement(By.id("log.login"));
+            loginButton.click();
+            log.info("아이디 입력완료");
+
+            // 여기까지만 만듬
+
+            driver.findElement(By.cssSelector("label.form_rdo[for='tgl1']")).click();
+            log.info("픽업시간 성공");
+            driver.findElement(By.className("btn bg_37d h_60")).click();
+            log.info("최종버튼 성공");
+            //바로구매 클릭
+
+        } finally {
+            driver.quit();
+        }
+    }
+}
+```
+
+## 네이버 쿠키 파일 저장해서 로그인 시도 (실패)
+
+```java
+package com.example.pocketcu;
+
+import lombok.extern.log4j.Log4j2;
+import org.openqa.selenium.*;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.interactions.Actions;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
+import org.springframework.context.annotation.Bean;
+import org.springframework.stereotype.Component;
+
+import java.awt.*;
+import java.awt.datatransfer.StringSelection;
+import java.io.*;
+import java.text.SimpleDateFormat;
+import java.time.Duration;
+import java.util.Date;
+import java.util.Set;
+import java.util.StringTokenizer;
+import java.util.concurrent.TimeUnit;
+@Log4j2
+@Component
+public class PocketController {
+
+    public void startCuReservation()
+    {
+        //drvier 설정 뒷쪽 내 크롬드라이버exe 위치
+        System.setProperty("webdriver.chrome.driver","C:\\chromedriver_win32\\chromedriver.exe");
+
+        ChromeOptions options = new ChromeOptions();
+        options.addArguments("--remote-allow-origins=*");
+//        options.setExperimentalOption("debuggerAddress", "127.0.0.1:9222");
+//        options.addArguments("--disable-extensions");
+//        options.addArguments("--disable-gpu");
+        //창 숨기는 옵션 추가 (댓글이 뜨지 않는 문제가 있었는데 이걸로 해결 댓글에 이미지가 포함되서 인듯)
+//        options.addArguments("--disable-popup-blocking");       //팝업안띄움
+//        options.addArguments("headless");                       //브라우저 안띄움
+//        options.addArguments("--disable-gpu");			//gpu 비활성화
+//        options.addArguments("--blink-settings=imagesEnabled=false"); //이미지 다운 안받음
+//      크롬실행 객체 만들기
+        WebDriver driver = new ChromeDriver(options);
+
+        try {
+            // 쿠키 파일을 로드
+            File dataFile = new File("target/browser.data");
+            FileReader fr = new FileReader(dataFile);
+            BufferedReader br = new BufferedReader(fr);
+            String line;
+
+            while ( (line = br.readLine()) != null) {
+                StringTokenizer str = new StringTokenizer(line, ";");
+                while (str.hasMoreTokens()) {
+                    String name = str.nextToken();
+                    String value = str.nextToken();
+                    String domain = str.nextToken();
+                    String path = str.nextToken();
+                    Date expiry = null;
+                    String dt;
+                    if (!(dt = str.nextToken()).equals("null")) {
+                        SimpleDateFormat formatter =
+                                new SimpleDateFormat("E MMM d HH:mm:ss z yyyy");
+                        expiry = formatter.parse(dt);
+                    }
+
+                    boolean isSecure = new Boolean(str.nextToken()).booleanValue();
+
+                    Cookie ck = new Cookie(name, value, domain, path, expiry, isSecure);
+
+                    // 드라이버에 쿠키 전달
+                    driver.manage().addCookie(ck);
+                }
+            }
+
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+
+        try {
+            //URL 접속(접속할 곳 적어주기)
+//            driver.get("https://www.pocketcu.co.kr/product/detail/2023110035021?store_cd=&cateTyp=&chldMealEvtYn=&isNetYn=Y");
+            driver.get("https://www.pocketcu.co.kr/product/detail/2023100034162?store_cd=&cateTyp=&chldMealEvtYn=&isNetYn=Y");
+            // 대기하기
+            driver.manage().timeouts().implicitlyWait(1000000, TimeUnit.SECONDS);
+            // 쿠키 가져오기
+            driver.manage().getCookies();
+            //조건이 성립할때까지 기다림 조건이 성립하지 않으면 설정된 시간만큼 기다림 wait 객체 생성
+             WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(60)); //조건 성립 x시 6초 대기
+
+            //class 이름 , 에 더보기 라는 값이 생성 될 떄 까지 대기
+//           wait.until(ExpectedConditions.textToBe(By.className("RestaurantReviewList__MoreReviewButton"), "더보기"));
+            //액션 추가 (움직이게 하는 기능) 액션 객체 생성
+            Actions actions = new Actions(driver);
+            //구매하기 버튼 클릭
+            driver.findElement(By.cssSelector(".btn_wrap.basic .btn.bg_37d.h_60")).click();
+            log.info("구매하기 성공");
+//            wait.until(ExpectedConditions.elementToBeClickable(By.className("btn_cart")));
+//            log.info("장바구니 성공");
+//            driver.findElement(By.className("btn_cart")).click();
+
+            // "alert_pop" 섹션이 나타날 때까지 대기
+            wait.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector(".alert_pop.on")));
+            log.info("요소 나타남");
+            driver.findElement(By.cssSelector(".alert_pop.on button[button-type='confirm']")).click();
+
+            log.info("로그인 시작");
+            wait.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector("li.naver a.go_view")));
+            driver.findElement(By.cssSelector("li.naver a.go_view")).click();
+
+            log.info("네이버 로그인 이동");
+
+            // 현재 창의 핸들을 저장
+            String mainWindowHandle = driver.getWindowHandle();
+
+            // 새로 열린 창의 핸들을 찾음
+            Set<String> allWindowHandles = driver.getWindowHandles();
+            String newWindowHandle = allWindowHandles.stream().filter(handle -> !handle.equals(mainWindowHandle)).findFirst().orElseThrow();
+
+            // 새로운 창으로 전환
+            driver.switchTo().window(newWindowHandle);
+
+            try {
+                Thread.sleep(1000); // 1초 대기
+            } catch (InterruptedException e) {
+                e.printStackTrace(); // InterruptedException 처리
+            }
+
+            // 아이디 입력
+            WebElement idInput = driver.findElement(By.id("id"));
+            idInput.click();
+
+            // 클립보드에 텍스트 복사
+//            StringSelection idSelection = new StringSelection("dhk939393");
+//            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(idSelection, null);
+
+            idInput.sendKeys("dhk939393");
+            // 붙여넣기 (Ctrl + V)
+//            actions.keyDown(Keys.CONTROL).sendKeys("v").keyUp(Keys.CONTROL).perform();
+            log.info("아이디 입력 완료");
+
+            // 비밀번호 입력
+            WebElement pwInput = driver.findElement(By.id("pw"));
+//            pwInput.click();
+//            StringSelection pwSelection = new StringSelection("kim14582367");
+//            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(pwSelection,null);
+
+//            actions.keyDown(Keys.CONTROL).sendKeys("v").keyUp(Keys.CONTROL).perform();
+
+            pwInput.sendKeys("kim14582367");
+
+            // 로그인 버튼 클릭
+            WebElement loginButton = driver.findElement(By.id("log.login"));
+            loginButton.click();
+            log.info("아이디 입력완료");
+
+            // 여기까지만 만듬
+
+            // 쿠키 정보를 파일로 저장
+            File dataFile = new File("target/browser.data");
+            // 부모 디렉토리가 없으면 생성
+            dataFile.getParentFile().mkdirs();
+            try {
+                dataFile.delete();
+                dataFile.createNewFile();
+                FileWriter fos = new FileWriter(dataFile);
+                BufferedWriter bos = new BufferedWriter(fos);
+
+                for (Cookie ck : driver.manage().getCookies()) {
+                    bos.write((ck.getName() + ";" + ck.getValue() + ";" + ck.getDomain()
+                            + ";" + ck.getPath() + ";" + ck.getExpiry() + ";" + ck.isSecure() ) );
+                    bos.newLine();
+                }
+                bos.flush();
+                bos.close();
+                fos.close();
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+
+            driver.findElement(By.cssSelector("label.form_rdo[for='tgl1']")).click();
+            log.info("픽업시간 성공");
+            driver.findElement(By.className("btn bg_37d h_60")).click();
+            log.info("최종버튼 성공");
+            //바로구매 클릭
+
+        } finally {
+            driver.quit();
+        }
+    }
+}
+```
+
+### 오류. (URL data:, 로 멈추는 경우)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381057/notion-blog/_/_/Spring_/Spring_Selenium/_/Untitled_1.png)
+
+```java
+창이 실행되고 저 상태로 멈추는 경우가 있다.
+
+버전을 업그레이드 하라는 글이 많았지만 결과적으로는 다른 방법으로 해결했다.
+
+스택 트레이스
+java.io.IOException: Invalid Status code=403 text=Forbidden
+	at org.asynchttpclient.netty.handler.WebSocketHandler.abort(WebSocketHandler.java:92) ~[async-http-client-2.12.3.jar:na]
+	at org.asynchttpclient.netty.handler.WebSocketHandler.handleRead(WebSocketHandler.java:118) ~[async-http-client-2.12.3.jar:na]
+	at org.asynchttpclient.netty.handler.AsyncHttpClientHandler.channelRead(AsyncHttpClientHandler.java:78) ~[async-http-client-2.12.3.jar:na]
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:444) ~[netty-transport-4.1.92.Final.jar:4.1.92.Final]
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420) ~[netty-transport-4.1.92.Final.jar:4.1.92.Final]
+	at io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:412) ~[netty-transport-4.1.92.Final.jar:4.1.92.Final]
+	at io.netty.channel.CombinedChannelDuplexHandler$DelegatingChannelHandlerContext.fireChannelRead(CombinedChannelDuplexHandler.java:436) ~[netty-transport-4.1.92.Final.jar:4.1.92.Final]
+	at io.netty.handler.codec.ByteToMessageDecoder.fireChannelRead(ByteToMessageDecoder.java:346) ~[netty-codec-4.1.92.Final.jar:4.1.92.Final]
+	at io.netty.handler.codec.ByteToMessageDecoder.fireChannelRead(ByteToMessageDecoder.java:333) ~[netty-codec-4.1.92.Final.jar:4.1.92.Final]
+	at io.netty.handler.codec.ByteToMessageDecoder.callDecode(ByteToMessageDecoder.java:454) ~[netty-codec-4.1.92.Final.jar:4.1.92.Final]
+	at io.netty.handler.codec.ByteToMessageDecoder.channelRead(ByteToMessageDecoder.java:290) ~[netty-codec-4.1.92.Final.jar:4.1.92.Final]
+	at io.netty.channel.CombinedChannelDuplexHandler.channelRead(CombinedChannelDuplexHandler.java:251) ~[netty-transport-4.1.92.Final.jar:4.1.92.Final]
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:442) ~[netty-transport-4.1.92.Final.jar:4.1.92.Final]
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420) ~[netty-transport-4.1.92.Final.jar:4.1.92.Final]
+	at io.netty.channel.AbstractChannelHandlerContext.fireChannelRead(AbstractChannelHandlerContext.java:412) ~[netty-transport-4.1.92.Final.jar:4.1.92.Final]
+	at io.netty.channel.DefaultChannelPipeline$HeadContext.channelRead(DefaultChannelPipeline.java:1410) ~[netty-transport-4.1.92.Final.jar:4.1.92.Final]
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:440) ~[netty-transport-4.1.92.Final.jar:4.1.92.Final]
+	at io.netty.channel.AbstractChannelHandlerContext.invokeChannelRead(AbstractChannelHandlerContext.java:420) ~[netty-transport-4.1.92.Final.jar:4.1.92.Final]
+	at io.netty.channel.DefaultChannelPipeline.fireChannelRead(DefaultChannelPipeline.java:919) ~[netty-transport-4.1.92.Final.jar:4.1.92.Final]
+	at io.netty.channel.nio.AbstractNioByteChannel$NioByteUnsafe.read(AbstractNioByteChannel.java:166) ~[netty-transport-4.1.92.Final.jar:4.1.92.Final]
+	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:788) ~[netty-transport-4.1.92.Final.jar:4.1.92.Final]
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:724) ~[netty-transport-4.1.92.Final.jar:4.1.92.Final]
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:650) ~[netty-transport-4.1.92.Final.jar:4.1.92.Final]
+	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:562) ~[netty-transport-4.1.92.Final.jar:4.1.92.Final]
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:997) ~[netty-common-4.1.92.Final.jar:4.1.92.Final]
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74) ~[netty-common-4.1.92.Final.jar:4.1.92.Final]
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30) ~[netty-common-4.1.92.Final.jar:4.1.92.Final]
+	at java.base/java.lang.Thread.run(Thread.java:834) ~[na:na]
+
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381057/notion-blog/_/_/Spring_/Spring_Selenium/_/Untitled_2.png)
+
+```java
+//옵션 생성
+ChromeOptions options = new ChromeOptions();
+options.addArguments("--remote-allow-origins=*");
+WebDriver driver = new ChromeDriver(options);
+
+위 코드를 옵션으로 추가 해줬다.
+```

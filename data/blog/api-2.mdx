@@ -1,0 +1,118 @@
+---
+title: '주소API(다음) 사용하기'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# 주소 API 기본 셋팅
+
+## 1.다음 주소 API 에 들어가서 원하는 방식의 API 를 찾는다
+
+[Daum 우편번호 서비스](https://postcode.map.daum.net/guide)
+
+![Untitled](<%EC%A3%BC%EC%86%8CAPI(%EB%8B%A4%EC%9D%8C)%20%EC%82%AC%EC%9A%A9%ED%95%98%EA%B8%B0/Untitled.png>)
+
+## 2.필요한 페이지에서 출력하기
+
+```java
+주소 API 를 붙여넣을 jsp 를 만든뒤 붙여넣는다
+
+그리고 API 를 사용 할 페이지에 ex) : <c:import url="common/address.jsp"></c:import>
+
+를 하여 페이지에 출력되도록 한다.
+```
+
+![Untitled](<%EC%A3%BC%EC%86%8CAPI(%EB%8B%A4%EC%9D%8C)%20%EC%82%AC%EC%9A%A9%ED%95%98%EA%B8%B0/Untitled%201.png>)
+
+![Untitled](<%EC%A3%BC%EC%86%8CAPI(%EB%8B%A4%EC%9D%8C)%20%EC%82%AC%EC%9A%A9%ED%95%98%EA%B8%B0/Untitled%202.png>)
+
+# 입력한 주소를 세션과 쿠키에 저장하기
+
+```java
+입력한 주소를 세션과 쿠기에 저장해서 다음에 자동으로 뜨게 한다.
+```
+
+## 1.API 에 추가적인 코드를 작성한다.
+
+```java
+위의 API 기본 셋팅에서 선택하고 붙여넣어 만들어준 jsp 에 추가적인 코드를 추가해준다.
+```
+
+```java
+// 추가
+console.log("data.zonecode = " + data.zonecode);
+console.log("addr = " + addr);
+
+$.ajax({
+    url: "/addressModify",
+    data: {address1 : data.zonecode , address2 : addr},
+    type: "post"
+})
+.done(function(){
+    $(".address1").text(addr);
+	address1 = data.zonecode;
+})
+.fail(function(){
+    alert("실패");
+})
+// 추가
+```
+
+## 2.추가로 작성한 코드를 받을 컨트롤러를 작성해준다.
+
+```java
+추가로 작성한 코드가 Ajax 로 호출 할 컨틀롤러를 만들어준다.
+```
+
+```java
+		@ResponseBody                 // 메서드의 반환 값을 응답 본문에 직접 작성해야 함을 나타냄
+    @PostMapping("/addressModify")
+    public void addressModify(String address1, String address2, HttpServletResponse response, HttpSession session)   // 'address1' 및 'address2' 매개변수는 사용자가 제공한 주소 정보 , response 매개변수는 클라이언트에 응답을 다시 보내는 데 사용되며 session 매개변수는 사용자의 세션을 나타냄
+            throws UnsupportedEncodingException {
+//		address1 = 우편번호
+//		address2 = 주소
+
+        System.out.println("address1 =" + address1);
+        System.out.println("address2 =" + address2);
+
+        String address = "{\"address1\" : \"" + address1 + "\",\"address2\" : \"" + address2 + "\"}";
+
+        // 쿠키에 JSON으로 저장
+        Cookie cookie = new Cookie("BMaddress", URLEncoder.encode(address, "UTF-8"));
+
+        int age = 60 * 60 * 24 * 7; // 일주일
+        cookie.setMaxAge(age);
+
+        response.addCookie(cookie);
+
+        // 세션에 map으로 저장
+        Map<String, String> addMap = new HashMap<>();
+        addMap.put("address1", address1);
+        addMap.put("address2", address2);
+        session.setMaxInactiveInterval(3600 * 3); // 3시간
+        session.setAttribute("BMaddress", addMap);
+    }
+```
+
+### 추가설명
+
+```java
+String address = "{\"address1\" : \"" + address1 + "\",\"address2\" : \"" + address2 + "\"}";
+
+넘어온 우편번호와 주소를 json형태로 변환함
+
+\ (이스케이프) 를 사용해서 "address1" 처럼 문자열로 만들어줌
+```
+
+```java
+Cookie cookie = new Cookie("BMaddress", URLEncoder.encode(address, "UTF-8"));
+
+세션은 오브젝트도 저장할수 있지만 쿠키는 문자열만 저장할수있고
+
+쿠키 문자열에 공백이나 특수문자가 들어가게 되면 에러가 나서 URLEncoder로 변환후 저장해야 함
+
+쿠키의값을 꺼낼때는 다시 URLDecoder로 변환함
+```

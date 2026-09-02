@@ -1,0 +1,1041 @@
+---
+title: '2023-04-25(AWS배포)'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# AWS 배포
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled.png>)
+
+### 1. AWS 가입
+
+```java
+- 해외 승인 카드 필요
+- 주소는 영어로
+- 가입 국가는 한국(대한민국)
+- 기본 지원 무료
+```
+
+### 2. 로그인
+
+```jsx
+1. 루트 사용자 체크
+2. 가입한 이메일 입력
+```
+
+### 3. RDS 대시보드
+
+```jsx
+1. 우측 상단의 지역을 한국(서울)로 꼭 꼭 꼭 변경
+```
+
+### 4. DB 생성
+
+- Oracle DB
+
+  ```jsx
+  1. RDS 대시보드에서 Database 생성 클릭
+  2. 표준 생성 선택
+  3. 엔진옵션 - 사용할 DB 선택
+  		- oracle
+  		- 12버전 선택
+  4. 템플릿
+  		- 프리티어 선택
+
+  5. DB 인스턴스 식별자
+  		- 중복 X
+  		- dk-oracle
+  6. 마스터 사용자 이름
+  		- 로그인 ID
+  		- admin
+
+  7. 암호 입력
+  		- oracle1234
+
+  8. 할당된 스토리지
+  		- 20G
+
+  9. 스토리지 자동 조정 활성화 체크 해제
+  		- 돈이 나갈 수 있음
+
+  10. 퍼블릭 액세스를 '예' 로 체크
+
+  11. 데이터베이스 인증 - 암호인증
+
+  12. 추가 구성
+  	a) 초기데이터베이스 이름- orcl
+  	b) 문자집합 - UTF-8
+
+  13. 자동백업을 활성화 체크 해제
+
+  14. 암호화 활성화 체크 해제
+
+  15. 성능 개선 도우미 체크 해제
+
+  16. 삭제 방지 활성화 체크 해제
+
+  ```
+
+- Mysql DB
+
+  ```jsx
+  Workbench
+  https://dev.mysql.com/downloads/workbench/
+
+  **dbeaver
+  https://dbeaver.io/
+
+  Database > New Database Connection > mysql 선택
+
+  Time_Zone 확인
+  SELECT @@GLOBAL.time_zone, @@SESSION.time_zone;
+  SELECT now()
+
+  => AWS에서 Time_Zone 수정해야함 (04/26 오전 10시 분 참고)**
+  ```
+
+[AWS 시험 (1)](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/AWS%20%EC%8B%9C%ED%97%98%20(1)%20178b8831130747429fe5fc46267911b2.md>)
+
+# EC2 생성
+
+### 1. 지역 변경
+
+```markdown
+로그인 후 우축 상단의 리전을 서울로 변경
+```
+
+### 2. 검색창에 ec2 를 검색하거나, 콘솔 홈에서 ec2 선택
+
+```markdown
+EC2 대시보드에서 인스턴트 시작
+```
+
+![ec2_1.png](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/ec2_1.png>)
+
+### 3. Name and Tags
+
+```markdown
+EC2 인스턴스의 이름을 지정한다.
+여러개의 인스턴스가 있을 수 있기 때문에 구분 할 수 있는 이름을 지정
+적당한 이름으로 지정
+```
+
+![ec2_2_name.png](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/ec2_2_name.png>)
+
+### 4. **애플리케이션 및 OS 이미지(Amazon Machine Image)**
+
+```markdown
+EC2 에서 사용할 OS 선택
+Ubuntu 선택
+다른 것 선택 가능, Free tier가 있는 이미지
+```
+
+![ec2_3_os.png](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/ec2_3_os.png>)
+
+### 5. 인스턴스 유형
+
+```markdown
+t2.micro (프리티어 선택)
+```
+
+![ec2_4_instance.png](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/ec2_4_instance.png>)
+
+### 6. 키페어 생성
+
+```markdown
+1. 콘솔로 접속 시 보안 접속을 위한 키페어
+2. 보관을 잘 해야 함
+
+새 키페어 생성 -> 키페어 이름 작성 -> 파일형식 pem 선택 -> 키페어 생성 -> 원하는곳에 파일저장
+
+파일 형식
+a. pem
+맥 또는 linux 에서 terminal 사용(window에서도 사용 가능)
+b. ppk
+windows에서 putty 사용
+```
+
+![ec2_5_key.png](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/ec2_5_key.png>)
+
+![ec2_6_key.png](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/ec2_6_key.png>)
+
+### 7. 네트워크 설정
+
+```markdown
+특별히 설정 할 것 없음
+HTTP 서버를 사용하려면 체크 (80포트 오픈)
+```
+
+![ec2_7_network.png](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/ec2_7_network.png>)
+
+### 8. 스토리지 구성
+
+```markdown
+EBS는 인스턴스 내부 저장장치가 아닌 네트워크로 연결된 가상 저장 장치이다.
+이러한 특징 때문에 인스턴스를 삭제하더라도 EBS는 따로 남아있기 때문에 데이터 자체를 보존할 수 있고
+인스턴스 업그레이드가 용이하다는 장점이 있다.
+
+또한 인스턴스 입장에서 여러 개의 EBS를 연결시거나, 하나의 EBS를 여러 개의 인스턴스로 연결이 가능하다.
+
+EBS는 종류에따라 나뉜다.
+범용(GP2, SSD) - 일반적으로 사용됨.
+프로비전된 IOPS(Provisioned IOPS, SSD) - IOPS가 중요한 경우 (IOPS: 저장장치의 성능)
+쓰로풋 최적화 HDD (Throughput Optimized HDD, SSD)
+콜드 HDD (HDD)
+마그네틱 (HDD) - 가장 저렴하지만 IOPS가 낮음
+
+범용(GP2) 선택 후 용량 30 입력(Free tier 최대 용량)
+```
+
+![ec2_8_storage.png](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/ec2_8_storage.png>)
+
+### 9. 요약 확인 후 생성
+
+```markdown
+요약 확인 후 생성
+```
+
+![ec2_9_confirm.png](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/ec2_9_confirm.png>)
+
+# EC2 접속
+
+```markdown
+AWS 인스턴스이 정보에 연결을 클릭하면 연결 정보를 볼 수 있음
+```
+
+![ec2_conn_1.png](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/ec2_conn_1.png>)
+
+### 1. Mac
+
+```markdown
+1. Terminal에서 다운 받은 키페어가 있는 디렉터리로 이동 또는 확인
+
+ssh -i ~/디렉터리경로/키페어이름.pem id@public DNS
+
+2. WARNING: UNPROTECTED PRIVATE KEY FILE! 에러 발생할 경우 권한 변경 후 재 접속
+   chmod 400 키페어이름.pem
+
+# Mac 용 putty 사용 가능
+```
+
+### 2. Windows
+
+```markdown
+1. putty 다운 후 설치
+```
+
+[Download PuTTY: latest release (0.78)](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html)
+
+```markdown
+2. pem 파일을 ppk로 변경
+
+a. puttygetn.exe 실행
+b. RSA 선택 후 load 버튼
+c. 다운로드한 키페어.pem 선택
+d. 확인을 클릭해서 키 생성
+e. Save private key 클릭
+f. 경고창이 뜨면 예를 클릭
+g. ppk 확장자로 파일 저장
+
+3. putty 접속
+   a. putty 실행
+   b. putty의 Host Name에 연결 정보 입력
+   c. connection -> SSH -> Auth에 Private key file에 Browser 버튼으로 PPK 파일 찾기
+   d. 만일 Auth에 Browser 버튼이 없으면 Auth -> Credentials -> Private key file에 Browser 버튼 있음
+   e. open클릭
+```
+
+```java
+* save한 ubuntu 만일 접속 안된다면 load하고, 퍼블릭 IPv4 DNS 다시 입력
+```
+
+# EC2 JDK
+
+```java
+# Open JDK는 교육용이며 무료
+# Oracle JDK 상업용이며 유료, OpenJDK를 기반으로 만듬
+# 패치등 장기 지원은 Oracle JDK
+
+sudo apt-get update
+
+#sudo apt-get install openjdk-버전-jdk
+
+sudo apt-get install openjdk-11-jdk
+
+java -version
+```
+
+# EC2 ubuntu 기본명령어
+
+```java
+* save한 ubuntu 만일 접속 안된다면 load하고, 퍼블릭 IPv4 DNS 다시 입력
+```
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%201.png>)
+
+```java
+* 파일 권한
+
+사용자 그룹 그외사용자
+r: 읽기
+w: 쓰기
+x: 실행
+
+ex) project 라는 폴더
+drwxrwxr-x 3 ubuntu ubuntu
+d -> 디렉토리(폴더)
+rwx -> 사용자는 읽기 쓰기 실행 권한
+rwx -> 그룹은 읽기 쓰기 실행 권한
+r-x -> 그외사용자는 읽기 실행 권한
+ubuntu ubuntu -> ubuntu라는 사용자는 ubuntu라는 그룹에 속한다
+```
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%202.png>)
+
+```java
+* mkdir : 디렉토리 만들기
+* chmod OOO 파일/폴더명 : 파일이나 폴더 권한 변경
+* pwd   : 현재위치
+* cd    : 디렉토리 변경
+```
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%203.png>)
+
+```java
+* ls -al: 현재 디렉토리의 파일과 디렉토리를 자세한 정보와 함께 나열하는 명령어
+* ls -l : 위와 동일하나 숨김 파일 및 디렉토리가 나타나지 않음
+```
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%204.png>)
+
+```java
+* touch 파일: 빈 파일 생성
+```
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%205.png>)
+
+```java
+* rm -r 폴더명: 폴더지우기
+* rm 파일명   : 파일지우기
+* rm -rf 폴더명: 폴더 강제 지우기 (폴더 안에 폴더,,파일,,있어도)
+```
+
+# EC2 TimeZone
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%206.png>)
+
+```java
+기본 미국시간
+
+# 시간 설정 보기
+timedatectl
+
+# 서울 시간 명칭 찾기 // 서울이 포함된 애들을 찾아주세요
+timedatectl list-timezones | grep Seoul
+
+# 서울 시간 세팅
+sudo timedatectl set-timezone Asia/Seoul
+```
+
+# EC2 FTP
+
+```java
+FTP Client 다운 후 설치
+```
+
+[FileZilla - The free FTP solution](https://filezilla-project.org/)
+
+```java
+1. FTP Client 프로그램 실행
+2. 파일 -> 사이트 관리자 열기
+3. 새사이트
+		프로토콜   : SFTP - SSH File Transfer Protocol
+		호스트     : EC2의 public IPv4 DNS
+		포트       : 비워둠
+		로그온유형 : 키파일
+		사용자     : ubuntu
+		키파일     : putty에서 사용한 PPK 파일
+
+# 파일 업로드시 권한 에러
+sudo chmod -R 777 디렉터리경로
+```
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%207.png>)
+
+![<putty와 ftp 연결>](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%208.png>)
+
+<putty와 ftp 연결>
+
+![<서버에 내pc의 파일 보내보기>](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%209.png>)
+
+<서버에 내pc의 파일 보내보기>
+
+![<정상적으로 putty에 파일 온 것을 확인>](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2010.png>)
+
+<정상적으로 putty에 파일 온 것을 확인>
+
+![<받은 파일 삭제>](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2011.png>)
+
+<받은 파일 삭제>
+
+---
+
+# EC2 ubuntu & ftp 프로젝트 배포
+
+## 프로젝트 배포
+
+```java
+* sts에서 maven clean -> maven install 하여서 war 파일 생성
+(프로젝트폴더 > target > .war 파일)
+```
+
+![<war 파일 서버로 업로드>](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2012.png>)
+
+<war 파일 서버로 업로드>
+
+![<putty에서 확인>](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2013.png>)
+
+<putty에서 확인>
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2014.png>)
+
+```java
+* sudo apt update
+=> 우분투 패키지 업데이트
+
+* sudo apt-get install openjdk-11-jdk
+
+* sudo java version
+```
+
+![< WAR 파일 압축 해제 >](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2015.png>)
+
+< WAR 파일 압축 해제 >
+
+![< 퍼블릭 IPv4 DNS로 접속 >](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2016.png>)
+
+< 퍼블릭 IPv4 DNS로 접속 >
+
+---
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2017.png>)
+
+```markdown
+재연결시 삼각형이나 사이트 관리자 열어서 ubuntu와 연결
+```
+
+# EC2 Docker
+
+```java
+1. Docker 구 버전 삭제
+sudo apt-get remove docker docker-engine docker.io containerd runc
+
+2.
+sudo apt-get update
+
+3.
+sudo apt-get install ca-certificates
+sudo apt-get install curl
+sudo apt-get install gnupg
+
+4.
+sudo mkdir -m 0755 -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+#curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -   : blog
+sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable"
+
+5.
+sudo apt-get update
+
+docker를 설치 할 수 있게 policy 수정
+apt-cache policy docker-ce
+
+docker 설치
+sudo apt install docker-ce
+
+docker 서비스 상태 확인
+sudo systemctl status docker
+
+# sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin  : AWS 공식사이트
+
+```
+
+## Oracle
+
+```java
+1. Oracle image Down
+sudo docker pull gvenzl/oracle-xe
+sudo docker pull wnameless/oracle-xe-11g-r2
+
+2. Container 생성
+sudo docker run -d -p 1521:1521 -e ORACLE_PASSWORD=oracle --name db gvenzl/oracle-xe
+```
+
+# EC2 GIT
+
+## 1. GIT 설치
+
+![<3. global user 등록>](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2018.png>)
+
+<3. global user 등록>
+
+![<4. 폴더 생성>](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2019.png>)
+
+<4. 폴더 생성>
+
+![<5. 해당 폴더 이동 후 git init>](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2020.png>)
+
+<5. 해당 폴더 이동 후 git init>
+
+![<6. git remote add origin github주소>](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2021.png>)
+
+<6. git remote add origin github주소>
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2022.png>)
+
+![<7. git pull origin 브랜치명>](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2023.png>)
+
+<7. git pull origin 브랜치명>
+
+```java
+1. git version 확인
+
+	git --version
+	# 기본 설치 되어 있음
+
+2. git 설치
+
+	sudo apt install git
+
+3. global user 등록
+A
+	$ git config --global user.name
+	$ git config --global user.email
+
+B.
+	$ git config --list
+
+4. 폴더 생성
+
+5. 해당 폴더 이동 후 git init
+
+6. git remote add origin github주소
+
+7. git pull origin 브랜치명
+```
+
+```java
+*mvnw : 리눅스용 (맥용)
+-스프링 부트(Spring Boot) 프로젝트에서 사용되는 Maven Wrapper의 실행 가능한 스크립트
+- Maven Wrapper는 프로젝트에 내장된 스크립트&라이브러리를 사용하여 Maven을 설치&실행
+  프로젝트를 빌드하는데 사용되는 Maven 버전이나 설정이 일관되게 유지 가능
+
+*mvnw.cmd: 윈도우용
+```
+
+# EC2 Spring 배포(GIT 연동해서)
+
+```java
+1. github에서 pull
+2. mvnw 실행시 권한 변경
+chmod u+x mvnw
+chmod 777 mvnw
+
+3. build 실행
+./mvnw clean install
+
+4. target 폴더에 ***.jar 생성 확인
+
+5. 원하는 폴더로 이동 해도 되고 안해도 됨
+
+6. 운영서버용 properties 파일을 FTP로 ***.jar로 전송
+ex) application-server.properties
+
+7. 서버 실행
+sudo java -jar ***.jar --spring.profiles.active=프로파일명
+ex) sudo java -jar ***.jar --spring.profiles.active=server
+
+https://mj-youn.github.io/spring-boot-properties-%EC%84%A4%EC%A0%95
+
+# 외부 파일의 위치 알려 주는 형식(아직 X)
+java -jar -Dspring.config.location=/home/test/test.properties &
+
+# 프로파일명으로 구분 (아직 X)
+java -jar StudyBoot-0.0.2-SNAPSHOT.war --spring.profiles.active=prod
+```
+
+![<2. mvnw 실행시 권한 변경>](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2024.png>)
+
+<2. mvnw 실행시 권한 변경>
+
+![<3. build 실행>](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2025.png>)
+
+<3. build 실행>
+
+```java
+1. **default**
+./mvnw clean install
+
+2**. 특정한 properties**
+./mvnw clean install -Dspring.profiles.active=프로파일명
+
+3. **Build시 Test Skip**
+	1) **./mvnw clean install -Dmaven.test.skip=true**
+	2) ./mvnw clean install -DskipTests
+	3) pom.xml에 plugin 추가
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<skipTests>true</skipTests>
+				</configuration>
+			</plugin>
+```
+
+![<4. target 폴더에 ***.war생성 확인>](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2026.png>)
+
+<4. target 폴더에 \*\*\*.war생성 확인>
+
+![<5. 원하는 폴더로 이동 해도 되고 안해도 됨 //project 폴더 만들어서 여기로 이동시킴>](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2027.png>)
+
+<5. 원하는 폴더로 이동 해도 되고 안해도 됨 //project 폴더 만들어서 여기로 이동시킴>
+
+![<6. 압축 푸는데 application-dev.properties가 없다 >](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2028.png>)
+
+<6. 압축 푸는데 application-dev.properties가 없다 >
+
+```java
+밑에 해결 방법 (밑에 백링크도 참고)
+이건 실제 예시는 아님 , 실제 예시는 맨 밑에 application-prod.properties 참고
+```
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2029.png>)
+
+```java
+project 폴더 만들어서 두 파일 모두 복붙함
+application.properties는 포트번호 81로 바꾼다
+```
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2030.png>)
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2031.png>)
+
+```java
+java -jar 로 풀었을 때 포트번호 81로 풀린다
+
+=> 즉, 같은 이름의 properties 파일이 있다면
+우선순위는 war 파일과 같은 위치에 있는 properties 파일이 우선순위가 더 높다
+
+## 1. properties 우선 순위
+
+1. war파일과 같은 위치에 있는 application.properties
+2. Testcase 폴더내에 위치한 application.properties (Test 시)
+3. classpath 내에 config 폴더에 위치한 application.properties
+4. classpath 내에 config 폴더에 위치한 application-{profile명}.properties
+5. classpath 내에 위치한 application.properties
+6. classpath 내에 위치한 application-{profile명}.properties
+
+=> 밑에 application-prod.properties 는 6번에 해당
+```
+
+---
+
+```java
+배포할때를 가정하여 application.properties 작성해야함 (하단 목차에 자세히 설명)
+* a**pplication-prod.properties**에 작성
+
+# port 변경
+server.port=80
+
+# Encoding 설정G
+server.servlet.encoding.charset=UTF-8
+server.servlet.encoding.force=true
+
+# JSP 연결
+spring.mvc.view.prefix=/WEB-INF/views/
+spring.mvc.view.suffix=.jsp
+
+#log level
+logging.level.root=info
+#logging.pattern.console=%msg%n
+
+#FileUpload
+## Multipart 사용 여부
+spring.servlet.multipart.enabled=true
+## 파일 하나당 최대 크기 설정
+spring.servlet.multipart.max-file-size=3MB
+## 총 파일 최대 크기 설정
+spring.servlet.multipart.max-request-size=20MB
+
+#파일 저장 경로
+app.upload=///production/upload/
+app.upload.notice=///production/upload/notice
+app.upload.qna=///production/upload/qna
+
+## 요청시 파일 경로
+app.upload.base=file:///production/upload/
+
+app.url.path=/file/**
+
+## transaction 처리
+spring.aop.proxy-target-class=true
+
+## message 설정
+spring.messages.basename=messages/message
+spring.messages.encoding=UTF-8
+spring.messages.use-code-as-default-message=true
+spring.messages.cache-duration=600
+
+# DB
+# username
+spring.datasource.hikari.username=admin
+# password
+spring.datasource.hikari.password=maria1234
+# url
+spring.datasource.url=jdbc:mariadb://gdj60mj.cerolrldoylw.ap-northeast-2.rds.amazonaws.com:3306/db
+# driver
+spring.datasource.driver-class-name=org.mariadb.jdbc.Driver
+
+## Mapper, Config 설정
+mybatis.mapper-locations=classpath:database/mappers/*Mapper.xml
+mybatis.config-location=classpath:database/config/MybatisConfig.xml
+```
+
+![<프로젝트 폴더에 resources의 [application-prod.properties](http://application-prod.properties)를 ubuntu 폴더 project에 업로드>](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2032.png>)
+
+<프로젝트 폴더에 resources의 [application-prod.properties](http://application-prod.properties)를 ubuntu 폴더 project에 업로드>
+
+![< putty에 도착 >](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2033.png>)
+
+< putty에 도착 >
+
+```java
+개발 설정, 배포 설정이 다른 경우
+환경별로 properties파일을 생성하고 실행 시 선택하거나, 조정 할 수 있음
+
+application-{profile명}.properties
+
+1. profile 선택
+**a. application.properties 내에서**
+	 spring.profiles.active=profile명
+
+**b. build 시 선택**
+
+**c. war 실행시 선택**
+	 **java -jar app.war --spring.profiles.active=프로파일명
+
+우리는 C방법**
+```
+
+[\*\*application-prod.properties](http://ㄴapplication-prod.properties)가 적용되어야 되는데 자꾸 [appication-dev.properties](http://appication-dev.properties) 를 읽어서 안된다 ⇒ GIT에서 당겨오는 방법 사용하자\*\*
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2034.png>)
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2035.png>)
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2036.png>)
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2037.png>)
+
+[‣](https://app.notion.com/p/0408d74e5fd141e090a7caceb6df8212?pvs=21)
+
+```markdown
+GDJ60_BOOT : 깃에서 pull로 당겨올때 쓰는 폴더
+project : 실제 배포하는 폴더 (war파일과 properties 파일 필요)
+```
+
+```markdown
+명령어 스크립트 (복붙용)
+cd GDJ60_BOOT2/
+git pull origin master
+./mvnw clean install -Dmaven.test.skip=true
+cd target/
+mv GDJ60_Boot2-0.0.1-SNAPSHOT.war ~/project
+cd ~/project/
+ls (=>application-prod.properties 파일로 존재하지 확인)
+sudo java -jar GDJ60_Boot2-0.0.1-SNAPSHOT.war --spring.profiles.active=prod
+```
+
+---
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2038.png>)
+
+```java
+깃에 올린 파일이 변경되었으면 pull로 당길때 바뀐 내역 보여줌
+```
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2039.png>)
+
+```markdown
+ubuntu에서 실행 중일때 '퍼블릭 IPv4 DNS' 아이피로 접속해서 글작성하면
+파일폴더는 우분투 경로에 저장
+```
+
+---
+
+## application.properties
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2040.png>)
+
+```markdown
+1. 기본
+2. 개발환경
+3. 배포환경
+```
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2041.png>)
+
+```markdown
+**\* application.properties**
+공백
+```
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2042.png>)
+
+```markdown
+**\* application-dev.properties (개발버전)**
+
+# port 변경
+
+server.port=80
+
+# DB
+
+# username
+
+spring.datasource.hikari.username=admin
+
+# password
+
+spring.datasource.hikari.password=maria1234
+
+# url
+
+#spring.datasource.url=jdbc:mariadb://gdj60mj.cerolrldoylw.ap-northeast-2.rds.amazonaws.com:3306/db
+
+# driver
+
+#spring.datasource.driver-class-name=org.mariadb.jdbc.Driver
+
+#로그 찍기 위해 DB연결 정보 수정
+spring.datasource.driver-class-name=net.sf.log4jdbc.sql.jdbcapi.DriverSpy
+spring.datasource.url=jdbc:log4jdbc:mariadb://gdj60mj.cerolrldoylw.ap-northeast-2.rds.amazonaws.com:3306/db
+
+log4jdbc.spylogdelegator.name=net.sf.log4jdbc.log.slf4j.Slf4jSpyLogDelegator
+log4jdbc.dump.sql.maxlinelength=0
+
+# Web 요청이 발생할 경우 설정
+
+logging.level.org.springframework.web=debug
+
+# post 방식으로 요청 했을 경우 파라미터의 종류가 많아질 경우 생략 될수도 있다
+
+#logging.level.org.springframework.web=TRACE
+#spring.mvc.log-request-details=false
+
+logging.level.jdbc=OFF
+logging.level.jdbc.sqlonly=OFF  
+logging.level.jdbc.sqltiming=DEBUG  
+logging.level.jdbc.audit=OFF  
+logging.level.jdbc.resultset=OFF  
+logging.level.jdbc.resultsettable=DEBUG
+logging.level.jdbc.connection=OFF  
+#logging.level.org.hibernate.SQL=DEBUG
+#logging.level.org.hibernate.type.descriptor.sql.BasicBinder=TRACE
+logging.level.com.zaxxer.hikari=OFF
+logging.level.javax.sql.DataSource=INFO
+
+## Mapper, Config 설정
+
+mybatis.mapper-locations=classpath:database/mappers/\*Mapper.xml
+mybatis.config-location=classpath:database/config/MybatisConfig.xml
+
+# Encoding 설정
+
+server.servlet.encoding.charset=UTF-8
+server.servlet.encoding.force=true
+
+#spring.config.import=classpath:application-dev.properties
+
+# JSP 연결
+
+spring.mvc.view.prefix=/WEB-INF/views/
+spring.mvc.view.suffix=.jsp
+
+#log level
+logging.level.root=info
+#logging.pattern.console=%msg%n
+
+#FileUpload
+
+## Multipart 사용 여부
+
+spring.servlet.multipart.enabled=true
+
+## 파일 하나당 최대 크기 설정
+
+spring.servlet.multipart.max-file-size=3MB
+
+## 총 파일 최대 크기 설정
+
+spring.servlet.multipart.max-request-size=20MB
+
+#파일 저장 경로
+app.upload=C:/production/upload/
+app.upload.notice=C:/production/upload/notice
+app.upload.qna=C:/production/upload/qna
+
+## 요청시 파일 경로
+
+app.upload.base=file:///C:/production/upload/
+
+app.url.path=/file/\*\*
+
+## transaction 처리
+
+spring.aop.proxy-target-class=true
+
+## message 설정
+
+spring.messages.basename=messages/message
+spring.messages.encoding=UTF-8
+spring.messages.use-code-as-default-message=true
+spring.messages.cache-duration=600
+```
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2043.png>)
+
+```markdown
+**\* application-prod.properties (배포버전)**
+
+# port 변경
+
+server.port=80
+
+# Encoding 설정
+
+server.servlet.encoding.charset=UTF-8
+server.servlet.encoding.force=true
+
+# JSP 연결
+
+spring.mvc.view.prefix=/WEB-INF/views/
+spring.mvc.view.suffix=.jsp
+
+#log level
+logging.level.root=info
+#logging.pattern.console=%msg%n
+
+#FileUpload
+
+## Multipart 사용 여부
+
+spring.servlet.multipart.enabled=true
+
+## 파일 하나당 최대 크기 설정
+
+spring.servlet.multipart.max-file-size=3MB
+
+## 총 파일 최대 크기 설정
+
+spring.servlet.multipart.max-request-size=20MB
+
+#파일 저장 경로
+app.upload.notice=///production/upload/notice
+app.upload.qna=///production/upload/qna
+app.upload=///production/upload/
+
+## 요청시 파일 경로
+
+app.upload.base=file:///production/upload/
+
+app.url.path=/file/\*\*
+
+## transaction 처리
+
+spring.aop.proxy-target-class=true
+
+## message 설정
+
+spring.messages.basename=messages/message
+spring.messages.encoding=UTF-8
+spring.messages.use-code-as-default-message=true
+spring.messages.cache-duration=600
+
+# DB
+
+# username
+
+spring.datasource.hikari.username=admin
+
+# password
+
+spring.datasource.hikari.password=maria1234
+
+# url
+
+spring.datasource.url=jdbc:mariadb://gdj60mj.cerolrldoylw.ap-northeast-2.rds.amazonaws.com:3306/db
+
+# driver
+
+spring.datasource.driver-class-name=org.mariadb.jdbc.Driver
+
+## Mapper, Config 설정
+
+mybatis.mapper-locations=classpath:database/mappers/\*Mapper.xml
+mybatis.config-location=classpath:database/config/MybatisConfig.xml
+```
+
+# EC2 Background 실행
+
+### 1. Background 실행
+
+```markdown
+nohup java -jar 파일명 1>log.out 2>err.out &
+
+# nohup
+
+프로세스를 실행한 터미널의 세션 연결이 끊어지더라도
+지속적으로 동작 할 수 있게 해주는 명령어
+
+# &
+
+백그라운드 실행
+
+# 0 : 표준 입력, 1 : 표준 출력, 2 : 표준 에러
+
+nohup [실행파일] 1>/dev/null 2>&1 &
+
+1 > /dev/null
+표준 출력(1)의 결과를 /dev/null(버림)로 전달
+
+2>&1
+표준 에러(2)를 표준 출력(1)이 전달되는 곳(/dev/null)으로 동일하게 전달
+```
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2044.png>)
+
+```markdown
+sudo java -jar GDJ60_Boot2-0.0.1-SNAPSHOT.war --spring.profiles.active=prod 1>/dev/null 2>&1 &
+=> 백그라운드로 실행
+```
+
+### 2. 강제 실행 종료
+
+```markdown
+# 80 포트로 실행하고 있는 프로세스 아이디를 찾음
+
+sudo lsof -t -i:80  
+=> 프로세스 아이디 뜨면 80포트 실행 중, 안뜨면 쓰지 않고 있다
+
+# 해당 PID 강제종료
+
+sudo kill -9 [프로세스ID]
+```
+
+![Untitled](<2023-04-25(AWS%EB%B0%B0%ED%8F%AC)/Untitled%2045.png>)

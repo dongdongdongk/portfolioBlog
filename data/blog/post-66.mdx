@@ -1,0 +1,231 @@
+---
+title: '컨트롤러와 프론트 사이에서 값 전달하는 방법의 종류'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# **JSP(프론트영역)에서 Controller(백엔드영역)으로 데이터 전송하기**
+
+## 1.**Form - Action 방식을 이용한 데이터 전송**
+
+```java
+가장 기본적인 전달방식인 Form태그를 이용한 방법
+
+JSP파일에서 보내고자 하는 데이터에 name속성을 지정해주고 action태그에서는 보내고자 하는 컨트롤러 url에 매핑을 해주면 됨
+
+받아주는 컨트롤러에서는 파라메타로 받아주면 되는데 이때 받아주는 파라메타의 이름은 JSP파일에서 설정한 name과 동일하게 적어주면 자동으로 파라메타 변수에 들어오게 됨
+```
+
+```java
+jsp 영역
+
+<form action="memberRegi.do" method="post">
+	이름 : <input type="text" name="userName"><br>
+	계정 : <input type="text" name="userId">
+	<input type="submit" value="전송버튼">
+</form>
+```
+
+```java
+컨트롤러 영역
+
+@RequestMapping(value = "memberRegi.do", method = RequestMethod.POST)
+public void memberRegi(Locale locale, Model model, String userName, MemberDto dto) {
+  System.out.println(userName);
+  System.out.println(dto.getUserName());
+  System.out.println(dto.getUserId());
+}
+```
+
+```java
+컨트롤러에서는 String userName라는 string타입의 변수와 MemberDto라는 객체로 데이터를 받고 있으며 당연히 dto에는 userName, userId라는 이름으로 변수가 선언되어 있다.
+
+결과적으로 jsp에서 이름에 입력한 값은 String userName과 dto의 userName 모두에게 들어오고 계정란에 입력한 값은 dto의 userId를 통해 받을 수 있다.
+
+물론 dto에는 getter와 setter함수가 선언되어 있어야 한다.
+```
+
+```java
+<button onclick='location.href="memberRegi.do?userName=33&userId=44";'>url전송</button>
+
+Get 방식을 응용해서 주소 방식으로 값을 보내는 방법도 있다.
+```
+
+## 2.**Ajax 방식을 이용한 데이터 전송**
+
+```java
+<script>
+
+let userName = "이순신";
+
+function ajax(){
+
+  $.ajax({
+    url: "memberRegi.do",
+    data: "userName=" + userName,
+    type: "POST",
+    success : function(data){
+      alert("성공")
+    },
+    error : function(){
+      alert("에러")
+    }
+  });
+}
+
+</script>
+```
+
+```java
+@ResponseBody
+@RequestMapping(value = "memberRegi.do", method = RequestMethod.POST)
+public void memberRegi(String userName, MemberDto dto, HttpServletRequest request) {
+  System.out.println(request.getParameter("userName"));
+  System.out.println(dto.getUserName());
+  System.out.println(userName);
+}
+```
+
+```java
+컨트롤러에서는 각각 String, Dto, request객체를 이용해서 데이터를 받고 있는데 어느방법으로 해도 상관없다.
+
+여기서 주의할점은 @ResponseBody라는 어노테이션인데 만약 ajax가 호출하는 컨트롤러에 @ResponseBody라는 어노테이션이 붙지 않는다면 정상적으로 동작하지 않는다.
+```
+
+# **Controller(백엔드영역)에서 JSP(프론트영역)으로 데이터 전송하기**
+
+## 1.**Model을 이용한 데이터 전송**
+
+```java
+@RequestMapping(value = "index.do")
+public String home(Model model) {
+
+  Map<String, String> map = new HashMap<String, String>();
+
+  MemberDto dto = new MemberDto("dtoId", "dtoName");
+
+  ArrayList<String> list = new ArrayList<String>();
+
+  map.put("userId", "mapId");
+  map.put("userName", "mapName");
+
+  list.add("listId");
+  list.add("listName");
+
+  model.addAttribute("dto", dto);
+  model.addAttribute("map", map);
+  model.addAttribute("list", list);
+
+  return "login/memberRegi.tiles";
+```
+
+```java
+리스트
+${list.get(0) }
+${list.get(1) }
+
+DTO
+${dto.userId }
+${dto.userName }
+
+MAP
+${map.userId }
+${map.userName }
+```
+
+```java
+Servlet에서는 request객체에 태워서 보냈지만 Spring에서는 model객체에 데이터를 태워서 JSP영역으로 전달한다.
+
+이때 model객체에는 String이나 int는 물론 Object형태의 데이터도 전달이 가능하기때문에 dto, map, list등등 어느형태의 자료도 전달이 가능하다.
+```
+
+## 2.**Redirect를 이용한 데이터 전송**
+
+```java
+@RequestMapping(value = "memberRegi.do")
+public String memberRegi(String userName, MemberDto dto, HttpServletRequest request) {
+  return "redirect:index.do?test=test";
+}
+
+
+@RequestMapping(value = "index.do", method = {RequestMethod.POST, RequestMethod.GET})
+public String home(Model model, String test) {
+  System.out.println(test);
+  return "login/memberRegi.tiles";
+}
+```
+
+```java
+첫 번째 코드는 "memberRegi.do" URL에 대한 요청을 처리하는 메소드 요청으로부터 전달된 데이터를 사용하여 작업을 수행한 후, "index.do"로 리다이렉트하고 있다.
+
+두 번째 코드는 "index.do" URL에 대한 요청을 처리하는 메소드 요청으로부터 전달된 데이터를 사용하여 작업을 수행한 후, "login/memberRegi.tiles"라는 뷰 페이지를 보여준다.
+```
+
+## 3.**ResponseBody를 이용한 데이터 전송**
+
+```java
+mvc패턴에서는 model을 이용해서 주로 데이터를 전송하지만 요즘 많이 사용하는 리액트나 뷰에서는 responsebody를 이용한 api방식을 많이 사용하기 때문에 알아둘 필요가 있다
+
+(물론 mvc패턴에서도 ajax를 이용한 통신을 할때 많이 사용한다)
+```
+
+```java
+@Controller
+public class TestController {
+
+  @ResponseBody
+  @PostMapping("/test")
+  public String test1() {
+    return "일반 String데이터";
+  }
+}
+```
+
+```java
+Controller에서는viewResolver(View를 어떤 것을 사용할지 설정)가 return하는 String의 앞에는 jsp페이지의 경로를 뒤에는 .jsp를 붙여서 jsp페이지로 이동하지만 위의 코드처럼
+
+@ResponseBody 어노테이션을 붙이면 viewResolver를 생략하고 데이터만 응답하게 됨.
+
+return타입만 변경한다면 int나 dto와 같은 데이터도 당연히 전송이 가능하며 dto와 같은 데이터는 javascirpt에서 사용할 수 있도록 json형태로 보내지게 됨
+```
+
+```java
+function ajax(){
+  $.ajax({
+    url: "/test",
+    type: "POST",
+    success : function(data){
+      alert(data)
+    },
+    error : function(){
+      alert("에러")
+    }
+  });
+}
+```
+
+```java
+물론 해당 데이터를 받기 위해서는 아래처럼 ajax를 사용해야하며 그냥 주소를 브라우저에 입력하면 아무런 html태그 없이 리턴된 String데이터만 보이게 됨
+```
+
+### @RestController
+
+```java
+@RestController
+public class TestController {
+
+  @PostMapping("/test")
+  public String test1() {
+    return "일반 String데이터";
+  }
+}
+```
+
+```java
+@ResponseBody사용한 컨트롤러와 동일한 역할을 수행함. 이와 같이 페이지 이동이 아닌 데이터 응답만을 목적으로 하는 컨트롤러를 @RestController라고 함.
+
+즉, 개발자들이 이야기하는 API가 됨.
+```

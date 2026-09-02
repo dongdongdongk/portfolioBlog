@@ -1,0 +1,368 @@
+---
+title: '아이디,비밀번호 찾기 메일 보내기'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+## **SMTP용 계정 설정**
+
+```java
+추후 Spring에서 해당 SMTP 서버를 사용하기 전에 해당 Naver SMTP 서버를 활성화 시켜준다.
+
+네이버 메일서버를 외부에서 사용하기 위해서는 pop3/SMTP 설정을 필수로 활성화 시켜주어야된다.
+```
+
+### Naver
+
+![](https://velog.velcdn.com/images/rnqhstlr2297/post/adcb6418-ab86-45fd-9d47-84364b7912ef/image.png)
+
+---
+
+<추후 정리>
+
+### Google
+
+```java
+앱 비밀번호는 2단계 인증을 해야 생성된다.
+```
+
+![](https://velog.velcdn.com/images/rnqhstlr2297/post/fb7703c6-a249-4e49-9119-48ccc678d1d1/image.png)
+
+```java
+메일, Window 컴퓨터용 앱 비밀번호 생성
+```
+
+![](https://velog.velcdn.com/images/rnqhstlr2297/post/4064f222-49e5-4f99-b772-57d562d5f4c8/image.png)
+
+```java
+앱 비밀번호 저장(smtp 설정에서 사용될 비밀번호)
+```
+
+![](https://velog.velcdn.com/images/rnqhstlr2297/post/aef7d15a-24a8-4065-9d5d-d9a9c3fba434/image.png)
+
+![](https://velog.velcdn.com/images/rnqhstlr2297/post/cd2e51f8-2495-414d-986e-cf9f91eb13c2/image.png)
+
+## 스프링 메일을 사용하기 위한 라이브러리를 추가
+
+```java
+	의존성 설정해준다.
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
+```
+
+## 발신자 정보를 application.properties 에 추가해준다.
+
+```java
+<구글>
+
+# SMTP
+spring.mail.host=smtp.gmail.com
+spring.mail.port=587
+spring.mail.username=지메일
+spring.mail.password=앱 키
+spring.mail.properties.mail.smtp.starttls.enable=true
+spring.mail.properties.mail.smtp.auth=true
+
+<네이버>
+
+spring.mail.host=smtp.naver.com
+spring.mail.port=465
+spring.mail.username=email@naver.com
+spring.mail.password=password
+spring.mail.properties.mail.smtp.auth=true
+spring.mail.properties.mail.smtp.ssl.enable=true
+
+```
+
+```jsx
+이제 SimpleMailMessage에 메세지를 담아서 JavaMailSender로 메일을 보낼 수 있다
+
+
+simpleMailMessage
+
+setTo() 받는사람 이메일 주소
+setSubject() 이메일 제목
+setText() 내용
+```
+
+## MailManager 생성
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381059/notion-blog/_/_/Spring_/_/Untitled.png)
+
+```java
+@Component
+@Slf4j
+public class MailManager {
+
+	@Value("${spring.mail.username}")
+	private String sender;
+
+	@Autowired
+	private JavaMailSender javaMailSender;
+
+	public void send(String to,String sub,String con) throws MessagingException {
+		//html 추가해서 보낼수 있음 (정교함)
+		MimeMessage mimeMessage = javaMailSender.createMimeMessage();
+		mimeMessage.setFrom(sender);
+		mimeMessage.addRecipient(RecipientType.TO, new InternetAddress(to));
+		mimeMessage.setSubject(sub);
+		mimeMessage.setText(con);
+		javaMailSender.send(mimeMessage);
+
+
+//		HTML태그를 무시하고 그대로 Text로 전송됨
+//		SimpleMailMessage mailMessage = new SimpleMailMessage();
+//		mailMessage.setFrom(sender);
+//		mailMessage.setTo(to);
+//		mailMessage.setSubject(sub);
+//		mailMessage.setText(con);
+//		javaMailSender.send(mailMessage);
+
+	}
+}
+```
+
+## id,pw를 찾기 Jsp 생성
+
+```java
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+         pageEncoding="UTF-8" %>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
+<!DOCTYPE html>
+<html lang="zxx">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="description" content="Sona Template">
+    <meta name="keywords" content="Sona, unica, creative, html">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+
+    <!--css-->
+    <c:import url="../temp/style.jsp"></c:import>
+    <!--css-->
+</head>
+
+<body>
+
+<!-- Header Section Begin -->
+<c:import url="../temp/header.jsp"></c:import>
+<!-- Header End -->
+
+<!-- Contact Section Begin -->
+<div class="breadcrumb-section">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="breadcrumb-text">
+                    <h2>ID/Password 찾기</h2>
+                    <div class="bt-option">
+                        <a href="./index.html">Home</a>
+                        <span>ID/Password 찾기</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="container">
+    <div class="row mb-5">
+        <div class="container padding-bottom-3x mb-2">
+            <div class="row justify-content-left contact-text">
+                <div class="col-lg-8 col-md-10">
+                    <div class="forgot">
+
+                        <h3>ID 찾기</h3>
+                        <br>
+                        <p>가입한 적이 없는 이메일 주소나 올바르지 않은 이메일 주소를 입력하신 경우에는 메일을 받을 수 없습니다!</p>
+                        <ol class="list-unstyled contact-text">
+                            <li><span class="text-Secondary ">1. </span>가입시 입력한 Email를 입력해주세요</li><br>
+                            <li><span class="text-Secondary">2. </span>가입하실 때 입력하신 이메일로 아이디가 발송됩니다.</li><br>
+                            <li><span class="text-Secondary">3. </span>사용한 이메일이 기억나지 않는 경우 관리자에게 문의주세요 </li>
+                        </ol>
+
+                    </div>
+
+                    <div class="mt-4">
+                        <div class="">
+                            <div class="form-group">
+                                <label for="email">Enter your Email</label>
+                                <input id="email" type="email" name="email" class="email form-control" placeholder="이메일 입력">             // email input  js를 통해서 ajax 로 보냄
+                                <small class="form-text text-muted">Enter the email address you used during the
+                                registration on BBBootstrap.com. Then we'll email a link to this address.</small>
+                            </div>
+                        </div>
+                        <div class="contact-form">
+                            <button class="find_btn">찾기</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="container padding-bottom-3x mb-5 mt-5">
+            <div class="row justify-content-left contact-text  mt-5">
+                <div class="col-lg-8 col-md-10 mb-5">
+                    <div class="forgot">
+
+                        <h3>Password 찾기</h3>
+                        <br>
+                        <p>현재 사용중인 ID 를 입력 해주세요!</p>
+                        <ol class="list-unstyled contact-text">
+                            <li><span class="text-Secondary ">1. </span>현재 사용중인 ID를 입력해주세요</li><br>
+                            <li><span class="text-Secondary">2. </span>가입하실 때 입력하신 Email로 임시 Password가 발송됩니다.</li><br>
+                            <li><span class="text-Secondary">3. </span>로그인 후 MyPage 에서 비밀번호를 재설정 해주세요</li>
+                        </ol>
+
+                    </div>
+
+                    <div class="mt-4">
+                        <div class="">
+                            <div class="form-group">
+                                <label for="id">Enter your ID</label>
+                                <input type="text" id="id" name="id" class="id form-control" placeholder="아이디 입력">                     // id input js를 통해서 ajax 로 보냄
+                                <small class="form-text text-muted">Enter the email address you used during the
+                                registration on BBBootstrap.com. Then we'll email a link to this address.</small>
+                            </div>
+                        </div>
+                        <div class="contact-form">
+                            <button class="find_btnPw">찾기</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer Section Begin -->
+    <c:import url="../temp/footer.jsp"></c:import>
+    <!-- Footer Section End -->
+
+    <!-- Search model Begin -->
+    <div class="search-model">
+        <div class="h-100 d-flex align-items-center justify-content-center">
+            <div class="search-close-switch"><i class="icon_close"></i></div>
+            <form class="search-model-form">
+                <input type="text" id="search-input" placeholder="Search here.....">
+            </form>
+        </div>
+    </div>
+    <!-- Search model end -->
+    <!-- Js Plugins -->
+    <c:import url="../temp/js.jsp"></c:import>
+    <script src="/js/findId.js"></script>
+
+</body>
+
+</html>
+```
+
+## email 유효성 검사를 위한 js 작성
+
+```jsx
+$(document).ready(function () {
+  function emailCheck(email) {
+    // 이메일 유효성 검사를 위한 정규식
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailPattern.test(email)
+  }
+
+  // email 찾기
+  $('.find_btn').click(function () {
+    const email = $('.email').val()
+    if (!emailCheck(email)) {
+      alert('올바른 이메일 주소를 입력해주세요.')
+      return
+    }
+    $.ajax({
+      url: 'findId',
+      type: 'POST',
+      data: {
+        email: email,
+      },
+    })
+      .done(function () {
+        alert('메일발송 완료')
+      })
+      .fail(function () {
+        alert('에러가 발생했습니다')
+      })
+  })
+
+  // id 찾기
+  $('.find_btnPw').click(function () {
+    const id = $('.id').val()
+
+    $.ajax({
+      url: 'findPw',
+      type: 'POST',
+      data: {
+        id: id,
+      },
+    })
+      .done(function () {
+        alert('메일발송 완료')
+      })
+      .fail(function () {
+        alert('에러가 발생했습니다')
+      })
+  })
+})
+```
+
+## Controller 생성
+
+```java
+@PostMapping("findId")
+    public ResponseEntity<Object> sendEmail(String email) throws Exception {
+        String to = email;
+        UserVO userVO=userService.findId(email);
+        String sub ="아이디 확인";
+        String con = "아이디는 " + userVO.getId() + "입니다.";
+        log.error("id는"+  userVO.getId());
+        log.error(email);
+        if( userVO.getId() != null) {
+            mailManager.send(to,sub,con);
+        }
+
+        return new ResponseEntity<Object>(HttpStatus.OK);  //서버가 작업을 완료한 후 모든 것이 잘 되었는지 여부를 브라우저에 알리는기능
+    }
+
+    @PostMapping("findPw")
+    @ResponseBody
+    public String findPw(String id) throws Exception {
+        UserVO userVO = userService.findEmail(id);
+        UUID uuidPw = UUID.randomUUID();
+        String tempPw = uuidPw.toString().substring(0, 7); // UUID 문자열 중 7자리만 사용하여 인증번호 생성
+        String to = userVO.getEmail();
+        String sub ="임시 비밀번호 전송";
+        String con = "임시 비밀번호 : "+tempPw;
+        userVO.setPassword(passwordEncoder.encode(tempPw));
+        userVO.setId(id);
+        log.error("이메일 : " + to);
+        mailManager.send(to,sub,con);
+        int result = userService.saveTempPw(userVO);
+        return tempPw;
+    }
+```
+
+## Mapper
+
+```java
+	<select id="findId" resultType="UserVO" parameterType="String" >
+		SELECT ID
+		FROM USER
+		WHERE EMAIL = #{email}
+	</select>
+
+	<select id="findEmail" resultType="UserVO" parameterType="String">
+		SELECT EMAIL
+		FROM USER
+		WHERE ID = #{id}
+	</select>
+```

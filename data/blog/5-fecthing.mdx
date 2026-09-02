@@ -1,0 +1,996 @@
+---
+title: '섹션 5: 데이터 가져오기(Fecthing) - 심층 분석'
+date: '2026-09-02'
+category: '풀스택/Next js'
+tags: ['풀스택', 'Next js']
+draft: false
+summary: ''
+---
+
+# { 백엔드 API를 사용해 데이터를 가져오기 }
+
+## 1. 핵심 개념 요약
+
+| 개념                  | 설명                                                                                                         |
+| --------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `useEffect`           | 컴포넌트가 처음 렌더링되었을 때, 한 번 실행되는 함수. 여기서 데이터를 가져옴(fetch).                         |
+| `useState`            | React에서 상태를 저장할 수 있게 해주는 기능. 로딩 중인지, 오류가 있는지, 뉴스 데이터를 저장함.               |
+| `fetch`               | 브라우저 내장 HTTP 요청 함수. 백엔드 API 서버에서 데이터를 가져올 때 사용.                                   |
+| `localhost:8080/news` | 백엔드에서 뉴스 데이터를 제공하는 주소(URL).                                                                 |
+| `"use client"`        | 이 파일이 **클라이언트 컴포넌트**임을 명시하는 지시문. `useEffect` 같은 브라우저 전용 기능을 사용할 때 필요. |
+| `NewsList`            | 뉴스 데이터를 화면에 보여주는 컴포넌트.                                                                      |
+
+## 2. 개선된 코드 (주석 포함)
+
+```jsx
+// 클라이언트 컴포넌트임을 명시해야 useEffect, useState 등 브라우저 전용 기능 사용 가능
+'use client'
+
+// React 훅 불러오기
+import { useEffect, useState } from 'react'
+
+// 뉴스 목록을 출력하는 컴포넌트
+import NewsList from '@/components/news-list'
+
+export default function NewsPage() {
+  // 로딩 상태를 저장하는 state. 요청을 보내는 중일 때 true.
+  const [isLoading, setIsLoading] = useState(false)
+
+  // 에러 메시지를 저장하는 state. 요청 실패 시 메시지를 담음.
+  const [error, setError] = useState()
+
+  // 가져온 뉴스 데이터를 저장하는 state
+  const [news, setNews] = useState()
+
+  // 컴포넌트가 처음 화면에 나타날 때 실행되는 훅
+  useEffect(() => {
+    // 비동기 요청을 처리할 별도 함수 정의
+    async function fetchNews() {
+      setIsLoading(true) // 요청 시작 시 로딩 상태 true로 설정
+
+      try {
+        const response = await fetch('http://localhost:8080/news')
+
+        // 응답 상태 코드가 200이 아니면 에러 처리
+        if (!response.ok) {
+          throw new Error('Failed to fetch news.')
+        }
+
+        // JSON 데이터로 변환
+        const newsData = await response.json()
+
+        // 뉴스 데이터를 상태에 저장
+        setNews(newsData)
+      } catch (err) {
+        // 오류가 발생하면 에러 메시지를 상태에 저장
+        setError(err.message || 'Something went wrong.')
+      } finally {
+        // 로딩 상태는 항상 false로 종료
+        setIsLoading(false)
+      }
+    }
+
+    // 위에서 정의한 함수 실행
+    fetchNews()
+  }, []) // 빈 배열이면 이 useEffect는 컴포넌트가 처음 마운트될 때 한 번만 실행됨
+
+  // 로딩 중일 때 보여줄 화면
+  if (isLoading) {
+    return <p>Loading...</p>
+  }
+
+  // 에러 발생 시 보여줄 화면
+  if (error) {
+    return <p>{error}</p>
+  }
+
+  // 뉴스가 존재할 때만 보여줄 내용
+  let newsContent
+  if (news) {
+    newsContent = <NewsList news={news} />
+  }
+
+  // 최종 화면 렌더링
+  return (
+    <>
+      <h1>News Page</h1>
+      {newsContent}
+    </>
+  )
+}
+```
+
+## 3. 동작 흐름 정리 (한눈에 보기)
+
+```jsx
+1. 컴포넌트가 처음 실행되면 → useEffect 동작
+
+2. fetchNews 함수가 호출되어 → http://localhost:8080/news에 요청
+
+3. 응답:
+
+		성공이면 → 뉴스 데이터를 setNews에 저장
+
+		실패면 → 에러 메시지를 setError에 저장
+
+4. 상태에 따라:
+
+		로딩 중이면 → Loading... 표시
+
+		에러가 있으면 → 에러 메시지 표시
+
+		뉴스가 있으면 → <NewsList> 컴포넌트로 뉴스 출력
+```
+
+## 4. 초보자 팁
+
+```jsx
+useEffect는 브라우저에서만 동작합니다. 따라서 서버 컴포넌트가 아니라 클라이언트 컴포넌트여야 합니다.
+
+이때 "use client"를 꼭 써야 합니다.
+
+fetch는 약속(Promise)을 반환하므로 await로 결과를 기다릴 수 있습니다.
+
+try-catch-finally는 비동기 함수에서 오류를 처리할 때 매우 유용합니다.
+```
+
+# { 클라이언트 방식 → 서버 방식으로 개선하기 }
+
+## 1. 핵심 개념 요약
+
+### 1. **클라이언트 측 데이터 패칭**
+
+```jsx
+useEffect()를 이용해서 페이지가 브라우저에서 실행된 후에 데이터를 가져오는 방식.
+
+단점: 사용자가 페이지를 처음 열었을 때, 콘텐츠가 바로 보이지 않음.
+
+또 다른 단점: 검색 엔진(SEO)이 내용을 수집하기 어려움 → 검색 노출 불리함.
+```
+
+### 2. **서버 측 데이터 패칭 (React 서버 컴포넌트 활용)**
+
+```jsx
+Next.js는 기본적으로 서버 컴포넌트로 구성되어 있어, 컴포넌트 안에서 바로 fetch()로 데이터를 가져올 수 있음.
+
+장점: 브라우저가 HTML을 받기 전에, 서버가 이미 데이터를 포함한 페이지를 생성해서 보냄.
+
+결과적으로 SEO에 유리하고 사용자에게도 콘텐츠가 빠르게 표시됨.
+```
+
+## 2. 클라이언트 방식 → 서버 방식으로 개선한 코드
+
+```jsx
+// NewsPage 컴포넌트는 기본적으로 서버에서 실행됩니다.
+// 따라서 fetch() 함수를 바로 컴포넌트 안에서 사용할 수 있습니다.
+
+import NewsList from '@/components/news-list'
+
+// 서버 컴포넌트이므로 async 사용 가능
+export default async function NewsPage() {
+  // 데이터를 가져오기 위해 fetch를 사용합니다.
+  // 이 코드는 서버에서 실행되며, 브라우저에 노출되지 않습니다.
+  const response = await fetch('http://localhost:8080/news')
+
+  // 응답이 실패했을 경우 에러를 던집니다.
+  // 이는 Next.js가 자동으로 에러 페이지를 보여주는 데 사용될 수 있습니다.
+  if (!response.ok) {
+    throw new Error('Failed to fetch news.')
+  }
+
+  // 응답된 JSON 데이터를 파싱하여 news 변수에 저장합니다.
+  const news = await response.json()
+
+  // 서버에서 데이터를 받아온 후, JSX를 렌더링합니다.
+  return (
+    <>
+      <h1>News Page</h1>
+
+      {/* 가져온 뉴스 데이터를 NewsList 컴포넌트로 전달합니다. */}
+      <NewsList news={news} />
+    </>
+  )
+}
+```
+
+## 3. 쉬운 설명: 서버 컴포넌트의 작동 방식
+
+### 예전 방식 (`useEffect` 사용, 클라이언트 측)
+
+```jsx
+// 브라우저가 페이지를 먼저 보여주고,
+// 그 후에 useEffect 안에서 fetch로 데이터를 가져옴.
+useEffect(() => {
+  fetch("http://localhost:8080/news").then(...);
+}, []);
+```
+
+```jsx
+단점: 페이지가 먼저 보여지고, 데이터는 늦게 도착함.
+
+사용자가 보기에 콘텐츠가 늦게 보임.
+
+검색 엔진도 페이지 내용을 못 읽음.
+```
+
+### 개선된 방식 (`async 컴포넌트`, 서버 측)
+
+```jsx
+// 컴포넌트가 서버에서 실행될 때
+// 먼저 데이터를 받아온 후, 완성된 HTML을 브라우저에 보냄.
+const response = await fetch(...);
+const news = await response.json();
+```
+
+```jsx
+장점: 사용자와 검색 엔진 모두 처음부터 완성된 페이지를 봄.
+
+SEO, 초기 로딩 속도에 좋음.
+```
+
+### 왜 async 컴포넌트를 쓰는가?
+
+```jsx
+기존의 React는 클라이언트에서 실행되므로 useEffect로 데이터를 나중에 가져와야 했습니다.
+
+하지만 Next.js는 기본적으로 모든 페이지와 대부분의 컴포넌트를 **서버 컴포넌트(Server Component)**로 처리합니다.
+
+서버 컴포넌트의 가장 큰 특징은:
+
+		서버에서 실행됨 (브라우저가 아님)
+
+		fetch 등 비동기 작업을 직접 할 수 있음
+
+		결과적으로 미리 데이터가 반영된 HTML을 클라이언트에 보낼 수 있음
+```
+
+### 작동 흐름 상세 설명
+
+```jsx
+1. 브라우저가 /news 페이지를 요청함
+
+2. NewsPage 컴포넌트가 서버에서 실행됨 (app/news/page.tsx)
+
+3. 서버에서 fetch('http://localhost:8080/news')로 데이터를 가져옴
+
+4. 가져온 뉴스 데이터를 이용해 JSX(HTML 템플릿)를 완성함
+
+5. 이 완성된 HTML이 브라우저에 보내짐 (브라우저는 즉시 내용을 볼 수 있음)
+
+6. 브라우저에서 hydration(수분 공급) 과정을 거쳐 React와 연결됨 (이건 자동)
+```
+
+## 4. 요약 정리
+
+| 구분              | 클라이언트 측 fetch (`useEffect`) | 서버 측 fetch (`async 컴포넌트`)        |
+| ----------------- | --------------------------------- | --------------------------------------- |
+| 실행 시점         | 브라우저에서 실행됨               | 서버에서 실행됨                         |
+| 초기 로딩 속도    | 느림 (페이지 뜬 후 fetch)         | 빠름 (서버가 데이터를 포함한 HTML 생성) |
+| SEO               | 불리함                            | 유리함                                  |
+| Next.js 권장 방식 | ❌                                | ✅                                      |
+
+## 5. 실전 팁
+
+```jsx
+Next.js에서는 가능하면 서버 컴포넌트에서 데이터를 가져오도록 하세요.
+
+fetch()는 Node.js 환경에서 실행되며, Next.js는 이 함수를 자동으로 캐싱 처리하기도 합니다.
+
+추후 loading.tsx, error.tsx 등의 파일을 활용해 로딩/에러 처리도 더 깔끔하게 할 수 있어요.
+```
+
+# { 별도 서버 없이 Next.js에서 DB에 바로 접근 }
+
+## 1. 왜 별도의 백엔드 서버가 필요할까?
+
+```jsx
+보통 웹 애플리케이션은 이렇게 구성됩니다:
+```
+
+```jsx
+클라이언트(브라우저)
+
+   ↕️ HTTP 요청/응답
+
+Next.js 서버 (백엔드 기능 포함)
+
+   ↕️
+
+데이터베이스 서버
+```
+
+```jsx
+1. 보안:
+
+		브라우저(클라이언트)가 직접 데이터베이스에 접근하면
+
+		DB 주소, 계정 정보가 노출되고 데이터 삭제·변경 위험이 큽니다.
+
+2. 비즈니스 로직 관리:
+
+		데이터를 단순히 가져오기만 하는 것이 아니라
+
+		가공, 검증, 권한 체크 등 로직을 서버에서 처리해야 합니다.
+
+3. 애플리케이션 분리:
+
+		데이터베이스 + API 서버(Express, NestJS 등) + Next.js 프런트엔드
+
+		로 분리하면 유지보수가 편리해집니다.
+```
+
+## 2. 그런데 왜 이번 강의에서는 별도 서버 없이 Next.js에서 DB에 바로 접근할까?
+
+```jsx
+이번 예제는 데모 프로젝트이므로,
+
+		추가 API 서버 없이도
+
+		Next.js 서버 컴포넌트 안에서 직접 DB에 접근
+
+하는 방법을 보여주는 것입니다.
+
+즉, 학습 목적으로 간단하게 구성한 것입니다.
+
+실제 서비스에서는 보안과 분리를 위해 API 서버를 두는 것이 일반적입니다.
+```
+
+### **Next.js 서버 컴포넌트 + DB 직접 접근**
+
+```jsx
+Vercel Edge Functions + Serverless DB
+
+		Vercel에서 Next.js를 배포하면
+
+				API Route (Edge Function) 또는 서버 컴포넌트가
+
+				PlanetScale, Supabase, Neon 같은 serverless DB에
+
+				직접 연결하는 구조가 실무에서 꽤 흔히 사용됩니다.
+```
+
+## 3. 코드 설명
+
+```jsx
+아래 코드는:
+
+1. SQLite 데이터베이스에서 뉴스 데이터를 직접 가져와서
+
+2. React 서버 컴포넌트에서 화면에 표시하는 예제입니다.
+```
+
+### app/news/page.js
+
+```jsx
+// NewsList 컴포넌트를 import합니다.
+// 이 컴포넌트는 전달받은 뉴스 목록을 화면에 렌더링합니다.
+import NewsList from '@/components/news-list'
+
+// getAllNews 함수를 import합니다.
+// 이 함수는 데이터베이스에서 모든 뉴스를 가져옵니다.
+import { getAllNews } from '@/lib/news'
+
+// Next.js 서버 컴포넌트
+// 서버에서만 실행되므로 데이터베이스 접근이 가능합니다.
+export default async function NewsPage() {
+  // 데이터베이스에서 모든 뉴스를 가져옵니다.
+  // getAllNews는 synchronous 함수지만
+  // 서버 컴포넌트이므로 async function으로 작성되어도 문제없습니다.
+  const news = getAllNews()
+
+  // JSX를 반환하여 페이지를 구성합니다.
+  return (
+    <>
+      <h1>News Page</h1>
+      {/* NewsList 컴포넌트에 news 데이터를 props로 전달 */}
+      <NewsList news={news} />
+    </>
+  )
+}
+```
+
+### lib/news.js
+
+```jsx
+// better-sqlite3 패키지를 import합니다.
+// 이 패키지는 SQLite 데이터베이스와 상호작용할 수 있게 해줍니다.
+import sql from 'better-sqlite3'
+
+// 예제용 가짜 뉴스 데이터도 import 해둡니다.
+// 일부 함수에서 여전히 사용됩니다.
+import { DUMMY_NEWS } from '@/dummy-news'
+
+// 데이터베이스 파일(data.db)에 연결합니다.
+// 루트 폴더에 있는 data.db 파일을 열어 db 상수에 저장합니다.
+const db = sql('data.db')
+
+/**
+ * 데이터베이스에서 모든 뉴스 데이터를 가져오는 함수
+ */
+export function getAllNews() {
+  // SQL 쿼리를 준비(prepared statement)합니다.
+  // 'news' 테이블의 모든 컬럼(*)을 선택(select)합니다.
+  const news = db.prepare('SELECT * FROM news').all()
+
+  // 결과를 반환합니다.
+  // news는 뉴스 객체들의 배열입니다.
+  return news
+}
+
+/**
+ * 최신 뉴스 3개를 반환하는 함수
+ * (아직 DUMMY_NEWS를 사용하고 있음)
+ */
+export function getLatestNews() {
+  return DUMMY_NEWS.slice(0, 3)
+}
+
+/**
+ * 현재 뉴스 데이터에 존재하는 연도 목록을 반환
+ */
+export function getAvailableNewsYears() {
+  return DUMMY_NEWS.reduce((years, news) => {
+    const year = new Date(news.date).getFullYear()
+    if (!years.includes(year)) {
+      years.push(year)
+    }
+    return years
+  }, []).sort((a, b) => b - a)
+}
+
+/**
+ * 특정 연도에 존재하는 월 목록을 반환
+ */
+export function getAvailableNewsMonths(year) {
+  return DUMMY_NEWS.reduce((months, news) => {
+    const newsYear = new Date(news.date).getFullYear()
+    if (newsYear === +year) {
+      const month = new Date(news.date).getMonth()
+      if (!months.includes(month)) {
+        months.push(month + 1) // JS의 getMonth는 0부터 시작하므로 +1
+      }
+    }
+    return months
+  }, []).sort((a, b) => a - b)
+}
+
+/**
+ * 특정 연도의 뉴스 목록을 반환
+ */
+export function getNewsForYear(year) {
+  return DUMMY_NEWS.filter((news) => new Date(news.date).getFullYear() === +year)
+}
+
+/**
+ * 특정 연도와 월에 해당하는 뉴스 목록을 반환
+ */
+export function getNewsForYearAndMonth(year, month) {
+  return DUMMY_NEWS.filter((news) => {
+    const newsYear = new Date(news.date).getFullYear()
+    const newsMonth = new Date(news.date).getMonth() + 1
+    return newsYear === +year && newsMonth === +month
+  })
+}
+```
+
+# { Next.js에서 데이터 로딩 처리 }
+
+## 1. **상황 설정**
+
+```jsx
+데이터 소스 소유
+
+외부 API가 아니라 직접 소유한 데이터베이스(예: SQLite)를 사용.
+
+따라서 외부 HTTP 요청이 아닌, DB 패키지를 통해 로컬에서 직접 쿼리.
+```
+
+## 2. **동기 패키지 vs 비동기 처리**
+
+```jsx
+SQLite에 사용하는 패키지는 동기 방식이라 async/await이 원래 필요 없음.
+
+그러나 의도적으로 지연(delay)을 시뮬레이션하여 로딩 상태를 테스트하고 UX를 개선하고자 함.
+```
+
+## 3. **지연(delay) 시뮬레이션 코드**
+
+```jsx
+export async function getAllNews() {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(뉴스_데이터_배열)
+    }, 2000) // 2초 지연 후 뉴스 데이터 반환
+  })
+}
+```
+
+```jsx
+new Promise() 생성자 내부에서
+
+		setTimeout으로 2초 지연 후 resolve 호출.
+
+이렇게 하면:
+
+		느린 백엔드, 느린 DB 응답 상황을 테스트 가능.
+
+		async 함수로 감싸 await 호출 가능하도록 변경.
+
+```
+
+## 4. **컴포넌트에서의 사용**
+
+```jsx
+이제 getAllNews가 프로미스를 반환하므로, 이를 사용하는 page.js에서:
+```
+
+```jsx
+export default async function NewsPage() {
+  const news = await getAllNews()
+  // JSX 반환
+}
+```
+
+```jsx
+React 서버 컴포넌트는 함수를 async로 선언 가능하므로, await 사용에 문제가 없다.
+```
+
+## 5. **로딩 UX 문제**
+
+```jsx
+현재 상태:
+
+		뉴스 페이지를 클릭하면, 아무 반응 없이 2초 뒤 페이지가 보임.
+
+		사용자 입장에서는 멈춘 것처럼 느껴짐.
+
+해결책: 로딩 스피너, 텍스트, 스켈레톤 로더 등 로딩 대체 화면 제공.
+```
+
+## 6. **Next.js의 로딩 대체 화면 (loading.js)**
+
+```jsx
+Next.js에서 loading.js라는 특별한 파일을 해당 페이지 폴더에 추가하면:
+
+데이터 로딩 중일 때 이 파일의 컴포넌트를 자동으로 보여줌.
+```
+
+```jsx
+// app/news/loading.js
+
+export default function NewsLoading() {
+  return <p>Loading...</p>
+}
+```
+
+```jsx
+다른 페이지에서 뉴스 페이지로 이동 시
+
+즉각적으로 로딩 텍스트(또는 스피너)가 표시되고
+
+데이터가 로드되면 최종 페이지가 렌더링됨.
+```
+
+# { 데이터베이스 Migration }
+
+## 1. 무엇을 하고 있는가?
+
+```jsx
+기존에 더미(dummy) 데이터 파일에서 뉴스 데이터를 가져오던 Next.js 앱을
+
+데이터베이스에서 직접 가져오도록 변경(Migration) 하여
+
+실제 앱처럼 로딩, 대체 화면, 비동기 fetch 등을 구성하는 것입니다.
+```
+
+## 2. 왜 이렇게 하는가?
+
+```jsx
+✅ 기존 방식
+
+→ dummy-news.js 파일에서 데이터를 가져와 즉시 렌더링했음.
+
+→ 실제 서비스에서는 DB에서 가져오므로 비동기 처리와 로딩 화면이 필요.
+
+✅ 변경 후 방식
+
+→ /lib/news.js 파일의 비동기 함수들을 사용하여 DB에서 데이터 fetch.
+
+→ 실제 지연시간(sleep) 시뮬레이션이 추가되어 있으므로 로딩 대체 화면 필수.
+```
+
+## 3. 중요한 개념 요약
+
+| 개념                  | 설명                                                                                           |
+| --------------------- | ---------------------------------------------------------------------------------------------- |
+| **async / await**     | DB에서 데이터를 가져오는 함수는 대부분 `Promise`를 반환하므로 `await`으로 결과를 기다림.       |
+| **서버 컴포넌트**     | Next.js에서 `async`를 직접 사용 가능. 클라이언트 컴포넌트에서는 불가능.                        |
+| **loading.js**        | 페이지나 레이아웃이 데이터를 불러오는 동안 보여줄 로딩 대체 화면을 정의.                       |
+| **중첩된 loading.js** | 더 구체적인 로딩 UI가 필요할 경우, 해당 page.js 옆에 `loading.js` 파일을 추가.                 |
+| **use client**        | 클라이언트 전용 훅(useRouter 등)을 사용하는 파일 상단에 작성. 서버 컴포넌트에서는 제거해야 함. |
+| **모달 백드롭 분리**  | 클라이언트 훅이 필요한 컴포넌트만 분리하여 전체 page.js는 서버 컴포넌트로 유지 가능.           |
+
+## 4. 주요 페이지별 Migration 흐름
+
+### NewsDetailPage (슬러그 페이지) 이전하기
+
+```jsx
+🔧 변경 내용
+
+		1. 더미 데이터 import 삭제.
+
+		2. getNewsItem 함수를 호출하여 데이터를 가져옴.
+
+				slug를 인자로 받고 프로미스를 반환한다.
+
+		3. 데이터를 받기 위해 await 키워드를 사용.
+
+				함수에 async를 붙여야 한다.
+
+		4. React Server Component에서는 async/await 사용 가능하므로 상단에 "use client"를 붙일 필요 없음.
+
+💡 결과
+
+		/news 페이지에서 뉴스 클릭 시,
+
+		loading.js 에 정의된 로딩 대체 화면이 먼저 보여지고,
+
+		데이터 fetch 후 상세 내용이 표시된다.
+```
+
+### 모달 인터셉터 경로
+
+```jsx
+문제:
+
+모달 백드롭 컴포넌트가 useRouter()를 사용하므로 반드시 클라이언트 컴포넌트여야 함.
+
+하지만 페이지 전체를 클라이언트 컴포넌트로 두면 async await 사용 불가.
+
+🔧 해결 방법 (리팩토링)
+
+1. useRouter가 필요한 div를 별도의 클라이언트 컴포넌트로 분리.
+
+2. page.js는 서버 컴포넌트로 유지하고 async/await 사용 가능.
+
+3. ModalBackdrop 컴포넌트를 만들어 /components/modal-backdrop.js에 정의.
+
+💡 결과: 모달 페이지 새로고침 시 ‘찾을 수 없음’ 오류가 사라지고 전체 화면 모드로 정상 로드.
+```
+
+```jsx
+'use client'
+
+import { useRouter } from 'next/navigation'
+
+export default function ModalBackdrop() {
+  const router = useRouter()
+
+  return <div className="modal-backdrop" onClick={router.back} />
+}
+```
+
+```jsx
+import { notFound } from 'next/navigation'
+import ModalBackdrop from '@/components/modal-backdrop'
+import { getNewsItem } from '@/lib/news'
+
+export default async function InterceptedImagePage({ params }) {
+  const newsItemSlug = params.slug
+  const newsItem = await getNewsItem(newsItemSlug)
+
+  if (!newsItem) {
+    notFound()
+  }
+
+  return (
+    <>
+      <ModalBackdrop />
+      <dialog className="modal" open>
+        <div className="fullscreen-image">
+          <img src={`/images/news/${newsItem.image}`} alt={newsItem.title} />
+        </div>
+      </dialog>
+    </>
+  )
+}
+```
+
+### Archive FilteredNewsPage
+
+```jsx
+🔧 변경 사항
+
+		1. getAvailableNewsYears() 등 대부분의 함수가 비동기 함수가 되었음.
+
+		2. async/await를 적용하여 데이터 fetch.
+
+		3. 숫자 변환(+selectedYear)을 제거.
+
+				DB에서 받아온 연도와 달은 문자열(string) 이므로,
+
+				availableYears.includes(selectedYear) 검사에서 실패하지 않도록 숫자 변환 제거.
+
+		4. 필요한 경우 로딩 대체 화면을 loading.js로 추가.
+```
+
+```jsx
+export default async function FilteredNewsPage({ params }) {
+  const filter = params.filter
+  const selectedYear = filter?.[0]
+  const selectedMonth = filter?.[1]
+
+  let news
+  let links = await getAvailableNewsYears()
+
+  if (selectedYear && !selectedMonth) {
+    news = await getNewsForYear(selectedYear)
+    links = await getAvailableNewsMonths(selectedYear)
+  }
+
+  if (selectedYear && selectedMonth) {
+    news = await getNewsForYearAndMonth(selectedYear, selectedMonth)
+    links = []
+  }
+
+  const availableYears = await getAvailableNewsYears()
+
+  if (
+    (selectedYear && !availableYears.includes(selectedYear)) ||
+    (selectedMonth && !(await getAvailableNewsMonths(selectedYear)).includes(selectedMonth))
+  ) {
+    throw new Error('Invalid filter.')
+  }
+
+  return (
+    <>
+      <header>
+        <nav>
+          <ul>
+            {links.map((link) => (
+              <li key={link}>
+                <Link href={`/archive/${selectedYear}/${link}`}>{link}</Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </header>
+      {news && news.length > 0 ? (
+        <NewsList news={news} />
+      ) : (
+        <p>No news found for the selected period.</p>
+      )}
+    </>
+  )
+}
+```
+
+### Filtered News Page
+
+```jsx
+문제: ‘Invalid filter’ 오류 발생
+
+이유:
+
+		DB에서 가져온 availableYears나 availableMonths는 문자열 배열인데, 기존에는 숫자로 변환(+selectedYear) 후 includes 검사를 했음.
+
+		→ 문자열 배열에 숫자를 포함하는지 검사하므로 실패.
+
+🔧 해결:
+
+		플러스 기호 제거 → selectedYear와 selectedMonth를 문자열 그대로 검사.
+```
+
+### @modal 인터셉터의 default.js 설정
+
+```jsx
+⚠️ 문제
+
+		인터셉터 경로(@modal)를 새로고침하면 ‘찾을 수 없음’ 오류 발생.
+
+💡 해결
+
+		page.js 파일명을 default.js로 변경.
+
+		Next.js 병렬 라우트에서 기본 컴포넌트를 제공하지 않으면 오류가 발생하기 때문에 이를 해결.
+```
+
+### LatestNewsPage (최신 뉴스 페이지)
+
+```jsx
+getLatestNews()는 DB에서 비동기로 최신 뉴스를 가져옴.
+
+함수 앞에 async를 붙이고 await로 호출.
+```
+
+```jsx
+import NewsList from '@/components/news-list'
+import { getLatestNews } from '@/lib/news'
+
+export default async function LatestNewsPage() {
+  const latestNews = await getLatestNews()
+
+  return (
+    <>
+      <h2>Latest News</h2>
+      <NewsList news={latestNews} />
+    </>
+  )
+}
+```
+
+# { React Suspense 로딩 화면 만들기 }
+
+## 1. 문제 상황 요약
+
+```jsx
+Next.js의 loading.js는 페이지 전환 시 로딩 화면을 보여줌.
+
+하지만 현재 페이지에서 필터(월)를 선택해 데이터를 다시 가져오는 경우
+
+→ loading.js의 로딩 화면이 보이지 않음.
+
+이유는:
+
+		이미 이 페이지에 있기 때문에 Next.js가 로딩 대체 화면으로 교체하지 않음.
+
+		데이터를 다시 fetch하지만 기존 컴포넌트를 그대로 유지함.
+```
+
+## 2. 해결 아이디어 (Suspense)
+
+### React Suspense
+
+```jsx
+React의 Suspense 컴포넌트는
+
+		감싼 컴포넌트가 데이터를 fetch하는 동안 fallback UI를 보여줌.
+
+		Next.js 13+의 서버 컴포넌트 + Suspense를 활용하면
+
+		→ 더 세밀한 로딩 UI 제어 가능.
+```
+
+## 3. 전체 코드 구조 (개선 후)
+
+```jsx
+import { Suspense } from 'react'
+import Link from 'next/link'
+
+import NewsList from '@/components/news-list'
+import {
+  getAvailableNewsMonths,
+  getAvailableNewsYears,
+  getNewsForYear,
+  getNewsForYearAndMonth,
+} from '@/lib/news'
+
+// ✅ 1. 헤더 컴포넌트 (연도/월 필터)
+async function FilterHeader({ year, month }) {
+  // 사용 가능한 연도 배열 가져오기
+  const availableYears = await getAvailableNewsYears()
+
+  // 기본 링크는 연도 리스트
+  let links = availableYears
+
+  // ❗ 잘못된 필터일 경우 에러
+  if (
+    (year && !availableYears.includes(year)) ||
+    (month && !getAvailableNewsMonths(year).includes(month))
+  ) {
+    throw new Error('Invalid filter.')
+  }
+
+  // 연도만 선택된 경우 해당 연도의 월 링크로 변경
+  if (year && !month) {
+    links = getAvailableNewsMonths(year)
+  }
+
+  // 연도 + 월 모두 선택된 경우 링크 없음
+  if (year && month) {
+    links = []
+  }
+
+  return (
+    <header id="archive-header">
+      <nav>
+        <ul>
+          {links.map((link) => {
+            // 링크의 경로 설정
+            const href = year
+              ? `/archive/${year}/${link}` // 연도 + 월
+              : `/archive/${link}` // 연도만
+
+            return (
+              <li key={link}>
+                <Link href={href}>{link}</Link>
+              </li>
+            )
+          })}
+        </ul>
+      </nav>
+    </header>
+  )
+}
+
+// ✅ 2. 뉴스 목록 컴포넌트 (연도/월별 데이터)
+async function FilteredNews({ year, month }) {
+  let news
+
+  // 연도만 있을 경우: 해당 연도의 모든 뉴스
+  if (year && !month) {
+    news = await getNewsForYear(year)
+  }
+  // 연도 + 월 모두 있을 경우: 해당 월의 뉴스
+  else if (year && month) {
+    news = await getNewsForYearAndMonth(year, month)
+  }
+
+  // 뉴스 없을 경우 대체 화면
+  let newsContent = <p>No news found for the selected period.</p>
+
+  if (news && news.length > 0) {
+    newsContent = <NewsList news={news} />
+  }
+
+  return newsContent
+}
+
+// ✅ 3. 페이지 컴포넌트
+export default async function FilteredNewsPage({ params }) {
+  const filter = params.filter
+
+  const selectedYear = filter?.[0]
+  const selectedMonth = filter?.[1]
+
+  return (
+    <>
+      {/* 
+        📝 Suspense로 FilterHeader 감싸기
+        데이터를 fetch 중이면 '필터 로딩 중...' 표시
+      */}
+      <Suspense fallback={<p>필터 로딩 중...</p>}>
+        <FilterHeader year={selectedYear} month={selectedMonth} />
+      </Suspense>
+
+      {/*
+        📝 Suspense로 FilteredNews 감싸기
+        데이터를 fetch 중이면 '뉴스 로딩 중...' 표시
+      */}
+      <Suspense fallback={<p>뉴스 로딩 중...</p>}>
+        <FilteredNews year={selectedYear} month={selectedMonth} />
+      </Suspense>
+    </>
+  )
+}
+```
+
+## 4. 코드 설명
+
+| 구간           | 설명                                                     |
+| -------------- | -------------------------------------------------------- |
+| `FilterHeader` | 연도/월 필터를 보여주는 비동기 서버 컴포넌트             |
+| `FilteredNews` | 실제 뉴스 데이터를 가져와 보여주는 컴포넌트              |
+| `Suspense`     | 각 컴포넌트를 감싸 **데이터 로딩 중 fallback UI**를 표시 |
+
+## 5. 핵심 포인트
+
+```jsx
+✅ loading.js
+
+		페이지 전체를 위한 로딩 UI
+
+		이미 같은 페이지 내에서 데이터 fetch 시에는 표시되지 않음
+
+✅ Suspense
+
+		원하는 컴포넌트 단위로 fallback UI 표시 가능
+
+		페이지 내부의 특정 fetch 상태를 세밀하게 제어 가능
+
+✅ Next.js 서버 컴포넌트 + Suspense
+
+		서버에서 데이터를 가져오는 컴포넌트를 Suspense로 감싸면
+
+		→ 데이터가 준비될 때까지 fallback UI가 보여짐.
+```

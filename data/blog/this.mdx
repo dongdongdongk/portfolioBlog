@@ -1,0 +1,238 @@
+---
+title: '자바스크립트에서의 this'
+date: '2026-09-02'
+category: '풀스택/JavaScript'
+tags: ['풀스택', 'JavaScript']
+draft: false
+summary: ''
+---
+
+```jsx
+자바스크립트 내에서 this는 '누가 나를 불렀느냐'를 뜻함
+
+즉, 선언이 아닌 호출에 따라 달라지며
+
+각 상황별로 this가 어디에 바인딩되는지 달라진다
+```
+
+# **1. 단독으로 쓴 this**
+
+```jsx
+묻지도 따지지도 않고 this를 호출하는 경우엔 global object를 가리킴
+
+브라우저에서 호출하는 경우 [object Window]
+
+이는 ES5에서 추가된 strict mode(엄격 모드)에서도 마찬가지
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381267/notion-blog/_/JavaScript/JavaScript_/_this/Untitled.png)
+
+```jsx
+'use strict'
+
+var x = this
+console.log(x) //Window
+```
+
+# **2. 함수 안에서 쓴 this**
+
+```jsx
+함수 안에서 this는 함수의 주인에게 바인딩
+
+함수의 주인은?  window객체
+```
+
+```jsx
+function myFunction() {
+  return this
+}
+console.log(myFunction()) //Window
+```
+
+```jsx
+var num = 0
+function addNum() {
+  this.num = 100
+  num++
+
+  console.log(num) // 101
+  console.log(window.num) // 101
+  console.log(num === window.num) // true
+}
+
+addNum()
+```
+
+```jsx
+위 코드에서 this.num의 this는 window 객체를 가리킴
+
+따라서 num은 전역 변수를 가리키게 됨
+```
+
+```jsx
+strict mode(엄격 모드)에서는 조금 다름
+
+함수 내의 this에 디폴트 바인딩이 없기 때문에 undefined가 됨
+```
+
+```jsx
+'use strict'
+
+function myFunction() {
+  return this
+}
+console.log(myFunction()) //undefined
+```
+
+```jsx
+'use strict'
+
+var num = 0
+function addNum() {
+  this.num = 100 //ERROR! Cannot set property 'num' of undefined
+  num++
+}
+
+addNum()
+```
+
+# **3. 메서드 안에서 쓴 this**
+
+```jsx
+메서드 호출 시 메서드 내부 코드에서 사용된 this는 해당 메서드를 호출한 객체로 바인딩
+```
+
+```jsx
+var person = {
+  firstName: 'John',
+  lastName: 'Doe',
+  fullName: function () {
+    return this.firstName + ' ' + this.lastName
+  },
+}
+
+person.fullName() //"John Doe"
+```
+
+```jsx
+var num = 0
+
+function showNum() {
+  console.log(this.num)
+}
+
+showNum() //0 전역 스코프에서 호출
+
+var obj = {
+  num: 200,
+  func: showNum,
+}
+
+obj.func() //200
+```
+
+```jsx
+아래 예시를 조금 설명하자면showNum 함수를 호출하는 위치에 떄라 this 의 값이 달라진다
+
+showNum 을 전역스코프에서 호출하면 this 는 전역객체를 가리키며 전역 스코프에 선언된 전역변수 num = 0 이 들어간다
+
+그러나 var obj 내부에서 showNum을 호출하면 함수 showNum의 this가 obj의 num 을 가리켜서 200이 출력된다
+
+```
+
+# **4. 이벤트 핸들러 안에서 쓴 this**
+
+```jsx
+이벤트 핸들러에서 this는 이벤트를 받는 HTML 요소를 가리킨다 (#btn 같은 html 요소)
+```
+
+```jsx
+var btn = document.querySelector('#btn')
+
+btn.addEventListener('click', function () {
+  console.log(this) //#btn을 가리킨다.
+})
+```
+
+# **5. 생성자 안에서 쓴 this**
+
+```jsx
+생성자 함수가 생성하는 객체로 this가 바인딩 된다.
+```
+
+```jsx
+function Person(name) {
+  this.name = name
+}
+
+var kim = new Person('kim')
+var lee = new Person('lee')
+
+console.log(kim.name) //kim
+console.log(lee.name) //lee
+```
+
+```jsx
+하지만 new 키워드를 빼먹는 순간 일반 함수 호출과 같아지기 때문에, 이 경우는 this가 window에 바인딩됨
+```
+
+```jsx
+var name = 'window'
+function Person(name) {
+  this.name = name
+}
+
+var kim = Person('kim')
+
+console.log(window.name) //kim
+```
+
+# **6. 화살표 함수로 쓴 this**
+
+```jsx
+함수 안에서 this가 전역 객체가 되는게 싫을때는 화살표 함수를 쓰면 된다.
+
+화살표 함수는 전역 컨텍스트에서 실행되더라도 this를 새로 정의하지 않고, 바로 바깥 함수나 클래스의 this를 쓴다.
+```
+
+```jsx
+var Person = function (name, age) {
+  this.name = name
+  this.age = age
+  this.say = function () {
+    console.log(this) // Person {name: "Nana", age: 28}
+
+    setTimeout(function () {
+      console.log(this) // Window
+      console.log(this.name + ' is ' + this.age + ' years old')
+    }, 100)
+  }
+}
+var me = new Person('Nana', 28)
+
+me.say() //global is undefined years old
+```
+
+```jsx
+위 코드를 보면 내부 함수에서 this가 전역 객체를 가리키는 바람에 의도와는 다른 결과가 나왔다
+```
+
+```jsx
+var Person = function (name, age) {
+  this.name = name
+  this.age = age
+  this.say = function () {
+    console.log(this) // Person {name: "Nana", age: 28}
+
+    setTimeout(() => {
+      console.log(this) // Person {name: "Nana", age: 28}
+      console.log(this.name + ' is ' + this.age + ' years old')
+    }, 100)
+  }
+}
+var me = new Person('Nana', 28) //Nana is 28 years old
+```
+
+```jsx
+하지만 화살표 함수로 바꾸면 제대로 된 결과가 나오는 걸 볼 수 있다
+```

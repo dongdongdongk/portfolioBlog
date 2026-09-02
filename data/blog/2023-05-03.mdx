@@ -1,0 +1,150 @@
+---
+title: '2023-05-03'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381118/notion-blog/_/_/_-Spring_boot/2023-05-03/Untitled.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381117/notion-blog/_/_/_-Spring_boot/2023-05-03/Untitled_1.png)
+
+## 3. WebClient
+
+### 1. API 추가
+
+```jsx
+<dependency>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-starter-webflux</artifactId>
+</dependency>
+```
+
+## 2. 요청 사용법
+
+```jsx
+A. WebClient 객체 생성
+
+1. create()
+WebClient webClient = WebClient.create();
+WebClient	webClient = WebClient.create("URI 주소");
+
+2. builder()
+WebClient webClient = WebClient.builder()
+										 .baseUrl("")
+										 .defaultHeader("Key", "value")
+										 .defaultCookie("key", "value")
+										 .build();
+
+a. baseUrl            : 기본 공통 URI 설정
+b. defaultHeader      : 공통 Header 설정
+c. defaultCookie      : 공통 Cookie 설정
+d. filter             : 요청에 사용할 클라이언트 필터
+e. exchangeStrategies : HTTP 메시지 read, write 커스텀 할 때 사용
+f. clientConnector    : HTTP 클라이언트 라이브러리 설정
+g. uriBuilderFactory  : Base URL을 커스텀한 uriBuilderFactory
+
+B. 요청 정보 설정
+webClient.요청메서드명()
+				 .uri("baseURL이후 URI", 파라미터설정)
+				 .header("k", "v")
+				 .cookie("k", "v");
+
+C. Parameter 설정
+	a. Get 요청 (3가지 방)
+		 1) uri("/list?page=1")
+		 2) uri("/list?page={page}&kind={kind}", 1, "Title")
+		 3) uri("/list", Map<String, Object> map)
+				Map<String, Object> map = new HashMap<>();
+				map.put("page", 1);
+				map.put("kind", "title");
+				uri("/list", map)
+		 4) uri("/list", TestVO)
+				PostVO postVO = new PostVO();
+				postVO.setId("1");
+			  uri("/list", postVO)
+
+		 5) URIBuilder의 queryparam : https://www.baeldung.com/webflux-webclient-parameters 참조
+
+	b. Post 요청
+		 1) bodyValue(PostVO)
+		 2) body(Mono.just(PostVO),  PostVO.class)
+		 3) body(BodyInserters.fromFormData(multiValueMap))
+		 4) body(BodyInserters.fromObject(postVO))
+
+```
+
+## 3. 응답
+
+```jsx
+응답은 두가지 메서드 중에서 하나를 선택해서 처리
+
+1. retrieve()   : body를 받아 디코딩하는 간단한 메서드
+2. exchange()   : Client Response를 상태값 과 Header를 함계 가져오는 메서드
+
+- exchange를 통해서 세세한 컨트롤이 가능하지만,
+  모든 처리를 직접 해야 하므로 메모리 누수 가능성이 있기 때문에 retrieve()권장
+```
+
+```jsx
+retrieve()는 크게 두가지의 객체 타입을 결과로 받음
+
+1. toEntity()
+	 status, headers, body을 포함하는 ResponseEntity 타입으로 받을 수 있음
+
+	WebClient webClient = WebClient.builder()
+									   .baseUrl("https://jsonplaceholder.typicode.com/")
+									   .build();
+	Mono<ResponseEntity<PostVO>> res = webClient.get()
+				 							.uri("posts/1")
+				 							.retrieve()
+				 							.toEntity(PostVO.class);
+
+	PostVO postVO = res.block().getBody();
+
+
+2. bodyToMono(), bodyToFlux()
+	 body의 데이터만 받고 싶을 때
+	 toMono : 0-1개의 결과를 처리하는 객체
+	 toFlux : 0-N개의 결과를 처리하는 객체
+
+		a. bodyToMono() : 결과가 0, 1개
+
+		WebClient webClient = WebClient.builder()
+									   .baseUrl("https://jsonplaceholder.typicode.com/")
+									   .build();
+		Mono<PostVO> res = webClient.get()
+				 					.uri("posts/2")
+				 					.retrieve()
+				 					.bodyToMono(PostVO.class);
+
+
+		 PostVO postVO = res.block();
+
+		b. bodyToFlux : 결과가 0, N 개
+
+		WebClient webClient = WebClient.builder()
+																   .baseUrl("https://jsonplaceholder.typicode.com/")
+																   .build();
+		Flux<PostVO> res = webClient.get()
+											 					.uri("posts")
+											 					.retrieve()
+											 					.bodyToFlux(PostVO.class);
+
+
+		PostVO postVO = res.blockFirst();
+
+		res.subscribe((s)->{
+			PostVO pvo = s;
+			log.info("ID : {} ", s.getId());
+		});
+
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381117/notion-blog/_/_/_-Spring_boot/2023-05-03/Untitled_2.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381117/notion-blog/_/_/_-Spring_boot/2023-05-03/Untitled_3.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381117/notion-blog/_/_/_-Spring_boot/2023-05-03/Untitled_4.png)

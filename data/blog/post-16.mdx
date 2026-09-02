@@ -1,0 +1,75 @@
+---
+title: '요청 흐름도'
+date: '2026-09-02'
+category: '기타, 사용 적음/국비'
+tags: ['기타, 사용 적음', '국비']
+draft: false
+summary: ''
+---
+
+### 1. Tomcat 시작
+
+```jsx
+1. Tomcat이 web.xml을 읽고 실행
+	- DispatcherServlet 객체를 생성
+	- Application(ServletContext type) 내장객체를 생성
+
+2. DS 초기화 작업(init)
+	1) root-context.xml, servlet-context.xml 을 읽고 실행
+	2) InternalResourceViewResolver 객체를 생성
+	3) context:component-scan base-package="com.iu.start" 실행
+			- base-package(하위패키지포함)에서 Annotation을 읽고 실행
+			- ex) @Controller : 해당클래스는 Controller역할이고 객체를 생성
+
+-- XML파일에 문제가 있을 경우(오타, 문법등 오류) Tomcat 실행시 에러(Exception) 발생
+
+3. 서비스 시작(Client의 요청을 기다림)
+```
+
+### 2. Client 서비스 이용
+
+```jsx
+1. Client의 WebBrowser에서 요청 발생
+	- WebBrowser의 주소창에 URL을 직접입력 (Get)
+	- a 태그 클릭 (Get)
+	- form 태그 submit (Get, Post)
+	- JavaScript의 location.href 발생 (Get)
+	- Ajax의 메서드 실행 (Get, Post)
+
+	* 서버로 요청시 필수 요소와 옵션요소
+	- URL
+	- Method
+	- Parameter(option)
+	- Cookie(Server에서 발행한 것이 있으면)
+
+2. Tomcat이 요청의 모든 정보를 담는 Request, Response 객체 생성하고 DS으로 보냄
+3. Tomcat이 발행한 Cookie(JSESSIONID)를 보고 해당 ID로 만든 Session 객체가 있는지 확인
+	 Session 객체가 없으면 새로 생성
+
+4. DS은 URL을 확인하고 해당 URL을 처리하는 Controller의 메서드를 호출
+
+5. Controller의 메서드는 실행하고 종료시 ModelAndView를 리턴
+
+6. DS은 리턴받은 ModelAndView객체를 InternalResourceViewResolver로 보냄
+
+7. VR는 View에 있는 ViewName을 꺼내서 앞에 "/WEB-INF/views/" 붙이고
+   뒤에 ".jsp"를 붙이고 다시 리턴
+
+8. DS은 ViewName의 JSP를 찾아서 실행
+
+9. JSP에서 HTML을 작성
+	- Page 내장객체 생성
+
+10. HTML, Cookie(서버에 발행) 등을 Response에 DS으로 리턴
+	- page객체 소멸
+
+11. DS에서 Response객체를 Tomcat으로 보내고
+	- Request, Response, ModelAndView 소멸
+
+12. Tomcat이 Client 전송
+
+13. 연결 종료
+
+```
+
+[spring.pdf](%EC%9A%94%EC%B2%AD%20%ED%9D%90%EB%A6%84%EB%8F%84/spring.pdf)

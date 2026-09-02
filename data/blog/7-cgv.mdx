@@ -1,0 +1,139 @@
+---
+title: '섹션 7. CGV 영화관 무비차트 크롤링'
+date: '2026-09-02'
+category: '기타, 사용 적음/크롤링 & 파이썬'
+tags: ['기타, 사용 적음', '크롤링 & 파이썬']
+draft: false
+summary: ''
+---
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380940/notion-blog/_/_/_/_7_CGV_/Untitled.png)
+
+```python
+import requests
+from bs4 import BeautifulSoup
+
+headers = {
+    "User-Agent" : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+}
+
+url = "http://www.cgv.co.kr/movies/?lt=1&ft=0"
+
+req = requests.get(url, headers=headers)
+
+html = req.text
+
+soup = BeautifulSoup(html, "html.parser")
+
+sect_movie_chart = soup.select_one(".sect-movie-chart")
+
+movie_chart = sect_movie_chart.select("li")
+
+for rank, movie in enumerate(movie_chart, 1):
+    title = movie.select_one(".title")
+    score = movie.select_one(".score")
+    ticketing = score.select_one(".percent")
+    egg_gage = score.select_one(".egg-gage.small > .percent") # egg-gate 클래스 하위 .percent 클래스를 찾아 선택
+
+    info = movie.select_one(".txt-info > strong").next_element # 그냥 개봉을 아예 가져오지 않게 해버림 next_element 를 사용해서
+
+    print(f"<<rank{rank}위>>")
+    print(title.text)
+    print(ticketing.get_text(" : "))
+    print(egg_gage.text)
+    print(f"{info.strip()}")
+    print("")
+
+# print(len(movie_chart))
+
+```
+
+```python
+cgv 사이트의 데이터를 크롤링 해온다
+
+영화 모두를 가지고 있는 요소를 선택하고
+
+그 하위 요소들을 선택해서 출력한다
+```
+
+# html 파일을 만들어서 분석하기
+
+```python
+기본적으로 관리자 도구를 사용해서 분석을 하려면 복잡하고 보기 편하지 않다
+
+이럴떄 html 파일을 만들어서 복사 - 붙여넣기 하고 분석하면 편하다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380939/notion-blog/_/_/_/_7_CGV_/Untitled_1.png)
+
+# get_text() 를 사용해서 출력하기
+
+```python
+ticketing = score.select_one(".percent")
+
+현재 위와 같이 percent 로 요소를 찾아서 데이터를 출력하니
+
+예매율과 span 의 요소가 같이 붙어서 출력되어 보기가 불편하다
+
+이때 사용 가능한게 get_text 이다
+
+print(ticketing.get_text(" : ")) 이런식으로 사용하면
+
+예매율과 퍼센트가
+
+예매율 : 6.6%
+
+이런식으로 나눠져서 출력된다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380939/notion-blog/_/_/_/_7_CGV_/Untitled_2.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380940/notion-blog/_/_/_/_7_CGV_/Untitled_3.png)
+
+## get_text()
+
+```python
+get_text() 메서드는 BeautifulSoup에서 사용되는 메서드로, HTML 문서에서 모든 텍스트를 추출하는 데 사용
+```
+
+```python
+태그.get_text(separator='', strip=False)
+
+태그: 텍스트를 추출할 HTML 태그입니다.
+separator (선택적): 텍스트를 결합할 때 사용할 구분자입니다. 기본값은 빈 문자열('')입니다.
+strip (선택적): True로 설정하면 텍스트에서 좌우 공백을 제거합니다. 기본값은 False입니다.
+```
+
+# 날짜와 개봉이 이상하게 출력 되는 이슈
+
+```python
+날짜와 span 사이의 빈칸 때문에 출력이 이상하게 되고 있다
+
+이 문제를 해결하기 위해서
+
+개봉은 출력하지 않기로 한다 이때 사용하는게
+
+info = movie.select_one(".txt-info > strong").next_element # 그냥 개봉을 아예 가져오지 않게 해버림 next_element 를 사용해서
+
+위의 코드이며 ".txt-info > strong" 의 바로 다음 요소 <strong> 만 출력하게 해준다
+
+그리고 strip 을 이용해서 빈칸을 제거해준다
+
+print(f"{info.strip()}")
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380940/notion-blog/_/_/_/_7_CGV_/Untitled_4.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380940/notion-blog/_/_/_/_7_CGV_/Untitled_5.png)
+
+```python
+구조가 위와 같이 <strong> 내부에 <span> 이 있어서 .next_element 로 날짜만 가져올 수 있고
+
+개봉 앞의 빈칸 때문에 아래처럼 이상하게 출려되는것
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380940/notion-blog/_/_/_/_7_CGV_/Untitled_6.png)
+
+```python
+최종적으로는 개봉은 빼버리고 위와 같이 출력된다
+```

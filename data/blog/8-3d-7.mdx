@@ -1,0 +1,2633 @@
+---
+title: '섹션 8: 제트팩 저니 - 제트팩을 이용한 3D 플랫폼 게임 - 7'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { ✨ 픽업 아이템에 Juice 추가하기 (Polish & Effects) }
+
+## 🎯 이번 강의 목표
+
+기능적으로는 완성된 픽업 아이템에 **게임의 완성도를 높이는 효과**들을 추가합니다.
+
+- 사운드 효과 추가
+- 파티클 효과 (Niagara System)
+- 회전 애니메이션
+- 스케일 타임라인 (Wink Out)
+- 충돌 비활성화
+
+---
+
+## 💡 핵심 개념: Game Juice (게임 주스)
+
+### Game Juice란?
+
+```
+Game Juice (게임 주스)
+  ↓
+게임의 "손맛", "재미 요소"를 높이는 시각/청각 효과
+  ├─ 기능적으로는 불필요
+  ├─ 하지만 게임 경험에 필수적
+  └─ 플레이어의 행동에 대한 피드백
+
+예시:
+  버튼 클릭
+    ├─ Juice 없음: 그냥 작동
+    └─ Juice 있음: 소리 + 애니메이션 + 파티클
+         ↓
+       훨씬 만족스러운 경험!
+```
+
+**왜 중요한가?**
+
+```
+게임 완성도 = 기능 + Juice
+  ├─ 기능만: 작동하지만 재미없음
+  ├─ Juice만: 예쁘지만 의미없음
+  └─ 둘 다: 완성도 높은 게임!
+
+플레이어 피드백:
+  ├─ "이 게임은 느낌이 좋아"
+  ├─ "타격감이 있어"
+  └─ "만족스러워"
+       ↓
+     모두 Juice의 효과!
+```
+
+---
+
+## 🎨 추가할 효과 목록
+
+### 1. 사운드 효과
+
+```
+Spawn Sound at Location
+  ├─ 픽업 시 소리 재생
+  └─ 청각 피드백
+```
+
+### 2. 파티클 효과
+
+```
+Spawn System at Location (Niagara)
+  ├─ 시각적 효과
+  └─ 픽업 순간 강조
+```
+
+### 3. 회전 애니메이션
+
+```
+Add World Rotation (Tick)
+  ├─ 지속적인 회전
+  └─ 눈에 띄게 만들기
+```
+
+### 4. 스케일 애니메이션
+
+```
+Timeline (Scale)
+  ├─ 픽업 시 확대 → 축소
+  └─ "Wink Out" 효과
+```
+
+---
+
+## 🔊 1단계: 사운드 효과 추가
+
+### Spawn Sound at Location
+
+```
+Event ActorBeginOverlap 이후
+  ↓
+Spawn Sound at Location
+  ├─ Sound: SFX_JetFuelPickup
+  ├─ Location: Get Actor Location
+  └─ Auto Destroy: True (기본값)
+```
+
+**노드 구성:**
+
+```
+Get Actor Location
+  ├─ Target: Self (픽업 아이템)
+  └─ Return: Vector (위치)
+       ↓
+Spawn Sound at Location
+  ├─ Sound: MS_JetFuel (Assets/Sounds/JetFuel/)
+  ├─ Location: Actor Location
+  ├─ Auto Destroy: True
+  └─ Volume Multiplier: 1.0 (기본값)
+```
+
+### Auto Destroy란?
+
+```
+Auto Destroy: True
+  ↓
+사운드 재생이 끝나면 자동으로 제거
+  ├─ 메모리 누수 방지
+  ├─ 수동 관리 불필요
+  └─ 권장 설정
+
+Auto Destroy: False
+  ↓
+수동으로 제거해야 함
+  └─ 반복 재생 등 특수한 경우만
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380770/notion-blog/_/_/_5_/_8_-_3D_-_7/image.png)
+
+---
+
+## ✨ 2단계: 파티클 효과 추가
+
+### Spawn System at Location (Niagara)
+
+```
+Spawn Sound at Location 이후
+  ↓
+Spawn System at Location
+  ├─ System: NS_FuelPickup
+  ├─ Location: Get Actor Location (재사용)
+  └─ Auto Destroy: True
+```
+
+**노드 구성:**
+
+```
+같은 Get Actor Location 사용
+  ↓
+Spawn System at Location
+  ├─ System Template: NS_FuelPickup
+  │    └─ Assets/Effects/JetFuel/
+  ├─ Location: Actor Location
+  ├─ Rotation: (0, 0, 0) 기본값
+  ├─ Scale: (1, 1, 1) 기본값
+  └─ Auto Destroy: True
+```
+
+### Niagara System이란?
+
+```
+Niagara System
+  ↓
+언리얼 엔진의 최신 파티클 시스템
+  ├─ 고성능
+  ├─ 유연한 커스터마이징
+  └─ GPU 가속
+
+특징:
+  ├─ 연기, 불, 폭발 등
+  ├─ 마법 효과
+  └─ 환경 효과
+```
+
+---
+
+## 🔄 3단계: 회전 애니메이션 추가
+
+### Rotation Offset (초기 각도)
+
+```
+Viewport에서:
+  FuelMesh 선택
+    ↓
+  Transform → Rotation
+    ↓
+  Y (Roll): 40도 정도
+    ↓
+  약간 기울어진 자세
+```
+
+**왜 기울이나?**
+
+```
+수직 (0, 0, 0):
+  └─ 단조로움, 밋밋함
+
+기울어짐 (0, 40, 0):
+  └─ 역동적, 흥미로움
+```
+
+### Event Tick 회전
+
+```
+Event Tick
+  ↓
+Add World Rotation
+  ├─ Target: FuelMesh
+  └─ Delta Rotation: (0, 0, Yaw)
+```
+
+**노드 구성 상세:**
+
+```
+1. Delta Rotation 계산
+   Get World Delta Seconds
+     ↓
+   Multiply (×)
+     ├─ A: Delta Seconds
+     └─ B: Rotation Speed (변수)
+          ↓
+        Yaw 값 (프레임당 회전량)
+
+2. Add World Rotation
+   FuelMesh
+     ↓
+   Add World Rotation
+     ├─ Delta Rotation:
+     │    ├─ Pitch: 0
+     │    ├─ Yaw: 계산된 값
+     │    └─ Roll: 0
+     └─ 효과: 매 프레임 회전
+```
+
+### Rotation Speed 변수
+
+```
+변수 생성:
+  ├─ Name: Rotation Speed
+  ├─ Type: Float
+  ├─ Default: 45.0
+  ├─ Instance Editable: True
+  └─ Category: Pickup
+
+효과:
+  45.0 = 초당 45도 회전
+  90.0 = 초당 90도 회전 (더 빠름)
+```
+
+**Delta Seconds 사용 이유:**
+
+```
+프레임 독립적 회전:
+  60 FPS: 0.0166초 × 45 = 0.75도/프레임
+  30 FPS: 0.0333초 × 45 = 1.5도/프레임
+
+결과: 모두 초당 45도 회전! ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380767/notion-blog/_/_/_5_/_8_-_3D_-_7/image_1.png)
+
+---
+
+## 📊 4단계: 스케일 타임라인 (Wink Out)
+
+### Timeline 생성
+
+```
+Event Graph
+  ↓
+Add Timeline
+  └─ Name: PickupScaleTimeline
+```
+
+### Float Track 추가
+
+```
+Timeline 더블클릭
+  ↓
+Add Float Track
+  ├─ Name: Scale
+  └─ Length: 0.2초 (빠른 애니메이션)
+```
+
+### 키프레임 설정
+
+```
+Key 1 (시작):
+  ├─ Time: 0.0
+  ├─ Value: 1.0
+  └─ 의미: 원래 크기
+
+Key 2 (끝):
+  ├─ Time: 0.2
+  ├─ Value: 0.0
+  └─ 의미: 완전히 축소
+```
+
+### 커브 조정
+
+```
+1. Key 2 선택
+   우클릭 → Auto
+     ↓
+   부드러운 곡선
+
+2. Tangent 조정
+   ├─ Key 2: 각도 위로 (급격한 축소)
+   └─ Key 1: 각도 아래로 (부드러운 시작)
+```
+
+**커브 모양:**
+
+```
+Value
+  1.0 ┤
+      │ ╲
+      │  ╲   (부드럽게 시작)
+      │   ╲╲
+  0.0 └────╲╲──→ Time
+      0.0  0.2
+           (급격하게 축소)
+
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380769/notion-blog/_/_/_5_/_8_-_3D_-_7/image_2.png)
+
+### Timeline 업데이트 구현
+
+```
+PickupScaleTimeline
+  └─ Update 핀
+       ↓
+     Scale Fuel Mesh 함수
+
+```
+
+**Scale Fuel Mesh 함수:**
+
+```
+함수 생성:
+  Name: Scale Fuel Mesh
+  Input: Scale (Float)
+
+노드 구성:
+  FuelMesh
+    ↓
+  Set World Scale 3D
+    ├─ Target: FuelMesh
+    └─ New Scale: Make Vector
+         ├─ X: Scale
+         ├─ Y: Scale
+         └─ Z: Scale
+              ↓
+            균등 스케일
+
+```
+
+**Make Vector 사용 이유:**
+
+```
+Set World Scale 3D는 Vector 필요
+  ↓
+Make Vector (X, Y, Z)
+  ├─ 모두 같은 값: Scale
+  └─ 균등하게 확대/축소
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380770/notion-blog/_/_/_5_/_8_-_3D_-_7/image_3.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380769/notion-blog/_/_/_5_/_8_-_3D_-_7/image_4.png)
+
+---
+
+## 🎬 5단계: Wink Out 구현
+
+### Custom Event 생성
+
+```
+Custom Event: Wink Out
+  ↓
+실행 내용:
+  1. 충돌 비활성화
+  2. 타임라인 재생
+```
+
+**노드 구성:**
+
+```
+Wink Out (Custom Event)
+  ↓
+Set Collision Enabled
+  ├─ Target: FuelMesh
+  ├─ New Type: No Collision
+  └─ 효과: 더 이상 충돌 안 함
+       ↓
+PickupScaleTimeline
+  └─ Play from Start
+       ↓
+     타임라인 시작
+```
+
+### 충돌 비활성화가 필요한 이유
+
+```
+문제 상황:
+  픽업 후 0.2초 동안 아직 존재
+    ↓
+  충돌 활성화 상태
+    ↓
+  다시 충돌 가능!
+    ↓
+  중복 픽업 또는 에러
+
+해결:
+  즉시 충돌 비활성화
+    ↓
+  타임라인 재생 중 충돌 없음
+    ↓
+  안전하게 제거
+```
+
+### Timeline Finished에서 제거
+
+```
+PickupScaleTimeline
+  └─ Finished 핀
+       ↓
+     Destroy Actor
+       └─ 애니메이션 끝나면 제거
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380769/notion-blog/_/_/_5_/_8_-_3D_-_7/image_5.png)
+
+---
+
+## 🔗 6단계: 전체 흐름 연결
+
+### Event ActorBeginOverlap 최종 구조
+
+```
+Event ActorBeginOverlap
+  ↓
+Does Implement Interface?
+  ├─ True:
+  │    ├─ Handle Refill Fuel (연료 보충)
+  │    ├─ Handle Pickup Effect (사운드 + 파티클)
+  │    └─ Wink Out (충돌 비활성화 + 타임라인)
+  │
+  └─ False:
+       └─ (아무것도 안 함)
+```
+
+### Handle Pickup Effect 함수
+
+```
+함수 생성:
+  Name: Handle Pickup Effect
+
+노드 구성:
+  Spawn Sound at Location
+    ├─ Sound: MS_JetFuel
+    └─ Location: Get Actor Location
+         ↓
+  Spawn System at Location
+    ├─ System: NS_FuelPickup
+    └─ Location: Get Actor Location (재사용)
+```
+
+**함수로 분리한 이유:**
+
+```
+가독성:
+  └─ "효과 처리" 기능 명확히 분리
+
+재사용성:
+  └─ 다른 곳에서도 호출 가능
+
+유지보수:
+  └─ 효과 변경 시 한 곳만 수정
+```
+
+---
+
+## 📊 완성된 시스템 구조
+
+### Event Graph 전체 흐름
+
+```
+Event BeginPlay
+  └─ (초기화 - 현재 없음)
+
+Event Tick
+  └─ Add World Rotation
+       ├─ FuelMesh 회전
+       └─ Rotation Speed 변수 사용
+
+Event ActorBeginOverlap
+  ├─ Does Implement Interface?
+  └─ True:
+       ├─ Handle Refill Fuel
+       │    └─ 연료 보충
+       │
+       ├─ Handle Pickup Effect
+       │    ├─ Spawn Sound
+       │    └─ Spawn Niagara
+       │
+       └─ Wink Out
+            ├─ Set Collision: No Collision
+            └─ Play Timeline
+                 ├─ Update → Scale Fuel Mesh
+                 └─ Finished → Destroy Actor
+```
+
+### Timeline 동작
+
+```
+Wink Out 호출
+  ↓
+PickupScaleTimeline Play
+  ↓
+0.0초 ~ 0.2초 동안:
+  ├─ Update 핀: 매 프레임 실행
+  │    └─ Scale 값: 1.0 → 0.0
+  │         ↓
+  │       Scale Fuel Mesh 호출
+  │         ↓
+  │       메시 크기 변화
+  │
+  └─ Finished 핀: 완료 시 1회 실행
+       └─ Destroy Actor
+            ↓
+          픽업 제거
+```
+
+---
+
+## 🎨 추가 개선 아이디어
+
+### 1. Bounce Animation (튕기는 애니메이션)
+
+```
+Timeline 추가:
+  Name: BounceTimeline
+  Float Track: Height
+    ├─ Key 1: (0.0, 0.0)
+    ├─ Key 2: (0.5, 10.0) - 위로
+    ├─ Key 3: (1.0, 0.0) - 아래로
+    └─ Loop: True
+
+Update:
+  Set Relative Location
+    ├─ Z: Height 값
+    └─ 위아래 움직임
+```
+
+### 2. Glow Effect (발광 효과)
+
+```
+Material에 Emissive 추가
+  ↓
+Timeline으로 강도 조절
+  ├─ Emissive Strength: 0 → 5 → 0
+  └─ 깜빡이는 효과
+```
+
+### 3. Rotation Variation (회전 변화)
+
+```
+Rotation Speed 랜덤화:
+  BeginPlay에서
+    └─ Random Float (30.0 ~ 60.0)
+         ↓
+       각 픽업마다 다른 속도
+```
+
+### 4. Distance-Based Scale (거리 기반 크기)
+
+```
+Tick에서:
+  Get Distance to Player
+    ↓
+  가까우면: 크기 증가
+  멀면: 원래 크기
+    ↓
+  주목 유도
+```
+
+---
+
+## 📝 핵심 노드 정리
+
+### Spawn Sound at Location
+
+```
+Spawn Sound at Location
+  ├─ Sound: USoundBase
+  ├─ Location: Vector
+  ├─ Rotation: Rotator (옵션)
+  ├─ Volume Multiplier: Float (기본 1.0)
+  ├─ Pitch Multiplier: Float (기본 1.0)
+  └─ Auto Destroy: Boolean (권장 True)
+
+용도:
+  ├─ 위치 기반 사운드 재생
+  └─ 3D 사운드 (거리감 있음)
+```
+
+### Spawn System at Location
+
+```
+Spawn System at Location (Niagara)
+  ├─ System Template: UNiagaraSystem
+  ├─ Location: Vector
+  ├─ Rotation: Rotator
+  ├─ Scale: Vector (기본 1,1,1)
+  ├─ Auto Destroy: Boolean
+  └─ Pool Method: 풀링 옵션
+
+용도:
+  ├─ 파티클 효과 생성
+  └─ 일회성 이펙트
+```
+
+### Add World Rotation
+
+```
+Add World Rotation
+  ├─ Target: Scene Component
+  ├─ Delta Rotation: Rotator
+  └─ 효과: 현재 회전에 추가
+
+vs Set World Rotation:
+  ├─ Set: 절대값으로 설정
+  └─ Add: 상대값으로 추가 (누적)
+```
+
+### Set World Scale 3D
+
+```
+Set World Scale 3D
+  ├─ Target: Scene Component
+  ├─ New Scale: Vector
+  └─ 효과: 월드 스케일 설정
+
+균등 스케일:
+  Make Vector (X, Y, Z)
+    └─ 모두 같은 값 = 비율 유지
+
+비균등 스케일:
+  └─ 각각 다른 값 = 변형됨
+```
+
+### Timeline (타임라인)
+
+```
+Timeline
+  ├─ Float/Vector/Linear Color Track 지원
+  ├─ Update: 매 프레임 실행
+  ├─ Finished: 완료 시 1회 실행
+  └─ 제어:
+       ├─ Play: 시작부터 재생
+       ├─ Play from Start: 0.0부터 재생
+       ├─ Reverse: 역재생
+       ├─ Stop: 정지
+       └─ Set New Time: 특정 지점으로
+
+커브 편집:
+  ├─ Linear: 직선
+  ├─ Auto: 부드러운 곡선
+  └─ User: 수동 조정
+```
+
+---
+
+## ⚠️ 주의사항
+
+```
+1. Auto Destroy 필수
+   ├─ 사운드/파티클 생성 시 True 설정
+   ├─ 메모리 누수 방지
+   └─ 성능 문제 예방
+
+2. 충돌 비활성화 타이밍
+   ├─ 픽업 즉시 비활성화
+   ├─ 중복 픽업 방지
+   └─ 타임라인 재생 중 안전
+
+3. Timeline Length 조절
+   ├─ 너무 짧으면: 보기 어려움
+   ├─ 너무 길면: 답답함
+   └─ 0.2~0.5초 권장
+
+4. Rotation Speed 적절히
+   ├─ 너무 빠르면: 어지러움
+   ├─ 너무 느리면: 눈에 안 띔
+   └─ 30~60도/초 권장
+
+5. Delta Time 사용
+   ├─ 모든 시간 기반 계산에 필수
+   ├─ Event Tick의 Delta Seconds
+   └─ Get World Delta Seconds
+```
+
+---
+
+## 🎓 Game Polish 원칙
+
+### Juice 추가 우선순위
+
+```
+1. 핵심 게임플레이 먼저
+   └─ 기능이 완성되어야 Juice 추가
+
+2. 피드백 강화
+   ├─ 플레이어 행동에 대한 반응
+   └─ 사운드 + 비주얼
+
+3. 과하지 않게
+   ├─ 너무 많으면 산만함
+   └─ 절제된 효과가 더 효과적
+
+4. 성능 고려
+   ├─ 파티클 수 제한
+   ├─ Auto Destroy 활용
+   └─ 풀링 시스템 사용
+```
+
+### 효과적인 Juice 요소
+
+```
+시각적:
+  ├─ 스케일 애니메이션 (크기 변화)
+  ├─ 파티클 효과
+  ├─ 색상 변화
+  └─ 카메라 쉐이크
+
+청각적:
+  ├─ 효과음
+  ├─ 음악 변화
+  └─ 음향 피드백
+
+촉각적 (선택):
+  └─ 컨트롤러 진동
+```
+
+---
+
+## 🚀 완성된 픽업 시스템 정리
+
+### Before vs After
+
+```
+Before (이전 강의):
+  픽업 충돌
+    ↓
+  연료 보충
+    ↓
+  아이템 즉시 제거
+    └─ 밋밋함, 재미없음
+
+After (이번 강의):
+  픽업 충돌
+    ↓
+  연료 보충
+    ↓
+  사운드 재생 ♪
+    ↓
+  파티클 분출 ✨
+    ↓
+  스케일 축소 애니메이션
+    ↓
+  0.2초 후 제거
+    └─ 만족스러움, 재미있음!
+```
+
+### 지속적인 효과
+
+```
+평소 (픽업 대기 중):
+  └─ 회전 애니메이션
+       ├─ 눈에 띄게
+       └─ 살아있는 느낌
+
+픽업 순간:
+  ├─ 사운드
+  ├─ 파티클
+  └─ 스케일 애니메이션
+       ↓
+     강력한 피드백
+```
+
+---
+
+## 💡 핵심 요약
+
+```
+Game Juice 추가
+  ↓
+기능 완성 후 경험 향상
+  ↓
+  ├─ 사운드: Spawn Sound at Location
+  ├─ 파티클: Spawn System at Location
+  ├─ 회전: Add World Rotation (Tick)
+  └─ 스케일: Timeline + Set World Scale 3D
+       ↓
+     완성도 높은 픽업 아이템
+```
+
+**이번 강의의 핵심:**
+
+- Game Juice는 게임 완성도의 핵심
+- 사운드와 비주얼로 피드백 제공
+- Timeline으로 부드러운 애니메이션
+- Auto Destroy로 메모리 관리
+- 충돌 비활성화로 중복 방지
+- 함수로 깔끔한 코드 구조
+
+**설계 원칙:**
+
+- 피드백 최우선: 플레이어 행동에 즉시 반응
+- 절제된 효과: 과하지 않게
+- 성능 고려: Auto Destroy, 짧은 Timeline
+- 유지보수성: 함수로 분리, 변수로 조절 가능
+
+**다음 단계:**
+
+- 다양한 픽업 타입 추가
+- 더 복잡한 애니메이션
+- UI 통합 (획득 알림)
+- 사운드/파티클 풀링 최적화
+
+# { 🖥️ UI 위젯 시스템 기초 - HUD 만들기 }
+
+## 🎯 이번 강의 목표
+
+화면에 **UI 요소를 표시**하는 위젯 시스템의 기초를 배웁니다.
+
+- Widget Blueprint 생성
+- UMG (Unreal Motion Graphics) 이해
+- Canvas Panel과 Text Widget
+- 뷰포트에 위젯 추가
+- 런타임에 위젯 속성 변경
+
+---
+
+## 💡 핵심 개념: Widget과 HUD
+
+### Widget(위젯)이란?
+
+```
+Widget
+  ↓
+화면에 표시되는 UI 요소
+  ├─ 체력 바
+  ├─ 미니맵
+  ├─ 인벤토리
+  ├─ 메뉴
+  └─ 텍스트, 이미지 등 모든 UI
+
+목적:
+  └─ 플레이어에게 정보 전달
+       ├─ 현재 상태 (체력, 연료 등)
+       ├─ 게임 진행 상황
+       └─ 조작 방법
+```
+
+### HUD란?
+
+```
+HUD (Heads-Up Display)
+  ↓
+"헤드업 디스플레이" = 게임 화면 위 UI
+  ├─ 비행 시뮬레이터 용어에서 유래
+  ├─ 화면을 가리지 않고 정보 표시
+  └─ 게임에서: 모든 UI 요소 총칭
+
+예시:
+  ├─ 체력 바
+  ├─ 연료 게이지
+  ├─ 미니맵
+  ├─ 점수 표시
+  └─ 크로스헤어(조준점)
+```
+
+---
+
+## 🎓 HUD 관리 방법 비교
+
+### 방법 1: HUD 클래스 (레거시)
+
+```
+HUD Class (언리얼 엔진 기본 클래스)
+  ↓
+Game Mode에서 자동 스폰
+  ├─ BP_JetpackGameMode 설정:
+  │    └─ HUD Class: 커스텀 HUD 지정 가능
+  │
+  └─ 장점: 전통적인 방법, 간단
+       단점: 레거시 클래스 (구식)
+```
+
+**레거시(Legacy)란?**
+
+- "유산", "과거 유물"이라는 뜻
+- 오래된 방식이지만 호환성 때문에 남아있음
+- 새 프로젝트에서는 권장하지 않음
+
+**왜 여전히 존재?**
+
+```
+제거하기 어려운 이유:
+  ├─ 많은 기존 프로젝트가 사용 중
+  ├─ 엔진 내부 시스템도 의존
+  └─ 호환성 깨짐 방지
+       ↓
+     그냥 남겨둠 (편의성)
+```
+
+### 방법 2: Player Controller (권장)
+
+```
+Player Controller에서 HUD 관리
+  ↓
+더 현대적이고 유연한 방식
+  ├─ 플레이어마다 다른 UI 가능
+  ├─ 멀티플레이어 친화적
+  └─ 더 나은 구조
+
+이번 강의 선택:
+  └─ BP_KixPlayerController에서 관리
+```
+
+---
+
+## 📁 프로젝트 구조 설정
+
+### UI 폴더 생성
+
+```
+Blueprints 폴더
+  └─ UI (새 폴더)
+       ├─ 의미: User Interface
+       └─ 모든 위젯 보관 장소
+```
+
+---
+
+## 🎨 UMG (Unreal Motion Graphics)
+
+### UMG란?
+
+```
+UMG (Unreal Motion Graphics)
+  ↓
+언리얼 엔진의 UI 제작 도구
+  ├─ 비주얼 에디터
+  ├─ 드래그 앤 드롭
+  └─ 강력한 기능
+
+포함 요소:
+  ├─ Widget Designer (디자이너 패널)
+  ├─ Palette (위젯 목록)
+  ├─ Hierarchy (계층 구조)
+  └─ Details Panel (속성 패널)
+```
+
+---
+
+## 🔧 Widget Blueprint 생성
+
+### 첫 위젯 만들기
+
+```
+UI 폴더에서
+  ↓
+우클릭 → User Interface → Widget Blueprint
+  ↓
+Parent Class 선택
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380770/notion-blog/_/_/_5_/_8_-_3D_-_7/image_6.png)
+
+### Parent Class 선택
+
+```
+Pick Parent Class 팝업
+  ↓
+User Widget (기본 선택)
+  ├─ 가장 기본적인 위젯 클래스
+  ├─ 대부분의 경우 이것 사용
+  └─ 커스텀 부모 클래스도 가능
+
+선택:
+  └─ User Widget (권장)
+```
+
+**User Widget이란?**
+
+- 모든 위젯의 기본 베이스 클래스
+- 화면에 표시되는 UI의 기초
+
+### 이름 지정
+
+```
+Name: WBP_Overlay
+  ├─ WBP = Widget Blueprint (접두사)
+  └─ Overlay = 전체 화면 오버레이
+```
+
+**Overlay의 의미:**
+
+```
+Overlay (오버레이)
+  ↓
+"위에 덮다", "겹치다"
+  ├─ 게임 화면 위에 UI를 겹쳐 표시
+  └─ 전체 화면을 덮는 메인 위젯
+       ↓
+     다른 위젯들을 여기에 추가
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380770/notion-blog/_/_/_5_/_8_-_3D_-_7/image_7.png)
+
+---
+
+## 🖼️ Widget Blueprint 인터페이스
+
+### Widget Designer 화면 구성
+
+```
+Widget Blueprint 에디터
+  ├─ Designer (디자이너 탭)
+  │    └─ 비주얼 편집 화면
+  │
+  ├─ Graph (그래프 탭)
+  │    └─ Blueprint 이벤트 그래프
+  │
+  ├─ Palette (팔레트 패널)
+  │    └─ 추가 가능한 위젯 목록
+  │
+  ├─ Hierarchy (계층 패널)
+  │    └─ 위젯 트리 구조
+  │
+  └─ Details (세부사항 패널)
+       └─ 선택한 위젯의 속성
+```
+
+### 주요 패널 설명
+
+### Palette (팔레트)
+
+```
+Palette 패널
+  ↓
+추가 가능한 위젯 종류
+  ├─ Panel (패널): 다른 위젯을 담는 컨테이너
+  │    ├─ Canvas Panel
+  │    ├─ Horizontal Box
+  │    └─ Vertical Box
+  │
+  ├─ Common (일반): 자주 사용하는 위젯
+  │    ├─ Text
+  │    ├─ Image
+  │    ├─ Button
+  │    └─ Progress Bar
+  │
+  └─ 기타 다양한 카테고리
+```
+
+### Hierarchy (계층 구조)
+
+```
+Hierarchy 패널
+  ↓
+위젯의 부모-자식 관계 표시
+  └─ Canvas Panel (부모)
+       └─ Text Widget (자식)
+            └─ 부모에 "부착됨"
+```
+
+**부모-자식 관계란?**
+
+```
+여기서 "자식"은:
+  ├─ 상속(Inheritance)이 아님!
+  └─ 부착(Attachment) 관계
+       └─ Component 부착과 유사
+
+Canvas Panel
+  └─ Text 1 (부착)
+  └─ Text 2 (부착)
+  └─ Image 1 (부착)
+```
+
+---
+
+## 🎨 Canvas Panel
+
+### Canvas Panel이란?
+
+```
+Canvas Panel
+  ↓
+자유롭게 배치 가능한 패널
+  ├─ 화면의 임의 위치에 위젯 배치
+  ├─ 절대 좌표 또는 앵커 기반
+  └─ 가장 기본적이고 유연한 패널
+
+용도:
+  └─ 전체 화면 UI의 베이스
+```
+
+### Canvas Panel 추가
+
+```
+Palette에서
+  ↓
+Panel → Canvas Panel
+  ↓
+Hierarchy 또는 Designer로 드래그
+  ↓
+전체 화면 크기로 생성됨
+```
+
+---
+
+## 📝 Text Widget 추가
+
+### Text Widget 배치
+
+```
+Palette에서
+  ↓
+Common → Text
+  ↓
+Canvas Panel 위로 드래그
+  ↓
+Hierarchy:
+  Canvas Panel
+    └─ Text Widget (자식으로 부착)
+```
+
+### Text 속성 수정
+
+### Content (내용)
+
+```
+Details 패널
+  └─ Content 섹션
+       └─ Text 속성
+            ├─ 기본값: "Text Block"
+            └─ 변경 가능
+                 예: "Test Widget Text"
+```
+
+### Size (크기)
+
+```
+위젯 크기 조절:
+  ├─ Designer에서 모서리 드래그
+  ├─ Details → Slot → Size
+  └─ 텍스트보다 크게 설정
+       ↓
+     내부 정렬 가능
+```
+
+### Justification (정렬)
+
+```
+Details → Appearance → Justification
+  ├─ Align Text Left (왼쪽 정렬)
+  ├─ Align Text Center (가운데 정렬)
+  └─ Align Text Right (오른쪽 정렬)
+```
+
+### Font (폰트)
+
+```
+Details → Appearance → Font
+  ├─ Typeface: Roboto (기본 폰트)
+  │    ├─ Bold (굵게)
+  │    ├─ Italic (이탤릭)
+  │    ├─ Light (얇게)
+  │    └─ 기타 스타일
+  │
+  └─ Size: 텍스트 크기
+       └─ 숫자로 조절 (기본 24)
+```
+
+**커스텀 폰트:**
+
+```
+현재: Roboto만 사용 가능
+  ↓
+나중에: 커스텀 폰트 임포트 방법 학습 예정
+```
+
+---
+
+## 📌 Anchor (앵커) 시스템
+
+### Anchor란?
+
+```
+Anchor (앵커)
+  ↓
+"닻", "고정점"
+  ↓
+위젯이 화면에서 고정되는 기준점
+  ├─ 화면 크기가 변해도
+  ├─ 앵커 기준으로 위치 유지
+  └─ 반응형 UI의 핵심
+```
+
+### Anchor 설정
+
+```
+Text Widget 선택
+  ↓
+Details → Anchors (앵커 드롭다운)
+  ↓
+프리셋 선택:
+  ├─ 왼쪽 상단 (기본)
+  ├─ 오른쪽 상단
+  ├─ 가운데
+  ├─ 하단 가운데
+  └─ 기타 다양한 옵션
+```
+
+### Anchor 동작 원리
+
+```
+Anchor: 왼쪽 상단
+  ↓
+Position (위치):
+  ├─ X: 왼쪽에서의 거리
+  └─ Y: 위에서의 거리
+
+화면 크기 변경 시:
+  └─ 왼쪽 상단에서의 거리 유지
+       ↓
+     항상 같은 상대 위치
+```
+
+**예시:**
+
+```
+1920x1080 화면:
+  Text Position: (100, 50)
+    └─ 왼쪽에서 100px, 위에서 50px
+
+1280x720 화면:
+  Text Position: (100, 50) 유지
+    └─ 여전히 왼쪽에서 100px, 위에서 50px
+```
+
+### 중앙 정렬 설정
+
+```
+1. Anchor → 가운데 선택
+   └─ Anchor Point: 화면 중앙
+
+2. Alignment 설정
+   ├─ X: 0.5
+   ├─ Y: 0.5
+   └─ 위젯 중심점이 중앙
+
+3. Position (X, Y): 0, 0
+   └─ 앵커에서의 오프셋 없음
+        ↓
+      완벽한 중앙 배치!
+```
+
+**Alignment란?**
+
+```
+Alignment (정렬)
+  ↓
+위젯의 "중심점" 위치
+  ├─ 0.0: 왼쪽/위 끝
+  ├─ 0.5: 정중앙
+  └─ 1.0: 오른쪽/아래 끝
+
+예시:
+  Alignment (0.5, 0.5)
+    └─ 위젯 중심이 기준점
+         ↓
+       Position (0, 0)이면
+         ↓
+       중심이 앵커 위치에 딱!
+```
+
+---
+
+## 💻 위젯을 화면에 표시하기
+
+### 위젯 생성 프로세스
+
+```
+위젯 생성 3단계:
+  1. Widget Blueprint 제작 (디자인)
+  2. Create Widget (인스턴스 생성)
+  3. Add to Viewport (화면에 추가)
+```
+
+### BP_KixPlayerController에서 구현
+
+### Create Widget
+
+```
+Event BeginPlay
+  ↓
+Create Widget
+  ├─ Class: WBP_Overlay (선택)
+  ├─ Owning Player: Self (Player Controller)
+  └─ Return Value: Widget 인스턴스
+```
+
+**노드 구성:**
+
+```
+Create Widget
+  ├─ Class: 어떤 위젯을 만들지
+  │    └─ WBP_Overlay
+  │
+  └─ Owning Player: 누가 소유하는지
+       └─ Self (PlayerController)
+            ↓
+          위젯의 주인 = 이 컨트롤러
+```
+
+**Owning Player란?**
+
+```
+Owning Player (소유 플레이어)
+  ↓
+이 위젯을 소유하는 플레이어 컨트롤러
+  ├─ 입력 처리
+  ├─ 권한 관리
+  └─ 멀티플레이어 구분
+
+설정:
+  Self (PlayerController 자신)
+    ↓
+  이 컨트롤러의 위젯임
+```
+
+### Add to Viewport
+
+```
+Create Widget의 Return Value
+  ↓
+Add to Viewport
+  └─ 화면에 위젯 표시
+```
+
+**전체 흐름:**
+
+```
+BeginPlay
+  ↓
+Create Widget (WBP_Overlay)
+  └─ Return: Widget Instance
+       ↓
+     Add to Viewport
+       ↓
+     화면에 표시됨!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380771/notion-blog/_/_/_5_/_8_-_3D_-_7/image_8.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380770/notion-blog/_/_/_5_/_8_-_3D_-_7/image_9.png)
+
+---
+
+## 💾 위젯 참조 저장
+
+### 변수로 저장하는 이유
+
+```
+문제:
+  Create Widget 결과를 변수에 안 저장하면
+    ↓
+  나중에 위젯에 접근 불가능
+    ↓
+  속성 변경 불가능
+
+해결:
+  Return Value → 변수로 승격
+    ↓
+  언제든지 접근 가능
+```
+
+### Overlay Widget 변수
+
+```
+Create Widget의 Return Value
+  ↓
+우클릭 → Promote to Variable
+  ↓
+Name: Overlay Widget
+  ├─ Type: WBP_Overlay Object Reference
+  ├─ Category: UI
+  └─ 저장 완료
+```
+
+### 노드 정리
+
+```
+Before (복잡):
+  Create Widget → Set Overlay Widget
+                → Add to Viewport
+
+After (깔끔):
+  Create Widget → Set Overlay Widget
+                       ↓
+                  Add to Viewport
+                  (Overlay Widget 변수 사용)
+```
+
+### 함수로 캡슐화
+
+```
+노드 선택 → Collapse to Function
+  ↓
+Name: Create Overlay Widget
+  ├─ Category: UI
+  └─ BeginPlay에서 호출
+```
+
+---
+
+## 🎮 런타임에 위젯 속성 변경
+
+### 위젯 변수로 만들기
+
+```
+WBP_Overlay Designer에서
+  ↓
+Text Widget 선택
+  ↓
+Details → Is Variable 체크 ✅
+  ↓
+Name: TextBlockTest
+  └─ 이제 Blueprint에서 접근 가능!
+```
+
+**Is Variable이란?**
+
+```
+Is Variable 체크:
+  ↓
+이 위젯을 Blueprint 변수로 노출
+  ├─ Graph에서 접근 가능
+  ├─ 런타임에 수정 가능
+  └─ 필요한 위젯만 체크
+
+체크 안 하면:
+  └─ 디자인 타임에만 존재
+       ↓
+     Blueprint에서 접근 불가
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380767/notion-blog/_/_/_5_/_8_-_3D_-_7/image_10.png)
+
+### PlayerController에서 접근
+
+```
+BP_KixPlayerController
+  ↓
+Get Overlay Widget (변수)
+  ↓
+TextBlockTest (위젯 변수 접근)
+  ↓
+Set Text (Text)
+  └─ 텍스트 변경!
+```
+
+**노드 구성:**
+
+```
+1. Overlay Widget 가져오기
+   Get Overlay Widget
+     └─ Return: WBP_Overlay 인스턴스
+
+2. 위젯 내부 변수 접근
+   Overlay Widget → TextBlockTest
+     └─ Return: Text Widget
+
+3. 텍스트 설정
+   Set Text (Text)
+     ├─ Target: TextBlockTest
+     └─ In Text: "텍스트 변경!"
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380767/notion-blog/_/_/_5_/_8_-_3D_-_7/image_11.png)
+
+### 테스트: 3초 후 텍스트 변경
+
+```
+Event BeginPlay
+  ↓
+Create Overlay Widget
+  ↓
+Delay (3.0초)
+  ↓
+Get Overlay Widget
+  ↓
+TextBlockTest → Set Text
+  └─ "텍스트 변경!"
+```
+
+**결과:**
+
+```
+게임 시작:
+  └─ "Test Widget Text" 표시
+
+3초 후:
+  └─ "텍스트 변경!" 으로 변경
+       ↓
+     런타임 변경 성공! ✅
+```
+
+---
+
+## 📊 Text vs String 데이터 타입
+
+### Text 타입
+
+```
+Text (텍스트 타입)
+  ↓
+사용자에게 보이는 텍스트 전용
+  ├─ 현지화(Localization) 지원
+  ├─ 포맷팅 기능
+  └─ UI 표시용
+
+용도:
+  ├─ 위젯 텍스트
+  ├─ 대화문
+  ├─ UI 레이블
+  └─ 플레이어가 보는 모든 글자
+```
+
+### String 타입
+
+```
+String (문자열 타입)
+  ↓
+코드 내부 처리용 텍스트
+  ├─ 변수 이름
+  ├─ 경로
+  ├─ ID
+  └─ 내부 로직
+
+용도:
+  ├─ 파일 경로
+  ├─ 오브젝트 이름
+  ├─ 내부 식별자
+  └─ 플레이어가 안 보는 데이터
+```
+
+### 비교
+
+```
+Text:
+  └─ "당신의 체력: 100"
+       ├─ 한국어: "당신의 체력: 100"
+       ├─ 영어: "Your Health: 100"
+       └─ 현지화 가능
+
+String:
+  └─ "/Game/Blueprints/BP_Kix"
+       ├─ 항상 같음
+       └─ 현지화 불필요
+```
+
+---
+
+## 📝 핵심 정리
+
+### Widget 생성 워크플로우
+
+```
+1. Widget Blueprint 제작
+   ├─ Canvas Panel 추가
+   └─ UI 요소 배치
+
+2. PlayerController에서 생성
+   ├─ Create Widget
+   └─ 변수에 저장
+
+3. 화면에 추가
+   └─ Add to Viewport
+
+4. 런타임 수정 (선택)
+   ├─ 위젯 변수 접근
+   └─ 속성 변경
+```
+
+### Canvas Panel 특징
+
+```
+Canvas Panel
+  ├─ 자유 배치 가능
+  ├─ 앵커 시스템
+  ├─ 절대/상대 위치
+  └─ 반응형 UI 기본
+```
+
+### Anchor 시스템
+
+```
+Anchor (앵커)
+  ├─ 화면의 고정점
+  ├─ 위젯 위치 기준
+  └─ 화면 크기 변화 대응
+
+Alignment (정렬)
+  ├─ 위젯의 중심점
+  └─ 0.0 ~ 1.0 값
+```
+
+---
+
+## ⚠️ 주의사항
+
+```
+1. Create Widget만으로는 표시 안 됨
+   ├─ Add to Viewport 필수
+   └─ 둘 다 해야 화면에 나타남
+
+2. Is Variable 체크
+   ├─ 접근 필요한 위젯만 체크
+   ├─ 의미있는 이름 지정
+   └─ 너무 많이 체크하면 복잡
+
+3. 위젯 참조 저장
+   ├─ 나중에 수정하려면 변수 필요
+   └─ Overlay Widget 같은 변수
+
+4. Text vs String 구분
+   ├─ UI 표시: Text 타입
+   └─ 내부 처리: String 타입
+
+5. Anchor 이해
+   ├─ 다양한 화면 크기 대응
+   ├─ 모바일/PC 등 고려
+   └─ 프리셋 활용
+```
+
+---
+
+## 🎓 HUD Class vs PlayerController 정리
+
+### HUD Class 방식
+
+```
+장점:
+  ├─ 전통적인 방법
+  ├─ 간단한 설정
+  └─ Game Mode에서 자동 관리
+
+단점:
+  ├─ 레거시 클래스
+  ├─ 유연성 낮음
+  └─ 멀티플레이어 불편
+```
+
+### PlayerController 방식 (권장)
+
+```
+장점:
+  ├─ 현대적인 접근
+  ├─ 플레이어별 UI 가능
+  ├─ 멀티플레이어 친화적
+  └─ 더 나은 제어
+
+단점:
+  └─ 초기 설정 약간 복잡
+       (하지만 이번 강의로 해결!)
+```
+
+---
+
+## 🚀 다음 단계
+
+```
+현재 완성:
+  ├─ Widget Blueprint 생성 ✅
+  ├─ Canvas Panel 이해 ✅
+  ├─ Text Widget 추가 ✅
+  ├─ 화면에 표시 ✅
+  └─ 런타임 수정 ✅
+
+다음 강의:
+  ├─ Progress Bar 추가
+  ├─ 연료 게이지 표시
+  ├─ 실시간 업데이트
+  └─ 바인딩 시스템
+```
+
+---
+
+## 💡 핵심 요약
+
+```
+Widget 시스템
+  ↓
+1. Widget Blueprint 제작 (WBP)
+  └─ Canvas Panel + UI 요소
+
+2. PlayerController에서 생성
+  └─ Create Widget + Add to Viewport
+
+3. 변수로 저장
+  └─ 나중에 접근 가능
+
+4. 런타임 수정
+  └─ Is Variable 체크 → 접근 → 변경
+```
+
+**이번 강의의 핵심:**
+
+- Widget은 화면 UI 요소
+- UMG로 비주얼 편집
+- Canvas Panel은 자유 배치 패널
+- Anchor로 반응형 UI 구현
+- Create + Add to Viewport로 표시
+- Is Variable로 런타임 접근
+- Text 타입은 UI 전용
+- PlayerController에서 관리 (권장)
+
+**설계 원칙:**
+
+- 위젯은 재사용 가능하게 설계
+- 변수 이름은 명확하게
+- 필요한 것만 Is Variable 체크
+- Anchor로 다양한 해상도 대응
+
+# { 📊 Progress Bar로 연료 게이지 만들기 }
+
+## 🎯 이번 강의 목표
+
+- \*Progress Bar(진행률 표시줄)\*\*를 추가하여 플레이어가 연료량을 시각적으로 확인할 수 있게 합니다.
+- Progress Bar Widget 추가 및 스타일링
+- 연료 소모 시 실시간 업데이트
+- Widget Blueprint에 커스텀 함수 추가
+- 코드 구조 개선 (캡슐화)
+
+---
+
+## 📊 Progress Bar Widget
+
+### Progress Bar란?
+
+```
+Progress Bar (진행률 표시줄)
+  ↓
+0%에서 100%까지 채워지는 바(막대)
+  ├─ 체력 바
+  ├─ 연료 게이지
+  ├─ 경험치 바
+  ├─ 로딩 바
+  └─ 모든 "채워지는" UI
+
+핵심 속성:
+  └─ Percent (퍼센트)
+       ├─ 0.0 = 0% (빈 상태)
+       ├─ 0.5 = 50% (반 채움)
+       └─ 1.0 = 100% (완전 채움)
+```
+
+---
+
+## 🎨 Progress Bar 추가 및 스타일링
+
+### WBP_Overlay에 추가
+
+```
+Designer 탭
+  ↓
+Palette → Common → Progress Bar
+  ↓
+Canvas Panel로 드래그
+  ↓
+Hierarchy:
+  Canvas Panel
+    ├─ TextBlockTest (삭제 예정)
+    └─ Progress Bar
+```
+
+### 기존 Text Widget 제거
+
+```
+TextBlockTest 선택
+  ↓
+Delete 키
+  ↓
+테스트용 텍스트 제거 완료
+```
+
+### Progress Bar 크기 조정
+
+```
+Designer에서
+  ↓
+Progress Bar 모서리 드래그
+  ↓
+크기 조정:
+  ├─ 길이: 길게 (가로)
+  └─ 높이: 얇게
+       ↓
+     연료 바 형태
+```
+
+---
+
+## 🎨 Progress Bar 스타일 커스터마이징
+
+### Percent 속성 (진행률)
+
+```
+Details 패널
+  └─ Progress → Percent
+       ├─ 0.0 ~ 1.0 값
+       ├─ 0.0 = 빈 상태
+       └─ 1.0 = 완전 채움
+
+테스트:
+  Percent 슬라이더를 좌우로 드래그
+    ↓
+  바가 채워지는 모습 확인 ✅
+```
+
+**Percent 값의 의미:**
+
+```
+0.0 = 0%
+0.25 = 25%
+0.5 = 50%
+0.75 = 75%
+1.0 = 100%
+
+게임에서:
+  "Percent"라고 부르지만
+  실제로는 0~1 사이의 분수(Fraction)
+```
+
+### Fill Color (채우기 색상)
+
+```
+Details 패널
+  ↓
+Appearance → Fill Color and Opacity
+  ↓
+색상 사각형 클릭
+  ↓
+Color Picker 열림
+```
+
+**색상 선택:**
+
+```
+기본: 파란색
+  ↓
+변경: 노란색/주황색
+  ├─ 게임 내 연료 색상과 매칭
+  └─ 시각적 일관성
+```
+
+### Background Color (배경 색상)
+
+```
+Details 패널
+  ↓
+Style → Background Image → Tint
+  ↓
+색상 변경
+```
+
+**배경 스타일링:**
+
+```
+기본 Tint: 흰색 (1, 1, 1, 1)
+  ↓
+변경 권장:
+  ├─ RGB: 거의 검은색 (0.1, 0.1, 0.1)
+  └─ Alpha: 0.5 ~ 0.6 (반투명)
+       ↓
+     어둡고 투명한 배경
+       ↓
+     게임 화면이 약간 보임
+```
+
+**Alpha(알파)란?**
+
+```
+Alpha (투명도)
+  ├─ 0.0: 완전 투명 (안 보임)
+  ├─ 0.5: 반투명
+  └─ 1.0: 불투명 (완전히 보임)
+
+UI에서 활용:
+  └─ 약간 투명하게 하여
+       게임 화면을 가리지 않게
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380767/notion-blog/_/_/_5_/_8_-_3D_-_7/image_12.png)
+
+---
+
+## 🎨 추가 스타일 옵션
+
+### Border Padding (테두리 여백)
+
+```
+Details 패널
+  ↓
+Progress → Border Padding
+  ├─ X: 2.0
+  └─ Y: 2.0
+       ↓
+     채우기 색상 주변에 여백 생성
+       ↓
+     배경이 약간 보이는 테두리 효과
+```
+
+**효과:**
+
+```
+Before:
+  ┌──────────────┐
+  │██████████████│ (바가 꽉 참)
+  └──────────────┘
+
+After (Padding 2):
+  ┌──────────────┐
+  │ ██████████ │ (약간의 여백)
+  └──────────────┘
+```
+
+### Bar Fill Type (채워지는 방향)
+
+```
+Details 패널
+  ↓
+Progress → Bar Fill Type
+  ↓
+옵션:
+  ├─ Left to Right (왼쪽→오른쪽) ← 기본
+  ├─ Right to Left (오른쪽→왼쪽)
+  ├─ Fill From Center (중앙에서 밖으로)
+  ├─ Top to Bottom (위→아래)
+  └─ 기타 다양한 옵션
+```
+
+**일반적인 사용:**
+
+```
+체력/연료 바:
+  └─ Left to Right (전통적)
+
+스태미나:
+  └─ Fill From Center (중앙에서)
+
+로딩:
+  └─ Left to Right 또는 Top to Bottom
+```
+
+---
+
+## 💾 Progress Bar를 변수로 만들기
+
+### Is Variable 설정
+
+```
+Progress Bar 선택
+  ↓
+Details 패널
+  ↓
+Is Variable ✅ 체크
+```
+
+### 이름 변경
+
+```
+방법 1: Hierarchy에서
+  Progress Bar 선택
+    ↓
+  한 번 더 클릭 (이름 편집 모드)
+    ↓
+  새 이름 입력
+
+방법 2: Details 패널에서
+  Name 속성 직접 수정
+```
+
+**네이밍 규칙:**
+
+```
+형식: [Widget Type]_[Purpose]
+  ↓
+예시: ProgressBar_Fuel
+  ├─ ProgressBar: 위젯 타입
+  └─ Fuel: 용도
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380767/notion-blog/_/_/_5_/_8_-_3D_-_7/image_13.png)
+
+---
+
+## 🔄 연료 소모 시 업데이트 구현
+
+### 문제 상황
+
+```
+현재:
+  플레이어가 연료량을 볼 수 없음
+    ↓
+  에디터에서만 BP_Kix 선택해서 확인 가능
+    ↓
+  게임 플레이 중 불편
+
+목표:
+  제트팩 사용 시 실시간으로 바 업데이트
+```
+
+---
+
+## 🔧 해결 방법 1: 인터페이스 함수 출력 추가
+
+### BPI_Jetpack에 출력 추가
+
+```
+BPI_Jetpack
+  ↓
+Drain Jet Fuel 함수
+  ↓
+Outputs 섹션
+  ↓
++ 버튼 → 출력 추가
+  ├─ Name: Current Fuel Percent
+  └─ Type: Float
+```
+
+**출력 추가의 효과:**
+
+```
+Before:
+  Drain Jet Fuel
+    └─ 반환값 없음 (Event)
+
+After:
+  Drain Jet Fuel
+    └─ 반환값: Float (Function)
+         ↓
+       이제 이벤트가 아닌 함수!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380768/notion-blog/_/_/_5_/_8_-_3D_-_7/image_14.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380768/notion-blog/_/_/_5_/_8_-_3D_-_7/image_15.png)
+
+---
+
+## 🎯 BP_Kix에서 구현 변경
+
+### 이벤트 → 함수 전환
+
+```
+인터페이스에 출력 추가 시:
+  ↓
+BP_Kix의 구현 자동 변경
+  ├─ Event (이벤트) 삭제됨
+  └─ Function (함수)로 다시 구현 필요
+```
+
+**Before (Event):**
+
+```
+Event Graph
+  └─ Event Drain Jet Fuel
+       └─ Consume Jet Fuel for Frame
+```
+
+**After (Function):**
+
+```
+Functions → Interfaces
+  └─ Drain Jet Fuel (Function)
+       └─ 구현 필요
+```
+
+### 함수 구현
+
+```
+Interfaces → Drain Jet Fuel
+  ↓
+Consume Jet Fuel for Frame 호출
+  ↓
+Current Fuel Percent 반환
+  └─ 연료 백분율 계산 필요
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380768/notion-blog/_/_/_5_/_8_-_3D_-_7/image_16.png)
+
+---
+
+## 🧮 연료 백분율 계산
+
+### Get Fuel Percentage 함수 생성
+
+```
+계산 공식:
+  Percent = Jet Fuel / Max Jet Fuel
+
+예시:
+  ├─ Jet Fuel: 25
+  ├─ Max Jet Fuel: 50
+  └─ Percent: 25/50 = 0.5 (50%)
+```
+
+### Safe Divide 사용
+
+```
+문제:
+  일반 Divide (/)
+    ├─ Max Jet Fuel = 0일 때
+    └─ 0으로 나누기 → 에러!
+
+해결:
+  Safe Divide
+    ├─ B가 0이면 → 0 반환
+    └─ B가 0이 아니면 → A/B 계산
+```
+
+**Safe Divide 노드:**
+
+```
+Safe Divide
+  ├─ A: Jet Fuel
+  ├─ B: Max Jet Fuel
+  └─ Return Value: Float
+       ├─ B ≠ 0: A/B
+       └─ B = 0: 0.0 (안전하게 0 반환)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380768/notion-blog/_/_/_5_/_8_-_3D_-_7/image_17.png)
+
+### 함수로 캡슐화
+
+```
+노드 선택
+  ↓
+Collapse to Function
+  ↓
+Name: Get Fuel Percentage
+  ├─ Category: Jet Fuel
+  └─ Pure: ✅ (Convert to Pure)
+```
+
+**Pure Function이란?**
+
+```
+Pure Function (순수 함수)
+  ↓
+실행 핀 없이 값만 계산
+  ├─ 부작용(Side Effect) 없음
+  ├─ 같은 입력 → 항상 같은 출력
+  └─ 여러 곳에서 호출해도 안전
+
+표시:
+  └─ 둥근 모서리 (실행 핀 없음)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380768/notion-blog/_/_/_5_/_8_-_3D_-_7/image_18.png)
+
+---
+
+## 🔌 BP_Kix 최종 구현
+
+### Drain Jet Fuel 함수
+
+```
+Consume Jet Fuel for Frame
+  ↓
+Get Fuel Percentage
+  ↓
+Return: Current Fuel Percent
+```
+
+**노드 구성:**
+
+```
+Drain Jet Fuel (Function)
+  ├─ 입력: 없음
+  └─ 출력: Current Fuel Percent
+       ↓
+     내부 로직:
+       1. Consume Jet Fuel for Frame
+       2. Get Fuel Percentage
+       3. Return Value 연결
+```
+
+---
+
+## 🎮 PlayerController에서 업데이트
+
+### 첫 번째 시도 (복잡한 방법)
+
+```
+Drain Jet Fuel 호출
+  ↓
+Current Fuel Percent 얻음
+  ↓
+Get Overlay Widget
+  ↓
+ProgressBar_Fuel 접근
+  ↓
+Set Percent
+  └─ In Percent: Current Fuel Percent
+```
+
+**문제점:**
+
+```
+PlayerController가:
+  ├─ WBP_Overlay 내부 구조 알아야 함
+  ├─ ProgressBar_Fuel이 있다는 것 알아야 함
+  └─ Set Percent 호출해야 함
+       ↓
+     너무 많은 것을 알고 있음!
+       (캡슐화 위반)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380769/notion-blog/_/_/_5_/_8_-_3D_-_7/image_19.png)
+
+---
+
+## 🎨 해결 방법 2: Widget에 커스텀 함수 추가
+
+### WBP_Overlay에 함수 생성
+
+```
+WBP_Overlay
+  ↓
+Graph 탭 (이벤트 그래프)
+  ↓
+Functions → + 버튼
+  ↓
+Name: Update Fuel Percent
+```
+
+**Widget의 Event Graph:**
+
+```
+Widget Blueprint도 Event Graph 가짐!
+  ├─ Actor처럼 Blueprint 로직 가능
+  ├─ 함수 생성 가능
+  └─ 위젯 자체 동작 정의
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380769/notion-blog/_/_/_5_/_8_-_3D_-_7/image_20.png)
+
+### 입력 파라미터 추가
+
+```
+Update Fuel Percent 함수 선택
+  ↓
+Details 패널 → Inputs
+  ↓
++ 버튼 → 입력 추가
+  ├─ Name: Fuel Percent
+  └─ Type: Float
+```
+
+### 함수 구현
+
+```
+ProgressBar_Fuel (변수)
+  ↓
+Set Percent
+  ├─ Target: ProgressBar_Fuel
+  └─ In Percent: Fuel Percent (입력)
+
+```
+
+**전체 흐름:**
+
+```
+Update Fuel Percent (Custom Function)
+  ├─ Input: Fuel Percent (Float)
+  └─ Logic:
+       Get ProgressBar_Fuel
+         ↓
+       Set Percent (Fuel Percent)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380769/notion-blog/_/_/_5_/_8_-_3D_-_7/image_21.png)
+
+---
+
+## ✨ PlayerController 코드 개선
+
+### Before (복잡)
+
+```
+Drain Jet Fuel
+  ↓
+Get Overlay Widget
+  ↓
+ProgressBar_Fuel
+  ↓
+Set Percent
+```
+
+### After (간결)
+
+```
+Drain Jet Fuel
+  ↓
+Get Overlay Widget
+  ↓
+Update Fuel Percent
+  └─ Fuel Percent: Current Fuel Percent
+```
+
+**비교:**
+
+```
+Before:
+  ├─ 4개 노드
+  ├─ Widget 내부 구조 노출
+  └─ ProgressBar_Fuel 이름 의존
+
+After:
+  ├─ 2개 노드
+  ├─ Widget 내부 구조 숨김
+  └─ 함수 인터페이스만 의존
+       ↓
+     깔끔하고 유지보수 쉬움!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380769/notion-blog/_/_/_5_/_8_-_3D_-_7/image_22.png)
+
+---
+
+## 🎓 캡슐화(Encapsulation) 개념
+
+### 캡슐화란?
+
+```
+Encapsulation (캡슐화)
+  ↓
+내부 구현을 숨기고 인터페이스만 노출
+  ├─ 내부: ProgressBar_Fuel, Set Percent
+  ├─ 인터페이스: Update Fuel Percent
+  └─ 외부는 내부를 몰라도 됨
+
+약 캡슐:
+  ├─ 내용물(약): 숨겨짐
+  └─ 캡슐 껍질: 인터페이스
+```
+
+### 장점
+
+```
+1. 변경 용이
+   Progress Bar → Slider로 변경 시
+     ├─ WBP_Overlay만 수정
+     └─ PlayerController는 변경 불필요
+
+2. 이해하기 쉬움
+   "Update Fuel Percent 호출"
+     └─ 내부 어떻게? 몰라도 됨
+
+3. 재사용성
+   다른 곳에서도 같은 함수 호출
+
+4. 버그 감소
+   내부 구조 잘못 건드릴 일 없음
+```
+
+---
+
+## ✅ 테스트 및 문제 발견
+
+### 연료 소모 테스트
+
+```
+Play → 제트팩 사용
+  ↓
+연료 바 감소 확인 ✅
+  ├─ 매 프레임 업데이트
+  └─ 0까지 정확히 감소
+```
+
+### 픽업 테스트
+
+```
+Play → 연료 소모 → 픽업 획득
+  ↓
+결과:
+  ├─ 실제 연료: 증가 ✅
+  ├─ 연료 바: 변화 없음 ❌
+  └─ 제트팩 다시 사용하면 바 업데이트됨
+```
+
+**문제 원인:**
+
+```
+연료 보충 시:
+  BP_JetFuel → BP_Kix → Handle Refill Fuel
+    ↓
+  PlayerController는 모름!
+    ↓
+  Update Fuel Percent 호출 안 됨
+    ↓
+  바가 업데이트 안 됨
+```
+
+---
+
+## 🔍 문제 분석
+
+### 현재 구조
+
+```
+연료 소모:
+  PlayerController → Drain Jet Fuel
+    ↓
+  Update Fuel Percent 호출
+    ↓
+  바 업데이트 ✅
+
+연료 보충:
+  BP_JetFuel → BP_Kix → Handle Refill Fuel
+    ↓
+  PlayerController 모름
+    ↓
+  Update Fuel Percent 호출 안 됨
+    ↓
+  바 업데이트 안 됨 ❌
+```
+
+### 해결 필요
+
+```
+다음 강의에서:
+  연료 보충 시에도 바 업데이트 방법 구현
+```
+
+---
+
+## 📝 핵심 노드 정리
+
+### Progress Bar
+
+```
+Progress Bar Widget
+  ├─ Percent: 0.0 ~ 1.0
+  ├─ Fill Color: 채우기 색상
+  ├─ Background Color: 배경 색상
+  └─ Bar Fill Type: 채워지는 방향
+```
+
+### Set Percent
+
+```
+Set Percent
+  ├─ Target: Progress Bar
+  ├─ In Percent: 0.0 ~ 1.0
+  └─ 효과: 바 채우기 정도 설정
+```
+
+### Safe Divide
+
+```
+Safe Divide
+  ├─ A: 분자
+  ├─ B: 분모
+  └─ Return:
+       ├─ B ≠ 0: A/B
+       └─ B = 0: 0.0
+```
+
+---
+
+## 📊 완성된 시스템 구조
+
+### 데이터 흐름
+
+```
+BP_Kix (캐릭터)
+  ├─ Jet Fuel (변수)
+  ├─ Max Jet Fuel (변수)
+  └─ Get Fuel Percentage (함수)
+       └─ Jet Fuel / Max Jet Fuel
+
+BP_KixPlayerController
+  ├─ Drain Jet Fuel 호출
+  │    ↓
+  │  Current Fuel Percent 반환
+  │    ↓
+  └─ Update Fuel Percent 호출
+
+WBP_Overlay (위젯)
+  ├─ ProgressBar_Fuel (변수)
+  └─ Update Fuel Percent (함수)
+       └─ Set Percent
+```
+
+---
+
+## ⚠️ 주의사항
+
+```
+1. Compile 순서
+   ├─ WBP_Overlay에서 변수/함수 추가
+   ├─ WBP_Overlay 컴파일 먼저!
+   └─ PlayerController 컴파일
+        ↓
+      순서 안 지키면 에러!
+
+2. Is Variable 필수
+   ├─ Progress Bar는 Is Variable 체크
+   └─ 안 하면 Graph에서 접근 불가
+
+3. Safe Divide 사용
+   ├─ 일반 Divide 대신 Safe Divide
+   └─ 0으로 나누기 방지
+
+4. Pure Function 활용
+   ├─ Get Fuel Percentage는 Pure
+   ├─ 여러 번 호출해도 안전
+   └─ 캐싱 필요 없음
+
+5. 캡슐화 유지
+   ├─ Widget 내부 구조 노출 금지
+   ├─ 커스텀 함수로 인터페이스 제공
+   └─ 유지보수성 향상
+```
+
+---
+
+## 🎓 설계 패턴 학습
+
+### Separation of Concerns (관심사의 분리)
+
+```
+BP_Kix:
+  └─ 연료 데이터 관리
+
+WBP_Overlay:
+  └─ UI 표시 관리
+
+PlayerController:
+  └─ 연결 및 조정
+
+각자의 역할 명확!
+```
+
+### Interface Segregation
+
+```
+WBP_Overlay의 Public Interface:
+  └─ Update Fuel Percent (함수)
+
+Private Implementation:
+  ├─ ProgressBar_Fuel
+  └─ Set Percent
+       ↓
+     외부는 Public만 사용
+```
+
+---
+
+## 💡 핵심 요약
+
+```
+Progress Bar 추가
+  ↓
+연료 게이지 시각화
+  ↓
+  ├─ Percent: 0.0 ~ 1.0
+  ├─ 스타일: 색상, 여백 등
+  └─ Is Variable: Blueprint 접근
+
+연료 소모 시 업데이트
+  ↓
+  ├─ Drain Jet Fuel → Current Fuel Percent 반환
+  ├─ Get Fuel Percentage (Safe Divide)
+  └─ Update Fuel Percent 호출
+
+캡슐화
+  ↓
+WBP_Overlay에 커스텀 함수
+  ├─ Update Fuel Percent
+  └─ 내부 구조 숨김
+       ↓
+     깔끔한 인터페이스
+```
+
+**이번 강의의 핵심:**
+
+- Progress Bar로 연료 시각화
+- Percent 속성 (0.0~1.0)
+- Safe Divide로 안전한 계산
+- Pure Function 활용
+- Widget에 커스텀 함수 추가
+- 캡슐화로 코드 구조 개선
+- Compile 순서 중요
+
+**다음 강의 예고:**
+
+- 연료 보충 시 바 업데이트 문제 해결
+- Event Dispatcher 또는 다른 패턴 활용

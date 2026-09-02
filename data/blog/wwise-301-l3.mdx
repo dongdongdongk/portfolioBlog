@@ -1,0 +1,536 @@
+---
+title: 'Wwise 301 L3'
+date: '2026-09-02'
+category: '게임 개발/WWISE'
+tags: ['게임 개발', 'WWISE']
+draft: false
+summary: ''
+---
+
+# {🎧 Trigger를 사용하여 SoundBank 로드하기}
+
+이번 강의에서는 **Wwise Adventure Game** 안에서 **Trigger를 사용하여 SoundBank를 로드하고 언로드하는 방법**을 학습합니다.
+
+즉, **플레이어가 특정 지역(예: Woodlands)** 안으로 들어오면 해당 지역의 사운드가 메모리에 로드되고,
+
+영역 밖으로 나가면 자동으로 메모리에서 언로드되도록 설정합니다.
+
+---
+
+## 📋 목차
+
+1. [SoundBank와 Trigger 개념 이해하기](https://www.notion.so/dd-28ae683f737e80ba8133c06e49d6a809#1-soundbank%EC%99%80-trigger-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Woodlands Trigger 만들기](https://www.notion.so/dd-28ae683f737e80ba8133c06e49d6a809#2-woodlands-trigger-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+3. [Trigger를 Trigger Collider로 설정하기](https://www.notion.so/dd-28ae683f737e80ba8133c06e49d6a809#3-trigger%EB%A5%BC-trigger-collider%EB%A1%9C-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+4. [Trigger를 시각적으로 구분하기 (Trigger_Red Material)](https://www.notion.so/dd-28ae683f737e80ba8133c06e49d6a809#4-trigger%EB%A5%BC-%EC%8B%9C%EA%B0%81%EC%A0%81%EC%9C%BC%EB%A1%9C-%EA%B5%AC%EB%B6%84%ED%95%98%EA%B8%B0-trigger_red-material)
+5. [AkBank 스크립트 추가 및 SoundBank 지정하기](https://www.notion.so/dd-28ae683f737e80ba8133c06e49d6a809#5-akbank-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%B6%94%EA%B0%80-%EB%B0%8F-soundbank-%EC%A7%80%EC%A0%95%ED%95%98%EA%B8%B0)
+6. [Trigger Enter/Exit 설정으로 로드 & 언로드 제어하기](https://www.notion.so/dd-28ae683f737e80ba8133c06e49d6a809#6-trigger-enterexit-%EC%84%A4%EC%A0%95%EC%9C%BC%EB%A1%9C-%EB%A1%9C%EB%93%9C--%EC%96%B8%EB%A1%9C%EB%93%9C-%EC%A0%9C%EC%96%B4%ED%95%98%EA%B8%B0)
+7. [Trigger 감지 대상을 Main Camera로 지정하기](https://www.notion.so/dd-28ae683f737e80ba8133c06e49d6a809#7-trigger-%EA%B0%90%EC%A7%80-%EB%8C%80%EC%83%81%EC%9D%84-main-camera%EB%A1%9C-%EC%A7%80%EC%A0%95%ED%95%98%EA%B8%B0)
+8. [Wwise Profiler로 SoundBank 로드 확인하기](https://www.notion.so/dd-28ae683f737e80ba8133c06e49d6a809#8-wwise-profiler%EB%A1%9C-soundbank-%EB%A1%9C%EB%93%9C-%ED%99%95%EC%9D%B8%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. SoundBank와 Trigger 개념 이해하기
+
+### 🎵 SoundBank란?
+
+- Wwise에서 제작한 **사운드 이벤트(Event)** 들을 모아놓은 **오디오 데이터 묶음**입니다.
+- 예: `Waterfall Event`, `Wind Event`, `Birds Event` 등 특정 지역 사운드를 하나의 SoundBank(`Woodlands.bnk`)로 묶을 수 있습니다.
+- 이 SoundBank는 메모리에 **로드(load)** 되어야만 게임에서 실제로 이벤트를 **재생(post)** 할 수 있습니다.
+
+### 🎮 지역 기반 로드의 필요성
+
+- 게임 내에는 여러 지역(Region)이 존재합니다.
+  - 예: `Village`, `Woodlands`, `Cave` 등.
+- 플레이어가 한 지역을 벗어나면 해당 지역의 사운드는 더 이상 필요하지 않기 때문에,
+  메모리 절약을 위해 **언로드(unload)** 하는 것이 좋습니다.
+- 이렇게 **지역 진입 시 로드 / 이탈 시 언로드**하는 과정을 **Trigger Collider**를 통해 제어합니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380523/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L3/image.png)
+
+```csharp
+다양한 지
+```
+
+### 🔔 Trigger Collider란?
+
+- Unity에서 물리적인 충돌이 아닌 **“감지용 영역”**을 정의할 수 있게 해주는 Collider입니다.
+- `Is Trigger` 옵션이 활성화되어 있으면, **충돌하지 않고도** 객체가 영역 안팎으로 들어오는 것을 감지할 수 있습니다.
+- 예: 플레이어(리스너)가 트리거 영역 안에 들어오면 → Wwise의 특정 행동(예: SoundBank 로드)이 실행됨.
+
+---
+
+## 2. Woodlands Trigger 만들기
+
+### ✅ 목적
+
+Woodlands 지역에 해당하는 영역을 감싸는 **Trigger Collider**를 생성합니다.
+
+### ⚙️ 단계
+
+1. Unity 메뉴에서
+
+   `Audiokinetic > Certification > 301 > Lesson 3 > Loading SoundBanks using Triggers` 선택
+
+   → Woodlands 씬이 자동으로 열립니다.
+
+2. `Hierarchy` 창에서 `Waterfall` 오브젝트를 클릭하고
+
+   Scene 뷰에서 마우스 커서를 둔 상태에서 **F** 키를 눌러 Woodlands 지역으로 이동합니다.
+
+3. 메뉴에서
+
+   **GameObject > 3D Object > Cube** 선택
+
+   → 새로운 Cube GameObject가 생성됩니다.
+
+4. `Hierarchy` 창에서 Cube를 **“Woodlands Trigger”** 로 이름 변경합니다.
+
+   (우클릭 > Rename)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380520/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L3/image_1.png)
+
+---
+
+## 3. Trigger를 Trigger Collider로 설정하기
+
+### 🎯 기본 설명
+
+- Cube를 생성하면 Unity가 자동으로 **Box Collider**를 추가합니다.
+- Box Collider는 기본적으로 물리 충돌용입니다.
+- 이를 **Trigger로 전환(Is Trigger 활성화)** 하면,
+  물리 충돌 대신 “영역 감지” 용도로 바뀝니다.
+
+### ⚙️ 단계
+
+1. `Inspector`에서 **Box Collider** 컴포넌트를 찾습니다.
+2. **Is Trigger** 옵션을 활성화합니다 ✅
+
+   → 이제 이 Collider는 “감지용” Trigger가 됩니다.
+
+---
+
+## 4. Trigger를 시각적으로 구분하기 (Trigger_Red Material)
+
+### 🎨 목적
+
+- 개발 중에 Trigger 영역이 잘 보이도록 **투명한 빨간색(Material)** 을 적용합니다.
+- 실제 게임에서는 이 영역이 보이지 않지만, 디버깅을 위해 시각화합니다.
+
+### ⚙️ 단계
+
+1. `Project` 창에서 **Trigger_Red**를 검색합니다.
+2. 검색 결과의 **Trigger_Red Material**을 `Woodlands Trigger` 오브젝트로 **드래그 앤 드롭**합니다.
+3. Scene 뷰에서 투명한 빨간색 상자가 표시됩니다.
+
+> 🔍 참고
+>
+> 트리거 안에 있을 때에는 내부에서 Trigger의 Mesh가 보이지 않습니다.
+>
+> 외부에서만 반투명으로 표시됩니다.
+
+### 💡 Collider 크기 조정
+
+- `Move`, `Rotate`, `Scale` 도구를 사용해 Woodlands 전체를 감싸도록 Trigger 크기를 조정합니다.
+  - **Village 다리**부터 **Cave 입구 바로 전까지** 포함되도록 확장.
+  - 인접한 **Pine Forest 일부 포함 가능**.
+  - 단, **Village 다리 쪽으로 너무 멀리 가지 않도록** (Village SoundBank와 겹치지 않게).
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380522/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L3/image_2.png)
+
+---
+
+## 5. AkBank 스크립트 추가 및 SoundBank 지정하기
+
+### 🎧 AkBank 스크립트란?
+
+- Wwise의 **SoundBank를 Unity에서 로드/언로드** 할 수 있게 해주는 컴포넌트입니다.
+- AkBank는 SoundBank를 **언제, 어떤 조건에서** 로드할지를 지정할 수 있습니다.
+
+### ⚙️ 단계
+
+1. `Woodlands Trigger`가 선택된 상태에서
+
+   **Inspector > Add Component** 클릭
+
+2. `AkBank` 검색 후 선택합니다.
+3. **Bank Name** 항목에서
+
+   `SoundBanks > Default Work Unit > Region > Woodlands` 선택
+
+   → 이제 이 트리거는 Woodlands SoundBank를 다루게 됩니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380522/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L3/image_3.png)
+
+---
+
+## 6. Trigger Enter/Exit 설정으로 로드 & 언로드 제어하기
+
+### 🎯 기본 개념
+
+- AkBank는 기본적으로 “Start 시점”에 SoundBank를 자동 로드합니다.
+- 하지만 우리는 “플레이어가 Trigger 안에 들어올 때만” 로드하고,
+  “나갈 때” 언로드하도록 설정해야 합니다.
+
+### ⚙️ 단계
+
+### ① Load 조건 설정
+
+1. `AkBank` 컴포넌트의 **Load On** 항목 확인
+2. “Start” 옵션을 해제하고
+
+   **AkTriggerEnter** 만 남깁니다.
+
+→ **의미:**
+
+플레이어가 Trigger Collider 안으로 “들어올 때” SoundBank를 로드합니다.
+
+### ② Unload 조건 설정
+
+1. `AkBank` 컴포넌트의 **Unload On** 항목 확인
+2. **AkTriggerExit** 만 남깁니다.
+
+→ **의미:**
+
+플레이어가 Trigger Collider 밖으로 “나갈 때” SoundBank를 언로드합니다.
+
+---
+
+## 7. Trigger 감지 대상을 Main Camera로 지정하기
+
+### 🎯 이유
+
+- 기본 상태에서는 Trigger가 **모든 Collider**를 감지합니다.
+  (바닥, 적, 이펙트 등 포함)
+- 하지만 실제로는 “플레이어(리스너)” 만 감지해야 합니다.
+  → Unity의 **Main Camera** 오브젝트가 리스너 역할을 함.
+
+### ⚙️ 단계
+
+### ① AkTriggerEnter 추가
+
+1. `Woodlands Trigger` 선택
+2. `Add Component` 클릭 → `AkTriggerEnter` 검색 후 추가
+3. **Trigger Object** 항목에 `Main Camera`를 드래그합니다.
+
+### ② AkTriggerExit 추가
+
+1. 다시 `Add Component` 클릭 → `AkTriggerExit` 검색 후 추가
+2. 동일하게 **Trigger Object**에 `Main Camera`를 드래그합니다.
+
+이제 **Main Camera가 Trigger 안팎으로 이동할 때만**
+
+SoundBank 로드/언로드가 발생합니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380522/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L3/image_4.png)
+
+```csharp
+위의 내용들을 모두 적용한 스크립트
+```
+
+---
+
+## 8. Wwise Profiler로 SoundBank 로드 확인하기
+
+### ⚙️ 단계
+
+1. **Wwise**에서 상단 메뉴 **Remote** 클릭
+2. **Remote Connections 창**에서
+
+   “Wwise Adventure Game (Editor)” 선택 → **Connect** 클릭
+
+3. Unity에서 **Play 버튼** 클릭 → 게임 실행
+4. 플레이어를 움직여 **Woodlands Trigger 안으로 진입**
+5. **Wwise Profiler → SoundBanks 탭** 에서 확인
+   - `Woodlands.bnk` 가 메모리에 **로드됨** ✅
+6. 다시 **Woodlands Trigger 밖으로 이동**
+   - `Woodlands.bnk` 가 메모리에서 **언로드됨** ✅
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380522/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L3/image_5.png)
+
+---
+
+## 💡 정리 요약
+
+| 구분                  | 동작                 | 사용된 컴포넌트                  | 설명 |
+| --------------------- | -------------------- | -------------------------------- | ---- |
+| **Trigger 영역 생성** | Cube + Box Collider  | 기본 영역 감지용 Collider        |      |
+| **Trigger 설정**      | Is Trigger 활성화    | Collider를 감지 모드로 변경      |      |
+| **시각화**            | Trigger_Red Material | 영역을 반투명 빨간색으로 표시    |      |
+| **SoundBank 관리**    | AkBank               | SoundBank 로드/언로드 설정       |      |
+| **로드 조건**         | AkTriggerEnter       | Main Camera가 들어올 때 로드     |      |
+| **언로드 조건**       | AkTriggerExit        | Main Camera가 나갈 때 언로드     |      |
+| **감지 대상**         | Main Camera          | 리스너로서 사운드 로드 조건 충족 |      |
+| **검증 도구**         | Wwise Profiler       | SoundBank 메모리 상태 확인       |      |
+
+---
+
+## 🧠 핵심 개념 요약
+
+- **Trigger Collider**: 물리 충돌이 아닌 “진입 감지용” Collider
+- **AkBank**: SoundBank를 로드하거나 언로드하는 Wwise 스크립트
+- **AkTriggerEnter / Exit**: 특정 객체가 Trigger에 들어오고 나가는 순간을 감지
+- **Main Camera = Listener**: 플레이어의 귀 역할을 하며 오디오 이벤트 감지 대상
+- **Profiler 확인**: 실제 SoundBank가 언제 메모리에 올라가고 내려가는지 실시간 모니터링 가능
+
+---
+
+# { 🎧 SoundBank를 Scene 단위로 로드하기 }
+
+## { 🎮 Scene 기반 SoundBank 로드 & 언로드 제어하기 }
+
+이번 강의에서는 **트리거(Trigger)** 를 이용해 SoundBank를 로드하던 방식을 확장하여,
+
+**Scene 단위로 SoundBank를 관리**하는 방법을 배웁니다.
+
+즉, **특정 지역(Scene)이 로드될 때 그 지역의 사운드 리소스만 함께 로드**되고,
+
+**해당 Scene이 언로드될 때 자동으로 해제(메모리 반환)** 되도록 구성합니다.
+
+---
+
+## 📋 목차
+
+1. [Scene 기반 사운드 관리 개념 이해하기](https://www.notion.so/Wwise-301-L3-28ae683f737e80ba8133c06e49d6a809#scene-%EA%B8%B0%EB%B0%98-%EC%82%AC%EC%9A%B4%EB%93%9C-%EA%B4%80%EB%A6%AC-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Woodlands 씬 생성 및 SoundBank 배치하기](https://www.notion.so/Wwise-301-L3-28ae683f737e80ba8133c06e49d6a809#woodlands-%EC%94%AC-%EC%83%9D%EC%84%B1-%EB%B0%8F-soundbank-%EB%B0%B0%EC%B9%98%ED%95%98%EA%B8%B0)
+3. [LoadSceneAsyncOnEnter 스크립트로 트리거-씬 연결하기](https://www.notion.so/Wwise-301-L3-28ae683f737e80ba8133c06e49d6a809#loadsceneasynconenter-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8%EB%A1%9C-%ED%8A%B8%EB%A6%AC%EA%B1%B0-%EC%94%AC-%EC%97%B0%EA%B2%B0%ED%95%98%EA%B8%B0)
+4. [Waterfall 오브젝트를 Woodlands 씬으로 이동하기](https://www.notion.so/Wwise-301-L3-28ae683f737e80ba8133c06e49d6a809#waterfall-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8%EB%A5%BC-woodlands-%EC%94%AC%EC%9C%BC%EB%A1%9C-%EC%9D%B4%EB%8F%99%ED%95%98%EA%B8%B0)
+5. [Profiler로 Ambient_Waterfall Event 모니터링하기](https://www.notion.so/Wwise-301-L3-28ae683f737e80ba8133c06e49d6a809#profiler%EB%A1%9C-ambient_waterfall-event-%EB%AA%A8%EB%8B%88%ED%84%B0%EB%A7%81%ED%95%98%EA%B8%B0)
+6. [정리 및 핵심 개념 요약](https://www.notion.so/Wwise-301-L3-28ae683f737e80ba8133c06e49d6a809#%EC%A0%95%EB%A6%AC-%EB%B0%8F-%ED%95%B5%EC%8B%AC-%EA%B0%9C%EB%85%90-%EC%9A%94%EC%95%BD)
+
+---
+
+## 1. Scene 기반 사운드 관리 개념 이해하기
+
+### 🎯 개념 요약
+
+- **문제점:**
+  이전에는 트리거(Trigger)에 **SoundBank 로드 이벤트**를 직접 연결했습니다.
+  → 하지만 이렇게 하면 **씬이 언로드되어도 SoundBank가 계속 메모리에 남아** 있을 수 있습니다.
+- **해결법:**
+  SoundBank를 **별도의 Scene으로 분리**하고,
+  **씬이 로드될 때 자동으로 로드 / 씬이 언로드될 때 자동으로 언로드**하도록 설정합니다.
+
+### 💡 장점
+
+1. **효율적인 메모리 관리**
+
+   → 현재 플레이어가 위치한 지역(Scene)의 사운드 자원만 메모리에 유지.
+
+2. **조직적인 관리 구조**
+
+   → 여러 지역별 사운드(Scene 단위)로 분리하여 유지보수 간편.
+
+3. **자동화된 로드/언로드**
+
+   → 트리거가 Scene을 로드하면 관련 사운드가 함께 로드되고, 씬이 사라질 때 함께 정리됨.
+
+---
+
+## 2. Woodlands 씬 생성 및 SoundBank 배치하기
+
+### 🧩 Step 1. 새 Scene 생성
+
+- Project 뷰에서 `Create → Scene` 선택
+- 이름: **Woodlands**
+- Hierarchy로 드래그해 활성화
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380522/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L3/image_6.png)
+
+### 🧩 Step 2. 불필요한 오브젝트 제거
+
+- Unity가 자동 생성한
+  - `Main Camera`
+  - `Directional Light`
+    이 둘은 기존 메인 씬에 이미 있으므로 삭제
+
+→ 완전히 **빈 Scene** 상태로 만듭니다.
+
+### 🧩 Step 3. Wwise GameObject 생성
+
+- Hierarchy에서 **우클릭 → Create Empty**
+- 이름: **Wwise**
+- Inspector: 현재 아무 컴포넌트도 없는 빈 GameObject
+
+### 🧩 Step 4. SoundBank 연결
+
+- 이전에 사용했던 **Woodlands SoundBank**를 Project에서 찾아
+  → `AkBank` 컴포넌트를 가진 트리거에서
+  → **Drag & Drop**으로 `Wwise` 오브젝트에 넣기
+- **Load On**: `Awake`
+  → Scene이 로드될 때 SoundBank 자동 로드
+- **Unload On**: `Destroy`
+  → Scene이 언로드될 때 SoundBank 자동 해제
+
+✅ 이 설정 덕분에 “Woodlands Scene이 로드될 때만 SoundBank가 활성화”됩니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380523/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L3/image_7.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380523/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L3/image_8.png)
+
+```csharp
+트리거가 아니기 때문에 씬 시작에 Awake 로 실행 그리고 씬 종료면 Destroy
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380523/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L3/image_9.png)
+
+```csharp
+이후 저장하고 씬을 Hierarchy 에서 삭제한다 ( 어짜피 에셋에 남아 있으니까 이제 이걸 로드 하는법을 아래에서 )
+```
+
+---
+
+## 3. LoadSceneAsyncOnEnter 스크립트로 트리거-씬 연결하기
+
+### 🧩 Step 1. 스크립트 개요
+
+- 이름: **LoadSceneAsyncOnEnter.cs**
+- 역할:
+  → 플레이어(예: Main Camera)가 **트리거에 진입할 때 지정된 Scene을 로드 ( 아까 만든 트리거 )**
+
+### 🧩 Step 2. Scene 이름 지정
+
+- 스크립트의 `Scene to Load` 속성에 `"Woodlands"` 입력
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380520/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L3/image_10.png)
+
+### ⚠️ 경고 메시지 처리
+
+- 처음엔 **"Scene not found in build settings"** 경고가 뜹니다.
+  → 원인: Build Settings에 해당 Scene이 아직 등록되지 않음.
+
+### 🧩 Step 3. Build Settings 등록
+
+- `File → Build Settings` 열기
+- `Scenes In Build` 영역에
+  → `Woodlands` Scene을 **Drag & Drop**
+
+이제 경고가 사라지고, 트리거를 통해 Scene이 정상적으로 로드 가능.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380520/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L3/image_11.png)
+
+---
+
+## 4. Waterfall 오브젝트를 Woodlands 씬으로 이동하기
+
+### 🎯 목표
+
+- **Waterfall 게임 오브젝트**가 Woodlands SoundBank 안의 Event(`Ambient_Waterfall`)를 사용하고 있으므로
+  → Waterfall은 **Woodlands Scene에 속해야** 정상적으로 동작.
+
+### 🧩 Step 1. Waterfall 구조 확인
+
+- `Waterfall`
+  └ `Waterfall_UpClose`
+  └ `AkEvent (Ambient_Waterfall)`
+
+이 `Ambient_Waterfall` 이벤트는 **Woodlands SoundBank** 안에 있음.
+
+→ 따라서 **Waterfall 전체를 Woodlands Scene으로 이동**해야 합니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380521/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L3/image_12.png)
+
+### 🧩 Step 2. 이동
+
+- Hierarchy에서 `Waterfall` 오브젝트 선택
+- **Woodlands Scene**으로 **드래그**
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380521/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L3/image_13.png)
+
+### 💡 참고
+
+> 자식 오브젝트의 위치는 부모를 기준으로 하지만,
+>
+> **Wwise는 항상 전역 좌표**로 사운드 위치를 계산하기 때문에
+>
+> 부모를 바꿔도 소리의 공간적 위치에는 영향을 주지 않습니다.
+
+### 🧩 Step 3. 결과
+
+- 이제 Woodlands Scene이 로드될 때
+  → SoundBank 로드
+  → Waterfall 오브젝트 활성화
+  → Ambient_Waterfall Event 재생
+
+씬이 언로드되면
+
+→ Waterfall과 Event가 함께 해제됩니다.
+
+---
+
+## 5. Profiler로 Ambient_Waterfall Event 모니터링하기
+
+### 🧩 Step 1. 준비
+
+- **Wwise**와 **Unity**를 나란히 배치
+- `Wwise → Layouts → Profiler` 선택
+
+### 🧩 Step 2. 필터 설정
+
+1. Advanced Profiler → Voices Graph 탭으로 이동
+2. Filter 오른쪽의 **(...) 버튼 클릭**
+3. `Events > Ambient > SoundBankSpecific > Ambient_Waterfall` 선택 → OK
+
+→ 이제 **Ambient_Waterfall Event만** 보이도록 필터링됨.
+
+### 🧩 Step 3. Unity 설정
+
+- Play 모드 실행 전에 `Woodlands Scene`을 Hierarchy에서 **Remove** (자동 로드 방지)
+- 저장 후 진행
+
+### 🧩 Step 4. Wwise Remote 연결
+
+- `Wwise → Remote → Connections`
+- `Wwise Adventure Game (Editor)` 선택 → **Connect**
+
+### 🧩 Step 5. 테스트
+
+1. Play 실행
+2. Main Camera를 **Woodlands Trigger 안쪽으로 이동**
+
+   → Scene이 로드되며 **Ambient_Waterfall Event 재생**
+
+   → Profiler에서 **Voices Graph에 이벤트 표시됨**
+
+3. Main Camera를 **Trigger 밖으로 이동**
+
+   → LoadSceneAsyncOnEnter 스크립트가 Scene 언로드 실행
+
+   → Event 사라짐 (메모리 해제 확인 가능)
+
+### 🧩 Step 6. 정리
+
+- Wwise Profiler의 Filter → `(None)` 선택
+- Unity에서 ESC → WAG 메뉴 → Play 종료
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380521/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L3/image_14.png)
+
+```csharp
+사운드 뱅크 관련해서 실수하면 위와 같이 오류가 Profiler 에서 발생한다 ( 검색어 Error 로 해보자 )
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380521/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L3/image_15.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380521/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L3/image_16.png)
+
+---
+
+## 6. 정리 및 핵심 개념 요약
+
+| 구분               | 내용                                                                       |
+| ------------------ | -------------------------------------------------------------------------- |
+| **핵심 개념**      | SoundBank를 **Scene 단위로 분리**하여 자동 로드/언로드 관리                |
+| **도입 이유**      | 트리거 기반 로드는 사운드 메모리 해제가 자동화되지 않음                    |
+| **주요 구성 요소** | `Woodlands Scene`, `Wwise GameObject (AkBank)`, `LoadSceneAsyncOnEnter.cs` |
+| **동작 방식**      | 트리거 → Scene 로드 → SoundBank & 오브젝트 로드 → Event 재생               |
+| **장점**           | 메모리 효율적 관리 / 씬 단위 구조화 / 자동 언로드                          |
+| **테스트 도구**    | Wwise Profiler → Voices Graph (Ambient_Waterfall 확인)                     |
+
+---
+
+## 🎓 핵심 이해 포인트
+
+- ✅ **Scene이 사운드 단위의 "컨테이너" 역할**을 함
+- ✅ **SoundBank는 Awake 시 자동 로드 / Destroy 시 자동 언로드**
+- ✅ **Wwise는 부모-자식 관계와 무관하게 전역 좌표에서 소리 계산**
+- ✅ **Profiler로 실시간 Event 메모리 상태를 확인** 가능

@@ -1,0 +1,1327 @@
+---
+title: '섹션 5: 타일바니아'
+date: '2026-09-02'
+category: '게임 개발/2D 게임을 만들기 위한 C# 유니티 학습'
+tags: ['게임 개발', '2D 게임을 만들기 위한 C# 유니티 학습']
+draft: false
+summary: ''
+---
+
+# { 스프라이트 시트 자르기 }
+
+## 🧱 1. 새 프로젝트 생성
+
+```csharp
+작업 과정
+
+		유니티 허브 실행 후, NEW 클릭.
+
+		템플릿으로 2D 선택.
+
+		프로젝트 이름 입력 (예: TileVania).
+
+		저장 위치 지정 → CREATE 클릭.
+
+개념 설명
+
+		유니티는 2D/3D 게임을 만드는 툴이에요.
+
+		프로젝트는 게임 개발의 전체 작업 공간이에요. 모든 스크립트, 이미지, 사운드, 설정이 여기 포함돼요.
+
+		2D는 평면 기반의 게임을 만들기 위한 설정이에요. (예: 슈퍼 마리오 같은 횡스크롤 게임)
+```
+
+## 📦 2. 에셋 다운로드 및 임포트
+
+```csharp
+
+작업 과정
+
+		강의자가 제공한 에셋 압축파일 다운로드.
+
+		압축 해제 후 Unity의 Assets 폴더로 드래그.
+
+		Project 창에서 우클릭 → Create > Folder → 이름: Sprites.
+
+		이미지 리소스들을 Sprites 폴더에 정리.
+
+개념 설명
+
+		에셋(Asset)은 게임에서 사용하는 모든 리소스예요.
+
+		(예: 캐릭터 이미지, 배경 음악, 효과음, 애니메이션 등)
+
+		Assets 폴더는 Unity가 자동으로 인식하는 리소스 저장 공간이에요.
+
+		Sprites는 이미지 리소스 중에서도 2D 게임에서 사용하는 그래픽 조각들이에요.
+
+		예를 들면 타일, 캐릭터, 배경 등이 여기에 해당돼요.
+```
+
+### 스프라이트 시트(Sprite Sheet)란?
+
+```csharp
+스프라이트 시트는 여러 개의 2D 이미지(스프라이트)를 하나의 이미지 파일로 합쳐 놓은 것.
+
+일반적으로 애니메이션 프레임, 타일맵의 타일들, UI 요소들 등이 포함되어 있음.
+
+이유는?
+
+		성능 최적화 (Draw Call 감소)
+
+		관리 용이성 (하나의 파일만 다루면 되니까!)
+
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380382/notion-blog/_/2D_C_/_5_/image.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380370/notion-blog/_/2D_C_/_5_/image_1.png)
+
+## 🔧 Pixels Per Unit 설정
+
+```csharp
+작업 과정
+
+		여러 개의 스프라이트 파일 선택.
+
+		Inspector에서 Pixels Per Unit을 32로 변경.
+
+		Apply 클릭.
+
+		씬에 하나 드래그해서 크기 확인 → 적절하면 유지.
+
+개념 설명
+
+		Pixels Per Unit (PPU)는 이미지 몇 픽셀이 Unity에서 1 유닛으로 표시될지를 결정해요.
+
+		예를 들어 32 PPU라면 이미지의 32픽셀이 Unity에서 1유닛으로 보임 → 이건 캐릭터나 타일 크기를 통일하는 데 중요해요.
+
+		이 설정은 이미지 스케일 통일, 충돌 처리, 플랫폼 간 해상도 차이 조정에도 영향을 줘요.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380372/notion-blog/_/2D_C_/_5_/image_2.png)
+
+## ✂️ 스프라이트 시트 자르기 (타일용)
+
+```csharp
+작업 과정
+
+		예시: SPA_Rock_Grass_Water 선택.
+
+		Sprite Mode: Single → Multiple → Apply.
+
+		Sprite Editor 열기 → Slice → Automatic → Apply.
+
+개념 설명
+
+		Sprite Mode에서 Multiple을 선택하면 한 이미지에서 여러 조각으로 잘라서 사용할 수 있어요.
+
+		Automatic 슬라이스는 이미지의 윤곽선을 자동 감지해서 잘라줘요.
+
+		배경 타일처럼 뚜렷한 경계가 있는 이미지에 적합해요.
+```
+
+### 왜 자르는가? (스프라이트 분할의 개념)
+
+```csharp
+유니티는 기본적으로 PNG 한 장을 하나의 스프라이트로 인식함.
+
+스프라이트 시트는 **하나의 이미지 안에 여러 개의 개체(타일, 캐릭터, 오브젝트 등)**가 있기 때문에 이를 개별 스프라이트로 분리해야 함.
+
+분리하지 않으면 이미지 전체를 통째로 쓸 수밖에 없음 → 효율적인 개발 불가능.
+```
+
+### Sprite Mode 설정
+
+```csharp
+해당 이미지(텍스처)에 여러 개의 스프라이트가 있음을 유니티에 알려주는 작업
+
+Single: 하나의 이미지가 하나의 스프라이트일 때
+
+Multiple: 하나의 이미지 안에 여러 스프라이트가 있을 때 → 직접 자르거나 자동으로 자르게 할 수 있음
+```
+
+### Sprite Editor로 자르기 (Slice)
+
+```csharp
+접근:
+
+		이미지 클릭 → Inspector에서 Sprite Mode를 Multiple로 → Apply → Sprite Editor 버튼 클릭
+
+자르기 방식:
+
+		Automatic
+
+				유니티가 알아서 투명하지 않은 픽셀 영역을 찾아서 자름
+
+				간단하고 빠르지만 간격이나 크기가 일정하지 않은 경우 정확도 떨어질 수 있음
+
+
+		Grid By Cell Size
+
+				일정한 **크기의 셀(타일)**로 자름
+
+				예: 32x32 픽셀로 나누면 그리드 모양으로 정확하게 잘라짐
+
+				패딩(Padding)이 있는 경우 패딩도 설정 필요 (스프라이트 간 간격)
+
+
+		Grid By Cell Count
+
+				가로 몇 개, 세로 몇 개 식으로 자름
+
+				셀의 개수가 명확할 때 사용
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380374/notion-blog/_/2D_C_/_5_/image_3.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380376/notion-blog/_/2D_C_/_5_/image_4.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380379/notion-blog/_/2D_C_/_5_/image_5.png)
+
+```csharp
+위와 같이 각 스프라이트에 이름이 생긴다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380380/notion-blog/_/2D_C_/_5_/image_6.png)
+
+```csharp
+자르고 나면 위와 같이 확인 가능하다
+```
+
+## 🧍캐릭터 시트 자르기 (그리드 방식)
+
+```csharp
+작업 과정
+
+		진저 캐릭터 시트 선택 → Sprite Mode: Multiple → Apply.
+
+		Sprite Editor → Slice > Grid by Cell Size.
+
+		Cell Size: 32x32, Padding: 6x6 → Slice → Apply.
+
+개념 설명
+
+		캐릭터 시트는 일정한 간격으로 정렬된 애니메이션 프레임이기 때문에, 자동보다는 그리드 방식이 더 정확해요.
+
+		Cell Size: 각 조각의 크기.
+
+		Padding: 각 조각 사이의 여백. 잘못 설정하면 스프라이트가 잘려요.
+
+		이 방식은 캐릭터가 걷는 애니메이션, 점프, 대기 등 다양한 프레임을 정확하게 분리하는 데 사용돼요.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380381/notion-blog/_/2D_C_/_5_/image_7.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380381/notion-blog/_/2D_C_/_5_/image_8.png)
+
+```csharp
+캐릭터가 잘못 잘려있음 이렇게 되면 캐릭터가 덜컹 거릴수 있음
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380382/notion-blog/_/2D_C_/_5_/image_9.png)
+
+```csharp
+Cell Size 모드로 변경
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380370/notion-blog/_/2D_C_/_5_/image_10.png)
+
+```csharp
+기존과 다르게 빨간색 격자가 생기면서 자를수 있게 된다
+```
+
+### 오프셋과 패딩의 개념
+
+```csharp
+오프셋 (Offset)
+
+		자르기 시작하는 지점의 기준 위치
+
+		일부 스프라이트 시트는 왼쪽 상단에서 조금 띄운 지점부터 스프라이트가 시작됨 → 이때 필요
+
+패딩 (Padding)
+
+		스프라이트 간 간격
+
+		많은 스프라이트 시트가 블록과 블록 사이에 일정한 간격을 둬서 겹침을 방지함
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380370/notion-blog/_/2D_C_/_5_/image_11.png)
+
+```csharp
+정상적으로 분할 완료
+```
+
+## 🎨 8. 배경 시트 자르기
+
+```csharp
+작업 과정
+
+		Background 선택 → Sprite Mode: Multiple → Apply.
+
+		Sprite Editor → Slice > Automatic → Apply.
+
+개념 설명
+
+		배경 시트는 고정된 형태의 조각들이기 때문에 자동 슬라이스로 잘 작동해요.
+
+		나중에 타일맵 시스템에 배치할 때 사용돼요.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380370/notion-blog/_/2D_C_/_5_/image_12.png)
+
+## 🪙 9. 동전 시트 자르기
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380371/notion-blog/_/2D_C_/_5_/image_13.png)
+
+```csharp
+작업 과정
+
+		Coin 선택 → Sprite Mode: Multiple → Apply.
+
+		Sprite Editor → Grid by Cell Size.
+
+		Cell Size: 32x32, Padding: 6x6 → Apply.
+
+개념 설명
+
+		동전은 회전 애니메이션을 위한 여러 프레임으로 구성됨.
+
+		나중에 애니메이션 컨트롤러를 만들어서 재생할 수 있어요.
+```
+
+## 🐛 10. 적군 시트 자르기
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380371/notion-blog/_/2D_C_/_5_/image_14.png)
+
+```csharp
+작업 과정
+
+		Enemy_Right 선택 → Sprite Mode: Multiple → Apply.
+
+		Sprite Editor → Grid by Cell Size.
+
+		Cell Size는 동일하지만, 오프셋 (Offset) 조정 필요:
+
+		Offset X: 10, Y: 4 → Slice → Apply.
+
+개념 설명
+
+		Offset은 자르는 기준점을 얼마만큼 안쪽으로 밀어 넣을지 정하는 값.
+
+		에셋에 여백이 있을 때 이걸 맞춰줘야 스프라이트가 잘리지 않고 정확히 자름.
+
+```
+
+# { Unity 타일맵(Tilemap) }
+
+## 1. 타일맵 시스템이란?
+
+```csharp
+**타일맵(Tilemap)**은 2D 게임에서 반복적인 지형, 배경, 플랫폼 등을 손쉽게 구성할 수 있는 시스템입니다.
+
+그림을 일일이 그리는 것이 아니라,
+
+미리 준비한 타일(Tile)을 그리드에 배치함으로써 빠르고 효율적으로 씬을 구성할 수 있어요.
+```
+
+## 2. 개념 정리
+
+```csharp
+스프라이트 시트(Sprite Sheet): 여러 그래픽 조각(스프라이트)이 하나의 이미지에 모여있는 것.
+
+타일 에셋(Tile Asset): 스프라이트를 타일맵에 쓸 수 있도록 만든 Unity 에셋.
+
+타일 팔레트(Tile Palette): 사용할 타일들을 모아놓은 팔레트. 화가의 팔레트처럼 배치하고 골라 씀.
+
+타일맵(Tilemap): 실제로 타일을 배치하는 그리드 형태의 객체.
+
+그리드(Grid): 하나 이상의 타일맵을 포함하는 부모 객체.
+```
+
+## 3. 타일맵 제작 전체 흐름
+
+```csharp
+스프라이트 시트 → 타일 에셋 변환 → 타일 팔레트 등록 → 타일맵에 칠하기
+```
+
+## 4. 프로젝트 준비
+
+```csharp
+폴더 정리
+
+1. Assets 폴더 안에 Tiles 폴더 생성
+
+		타일 관련 에셋(.asset 등)을 이곳에 저장
+
+2. Sprites 폴더: 원본 스프라이트 시트 보관
+```
+
+## 5. 타일맵 & 그리드 생성
+
+```csharp
+Hierarchy 작업
+
+1. 우클릭 > 2D Object > Tilemap > Rectangular 선택
+
+2. 생성된 Grid 오브젝트의 이름을 Tilemap Grid로 변경
+
+3. 생성된 Tilemap 오브젝트의 이름을 Platforms Tilemap으로 변경
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380371/notion-blog/_/2D_C_/_5_/image_15.png)
+
+## 6. 타일 팔레트 만들기
+
+```csharp
+Tile Palette 창 열기
+
+		메뉴: Window > 2D > Tile Palette
+
+		왼쪽에 고정 (씬과 나란히 보기 좋음)
+
+새 팔레트 생성
+
+		Create New Palette 클릭
+
+		이름: Platforms Palette
+
+		저장 위치: Assets/Tiles 폴더
+
+		.prefab 파일 생성됨
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380371/notion-blog/_/2D_C_/_5_/image_16.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380371/notion-blog/_/2D_C_/_5_/image_17.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380372/notion-blog/_/2D_C_/_5_/image_18.png)
+
+## 7. 스프라이트 시트를 타일로 변환
+
+```csharp
+Sprites 폴더에서 SPA_Rock_Grass_Water 선택
+
+첫 번째 스프라이트 클릭 + Shift로 전체 선택
+
+드래그하여 Tile Palette에 넣기
+
+저장 경로: Assets/Tiles
+
+각각의 타일 .asset 파일 생성됨
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380372/notion-blog/_/2D_C_/_5_/image_19.png)
+
+## 8. 타일 배치하기
+
+```csharp
+팔레트에서 타일 선택 후 씬(Tilemap)에 배치
+
+여러 개 드래그하여 칠할 수 있음
+
+같은 위치는 덮어쓰기 방식 (레이어처럼 쌓이지 않음)
+```
+
+## 9. 편집 도구 사용법
+
+```csharp
+🧹 지우개 도구
+
+		오른쪽 상단 두 번째 도구
+
+		타일맵 내 타일 지움
+
+⬆ 이동 도구
+
+		선택 → 이동 순서대로
+
+		단, 타일맵 이동은 불편하므로 조심
+```
+
+## 10. 타일 뒤집기 (Flip)
+
+```csharp
+른쪽 모서리 타일이 없을 때 왼쪽 타일을 X축 반전
+
+		씬에서 타일 선택
+
+		Inspector > Transform > Scale > X = -1
+
+✅ 이유: 아티스트가 에셋 절약을 위해 반복 타일 생략했기 때문
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380372/notion-blog/_/2D_C_/_5_/image_20.png)
+
+## 11. 스프라이트 단위 설정
+
+### Pixels Per Unit 설정
+
+```csharp
+스프라이트 시트 크기가 32x32이면 Pixels Per Unit = 32
+
+기본은 100 → 너무 작게 보임
+
+잘못되면 타일 사이 흰 줄이 생김
+
+해결법: 단위 픽셀을 31로 조정 (타일이 약간 커짐, 틈 해결)
+```
+
+# { 배경과 물 레이어를 추가 }
+
+## 강의 목표
+
+```csharp
+배경과 물 레이어를 추가해서 맵에 다양한 층을 만들기
+
+Tilemap의 레이어와 정렬 순서를 이해하고 활용하기
+```
+
+## 타일맵 레이어란?
+
+```csharp
+Tilemap 레이어는 2D 게임에서 다양한 층(배경, 플랫폼, 물 등)을 구분하는 구조예요.
+
+각각의 레이어는 다른 Sorting Layer에 속할 수 있어요.
+
+Sorting Layer는 어떤 레이어가 앞에 보일지, 뒤에 있을지를 결정하죠.
+```
+
+## 배경 타일맵 만들기
+
+### 1. 새로운 타일맵 만들기
+
+```csharp
+Hierarchy 뷰에서 Tilemap Grid를 우클릭
+
+		→ 2D Object → Tilemap → Rectangular
+
+이름을 Background Tilemap으로 바꾸세요.
+```
+
+### 2. 배경 타일 추가
+
+```csharp
+팔레트에 배경 타일 추가
+
+		→ 강의에서는 ‘SPA_Background in brown tint’라는 에셋을 사용했지만 초록색이라고 언급됨
+
+전체 선택 후 드래그해서 타일 팔레트에 넣어주세요.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380372/notion-blog/_/2D_C_/_5_/image_21.png)
+
+### 3. 배경 타일 칠하기
+
+```csharp
+타일 브러시로 원하는 위치에 칠합니다.
+
+플랫폼 위에 배경이 덮히는 현상이 생길 수 있지만 걱정 마세요 — Sorting Layer로 해결할 수 있어요.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380373/notion-blog/_/2D_C_/_5_/image_22.png)
+
+## 정렬 순서와 Sorting Layer 설정
+
+### 정렬 순서가 중요한 이유
+
+```csharp
+배경이 플랫폼보다 앞에 그려지면 이상해 보이겠죠?
+
+그래서 **레이어 순서(Sorting Layer)**를 통해 앞뒤 순서를 조절해야 해요
+```
+
+### 1. 간단한 방법: `Order in Layer`
+
+```csharp
+Inspector에서 Order in Layer를 -1로 설정
+
+→ 배경이 플랫폼(0) 뒤로 감
+```
+
+### 2. 더 체계적인 방법: `Sorting Layer` 추가
+
+```csharp
+Edit → Project Settings → Tags and Layers
+
+Sorting Layers 항목에 들어가서:
+
+		+ 버튼으로 레이어 추가
+
+				Background
+
+				Platforms
+
+각각의 Tilemap에서 해당 Sorting Layer 선택:
+
+		Background Tilemap: Background
+
+		플랫폼 Tilemap: Platforms
+
+🔎 Sorting Layer는 화면에서 어떤 오브젝트가 위에 보일지를 결정해요. 밑에 있을수록 위에 보입니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380373/notion-blog/_/2D_C_/_5_/image_23.png)
+
+```csharp
+레이어 추가
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380373/notion-blog/_/2D_C_/_5_/image_24.png)
+
+```csharp
+레이어 이름을 적어준다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380373/notion-blog/_/2D_C_/_5_/image_25.png)
+
+```csharp
+Background Tilemap ( 초록색 배경 )  으로 가서 Sorting Layer 을 선택해준다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380373/notion-blog/_/2D_C_/_5_/image_26.png)
+
+```csharp
+특이하게 Platforms 가 위로 가야지 나타난다
+```
+
+## 배경 색 조절하기
+
+```csharp
+팔레트에 있는 배경 타일 .asset 파일을 선택
+
+Inspector에서 Color 속성 조정:
+
+		더 어둡게, 더 붉게, 푸르게 등 변경 가능
+
+		녹색 배경이 너무 튀면 색을 조정해보세요
+```
+
+## 물 타일맵 만들기
+
+### 1. 새로운 타일맵 생성
+
+```csharp
+Tilemap Grid 우클릭 → 2D Object → Tilemap → Rectangular
+
+이름을 Water Tilemap으로 바꾸세요
+```
+
+### 2. 물 Sorting Layer 설정
+
+```csharp
+Sorting Layers에서 Water 추가 (Background보다 위, Platform보다 아래)
+
+Water Tilemap에 Sorting Layer로 Water 선택
+```
+
+### 3. 물 타일 칠하기
+
+```csharp
+물 타일을 팔레트에서 선택해서 적절한 위치에 칠함
+
+연못처럼 표현하기 위해 아래/위 타일 분리해서 배치
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380374/notion-blog/_/2D_C_/_5_/image_27.png)
+
+# { 룰 타일(Rule Tile) }
+
+## 룰 타일(Rule Tile)이란?
+
+```csharp
+Tilemap(타일맵) 위에 규칙을 정해놓고 자동으로 타일을 배치해주는 유니티 기능이야.
+
+주변 타일 상황(위에 뭐가 있는지, 옆에 뭐가 있는지 등등)을 보고 알아서 어떤 타일을 배치할지 결정해줘.
+
+덕분에 손으로 일일이 타일을 골라 깔 필요 없이, 똑똑하게 타일들이 연결돼서 "월드 맵"이 예쁘게 만들어져.
+```
+
+## Step 1. Tilemap Extras 설치하기
+
+```csharp
+Unity 에디터 → 상단 메뉴에서 Window → Package Manager 클릭.
+
+왼쪽 상단 드롭다운에서 Unity Registry 선택.
+
+검색창에 tile 입력.
+
+Tilemap Extras 패키지를 찾아 Install(설치) 버튼 클릭.
+
+※ 설치가 안 보이면
+
+Advanced Project Settings → Enable Pre-release Packages 체크하고 다시 찾아봐야 할 수 있어.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380374/notion-blog/_/2D_C_/_5_/image_28.png)
+
+## Step 2. Rule Tile 만들기
+
+```csharp
+프로젝트 패널(Sprites 폴더 추천)에서 우클릭 → Create → 2D → Tiles → Rule Tile 선택.
+
+이름을 간단히 예를 들어 PlatformRuleTile처럼 지정해줘.
+
+※ 왜 Sprites 폴더에 만들까?
+
+나중에 작업할 스프라이트랑 룰 타일이 한 눈에 보여서 관리하기 편해!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380374/notion-blog/_/2D_C_/_5_/image_29.png)
+
+## Step 3. 기본 스프라이트 지정하기
+
+```csharp
+방금 만든 Rule Tile을 클릭하면 Inspector에 Default Sprite가 비어있어.
+
+이걸 채워야 팔레트에 룰 타일이 나타나.
+
+'Select'를 눌러서 기본이 될 잔디, 돌, 벽 등 원하는 스프라이트를 지정해줘.
+```
+
+## Step 4. 팔레트에 추가하고 칠해보기
+
+```csharp
+1. Tile Palette 창을 열어줘 (Window → 2D → Tile Palette).
+
+2. 만들었던 Rule Tile을 팔레트로 드래그해서 추가.
+
+3. 씬(Scene)에서 칠해보자.
+
+		이때는 그냥 기본 스프라이트로만 칠해질 거야.
+
+		아직 룰(Tiling Rules)이 없으니까!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380374/notion-blog/_/2D_C_/_5_/image_30.png)
+
+## Step 5. Tiling Rules 작성하기
+
+```csharp
+Inspector에서 Rule Tile을 다시 선택하고, 이제 진짜 중요한
+
+Tiling Rules를 설정하는 단계야.
+```
+
+### 기본 구조 이해하기
+
+```csharp
+타일 주변의 8개 방향에 대해 "주변에 타일이 있는지 없는지"를 설정할 수 있어.
+
+가운데는 '자기 자신'이고 주변은 다음처럼 배열돼:
+```
+
+```csharp
+↖ ↑ ↗
+←     →
+↙ ↓ ↘
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380375/notion-blog/_/2D_C_/_5_/image_31.png)
+
+### 각 셀의 의미
+
+```csharp
+None(빈칸) = 주변에 뭐가 있든 상관 없음
+
+This(화살표) = 주변에 같은 종류의 타일이 있어야 함
+
+NotThis(X표) = 주변에 타일이 없어야 함 (비어있어야 함)
+```
+
+## Step 6. 실제 규칙 하나 만들어보기
+
+```csharp
+1. +버튼 클릭해서 규칙 하나 추가
+
+2. 가운데 타일을 "평범한 가운데용 타일" 스프라이트로 지정
+
+3. 주변 8칸을 모두 This(화살표)로 설정
+
+			즉, "내 주변에 모두 타일이 있을 때는 이 평범한 타일을 보여라."
+```
+
+## Step 7. 모서리 타일 만들기
+
+```csharp
+예를 들어 왼쪽 상단 모서리 규칙을 만든다면:
+
+1. 또 +버튼 눌러서 새로운 규칙 추가
+
+2. 가운데를 왼쪽 상단용 모서리 스프라이트로 지정
+
+3. 주변 조건 설정:
+
+		위(↑): NotThis (X)
+
+		왼쪽(←): NotThis (X)
+
+		오른쪽(→), 아래(↓): This (화살표)
+
+		오른쪽 아래(↘): This (화살표)
+
+		나머지 대각선(↖, ↗, ↙): 비워둬도 돼
+
+4. 그리고 회전(Rotation) 허용하면
+
+		이 규칙을 왼쪽 상단, 오른쪽 상단, 왼쪽 하단, 오른쪽 하단 모서리에 모두 적용할 수 있어!
+
+		회전 옵션은 "곡선 화살표"를 클릭해서 설정할 수 있어.
+```
+
+### Rotation(회전)이란?
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380375/notion-blog/_/2D_C_/_5_/image_32.png)
+
+```csharp
+"내가 만든 규칙을 회전시켜서 다른 방향에도 적용할 수 있도록 하는 것"이야.
+```
+
+```csharp
+예를 들어
+
+"왼쪽 위 모서리에 사용하는 타일" 규칙을 만들었어.
+
+그런데 게임 맵에는 "오른쪽 위", "왼쪽 아래", "오른쪽 아래" 모서리도 있을 거잖아?
+
+그럴 때 일일이 4개 규칙을 각각 만들 필요 없이,
+
+하나 만든 걸 90도씩 회전해서 자동으로 다른 방향에 적용하는 거야!
+```
+
+### RuleTile(규칙 타일)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380375/notion-blog/_/2D_C_/_5_/image_33.png)
+
+```csharp
+1. 고정 (Fixed)
+
+		무조건 딱 그 모양 그대로만 매칭됨.
+
+		회전/미러 이런 거 절대 없음.
+
+		➡️ "왼쪽 오른쪽에 타일 있어야 해. 위치 바뀌면 안 됨."
+
+2. 회전 (Rotation)
+
+		규칙이 안 맞으면 90도씩 돌려서 다시 검사함.
+
+		90도, 180도, 270도 회전해서도 맞으면 OK.
+
+		➡️ "안 맞아? 돌려봐~ 맞으면 적용!"
+
+3. 미러 (X축 / Y축 / XY 미러링)
+
+		규칙이 안 맞으면 좌우(X축), 위아래(Y축), 둘 다(XY) 뒤집어봄.
+
+		뒤집어서 맞으면 OK.
+
+		➡️ "뒤집어봤는데 맞네? 적용!"
+
+4. 무작위 출력 (Random Output)
+
+		같은 규칙인데 스프라이트를 랜덤으로 출력함.
+
+		예를 들면 땅 타일인데 "돌맹이 버전", "잔디 버전" 랜덤으로 섞임.
+
+		➡️ "같은 땅인데 모양은 다양하게 보여!"
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380375/notion-blog/_/2D_C_/_5_/image_34.png)
+
+```csharp
+고정 (Fixed)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380375/notion-blog/_/2D_C_/_5_/image_35.png)
+
+```csharp
+회전 (Rotation)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380376/notion-blog/_/2D_C_/_5_/image_36.png)
+
+```csharp
+미러 (X축 / Y축 / XY 미러링)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380376/notion-blog/_/2D_C_/_5_/image_37.png)
+
+```csharp
+무작위 출력 (Random Output)
+```
+
+## Step 8. 무작위(Random) 타일 넣기
+
+```csharp
+바닥 타일을 더 자연스럽게 하려면:
+
+1. +버튼 → 새로운 규칙 추가
+
+2. Output을 Random으로 설정
+
+3. Size를 5로 설정
+
+4. 초록색 3개 + 파란색 2개 스프라이트 넣기
+
+5. 옵션으로 MirrorX, MirrorY 선택하면 타일이 좌우로, 상하로 랜덤 반전돼서 훨씬 다양하게 보여.
+```
+
+## 완성 예시
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380376/notion-blog/_/2D_C_/_5_/image_38.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380376/notion-blog/_/2D_C_/_5_/image_39.png)
+
+```csharp
+최종 결과 테스트
+```
+
+# { Idle 애니메이션 만들기 }
+
+## 플레이어 Idle 애니메이션 만들기 시작
+
+### 윈도우 열기
+
+```csharp
+상단 메뉴 [Window] - [Animation] - [Animator]를 열었어.
+
+Animator 창을 프로젝트/콘솔 옆에 드래그해서 배치했어.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380377/notion-blog/_/2D_C_/_5_/image_40.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380377/notion-blog/_/2D_C_/_5_/image_41.png)
+
+### 초보자 개념 정리
+
+```csharp
+기본 개념들 정리
+```
+
+```csharp
+애니메이터 컴포넌트
+
+		플레이어(GameObject)에 붙는 컴포넌트. 어떤 애니메이션을 재생할지 연결해줌.
+
+애니메이터 컨트롤러
+
+		다양한 애니메이션(Idle, Run 등)을 관리하는 '애니메이션 상태 기계'.
+
+애니메이션(클립)
+
+		움직임 하나하나. 예를 들면 "idle 상태에서 미세하게 위아래로 움직이기"
+
+스프라이트 렌더러
+
+		2D 이미지를 화면에 보여주는 컴포넌트.
+```
+
+## 새 플레이어 GameObject 만들기
+
+```csharp
+**Hierarchy(계층 창)**에서 마우스 우클릭 → [Create Empty]로 빈 오브젝트 만들기.
+
+이름은 "Ginger (Player)"로 지었어. ('Ginger'는 빨간 머리에서 따온 이름!)
+
+Transform을 Reset해서 (Position, Rotation, Scale 모두 0, 0, 0)으로 초기화했어.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380377/notion-blog/_/2D_C_/_5_/image_42.png)
+
+## Animator 컴포넌트 추가
+
+```csharp
+Ginger (Player) 오브젝트에 [Add Component] 클릭 → Animator 추가.
+
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380377/notion-blog/_/2D_C_/_5_/image_43.png)
+
+## Animator Controller 만들기
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380377/notion-blog/_/2D_C_/_5_/image_44.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380378/notion-blog/_/2D_C_/_5_/image_45.png)
+
+```csharp
+프로젝트 창에서 폴더를 정리:
+
+		Animation 폴더 새로 만들기.
+
+Animation 폴더 안에서 [Create] → [Animator Controller] 클릭.
+
+이름은 "Player"로 설정.
+
+✨ Animator Controller란?
+
+		여러 애니메이션 클립(Idle, Run, Jump 등)을 상태(State)로 연결해서 전환을 관리하는 컨트롤러야!
+
+Animator Controller를 더블 클릭하면 진입(Entry), 종료(Exit) 상태가 보였어.
+
+✨ Entry란?
+
+		플레이어가 시작할 때 가장 먼저 들어가는 상태야. 예를 들면 Idle.
+```
+
+## Idle 애니메이션 클립 만들기
+
+### 스프라이트 시트 준비
+
+```csharp
+"SPA_Player_Ginger"라는 스프라이트 시트를 사용했어.
+
+(빨간 머리 스프라이트 모음)
+
+미리 보기(Preview) 창을 켜서 idle처럼 보이는 프레임 찾았어.
+
+			프레임 5, 6, 7, 8번이 미묘하게 움직이는 모습이야.
+```
+
+### 애니메이션 클립 생성
+
+```csharp
+스프라이트 5~8번을 Shift로 모두 선택.
+
+마우스 오른쪽 클릭 → [Create] → [Animation] 선택.
+
+파일 이름을 "Idle"로 저장.
+
+저장 위치는 아까 만든 Animation 폴더.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380378/notion-blog/_/2D_C_/_5_/image_46.png)
+
+## Idle 애니메이션 연결하기
+
+```csharp
+Animator 창에서 "Idle" 애니메이션 파일을 드래그해서 Animator Controller 위에 놓음.
+
+그러면 Entry → Idle로 자동 연결됨.
+
+✨ Entry → Idle 연결:
+
+		게임 시작하자마자 Idle 애니메이션이 실행된다는 뜻이야.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380378/notion-blog/_/2D_C_/_5_/image_47.png)
+
+## Player에 Animator Controller 연결
+
+```csharp
+Ginger (Player) 오브젝트 클릭 → Animator 컴포넌트에
+
+		Controller 칸에 아까 만든 Player Animator Controller를 연결했어.
+
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380378/notion-blog/_/2D_C_/_5_/image_48.png)
+
+## Sprite Renderer 추가하기
+
+```csharp
+플레이어가 보이게 하려면 Sprite Renderer도 추가해야 해.
+
+[Add Component] 클릭 → Sprite Renderer 추가.
+
+Sprite Renderer에 스프라이트 이미지를 하나 연결했어.
+
+(Idle 애니메이션과 별도로 대표 이미지를 보여주는 역할)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380378/notion-blog/_/2D_C_/_5_/image_49.png)
+
+## 플레이어가 화면에 보이지 않는 문제 해결
+
+```csharp
+실행해봤더니 캐릭터가 안 보였어!
+
+문제는 Sorting Layer 때문이야.
+
+		기본(Default) 레이어는 다른 타일맵에 가려서 안 보였던 거야.
+```
+
+### Sorting Layer 설정
+
+```csharp
+[Add Layer] 클릭 → 새 Sorting Layer를 만들었어.
+
+		이름은 "Player".
+
+Ginger (Player) 오브젝트의 Sorting Layer를 Player로 변경.
+```
+
+## Idle 애니메이션 속도 조절
+
+```csharp
+Idle 애니메이션이 너무 빠르게 넘어가서 멈춘 것처럼 보였어.
+
+Animation 창(Idle 애니메이션 클릭)에서:
+
+		Loop Time을 체크해서 무한 반복되게 했고,
+
+		필요하면 Speed(속도)를 조절해서 자연스럽게 느리게 만들었어.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380379/notion-blog/_/2D_C_/_5_/image_50.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380379/notion-blog/_/2D_C_/_5_/image_51.png)
+
+```csharp
+애니메이션을 사용해서 애니메이션을 미리 확인 가능하다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380379/notion-blog/_/2D_C_/_5_/image_52.png)
+
+# 여러 가지 상태(state) 애니메이션 추가
+
+```csharp
+플레이어에게 여러 가지 상태(state) 를 주고, 상황에 따라 다른 애니메이션을 재생하는 시스템을 만든다.
+
+구체적으로는:
+
+		달리는 애니메이션 만들기
+
+		사다리 오르는 애니메이션 만들기
+
+		상태 간 전환 조건 설정하기
+```
+
+## 1. 스프라이트 시트에서 애니메이션 만들기
+
+### 1.1 스프라이트 시트 열기
+
+```csharp
+Sprite Sheet = 여러 장의 그림(프레임)이 모여 있는 하나의 이미지 파일.
+
+Unity에서 Sprite Editor를 클릭하면 이 시트를 편집할 수 있다.
+
+👉 스프라이트 에디터를 열어 확대하면, 각각의 작은 그림(프레임) 을 볼 수 있다.
+```
+
+### 1.2 달리기 애니메이션 프레임 선택
+
+```csharp
+달리는 애니메이션은 19번부터 26번까지 스프라이트를 사용한다.
+
+오른쪽 번호를 보고 19번을 찾는다.
+
+19번을 클릭한 다음, Shift 키를 누른 채 26번까지 드래그해서 모두 선택한다.
+```
+
+### 1.3 애니메이션 생성
+
+```csharp
+마우스 오른쪽 클릭 → Create → Animation 선택.
+
+이름을 Running으로 저장한다.
+
+[Animations] 폴더 안에 이 파일을 넣는다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380379/notion-blog/_/2D_C_/_5_/image_53.png)
+
+## 2. 애니메이터에 애니메이션 연결하기
+
+### 2.1 애니메이터에 끌어놓기
+
+```csharp
+만든 Running 애니메이션을 Animator Controller 창에 끌어다 놓는다.
+
+어느 위치에 놓든 상관없다. (위치는 편의에 따라 정리할 수 있다.)
+```
+
+### 2.2 상태 전환 만들기
+
+```csharp
+Idle 상태(가만히 있는 상태)에서 Running으로 전환할 수 있게 설정한다.
+
+		Idle 상태를 오른쪽 클릭 → Make Transition.
+
+		나온 화살표를 Running 위로 끌어다 놓는다.
+
+👉 전환(Transition) = "한 애니메이션 상태"에서 "다른 애니메이션 상태"로 넘어가는 것.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380380/notion-blog/_/2D_C_/_5_/image_54.png)
+
+## 3. 전환 세팅 조정하기
+
+### 3.1 Transition Duration 설정
+
+```csharp
+전환 화살표를 클릭하고,
+
+Settings에서 Transition Duration을 0으로 설정.
+
+(→ 애니메이션이 부드럽게 섞이는 시간이 0. 즉, 즉시 전환된다.)
+```
+
+### 3.2 Has Exit Time 끄기
+
+```csharp
+Has Exit Time = 애니메이션이 끝나야 전환이 가능한 설정.
+
+우리는 키 입력에 즉시 반응하고 싶으므로 끈다.
+```
+
+### 개념 설명:
+
+```csharp
+Has Exit Time은 원샷 애니메이션(예: 점프, 공격 등)이 끝날 때 자동으로 상태를 되돌리도록 돕는 옵션이다.
+
+하지만 지금 우리는 키보드 입력에 바로 반응하게 하고 싶기 때문에 필요 없다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380380/notion-blog/_/2D_C_/_5_/image_55.png)
+
+## 4. 상태 전환 조건 만들기
+
+### 4.1 파라미터 추가
+
+```csharp
+Animator 창의 Parameters 탭으로 이동.
+
++ 버튼 → bool(참/거짓) 타입을 선택.
+
+이름을 isRunning으로 설정.
+
+👉 bool 타입은 단 두 가지 값: true(참) 또는 false(거짓).
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380380/notion-blog/_/2D_C_/_5_/image_56.png)
+
+## 4.2 전환에 조건 설정
+
+```csharp
+Idle → Running 전환선을 클릭.
+
+Conditions에서 + 버튼 클릭 → isRunning == true 설정.
+
+반대로, Running → Idling 전환도 만든다.
+
+		Running 상태를 우클릭 → Make Transition → Idling으로 연결.
+
+		이 전환에도 isRunning == false를 설정한다.
+
+🧠 중요 개념 요약:
+
+		isRunning이 true → Running 애니메이션 실행.
+
+		isRunning이 false → 다시 Idling 애니메이션 실행.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380380/notion-blog/_/2D_C_/_5_/image_57.png)
+
+```csharp
+Running 이 true 면 idle -> Running 이 된다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380380/notion-blog/_/2D_C_/_5_/image_58.png)
+
+```csharp
+서로 연결해주기  ( 러닝에서 idle 로 돌아가기 )
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380380/notion-blog/_/2D_C_/_5_/image_59.png)
+
+```csharp
+Has Exit Time 관련 Duration 설정 관련 해주고
+
+Running 이 false 면 Running 에서 idle
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380380/notion-blog/_/2D_C_/_5_/image_60.png)
+
+```csharp
+Loop Time 을 true 로 해줘야 반복해서 재생된다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380380/notion-blog/_/2D_C_/_5_/image_61.png)
+
+```csharp
+게임을 실행하고 Running 을 true 로 만들어 재생하면 캐릭터가 뛰어간다
+```
+
+## 5. 애니메이션 속도 조절
+
+```csharp
+Running 애니메이션이 느리게 보이면,
+
+Speed 값을 1.5로 설정해서 조금 빠르게 한다.
+
+👉 Speed 값은 애니메이션 재생 속도이다.
+
+1이면 원래 속도, 2면 2배 빠르게 재생된다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380380/notion-blog/_/2D_C_/_5_/image_62.png)
+
+## 6. 사다리 오르기(Climbing) 애니메이션 추가
+
+```csharp
+이제 사다리를 타는 애니메이션도 추가할 차례!
+```
+
+### 6.1 필요한 스프라이트 선택
+
+```csharp
+Sprite Editor를 열고, 14번과 15번 스프라이트를 찾는다.
+
+14번과 15번을 Shift로 모두 선택.
+```
+
+### 6.2 애니메이션 생성
+
+```csharp
+마우스 오른쪽 클릭 → Create → Animation.
+
+이름을 Climbing으로 저장.
+
+[Animations] 폴더 안으로 옮긴다.
+```
+
+## 7. 사다리 오르기 상태 설정
+
+### 7.1 애니메이터 연결
+
+```csharp
+Climbing 애니메이션을 Animator Controller로 끌어놓는다.
+
+Idling에서 Climbing으로, Climbing에서 다시 Idling으로 연결한다.
+```
+
+### 7.2 파라미터 추가
+
+```csharp
+Parameters 탭에서 + → bool 선택 → 이름은 isClimbing으로 설정.
+```
+
+### 7.3 전환 조건 설정
+
+```csharp
+Idling → Climbing 전환: isClimbing == true.
+
+Climbing → Idling 전환: isClimbing == false.
+
+역시 모든 전환은 Transition Duration을 0으로 만들고, Has Exit Time도 끈다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380381/notion-blog/_/2D_C_/_5_/image_63.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380381/notion-blog/_/2D_C_/_5_/image_64.png)
+
+## 8. 루프 설정 (Loop Time 켜기)
+
+```csharp
+Climbing 애니메이션을 클릭한 후, Inspector 창에서 Loop Time 체크하기.
+
+		(→ 사다리 타는 애니메이션이 반복해서 돌아가게 한다.)
+
+Running 애니메이션도 마찬가지로 Loop Time을 켜야 한다.
+```
+
+## 추가 개념 요약
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380381/notion-blog/_/2D_C_/_5_/image_65.png)

@@ -1,0 +1,480 @@
+---
+title: '섹션 2: 프로젝트 1 - 이미지 축소 앱 및 Electron 시작하기'
+date: '2026-09-02'
+category: '풀스택/Electron'
+tags: ['풀스택', 'Electron']
+draft: false
+summary: ''
+---
+
+# { Image Shrink 애플리케이션 소개 및 사용법 }
+
+```jsx
+1. 애플리케이션 개요
+
+		이름: Image Shrink
+
+		기능: 이미지를 최적화하여 파일 크기를 줄이는 데 사용.ㅡㄸ
+
+		활용 사례: 웹사이트에 업로드할 이미지 최적화. (큰 이미지는 로딩 시간을 증가시키므로 최적화가 필요함.)
+
+		설치: 애플리케이션은 이미 패키징되어 바탕 화면에 아이콘으로 제공됨.
+```
+
+# { Electron 기초 화면 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381245/notion-blog/_/Electron/Electron_From_Scratch_JavaScript_/_2_1_-_Electron_/image.png)
+
+## 강의 요약 및 정리
+
+```jsx
+이 프로젝트에서는 Electron.js를 사용하여 이미지 최적화 데스크톱 앱을 만들어봅니다.
+
+Electron은 Node.js와 Chromium을 기반으로 한 프레임워크로,
+
+웹 기술(HTML, CSS, JavaScript)을 사용하여 데스크톱 애플리케이션을 개발할 수 있습니다.
+```
+
+```jsx
+주요 단계:
+
+1. 프로젝트 초기화:
+
+		npm init을 사용하여 package.json 파일을 생성합니다.
+
+		Electron을 설치하고, npm start 스크립트를 추가합니다.
+
+2. Electron 애플리케이션 구조 이해:
+
+		Electron 앱은 두 가지 주요 프로세스로 구성됩니다:
+
+		메인 프로세스: 앱의 생명주기를 관리합니다.
+
+		렌더러 프로세스: 각 창(브라우저 창)에서 실행되는 HTML/JS 기반의 프론트엔드를 처리합니다.
+
+3. 메인 프로세스 코드 작성:
+
+		BrowserWindow를 사용하여 창을 생성합니다.
+
+		이벤트를 등록하여 앱이 준비되었을 때 창을 표시합니다.
+
+4. 기본 창 옵션 설정:
+
+		창 크기, 제목 등 다양한 옵션을 설정합니다.
+
+		추후 HTML 파일을 창에 로드하여 실제 UI를 구성할 것입니다.
+```
+
+```jsx
+// Electron에서 필요한 모듈을 가져옵니다.
+// `app`: 애플리케이션의 생명주기를 관리하는 객체
+// `BrowserWindow`: 데스크톱 창을 생성할 때 사용하는 클래스
+const { app, BrowserWindow } = require('electron')
+
+// 메인 창을 생성하는 함수
+function createMainWindow() {
+  // `BrowserWindow` 클래스를 사용하여 새 창을 생성합니다.
+  const mainWindow = new BrowserWindow({
+    // 창 제목 설정
+    title: 'ImageShrink',
+    // 창의 너비와 높이 설정
+    width: 500,
+    height: 600,
+    // 추가 옵션들을 필요에 따라 설정할 수 있습니다.
+    // resizable: false, // 창 크기 조정 비활성화
+    // backgroundColor: '#ffffff', // 창 배경색 설정
+  })
+
+  // **중요**: 지금은 창에 아무 내용도 로드하지 않았으므로 빈 창만 표시됩니다.
+}
+
+// `app` 객체의 `ready` 이벤트가 발생하면 창을 생성합니다.
+// "ready" 이벤트는 Electron이 내부 초기화를 완료한 후 발생합니다.
+app.on('ready', createMainWindow)
+```
+
+## 코드 설명
+
+```jsx
+1. 모듈 가져오기
+
+		Electron은 Node.js 모듈 형식을 사용하므로 require 키워드를 통해 필요한 모듈을 가져옵니다.
+
+		app: Electron 애플리케이션의 생명주기를 관리합니다. (예: 앱 시작, 종료 등)
+
+		BrowserWindow: 창을 생성하고 관리하는 데 사용됩니다.
+
+2. createMainWindow 함수
+
+		이 함수는 메인 창을 생성합니다.
+
+		BrowserWindow는 다양한 옵션을 받으며,
+
+		여기에 창의 크기, 제목, 배경색, 위치 등을 지정할 수 있습니다.
+
+3. app.on('ready', createMainWindow)
+
+		app.on('ready'): Electron이 준비되었을 때 실행할 작업을 지정합니다.
+
+		createMainWindow: 준비가 완료되면 호출되어 창을 생성합니다.
+```
+
+# { Electron에서 메인 윈도우에 HTML 콘텐츠 로드하기 }
+
+```jsx
+이번 강의에서는 Electron 메인 윈도우에 HTML 파일을 로드하는 방법을 배웠습니다.
+```
+
+## 1. **메인 윈도우 변수 선언 위치 변경**
+
+```jsx
+메인 윈도우를 생성할 때 const로 선언된 변수를 함수 내부가 아닌 함수 외부에 let으로 선언했습니다.
+
+이렇게 하면 다른 함수에서도 mainWindow를 참조할 수 있습니다.
+```
+
+```jsx
+let mainWindow
+
+function createMainWindow() {
+  mainWindow = new BrowserWindow({
+    title: 'ImageShrink',
+    width: 500,
+    height: 600,
+    icon: './assets/Icon_256x256.png',
+  })
+  mainWindow.loadFile('./app/index.html')
+}
+```
+
+## 2. **HTML 파일 로드 방법**
+
+```jsx
+Electron의 loadFile과 loadURL 메서드를 이용해 윈도우에 콘텐츠를 로드할 수 있습니다.
+```
+
+### `loadURL` 메서드
+
+```jsx
+HTTP 또는 HTTPS 프로토콜로 외부 웹사이트를 로드합니다.
+
+이런 방식은 외부 웹페이지를 로드할 때 적합합니다.
+```
+
+```jsx
+mainWindow.loadURL('https://twitter.com')
+```
+
+### 파일 프로토콜로 로컬 HTML 파일 로드
+
+```jsx
+로컬 파일을 로드하려면 file:// 프로토콜을 사용합니다. 이를 위해 __dirname(현재 디렉토리 경로)을 사용했습니다.
+```
+
+```jsx
+mainWindow.loadURL(`file://${__dirname}/app/index.html`)
+```
+
+### `loadFile` 메서드
+
+```jsx
+loadURL의 축약형으로, 파일 경로만 전달하면 됩니다.
+```
+
+```jsx
+mainWindow.loadFile('./app/index.html')
+```
+
+## 3. **HTML 파일 기본 구조**
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381245/notion-blog/_/Electron/Electron_From_Scratch_JavaScript_/_2_1_-_Electron_/image_1.png)
+
+```jsx
+app/index.html 파일을 생성하고, 간단한 HTML 구조를 작성했습니다.
+```
+
+```jsx
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ImageShrink</title>
+    <!-- Content Security Policy 설정 -->
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';">
+</head>
+<body>
+    <h1>ImageShrink</h1>
+</body>
+</html>
+
+```
+
+## 4. **Content Security Policy(CSP) 경고 해결**
+
+```jsx
+Electron은 보안 정책(Content Security Policy, CSP)을 준수합니다.
+
+CSP 관련 경고를 해결하기 위해 HTML <head> 태그에 meta 태그를 추가했습니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381245/notion-blog/_/Electron/Electron_From_Scratch_JavaScript_/_2_1_-_Electron_/image_2.png)
+
+```jsx
+외부 URL을 로드하는 경우 CSP(Content Security Policy) 설정으로 보호합니다
+
+meta 태그 또는 HTTP 헤더를 사용하여 허용된 스크립트와 스타일만 실행되도록 설정
+```
+
+```jsx
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self';">
+```
+
+## 5. **아이콘 설정**
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381245/notion-blog/_/Electron/Electron_From_Scratch_JavaScript_/_2_1_-_Electron_/image_3.png)
+
+```jsx
+윈도우 창의 아이콘을 커스텀 이미지로 변경했습니다.
+
+아이콘 파일은 assets/icons 폴더에 저장된 Icon_256x256.png를 사용했습니다.
+```
+
+```jsx
+icon: './assets/Icon_256x256.png'
+```
+
+## **중요! 절대 아이콘 경로**
+
+```jsx
+창에 아이콘을 추가할 때 상대 경로를 사용했는데 개발에는 작동하지만
+
+나중에 패키징할 때는 절대 경로여야 합니다.
+
+BrowserWindow 옵션을 다음과 같이 변경하세요...
+```
+
+```jsx
+icon: './assets/icons/Icon_256x256.png',
+
+to
+
+icon: `${__dirname}/assets/icons/Icon_256x256.png`,
+
+작은따옴표가 아닌 백틱(\)을 사용해야 합니다.
+
+패키징 시 오류가 발생하지 않도록 모든 프로젝트와 모든 창에 대해 이 작업을 수행하세요.
+```
+
+# { 개발 환경과 배포 환경에 따라 코드 동작을 다르게 설정 }
+
+```jsx
+개발 환경과 배포 환경에 따라 코드 동작을 다르게 설정.
+
+플랫폼별로 UI 동작을 사용자 친화적으로 조정.
+
+재사용 가능한 변수(isDev, isMac)를 만들어 코드 가독성 및 유지보수성을 높임.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381245/notion-blog/_/Electron/Electron_From_Scratch_JavaScript_/_2_1_-_Electron_/image_4.png)
+
+## 1. **환경 설정 (Environment Setting)**
+
+```jsx
+process.env.NODE_ENV: 현재 앱의 실행 환경을 나타냄.
+
+		예: development, production
+
+isDev 변수:
+
+		process.env.NODE_ENV가 production이 아니면 true, 그렇지 않으면 false
+
+		사용 이유: 매번 process.env.NODE_ENV !== 'production'를 작성하는 대신 간단하게 isDev로 조건 확인.
+
+환경 설정 방법:
+
+		process.env.NODE_ENV 값을 개발 시 development로 설정.
+
+		실제 배포 전 테스트하거나 배포 시 production으로 변경.
+```
+
+## 2. **플랫폼 확인 (Platform Check)**
+
+```jsx
+process.platform: 현재 실행 중인 OS 플랫폼 확인.
+
+		Mac: darwin
+
+		Windows: win32
+
+		Linux: linux
+
+isMac 변수:
+
+		process.platform이 darwin이면 true, 그렇지 않으면 false.
+
+		사용 이유: 특정 플랫폼에서 실행해야 할 코드를 간결하게 작성.
+```
+
+## 3. **BrowserWindow 생성 (Creating BrowserWindow)**
+
+```jsx
+Electron 앱에서 창을 생성하기 위해 BrowserWindow를 사용.
+
+주요 옵션:
+
+		title: 창의 제목.
+
+		width, height: 창의 크기.
+
+		icon: 앱 아이콘 설정.
+
+		resizable: 창 크기 조절 가능 여부.
+
+				개발 환경(isDev)에서만 창 크기 조절 허용.
+```
+
+## 4. **개발/배포 환경에 따라 다른 동작 설정**
+
+```jsx
+개발 환경(isDev):
+
+		창 크기 조절 허용(resizable: true).
+
+		디버깅을 위해 개발자 도구 사용 가능.
+
+배포 환경(production):
+
+		창 크기 조절 불가(resizable: false).
+
+		개발자 도구 비활성화 (강의에서는 추후 구현 예정).
+```
+
+## 5. **앱 종료 동작 설정 (Window Close Behavior)**
+
+```jsx
+macOS에서는 일반적으로 창을 닫아도 앱이 종료되지 않음.
+
+		이 동작은 macOS의 기본적인 UX 규칙을 따르기 위함.
+
+구현:
+
+1. 모든 창이 닫혔을 때 앱 종료:
+
+		macOS 외 플랫폼에서만 작동.
+
+		if (!isMac) { app.quit(); }
+
+2. Dock 아이콘 클릭 시 창 복원:
+
+		macOS에서 창이 모두 닫혀도 앱은 실행 중.
+
+		Dock 아이콘을 클릭하면 createMainWindow()를 호출해 창을 복원.
+
+```
+
+## 6. **Renderer 프로세스 재사용 경고 제거**
+
+```jsx
+경고 메시지: The default value of app.allowRendererProcessReuse is deprecated.
+
+해결 방법:
+
+		app.allowRendererProcessReuse = true; 추가.
+```
+
+```jsx
+이 경고 메시지는 문제를 나타내는 것은 아니며, Electron 9 이상에서는 기본적으로 true로 동작합니다.
+
+명시적으로 app.allowRendererProcessReuse = true;를 추가하면,
+
+경고가 사라지고 앱이 최신 Electron의 설정에 맞춰 동작하게 됩니다.
+
+allowRendererProcessReuse를 true로 설정하면 어떤 효과가 있는가?
+
+리소스 절약: 이미 생성된 Renderer 프로세스를 재사용하므로 메모리와 CPU를 절약합니다.
+
+성능 향상: 새 프로세스를 생성할 필요가 없어, 앱의 응답 속도가 개선됩니다.
+```
+
+# { Nodemon 추가 }
+
+```jsx
+강의에서는 Nodemon을 활용해 Node.js 기반 프로젝트에서
+
+코드를 수정할 때마다 서버를 자동으로 리로드하는 방법을 설명합니다.
+```
+
+## 1. **Nodemon이란?**
+
+```jsx
+Nodemon은 코드 변경 시 서버를 자동으로 리로드해주는 도구입니다.
+
+서버 실행을 종료하고 다시 시작할 필요 없이, 파일이 수정될 때 자동으로 반영됩니다.
+```
+
+## 2. **Electron과 Nodemon**
+
+```jsx
+Electron에서는 창(Window)과 메인 프로세스를 따로 관리해야 합니다.
+
+Nodemon은 메인 프로세스를 자동으로 리로드해주지만,
+
+**Electron 창(Window)**은 수동으로 리로드해야 합니다.
+
+Electron 창은 키보드 단축키(Command+R 또는 Ctrl+R)로 쉽게 새로고침할 수 있습니다.
+```
+
+## Nodemon 설치 및 설정
+
+### 1) **Nodemon 설치**
+
+```jsx
+개발 중에만 사용할 것이므로 **개발 의존성(dev dependency)**으로 설치합니다
+```
+
+```jsx
+npm install --save-dev nodemon
+```
+
+### 2) **`package.json` 설정**
+
+```jsx
+package.json 파일에 Nodemon을 실행하는 스크립트를 추가합니다
+
+start: Electron 앱을 실행하는 기본 스크립트.
+
+dev: Nodemon으로 파일 변경을 감지하고, Electron 앱을 재실행하는 스크립트.
+```
+
+```jsx
+{
+  "scripts": {
+    "start": "electron .",  // 기존 start 스크립트
+    "dev": "nodemon --exec electron ."
+  }
+}
+
+```
+
+## 제약 사항 및 해결 방법
+
+```jsx
+1. Electron 창(Window)은 자동 리로드되지 않음
+
+		Nodemon은 메인 프로세스만 자동 리로드합니다.
+
+		창(Window) 내용 변경 시, 수동으로 새로고침해야 합니다:
+
+				Mac: Command+R
+
+				Windows/Linux: Ctrl+R
+
+		강의자는 이를 큰 문제로 보지 않고, 수동 리로드 방식을 사용했습니다.
+
+2. 창(Window) 자동 리로드가 필요하다면?
+
+		**electron-reload**를 시도할 수 있습니다.
+
+		그러나 Mac에서의 문제를 피하기 위해 Nodemon 방식을 추천했습니다.
+```

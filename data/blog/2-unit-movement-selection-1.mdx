@@ -1,0 +1,1626 @@
+---
+title: '섹션 2: Unit Movement & Selection - 1'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+# { 🚀 유닛(Unit) 생성과 기본 비주얼 구성하기 }
+
+이번 강의에서는 **게임 유닛(Game Unit)**을 만들고, **올바르게 오브젝트 구조를 설계하는 방법**, **Pivot / Center 개념**, **Grid 기반 게임에서 Pivot을 바닥에 두어야 하는 이유**, **Asset Pack의 Material과 Shader 옵션**, **Visual 오브젝트를 자식으로 두는 이유**를 모두 설명한다.
+
+---
+
+# 📋 목차
+
+1. 유닛 구조 설계가 왜 중요한가
+2. 올바른 유닛 생성 방식: Empty → Visual 자식화
+3. Pivot 과 Center 차이 (초보 필수 개념)
+4. Pivot 을 바닥(0,0,0)에 둬야 하는 이유
+5. Child Object 구조의 실제 장점 3가지
+6. Scene 기본 배경 Plane 만들기
+7. Grid Material 적용하기 + 옵션 설명
+8. Grid Material Shader 변경 이유 (개념 설명)
+9. Asset Pack의 다양한 색상(Material) 활용
+10. 최종 구조 정리
+
+---
+
+# 1. 유닛 구조 설계가 왜 중요한가
+
+게임이 **점점 복잡해질수록 오브젝트 구조가 망가지면 유지보수가 어려워진다.**
+
+- 처음엔 컴포넌트를 아무데나 넣어도 작동함
+- 하지만 AI, 상태, 이펙트, 애니메이션, 충돌 등 기능이 쌓이기 시작하면
+  **정리되지 않은 GameObject 는 악몽이 된다**.
+
+그래서 강의에서는 처음부터 “정확한 구조”로 유닛을 만들고 있다.
+
+---
+
+# 2. 올바른 유닛 생성 방식 (Empty → Visual 자식화)
+
+### ❌ 잘못된 방법
+
+Prefab(모델)을 씬에 드래그 → 거기에 스크립트 붙이기
+
+→ 나중에 콜라이더, 이펙트, 오버레이까지 전부 붙여야 해서 난잡해짐.
+
+### ✅ 올바른 방법
+
+1. **Hierarchy → Create Empty → 이름을 Unit 으로 설정**
+   - 이 객체는 “논리(Logic)”만 담당
+   - 비주얼은 넣지 않음
+2. **Prefab(캐릭터 모델)을 Unit의 자식으로 넣기**
+3. Visual 오브젝트의 Transform 은 반드시 **Reset (0,0,0)**
+
+   → 부모의 정확한 위치에 놓이도록
+
+---
+
+# 3. Pivot 과 Center 차이 (초보 필수 개념)
+
+Unity 좌측 상단의 옵션:
+
+- **Pivot**
+  → 실제 Transform 이 존재하는 위치
+  → GameObject가 “원래” 가지고 있는 위치
+- **Center**
+  → 오브젝트의 “렌더링된 형태” 기준 중앙
+  → 모든 Mesh Bound의 중앙을 수학적으로 계산한 값
+
+### 예시
+
+- Pivot: 모델의 발바닥
+- Center: 캐릭터 몸 전체의 정중앙
+
+### 왜 Pivot 으로 두어야 하나?
+
+스케일 조정 시 차이가 생김:
+
+- Pivot 기준 → 발바닥에서 자연스럽게 커짐
+- Center 기준 → 모델 가운데서 전체가 커짐 (이상한 느낌)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380461/notion-blog/_/3D_/_/_2_Unit_Movement_Selection_-_1/image.png)
+
+```csharp
+피벗
+```
+
+---
+
+# 4. Pivot 을 바닥(0,0,0)에 둬야 하는 이유
+
+Grid 기반 게임에서 매우 중요함.
+
+- 게임의 바닥(Grid)이 y=0 에 있음
+- 유닛 오브젝트를 (0,0,0)에 놓으면
+  → **시각 모델도 바닥 위에 딱 맞게 서야 함**
+
+만약 모델 Pivot 이 가운데에 있을 경우…
+
+- (0,0,0)에 두면
+  → 모델의 절반이 바닥 아래로 박힘
+  → 또는 어색하게 떠 있음
+  → 이후 그리드 이동 시마다 “오프셋 계산”이라는 번거로움이 생김
+
+그래서 Pivot 을 “가장 아래”에 두는 것이 표준.
+
+---
+
+# 5. Child Object 구조의 실제 장점 3가지
+
+### ✔ 1. Pivot 수정이 필요해도 문제 없음
+
+모델의 Pivot 이 잘못돼 있어도,
+
+부모(Empty)는 그대로 두고 자식 Visual의 위치만 위아래로 움직이면 해결된다.
+
+### ✔ 2. 논리(Logic)와 시각(Visual)이 분리
+
+각종 스크립트, AI, Collider 등은 부모에
+
+그래픽 모델은 자식에
+
+→ 유지보수가 압도적으로 편함
+
+### ✔ 3. Overlay, 이펙트, UI 등을 쉽게 추가
+
+Visual 옆에 “Effects”, “UI”, “Shadow” 같은 오브젝트를 자연스럽게 배치 가능
+
+---
+
+# 6. Scene 기본 배경 Plane 만들기
+
+씬에 기본 배경을 깔기 위해 Plane 생성:
+
+1. **Hierarchy → Create → 3D Object → Plane**
+2. Transform:
+   - Position: **0,0,0**
+   - Scale: **10,10,10** (넓은 바닥)
+
+---
+
+# 7. Grid Material 적용하기 + 옵션 설명
+
+강의에서 사용한 Material: **global grid 6**
+
+### Material 옵션 설명
+
+Inspector 를 확장하면 아래와 같은 옵션이 있음:
+
+- **Grid Scale**
+  → 그리드(격자)의 크기 조절
+  → 숫자가 작으면 촘촘해지고, 크면 넓어짐
+  → 강의에서는 0.5 사용
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380460/notion-blog/_/3D_/_/_2_Unit_Movement_Selection_-_1/image_1.png)
+
+```csharp
+그리드 숫자 조절 ( 이 메테리얼 특징인듯 )
+```
+
+---
+
+# 8. Grid Material Shader 변경 이유 (개념 설명)
+
+강의에서는 Shader Graph 파일을 열어 직접 수정한 이유를 설명함.
+
+### 기본 Shader 문제점
+
+- Asset 원본 shader는
+  **Grid 라인의 굵은 선이 “월드 좌표의 (0,0)”에서 시작됨**
+- 즉, 캐릭터도 (0,0)에 놓이면
+  굵은 라인이 딱 그 아래에 생김 → 어색함
+
+### 개선 방향 (강의에서 한 수정)
+
+- World Position 에 1,1 정도 offset을 추가
+  → Grid 패턴이 “타일의 중앙 기준”으로 보이도록 변경
+  → 더 자연스럽고 게임적인 느낌
+
+💡 이 수정은 Shader Graph에서
+
+`World Position → Add(Node) → +1 → Position Input`
+
+구조로 변경한 것.
+
+※ 초보자가 Shader Graph를 몰라도 됨
+
+→ "그리드 라인이 중앙 기준으로 보이도록 수정했다"가 핵심
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380460/notion-blog/_/3D_/_/_2_Unit_Movement_Selection_-_1/image_2.png)
+
+```csharp
+셰이더 Edit 클릭하면 셰이더 열
+```
+
+---
+
+# 9. Asset Pack의 다양한 색상(Material) 활용
+
+Synty Studios의 패키지는 다양한 재질(Material)이 존재함.
+
+- 캐릭터 모델의 Skinned Mesh Renderer 에
+  재질을 드래그하여 변경 가능
+
+예시 색상:
+
+- Yellow (기본)
+- Blue
+- Red
+- Gray 등 10개 이상
+
+강의에서는:
+
+- 플레이어: Yellow
+- 적 유닛: Red
+
+그러나 원하는 색으로 변경해도 OK.
+
+---
+
+# 10. 최종 구조 정리
+
+### 게임 오브젝트 구조 (이 강의 목표)
+
+```
+Unit (Empty — Logic 담당)
+│
+└── Visual (Prefab — 그래픽 모델)
+```
+
+### 씬 구성
+
+```
+Scene
+│
+├── Unit
+│    └── Visual (캐릭터 모델)
+│
+└── Plane (Grid Material 적용)
+```
+
+이 구조는 앞으로 AI, 이동, 인터랙션, 이펙트 등
+
+수많은 컴포넌트를 추가해도 **완전히 깔끔한 구조**를 유지하게 해 준다.
+
+# { 🚀 섹션 2: 유닛 이동(Unit Movement) 만들기 }
+
+```csharp
+title: '유닛 이동 만들기 — 목표 지점까지 이동하고 멈추기'
+date: '2025-11-21'
+category: 'Developer/Unity/전략 게임 시스템'
+tags:
+  ['Unity', 'C#', '3D 게임', 'Transform', 'Vector3', 'Time.deltaTime', '프레임독립', 'Update', 'Unit Movement']
+draft: false
+summary: '유닛이 목표 위치까지 이동하고, 적절한 거리에서 멈추는 이동 시스템을 구현하는 과정을 개념 중심으로 상세히 정리합니다.'
+
+```
+
+**유닛이 목표 지점까지 이동하고, 적당한 거리에서 멈추도록 구현하는 강의의 전체 흐름을 개념 중심으로 정리**
+
+---
+
+## 📋 목차
+
+1. 유닛 오브젝트 구조 설계 개념
+2. Unit 스크립트 생성 및 구성
+3. Move() 함수 설계 – 목표 위치 저장
+4. Update()에서 이동 로직 구현하기
+5. 프레임 독립적 이동(Time.deltaTime) 개념
+6. 멈추기 로직(Stopping Distance) 개념과 구현
+7. 테스트 입력 추가하기
+8. 카메라 배치와 Control+Shift+F 기능
+9. 최종 결과
+
+---
+
+# 1. 유닛 오브젝트 구조 설계 개념
+
+강의에서는 먼저 “**오브젝트 구조를 깔끔하게 유지하는 것의 중요성**”을 강조함.
+
+### ✔ 핵심 개념
+
+- **부모 오브젝트(Parent)**
+  - 게임 로직(스크립트), 충돌, 이동, 상태 관리 등 **모든 기능 요소를 붙이는 곳**
+- **자식 오브젝트(Child)**
+  - 순수한 **비주얼(모델, MeshRenderer, Animator)**만 존재
+- 이유:
+  - 여러 시각 요소가 있을 때도 로직을 흔들리지 않게 유지
+  - 비주얼 교체가 쉬워짐
+  - 컴포넌트가 명확하게 분리됨 → 유지보수 편함
+
+---
+
+# 2. Unit 스크립트 생성 및 구성
+
+Scripts 폴더를 만들고 `Unit.cs` 생성 후 **부모 오브젝트**에 붙임.
+
+### Unit.cs 초기 구조
+
+```csharp
+public class Unit : MonoBehaviour
+{
+    private Vector3 targetPosition;
+
+    private void Update()
+    {
+    }
+
+    private void Move(Vector3 targetPosition)
+    {
+        this.targetPosition = targetPosition;
+    }
+}
+
+```
+
+### ✔ 개념 요소
+
+- **targetPosition**
+  - 미래에 이동해야 할 좌표를 저장
+  - Move() 함수에서 받은 위치를 Update()에서 이동에 사용해야 하므로 **필드로 저장하는 구조**
+
+---
+
+# 3. Move() 함수 설계 – 목표 위치 저장
+
+강의에서 강조한 부분:
+
+### ✔ Move() 설계 개념
+
+- 입력은 `Vector3 targetPosition`
+- 이 값은 **Update()에서도 계속 사용해야 하기 때문에**
+  → 지역 변수로는 안 되고, 필드에 저장해야 함.
+- `this.targetPosition = targetPosition;`
+  - this는 “현재 오브젝트의 필드”를 의미
+  - 동일한 변수명 충돌을 방지하는 명확한 표기
+
+---
+
+# 4. Update()에서 이동 로직 구현하기
+
+유닛은 매 프레임마다 목표 위치를 향해 이동해야 하므로 Update()에서 계산을 진행함.
+
+### ✔ 이동 방향(moveDirection) 구하기
+
+```csharp
+Vector3 moveDirection = (targetPosition - transform.position).normalized;
+```
+
+이 공식이 의미하는 개념:
+
+| 요소                                | 의미                                      |
+| ----------------------------------- | ----------------------------------------- |
+| targetPosition - transform.position | 목표 방향 벡터                            |
+| normalized                          | 길이를 1로 맞춰 “방향만 가진 벡터”로 변환 |
+
+즉, “얼마나 떨어졌든 상관없이 순수 방향만 얻기 위해” normalize 필요.
+
+### ✔ 위치 이동하기
+
+```csharp
+transform.position += moveDirection * moveSpeed * Time.deltaTime;
+```
+
+- `+=` : 현재 위치에서 방향으로 한 스텝 이동
+- `moveSpeed` : 유닛 속도
+- `Time.deltaTime` : **프레임 독립적 movement 보장**
+
+### `( (targetPosition - transform.position).normalized` 수학적 원리 )
+
+이 코드가 어떤 원리인지 이해하기 위해 필요한 **기초 수학 공식 3개**만 설명할게.
+
+## 🎯 핵심 3단계
+
+### 1단계: 어느 방향인지 알아내기
+
+`목표 - 현재 = 가야 할 방향
+(5,0,5) - (2,0,1) = (3,0,4)`
+
+**의미:** "오른쪽으로 3, 앞으로 4 가야 해"
+
+---
+
+### 2단계: 지금은 방향 + 거리가 섞여있음
+
+`(3,0,4) 는:
+
+- 방향: 오른쪽+앞 대각선
+- 거리: 5 (먼 거리)`
+
+**문제점:** 이대로 쓰면 한 프레임에 5칸을 확 이동함 (너무 빠름!)
+
+---
+
+### 3단계: 순수한 "방향만" 추출
+
+`.normalized 하면:
+(3,0,4) → (0.6, 0, 0.8)`
+
+**의미:**
+
+- 방향은 똑같음 (오른쪽+앞 대각선)
+- 길이는 1로 고정
+
+### 📐 2D부터 시작 (더 쉬움)
+
+**점 (3, 4)의 길이를 구한다면:**
+
+`원점(0,0)에서 (3,4)까지의 거리`
+
+그림으로 보면:
+
+      `(3,4)
+       /|
+      / |
+     /  | 4
+    /   |
+
+/ |
+
+---
+
+    3`
+
+**직각삼각형이 만들어짐!**
+
+- 밑변: 3
+- 높이: 4
+- 빗변: ???
+
+### 🔺 피타고라스 정리
+
+`빗변² = 밑변² + 높이²
+빗변² = 3² + 4²
+빗변² = 9 + 16 = 25
+빗변 = √25 = 5`
+
+---
+
+## 🎮 3D는 똑같은데 한 번 더
+
+**벡터 (3, 0, 4)의 길이:**
+
+`길이² = x² + y² + z²
+길이² = 3² + 0² + 4²
+길이² = 9 + 0 + 16 = 25
+길이 = √25 = 5`
+
+---
+
+# 📘 필요한 공식 1: “두 점의 차이”
+
+### 👉 개념 이름: **벡터 뺄셈**
+
+**공식:**
+
+```
+(targetX - currentX,
+ targetY - currentY,
+ targetZ - currentZ)
+```
+
+### ✨ 이것이 의미하는 것
+
+→ “지금 있는 곳에서 목표까지 가는 화살표 만들기”
+
+---
+
+# 🧪 예시 (숫자는 따라하지 않아도 됨)
+
+현재 위치: (2, 0, 1)
+
+목표: (5, 0, 5)
+
+차이:
+
+```
+(5-2, 0-0, 5-1)
+= (3, 0, 4)
+```
+
+### ✨ 의미
+
+→ “오른쪽으로 3만큼, 앞으로 4만큼 가면 목표 방향이야!”
+
+---
+
+# 📘 필요한 공식 2: “길이 구하기”
+
+### 👉 개념 이름: **벡터 길이 (Magnitude)**
+
+공식:
+
+```
+길이 = √(x² + y² + z²)
+```
+
+### ✨ 쉽게 말하면
+
+→ “이 화살표가 얼마나 긴지(얼마나 멀리 떨어졌는지) 구하는 방법”
+
+### 🧪 왜 이런 공식이 나오냐?
+
+이건 단순히 **피타고라스** 확장판이야.
+
+- 오른쪽으로 3
+- 앞으로 4
+
+이걸 대각선으로 쭉 이어 붙이면 총 길이는 5가 되는 원리.
+
+---
+
+# 📘 필요한 공식 3: “normalized”
+
+### 👉 개념 이름: **정규화(노멀라이즈)**
+
+공식:
+
+```
+( x / 길이,
+  y / 길이,
+  z / 길이 )
+```
+
+### ✨ 쉽게 설명하면
+
+> 원래 길이가 긴 화살표를 길이 1짜리 “작은 화살표”로 축소하는 것
+>
+> 단, **방향은 그대로** 유지!
+
+왜 이렇게 하냐?
+
+👉 게임에서는 “속도”를 따로 곱해야 해서,
+
+**깨끗한 방향만 필요하기 때문**!
+
+---
+
+# 🧠 예시로 다시 정리
+
+## 1️⃣ 방향 + 거리 포함한 벡터 만들기
+
+(3, 0, 4)
+
+## 2️⃣ 길이 구하기
+
+길이 = √(3² + 4²) = 5
+
+## 3️⃣ 방향만 남기기
+
+```
+(3/5, 0/5, 4/5)
+= (0.6, 0, 0.8)
+```
+
+### ✨ 최종 의미
+
+→ “오른쪽으로 0.6 비율, 앞으로 0.8 비율로 가면 목표 방향이다.”
+
+즉, 방향만 남았지!
+
+거리 정보는 없어졌어.
+
+---
+
+# 5. 프레임 독립적 이동(Time.deltaTime) 개념
+
+강의에서 매우 중요한 개념이라고 강조:
+
+### ✔ 왜 필요한가?
+
+- Update()는 **프레임마다 호출됨**
+- 60FPS = 1초에 60번 이동
+- 30FPS = 1초에 30번 이동
+- 만약 deltaTime 없이 이동하면
+  → 컴퓨터 성능에 따라 속도가 달라짐(빠른 PC에서 더 빠르게 이동)
+
+### ✔ deltaTime의 역할
+
+- `1초 동안 이동한 총 거리`가 항상 일정하도록 보정
+- 모든 게임의 기본 설계 개념
+
+---
+
+# 6. 멈추기 로직(Stopping Distance) 개념과 구현
+
+유닛은 목표 지점에 **정확히 0차이**로 도달하지 못함.
+
+→ 오버슈팅 → 뒤로 반동 → 다시 앞으로 밀기 → 떨림(jitter)
+
+### ✔ 해결법: “충분히 가까우면 멈추기”
+
+강의에서 주어진 힌트:
+
+`Vector3.Distance()` 사용
+
+```csharp
+float stoppingDistance = 0.5f;
+
+if (Vector3.Distance(transform.position, targetPosition) > stoppingDistance)
+{
+    transform.position += moveDirection * moveSpeed * Time.deltaTime;
+}
+```
+
+### ✔ Magic Number 회피 개념
+
+강사가 강조한 개념:
+
+- 코드에 “0.1” 같은 숫자를 직접 넣는 건 bad practice
+- 나중에 보면 이 숫자가 **무엇을 의미하는지 기억나지 않음**
+- → 변수로 이름을 붙이면 목적이 명확해짐
+
+예:
+
+❌ `if (distance < 0.1f)`
+
+✔ `float stoppingDistance = 0.1f;`
+
+---
+
+# 7. 테스트 입력 추가하기
+
+강의에서는 단순 테스트로 T 키를 눌렀을 때 이동하도록 제작.
+
+```csharp
+if (Input.GetKeyDown(KeyCode.T))
+{
+    Move(new Vector3(4, 0, 4));
+}
+```
+
+---
+
+# 8. 카메라 배치와 Control+Shift+F 기능
+
+이 강의에서 제공한 **실용적인 Unity 팁**
+
+### ✔ Scene 카메라 위치를 그대로 Game 카메라에 반영하기
+
+1. 씬 뷰에서 원하는 위치로 카메라 시점을 잡는다.
+2. 메인 카메라 선택
+3. `Ctrl + Shift + F`
+
+→ 메인 카메라가 **씬 카메라의 위치로 이동**
+
+### ✔ 목적
+
+- 탑다운 스타일 게임의 기본 시점을 빠르게 구성
+- 테스트하기 편해짐
+
+---
+
+# 9. 최종 결과
+
+- 유닛은 목표 지점까지 부드럽게 이동
+- 가까워지면 stoppingDistance 기준으로 정확히 멈춤
+- 오버슈팅 및 흔들림 없음
+- 프레임 독립적 이동 구현
+- 정리된 폴더 구조와 오브젝트 구조
+
+# { 🎯 마우스 위치로 Raycast(레이캐스트) 쏘기 }
+
+이번 강의는 **마우스 클릭 위치를 실제 월드 좌표로 가져오는 방법**을 배우는 강의이다.
+
+이를 위해 **마우스 스크린 좌표 → 카메라 기준으로 Ray 생성 → Raycast로 충돌점 찾기**까지 전체 흐름을 학습한다.
+
+---
+
+## 📋 목차
+
+1. 마우스 스크린 좌표란?
+2. 왜 Raycast가 필요한가?
+3. 카메라에서 Ray 만들기(ScreenPointToRay)
+4. Physics.Raycast로 충돌 확인하기
+5. Collider가 꼭 필요한 이유
+6. 전체 코드
+
+---
+
+## 1. 마우스 스크린 좌표란?
+
+### 🎮 **Input.mousePosition이 반환하는 것**
+
+- `Input.mousePosition` 은 **스크린 좌표**를 반환한다.
+- 스크린 좌표 = **모니터(혹은 게임창) 픽셀 기준 좌표**
+- 즉, 월드좌표(X, Y, Z)가 아니라 **2D 평면(화면)의 픽셀 값**이다.
+
+예시:
+
+- 게임 화면 크기: **888 × 500**
+- 왼쪽 아래: (0,0)
+- 오른쪽 위: (888,500)
+
+➡ 그래서 **그 자체로는 게임 세계(World Space)의 위치가 아니다.**
+
+---
+
+## 2. 왜 Raycast가 필요한가?
+
+### 🛰️ "화면의 2D 좌표 → 3D 월드 좌표" 를 얻기 위해 필요
+
+마우스가 화면의 **어느 지점**을 가리키고는 있지만,
+
+그것이 **3D 공간의 어느 점인지 모른다.**
+
+그래서 해야 할 일:
+
+1. 카메라가 보고 있는 화면의 특정 픽셀 위치에서
+2. **레이(Ray)** 라는 가상의 레이저를 발사하고
+3. 3D 물체(콜라이더)에 **충돌한 지점(hit point)** 을 가져오는 것
+
+이 hit point가 바로 **마우스가 가리키는 실제 월드 좌표**가 된다.
+
+---
+
+## 3. 카메라에서 Ray 만들기
+
+### 📌 사용 함수: `Camera.main.ScreenPointToRay(Input.mousePosition)`
+
+- 이 함수는
+  **“카메라 → 마우스가 있는 픽셀 위치 방향으로”**
+  레이 객체(Ray)를 만든다.
+
+### 📦 Ray 객체가 가진 정보
+
+- 시작점(origin) = 카메라 위치
+- 방향(direction) = 마우스가 바라보는 화면 방향으로 뻗는 벡터
+
+즉, 레이가 정확히 마우스가 가리키는 방향으로 발사되는 것.
+
+---
+
+## 4. Physics.Raycast로 충돌 확인하기
+
+### 📌 사용 함수: `Physics.Raycast(ray)`
+
+- 레이를 실제로 발사하여
+  **Collider가 있는 곳과 충돌하는지** 검사한다.
+
+### 리턴값:
+
+- `true` = 뭔가 충돌했다 (물체 위에 마우스가 있다)
+- `false` = 충돌 안 했다 (비어있는 공간 위에 있다)
+
+### 🔍 콘솔에서 테스트
+
+- 기본 Plane(바닥)은 MeshCollider가 있기 때문에
+  마우스를 바닥 위에 올리면 항상 `true`가 출력됨.
+- Plane을 축소하면 → 빈 공간에서는 false 출력됨.
+
+---
+
+## 5. Collider가 꼭 필요한 이유
+
+강의에서 중요한 개념을 강조함:
+
+### ✔ Raycast는 **물리(Physics) 세계만 본다**
+
+- “보이기만 하는 것(렌더러)”은 무시한다.
+- **Collider가 있는 물체만 충돌 감지된다.**
+
+### 강의에서 보여준 테스트
+
+| 상태                       | 보임?   | 충돌됨? | 이유                                   |
+| -------------------------- | ------- | ------- | -------------------------------------- |
+| MeshRenderer O, Collider O | 보임    | O       | 정상                                   |
+| MeshRenderer O, Collider ✕ | 보임    | ✕       | Collider 없어서 감지 안 됨             |
+| MeshRenderer ✕, Collider O | 안 보임 | O       | 보이지 않아도 Collider가 있으면 감지됨 |
+
+➡ **Raycast는 “보이는 것”이 아니라 “물리 충돌체”를 기준으로 판단한다.**
+
+그래서:
+
+- 마우스 좌표로 월드 위치를 얻고 싶다면
+  바닥이나 지정된 표면에는 반드시 **Collider** 가 있어야 한다.
+
+---
+
+## 6. 전체 코드 (강의 예제)
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class MouseWorld : MonoBehaviour
+{
+    private void Update()
+    {
+        // 1. 마우스 스크린 좌표 → 카메라 기준 Ray 만들기
+        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+
+        // 2. Raycast하여 충돌 여부 출력
+        Debug.Log(Physics.Raycast(ray));
+    }
+}
+```
+
+---
+
+# 🎯 핵심 요약 (짧고 명확하게)
+
+- `Input.mousePosition` 은 **화면의 픽셀 좌표**
+- 3D 위치를 얻으려면 반드시 **Camera.ScreenPointToRay** 를 사용해 레이를 생성해야 함
+- 레이캐스트는 **Collider가 있는 물체만 충돌**
+- 시각적으로 보여도 Collider 없으면 충돌 X
+- 시각적으로 안 보여도 Collider 있으면 충돌 O
+
+➡ 다음 단계는 **RaycastHit을 사용해 실제 월드 좌표(hit.point)를 가져오기**
+
+(강의가 다음 파트에서 설명할 예정)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380460/notion-blog/_/3D_/_/_2_Unit_Movement_Selection_-_1/image_3.png)
+
+# { 🎯 마우스 위치로 레이캐스트하여 월드 좌표 얻기 }
+
+이번 강의는 **마우스 위치를 월드 공간 좌표로 정확하게 얻고**,
+
+**불필요한 물체와의 충돌을 무시하고 원하는 바닥만 인식하도록 레이어 마스크를 사용하는 방법**을 설명함!
+
+---
+
+## 📋 목차
+
+1. 레이캐스트(Raycast) 기본 개념
+2. 마우스에서 레이 발사하기 (ScreenPointToRay)
+3. RaycastHit 사용하여 충돌 지점 구하기
+4. 시각적 디버그용 Sphere 만들기
+5. 레이어와 레이어마스크(layer mask) 개념과 적용
+6. 충돌 무시하고 바닥만 인식하도록 레이어 마스크 설정하기
+7. 정리 및 깔끔한 코드 구조 만들기
+
+---
+
+---
+
+# 1. 레이캐스트(Raycast) 기본 개념
+
+### ✔ 레이캐스트란?
+
+- **보이지 않는 레이(선)를 한 방향으로 쏘고, 충돌한 오브젝트 정보를 가져오는 기술**
+- FPS 총알 판정, 마우스 클릭 위치 감지, AI 시야, 지면 감지 등에 사용됨.
+
+### ✔ 동작 원리
+
+1. 시작점(Point)
+2. 방향(Direction)
+3. 길이(Distance)
+4. 맞은 물체 정보를 담는 **RaycastHit**
+
+---
+
+---
+
+# 2. 마우스에서 레이 발사하기 (ScreenPointToRay)
+
+### ✔ Camera.main.ScreenPointToRay
+
+```csharp
+Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+```
+
+- **화면 픽셀 좌표(Input.mousePosition)** → **3D 공간을 향한 Ray** 로 변환.
+- 즉, 마우스를 기준으로 "어디로 쏴야 바닥을 맞출 수 있을까?" 를 계산하는 함수.
+
+### ✔ Physics.Raycast으로 실제로 발사
+
+```csharp
+Physics.Raycast(ray, out RaycastHit raycastHit);
+```
+
+- `out` 키워드는 “함수 내부에서 값을 채워서 돌려준다”는 의미
+- 충돌한 경우 → `true`
+- 아무것도 안 맞으면 → `false`
+
+---
+
+---
+
+# 3. RaycastHit 사용하여 충돌 지점 구하기
+
+### ✔ RaycastHit가 제공하는 정보들
+
+강의에서 강조한 내용:
+
+- `collider` : 어떤 콜라이더에 맞았는지
+- `distance` : 얼마나 떨어져 있는지
+- `transform` : 맞은 오브젝트의 트랜스폼
+- `rigidbody` : 물리 몸체
+- **`point` : 충돌 지점 (우리가 필요한 값!)**
+
+### ✔ 충돌 지점 얻기
+
+```csharp
+return raycastHit.point;
+```
+
+이 지점이 **“마우스가 가리키는 월드 공간 좌표”**이다.
+
+---
+
+---
+
+# 4. 시각적 디버그용 Sphere 만들기
+
+> 강의에서는 “좌표 텍스트 출력 대신 화면에 직접 보이게 하자”라는 목적!
+
+### ✔ 디버그용 Sphere 생성 절차
+
+1. MouseWorld 오브젝트 하위에 **Sphere 생성**
+2. 크기 조절 (0.2, 0.2, 0.2)
+3. Material 생성해서 색상 + Emission 활성화 (빛나도록)
+4. Sphere Collider 삭제
+
+   👉 **Collider가 있으면 Ray에 방해됨**
+
+### ✔ Sphere를 마우스 위치로 이동
+
+```csharp
+transform.position = raycastHit.point;
+```
+
+- 이 덕분에 마우스가 어디를 바라보는지 실시간 시각화 가능!
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380460/notion-blog/_/3D_/_/_2_Unit_Movement_Selection_-_1/image_4.png)
+
+---
+
+---
+
+# 5. 레이어와 레이어마스크(Layer Mask) 개념과 적용
+
+### ✔ 문제 상황
+
+- 건물, 벽, 기타 오브젝트에도 Collider가 있음.
+- 따라서 마우스를 벽 위에 올리면
+  **벽을 맞고 floor까지 레이가 닿지 않음 → 잘못된 위치 반환**
+
+### ✔ 해결 방법: Layer Mask
+
+- 특정 레이어만 “맞는 대상”으로 설정하는 필터
+- 즉, **“이 레이어만 Raycast 대상으로 삼아라”**라고 강제하는 기능.
+
+---
+
+---
+
+# 6. 충돌 무시하고 바닥만 인식하도록 레이어 마스크 설정하기
+
+### ✔ Step 1 — 새 레이어 만들기
+
+1. Plane(바닥) 선택
+2. Layer → “Add Layer…”
+3. User Layer 6 → 이름 지정: **MousePlane**
+4. Plane에 이 레이어 적용
+
+### ✔ Step 2 — MouseWorld 코드에 LayerMask 필드 추가
+
+```csharp
+[SerializeField] private LayerMask mousePlaneLayerMask;
+```
+
+- 레이어마스크를 코드에서 드롭다운으로 선택할 수 있게 함.
+
+### ✔ Step 3 — Raycast에서 LayerMask 사용
+
+```csharp
+Physics.Raycast(ray, out RaycastHit raycastHit, float.MaxValue, mousePlaneLayerMask);
+```
+
+- `float.MaxValue` : 가용한 최대 거리까지 쏘기
+- 마지막 매개변수: **레이어 마스크**
+
+### ✔ 결과
+
+- 바닥 레이어(MousePlane)를 제외한 모든 콜라이더 무시
+- 벽이 있어도 바닥 좌표만 정확히 얻음
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380461/notion-blog/_/3D_/_/_2_Unit_Movement_Selection_-_1/image_5.png)
+
+---
+
+---
+
+# 7. 정리 및 깔끔한 코드 구조 만들기
+
+### ✔ Static 구조로 전역에서 쉽게 사용 가능하게 만들기
+
+MouseWorld는 “게임 전체에서 단 하나만 존재”하므로 static 방식 사용.
+
+### ✔ instance 패턴 적용
+
+```csharp
+private static MouseWorld instance;
+
+private void Awake() {
+    instance = this;
+}
+```
+
+### ✔ 최종 getPosition 메서드
+
+```csharp
+public static Vector3 GetPosition()
+{
+    Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+    Physics.Raycast(ray, out RaycastHit raycastHit, float.MaxValue, instance.mousePlaneLayerMask);
+    return raycastHit.point;
+}
+```
+
+어디서든:
+
+```csharp
+Vector3 mousePos = MouseWorld.GetPosition();
+```
+
+로 쉽게 사용 가능.
+
+### ✔ Update에서 시각 테스트는 이제 삭제해도 됨
+
+강의에서는 Sphere 오브젝트를 꺼두고 테스트용으로만 남김.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380461/notion-blog/_/3D_/_/_2_Unit_Movement_Selection_-_1/image_6.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380461/notion-blog/_/3D_/_/_2_Unit_Movement_Selection_-_1/image_7.png)
+
+```csharp
+더이상 벽에는 반응하지 않
+```
+
+---
+
+---
+
+# ✅ 전체 강의 핵심 요약
+
+| 개념                 | 설명                                                |
+| -------------------- | --------------------------------------------------- |
+| **Raycast**          | 카메라 → 마우스 방향으로 레이를 쏘아 충돌 지점 찾기 |
+| **RaycastHit.point** | 충돌 지점의 월드 좌표                               |
+| **Layer**            | 게임 오브젝트 분류 시스템                           |
+| **LayerMask**        | Raycast가 인식할 레이어만 선택하도록 필터링         |
+| **문제 상황**        | 벽/오브젝트에도 충돌되면서 잘못된 좌표 반환         |
+| **해결**             | 바닥만 따로 레이어 지정 → LayerMask로 필터링        |
+| **마지막 구조**      | MouseWorld.GetPosition() → 전역 어디서든 호출 가능  |
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using Unity.VisualScripting;
+using UnityEngine;
+
+public class MouseWorld : MonoBehaviour
+{
+    // 🔥 MouseWorld라는 스크립트의 '단 하나만 존재하는 버전'을 저장하는 변수
+    // static은 "프로젝트 전체에서 하나만 존재하는" 전역 개념이라고 보면 됨
+    private static MouseWorld instance;
+
+    // 🧱 레이어마스크: 무엇을 레이캐스트가 맞춰야 하는지 골라주는 필터
+    // 여기서는 "마우스가 클릭해야 하는 바닥(Floor)만 골라내기 위한 설정"
+    [SerializeField] private LayerMask mousePlaneLayerMask;
+
+    // 🟦 Awake(): 게임이 시작될 때 제일 먼저 한 번 실행됨
+    private void Awake()
+    {
+        // instance = this;
+        // → "이 스크립트의 이 객체가 우리 클래스의 대표(instance)다!"
+        instance = this;
+    }
+
+    // 🔄 Update(): 매 프레임 실행됨 (초당 60번~100번 등)
+    private void Update()
+    {
+        // 이 게임 오브젝트(마우스 위치 표시 구슬 같은 것)의 위치를
+        // 마우스가 가리키는 곳으로 옮긴다.
+        transform.position = MouseWorld.GetPosition();
+    }
+
+    // 🎯 GetPosition(): "마우스가 월드에서 가리키는 3D 좌표를 반환"
+    // static: 아무 객체를 만들지 않아도 MouseWorld.GetPosition() 으로 호출 가능
+    public static Vector3 GetPosition()
+    {
+        // 1️⃣ 현재 마우스가 화면에서 어디 있는지 가져오기
+        // 2️⃣ 그 화면 좌표를 기준으로 "카메라에서 앞으로 쏘는 레이(레이저)" 만들기
+        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+
+        // RaycastHit 객체를 하나 만든다 (out 키워드: 함수가 내부에서 값을 채워 넣는 구조)
+        RaycastHit raycastHit;
+
+        // 3️⃣ Physics.Raycast로 레이 발사!
+        // - ray: 카메라에서 마우스로 향하는 레이
+        // - out raycastHit: 무엇을 맞추었는지 정보가 저장됨
+        // - float.MaxValue: 레이 최대 거리(엄청 멀리까지 쏜다는 뜻)
+        // - instance.mousePlaneLayerMask: "이 레이어만 맞춰라!" 라는 필터
+        Physics.Raycast(ray, out raycastHit, float.MaxValue, instance.mousePlaneLayerMask);
+
+        // 4️⃣ raycastHit.point = 레이가 바닥을 때린 정확한 3D 지점
+        return raycastHit.point;
+    }
+}
+
+```
+
+# { 🖱️ 마우스 위치로 유닛 이동시키기 }
+
+이번 강의는 **마우스 포지션을 레이캐스트로 구하는 시스템**과
+
+**유닛 이동 시스템**을 연결하여
+
+“**마우스 클릭한 위치로 유닛이 이동하도록 만드는 작업**”을 완성하는 강의이다.
+
+---
+
+## 📋 목차
+
+1. 전체 흐름 이해하기
+2. MouseWorld 클래스 개념 정리
+3. 유닛(Unit) 이동 시스템 개념 정리
+4. 두 시스템 연결하기(마우스 클릭 → 유닛 이동)
+5. 정리: 왜 이렇게 구조화하는가?
+6. 최종 코드
+
+---
+
+## 1. 전체 흐름 이해하기
+
+이번 강의에서 우리가 하는 핵심 작업은 **세 가지**이다.
+
+1. **마우스 위치를 월드 좌표로 변환**하는 기능 (MouseWorld)
+2. **유닛이 특정 목표 지점으로 이동**하는 기능 (Unit)
+3. **마우스를 클릭하면 → 해당 위치를 목표 지점으로 설정 → 유닛이 이동**하도록 연결
+
+즉, 이미 만들어둔 두 시스템을 그냥 “연결”만 해주면 된다.
+
+---
+
+## 2. MouseWorld 클래스 개념 정리
+
+### 🔍 MouseWorld는 무슨 역할?
+
+**"화면의 마우스 위치(Screen 좌표) → 월드(World) 좌표로 변환"**
+
+이 역할만 담당하는 **독립된 클래스**이다.
+
+강의에서 강조된 개념:
+
+### ✔ (1) ScreenPointToRay
+
+- `Camera.main.ScreenPointToRay(Input.mousePosition)`
+- 화면 기준 좌표를 기준으로 **카메라에서 앞으로 뻗는 레이(광선)**을 만든다.
+
+### ✔ (2) 해당 레이가 부딪히는 지점 찾기
+
+- 물리 레이캐스트로 바닥 Plane을 맞춘다.
+- 부딪힌 **hit.point**가 바로 "마우스가 가리키는 실제 월드 좌표".
+
+### ✔ (3) static 함수로 만든 이유
+
+- 어느 오브젝트든 접근해야 하기 때문에
+  **MouseWorld.GetPosition()** 처럼 바로 불러올 수 있도록 `static` 선언.
+
+### ✔ (4) MouseWorld 오브젝트의 transform 위치 = 마우스가 가리키는 곳
+
+- Update에서 `transform.position = GetPosition()` 하여
+  *씬에서 마우스 위치가 어떻게 이동하는지 시각적으로 관찰 가능*하도록 설계됨.
+
+---
+
+## 3. 유닛(Unit) 이동 시스템 개념 정리
+
+### 🔥 유닛이 이동하기 위한 핵심 요소
+
+### ✔ (1) targetPosition
+
+유닛이 "가야 하는 목적지".
+
+```csharp
+private Vector3 targetPosition;
+```
+
+---
+
+### ✔ (2) 매 프레임마다 이동 처리(Update)
+
+Update 안에서는 다음 두 작업이 이루어진다.
+
+### (A) 유닛은 targetPosition까지 이동
+
+- 현재 위치와 목표 위치 간 거리 계산
+- stoppingDistance 이내면 멈춤
+- 그 외에는 normalized로 방향 구하고 이동
+
+옵션별 개념:
+
+### ☑ **Vector3.Distance(a, b)**
+
+두 점 사이의 실제 거리 계산.
+
+### ☑ **moveDirection = (target - current).normalized**
+
+`(목표 지점 - 현재 지점)` = 목표를 향하는 방향 벡터
+
+`.normalized` = 방향만 유지하도록 길이를 1로 정규화
+
+### ☑ **transform.position += direction _ speed _ Time.deltaTime**
+
+deltaTime을 곱해 자연스러운 프레임 독립 이동 구현.
+
+---
+
+### (B) 마우스 클릭 입력 처리
+
+강의에서 중요한 개념:
+
+### ✔ GetMouseButtonDown(0)
+
+- 버튼 번호 0 = 왼쪽 마우스 버튼
+- 1 = 오른쪽 마우스 버튼
+- 2 = 휠 클릭
+
+즉,
+
+```
+Input.GetMouseButtonDown(0) = 왼쪽 클릭
+```
+
+---
+
+## 4. 두 시스템 연결하기(마우스 클릭 → 유닛 이동)
+
+### 🔥 연결 원리
+
+1. **마우스를 클릭한다**
+2. MouseWorld.GetPosition() 로 월드 좌표 구한다
+3. Unit.Move(그 좌표) 호출
+4. 유닛 이동 시스템이 targetPosition을 갱신
+5. Update()에서 해당 위치로 이동
+
+---
+
+### ⚙️ 구현 방식(설명형)
+
+### (1) 기존에는 “키보드 버튼”으로만 이동 테스트
+
+강의에서는 원래 다음처럼 키보드로 테스트하고 있었다:
+
+```csharp
+if (Input.GetKeyDown(KeyCode.T))
+{
+    Move(new Vector3(3, 0, 3));
+}
+```
+
+이제 이것을 **마우스 클릭 입력**으로 바꾼다.
+
+---
+
+### (2) 바뀐 코드
+
+```csharp
+if (Input.GetMouseButtonDown(0))
+{
+    Move(MouseWorld.GetPosition());
+}
+```
+
+여기서 중요한 점:
+
+- MouseWorld.GetPosition()은 **static**이므로 직접 호출 가능
+- 클릭하는 순간 **targetPosition**이 업데이트됨
+- 이동 로직은 그대로 유지되므로 바로 해당 위치로 이동함
+
+---
+
+## 5. 정리: 왜 이렇게 구조화하는가?
+
+강의에서 가장 강조된 개념 중 하나.
+
+---
+
+### 🎯 “각 클래스는 한 가지 역할만”
+
+- MouseWorld → 마우스 위치 계산 전담
+- Unit → 유닛 이동 처리 전담
+
+👉 서로 뒤섞지 않아서 유지보수가 쉽다.
+
+---
+
+### 🎯 나중에 기능이 복잡해져도 확장 용이
+
+예를 들어 추후에:
+
+- 지형이 여러 층이 생기고
+- NavMesh 를 써야 하고
+- 마우스가 UI 를 클릭할 때는 이동하면 안 되고
+- 이동 애니메이션이 들어가고
+- 이동 중 장애물 회피가 필요해지고
+
+이런 기능이 추가되어도
+
+MouseWorld와 Unit이 독립되어 있기 때문에
+
+수정이 수월하다.
+
+---
+
+## 6. 최종 코드
+
+### ✔ Unit.cs
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class Unit : MonoBehaviour
+{
+    // 유닛이 이동해야 할 목표 위치를 저장하는 변수
+    // 마우스로 클릭한 위치를 여기 저장하게 됨
+    private Vector3 targetPosition;
+
+    private void Update()
+    {
+        // 유닛이 목표 위치에 거의 도착했다고 판단할 거리
+        // 이 값 이하로 가까워지면 멈춘다
+        float stoppingDistance = 0.5f;
+
+        // 현재 위치와 목표 위치 사이의 거리 계산
+        // 만약 아직 도착하지 않았다면(> stoppingDistance)
+        if (Vector3.Distance(transform.position, targetPosition) > stoppingDistance)
+        {
+            // 이동 방향 계산
+            // (목표 위치 - 현재 위치) = 목표를 향하는 벡터
+            // .normalized = 길이를 1로 만들어 "방향"만 사용한다는 뜻
+            Vector3 moveDirection = (targetPosition - transform.position).normalized;
+
+            // 이동 속도 (1초에 4만큼 이동)
+            float moveSpeed = 4f;
+
+            // 실제 이동
+            // Time.deltaTime : 프레임마다 시간이 다르므로,
+            // 모든 컴퓨터에서 똑같은 속도로 움직이기 위해 곱해줌
+            transform.position += moveDirection * Time.deltaTime * moveSpeed;
+        }
+
+        // 마우스 왼쪽 버튼을 눌렀는지 체크
+        // 0 = 왼쪽 버튼, 1 = 오른쪽 버튼, 2 = 휠 버튼
+        if (Input.GetMouseButtonDown(0))
+        {
+            // MouseWorld.GetPosition() :
+            // 화면의 마우스 위치를 "월드 좌표"로 변환해주는 함수
+            // 결과적으로 "내가 클릭한 바닥 위치"를 가져오는 것
+            Move(MouseWorld.GetPosition());
+        }
+    }
+
+    // 유닛이 이동해야 할 목표 위치를 설정하는 함수
+    // 클릭할 때마다 targetPosition을 새로 저장한다
+    private void Move(Vector3 targetPosition)
+    {
+        // this.targetPosition = 위에서 선언한 변수
+        // = 파라미터로 들어온 targetPosition 값을 저장하는 것
+        this.targetPosition = targetPosition;
+    }
+}
+
+```
+
+---
+
+# ✨ 전체 요약
+
+| 기능          | 설명                                      |
+| ------------- | ----------------------------------------- |
+| MouseWorld    | 화면 좌표 → 월드 좌표 변환, static 메서드 |
+| Unit 이동     | 타겟 방향으로 이동, 거리 계산 후 정지     |
+| 입력 처리     | 왼쪽 클릭(GetMouseButtonDown)로 이동 명령 |
+| 구조적 포인트 | 클래스별 역할 분리(깨끗한 코드)           |
+
+# { 🚀 **유니티 Clean Code: Public 필드를 피해야 하는 이유 }**
+
+---
+
+## 📋 **목차**
+
+1. 왜 Public 필드를 사용하면 안 되는가?
+2. Public 필드가 만들어내는 문제점들
+3. Private + SerializeField 조합의 의미
+4. 필드를 외부에서 사용해야 한다면? (Getter / 함수 사용)
+5. Clean Code의 핵심 원칙: 접근 최소화
+6. 정리
+
+---
+
+---
+
+# 1. 왜 Public 필드를 사용하면 안 되는가?
+
+## 🔥 **문제의 시작: public은 “어디서나 접근 가능”**
+
+```csharp
+public float speed;
+```
+
+이렇게 작성하면…
+
+- **모든 스크립트가 이 값을 읽거나 수정할 수 있음**
+- Player, Enemy, Boss, UI, UpgradeSystem… 등
+  게임 안의 _모든_ 클래스가 `speed` 변수에 접근 가능
+
+즉, **플레이어 속도(speed)가 어떻게 바뀌는지 예측할 수 없게 된다.**
+
+---
+
+## 🎯 **초보 입장에서의 오해**
+
+> “Editor에서 보이고 싶으니까 public!”
+>
+> “그냥 쓰기 편한데?”
+
+하지만 **public은 편하지만, 프로젝트가 커질수록 치명적인 문제**를 만든다.
+
+---
+
+---
+
+# 2. Public 필드가 만들어내는 문제점들
+
+### 😈 **문제 1 — 어떤 코드가 값을 바꾸는지 알 수 없음**
+
+예:
+
+`player.speed = 5` 를 누가 바꿨는지 찾기 어려움
+
+- UI 스크립트가 speed를 수정할 수도 있고
+- Enemy가 슬로우 디버프 걸어서 speed를 줄일 수도 있고
+- UpgradeSystem이 태연히 speed를 증가시킬 수도 있음
+
+→ **수정·디버깅이 어려워짐**
+
+---
+
+### 😈 **문제 2 — 작은 요구사항 변경이 큰 작업량으로 변함**
+
+예: “speed에는 최소값/최대값을 넣자!”
+
+그런데 public이면…
+
+- speed를 직접 수정하는 모든 스크립트에서
+  직접 min/max를 처리해야 함
+
+즉,
+
+> 작은 기능 하나 때문에 모든 관련 스크립트를 수정해야 한다.
+
+이건 유지보수가 최악이 되는 패턴.
+
+---
+
+### 😈 **문제 3 — 프로젝트가 커질수록 혼돈이 커짐**
+
+게임이 커지면 스크립트는 수십 → 수백 → 수천 개가 됨.
+
+public을 사용하면…
+
+- “누가 값을 바꾸는지”
+- “어디에서 읽는지”
+- “왜 바뀌었는지”
+
+이 모든 걸 일일이 체크해야 한다.
+
+→ 사람이 감당 못 하는 수준의 **복잡도 증가**
+
+---
+
+---
+
+# 3. Private + SerializeField 조합의 의미
+
+## ✔️ **Private: 외부에서 접근 금지(안전)**
+
+```csharp
+private float speed;
+```
+
+→ 이제 speed는 **오직 Player 클래스 내부에서만** 수정 가능
+
+→ 다른 스크립트는 이 값을 직접 만지지 못함
+
+→ 따라서 예측 가능한 동작을 유지할 수 있음
+
+---
+
+## ✔️ **SerializeField: Editor에서만 보이게 함(편리)**
+
+```csharp
+[SerializeField]
+private float speed;
+```
+
+이 조합의 의미:
+
+- **Editor(Inspector)에서는 값이 보인다** (디자이너가 수정하기 쉬움)
+- **다른 스크립트에서는 수정할 수 없다** (코드적으로는 안전)
+
+즉,
+
+> ⚡ “편리함 + 안정성” 두 마리 토끼를 잡는 구조
+
+---
+
+## ✔️ Public vs Private + [SerializeField] 비교
+
+| 방식                       | 에디터 노출 | 다른 스크립트 접근 | 안정성       |
+| -------------------------- | ----------- | ------------------ | ------------ |
+| `public`                   | ✔          | ✔                 | ❌ 매우 위험 |
+| `private`                  | ❌          | ❌                 | ✔ 매우 안전 |
+| `[SerializeField] private` | ✔          | ❌                 | ✔ 최적      |
+
+---
+
+---
+
+# 4. 필드를 외부에서 사용해야 한다면? (Getter / 함수 사용)
+
+강의에서 강조한 핵심:
+
+> 필드를 직접 public으로 열지 말고 “함수만” 통해 접근하게 만들라
+
+예:
+
+### 💡 외부에서 속도를 읽어야 할 때 (Getter)
+
+```csharp
+public float GetSpeed() {
+    return speed;
+}
+```
+
+다른 스크립트는 `speed` 자체가 아니라
+
+**“speed를 가져오는 함수”**만 호출 가능
+
+---
+
+### 💡 외부가 speed를 바꿔야 할 때
+
+예: 적이 플레이어에게 디버프를 거는 기능
+
+```csharp
+public void ApplySpeedDebuff(float amount) {
+    speed -= amount;
+
+    // 여기서 min/max 제한도 가능
+    speed = Mathf.Clamp(speed, 0, maxSpeed);
+}
+```
+
+**좋은 점**
+
+- speed 수정 로직은 Player 안에서만 관리됨
+- Enemy, UI, UpgradeSystem 등은
+  오직 “ApplySpeedDebuff() 함수”만 실행
+- 이후에 speed 최소값/최대값을 바꿔도
+  **Player 스크립트 1곳만 수정하면 됨**
+
+→ 엄청난 유지보수성 증가
+
+---
+
+---
+
+# 5. Clean Code의 핵심 원칙: 접근 최소화
+
+강의에서 핵심 원칙은 이것 하나임:
+
+## 🔑 **"무조건 접근을 최소화하라"**
+
+왜?
+
+- **접근 가능성이 낮아질수록 코드 복잡도가 감소**
+- **누가 값을 바꾸는지 확실하게 보장할 수 있음**
+- **버그 추적이 쉬워짐**
+- **큰 프로젝트일수록 안정성이 폭발적으로 증가**
+
+---
+
+### ✔️ 기본 규칙 정리
+
+- 필드는 **무조건 private이 기본값**
+- public을 써야 한다면 **정말 필요한가?** 꼭 다시 물어보기
+- 에디터 노출이 필요하면
+  → `private + [SerializeField]` 사용
+- 외부 접근이 필요하면
+  → **Getter / Setter / 기능 함수만 제공**
+
+---
+
+---
+
+# 6. 정리
+
+### 🎯 이 강의에서 배운 핵심 5가지
+
+1. **public 필드는 어디서나 접근 가능해서 매우 위험하다.**
+2. **프로젝트가 커질수록 public은 디버깅 지옥을 만든다.**
+3. **private 필드는 안전하며 예측 가능한 코드 구조를 만든다.**
+4. **SerializeField는 "에디터 전용 공개"라서 매우 유용하다.**
+5. **Clean Code의 핵심은 접근을 최소화하는 것이다.**
+
+---
+
+### 📌 가장 중요한 문장 (강의 핵심)
+
+> ❗ “public을 쓰지 말라”가 아니라
+>
+> **‘왜 private이 아니어야 하는지 먼저 자문하라’**
+>
+> “정말 필요한 경우에만 public을 써라.”

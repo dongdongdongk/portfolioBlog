@@ -1,0 +1,223 @@
+---
+title: 'Member 예제'
+date: '2026-09-02'
+category: '기타, 사용 적음/국비'
+tags: ['기타, 사용 적음', '국비']
+draft: false
+summary: ''
+---
+
+# Member-Login
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381049/notion-blog/_/_/Spring_/Member/Untitled_1.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381051/notion-blog/_/_/Spring_/Member/Untitled_2.png)
+
+```java
+1.컨트롤러에서 getMemberLogin GET,POST 를 만들어준다.
+(GET은 setViewName 을 이용해 memberLogin JSP 에서 파라미터 값을 받아온다 ID,PW)
+
+2.getMemberLogin POST 에서 memberService 에서 getMemberLogin 메서드를 호출한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380875/notion-blog/_/_/JSP/Member_/Untitled.png)
+
+```java
+Service
+getMemberLogin 에서 memberDAO 의 getMemberLogin 메서드를 호출한다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381051/notion-blog/_/_/Spring_/Member/Untitled_5.png)
+
+```java
+DAO
+NAMESPACE + id 로 MemberMapper 를 찾아가서 값을 받아온다.
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381051/notion-blog/_/_/Spring_/Member/Untitled_6.png)
+
+```java
+selectOne 인 이유는 id 와 pw 값이 모두 같은 멤버는 한명
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380874/notion-blog/_/_/JSP/Member_/Untitled_1.png)
+
+```java
+memberDTO 에 돌아온 리턴값 넣어주고
+
+ 매서드로 선언된 내장객체 HttpServletRequest request 를 매개변수로 선언해주고
+
+HttpSession 타입에 session 변수
+
+request 에 .getSession 메서드를 이용해 세션을 꺼내 넣어준다.
+
+session.setAttribute(속성)(이름과 value 로 구성되는) (사실 request.setAttribute랑 거의 같다)
+
+에 이름(마음대로) 과 value memberDTO 를 담아준다
+
+redirect 로 나가주지만 session 은 살아있다.
+
+```
+
+# 세션이란?
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380874/notion-blog/_/_/JSP/Member_/Untitled_2.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380874/notion-blog/_/_/JSP/Member_/Untitled_3.png)
+
+```java
+라이프 사이클 Page < Request,Response < Session < Application
+
+Page : Jsp가 만들어 지면 만들어 졌다가 사라지면 없어짐
+
+Request,Response : 요청이 들어왔다가 응답이 나가면 사라짐
+
+Session : 클라이언트가 처음 들어오면 생성되고 Response 로 응답이 나가고 일정한 시간뒤 사라짐
+(이때문에 로그인은 Session 에 담아두고 생성)
+(톰캣이 세션 테이블을 만들어서 관리함 (세선 id로 구별)
+
+Application : 서버컴퓨터가 부팅되면 만들어지고 셧다운 되면 사라진다.
+
+*Session.getApplication (o)
+
+*Session.getPage (x)
+
+*생명주기가 짧은것에서 긴것은 꺼낼 수 있지만 반대로는 불가능하다.
+```
+
+```java
+톰켓에서 세션 테이블을 만들고 각각(클라 웹브라우저) 세션 id 를 부여하고
+
+클라이언트를 관리하는데
+
+클라이언트 에게 cookie 라는 곳에 id를 담아 내보내고 클라이언트가 요청을 보내면서 cookie에
+
+id 를 담아 다시 보내준다.
+
+ (쿠키는 웹브라우저에 저장)
+
+*(세션은 클라이언트 의 웹 브라우저 기준으로 발급)
+```
+
+### 내장 객체
+
+```jsx
+- Tomcat(WAS)이 생성하는 객체만
+- Life Cycle 이 중요(생명주기)
+- 내장 객체에서 다른 내장 객체를 반환
+- 단, 라이프사이클이 짧은 것에서 부터 큰것들을 반환
+- 역으로 반환 X
+
+1. Page
+	- jsp 가 실행하면 생성되고, jsp를 벗어나면 소멸
+	- jsp내의 정보를 담고 있는 객체
+
+2. Request & Response : HttpServletRequest & Response : HttpServletResponse
+	- 요청이 발생하면 생성되고, 응답이 나가면 소멸
+	- RequestScope (Request영역)
+	- 주요 메서드
+	1) String value = getParameter("파라미터이름")           : Parameter 값 한개 반환
+	2) String [] values = getParameterValues("파라미터이름") : 한개의 파라미터이름으로 여러개의 값이 올때
+	3) Enumeration <String> en = getParameterNames()         : Parameter의 이름을 가지고 오고 싶을 때
+	4) setAttribute("속성명", 값)                            : jsp로 보낼 데이터
+
+3. Session
+	- Server에 Client가 처음 요청이 발생하면 Session 객체 생성
+	- Session 객체를 식별하는 sessionId를 생성해서 Cookie로 Client에 저장
+	- Session 객체는 Server에 저장관리
+	- server에서 session 객체를 소멸시키거나 Client 의  JSessionID가 삭제 되었을 때
+	- 또는 session 객체가 생성되고 일정 시간동안 해당 Client이 요청이 없을 때 삭제
+
+	- 주요 메서드
+		1) long getCreationTime()                  : session 객체가 만들어진 시간을 반환, Milliseconds
+		2) long getLastAccessTime()                : Client에서 마지막에 접근한 시간(요청)을 반환
+		3) void setMaxinActiveInterval(int second) : Session 유효 시간 초 단위
+		4) int getMaxinActiveInterval()            : Session 유효 시간 반환
+		5) void setAttribute("key", Object)        : Session 속성에 Data저장
+		6) Object getAttribute("key")              : Session 속성의 Data 반환
+		7) void removeAttribute("key")             : Session 속성의 key에 해당하는 Data 삭제
+		8) void invalidate()                       : Session 삭제 (유효시간을 0으로 만듬)
+
+	- Session 유효기간 설정
+	1) setMaxinActiveInterval 사용
+	2) web.xml 등록
+		 <session-config>
+				<session-timeout>20<session-timeout>   --분단위
+		 </session-config>
+
+	3) Tomcat web.xml
+		 <session-config>
+				<session-timeout>20<session-timeout>   --분단위
+		 </session-config>
+
+	-- 설정 우선 순위
+		1) > 2) > 3)
+
+4. Application(ServletContext)
+		- Web application과 외부(OS)간의 연결정보를 담고 있는 객체
+```
+
+### Cookie
+
+```jsx
+- Server에서 생성하고 Client(Web Browser)에 저장되는 작은 크기의 Text 파일
+- Server에서 생성된 Cookie를 Response에 담아서 Client로 전송
+- Client는 Server에 요청을 할 때 해당 Server에서 발행한 Cookie가 있으면 요청시 같이 보냄
+- 같은 Domain에서만 사용가능 (Naver에서 생성한 Cookie는 naver 접속시만 사용 가능, 쿠팡에서는 사용 불가능)
+- Key(이름:String) 과 Value(값: String) 형식
+
+1. 메서드
+
+	a. String:  getName()    : Cookie의 이름 반환(key)
+	b. String:  getValue()   : Cookie의 값 반환(Value)
+	c. String:  getPath()    : Cookie의 유효 경로정보를 반환(발행한 URI, 같은 URI 폴더 내에서 사용 가능)
+	d. String:  getDomain()  : Cookie의 Domain 정보 반환
+	e. String:  getMaxAge()  : Cookie의 유효시간을 반환
+
+	f. void  : setValue("값")    : Cookie를 생성하고 Cookie의 값을 변경
+	g. void  : setPath("경로")   : Path(URI) 경로 변경
+	h. void  : setMaxAge(int )   : 유효 시간을 지정, 단위는 초 단위 , 0이면 삭제, -1이면 영구적
+
+- 같은 이름으로 Cookie를 발행하면 수정의 의미
+
+2. Java Cookie 사용
+
+	a. 쿠키생성
+			//cookie 생성
+			Cookie cookie = new Cookie("remember", "value");
+			cookie.setPath("/");
+			cookie.setMaxAge(-1);
+			//응답에 추가
+			response.addCookie(cookie);
+
+	b. 쿠키 사용
+		1) Request
+			Cookie [] cookies = request.getCookies();
+
+		2) @CookieValue
+			@CookieValue(value="Cookie의 이름", required = false, defaultValue="값") String value
+			- value          : Cookie의 이름
+			- required      : true면 Cookie가 없으면 에러
+									      false면 Cookie가 없으면 null 반환
+			- defaultValue  : Cookie가 없으면 기본값 적용
+
+3. Cookie 삭제
+		- setMaxAge(0) 으로 삭제
+
+```
+
+# Member-Logout
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381051/notion-blog/_/_/Spring_/Member/Untitled_8.png)
+
+```java
+위에서 Login 할때 request.getSession 을 했기 때문에 다시 반복할 필요 없이
+
+HttpSession session 으로 선언하면 된다.
+
+session.invalidate(); // Session 삭제 메서드
+
+세션을 삭제하면 로그아웃 된다
+
+redirect 로 끝
+```

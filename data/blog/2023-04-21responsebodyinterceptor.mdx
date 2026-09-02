@@ -1,0 +1,484 @@
+---
+title: '2023-04-21(@ResponseBody),(Interceptor)'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# Join Form 검증(ajax), (@ResponseBody)
+
+```java
+아이디 중복을 검사하는 ajax 이용방법
+```
+
+```java
+**jsp**
+
+/**
+ *  Join Form에서 검증
+ */
+
+ $("#userName").blur(idDuplicateCheck);     //빠져나왔을 때
+
+ function idDuplicateCheck(){
+
+	 $.ajax({
+		 type:"GET",
+		 url:"./idDuplicateCheck",
+		 data:{
+			 userName:$('#userName').val()  // .val() 값
+		 },
+		 success:function(result){
+			 console.log(result)
+			 if(result){
+				 console.log('사용 가능한 ID')
+			 }else {
+				 console.log('중복 ID')
+			 }
+		 },
+		 error:function(){
+			 console.log('error')
+		 }
+	 })
+
+ }
+```
+
+```java
+**JSP**
+
+<!-- UserName input-->
+<div class="form-floating mb-3">
+		<form:input path="userName" id="userName" cssClass="form-control"/>
+		<form:label path="userName">User name</form:label>
+		<form:errors path="userName"></form:errors>
+</div>
+```
+
+```java
+**Controller**
+
+@GetMapping("idDuplicateCheck")
+	@ResponseBody
+	public boolean idDuplicateCheck(MemberVO memberVO) throws Exception{
+		log.debug("================ ID 중복 체크 =================");
+		boolean check=false;
+
+		memberVO = memberService.idDuplicateCheck(memberVO);
+
+		if(memberVO == null) {
+			check=true;
+		}
+
+		return check;
+	}
+```
+
+![Untitled](<2023-04-21(@ResponseBody),(Interceptor)/Untitled.png>)
+
+```java
+@ResponseBody :  리턴하는 데이터를 자동으로 json 타입으로 내보낸다
+
+jsp 를 거치지 않고 요청하는 응답을
+```
+
+# 응답이 나가는 방식 3가지
+
+```java
+
+1. Fowarding
+
+요청이 오면 DS 에서 Controller 로 보냈다가 ModelandView 로 다시 받은뒤 리소스 핸들러에서 .jsp
+
+를 붙인뒤 다시 돌아와서 jsp 를 찾아간다.
+
+2. Redirect
+
+Fowarding 과 같지만 jsp 로 가지않고 Controller 에서 되돌려 받은뒤 그대로 나간다
+
+3.@ResponseBody
+
+Redirect 와 비슷하지만 나갈때 JSON 형태로 담아서 내보낸다
+```
+
+### @ResponseBody
+
+```java
+리턴하는 데이터를 자동으로 json 타입으로 내보낸다
+
+Jsp 를 거치지 않고 요청하는 응답을 보내줄 수 있다.
+
+또 List 같은 배열 타입이나 memberVO 같은 형태의 타입 도 보내줄 수 있다.
+
+(더이상 common 에 result 찍어주던 작업(JSP 를 거치는 작업) 을 해줄 필요가없다.)
+```
+
+/z
+
+![Untitled](<2023-04-21(@ResponseBody),(Interceptor)/Untitled%201.png>)
+
+![Untitled](<2023-04-21(@ResponseBody),(Interceptor)/Untitled%202.png>)
+
+```java
+리스트를 리턴한다
+```
+
+![Untitled](<2023-04-21(@ResponseBody),(Interceptor)/Untitled%203.png>)
+
+```java
+자동으로 json 배열 형태로 보내준다
+```
+
+# Interceptor
+
+![Untitled](<2023-04-21(@ResponseBody),(Interceptor)/Untitled%204.png>)
+
+```java
+인터셉터 클래스 생성 (부트는 config 에서  (레거시) xml 에서하던설정해준다)
+```
+
+## 1. Interceptor Class 선언
+
+```bash
+HandlerInterceptor interface 구현
+
+preHandle         : Controller 진입 전
+postHandle        : Controller 종료 후
+afterCompletion   : JSP 렌더링 후
+```
+
+## 2. Interceptor 등록
+
+```bash
+- Legacy의 ***-context.xml 역할
+
+1. Interceptor 설정하는 클래스 선언
+2. WebMvcConfigurer Interface 구현
+3. class 선언부에 @Configuration 선언
+4. addInterceptor 메서드 오버라이딩
+
+@Configuration
+@Slf4j
+public class InterceptorConfig implements WebMvcConfigurer {
+	@Autowired //IOC(Inversion Of Control)
+	private TestInterceptor testInterceptor;
+	@Autowired
+	private StudyInterceptor studyInterceptor;
+
+	@Override
+	public void addInterceptors(InterceptorRegistry registry) {
+		//method 체이닝
+		//적용할 Interceptor 등록
+		registry.addInterceptor(testInterceptor)
+		//Interceptor를 적용할 URL 등록
+				.addPathPatterns("/qna/**")
+				.addPathPatterns("/notice/**")
+		//제외할 URL등록
+				.excludePathPatterns("/qna/detail")
+				.excludePathPatterns("/qna/write");
+
+		//추가 Interceptor등록
+		registry.addInterceptor(studyInterceptor)
+				.addPathPatterns("/qna/**");
+	}
+
+}
+```
+
+![Untitled](<2023-04-21(@ResponseBody),(Interceptor)/Untitled%205.png>)
+
+![Untitled](<2023-04-21(@ResponseBody),(Interceptor)/Untitled%206.png>)
+
+```java
+인터셉터 전문 클래스 생성
+```
+
+![Untitled](<2023-04-21(@ResponseBody),(Interceptor)/Untitled%207.png>)
+
+```java
+super 지워주기
+```
+
+![Untitled](<2023-04-21(@ResponseBody),(Interceptor)/Untitled%208.png>)
+
+```java
+
+```
+
+![Untitled](<2023-04-21(@ResponseBody),(Interceptor)/Untitled%209.png>)
+
+```java
+인터셉터 등록
+```
+
+![Untitled](<2023-04-21(@ResponseBody),(Interceptor)/Untitled%2010.png>)
+
+```java
+들여쓰기도 많이 사용
+
+하나씩 하나씩 사용 리스트로 사용도 가능
+
+예제는 마이 페이지 들어가는걸 검사
+
+* 사용하면 member 의 로그인 페이지도 검사를 하기 때문에
+
+exclude 메서드를 사용해서 예외를 만들기도 가능
+```
+
+```java
+추가적인 인터셉터를 원할경우 새로운 컨피크 파일을 만들 수 도 있고
+
+; 을 찍고 밑에 다시 새로 추가하는것도 가능하다
+```
+
+![Untitled](<2023-04-21(@ResponseBody),(Interceptor)/Untitled%2011.png>)
+
+```java
+마이 페이지에 접속 했을 떄 위의 로그가 뜨면 성공이다.
+```
+
+![Untitled](<2023-04-21(@ResponseBody),(Interceptor)/Untitled%2012.png>)
+
+```java
+/** 문서 만들떄 사용 (주석이 문서로 저장됨)
+```
+
+![Untitled](<2023-04-21(@ResponseBody),(Interceptor)/Untitled%2013.png>)
+
+```java
+세션을 꺼내고 내장객체에 넣고
+
+세션 속성에 멤버를 넣고
+
+로그인을 하지 않았다면 false
+
+모델 뷰가 사용 불가능 하기 때문에 예전 방식을 사용해야한다
+```
+
+![Untitled](<2023-04-21(@ResponseBody),(Interceptor)/Untitled%2014.png>)
+
+![Untitled](<2023-04-21(@ResponseBody),(Interceptor)/Untitled%2015.png>)
+
+![Untitled](<2023-04-21(@ResponseBody),(Interceptor)/Untitled%2016.png>)
+
+![Untitled](<2023-04-21(@ResponseBody),(Interceptor)/Untitled%2017.png>)
+
+```java
+이건 포워딩 형식
+```
+
+![Untitled](<2023-04-21(@ResponseBody),(Interceptor)/Untitled%2018.png>)
+
+```java
+얼럿창과 이동
+```
+
+![Untitled](<2023-04-21(@ResponseBody),(Interceptor)/Untitled%2019.png>)
+
+```java
+나중에 추가 할 인터셉터가 더 있다면 세미콜론을 아래로 내려서 두자
+```
+
+## 예제
+
+### **인터셉터 클래스 생성**
+
+```java
+**MemberCheckInterceptor**
+
+package com.iu.base.interceptors;
+
+import javax.servlet.RequestDispatcher;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+
+import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.HandlerInterceptor;
+
+import com.iu.base.member.MemberVO;
+
+import lombok.extern.slf4j.Slf4j;
+/**
+ *
+ * 로그인 유무를 판별하는 Interceptors
+ *
+ */
+
+@Slf4j
+@Component      //객체를 만들어야 하니 어노테이션 등록
+public class MemberCheckInterceptor implements HandlerInterceptor{
+
+	@Override
+	public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)   // preHandle Controller 진입 전
+			throws Exception {
+		log.info("=====Interceptor 실행=====");
+		HttpSession session=request.getSession();
+		Object memberVO = session.getAttribute("member");  // MemberVO 타입이면 에러 session 은 Object 타입이기 때문에
+		//null인지 아닌지만 알아보려고 하므로 Object로 받자
+
+		if(memberVO != null) {
+			return true;
+		} else {
+			//redirect 방식               // 또다른 응답 방식 forwarding 과 redirect
+			//response.sendRedirect("/member/login");
+
+			//forwarding방식
+			request.setAttribute("message", "로그인이 필요합니다.");  //request.setAttribute = model 에 담는것과 같다.
+			request.setAttribute("url", "/member/login");
+			//model = request의 setAttribute
+
+			RequestDispatcher view = request.getRequestDispatcher("/WEB-INF/views/common/result.jsp");  // 옛날 서블릿 방식으로 쓰던 RequestDispatcher
+			//return이 false 이므로 ModelAndView 못쓰므로 옛날 방식으로 보내줘야 함
+			view.forward(request, response);  // view 를 보내는것 (jsp 경로)
+			return false;
+		}
+	}
+
+}
+```
+
+![Untitled](<2023-04-21(@ResponseBody),(Interceptor)/Untitled%2020.png>)
+
+```java
+result.jsp 로 request.setAttribute 로 전달
+```
+
+```java
+**AdminCheckInterceptor**
+
+package com.iu.base.interceptors;
+
+import java.util.List;
+
+import javax.servlet.RequestDispatcher;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+
+import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.HandlerInterceptor;
+
+import com.iu.base.member.MemberVO;
+import com.iu.base.member.RoleVO;
+
+@Component
+public class AdminCheckInterceptor implements HandlerInterceptor {
+
+	@Override
+	public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
+			throws Exception {
+		HttpSession session = request.getSession();
+		MemberVO memberVO = (MemberVO) session.getAttribute("member");
+
+		List<RoleVO> roleVOs = memberVO.getRoleVOs();
+
+		for (RoleVO roleVO : roleVOs) {
+			if(roleVO.getRoleName().equals("ROLE_ADMIN")) {
+				return true;
+			}
+		}
+
+		request.setAttribute("message", "권한이 없습니다.");
+		request.setAttribute("url", "../");
+		RequestDispatcher view = request.getRequestDispatcher("/WEB-INF/views/common/result.jsp");
+		view.forward(request, response);
+
+		return false;
+	}
+}
+```
+
+```java
+**EncodingInterceptor**
+//HttpServletRequest와 HttpServletResponse 객체의 인코딩을 UTF-8로 설정하는 작업을 수행
+package com.iu.base.interceptors;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.servlet.ModelAndView;
+
+public class EncodingInterceptor implements HandlerInterceptor{
+
+	@Override
+	public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
+			throws Exception {
+		// TODO Auto-generated method stub
+		request.setCharacterEncoding("UTF-8");
+		response.setCharacterEncoding("UTF-8");
+		return true;
+	}
+
+	//update insert 후 검증
+//	@Override
+//	public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler,     //postHandle 을 사용한다
+//			ModelAndView modelAndView) throws Exception {
+//
+//    똑같은 url 이지만 하나는 해야하고 하나는 하지 말아야한다.(form 이동,DB insert 에 갔다가 돌아올 때 도 같은 주소기 때문에 문제가 생김)
+//		1.method 형식으로
+//		모든 요청에 대한 정보는 request.getMethod() 로 불러옴 get or post
+//
+//
+//	}
+
+
+}
+```
+
+### 인터셉터 등록
+
+```java
+package com.iu.base.config;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.servlet.i18n.LocaleChangeInterceptor;
+
+import com.iu.base.interceptors.AdminCheckInterceptor;
+import com.iu.base.interceptors.MemberCheckInterceptor;
+
+@Configuration     // 설정파일 어노테이션
+public class InterceptorConfig implements WebMvcConfigurer {    //webMvc 인터페이스
+
+	@Autowired
+	private LocaleChangeInterceptor localeChangeInterceptor;
+
+	@Autowired
+	private MemberCheckInterceptor memberCheckInterceptor;
+
+	@Autowired
+	private AdminCheckInterceptor adminCheckInterceptor;
+
+	@Override
+	public void addInterceptors(InterceptorRegistry registry) {     //registry 등록하다 인터셉터 등록한다
+
+		//등록 순서 감안해서 코드를 작성해야한다
+		//만약 어드민이 멤버 위로오고 멤버가 아닌 멤버(로그인 하지 않은상태)가 어드민권한에 페이지에 접근하면 어드민의 memberVO 에 null.getRoleVOs 가 되므로 null 포인트
+		//쉽게 생각하면 하위 단계부터 순차적으로 인터셉터 해주자
+		registry.addInterceptor(localeChangeInterceptor)
+					.addPathPatterns("/**");
+
+		registry.addInterceptor(memberCheckInterceptor)         // 멤버인지 체크하는 인터셉터 등록
+					.addPathPatterns("/member/myPage")     //  여기서 /member/* 로 등록하면 로그인 페이지까지 검사하기 때문에 x
+					.addPathPatterns("/qna/*")             // addPathPatterns 경로 추가
+					.excludePathPatterns("/qna/list")      // excludePathPatterns 제외하는 경로
+					.addPathPatterns("/member/admin")
+				.addPathPatterns("/notice/*")
+					.excludePathPatterns("/notice/list")
+					.excludePathPatterns("/notice/detail");
+
+		registry.addInterceptor(adminCheckInterceptor)  // 어드민 체크 인터셉터 등록
+					.addPathPatterns("/member/admin")
+					.addPathPatterns("/notice/*")
+					.excludePathPatterns("/notice/list")
+					.excludePathPatterns("/notice/detail");
+	}
+}
+
+```

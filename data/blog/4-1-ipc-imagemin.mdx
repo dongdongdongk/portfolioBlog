@@ -1,0 +1,1171 @@
+---
+title: '섹션 4: 프로젝트 1- 인터페이스, IPC, ImageMin 및 패키징'
+date: '2026-09-02'
+category: '풀스택/Electron'
+tags: ['풀스택', 'Electron']
+draft: false
+summary: ''
+---
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381249/notion-blog/_/Electron/Electron_From_Scratch_JavaScript_/_4_1-_IPC_ImageMin_/image.png)
+
+```jsx
+1. 프로젝트 개요
+
+		Electron을 사용하여 웹 기술(HTML, CSS, JavaScript) 기반의 데스크톱 애플리케이션 개발
+
+		Materialize(프론트엔드 프레임워크)와 Font Awesome(아이콘 라이브러리) 사용
+
+		모든 파일을 로컬에서 관리 (CDN 대신 직접 다운로드하여 사용)
+
+2. 프로젝트 준비
+
+		이미 제공된 template.zip 파일을 활용하여 기본 인터페이스 구축
+
+		index.html 파일을 열어 현재 인터페이스 확인
+
+		app 폴더에 CSS, JS, web fonts 폴더 복사
+
+3. HTML 구조 작성
+
+		CSS 및 라이브러리 추가
+
+		Font Awesome, Materialize CSS, custom style.css 추가
+
+		Materialize의 기본 스타일 적용 확인
+
+UI 구성
+
+		파일 업로드 폼
+
+				input type="file"을 사용하여 이미지 업로드
+
+				Materialize의 file-field 클래스 활용
+
+				업로드된 파일명을 표시하는 text input 추가
+
+
+		이미지 품질 슬라이더
+
+				input type="range"을 사용하여 0~100 범위의 품질 선택
+
+				Materialize의 range-field 스타일 적용
+
+
+		리사이즈 버튼
+
+				input type="submit" 버튼 추가
+
+
+		출력 경로 표시 카드
+
+				card 클래스를 사용하여 출력 경로를 표시할 span 태그 추가
+
+				JavaScript에서 동적으로 경로 삽입 예정
+
+				Materialize JavaScript 파일 추가
+
+4. About 페이지 생성 (about.html)
+
+		index.html과 동일한 스타일 적용
+
+		애플리케이션 정보 표시 (개발자명, 버전 정보)
+```
+
+## index.html
+
+```jsx
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self';">
+    <link rel="stylesheet" href="../css/all.min.css">
+    <link rel="stylesheet" href="../css/materialize.min.css">
+    <link rel="stylesheet" href="../css/style.css">
+    <title>image-shrink</title>
+</head>
+<body>
+    <div class="container center-align">
+        <h3><i class="fas fa-images">이미지 압축기</i></h3>
+        <p>크기를 조절할 이미지를 선택하세요</p>
+        <form id="image-form">
+            <div class="file-field input-field">
+                <div class="btn">
+                    <span>크기 조절</span>
+                    <input type="file" id="img">
+                </div>
+
+                <div class="file-path-wrapper">
+                    <input type="text" class="file-path validate" placeholder="Upload file">
+                </div>
+            </div>
+            <p>
+                <strong>퀄리티:</strong>
+                <em>품질이 낮을수록 파일 크기가 작아집니다</em>
+            </p>
+            <p class="range-field">
+                <input type="range" min="0" max="100" id="slider">
+            </p>
+            <input type="submit" value="크기 조절" class="btn black">
+        </form>
+
+        <div class="card output">
+            <div class="card-content">
+                출력 경로: <span id="output-path"></span>
+            </div>
+        </div>
+    </div>
+    <script src="../js/materialize.min.js"></script>
+</body>
+</html>
+```
+
+## about.html
+
+```jsx
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self';">
+    <link rel="stylesheet" href="../css/all.min.css">
+    <link rel="stylesheet" href="../css/materialize.min.css">
+    <link rel="stylesheet" href="../css/style.css">
+    <title>About image-shrink</title>
+</head>
+<body>
+    <div class="about-container about center-align">
+        <h4>
+            <i class="fas fa-images">이미지 압축기</i>
+        </h4>
+        <ul class="collection">
+            <li class="collection-item">개발자: 김동현</li>
+            <li class="collection-item">버전: 1.0.0</li>
+        </ul>
+    </div>
+</body>
+</html>
+```
+
+## main.js
+
+```jsx
+const { app, BrowserWindow, Menu, globalShortcut } = require('electron')
+
+// Set env
+
+process.env.NODE_ENV = 'development'
+
+const isDev = process.env.NODE_ENV !== 'production' ? true : false
+const isMac = process.platform === 'darwin' ? true : false
+
+let aboutWindow
+let mainWindow
+
+function createMainWindow() {
+  mainWindow = new BrowserWindow({
+    title: 'ImageShrink',
+    width: 500,
+    height: 600,
+    icon: './assets/Icon_256x256.png',
+    resizable: isDev,
+    backgroundColor: 'white',
+  })
+  // mainWindow.loadURL('https://www.base64decode.org/')
+  // mainWindow.loadURL(`file://${__dirname}/app/index.html`);
+  mainWindow.loadFile('./app/index.html')
+}
+
+function createAboutWindow() {
+  aboutWindow = new BrowserWindow({
+    title: 'About ImageShrink',
+    width: 300,
+    height: 300,
+    icon: './assets/Icon_256x256.png',
+    resizable: false,
+    backgroundColor: 'white',
+  })
+  aboutWindow.loadFile('./app/about.html')
+}
+
+app.on('ready', () => {
+  createMainWindow()
+
+  const mainMenu = Menu.buildFromTemplate(menu)
+  Menu.setApplicationMenu(mainMenu)
+
+  globalShortcut.register('CmdOrCtrl+R', () => mainWindow.reload())
+  globalShortcut.register(isMac ? 'Command+Alt+I' : 'Ctrl+Shift+C', () =>
+    mainWindow.toggleDevTools()
+  )
+
+  mainWindow.on('closed', () => (mainWindow = null))
+})
+
+const menu = [
+  ...(isMac
+    ? [
+        {
+          label: app.name,
+          submenu: [
+            {
+              label: 'About',
+              click: createAboutWindow,
+            },
+          ],
+        },
+      ]
+    : []),
+  {
+    role: 'fileMenu',
+  },
+  ...(!isMac
+    ? [
+        {
+          label: 'Help',
+          submenu: [
+            {
+              label: 'About',
+              click: createAboutWindow,
+            },
+          ],
+        },
+      ]
+    : []),
+  ...(isDev
+    ? [
+        {
+          label: 'Developer',
+          submenu: [
+            { role: 'reload' },
+            { type: 'separator' },
+            { role: 'forcereload' },
+            { type: 'separator' },
+            { role: 'toggledevtools' },
+          ],
+        },
+      ]
+    : []),
+]
+
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createMainWindow()
+  }
+})
+
+app.on('window-all-closed', () => {
+  if (!isMac) {
+    app.quit()
+  }
+})
+
+app.allowRendererProcessReuse = true
+```
+
+# { Electron에서 파일 경로 출력하기 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381246/notion-blog/_/Electron/Electron_From_Scratch_JavaScript_/_4_1-_IPC_ImageMin_/image_1.png)
+
+```jsx
+Electron을 사용해서 기본 다운로드 폴더와 현재 프로젝트 폴더 경로를 화면에 출력하는 기능을 구현할 거예요.
+```
+
+## 1️⃣ Electron의 주요 개념
+
+```jsx
+Electron은 HTML, CSS, JavaScript로 데스크톱 애플리케이션을 개발할 수 있도록 도와주는 프레임워크예요.
+```
+
+### 🖥️ Electron의 두 가지 프로세스
+
+```jsx
+1. 메인 프로세스 (Main Process)
+
+		Node.js 환경에서 실행됨
+
+		앱의 창을 생성하고 관리함
+
+		파일 시스템, OS와 상호작용 가능
+
+		main.js에서 실행됨
+
+2. 렌더러 프로세스 (Renderer Process)
+
+		Chrome 웹 브라우저처럼 동작
+
+		HTML, CSS, JavaScript 실행
+
+		preload.js를 통해 메인 프로세스와 통신
+```
+
+### Electron 앱의 동작 흐름
+
+```jsx
+메인 프로세스 (main.js) → 창(BrowserWindow) 생성 → index.html 로드
+
+렌더러 프로세스 (index.html + renderer.js) → UI 조작
+```
+
+## 2️⃣ Electron에서 파일 경로 가져오는 기능 구현
+
+```jsx
+📌 목표
+
+✅ 사용자의 "다운로드 폴더"와 현재 프로젝트 폴더를 가져와 출력
+```
+
+## 3️⃣ `main.js` (메인 프로세스)
+
+```jsx
+📌 역할:
+
+		앱을 실행하고 창을 띄움 (BrowserWindow)
+
+		다운로드 폴더와 프로젝트 폴더 경로를 계산
+
+		렌더러 프로세스가 요청하면, 해당 경로를 전달
+```
+
+### `main.js` 코드
+
+```jsx
+const { app, BrowserWindow, ipcMain } = require('electron')
+const path = require('path') // 경로 조작을 위한 Node.js 내장 모듈
+const os = require('os') // OS 관련 정보 가져오기 위한 Node.js 내장 모듈
+
+let mainWindow
+
+function createMainWindow() {
+  mainWindow = new BrowserWindow({
+    title: 'ImageShrink',
+    width: 800,
+    height: 600,
+    backgroundColor: 'white',
+    webPreferences: {
+      nodeIntegration: false, // 보안 강화를 위해 Node.js 기능 비활성화
+      contextIsolation: true, // 메인 프로세스와 렌더러 프로세스를 격리
+      preload: path.join(__dirname, 'preload.js'), // preload.js 로드
+    },
+  })
+
+  mainWindow.loadFile('./app/index.html') // HTML 파일 로드
+
+  mainWindow.on('closed', () => {
+    mainWindow = null
+  })
+}
+
+// 📌 IPC (프로세스 간 통신) - 렌더러 프로세스에서 요청하면 실행됨
+ipcMain.handle('getOutputPath', async () => {
+  return {
+    downloads: path.join(os.homedir(), 'Downloads'), // 사용자의 다운로드 폴더 경로
+    project: __dirname, // 현재 프로젝트 폴더 경로
+  }
+})
+
+// Electron 앱 실행
+app.whenReady().then(createMainWindow)
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit()
+  }
+})
+```
+
+## 4️⃣ `preload.js` (메인 ↔ 렌더러 프로세스 연결)
+
+```jsx
+📌 preload.js 역할:
+
+		메인 프로세스(main.js)와 렌더러 프로세스(index.html) 간 통신을 중계
+
+		contextBridge.exposeInMainWorld를 이용해 보안 문제 방지
+```
+
+### `preload.js` 코드
+
+```jsx
+// Electron에서 `contextBridge`와 `ipcRenderer` 모듈 가져오기
+// - `contextBridge` : 보안 강화를 위해 메인 프로세스 기능을 렌더러 프로세스에서 안전하게 사용할 수 있도록 함
+// - `ipcRenderer` : 렌더러 프로세스에서 메인 프로세스로 데이터를 주고받을 수 있도록 하는 API
+const { contextBridge, ipcRenderer } = require('electron')
+
+// `contextBridge.exposeInMainWorld`를 사용하여 `electron` 객체를 `window` 전역 객체에 등록
+// - 이렇게 하면 렌더러 프로세스(HTML/JS)에서 `window.electron.getOutputPath()` 형태로 사용할 수 있음
+contextBridge.exposeInMainWorld('electron', {
+  // `getOutputPath`라는 함수를 등록 (렌더러에서 호출 가능)
+  getOutputPath: () => ipcRenderer.invoke('getOutputPath'),
+  // `ipcRenderer.invoke('getOutputPath')` :
+  //   - 메인 프로세스(main.js)에 'getOutputPath' 요청을 보냄
+  //   - 요청을 받은 메인 프로세스는 해당 경로 데이터를 계산 후 응답을 반환
+  //   - 응답 데이터는 `Promise` 형태로 반환됨 (비동기 처리됨)
+})
+```
+
+```jsx
+window.electron.getOutputPath()를 호출하면
+
+ipcRenderer.invoke('getOutputPath')가 실행됨
+
+main.js에서 ipcMain.handle('getOutputPath', ...)가 응답을 반환
+
+경로 데이터를 렌더러 프로세스로 전달
+```
+
+## 5️⃣ `index.html` (렌더러 프로세스)
+
+```jsx
+📌 UI 역할:
+
+Electron 앱의 HTML 화면을 구성
+```
+
+### `index.html` 코드
+
+```jsx
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self';">
+    <title>ImageShrink</title>
+</head>
+<body>
+    <h3>📂 출력 경로</h3>
+    <p>다운로드 폴더: <span id="downloads-path"></span></p>
+    <p>프로젝트 폴더: <span id="project-path"></span></p>
+
+    <script src="../js/renderer.js"></script>  <!-- JavaScript 로드 -->
+</body>
+</html>
+
+```
+
+## 6️⃣ `renderer.js` (렌더러 프로세스)
+
+```jsx
+📌 renderer.js 역할:
+
+메인 프로세스로부터 다운로드 폴더와 프로젝트 폴더 경로를 받아서 HTML에 표시
+```
+
+```jsx
+// Electron의 메인 프로세스에서 `getOutputPath` 함수를 호출하고, 그 결과를 받아옴
+window.electron
+  .getOutputPath()
+  .then((paths) => {
+    // 비동기 응답이 오면 실행되는 콜백 함수
+    // 📂 다운로드 폴더 경로를 콘솔에 출력
+    console.log('📂 다운로드 폴더:', paths.downloads)
+
+    // 📁 프로젝트 폴더 경로를 콘솔에 출력
+    console.log('📁 프로젝트 폴더:', paths.project)
+
+    // HTML 문서에서 ID가 'downloads-path'인 요소를 찾아 다운로드 폴더 경로를 표시
+    document.getElementById('downloads-path').innerText = paths.downloads
+
+    // HTML 문서에서 ID가 'project-path'인 요소를 찾아 프로젝트 폴더 경로를 표시
+    document.getElementById('project-path').innerText = paths.project
+  })
+  .catch((err) => console.error('경로 가져오기 실패:', err)) // 만약 오류가 발생하면 콘솔에 에러 메시지 출력
+```
+
+```jsx
+window.electron.getOutputPath() 호출
+
+preload.js에서 ipcRenderer.invoke('getOutputPath') 실행
+
+main.js에서 ipcMain.handle('getOutputPath', ...)이 다운로드/프로젝트 폴더 경로 반환
+
+HTML id="downloads-path", id="project-path" 부분을 업데이트
+```
+
+### 호출 되자마자 실행되는 getOutputPath()
+
+```jsx
+이 코드는 함수 정의가 아니라 함수 호출이야.
+
+JavaScript는 위에서 아래로 코드가 실행되기 때문에,
+
+renderer.js가 로드되는 순간 자동으로 실행됨.
+
+즉, 어떤 이벤트를 기다리는 것이 아니라, renderer.js가 실행되면서 즉시 실행되는 코드임.
+```
+
+### 실행 방식을 변경하려면?
+
+```jsx
+이벤트 기반으로 실행하도록 변경
+
+📌 이제 버튼을 클릭할 때만 실행됨!
+```
+
+```jsx
+document.getElementById('get-path-btn').addEventListener('click', () => {
+  window.electron.getOutputPath().then((paths) => {
+    document.getElementById('downloads-path').innerText = paths.downloads
+    document.getElementById('project-path').innerText = paths.project
+  })
+})
+```
+
+```jsx
+<button id="get-path-btn">경로 가져오기</button>
+```
+
+## 🎯 최종 동작 흐름
+
+```jsx
+1️⃣ main.js   → 창(BrowserWindow) 생성
+2️⃣ main.js   → "다운로드 폴더"와 "프로젝트 폴더" 경로 계산
+3️⃣ preload.js → 메인 ↔ 렌더러 간 통신 브릿지 역할
+4️⃣ renderer.js → 경로 요청 후 HTML에 표시
+```
+
+```jsx
+📌 렌더러 프로세스에서 데이터를 요청하면
+
+renderer.js  →  preload.js  →  main.js  →  경로 반환  →  renderer.js에서 화면에 표시
+```
+
+# { `invoke`의 의미 ( 여러 ipcRenderer 통신 방법 ) }
+
+```jsx
+ipcRenderer.invoke(channel, ...args)는 Promise 기반의 IPC(Inter-Process Communication) 요청을 의미합니다.
+
+즉, 렌더러 프로세스가 메인 프로세스에 요청을 보내고,
+
+메인 프로세스에서 처리한 후 응답을 반환하는 방식입니다.
+
+아래 코드에서 invoke('dialog:selectFile')를 실행하면:
+
+dialog:selectFile이라는 채널을 통해 메인 프로세스에 요청을 보냄.
+
+메인 프로세스에서 해당 요청을 처리한 후 Promise 형태로 응답을 반환함.
+
+렌더러 프로세스는 await 또는 .then()을 사용하여 응답을 받을 수 있음.
+```
+
+## 여러 ipcRenderer 통신 방법
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381247/notion-blog/_/Electron/Electron_From_Scratch_JavaScript_/_4_1-_IPC_ImageMin_/image_2.png)
+
+## 사용 예시 시나리오
+
+```jsx
+1️⃣ invoke (비동기 요청-응답)
+
+사용자가 "파일 열기" 버튼을 누르면, 파일 선택 대화상자를 띄우고 선택한 파일 경로를 렌더러로 반환
+
+2️⃣ send (단방향 메시지 전송)
+
+사용자가 "로그 저장" 버튼을 누르면, 메인 프로세스에 로그 저장 요청을 보냄 (응답 불필요)
+
+3️⃣ sendSync (동기 요청-응답)
+
+앱 시작 시 config.json에서 "언어 설정" 값을 즉시 가져와야 함 (UI 표시 전에 필요)
+
+4️⃣ on (이벤트 수신)
+
+메인 프로세스가 1초마다 CPU 사용량을 계산하여 렌더러에 전달 (UI 실시간 업데이트)
+
+5️⃣ once (한 번만 수신)
+
+앱 최초 실행 시 "환경 설정값"을 메인 프로세스에서 로드한 후 렌더러로 전송 (추가 호출 없음)
+
+6️⃣ reply (메인 → 렌더러 응답)
+
+사용자가 "서버에 메시지 전송"하면, 메인 프로세스에서 처리 후 응답을 렌더러에 전달
+```
+
+# { `ipcMain` vs `mainWindow.webContents` 차이 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381247/notion-blog/_/Electron/Electron_From_Scratch_JavaScript_/_4_1-_IPC_ImageMin_/image_3.png)
+
+```jsx
+렌더러 → 메인으로 요청을 보내고 응답을 받으려면?
+
+		→ ipcMain.handle() 사용 (window.electron.invoke()와 함께)
+
+메인 → 렌더러에게 데이터나 메시지를 보낼 때?
+
+		→ mainWindow.webContents.send() 사용 (window.electron.on()과 함께)
+
+
+쉽게 말하면 mainWindow는 메인에서 렌더러로 일방적으로 전송
+
+ipc 는 메인이 렌더러의 요청을 응답할 수 있게 대기 하는 것
+```
+
+# { 파일 다이얼로그를 사용하여 파일 경로를 가져오기 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381247/notion-blog/_/Electron/Electron_From_Scratch_JavaScript_/_4_1-_IPC_ImageMin_/image_4.png)
+
+## 1. 기본 개념
+
+```jsx
+Electron은 크게 두 개의 프로세스로 구성됩니다:
+
+1. 메인 프로세스 (main.js)
+
+		운영체제와 직접 상호작용
+
+		파일 시스템 접근 가능
+
+		시스템 다이얼로그 실행 가능
+
+2. 렌더러 프로세스 (renderer.js)
+
+		웹 페이지를 표시
+
+		사용자 인터페이스 담당
+
+		보안상 시스템 직접 접근 불가
+```
+
+## 2. 통신 과정
+
+```jsx
+1. 사용자가 '파일 선택' 버튼 클릭
+
+2. renderer.js의 클릭 이벤트 핸들러 실행
+
+3. window.electron.selectFile() 호출
+
+4. preload.js를 통해 메인 프로세스에 'dialog:selectFile' 이벤트 전송
+
+5. main.js에서 시스템 파일 선택 다이얼로그 표시
+
+6. 사용자가 파일 선택
+
+7. 선택된 파일 경로가 렌더러로 전달
+
+8. 파일 경로가 화면에 표시
+```
+
+## 3. 코드 구현 상세 설명
+
+### preload.js (다리 역할)
+
+```jsx
+const { contextBridge, ipcRenderer } = require('electron')
+
+// contextBridge: 렌더러와 메인 프로세스 사이의 안전한 통신 다리
+contextBridge.exposeInMainWorld('electron', {
+  // selectFile 함수를 렌더러에서 사용할 수 있게 노출
+  selectFile: () => ipcRenderer.invoke('dialog:selectFile'),
+})
+```
+
+### main.js (시스템 작업 처리)
+
+```jsx
+const { ipcMain, dialog } = require('electron')
+
+// dialog:selectFile 이벤트 처리기 등록
+ipcMain.handle('dialog:selectFile', async () => {
+  // 파일 선택 다이얼로그 표시
+  const result = await dialog.showOpenDialog({
+    properties: ['openFile'], // 단일 파일 선택 모드
+    filters: [
+      // 선택 가능한 파일 형식 제한
+      { name: 'Images', extensions: ['jpg', 'png', 'gif'] },
+    ],
+  })
+
+  // 사용자가 파일을 선택했는지 확인
+  if (!result.canceled) {
+    return result.filePaths[0] // 선택된 파일 경로 반환
+  }
+  return null // 취소한 경우 null 반환
+})
+```
+
+### renderer.js (사용자 인터페이스 처리)
+
+```jsx
+// 필요한 DOM 요소 가져오기
+const selectBtn = document.getElementById('select-btn')
+let filePath = null // 선택된 파일 경로 저장용 변수
+
+// 파일 선택 버튼 클릭 이벤트 처리
+selectBtn.addEventListener('click', async (e) => {
+  e.preventDefault() // 기본 동작 방지
+
+  // electron.selectFile() 호출하여 파일 선택 다이얼로그 표시
+  filePath = await window.electron.selectFile()
+
+  if (filePath) {
+    console.log('선택된 파일:', filePath)
+    // 선택된 파일 경로를 input에 표시
+    document.querySelector('.file-path').value = filePath
+  }
+})
+```
+
+# { Electron을 활용한 이미지 압축 로직 상세 설명 }
+
+```jsx
+이 프로젝트는 Electron + imagemin을 활용하여 이미지를 압축하는 데 초점을 맞추고 있어요.
+
+아래 순서로 동작합니다:
+```
+
+```jsx
+📌 전체 동작 흐름
+
+1. 사용자가 파일을 선택
+
+2. 압축 품질(0~100) 조절 후 "크기 조절" 버튼 클릭
+
+3. 렌더러 프로세스에서 IPC 통신을 통해 메인 프로세스로 요청 전송
+
+4. 메인 프로세스에서 imagemin 라이브러리를 이용해 이미지 압축
+
+5. 압축된 이미지가 저장되고, 폴더를 자동으로 엽니다
+```
+
+## 사용 라이브러리
+
+```jsx
+1️⃣ Electron (UI 및 IPC 통신)
+메인 프로세스와 렌더러 프로세스 간 통신 및 GUI 제공
+🔹 BrowserWindow : 창을 생성하고 관리
+🔹 ipcMain, ipcRenderer : 프로세스 간 통신 (IPC)
+🔹 dialog : 파일 선택 대화상자 사용
+🔹 shell : 압축 완료 후 폴더 열기
+
+2️⃣ imagemin (이미지 압축)
+이미지 크기를 줄여주는 라이브러리
+🔹 imagemin-mozjpeg : JPEG 이미지 압축
+🔹 imagemin-pngquant : PNG 이미지 압축
+🔹 slash : 경로를 슬래시(\ → /)로 변환 (윈도우 환경 대응)
+```
+
+## 🔎 코드 흐름 상세 설명
+
+### 1️⃣ 사용자가 파일 선택 (`renderer.js`)
+
+```jsx
+📌 파일 선택 버튼을 누르면 selectFile() 실행
+```
+
+```jsx
+document.getElementById('select-btn').addEventListener('click', async (e) => {
+  e.preventDefault()
+  filePath = await window.electron.selectFile()
+  if (filePath) {
+    console.log('선택된 파일:', filePath)
+    document.querySelector('.file-path').value = filePath
+  }
+})
+```
+
+```jsx
+사용자가 버튼 클릭 → electron.selectFile() 호출
+
+ipcRenderer.invoke('dialog:selectFile') 를 통해 메인 프로세스에 파일 선택 요청
+
+선택된 파일 경로를 filePath 변수에 저장하고, 입력창에 표시
+```
+
+### 2️⃣ 메인 프로세스에서 파일 선택 대화상자 실행 (`main.js`)
+
+```jsx
+ipcMain.handle('dialog:selectFile', async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openFile'],
+    filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif'] }],
+  })
+
+  if (!result.canceled) {
+    return result.filePaths[0]
+  }
+  return null
+})
+```
+
+```jsx
+ipcMain.handle('dialog:selectFile')를 통해 렌더러의 요청을 처리
+
+dialog.showOpenDialog() 를 사용하여 파일 선택 창을 띄움
+
+사용자가 파일을 선택하면 해당 경로를 반환
+```
+
+### 3️⃣ 사용자가 압축 요청 (`renderer.js`)
+
+```jsx
+📌 폼 제출 시 minimizeImage() 호출
+```
+
+```jsx
+// 이미지 폼(form) 요소를 가져와 이벤트 리스너 등록
+form.addEventListener('submit', (e) => {
+  // 폼 제출 시 기본 동작(페이지 새로고침)을 방지
+  e.preventDefault()
+
+  // 사용자가 이미지를 선택하지 않은 경우 경고 메시지를 표시하고 함수 실행 중단
+  if (!filePath) {
+    alert('이미지 파일을 선택해주세요!')
+    return // 더 이상 코드 실행하지 않음
+  }
+
+  // 사용자가 설정한 이미지 품질 값(0~100 범위의 숫자)을 가져옴
+  const quality = slider.value
+
+  // 콘솔에 사용자가 선택한 파일 경로 출력
+  console.log('제출된 파일:', filePath)
+
+  // 콘솔에 사용자가 설정한 이미지 품질 출력
+  console.log('설정된 품질:', quality)
+
+  // 메인 프로세스로 압축 요청을 보냄
+  window.electron.minimizeImage({
+    imgPath: filePath, // 선택한 이미지 경로
+    quality: parseInt(quality, 10), // 문자열로 받아온 품질 값을 정수로 변환하여 전달
+  })
+})
+```
+
+```jsx
+사용자가 submit 버튼 클릭 시 window.electron.minimizeImage() 실행
+
+이미지 경로 (filePath)와 품질 (slider.value)을 함께 메인 프로세스로 전송
+```
+
+### 4️⃣ 메인 프로세스에서 압축 실행 (`main.js`)
+
+```jsx
+📌 IPC 리스너 등록 및 shrinkImage() 실행
+```
+
+```jsx
+ipcMain.on('image:minimize', (e, option) => {
+  option.dest = path.join(os.homedir(), 'imageshrink') // 저장 폴더 지정
+  shrinkImage(option)
+})
+```
+
+```jsx
+ipcMain.on('image:minimize') 를 통해 렌더러의 요청 수신
+
+압축된 이미지를 저장할 폴더 경로 지정 (os.homedir() = 사용자 홈 디렉토리)
+
+shrinkImage(option) 실행하여 이미지 압축 시작
+```
+
+### 5️⃣ `shrinkImage()`에서 이미지 압축 실행 (`main.js`)
+
+```jsx
+📌 imagemin을 이용한 이미지 압축
+```
+
+```jsx
+// 이미지 압축을 수행하는 비동기 함수
+async function shrinkImage({ imgPath, quality, dest }) {
+  try {
+    // 필요 라이브러리 동적 가져오기 (ES 모듈 방식) import 를 사용하지 못해서 이렇게 가져왔다
+    const { default: imagemin } = await import('imagemin') // 이미지 최적화 라이브러리
+    const { default: imageminMozjpeg } = await import('imagemin-mozjpeg') // JPEG 압축 플러그인
+    const { default: imageminPngquant } = await import('imagemin-pngquant') // PNG 압축 플러그인
+    const slash = (await import('slash')).default // Windows 경로를 UNIX 스타일 경로로 변환
+
+    // PNG 압축 품질을 0~1 범위로 변환 (예: 80 -> 0.8)
+    const pngQuality = quality / 100
+
+    // 이미지 압축 실행
+    const files = await imagemin([slash(imgPath)], {
+      // 선택한 이미지 파일 경로를 변환하여 압축 실행
+      destination: dest, // 압축된 파일 저장 경로
+      plugins: [
+        imageminMozjpeg({ quality }), // JPEG 파일 품질 설정 (0~100)
+        imageminPngquant({
+          quality: [pngQuality, pngQuality], // PNG 파일 품질 설정 (0~1 범위)
+        }),
+      ],
+    })
+
+    // 압축된 파일 정보 출력 (배열 형태)
+    console.log(files)
+
+    // 압축된 이미지가 저장된 폴더를 파일 탐색기로 엶
+    shell.openPath(dest)
+  } catch (error) {
+    // 오류 발생 시 콘솔에 출력
+    console.log(error)
+  }
+}
+```
+
+```jsx
+이미지 압축 라이브러리 동적 로드
+
+		import() 사용 → Electron의 require() 대신 최신 방식 적용
+
+		imagemin, imagemin-mozjpeg, imagemin-pngquant 를 가져옴 ( import 를 사용하지 못해서 이렇게 가져왔다 )
+
+이미지 경로 변환
+
+		slash(imgPath) : 윈도우와 리눅스/맥의 경로 차이를 해결
+
+압축 실행
+
+		imageminMozjpeg({ quality }) : JPEG 품질 설정
+
+		imageminPngquant({ quality: [pngQuality, pngQuality] }) : PNG 품질 설정
+
+		압축된 파일을 지정된 폴더 (dest)에 저장
+
+				* 왜 [pngQuality, pngQuality] 같은 값을 쓰나요?
+
+					quality: [0.8, 0.8]처럼 최소와 최대를 동일하게 설정하면,
+
+					항상 고정된 품질로 압축됨.
+
+					만약 quality: [0.6, 0.8]처럼 최소와 최대를 다르게 설정하면,
+
+					플러그인이 최적의 품질을 자동 선택함.
+
+					코드에서는 사용자가 설정한 품질을 유지하려고 [pngQuality, pngQuality]로 고정한 것.
+
+압축 완료 후 저장 폴더 열기
+
+		shell.openPath(dest) : 사용자에게 압축된 파일 확인 가능
+```
+
+# { 완료 알람(`M.toast()`) 보내기 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381247/notion-blog/_/Electron/Electron_From_Scratch_JavaScript_/_4_1-_IPC_ImageMin_/image_5.png)
+
+```jsx
+"이미지를 XX% 퀄리티로 리사이즈 했습니다." 알림을 사용자에게 보여주기
+```
+
+## 렌더러 프로세스로 "이미지 압축 완료" 신호 보내기
+
+```jsx
+async function shrinkImage({ imgPath, quality, dest }) {
+  try {
+    const { default: imagemin } = await import('imagemin')
+    const { default: imageminMozjpeg } = await import('imagemin-mozjpeg')
+    const { default: imageminPngquant } = await import('imagemin-pngquant')
+    const slash = (await import('slash')).default
+
+    const pngQuality = quality / 100 // PNG 압축 품질 변환
+
+    const files = await imagemin([slash(imgPath)], {
+      destination: dest,
+      plugins: [
+        imageminMozjpeg({ quality }),
+        imageminPngquant({ quality: [pngQuality, pngQuality] }),
+      ],
+    })
+
+    console.log(files)
+    shell.openPath(dest) // 압축된 파일이 있는 폴더 열기
+
+    // 🟢 렌더러 프로세스로 "이미지 압축 완료" 신호 보내기!
+    mainWindow.webContents.send('image:done')
+  } catch (error) {
+    console.log(error)
+  }
+}
+```
+
+```jsx
+렌더러 프로세스에 "image:done" 이벤트를 전송!
+
+mainWindow.webContents.send('image:done');
+```
+
+### `ipcMain.handle()` vs. `mainWindow.webContents.send()` 차이점
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381247/notion-blog/_/Electron/Electron_From_Scratch_JavaScript_/_4_1-_IPC_ImageMin_/image_6.png)
+
+```jsx
+ipcMain.handle() + invoke()
+
+		메인 프로세스에서 결과를 반환해야 하는 경우
+
+		예: 파일 경로 요청, 설정 데이터 가져오기
+
+✅ mainWindow.webContents.send() + on()
+
+		메인 프로세스에서 렌더러에게 특정 이벤트가 발생했음을 알릴 때
+
+		예: 이미지 변환 완료, 다운로드 시작 알림
+
+데이터 요청은 invoke() / 이벤트 알림은 send()가 적절!
+```
+
+## `preload.js`에서 이벤트 리스너 등록
+
+```jsx
+const { contextBridge, ipcRenderer } = require('electron')
+
+contextBridge.exposeInMainWorld('electron', {
+  getOutputPath: () => ipcRenderer.invoke('getOutputPath'),
+  selectFile: () => ipcRenderer.invoke('dialog:selectFile'),
+  minimizeImage: (options) => ipcRenderer.send('image:minimize', options),
+  onImageDone: (callback) => ipcRenderer.on('image:done', callback),
+})
+```
+
+```jsx
+onImageDone: (callback) => ipcRenderer.on('image:done', callback)
+
+를 추가하고 onImageDone 을 main 에 추가
+
+onImageDone(callback) 함수가 호출되면, "image:done" 이벤트를 감지하여 콜백 함수를 실행
+
+* 콜백 함수는 "이벤트가 발생했을 때 실행할 동작"을 정의하는 필수적인 요소!
+
+콜백을 전달해야 "image:done" 이벤트가 발생했을 때 어떤 행동을 할지 정할 수 있어요
+
+invoke()는 요청-응답 방식이므로, await을 사용해서 응답을 기다릴 수 있습니다.
+
+on() 이 방식은 이벤트를 수신하는 방식으로, 응답을 처리하려면 callback 함수를 등록해야 합니다.
+```
+
+## 렌더러 프로세스 (`renderer.js`)
+
+```jsx
+window.electron.onImageDone(() => {
+  M.toast({
+    html: `이미지를 ${slider.value}% 퀄리티로 리사이즈 했습니다.`,
+  })
+})
+```
+
+```jsx
+main.js에서 "image:done" 이벤트가 발생하면, onImageDone()에 등록된 콜백 함수가 실행됨
+
+MaterializeCSS의 M.toast()를 사용하여 알람 표시
+
+사용자에게 "이미지를 XX% 퀄리티로 리사이즈 했습니다." 메시지 출력
+```
+
+# { 로그 추가하기 }
+
+```jsx
+npm i electron-log
+```
+
+```jsx
+일렉트론 로그를 설치해주고
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381248/notion-blog/_/Electron/Electron_From_Scratch_JavaScript_/_4_1-_IPC_ImageMin_/image_7.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381249/notion-blog/_/Electron/Electron_From_Scratch_JavaScript_/_4_1-_IPC_ImageMin_/image_8.png)
+
+```jsx
+require 추가해주고 log.info 같은 방법으로 사용
+```
+
+# { 앱 패키징 방법 }
+
+```jsx
+npm install --save-dev electron-builder
+```
+
+```jsx
+일렉트론 패키저를 설치해준다
+```
+
+## `package.json` 예제
+
+```jsx
+{
+  "name": "image-shrink", // 프로젝트 이름
+  "version": "1.0.0", // 프로젝트 버전
+  "description": "App to optimize images", // 프로젝트 설명
+  "main": "main.js", // Electron 앱의 진입점 파일 지정
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1", // 테스트 실행 시 기본적으로 오류 출력
+    "start": "electron .", // Electron 앱 실행
+    "dev": "nodemon --exec electron .", // 개발 모드에서 nodemon을 사용하여 Electron 실행 (코드 변경 시 자동 재시작)
+    "deploy:osx": "electron-builder --mac", // macOS용 앱 빌드
+    "deploy:win": "npm run deploy:win32 && npm run deploy:win64", // Windows용 32비트 및 64비트 앱을 모두 빌드
+    "deploy:win32": "electron-builder --win nsis:ia32", // Windows 32비트 버전 빌드
+    "deploy:win64": "electron-builder --win nsis:x64" // Windows 64비트 버전 빌드
+  },
+  "build": {
+    "productName": "이미지 압축기", // 앱 이름 (빌드 시 적용될 제품명)
+    "appId": "net.jetalab.ex.startelectron", // 앱 ID (고유 식별자)
+    "asar": false, // ASAR 패키징 비활성화 (파일을 압축하지 않음)
+    "icon": "./assets/win/icon.ico", // 앱 아이콘 경로 (Windows용)
+    "mac": {
+      "target": [
+        "default" // macOS용 기본 타겟 설정 (dmg 등)
+      ]
+    },
+    "dmg": {
+      "title": "Start Electron" // macOS DMG 파일 제목
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis", // Windows 설치 파일을 NSIS 포맷으로 생성
+          "arch": [
+            "x64", // 64비트 아키텍처 지원
+            "ia32" // 32비트 아키텍처 지원
+          ]
+        }
+      ],
+      "icon": "./assets/win/icon.ico" // Windows 아이콘 설정
+    },
+    "nsis": {
+      "oneClick": false, // 설치 과정에서 사용자 입력 필요 (One-click 설치 비활성화)
+      "allowToChangeInstallationDirectory": false, // 설치 경로 변경 불가능
+      "createDesktopShortcut": true, // 바탕화면에 바로가기 아이콘 생성
+      "perMachine": false // 사용자별 설치 (전체 시스템이 아니라 현재 사용자만 설치)
+    },
+    "directories": {
+      "buildResources": "./resources/installer/", // 설치 파일 관련 리소스 디렉터리
+      "output": "./dist/", // 빌드 결과물이 저장될 디렉터리
+      "app": "." // 애플리케이션 루트 디렉터리
+    }
+  },
+  "author": "", // 프로젝트 작성자 정보 (비어 있음)
+  "license": "ISC", // 프로젝트 라이선스
+  "devDependencies": { // 개발 환경에서만 필요한 패키지 목록
+    "electron": "^34.0.2", // Electron 프레임워크
+    "electron-builder": "^25.1.8" // Electron 앱을 패키징하는 도구
+  },
+  "dependencies": { // 애플리케이션 실행에 필요한 패키지 목록
+    "electron-log": "^5.3.0", // Electron 앱에서 로그 기록을 위한 라이브러리
+    "imagemin": "^9.0.0", // 이미지 최적화 라이브러리
+    "imagemin-mozjpeg": "^10.0.0", // JPEG 이미지 압축을 위한 플러그인
+    "imagemin-pngquant": "^10.0.0", // PNG 이미지 압축을 위한 플러그인
+    "path": "^0.12.7", // 파일 및 디렉터리 경로 처리를 위한 Node.js 내장 모듈 (여기서는 필요 없음)
+    "slash": "^5.1.0" // 경로 문자열에서 슬래시(`/` 또는 `\`)를 통일하는 라이브러리 (Windows/Linux 경로 차이 해결)
+  }
+}
+
+```
+
+```jsx
+ex) npm run deploy:win
+```
+
+```jsx
+각각의 파일이 생성됨
+```
+
+### 주의
+
+```jsx
+의존성 파일은 dependencies 에 넣어주고
+
+electron, electron-builder 같은 경우에는 devDependencis 에
+
+넣어주도록 한다
+```

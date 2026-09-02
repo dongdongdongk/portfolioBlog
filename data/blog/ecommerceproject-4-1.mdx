@@ -1,0 +1,531 @@
+---
+title: 'EcommerceProject -4-1'
+date: '2026-09-02'
+category: '풀스택/프로젝트 정리'
+tags: ['풀스택', '프로젝트 정리']
+draft: false
+summary: ''
+---
+
+# Cart Redux 추가
+
+## cartAction.js
+
+```jsx
+import { createAsyncThunk } from '@reduxjs/toolkit'
+
+// 카트에 상품을 추가하는 액션 생성자
+export const addToCart = createAsyncThunk('cart/addToCart', async (newForm, { getState }) => {
+  try {
+    // 현재 상태 가져오기
+    const currentState = getState()
+    console.log('현재 상태', currentState)
+
+    // 기존 카트 내용 가져오기
+    const existingCart = currentState.cart.cart
+
+    // 새로 추가할 아이템
+    const item = newForm
+
+    // 이미 카트에 존재하는 경우 해당 아이템 정보를 업데이트
+    const isItemExist = existingCart.find((i) => i._id === item._id)
+    if (isItemExist) {
+      const updatedCart = existingCart.map((i) => (i._id === isItemExist._id ? item : i))
+      return {
+        cart: updatedCart,
+      }
+    } else {
+      // 카트에 없는 경우 새로운 아이템 추가
+      const updatedCart = [...existingCart, item]
+      localStorage.setItem('cartItems', JSON.stringify(updatedCart))
+      return {
+        cart: updatedCart,
+      }
+    }
+  } catch (error) {
+    throw error // 에러 발생 시 에러 처리
+  }
+})
+
+// 카트에서 상품을 제거하는 액션 생성자
+export const removeFromCart = createAsyncThunk(
+  'cart/removeFromCart',
+  async (data, { getState }) => {
+    try {
+      // getState 함수를 사용하여 현재 상태 가져오기
+      const filteredCart = getState().cart.cart.filter((item) => item._id !== data._id) // 지정된 상품 제거
+      console.log('제거하고 남은 상품', filteredCart)
+      localStorage.setItem('cartItems', JSON.stringify(filteredCart)) // 로컬 스토리지에 업데이트된 카트 정보 저장
+      return {
+        cart: filteredCart, // 제거된 상품 반환
+      }
+    } catch (error) {
+      throw error // 에러 발생 시 에러 처리
+    }
+  }
+)
+```
+
+```jsx
+createAsyncThunk의 두 번째 매개변수인 thunkAPI 객체는 여러 유용한 함수 중 하나인 getState 함수를 제공
+
+getState 함수는 현재 Redux 스토어의 상태를 가져오는 함수로, Redux 스토어에 저장된 상태를 조회할 수 있게 해준다
+
+const isItemExist = existingCart.find((i) => i._id === item._id);:
+
+이미 장바구니에 추가하려는 상품(item)이 존재하는지 확인한다. 상품의 고유 식별자(_id)를 사용하여 확인
+
+( .find 메소드는 배열의 각 요소에 대해 해당 조건을 만족하는 첫 번째 요소를 찾으면 검색을 멈추고 해당 요소를 반환 )
+
+------------------------------------------------------------------------------------------------------
+
+const updatedCart = existingCart.map((i) => i._id === isItemExist._id ? item : i);
+
+기존 장바구니를 순회하면서 이미 존재하는 상품인 경우 상품 정보를 업데이트하고, ( 그대로 배열 반환 )
+
+그렇지 않은 경우에는 ( 아래 else )  기존 상품 정보를 그대로 사용하여 새로운 장바구니 정보를 생성
+```
+
+## cartReducer.js
+
+```jsx
+import { addToCart, removeFromCart } from './cartAction'
+import { createSlice } from '@reduxjs/toolkit'
+
+const cartSlice = createSlice({
+  name: 'cart',
+  initialState: {
+    cart: localStorage.getItem('cartItems') ? JSON.parse(localStorage.getItem('cartItems')) : [],
+    error: null,
+  },
+  reducers: {},
+  extraReducers: (builder) => {
+    builder
+      // 카트에 상품 추가
+      .addCase(addToCart.fulfilled, (state, action) => {
+        state.cart = action.payload.cart // 업데이트된 카트 정보로 상태 갱신
+      })
+      .addCase(addToCart.rejected, (state, action) => {
+        state.error = action.error.message // 에러 발생 시 에러 메시지 저장
+      })
+
+      // 카트에서 상품 제거
+      .addCase(removeFromCart.fulfilled, (state, action) => {
+        state.cart = action.payload.cart // 업데이트된 카트 정보로 상태 갱신
+      })
+      .addCase(removeFromCart.rejected, (state, action) => {
+        state.error = action.error.message // 에러 발생 시 에러 메시지 저장
+      })
+  },
+})
+
+export default cartSlice.reducer
+```
+
+```jsx
+initialState: {
+        cart: localStorage.getItem("cartItems") ? JSON.parse(localStorage.getItem("cartItems")) : [] ,
+        error: null,
+    },
+
+로컬 스토리지에 cartItems가 저장되어 있으면 해당 데이터를 사용하고, 저장된 데이터가 없으면 빈 배열을 초기 카트 상태로 설정
+
+JSON.parse(localStorage.getItem("cartItems")): 가져온 데이터는 문자열 형태일 것이므로, JSON 파싱을 통해 자바스크립트 객체로 변환
+
+------------------------------------------------------------------------------------------------------
+
+state.cart = action.payload.cart
+
+palyload 필드의 cart 값을 반환하는것
+
+```
+
+# wishlist.js Redux 추가
+
+## wishListAction.js
+
+```jsx
+import { createAsyncThunk } from '@reduxjs/toolkit'
+
+// 위시 리스트 추가
+export const addToWishList = createAsyncThunk(
+  'whishList/addWishList',
+  async (newForm, { getState }) => {
+    try {
+      const currentState = getState() // 현재 상태 가져오기
+
+      const existingWishList = currentState.wishList.wishList // 기존 위시 리스트 가져오기
+
+      const item = newForm // 새로 추가할 위시 아이템
+
+      const isItemExist = existingWishList.find((i) => i._id === item._id) // 이미 존재하는 아이템인지 확인
+
+      if (isItemExist) {
+        // 이미 존재하는 경우 해당 아이템 정보를 업데이트 ( 그대로 배열 반환 )
+        const updatedWishList = existingWishList.map((i) => (i._id === isItemExist._id ? item : i))
+        return {
+          wishList: updatedWishList,
+        }
+      } else {
+        // 존재하지 않는 경우 새로운 아이템 추가
+        const updatedWishList = [...existingWishList, item]
+
+        // 로컬 스토리지에 업데이트된 위시 리스트 정보 저장
+        localStorage.setItem('wishListItem', JSON.stringify(updatedWishList))
+
+        return {
+          wishList: updatedWishList,
+        }
+      }
+    } catch (error) {
+      throw error // 에러 발생 시 에러 처리
+    }
+  }
+)
+
+// 위시 리스트 삭제
+export const removeFromWishList = createAsyncThunk(
+  'wishList/removeFromWishList',
+  async (data, { getState }) => {
+    try {
+      const filteredWishList = getState().wishList.wishList.filter((item) => item._id !== data._id) // 지정된 위시 아이템 제거
+
+      // 로컬 스토리지에 업데이트된 위시 리스트 정보 저장
+      localStorage.setItem('wishListItem', JSON.stringify(filteredWishList))
+
+      return {
+        wishList: filteredWishList, // 제거된 위시 아이템 반환
+      }
+    } catch (error) {
+      throw error // 에러 발생 시 에러 처리
+    }
+  }
+)
+```
+
+```jsx
+cart 와 거의 같은 방식으로 사용되고 있다
+```
+
+## wishListReducer.js
+
+```jsx
+import { addToWishList, removeFromWishList } from '../../redux/wishList/wishListAction'
+import { createSlice } from '@reduxjs/toolkit'
+
+const wishListSlice = createSlice({
+  name: 'wishList',
+  initialState: {
+    wishList: localStorage.getItem('wishListItem')
+      ? JSON.parse(localStorage.getItem('wishListItem'))
+      : [],
+    error: null,
+  },
+
+  extraReducers: (builder) => {
+    builder
+      .addCase(addToWishList.fulfilled, (state, action) => {
+        state.wishList = action.payload.wishList
+      })
+      .addCase(addToWishList.rejected, (state, action) => {
+        state.error = action.error.message
+      })
+
+      // 위시리스트 삭제
+      .addCase(removeFromWishList.fulfilled, (state, action) => {
+        state.wishList = action.payload.wishList
+      })
+      .addCase(removeFromWishList.rejected, (state, action) => {
+        state.error = action.error.message
+      })
+  },
+})
+
+export default wishListSlice.reducer
+```
+
+# ProductDetailCard.jsx 수정
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381462/notion-blog/_/_/EcommerceProject/EcommerceProject_-4-1/Untitled.png)
+
+```jsx
+import React, { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import {
+  AiFillHeart,
+  AiOutlineHeart,
+  AiOutlineMessage,
+  AiOutlineShoppingCart,
+} from 'react-icons/ai'
+import { RxCross1 } from 'react-icons/rx'
+import styles from '../../styles/styles'
+import { useDispatch, useSelector } from 'react-redux'
+import { addToCart, removeFromCart } from '../../redux/cart/cartAction'
+import { toast } from 'react-toastify'
+import { addToWishList, removeFromWishList } from '../../redux/wishList/wishListAction'
+
+const ProductDetailsCard = ({ setOpen, data }) => {
+  // Redux에서 상태 가져오기
+  const { cart } = useSelector((state) => state.cart)
+  const { wishList } = useSelector((state) => state.wishList)
+  const dispatch = useDispatch()
+
+  // 상태 설정
+  const [count, setCount] = useState(1)
+  const [click, setClick] = useState(false)
+
+  // 메시지 전송 핸들러
+  const handleMessageSubmit = () => {}
+
+  // 수량 감소 함수
+  const decrementCount = () => {
+    if (count > 1) {
+      setCount(count - 1)
+    }
+  }
+
+  // 수량 증가 함수
+  const incrementCount = () => {
+    setCount(count + 1)
+  }
+
+  // 장바구니에 상품 추가 함수
+  const addToCartHandler = (id) => {
+    // 현재 장바구니 상태 가져오기
+    const isItemExists = cart && cart.find((i) => i._id === id)
+
+    // 상품이 이미 장바구니에 존재하는 경우
+    if (isItemExists) {
+      toast.error('상품이 카트에 이미 있습니다!')
+    } else {
+      // 상품이 장바구니에 없는 경우
+      if (data.stock < count) {
+        // 상품의 재고가 선택한 수량보다 부족한 경우 에러 메시지 표시
+        toast.error('상품 재고가 부족합니다!')
+      } else {
+        // 상품의 재고가 충분한 경우, 선택한 수량과 함께 새로운 카트 아이템 생성
+        const cartData = { ...data, qty: count }
+
+        // Redux의 addToCart 액션을 통해 새로운 카트 아이템을 추가
+        dispatch(addToCart(cartData))
+
+        // 성공적으로 카트에 상품이 추가된 경우 성공 메시지 표시
+        toast.success('상품이 카트에 추가되었습니다!')
+      }
+    }
+  }
+
+  // 위시리스트 추가 및 제거 핸들러
+  useEffect(() => {
+    if (wishList && wishList.find((i) => i._id === data._id)) {
+      setClick(true)
+    } else {
+      setClick(false)
+    }
+  }, [wishList])
+
+  const removeFromWishListHandler = (data) => {
+    setClick(!click)
+    dispatch(removeFromWishList(data))
+  }
+
+  const addToWishListHandler = (data) => {
+    setClick(!click)
+    dispatch(addToWishList(data))
+  }
+
+  return (
+    <div className="bg-[#fff]">
+      {data ? (
+        <div className="fixed top-0 left-0 z-40 flex h-screen w-full items-center justify-center bg-[#00000030]">
+          <div className="800px:w-[60%] 800px:h-[75vh] relative h-[90vh] w-[90%] overflow-y-scroll rounded-md bg-white p-4 shadow-sm">
+            <RxCross1
+              size={30}
+              className="absolute top-3 right-3 z-50"
+              onClick={() => setOpen(false)}
+            />
+
+            <div className="800px:flex block w-full">
+              <div className="800px:w-[50%] w-full">
+                <img src={`http://localhost:5000/${data.images && data.images[0]}`} alt="" />
+                <div className="flex">
+                  <Link to={`/shop/preview/${data.shop._id}`} className="flex">
+                    <img
+                      src={`http://localhost:5000/${data?.shop?.avatar}`}
+                      alt=""
+                      className="mr-2 h-[50px] w-[50px] rounded-full"
+                    />
+                    <div>
+                      <h3 className={`${styles.shop_name}`}>{data.shop.name}</h3>
+                      <h5 className="pb-3 text-[15px]">(4.5) Ratings</h5>
+                    </div>
+                  </Link>
+                </div>
+                <div
+                  className={`${styles.button} mt-4 h-11 rounded-[4px] bg-[#000]`}
+                  onClick={handleMessageSubmit}
+                >
+                  <span className="flex items-center text-[#fff]">
+                    Send Message <AiOutlineMessage className="ml-1" />
+                  </span>
+                </div>
+                <h5 className="mt-5 text-[16px] text-[red]">(50) Sold out</h5>
+              </div>
+
+              <div className="800px:w-[50%] w-full pt-5 pr-[5px] pl-[5px]">
+                <h1 className={`${styles.productTitle} text-[20px]`}>{data.name}</h1>
+                <p>{data.description}</p>
+
+                <div className="flex pt-3">
+                  <h4 className={`${styles.productDiscountPrice}`}>{data.discountPrice}$</h4>
+                  <h3 className={`${styles.price}`}>
+                    {data.originalPrice ? data.originalPrice + ' 원' : null}
+                  </h3>
+                </div>
+                <div className="mt-12 flex items-center justify-between pr-3">
+                  <div>
+                    <button
+                      className="rounded-l bg-gradient-to-r from-teal-400 to-teal-500 px-4 py-2 font-bold text-white shadow-lg transition duration-300 ease-in-out hover:opacity-75"
+                      onClick={decrementCount}
+                    >
+                      -
+                    </button>
+                    <span className="bg-gray-200 px-4 py-[11px] font-medium text-gray-800">
+                      {count}
+                    </span>
+                    <button
+                      className="rounded-l bg-gradient-to-r from-teal-400 to-teal-500 px-4 py-2 font-bold text-white shadow-lg transition duration-300 ease-in-out hover:opacity-75"
+                      onClick={incrementCount}
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div>
+                    {click ? (
+                      <AiFillHeart
+                        size={30}
+                        className="cursor-pointer"
+                        onClick={() => removeFromWishListHandler(data)}
+                        color={click ? 'red' : '#333'}
+                        title="Remove from wishlist"
+                      />
+                    ) : (
+                      <AiOutlineHeart
+                        size={30}
+                        className="cursor-pointer"
+                        onClick={() => addToWishListHandler(data)}
+                        title="Add to wishlist"
+                      />
+                    )}
+                  </div>
+                </div>
+                <div
+                  className={`${styles.button} mt-6 flex h-11 items-center rounded-[4px]`}
+                  onClick={() => addToCartHandler(data._id)}
+                >
+                  <span className="flex items-center text-[#fff]">
+                    Add to cart <AiOutlineShoppingCart className="ml-1" />
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+export default ProductDetailsCard
+```
+
+```jsx
+  const { cart } = useSelector((state) => state.cart);
+  const { wishList } = useSelector((state) => state.wishList);
+
+Redux 에서 cart 와 wishList 에 대한 정보를 가져온다
+
+------------------------------------------------------------------------------------------------------
+
+ if (data.stock < count) 이 부분은 data.stock 상품의 재고를 확인하고 상품이 부족하면 에러를 표시하고
+
+상품이 충분하다면
+
+const cartData = { ...data, qty: count };
+
+상품의 수량과 함께 장바구니에 물건을 추가한다
+
+( qty: count: 이 부분은 현재 선택된 수량(count)을 새로운 객체에 추가하는 역할 )
+
+이후 dispatch(addToCart(cartData)); 를 통해서  Redux의 addToCart 액션을 통해 장바구니에 추가
+```
+
+```jsx
+아래 ProductDetailsPage 부분에서 데이터를 ProductDetails 을 보내준다
+```
+
+### ProductDetailsPage
+
+```jsx
+import React, { useEffect, useState } from 'react'
+import { useParams } from 'react-router-dom'
+import Footer from '../components/Layout/Footer'
+import Header from '../components/Layout/Header'
+import ProductDetails from '../components/Products/ProductDetails'
+import { useSelector } from 'react-redux'
+import SuggestedProduct from '../components/Products/SuggestedProduct'
+
+const ProductDetailsPage = () => {
+  // React Router의 useParams 훅을 사용하여 URL에서 파라미터 추출
+  const { id } = useParams()
+
+  // Redux에서 전체 상품 데이터 가져오기
+  const { allProducts } = useSelector((state) => state.product)
+
+  // 로컬 상태 설정
+  const [data, setData] = useState(null)
+
+  // URL 파라미터에 해당하는 상품 데이터 찾기
+  useEffect(() => {
+    // const data = productData.find((i) => i.name === productName);
+    const productID = id.replace(/-/g, ' ') // URL에서 언더스코어를 공백으로 변환
+    const productData = allProducts && allProducts.find((i) => i._id === productID)
+    setData(productData)
+  }, [id, allProducts])
+
+  return (
+    <div>
+      {/* 페이지의 상단에 위치하는 헤더 컴포넌트 */}
+      <Header />
+
+      {/* 선택된 상품의 세부 정보를 표시하는 컴포넌트 */}
+      <ProductDetails data={data} />
+
+      {/* 선택된 상품과 관련된 추천 상품을 표시하는 컴포넌트 */}
+      {data && <SuggestedProduct data={data} />}
+
+      {/* 페이지의 하단에 위치하는 푸터 컴포넌트 */}
+      <Footer />
+    </div>
+  )
+}
+
+export default ProductDetailsPage
+```
+
+```jsx
+    useEffect(() => {
+        // const data = productData.find((i) => i.name === productName);
+        const productID = id.replace(/-/g, " ");  // URL에서 언더스코어를 공백으로 변환
+        const productData = allProducts && allProducts.find((i) => i._id === productID);
+        setData(productData);
+    }, [id, allProducts]);
+
+productData 찾기:
+
+allProducts 배열에서 productID와 일치하는 상품 데이터를 찾는다.
+
+find 메서드를 사용하여 배열에서 조건에 맞는 첫 번째 항목을 찾는다. 여기서 조건은 상품의 _id가 productID와 일치하는 것
+
+( id 가 일치하는 상품을 찾아서 그 상품의 디테일을 확인하는 로직 )
+```

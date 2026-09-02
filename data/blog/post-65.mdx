@@ -1,0 +1,772 @@
+---
+title: '스프링 부트 익셉션 처리'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+```jsx
+간단한 예제 애플리케이션을 구성하여 예외 처리를 포함한 전체적인 코드를 작성했다.
+
+이 예제는 보드(Board)와 유저(User)를 다루는 간단한 CRUD 애플리케이션 이다
+```
+
+# 1. 프로젝트 구조
+
+```java
+src
+├── main
+│   ├── java
+│   │   └── com
+│   │       └── example
+│   │           ├── controller
+│   │           │   ├── UserController.java
+│   │           │   └── BoardController.java
+│   │           ├── service
+│   │           │   ├── UserService.java
+│   │           │   └── BoardService.java
+│   │           ├── repository
+│   │           │   ├── UserRepository.java
+│   │           │   └── BoardRepository.java
+│   │           ├── model
+│   │           │   ├── User.java
+│   │           │   └── Board.java
+│   │           └── exception
+│   │               ├── UserNotFoundException.java
+│   │               ├── BoardNotFoundException.java
+│   │               ├── GlobalExceptionHandler.java
+│   │               └── ErrorResponse.java
+│   └── resources
+│       └── application.properties
+```
+
+# 2. 코드 작성
+
+## 2.1. User 모델 클래스
+
+```java
+package com.example.model;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+ * User 클래스는 유저 정보를 저장하는 데이터 모델입니다.
+ * Lombok 라이브러리를 사용하여 Getter, Setter, Constructor를 자동 생성합니다.
+ */
+@Data // Getter, Setter, toString, equals, hashCode 메서드를 자동으로 생성
+@NoArgsConstructor // 기본 생성자를 자동으로 생성
+@AllArgsConstructor // 모든 필드를 포함한 생성자를 자동으로 생성
+public class User {
+    private Long id; // 유저 ID
+    private String name; // 유저 이름
+    private String email; // 유저 이메일
+}
+
+```
+
+## 2.2. Board 모델 클래스
+
+```java
+package com.example.model;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+ * Board 클래스는 게시판 정보를 저장하는 데이터 모델입니다.
+ * Lombok 라이브러리를 사용하여 Getter, Setter, Constructor를 자동 생성합니다.
+ */
+@Data // Getter, Setter, toString, equals, hashCode 메서드를 자동으로 생성
+@NoArgsConstructor // 기본 생성자를 자동으로 생성
+@AllArgsConstructor // 모든 필드를 포함한 생성자를 자동으로 생성
+public class Board {
+    private Long id; // 게시글 ID
+    private String title; // 게시글 제목
+    private String content; // 게시글 내용
+    private Long userId; // 작성자 ID
+}
+
+```
+
+## 2.3. UserRepository 인터페이스
+
+```java
+package com.example.repository;
+
+import com.example.model.User;
+import java.util.Optional;
+import java.util.List;
+
+/**
+ * UserRepository 인터페이스는 User 데이터를 다루는 메서드의 집합입니다.
+ * 실제 데이터베이스와의 상호작용을 담당합니다.
+ */
+public interface UserRepository {
+    Optional<User> findById(Long id); // ID로 유저를 찾음
+    List<User> findAll(); // 모든 유저를 반환
+    User save(User user); // 유저를 저장
+    void deleteById(Long id); // ID로 유저를 삭제
+}
+
+```
+
+## 2.4. BoardRepository 인터페이스
+
+```java
+package com.example.repository;
+
+import com.example.model.Board;
+import java.util.Optional;
+import java.util.List;
+
+/**
+ * BoardRepository 인터페이스는 Board 데이터를 다루는 메서드의 집합입니다.
+ * 실제 데이터베이스와의 상호작용을 담당합니다.
+ */
+public interface BoardRepository {
+    Optional<Board> findById(Long id); // ID로 게시글을 찾음
+    List<Board> findAll(); // 모든 게시글을 반환
+    Board save(Board board); // 게시글을 저장
+    void deleteById(Long id); // ID로 게시글을 삭제
+    List<Board> findByUserId(Long userId); // 특정 유저가 작성한 게시글 조회
+}
+
+```
+
+## 2.5. UserService 클래스
+
+```java
+package com.example.service;
+
+import com.example.exception.UserNotFoundException;
+import com.example.model.User;
+import com.example.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+/**
+ * UserService 클래스는 비즈니스 로직을 처리하는 서비스 계층입니다.
+ * UserRepository를 사용하여 데이터를 조회하고 조작합니다.
+ */
+@Service // 이 클래스가 서비스 계층임을 Spring에게 알려줍니다.
+@RequiredArgsConstructor // final 필드를 포함한 생성자를 자동으로 생성
+public class UserService {
+
+    private final UserRepository userRepository;
+
+    public User getUserById(Long id) {
+        // ID로 유저를 조회하고, 유저가 없으면 예외를 던집니다.
+        return userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException("User not found with id " + id));
+    }
+
+    public List<User> getAllUsers() {
+        // 모든 유저를 조회합니다.
+        return userRepository.findAll();
+    }
+
+    public User createUser(User user) {
+        // 유저를 생성합니다.
+        return userRepository.save(user);
+    }
+
+    public void deleteUser(Long id) {
+        // ID로 유저를 조회하고, 유저가 없으면 예외를 던집니다.
+        if (!userRepository.findById(id).isPresent()) {
+            throw new UserNotFoundException("User not found with id " + id);
+        }
+        // 유저를 삭제합니다.
+        userRepository.deleteById(id);
+    }
+}
+
+```
+
+## 2.6. BoardService 클래스
+
+```java
+package com.example.service;
+
+import com.example.exception.BoardNotFoundException;
+import com.example.model.Board;
+import com.example.repository.BoardRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+/**
+ * BoardService 클래스는 비즈니스 로직을 처리하는 서비스 계층입니다.
+ * BoardRepository를 사용하여 데이터를 조회하고 조작합니다.
+ */
+@Service // 이 클래스가 서비스 계층임을 Spring에게 알려줍니다.
+@RequiredArgsConstructor // final 필드를 포함한 생성자를 자동으로 생성
+public class BoardService {
+
+    private final BoardRepository boardRepository;
+
+    public Board getBoardById(Long id) {
+        // ID로 게시글을 조회하고, 게시글이 없으면 예외를 던집니다.
+        return boardRepository.findById(id)
+                .orElseThrow(() -> new BoardNotFoundException("Board not found with id " + id));
+    }
+
+    public List<Board> getAllBoards() {
+        // 모든 게시글을 조회합니다.
+        return boardRepository.findAll();
+    }
+
+    public Board createBoard(Board board) {
+        // 게시글을 생성합니다.
+        return boardRepository.save(board);
+    }
+
+    public void deleteBoard(Long id) {
+        // ID로 게시글을 조회하고, 게시글이 없으면 예외를 던집니다.
+        if (!boardRepository.findById(id).isPresent()) {
+            throw new BoardNotFoundException("Board not found with id " + id);
+        }
+        // 게시글을 삭제합니다.
+        boardRepository.deleteById(id);
+    }
+
+    public List<Board> getBoardsByUserId(Long userId) {
+        // 특정 유저가 작성한 게시글을 조회합니다.
+        return boardRepository.findByUserId(userId);
+    }
+}
+
+```
+
+## 2.7. UserController 클래스
+
+```java
+package com.example.controller;
+
+import com.example.model.User;
+import com.example.service.UserService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+/**
+ * UserController 클래스는 HTTP 요청을 처리하는 컨트롤러 계층입니다.
+ * UserService를 사용하여 비즈니스 로직을 수행합니다.
+ */
+@RestController // 이 클래스가 RESTful 웹 서비스의 컨트롤러임을 Spring에게 알려줍니다.
+@RequestMapping("/users") // 이 클래스의 요청 URL을 "/users"로 설정합니다.
+@RequiredArgsConstructor // final 필드를 포함한 생성자를 자동으로 생성
+public class UserController {
+
+    private final UserService userService;
+
+    @GetMapping("/{id}")
+    public ResponseEntity<User> getUserById(@PathVariable Long id) {
+        // ID로 유저를 조회합니다.
+        User user = userService.getUserById(id);
+        return new ResponseEntity<>(user, HttpStatus.OK);
+    }
+
+    @GetMapping
+    public ResponseEntity<List<User>> getAllUsers() {
+        // 모든 유저를 조회합니다.
+        List<User> users = userService.getAllUsers();
+        return new ResponseEntity<>(users, HttpStatus.OK);
+    }
+
+    @PostMapping
+    public ResponseEntity<User> createUser(@RequestBody User user) {
+        // 유저를 생성합니다.
+        User createdUser = userService.createUser(user);
+        return new ResponseEntity<>(createdUser, HttpStatus.CREATED);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
+        // 유저를 삭제합니다.
+        userService.deleteUser(id);
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+    }
+}
+
+```
+
+## 2.8. BoardController 클래스
+
+```java
+package com.example.controller;
+
+import com.example.model.Board;
+import com.example.service.BoardService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+/**
+ * BoardController 클래스는 HTTP 요청을 처리하는 컨트롤러 계층입니다.
+ * BoardService를 사용하여 비즈니스 로직을 수행합니다.
+ */
+@RestController // 이 클래스가 RESTful 웹 서비스의 컨트롤러임을 Spring에게 알려줍니다.
+@RequestMapping("/boards") // 이 클래스의 요청 URL을 "/boards"로 설정합니다.
+@RequiredArgsConstructor // final 필드를 포함한 생성자를 자동으로 생성
+public class BoardController {
+
+    private final BoardService boardService;
+
+    @GetMapping("/{id}")
+    public ResponseEntity<Board> getBoardById(@PathVariable Long id) {
+        // ID로 게시글을 조회합니다.
+        Board board = boardService.getBoardById(id);
+        return new ResponseEntity<>(board, HttpStatus.OK);
+    }
+
+    @GetMapping
+    public ResponseEntity<List<Board>> getAllBoards() {
+        // 모든 게시글을 조회합니다.
+        List<Board> boards = boardService.getAllBoards();
+        return new ResponseEntity<>(boards, HttpStatus.OK);
+    }
+
+    @PostMapping
+    public ResponseEntity<Board> createBoard(@RequestBody Board board) {
+        // 게시글을 생성합니다.
+        Board createdBoard = boardService.createBoard(board);
+        return new ResponseEntity<>(createdBoard, HttpStatus.CREATED);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteBoard(@PathVariable Long id) {
+        // 게시글을 삭제합니다.
+        boardService.deleteBoard(id);
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+    }
+
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<List<Board>> getBoardsByUserId(@PathVariable Long userId) {
+        // 특정 유저가 작성한 게시글을 조회합니다.
+        List<Board> boards = boardService.getBoardsByUserId(userId);
+        return new ResponseEntity<>(boards, HttpStatus.OK);
+    }
+}
+
+```
+
+## 2.9. UserNotFoundException 클래스
+
+```java
+package com.example.exception;
+
+/**
+ * UserNotFoundException 클래스는 유저를 찾을 수 없을 때 발생하는 예외입니다.
+ * RuntimeException을 상속하여 비검사 예외로 처리됩니다.
+ */
+public class UserNotFoundException extends RuntimeException {
+
+    public UserNotFoundException(String message) {
+        super(message);
+    }
+}
+
+```
+
+## 2.10. BoardNotFoundException 클래스
+
+```java
+package com.example.exception;
+
+/**
+ * BoardNotFoundException 클래스는 게시글을 찾을 수 없을 때 발생하는 예외입니다.
+ * RuntimeException을 상속하여 비검사 예외로 처리됩니다.
+ */
+public class BoardNotFoundException extends RuntimeException {
+
+    public BoardNotFoundException(String message) {
+        super(message);
+    }
+}
+
+```
+
+## 2.11. GlobalExceptionHandler 클래스
+
+```java
+package com.example.exception;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+
+/**
+ * GlobalExceptionHandler 클래스는 애플리케이션 전역에서 발생하는 예외를 처리하는 핸들러입니다.
+ * ResponseEntityExceptionHandler를 상속하여 Spring이 제공하는 기본 예외 처리 기능을 활용합니다.
+ */
+@RestControllerAdvice // 모든 @RestController에서 발생하는 예외를 처리합니다.
+@Slf4j // 로깅을 위한 Lombok 애노테이션
+public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+
+    /**
+     * UserNotFoundException 예외를 처리하는 메서드입니다.
+     */
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleUserNotFoundException(UserNotFoundException ex, WebRequest request) {
+        log.error("User not found", ex); // 로그를 남깁니다.
+        ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.NOT_FOUND.value(), // HTTP 상태 코드
+                "User Not Found", // 에러 메시지
+                request.getDescription(false) // 요청 내용을 포함한 상세 정보
+        );
+        return new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND); // HTTP 응답을 반환합니다.
+    }
+
+    /**
+     * BoardNotFoundException 예외를 처리하는 메서드입니다.
+     */
+    @ExceptionHandler(BoardNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleBoardNotFoundException(BoardNotFoundException ex, WebRequest request) {
+        log.error("Board not found", ex); // 로그를 남깁니다.
+        ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.NOT_FOUND.value(), // HTTP 상태 코드
+                "Board Not Found", // 에러 메시지
+                request.getDescription(false) // 요청 내용을 포함한 상세 정보
+        );
+        return new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND); // HTTP 응답을 반환합니다.
+    }
+
+    /**
+     * 기본 Exception 예외를 처리하는 메서드입니다.
+     */
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleAllExceptions(Exception ex, WebRequest request) {
+        log.error("Internal Server Error", ex); // 로그를 남깁니다.
+        ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR.value(), // HTTP 상태 코드
+                "Internal Server Error", // 에러 메시지
+                request.getDescription(false) // 요청 내용을 포함한 상세 정보
+        );
+        return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR); // HTTP 응답을 반환합니다.
+    }
+}
+
+```
+
+## 2.12. ErrorResponse 클래스
+
+```java
+ErrorResponse.java 클래스는 예외 발생 시 클라이언트에게 반환할 응답 메시지를 정의하는 클래스이다.
+
+이 클래스는 HTTP 상태 코드, 에러 메시지, 에러 상세 정보 등을 포함한다.
+```
+
+```java
+package com.example.exception;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class ErrorResponse {
+    private int status;
+    private String message;
+    private String details;
+}
+```
+
+# 3. 설명
+
+## 3.1. 프로젝트 구조
+
+```java
+controller:
+HTTP 요청을 처리하는 컨트롤러 클래스들이 위치한. 각 컨트롤러는 특정 엔티티(User, Board)에 대한 CRUD 기능을 제공한다.
+
+service:
+비즈니스 로직을 처리하는 서비스 클래스들이 위치한다. 각 서비스 클래스는 해당 엔티티에 대한 데이터 처리 및 비즈니스 규칙을 구현한다.
+
+repository:
+데이터베이스와 상호작용하는 인터페이스들이 위치한다. 각 인터페이스는 특정 엔티티에 대한 데이터 접근 및 조작을 정의한다.
+
+model:
+데이터베이스의 테이블과 매핑되는 엔티티 클래스들이 위치한다. 각 클래스는 데이터를 저장하고 조작하는 데 필요한 필드와 메서드를 포함한다.
+
+exception:
+예외 처리 관련 클래스들이 위치한다.
+
+예외 처리 핸들러(GlobalExceptionHandler)와 각 예외 클래스(UserNotFoundException, BoardNotFoundException)가 정의되어 있다.
+```
+
+## 3.2. 각 클래스 설명
+
+```java
+User, Board 모델 클래스:
+데이터베이스의 특정 테이블과 매핑되는 데이터 모델입니다. Lombok을 사용하여 Getter, Setter, Constructor 등의 메서드를 자동 생성하였다.
+
+UserRepository, BoardRepository 인터페이스:
+각각 User, Board 엔티티에 대한 데이터 접근 메서드를 정의한다. 실제 구현체는 JpaRepository 등을 통해 Spring Data JPA가 자동 생성한다.
+
+UserService, BoardService 클래스:
+각각 User, Board 엔티티에 대한 비즈니스 로직을 처리한다. Repository를 사용하여 데이터를 조작하고 예외 처리를 한다.
+
+UserController, BoardController 클래스:
+각각 User, Board 엔티티에 대한 HTTP 요청을 처리한다. Service를 호출하여 비즈니스 로직을 수행하고, HTTP 응답을 반환한다.
+
+UserNotFoundException, BoardNotFoundException 클래스:
+각각 User, Board 엔티티에 대해 찾을 수 없을 때 발생하는 예외를 정의한다.
+
+RuntimeException을 상속하여 비검사 예외로 처리되며, 예외 메시지를 받아 생성한다.
+
+GlobalExceptionHandler 클래스:
+애플리케이션 전역에서 발생하는 예외를 처리하는 핸들러 클래스이다.
+
+ResponseEntityExceptionHandler를 상속하여 Spring이 제공하는 기본 예외 처리 기능을 활용하며,
+
+@RestControllerAdvice 애노테이션을 사용하여 모든 @RestController에서 발생하는 예외를 처리한다.
+
+@ExceptionHandler를 사용하여 특정 예외를 처리하는 메서드를 정의한다.
+
+ErrorResponse 클래스:
+예외 발생 시 클라이언트에게 반환할 응답 메시지를 정의한다.
+
+Lombok 라이브러리를 사용하여 Getter, Setter, Constructor를 자동 생성합니다. HTTP 상태 코드, 에러 메시지, 에러 상세 정보를 포함한다.
+```
+
+# 예외 발생 및 처리 과정 ( 예제 )
+
+```java
+여기서 설명할 예외 처리 과정은
+
+사용자가 존재하지 않는 유저를 조회하려고 할 때(GET /users/{id}) 발생하는 UserNotFoundException을 예로 들어 설명하겠다.
+```
+
+## 1. 사용자의 요청
+
+```java
+사용자가 존재하지 않는 유저 ID로 GET /users/{id} 요청을 보낸다
+```
+
+```java
+GET /users/100 HTTP/1.1
+Host: example.com
+```
+
+## 2. UserController에서 요청 처리
+
+```java
+UserController 클래스의 getUserById 메서드가 호출된다.
+```
+
+```java
+@GetMapping("/{id}")
+public ResponseEntity<User> getUserById(@PathVariable Long id) {
+    // ID로 유저를 조회합니다.
+    User user = userService.getUserById(id);
+    return new ResponseEntity<>(user, HttpStatus.OK);
+}
+```
+
+```java
+@GetMapping("/{id}"): 해당 메서드가 /users/{id} 요청을 처리하도록 매핑한다.
+
+@PathVariable Long id: URL 경로 변수 id를 메서드 파라미터 id로 매핑한다.
+```
+
+## 3. UserService에서 비즈니스 로직 처리
+
+```java
+UserService 클래스의 getUserById 메서드가 호출된다.
+```
+
+```java
+public User getUserById(Long id) {
+    // ID로 유저를 조회하고, 유저가 없으면 예외를 던집니다.
+    return userRepository.findById(id)
+            .orElseThrow(() -> new UserNotFoundException("User not found with id " + id));
+}
+```
+
+```java
+userRepository.findById(id):
+
+UserRepository를 사용하여 데이터베이스에서 유저를 조회합니다. Optional<User>를 반환한다.
+
+.orElseThrow(() -> new UserNotFoundException("User not found with id " + id)):
+
+유저가 존재하지 않으면 UserNotFoundException을 던진다.
+```
+
+## 4. UserNotFoundException 발생
+
+```java
+유저가 존재하지 않는 경우 UserNotFoundException이 발생
+```
+
+```java
+// 예외 클래스 정의
+public class UserNotFoundException extends RuntimeException {
+    // 예외가 발생할 때 사용할 메시지를 받는 생성자
+    public UserNotFoundException(String message) {
+        // 부모 클래스인 RuntimeException의 생성자를 호출하여 메시지를 전달
+        super(message);
+    }
+}
+```
+
+```java
+RuntimeException을 상속받아 비검사 예외로 처리된다.
+
+예외 메시지를 생성자 파라미터로 받아 super(message)를 통해 RuntimeException의 생성자를 호출한다.
+```
+
+## \* RuntimeException을 상속받아 비검사 예외로 처리
+
+```java
+RuntimeException을 상속받아 비검사 예외로 처리된다는 의미와, 예외 메시지를 생성자 파라미터로 받아
+
+super(message)를 통해 RuntimeException의 생성자를 호출하는 부분을 좀 더 쉽게 설명해본다
+```
+
+### 비검사 예외 (Unchecked Exception)로 처리
+
+```java
+RuntimeException을 상속:
+
+예외 클래스를 RuntimeException을 상속하여 정의하면, 이 예외는 비검사 예외가 된다.
+
+비검사 예외:
+
+비검사 예외는 컴파일러가 강제로 처리하도록 요구하지 않는 예외이다. 즉, 메서드 시그니처에 throws 키워드를 추가하지 않아도 된다.
+
+비검사 예외의 장점:
+
+코드를 더 간결하게 만들 수 있다. 호출하는 쪽에서 예외를 명시적으로 처리하지 않아도 되기 때문이다.
+
+* 만약 UserNotFoundException이 발생하면, 이 예외를 반드시 잡아야 하거나, 메서드 시그니처에 throws를 명시할 필요가 없다.
+
+	이는 개발자가 더 간단하게 코드를 작성할 수 있게 한다.
+```
+
+### 예외 메시지를 생성자 파라미터로 받아 RuntimeException의 생성자를 호출
+
+```java
+예외 메시지를 생성자 파라미터로 받기:
+
+예외가 발생했을 때, 그 예외에 대한 설명이나 메시지를 포함시켜야 할 때가 있다. 이를 위해 예외 클래스의 생성자에서 메시지를 파라미터로 받는다.
+
+super(message) 호출:
+
+super(message)는 부모 클래스(RuntimeException)의 생성자를 호출하는 코드이다. RuntimeException 클래스에는 예외 메시지를 받을 수 있는 생성자가 있다.
+
+super(message)의 역할:
+
+부모 클래스인 RuntimeException에 메시지를 전달하여 예외가 발생했을 때 그 메시지를 표시할 수 있게 한다.
+
+* 예외가 발생했을 때, 사용자에게 "사용자를 찾을 수 없습니다"와 같은 메시지를 전달하고 싶다.
+
+		예외 클래스의 생성자에서 이 메시지를 파라미터로 받는다.
+
+		super(message)를 통해 이 메시지를 RuntimeException 클래스에 전달한다.
+```
+
+## 5. GlobalExceptionHandler에서 예외 처리
+
+```java
+GlobalExceptionHandler 클래스의 handleUserNotFoundException 메서드가 호출된다
+```
+
+```java
+@RestControllerAdvice // 모든 @RestController에서 발생하는 예외를 처리합니다.
+@Slf4j // 로깅을 위한 Lombok 애노테이션
+public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleUserNotFoundException(UserNotFoundException ex, WebRequest request) {
+        log.error("User not found", ex); // 로그를 남깁니다.
+        ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.NOT_FOUND.value(), // HTTP 상태 코드
+                "User Not Found", // 에러 메시지
+                request.getDescription(false) // 요청 내용을 포함한 상세 정보
+        );
+        return new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND); // HTTP 응답을 반환합니다.
+    }
+}
+```
+
+```java
+@RestControllerAdvice:
+모든 @RestController에서 발생하는 예외를 처리하는 클래스임을 나타낸다.
+
+@ExceptionHandler(UserNotFoundException.class):
+UserNotFoundException이 발생하면 이 메서드가 호출된다.
+
+log.error("User not found", ex):
+예외 메시지를 로그에 기록한다.
+
+ErrorResponse:
+예외 정보를 담은 응답 객체를 생성한다.
+
+new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND):
+HTTP 상태 코드 404와 함께 ErrorResponse 객체를 반환한다.
+```
+
+## 6. 클라이언트에게 응답 반환
+
+```java
+서버는 클라이언트에게 예외 처리 결과를 HTTP 응답으로 반환
+```
+
+```java
+{
+    "status": 404,
+    "message": "User Not Found",
+    "details": "uri=/users/100"
+}
+```
+
+```java
+status: HTTP 상태 코드 404 (Not Found)
+
+message: 예외 메시지 "User Not Found"
+
+details: 요청 URI 정보
+```
+
+## 예외 처리 흐름 요약
+
+```java
+1. 사용자가 GET /users/{id} 요청을 보냄.
+
+2. UserController의 getUserById 메서드 호출.
+
+3. UserService의 getUserById 메서드 호출.
+
+4. UserRepository의 findById 메서드 호출.
+
+5. 유저가 존재하지 않아 UserNotFoundException 예외 발생.
+
+6. GlobalExceptionHandler의 handleUserNotFoundException 메서드 호출.
+
+7. 예외 정보를 포함한 ErrorResponse 객체를 생성하여 HTTP 응답 반환.
+
+8. 클라이언트가 HTTP 404 응답을 받음.
+```

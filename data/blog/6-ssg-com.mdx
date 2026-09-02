@@ -1,0 +1,100 @@
+---
+title: '섹션 6. 쓱닷컴(ssg.com) 이벤트 페이지 크롤링'
+date: '2026-09-02'
+category: '기타, 사용 적음/크롤링 & 파이썬'
+tags: ['기타, 사용 적음', '크롤링 & 파이썬']
+draft: false
+summary: ''
+---
+
+![Untitled](<%EC%84%B9%EC%85%98%206%20%EC%93%B1%EB%8B%B7%EC%BB%B4(ssg%20com)%20%EC%9D%B4%EB%B2%A4%ED%8A%B8%20%ED%8E%98%EC%9D%B4%EC%A7%80%20%ED%81%AC%EB%A1%A4%EB%A7%81/Untitled.png>)
+
+![Untitled](<%EC%84%B9%EC%85%98%206%20%EC%93%B1%EB%8B%B7%EC%BB%B4(ssg%20com)%20%EC%9D%B4%EB%B2%A4%ED%8A%B8%20%ED%8E%98%EC%9D%B4%EC%A7%80%20%ED%81%AC%EB%A1%A4%EB%A7%81/Untitled%201.png>)
+
+```python
+import requests
+from bs4 import BeautifulSoup
+
+url = "https://www.ssg.com/event/eventMain.ssg"
+
+headers = {
+    "User-Agent" : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+}
+
+req = requests.get(url, headers=headers)
+
+html = req.text
+
+soup = BeautifulSoup(html, "html.parser")
+
+evt_osmu_lst = soup.select_one(".evt_osmu_lst")
+
+units  = evt_osmu_lst.select(".eo_link")
+
+# print(len(units))
+
+for unit in units:
+    link = unit['href']
+    if link.startswith("https"):
+        print(link)
+    else:
+        print(f"https://www.ssg.con//{link}")
+
+    eo_in = unit.select_one(".eo_in") # 텍스트전체 들어있는 가장 가까운 class
+
+    text_list = eo_in.find_all(string=True) # 스트링 요소를 전부 찾음
+
+    for text in text_list: # \n 이 들어있는데 이를 빼고 출력
+        if text != "\n":
+            print(text)
+    print("")
+```
+
+# find_all 로 모든 텍스트 출력하기
+
+```python
+이벤트 전체 요소를 선택하고
+
+텍스트가 전부 들어가 있는 가장 가까운 class 를 선택하고
+
+스트링 요소를 find_all 로 찾아서 출력한다
+
+이 방법은 쉽게 출력이 가능하지만 따로 데이터를 나눠줘야 할때는 불편함이 있다
+```
+
+# 모든 주소가 https 붙어있지 않는 문제
+
+```python
+모든 주소에 https 가 붙어있지 않고
+
+https 를 제외한 부분만 있는 요소들이 몇가지 있었다
+
+이럴때는 startswith() 를 사용해서 false 일때 앞에 https 를 붙여주도록 해주면 된다
+```
+
+## startswith() 사용하기
+
+```python
+ 문자열이 특정 접두사(prefix)로 시작하는지 여부를 확인하는 파이썬의 문자열 메서드이다.
+
+ 이 함수는 문자열이 지정된 접두사로 시작하면 True를 반환하고, 그렇지 않으면 False를 반환
+```
+
+```python
+문자열.startswith(접두사[, 시작[, 끝]])
+
+문자열: 검사할 문자열입니다.
+접두사: 문자열이 시작되는 부분을 나타내는 문자열입니다.
+시작 (선택적): 검사를 시작할 위치를 나타내는 정수값입니다. 기본값은 0입니다.
+끝 (선택적): 검사를 종료할 위치를 나타내는 정수값입니다. 기본값은 문자열의 길이입니다.
+```
+
+```python
+text = "Hello, world!"
+
+# 문자열이 "Hello"로 시작하는지 여부를 확인합니다.
+print(text.startswith("Hello"))  # 출력: True
+
+# 문자열이 "world"로 시작하는지 여부를 확인합니다.
+print(text.startswith("world"))  # 출력: False
+```

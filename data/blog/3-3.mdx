@@ -1,0 +1,1217 @@
+---
+title: '섹션 3 : 로켓 부스트 3'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+# { 🚀 부울 값과 충돌 처리 시스템 이해하기 }
+
+## 📋 목차
+
+1. [Skybox(스카이박스) 변경하기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#skybox%EC%8A%A4%EC%B9%B4%EC%9D%B4%EB%B0%95%EC%8A%A4-%EB%B3%80%EA%B2%BD%ED%95%98%EA%B8%B0)
+2. [게임 오브젝트 상태 제어하기 (Bool 변수)](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EA%B2%8C%EC%9E%84-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%EC%83%81%ED%83%9C-%EC%A0%9C%EC%96%B4%ED%95%98%EA%B8%B0-bool-%EB%B3%80%EC%88%98)
+3. [if 문과 Bool의 관계](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#if-%EB%AC%B8%EA%B3%BC-bool%EC%9D%98-%EA%B4%80%EA%B3%84)
+4. [충돌(Collision) 처리 흐름](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EC%B6%A9%EB%8F%8Ccollision-%EC%B2%98%EB%A6%AC-%ED%9D%90%EB%A6%84)
+5. [return 키워드 활용](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#return-%ED%82%A4%EC%9B%8C%EB%93%9C-%ED%99%9C%EC%9A%A9)
+6. [충돌 후 상태 변화 처리](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EC%B6%A9%EB%8F%8C-%ED%9B%84-%EC%83%81%ED%83%9C-%EB%B3%80%ED%99%94-%EC%B2%98%EB%A6%AC)
+7. [Audio 제어하기 (Stop & PlayOneShot)](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#audio-%EC%A0%9C%EC%96%B4%ED%95%98%EA%B8%B0-stop--playoneshot)
+8. [씬(Scene) 전환하기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EC%94%ACscene-%EC%A0%84%ED%99%98%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. Skybox(스카이박스) 변경하기
+
+- **Skybox** : 게임의 배경 하늘을 표현하는 시스템.
+- 기본 Unity Skybox는 지겹게 보일 수 있으므로, `Material`을 만들어 교체 가능.
+- 경로: **Assets → Materials → Create → Material → Shader → Skybox/Procedural**
+
+**Skybox 옵션**
+
+- **Sky Tint** : 하늘 색상 조정 (예: 붉은 기운을 주면 화성 같은 느낌)
+- **Atmospheric Thickness** : 대기의 두께 → 하늘의 탁한 정도 조절
+- **Ground Color** : 땅의 색상 변경
+- **Exposure** : 전체 밝기 조절 (우주 느낌을 만들고 싶을 때 낮춤)
+- **Sun Size / Sun Size Convergence** : 태양 크기와 퍼짐 정도
+  ![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380415/notion-blog/_/3D_/3D_/_3_3/image.png)
+  ```csharp
+  SkyBox 로 하늘 material 변경
+  ```
+
+---
+
+## 2. 게임 오브젝트 상태 제어하기 (Bool 변수)
+
+- **Bool 변수** : `true / false` 두 값만을 가짐.
+- 게임 캐릭터가 현재 **조작 가능한지 / 불가능한지** 상태를 저장하기에 적합.
+
+```csharp
+bool isControllable = true;
+```
+
+- 초기 상태는 `true` (플레이어 조작 가능).
+- 충돌하거나 씬 전환 중 → `false`로 변경하여 조작 불가.
+
+---
+
+## 3. if 문과 Bool의 관계
+
+- `if` 문과 Bool은 매우 밀접한 관계.
+
+```csharp
+if (isControllable)
+{
+    // 조작이 가능할 때 실행
+}
+```
+
+- 반대 조건 확인 :
+  - `== false` → `if (isControllable == false)`
+  - `!` 연산자 → `if (!isControllable)`
+
+👉 `!`를 사용하면 간결하게 표현 가능.
+
+---
+
+## 4. 충돌(Collision) 처리 흐름
+
+Unity의 `OnCollisionEnter()`에서 충돌 상황을 처리.
+
+```csharp
+void OnCollisionEnter(Collision collision)
+{
+    if (!isControllable)
+    {
+        return; // 더 이상 충돌 처리 안 함
+    }
+
+    switch (collision.gameObject.tag)
+    {
+        case "Friendly":
+            Debug.Log("Friendly");
+            break;
+        case "Finish":
+            StartSuccessSequence();
+            break;
+        case "Fuel":
+            Debug.Log("Fuel");
+            break;
+        default:
+            StartCrashSequence();
+            break;
+    }
+}
+```
+
+- **switch-case** : 오브젝트의 태그(tag)에 따라 다른 동작 실행.
+- **Friendly** : 무해한 오브젝트
+- **Finish** : 성공 지점 → 다음 레벨 이동
+- **Fuel** : 연료 아이템
+- **default** : 그 외 모든 경우 충돌(실패)
+
+---
+
+## 5. return 키워드 활용
+
+- `return;` 은 메소드 실행을 중단하고 빠져나옴.
+- **제어 불가능할 때(isControllable == false)** 더 이상 충돌 처리하지 않음.
+
+```csharp
+if (!isControllable)
+{
+    return; // 중복 충돌 방지
+}
+```
+
+---
+
+## 6. 충돌 후 상태 변화 처리
+
+- 충돌이 발생하면 즉시 조작 불가능하게 만듦.
+- 성공 또는 실패 시퀀스에서 `isControllable = false;`
+
+```csharp
+private void StartSuccessSequence()
+{
+    isControllable = false;
+    // 성공 효과 실행
+}
+
+private void StartCrashSequence()
+{
+    isControllable = false;
+    // 실패 효과 실행
+}
+```
+
+---
+
+## 7. Audio 제어하기 (Stop & PlayOneShot)
+
+- **문제** : 충돌 후에도 엔진 추진 소리가 계속 남아 있음.
+- 해결 → 충돌 시 모든 오디오 중지 후 새로운 효과음 재생.
+
+```csharp
+audioSource.Stop();              // 현재 재생 중인 모든 사운드 중지
+audioSource.PlayOneShot(crash);  // 충돌 효과음 재생
+```
+
+- `Stop()` : 재생 중인 클립 즉시 정지
+- `PlayOneShot(AudioClip clip)` : 겹쳐서 재생 가능 (효과음에 적합)
+
+---
+
+## 8. 씬(Scene) 전환하기
+
+- **성공 시** : 다음 레벨 로드
+- **실패 시** : 현재 레벨 다시 로드
+
+```csharp
+void LoadNextLevel()
+{
+    int currentScene = SceneManager.GetActiveScene().buildIndex;
+    int nextScene = currentScene + 1;
+
+    if (nextScene == SceneManager.sceneCountInBuildSettings)
+    {
+        nextScene = 0; // 마지막 레벨 → 다시 첫 레벨
+    }
+
+    SceneManager.LoadScene(nextScene);
+}
+
+private void ReloadLevel()
+{
+    int currentScene = SceneManager.GetActiveScene().buildIndex;
+    SceneManager.LoadScene(currentScene);
+}
+```
+
+- `SceneManager.GetActiveScene().buildIndex` → 현재 씬 번호
+- `SceneManager.sceneCountInBuildSettings` → 빌드에 포함된 전체 씬 개수
+
+---
+
+## 📌 정리
+
+1. Skybox 변경으로 시각적 다양성 확보
+2. `isControllable` Bool 변수를 활용해 조작 가능 여부 관리
+3. `if` 와 `return`을 활용해 충돌 중복 처리 방지
+4. 충돌 시퀀스 → 상태 변경(`isControllable = false`) → 효과음 처리 → 씬 전환
+5. `audioSource.Stop()`으로 충돌 후 사운드 깔끔하게 정리
+
+---
+
+👉 이 구조를 알면 **상태 관리(State Management)**의 기본을 이해할 수 있고,
+
+이후 **FSM(상태 머신)**이나 더 복잡한 게임 로직을 설계할 때도 큰 도움이 됩니다.
+
+---
+
+# {✨ 충돌과 성공 시 파티클 효과 트리거하기}
+
+## 📋 목차
+
+1. [파티클 시스템 기본 개념](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%ED%8C%8C%ED%8B%B0%ED%81%B4-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B8%B0%EB%B3%B8-%EA%B0%9C%EB%85%90)
+2. [파티클 시스템 생성하기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%ED%8C%8C%ED%8B%B0%ED%81%B4-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EC%83%9D%EC%84%B1%ED%95%98%EA%B8%B0)
+3. [파티클의 재질(Material)과 렌더링](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%ED%8C%8C%ED%8B%B0%ED%81%B4%EC%9D%98-%EC%9E%AC%EC%A7%88material%EA%B3%BC-%EB%A0%8C%EB%8D%94%EB%A7%81)
+4. [파티클 시스템 속성 살펴보기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%ED%8C%8C%ED%8B%B0%ED%81%B4-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EC%86%8D%EC%84%B1-%EC%82%B4%ED%8E%B4%EB%B3%B4%EA%B8%B0)
+5. [파티클 모양(Shape) 변경하기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%ED%8C%8C%ED%8B%B0%ED%81%B4-%EB%AA%A8%EC%96%91shape-%EB%B3%80%EA%B2%BD%ED%95%98%EA%B8%B0)
+6. [파티클 프리팹 가져오기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%ED%8C%8C%ED%8B%B0%ED%81%B4-%ED%94%84%EB%A6%AC%ED%8C%B9-%EA%B0%80%EC%A0%B8%EC%98%A4%EA%B8%B0)
+7. [로켓에 파티클 연결하기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EB%A1%9C%EC%BC%93%EC%97%90-%ED%8C%8C%ED%8B%B0%ED%81%B4-%EC%97%B0%EA%B2%B0%ED%95%98%EA%B8%B0)
+8. [Play On Awake / Looping 옵션](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#play-on-awake--looping-%EC%98%B5%EC%85%98)
+9. [자식 오브젝트 위치(Transform) 주의사항](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EC%9E%90%EC%8B%9D-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%EC%9C%84%EC%B9%98transform-%EC%A3%BC%EC%9D%98%EC%82%AC%ED%95%AD)
+10. [스크립트에서 파티클 시스템 연결하기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8%EC%97%90%EC%84%9C-%ED%8C%8C%ED%8B%B0%ED%81%B4-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EC%97%B0%EA%B2%B0%ED%95%98%EA%B8%B0)
+11. [ParticleSystem.Play()로 트리거하기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#particlesystemplay%EB%A1%9C-%ED%8A%B8%EB%A6%AC%EA%B1%B0%ED%95%98%EA%B8%B0)
+12. [프리팹 적용(Overrides) 중요성](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%ED%94%84%EB%A6%AC%ED%8C%B9-%EC%A0%81%EC%9A%A9overrides-%EC%A4%91%EC%9A%94%EC%84%B1)
+
+---
+
+## 1. 파티클 시스템 기본 개념
+
+- **Emitter(발사 장치)** : 파티클이 생성되는 출발점.
+- **Particle(파티클)** : 발사 장치에서 뿜어져 나오는 개별 입자.
+- **Particle System(파티클 시스템)** : 발사 장치와 파티클 전체를 관리하는 컴포넌트.
+- **중요 포인트**
+  - 파티클은 **게임 오브젝트가 아님** → 개별적으로 Collider, Script 같은 걸 붙일 수 없음.
+  - 제어는 **모듈(Module)**을 통해 이루어짐.
+  - 파티클은 단순히 "효과"로 쓰이는 작은 단위이고, 전체를 관리하는 것은 파티클 시스템임.
+
+---
+
+## 2. 파티클 시스템 생성하기
+
+- **방법 1**: Hierarchy 우클릭 → Effects → Particle System.
+  - 새로운 **Particle System 게임 오브젝트**가 생성됨.
+- **방법 2**: 빈 게임 오브젝트 생성 후 → `Add Component` → `Particle System`.
+  - 동일한 결과.
+
+> 즉, 첫 번째 방법은 자동으로 빈 게임 오브젝트 + 파티클 시스템을 함께 만들어주는 것.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380414/notion-blog/_/3D_/3D_/_3_3/image_1.png)
+
+```csharp
+파티클 시스템
+```
+
+---
+
+## 3. 파티클의 재질(Material)과 렌더링
+
+- 파티클이 **핑크색**으로 보이면 → "재질 없음" 상태.
+- Renderer 모듈에서 **Material** 항목 확인 가능.
+- 기본적으로 None(None)으로 되어 있으며, 다른 Material을 적용해 원하는 색/텍스처를 입힐 수 있음.
+  ![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380414/notion-blog/_/3D_/3D_/_3_3/image_2.png)
+  ```csharp
+  렌더를 클릭하고 현재 material 이 없으니 지정해본다
+  ```
+  ![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380414/notion-blog/_/3D_/3D_/_3_3/image_3.png)
+  ```csharp
+  아웃라인을 없에는것도 가능하다
+  ```
+
+---
+
+## 4. 파티클 시스템 속성 살펴보기
+
+- **Duration (지속 시간)**
+  - 시스템이 작동하는 시간 (예: 5초).
+- **Looping (반복)**
+  - 체크 ON → Duration 끝나도 계속 반복.
+  - 체크 OFF → Duration 동안만 실행.
+- **Start Lifetime (수명)**
+  - 개별 파티클이 살아 있는 시간. Duration과는 다름.
+- **Emission (발사)**
+  - `Rate Over Time`: 초당 몇 개의 파티클을 발사할지 결정.
+
+예시:
+
+- Duration = 1, Rate Over Time = 100 → 1초 동안 100개의 파티클 발사.
+
+---
+
+## 5. 파티클 모양(Shape) 변경하기
+
+- Shape 모듈에서 선택 가능.
+- 주요 옵션:
+  - **Cone (원뿔)** → 기본값, 원뿔 모양으로 발사.
+  - **Circle (원)** → 2D 평면 원 형태에서 발사.
+  - **Sphere (구체)** → 모든 방향에서 발사 → 폭발 효과.
+  - **Box (상자)**, **Mesh (메시)** → 특정 영역이나 오브젝트 모양을 따라 발사.
+
+---
+
+## 6. 파티클 프리팹 가져오기
+
+- 강의 리소스에서 제공된 프리팹:
+  - Explosion
+  - Rocket Jet Particles
+  - Side Thruster Particles
+  - Success Particles
+- 프리팹 특징:
+  - Project 뷰에서 Scene으로 드래그하면 바로 사용할 수 있음.
+  - Prefab에 변경을 가하면 Scene에 배치된 모든 인스턴스에도 반영됨.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380414/notion-blog/_/3D_/3D_/_3_3/image_4.png)
+
+```csharp
+파티클 파일을 폴더를 만들고 넣어준다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380414/notion-blog/_/3D_/3D_/_3_3/image_5.png)
+
+```csharp
+로켓 상세에 들어가서 넣은 파티클 프리팹을 넣어준다
+```
+
+---
+
+## 7. 로켓에 파티클 연결하기
+
+- Player Rocket 프리팹 안으로 들어감.
+- Rocket 아래에 **Explosion**과 **Success Particles**을 드래그 → Rocket의 **자식 오브젝트**로 추가.
+
+---
+
+## 8. Play On Awake / Looping 옵션
+
+- Explosion 파티클 설정:
+  - **Looping OFF** (계속 폭발하면 안 됨).
+  - **Play On Awake OFF** (시작하자마자 실행되면 안 됨).
+- Success 파티클도 동일하게 설정.
+
+---
+
+## 9. 자식 오브젝트 위치(Transform) 주의사항
+
+- 자식의 **Transform (0,0,0)** 은 부모(Rocket)의 위치에 상대적.
+- Success Particles가 Rocket과 멀리 떨어져 보인 이유 → Transform 값이 (505, 0, 0) 같은 상태였기 때문.
+- 해결: **위치를 (0,0,0)으로 리셋**해서 부모(로켓) 위치에 정확히 붙도록 설정.
+
+---
+
+## 10. 스크립트에서 파티클 시스템 연결하기
+
+- `Collision.cs`에서 필드 추가:
+
+```csharp
+[SerializeField] ParticleSystem successParticles;
+[SerializeField] ParticleSystem crashParticles;
+```
+
+- Inspector에서 Player Rocket 오브젝트 클릭 후, 각각 Success / Explosion 파티클을 드래그해서 연결.
+
+---
+
+## 11. ParticleSystem.Play()로 트리거하기
+
+- 충돌 시와 성공 시 함수에서 호출.
+
+```csharp
+void StartSuccessSequence() {
+    audioSource.Stop();
+    audioSource.PlayOneShot(successSFX);
+    successParticles.Play();   // 성공 파티클 재생
+}
+
+void StartCrashSequence() {
+    audioSource.Stop();
+    audioSource.PlayOneShot(crashSFX);
+    crashParticles.Play();     // 폭발 파티클 재생
+}
+```
+
+- 오디오와 거의 같은 구조.
+- 오디오: `audioSource.PlayOneShot(clip);`
+- 파티클: `particleSystem.Play();`
+
+---
+
+## 12. 프리팹 적용(Overrides) 중요성
+
+- 실험 중 Scene에서 수정한 값은 Prefab에 자동 적용되지 않음.
+- Player Rocket 프리팹 → **Overrides → Apply All** 해줘야 모든 Scene에 반영됨.
+- 적용 안 하면 다른 Scene에서 파티클이 안 나오거나 잘못된 동작 발생.
+
+---
+
+✅ 요약
+
+- 파티클 시스템은 "Emitter + Particles"로 구성되며, 게임 오브젝트에 붙는 컴포넌트다.
+- 파티클은 게임 오브젝트가 아니므로, 개별 제어 대신 모듈을 통해 관리한다.
+- Rocket에 Explosion/Success 파티클을 자식으로 붙여 충돌/성공 시 `ParticleSystem.Play()`로 재생.
+- `Play On Awake`와 `Looping` 옵션은 반드시 끄고, Prefab 적용을 통해 다른 Scene에도 반영해야 한다.
+
+---
+
+# { 🚀 로켓 추진기와 파티클 시스템 제어하기 }
+
+## 📋 목차
+
+1. [파티클 시스템 개념 이해하기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%ED%8C%8C%ED%8B%B0%ED%81%B4-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [메인 엔진 파티클 배치하기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EB%A9%94%EC%9D%B8-%EC%97%94%EC%A7%84-%ED%8C%8C%ED%8B%B0%ED%81%B4-%EB%B0%B0%EC%B9%98%ED%95%98%EA%B8%B0)
+3. [사이드 추진기 파티클 배치하기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EC%82%AC%EC%9D%B4%EB%93%9C-%EC%B6%94%EC%A7%84%EA%B8%B0-%ED%8C%8C%ED%8B%B0%ED%81%B4-%EB%B0%B0%EC%B9%98%ED%95%98%EA%B8%B0)
+4. [프리팹 적용과 오버라이드](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%ED%94%84%EB%A6%AC%ED%8C%B9-%EC%A0%81%EC%9A%A9%EA%B3%BC-%EC%98%A4%EB%B2%84%EB%9D%BC%EC%9D%B4%EB%93%9C)
+5. [스크립트에 변수 연결하기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8%EC%97%90-%EB%B3%80%EC%88%98-%EC%97%B0%EA%B2%B0%ED%95%98%EA%B8%B0)
+6. [ProcessThrust() – 메인 엔진 제어](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#processthrust--%EB%A9%94%EC%9D%B8-%EC%97%94%EC%A7%84-%EC%A0%9C%EC%96%B4)
+7. [ProcessRotation() – 사이드 추진기 제어](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#processrotation--%EC%82%AC%EC%9D%B4%EB%93%9C-%EC%B6%94%EC%A7%84%EA%B8%B0-%EC%A0%9C%EC%96%B4)
+8. [버그 해결: 두 개 입자 동시 실행 방지](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EB%B2%84%EA%B7%B8-%ED%95%B4%EA%B2%B0-%EB%91%90-%EA%B0%9C-%EC%9E%85%EC%9E%90-%EB%8F%99%EC%8B%9C-%EC%8B%A4%ED%96%89-%EB%B0%A9%EC%A7%80)
+9. [최종 코드 구조](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EC%B5%9C%EC%A2%85-%EC%BD%94%EB%93%9C-%EA%B5%AC%EC%A1%B0)
+
+---
+
+## 1. 파티클 시스템 개념 이해하기
+
+- **파티클 시스템(Particle System)** : 불꽃, 연기, 먼지, 추진 화염 같은 시각 효과를 표현할 때 사용.
+- 주요 구성:
+  - **Emitter(발사 장치)** : 입자가 뿜어져 나오는 출발점.
+  - **Particles(입자)** : 실제로 화면에 나타나는 작은 시각 요소들.
+- Rocket에서는 3가지 파티클 시스템을 사용:
+  1. **메인 엔진 (mainEngineParticles)**
+  2. **왼쪽 사이드 추진기 (leftThrustParticles)**
+  3. **오른쪽 사이드 추진기 (rightThrustParticles)**
+
+---
+
+## 2. 메인 엔진 파티클 배치하기
+
+- `Rocket Jet` 파티클 시스템을 로켓 오브젝트에 추가.
+- 위치 정리:
+  - `Position = (0,0,0)` 으로 리셋 → 로켓 중심부에 정확히 배치됨.
+- 회전 정리:
+  - `x` 회전은 **90°** 로 맞추어야 올바른 방향으로 뿜어짐.
+  - `y`, `z` 는 0에 가깝게 유지.
+- **Shape(모양) 옵션**:
+  - `Cone(원뿔)` 모양 사용.
+  - **Radius** 값 조절 → 불꽃의 퍼짐 정도 변경 (예: `0.3`).
+
+---
+
+## 3. 사이드 추진기 파티클 배치하기
+
+- `Side Thruster` 파티클을 로켓 오브젝트에 추가.
+- 초기 위치 `0,0,0`으로 맞춘 뒤 **착륙 장치 근처**로 이동.
+- 오른쪽 추진기:
+  - 이름을 `RightThrustParticle` 로 변경.
+  - 로켓 오른쪽에 배치, x축 회전값 조절로 로켓 팔 모양과 정렬.
+- 왼쪽 추진기:
+  - 오른쪽 추진기를 복제(`Ctrl+D`) → `LeftThrustParticle` 로 이름 변경.
+  - 위치를 로켓 왼쪽으로 이동.
+  - 회전은 `Y` 축 또는 `Z` 축을 반전시켜 올바른 방향으로 배치.
+
+---
+
+## 4. 프리팹 적용과 오버라이드
+
+- 로켓은 **프리팹(Prefab)** 으로 관리.
+- 파티클을 추가하면 Unity가 “Prefab에 적용할까요?” 라고 묻는다.
+- **Apply** → 모든 변경 사항이 프리팹에 저장됨.
+- 이후 **플레이어 로켓 인스펙터에서 오버라이드(Override)** 항목을 확인 → 모두 정리됨.
+
+---
+
+## 5. 스크립트에 변수 연결하기
+
+- `Movements.cs` 에 **SerializeField** 변수 추가:
+
+```csharp
+[SerializeField] ParticleSystem mainEngineParticle;
+[SerializeField] ParticleSystem rightThrustParticle;
+[SerializeField] ParticleSystem leftThrustParticle;
+```
+
+- Unity 인스펙터에서 각 파티클 오브젝트를 드래그해 연결.
+  - `mainEngineParticle` ← 로켓 중앙 불꽃
+  - `rightThrustParticle` ← 오른쪽 불꽃
+  - `leftThrustParticle` ← 왼쪽 불꽃
+
+---
+
+## 6. ProcessThrust() – 메인 엔진 제어
+
+- thrust 키가 눌렸을 때:
+  1. `Rigidbody.AddRelativeForce()` → 로켓 위로 힘을 가함.
+  2. 오디오가 재생 중이 아니면 → `PlayOneShot(mainEngineSFX)`.
+  3. 파티클이 재생 중이 아니면 → `mainEngineParticle.Play()`.
+- thrust 키가 눌리지 않았을 때:
+  - 오디오 정지: `audioSource.Stop()`
+  - 파티클 정지: `mainEngineParticle.Stop()`
+
+👉 **핵심 개념**:
+
+- `isPlaying` 속성을 이용해 중복 재생을 막는다.
+- Stop()을 통해 사용자가 키를 떼면 즉시 꺼지게 함.
+
+---
+
+## 7. ProcessRotation() – 사이드 추진기 제어
+
+- 입력값: `rotation.ReadValue<float>()` (좌우 입력은 -1 ~ 1 범위).
+- `rotationInput < 0` → 오른쪽 회전:
+  - `ApplyRotation(rotationStrength)` → 시계 방향 회전.
+  - 왼쪽 추진기 Stop(), 오른쪽 추진기 Play().
+- `rotationInput > 0` → 왼쪽 회전:
+  - `ApplyRotation(-rotationStrength)` → 반시계 방향 회전.
+  - 오른쪽 추진기 Stop(), 왼쪽 추진기 Play().
+- `rotationInput == 0` → 양쪽 모두 Stop().
+
+---
+
+## 8. 버그 해결: 두 개 입자 동시 실행 방지
+
+- 문제: float 입력값이 0 근처에 있을 때 **양쪽 파티클이 동시에 실행**되는 버그 발생.
+- 해결 방법:
+  - 오른쪽을 켤 때 → **왼쪽 Stop()**
+  - 왼쪽을 켤 때 → **오른쪽 Stop()**
+  - 아무 입력 없을 때 → 둘 다 Stop()
+- 즉, **세 가지 상황을 모두 대비**하여 의도치 않은 동시 실행 방지.
+
+---
+
+## 9. 최종 코드 구조
+
+```csharp
+private void ProcessThrust()
+{
+    if (thrust.IsPressed())
+    {
+        rb.AddRelativeForce(Vector3.up * thrustStrength * Time.fixedDeltaTime);
+        if (!audioSource.isPlaying)
+            audioSource.PlayOneShot(mainEngineSFX);
+
+        if (!mainEngineParticle.isPlaying)
+            mainEngineParticle.Play();
+    }
+    else
+    {
+        audioSource.Stop();
+        mainEngineParticle.Stop();
+    }
+}
+
+private void ProcessRotation()
+{
+    float rotationInput = rotation.ReadValue<float>();
+
+    if (rotationInput < 0)
+    {
+        ApplyRotation(rotationStrength);
+        if (!rightThrustParticle.isPlaying)
+        {
+            leftThrustParticle.Stop();
+            rightThrustParticle.Play();
+        }
+    }
+    else if (rotationInput > 0)
+    {
+        ApplyRotation(-rotationStrength);
+        if (!leftThrustParticle.isPlaying)
+        {
+            rightThrustParticle.Stop();
+            leftThrustParticle.Play();
+        }
+    }
+    else
+    {
+        rightThrustParticle.Stop();
+        leftThrustParticle.Stop();
+    }
+}
+```
+
+---
+
+✅ 이렇게 해서 로켓의 **메인 엔진 + 양쪽 사이드 추진기**가 모두 파티클과 오디오와 함께 제어되도록 구현됨.
+
+👉 핵심은 **파티클 시스템 배치** + **프리팹 적용** + **코드에서 Play()/Stop()을 적절히 제어**하는 것.
+
+---
+
+# { 🚧 디버그 키 추가와 충돌 시스템 제어하기 }
+
+## 📋 목차
+
+1. [디버그 키의 필요성](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EB%94%94%EB%B2%84%EA%B7%B8-%ED%82%A4%EC%9D%98-%ED%95%84%EC%9A%94%EC%84%B1)
+2. [Update 메소드와 RespondToDebugKeys](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#update-%EB%A9%94%EC%86%8C%EB%93%9C%EC%99%80-respondtodebugkeys)
+3. [Keyboard.current와 키 입력 확인](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#keyboardcurrent%EC%99%80-%ED%82%A4-%EC%9E%85%EB%A0%A5-%ED%99%95%EC%9D%B8)
+4. [레벨 순차 로드하기 (LoadNextLevel)](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EB%A0%88%EB%B2%A8-%EC%88%9C%EC%B0%A8-%EB%A1%9C%EB%93%9C%ED%95%98%EA%B8%B0-loadnextlevel)
+5. [충돌 기능 제어를 위한 bool 변수](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EC%B6%A9%EB%8F%8C-%EA%B8%B0%EB%8A%A5-%EC%A0%9C%EC%96%B4%EB%A5%BC-%EC%9C%84%ED%95%9C-bool-%EB%B3%80%EC%88%98)
+6. [C 키를 활용한 충돌 On/Off 전환](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#c-%ED%82%A4%EB%A5%BC-%ED%99%9C%EC%9A%A9%ED%95%9C-%EC%B6%A9%EB%8F%8C-onoff-%EC%A0%84%ED%99%98)
+7. [OnCollisionEnter에서 조건 추가하기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#oncollisionenter%EC%97%90%EC%84%9C-%EC%A1%B0%EA%B1%B4-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+8. [디버그 로그와 문제 해결](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EB%94%94%EB%B2%84%EA%B7%B8-%EB%A1%9C%EA%B7%B8%EC%99%80-%EB%AC%B8%EC%A0%9C-%ED%95%B4%EA%B2%B0)
+9. [치트 키 활용 주의사항](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EC%B9%98%ED%8A%B8-%ED%82%A4-%ED%99%9C%EC%9A%A9-%EC%A3%BC%EC%9D%98%EC%82%AC%ED%95%AD)
+
+---
+
+## 1. 디버그 키의 필요성
+
+- 개발 과정에서 특정 레벨을 바로 테스트해야 할 때, 매번 처음부터 플레이하면 비효율적임.
+- \*디버그 키(Debug Key)\*\*를 추가하면 원하는 시점에 레벨을 이동하거나 충돌을 끌 수 있어 테스트가 편해짐.
+- 예시:
+  - `L` 키 → 다음 레벨 로드
+  - `C` 키 → 충돌 기능 On/Off
+
+---
+
+## 2. Update 메소드와 RespondToDebugKeys
+
+- `Update()`는 **매 프레임마다 실행되는 메소드**.
+- 키 입력을 확인하고 특정 동작을 수행하기 위해 `Update()` 안에서 **RespondToDebugKeys()** 메소드를 호출함.
+- 구조:
+
+  ```csharp
+  void Update()
+  {
+      RespondToDebugKeys();
+  }
+
+  void RespondToDebugKeys()
+  {
+      // 키 입력 체크 및 처리
+  }
+  ```
+
+---
+
+## 3. Keyboard.current와 키 입력 확인
+
+- **Unity Input System**에서 `Keyboard.current`를 사용하면 현재 키보드 상태를 가져올 수 있음.
+- 특정 키가 눌렸는지 확인:
+  ```csharp
+  if (Keyboard.current.lKey.isPressed)
+  {
+      // L 키가 눌려 있는 동안 계속 실행
+  }
+  ```
+- `isPressed` → 키가 **눌려 있는 상태**를 의미.
+- `wasPressedThisFrame` → 키가 **이번 프레임에만 눌렸는지** 확인 (중복 입력 방지).
+
+---
+
+## 4. 레벨 순차 로드하기 (LoadNextLevel)
+
+- L 키가 눌렸을 때 → `LoadNextLevel()` 실행.
+- 코드 예시:
+  ```csharp
+  if (Keyboard.current.lKey.wasPressedThisFrame)
+  {
+      LoadNextLevel();
+  }
+  ```
+- 결과:
+  - `L` 키를 누를 때마다 **다음 레벨로 이동**.
+  - 빠른 테스트 및 특정 레벨 점검에 유용.
+
+---
+
+## 5. 충돌 기능 제어를 위한 bool 변수
+
+- 충돌 기능을 켜고 끄기 위해 `bool` 변수를 선언.
+- 네이밍: **isCollidable** (불린 값 관례에 맞게 `is` 접두사 사용).
+- 기본값: `true` (충돌 가능).
+  ```csharp
+  bool isCollidable = true;
+  ```
+
+---
+
+## 6. C 키를 활용한 충돌 On/Off 전환
+
+- `C` 키 입력 시 `isCollidable` 값을 **토글(toggle)** 함.
+- 코드:
+  ```csharp
+  else if (Keyboard.current.cKey.wasPressedThisFrame)
+  {
+      isCollidable = !isCollidable; // true ↔ false 전환
+  }
+  ```
+- `!isCollidable` → 현재 값의 반대값으로 전환.
+  - `true` → `false`
+  - `false` → `true`
+
+---
+
+## 7. OnCollisionEnter에서 조건 추가하기
+
+- 기존 충돌 처리 로직을 `isCollidable` 값에 따라 제어.
+- 조건문:
+
+  ```csharp
+  void OnCollisionEnter(Collision other)
+  {
+      if (!isCollidable) return;
+
+      // 기존 충돌 처리 로직
+  }
+  ```
+
+- 의미:
+  - `isCollidable == false`일 경우 → 충돌 무시.
+  - `isCollidable == true`일 경우 → 정상 충돌 처리.
+
+---
+
+## 8. 디버그 로그와 문제 해결
+
+- 문제: `isPressed` 사용 시 키가 계속 눌린 상태로 판정되어 **충돌 On/Off가 빠르게 반복됨**.
+- 해결:
+  - `wasPressedThisFrame`으로 변경하여 **한 번만 토글**되도록 함.
+- 디버깅용 코드:
+  ```csharp
+  Debug.Log("C 키가 눌렸습니다. 현재 충돌 가능 여부: " + isCollidable);
+  ```
+- 결과:
+  - C 키를 누를 때마다 한 번만 로그 출력.
+  - 값이 정상적으로 토글됨을 확인 가능.
+
+---
+
+## 9. 치트 키 활용 주의사항
+
+- 디버그용 치트 키는 개발 단계에서는 유용하지만, 실제 게임 빌드에는 **비활성화**해야 함.
+- 이유:
+  - 플레이어가 치트를 발견하면 게임 난이도와 밸런스가 무너질 수 있음.
+  - 예: 인터넷에 “충돌 꺼서 엔딩 봄” 같은 글이 올라올 수 있음.
+
+---
+
+👉 정리하면, 이번 강의는 **디버그 키 시스템**을 통해 개발자가 테스트를 쉽게 하고, **충돌 기능 제어**를 통해 난이도를 자유롭게 조절할 수 있도록 하는 방법을 다루었습니다.
+
+---
+
+# { 🧱 에셋과 충돌 설정하기 }
+
+## 📋 목차
+
+1. [에셋과 프리팹 개념 이해하기]
+2. [게임 내 오브젝트 정리하기]
+3. [환경(Environment) 오브젝트 구성하기]
+4. [충돌(Collision) 개념과 콜라이더 종류]
+5. [콜라이더 적용 방법과 주의사항]
+6. [프리팹 관리 및 변형(Variant) 활용]
+7. [마무리: 에셋 배치와 충돌 적용 실습]
+
+---
+
+## 1. 에셋과 프리팹 개념 이해하기
+
+- **에셋(Asset)** : 프로젝트에서 사용하는 모든 리소스(모델, 텍스처, 재질, 사운드, 프리팹 등).
+- **프리팹(Prefab)** : 재사용 가능한 오브젝트의 설계도. 에셋 폴더 안에 저장해두면 여러 씬(Scene)에서 재활용 가능.
+- **프리팹 변형(Prefab Variant)** : 원본 프리팹을 기반으로 하되, 일부 속성만 변경하여 새로운 변형을 만드는 것.
+
+👉 강의에서는 "론치 패드(Launch Pad)"를 "피니시 패드(Finish Pad)"로 이름을 바꾸고, 프리팹 변형을 만들어 사용.
+
+→ 이름은 완벽하지 않아도 **의미가 중요**하며, 플레이어가 쉽게 구분할 수 있도록 색상과 재질을 달리 설정.
+
+---
+
+## 2. 게임 내 오브젝트 정리하기
+
+- **정리 이유** : 씬이 복잡해질수록 오브젝트 관리가 힘들어짐. 카테고리화해서 관리하면 레벨 빌딩이 훨씬 수월해짐.
+- **예시**:
+  - **게임 플레이 관련 오브젝트**: 시작 패드, 피니시 패드
+  - **환경 관련 오브젝트**: 지면, 배경 오브젝트(바위, 파이프, 엔진 블록 등)
+
+---
+
+## 3. 환경(Environment) 오브젝트 구성하기
+
+- **빈 게임 오브젝트 생성 → "Environment"로 이름 변경**
+- transform(변환) 초기화: 위치 `(0,0,0)`으로 되돌림.
+- **Environment에 포함되는 요소**:
+  - 지면(Ground)
+  - 드롭쉽 탱크(Dropship Tank)
+  - 기타 배경용 바위, 파이프, 엔진 블록 등
+
+⚠️ 주의: **론치 패드, 피니시 패드**는 환경이 아닌 **게임 플레이 오브젝트** → Environment에 넣지 않음.
+
+---
+
+## 4. 충돌(Collision) 개념과 콜라이더 종류
+
+- **충돌(Collision)** : 플레이어(로켓)가 다른 오브젝트와 부딪히는 물리적 판정.
+- **Collider(콜라이더)** : 오브젝트에 물리적 형태를 부여하는 컴포넌트.
+
+### 주요 콜라이더 종류
+
+1. **박스 콜라이더(Box Collider)**
+   - 직육면체 모양 충돌 영역.
+   - 단순하고 계산 효율적.
+   - 큐브/상자 형태의 오브젝트에 적합.
+2. **캡슐 콜라이더(Capsule Collider)**
+   - 원통 양 끝이 둥근 형태.
+   - 캐릭터나 원기둥 모양 오브젝트에 적합.
+3. **구체 콜라이더(Sphere Collider)**
+   - 구체(원) 모양 충돌 영역.
+   - 공, 둥근 바위 등에 적합.
+4. **메시 콜라이더(Mesh Collider)**
+   - 모델의 실제 메시에 따라 충돌 영역을 생성.
+   - 복잡한 형태의 오브젝트(바위 절벽, 엔진 블록 등)에 적합.
+   - **Convex 옵션**:
+     - 체크하면 충돌 영역이 단순화되어 **다른 메시 콜라이더와 충돌 가능**.
+     - 체크 해제 시 더 정밀하지만 메시-메시 충돌이 안 되거나 성능 저하 발생.
+
+---
+
+## 5. 콜라이더 적용 방법과 주의사항
+
+- **올바른 순서**:
+  1. 오브젝트 배치 → **스케일 조정** 먼저
+  2. 이후 콜라이더 추가
+  - 이유: 스케일을 바꾼 후 콜라이더를 추가해야 올바른 비율로 적용됨.
+  - 순서를 반대로 하면 콜라이더 크기가 비정상적으로 적용될 수 있음.
+- **효율성 고려**:
+  - 가능한 한 단순한 콜라이더(박스, 캡슐, 구체) 사용.
+  - 메시 콜라이더는 성능 비용이 크므로 꼭 필요할 때만 사용.
+- **여러 콜라이더 활용**:
+  - 하나의 콜라이더로 원하는 모양을 커버하기 어렵다면, **여러 개의 콜라이더**를 같은 오브젝트에 추가해서 조합.
+  - 예: 다리 밑을 통과할 수 있게 하려면 박스 콜라이더 2개를 양쪽 기둥에 따로 적용.
+
+---
+
+## 6. 프리팹 관리 및 변형(Variant) 활용
+
+- **프리팹으로 저장하는 이유**:
+  - 씬에서 삭제해도 다시 끌어다 쓸 수 있음.
+  - 이름과 속성을 정리해두면 체계적 관리 가능.
+- **프리팹 변형(Variant) 활용**:
+  - 원본 프리팹을 유지하면서 색상, 재질, 이름만 다르게 만든 변형 버전 생성 가능.
+  - 예: "Launch Pad" → "Finish Pad Variant"
+
+---
+
+## 7. 마무리: 에셋 배치와 충돌 적용 실습
+
+- 강의자가 씬에 다양한 오브젝트(바위, 파이프, 엔진 블록 등)를 배치.
+- 각각에 적절한 콜라이더를 추가:
+  - 바위 절벽 → 메시 콜라이더
+  - 단순한 상자형 오브젝트 → 박스 콜라이더
+  - 둥근 오브젝트 → 구체 콜라이더
+- 모든 오브젝트를 **프리팹 폴더에 저장**해 "작은 라이브러리"처럼 활용할 수 있게 준비.
+- **충돌이 필요 없는 배경 오브젝트**는 콜라이더를 추가하지 않아도 됨.
+
+👉 다음 강의에서는 이렇게 준비된 프리팹들을 사용해 실제 **레벨 빌딩**을 진행.
+
+---
+
+# { 🚀 로켓 추진기와 파티클 시스템 제어하기 }
+
+## 📋 목차
+
+1. [플레이 영역 설정하기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%ED%94%8C%EB%A0%88%EC%9D%B4-%EC%98%81%EC%97%AD-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+2. [벽(Obstacle) 만들고 배치하기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EB%B2%BDobstacle-%EB%A7%8C%EB%93%A4%EA%B3%A0-%EB%B0%B0%EC%B9%98%ED%95%98%EA%B8%B0)
+3. [지붕과 경계 설정하기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EC%A7%80%EB%B6%95%EA%B3%BC-%EA%B2%BD%EA%B3%84-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+4. [레벨 흐름 설계하기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EB%A0%88%EB%B2%A8-%ED%9D%90%EB%A6%84-%EC%84%A4%EA%B3%84%ED%95%98%EA%B8%B0)
+5. [충돌(Collision) 다듬기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EC%B6%A9%EB%8F%8Ccollision-%EB%8B%A4%EB%93%AC%EA%B8%B0)
+6. [레벨 디자인 철학과 도전 과제](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EB%A0%88%EB%B2%A8-%EB%94%94%EC%9E%90%EC%9D%B8-%EC%B2%A0%ED%95%99%EA%B3%BC-%EB%8F%84%EC%A0%84-%EA%B3%BC%EC%A0%9C)
+7. [강의 요약](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EA%B0%95%EC%9D%98-%EC%9A%94%EC%95%BD)
+
+---
+
+## 1. 플레이 영역 설정하기
+
+- **문제 상황**: 플레이어가 아무 방향으로나 날아가면 “어, 이제 뭘 해야 하지?”라는 생각이 들며 게임 흐름이 끊길 수 있음.
+- **해결책**: **경계를 설정**해서 플레이어가 자연스럽게 목표를 향해 이동하도록 유도해야 함.
+
+👉 **방법**
+
+- 큐브나 **바위 에셋**을 사용해서 “여기서 더 이상 갈 수 없다”는 공간적 제한을 줌.
+- 시작 지점에 Launch Pad(론치 패드)를 배치하고, Finish Pad(피니시 패드)까지 이어지는 길을 상상하여 설계.
+
+---
+
+## 2. 벽(Obstacle) 만들고 배치하기
+
+- 플레이어가 **위로 넘어가고, 아래로 지나가고, 다시 위로 가야 하는 구조**를 만듦.
+- **큐브**나 **바위 에셋**을 사용하여 장애물(Obstacle)을 배치.
+
+👉 **옵션/방법**
+
+- 바위 크기 조정 (Scale 조절) → 두껍게/길게 만들어 벽처럼 사용.
+- 바위 위치 이동 (Move) → 통로처럼 보이도록 간격 조정.
+- **Pivot(피벗 포인트)**: 중심을 기준으로 회전/이동 시 정렬이 쉬움.
+
+---
+
+## 3. 지붕과 경계 설정하기
+
+- 레벨 디자인의 핵심은 **지붕(천장)을 어떻게 처리할 것인가**.
+- 완전히 뚫려 있으면 플레이어가 위로 끝없이 날아갈 수 있음 → 게임의 몰입감이 깨짐.
+
+👉 **해결책**
+
+- **바위 에셋을 회전·복제**하여 위쪽을 막아 동굴처럼 보이게 만듦.
+- 필요 시 **시네머신 카메라 제한** 기능을 써서 카메라가 위로 따라가지 못하도록 할 수도 있음.
+- 지금은 단순히 “큰 동굴 안에 있는 척”하도록 바위 배치.
+
+---
+
+## 4. 레벨 흐름 설계하기
+
+- 목표: **Launch Pad A → 장애물 통과 → Finish Pad B 착륙**.
+- **플로우(Flow)**: 위로 넘어가고 → 아래로 지나가고 → 다시 위로 → 착륙.
+
+👉 **구현 방법**
+
+1. 큰 건물/바위 오브젝트를 세워 “넘어야 할 것” 배치.
+2. 낮은 위치에 돌출된 오브젝트 배치 → “밑으로 지나가야 할 것”.
+3. 다시 큰 장애물 배치 → “마지막으로 넘어야 할 것”.
+
+- 단순한 큐브로도 가능하지만, 에셋을 쓰면 분위기가 더 자연스러워짐.
+
+---
+
+## 5. 충돌(Collision) 다듬기
+
+- **문제**: 기본 에셋의 콜라이더는 실제 모델과 딱 맞지 않아 **큰 틈**이 생김.
+- **해결 방법**:
+  - 불필요한 충돌체는 제거.
+  - 플레이어가 실제로 부딪힐 수 있는 **작은 박스 콜라이더**만 추가.
+  - 일부 장식용 오브젝트는 **Mesh Collider 꺼두기** → 충돌 무시.
+
+👉 핵심은 “보이기에는 막힌 것 같지만 실제 충돌은 플레이어 경험을 고려해 단순화”하는 것.
+
+---
+
+## 6. 레벨 디자인 철학과 도전 과제
+
+- **레벨 디자인에서 중요한 점**
+  1. **도전성(Challenge)**: 그냥 날아가기만 하면 재미없음 → 장애물 배치로 난이도 부여.
+  2. **명확성(Clarity)**: “아, 저 물체에 부딪히겠구나”라는 생각이 들도록 시각적으로 분명하게 표현. (예: 빨간색 오브젝트 배치)
+  3. **비주얼(Visuals)**: 보기 좋은 배경, 적절한 색상, 깊이감을 줘서 진짜 게임 같은 느낌을 살림.
+- **도전 과제 (Challenge)**
+  - 여러분만의 레벨을 만들어 보기.
+  - 조건: **약 20초 안에 클리어 가능**해야 함.
+  - 에셋이든 큐브든 상관 없음.
+  - 예쁘게 꾸미든, 기능적으로만 만들든 자유.
+  - 단, **너무 쉽지 않도록** 적당한 난이도를 부여.
+
+---
+
+## 7. 강의 요약
+
+- 이번 강의에서 배운 핵심
+  1. 플레이어가 길을 잃지 않도록 **경계 설정**하기.
+  2. 장애물을 **위·아래·위** 흐름으로 배치해 도전 구조 만들기.
+  3. 지붕(천장)과 벽을 바위 에셋으로 구성해 **공간 제약** 주기.
+  4. 충돌은 플레이 경험 위주로 단순화 → 필요 없는 충돌 제거.
+  5. 단순 배치가 끝나면 **비주얼 요소** (배경, 조명, 후처리)로 게임 분위기 강화.
+
+👉 다음 강의에서는 **로켓의 물리(중력, 속도, 조작감)**를 다듬고, **세트 드레싱(장식)**과 **조명·후처리**를 통해 레벨을 더 “진짜 게임”처럼 보이게 만드는 방법을 배움.
+
+---
+
+# { 🚀 로켓 추진기와 게임 플레이 조정하기 }
+
+## 📋 목차
+
+1. [게임 조정 개념 이해하기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EA%B2%8C%EC%9E%84-%EC%A1%B0%EC%A0%95-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [게임의 느낌(비전) 정의하기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EA%B2%8C%EC%9E%84%EC%9D%98-%EB%8A%90%EB%82%8C%EB%B9%84%EC%A0%84-%EC%A0%95%EC%9D%98%ED%95%98%EA%B8%B0)
+3. [물리 값 조정하기 (Gravity, Thrust, Rotation)](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EB%AC%BC%EB%A6%AC-%EA%B0%92-%EC%A1%B0%EC%A0%95%ED%95%98%EA%B8%B0-gravity-thrust-rotation)
+4. [카메라 설정하기 (Cinemachine 활용)](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EC%B9%B4%EB%A9%94%EB%9D%BC-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0-cinemachine-%ED%99%9C%EC%9A%A9)
+5. [조정 과정의 핵심 포인트](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EC%A1%B0%EC%A0%95-%EA%B3%BC%EC%A0%95%EC%9D%98-%ED%95%B5%EC%8B%AC-%ED%8F%AC%EC%9D%B8%ED%8A%B8)
+
+---
+
+## 1. 게임 조정 개념 이해하기
+
+- 게임 개발에서 **단순히 기능이 동작하는 것**과 **재미있는 느낌을 주는 것**은 다릅니다.
+- 이번 강의는 **기능은 이미 구현했지만, 플레이가 만족스럽지 않아서 조정하는 단계**를 다룹니다.
+- 조정 요소들:
+  - 중력(Gravity)
+  - 추진력(Thrust)
+  - 회전 속도(Rotation Speed)
+  - 카메라 거리(Camera Distance)
+  - 카메라 감쇠(Damping)
+  - 오브젝트 크기 및 장애물 배치
+
+---
+
+## 2. 게임의 느낌(비전) 정의하기
+
+조정을 하기 전에 먼저 **게임이 어떤 느낌이길 원하는지** 정해야 합니다.
+
+- 선택 가능한 느낌들:
+  - **느리고 취약한 느낌** → 둥둥 떠다니며 불안정한 조작
+  - **빠르고 혼란스러운 느낌** → 방향 전환이 어렵고 통제 불가 같은 느낌
+  - **정확하고 정밀한 느낌** → 작은 조작에도 세밀하게 반응
+- 강사(개발자)의 목표:
+  - **빠르고 민첩하며 반응성 있는 조작**
+  - 부스터를 과하게 누르면 **벽에 부딪히는 위험**이 있을 정도로 예민한 컨트롤
+
+---
+
+## 3. 물리 값 조정하기 (Gravity, Thrust, Rotation)
+
+### (1) 중력(Gravity)
+
+- **개념**: 로켓이 공중에서 얼마나 빨리 떨어지는지를 결정.
+- Unity 기본값은 `9.81` 정도.
+- 조정 과정:
+  1. 처음: `9` → 너무 약해서 둥둥 떠다님.
+  2. 실험: `15` → 더 빠르게 떨어지고, “무겁고 밀도 있는” 느낌이 됨.
+  3. 최종: **너무 과하다고 판단 → 약간 낮춤.**
+- 의도: **공중에 오래 머물지 못하고, 빠르게 내려오는 무거운 조작감.**
+
+---
+
+### (2) 추진력(Thrust) & 회전(Rotation)
+
+- **개념**: 로켓의 방향 전환 속도, 즉 좌우 회전 민첩도를 결정.
+- 조정 과정:
+  1. **400** → 너무 빠르게 돌아서 인위적이고 부자연스러움.
+  2. **150** → 개선되었지만 여전히 답답함.
+  3. **190** → 더 민첩하고, 조작 난이도도 적절하게 올라감.
+- 최종 의도:
+  - 플레이어가 방향을 돌리려 해도 **너무 빨라서 제대로 제어하기 어렵다**는 상황을 일부러 만듦.
+  - 이렇게 해서 **속도감 + 위험 요소**를 강조.
+
+---
+
+## 4. 카메라 설정하기 (Cinemachine 활용)
+
+### (1) 감쇠(Damping)
+
+- **개념**: 카메라가 따라올 때 반응하는 속도.
+- 값이 크면 카메라가 느리게 따라와서 화면이 흔들리고,
+- 값이 작으면 즉각적으로 따라옴.
+- 조정:
+  - `0.5, 0.5, 0.5` → 카메라 반응이 빨라지고, 플레이어가 **즉각적인 피드백**을 받음.
+
+---
+
+### (2) 화면 위치(Screen Position)
+
+- 문제: 로켓이 화면 한쪽으로 치우쳐서 위아래 균형이 맞지 않았음.
+- 조정:
+  - Screen Position 값을 `0, 0` 으로 설정 → 화면 중앙에 위치.
+
+---
+
+### (3) 데드 존(Dead Zone)
+
+- **개념**: 로켓이 이 범위 안에서는 카메라가 움직이지 않음.
+- 효과: 화면이 너무 흔들리지 않고 **완충 구간**을 제공.
+- 강사 의도:
+  - 데드 존을 좁게 설정 → **민감한 반응성** 유지.
+
+---
+
+### (4) 하드 리미트(Hard Limit)
+
+- **개념**: 카메라가 절대 넘어가지 못하는 경계선.
+- 원래 너무 멀리 있었음 → 로켓이 지나치게 자유롭게 움직여 화면이 불안정해 보임.
+- 조정:
+  - 하드 리미트를 좀 더 좁게 해서 화면이 **안정적이고 집중된 느낌**을 줌.
+
+---
+
+### (5) 카메라 거리(Camera Distance)
+
+- **개념**: 카메라가 로켓에서 얼마나 멀리 떨어져 있는지.
+- 조정:
+  - 기본 거리에서 **14**로 증가.
+  - 주변 환경과 장애물을 더 넓게 볼 수 있음.
+- 의도:
+  - 앞으로 다가오는 장애물을 미리 보고 회피할 수 있도록 **시야 확보**.
+
+---
+
+## 5. 조정 과정의 핵심 포인트
+
+- **즉흥적 실험**: 수치를 정해놓고 가는 게 아니라, 직접 테스트하면서 맞는 값을 찾아감.
+- **비전 중심**: “내가 원하는 느낌(민첩하고 빠른 반응성)”에 맞추어 조정.
+- **중요한 판단 기준**:
+  1. “내 마음에 드는가?”
+  2. “왜 마음에 드는지, 혹은 안 드는지?” → 이유를 스스로 설명할 수 있어야 함.
+- **외부 의견은 신경 X**: 지금은 **개발자 자신이 즐거운 게임**을 만드는 단계.
+- **최종 결과**:
+  - 더 빠르고 민첩한 로켓 조작
+  - 안정적이면서도 반응성 있는 카메라
+  - 플레이어가 “앞으로 다가오는 장애물”을 잘 볼 수 있는 시야 확보
+
+---
+
+✅ 정리하면, 이번 강의는 **로켓 게임의 물리·카메라 설정을 조정해서 “재미있게 만드는 방법”**을 보여주는 단계였어요.
+
+특히 **중력·회전 속도·카메라 거리**가 게임 느낌에 얼마나 큰 영향을 주는지를 실험적으로 확인하는 과정이 핵심입니다.
+
+---
+
+# { 🎨 세트 드레싱(Set Dressing)으로 게임 세계 꾸미기 }
+
+## 📋 목차
+
+1. [세트 드레싱 개념 이해하기](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EC%84%B8%ED%8A%B8-%EB%93%9C%EB%A0%88%EC%8B%B1-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [전경·중경·원경 개념과 적용](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EC%A0%84%EA%B2%BD%EC%A4%91%EA%B2%BD%EC%9B%90%EA%B2%BD-%EA%B0%9C%EB%85%90%EA%B3%BC-%EC%A0%81%EC%9A%A9)
+3. [원경 꾸미기: 배경 건물 추가](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EC%9B%90%EA%B2%BD-%EA%BE%B8%EB%AF%B8%EA%B8%B0-%EB%B0%B0%EA%B2%BD-%EA%B1%B4%EB%AC%BC-%EC%B6%94%EA%B0%80)
+4. [전경 꾸미기: 바위와 나무 같은 방해 요소](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EC%A0%84%EA%B2%BD-%EA%BE%B8%EB%AF%B8%EA%B8%B0-%EB%B0%94%EC%9C%84%EC%99%80-%EB%82%98%EB%AC%B4-%EA%B0%99%EC%9D%80-%EB%B0%A9%ED%95%B4-%EC%9A%94%EC%86%8C)
+5. [중경 꾸미기: 실제 충돌 영역 강화](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EC%A4%91%EA%B2%BD-%EA%BE%B8%EB%AF%B8%EA%B8%B0-%EC%8B%A4%EC%A0%9C-%EC%B6%A9%EB%8F%8C-%EC%98%81%EC%97%AD-%EA%B0%95%ED%99%94)
+6. [후처리와 패럴랙스 효과](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%ED%9B%84%EC%B2%98%EB%A6%AC%EC%99%80-%ED%8C%A8%EB%9F%B4%EB%9E%99%EC%8A%A4-%ED%9A%A8%EA%B3%BC)
+7. [실전 팁과 과제](https://www.notion.so/3-3-270e683f737e80e78f1bc0e80ea48d9b#%EC%8B%A4%EC%A0%84-%ED%8C%81%EA%B3%BC-%EA%B3%BC%EC%A0%9C)
+
+---
+
+## 1. 세트 드레싱 개념 이해하기
+
+- **정의**
+  세트 드레싱(Set Dressing)이란 무대 장치를 꾸미듯이, **게임 월드에 오브젝트와 배경 요소를 배치하여 시각적 풍부함과 몰입감을 주는 작업**이다.
+  → 단순히 플레이 가능한 영역만 만드는 것이 아니라, “보이는 세계 전체”를 꾸미는 과정.
+- **중요성**
+  - 만약 배경이 텅 비어 있다면? → 플레이어는 “이 게임, 대충 만들었네?”라고 생각할 수 있음.
+  - 단순히 건물만 일렬로 늘어선다면? → 어색하고 현실감이 떨어짐.
+  - 즉, **세트 드레싱은 플레이어에게 “살아있는 세계”라는 느낌을 주는 핵심 요소**.
+
+---
+
+## 2. 전경·중경·원경 개념과 적용
+
+- **전경(Foreground)** : 카메라와 가까운 영역.
+  → 플레이어 시야를 가리거나 지나가면서 "헉, 내 캐릭터가 어디 갔지?" 같은 재미 요소 제공.
+- **중경(Midground)** : 실제 게임 플레이가 일어나는 영역.
+  → 충돌 감지(콜리전)가 적용되는 오브젝트들이 위치.
+  → 플레이어가 부딪히거나 지나가는 실제 장애물.
+- **원경(Background)** : 멀리 보이는 배경.
+  → 패럴랙스 효과로 움직임에 깊이감 부여.
+  → 실제로 플레이어와 상호작용하지 않음.
+
+---
+
+## 3. 원경 꾸미기: 배경 건물 추가
+
+- **소스** : 강의 자료 → `[Project] - [GameDV TV Assets] - [Models]` → SF 건물 팩 사용.
+- **지면 확장** : 뒤쪽에 배치할 공간을 확보하기 위해 지면을 늘림.
+- **프리팹 드래그 앤 드롭** : 충돌은 필요 없으므로 그냥 원경 오브젝트로 배치.
+- **위치 조정** :
+  - 크기를 조정 (비율 깨져도 괜찮음, 로우폴리라 티 안 남).
+  - 회전시켜 복사 티 안 나게 하기.
+  - Ctrl+D 로 복사 후 위치/크기 랜덤 조정.
+- **배치 팁** :
+  - 건물들이 일직선으로 늘어서지 않도록 Z축/XY축 위치를 조금씩 흩트리기.
+  - 지평선을 가리도록 배치해 “끝없는 세계” 같은 느낌을 주기.
+
+---
+
+## 4. 전경 꾸미기: 바위와 나무 같은 방해 요소
+
+- **목적** :
+  플레이어 시야를 잠깐 가려서 **입체감과 현실감을 강화**.
+  (예: “내 캐릭터 어디 갔지? 아, 나무 뒤에 있었구나!”)
+- **실습 예시** :
+  - 바위를 전경에 배치 → 카메라 앞을 가로지르는 효과.
+  - 크기와 위치를 조정해 플레이어 길을 막지 않도록 함.
+  - 복사 후 회전시켜 똑같아 보이지 않게 하기.
+- **주의사항** :
+  - 전경 오브젝트는 **실제 충돌이 발생하면 안 됨**.
+    → 플레이어가 “저거 부딪히는 장애물인가?” 혼란스러워하지 않도록.
+  - 전경은 **꾸밈용, 시각 효과용**임을 확실히 해야 한다.
+- **좋은 전경 오브젝트 예시** : 나무 🌳
+  - 실제 충돌 X, 그냥 카메라를 가리는 장식용.
+  - 카메라 움직임에 따라 자연스럽게 화면을 스쳐 지나감.
+
+---
+
+## 5. 중경 꾸미기: 실제 충돌 영역 강화
+
+- **중경의 역할** : 플레이어가 실제로 상호작용하는 영역.
+- **방법** :
+  - 충돌이 있는 바위, 건물, 장애물 배치.
+  - 단순히 한 개 두는 것보다, 앞뒤로 여러 개 배치하면 역동적임.
+- **예시** :
+  - 바위에 창문/관측소 같은 구조물을 추가 → 단순한 돌이 아니라 “문명 사회의 흔적”처럼 보이게 함.
+  - 하얀 오브젝트로 위험 구역 표시 → “여긴 피해야 한다”는 명확한 신호 제공.
+
+---
+
+## 6. 후처리와 패럴랙스 효과
+
+- **패럴랙스 효과** :
+  - 가까운 전경 오브젝트는 빨리 움직이고,
+  - 먼 원경 오브젝트는 천천히 움직이는 시각 효과.
+  - → 깊이감, 입체감을 강화.
+- **후처리(Post-processing) 아이디어** :
+  - 초점 처리(Depth of Field):
+    - 전경/중경은 선명하게, 원경은 흐릿하게 → 실제 카메라 같은 느낌.
+  - 단순한 오브젝트 배치만으로도 훨씬 전문적인 게임처럼 보이게 함.
+
+---
+
+## 7. 실전 팁과 과제
+
+- **팁 정리** :
+  1. 전경/중경/원경을 균형 있게 배치해야 몰입감이 생김.
+  2. 복사-붙여넣기 할 때는 **회전·크기 변경**으로 티 안 나게.
+  3. 전경은 장식, 중경은 충돌, 원경은 배경 → **역할을 명확히 구분**.
+  4. 충돌 ON/OFF를 잘 활용 (전경 오브젝트는 충돌 OFF).
+- **강의에서 준 과제** :
+  - 전경·중경·원경에 각각 에셋을 추가해 **여러분만의 세계를 실체화하기**.
+  - 단순히 오브젝트를 나열하는 것이 아니라, **특징과 디테일을 주어 세계관을 살리기**.
+  - (예: 단순한 바위 → 빨간 관측탑 추가 → 의미 있는 구조물로 변신).
+
+---
+
+✅ 정리하자면, 이번 강의의 핵심은 **“플레이어가 실제로 부딪히는 영역(중경)”과 “몰입감을 주는 장식(전경·원경)”을 구분해서 배치하는 방법**이었어요.
+
+세트 드레싱은 단순히 예쁘게 꾸미는 게 아니라, **게임을 전문적으로 보이게 하고 플레이어 몰입도를 높이는 중요한 과정**입니다.

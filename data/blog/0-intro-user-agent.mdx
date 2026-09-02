@@ -1,0 +1,135 @@
+---
+title: '섹션 0. Intro (설치, User-Agent)'
+date: '2026-09-02'
+category: '기타, 사용 적음/크롤링 & 파이썬'
+tags: ['기타, 사용 적음', '크롤링 & 파이썬']
+draft: false
+summary: ''
+---
+
+# 네이버 크롤링과 함께하는 웹 크롤링 맛보기
+
+```python
+pip install requests 를 터미널에 입력해서 설치해준다
+
+(  라이브러리는 HTTP 요청을 보내고 받는 기능을 제공하여 웹 상의 데이터를 가져오거나 웹 서비스와 통신하는 데 사용된다. 주로 웹 크롤링, 웹 API 호출 등의 작업에 활용된다. )
+```
+
+```python
+pip install beautifulsoup4 를 입력해서 설치
+
+( beautifulsoup4 라이브러리는 HTML 및 XML 문서를 파싱하고 분석하는 기능을 제공하여 웹 스크래핑(scraping) 작업을 할 때 사용e된다. HTML 문서에서 원하는 정보를 추출하거나 조작하는 데 유용 )
+```
+
+## 예제
+
+```python
+import requests  # requests 라이브러리를 import하여 웹 페이지에 HTTP 요청을 보내기 위한 기능을 가져옵니다.
+from bs4 import BeautifulSoup  # BeautifulSoup 라이브러리를 import하여 HTML 문서를 파싱하고 분석하는 기능을 가져옵니다.
+
+url = "https://m.naver.com/"  # 크롤링할 웹 페이지의 URL을 변수에 저장합니다.
+
+req = requests.get(url)  # 지정한 URL에 HTTP GET 요청을 보내고, 서버로부터 응답을 받습니다.
+
+html = req.text  # HTTP 응답으로 받은 HTML 문서를 가져와 변수에 저장합니다.
+
+# print(html)  # 받아온 HTML 문서를 출력합니다. (주석 처리하여 출력하지 않습니다.)
+
+soup = BeautifulSoup(html, "html.parser")  # BeautifulSoup을 사용하여 HTML 문서를 파싱합니다. html.parser는 Python 표준 라이브러리에 내장된 HTML 파서입니다. 이 파서는 HTML 문서를 파싱하고, 각 요소의 구조를 이해하여 BeautifulSoup 객체로 변환
+
+# ( 요약하면 html 변수에 저장된 문자열을 HTML로 파싱하고, 이를 BeautifulSoup 객체로 만들어주는 역할 )
+
+logo = soup.select_one(".mf_logo_naver").text  # HTML 문서에서 클래스명이 "mf_logo_naver"인 요소를 선택하고, 해당 요소의 텍스트를 가져옵니다.
+
+print(logo)  # 선택한 요소의 텍스트를 출력합니다.
+```
+
+```python
+큰 흐름을 보자면
+
+url 변수에 주소를 넣어주고
+
+requests.get(url) 를 사용하여 url 주소에 get 요청을 보내 응답을 받고
+
+html 변수에 html 로 응답받은 html 문서를 저장한다
+
+그리고 BeautifulSoup 의 html.parser 를 사용해서 html 문서를 파싱하고
+
+soup.select_one 을 사용해서 하나의 요소를 선택하고 .text 로 텍스트를 가져온다
+```
+
+# requests에 User-Agent를 추가하여 사람이 접속한 것처럼 보이는 방법
+
+![Untitled](<%EC%84%B9%EC%85%98%200%20Intro%20(%EC%84%A4%EC%B9%98,%20User-Agent)/Untitled.png>)
+
+## dir 사용해보기
+
+```python
+get 요청으로 받아온 req 데이에
+
+print(req.raise_for_status)
+
+를 해보면 응답 결과가 나오게 된다
+
+* ( print(dir(req))  dir()를 해보면 사용 가능한 메서드 들이 다 나온다 여기서 나온 request 라는 메서드를 한번 사용해보면
+
+print(req.request)
+
+결과 : <PreparedRequest [GET]>
+
+이런 결과가 나온다 여기서 다시한번 print(dir(req.request)) 를 해서 메서드를 확인해보면
+```
+
+![Untitled](<%EC%84%B9%EC%85%98%200%20Intro%20(%EC%84%A4%EC%B9%98,%20User-Agent)/Untitled%201.png>)
+
+## 차단 당하는 이유
+
+```python
+이런게 또 잔뜩 나오고 여기서 headers 를 한번 사용해본다
+
+print(req.request.headers)
+
+그런 아래와 같은 결과가 뜬다
+
+{'User-Agent': 'python-requests/2.31.0', 'Accept-Encoding': 'gzip, deflate', 'Accept': '*/*', 'Connection': 'keep-alive'}
+
+사이트 마다 이 정보를 보고 차단을 하는 경우가 많다 이걸 우회하기 위한 방법을 알아보자
+```
+
+![Untitled](<%EC%84%B9%EC%85%98%200%20Intro%20(%EC%84%A4%EC%B9%98,%20User-Agent)/Untitled%202.png>)
+
+```python
+관리자 도구로 네이버에 접속하고 헤더 부분을 살펴보면 User-Agent 라는 부분이 있다
+
+이 부분을 복사해와서 headers 라는 변수를 만들고 거기에 담아준다 ( 모바일 버전도 나중에 가능하다 )
+```
+
+![Untitled](<%EC%84%B9%EC%85%98%200%20Intro%20(%EC%84%A4%EC%B9%98,%20User-Agent)/Untitled%203.png>)
+
+```python
+그리고 get 요청을 보낼 때 두번째 인자에 headers 에 아까 담아두었던 headers 를 넣어주면
+
+headers = {
+    "User-Agent" : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+}
+
+req = requests.get(url, headers=headers);
+```
+
+![Untitled](<%EC%84%B9%EC%85%98%200%20Intro%20(%EC%84%A4%EC%B9%98,%20User-Agent)/Untitled%204.png>)
+
+```python
+위와 같이 고정된 헤더가 보내지는걸 확인 가능하다
+
+기본적으로는 이정도만으로도 대부분 사이트는 통과 가능하지만 추가적으로 설정이 필요한 사이트도 있고 모바일 버전등 다양한 변수가 존재한다
+```
+
+## User-Agent 란?
+
+```python
+User-Agent"는 HTTP 요청 헤더 중 하나로, 클라이언트가 서버에게 자신을 식별하는 데 사용되는 정보이다.
+
+일반적으로 웹 브라우저의 종류 및 버전, 운영 체제 등의 정보를 포함된다.
+
+이 정보는 서버가 클라이언트에 맞춤형 콘텐츠를 제공하거나 요청을 처리하는 데 도움이 될 수 있다.
+```

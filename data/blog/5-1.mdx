@@ -1,0 +1,2399 @@
+---
+title: '섹션 5: 폰과 향상된 입력 - 1'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 언리얼 엔진 - 클래스 계층구조와 상속 개념 }
+
+## 🎯 학습 목표
+
+객체 지향 프로그래밍의 핵심 개념 이해
+
+- 클래스 계층구조 (Class Hierarchy)
+- 상속 (Inheritance)
+- IS-A vs HAS-A 관계
+- 다음 단계: Pawn 클래스
+
+---
+
+## 🌳 클래스 계층구조란?
+
+### 기본 개념
+
+```
+언리얼 엔진 = 클래스 계층구조 기반
+
+계층구조 = 나무 구조
+  ├─ 위: 부모 (Parent)
+  └─ 아래: 자식 (Child)
+```
+
+**비유: 가계도**
+
+```
+할아버지
+  ├─ 아버지
+  │   └─ 나
+  └─ 삼촌
+      └─ 사촌
+```
+
+---
+
+## 📊 언리얼 엔진 기본 계층구조
+
+### Object (최상위)
+
+```
+Object (오브젝트)
+  ↓
+모든 것의 조상
+  ├─ 데이터 저장 가능
+  ├─ Blueprint로 만들 수 있음
+  └─ 가장 기본적인 기능만
+```
+
+### Actor (중간)
+
+```
+Object
+  └─ Actor (액터)
+      ↓
+      추가 기능:
+      ├─ 레벨에 배치 가능
+      ├─ 스폰 가능
+      ├─ Components 가질 수 있음
+      └─ Transform (위치, 회전, 크기)
+```
+
+### 우리가 만든 것들
+
+```
+Object
+  └─ Actor
+      ├─ BP_Bot
+      ├─ BP_Blaster_Beam
+      ├─ BP_Small_Sphere
+      └─ BP_Sphere_Spawner
+```
+
+---
+
+## 🎭 상속 (Inheritance) 이해
+
+### 개념
+
+```
+상속 = 부모의 특성을 물려받음
+
+자식 클래스:
+  ├─ 부모의 모든 기능 ✓
+  └─ + 자신만의 새 기능
+```
+
+### 예시: BP_Bot
+
+```
+Object (조상)
+  └─ Actor (부모)
+      └─ BP_Bot (자식)
+
+BP_Bot이 가진 것:
+  ├─ Object의 기능 (데이터 저장)
+  ├─ Actor의 기능 (레벨 배치, 스폰)
+  └─ BP_Bot만의 기능 (레이저 발사)
+```
+
+---
+
+## 🐕 동물 비유로 이해하기
+
+### 계층구조
+
+```
+동물 (Animal)
+  ├─ 포유류 (Mammal)
+  │   ├─ 개 (Dog)
+  │   │   └─ 저먼 셰퍼드
+  │   ├─ 고양이 (Cat)
+  │   └─ 말 (Horse)
+  │
+  └─ 파충류 (Reptile)
+      ├─ 뱀
+      └─ 도마뱀
+```
+
+### IS-A 관계 (상속)
+
+```
+✓ 저먼 셰퍼드는 개다
+✓ 개는 포유류다
+✓ 포유류는 동물이다
+✓ 저먼 셰퍼드는 동물이다
+
+✗ 동물은 포유류다 (틀림!)
+✗ 포유류는 개다 (틀림!)
+```
+
+**화살표 방향**
+
+```
+저먼 셰퍼드 → 개 → 포유류 → 동물
+(자식)              (부모)
+  ↑
+  한 방향만!
+```
+
+---
+
+## 🎮 언리얼의 IS-A 관계
+
+### Actor 계층
+
+```
+Object
+  └─ Actor
+      ├─ Pawn
+      │   └─ Character
+      │
+      └─ Game Mode Base
+          └─ BP_BadBotGameMode
+```
+
+### 예시들
+
+```
+✓ BP_BadBotGameMode는 Game Mode Base다
+✓ Game Mode Base는 Actor다
+✓ Actor는 Object다
+
+✗ Actor는 Pawn이다 (틀림!)
+✗ Game Mode Base는 BP_BadBotGameMode다 (틀림!)
+```
+
+---
+
+## 🔧 Component 계층구조
+
+### Actor Component 계열
+
+```
+Object
+  └─ Actor Component
+      └─ Scene Component
+          └─ Primitive Component
+              ├─ Static Mesh Component
+              └─ Sphere Collision
+```
+
+### 특징별 기능
+
+**Actor Component (최상위)**
+
+```
+기능:
+  ├─ Actor에 추가 가능
+  └─ 기본 Component 기능
+```
+
+**Scene Component**
+
+```
+Actor Component +
+  ├─ Transform (위치, 회전, 크기)
+  └─ Attachment (부착) 지원
+```
+
+**Primitive Component**
+
+```
+Scene Component +
+  ├─ Collision (충돌)
+  ├─ Overlap (겹침)
+  └─ On Component Begin Overlap ← 여기!
+```
+
+**Static Mesh Component**
+
+```
+Primitive Component +
+  └─ 시각적 메시
+```
+
+**Sphere Collision**
+
+```
+Primitive Component +
+  └─ 구 모양 충돌
+```
+
+---
+
+## 💡 왜 계층이 중요한가?
+
+### 1. 기능 상속
+
+```
+Static Mesh Component가
+  ↓
+Attachment 가능한 이유?
+  ↓
+Scene Component 상속!
+```
+
+### 2. Overlap 이벤트
+
+```
+Sphere Volume에
+  ↓
+On Component Begin Overlap 있는 이유?
+  ↓
+Primitive Component 상속!
+```
+
+**증명**
+
+```
+Scene Component (부모)
+  ├─ Overlap 기능 없음 ✗
+
+Primitive Component (자식)
+  ├─ Overlap 기능 있음 ✓
+
+Static Mesh Component (손자)
+  ├─ Overlap 기능 있음 ✓ (상속!)
+```
+
+---
+
+## 🎨 Cast 이해 (복습)
+
+### 왜 Cast가 필요한가?
+
+```
+Get Game Mode
+  ↓
+Game Mode Base 타입 반환
+  ↓
+하지만 실제로는 BP_BadBotGameMode
+  ↓
+부모 타입으로 포장됨
+```
+
+**비유**
+
+```
+저먼 셰퍼드를 "개"라고 소개
+  ↓
+개의 기본 기능만 보임
+  ↓
+"저먼 셰퍼드"로 Cast
+  ↓
+특수 기능 사용 가능!
+```
+
+### Cast의 원리
+
+```
+부모 타입 → 자식 타입 변환
+
+조건:
+  실제로 그 타입이어야 함!
+
+예:
+  "개"를 "저먼 셰퍼드"로 Cast
+  ✓ 실제로 저먼 셰퍼드면 성공
+  ✗ 고양이면 실패
+```
+
+---
+
+## 🏗️ IS-A vs HAS-A 관계
+
+### IS-A (상속)
+
+```
+BP_Bot은 Actor다 (IS-A)
+  ↓
+상속 관계
+  ├─ BP_Bot이 Actor 상속
+  └─ Actor의 모든 기능 가짐
+```
+
+**특징**
+
+```
+한 방향
+  자식 → 부모 (O)
+  부모 → 자식 (X)
+```
+
+### HAS-A (구성/컴포지션)
+
+```
+Actor는 Component를 가진다 (HAS-A)
+  ↓
+소유 관계
+  ├─ Actor가 Component 소유
+  └─ Component는 Actor 아님
+```
+
+**특징**
+
+```
+독립적
+  ├─ Actor와 Component는 다른 계층
+  └─ 상속 관계 아님
+```
+
+---
+
+## 📐 두 관계 비교
+
+### IS-A (상속)
+
+```
+예시:
+  Pawn은 Actor다
+
+관계:
+  └─ Actor
+      └─ Pawn (상속)
+
+특징:
+  ├─ Actor의 기능 자동 보유
+  └─ + Pawn만의 추가 기능
+```
+
+### HAS-A (구성)
+
+```
+예시:
+  Actor는 Static Mesh를 가진다
+
+관계:
+  Actor
+    └─ Static Mesh (소유)
+
+특징:
+  ├─ 추가/제거 가능
+  └─ 독립적 존재
+```
+
+---
+
+## 🎯 기능 확장 2가지 방법
+
+### 1. 상속 (Inheritance)
+
+```
+기존 클래스 기반 새 클래스 생성
+  ↓
+부모 기능 + 새 기능
+
+예:
+  Actor → BP_Bot
+  ├─ Actor 기능 (배치, 스폰)
+  └─ + 레이저 발사
+```
+
+### 2. 구성 (Composition)
+
+```
+기존 클래스에 Component 추가
+  ↓
+기본 기능 + Component 기능
+
+예:
+  BP_Bot + Static Mesh
+  ├─ BP_Bot 기능 (이동)
+  └─ + 시각적 표현
+```
+
+---
+
+## 🎓 객체 지향 프로그래밍 (OOP)
+
+### 개념
+
+```
+OOP = Object-Oriented Programming
+  ↓
+객체(Object) 중심 프로그래밍
+```
+
+**핵심 개념**
+
+```
+1. 상속 (Inheritance)
+   부모 → 자식
+
+2. 구성 (Composition)
+   전체 → 부분
+
+3. 캡슐화 (Encapsulation)
+   데이터 보호
+
+4. 다형성 (Polymorphism)
+   여러 형태
+```
+
+### Blueprint는 OOP
+
+```
+Blueprint = 객체 지향 시스템
+  ├─ 클래스 계층구조
+  ├─ 상속 사용
+  ├─ 컴포넌트 시스템
+  └─ Cast (타입 변환)
+```
+
+---
+
+## 🎮 Pawn 클래스 소개
+
+### Pawn이란?
+
+```
+Object
+  └─ Actor
+      └─ Pawn
+```
+
+**추가 기능**
+
+```
+Actor +
+  ├─ 빙의 (Possess) 가능
+  ├─ 입력 (Input) 받을 수 있음
+  └─ 플레이어/AI 제어 가능
+```
+
+### Default Pawn
+
+```
+현재 게임에서:
+  ├─ Play 누르면
+  ├─ Default Pawn 스폰
+  └─ 회색 구체, 날아다님
+
+이유:
+  Game Mode에서 설정됨
+```
+
+### 입력 제어
+
+```
+Pawn의 특별한 점:
+  ├─ 키보드 입력
+  ├─ 마우스 입력
+  └─ 게임패드 입력
+  ↓
+직접 제어 가능!
+
+Actor는:
+  Event Graph 로직으로만 이동
+
+Pawn은:
+  키 누르면 바로 이동!
+```
+
+---
+
+## 📝 다음 단계 예고
+
+### Custom Pawn 제작
+
+```
+다음 강의:
+  ├─ Pawn 기반 Blueprint 생성
+  ├─ Enhanced Input System 사용
+  ├─ 키보드로 이동 제어
+  └─ Default Pawn 대체
+```
+
+**목표**
+
+```
+회색 구체 대신
+  ↓
+나만의 커스텀 캐릭터
+  ↓
+키보드/마우스로 제어
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### 클래스 계층구조
+
+```
+위로 갈수록: 범용적, 기본적
+  ↑
+Object → Actor → Pawn → Character
+  ↓
+아래로 갈수록: 구체적, 전문적
+```
+
+### 상속의 법칙
+
+```
+✓ 자식은 부모다
+✗ 부모는 자식 아니다
+  ↓
+한 방향 관계
+```
+
+### IS-A vs HAS-A
+
+```
+IS-A (상속):
+  "~은 ~이다"
+  예: Pawn은 Actor다
+
+HAS-A (구성):
+  "~은 ~을 가진다"
+  예: Actor는 Component를 가진다
+```
+
+---
+
+## 🎨 용어 정리
+
+### 같은 의미
+
+**부모 클래스**
+
+```
+= Base Class (베이스 클래스)
+= Parent Class (부모 클래스)
+= Super Class (상위 클래스)
+```
+
+**자식 클래스**
+
+```
+= Child Class (자식 클래스)
+= Derived Class (파생 클래스)
+= Sub Class (하위 클래스)
+```
+
+**관계 설명**
+
+```
+"~을 기반으로"
+= "~에서 파생된"
+= "~을 상속받은"
+= "~의 자식"
+```
+
+---
+
+## 📊 실제 예시 정리
+
+### 우리가 만든 것들
+
+```
+Object
+  └─ Actor
+      ├─ BP_Bot (드론)
+      ├─ BP_Blaster_Beam (레이저)
+      ├─ BP_Small_Sphere (구체)
+      ├─ BP_Sphere_Spawner (생성기)
+      └─ Game Mode Base
+          └─ BP_BadBotGameMode
+```
+
+### Component들
+
+```
+Object
+  └─ Actor Component
+      └─ Scene Component
+          └─ Primitive Component
+              ├─ Static Mesh Component
+              │   └─ 우리가 추가한 메시들
+              │
+              └─ Sphere Collision
+                  └─ Sphere Volume
+```
+
+---
+
+## ⚠️ 중요한 이해
+
+### 1. 계층 = 상속
+
+```
+위에서 아래로
+  ↓
+부모에서 자식으로
+  ↓
+기능 물려받음
+```
+
+### 2. Cast의 필요성
+
+```
+부모 타입으로 받았지만
+  ↓
+실제로는 자식 타입
+  ↓
+Cast로 변환
+  ↓
+자식의 특수 기능 사용
+```
+
+### 3. Component ≠ 상속
+
+```
+Actor와 Component
+  ↓
+상속 관계 아님!
+  ↓
+소유 관계 (HAS-A)
+```
+
+---
+
+## 🎓 학습 요약
+
+### 새로 배운 개념
+
+```
+1. 클래스 계층구조
+   나무 구조로 정리
+
+2. 상속 (Inheritance)
+   부모 → 자식으로 기능 전달
+
+3. IS-A 관계
+   한 방향 관계
+
+4. HAS-A 관계
+   소유 관계
+
+5. OOP (객체 지향)
+   Blueprint의 기반 원리
+
+6. Pawn 클래스
+   입력 제어 가능한 Actor
+```
+
+### 이해한 것들
+
+```
+왜 Cast가 필요한지
+  ↓
+왜 연결이 안 되는지
+  ↓
+왜 특정 기능이 있는지
+  ↓
+클래스 계층구조로 설명 가능!
+```
+
+---
+
+## 🎯 핵심 정리
+
+```
+언리얼 엔진 = 클래스 계층구조
+  ├─ Object (최상위)
+  ├─ Actor (레벨 배치 가능)
+  ├─ Pawn (입력 제어 가능)
+  └─ 우리 Blueprint들 (특수 기능)
+  ↓
+상속 (IS-A):
+  자식은 부모의 모든 것 + α
+  ↓
+구성 (HAS-A):
+  Actor는 Component를 소유
+  ↓
+Cast:
+  부모 타입 → 자식 타입 변환
+  ↓
+다음: Pawn 만들기!
+```
+
+---
+
+# { 언리얼 엔진 - Custom Pawn 클래스 생성 }
+
+## 🎯 학습 목표
+
+커스텀 Pawn Blueprint 생성 및 Game Mode에 설정
+
+- Pawn 클래스 이해
+- BP_Bot_Pawn 생성
+- Default Pawn Class 변경
+
+---
+
+## 💡 사전 정리: Point Light Mobility
+
+### 문제: 빨간 X 표시
+
+```
+일부 Point Light에
+  ↓
+빨간 X 표시
+  ↓
+Mobility 설정 필요
+```
+
+### Mobility 옵션
+
+```
+Static (정적):
+  ├─ 절대 변하지 않음
+  ├─ 가장 효율적
+  └─ 베이크된 라이팅
+
+Stationary (고정):
+  ├─ 위치 고정
+  ├─ 강도/색상 변경 가능
+  └─ 중간 효율
+
+Movable (이동):
+  ├─ 게임 중 이동 가능
+  ├─ 가장 비효율적
+  └─ 동적 라이팅
+```
+
+### 설정
+
+```
+Point Light 선택
+  ↓
+Details → Transform
+  ↓
+Mobility: Static
+  ↓
+빨간 X 사라짐 ✓
+```
+
+---
+
+## 🎮 BP_Bot_Pawn 생성
+
+### 1. 폴더 생성
+
+```
+Content/Blueprints/
+  └─ Bot/ (새 폴더)
+```
+
+### 2. Pawn Blueprint 생성
+
+```
+Bot 폴더에서 우클릭
+  ↓
+Blueprint Class
+  ↓
+Pawn 선택 (Actor 아님!)
+  ↓
+이름: BP_Bot_Pawn
+```
+
+### 3. Pawn 특징 확인
+
+```
+설명:
+"Pawn은 빙의하여
+컨트롤러의 입력을 받을 수 있는 Actor"
+
+구조:
+  ├─ Scene Root (기본)
+  ├─ Event Graph
+  └─ Construction Script
+  ↓
+Actor와 매우 유사
+  (실제로 Actor 상속!)
+```
+
+---
+
+## ⚙️ Game Mode에 설정
+
+### Default Pawn Class 변경
+
+```
+BP_BadBotGameMode 열기
+  ↓
+Details Panel → Classes
+  ↓
+Default Pawn Class
+  ├─ 현재: Default Pawn
+  └─ 변경: BP_Bot_Pawn ✓
+  ↓
+Compile & Save
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380720/notion-blog/_/_/_5_/_5_-_1/image.png)
+
+---
+
+## 🧪 테스트 결과
+
+### Play 실행
+
+```
+Play 버튼
+  ↓
+Outliner 확인 (Shift + F1)
+  ↓
+BP_Bot_Pawn 스폰됨 ✓
+Default Pawn 없음 ✓
+```
+
+### 현재 상황
+
+```
+❌ WASD 작동 안 함
+❌ 마우스 회전 안 됨
+❌ 아무것도 안 보임
+
+이유:
+  BP_Bot_Pawn이 완전히 비어있음
+  ├─ Component 없음
+  ├─ 입력 설정 없음
+  └─ 기본 기능 없음
+```
+
+---
+
+## 💭 왜 이렇게 하나?
+
+### 백지 상태의 장점
+
+```
+Default Pawn:
+  ├─ 기본 기능 많음
+  ├─ 날아다님
+  └─ 커스터마이징 제한적
+
+BP_Bot_Pawn:
+  ├─ 완전히 비어있음
+  ├─ 원하는 대로 설계
+  └─ 100% 커스텀 가능 ✓
+```
+
+---
+
+## 📝 다음 단계
+
+```
+현재:
+  빈 Pawn 생성 ✓
+  Game Mode 설정 ✓
+
+다음:
+  ├─ Component 추가 (시각적 표현)
+  ├─ 입력 시스템 설정
+  └─ 이동 기능 구현
+```
+
+---
+
+## 🎯 핵심 정리
+
+```
+Pawn = 입력 받을 수 있는 Actor
+  ├─ 빙의(Possess) 가능
+  ├─ 컨트롤러 입력 수신
+  └─ 플레이어/AI 제어
+
+Custom Pawn 생성:
+  1. Pawn 기반 Blueprint
+  2. Game Mode에 설정
+  3. Component & 입력 추가
+
+백지 상태:
+  자유로운 커스터마이징 가능! 🎨
+```
+
+# { 언리얼 엔진 - Pawn에 Component 추가 }
+
+## 🎯 학습 목표
+
+BP_Bot_Pawn에 시각적 표현 및 카메라 추가
+
+- Static Mesh Component
+- Camera Component
+- Spring Arm Component
+
+---
+
+## 📦 Static Mesh 추가
+
+### 현재 문제
+
+```
+BP_Bot_Pawn
+  └─ Scene Root만 있음
+      ├─ 보이지 않음 ❌
+      ├─ Collision 없음 ❌
+      └─ Transform만 있음
+```
+
+### Static Mesh 추가
+
+```
+Add Component
+  ↓
+Static Mesh
+  ↓
+이름: Bot Mesh
+  ↓
+Static Mesh: SM_Drone 선택
+```
+
+### Root로 변경
+
+```
+Bot Mesh를 Scene Root로 드래그
+  ↓
+Scene Root 제거
+  ↓
+Bot Mesh가 Root ✓
+```
+
+---
+
+## 📷 Camera Component
+
+### 문제: 시점이 이상함
+
+```
+Play 실행
+  ↓
+드론이 안 보임
+  ↓
+Eject (Shift + F1 + Eject)
+  ↓
+카메라가 드론 위에 있음
+  ↓
+루트 위치 = 기본 시점
+```
+
+### Camera 추가
+
+```
+Bot Mesh 선택
+  ↓
+Add Component → Camera
+  ↓
+Camera Component 생성
+  ↓
+뒤로 이동 (위치 조정)
+```
+
+**특징**
+
+```
+게임에서 보이지 않음
+  ├─ Blueprint에서만 보임
+  └─ 시점 위치 결정
+```
+
+---
+
+## 🌸 Spring Arm Component
+
+### 왜 필요한가?
+
+```
+카메라만 추가:
+  ├─ 수동으로 위치 조정
+  └─ 벽 충돌 시 카메라 관통
+
+Spring Arm 사용:
+  ├─ 자동 거리 조정
+  ├─ 벽 충돌 감지
+  └─ 카메라 자동 당김 ✓
+```
+
+### Spring Arm 추가
+
+```
+Bot Mesh 선택
+  ↓
+Add Component → Spring Arm
+  ↓
+빨간 선 표시 (편집 시만)
+```
+
+### Camera를 Spring Arm에 부착
+
+```
+Camera를 Spring Arm으로 드래그
+  ↓
+Details → Location
+  ↓
+Reset (곡선 화살표)
+  ↓
+(0, 0, 0)으로 리셋
+```
+
+---
+
+## ⚙️ Spring Arm 설정
+
+### Target Arm Length
+
+```
+Details Panel
+  ↓
+Camera Settings
+  ↓
+Target Arm Length: 조정
+  ↓
+카메라와 드론 거리
+```
+
+### Rotation
+
+```
+Spring Arm 회전
+  ↓
+Pitch: -20도 (약간 내려다봄)
+  ↓
+카메라도 함께 회전
+```
+
+---
+
+## 🎮 Spring Arm의 장점
+
+### 자동 충돌 처리
+
+```
+플레이어가 벽 가까이 이동
+  ↓
+카메라가 벽 관통하려 함
+  ↓
+Spring Arm이 감지
+  ↓
+자동으로 카메라 당김
+  ↓
+벽 안 뚫림 ✓
+```
+
+---
+
+## 📊 최종 구조
+
+```
+BP_Bot_Pawn
+  └─ Bot Mesh (Root)
+      └─ Spring Arm
+          └─ Camera
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380716/notion-blog/_/_/_5_/_5_-_1/image_1.png)
+
+---
+
+## 🎯 핵심 정리
+
+```
+Static Mesh:
+  시각적 표현 (드론 보임)
+
+Camera:
+  시점 위치 결정
+
+Spring Arm:
+  ├─ Camera 부착용
+  ├─ 거리 자동 조정
+  └─ 충돌 처리
+  ↓
+전문적인 3인칭 카메라! 📷
+```
+
+---
+
+# { 언리얼 엔진 - Enhanced Input System 설정 }
+
+## 🎯 학습 목표
+
+Enhanced Input System으로 입력 처리 구현
+
+- Input Action 생성
+- Input Mapping Context 설정
+- Pawn에 입력 연결
+- 입력 이벤트 이해
+
+---
+
+## 🎮 Enhanced Input System이란?
+
+### 구성 요소
+
+```
+Enhanced Input System = 3가지 부품
+
+1. Input Action (IA)
+   "무엇을" 할 것인가
+   예: 발사, 점프, 이동
+
+2. Input Mapping Context (IMC)
+   "어떤 키로" 할 것인가
+   예: 마우스 클릭, F키
+
+3. Pawn 연결
+   "누가" 받을 것인가
+   예: BP_Bot_Pawn
+```
+
+---
+
+## 📝 1단계: Input Action 생성
+
+### 폴더 생성
+
+```
+Content/Blueprints/
+  └─ Input/ (새 폴더)
+```
+
+### Input Action 생성
+
+```
+Input 폴더에서 우클릭
+  ↓
+Input → Input Action
+  ↓
+이름: IA_Fire
+  (IA = Input Action의 약자)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380718/notion-blog/_/_/_5_/_5_-_1/image_2.png)
+
+### Value Type 이해
+
+```
+IA_Fire 열기
+  ↓
+Details → Value Type
+```
+
+**옵션들**
+
+```
+Digital (Bool):
+  ├─ True/False 두 가지만
+  ├─ 버튼 눌림/안 눌림
+  └─ 가장 기본적
+  예: 발사, 점프
+
+Axis 1D (Float):
+  ├─ -1 ~ 1 범위
+  ├─ 한 방향
+  └─ 트리거, 스크롤
+  예: 가속, 줌
+
+Axis 2D (Vector 2D):
+  ├─ X, Y 두 방향
+  ├─ 평면 이동
+  └─ 마우스, 조이스틱
+  예: 이동 (WASD)
+
+Axis 3D (Vector 3D):
+  ├─ X, Y, Z 세 방향
+  ├─ 3D 이동
+  └─ 덜 일반적
+  예: 비행
+```
+
+**우리는 Digital (Bool) 사용**
+
+```
+발사 = 누름/안 누름
+  ↓
+True/False만 필요
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380718/notion-blog/_/_/_5_/_5_-_1/image_3.png)
+
+---
+
+## 🗺️ 2단계: Input Mapping Context 생성
+
+### IMC 생성
+
+```
+Input 폴더에서 우클릭
+  ↓
+Input → Input Mapping Context
+  ↓
+이름: IMC_Bot
+  (IMC = Input Mapping Context)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380719/notion-blog/_/_/_5_/_5_-_1/image_4.png)
+
+### IMC 역할
+
+```
+Input Action과 실제 키 연결
+
+예:
+  IA_Fire (발사 동작)
+    ↓
+  IMC_Bot에서 연결
+    ↓
+  마우스 왼쪽 버튼
+  F키
+```
+
+---
+
+## ⌨️ 키 매핑 설정
+
+### IMC_Bot 열기
+
+```
+Mappings 배열
+  ↓
++ 버튼 (매핑 추가)
+  ↓
+드롭다운 확장
+```
+
+### Input Action 선택
+
+```
+드롭다운
+  ↓
+IA_Fire 선택
+```
+
+### 키 연결 방법 1: 드롭다운
+
+```
+삼각형 확장
+  ↓
+Key 드롭다운
+  ↓
+Mouse → Left Mouse Button
+```
+
+### 키 연결 방법 2: 직접 누르기 (빠름!)
+
+```
+키보드 아이콘 클릭
+  ↓
+노란색으로 변함
+  ↓
+원하는 키 누르기 (F)
+  ↓
+자동으로 F키 연결 ✓
+```
+
+### 여러 키 연결
+
+```
+매핑 옆 + 버튼 (매핑 추가 아님!)
+  ↓
+추가 입력 슬롯
+  ↓
+키보드 아이콘 → F 누르기
+```
+
+**결과**
+
+```
+IA_Fire
+  ├─ Mouse Left Button
+  └─ F
+  ↓
+둘 중 아무거나 눌러도 발사!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380719/notion-blog/_/_/_5_/_5_-_1/image_5.png)
+
+---
+
+## 🔌 3단계: Pawn에 연결
+
+### BP_Bot_Pawn Event Graph
+
+### 전체 흐름 (외워두세요!)
+
+```
+1. Get Controller (이 Pawn의 컨트롤러)
+   ↓
+2. Cast to Player Controller (타입 변환)
+   ↓
+3. Get Enhanced Input Local Player Subsystem
+   ↓
+4. Add Mapping Context (IMC 추가)
+```
+
+---
+
+## 🔧 노드별 상세 설명
+
+### 1. Get Controller
+
+```
+Event Begin Play
+  ↓
+우클릭 → "Get Controller"
+```
+
+**의미**
+
+```
+이 Pawn을 소유한 컨트롤러 가져오기
+
+모든 Pawn은:
+  ├─ Controller가 소유
+  └─ Possess (빙의) 관계
+
+Return Type: Controller
+```
+
+### 2. Cast to Player Controller
+
+```
+Get Controller 드래그
+  ↓
+"Cast to Player Controller"
+```
+
+**왜 Cast가 필요한가?**
+
+```
+Get Controller 반환값:
+  Controller (부모 타입)
+
+필요한 것:
+  Player Controller (자식 타입)
+  ↓
+Cast로 변환!
+
+Player Controller는 Controller다 ✓
+Controller는 Player Controller 아님 ✗
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380719/notion-blog/_/_/_5_/_5_-_1/image_6.png)
+
+### 3. Enhanced Input Subsystem
+
+```
+Cast to Player Controller 드래그
+  ↓
+"Get Enhanced Input Local Player Subsystem"
+  (긴 이름!)
+```
+
+**Subsystem이란?**
+
+```
+게임에 단 1개만 존재하는 객체
+  ├─ 전역적으로 접근 가능
+  ├─ 입력 시스템 관리
+  └─ Get 함수로 접근
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380719/notion-blog/_/_/_5_/_5_-_1/image_7.png)
+
+### 4. Add Mapping Context
+
+```
+Subsystem 드래그
+  ↓
+"Add Mapping Context"
+  ↓
+Mapping Context: IMC_Bot 선택
+  ↓
+Priority: 0 (기본값)
+```
+
+**Priority란?**
+
+```
+여러 IMC 추가 시
+  ↓
+우선순위 높은 것이 먼저
+  ↓
+같은 키 충돌 시 해결
+
+예:
+  IMC_Bot (Priority 1)
+  IMC_Menu (Priority 0)
+  ↓
+  IMC_Bot이 우선
+```
+
+### 최종 연결
+
+```
+Event Begin Play
+  ↓
+Get Controller
+  ↓
+Cast to Player Controller → Success
+  ↓
+Get Enhanced Input Subsystem
+  ↓
+Add Mapping Context (IMC_Bot)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380719/notion-blog/_/_/_5_/_5_-_1/image_8.png)
+
+---
+
+## 🎯 입력 이벤트 사용
+
+### 이벤트 추가
+
+```
+Event Graph 우클릭
+  ↓
+"IA_Fire" 검색
+  ↓
+두 가지 옵션:
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380720/notion-blog/_/_/_5_/_5_-_1/image_9.png)
+
+### 옵션 1: IA Fire (Event)
+
+```
+화살표 아이콘 있는 것
+  ↓
+Event IA_Fire
+```
+
+**실행 핀들**
+
+```
+Started:
+  버튼 누르는 순간 1회
+
+Triggered:
+  버튼 누르고 있는 동안 매 프레임
+
+Ongoing:
+  (고급 기능)
+
+Canceled:
+  (고급 기능)
+
+Completed:
+  버튼 떼는 순간 1회
+```
+
+### 옵션 2: Enhanced Action Value
+
+```
+화살표 없는 것
+  ↓
+Get Enhanced Input Action Value
+  ↓
+Pure Function (녹색)
+```
+
+**반환값**
+
+```
+Value Type: Bool
+  ├─ True: 누르고 있음
+  └─ False: 안 누름
+  ↓
+Branch에 바로 연결 가능
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380720/notion-blog/_/_/_5_/_5_-_1/image_9.png)
+
+---
+
+## 🧪 테스트
+
+### Print String으로 확인
+
+```
+IA_Fire Event
+  ├─ Started → Print "Started" (파란색)
+  ├─ Triggered → Print "Triggered" (녹색)
+  └─ Completed → Print "Completed" (빨간색)
+
+Duration: 60초로 변경
+  (오래 보이게)
+```
+
+### 결과
+
+```
+클릭 시:
+1. "Started" (1회)
+2. "Triggered" (계속)
+3. "Completed" (떼면 1회)
+
+순서:
+  Started → Triggered → Triggered → ... → Completed
+```
+
+---
+
+## 🔍 Show Debug Enhanced Input
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380716/notion-blog/_/_/_5_/_5_-_1/image_10.png)
+
+### 콘솔 명령어
+
+```
+Play 실행
+  ↓
+뷰포트 클릭 (참여)
+  ↓
+~ (물결표) 키
+  ↓
+명령: showdebug enhancedinput
+```
+
+**표시 정보**
+
+```
+좌상단에 표시:
+  ├─ Pawn 이름 (BP_Bot_Pawn)
+  ├─ Controller (PlayerController)
+  ├─ 위치, 회전
+  ├─ 사용 중인 IMC
+  ├─ Input Actions
+  │   ├─ IA_Fire
+  │   ├─ 연결된 키들
+  │   └─ 현재 값 (True/False)
+  └─ Triggered 시간 추적
+```
+
+### Page Up/Down
+
+```
+여러 Pawn 있을 때
+  ↓
+Page Up/Down으로 전환
+  ↓
+각 Pawn 정보 확인
+```
+
+### 콘솔 팁
+
+```
+Play 중:
+  뷰포트 클릭 → ~ → 명령어 ✓
+
+Play 안 할 때:
+  에디터 콘솔 → 일부만 작동
+
+단축키:
+  ↑ (위 화살표) → 이전 명령 자동 입력
+```
+
+---
+
+## ⚠️ 주의사항
+
+### Get Controller vs Get Player Controller
+
+**Get Controller (추천!)**
+
+```
+Target: Pawn
+  ↓
+이 Pawn의 실제 컨트롤러
+  ↓
+항상 정확 ✓
+  ↓
+Cast to Player Controller 필요
+```
+
+**Get Player Controller (권장 안 함)**
+
+```
+Target: Gameplay Statics
+  ↓
+Player Index로 찾기
+  ↓
+멀티플레이어에서 불확실 ✗
+  ↓
+Cast 불필요하지만 위험
+```
+
+**결론**
+
+```
+Get Controller + Cast to Player Controller
+  ↓
+더 안전하고 정확!
+```
+
+---
+
+## 📊 전체 구조 요약
+
+### 설정 순서
+
+```
+1. Input Action (IA_Fire)
+   └─ Value Type: Digital (Bool)
+
+2. Input Mapping Context (IMC_Bot)
+   └─ IA_Fire → Mouse Left, F
+
+3. Pawn에 연결
+   └─ Begin Play에서 IMC 추가
+
+4. 이벤트 사용
+   └─ IA_Fire Event 또는 Value
+```
+
+### 파일 구조
+
+```
+Input/
+  ├─ IA_Fire (Input Action)
+  └─ IMC_Bot (Input Mapping Context)
+
+Bot/
+  └─ BP_Bot_Pawn
+      └─ Event Graph에서 연결
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Enhanced Input의 장점
+
+```
+기존 방식:
+  하드코딩된 키
+  ├─ 변경 어려움
+  └─ 재사용 불가
+
+Enhanced Input:
+  유연한 시스템
+  ├─ 키 쉽게 변경
+  ├─ 여러 키 동시 바인딩
+  ├─ 재사용 가능
+  └─ 디버그 도구 제공
+```
+
+### 3단계 기억법
+
+```
+1. "무엇을" - Input Action
+2. "어떤 키로" - Mapping Context
+3. "누가" - Pawn 연결
+```
+
+---
+
+## 🎓 학습 정리
+
+### 새로 배운 것
+
+```
+1. Input Action
+   동작 정의
+
+2. Input Mapping Context
+   키 연결
+
+3. Enhanced Input Subsystem
+   시스템 관리 객체
+
+4. Input Events
+   Started/Triggered/Completed
+
+5. Console Commands
+   showdebug enhancedinput
+```
+
+### 어려운 부분
+
+```
+Pawn 연결 과정:
+  4개 노드 순서
+  ├─ Get Controller
+  ├─ Cast to Player Controller
+  ├─ Get Subsystem
+  └─ Add Mapping Context
+  ↓
+외우거나 메모!
+```
+
+---
+
+## 🎯 핵심 정리
+
+```
+Enhanced Input = 현대적 입력 시스템
+  ├─ Input Action (동작)
+  ├─ Mapping Context (키)
+  └─ Pawn 연결 (사용자)
+  ↓
+Begin Play에서:
+  Controller → Cast → Subsystem → Add IMC
+  ↓
+Event Graph에서:
+  IA_Fire Event로 반응
+  ├─ Started (누름)
+  ├─ Triggered (계속)
+  └─ Completed (뗌)
+  ↓준비 완료! 다음은 이동! 🚀
+
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380717/notion-blog/_/_/_5_/_5_-_1/image_11.png)
+
+```csharp
+더블 클릭으로 정리하기
+```
+
+# { 언리얼 엔진 - 발사 시스템 구현 및 Trigger 설정 }
+
+## 🎯 학습 목표
+
+IA_Fire로 Blaster Beam 발사 구현
+
+- Fire Rifle 함수 제작
+- FlipFlop으로 좌우 교체
+- Pulse Trigger로 연사 제어
+
+---
+
+## 🎮 도전 과제
+
+### 목표
+
+```
+마우스 클릭 또는 F키
+  ↓
+Blaster Beam 발사
+  ↓
+좌우 소총 교대 발사
+```
+
+---
+
+## 🔫 Fire Rifle 함수 제작
+
+### 1. 함수 생성
+
+```
+Functions → + 버튼
+  ↓
+이름: Fire Rifle
+  ↓
+Input: Left Rifle (Boolean)
+```
+
+**Left Rifle 의미**
+
+```
+True: 왼쪽 소총 발사
+False: 오른쪽 소총 발사
+```
+
+### 2. Socket 이름 확인
+
+```
+Bot Mesh 선택
+  ↓
+Details → Static Mesh
+  ↓
+SM_Drone 더블클릭
+  ↓
+Sockets 확인:
+  ├─ Rifle_L (왼쪽)
+  └─ Rifle_R (오른쪽)
+```
+
+---
+
+## 🔧 Local Variable 사용
+
+### Local Variable이란?
+
+```
+일반 Variable:
+  ├─ Actor 전체에서 사용
+  └─ 항상 메모리에 존재
+
+Local Variable:
+  ├─ 함수 내부에만 존재
+  ├─ 함수 호출 시 생성
+  └─ 함수 끝나면 소멸
+  ↓
+메모리 효율적!
+```
+
+### Socket Name 생성
+
+```
+Fire Rifle 함수 내
+  ↓
+Variables → + 버튼
+  ↓
+이름: Socket Name
+  ├─ Type: Name
+  └─ 함수 내부에서만 보임
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380717/notion-blog/_/_/_5_/_5_-_1/image_12.png)
+
+---
+
+## 🎯 Branch로 분기
+
+### 구조
+
+```
+Fire Rifle 함수
+  ↓
+Branch
+  ├─ Condition: Left Rifle (Input)
+  │
+  ├─ True
+  │   └─ Set Socket Name = "Rifle_L"
+  │
+  └─ False
+      └─ Set Socket Name = "Rifle_R"
+```
+
+**흐름**
+
+```
+Left Rifle = True
+  → Socket Name = "Rifle_L"
+
+Left Rifle = False
+  → Socket Name = "Rifle_R"
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380717/notion-blog/_/_/_5_/_5_-_1/image_13.png)
+
+---
+
+## 🚀 Spawn Actor 구현
+
+### 방법 1: Get Socket Location + Rotation
+
+```
+Get Socket Location
+  ├─ Target: Bot Mesh
+  └─ Socket Name: Socket Name (변수)
+  ↓
+Get Socket Rotation
+  ├─ Target: Bot Mesh
+  └─ Socket Name: Socket Name
+  ↓
+Spawn Actor from Class
+  ├─ Class: BP_Blaster_Beam
+  ├─ Spawn Transform (Split)
+  │   ├─ Location: Socket Location
+  │   └─ Rotation: Socket Rotation
+```
+
+### 방법 2: Get Socket Transform (더 간결!)
+
+```
+Get Socket Transform
+  ├─ Target: Bot Mesh
+  └─ Socket Name: Socket Name
+  ↓
+Return Value 우클릭
+  ↓
+Split Struct Pin
+  ├─ Location
+  └─ Rotation
+  ↓
+Spawn Actor from Class
+  └─ Spawn Transform: 직접 연결도 가능!
+```
+
+**가장 간결한 방법**
+
+```
+Get Socket Transform
+  ↓
+Return Value → Spawn Transform
+  (Split 안 하고 직접 연결!)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380718/notion-blog/_/_/_5_/_5_-_1/image_14.png)
+
+---
+
+## 🔄 FlipFlop으로 교대 발사
+
+### 이벤트 연결
+
+```
+IA_Fire Event → Started
+  ↓
+FlipFlop
+  ├─ A → Fire Rifle (Left Rifle: True)
+  └─ B → Fire Rifle (Left Rifle: False)
+```
+
+### 테스트
+
+```
+클릭 1: 왼쪽 발사
+클릭 2: 오른쪽 발사
+클릭 3: 왼쪽 발사
+...
+완벽한 교대! ✓
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380717/notion-blog/_/_/_5_/_5_-_1/image_15.png)
+
+---
+
+## 💡 FlipFlop 최적화
+
+### 개선 전
+
+```
+FlipFlop
+  ├─ A → Fire Rifle (True)
+  └─ B → Fire Rifle (False)
+  ↓
+함수 호출 2번
+```
+
+### FlipFlop의 비밀
+
+```
+FlipFlop
+  ├─ A 핀 실행 → Is A = True
+  └─ B 핀 실행 → Is A = False
+  ↓
+Boolean 값 반환!
+```
+
+### 개선 후
+
+```
+FlipFlop
+  ├─ A → Fire Rifle
+  └─ B → Fire Rifle
+  ↓
+Is A → Left Rifle
+  ↓
+함수 호출 1번만! ✓
+```
+
+**더 깔끔!**
+
+---
+
+## 🎵 사운드 & 파티클 추가
+
+### BP_Bot에서 복사
+
+```
+BP_Bot 열기
+  ↓
+Spawn Blaster Beam 함수
+  ↓
+노드 복사:
+  ├─ Spawn System at Location
+  └─ Play Sound at Location
+```
+
+### BP_Bot_Pawn에 붙여넣기
+
+```
+Fire Rifle 함수
+  ↓
+Ctrl + V (붙여넣기)
+  ↓
+자동으로 Socket Name 연결! ✓
+```
+
+**왜 자동 연결?**
+
+```
+BP_Bot:
+  Socket Name (함수 Input Parameter)
+
+BP_Bot_Pawn:
+  Socket Name (Local Variable)
+
+둘 다 이름이 같아서
+  ↓
+자동으로 연결됨!
+```
+
+### Input Parameter vs Local Variable
+
+```
+Input Parameter:
+  ├─ 함수 외부에서 전달
+  ├─ 함수 입력으로 받음
+  └─ 예: BP_Bot의 Socket Name
+
+Local Variable:
+  ├─ 함수 내부에서 생성
+  ├─ 함수 안에서만 사용
+  └─ 예: BP_Bot_Pawn의 Socket Name
+
+공통점:
+  둘 다 함수 범위 내에서만 존재!
+```
+
+---
+
+## ⚡ Triggered 문제
+
+### Started vs Triggered
+
+**Started 연결 시**
+
+```
+클릭 → 1발 발사 ✓
+```
+
+**Triggered 연결 시**
+
+```
+클릭 유지
+  ↓
+매 프레임 발사
+  ↓
+너무 빠름! ✗
+```
+
+---
+
+## 🎛️ Pulse Trigger (핵심!)
+
+### Trigger란?
+
+```
+Input Action의 동작 방식 변경
+
+위치:
+  ├─ Input Mapping Context
+  │   └─ 각 키마다 설정
+  │
+  └─ Input Action
+      └─ 모든 키에 공통 적용 ✓
+```
+
+### IMC에서 설정 (권장 안 함)
+
+```
+IMC_Bot 열기
+  ↓
+IA_Fire → Mouse Left Button
+  ↓
+Triggers 배열 → + 버튼
+  ↓
+Pulse 선택
+  ├─ Interval: 0.25 (0.25초마다)
+  └─ Trigger on Start: ✓
+```
+
+**문제**
+
+```
+마우스만 적용됨
+  ↓
+F키는 여전히 빠름
+  ↓
+각 키마다 설정 필요 ✗
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380719/notion-blog/_/_/_5_/_5_-_1/image_16.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380719/notion-blog/_/_/_5_/_5_-_1/image_17.png)
+
+---
+
+## ✅ Input Action에서 설정 (추천!)
+
+### 올바른 방법
+
+```
+IA_Fire 열기
+  ↓
+Triggers 배열 → + 버튼
+  ↓
+Pulse 선택
+```
+
+### Pulse 설정
+
+```
+Interval: 0.1 ~ 0.15
+  ├─ 0.1: 빠른 연사
+  ├─ 0.15: 적당한 연사
+  └─ 0.25: 느린 연사
+
+Trigger on Start: ✓
+  └─ 버튼 누르자마자 발사
+```
+
+### 효과
+
+```
+모든 키에 적용!
+  ├─ Mouse Left Button
+  └─ F
+  ↓
+어떤 키든 같은 속도 ✓
+```
+
+---
+
+## 🎮 Trigger 종류
+
+### Pulse (펄스)
+
+```
+일정 간격으로 트리거
+  ├─ Interval: 시간 간격
+  └─ Trigger on Start: 즉시 발사
+
+용도: 연사, 반복 동작
+```
+
+### Hold (홀드)
+
+```
+일정 시간 누르고 있어야 트리거
+  ├─ Hold Time: 필요 시간
+  └─ Is One Shot: 1회만
+
+용도: 차지 공격
+```
+
+### Tap (탭)
+
+```
+짧게 눌러야 트리거
+  ├─ 길게 누르면 취소
+  └─ 빠른 입력만 인정
+
+용도: 더블 탭, 빠른 반응
+```
+
+### Chorded Action
+
+```
+여러 키 조합
+  예: Ctrl + C
+
+용도: 복합 입력
+```
+
+---
+
+## 🔧 Modifier (수정자)
+
+### 역할
+
+```
+Trigger 후
+  ↓
+Input Action 값 변경
+  ↓
+예: 민감도 조절, 반전
+```
+
+**Digital (Bool)에는 불필요**
+
+```
+True/False만 있어서
+  ↓
+변경할 것 없음
+  ↓
+주로 Axis에서 사용
+```
+
+---
+
+## 📊 최종 구조
+
+### Fire Rifle 함수
+
+```
+Input: Left Rifle (Bool)
+  ↓
+Branch
+  ├─ True → Socket Name = "Rifle_L"
+  └─ False → Socket Name = "Rifle_R"
+  ↓
+Get Socket Transform
+  └─ Socket Name
+  ↓
+Spawn Actor (BP_Blaster_Beam)
+  ├─ Transform: Socket Transform
+  └─ 동시 실행:
+      ├─ Spawn System (파티클)
+      └─ Play Sound (사운드)
+```
+
+### Event Graph
+
+```
+IA_Fire Event → Started
+  ↓
+FlipFlop
+  ├─ A → Fire Rifle
+  └─ B → Fire Rifle
+  ↑
+  Is A → Left Rifle (Input)
+```
+
+### IA_Fire 설정
+
+```
+Value Type: Digital (Bool)
+  ↓
+Triggers:
+  └─ Pulse
+      ├─ Interval: 0.15
+      └─ Trigger on Start: ✓
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Local Variable 장점
+
+```
+1. 함수 내부에만 존재
+   └─ 메모리 효율적
+
+2. 함수끼리 독립적
+   └─ 이름 충돌 없음
+
+3. 일시적 계산용
+   └─ 임시 데이터 저장
+```
+
+### Trigger vs Modifier
+
+```
+Trigger:
+  언제 트리거되는지
+  예: 0.15초마다
+
+Modifier:
+  트리거된 값을 어떻게
+  예: 2배 증폭, 반전
+```
+
+### Input Action vs Mapping Context
+
+```
+Input Action에 설정:
+  ├─ 모든 키에 공통 적용
+  └─ 추천! ✓
+
+Mapping Context에 설정:
+  ├─ 각 키마다 개별 적용
+  └─ 번거로움 ✗
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 1. Triggered는 빠름
+
+```
+Started: 1회
+Triggered: 매 프레임
+  ↓
+Pulse 없으면 너무 빠름!
+```
+
+### 2. Local Variable 범위
+
+```
+함수 밖에서 접근 불가
+  ↓
+다른 함수에서 못 씀
+  ↓
+함수 전용 변수
+```
+
+### 3. Trigger 위치
+
+```
+각 키마다 설정 (비효율)
+  vs
+Input Action에 설정 (효율) ✓
+```
+
+---
+
+## 🎓 학습 요약
+
+### 새로 배운 것
+
+```
+1. Local Variable
+   함수 내부 전용 변수
+
+2. FlipFlop Boolean
+   Is A로 True/False 활용
+
+3. Pulse Trigger
+   연사 속도 제어
+
+4. Get Socket Transform
+   위치 + 회전 한 번에
+```
+
+### 구현한 시스템
+
+```
+발사 시스템
+  ├─ 좌우 교대 발사
+  ├─ 자동 연사
+  ├─ 사운드 & 파티클
+  └─ 속도 조절 가능
+```
+
+---
+
+## 🎯 핵심 정리
+
+```
+Fire Rifle 함수
+  ├─ Input: Left Rifle (Bool)
+  ├─ Local: Socket Name (Name)
+  ├─ Branch로 소켓 선택
+  └─ Spawn + 파티클 + 사운드
+  ↓
+FlipFlop 활용
+  ├─ A/B 교대 실행
+  └─ Is A로 Boolean 전달
+  ↓
+Pulse Trigger (중요!)
+  ├─ Input Action에 설정
+  ├─ Interval: 0.15초
+  └─ 모든 키에 자동 적용
+  ↓
+결과: 전문적인 발사 시스템! 🔫
+
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380718/notion-blog/_/_/_5_/_5_-_1/image_18.png)

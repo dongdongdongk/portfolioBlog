@@ -1,0 +1,304 @@
+---
+title: 'Logback'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+[Logback Manual](https://logback.qos.ch/manual/)
+
+[Core Features](https://docs.spring.io/spring-boot/docs/2.6.7/reference/html/features.html#features.logging)
+
+## 1. 로그 라이브러리 종류
+
+```java
+1. java.util.Logging
+	 - 별도 라이브러리 추가 없이 사용
+	 - JDK 1.4 이후 추가된 표준
+	 - 기능 부족
+
+2. Apache Commons Logging
+	 - 아파치 재단의 Commons 라이브러리 중 하나
+
+3. Log4j
+	 - 아파치 재단에서 제공
+	 - 현재는 중단, 이후 Log4j2 로 대체 됨
+	 - 한때 보안 이슈 발생
+
+4. Logback
+	 - Log4j의 단점을 개선하여 개발
+	 - 현재 많이 씀
+
+-----------------------------------------
+SLF4J (Simple Logging Facade for Java)
+	- 로그 API들을 추상화한 Interface
+	- 자유로운 로거 사용을 위해
+	- 어떤 로거를 사용하든 SLF4J를 구현해 사용
+	- 로거 라이브러리를 교체 하기에도 용이 함
+```
+
+## 2. Log Level
+
+```java
+1. Error
+	 요청을 처리하는 중 오류가 발생한 정보
+2. Warn
+	 오류는 아니지만 잠재적인 오류 원인이 될 수 있는 경고
+3. Info
+	 진행 상황등 일반 정보
+4. Debug
+	 디버깅에 유용한 세부 정보
+5. Trace
+	 debug 보다 세분화된 정보
+
+기본 레벨을 Info로 했다면 Info 이상만 출력(Warn, Error)
+```
+
+## 3. Log 설정 항목
+
+```xml
+**Appender**
+이벤트 마다 로그를 기록하는 기능을 처리하는 객체
+로그이 출력위치, 출력 형식등을 설정
+
+1. ConsoleAppender
+	 - 로그를 콘솔에 출력
+2. FileAppender
+	 - 로그를 지정 파일에 기록
+3. RollingFileAppender
+	- FileAppender을 상속. 날짜와 용량등을 설정해서 패턴에 따라 로그가 각기 다른파일에 기록되게 할 수 있음.
+	- rollover는 다음 파일로 이동하는 행위로 한 로그 파일에 무한정 기록할 수 없으니 특정 기준에 따라 기록하는 파일 대상을 바꿔주는 것
+
+	1) RollingPolicy    : rollover에 필요한 action을 설정한다. (ex. TimeBasedPolicy, SizeAndTimeBasedRollingPolicy 등)
+			a. TimeBasedPolicy, SizeAndTimeBasedRollingPolicy
+				 - TimeBasedPolicy는 시간을 기준으로 rollover를 설정
+				 - SizeAndTimeBasedRollingPolicy 시간에다가 파일 크기까지 고려하여 rollover를 설정
+				 * fileNamePattern
+					 - 아카이브 될 로그 파일의 패턴을 정의한다.
+					 - %d 문자를 이용해 파일의 적절한 부분을 dateTime 패턴으로 바꿔준다.
+					 - default(%d)는 yyyy-mm-dd로 매일 자정 새로운 로그 파일로 rollover 한다.
+				 * maxHistory
+					 - 아카이브에 저장할 로그 파일 개수를 지정한다.
+					 - fileNamePattern에 명시된 dateTime 패턴의 최소 단위에 따라 rollover 단위가 달라진다.
+				 * totalSizeCap
+					 - 로그 파일 아카이브 저장소 최대 크기를 지정한다. 이를 초과하면 가장 오래된 파일이 삭제된다.
+				 * cleanHistoryOnStart
+					- true로 설정하면 앱을 시작하면 아카이브된 로그 파일을 모두 삭제한다. default는 false이다.
+
+
+	2) TriggeringPolicy : rollover가 발생하는 기준(정책)을 설정한다.
+
+4. Loback-classic 모듈의 Appender (SSLSocketAppender, SMTPAppender, DBAppender 등)을 사용하여 로그를 원격위치에 기록 가능
+
+**Logger**
+실제 로그 기능을 수행하는 객체
+각 Logger 마다 name을 통해 구분
+최상위 로거인 Root Logger를 설정하면 계층적으로 활용 가능
+
+**Pattern**
+	1. %-5level           : 로그 레벨, -5는 출력의 고정폭 값(5글자이하라도 5칸 차지 줄맞추기 위한 용도) (INFO, ERROR, DEBUG , 기타 등등이다.)
+  2. %d{날짜 형식 포맷} : 로그 기록시간 %d{yyyy-MM-dd HH:mm:ss}
+	3. %thread            : 현재 Thread 명
+	4. %F                 : 로깅을 발생시킨 파일 명
+	5. %M                 : 로깅을 발생시킨 메소드 명
+	6. %logger{length}    : Logger name을 축약할 수 있다. length는 최대 자릿수이다 (0 = 무제한)
+	7. %line              : 로깅이 발생된 라인 넘버
+	8. %msg               : 로그 메시지
+	9. %n                 : 줄바꿈(new line)
+
+**Color**
+로그 기록 출력시 색상 적용(공식 문서 확인)
+%clr(pattern){color}로 사용
+
+Springboot에서 제공하는 로그 Color 참조
+https://github.com/spring-projects/spring-boot/blob/main/spring-boot-project/spring-boot/src/main/resources/org/springframework/boot/logging/logback/defaults.xml
+======================================================================================
+
+<configuration>
+		<!-- 다른 설정 파일 불러오기 가능 -->
+		<include resource="org/springframework/boot/logging/logback/console-appender.xml" />
+
+		<!------------------------------------  **Property 설정**  ----------------------------------------------------->
+		<!-- peroperty : 변수 같은 개념 사용하는 곳에서 ${perperty의 name값} 으로 사용 -->
+		<!-- log 기록 절대 위치 설정 -->
+    <property name="LOGS_ABSOLUTE_PATH" value="./logs" />
+		<!-- CONSOLE에 출력시 format 형식을 지정-->
+    <property name="CONSOLE_LOG_PATTERN"
+              value="[%d{yyyy-MM-dd HH:mm:ss}:%-3relative]  %clr(%-5level) %clr(${PID:-}){magenta} %clr(---){faint} %clr([%15.15thread]){faint} %clr(%-40.40logger{36}){cyan} %clr(:){faint} %msg%n"/>
+    <!-- File에 출력시 format 형식을 지정-->
+		<property name="FILE_LOG_PATTERN"
+              value="[%d{yyyy-MM-dd HH:mm:ss}:%-3relative] %-5level ${PID:-} --- [%15.15thread] %-40.40logger{36} : %msg%n"/>
+
+		<!------------------------------------  **Appender 설정**  ----------------------------------------------------->
+		<!-- Console Appender -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+				<!-- encoder : 출력 format 형식을 지정 -->
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+		<!-- 파일(FILE) Appender -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <!-- log 기록할 파일 위치 설정 -->
+        <file>${LOGS_ABSOLUTE_PATH}/logback.log</file>
+        <!-- 출력 format 형식을 지정 -->
+        <encoder>
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+        </encoder>
+        <!-- TimeBasedRollingPolicy 사용한다면 -->
+				<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- daily rollover -->
+            <fileNamePattern>logFile.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <!-- keep 30 days' worth of history capped at 3GB total size -->
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>3GB</totalSizeCap>
+        </rollingPolicy>
+				<!-- SizeAndTimeBasedRollingPolicy 사용한다면 -->
+				<rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_FILE}.%d{yyyy-MM-dd}.%i.gz</fileNamePattern>
+            <maxFileSize>${LOG_FILE_MAX_SIZE:-10MB}</maxFileSize>
+            <maxHistory>${LOG_FILE_MAX_HISTORY:-0}</maxHistory>
+        </rollingPolicy>
+
+    </appender>
+
+		<!------------------------------------  **Logger 설정**  ----------------------------------------------------->
+		<!-- 특정 클래스별로 Logger 지정 -->
+		<!-- SomeService는 INFO일때 Log 생성 -->
+    <logger name="com.iu.service.SomeService" level="INFO"/>
+
+		<!-- log 레벨 설정 (org.springframework.web=debug)-->
+    <logger name="org.springframework.web" level="debug">
+        <appender-ref ref="FILE" />
+    </logger>
+
+		<!------------------------------------  **Root(전역) 설정**  ----------------------------------------------------->
+		<!-- 전역 설정 Warn 이상일 때 Log 생성 (logging.level.root=info) -->
+    <root level="warn">
+		<!-- 참조할 appender 설정 - STDOUT -->
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>
+
+```
+
+## 4. Spring 기본 Logging
+
+```java
+Spring Boot는 Commons Logging을 사용하지만 결국 SLF4j를 사용하여
+Logback에서 출력
+
+Commons Logging -> SLF4j -> Logback
+```
+
+### 1. 기본 Logging 사용
+
+```java
+1. 사용하려는 Class 내에 로거 객체 생성 및 출력
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class LogTest(){
+	private final Logger log = LoggerFactory.getLogger(LogTest.class);
+
+	public void logPrint(){
+		log.info("Info Level");
+		/* log 기본 Level이 Info라면 debug는 작동 안함 */
+		log.debug("Debug Level");
+	}
+}
+
+2. Lombok의 @Slf4j annotation
+	 a. Lombok을 설치
+	 b. 클래스 선언부에 @Slf4j 선언
+	 c. 사용하려는 메서드 내부에서 log(자동생성) 변수 사용
+
+ @Slf4j
+	public class LogTest(){
+
+		public void logPrint(){
+				log.info("Info Level");
+				/* log 기본 Level이 Info라면 debug는 작동 안함 */
+				log.debug("Debug Level");
+			}
+	}
+
+
+```
+
+### 2. properties 파일에서 logger 설정
+
+```xml
+## 전역 레벨 설정
+logging.level.root=warn
+## console 출력시 출력 format 설정
+logging.pattern.console=%msg%n
+
+# Web 요청이 발생할 경우 설정
+logging.level.org.springframework.web=debug
+
+# Web 요청이 발생한 경우 파라미터 출력
+spring.mvc.log-request-details=true
+
+# post 방식으로 요청 했을 경우 파라미터의 종류가 많아질 경우 생략 될수도 있다
+# logging.level.org.springframework.web=TRACE
+# spring.mvc.log-request-details=false
+```
+
+## 5. SQL Log
+
+```bash
+SQL Query와 매개변수, 결과를 Log에 출력
+```
+
+### 1. API
+
+```bash
+<!-- https://mvnrepository.com/artifact/org.bgee.log4jdbc-log4j2/log4jdbc-log4j2-jdbc4.1 -->
+<!-- 버전은 최신 버전으로 -->
+<dependency>
+	<groupId>org.bgee.log4jdbc-log4j2</groupId>
+	<artifactId>log4jdbc-log4j2-jdbc4.1</artifactId>
+	<version>1.16</version>
+</dependency>
+```
+
+### 2. [application.properties](http://application.properties) 수정
+
+```bash
+1. DB 연결 정보 수정
+- driver정보와 url 정보를 수정
+spring.datasource.username=user01
+spring.datasource.password=user01
+**spring.datasource.driver-class-name=net.sf.log4jdbc.sql.jdbcapi.DriverSpy
+spring.datasource.url=jdbc:log4jdbc:mariadb://localhost:3306/user**
+
+2. log4jdbc.log4j2.properties 생성
+## 다음을 추가
+## sql log를 slf4j에서 출력하겠다는 것
+
+## log4jdbc.log4j2.properties 생성
+log4jdbc.spylogdelegator.name=net.sf.log4jdbc.log.slf4j.Slf4jSpyLogDelegator
+log4jdbc.dump.sql.maxlinelength=0
+
+3. logback.xml
+## 출력 설정을 할 수 있지만 properties에서 조정 가능함
+
+4. application.properties에 로그 레벨 출력 설정
+## 3 에서 설정할 정보를 application.properties에서 설정
+logging.level.jdbc=OFF
+logging.level.jdbc.sqlonly=OFF           : SQL문만 로깅할지 여부, PreparedStatement일 경우 관련된 argument 값으로 대체된 SQL문을 출력
+logging.level.jdbc.sqltiming=DEBUG       : SQL문과 해당 SQL을 실행한 시간 정보(milliseconds)를 포함
+logging.level.jdbc.audit=OFF             : ResultSet을 제외한 모든 JDBC 호출 정보를 출력, 로그 양이 많아서 특별한 문제가 아니면 사용을 권장하지 않음
+logging.level.jdbc.resultset=OFF         : ResultSet을 포함한 모든 JDBC 호출 정보를 출력 매우, 방대한 양의 로그가 생성
+logging.level.jdbc.resultsettable=DEBUG  : SQL 조회된 결과 데이터를 table형식의 로그로 출력
+logging.level.jdbc.connection=OFF        : connection open close 로깅 여부
+#logging.level.org.hibernate.SQL=DEBUG
+#logging.level.org.hibernate.type.descriptor.sql.BasicBinder=TRACE
+logging.level.com.zaxxer.hikari=OFF
+logging.level.javax.sql.DataSource=
+```

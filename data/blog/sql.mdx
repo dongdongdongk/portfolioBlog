@@ -1,0 +1,269 @@
+---
+title: 'SQL 주세요'
+date: '2026-09-02'
+category: '기타, 사용 적음/국비'
+tags: ['기타, 사용 적음', '국비']
+draft: false
+summary: ''
+---
+
+```jsx
+--회원 정보 : 아이디, 비번, 예금주, 이메일, 전화번호
+CREATE TABLE BANKMEMBERS (
+    USERNAME VARCHAR2(200),
+    PASSWORD VARCHAR2(200) CONSTRAINT BANKMEMBERS_PASSWORD_NN NOT NULL,
+    NAME VARCHAR2(200) CONSTRAINT BANKMEMBERS_NAME_NN NOT NULL,
+    EMAIL VARCHAR2(200) CONSTRAINT BANKMEMBERS_EMAIL_NN NOT NULL,
+    PHONE VARCHAR2(200) CONSTRAINT BANKMEMBERS_PHONE_NN NOT NULL,
+    --제약조건
+    CONSTRAINT BANKMEMBERS_USERNAME_PK PRIMARY KEY (USERNAME),
+    CONSTRAINT BANKMEMBERS_EMAIL_U UNIQUE (EMAIL),
+    CONSTRAINT BANKMEMBERS_PHONE_U UNIQUE (PHONE)
+)
+--데이터 테스트
+SELECT * FROM BANKMEMBERS;
+DESC BANKMEMBERS;
+INSERT INTO BANKMEMBERS
+VALUES ('iu', '123', '아이유', 'iu@naver.com', '010-1111-1111')--정상적인 데이터
+--제약조건 확인)
+INSERT INTO BANKMEMBERS --Primary Key확인
+VALUES ('iu', '123', '아이유', 'iu@naver.com', '010-1111-1111')
+INSERT INTO BANKMEMBERS (USERNAME, NAME, EMAIL, PHONE) --NOT NULL확인 비번
+VALUES ('GD', '지디', 'iu@naver.com','010-1111-1111')
+INSERT INTO BANKMEMBERS (USERNAME, PASSWORD, EMAIL, PHONE) --NOT NULL확인 이름
+VALUES ('GD', '123', 'iu@naver.com','010-1111-1111')
+INSERT INTO BANKMEMBERS (USERNAME, PASSWORD, NAME, PHONE) --NOT NULL확인 이메일
+VALUES ('GD', '123', '지디', '010-1111-1111')
+INSERT INTO BANKMEMBERS (USERNAME, PASSWORD, NAME, EMAIL) --NOT NULL확인 폰
+VALUES ('GD', '123', '지디', 'GD@naver.com')
+INSERT INTO BANKMEMBERS (USERNAME, PASSWORD, NAME, EMAIL, PHONE) --UNIQUE확인 이메일
+VALUES ('GD', '123', '지디', 'iu@naver.com','010-1111-1111')
+INSERT INTO BANKMEMBERS (USERNAME, PASSWORD, NAME, EMAIL, PHONE) --UNIQUE확인 폰
+VALUES ('GD', '123', '지디', 'GD@naver.com','010-1111-1111')
+
+--통장 개설 정보 : 계좌번호, 회원의 아이디, 일련번호, 통장개설일 컬럼명 설정
+CREATE TABLE BANKACCOUNT (
+    ACCOUNTNUM NUMBER,
+    USERNAME VARCHAR2(200),
+    BOOKNUM NUMBER,
+    ACCOUNTDATE DATE,
+    --제약조건 이름 : 테이블명_컬럼명_제약조건의약칭
+    CONSTRAINT BANKACCOUNT_ACCOUNTNUM_PK PRIMARY KEY (ACCOUNTNUM),
+    CONSTRAINT BANKACCOUNT_USERNAME_FK FOREIGN KEY (USERNAME) REFERENCES BANKMEMBERS ON DELETE CASCADE,
+    CONSTRAINT BANKACCOUNT_BOOKNUM_FK FOREIGN KEY (BOOKNUM) REFERENCES BANKBOOK
+)
+
+--통장정보 : 일련번호, 통장이름, 이자율, 판매여부
+CREATE TABLE BANKBOOK (
+    BOOKNUM NUMBER,
+    BOOKNAME VARCHAR2(200),
+    BOOKRATE NUMBER(4,2),
+    BOOKSALE NUMBER(1) CHECK (BOOKSALE BETWEEN 0 AND 1),
+    --제약조건
+    CONSTRAINT BANKBOOK_BOOKNUM_PK PRIMARY KEY (BOOKNUM)
+)
+
+--거래내역 : 거래번호, 거래금액, 거래 후 잔액, 거래일, 입출금구분, 계좌번호
+CREATE TABLE BANKTRADE (
+    TRADENUM NUMBER,
+    TRADEAMOUNT NUMBER,
+    TRADEEBALANCE NUMBER,
+    TRADEDATE DATE,
+    TRADEIO NUMBER(1) CHECK (TRADEIO BETWEEN 0 AND 1),
+    ACCOUNTNUM NUMBER,
+    --제약조건
+		CONSTRAINT BANKTRADE_TRADENUM_PK PRIMARY KEY (TRADENUM),
+    CONSTRAINT BANKTRADE_ACCOUNTNUM_FK FOREIGN KEY (ACCOUNTNUM) REFERENCES BANKACCOUNT
+)
+
+--테이블(회원, 통장정보, 개설정보, 거래내역)
+CREATE TABLE BANKMEMBERS (
+ID VARCHAR2(200) CONSTRAINT MEMBERS_ID_PK PRIMARY KEY,
+PW VARCHAR2(200) CONSTRAINT MEMBERS_PW_NN NOT NULL,
+Name VARCHAR2(200) CONSTRAINT MEMBERS_NAME_NN NOT NULL,
+Email VARCHAR2(200) CONSTRAINT MEMBERS_EMAIL_NN NOT NULL,
+Phone VARCHAR2(200) CONSTRAINT MEMBERS_PHONE_NN NOT NULL,
+
+CONSTRAINT MEMBERS_Email_U UNIQUE (Email),
+CONSTRAINT MEMBERS_PHONE_U UNIQUE (Phone)
+);
+
+CREATE TABLE BANKBOOK (
+BookNum NUMBER CONSTRAINT BOOK_BOOKNUM_PK PRIMARY KEY,
+BookName VARCHAR2(200) CONSTRAINT BOOK_BOOKNAME_NN NOT NULL,
+BookRate NUMBER(4,2) CONSTRAINT BOOK_BOOKRATE_NN NOT NULL,
+BookSale NUMBER(1) CONSTRAINT BOOK_BOOKSALE_NN NOT NULL,
+
+CONSTRAINT BOOK_BOOKRATE_C CHECK (BookRate >= 0)
+);
+
+CREATE TABLE BANKACCOUNT (
+AccountNum NUMBER CONSTRAINT ACCOUNT_ACCOUNTNUM_PK PRIMARY KEY,
+UserID VARCHAR2(200) CONSTRAINT ACCOUNT_USERID_NN NOT NULL,
+BookNum NUMBER CONSTRAINT ACCOUNT_BOOKNUM_NN NOT NULL,
+AccountDate DATE CONSTRAINT ACCOUNT_ACCOUNTDATE_NN NOT NULL,
+
+CONSTRAINT ACCOUNT_USERID_FK FOREIGN KEY (UserID) REFERENCES BANKMEMBERS (ID),
+CONSTRAINT ACCOUNT_BOOKNUM_FK FOREIGN KEY (BookNum) REFERENCES BANKBOOK (BookNum)
+);
+
+CREATE TABLE BANKTRADE (
+TradeNum NUMBER CONSTRAINT TRADE_TRADENUM_PK PRIMARY KEY,
+TradeAmount NUMBER CONSTRAINT TRADE_TRADEAMOUNT_NN NOT NULL,
+TradeBalance NUMBER CONSTRAINT TRADE_TRADEBALANCE_NN NOT NULL,
+TradeDate DATE CONSTRAINT TRADE_TRADEDATE_NN NOT NULL,
+TradeIO NUMBER(1) CONSTRAINT TRADE_TRADEIO_NN NOT NULL,
+AccountNum NUMBER CONSTRAINT TRADE_ACCOUNTNUM_NN NOT NULL,
+
+CONSTRAINT TRADE_TRADEAMOUNT_C CHECK (TradeAmount > 0),
+CONSTRAINT TRADE_TRADEBALANCE_C CHECK (TradeBalance >= 0),
+CONSTRAINT TRADE_ACCOUNTNUM_FK FOREIGN KEY (AccountNum) REFERENCES BANKACCOUNT (AccountNum)
+);
+```
+
+### DAO LIST 주세요
+
+```jsx
+@Override
+	public ArrayList<BankBookDTO> getList() throws Exception {
+		ArrayList<BankBookDTO> ar = new ArrayList<BankBookDTO>();
+
+		Connection con = DBConnector.getConnection();
+		String sql = "SELECT * FROM BANKBOOK ORDER BY BOOKNUM DESC";
+		PreparedStatement st = con.prepareStatement(sql);
+		ResultSet rs = st.executeQuery();
+
+		while(rs.next()) {
+			BankBookDTO dto = new BankBookDTO();
+			dto.setBookNum(rs.getLong(1));
+			dto.setBookName(rs.getString(2));
+			dto.setBookRate(rs.getDouble(3));
+			dto.setBookSale(rs.getInt(4));
+			ar.add(dto);
+		}
+		DBConnector.disConnection(rs, st, con);
+		return ar;
+	}
+```
+
+### HTML 주세요
+
+```jsx
+<div>
+        <form>
+            <div class="container">
+                <h2>ID 로그인</h2>
+                <div>
+                    <input type="text" placeholder="아이디">
+                </div>
+                <div>
+                    <input type="password" placeholder="비밀번호">
+                </div>
+                <div class="radio">
+                    <form >
+                        <input type="radio" class="login"> <span>로그인상태유지</span>
+                        <div class="login">
+                            <input type="button" value="로그인">
+                        </div>
+                        <div>
+                            <a href="../study_index.html">뒤로가기</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </form>
+    </div>
+
+        <form>
+            <h4>아이디</h4>
+            <input type="text">
+            <h4>비밀번호</h4>
+            <input type="password">
+            <h4>비밀번호 재확인</h4>
+            <input type="password">
+            <h4>이름</h4>
+            <input type="text">
+            <h4>생년월일</h4>
+            <input type="date">
+            <h4>성별</h4>
+            <select>
+                <option>남자</option>
+                <option>여자</option>
+            </select>
+            <h4>본인 확인 이메일 <span>(선택)</span></h4>
+            <input type="email">
+            <h4>휴대전화</h4>
+            <select>
+                <option>대한민국 +82</option>
+                <option>뉴질랜드 +22</option>
+                <option>기니 +35</option>
+                <option>영국 +45</option>
+                <option>미국 +85</option>
+                <option>중국 +55</option>
+            </select>
+            <div>
+                <input type="number" placeholder="전화번호 입력"><input type="button" value="인증번호 받기">
+            </div>
+            <input type="number" placeholder="인증번호를 입력하세요.">
+            <div>
+                <a href="#">가입하기</a>
+            </div>
+        </form>
+
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Insert title here</title>
+</head>
+<body>
+	<h1>Join page</h1>
+    <div class="container">
+        <form action="join" method="post" >
+            <h4>아이디</h4>
+            <input type="text" name="id">
+            <h4>비밀번호</h4>
+            <input type="password" name="pw">
+            <h4>이름</h4>
+            <input type="text" name="name">
+            <h4>본인 확인 이메일 <span>(선택)</span></h4>
+            <input type="email" name="email">
+            <h4>휴대전화</h4>
+            <div>
+                <input type="number" name="phone" placeholder="전화번호 입력">
+            </div>
+            <div>
+                <input type = "submit" value="가입하기">
+            </div>
+        </form>
+    </div>
+</body>
+</html>
+```
+
+### Notice, Qna
+
+```jsx
+CREATE TABLE NOTICE (
+    NUM NUMBER CONSTRAINT NOTICE_NUM_PK PRIMARY KEY,
+    TITLE VARCHAR2(200) CONSTRAINT NOTICE_TITLE_NN NOT NULL,
+    CONTENTS CLOB,
+    WRITER VARCHAR2(200) CONSTRAINT NOTICE_WRITER_NN NOT NULL,
+    REGDATE DATE,
+    HIT NUMBER
+);
+
+CREATE TABLE QNA (
+    NUM NUMBER CONSTRAINT QNA_NUM_PK PRIMARY KEY,
+    TITLE VARCHAR2(200) CONSTRAINT QNA_TITLE_NN NOT NULL,
+    CONTENTS CLOB,
+    WRITER VARCHAR2(200) CONSTRAINT QNA_WRITER_NN NOT NULL,
+    REGDATE DATE,
+    HIT NUMBER,
+    REF NUMBER,
+    STEP NUMBER,
+    DEPTH NUMBER
+);
+```

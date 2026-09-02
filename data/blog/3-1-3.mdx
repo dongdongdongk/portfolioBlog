@@ -1,0 +1,278 @@
+---
+title: '섹션 3: 프로젝트 #1: 아름다운 수프로 여러 페이지 긁기'
+date: '2026-09-02'
+category: '기타, 사용 적음/크롤링 & 파이썬'
+tags: ['기타, 사용 적음', '크롤링 & 파이썬']
+draft: false
+summary: ''
+---
+
+# 여러 페이지 스크래핑 하기 ( Scraping Multiple Links within The Same Page )
+
+```python
+한번에 여러 페이지를 스크래핑 하도록 해본다
+
+메인 페이지의 a 태그 ( 영화 상세 내용 ) 의 href 를 가져와 해당 영화의 상세 내용으로 들어가 내용을 스크래핑 한다
+
+그리고 파일로 내보낸다
+```
+
+```python
+from bs4 import BeautifulSoup
+import requests
+import time
+import re
+
+# 사용하지 못하는 문자를 파일명에서 제거하는 함수
+def clean_filename(filename):
+    # 파일명에 사용할 수 없는 문자들을 정규 표현식으로 찾아 제거
+    return re.sub(r'[\/:*?"<>|]', '', filename)
+
+root = 'https://subslikescript.com'
+website = f'{root}/movies'
+result = requests.get(website)  # 웹사이트에 GET 요청을 보내고 응답을 받음
+content = result.text  # 응답의 내용을 텍스트로 저장
+
+soup = BeautifulSoup(content, 'lxml')  # BeautifulSoup 객체를 생성하여 HTML 내용을 파싱
+# print(soup.prettify())
+
+# 'article' 태그 내에 있는 'scripts-list' 클래스를 가진 요소를 선택
+box = soup.select_one('article .scripts-list')
+
+# print(box)
+
+# 'article.main-article' 내의 모든 'a' 태그를 선택
+a_tags = box.select('a')
+
+# 각 'a' 태그의 'href' 속성을 추출하여 'links' 배열에 저장
+links = [a.get('href') for a in a_tags]
+
+print(links)  # 추출한 링크들을 출력
+
+for link in links:
+    time.sleep(1)  # 웹사이트에 요청을 보낼 때 1초간 대기 (서버 부하를 줄이기 위해)
+    website = f'{root}/{link}'  # 각 링크의 전체 URL을 생성
+    result = requests.get(website)  # 해당 URL에 GET 요청을 보내고 응답을 받음
+    content = result.text  # 응답의 내용을 텍스트로 저장
+    soup = BeautifulSoup(content, 'lxml')  # BeautifulSoup 객체를 생성하여 HTML 내용을 파싱
+
+    # 'article.main-article' 태그를 선택
+    box = soup.select_one('article.main-article')
+    # 'article.main-article' 내의 'h1' 태그의 텍스트를 가져와서 제목으로 저장
+    title = box.select_one('h1').get_text()
+    # 'article.main-article' 내의 'full-script' 클래스를 가진 요소의 텍스트를 가져와서 대본으로 저장
+    transcript = box.select_one('.full-script').get_text(strip=True, separator=' ')
+
+    # 파일명을 깨끗하게 정리 (사용할 수 없는 문자를 제거)
+    clean_title = clean_filename(title)
+
+    # 대본을 파일로 저장 (파일명: 깨끗하게 정리된 제목)
+    with open(f'{clean_title}.txt', 'w', encoding='utf-8') as file:
+        file.write(transcript)  # 파일에 대본 내용을 씀
+
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380914/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_3_1_/Untitled.png)
+
+## 파일의 이름에 : 등 사용할 수 없는 문자가 들어가 있어서 오류 발생
+
+```python
+# 사용하지 못하는 문자를 파일명에서 제거하는 함수
+def clean_filename(filename):
+    # 파일명에 사용할 수 없는 문자들을 정규 표현식으로 찾아 제거
+    return re.sub(r'[\/:*?"<>|]', '', filename)
+
+
+사용 불가능한 문자를 삭제 해주는 함수를 만들어 사용하였다
+```
+
+## 공백이 있는 경우와 없는경우
+
+```python
+공백이 있는 경우: 'article .scripts-list'
+
+공백이 있는 경우는 두 개의 선택자가 부모-자식 관계 또는 조상-후손 관계를 나타냄
+
+<article>
+    <ul class="scripts-list">
+        <li>Movie 1</li>
+        <li>Movie 2</li>
+    </ul>
+</article>
+```
+
+```python
+공백이 없는 경우: 'article.scripts-list'
+
+공백이 없는 경우는 단일 요소를 나타내며, 해당 요소는 두 가지 조건을 모두 만족해야 한다
+
+<article class="scripts-list">
+    <li>Movie 1</li>
+    <li>Movie 2</li>
+</article>
+```
+
+# 페이지 네이션 ( Pagination )
+
+```python
+페이지 네이션이 있는 페이지를 전부 스크래핑 하는 방법을 알아본다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380914/notion-blog/_/_/Python_Selenium_Scrapy_ChatGPT_Prize/_3_1_/Untitled_1.png)
+
+```python
+from bs4 import BeautifulSoup
+import requests
+import time
+import re
+
+# 사용하지 못하는 문자를 파일명에서 제거하는 함수
+def clean_filename(filename):
+    return re.sub(r'[\/:*?"<>|]', '', filename)
+
+# 웹사이트 루트 URL 및 영화 목록 페이지 URL 설정
+root = 'https://subslikescript.com'
+website = f'{root}/movies'
+
+# 영화 목록 페이지 요청 및 응답 내용 저장
+result = requests.get(website)
+content = result.text
+
+# BeautifulSoup 객체를 생성하여 HTML 내용을 파싱
+soup = BeautifulSoup(content, 'lxml')
+
+# 페이지 네이션(pagination) 요소 선택
+pagination = soup.select_one('.pagination')
+# 페이지 네이션에서 모든 페이지 아이템을 선택
+pages = pagination.select('.page-item')
+# 마지막 페이지 번호를 추출
+last_page = pages[-2].text
+
+# 모든 페이지를 순회하는 루프
+for page in range(1, int(last_page) + 1): # range(1, 92+1) +1을 하는 이유는 range 함수가 마지막 값을 포함하지 않기 때문
+    # 각 페이지에 대한 요청 URL 생성 및 요청
+    result = requests.get(f'{website}?page={page}')
+    print(f'현재 페이지: {website}?page={page}')
+    content = result.text
+    # 새로운 HTML 내용으로 BeautifulSoup 객체 업데이트
+    soup = BeautifulSoup(content, 'lxml')
+    # 메인 아티클 요소 선택
+    box = soup.select_one('.main-article')
+
+    # 메인 아티클 내의 모든 'a' 태그를 선택
+    a_tags = box.select('a')
+
+    # 각 'a' 태그의 'href' 속성을 추출하여 'links' 배열에 저장
+    links = [a.get('href') for a in a_tags]
+
+    # 2개의 링크만 추출
+    limited_links = links[:2]
+
+    print(links)
+
+    # 추출한 링크를 순회하는 루프
+    for link in limited_links:
+        try:
+            print(link)
+            # 각 링크에 대해 1초 대기 후 요청
+            time.sleep(1)
+            result = requests.get(f'{root}/{link}')
+            content = result.text
+            # 새로운 HTML 내용으로 BeautifulSoup 객체 업데이트
+            soup = BeautifulSoup(content, 'lxml')
+
+            # 메인 아티클 요소 선택
+            box = soup.select_one('article.main-article')
+            # 영화 제목 추출
+            title = box.select_one('h1').get_text()
+            # 영화 대본 내용 추출
+            transcript = box.select_one('.full-script').get_text(strip=True, separator=' ')
+
+            # 파일명을 깨끗하게 정리
+            clean_title = clean_filename(title)
+            # 대본 내용을 파일에 저장
+            with open(f'{clean_title}.txt', 'w', encoding='utf-8') as file:
+                file.write(transcript)
+        except:
+            # 예외 발생 시 오류 메시지 출력 및 계속 진행
+            print('=======링크 스크래핑에 실패하였습니다.======')
+            print(link)
+            pass
+
+```
+
+## **1.필요한 모듈 임포트 및 함수 정의**
+
+```python
+from bs4 import BeautifulSoup
+import requests
+import time
+import re
+
+# 사용하지 못하는 문자를 파일명에서 제거하는 함수
+def clean_filename(filename):
+    return re.sub(r'[\/:*?"<>|]', '', filename)
+```
+
+## 2.**첫 페이지 요청 및 페이지 네이션 요소 추출**
+
+```python
+root = 'https://subslikescript.com'
+website = f'{root}/movies'
+result = requests.get(website)
+content = result.text
+
+soup = BeautifulSoup(content, 'lxml')
+
+# 페이지 네이션 요소와 마지막 페이지 번호 추출
+pagination = soup.select_one('.pagination')
+pages = pagination.select('.page-item')
+last_page = int(pages[-2].text)
+
+* pages[-2]는 페이지 목록에서 두 번째 마지막 요소를 가리키며, 이는 마지막 페이지 번호가 된다. ( next 버튼이 있기 때문에 )
+```
+
+## 3.**페이지 순회**
+
+```python
+for page in range(1, last_page + 1): # +1을 하는 이유는 range 함수가 마지막 값을 포함하지 않기 때문
+    result = requests.get(f'{website}?page={page}')
+    print(f'현재 페이지: {website}?page={page}')
+    content = result.text
+    soup = BeautifulSoup(content, 'lxml')
+    box = soup.select_one('.main-article')
+```
+
+## 4.**페이지 내 링크 추출 및 제한**
+
+```python
+# 페이지 내의 링크 추출 및 제한
+    links = [a.get('href') for a in box.select('a')][:2]
+    print(links)
+```
+
+## 5.**링크에 대한 대본 추출 및 저장**
+
+```python
+    for link in links:
+        try:
+            print(link)
+            time.sleep(1)
+            result = requests.get(f'{root}/{link}')
+            content = result.text
+            soup = BeautifulSoup(content, 'lxml')
+
+            # 제목과 대본 추출 및 저장
+            box = soup.select_one('article.main-article')
+            title = box.select_one('h1').get_text()
+            transcript = box.select_one('.full-script').get_text(strip=True, separator=' ')
+            clean_title = clean_filename(title)
+
+            with open(f'{clean_title}.txt', 'w', encoding='utf-8') as file:
+                file.write(transcript)
+        except Exception as e:
+            print('=======링크 스크래핑에 실패하였습니다.======')
+            print(link)
+            print(e)
+            pass
+```

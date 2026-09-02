@@ -1,0 +1,260 @@
+---
+title: '스프링 유효성 검사 실습'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+참고 정리 자료
+
+Spring Form 과 검증 복제
+
+```java
+국비에서 배운 유효성 검사는 더 복잡하고 폼을 변경 해야해서 불편함이 있는것 같다
+```
+
+```java
+조금더 단순한 방법의 유효성 검사 방법을 사용
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381059/notion-blog/_/_/Spring_/_/Untitled.png)
+
+# 1.라이브러리 추가
+
+```java
+		<!-- 유효성 검사 -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+```
+
+```java
+유효성 검사 기능을 사용하기 위해 라이브러리를 추가해준다.
+```
+
+# 2.VO 에 패턴 or 조건 추가
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381059/notion-blog/_/_/Spring_/_/Untitled_1.png)
+
+```java
+@Setter
+@Getter
+public class UserVO {
+    @NotBlank
+    @Pattern(regexp = "[A-Za-z0-9]{4,15}$", message = "아이디는 영어, 숫자 4 ~15자리로 입력 가능합니다")
+    private String id;
+    @NotBlank
+    private String password;
+    @NotBlank
+    private String passwordCheck;
+    @NotBlank
+    @Pattern(regexp = "^01([0|1|6|7|8|9])-?([0-9]{3,4})-?([0-9]{4})$", message = "휴대폰번호를 확인해 주세요")
+    private String phoneNumber;
+    @NotBlank
+    private String email;
+    private String emailCheck;
+    private String role;
+    @NotBlank
+    @Pattern(regexp = "^[가-힣|a-z|A-Z|0-9|]+$", message = "닉네임은 한글, 영어, 숫자만 4 ~10자리로 입력 가능합니다")
+    private String nickName;
+    @NotBlank
+    private String userName;
+    private Date joinDate;
+    @DateTimeFormat                                  // @DateTimeFormat(pattern = "yyyy-MM-dd") 날짜필드의 형식을 지정하는 어노테이션
+    private java.util.Date birth;                    // @DateTimeFormat 주석에 유형을 맞춰주기 위해서 java.util.Date 이렇게 바꿔준다
+    @NotBlank(message = "성별을 선택 해주세요")
+    private String gender;
+
+}
+```
+
+```java
+VO 에 패턴과 조건을 추가해 준다
+```
+
+```java
+message = "닉네임은 한글, 영어, 숫자만 4 ~10자리로 입력 가능합니다"
+
+출력될 메세지 입력하는곳
+
+regexp = "^01([0|1|6|7|8|9])-?([0-9]{3,4})-?([0-9]{4})$ "
+
+패턴을 지정해 주는곳으로 분석하자면
+
+^ : 문자열의 시작
+
+01 : "01"로 시작해야 함
+
+([0|1|6|7|8|9]) : 그 다음에는 0, 1, 6, 7, 8, 9 중 하나의 숫자가 있어야 합
+
+-? : 다음 선택적으로 하이픈("-")이 있을 수 있음
+
+([0-9]{3,4}) :  0-9 범위의 숫자가 3개 또는 4개 나옴
+
+([0-9]{4}) : 0-9 범위의 숫자가 4개 나옴
+
+$ : 문자열 종료
+
+```
+
+# 3.jsp에 메세지 보내줄 Controller 제작
+
+```java
+@GetMapping("userJoin")
+    public ModelAndView setJoin(@ModelAttribute() UserVO userVO) throws Exception {
+        ModelAndView mv = new ModelAndView();
+        mv.setViewName("user/userJoin");
+        return mv;
+    }
+
+    @PostMapping("userJoin")
+    public ModelAndView setJoin(@Valid UserVO userVO, BindingResult bindingResult) throws Exception {            //@Valid 주석은 UserVO 개체에 대한 유효성 검사를 수행하는 데 사용됨. 정의된 유효성 검사 제약 조건에 따라 개체의 유효성을 검사
+        ModelAndView mv = new ModelAndView();                                                                    //BindingResult 객체에는 유효성 검사를 하여 위반이 있으면 정보를 저장한다. 저장된 정보는 request 영역에 erorros라는 이름으로 저장된다.
+        log.debug("Join");
+        if(bindingResult.hasErrors()) {                                                                          //유효성 검사 오류가 있는지 확인
+            List<FieldError>list = bindingResult.getFieldErrors();                                               //bindingResult 개체에서 모든 필드 오류를 검색하여 List<FieldError> 유형인 list변수에 할당
+            Map<String, String> errorMsg = new HashMap<>();                                                      //오류 메시지를 저장할 맵을 생성
+            for(int i=0;i<list.size();i++) {
+                String field = list.get(i).getField();                                                           //list에서 인덱스 i에 있는 FieldError 객체의 필드 이름을 검색하고 field 변수에 할당
+                String message = list.get(i).getDefaultMessage();                                                //list에서 인덱스 i에 있는 FieldError 개체의 기본 오류 메시지를 검색하고 message 에 할당
+
+                System.out.println("필드 = " + field);
+                System.out.println("메세지 = " + message);
+
+                errorMsg.put(field,message);                                                                     //errorMsg 맵에 새로운 키-값(field(키),message(값)) 쌍을 추가
+            }
+            mv.addObject("errorMsg",errorMsg);
+            mv.setViewName("user/userJoin");
+            return mv;
+        }
+        int result = userService.setJoin(userVO);
+        mv.setViewName("redirect:../");
+        return mv;
+    }
+```
+
+# 4.jsp에서 출력
+
+```java
+<div class="container">
+    <div class="row py-5 mt-4 align-items-center">
+        <!-- For Demo Purpose -->
+        <div class="col-md-5 pr-lg-5 mb-5 mb-md-0">
+            <img src="https://cdn-icons-png.flaticon.com/512/7541/7541900.png" alt="" class="img-fluid mb-3 d-none d-md-block">
+            <h1>Create an Account</h1>
+            <p class="font-italic text-muted mb-0">엄선된 맛집에서 간편하게 배달 또는 방문포장 주문을 하실 수 있는 웹서비스입니다.</p>
+        </div>
+
+        <!-- Registeration Form -->
+        <div class="col-md-7 col-lg-6 ml-auto">
+            <form id="userJoin" action="userJoin" method="post">
+                <div class="row">
+
+                    <!-- 아이디 -->
+                    <div class="input-group col-lg-12">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text bg-white px-4 border-md border-right-0">
+                                <i class="fa fa-user text-muted"></i>
+                            </span>
+                        </div>
+                        <input id="id" type="text" name="id" placeholder="아이디" class="form-control bg-white border-left-0 border-md">
+                    </div>
+                    <div class="col-lg-12 text-alert mb-4">${errorMsg.id}</div>                                                          //마이바티스의 ${} 를 사용해서 오류를 출력
+                    <!-- 이름 -->
+                    <div class="input-group col-lg-12">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text bg-white px-4 border-md border-right-0">
+                                <i class="fa fa-user text-muted"></i>
+                            </span>
+                        </div>
+                        <input id="userName" type="text" name="userName" placeholder="이름" class="form-control bg-white border-left-0 border-md">
+                    </div>
+                    <div class="col-lg-12 text-alert mb-4">${errorMsg.userName}</div>
+                    <!--닉네임-->
+                    <div class="input-group col-lg-12">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text bg-white px-4 border-md border-right-0">
+                                <i class="fa fa-user text-muted"></i>
+                            </span>
+                        </div>
+                        <input id="nickname" type="text" name="nickname" placeholder="닉네임" class="form-control bg-white border-left-0 border-md">
+                    </div>
+                    <div class="col-lg-12 text-alert mb-4">${errorMsg.nickName}</div>
+                  <!--birth-->
+                    <div class="input-group col-lg-12">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text bg-white px-4 border-md border-right-0">
+                                <i class="fa fa-calendar text-muted"></i>
+                            </span>
+                        </div>
+                        <input id="birth" type="date" name="birth" data-placeholder="생년월일" class="form-control bg-white border-left-0 border-md">
+                    </div>
+                    <div class="col-lg-12 text-alert mb-4">${errorMsg.birth}</div>
+
+                    <!-- Email Address -->
+                    <div class="input-group col-lg-12">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text bg-white px-4 border-md border-right-0">
+                                <i class="fa fa-envelope text-muted"></i>
+                            </span>
+                        </div>
+                        <input id="email" type="email" name="email" placeholder="이메일" class="form-control bg-white border-left-0 border-md">
+                    </div>
+                    <div class="col-lg-12 text-alert mb-4">${errorMsg.email}</div>
+
+                    <!-- Phone Number -->
+                    <div class="input-group col-lg-12">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text bg-white px-4 border-md border-right-0">
+                                <i class="fa fa-phone-square text-muted"></i>
+                            </span>
+                        </div>
+                        <input id="phoneNumber" type="tel" name="phoneNumber" placeholder="휴대폰 번호" class="form-control bg-white border-md border-left-0 pl-3">
+                    </div>
+                    <div class="col-lg-12 text-alert mb-4">${errorMsg.phoneNumber}</div>
+
+                    <div class="input-group col-lg-12">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text bg-white px-4 border-md border-right-0">
+                                <i class="fa fa-male" aria-hidden="true"></i>
+                            </span>
+                        </div>
+                       <!--성별-->
+                        <select id="gender" name="gender" class="form-control custom-select bg-white border-left-0 border-md">
+                            <option value="">성별</option>
+                            <option value="남자">남자</option>
+                            <option value="여자">여자</option>
+                        </select>
+                    </div>
+                    <div class="col-lg-12 text-alert mb-4">${errorMsg.gender}</div>
+
+                    <!-- Password -->
+                    <div class="input-group col-lg-12">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text bg-white px-4 border-md border-right-0">
+                                <i class="fa fa-lock text-muted"></i>
+                            </span>
+                        </div>
+                        <input id="password" type="password" name="password" placeholder="비밃번호" class="form-control bg-white border-left-0 border-md">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text bg-white px-4 border-md border-right-0">
+                                <i class="fa fa-lock text-muted"></i>
+                            </span>
+                        </div>
+                        <input id="passwordCheck" type="password" name="passwordCheck" placeholder="비밀번호 확인" class="form-control bg-white border-left-0 border-md">
+                    </div>
+                    <div class="col-lg-12 text-alert mb-4">${errorMsg.password}</div>
+
+                    <!-- Password Confirmation -->
+<%--                    <div class="input-group col-lg-6 mb-4">--%>
+<%--                    </div>--%>
+
+                    <div class="form-group col-lg-12 mx-auto mb-0">
+                        <button type="submit" class="btn btn-primary btn-block py-2">
+                            <span class="font-weight-bold">Create your account</span>
+                        </button>
+                    </div>
+```

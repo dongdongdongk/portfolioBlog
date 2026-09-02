@@ -1,0 +1,309 @@
+---
+title: 'YelpCamp 재구성 ( 라우터 )'
+date: '2026-09-02'
+category: '풀스택/The Web Developer 부트캠프 2022'
+tags: ['풀스택', 'The Web Developer 부트캠프 2022']
+draft: false
+summary: ''
+---
+
+# YelpCamp 라우터 재구성
+
+![Untitled](<YelpCamp%20%EC%9E%AC%EA%B5%AC%EC%84%B1%20(%20%EB%9D%BC%EC%9A%B0%ED%84%B0%20)/Untitled.png>)
+
+```jsx
+routes 폴더를 만들어 주고
+
+campgrounds 와 review js 를 만들어 준다
+```
+
+## review.js
+
+```jsx
+const express = require('express')
+const router = express.Router({ mergeParams: true }) // 라우터 생성 및 부모 라우터의 매개변수와 병합
+const CampGround = require('../models/campground') // 캠프 그라운드 모델 불러오기
+const Review = require('../models/review') // 리뷰 모델 불러오기
+const { reviewSchema } = require('../validate') // 리뷰 유효성 검사 스키마 불러오기
+const catchAsync = require('../util/catchAsync') // 비동기 함수 에러 처리 유틸리티 불러오기
+const ExpressError = require('../util/ExpressError') // 커스텀 에러 클래스 불러오기
+
+// 리뷰 유효성 검사 미들웨어
+const validateReview = (req, res, next) => {
+  const { error } = reviewSchema.validate(req.body, { abortEarly: false })
+  if (error) {
+    // 유효성 검사 에러 발생 시, 에러 메시지를 모아서 커스텀 에러로 던짐
+    const errorMessage = error.details.map((detail) => detail.message).join(',')
+    throw new ExpressError(errorMessage, 400)
+  } else {
+    // 유효성 검사 통과 시, 다음 미들웨어로 진행
+    next()
+  }
+}
+
+// 리뷰 추가 라우트
+router.post(
+  '/',
+  validateReview,
+  catchAsync(async (req, res) => {
+    const { id } = req.params // 부모 라우터에서 전달받은 캠프 그라운드 ID
+    const campground = await CampGround.findById(id) // 해당 ID의 캠프 그라운드 찾기
+    const { body, rating } = req.body // 요청 바디에서 리뷰 내용 및 평점 추출
+    const review = new Review({ body, rating }) // 새 리뷰 객체 생성
+    campground.reviews.push(review._id) // 캠프 그라운드의 리뷰 배열에 리뷰 ID 추가
+    await review.save() // 리뷰 저장
+    await campground.save() // 캠프 그라운드 저장 (리뷰 ID가 추가된 상태)
+    console.log(campground)
+    console.log('reviewSuccess')
+    res.send(campground) // 변경된 캠프 그라운드 정보 응답
+  })
+)
+
+// 리뷰 삭제 라우트
+router.delete(
+  '/:reviewId',
+  catchAsync(async (req, res) => {
+    const { id, reviewId } = req.params // 부모 라우터에서 전달받은 캠프 그라운드 ID와 삭제할 리뷰 ID
+    await CampGround.findByIdAndUpdate(id, { $pull: { reviews: reviewId } }) // 캠프 그라운드의 리뷰 배열에서 리뷰 ID 제거
+    await Review.findByIdAndDelete(reviewId) // 해당 리뷰 삭제
+    res.send('Delete Test') // 삭제 성공 메시지 응답
+  })
+)
+
+module.exports = router // 라우터 내보내기
+```
+
+```jsx
+상위 require 들을 주의하고
+
+마지막으로 module.exports 를 꼭 해주자
+
+그리고 { mergeParams: true } 를 사용해서 상위 :id ( 캠프 그라운드 id ) 를 가져올 수 있도록 설정해주자
+```
+
+### 라우터의 { mergeParams: true } 옵션
+
+```jsx
+
+이 옵션은 부모 라우터에서 전달된 매개변수를 하위 라우터에서도 사용할 수 있도록 하는 역할을 한다.
+
+라우터는 기본적으로 각각 독립적인 범위(scope)를 가지고 있다.
+
+즉, 부모 라우터에서 전달된 매개변수는 하위 라우터에서는 기본적으로 접근할 수 없다.
+
+하지만 { mergeParams: true } 옵션을 사용하면 부모 라우터의 매개변수를 하위 라우터에서도 공유할 수 있다.
+
+예를 들어, 상위 라우터에서 /campgrounds/:id와 같이 캠프 그라운드 ID를 포함하는 경로를 가지고 있다고 가정해본다.
+
+그리고 이 상위 라우터에서 하위 라우터로 라우팅을 위해 express.Router({ mergeParams: true })를 사용했다면,
+
+하위 라우터에서도 :id 매개변수를 사용할 수 있게 된다.
+
+이렇게 함으로써, 하위 라우터에서도 부모 라우터의 매개변수를 활용하여 동적인 경로 처리를 할 수 있다.
+
+특히 중첩된 라우터에서 부모 라우터의 매개변수를 공유해야 할 때 유용하게 사용된다.
+```
+
+## campgrounds.js
+
+```jsx
+const express = require('express')
+const router = express.Router()
+const catchAsync = require('../util/catchAsync')
+const ExpressError = require('../util/ExpressError')
+const CampGround = require('../models/campground')
+const { campgroundSchema } = require('../validate')
+
+const validateCampground = (req, res, next) => {
+  const { error } = campgroundSchema.validate(req.body, { abortEarly: false })
+  if (error) {
+    const errorMessage = error.details.map((detail) => detail.message).join(', ')
+    throw new ExpressError(errorMessage, 400)
+  } else {
+    next()
+  }
+}
+
+// 조회
+router.get(
+  '/',
+  catchAsync(async (req, res) => {
+    const campground = await CampGround.find({})
+    res.send(campground)
+  })
+)
+
+// 상세 조회
+router.get(
+  '/:id',
+  catchAsync(async (req, res) => {
+    const { id } = req.params
+
+    const campground = await CampGround.findById(id).populate('reviews')
+    if (!campground) throw new ExpressError('Invalid Campground Data', 400)
+    res.send(campground)
+  })
+)
+
+// 추가
+router.post(
+  '/new',
+  validateCampground,
+  catchAsync(async (req, res) => {
+    // if (!req.body.newCamp) throw new ExpressError('Invalid Campground Data', 400);
+    const newCamp = new CampGround(req.body)
+    await newCamp.save()
+    res.send('SaveSuccess')
+  })
+)
+
+// 업데이트
+router.put(
+  '/:id',
+  validateCampground,
+  catchAsync(async (req, res) => {
+    const { id } = req.params
+    const camp = await CampGround.findById(id)
+
+    if (!camp) throw new ExpressError('CampFindFail', 404)
+    if (!req.body.camp) throw new ExpressError('Invalid Campground Data(Update)', 400)
+
+    camp.set(req.body)
+    await camp.save()
+
+    res.send(camp)
+  })
+)
+//캠프 삭제
+router.delete(
+  '/:id',
+  catchAsync(async (req, res) => {
+    const { id } = req.params
+    try {
+      const result = await CampGround.deleteOne({ _id: id })
+      if (result.deletedCount > 0) {
+        res.status(200).send('DELETE SUCCESS')
+      } else {
+        res.status(404).send('ID NOT FOUND')
+      }
+    } catch (error) {
+      console.log('DELETE FAIL')
+      res.send(500).send('DELETE FAIL')
+    }
+  })
+)
+
+module.exports = router
+```
+
+```jsx
+위와 같이 require 잘 넣어주고
+
+마지막 exports 를 잘해주자
+```
+
+## index.js
+
+```jsx
+const express = require('express')
+const mongoose = require('mongoose') // 몽구스 연결
+const cors = require('cors')
+const ExpressError = require('./util/ExpressError')
+// campground 라우트
+const campgrounds = require('./routes/campgrounds')
+const reviews = require('./routes/review')
+
+const app = express()
+app.use(cors())
+app.use(express.urlencoded({ extended: true }))
+app.use(express.json())
+mongoose.connect('mongodb://localhost:27017/yelp-camp') // 몽구스를 이용해서 몽고DB 연결
+
+// 연결 확인 코드
+const db = mongoose.connection // MongoDB 연결에 대한 정보를 얻는다. 이 정보를 db 변수에 할당
+db.on('error', console.error.bind(console, 'connection error'), {
+  useNewUrlParser: true, // 최신 버전의 드라이버와의 호환성을 유지
+  useUnifiedTopology: true,
+})
+db.once('open', () => {
+  // 한 번만 실행되는 이벤트 리스너 등록 MongoDB에 성공적으로 연결되었을 때 메세지
+  console.log('Database connected')
+})
+
+app.use('/campground', campgrounds)
+app.use('/campground/:id/reviews', reviews)
+
+app.use((err, req, res, next) => {
+  console.log(err.name)
+  next(err)
+})
+
+app.all('*', (req, res, next) => {
+  next(new ExpressError('Page Not Found'), 404)
+})
+
+app.use((err, req, res, next) => {
+  const { statusCode = 500, message = 'Something went wrong' } = err
+  res.status(statusCode).send(message)
+})
+
+app.listen(4000, () => {
+  console.log('serving on port 4000')
+})
+```
+
+```jsx
+상위에 라우터들 require 잘 넣어주고
+
+app.use('/campground', campgrounds)
+app.use('/campground/:id/reviews', reviews )
+
+스프링의 리퀘스트 매핑 같은 개념의 주소를 잘 넣어주자 ( 라우터 앞에 자동으로 붙는 주소 )
+```
+
+# 세션 구성하기
+
+## express-session 설치
+
+```jsx
+npm i express-session
+
+을 설치해준다
+```
+
+```jsx
+const session = require('express-session') 을 추가해주고
+
+const sessionConfig = {
+    secret : 'ThisisSecretKey',
+    resave : false,
+    saveUninitialized : true
+}
+
+app.use(session(sessionConfig))
+
+두가지를 또 추가해준다
+```
+
+![Untitled](<YelpCamp%20%EC%9E%AC%EA%B5%AC%EC%84%B1%20(%20%EB%9D%BC%EC%9A%B0%ED%84%B0%20)/Untitled%201.png>)
+
+```jsx
+개발자 모드를 확인해보면 세션 ID 를 확인 가능하다
+```
+
+```jsx
+ 	const sessionConfig = {
+    secret: 'ThisisSecretKey', // 세션을 서명하기 위한 비밀 키 (임의의 문자열 사용)
+    resave: false, // 요청이 왔을 때 세션에 변동이 없더라도 다시 저장 여부 설정 (false는 저장하지 않음)
+    saveUninitialized: true, // 초기화되지 않은 세션도 저장 여부 설정 (true로 설정하여 저장)
+    cookie: { // 쿠키 설정 객체
+        expires: Date.now() + 1000 * 60 * 60 * 24 * 7, // 쿠키 만료 시간 설정 (현재 시간 기준 1주일 뒤)
+        maxAge: 1000 * 60 * 60 * 24 * 7 // 쿠키의 최대 수명 설정 (1주일)
+    }
+```
+
+```jsx
+그리고 쿠키의 최대 만료 시간을 설정해준다
+
+( 하나만 사용해도 상관없고 maxAge 를 더 많이 사용하지만 둘다 사용하면 좋다 )
+```

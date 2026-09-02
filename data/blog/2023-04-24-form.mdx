@@ -1,0 +1,1328 @@
+---
+title: '2023-04-24(다국어 설정, Form 검증)'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# 다국어 설정
+
+```bash
+다국어 페이지 설정
+
+- 한글은 ko
+- 영어는 en
+- 일어는 jp
+```
+
+## 1. 다국어 Message 파일 작성
+
+```bash
+1. /src/main/resources/ 하위에 폴더를 생성
+	 /src/main/resources/messages 폴더 생성
+
+2. message를 저장할 파일 생성
+	 - 형식이 있음
+	 - 기본파일은 ****.properties(ex: message.properties)
+	 - 한국어 파일은 기본파일명과 동일한 이름뒤에 국가코드 작성
+		 (ex: message_ko.properties)
+	 - 다른 언어도 동일
+		 (ex: message_en.properties)
+
+3. message.properties에서 여러줄을 입력
+	 - \ 로 구분
+	 - loginSuccess=ID가 {0} <br> 이고이름이 {1} 인분 환영합니다 \
+									글이 길어질때
+
+
+```
+
+![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled.png>)
+
+```java
+file 형식으로 메세지를 저장할 수 있는 파일을 만든다 (ex: message_ko.properties)
+```
+
+## 2. [application.properties](http://application.properties) 설정
+
+```java
+1. application.properties
+	1) message.properties의 위치와 파일명 설정
+
+
+		 ## message 파일의 위치와 이름 -> 폴더명/파일명
+		 ## messages/message로 시작하는 모든 파일
+		 spring.messages.basename=messages/message
+
+
+
+	2) Encoding
+		 spring.messages.encoding=UTF-8
+
+
+
+	3) message(key)가 없는 경우
+		 spring.messages.use-code-as-default-message=true
+		 ### true  : 예외를 발생 시키지 않고 key를 출력
+		 ### false : 예외를 발생
+
+	4) message 파일 내용의 변경을 감지하는 간격(초단위)
+		 spring.messages.cache-duration=600
+		//6초마다 한번씩 언어가 변경되었는지 확인 (시간조절 자유)
+```
+
+![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%201.png>)
+
+```java
+## message 설정
+spring.messages.basename=messages/message  // messages 폴더에 message 로 시작하는 파일
+spring.messages.encoding=UTF-8            // 인코딩
+spring.messages.use-code-as-default-message=true  // 키가 없는경우 에러를 발생 시킬것이냐 (키에 해당하는 메세지가 없으면 default 를
+spring.messages.cache-duration=600 //프로퍼티스 내용이 변경되는것을 감지하는 시간 ex)600
+```
+
+## 3. Java 적용
+
+```java
+- 언어를 구분하는 방법은 Cookie나 Session을 사용
+- Interceptor를 사용하여 언어별 message를 사용
+
+1. java class 선언
+2. WebMvcConfigure Interface 구현
+3. 클래스 선언부에 @Configuration 선언
+
+-------------------------------------------------------
+
+@Configuration  //설정 파일입니다 어노테이션
+public class MessageConfig implements WebMvcConfigurer {
+
+	1. Cookie또는 Session 사용 결정
+
+	@Bean                            //세션을 사용하고 싶으면
+	public LocaleResolver localeResolver() {  //메서드 명은 꼭 locale 로 해야한다
+		//1. session
+		SessionLocaleResolver resolver = new SessionLocaleResolver();
+		resolver.setDefaultLocale(Locale.KOREAN);
+
+
+		//2. Cookie                     //쿠키를 사용하고 싶으면
+		CookieLocaleResolver cResolver = new CookieLocaleResolver();
+		cResolver.setDefaultLocale(Locale.KOREAN);
+		cResolver.setCookieName("lang");
+
+		return cResolver;
+	}
+
+-------------------------------------------------------
+
+	2. Message Interceptor 객체 생성
+	//Interceptor 객체
+	@Bean
+	public LocaleChangeInterceptor changeInterceptor() {
+		LocaleChangeInterceptor changeInterceptor = new LocaleChangeInterceptor();
+		changeInterceptor.setParamName("lang"); (여길 수정해서 변화)("lang_kr")
+		//parameter를 받아서 언어 구분
+		//url?lang=en
+		return changeInterceptor;
+	}
+}
+
+3. Interceptor 등록
+public class InterceptorConfig implements WebMvcConfigurer {
+	@Autowired //IOC(Inversion Of Control)
+	private TestInterceptor testInterceptor;
+	@Autowired
+	private StudyInterceptor studyInterceptor;
+	@Autowired
+	private LocaleChangeInterceptor localeChangeInterceptor;
+
+	@Override
+	public void addInterceptors(InterceptorRegistry registry) {
+		//method 체이닝
+		//적용할 Interceptor 등록
+		registry.addInterceptor(testInterceptor)
+		//Interceptor를 적용할 URL 등록
+				.addPathPatterns("/qna/**")
+				.addPathPatterns("/notice/**")
+		//제외할 URL등록
+				.excludePathPatterns("/qna/detail")
+				.excludePathPatterns("/qna/write");
+
+		//추가 Interceptor등록
+		registry.addInterceptor(studyInterceptor)
+				.addPathPatterns("/qna/**");
+
+		-------------------------------------------------------
+		//message Interceptor 등록
+		registry.addInterceptor(localeChangeInterceptor)
+				.addPathPatterns("/**");
+	}
+
+}
+```
+
+### MessageConfig Interface 구현
+
+![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%202.png>)
+
+```java
+package com.iu.base.config;
+
+import java.util.Locale;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.LocaleResolver;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.servlet.i18n.CookieLocaleResolver;
+import org.springframework.web.servlet.i18n.LocaleChangeInterceptor;
+import org.springframework.web.servlet.i18n.SessionLocaleResolver;
+
+import com.iu.base.member.MemberVO;
+
+@Configuration
+public class MessageConfig implements WebMvcConfigurer {
+
+	// @Bean 객체 생성 :  annotation, xml -> <bean>     return new MemberVO() 랑 같고 bean 의 이름은 MemberVO 의 (클래스명) 맨 앞글자를 소문자로 바꾼것
+  // annotation 은 스스로 만든 클래스 객체를 만들 때 클래스 소스에 선언해서 사용할 수 있지만 라이브러리는 클래스 소스를 열어
+	// 사용이 불가능 하기 때문에 @Bean 을 사용한다.
+
+
+	@Bean          // 원래 session 은 xml 에 작성했지만 부트에서는 xml 이 없기 때문에 @Bean 으로 사용한다.
+	public LocaleResolver localeResolver() {    // 언어 설정을 저장하는 방법은 세션을 사용한 방법 , 쿠키를 사용한 방법 두가지가 있다.
+		//1. session
+		SessionLocaleResolver sessionLocaleResolver = new SessionLocaleResolver();
+		sessionLocaleResolver.setDefaultLocale(Locale.KOREAN);     // 첫 시작 기본을 KOREAN 으로 설정하라
+
+		//2. cookie
+		CookieLocaleResolver cookieLocaleResolver= new CookieLocaleResolver();
+		cookieLocaleResolver.setDefaultLocale(Locale.KOREAN);
+		cookieLocaleResolver.setCookieName("lang");  // 쿠키 네임은 자유롭게 선택가능
+
+		return cookieLocaleResolver;
+
+	}
+
+	@Bean                            //  이 인터셉터는 라이브러리로 @Bean 을 사용해서 객체를 만들어 줘야한다.
+	public LocaleChangeInterceptor getloChangeInterceptor() {
+		LocaleChangeInterceptor localeChangeInterceptor = new LocaleChangeInterceptor();
+		localeChangeInterceptor.setParamName("lang_opt"); //언어 설정 변경을 위한 파라미터 이름을 "lang_opt"으로 설정
+
+		return localeChangeInterceptor;
+	}
+
+
+
+}
+```
+
+![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%203.png>)
+
+```java
+package com.iu.base.config;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.servlet.i18n.LocaleChangeInterceptor;
+
+import com.iu.base.interceptors.AdminCheckInterceptor;
+import com.iu.base.interceptors.MemberCheckInterceptor;
+
+@Configuration
+public class InterceptorConfig implements WebMvcConfigurer {
+
+	@Autowired
+	private LocaleChangeInterceptor localeChangeInterceptor;         // 언어 설정을 변경할때 사용하는 인터셉터를 등록해준다.
+
+	@Autowired
+	private MemberCheckInterceptor memberCheckInterceptor;
+
+	@Autowired
+	private AdminCheckInterceptor adminCheckInterceptor;
+
+	@Override
+	public void addInterceptors(InterceptorRegistry registry) {
+
+		//등록 순서 감안해서 코드 작성
+
+		registry.addInterceptor(localeChangeInterceptor)
+					.addPathPatterns("/**");
+
+//		registry.addInterceptor(memberCheckInterceptor)
+//					.addPathPatterns("/member/myPage")
+//					.addPathPatterns("/qna/*")
+//					.excludePathPatterns("/qna/list")
+//					.addPathPatterns("/member/admin")
+//					.addPathPatterns("/notice/*")
+//					.excludePathPatterns("/notice/list")
+//					.excludePathPatterns("/notice/detail");
+//
+//		registry.addInterceptor(adminCheckInterceptor)
+//					.addPathPatterns("/member/admin")
+//					.addPathPatterns("/notice/*")
+//					.excludePathPatterns("/notice/list")
+//					.excludePathPatterns("/notice/detail");
+	}
+}
+```
+
+## 4. JSP 사용
+
+```bash
+1. jsp에 spring message를 사용할 수 있도록 tag lib 선언
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
+
+2. message 기본 문법
+<spring:message code="properites의 key" text="code가 없을 때 기본 메세지"
+	arguments="${}" argumentSeperator="구분자" var="변수명"/>
+
+a. message를 변수에 저장하고 다른 곳에서 출력
+	<spring:message code="hi" var="m" text="기본메세지"/>
+	<h3>${m}</h3>
+
+b. message에서 여러개를 구분해서 출력
+
+	a) message.properties
+		 welcome=회원님의 ID는 {0} 이고 Name은 {1} 입니다
+
+	b) jsp
+
+	<spring:message code="welcome"
+		arguments="${member.id},${member.name}" argumentSeperator="," />
+```
+
+### message_ko.properties
+
+```java
+hello=환영합니다
+loginSuccess=ID가 {0} \
+이고 이름이 {1} 인분 환영합니다 \
+글이 길어질때
+NotBlank=필수입니다.
+NotBlank.title=제목은 필수 입니다.
+NotBlank.writer=작성자는 필수 입니다.
+Size.title=제목은 {2} 이상 {1} 미만이어야 합니다.
+
+NotBlank.memberVO.userName=유저이름은 필수입니다.
+NotBlank.memberVO.name=이름은 필수입니다.
+Size.memberVO.passWord=비밀번호는 {2} 이상 {1} 미만입니다.
+member.password.notEqual=password가 일치하지 않습니다.
+member.userName.notEqual=User가 중복됩니다
+```
+
+### message_en.properties
+
+```java
+hello=Welcome
+loginSuccess=Your ID is {0} and Your Name is {1}
+NotBlank=Required
+NotBlank.title=Required Title
+NotBlank.writer=Required Writer
+Size.title=Title bigger {2} lower {1}
+
+NotBlank.memberVO.userName=Required userName
+NotBlank.memberVO.name=Required Name
+Size.memberVO.passWord=Password bigger {2} lower {1}
+member.password.notEqual=Not Equal password
+member.userName.notEqual=User OverLab
+```
+
+```java
+<h1>
+	<spring:message code="loginSuccess" text="없는 message" arguments="${member.userName},${member.name}" argumentSeparator=","></spring:message>
+</h1>
+
+<!-- 키가 없을때 text 의 값을 출력한다 -->
+
+<!-- arguments="${member.userName},${member.name}" argumentSeparator="," -->
+<!-- 위의 {0},{1} 형식으로 값을 넣어줄 수 있다 {0}= userName {1}= name -->
+<!-- argumentSeparator 이건 arguments 를 구분할 기호를 설정해준다 ex 는 , 로 구분한다.-->
+
+<h1>
+	<spring:message code="hello" var="msg"></spring:message>
+</h1>
+
+<!-- hello 에 있는 값을 msg 에 넣어서 사용하겠다 -->
+<!-- 이후 ${msg} 이런식으로 여러번 반복해서 사용 가능하다.
+
+<!-- 만약 code 가 없는 키 이면 code의 글자 그대로 출력된다.(설정 바꿔주면 에러가 뜨도록 설정도 가능하다)
+```
+
+```java
+**home**
+
+<!DOCTYPE html>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
+<%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+        <meta name="description" content="" />
+        <meta name="author" content="" />
+        <title>Modern Business - Start Bootstrap Template</title>
+        <!-- css favicon  -->
+        <c:import url="./temp/style.jsp"></c:import>
+        <!-- css favicon -->
+    </head>
+    <body class="d-flex flex-column h-100">
+        <main class="flex-shrink-0">
+            <!-- Navigation-->
+            <c:import url="./temp/header.jsp"></c:import>
+            <!-- Header-->
+            <header class="bg-dark py-5">
+                <div class="container px-5">
+                    <div class="row gx-5 align-items-center justify-content-center">
+                        <div class="col-lg-8 col-xl-7 col-xxl-6">
+                            <div class="my-5 text-center text-xl-start">
+                                <h1 class="display-5 fw-bolder text-white mb-2">A Bootstrap 5 template for modern businesses</h1>
+                                <p class="lead fw-normal text-white-50 mb-4">Quickly design and customize responsive mobile-first sites with Bootstrap, the world’s most popular front-end open source toolkit!</p>
+                                <div class="d-grid gap-3 d-sm-flex justify-content-sm-center justify-content-xl-start">
+                                    <a class="btn btn-primary btn-lg px-4 me-sm-3" href="#features">Get Started</a>
+                                    <a class="btn btn-outline-light btn-lg px-4" href="#!">Learn More</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-5 col-xxl-6 d-none d-xl-block text-center"><img class="img-fluid rounded-3 my-5" src="https://dummyimage.com/600x400/343a40/6c757d" alt="..." /></div>
+                    </div>
+                </div>
+            </header>
+            <!-- Features section-->
+            <section class="py-5" id="features">
+                <div class="container px-5 my-5">
+                    <div class="row gx-5">
+                        <div class="col-lg-4 mb-5 mb-lg-0">
+
+                        	<!-- message -->                        // 다른 언어 메세지 출력
+
+                        	<h1>
+                        		<spring:message code="loginSuccess" text="없는 message"
+                        		arguments="${member.userName},${member.name}" argumentSeparator=","></spring:message>
+                        	</h1>
+
+													<!--  -->
+                        	<!-- message -->
+
+                        	<h2 class="fw-bolder mb-0">A better way to start building.</h2>
+                        </div>
+                        <div class="col-lg-8">
+                            <div class="row gx-5 row-cols-1 row-cols-md-2">
+                                <div class="col mb-5 h-100">
+                                    <div class="feature bg-primary bg-gradient text-white rounded-3 mb-3"><i class="bi bi-collection"></i></div>
+                                    <h2 class="h5">Featured title</h2>
+                                    <p class="mb-0">Paragraph of text beneath the heading to explain the heading. Here is just a bit more text.</p>
+                                </div>
+                                <div class="col mb-5 h-100">
+                                    <div class="feature bg-primary bg-gradient text-white rounded-3 mb-3"><i class="bi bi-building"></i></div>
+                                    <h2 class="h5">Featured title</h2>
+                                    <p class="mb-0">Paragraph of text beneath the heading to explain the heading. Here is just a bit more text.</p>
+                                </div>
+                                <div class="col mb-5 mb-md-0 h-100">
+                                    <div class="feature bg-primary bg-gradient text-white rounded-3 mb-3"><i class="bi bi-toggles2"></i></div>
+                                    <h2 class="h5">Featured title</h2>
+                                    <p class="mb-0">Paragraph of text beneath the heading to explain the heading. Here is just a bit more text.</p>
+                                </div>
+                                <div class="col h-100">
+                                    <div class="feature bg-primary bg-gradient text-white rounded-3 mb-3"><i class="bi bi-toggles2"></i></div>
+                                    <h2 class="h5">Featured title</h2>
+                                    <p class="mb-0">Paragraph of text beneath the heading to explain the heading. Here is just a bit more text.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <!-- Testimonial section-->
+            <div class="py-5 bg-light">
+                <div class="container px-5 my-5">
+                    <div class="row gx-5 justify-content-center">
+                        <div class="col-lg-10 col-xl-7">
+                            <div class="text-center">
+                                <div class="fs-4 mb-4 fst-italic">"Working with Start Bootstrap templates has saved me tons of development time when building new projects! Starting with a Bootstrap template just makes things easier!"</div>
+                                <div class="d-flex align-items-center justify-content-center">
+                                    <img class="rounded-circle me-3" src="https://dummyimage.com/40x40/ced4da/6c757d" alt="..." />
+                                    <div class="fw-bold">
+                                        Tom Ato
+                                        <span class="fw-bold text-primary mx-1">/</span>
+                                        CEO, Pomodoro
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Blog preview section-->
+            <section class="py-5">
+                <div class="container px-5 my-5">
+                    <div class="row gx-5 justify-content-center">
+                        <div class="col-lg-8 col-xl-6">
+                            <div class="text-center">
+                                <h2 class="fw-bolder">From our blog</h2>
+                                <p class="lead fw-normal text-muted mb-5">Lorem ipsum, dolor sit amet consectetur adipisicing elit. Eaque fugit ratione dicta mollitia. Officiis ad.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row gx-5">
+                        <div class="col-lg-4 mb-5">
+                            <div class="card h-100 shadow border-0">
+                                <img class="card-img-top" src="https://dummyimage.com/600x350/ced4da/6c757d" alt="..." />
+                                <div class="card-body p-4">
+                                    <div class="badge bg-primary bg-gradient rounded-pill mb-2">News</div>
+                                    <a class="text-decoration-none link-dark stretched-link" href="#!"><h5 class="card-title mb-3">Blog post title</h5></a>
+                                    <p class="card-text mb-0">Some quick example text to build on the card title and make up the bulk of the card's content.</p>
+                                </div>
+                                <div class="card-footer p-4 pt-0 bg-transparent border-top-0">
+                                    <div class="d-flex align-items-end justify-content-between">
+                                        <div class="d-flex align-items-center">
+                                            <img class="rounded-circle me-3" src="https://dummyimage.com/40x40/ced4da/6c757d" alt="..." />
+                                            <div class="small">
+                                                <div class="fw-bold">Kelly Rowan</div>
+                                                <div class="text-muted">March 12, 2023 &middot; 6 min read</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4 mb-5">
+                            <div class="card h-100 shadow border-0">
+                                <img class="card-img-top" src="https://dummyimage.com/600x350/adb5bd/495057" alt="..." />
+                                <div class="card-body p-4">
+                                    <div class="badge bg-primary bg-gradient rounded-pill mb-2">Media</div>
+                                    <a class="text-decoration-none link-dark stretched-link" href="#!"><h5 class="card-title mb-3">Another blog post title</h5></a>
+                                    <p class="card-text mb-0">This text is a bit longer to illustrate the adaptive height of each card. Some quick example text to build on the card title and make up the bulk of the card's content.</p>
+                                </div>
+                                <div class="card-footer p-4 pt-0 bg-transparent border-top-0">
+                                    <div class="d-flex align-items-end justify-content-between">
+                                        <div class="d-flex align-items-center">
+                                            <img class="rounded-circle me-3" src="https://dummyimage.com/40x40/ced4da/6c757d" alt="..." />
+                                            <div class="small">
+                                                <div class="fw-bold">Josiah Barclay</div>
+                                                <div class="text-muted">March 23, 2023 &middot; 4 min read</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4 mb-5">
+                            <div class="card h-100 shadow border-0">
+                                <img class="card-img-top" src="https://dummyimage.com/600x350/6c757d/343a40" alt="..." />
+                                <div class="card-body p-4">
+                                    <div class="badge bg-primary bg-gradient rounded-pill mb-2">News</div>
+                                    <a class="text-decoration-none link-dark stretched-link" href="#!"><h5 class="card-title mb-3">The last blog post title is a little bit longer than the others</h5></a>
+                                    <p class="card-text mb-0">Some more quick example text to build on the card title and make up the bulk of the card's content.</p>
+                                </div>
+                                <div class="card-footer p-4 pt-0 bg-transparent border-top-0">
+                                    <div class="d-flex align-items-end justify-content-between">
+                                        <div class="d-flex align-items-center">
+                                            <img class="rounded-circle me-3" src="https://dummyimage.com/40x40/ced4da/6c757d" alt="..." />
+                                            <div class="small">
+                                                <div class="fw-bold">Evelyn Martinez</div>
+                                                <div class="text-muted">April 2, 2023 &middot; 10 min read</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Call to action-->
+                    <aside class="bg-primary bg-gradient rounded-3 p-4 p-sm-5 mt-5">
+                        <div class="d-flex align-items-center justify-content-between flex-column flex-xl-row text-center text-xl-start">
+                            <div class="mb-4 mb-xl-0">
+                                <div class="fs-3 fw-bold text-white">New products, delivered to you.</div>
+                                <div class="text-white-50">Sign up for our newsletter for the latest updates.</div>
+                            </div>
+                            <div class="ms-xl-4">
+                                <div class="input-group mb-2">
+                                    <input class="form-control" type="text" placeholder="Email address..." aria-label="Email address..." aria-describedby="button-newsletter" />
+                                    <button class="btn btn-outline-light" id="button-newsletter" type="button">Sign up</button>
+                                </div>
+                                <div class="small text-white-50">We care about privacy, and will never share your data.</div>
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+            </section>
+        </main>
+        <!-- Footer 적용 -->
+        <c:import url="./temp/footer.jsp"></c:import>
+        <!-- Footer 끝 -->
+    </body>
+</html>
+```
+
+- jsp상세
+  ![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%204.png>)
+  ```java
+  스프링에서 제공하는 태그 (JSTL 아님)
+  ```
+  ![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%205.png>)
+  ![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%206.png>)
+  ![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%207.png>)
+  ```java
+  인터셉터에서 설정해놓은
+  ```
+  ![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%208.png>)
+  ![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%209.png>)
+  ```java
+  var 변수에 담아서 사용하겠다. (페이지 내에서만 적용)
+  ```
+  ![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%2010.png>)
+  ![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%2011.png>)
+  ![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%2012.png>)
+  ![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%2013.png>)
+  ![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%2014.png>)
+  ![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%2015.png>)
+  ![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%2016.png>)
+  ![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%2017.png>)
+  ![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%2018.png>)
+  ![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%2019.png>)
+  ```java
+  ?? = 배열 인덱스가 들어간다
+  ```
+  ![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%2020.png>)
+  ```java
+  id 가 {0}번 name 이 {1}
+  ```
+  ![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%2021.png>)
+  ```java
+  배열 구분할 기호 설정 (현재 , )
+  ```
+  ![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%2022.png>)
+  ![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%2023.png>)
+  ```java
+  (이름은 불러오지 않아서 없음)
+  ```
+  ![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%2024.png>)
+  ```java
+  로그인 했을때만 출력되도록 설정
+  ```
+
+## 인코딩 설정
+
+```java
+# Encoding 설정
+server.servlet.encoding.charset=UTF-8
+server.servlet.encoding.force=true
+
+글자가 깨지는것을 방지하기 위해서 application.properties 에 기입해준다.
+```
+
+# Spring Form 과 검증
+
+```java
+프론트의 보안 문제를 보안하기 위해서
+
+프론트 + 서버에서 검증을 같이한다.
+```
+
+## 1. Spring Form 검증 설정
+
+```jsx
+API 설정
+
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-validation</artifactId>
+</dependency>
+
+// porm.xml에 추가해준다.
+```
+
+## 2. Spring Form 사용 방법
+
+```jsx
+1. 입력 폼이 있는 JSP로 이동 전 Controller에서 Data가 없는 빈 VO객체를 Model 담아서 전송
+	@GetMapping("add")
+	public void setAdd(@ModelAttribute MemberVO memberVO)throws Exception{
+		//MemberVO memberVO = new MemberVO();
+		//model.addAttribute(memberVO);
+	}
+
+2. JSP에 form 태그를 HTML form 이 아니라 Spring form 태그 사용
+	1) JSP 선언부에 Spring form 태그를 사용할 수 있도록 taglib 추가
+	<%@ taglib prefix="form" uri="http://www.springframework.org/tags/form" %>
+
+
+	2) Spring Form Tag
+		<form:form action="./add" modelAttribute="memberVO" method="post" enctypye="">
+		- action은 생략 가능, 현재 URL이 action으로 지정
+		- modelAttribute 는 Controller에서 Model에 추가한 Bean의 속성명
+		- 속성명을 지정하지 않으면 클래스명의 첫글자를 소문자로 바꾼 것이 속성명으로 지정
+
+
+		<form:input path="">
+		- path     : Bean의 getter의 이름, HTML input 태그의 name과 비슷한 역할
+		- cssClass : css 사용을 위한 HTML의 class 속성
+
+
+		<form:errors path="id"></form:errors>
+		- Back-end에서 검증에 위반 되었을 경우 에러메세지 출력
+
+```
+
+## @ModelAttribute
+
+```java
+@ModelAttribute는 사용자가 전달하는 값을 오브젝트 형태(객체 형태)로 매핑해주는 어노테이션이다.
+
+보통 폼을 통해 값을 전달할 때 자주 사용한다. (생략도 가능하고 지금까지 모르게 존재했음)
+
+예를들어
+
+/?name=JJY&age=10로 요청을 하면 각각의 값이 핸들러(Controller)의 testModel 객체로 자동으로 바인딩(매개변수를 해당 객체의 필드에 매핑)된다.
+
+name = JJY
+age = 10
+
+1 .Model은 객체이다.
+2 .view의 이름과 view를 렌더링할 때 필요하다.
+3 .map으로 되어있기 때문에 controller에서 view에 필요한 데이터를 key, value로 넣어준다.
+4 .Servlet에서 request.setAttribute()와 비슷한 역할을 한다.
+5 .model객체에 담을 때는 model.addAttribute("key", value)를 사용하면 된다.
+```
+
+```java
+@Getter
+@Setter
+public class TestModel {
+    private String name;
+    private int age;
+}
+
+@RestController
+public class TestController {
+    @GetMapping("/")
+    public String getTestPage(@ModelAttribute TestModel testModel) {       //TestModel 객체를 자동으로 생성
+        System.out.println("이름 : " + testModel.getName());
+        System.out.println("나이 : " + testModel.getAge());
+        return "test";
+    }
+}
+```
+
+```java
+예를들어, name, age를 인스턴스 변수로 가지는 TestModel객체가 존재하고 이를 매개변수로 받기 위해서는 위와 같이 컨트롤러를 생성하고,
+
+/?name=JJY&age=10로 요청을 하면 각각의 값이 핸들러(Controller)의 testModel 객체로 바인딩된다. (Setter가 존재해야 한다.)
+```
+
+## 3. Form 검증
+
+```jsx
+1. Controller 메서드의 검증할 VO 앞에 @Valid 선언하면 검증을 실행
+2. 검증 결과를 BindingResult에 저장
+3. !!!!!!!!!!! 중요 !!!!!!!!!!!!!
+	 선언순서를 지켜 줘야 함 (이유는 검증에 실패하면 - 바로 뒤 BindingResult 에 담아주기 때문)
+	 @Valid vo, BindingResult
+
+@PostMapping("add")
+	public ModelAndView setAdd(@Valid MemberVO memberVO, BindingResult bindingResult, ModelAndView mv)throws Exception{
+
+		if(bindingResult.hasErrors()) {
+			//검증에 실패하면 회원가입하는 jsp로 foward
+			mv.setViewName("member/add");
+			return mv;
+		}
+
+		int result = memberService.setAdd(memberVO);
+
+		mv.setViewName("redirect:../");
+		return mv;
+	}
+```
+
+## 4. 검증 Annotation
+
+```jsx
+검증할 VO의 멤버변수 선언부에 작성
+
+참조 : https://beanvalidation.org/
+
+1. @NotEmpty          : Null 허용하지 않음, 공백문자 허용
+2. @NotBlank          : Null 허용하지 않음, 문자 1개이상 포함
+3. @NotNull           : Null 허용하지 않음
+4. @Null              : Null 허용 함
+5. @Max(value=지정값) : 최대지정값 보다 작거나 같은값들만 허용
+6. @Min(value=지정값) : 최소지정값 보다 크거나 같은값들만 허용
+7. @Size(max=값, min=값) : 문자열이나 배열 의 길이 가 min이상 max이하 허용
+8. @Pattern(regexp="정규표현식", flag="") : 정규표현식으로 검증
+9. @AssertFalse       : false 여부
+10. @AssertTrue       : true 여부
+11. @Future           : 미래 날짜 여부
+12. @Past             : 과거 날짜 여부
+13. @Email            : 이메일 형식
+14. @Length(min="값", max="값") : 문자열 길이 검증
+15. @Range(min="값", max="값")  : 숫자 범위 검증
+16. @URL              : URL 형식 검증
+
+@Pattern(regexp = "(?=.*[0-9])(?=.*[a-z])(?=.*\\\\W)(?=\\\\S+$).{6,12}")
+private String pw;
+```
+
+## 5. 검증 Message
+
+```jsx
+1. 검증 Annotation의 속성 message의 값을 변경
+
+@NotBlank(message = "ID는 꼭 필요해!!!")      // 이런 형식으로도 출력 가능
+private String id;
+
+2. 검증 메세지를 message.properties에 등록 후 사용
+
+a. 검증Annotation=메세지
+b. 검증Annotation.멤버변수명=메세지
+c. 검증Annotation.vo명.멤버변수명=메세지
+
+우선순위 c>b>a>1
+
+3. message에 변수를 사용해서 출력 하는 경우
+	- 검증 Annotation의 속성의 인덱스 번호 이용
+	- 정해진 순서가 있음
+	- 코드 작성시 임의로 순서를 바꿀 수 없음
+
+	@Size(min=4, max=10)
+	private String pw;
+	{0}  : 멤버변수명
+	{1}  : max
+	{2}  : min
+
+	message.properties
+	Size.memberVO.pw={0}는 {2} 글자 이상 {1} 글자 이하여야 함
+```
+
+- 상세설명
+  ![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%2025.png>)
+  ```java
+  검증 a
+  ```
+  ![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%2026.png>)
+  ```java
+  검증 b. 더 세분화 해서 검증메세지 출력
+  ```
+  ```java
+  검증 c. notice.vo.writter = 메세지  -  더더 세분화 해서 사용가능
+  ```
+  ![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%2027.png>)
+  ```java
+  이러면 출력 x {0} , {1} 이 아니다.
+  ```
+  ![Untitled](<2023-04-24(%EB%8B%A4%EA%B5%AD%EC%96%B4%20%EC%84%A4%EC%A0%95,%20Form%20%EA%B2%80%EC%A6%9D)/Untitled%2028.png>)
+  ```java
+  min , max 라고 {0}, {1} 이 되는게 아니라 각자 순서가 정해져있다 ex min = {2}
+  ```
+
+## 6. 사용자 정의 검증
+
+```jsx
+Annotation으로 검증하지 못하는 것들을 사용자 정의 코드로 작성
+
+1. 사용자 정의 검증을 할 메서드나 클래스를 생성
+	 a. 기존 service에 검증할 메서드를 선언
+	 b. 새로운 검증 클래스를 생성하고 메서드 선언
+
+-- 기존 service 메서드 선언
+	//사용자 정의 검증 메서드
+	public boolean getMemberError(MemberVO memberVO, BindingResult bindingResult)throws Exception{
+		boolean check=false;
+		//check=false : 검증성공(error 없음)
+		//check=true  : 검증실패(error 있음)
+
+		//1. annotation 검증
+		check = bindingResult.hasErrors();
+
+		//2. password가 일치하는지 검증
+		if(!memberVO.getPw().equals(memberVO.getPwCheck())) {
+			check=true;
+			//에러메세지
+			//bindingResult.rejectValue("멤버변수명(path)", "properties의key(코드)");
+			bindingResult.rejectValue("pwCheck", "member.password.notEqual");
+
+		}
+
+		//3. id가 중복 인지 검증
+		int result = memberMapper.getIdCheck(memberVO);
+		if(result>0) {
+			check=true;
+			bindingResult.rejectValue("id", "member.id.equal");
+		}
+
+		return check;
+
+	}
+
+2. message.properties에 사용자 정의 메세지 코드 등록
+	 ### Custom message
+	 member.password.notEqual=Password가 일치하지 않습니다
+	 member.id.equal=이미사용중인 ID입니다
+
+3. Controller에서 사용자 정의 검증 메서드 호출
+	@PostMapping("add")
+	public ModelAndView setAdd(@Valid MemberVO memberVO, BindingResult bindingResult, ModelAndView mv)throws Exception{
+
+		boolean check = memberService.getMemberError(memberVO, bindingResult);
+		if(check) {
+			log.info("===== 검증 에러 발생 =====");
+			mv.setViewName("member/add");
+			return mv;
+		}
+		...
+
+```
+
+### id,password 검증 예제
+
+```java
+**MemberVO**
+
+package com.iu.base.member;
+
+import java.sql.Date;
+import java.util.List;
+
+import javax.validation.constraints.Email;
+import javax.validation.constraints.Future;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.Past;
+import javax.validation.constraints.Size;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@Setter
+@Getter
+public class MemberVO {
+	@NotBlank
+	private String userName;
+	@NotBlank
+	@Size(min = 8, max=10)
+	private String passWord;
+
+	private String passWordCheck;
+	@NotBlank
+	private String name;
+	@Email
+	private String email;
+	@Future
+	private Date birth;
+	private boolean enabled;
+
+	private List<RoleVO> roleVOs;
+}
+```
+
+```java
+**MemberController**
+
+package com.iu.base.member;
+
+import java.lang.reflect.Member;
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
+import javax.validation.Valid;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.servlet.ModelAndView;
+
+import lombok.extern.slf4j.Slf4j;
+
+@Controller
+@RequestMapping("/member/*")
+@Slf4j
+public class MemberController {
+
+	@Autowired
+	private MemberService memberService;
+
+	@GetMapping("admin")
+	public void getAdmin() throws Exception{
+
+	}
+
+	@GetMapping("myPage")
+	public void getMyPage() throws Exception{
+
+	}
+
+	@GetMapping("idDuplicateCheck")                               // 사용자 정의 검증 할 클래스 생성 (ID 중복체크 )
+	@ResponseBody
+	public boolean idDuplicateCheck(MemberVO memberVO) throws Exception{
+		log.debug("================ ID 중복 체크 =================");
+		boolean check=false;
+
+		memberVO = memberService.idDuplicateCheck(memberVO);
+
+		if(memberVO == null) {
+			check=true;
+		}
+
+		return check;
+	}
+
+	@GetMapping("join")
+	public ModelAndView setJoin(@ModelAttribute MemberVO memberVO) throws Exception{
+		ModelAndView mv = new ModelAndView();
+		mv.setViewName("member/join");
+		return mv;
+	}
+
+	@PostMapping("join")
+	public ModelAndView setJoin(@Valid MemberVO memberVO, BindingResult bindingResult) throws Exception{
+		ModelAndView mv = new ModelAndView();
+		boolean check  = memberService.memberCheck(memberVO, bindingResult);
+		if(check) {
+			log.warn("======검증에 실패======");
+			mv.setViewName("member/join");
+			return mv;
+		}
+		int result = memberService.setJoin(memberVO);
+		mv.setViewName("redirect:../");
+		return mv;
+	}
+
+	@GetMapping("logout")
+	public ModelAndView getLogout(HttpSession session) throws Exception{
+		ModelAndView mv = new ModelAndView();
+		session.invalidate();
+		mv.setViewName("redirect:../");
+		return mv;
+	}
+
+	@GetMapping("login")
+	public ModelAndView getLogin() throws Exception{
+		ModelAndView mv = new ModelAndView();
+		mv.setViewName("member/login");
+		return mv;
+	}
+
+	@PostMapping
+	public ModelAndView getLogin(MemberVO memberVO, HttpSession session) throws Exception {
+		ModelAndView mv =new ModelAndView();
+		memberVO = memberService.getLogin(memberVO);
+		mv.setViewName("redirect:./login");
+		if(memberVO != null) {
+			session.setAttribute("member", memberVO);
+			mv.setViewName("redirect:../");
+		}
+		return mv;
+	}
+
+}
+```
+
+```java
+**MemberService**
+
+package com.iu.base.member;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.http.HttpSession;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.validation.BindingResult;
+
+import lombok.extern.slf4j.Slf4j;
+
+@Service
+@Slf4j
+public class MemberService {
+
+	@Autowired
+	private MemberDAO memberDAO;
+
+	//패스워드가 일치하는지 검증하는 메서드
+	public boolean memberCheck(MemberVO memberVO, BindingResult bindingResult) throws Exception{
+		boolean result = false;
+		//false : error가 없음, 검증 성공
+		//true : error가 있음, 검증 실패
+
+		//1. annotation의 검증 결과
+		result = bindingResult.hasErrors();
+
+		//2. password 일치 검증
+		if(!memberVO.getPassWord().equals(memberVO.getPassWordCheck())) {
+			result = true;
+			//에러메세지
+			//bindingResult.rejectValue("멤버변수명(path)", "properties의key(코드)");
+			//.rejectValue 오류 메세지를 생성해서 출력할때 사용하는 메서드
+			bindingResult.rejectValue("passWordCheck", "member.password.notEqual"); // passWordCheck 메서드가 같지않다면(true) member.password.notEqual 메세지id출력
+		}
+
+		//3. ID 중복 검사
+		MemberVO checkMember = memberDAO.idDuplicateCheck(memberVO);
+		 if(checkMember != null) {
+			 result=true;
+			 bindingResult.rejectValue("userName", "member.userName.notEqual"); //에러 메세지
+		 }
+
+		return result;
+	}
+
+	public MemberVO getLogin(MemberVO memberVO) throws Exception{
+		return memberDAO.getLogin(memberVO);
+	}
+
+	public int setJoin(MemberVO memberVO) throws Exception{
+		memberVO.setEnabled(true);
+		int result = memberDAO.setJoin(memberVO);
+		Map<String, Object> map = new HashMap<>();   //HashMap 객체를 생성하여 Map<String, Object> 형태의 변수 map에 할당 변수는 후에 쿼리문에서 사용될 매개변수를 저장할 때 사용
+		map.put("userName", memberVO.getUserName()); //생성한 HashMap 객체(map)에 "userName"이라는 key와 MemberVO 객체의 userName 필드를 value로 갖는 값을 저장
+		map.put("num", 3); // "num"이라는 key와 3을 value로 갖는 값을 저장
+		result = memberDAO.setMemberRole(map); // HashMap 객체(map)를 이용하여 memberDAO를 통해 회원의 권한 정보를 업데이트하는 메소드
+		return result;
+	}
+
+	public List<MemberVO> getList() throws Exception{
+		return memberDAO.getList();
+	}
+
+	public MemberVO idDuplicateCheck(MemberVO memberVO)throws Exception{
+		return memberDAO.idDuplicateCheck(memberVO);
+	}
+
+}
+```
+
+### 예제
+
+```java
+**BoardVO**
+
+package com.iu.base.board;
+
+import java.sql.Date;
+import java.util.List;
+
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.Size;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@Setter
+@Getter
+public class BoardVO {
+	private Long num;
+	@NotBlank                      // Null 허용하지 않음, 문자 1개이상 포함
+	@Size(min = 5, max=20)         // (max=값, min=값) : 문자열이나 배열 의 길이 가 min이상 max이하 허용
+	private String title;
+	private String info;
+	@NotBlank
+	private String writer;
+	private Date regDate;
+	private Long Hit;
+	private SubVO subVO;
+	private List<BoardFileVO> boardFileVOs;
+}
+```
+
+```java
+**검증 메세지**
+
+hello=Welcome
+loginSuccess=Your ID is {0} and Your Name is {1}
+NotBlank=Required
+NotBlank.title=Required Title
+NotBlank.writer=Required Writer
+Size.title=Title bigger {2} lower {1}
+
+NotBlank.memberVO.userName=Required userName
+NotBlank.memberVO.name=Required Name
+Size.memberVO.passWord=Password bigger {2} lower {1}
+member.password.notEqual=Not Equal password
+member.userName.notEqual=User OverLab
+```
+
+```java
+**Controller**
+
+//add
+	@GetMapping("add")
+	public ModelAndView setInsert(@ModelAttribute BoardVO boardVO) throws Exception{ // @ModelAttribute 값이 들어오면BoardVO 객체를 생성하고 자동으로 값을매핑
+		ModelAndView mv = new ModelAndView();
+		mv.setViewName("board/add");
+		//mv.addObject(new NoticeVO()); //속성명은 클래스명의 소문자로 바꾼 것
+		return mv;
+	}
+
+	@PostMapping("add")
+	public ModelAndView setInsert(@Valid BoardVO boardVO,BindingResult bindingResult, MultipartFile[] boardFiles) throws Exception{
+		                                                                                       //VO 앞에 @Valid 를 사용하면 검증을 실행
+		log.error(path);                                                            // 검증 결과를 BindingResult 에 저장 선언순서 VO , BindingResult 지켜주기
+
+
+		ModelAndView mv = new ModelAndView();
+		if(bindingResult.hasErrors()) {                       // 검증 결과가 hasErrors( 에러가 뜬다면 )
+			log.warn("========== 검증에 실패 ==========");
+			mv.setViewName("board/add");
+			return mv;                                          // 리턴을 해서 종료
+		}
+
+		for(MultipartFile multipartFile:boardFiles) {
+			log.info("OriginalName: {} Size: {}", multipartFile.getOriginalFilename(), multipartFile.getSize());
+		}
+		int result = noticeService.setInsert(boardVO,boardFiles);
+		//boardFiles는 jsp에서 온 파라미터 이름과 동일하게 하려고, Service는 어떤 이름이 와도 상관X
+		mv.setViewName("redirect:./list");
+		return mv;
+	}
+```
+
+```java
+**add JSP**
+
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
+<%@ taglib prefix="form" uri="http://www.springframework.org/tags/form" %>                    // 태그 추가시켜 줘야한다
+<!DOCTYPE html>
+<html>
+<head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+        <meta name="description" content="" />
+        <meta name="author" content="" />
+        <title>Modern Business - Start Bootstrap Template</title>
+        <!-- css favicon  -->
+        <c:import url="../temp/style.jsp"></c:import>
+        <!-- css favicon -->
+            <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.js"></script>
+    </head>
+<body class="d-flex flex-column h-100">
+	<main class="flex-shrink-0">
+		<!-- Navigation-->
+        <c:import url="../temp/header.jsp"></c:import>
+         <!-- Page content-->
+            <section class="py-5">
+                <div class="container px-5">
+                    <!-- Contact form-->
+                    <div class="bg-light rounded-3 py-5 px-4 px-md-5 mb-5">
+                        <div class="text-center mb-5">
+                            <div class="feature bg-primary bg-gradient text-white rounded-3 mb-3"><i class="bi bi-envelope"></i></div>
+                            <h1 class="fw-bolder">Get in touch</h1>
+                            <p class="lead fw-normal text-muted mb-0">We'd love to hear from you</p>
+                        </div>
+                        <div class="row gx-5 justify-content-center">
+                            <div class="col-lg-8 col-xl-6">
+                                <!-- * * * * * * * * * * * * * * *-->
+                                <!-- * * SB Forms Contact Form * *-->
+                                <!-- * * * * * * * * * * * * * * *-->
+                                <!-- This form is pre-integrated with SB Forms.-->
+                                <!-- To make this form functional, sign up at-->
+                                <!-- https://startbootstrap.com/solution/contact-forms-->
+                                <!-- to get an API token!-->
+                                   <form:form id="contactForm" data-sb-form-api-token="API_TOKEN" modelAttribute="boardVO" cssClass="" action="./add" method="post" enctype="multipart/form-data">                                    <!-- Title input-->
+                                    <div class="form-floating mb-3">
+                                        <form:input path="title" id="title" cssClass="form-control"/>
+                                        <label for="title">title</label>
+                                        <form:errors path="title"></form:errors>
+                                        <div class="invalid-feedback" data-sb-feedback="name:required">A name is required.</div>  //required 비있지 않게 설정
+                                    </div>
+                                    <!-- 첨부 파일 -->
+                                    <div class="form-floating mb-3">
+                                    	<input type="file" name="boardFiles" class="check">
+                                    </div>
+
+                                    <!-- Writer address input-->
+                                    <div class="form-floating mb-3">
+                                        <form:input path="writer" id="writer" cssClass="form-control"/>
+                                        <label for="writer">Writer</label>
+                                        <form:errors path="writer"></form:errors>
+                                    </div>
+
+                                    <!-- Contents input-->
+                                    <div class="form-floating mb-3">
+                                        <textarea class="form-control check" id="info" name="info" placeholder="Enter your contents here..." style="height: 10rem" data-sb-validations="required"></textarea>
+
+                                        <div class="invalid-feedback" data-sb-feedback="message:required">A message is required.</div>
+                                    </div>
+                                    <!-- Submit Button-->
+                                    <div class="d-grid"><button class="btn btn-primary btn-lg" id="submitButton" type="submit">Submit</button></div>
+                                </form:form>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Contact cards-->
+                    <div class="row gx-5 row-cols-2 row-cols-lg-4 py-5">
+                        <div class="col">
+                            <div class="feature bg-primary bg-gradient text-white rounded-3 mb-3"><i class="bi bi-chat-dots"></i></div>
+                            <div class="h5 mb-2">Chat with us</div>
+                            <p class="text-muted mb-0">Chat live with one of our support specialists.</p>
+                        </div>
+                        <div class="col">
+                            <div class="feature bg-primary bg-gradient text-white rounded-3 mb-3"><i class="bi bi-people"></i></div>
+                            <div class="h5">Ask the community</div>
+                            <p class="text-muted mb-0">Explore our community forums and communicate with other users.</p>
+                        </div>
+                        <div class="col">
+                            <div class="feature bg-primary bg-gradient text-white rounded-3 mb-3"><i class="bi bi-question-circle"></i></div>
+                            <div class="h5">Support center</div>
+                            <p class="text-muted mb-0">Browse FAQ's and support articles to find solutions.</p>
+                        </div>
+                        <div class="col">
+                            <div class="feature bg-primary bg-gradient text-white rounded-3 mb-3"><i class="bi bi-telephone"></i></div>
+                            <div class="h5">Call us</div>
+                            <p class="text-muted mb-0">Call us during normal business hours at (555) 892-9403.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+    	<!-- Header-->
+	</main>
+	<!-- Footer 적용 -->
+   	<c:import url="../temp/footer.jsp"></c:import>
+   	<!-- Footer 끝 -->
+
+   	<script type="text/javascript" src="../js/boardform.js"></script>
+   	<script>
+		$('#contents').summernote();
+	</script>
+</body>
+</html>
+```
+
+```java
+**예제**
+<div class="form-floating mb-3">
+	<form:input path="title" id="title" cssClass="form-control"/>
+		<label for="title">title</label>
+	<form:errors path="title"></form:errors>
+<div class="invalid-feedback" data-sb-feedback="name:required">A name is required.</div>
+</div>
+
+1. type = 이 없어지고 input , 또는 password 같은 속성명으로 적어준다
+
+2. path = modelAttribute 의 (ex noticeVO) setter getter 이름과 동일한 이름을 적어준다.(멤버 변수명)
+
+3. required = 값이 비어있지 않게 설정
+
+<form:form id="contactForm" data-sb-form-api-token="API_TOKEN" modelAttribute="boardVO" cssClass="" action="./add" method="post" enctype="multipart/form-data">
+</form:form>
+
+
+1. modelAttribute="boardVO" = 컨트롤러에서 모델어트리뷰트에 담아온 타입을 적어준다. (컨트롤러에서 지정해준게 없다면 클래스의 첫 글자를 소문자로 바꾼것)
+
+2. cssClass=""    =  클래스와 같지만 이름만 조금 달라졌다.
+```

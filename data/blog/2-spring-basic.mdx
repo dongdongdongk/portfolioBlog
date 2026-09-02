@@ -1,0 +1,400 @@
+---
+title: '2. Spring Basic'
+date: '2026-09-02'
+category: '기타, 사용 적음/국비'
+tags: ['기타, 사용 적음', '국비']
+draft: false
+summary: ''
+---
+
+```jsx
+1. Framewaork
+	 - 디자인패턴 + 라이브러리
+	 - 개발자가 해야할 것들을 대신 해주는 것들
+	 - POJO(Plain Old Java Object) 기반 - 순수한 자바 객체
+	 - Java 개발에만 신경 써라
+
+2. Project 구성
+	1) src/main/java      : java의 class 파일들이 있는곳
+	2) src/main/resources : Back-end에서 java이외의 자원들
+	3) src/test/java      : java Test 파일
+	4) src/test/resources : java Test시에 필요한 java 이외의 자원들
+
+	5) src/main/webapp/resources      : css, js, image 등 저장
+	6) src/main/webapp/WEB-INF/spring : Spring Framework 설정 파일들
+	7) src/main/webapp/WEB-INF/views  : jsp 파일들
+
+	8) pom.xml             : maven 설정파일, 버전관리, 라이브러리, 배포관리
+
+	9) target              : 개발이 끝나고 배포파일을 생성하면 target 폴더에 저장
+
+3. 요청(Request)과 응답(Response) 진행 순서
+
+	1. 서버 실행(Tomcat 실행)
+	2. web.xml을 Tomcat이 읽고 그대로 실행
+		1) 배포서술자(DD, Deployment Descriptor)
+		2) Servlet 객체를 생성해라(Tomcat이)
+		3) / 이하의 모든 요청이 들어오면 Serlvet을 실행(Tomcat)
+		4) service method 실행(tomcat)
+		5) service method에서 URL에 해당하는 컨트롤러의 메서드를 실행
+
+	2_1. Spring 설정 파일을 읽고 그대로 실행
+		servlet-context.xml, root-context.xml 등등...
+
+	3. Request 구성 요소 와 Response
+
+		1) URL : 필수
+		2) 요청 메서드 형식 : 필수
+			- WEB Browser가 지원하는것은 a, b
+			- Rest API 에서 나머지 c, d 까지 사용
+			a. GET    : 클라이언트에서 서버로 보내는 Data(Parameter)가 주소창에 노출 (Header에 담김)
+									보안이 요구 되지 않는 데이터
+									작은 용량의 Text를 보낼 때 적합
+			b. POST   : 클라이언트에서 서버로 보내는 Data(Parameter)가 주소창에 노출되지 않음 (Body)에 담김)
+									보안이 요구 될 때 사용
+									용량이 큰 데이터 를 보낼 때 적합
+			c. PUT    : 수정(Update)
+			d. DELETE : 삭제(Delete)
+
+		3) Parameter : Option
+			- Client에서 Server로 보내는 Data
+			- 이름과 값 (Name과 Value) 형식
+			- 이름은 String 값 String
+		4) Cookie(필수)
+			- Client 컴퓨터에 저장되는 작은 크기의 파일(text가 저장)
+			- Server에서 발행한 Data를 Client에 보냄
+			- 이름 과 value
+			- 이름은 String 값 String
+
+		- URL(Uniform Resources Locator)
+			ip:port/폴더/...
+		- URI(Uniform Resource Identifier)
+			-- Server 내에서 사용하는 URL
+			-- URL에서 IP:PORT 번호를 제외한 나머지 주소
+
+		5) Request
+			- 요청의 모든 정보를 담고 있음
+		6) Response
+			- Client의 요청의 결과물을 Server가 Client로 보냄
+			- 응답데이터 (HTML,..)
+			- 상태코드(200, 404, 500)
+			- Server가 발행한 Cookie
+
+4. Get & Post
+	1) Get Method
+		a. a 태그
+		b. JavaScript의 location.href
+		c. Ajax에서 Get 선택
+		d. form 태그에서 Get 선택
+		e. Client가 주소창에 URL 주소를 직접 입력 한 경우
+
+	IP:PORT/폴더명/...?파라미터이름1=값1&파라미터이름2=값2&...
+	- ? 왼쪽   : URL
+	- ? 오른쪽 : 파라미터들
+
+	2) Post Method
+		a. Ajax에서 Post를 선택
+		b. form 태그에서 Post 선택
+
+	IP:PORT/폴더명/...
+
+	3) Server로 요청 보내는 방식
+		a. a 태그
+		b. JavaScript의 Location
+		c. Ajax
+		d. form 태그
+		e. Cilent가 주소창에 URL 주소를 직접 입력
+
+
+```
+
+### 3. DI (Dependency Injection, 의존성 주입)
+
+```jsx
+- 객체의 생명주기를 관리 : Container
+- Tomcat Container      : 내장 객체 관리
+- Spring Container      : Java 객체 관리
+- Spring에서는 개발자가 객체를 직접생성하지 않고 Spring Container에게 위임
+- 위임을 하면 Spring Container가 객체를 생성하고 bean pool에 저장
+- 객체는 SingleTon으로 생성 : 어플리케이션 전체에 객체 하나만 생성
+
+멤버 변수에 값을 대입하는 방법(DI, 의존성 주입)
+	a. 생성자
+	b. 초기화블럭
+	c. 직접 대입
+	d. Setter
+	e. 객체를 생성하고 참조변수명.멤버변수명=값
+
+IOC (Inversion Of Control, 제어의 역전)
+- java개발자가 직접 객체 생성하고 직접 DI 작업을 진행을 하는것이 아니고
+- Spring에게 객체 생성과 주입을 위임(조립 설계도 제공)
+
+위임 방법
+1. Annotation
+	- 실행 + 설명
+	- servlet-context.xml에 선언된 scan package 범위 안에 있어야 인식 함
+
+	1) 객체 생성(new 생성자())
+			- 클래스 선언부 위에 작성
+			a. @Controller("이름")     : 객체 생성, Controller 역할
+			b. @Service("이름")        : 객체 생성, Service 역할
+			c. @Repository("이름")     : 객체 생성, DAO 역할
+			d. @Component("이름")      : 객체 생성, Controller, Service, DAO가 아니 그외 나머지
+
+		- 객체(Bean)의 이름을 지정 할 수 있음(참조변수와 비슷)
+		- 이름을 지정하지 않으면 클래스명의 첫글자를 소문자로 만든것이 이름으로 지정
+
+	2) 객체 주입
+		- Setter(메서드) 선언부 위에
+		- 생성자 (매개변수가 있는 생성자)선언부 위에
+		- 멤버변수 선언부 위에
+
+			a. @Autowired
+					1. pool에서 Data Type이 일치하는 객체를 검색
+					2. 같은 Type이 여러개 있으면 bean name(변수명)으로 검색
+					@AutoWired
+					@Qualifier("대입할 bean의 이름")
+
+					public class A {}
+
+					@Component
+					public class B extends A {}   : bean name - b
+
+					@Component("hi")
+					public class C extends A {}   : bean name - hi
+
+
+					...
+					@AutoWired
+					@Qualifier("hi")
+					private A test; //C가 대입
+
+					@AutoWired
+					private A hi;  //C 가 대입
+
+			b. @Inject
+					- AutoWired와 같음
+					- 최신버전에서는 삭제
+
+			c. @Resource
+					1. Bean name으로 검색
+					2. Name이 없으면 Data type으로 검색
+
+2. XML
+	/WEB-INF/spring/ ****-context.xml 에 작성
+
+	1. 객체 생성(Default 생성자 호출)
+	<!-- 클래스명 참조변수 = new 생성자() -->
+	<bean class="풀패키지명.클래스명" id="참조변수명"></bean>
+
+	<!--ex)-->
+	<bean class="com.iu.s1.util.DBConnector" id="dbConnector"></bean>
+
+	2. 객체 생성시 Setter 호출
+	<bean class="풀패키지명.클래스명" id="참조변수명">
+		<!--setter 호출 값이 refernce 타입일 경우-->
+		<property name="setter의 이름" ref="참조변수명">
+		<!--setter 호출 값이 primitive와 String 일 경우-->
+		<property name="setter의 이름" value="값">
+
+	</bean>
+
+	3. 매개변수가 있는 생성자 호출하면서 객체 생성
+	<bean class="풀패키지명.클래스명" id="참조변수명">
+		1) Index 번호로 구분
+		<constructor-arg index="번호" ref or value = "값">
+
+		2) 매개변수명으로 구분
+		<constructor-arg name="매개변수명" ref or value = "값">
+
+		3) 데이터타입으로 구분
+		<constructor-arg type="데이터타입" ref or value = "값">
+
+	</bean>
+
+	pulbic Test(int num, String name, int age){}
+
+- Annotation VS XML
+개발자가 선언한 클래스의 객체 생성과 주입은 Annotation 주로 사용
+라이러브리 클래스의 객체생성은 XML 사용
+
+- DTO 클래스는 위임 하지 마세요
+```
+
+### 4. Controller 작성법
+
+```jsx
+1. 순수한 Java 클래스 선언
+2. 클래스 선언부 위에 @Controller Annotation 선언
+3. URL 요청을 처리하는 멤버메서드 선언
+4. 메서드 선언부 위에 @RequestMapping Annotation을 추가
+		-- value      : 요청 URI를 String 타입으로 절대경로 형식으로 작성
+		-- method     : 요청 메서드를 구분
+									: RequestMethod.GET || RequestMethod.POST
+									: method = {RequestMethod.GET, RequestMethod.POST} -- 둘다
+									: 생략하면 default로 GET 설정
+
+5. 멤버메서드의 매개변수 선언
+	1) 내장객체 선언
+		- 모든 내장 객체 선언 가능(Request, Session, Application..)
+
+		a. Request
+			1) 파라미터 값 반환
+				- 하나의 파라미터이름으로 하나의 값이 올 때
+				 String value= request.getParameter("파라미터이름");
+				- 하나의 파라미터이름으로 여러개의 값이 올 때
+					String [] values = request.getParameterValues("파라미터이름");
+
+	2) 파라미터의 이름과 최종 변환 타입이 동일한 매개변수 선언
+					url?age=20&ki=185.3&name=kim
+
+				- request
+					public void test(HttpServletRequest request){
+					String a = request.getParameter("age");
+					int age = Integer.parseInt(a);
+					String k = request.getParameter("ki");
+					double ki = Double.parseDouble("ki");
+					String name = request.getParameter("name")
+				}
+
+				- 파라미터값 반환시 데이터타입과 매개변수명을 파라미터의 이름과 타입을 일치
+					public void test(int age, Double ki, String name)
+
+				a. 파라미터의 이름과 매개변수명이 일치 않는 경우
+					 @RequestParam(value="파라미터이름")  매개변수데이터타입 매개변수명
+
+				b. 파라미터가 없을 때(URL주소만 오는 경우)
+					 @RequestParam(defaultValue="기본값") 매개변수데이터타입 매개변수명
+
+				a+b. @RequestParam(value="파라미터이름", defaultValue="기본값") 매개변수데이터타입 매개변수명
+
+	3) Bean (객체, DTO, VO)을 선언
+			- Setter의 이름(타입)과 파라미터의 이름(타입)이 동일 해야 함
+
+	4) ModelAndView
+			- Model(Data Model, Data를 담고 있는 객체, DTO등등..) 객체
+			- View (출력에 관련된 객체) 객체
+			- ModelAndView == Model + View
+			- modelAndView.setViewName("jsp 경로명")
+			- modelAndView.addObject("속성명", obj)
+			- 매개변수로 선언하거나 메서드내에서 객체 생성
+
+	5) Model
+			- Spring에서 Server의 jsp로 데이터를 전달하는 객체
+			- Request 대신 Model 사용
+			- Life Cycle(생명주기) 는 RequestScope와 거의 같음
+			- Interface 타입이라 개발자가 직접 객체를 생성하지 못함
+
+			- model.addAttribute("속성명", obj);
+			- jsp에서 사용법은 동일
+
+6. 메서드의 리턴 타입
+	- Controller의 return은 Spring Container가 ModelAndView라는 객체로 바꿔서 리턴
+
+	1) String
+		- view(jsp)의 경로명
+		- ex) return "dept/insert"
+					- Spring Container가 내부에서 다음작업을 진행하고 return
+					ModelAndView mv = new ModelAndView();
+					mv.setViewName("dept/insert")
+
+	2) void
+		- 요청한 URI주소와 View(jsp)의 경로명이 일치 할 경우
+		- 요청한 URI주소가 Vuew(jsp)의 경로명이 됨
+
+	3) ModelAndView
+		- Model + view
+		- View : jsp의 경로명을 담고 있는 객체
+
+7. @ModelAttribute
+	 1) 작성위치 : 멤버메서드 선언부
+	 2) Controller의 모든 메서드에 공통 Data들을 model에 담으려 할 때 사용
+	 3)
+			@ModelAttribute("속성명")
+			public 리턴타입 메서드명(){
+				return 속성값
+			}
+			=> model.addAttribute("속성명", 속성값)
+
+```
+
+```jsx
+DB의 컬럼명 == DTO의 멤버변수명 == 파라미터이름
+```
+
+### Spring Error 처리
+
+```jsx
+1. 프로젝트 생성 후 에러 표시가 있는 경우
+	 - 프로젝트 우클릭 -> run as -> maven clean        : Target 폴더 지움(컴파일된 class삭제)
+	 - 프로젝트 우클릭 -> maven -> update project 실행 : lib 점검, 컴파일을 새로 함
+
+2. pom.xml에 library 추가하면 인식을 못하는 경우가 발생
+	 - 프로젝트 우클릭 -> maven -> update project 실행
+
+3. Update Project 실행 해도 안되는 경우
+		1) 사용중인 STS 종료
+		2) 사용자폴더 -> .m2 -> repository 폴더 내의 모든 폴더 삭제
+		3) STS를 실행하면 라이브러리를 다시 다운로드 받기 시작함
+		4) 다운로드가 끝나면 프로젝트 우클릭 -> maven -> update project 실행
+
+4. HTML, CSS, JS 를 작성 후 Web Browser에서 reload를 적용 했음에도 변환가 없는 경우
+		- Web browser 캐시 삭제 또는
+		- 개발자모드를 켜고, reload를 꾹 누르면 캐시비우기 및 강력 새로고침클릭
+
+5. 서버 Start or 서버 Restart
+		- 서버를 실행하면 서버를 종료하기 전까진 계속 실행중
+
+		1) Back-end 영역을 작업한 경우
+			- 서버가 실행 중이라면 STS에 Servers 탭에 Tomcat 우클릭 -> restart
+
+		2) Front-end 영역을 작업한 경우
+			- 서버를 Restart가 아니라 Web Brower를 Reload
+
+6. 프로젝트에는 에러 표시가 없을 때 에러 메세지로 개발자가 작성한 클래스를 찾지 못하는 경우
+		- ClassNotFound
+		- Compile이 실패한 경우
+
+		1) 프로젝트 우클릭 -> run as -> maven clean 실행 (컴파일된 클래스 파일과 결과물을 삭제)
+
+		2) 프로젝트 우클릭 -> maven -> update project 실행
+
+7. 상태코드
+		- 200 : 응답이 완료, 성공
+
+		- 400번대 : 클라이언트 오류
+			a. 400  : 파라미터가 맞지 않는 경우
+								파라미터 하나하나를 체크
+			b. 403  : 권한이 없는 경우(Forbidden)
+			c. 404  : not found, URL이 틀리거나, Controller에서 jsp경로가 틀린경우
+			d. 405  : method 형식이 틀린경우
+
+		- 500번대 : 서버측 오류
+				-- 서버에서(java) Exception이 발생한 경우
+				-- 예외 발생을 찾아야 함
+
+```
+
+### Spring 작업 중 Error
+
+```jsx
+- Spring Legacy의 에러는 complie이 미적용, API이 다운로드가 불안전...
+- Maven에서 다운받은 API들의 저장소
+	-- 사용자폴더 > .m2
+
+1. 프로젝트 우클릭 > run as > maven clean
+		- Targe폴더 내부의 내용 삭제
+		- class 파일들을 삭제
+
+2. 프로젝트 우클릭 > maven > update project
+		- 컴파일을 새로 함
+		- API들을 점검하고 다운로드
+
+3. 1,2 번으로 해결이 안될 때
+	a. sts 끄기
+	b. .m2  > repository 내부의 모든 폴더를 삭제
+	c. sts 실행
+
+```
+
+@RequestMapping 개념과 설명

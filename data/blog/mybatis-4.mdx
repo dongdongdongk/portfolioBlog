@@ -1,0 +1,227 @@
+---
+title: 'MyBatis 실습'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# Country 테이블에 대한 resultMap의 예
+
+```java
+<resultMap type="Country" id="countryBase">
+	<id column="Code" property="code"/>
+	<result column="Name" property="name"/>
+	<result column="Continent" property="continent"/>
+	<result column="Region" property="region"/>
+	<result column="SurfaceArea" property="surfaceArea"/>
+	<result column="IndepYear" property="indepYear"/>
+	<result column="Population" property="population"/>
+	<result column="LifeExpectancy" property="lifeExpectancy"/>
+	<result column="GNP" property="GNP"/>
+	<result column="GNPOld" property="GNPOld"/>
+	<result column="LocalName" property="localName"/>
+	<result column="GovernmentForm" property="governmentForm"/>
+	<result column="HeadOfState" property="headOfState"/>
+	<result column="Capital" property="capital"/>
+	<result column="Code2" property="code2"/>
+</resultMap>
+```
+
+```java
+<resultMap> : 하나의 매핑 정보를 작성한다.
+
+type : 매핑 결과가 담길 DTO의 타입이다.
+
+id : resultMap을 구별하는 이름으로 unique 해야 한다.
+
+<id> : primary key에 해당하는 컬럼을 설정하는 엘리먼트이다.
+
+column : 테이블의 컬럼 명을 적는다.
+
+property : 조회 결과가 매핑될 DTO의 속성 이름이다.
+
+<result>는 primary key가 아닌 일반 컬럼에 대한 매핑을 처리하며 속성은 <id>와 동일하다.
+```
+
+# **Association 연결**
+
+```java
+City는 반드시 하나의 Country에 연결된다. 즉 City와 Country는 has-one의 관계이다.
+
+City와 함께 City가 속한 Country의 정보를 조회하기 위해서는
+
+Country와 City를 Join 해서 조회해야 한다. 이 결과를 City에 매핑하기 위한 방법을 설명
+```
+
+```java
+기존의 City는 CountryCode를 통해서 Country를 연결할 수는 있었지만 상세 정보를 갖지는 못했다
+
+이미 Country에 대한 모델링 결과로 Country DTO가 만들어졌기 때문에
+
+Country를 맴버로 갖기만 하면 된다.
+```
+
+```java
+@Data
+@NoArgsConstructor
+@RequiredArgsConstructor
+public class City {
+    @NonNull
+    private Integer id;
+    @NonNull
+    private String name;
+    @NonNull
+    private String countryCode;
+    private String district;
+    private Integer population;
+    // Country의 상세 정보를 저장하기 위함
+    private Country country;        // 추가
+}
+```
+
+```java
+join 쿼리의 결과를 City에 연결해주기 위해서 resultMap을 사용
+
+이 과정에서 has-one 관계에 대한 처리를 위해 <association> 엘리먼트를 사용
+```
+
+```java
+<resultMap type="City" id="cityDetail">
+	<id column="id" property="id" />
+	<result column="Name" property="name" />
+	<result column="CountryCode" property="countryCode" />
+	<result column="District" property="district" />
+	<result column="Population" property="population" />
+	<association property="country" javaType="Country" columnPrefix="co_" >
+		<id column="Code" property="code" />
+		<result column="Name" property="name" />
+		<result column="Continent" property="continent" />
+		<result column="Region" property="region" />
+		<result column="SurfaceArea" property="surfaceArea" />
+		<result column="IndepYear" property="indepYear" />
+		<result column="Population" property="population" />
+		<result column="LifeExpectancy" property="lifeExpectancy" />
+		<result column="GNP" property="GNP" />
+		<result column="GNPOld" property="GNPOld" />
+		<result column="LocalName" property="localName" />
+		<result column="GovernmentForm" property="governmentForm" />
+		<result column="HeadOfState" property="headOfState" />
+		<result column="Capital" property="capital" />
+		<result column="Code2" property="code2" />
+	</association>
+</resultMap>
+```
+
+```java
+property 속성: DTO에서 관계에 사용되는 속성 이름
+
+javaType: 연동될 객체의 타입
+
+columnPrefix: 두 테이블의 컬럼 이름이 동일해서 구별해야 할 경우
+prefix 를 적용해서 alias 구성
+
+resultMap: 다른 resultMap을 재사용할 때
+그 resultMap의 id(다른 mapper일 경우 namespace 포함)
+```
+
+### select join 쿼리 작성
+
+```jsx
+<select id="selectDetail" resultMap="cityDetail" parameterType="int">
+  select ci.*, co.Code as co_Code, co.Name as co_Name, co.Continent as co_Continent, co.Region as
+  co_Region, co.SurfaceArea as co_SurfaceArea, co.IndepYear as co_IndepYear, co.Population as
+  co_Population, co.LifeExpectancy as co_LifeExpectancy, co.GNP as co_GNP, co.GNPOld as co_GNPOld,
+  co.LocalName as co_LocalName, co.GovernmentForm as co_GovernmentForm, co.HeadOfState as
+  co_HeadOfState, co.Capital as co_Capital, co.Code2 as co_Code2 from city ci join country co on
+  ci.countryCode=co.code where ci.id=#{id}
+</select>
+```
+
+# **collection 연결**
+
+```jsx
+하나의 Country에는 여러 개의 City 정보들이 담겨있다.
+
+Country에 City 정보를 담기 위해서는 has-one 관계에서 처럼 City를 속성으로 추가하면 된다.
+
+단 여러 개의 City가 연결될 수 있기 때문에 List<City>처럼 목록이 되어야 할 것이다.
+```
+
+```java
+@Data
+@NoArgsConstructor
+@RequiredArgsConstructor
+public class Country {
+    @NonNull
+    private String code;
+    @NonNull
+    private String name;
+    @NonNull
+    private String continent;
+    ...
+    // has-many 관계의 처리
+    private List<City> cities;
+}
+```
+
+```java
+<resultMap type="Country" id="countryDetail">
+	<id column="Code" property="code" />
+	<result column="Name" property="name" />
+	<result column="Continent" property="continent" />
+	<result column="Region" property="region" />
+	<result column="SurfaceArea" property="surfaceArea" />
+	<result column="IndepYear" property="indepYear" />
+	<result column="Population" property="population" />
+	<result column="LifeExpectancy" property="lifeExpectancy" />
+	<result column="GNP" property="GNP" />
+	<result column="GNPOld" property="GNPOld" />
+	<result column="LocalName" property="localName" />
+	<result column="GovernmentForm" property="governmentForm" />
+	<result column="HeadOfState" property="headOfState" />
+	<result column="Capital" property="capital" />
+	<result column="Code2" property="code2" />
+	<collection property="cities"  ofType="City" columnPrefix="ci_" >
+		<id column="id" property="id" />
+		<result column="Name" property="name" />
+		<result column="CountryCode" property="countryCode" />
+		<result column="District" property="district" />
+		<result column="Population" property="population" />
+	</collection>
+</resultMap>
+```
+
+```java
+<collection>: has-many 관계를 처리하기 위한 <resultMap>의 하위 엘리먼트
+
+property : DTO에서 관계에 사용되는 속성 이름
+
+ofType : List에 담길 N에 해당하는 객체의 타입
+
+resultMap : 다른 resultMap을 재사용할 때 그 resultMap의
+id(다른 mapper일 경우 namespace 포함)
+
+columnPrefix : 두 테이블의 컬럼 이름이 동일해서 구별해야
+할 경우 prefix를 적용해서 alias 구성
+
+*기본적인 내용은 <association>과 유사한데
+객체를 연동할 때 javaType이 아닌 ofType임을 주의하자.
+```
+
+### select join 쿼리 작성
+
+```java
+<select id="selectDetail" resultMap="countryDetail" parameterType="string">
+    select
+        co.*,
+        ci.id as ci_id,
+        ci.name as ci_name,
+        ci.countrycode as ci_countrycode,
+        ci.district as ci_district,
+        ci.population as ci_population
+    from country co left join city ci on co.code=ci.countryCode
+    where co.code=#{code}
+</select>
+```

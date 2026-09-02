@@ -99,13 +99,14 @@ export default async function Page(props: { params: Promise<{ slug: string[] }> 
       date: post.date,
       summary: post.summary,
       tags: post.tags,
+      category: post.category,
       slug: post.slug,
       path: `/blog/${post.slug}`,
       filePath: `data/blog/${post.slug}.md`,
     }
 
     return (
-      <Layout content={mainContent} authorDetails={[]} next={next} prev={prev}>
+      <Layout content={mainContent} authorDetails={[]} next={next} prev={prev} allPosts={allPosts}>
         <div
           className="blog-content"
           style={{

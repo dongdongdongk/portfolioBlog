@@ -1,0 +1,1775 @@
+---
+title: '섹션 8: 제트팩 저니 - 제트팩을 이용한 3D 플랫폼 게임 - 4'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 🚀 스켈레탈 메시 소켓에 나이아가라 이펙트 부착하기 }
+
+## 🎯 목표
+
+스켈레탈 메시의 소켓에 나이아가라 파티클 시스템을 부착하여 제트팩 추진기 효과 구현
+
+---
+
+## 📍 나이아가라 시스템 컴포넌트 추가
+
+### 1. 왼쪽 추진기 추가
+
+```
+BP_Kick 블루프린트 열기
+  ↓
+Mesh 선택
+  ↓
+Add Component → Niagara Particle System 검색
+  ↓
+이름: Thruster_Effect_L
+```
+
+**Niagara Particle System이란?**
+
+- 언리얼의 파티클 이펙트 시스템
+- 불, 연기, 폭발 같은 시각 효과 생성
+- 컴포넌트로 추가하면 액터에 부착 가능
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380757/notion-blog/_/_/_5_/_8_-_3D_-_4/image.png)
+
+### 2. 소켓에 부착
+
+```
+Thruster_Effect_L 선택
+  ↓
+Details 패널
+  ↓
+Parent Socket
+  └─ Browse 아이콘 클릭 → Thruster_L 선택
+```
+
+**Parent Socket이란?**
+
+- 컴포넌트가 부착될 위치 지정
+- 소켓을 선택하면 해당 위치/각도 자동 적용
+- 본 대신 소켓 사용 이유: 오프셋 포함된 정확한 위치
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380755/notion-blog/_/_/_5_/_8_-_3D_-_4/image_1.png)
+
+### 3. 나이아가라 에셋 할당
+
+```
+Niagara System Asset
+  └─ JetPack_Thruster 선택
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380755/notion-blog/_/_/_5_/_8_-_3D_-_4/image_2.png)
+
+---
+
+## 📍 오른쪽 추진기 추가 (동일 과정)
+
+```
+Mesh 선택
+  ↓
+Add Component → Niagara Particle System
+  ├─ 이름: Thruster_Effect_R
+  ├─ Parent Socket: Thruster_R
+  └─ Niagara System: JetPack_Thruster
+```
+
+**결과**
+
+- 양쪽 발에 추진기 이펙트 배치 완료
+- 소켓 위치/방향 자동 적용
+
+---
+
+## ⚙️ 모션 블러 비활성화
+
+### 문제
+
+플레이 시 카메라 움직이면 이펙트가 흐릿하게 보임
+
+### 해결
+
+```
+Edit → Project Settings
+  ↓
+검색: Motion Blur
+  ↓
+Default Settings
+  └─ Motion Blur 체크 해제
+```
+
+**Motion Blur란?**
+
+- 빠른 움직임 시 잔상 효과
+- 영화 같은 느낌 연출
+- 이 프로젝트에선 불필요하여 제거
+
+---
+
+## 🔧 컴포넌트 활성화 제어
+
+### Auto Activate 비활성화
+
+```
+Thruster_Effect_L 선택
+  ↓
+Details → Activation
+  └─ Auto Activate 체크 해제
+
+Thruster_Effect_R도 동일
+```
+
+**Auto Activate란?**
+
+- 체크 시: 게임 시작과 동시에 작동
+- 해제 시: 수동으로 활성화 필요
+- 추진기는 필요할 때만 켜야 하므로 해제
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380755/notion-blog/_/_/_5_/_8_-_3D_-_4/image_3.png)
+
+---
+
+## 🧪 활성화 테스트
+
+### Event Graph에서 테스트
+
+```
+Event BeginPlay
+  ↓
+Delay (2초)
+  ↓
+Activate (Thruster_Effect_L)
+  +
+Activate (Thruster_Effect_R)
+```
+
+**노드 설명**
+
+- `Delay`: 지정한 시간만큼 대기
+- `Activate`: 컴포넌트 활성화 (이펙트 시작)
+- 두 컴포넌트를 동시에 드래그하여 한 번에 연결 가능
+
+**결과**
+
+- 플레이 시작 2초 후 추진기 작동 확인
+- 원하는 타이밍에 켜고 끌 수 있음 검증
+
+---
+
+## ✅ 핵심 정리
+
+### 배운 내용
+
+```
+1. Niagara 컴포넌트 추가 방법
+2. 소켓에 컴포넌트 부착
+3. Auto Activate 옵션 제어
+4. Activate 노드로 수동 활성화
+5. Motion Blur 프로젝트 설정
+```
+
+### 다음 단계
+
+입력 액션으로 추진기 활성화/비활성화 구현
+
+---
+
+## 💡 주요 포인트
+
+⚠️ **소켓 vs 본**
+
+- 본에 직접 부착: 정확한 위치 조정 어려움
+- 소켓 사용: 오프셋 미리 설정된 정확한 위치
+
+⚠️ **컴포넌트 다중 선택**
+
+- 양쪽 추진기를 함께 드래그하면 한 번에 연결 가능
+- 같은 작업 반복 시 효율적
+
+# { 🎮 입력 액션과 인터페이스로 제트팩 제어하기 }
+
+## 🎯 목표
+
+입력 액션으로 제트팩을 켜고 끄며, 블루프린트 인터페이스를 활용한 깔끔한 코드 구조 구현
+
+---
+
+## 📍 입력 액션 생성
+
+### 1. 입력 액션 만들기
+
+```
+Content/Input 폴더
+  ↓
+우클릭 → Input Action
+  └─ 이름: IA_Jetpack
+```
+
+**설정**
+
+```
+Value Type
+  └─ Digital (bool) - 켜짐/꺼짐만 필요
+```
+
+**Digital (bool)이란?**
+
+- True/False 두 가지 상태만 존재
+- 버튼을 눌렀나(True), 안 눌렀나(False)
+- 추진기는 켜짐/꺼짐만 필요하므로 적합
+
+### 2. 입력 매핑 추가
+
+```
+IMC_Kick_Actions 열기
+  ↓
+Mappings 추가
+  ├─ Input Action: IA_Jetpack
+  └─ Key 설정
+```
+
+**키보드**
+
+```
+키 클릭
+  ↓
+Left Shift 입력
+```
+
+**게임패드**
+
+```
++ 버튼으로 새 바인딩 추가
+  ↓
+키 클릭
+  ↓
+게임패드에서 오른쪽 트리거 입력
+```
+
+⚠️ **중요: Axis vs Button**
+
+```
+❌ Gamepad Right Trigger Axis
+   └─ 0~1 사이 값 (압력 감지)
+
+✅ Gamepad Right Trigger
+   └─ 누름/안누름 (Digital)
+```
+
+**왜 Axis가 아닌가?**
+
+- Axis: 트리거를 얼마나 세게 누르는지 측정 (0~1)
+- Button: 단순히 눌렀는지만 체크 (True/False)
+- 제트팩은 세기 조절 불필요, 켜짐/꺼짐만 필요
+
+---
+
+## 🔧 방법 1: 캐릭터에서 직접 처리
+
+### Event Graph 구성
+
+```
+BP_Kick 이벤트 그래프
+  ↓
+우클릭 → IA_Jetpack 검색
+```
+
+### 블루프린트 노드
+
+```
+IA_Jetpack
+  ├─ Started → Activate
+  │   ├─ Thruster_Effect_R
+  │   └─ Thruster_Effect_L
+  │
+  └─ Completed → Deactivate
+      ├─ Thruster_Effect_R
+      └─ Thruster_Effect_L
+```
+
+**노드 설명**
+
+- `Started`: 키를 누르는 순간
+- `Completed`: 키를 떼는 순간
+- `Activate`: 컴포넌트 켜기
+- `Deactivate`: 컴포넌트 끄기
+
+**동작 원리**
+
+```
+Shift 누름
+  ↓
+Started 실행
+  ↓
+두 추진기 Activate
+  ↓
+이펙트 시작
+
+Shift 뗌
+  ↓
+Completed 실행
+  ↓
+두 추진기 Deactivate
+  ↓
+이펙트 중지
+```
+
+---
+
+## 🏗️ 방법 2: 인터페이스 활용 (권장)
+
+### 왜 인터페이스를 사용하나?
+
+**문제 상황**
+
+```
+Player Controller
+  ↓
+Get Controlled Character (Character 타입)
+  ↓
+❌ Thruster_Effect가 없음
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380756/notion-blog/_/_/_5_/_8_-_3D_-_4/image_4.png)
+
+```csharp
+컨트롤러에 이게 없어서 이걸 가지기 위해서는 Cast 를 해줘야 해서 문제가 생김
+```
+
+**나쁜 해결책: Cast 사용**
+
+```
+Player Controller
+  ↓
+Cast to BP_Kick
+  ↓
+❌ Player Controller가 BP_Kick에 의존
+```
+
+**의존성 문제란?**
+
+- Player Controller는 범용 클래스
+- 여러 캐릭터에서 재사용 가능해야 함
+- 특정 캐릭터(BP_Kick)에 묶이면 안 됨
+
+**좋은 해결책: Interface**
+
+```
+Player Controller
+  ↓
+Interface 함수 호출
+  ↓
+✅ 어떤 캐릭터든 Interface만 구현하면 작동
+```
+
+## ❓ 왜 Thruster_Effect가 없나?
+
+### 타입 차이 때문
+
+```
+Player Controller의 Get Controlled Character
+  ↓
+반환 타입: Character (엔진 기본 클래스)
+  ├─ 모든 캐릭터의 기본 기능만 포함
+  └─ ❌ Thruster_Effect 없음
+
+실제 우리 캐릭터: BP_Kick
+  ├─ Character를 상속받음
+  └─ ✅ Thruster_Effect 추가됨
+```
+
+### 비유
+
+```
+Character 클래스
+  └─ "사람"이라는 일반 개념
+      └─ 걷기, 점프 같은 기본 기능만
+
+BP_Kick 클래스
+  └─ "제트팩 든 특정 사람"
+      └─ 기본 기능 + Thruster_Effect
+```
+
+### 해결 방법
+
+**Cast 사용 (비추천)**
+
+```
+Character → Cast to BP_Kick
+  └─ 특정 클래스에 의존
+```
+
+**Interface 사용 (권장)**
+
+```
+Character → Interface 함수 호출
+  └─ 타입 상관없이 작동
+```
+
+---
+
+## 📝 블루프린트 인터페이스 생성
+
+### 1. 인터페이스 파일 생성
+
+```
+Content/Blueprints 폴더
+  ↓
+새 폴더: Interfaces
+  ↓
+우클릭 → Blueprint → Blueprint Interface
+  └─ 이름: BPI_Jetpack
+```
+
+**Blueprint Interface란?**
+
+- 함수의 "약속" 정의
+- 구현은 각 클래스가 담당
+- 여러 클래스에서 같은 함수 사용 가능
+
+### 2. 함수 정의
+
+```
+BPI_Jetpack 열기
+  ↓
+함수 추가
+  ├─ Start Jetpack
+  └─ Stop Jetpack
+```
+
+**이 함수들의 역할**
+
+- Start Jetpack: 추진기 켜기
+- Stop Jetpack: 추진기 끄기
+- 내부 구현은 비어있음 (약속만 함)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380756/notion-blog/_/_/_5_/_8_-_3D_-_4/image_5.png)
+
+---
+
+## 🎨 캐릭터에서 인터페이스 구현
+
+### 1. 인터페이스 추가
+
+```
+BP_Kick 열기
+  ↓
+Class Settings
+  ↓
+Interfaces
+  └─ BPI_Jetpack 추가
+```
+
+### 2. 함수 구현
+
+```
+좌측 패널 → Interfaces 섹션
+  ├─ Start Jetpack 더블클릭
+  └─ Stop Jetpack 더블클릭
+```
+
+### 블루프린트 연결
+
+```
+Event Start Jetpack
+  ↓
+Activate
+  ├─ Thruster_Effect_R
+  └─ Thruster_Effect_L
+
+Event Stop Jetpack
+  ↓
+Deactivate
+  ├─ Thruster_Effect_R
+  └─ Thruster_Effect_L
+```
+
+**이전 Input Action 노드 삭제**
+
+- 이제 Player Controller에서 처리
+- 캐릭터는 Interface 구현만 담당
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380756/notion-blog/_/_/_5_/_8_-_3D_-_4/image_6.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380756/notion-blog/_/_/_5_/_8_-_3D_-_4/image_7.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380756/notion-blog/_/_/_5_/_8_-_3D_-_4/image_8.png)
+
+---
+
+## 🎮 Player Controller에서 처리
+
+### Event Graph 구성
+
+```
+BP_Kick_PlayerController
+  ↓
+IA_Jetpack 노드 추가
+```
+
+### Started 처리
+
+```
+Started
+  ↓
+Get Controlled Character (validated)
+  ├─ Is Valid → Start Jetpack
+  └─ Is Not Valid → (무시)
+```
+
+**Get Validated란?**
+
+- Get + 유효성 검사 자동 수행
+- Controlled Character가 존재하면 Is Valid
+- 존재하지 않으면 Is Not Valid
+
+### Completed 처리
+
+```
+Completed
+  ↓
+Get Controlled Character (validated)
+  ├─ Is Valid → Stop Jetpack
+  └─ Is Not Valid → (무시)
+```
+
+### 최종 구조
+
+```
+Player Controller
+  ├─ 입력 처리
+  └─ Interface 함수 호출
+       ↓
+Character (BP_Kick)
+  └─ Interface 구현
+       └─ 실제 추진기 제어
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380757/notion-blog/_/_/_5_/_8_-_3D_-_4/image_9.png)
+
+---
+
+## ✅ 구조 비교
+
+### 방법 1: 직접 처리
+
+```
+장점
+  ├─ 간단하고 빠름
+  └─ 초보자에게 이해 쉬움
+
+단점
+  ├─ 입력과 기능이 섞임
+  └─ 다른 캐릭터 추가 시 복잡
+```
+
+### 방법 2: 인터페이스 (권장)
+
+```
+장점
+  ├─ 역할 분리 명확
+  ├─ 코드 재사용성 높음
+  ├─ 확장성 좋음
+  └─ 다른 캐릭터 추가 쉬움
+
+단점
+  └─ 초기 설정 약간 복잡
+```
+
+---
+
+## 🧪 테스트
+
+### 키보드
+
+```
+Shift 누르기
+  ↓
+추진기 작동
+
+Shift 떼기
+  ↓
+추진기 중지
+```
+
+### 게임패드
+
+```
+오른쪽 트리거 누르기
+  ↓
+추진기 작동
+
+트리거 떼기
+  ↓
+추진기 중지
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Input Action
+
+```
+정의
+  └─ 특정 입력을 추상화한 것
+
+장점
+  ├─ 키 변경 쉬움
+  ├─ 여러 키를 한 액션에 매핑
+  └─ 플랫폼별 다른 키 설정
+```
+
+### Blueprint Interface
+
+```
+정의
+  └─ 함수의 약속을 정의
+
+사용 이유
+  ├─ 의존성 감소
+  ├─ 코드 재사용
+  └─ 유연한 구조
+
+작동 방식
+  ├─ Interface: 함수 선언
+  ├─ Class: 함수 구현
+  └─ 호출: Cast 없이 사용 가능
+```
+
+### 의존성 관리
+
+```
+❌ 나쁜 구조
+Player Controller → Cast to BP_Kick
+  └─ 특정 클래스에 의존
+
+✅ 좋은 구조
+Player Controller → Interface 호출
+  └─ 구현 클래스는 몰라도 됨
+```
+
+---
+
+## ⚠️ 주의사항
+
+### 1. Axis vs Button 구분
+
+```
+Trigger Axis
+  └─ 0~1 값 (압력)
+
+Trigger Button
+  └─ True/False (눌림)
+```
+
+### 2. 유효성 검사 필수
+
+```
+Get Controlled Character
+  ↓
+반드시 Is Valid 확인
+  └─ 캐릭터가 없을 수 있음
+```
+
+### 3. Interface 구현 확인
+
+```
+Interface 추가했는지 확인
+  ↓
+함수 구현했는지 확인
+  └─ 빈 함수는 작동 안 함
+```
+
+---
+
+## 📚 용어 정리
+
+**Enhanced Input System**
+
+- 언리얼의 새로운 입력 시스템
+- Input Action으로 입력 추상화
+- IMC로 키 매핑 관리
+
+**Blueprint Interface**
+
+- C++의 Interface와 동일 개념
+- 여러 클래스가 같은 함수 구현
+- Cast 없이 함수 호출 가능
+
+**Dependency (의존성)**
+
+- 한 클래스가 다른 클래스를 알아야 함
+- 의존성 높을수록 수정 어려움
+- Interface로 의존성 감소
+
+**Validated Get**
+
+- Get + 유효성 검사 자동
+- Is Valid/Is Not Valid 핀 제공
+- Null 체크 간편화
+
+---
+
+## 🎯 다음 단계
+
+현재 상태
+
+```
+✅ 추진기 시각 효과 완성
+✅ 입력으로 켜고 끄기 가능
+❌ 실제로 날지는 못함
+```
+
+다음 작업
+
+```
+Movement Component 수정
+  └─ 실제 비행 기능 구현
+```
+
+# { 🔊 제트팩 사운드 시스템 구축하기 }
+
+## 🎯 목표
+
+제트팩 시작/반복/정지 사운드를 구현하고, 메모리 누수 방지를 위한 최적화 적용
+
+---
+
+## 📂 사운드 에셋 확인
+
+### 제공된 사운드 파일
+
+```
+Content/Assets/Sound/SFX
+  ├─ MS_Thruster_Start (시작 소리)
+  ├─ MS_Thruster_Loop (반복 소리)
+  └─ MS_Thruster_Stop (정지 소리)
+```
+
+**MS는 Meta Sound의 약자**
+
+- 언리얼의 고급 오디오 시스템
+- 더블클릭으로 미리듣기 가능
+
+---
+
+## 🎵 사운드 재생 기본 개념
+
+### Spawn Sound at Location
+
+```
+정의
+  └─ 특정 위치에서 사운드 재생
+
+특징
+  ├─ 위치 고정
+  ├─ 액터에 부착되지 않음
+  └─ 짧은 효과음에 적합
+
+반환값
+  └─ Audio Component (재생 제어 가능)
+```
+
+### Spawn Sound Attached
+
+```
+정의
+  └─ 특정 컴포넌트에 부착하여 재생
+
+특징
+  ├─ 액터 따라 이동
+  ├─ 지속적인 소리에 적합
+  └─ Audio Component 반환
+
+용도
+  └─ 엔진음, 환경음 등 계속 들려야 하는 소리
+```
+
+---
+
+## 🚀 시작 사운드 구현 (Start Thruster Sound)
+
+### 1. 함수 생성 준비
+
+```
+Event Start Jetpack에서
+  ├─ Activate 노드들 분리
+  └─ 사운드 재생 추가 예정
+```
+
+**왜 분리하나?**
+
+- 단순 Activate만 → 추가 기능 필요
+- 사운드 재생, 페이드 등 복잡해짐
+- 함수로 분리해 관리 용이
+
+### 2. Spawn Sound at Location 노드
+
+```
+Spawn Sound at Location
+  ├─ Sound: MS_Thruster_Start
+  ├─ Location: Get Actor Location (Self)
+  ├─ Volume Multiplier: 0.6
+  └─ Return Value → Audio Component
+```
+
+**각 설정의 의미**
+
+**Sound (필수)**
+
+- 재생할 사운드 파일 선택
+- MS_Thruster_Start 할당
+
+**Location (필수)**
+
+```
+Get Actor Location
+  └─ 현재 캐릭터(Self)의 위치
+  └─ 그 위치에서 소리 재생
+```
+
+**Volume Multiplier**
+
+```
+기본값: 1.0 (100%)
+설정값: 0.6 (60%)
+  └─ 소리가 너무 크면 조절
+```
+
+**Return Value**
+
+```
+Audio Component 오브젝트
+  ├─ 재생 중인 사운드 제어 가능
+  ├─ Stop, Pause, Fade 등
+  └─ 이 레퍼런스로 사운드 조작
+```
+
+### 3. Fade Out 적용
+
+```
+Spawn Sound at Location
+  ↓
+Return Value
+  ↓
+Fade Out
+  ├─ Fade Out Duration: 1.0초
+  ├─ Fade Volume Level: 0.0
+  └─ Fade Curve: Linear
+```
+
+**왜 Fade Out이 필요한가?**
+
+```
+문제
+  └─ 시작 소리가 너무 길게 재생됨
+
+해결
+  └─ 1초 동안 서서히 볼륨 감소
+
+효과
+  └─ 자연스러운 전환
+```
+
+**Fade Out 옵션 설명**
+
+**Target (자동 연결)**
+
+- Audio Component 레퍼런스
+- 어떤 소리를 페이드 할지 지정
+
+**Fade Out Duration**
+
+```
+1.0초 설정
+  └─ 1초에 걸쳐 볼륨 감소
+```
+
+**Fade Volume Level**
+
+```
+0.0 설정
+  └─ 최종적으로 소리 완전 꺼짐
+```
+
+**Fade Curve**
+
+```
+Linear (선형)
+  └─ 일정한 속도로 감소
+
+다른 옵션
+  ├─ Exponential: 점점 빠르게
+  ├─ Logarithmic: 점점 느리게
+  └─ S-Curve: 중간 빠름
+```
+
+### 4. 함수로 축소
+
+```
+노드 선택
+  ↓
+우클릭 → Collapse to Function
+  └─ 이름: Start Thruster Sound
+```
+
+**함수로 만드는 이유**
+
+```
+장점
+  ├─ 코드 재사용 가능
+  ├─ Event Graph 깔끔해짐
+  ├─ 수정 시 한 곳만 변경
+  └─ 디버깅 쉬움
+```
+
+---
+
+## 🔁 반복 사운드 구현 (Looping Sound)
+
+### 1. Spawn Sound Attached 노드
+
+```
+Spawn Sound Attached
+  ├─ Sound: MS_Thruster_Loop
+  ├─ Attach to Component: Capsule Component (Root)
+  ├─ Location Type: Keep Relative Offset
+  ├─ Location: (0, 0, 0)
+  ├─ Volume Multiplier: 0.6
+  └─ Auto Destroy: False (중요!)
+```
+
+**왜 Spawn Sound Attached를 사용하나?**
+
+```
+Spawn Sound at Location
+  └─ 위치 고정, 캐릭터 이동 시 소리 멀어짐
+
+Spawn Sound Attached
+  └─ 캐릭터 따라다님, 항상 가까이 들림
+```
+
+**Attach to Component 설명**
+
+```
+Capsule Component 선택
+  └─ 캐릭터의 Root Component
+
+이유
+  ├─ 캐릭터 중심에서 소리 재생
+  ├─ 캐릭터 이동 시 함께 이동
+  └─ 안정적인 위치
+```
+
+**Location Type 옵션**
+
+```
+Keep Relative Offset
+  └─ 부모 컴포넌트 기준 상대 위치 유지
+
+Snap to Target
+  └─ 정확히 부모 위치에 붙음
+
+Keep World Position
+  └─ 월드 좌표 기준 (사용 안 함)
+```
+
+**Location (0, 0, 0)**
+
+```
+Relative Offset이므로
+  └─ Capsule 중심에서 (0,0,0) 오프셋
+  └─ 즉, Capsule 정중앙에서 재생
+```
+
+**Auto Destroy 중요!**
+
+```
+True
+  └─ 재생 끝나면 자동 삭제
+
+False
+  └─ 계속 유지 (우리가 직접 제어)
+
+우리 선택: False
+  └─ 반복 재생 제어 위해 유지
+```
+
+### 2. Fade In 적용
+
+```
+Spawn Sound Attached
+  ↓
+Return Value
+  ↓
+Fade In
+  └─ Fade In Duration: 0.35초
+```
+
+**왜 Fade In이 필요한가?**
+
+```
+문제
+  └─ 반복 소리가 갑자기 시작됨
+
+해결
+  └─ 0.35초 동안 부드럽게 증가
+
+효과
+  └─ 자연스러운 시작
+```
+
+### 3. 변수로 저장
+
+```
+Return Value
+  ↓
+Promote to Variable
+  └─ 이름: Looping Thruster Sound
+  └─ Category: Thruster
+```
+
+**왜 변수로 저장하나?**
+
+```
+필요성
+  └─ 나중에 정지할 때 접근 필요
+
+저장 안 하면
+  └─ Audio Component 레퍼런스 없음
+  └─ 정지 불가능
+
+변수 저장 후
+  └─ 언제든지 Stop, Pause 가능
+```
+
+---
+
+## ⚠️ 메모리 누수 문제와 해결
+
+### 문제 발견 과정
+
+**테스트 1: Auto Destroy = True**
+
+```
+제트팩 시작
+  ↓
+반복 소리 재생
+  ↓
+제트팩 정지
+  ↓
+Stop 호출 → 소리 멈춤 + 자동 삭제
+  ↓
+다시 시작
+  ↓
+Is Valid 체크 → 유효하지 않음 (빨간 메시지)
+  └─ 매번 새로 생성해야 함
+```
+
+**Auto Destroy = True의 문제**
+
+```
+장점
+  └─ 메모리 자동 정리
+
+단점
+  ├─ 매번 새로 생성/삭제
+  ├─ 성능 낭비 (생성/삭제 비용 큼)
+  └─ 비효율적
+```
+
+**테스트 2: Auto Destroy = False (문제)**
+
+```
+제트팩 시작
+  ↓
+반복 소리 재생 (Audio Component 1)
+  ↓
+Looping Thruster Sound 변수에 저장
+  ↓
+제트팩 정지
+  ↓
+Stop 호출 → 소리 멈춤 (삭제 안 됨)
+  ↓
+다시 시작
+  ↓
+새 Audio Component 2 생성
+  ↓
+Looping Thruster Sound에 덮어쓰기
+  ↓
+❌ Component 1은 메모리에 남음 (접근 불가)
+```
+
+**메모리 누수란?**
+
+```
+정의
+  └─ 사용 안 하는 오브젝트가 메모리에 계속 쌓임
+
+문제
+  ├─ 메모리 점점 증가
+  ├─ 게임 느려짐
+  └─ 최악: 메모리 부족으로 크래시
+
+비유
+  └─ 쓰레기를 버리지 않고 계속 쌓는 것
+```
+
+### 올바른 해결 방법
+
+**체크 후 생성 방식**
+
+```
+Looping Thruster Sound
+  ↓
+Is Valid?
+  ├─ Is Not Valid (없음)
+  │   └─ Spawn Sound Attached
+  │       └─ Looping Thruster Sound에 저장
+  │       └─ Fade In
+  │
+  └─ Is Valid (이미 있음)
+      └─ Play (기존 것 재사용)
+      └─ Fade In
+```
+
+**Is Valid 노드란?**
+
+```
+기능
+  └─ 오브젝트가 유효한지 체크
+
+Is Valid (True)
+  └─ 오브젝트가 존재하고 사용 가능
+
+Is Not Valid (False)
+  ├─ None (Null)
+  ├─ 삭제됨
+  └─ 유효하지 않음
+```
+
+**Play 노드란?**
+
+```
+기능
+  └─ 멈춘 Audio Component 다시 재생
+
+vs Spawn
+  ├─ Spawn: 새로 생성 (비쌈)
+  └─ Play: 기존 것 재생 (저렴)
+
+Start Time 옵션
+  └─ 0.0: 처음부터 재생
+```
+
+**최종 로직**
+
+```
+시작 버튼 누름
+  ↓
+Is Valid?
+
+첫 실행 (Is Not Valid)
+  ├─ Spawn Sound Attached
+  ├─ 변수 저장
+  └─ Fade In
+
+두 번째 실행 (Is Valid)
+  ├─ Play (재사용)
+  └─ Fade In
+
+메모리
+  └─ Audio Component 1개만 유지
+  └─ 생성/삭제 반복 없음
+```
+
+**성능 비교**
+
+```
+Auto Destroy = True (매번 생성)
+  └─ 시작: 생성 비용 + 재생
+  └─ 정지: 삭제 비용
+  └─ 비용: 높음
+
+Auto Destroy = False + Is Valid 체크
+  └─ 첫 시작: 생성 비용 + 재생 (1회)
+  └─ 이후: 재생만 (저렴)
+  └─ 정지: 중지만 (저렴)
+  └─ 비용: 낮음
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380755/notion-blog/_/_/_5_/_8_-_3D_-_4/image_10.png)
+
+---
+
+## 🛑 정지 사운드 구현 (Stop Thruster Sound)
+
+### 1. 반복 소리 정지
+
+```
+Event Stop Jetpack
+  ↓
+Looping Thruster Sound (Get)
+  ↓
+Is Valid?
+  └─ Is Valid → Stop
+```
+
+**Stop 노드**
+
+```
+기능
+  └─ 재생 중인 Audio Component 중지
+
+효과
+  ├─ 소리 멈춤
+  ├─ Auto Destroy = False면 유지
+  └─ 나중에 Play로 다시 재생 가능
+```
+
+### 2. 함수로 축소
+
+```
+노드 선택
+  ↓
+Collapse to Function
+  └─ 이름: Stop Thruster Sound
+```
+
+### 3. 정지 효과음 추가
+
+```
+Stop Thruster Sound 함수 내부
+  ↓
+Spawn Sound at Location
+  ├─ Sound: MS_Thruster_Stop
+  ├─ Location: Get Actor Location
+  ├─ Volume Multiplier: 0.4
+  ├─ Auto Destroy: True (중요!)
+  └─ Return Value → Fade Out
+```
+
+**Auto Destroy = True인 이유**
+
+```
+일회성 효과음
+  ├─ 한 번 재생하고 끝
+  ├─ 다시 제어할 필요 없음
+  └─ 자동 삭제가 효율적
+
+반복음과 차이
+  ├─ 반복음: 켜고 끄기 반복 → Auto Destroy False
+  └─ 효과음: 한 번 재생 → Auto Destroy True
+```
+
+### 4. Fade Out 적용
+
+```
+Fade Out
+  ├─ Fade Out Duration: 0.55초
+  ├─ Fade Volume Level: 0.0
+  └─ Fade Curve: Linear
+```
+
+**왜 정지음도 페이드?**
+
+```
+자연스러운 끝
+  └─ 갑자기 끊기지 않음
+  └─ 부드럽게 사라짐
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380755/notion-blog/_/_/_5_/_8_-_3D_-_4/image_11.png)
+
+---
+
+## 📊 최종 사운드 시스템 구조
+
+### Event Graph 구조
+
+```
+Event Start Jetpack
+  ├─ Activate (Thruster_Effect_R)
+  ├─ Activate (Thruster_Effect_L)
+  └─ Start Thruster Sound
+
+Event Stop Jetpack
+  ├─ Deactivate (Thruster_Effect_R)
+  ├─ Deactivate (Thruster_Effect_L)
+  └─ Stop Thruster Sound
+```
+
+### Start Thruster Sound 함수
+
+```
+1. Spawn Sound at Location
+   └─ MS_Thruster_Start
+   └─ Fade Out (1초)
+
+2. Looping Thruster Sound Is Valid?
+
+   Is Not Valid
+     └─ Spawn Sound Attached
+         └─ MS_Thruster_Loop
+         └─ 변수 저장
+         └─ Fade In (0.35초)
+
+   Is Valid
+     └─ Play
+         └─ Fade In (0.35초)
+```
+
+### Stop Thruster Sound 함수
+
+```
+1. Looping Thruster Sound Stop
+
+2. Spawn Sound at Location
+   └─ MS_Thruster_Stop
+   └─ Fade Out (0.55초)
+   └─ Auto Destroy
+```
+
+---
+
+## 💡 핵심 개념 정리
+
+### Audio Component
+
+```
+정의
+  └─ 재생 중인 사운드를 제어하는 오브젝트
+
+기능
+  ├─ Play: 재생
+  ├─ Stop: 정지
+  ├─ Pause: 일시정지
+  ├─ Fade In: 볼륨 증가
+  └─ Fade Out: 볼륨 감소
+
+생명 주기
+  ├─ Spawn으로 생성
+  ├─ Play/Stop으로 제어
+  └─ Auto Destroy로 삭제 여부 결정
+```
+
+### Auto Destroy
+
+```
+True
+  ├─ 재생 완료/정지 시 자동 삭제
+  ├─ 메모리 자동 관리
+  ├─ 일회성 효과음에 적합
+  └─ 예: 폭발음, 발소리
+
+False
+  ├─ 수동 관리 필요
+  ├─ 재사용 가능
+  ├─ 반복/지속 사운드에 적합
+  └─ 예: 엔진음, 환경음
+```
+
+### Fade (페이드)
+
+```
+Fade In
+  └─ 볼륨 0 → 목표 볼륨 (서서히 증가)
+
+Fade Out
+  └─ 현재 볼륨 → 0 (서서히 감소)
+
+사용 이유
+  ├─ 자연스러운 전환
+  ├─ 갑작스러운 소리 방지
+  └─ 몰입감 향상
+```
+
+### 메모리 누수
+
+```
+발생 원인
+  └─ 참조 잃은 오브젝트가 메모리에 남음
+
+예방 방법
+  ├─ Auto Destroy 적절히 사용
+  ├─ Is Valid 체크로 재사용
+  └─ 불필요한 생성/삭제 방지
+
+체크 방법
+  └─ Is Valid로 오브젝트 존재 확인
+```
+
+---
+
+## ⚠️ 중요 포인트
+
+### 1. Spawn 방식 선택
+
+```
+Spawn Sound at Location
+  ├─ 위치 고정 필요
+  ├─ 짧은 효과음
+  └─ 예: 충돌음, 발소리
+
+Spawn Sound Attached
+  ├─ 액터 따라 이동
+  ├─ 지속적인 소리
+  └─ 예: 엔진음, 환경음
+```
+
+### 2. Auto Destroy 설정
+
+```
+고려 사항
+  ├─ 소리를 다시 제어할 필요가 있나?
+  ├─ 일회성인가 반복인가?
+  └─ 메모리 효율은?
+
+일회성 효과음
+  └─ Auto Destroy = True
+
+반복/제어 필요
+  └─ Auto Destroy = False + Is Valid 체크
+```
+
+### 3. 변수 저장 시점
+
+```
+나중에 접근 필요하면
+  └─ 반드시 변수 저장
+
+예시
+  ├─ Stop 호출 필요 → 저장
+  ├─ Fade 제어 필요 → 저장
+  └─ 한 번 재생 끝 → 저장 불필요
+```
+
+### 4. Is Valid 체크
+
+```
+변수 사용 전 항상 체크
+  ├─ None 체크
+  ├─ 삭제 여부 확인
+  └─ 안전한 코드
+
+체크 안 하면
+  └─ Null Reference 에러 가능
+```
+
+---
+
+## 🎓 용어 정리
+
+**Meta Sound**
+
+- 언리얼의 고급 오디오 시스템
+- 노드 기반 사운드 편집
+- 동적 사운드 생성 가능
+
+**Audio Component**
+
+- 재생 중인 사운드 오브젝트
+- 생성/제어/삭제 가능
+- 3D 공간 음향 지원
+
+**Fade (페이드)**
+
+- 볼륨 서서히 변화
+- In: 증가, Out: 감소
+- 자연스러운 전환
+
+**Memory Leak (메모리 누수)**
+
+- 사용 안 하는 메모리 점유
+- 성능 저하 원인
+- 최악: 크래시
+
+**Object Reference (오브젝트 레퍼런스)**
+
+- 오브젝트의 주소/포인터
+- 해당 오브젝트 접근/제어
+- 변수에 저장 가능
+
+**Attenuation (감쇠)**
+
+- 거리에 따른 볼륨 감소
+- 현실감 있는 3D 사운드
+- 설정으로 조절 가능
+
+---
+
+## 🎯 다음 단계
+
+현재 상태
+
+```
+✅ 시각 효과 완성
+✅ 사운드 시스템 완성
+✅ 입력 제어 완성
+❌ 실제 비행 기능 없음
+```
+
+다음 작업
+
+```
+Movement Component
+  └─ 실제 비행 메커니즘 구현
+```
+
+# { 🤔 사운드 재사용 원리 설명 추가 }
+
+## 핵심 개념
+
+**Spawn Sound Attached의 특별한 점**
+
+```
+일반 Spawn (at Location)
+  ├─ 월드의 특정 좌표에 고정
+  ├─ 캐릭터 이동 시 소리 멀어짐
+  └─ 위치 변경 불가
+
+Spawn Sound Attached (부착)
+  ├─ 컴포넌트에 붙음
+  ├─ 부모가 움직이면 자동으로 따라감
+  └─ 항상 캐릭터와 함께 이동 ✅
+```
+
+---
+
+## 🔍 상세 원리
+
+### 부착(Attach)의 의미
+
+```
+Spawn Sound Attached
+  ├─ Attach to Component: Capsule Component
+  └─ 결과: Audio Component가 Capsule의 "자식"이 됨
+
+계층 구조
+BP_Kick
+  └─ Capsule Component (부모)
+      └─ Audio Component (자식) ← 여기에 붙음!
+```
+
+**자식-부모 관계**
+
+```
+부모가 이동하면
+  └─ 자식도 자동으로 따라 이동
+
+부모가 회전하면
+  └─ 자식도 함께 회전
+
+위치 계산
+  └─ 자식 위치 = 부모 위치 + 상대 오프셋
+```
+
+---
+
+## 🎮 실제 동작 과정
+
+### 첫 번째 실행
+
+```
+1. 제트팩 시작
+   ↓
+2. Looping Thruster Sound Is Valid?
+   └─ Is Not Valid (변수가 None)
+   ↓
+3. Spawn Sound Attached
+   ├─ Capsule Component에 부착
+   ├─ Audio Component 생성
+   └─ Looping Thruster Sound 변수에 저장
+   ↓
+4. Fade In & Play
+
+위치: (100, 200, 300) 캐릭터 위치
+Audio Component: Capsule에 부착됨
+```
+
+### 캐릭터 이동 중
+
+```
+캐릭터가 (500, 600, 700)으로 이동
+  ↓
+Capsule Component 이동
+  ↓
+Audio Component 자동으로 따라감 ✅
+  └─ 부모-자식 관계이므로
+
+소리 위치
+  └─ 항상 캐릭터와 함께
+  └─ 별도 처리 불필요!
+```
+
+### 제트팩 정지
+
+```
+1. Stop 버튼
+   ↓
+2. Looping Thruster Sound → Stop
+   ├─ 소리만 멈춤
+   ├─ Audio Component는 여전히 존재
+   └─ 여전히 Capsule에 부착되어 있음
+
+위치: 캐릭터와 함께
+상태: 정지됨 (삭제 안 됨)
+```
+
+### 두 번째 실행
+
+```
+1. 제트팩 다시 시작
+   ↓
+2. Looping Thruster Sound Is Valid?
+   └─ Is Valid! (이미 있음)
+   ↓
+3. 새로 만들지 않고 Play 호출
+   ├─ 기존 Audio Component 재사용
+   └─ 이미 Capsule에 부착되어 있음
+   ↓
+4. Fade In
+
+위치: 현재 캐릭터 위치 (자동)
+Audio Component: 그대로 부착되어 있음
+```
+
+---
+
+## 💡 왜 다시 Spawn 안 해도 되나?
+
+### 이유 1: 부착 관계 유지
+
+```
+Audio Component가 Capsule에 붙어있음
+  ↓
+캐릭터 어디로 가든
+  ↓
+Audio Component도 함께
+  ↓
+별도로 위치 업데이트 불필요
+```
+
+### 이유 2: 컴포넌트 수명
+
+```
+Auto Destroy = False
+  ↓
+Stop해도 삭제 안 됨
+  ↓
+계속 Capsule에 붙어있음
+  ↓
+Play만 하면 다시 재생
+```
+
+---
+
+## 📊 비교: Location vs Attached
+
+### Spawn Sound at Location
+
+```
+생성 시
+  └─ 월드 좌표 (100, 200, 300)에 고정
+
+캐릭터 이동
+  ├─ 캐릭터: (500, 600, 700)
+  └─ 소리: (100, 200, 300) ← 그대로!
+
+결과
+  └─ 소리가 멀어짐
+  └─ 재사용 불가능 (위치 다름)
+  └─ 매번 새로 만들어야 함 ✅
+```
+
+### Spawn Sound Attached
+
+```
+생성 시
+  └─ Capsule Component의 상대 위치 (0, 0, 0)
+
+캐릭터 이동
+  ├─ 캐릭터: (500, 600, 700)
+  └─ 소리: (500, 600, 700) ← 자동으로 따라감!
+
+결과
+  └─ 항상 캐릭터 위치
+  └─ 재사용 가능 ✅
+  └─ 한 번만 만들면 됨 ✅
+```
+
+---
+
+## 🔧 상대 위치의 비밀
+
+### Location Type: Keep Relative Offset
+
+```
+Spawn Sound Attached
+  └─ Location: (0, 0, 0)
+  └─ 상대 좌표!
+
+의미
+  └─ Capsule 중심에서 (0, 0, 0) 떨어진 곳
+
+캐릭터가 (100, 200, 300)
+  └─ 소리 위치 = (100, 200, 300) + (0, 0, 0)
+  └─ = (100, 200, 300)
+
+캐릭터가 (500, 600, 700) 이동
+  └─ 소리 위치 = (500, 600, 700) + (0, 0, 0)
+  └─ = (500, 600, 700) ← 자동 업데이트!
+```
+
+---
+
+## 🎯 정리
+
+### 핵심 원리
+
+```
+1. Attach = 부모-자식 관계
+   └─ 자식은 부모 따라 자동 이동
+
+2. Auto Destroy = False
+   └─ 컴포넌트 유지
+
+3. 상대 좌표
+   └─ 부모 기준으로 위치 자동 계산
+
+결론
+  └─ 한 번 만들어두면
+  └─ 어디로 가든 따라다님
+  └─ Play/Stop만 하면 됨
+```
+
+### 왜 효율적인가?
+
+```
+매번 새로 만들기
+  ├─ Spawn 비용 (무거움)
+  ├─ Destroy 비용 (무거움)
+  └─ 반복 시 성능 저하
+
+한 번 만들고 재사용
+  ├─ Spawn 1회만 (초기만)
+  ├─ Play/Stop (가벼움)
+  └─ 성능 좋음 ✅
+```
+
+### 비유
+
+```
+매번 새로 만들기
+  └─ 음악 들을 때마다 스피커 사고 버리기
+
+재사용
+  └─ 스피커 하나 사서 재생/정지 버튼만 누르기
+```
+
+**바로 이게 Attach의 마법입니다! 🎩✨**

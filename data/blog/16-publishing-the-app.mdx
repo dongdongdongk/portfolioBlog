@@ -1,0 +1,220 @@
+---
+title: '섹션 16: Publishing the app + 효과음 추가'
+date: '2026-09-02'
+category: '게임 개발/Game Development in JS TS - The Complete Guide (w_'
+tags: ['게임 개발', 'Game Development in JS TS - The Complete Guide (w_']
+draft: false
+summary: ''
+---
+
+# **{ 게임에 사운드 추가하기 }**
+
+```jsx
+이 강의에서는 Phaser 게임에 사운드를 추가하는 방법을 알아봅니다.
+
+기본적인 배경 음악뿐만 아니라, 점프, 공격, 투사체 발사 등의 효과음을 추가할 것입니다.
+```
+
+## **1. 사운드 로드하기 (Preload Scene)**
+
+```jsx
+먼저, 필요한 오디오 파일을 로드해야 합니다. Phaser에서는 this.load.audio를 사용하여 사운드를 로드할 수 있습니다.
+```
+
+```jsx
+class Preload extends Phaser.Scene {
+  constructor() {
+    super('PreloadScene')
+  }
+
+  preload() {
+    // 배경 음악
+    this.load.audio('theme', 'assets/music/theme_music.wav')
+
+    // 효과음
+    this.load.audio('projectile-launch', 'assets/music/projectile_launch.wav')
+    this.load.audio('step', 'assets/music/step_mud.wav')
+    this.load.audio('jump', 'assets/music/jump.wav')
+    this.load.audio('swipe', 'assets/music/swipe.wav')
+    this.load.audio('coin-pickup', 'assets/music/coin_pickup.wav')
+  }
+}
+```
+
+## **2. 사운드 설정 (Player 클래스)**
+
+```jsx
+이제 Player 클래스에서 사운드를 사용할 수 있도록 추가합니다.
+```
+
+```jsx
+class Player extends Phaser.Physics.Arcade.Sprite {
+  constructor(scene, x, y) {
+    super(scene, x, y, 'player')
+
+    scene.add.existing(this)
+    scene.physics.add.existing(this)
+
+    this.init()
+  }
+
+  init() {
+    this.jumpSound = this.scene.sound.add('jump', { volume: 0.2 })
+    this.projectileSound = this.scene.sound.add('projectile-launch', { volume: 0.2 })
+    this.stepSound = this.scene.sound.add('step', { volume: 0.2 })
+    this.swipeSound = this.scene.sound.add('swipe', { volume: 0.2 })
+  }
+}
+```
+
+```jsx
+this.scene.sound.add('키값', {volume: 0.2}): 불러온 오디오를 사용할 수 있도록 설정합니다.
+```
+
+## **3. 점프 사운드 추가하기**
+
+```jsx
+플레이어가 점프할 때 사운드를 재생하도록 update 함수에 추가합니다.
+```
+
+```jsx
+update() {
+    const { space } = this.cursors;
+    const isSpaceJustDown = Phaser.Input.Keyboard.JustDown(space);
+    const onFloor = this.body.onFloor();
+
+    if (isSpaceJustDown && onFloor) {
+        this.jumpSound.play();
+        this.setVelocityY(-350);
+    }
+}
+```
+
+## **4. 공격 및 투사체 사운드 추가하기**
+
+```jsx
+플레이어가 근접 공격(검 휘두르기)과 원거리 공격(투사체 발사)을 할 때도 사운드를 추가합니다.
+```
+
+```jsx
+handleAttacks() {
+    this.scene.input.keyboard.on("keydown-Q", () => {
+        this.projectileSound.play();
+        this.play("throw", true);
+    });
+
+    this.scene.input.keyboard.on("keydown-E", () => {
+        this.swipeSound.play();
+        this.play("throw", true);
+    });
+}
+```
+
+## **5. 사운드 오류 수정**
+
+```jsx
+사운드 파일이 정상적으로 로드되지 않았을 때 오류가 발생할 수 있습니다.
+
+아래 코드를 사용해 preload에서 정확한 키값을 확인 후 사용해야 합니다.
+```
+
+```jsx
+if (!this.scene.cache.audio.exists('projectile-launch')) {
+  console.error('오디오 파일이 캐시에 존재하지 않습니다: projectile-launch')
+}
+```
+
+```jsx
+preload에서 this.load.audio()에 잘못된 키값이 있으면 오류가 발생할 수 있으므로 확인이 필요합니다.
+
+개발 중에는 console.error()로 디버깅하면 쉽게 해결할 수 있습니다.
+```
+
+# **{ 게임에 사운드 추가하기 2 (달리기, 수집) }**
+
+```jsx
+리는 소리와 다이아몬드를 수집하는 소리를 추가할 것입니다.
+```
+
+## 다이아몬드 수집 소리 추가
+
+### PlayScene의 `create()` 함수에서 추가하기
+
+```jsx
+this.collectSound = this.sound.add('coin-pickup', { volume: 0.2 })
+```
+
+```jsx
+코인을 수집하는 coin-pickup 사운드를 재활용하여 다이아몬드에도 적용합니다.
+```
+
+### 다이아몬드 수집 시 소리 재생
+
+```jsx
+onCollect(entity, collectable) {
+    this.score += collectable.score;
+    this.hud.updateScoreboard(this.score);
+    this.collectSound.play();  // ✅ 다이아몬드 수집 소리 재생
+    collectable.disableBody(true, true);
+    collectable.destroy();
+}
+```
+
+```jsx
+
+콜렉터블(collectables)과 충돌할 때 소리 재생
+
+플레이어가 아이템을 먹으면 점수를 증가시키고,
+
+this.collectSound.play();를 호출하여 소리를 재생합니다.
+```
+
+## 플레이어가 달릴 때 발소리 추가
+
+```jsx
+발소리는 일반적인 사운드와 다르게 특정 주기로 반복되어야 합니다.
+
+만약 update() 함수에서 실행하면 1초에 60번 실행되므로 사운드가 너무 많이 재생됩니다.
+
+따라서, **scene.time.addEvent()**를 사용하여 일정 간격으로 사운드를 재생합니다.
+```
+
+### Player 클래스에서 사운드 추가
+
+```jsx
+this.stepSound = this.scene.sound.add('step', { volume: 0.2 })
+```
+
+### 발소리 일정 간격으로 재생
+
+```jsx
+this.scene.time.addEvent({
+  delay: 100, // 100ms마다 실행
+  repeat: -1, // 무한 반복
+  callbackScope: this,
+  callback: () => {
+    if (this.isPlayingAnims('run')) {
+      // 달리는 애니메이션이 실행 중일 때만
+      this.stepSound.play() // ✅ 발소리 재생
+    }
+  },
+})
+```
+
+```jsx
+scene.time.addEvent()를 사용하여 100ms마다 실행 ( scene.time.addEvent() Phaser에서 특정 시간 간격으로 이벤트를 실행하도록 예약하는 메서드 )
+
+this.isPlayingAnims('run')을 체크하여 플레이어가 달릴 때만 소리 재생
+
+this.stepSound.play();로 소리 재생
+```
+
+# { 최종 수정 }
+
+```jsx
+지형 또는 오브젝트에 보라색 선이 보이는 오류
+```
+
+```jsx
+const platformsColliders = map.createStaticLayer('platforms_colliders', tileset).setAlpha(0)
+```

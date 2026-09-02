@@ -1,0 +1,2192 @@
+---
+title: '섹션 5: Shooter Sam - 7'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# C++ 매크로 (Macro) - 완전 초보 버전
+
+## 🎯 매크로란?
+
+**컴파일 전에 텍스트를 자동으로 치환하는 기능**
+
+```cpp
+#define PI 3.14159f
+
+// 코드에서:
+float radius = PI * 2;
+
+// 컴파일 전에 자동으로:
+float radius = 3.14159f * 2;
+```
+
+**비유:**
+
+```
+워드의 자동 고침 기능과 비슷
+
+"ㅋㅋ" 입력 → 자동으로 "ㅎㅎ"로 변경
+"PI" 입력 → 자동으로 "3.14159f"로 변경
+```
+
+---
+
+## 🔧 매크로가 작동하는 방식
+
+### 전처리기 (Preprocessor)
+
+**컴파일 과정:**
+
+```
+1. 코드 작성 (.cpp)
+    ↓
+2. 전처리기 실행 ← 매크로 처리!
+    ↓
+3. 컴파일러 실행
+    ↓
+4. 실행 파일 생성
+```
+
+**전처리기가 하는 일:**
+
+```cpp
+// 원본 코드:
+#define PI 3.14159f
+float x = PI;
+
+// 전처리기가 변환:
+// (매크로 정의 제거)
+float x = 3.14159f;
+
+// 컴파일러가 컴파일
+```
+
+---
+
+## 📝 기본 매크로 만들기
+
+### 문법
+
+```cpp
+#define 이름 값
+```
+
+### 예제 1: 숫자 상수
+
+```cpp
+#define PI 3.14159f
+
+void AGun::BeginPlay()
+{
+    Super::BeginPlay();
+
+    UE_LOG(LogTemp, Display, TEXT("PI is %f"), PI);
+    // 전처리기가 자동으로:
+    // UE_LOG(LogTemp, Display, TEXT("PI is %f"), 3.14159f);
+}
+```
+
+**출력:**
+
+```
+PI is 3.141590
+```
+
+---
+
+### 예제 2: 텍스트 상수
+
+```cpp
+#define GAME_NAME TEXT("My Awesome Game")
+#define MAX_PLAYERS 16
+#define DEBUG_MODE 1
+
+void Test()
+{
+    UE_LOG(LogTemp, Display, TEXT("Game: %s"), GAME_NAME);
+    UE_LOG(LogTemp, Display, TEXT("Max Players: %d"), MAX_PLAYERS);
+}
+```
+
+---
+
+## 🎨 매크로 vs 변수
+
+### 변수 방식
+
+```cpp
+const float PI = 3.14159f;  // 메모리 할당됨
+
+void Test()
+{
+    float x = PI;  // 메모리에서 읽기
+}
+```
+
+### 매크로 방식
+
+```cpp
+#define PI 3.14159f  // 메모리 할당 안 됨!
+
+void Test()
+{
+    float x = PI;  // 컴파일 전에 3.14159f로 치환
+}
+```
+
+---
+
+### 비교
+
+| 항목            | 변수      | 매크로    |
+| --------------- | --------- | --------- |
+| **메모리**      | 사용 O    | 사용 X    |
+| **디버깅**      | 쉬움      | 어려움    |
+| **타입 안정성** | 있음      | 없음      |
+| **성능**        | 약간 느림 | 약간 빠름 |
+| **유연성**      | 낮음      | 높음      |
+
+**언제 뭘 쓸까?**
+
+```
+변수 사용:
+  - 일반적인 경우
+  - 디버깅 중요할 때
+  - 타입 안정성 필요할 때
+
+매크로 사용:
+  - 조건부 컴파일
+  - 코드 생성 자동화
+  - 성능이 매우 중요할 때
+```
+
+---
+
+## 🔥 인수가 있는 매크로
+
+### 함수처럼 동작하는 매크로
+
+**기본 문법:**
+
+```cpp
+#define 이름(인수) 값
+```
+
+---
+
+### 예제 1: 로그 매크로
+
+```cpp
+#define LOG(x) UE_LOG(LogTemp, Display, TEXT(x))
+
+void Test()
+{
+    LOG("Hello");
+
+    // 전처리기가 변환:
+    // UE_LOG(LogTemp, Display, TEXT("Hello"));
+}
+```
+
+**출력:**
+
+```
+Hello
+```
+
+---
+
+### 예제 2: 경고 로그 매크로
+
+```cpp
+#define LOG_WARNING(x) UE_LOG(LogTemp, Warning, TEXT(x))
+
+void Test()
+{
+    LOG_WARNING("Warning!");
+
+    // 전처리기가 변환:
+    // UE_LOG(LogTemp, Warning, TEXT("Warning!"));
+}
+```
+
+**출력:**
+
+```
+Warning!  (노란색으로)
+```
+
+---
+
+### 예제 3: 여러 인수
+
+```cpp
+#define LOG_FORMAT(Format, Value) \
+    UE_LOG(LogTemp, Display, TEXT(Format), Value)
+
+void Test()
+{
+    LOG_FORMAT("Health: %d", 100);
+
+    // 전처리기가 변환:
+    // UE_LOG(LogTemp, Display, TEXT("Health: %d"), 100);
+}
+```
+
+**출력:**
+
+```
+Health: 100
+```
+
+---
+
+### 여러 줄 매크로
+
+**백슬래시() 사용:**
+
+```cpp
+#define LOG_DETAILED(Category, Level, Format, ...) \
+    UE_LOG(Category, Level, TEXT(Format), ##__VA_ARGS__)
+
+// 사용:
+LOG_DETAILED(LogTemp, Warning, "Value: %d", 42);
+```
+
+**주의:**
+
+```cpp
+// ✅ 올바른 형식
+#define MACRO(x) \
+    Line1; \
+    Line2; \
+    Line3
+
+// ❌ 틀린 형식 (백슬래시 없음)
+#define MACRO(x)
+    Line1;
+    Line2;
+```
+
+---
+
+## 🎓 언리얼의 매크로들
+
+### 우리가 이미 사용 중인 매크로들
+
+**1. UE_LOG**
+
+```cpp
+UE_LOG(LogTemp, Display, TEXT("Test"));
+// 이것도 매크로!
+```
+
+---
+
+**2. UFUNCTION**
+
+```cpp
+UFUNCTION()
+void MyFunction();
+// 이것도 매크로!
+```
+
+---
+
+**3. UPROPERTY**
+
+```cpp
+UPROPERTY(EditAnywhere)
+float Health;
+// 이것도 매크로!
+```
+
+---
+
+**4. UCLASS**
+
+```cpp
+UCLASS()
+class AMyActor : public AActor
+{
+    GENERATED_BODY()  // 이것도 매크로!
+};
+```
+
+---
+
+**5. AddDynamic**
+
+```cpp
+OnTakeAnyDamage.AddDynamic(this, &AMyClass::OnDamage);
+// AddDynamic도 매크로!
+```
+
+**실제로는:**
+
+```cpp
+// AddDynamic 매크로 정의:
+#define AddDynamic(UserObject, FuncName) \
+    __Internal_AddDynamic(UserObject, FuncName, STATIC_FUNCTION_FNAME(FuncName))
+```
+
+---
+
+## 💡 실전 예제
+
+### 예제 1: 디버그 출력 단순화
+
+```cpp
+// 헤더 또는 cpp 상단에:
+#define PRINT(Text) \
+    if (GEngine) \
+        GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, TEXT(Text))
+
+#define PRINT_F(Format, ...) \
+    if (GEngine) \
+        GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, \
+            FString::Printf(TEXT(Format), ##__VA_ARGS__))
+
+// 사용:
+void Test()
+{
+    PRINT("Simple message");
+    PRINT_F("Health: %d", Health);
+}
+```
+
+---
+
+### 예제 2: 조건부 컴파일
+
+```cpp
+// 디버그 모드에서만 로그
+#if WITH_EDITOR
+    #define DEBUG_LOG(x) UE_LOG(LogTemp, Display, TEXT(x))
+#else
+    #define DEBUG_LOG(x)  // 빈 매크로 (아무것도 안 함)
+#endif
+
+// 사용:
+DEBUG_LOG("This only prints in editor");
+// 빌드된 게임에서는 완전히 제거됨!
+```
+
+---
+
+### 예제 3: NULL 체크 단순화
+
+```cpp
+#define CHECK_VALID(Object) \
+    if (!Object) \
+    { \
+        UE_LOG(LogTemp, Error, TEXT(#Object " is null!")); \
+        return; \
+    }
+
+// 사용:
+void Shoot()
+{
+    CHECK_VALID(Gun);  // Gun이 null이면 에러 + return
+
+    Gun->Fire();
+}
+```
+
+**`#Object`의 의미:**
+
+```cpp
+CHECK_VALID(Gun);
+
+// 전처리기가 변환:
+if (!Gun)
+{
+    UE_LOG(LogTemp, Error, TEXT("Gun is null!"));
+    return;
+}
+```
+
+---
+
+### 예제 4: 속성 매크로 모음
+
+```cpp
+// 자주 쓰는 속성 묶음
+#define READONLY_PROPERTY(Type, Name) \
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Info") \
+    Type Name
+
+#define EDITABLE_PROPERTY(Type, Name) \
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings") \
+    Type Name
+
+// 사용:
+class AMyActor : public AActor
+{
+    READONLY_PROPERTY(float, Health);
+    EDITABLE_PROPERTY(float, MaxHealth);
+
+    // 전처리 후:
+    // UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Info")
+    // float Health;
+    //
+    // UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings")
+    // float MaxHealth;
+};
+```
+
+---
+
+## ⚠️ 매크로 사용 시 주의사항
+
+### 1. 괄호를 꼭 사용하세요!
+
+```cpp
+// ❌ 나쁜 예
+#define SQUARE(x) x * x
+
+int result = SQUARE(2 + 3);
+// 전처리: 2 + 3 * 2 + 3 = 2 + 6 + 3 = 11 (틀림!)
+
+// ✅ 좋은 예
+#define SQUARE(x) ((x) * (x))
+
+int result = SQUARE(2 + 3);
+// 전처리: ((2 + 3) * (2 + 3)) = 5 * 5 = 25 (맞음!)
+```
+
+---
+
+### 2. 세미콜론 주의
+
+```cpp
+// ❌ 나쁜 예
+#define LOG(x) UE_LOG(LogTemp, Display, TEXT(x));
+//                                               ^ 세미콜론!
+
+if (condition)
+    LOG("Test");  // if 끝
+else
+    DoSomething();  // 에러! (세미콜론 때문에 if/else 망가짐)
+
+// ✅ 좋은 예
+#define LOG(x) UE_LOG(LogTemp, Display, TEXT(x))
+
+if (condition)
+    LOG("Test");  // OK
+else
+    DoSomething();  // OK
+```
+
+---
+
+### 3. 타입 체크 없음
+
+```cpp
+#define ADD(a, b) ((a) + (b))
+
+int x = ADD(1, 2);        // OK
+float y = ADD(1.5f, 2.5f);  // OK
+FString z = ADD("A", "B");  // 컴파일 에러! (타입 체크 안 됨)
+```
+
+**해결:**
+
+```cpp
+// 템플릿 함수 사용
+template<typename T>
+T Add(T a, T b) { return a + b; }
+
+// 타입 체크 됨!
+```
+
+---
+
+### 4. 디버깅 어려움
+
+```cpp
+#define COMPLEX_MACRO(x) \
+    /* 복잡한 로직 */
+
+// 디버거에서:
+// 매크로는 이미 확장되어 있어서
+// 어디서 문제인지 찾기 어려움
+```
+
+---
+
+## 🛠️ Live Coding 버그 해결
+
+### 문제 상황
+
+```
+Live Coding으로 IsAlive 추가
+    ↓
+애니메이션 BP에서 Get Is Alive 사용
+    ↓
+Visual Studio에서 컴파일 안 함
+    ↓
+프로젝트 재실행
+    ↓
+에러! 🔴
+```
+
+---
+
+### 해결 방법
+
+**방법 1: Visual Studio 컴파일**
+
+```
+1. Visual Studio에서 Ctrl + Shift + B (빌드)
+2. 언리얼 재시작
+3. 애니메이션 BP 열기
+4. 에러 난 노드 삭제
+5. Get Is Alive 노드 다시 추가
+```
+
+**방법 2: Live Coding 재실행**
+
+```
+1. 언리얼에서 Ctrl + Alt + F11 (Live Coding)
+2. 애니메이션 BP에서 노드 교체
+```
+
+**권장:**
+
+```
+Live Coding은 빠른 테스트용
+중요한 변경은 항상 Visual Studio에서 컴파일!
+```
+
+---
+
+## 📚 핵심 개념 정리
+
+### 매크로
+
+컴파일 전 텍스트 치환
+
+```cpp
+#define NAME value
+```
+
+### 전처리기
+
+매크로를 처리하는 프로그램
+
+```
+코드 작성 → 전처리 → 컴파일
+```
+
+### 인수 매크로
+
+함수처럼 동작
+
+```cpp
+#define LOG(x) UE_LOG(...)
+```
+
+### # 연산자
+
+인수를 문자열로
+
+```cpp
+#define PRINT(x) TEXT(#x)
+PRINT(Hello) → TEXT("Hello")
+```
+
+### ## 연산자
+
+토큰 연결
+
+```cpp
+#define CONCAT(a,b) a##b
+CONCAT(Hello, World) → HelloWorld
+```
+
+---
+
+## 🎯 요약
+
+**매크로 = 컴파일 전 텍스트 치환**
+
+**장점:**
+
+```
+- 코드 자동 생성
+- 메모리 안 씀
+- 조건부 컴파일
+```
+
+**단점:**
+
+```
+- 디버깅 어려움
+- 타입 체크 없음
+- 실수하기 쉬움
+```
+
+**언리얼에서:**
+
+```
+UCLASS, UPROPERTY, UFUNCTION 등
+모두 매크로!
+```
+
+**실전 팁:**
+
+```
+- 간단한 상수: 매크로 OK
+- 복잡한 로직: 함수 사용
+- 항상 괄호 사용
+- 세미콜론 주의
+```
+
+---
+
+매크로는 강력하지만 조심히 사용해야 하는 도구입니다!
+
+언리얼 엔진의 많은 기능이 매크로로 만들어져 있으니, 이해하면 엔진을 더 잘 이해할 수 있어요!
+
+# { Protected 키워드 }
+
+## 🎯 Protected란?
+
+**상속받은 자식 클래스에서만 접근 가능한 접근 제어자**
+
+```cpp
+class Shape
+{
+protected:
+    int Sides;  // 자식 클래스에서 접근 가능!
+};
+
+class Rectangle : public Shape
+{
+public:
+    void SetSides()
+    {
+        Sides = 4;  // ✅ OK! (자식이라서)
+    }
+};
+
+void AGun::BeginPlay()
+{
+    Rectangle rect;
+    rect.Sides = 4;  // ❌ 에러! (외부라서)
+}
+```
+
+---
+
+## 🔐 접근 제어자 완전 정리
+
+### 3가지 접근 제어자
+
+**Public (공개):**
+
+```cpp
+public:
+    int Health;  // 누구나 접근 가능
+```
+
+**Private (비공개):**
+
+```cpp
+private:
+    int Health;  // 클래스 내부에서만
+```
+
+**Protected (보호):**
+
+```cpp
+protected:
+    int Health;  // 클래스 + 자식 클래스
+```
+
+---
+
+### 접근 가능한 곳
+
+| 접근 위치       | Public | Protected | Private |
+| --------------- | ------ | --------- | ------- |
+| **클래스 내부** | ✅     | ✅        | ✅      |
+| **자식 클래스** | ✅     | ✅        | ❌      |
+| **외부 코드**   | ✅     | ❌        | ❌      |
+
+---
+
+### 시각적 비교
+
+```cpp
+class Parent
+{
+public:
+    int A;        // 🌍 누구나
+
+protected:
+    int B;        // 👨‍👩‍👧 가족만 (자식 포함)
+
+private:
+    int C;        // 🔒 나만
+};
+
+class Child : public Parent
+{
+    void Test()
+    {
+        A = 1;  // ✅ OK (Public)
+        B = 2;  // ✅ OK (Protected)
+        C = 3;  // ❌ 에러! (Private)
+    }
+};
+
+void External()
+{
+    Parent p;
+    p.A = 1;  // ✅ OK (Public)
+    p.B = 2;  // ❌ 에러! (Protected)
+    p.C = 3;  // ❌ 에러! (Private)
+}
+```
+
+---
+
+## 📝 Protected 상세 설명
+
+### Private vs Protected
+
+**Private (비공개):**
+
+```cpp
+class Parent
+{
+private:
+    int Secret = 10;
+};
+
+class Child : public Parent
+{
+    void Test()
+    {
+        Secret = 20;  // ❌ 에러!
+        // 자식도 못 봄!
+    }
+};
+```
+
+**Protected (보호):**
+
+```cpp
+class Parent
+{
+protected:
+    int Secret = 10;
+};
+
+class Child : public Parent
+{
+    void Test()
+    {
+        Secret = 20;  // ✅ OK!
+        // 자식은 볼 수 있음!
+    }
+};
+```
+
+---
+
+### 왜 Protected가 필요한가요?
+
+**시나리오:**
+
+```cpp
+// 캐릭터 기본 클래스
+class ACharacter
+{
+private:
+    float Health;  // ❌ 자식이 못 씀!
+
+    // 자식 클래스에서 체력 수정하려면
+    // Getter/Setter 필요 (불편!)
+};
+
+// 적 캐릭터
+class AEnemy : public ACharacter
+{
+    void Die()
+    {
+        Health = 0;  // ❌ 에러!
+        // Setter 사용해야 함 (번거로움)
+    }
+};
+```
+
+**Protected 사용:**
+
+```cpp
+class ACharacter
+{
+protected:
+    float Health;  // ✅ 자식이 직접 접근!
+};
+
+class AEnemy : public ACharacter
+{
+    void Die()
+    {
+        Health = 0;  // ✅ OK! (직접 접근)
+    }
+};
+```
+
+---
+
+## 💻 실습 예제
+
+### 예제: Shape & Rectangle
+
+**Shape.cpp (Gun.cpp에 작성):**
+
+```cpp
+// Shape 클래스 정의
+class Shape
+{
+protected:
+    int Sides;  // 변의 개수
+};
+
+// Rectangle 클래스 정의 (Shape 상속)
+class Rectangle : public Shape
+{
+public:
+    void SetSides();  // 함수 선언
+};
+
+// SetSides 구현
+void Rectangle::SetSides()
+{
+    Sides = 4;  // ✅ OK! (자식이라서)
+    // 직사각형은 4개 변
+}
+```
+
+---
+
+### 테스트 1: 자식에서 접근 (✅ 성공)
+
+```cpp
+void AGun::BeginPlay()
+{
+    Super::BeginPlay();
+
+    Rectangle rect;
+    rect.SetSides();  // ✅ OK!
+    // SetSides 내부에서 Sides 접근 가능
+}
+```
+
+**결과:**
+
+```
+컴파일 성공!
+자식 클래스 내부에서 protected 멤버 접근 가능
+```
+
+---
+
+### 테스트 2: 외부에서 접근 (❌ 실패)
+
+```cpp
+void AGun::BeginPlay()
+{
+    Super::BeginPlay();
+
+    Rectangle rect;
+    rect.Sides = 4;  // ❌ 컴파일 에러!
+    // 외부에서 protected 접근 불가
+}
+```
+
+**에러 메시지:**
+
+```
+error C2248: 'Shape::Sides': cannot access protected member
+declared in class 'Shape'
+```
+
+**해석:**
+
+```
+"Shape::Sides는 Shape 클래스의 protected 멤버라서
+외부에서 접근할 수 없습니다"
+```
+
+---
+
+## 🎓 언리얼의 Protected 사용
+
+### Character 클래스 확인
+
+**ShooterSamCharacter.h:**
+
+```cpp
+class AShooterSamCharacter : public ACharacter
+{
+protected:
+    // ===== Protected 함수들 =====
+
+    virtual void BeginPlay() override;
+
+    virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+
+    void Move(const FInputActionValue& Value);
+    void Look(const FInputActionValue& Value);
+    void Shoot();
+
+    // ===== Protected 변수들 =====
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input)
+    UInputAction* MoveAction;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input)
+    UInputAction* LookAction;
+};
+```
+
+---
+
+### 왜 Protected를 사용했나요?
+
+**1. BeginPlay가 Protected인 이유:**
+
+```cpp
+protected:
+    virtual void BeginPlay() override;
+```
+
+**이유:**
+
+```
+BeginPlay는 엔진이 호출함
+→ 외부에서 직접 호출하면 안 됨!
+→ 하지만 자식 클래스는 오버라이드해야 함
+→ Protected가 딱 맞음!
+```
+
+**만약 Public이면:**
+
+```cpp
+public:
+    virtual void BeginPlay() override;
+
+// 어디서든 호출 가능 (위험!)
+MyCharacter->BeginPlay();  // ❌ 하면 안 되는데 됨!
+```
+
+**만약 Private이면:**
+
+```cpp
+private:
+    virtual void BeginPlay() override;
+
+// 자식에서 오버라이드 못 함!
+class MyCharacter : public ACharacter
+{
+    void BeginPlay() override;  // ❌ 에러!
+};
+```
+
+---
+
+**2. Input Action이 Protected인 이유:**
+
+```cpp
+protected:
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    UInputAction* MoveAction;
+```
+
+**이유:**
+
+```
+블루프린트에서 설정 가능 (EditAnywhere)
+→ 하지만 외부 코드에서 함부로 바꾸면 안 됨
+→ 자식 클래스는 사용할 수 있어야 함
+→ Protected + BlueprintReadOnly
+```
+
+---
+
+## 💡 실전 사용 예제
+
+### 예제 1: 체력 시스템
+
+```cpp
+class ACharacter
+{
+protected:
+    // 자식 클래스에서 수정 가능
+    float Health = 100.f;
+    float MaxHealth = 100.f;
+
+public:
+    // 외부에서는 Getter로만 접근
+    float GetHealth() const { return Health; }
+    float GetMaxHealth() const { return MaxHealth; }
+};
+
+class AEnemy : public ACharacter
+{
+public:
+    void TakeDamage(float Damage)
+    {
+        Health -= Damage;  // ✅ OK! (Protected)
+
+        if (Health <= 0.f)
+        {
+            Die();
+        }
+    }
+
+private:
+    void Die()
+    {
+        Health = 0.f;  // ✅ OK!
+        // 처리...
+    }
+};
+```
+
+---
+
+### 예제 2: 무기 시스템
+
+```cpp
+class AWeapon : public AActor
+{
+protected:
+    // 자식 무기들이 수정 가능
+    float Damage = 10.f;
+    float FireRate = 0.1f;
+    int32 MagazineSize = 30;
+    int32 CurrentAmmo = 30;
+
+    // 자식 무기들이 구현
+    virtual void Fire();
+    virtual void Reload();
+
+public:
+    // 외부에서는 이것만 호출
+    void PullTrigger();
+};
+
+class ARifle : public AWeapon
+{
+protected:
+    virtual void Fire() override
+    {
+        if (CurrentAmmo > 0)  // ✅ OK! (Protected)
+        {
+            CurrentAmmo--;    // ✅ OK!
+            Damage = 25.f;    // ✅ OK! (라이플은 강함)
+            // 발사 로직...
+        }
+    }
+};
+
+class AShotgun : public AWeapon
+{
+protected:
+    virtual void Fire() override
+    {
+        CurrentAmmo--;        // ✅ OK!
+        Damage = 50.f;        // ✅ OK! (샷건은 더 강함)
+        // 여러 발 발사...
+    }
+};
+```
+
+---
+
+### 예제 3: AI 시스템
+
+```cpp
+class AAICharacter : public ACharacter
+{
+protected:
+    // AI 자식들이 접근 가능
+    AActor* Target = nullptr;
+    float DetectionRange = 1000.f;
+
+    // 자식들이 오버라이드
+    virtual void OnTargetDetected(AActor* NewTarget);
+    virtual void OnTargetLost();
+
+    // 유틸리티 함수
+    bool IsInRange(AActor* Actor);
+
+public:
+    void UpdateAI();
+};
+
+class AMeleeEnemy : public AAICharacter
+{
+protected:
+    virtual void OnTargetDetected(AActor* NewTarget) override
+    {
+        Target = NewTarget;         // ✅ OK!
+        DetectionRange = 500.f;     // ✅ OK! (근접이라 짧음)
+
+        // 근접 공격 시작
+        StartMeleeAttack();
+    }
+};
+
+class ARangedEnemy : public AAICharacter
+{
+protected:
+    virtual void OnTargetDetected(AActor* NewTarget) override
+    {
+        Target = NewTarget;         // ✅ OK!
+        DetectionRange = 2000.f;    // ✅ OK! (원거리라 김)
+
+        // 총 쏘기 시작
+        StartShooting();
+    }
+};
+```
+
+---
+
+## 🎯 언제 뭘 쓸까?
+
+### Public 사용
+
+```cpp
+public:
+    // ✅ 외부에서 자유롭게 호출/접근해도 되는 것
+    void Jump();
+    void Fire();
+    float GetHealth();
+    void SetSpeed(float Speed);
+```
+
+**예시:**
+
+```
+- 게임플레이 함수
+- Getter/Setter
+- 인터페이스 함수
+```
+
+---
+
+### Protected 사용
+
+```cpp
+protected:
+    // ✅ 자식은 쓰지만 외부는 안 되는 것
+    virtual void BeginPlay() override;
+    float Health;
+    void UpdateAnimation();
+```
+
+**예시:**
+
+```
+- 오버라이드할 가상 함수
+- 자식이 수정할 변수
+- 내부 헬퍼 함수
+```
+
+---
+
+### Private 사용
+
+```cpp
+private:
+    // ✅ 완전히 내부에서만 쓰는 것
+    void CalculateInternalState();
+    int32 InternalCounter;
+```
+
+**예시:**
+
+```
+- 구현 디테일
+- 캐싱된 값
+- 내부 상태
+```
+
+---
+
+## 📊 결정 플로우차트
+
+```
+질문: 이 멤버를 어디서 쓸까?
+
+외부에서도 써야 함?
+    ↓ Yes
+  Public
+
+자식 클래스에서 써야 함?
+    ↓ Yes
+  Protected
+
+이 클래스 내부에서만?
+    ↓ Yes
+  Private
+```
+
+---
+
+## 🔍 추가 팁
+
+### 1. BlueprintReadOnly와 함께
+
+```cpp
+// C++에서는 Protected (자식만)
+// 블루프린트에서는 ReadOnly
+UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Settings")
+protected:
+    float MaxHealth = 100.f;
+```
+
+---
+
+### 2. Virtual과 함께
+
+```cpp
+class ACharacter
+{
+protected:
+    // 자식이 오버라이드 가능
+    virtual void Die();
+    virtual void TakeDamage(float Damage);
+};
+```
+
+---
+
+### 3. 상속과 접근 제어
+
+```cpp
+// Public 상속 (일반적)
+class Child : public Parent
+{
+    // Parent의 public → public
+    // Parent의 protected → protected
+};
+
+// Protected 상속 (드물게 사용)
+class Child : protected Parent
+{
+    // Parent의 public → protected
+    // Parent의 protected → protected
+};
+
+// Private 상속 (거의 안 씀)
+class Child : private Parent
+{
+    // Parent의 public → private
+    // Parent의 protected → private
+};
+```
+
+---
+
+## 📚 핵심 정리
+
+### Protected 키워드
+
+**정의:**
+
+```
+자식 클래스에서만 접근 가능한 접근 제어자
+```
+
+**접근 가능:**
+
+```
+✅ 클래스 내부
+✅ 자식 클래스
+❌ 외부 코드
+```
+
+**사용 시기:**
+
+```
+- 자식이 수정해야 하는 변수
+- 자식이 오버라이드할 함수
+- 상속 계층 내부 공유 로직
+```
+
+**Private와 차이:**
+
+```
+Private: 나만
+Protected: 나 + 자식들
+```
+
+**언리얼에서:**
+
+```
+BeginPlay, SetupPlayerInputComponent 등
+대부분의 오버라이드 함수가 Protected
+```
+
+---
+
+## 🎓 요약
+
+**3가지 접근 제어자:**
+
+```cpp
+public:     // 🌍 모두
+protected:  // 👨‍👩‍👧 가족 (자식 포함)
+private:    // 🔒 나만
+```
+
+**Protected = Private + 자식 접근**
+
+```
+외부 차단 (Private와 같음)
+자식 허용 (Private와 다름)
+```
+
+**실전 팁:**
+
+```
+- 기본은 Private
+- 상속 고려하면 Protected
+- 외부 API는 Public
+```
+
+---
+
+Protected는 상속을 사용할 때 매우 중요한 개념입니다!
+
+클래스 설계 시 "자식 클래스가 이걸 써야 하나?"를 생각하면 Protected를 써야 할지 알 수 있어요! 👍
+
+# { 가상 함수 (Virtual Functions) }
+
+## 🎯 가상 함수란?
+
+**자식 클래스에서 재정의(Override)할 수 있는 함수**
+
+```cpp
+class Parent
+{
+public:
+    virtual void Describe()  // virtual = 재정의 가능!
+    {
+        UE_LOG(LogTemp, Display, TEXT("I am a Shape"));
+    }
+};
+
+class Child : public Parent
+{
+public:
+    virtual void Describe() override  // 재정의!
+    {
+        UE_LOG(LogTemp, Display, TEXT("I am a Rectangle"));
+    }
+};
+```
+
+---
+
+## 🤔 왜 필요한가요?
+
+### 문제 상황
+
+**가상 함수 없을 때:**
+
+```cpp
+class Shape
+{
+public:
+    void Describe()  // virtual 없음!
+    {
+        UE_LOG(LogTemp, Display, TEXT("I am a Shape"));
+    }
+};
+
+class Rectangle : public Shape
+{
+public:
+    void Describe()  // 재정의 시도
+    {
+        UE_LOG(LogTemp, Display, TEXT("I am a Rectangle"));
+    }
+};
+
+void Test()
+{
+    Rectangle rect;
+
+    // 직접 호출
+    rect.Describe();  // "I am a Rectangle" ✅
+
+    // 포인터로 호출
+    Shape* ptr = &rect;
+    ptr->Describe();  // "I am a Shape" ❌ 잘못됨!
+    // Rectangle이지만 Shape 함수 호출!
+}
+```
+
+**출력:**
+
+```
+I am a Rectangle  (직접 호출)
+I am a Shape      (포인터 호출 - 잘못됨!)
+```
+
+---
+
+### 해결: virtual 사용
+
+**가상 함수 사용:**
+
+```cpp
+class Shape
+{
+public:
+    virtual void Describe()  // virtual 추가!
+    {
+        UE_LOG(LogTemp, Display, TEXT("I am a Shape"));
+    }
+};
+
+class Rectangle : public Shape
+{
+public:
+    virtual void Describe() override
+    {
+        UE_LOG(LogTemp, Display, TEXT("I am a Rectangle"));
+    }
+};
+
+void Test()
+{
+    Rectangle rect;
+
+    // 포인터로 호출
+    Shape* ptr = &rect;
+    ptr->Describe();  // "I am a Rectangle" ✅ 올바름!
+    // Rectangle 함수 제대로 호출!
+}
+```
+
+**출력:**
+
+```
+I am a Rectangle  (올바르게 자식 함수 호출!)
+```
+
+---
+
+## 📝 가상 함수의 2가지 핵심
+
+### 1. 함수 재정의 (Override)
+
+**자식에서 부모 함수를 덮어쓸 수 있음**
+
+```cpp
+class Parent
+{
+public:
+    virtual void BeginPlay()
+    {
+        // 부모 구현
+    }
+};
+
+class Child : public Parent
+{
+public:
+    virtual void BeginPlay() override
+    {
+        // 자식 구현 (부모 덮어씀!)
+    }
+};
+```
+
+---
+
+### 2. 동적 디스패치 (Dynamic Dispatch)
+
+**부모 포인터로 자식 함수 호출 가능**
+
+```cpp
+Child child;
+Parent* ptr = &child;  // 부모 포인터
+
+ptr->BeginPlay();  // 자식의 BeginPlay 호출!
+// virtual이 없으면: 부모의 BeginPlay 호출
+// virtual이 있으면: 자식의 BeginPlay 호출 ✅
+```
+
+---
+
+## 💻 실습 예제
+
+### Gun.cpp에서 테스트
+
+```cpp
+// Shape 클래스
+class Shape
+{
+public:
+    virtual void Describe()  // virtual!
+    {
+        UE_LOG(LogTemp, Display, TEXT("I am a Shape"));
+    }
+};
+
+// Rectangle 클래스
+class Rectangle : public Shape
+{
+public:
+    virtual void Describe() override
+    {
+        UE_LOG(LogTemp, Display, TEXT("I am a Rectangle"));
+    }
+};
+```
+
+---
+
+### 테스트 1: 직접 호출
+
+```cpp
+void AGun::BeginPlay()
+{
+    Super::BeginPlay();
+
+    Shape myShape;
+    Rectangle myRect;
+
+    myShape.Describe();    // "I am a Shape"
+    myRect.Describe();     // "I am a Rectangle"
+}
+```
+
+**출력:**
+
+```
+I am a Shape
+I am a Rectangle
+```
+
+**결과:** ✅ 예상대로 작동
+
+---
+
+### 테스트 2: 포인터 호출 (문제 발생!)
+
+```cpp
+void AGun::BeginPlay()
+{
+    Super::BeginPlay();
+
+    Shape myShape;
+    Rectangle myRect;
+
+    // 포인터 생성
+    Shape* shapePtr1 = &myShape;
+    Shape* shapePtr2 = &myRect;  // Rectangle을 Shape*로!
+
+    shapePtr1->Describe();  // "I am a Shape"
+    shapePtr2->Describe();  // "I am a Shape" ❌
+    // Rectangle인데 Shape 출력!
+}
+```
+
+**virtual 없으면 출력:**
+
+```
+I am a Shape
+I am a Shape  (Rectangle인데도!)
+```
+
+---
+
+### 테스트 3: virtual로 해결!
+
+```cpp
+class Shape
+{
+public:
+    virtual void Describe()  // virtual 추가!
+    {
+        UE_LOG(LogTemp, Display, TEXT("I am a Shape"));
+    }
+};
+
+void AGun::BeginPlay()
+{
+    Super::BeginPlay();
+
+    Shape myShape;
+    Rectangle myRect;
+
+    Shape* shapePtr1 = &myShape;
+    Shape* shapePtr2 = &myRect;
+
+    shapePtr1->Describe();  // "I am a Shape"
+    shapePtr2->Describe();  // "I am a Rectangle" ✅
+    // 이제 Rectangle 함수 제대로 호출!
+}
+```
+
+**virtual 있으면 출력:**
+
+```
+I am a Shape
+I am a Rectangle  (제대로!)
+```
+
+---
+
+## 🔍 virtual이 필요한 이유 상세
+
+### C++의 성능 최적화
+
+**virtual 없으면:**
+
+```cpp
+// 컴파일 시점에 결정 (빠름)
+Shape* ptr = &rect;
+ptr->Describe();
+// "포인터 타입이 Shape니까 Shape::Describe 호출!"
+```
+
+**virtual 있으면:**
+
+```cpp
+// 실행 시점에 결정 (약간 느림, 하지만 정확함)
+Shape* ptr = &rect;
+ptr->Describe();
+// "실제 객체가 Rectangle이네? Rectangle::Describe 호출!"
+```
+
+---
+
+### 비유로 이해하기
+
+**virtual 없음 = 겉모습만 보고 판단**
+
+```
+외투 입은 사람 발견
+→ "외투 입었으니 추울 거야"
+→ 실제로는 안에 반팔 입음 (확인 안 함)
+```
+
+**virtual 있음 = 실제를 확인하고 판단**
+
+```
+외투 입은 사람 발견
+→ 외투 벗겨보기
+→ "안에 반팔이네! 안 추워하겠군"
+→ 정확한 판단!
+```
+
+---
+
+## ⚙️ override 키워드
+
+### override란?
+
+**"이 함수는 부모 함수를 재정의합니다"라고 명시**
+
+```cpp
+class Rectangle : public Shape
+{
+public:
+    virtual void Describe() override  // override!
+    {
+        UE_LOG(LogTemp, Display, TEXT("I am a Rectangle"));
+    }
+};
+```
+
+---
+
+### override의 장점
+
+**1. 가독성 향상**
+
+```cpp
+// override 없으면:
+void Describe()
+// "이게 새 함수? 재정의? 모르겠네..."
+
+// override 있으면:
+void Describe() override
+// "아! 부모 함수 재정의구나!" ✅
+```
+
+---
+
+**2. 오타 방지**
+
+```cpp
+class Rectangle : public Shape
+{
+public:
+    // 오타 발생!
+    void Descirbe() override  // Describe 아님!
+    // ❌ 컴파일 에러!
+    // "부모에 Descirbe 없는데 override?"
+};
+```
+
+**override 없으면:**
+
+```cpp
+void Descirbe()  // 오타
+// ✅ 컴파일 성공
+// 그냥 새 함수로 인식됨
+// 버그 발생! (재정의 안 됨)
+```
+
+---
+
+**3. 시그니처 확인**
+
+```cpp
+class Shape
+{
+public:
+    virtual void Describe();
+};
+
+class Rectangle : public Shape
+{
+public:
+    // 파라미터 추가 (실수!)
+    void Describe(int x) override
+    // ❌ 컴파일 에러!
+    // "시그니처 다른데 override?"
+};
+```
+
+---
+
+## 🎓 언리얼의 가상 함수들
+
+### 이미 사용 중인 가상 함수
+
+**AGun.h:**
+
+```cpp
+class AGun : public AActor
+{
+protected:
+    // ===== 가상 함수들 =====
+
+    virtual void BeginPlay() override;
+    // AActor의 BeginPlay 재정의
+
+public:
+    virtual void Tick(float DeltaTime) override;
+    // AActor의 Tick 재정의
+};
+```
+
+---
+
+**AShooterSamCharacter.h:**
+
+```cpp
+class AShooterSamCharacter : public ACharacter
+{
+protected:
+    virtual void BeginPlay() override;
+
+    virtual void SetupPlayerInputComponent(
+        UInputComponent* PlayerInputComponent
+    ) override;
+
+    // ===== 새로운 가상 함수 =====
+    // (이 클래스에서 처음 만든 것)
+
+    virtual void DoMove(float Right, float Forward);
+    virtual void DoLook(float Yaw, float Pitch);
+    virtual void DoJumpStart();
+    virtual void DoJumpEnd();
+};
+```
+
+**왜 DoMove 등이 virtual?**
+
+```cpp
+// 자식 클래스에서 재정의 가능하게!
+class AMyCharacter : public AShooterSamCharacter
+{
+protected:
+    virtual void DoMove(float Right, float Forward) override
+    {
+        // 특수한 이동 로직!
+    }
+};
+```
+
+---
+
+## 💡 실전 사용 예제
+
+### 예제 1: 무기 시스템
+
+```cpp
+class AWeapon : public AActor
+{
+public:
+    virtual void Fire()
+    {
+        UE_LOG(LogTemp, Display, TEXT("Basic weapon fire"));
+    }
+};
+
+class ARifle : public AWeapon
+{
+public:
+    virtual void Fire() override
+    {
+        UE_LOG(LogTemp, Display, TEXT("Rifle fire!"));
+        // 라이플 로직
+    }
+};
+
+class AShotgun : public AWeapon
+{
+public:
+    virtual void Fire() override
+    {
+        UE_LOG(LogTemp, Display, TEXT("Shotgun fire!"));
+        // 샷건 로직
+    }
+};
+
+// 사용:
+void Shoot(AWeapon* weapon)
+{
+    weapon->Fire();  // 실제 무기 타입에 맞는 Fire 호출!
+}
+
+ARifle rifle;
+AShotgun shotgun;
+
+Shoot(&rifle);    // "Rifle fire!"
+Shoot(&shotgun);  // "Shotgun fire!"
+```
+
+---
+
+### 예제 2: AI 시스템
+
+```cpp
+class AAICharacter : public ACharacter
+{
+public:
+    virtual void UpdateAI()
+    {
+        // 기본 AI 로직
+    }
+};
+
+class AMeleeEnemy : public AAICharacter
+{
+public:
+    virtual void UpdateAI() override
+    {
+        // 근접 공격 AI
+        ChasePlayer();
+        MeleeAttack();
+    }
+};
+
+class ARangedEnemy : public AAICharacter
+{
+public:
+    virtual void UpdateAI() override
+    {
+        // 원거리 공격 AI
+        KeepDistance();
+        ShootAtPlayer();
+    }
+};
+
+// 사용:
+TArray<AAICharacter*> Enemies;
+
+for (AAICharacter* Enemy : Enemies)
+{
+    Enemy->UpdateAI();  // 각자의 AI 실행!
+}
+```
+
+---
+
+### 예제 3: 데미지 처리
+
+```cpp
+class ACharacter
+{
+public:
+    virtual void TakeDamage(float Amount)
+    {
+        Health -= Amount;
+        UE_LOG(LogTemp, Display, TEXT("Took %f damage"), Amount);
+    }
+};
+
+class APlayer : public ACharacter
+{
+public:
+    virtual void TakeDamage(float Amount) override
+    {
+        // 플레이어는 방어력 적용
+        float ActualDamage = Amount * (1.0f - Armor);
+        Health -= ActualDamage;
+
+        // HUD 업데이트
+        UpdateHealthBar();
+    }
+};
+
+class ABoss : public ACharacter
+{
+public:
+    virtual void TakeDamage(float Amount) override
+    {
+        // 보스는 약점 체크
+        if (bWeakPointHit)
+        {
+            Amount *= 3.0f;  // 3배 데미지
+        }
+
+        Health -= Amount;
+
+        // 분노 모드
+        if (Health < MaxHealth * 0.3f)
+        {
+            EnterRageMode();
+        }
+    }
+};
+```
+
+---
+
+## 🔗 virtual과 override 조합
+
+### 패턴 1: 기본 (부모만 virtual)
+
+```cpp
+class Parent
+{
+public:
+    virtual void Func();  // virtual
+};
+
+class Child : public Parent
+{
+public:
+    void Func() override;  // override만
+    // virtual 생략 가능
+};
+```
+
+---
+
+### 패턴 2: 계속 재정의 가능 (둘 다)
+
+```cpp
+class Grandparent
+{
+public:
+    virtual void Func();
+};
+
+class Parent : public Grandparent
+{
+public:
+    virtual void Func() override;  // 둘 다!
+    // 손자도 재정의 가능하게
+};
+
+class Child : public Parent
+{
+public:
+    virtual void Func() override;
+    // 증손자도 재정의 가능
+};
+```
+
+**언리얼에서:**
+
+```cpp
+AActor
+  └─ BeginPlay (virtual)
+      └─ AGun
+          └─ BeginPlay (virtual + override)
+              └─ AMyGun
+                  └─ BeginPlay (override)
+```
+
+---
+
+## 📊 정리 표
+
+### 키워드 비교
+
+| 키워드       | 위치 | 의미        | 필수?   |
+| ------------ | ---- | ----------- | ------- |
+| **virtual**  | 부모 | 재정의 가능 | ✅ 필수 |
+| **override** | 자식 | 재정의 중   | ⚠️ 권장 |
+
+---
+
+### 동작 비교
+
+| 상황            | virtual 없음 | virtual 있음 |
+| --------------- | ------------ | ------------ |
+| **직접 호출**   | 자식 함수 ✅ | 자식 함수 ✅ |
+| **부모 포인터** | 부모 함수 ❌ | 자식 함수 ✅ |
+| **성능**        | 빠름         | 약간 느림    |
+
+---
+
+## 🎯 핵심 정리
+
+### 가상 함수
+
+**정의:**
+
+```cpp
+virtual void FunctionName();
+```
+
+**의미:**
+
+```
+자식이 재정의할 수 있음
+포인터로 호출 시 자식 함수 실행
+```
+
+---
+
+### override
+
+**정의:**
+
+```cpp
+void FunctionName() override;
+```
+
+**의미:**
+
+```
+부모 함수 재정의 중
+컴파일러가 확인해줌
+```
+
+---
+
+### 언제 사용?
+
+**virtual 사용:**
+
+```
+- 자식이 재정의할 함수
+- 다형성 필요할 때
+- BeginPlay, Tick 등
+```
+
+**override 사용:**
+
+```
+- 부모 함수 재정의할 때
+- 오타 방지
+- 가독성 향상
+```
+
+---
+
+### 실전 팁
+
+```cpp
+// ✅ 좋은 패턴
+class Parent
+{
+public:
+    virtual void Func();  // 부모: virtual
+};
+
+class Child : public Parent
+{
+public:
+    virtual void Func() override;  // 자식: 둘 다
+};
+
+// ❌ 나쁜 패턴
+class Parent
+{
+public:
+    void Func();  // virtual 없음!
+};
+
+class Child : public Parent
+{
+public:
+    void Func();  // 재정의 안 됨!
+};
+```
+
+---
+
+## 🚀 요약
+
+**가상 함수 = 재정의 가능 + 동적 호출**
+
+```
+virtual: 재정의 가능하게 만듦
+override: 재정의 중임을 명시
+```
+
+**핵심 개념:**
+
+```
+1. 부모: virtual
+2. 자식: override
+3. 포인터로 호출 → 자식 함수 실행!
+```
+
+**언리얼에서:**
+
+```
+BeginPlay, Tick, SetupPlayerInputComponent
+모두 가상 함수!
+```
+
+**실전 사용:**
+
+```
+- 무기 시스템
+- AI 시스템
+- 데미지 처리
+- 모든 다형성 필요 상황
+```
+
+---
+
+가상 함수는 객체지향 프로그래밍의 핵심 개념입니다!
+
+언리얼 엔진의 거의 모든 오버라이드 함수가 가상 함수로 되어있어요. 이제 왜 그런지 이해되시죠? 💪✨

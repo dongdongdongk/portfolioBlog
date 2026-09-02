@@ -1,0 +1,773 @@
+---
+title: 'Wwise 301 L4'
+date: '2026-09-02'
+category: '게임 개발/WWISE'
+tags: ['게임 개발', 'WWISE']
+draft: false
+summary: ''
+---
+
+# { 🚀 Wwise-Type Event 프로퍼티 만들기 }
+
+이번 강의는 **Wwise Event를 C# 스크립트에서 호출(Post)하는 방법**을 배우는 과정입니다.
+
+특히 `AK.Wwise.Event` 타입의 변수를 만들어 Unity **Inspector**에서 직접 Event를 선택할 수 있도록 설정하는 것이 핵심입니다.
+
+---
+
+## 📋 목차
+
+1. [Wwise Event와 스크립트의 관계 이해하기](https://www.notion.so/28ae683f737e80ee96c5e247b5b52387#1-wwise-event%EC%99%80-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8%EC%9D%98-%EA%B4%80%EA%B3%84-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [새 스크립트 생성하기](https://www.notion.so/28ae683f737e80ee96c5e247b5b52387#2-%EC%83%88-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%83%9D%EC%84%B1%ED%95%98%EA%B8%B0)
+3. [C# 스크립트 구조 이해하기](https://www.notion.so/28ae683f737e80ee96c5e247b5b52387#3-c-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EA%B5%AC%EC%A1%B0-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+4. [Wwise-Type Event 프로퍼티 선언하기](https://www.notion.so/28ae683f737e80ee96c5e247b5b52387#4-wwise-type-event-%ED%94%84%EB%A1%9C%ED%8D%BC%ED%8B%B0-%EC%84%A0%EC%96%B8%ED%95%98%EA%B8%B0)
+5. [Inspector에서 Wwise Event 연결하기](https://www.notion.so/28ae683f737e80ee96c5e247b5b52387#5-inspector%EC%97%90%EC%84%9C-wwise-event-%EC%97%B0%EA%B2%B0%ED%95%98%EA%B8%B0)
+6. [Post() 함수로 Event 재생하기](https://www.notion.so/28ae683f737e80ee96c5e247b5b52387#6-post-%ED%95%A8%EC%88%98%EB%A1%9C-event-%EC%9E%AC%EC%83%9D%ED%95%98%EA%B8%B0)
+7. [정리 및 핵심 개념 요약](https://www.notion.so/28ae683f737e80ee96c5e247b5b52387#7-%EC%A0%95%EB%A6%AC-%EB%B0%8F-%ED%95%B5%EC%8B%AC-%EA%B0%9C%EB%85%90-%EC%9A%94%EC%95%BD)
+
+---
+
+## 1. Wwise Event와 스크립트의 관계 이해하기
+
+Unity에서 **Wwise Event**를 재생하려면 반드시 다음 두 가지가 필요합니다.
+
+1. **어떤 Event를 재생할 것인가** — (예: Explosion, Pickup_Coin 등)
+2. **어디(GameObject)에서 재생할 것인가** — (예: Player, Tree, Enemy 등)
+
+이 정보를 코드로 제어하기 위해 Wwise는 **AK.Wwise.Event**라는 특별한 클래스 타입을 제공합니다.
+
+즉, `AK.Wwise.Event` 타입의 변수를 스크립트에 선언하면, **Inspector에서 직접 Event를 지정**할 수 있게 됩니다.
+
+---
+
+## 2. 새 스크립트 생성하기
+
+### 🎬 단계 요약
+
+1. Unity 메뉴에서 `Audiokinetic > Certification > 301 > Lesson 4` 이동
+2. `Posting Events using Wwise-Types` 씬 열기
+3. **Hierarchy** 창에서 `Player` 오브젝트 선택
+4. **Inspector → Add Component → New Script** 클릭
+5. 스크립트 이름을 `PostWwiseEvent`로 지정하고 **Create and Add** 클릭
+
+> 💡 스크립트 이름은 나중에 바꾸기 어렵기 때문에 정확히 입력하는 것이 중요합니다.
+
+### ✅ 결과
+
+Inspector에서 Player에 새 `PostWwiseEvent` 스크립트가 추가됩니다.
+
+이 스크립트는 자동으로 `Assets` 폴더에도 저장되며, **더블 클릭하면 Visual Studio**에서 열립니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380525/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L4/image.png)
+
+---
+
+## 3. C# 스크립트 구조 이해하기
+
+Visual Studio에서 새 스크립트를 열면 기본적으로 아래와 같은 코드가 들어 있습니다.
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class PostWwiseEvent : MonoBehaviour {
+
+    // Use this for initialization
+    void Start () {
+
+    }
+
+    // Update is called once per frame
+    void Update () {
+
+    }
+}
+
+```
+
+### 📘 구성 설명
+
+| 구성요소                                 | 역할                                                                                                |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| **using 문**                             | 코드에서 외부 기능(클래스)을 불러오기 위한 선언. 예: `UnityEngine`은 Unity 기능 사용을 가능하게 함. |
+| **class PostWwiseEvent : MonoBehaviour** | Unity가 인식할 수 있는 스크립트의 기본 구조. 모든 기능과 변수는 이 클래스 내부에 포함되어야 함.     |
+| **Start() 함수**                         | 게임이 시작될 때 한 번 실행되는 함수. 초기화 작업에 사용됨.                                         |
+| **Update() 함수**                        | 매 프레임마다 호출되는 함수. 주로 실시간 동작을 처리함.                                             |
+| **주석 (//)**                            | 코드 설명용으로 실행에는 영향을 주지 않음.                                                          |
+
+> 💡 **중괄호 {}**는 클래스와 함수의 영역을 구분합니다.
+>
+> 모든 변수와 함수는 클래스의 중괄호 내부에 있어야 합니다.
+
+---
+
+## 4. Wwise-Type Event 프로퍼티 선언하기
+
+### 🧩 목표
+
+Inspector에서 Wwise Event를 선택할 수 있도록,
+
+`AK.Wwise.Event` 타입의 변수를 **public 프로퍼티**로 선언합니다.
+
+### 🧠 개념 정리
+
+C#에서 변수를 선언할 때 기본 구조는 다음과 같습니다:
+
+```
+[접근 한정자] [타입] [이름];
+```
+
+| 구성 요소   | 설명                                                      |
+| ----------- | --------------------------------------------------------- |
+| 접근 한정자 | 외부 접근 가능 여부를 결정 (`public`, `private` 등)       |
+| 타입        | 변수의 데이터 형태 (`int`, `string`, `AK.Wwise.Event` 등) |
+| 이름        | 변수명 (자유롭게 지정 가능, 예: `MyEvent`)                |
+
+### ✏️ 실제 코드
+
+```csharp
+public class PostWwiseEvent : MonoBehaviour {
+    public AK.Wwise.Event MyEvent;
+
+    void Start () {
+
+    }
+
+    void Update () {
+
+    }
+}
+```
+
+> 🧩 public으로 지정했기 때문에 Unity Inspector에서 이 프로퍼티가 보이게 됩니다.
+>
+> **AK.Wwise.Event**는 Wwise가 제공하는 특별한 클래스 타입으로,
+>
+> Inspector에서 Wwise 프로젝트의 Event를 직접 선택할 수 있게 해줍니다.
+
+### 🧠 참고
+
+- AK.Wwise.Event 외에도
+  - `AK.Wwise.RTPC` (실시간 파라미터 제어)
+  - `AK.Wwise.State`, `AK.Wwise.Switch` 등 다양한 타입이 존재합니다.
+- 즉, 사운드 시스템을 코드로 유연하게 제어하기 위한 인터페이스입니다.
+
+---
+
+## 5. Inspector에서 Wwise Event 연결하기
+
+1. Unity로 돌아가면 잠시 로딩 후,
+
+   Player 오브젝트의 `PostWwiseEvent` 컴포넌트 아래에 **MyEvent 프로퍼티**가 나타납니다.
+
+2. **MyEvent 오른쪽 버튼**을 클릭합니다.
+3. `Events > Destruction > Region_Specific > Rock_Destroy`를 선택합니다.
+
+이제 `MyEvent` 변수는 **Rock_Destroy Event**를 가리키게 되었습니다.
+
+하지만, 아직 “재생(Post)” 동작을 코드로 추가해야 합니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380523/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L4/image_1.png)
+
+---
+
+## 6. Post() 함수로 Event 재생하기
+
+### 🎬 개념 설명
+
+Wwise Event를 실제로 재생하기 위해서는 `Post()` 함수를 호출해야 합니다.
+
+형식:
+
+```csharp
+MyEvent.Post(GameObject);
+```
+
+- `MyEvent` → Inspector에서 지정한 Wwise Event
+- `GameObject` → 이 이벤트를 재생할 대상 (예: Player 자신)
+
+### 🧩 코드 구현
+
+```csharp
+using UnityEngine;
+
+public class PostWwiseEvent : MonoBehaviour {
+    public AK.Wwise.Event MyEvent;
+
+    void Start() {
+        MyEvent.Post(gameObject);
+    }
+}
+```
+
+### 🧠 작동 원리
+
+- **Start()** 함수는 씬이 실행될 때 한 번 호출됩니다.
+- 따라서 Play 버튼을 누르면 `MyEvent`에 지정된 **Rock_Destroy** Event가
+  `Player` 오브젝트의 위치에서 재생됩니다.
+
+### ✅ 테스트
+
+1. Unity에서 **Play** 버튼 클릭
+2. 씬이 실행되면 Rock_Destroy 사운드가 재생됩니다.
+
+> 💡 Post() 함수는 스크립트가 붙은 오브젝트를 기준으로 소리가 재생됩니다.
+>
+> 즉, Player가 움직이면 그 위치에서 사운드가 들리게 됩니다.
+
+---
+
+## 7. 정리 및 핵심 개념 요약
+
+| 개념               | 설명                                                      |
+| ------------------ | --------------------------------------------------------- |
+| **AK.Wwise.Event** | Wwise의 Event를 Unity에서 변수로 다룰 수 있게 하는 클래스 |
+| **public**         | Inspector에 변수를 노출시키는 접근 한정자                 |
+| **Post()**         | Wwise Event를 실제로 재생하는 함수                        |
+| **gameObject**     | 스크립트가 붙어 있는 현재 Unity 오브젝트를 가리킴         |
+| **Start()**        | 게임이 시작될 때 한 번 실행되는 함수                      |
+
+---
+
+### 🧭 전체 코드 요약
+
+```csharp
+using UnityEngine;
+
+public class PostWwiseEvent : MonoBehaviour {
+    public AK.Wwise.Event MyEvent;
+
+    void Start() {
+        // 씬 시작 시 지정된 Wwise Event를 현재 오브젝트에서 재생
+        MyEvent.Post(gameObject);
+    }
+}
+```
+
+---
+
+### 📘 추가 학습 포인트
+
+- Wwise의 `RTPC`나 `State`, `Switch` 클래스도 비슷한 방식으로 사용됩니다.
+- 한 번에 여러 사운드를 제어하거나, 플레이어의 상태에 따라 소리를 바꾸는 로직을 쉽게 구현할 수 있습니다.
+- Inspector에서 지정한 Wwise Event는 **코드 수정 없이도 변경 가능**하므로 사운드 디자이너와 협업할 때 매우 유용합니다.
+
+---
+
+✅ **정리 문장**
+
+> 이번 강의에서는 C# 스크립트에서 AK.Wwise.Event 타입의 프로퍼티를 선언하여
+>
+> Unity Inspector에서 Wwise Event를 선택하고, `Post()` 함수를 통해 사운드를 재생하는
+>
+> 가장 기본적인 **스크립트 기반 Wwise 연동** 방법을 배웠습니다.
+
+---
+
+# { 🎧 애니메이션에서 Event 게시하기 (Posting Events from Animations) }
+
+이번 강의에서는 **Unity의 Animation Event 기능**을 활용하여
+
+**캐릭터 애니메이션의 특정 시점(발이 바닥에 닿는 타이밍 등)** 에
+
+**Wwise Event(발소리 등)**를 정확하게 재생하는 방법을 학습합니다.
+
+---
+
+## 📋 목차
+
+1. [개념 이해하기](https://www.notion.so/Wwise-301-L4-28ae683f737e80ee96c5e247b5b52387#%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [PostWwiseEvent 스크립트 추가하기](https://www.notion.so/Wwise-301-L4-28ae683f737e80ee96c5e247b5b52387#postwwiseevent-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+3. [Event 프로퍼티에 Footstep 이벤트 연결하기](https://www.notion.so/Wwise-301-L4-28ae683f737e80ee96c5e247b5b52387#event-%ED%94%84%EB%A1%9C%ED%8D%BC%ED%8B%B0%EC%97%90-footstep-%EC%9D%B4%EB%B2%A4%ED%8A%B8-%EC%97%B0%EA%B2%B0%ED%95%98%EA%B8%B0)
+4. [Start 함수 수정하여 Animation Event로 전환하기](https://www.notion.so/Wwise-301-L4-28ae683f737e80ee96c5e247b5b52387#start-%ED%95%A8%EC%88%98-%EC%88%98%EC%A0%95%ED%95%98%EC%97%AC-animation-event%EB%A1%9C-%EC%A0%84%ED%99%98%ED%95%98%EA%B8%B0)
+5. [Animation Window 이해하기](https://www.notion.so/Wwise-301-L4-28ae683f737e80ee96c5e247b5b52387#animation-window-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+6. [Animation Event 추가 및 함수 연결하기](https://www.notion.so/Wwise-301-L4-28ae683f737e80ee96c5e247b5b52387#animation-event-%EC%B6%94%EA%B0%80-%EB%B0%8F-%ED%95%A8%EC%88%98-%EC%97%B0%EA%B2%B0%ED%95%98%EA%B8%B0)
+7. [좌우 발소리 모두 연결하기](https://www.notion.so/Wwise-301-L4-28ae683f737e80ee96c5e247b5b52387#%EC%A2%8C%EC%9A%B0-%EB%B0%9C%EC%86%8C%EB%A6%AC-%EB%AA%A8%EB%91%90-%EC%97%B0%EA%B2%B0%ED%95%98%EA%B8%B0)
+8. [Prefab 저장 및 적용하기](https://www.notion.so/Wwise-301-L4-28ae683f737e80ee96c5e247b5b52387#prefab-%EC%A0%80%EC%9E%A5-%EB%B0%8F-%EC%A0%81%EC%9A%A9%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. 개념 이해하기
+
+### 🎬 Animation Clip이란?
+
+- Unity에서 **애니메이션 클립(Animation Clip)** 은 오브젝트의 움직임, 회전, 크기, 위치 등 **프로퍼티의 변화 시퀀스**를 담은 파일입니다.
+- 외부 프로그램(Maya, 3ds Max 등)에서 만든 애니메이션을 Unity로 가져오거나, Unity 내에서 직접 수정할 수 있습니다.
+- 예를 들어 Player 캐릭터는 Maya에서 모델링되고, **Move(이동)** 와 **Attack(공격)** 같은 행동 애니메이션이 정의되어 있습니다.
+
+### 👣 Animation Event란?
+
+- **Animation Event**는 **애니메이션의 특정 시점에 스크립트의 함수를 호출**할 수 있게 해주는 Unity 기능입니다.
+- 예를 들어,
+  - "발이 바닥에 닿는 시점" → `PlayFootstepSound()` 함수 호출
+  - "공격 모션에서 팔을 휘두르는 시점" → `PlaySwingSound()` 함수 호출
+
+이를 통해 **시각적인 움직임과 소리를 완벽히 동기화**할 수 있습니다.
+
+---
+
+## 2. PostWwiseEvent 스크립트 추가하기
+
+1. Unity 상단 메뉴에서
+
+   **Audiokinetic > Certification > 301 > Lesson 4 > Posting Events from Animations** 로 이동합니다.
+
+2. **Hierarchy** 창에서 `Player` 게임 오브젝트를 선택합니다.
+3. **Inspector > Add Component** 버튼 클릭 → `PostWwiseEvent` 스크립트를 추가합니다.
+
+> 🔸 이 스크립트는 이전 강의 “Wwise-Type을 사용하여 Event 게시하기” 에서 직접 작성한 것입니다.
+>
+> 스크립트가 보이지 않는다면, 먼저 이전 강의를 완료해야 합니다.
+
+---
+
+## 3. Event 프로퍼티에 Footstep 이벤트 연결하기
+
+1. `PostWwiseEvent` 스크립트를 선택하면
+
+   `MyEvent`라는 **AK.Wwise.Event 프로퍼티**가 Inspector에 표시됩니다.
+
+2. `MyEvent` 프로퍼티 드로어(작은 동그란 버튼)를 클릭하고
+
+   `Player_Footstep` Event를 선택합니다.
+
+이제 스크립트에서 Wwise의 Player_Footstep Event를 사용할 수 있습니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380524/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L4/image_2.png)
+
+---
+
+## 4. Start 함수 수정하여 Animation Event로 전환하기
+
+기존 스크립트는 아래와 같습니다 👇
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class PostWwiseEvent : MonoBehaviour {
+    public AK.Wwise.Event MyEvent;
+
+    // Use this for initialization
+    void Start () {
+        MyEvent.Post(gameObject);
+    }
+}
+```
+
+### ❗ 문제점
+
+- `Start()` 함수는 Unity가 **씬이 로드될 때 자동으로 실행**합니다.
+- 즉, 게임이 시작되면 발소리가 **계속 자동으로 재생**됩니다.
+
+### ✅ 해결 방법
+
+Animation Event에서 직접 호출할 수 있도록
+
+함수 이름을 바꾸고, 접근 한정자를 `public`으로 설정해야 합니다.
+
+---
+
+### ✏️ 수정된 코드
+
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class PostWwiseEvent : MonoBehaviour {
+    public AK.Wwise.Event MyEvent;
+
+    // Animation Event로 호출할 함수
+    public void PlayFootstepSound() {
+        MyEvent.Post(gameObject);
+    }
+}
+
+```
+
+- 함수 이름을 `Start()` → `PlayFootstepSound()` 로 변경
+- `public` 접근 한정자 추가 → Animation Event에서 접근 가능
+- 이제 이 함수는 Unity가 자동으로 호출하지 않으며,
+  Animation Event에서만 호출됩니다.
+
+💾 저장 (Ctrl+S 또는 Cmd+S) 후 Unity로 돌아갑니다.
+
+---
+
+## 5. Animation Window 이해하기
+
+1. **Player** 게임 오브젝트를 선택합니다.
+2. 상단 메뉴에서 **Window > Animation > Animation** 을 엽니다.
+3. 새로 열린 Animation 창을 Unity 레이아웃에 배치합니다.
+
+   (예: Project 뷰 오른쪽 아래로 드래그)
+
+### Animation Window 구성
+
+| 구역                              | 설명                                                           |
+| --------------------------------- | -------------------------------------------------------------- |
+| **왼쪽 영역**                     | 애니메이션에 포함된 프로퍼티 목록 (예: Transform, Rotation 등) |
+| **오른쪽 영역**                   | 각 프로퍼티의 키프레임(시점별 값 변화)                         |
+| **하단 Event 줄**                 | Animation Event를 추가할 수 있는 구간                          |
+| **Timeline Cursor (흰색 세로선)** | 현재 시점 표시 및 미리보기 가능                                |
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380524/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L4/image_3.png)
+
+---
+
+## 6. Animation Event 추가 및 함수 연결하기
+
+### (1) Player_Sprint 애니메이션 선택
+
+- Animation 창 왼쪽 상단의 드롭다운 메뉴에서 `Player_Sprint` 선택
+- 타임라인에서 커서를 드래그하여 애니메이션을 미리봅니다.
+  → 왼발, 오른발이 번갈아 닿는 시점을 확인할 수 있습니다.
+
+### (2) 오른발이 닿는 시점(약 0:05초)에 Animation Event 추가
+
+1. Timeline Cursor를 오른발이 바닥에 닿는 프레임에 위치시킵니다.
+2. Event 줄을 **우클릭 → Add Animation Event** 클릭.
+
+   → 하단 Event 라인에 흰색 마커가 생깁니다.
+
+3. Inspector 창에서 **Function** 속성을 클릭 →
+
+   `PostWwiseEvent > Methods > PlayFootstepSound()` 선택.
+
+이제 애니메이션이 해당 프레임에 도달하면
+
+`PlayFootstepSound()` 함수가 호출되어 발소리가 재생됩니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380524/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L4/image_4.png)
+
+---
+
+## 7. 좌우 발소리 모두 연결하기
+
+1. Animation Timeline Cursor를 **왼발이 닿는 시점(약 0:15초)** 으로 이동합니다.
+2. Event 줄을 우클릭 → **Add Animation Event** 추가.
+3. Inspector에서 다시 `PlayFootstepSound()` 함수를 선택합니다.
+
+이제 오른발(0:05)과 왼발(0:15) 모두 정확한 시점에 소리가 재생됩니다.
+
+> 💡 팁:
+>
+> Event 마커를 잘못 위치시켰다면 마커를 드래그하여 시간 위치를 조정할 수 있습니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380524/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L4/image_5.png)
+
+```csharp
+Add event 로 추가
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380524/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L4/image_6.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380525/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L4/image_7.png)
+
+---
+
+## 8. Prefab 저장 및 적용하기
+
+모든 설정이 완료되면 변경 사항을 Player Prefab에 반영해야 합니다.
+
+1. Play 모드를 종료합니다. (`ESC` → 메뉴 → Play 해제)
+2. **Hierarchy에서 Player 선택 → Inspector 하단의 Overrides > Apply All** 클릭.
+
+이제 프로젝트 내 모든 Player 프리팹에 동일한 발소리 설정이 적용됩니다.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380525/notion-blog/_/WWISE/Wwise_Unity_/Wwise_301_L4/image_8.png)
+
+---
+
+## ✅ 정리
+
+| 개념                        | 설명                                               |
+| --------------------------- | -------------------------------------------------- |
+| **Animation Event**         | 애니메이션의 특정 시점에서 스크립트 함수 호출 가능 |
+| **PostWwiseEvent 스크립트** | Wwise Event를 Unity에서 실행하기 위한 중간 매개체  |
+| **함수 공개(public)**       | Animation Event가 함수를 인식할 수 있도록 설정     |
+| **함수명 변경 이유**        | Start()는 Unity가 자동 호출하므로 이름 변경 필요   |
+| **Footstep 이벤트 연결**    | Player_Footstep Wwise Event를 MyEvent에 할당       |
+| **Prefab 저장**             | 모든 Player 오브젝트에 동일한 사운드 동작 적용     |
+
+---
+
+## 🎮 결과
+
+- Player가 **달리기 애니메이션**을 실행할 때,
+  오른발이 닿을 때 한 번, 왼발이 닿을 때 한 번
+  → **정확한 타이밍에 발소리 재생!**
+- Animation Event를 이용하면
+  **시각적 타이밍과 오디오 피드백을 완벽하게 동기화**할 수 있습니다.
+
+---
+
+> 🔊 추가 학습 팁:
+>
+> - 이 방식을 활용하면 공격 모션, 점프 착지, 무기 스윙 등에도 사운드를 연결할 수 있습니다.
+> - Animation Event는 **Animator 컴포넌트와 동일한 오브젝트의 함수만 호출**할 수 있다는 점을 꼭 기억하세요.
+> - 만약 다른 오브젝트에 있는 스크립트를 호출하고 싶다면, **중계용 스크립트(delegate script)** 를 추가로 작성해야 합니다.
+
+---
+
+**이 부분은 필요 시 강의를 다시 볼 것**
+
+# { 🎤 오디오 입력 게시하기 (Posting Audio Input) }
+
+---
+
+## 📋 목차
+
+1. [개요 및 핵심 개념](https://www.notion.so/Wwise-301-L4-28ae683f737e80ee96c5e247b5b52387#%EA%B0%9C%EC%9A%94-%EB%B0%8F-%ED%95%B5%EC%8B%AC-%EA%B0%9C%EB%85%90)
+2. [마이크 입력을 사용하는 이유](https://www.notion.so/Wwise-301-L4-28ae683f737e80ee96c5e247b5b52387#%EB%A7%88%EC%9D%B4%ED%81%AC-%EC%9E%85%EB%A0%A5%EC%9D%84-%EC%82%AC%EC%9A%A9%ED%95%98%EB%8A%94-%EC%9D%B4%EC%9C%A0)
+3. [Unity에서 AkMicrophone 스크립트 추가하기](https://www.notion.so/Wwise-301-L4-28ae683f737e80ee96c5e247b5b52387#unity%EC%97%90%EC%84%9C-akmicrophone-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+4. [Wwise에서 Audio Input 음원 만들기](https://www.notion.so/Wwise-301-L4-28ae683f737e80ee96c5e247b5b52387#wwise%EC%97%90%EC%84%9C-audio-input-%EC%9D%8C%EC%9B%90-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+5. [Microphone Audio Bus 생성 및 볼륨 조정](https://www.notion.so/Wwise-301-L4-28ae683f737e80ee96c5e247b5b52387#microphone-audio-bus-%EC%83%9D%EC%84%B1-%EB%B0%8F-%EB%B3%BC%EB%A5%A8-%EC%A1%B0%EC%A0%95)
+6. [Wwise Meter로 마이크 신호 측정하기](https://www.notion.so/Wwise-301-L4-28ae683f737e80ee96c5e247b5b52387#wwise-meter%EB%A1%9C-%EB%A7%88%EC%9D%B4%ED%81%AC-%EC%8B%A0%ED%98%B8-%EC%B8%A1%EC%A0%95%ED%95%98%EA%B8%B0)
+7. [RTPC를 Wwise Meter에 연결하기](https://www.notion.so/Wwise-301-L4-28ae683f737e80ee96c5e247b5b52387#rtpc%EB%A5%BC-wwise-meter%EC%97%90-%EC%97%B0%EA%B2%B0%ED%95%98%EA%B8%B0)
+8. [Unity의 AkMicrophone 스크립트와 RTPC 연결](https://www.notion.so/Wwise-301-L4-28ae683f737e80ee96c5e247b5b52387#unity%EC%9D%98-akmicrophone-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8%EC%99%80-rtpc-%EC%97%B0%EA%B2%B0)
+9. [Wwise에서 Enable_Microphone Event 생성하기](https://www.notion.so/Wwise-301-L4-28ae683f737e80ee96c5e247b5b52387#wwise%EC%97%90%EC%84%9C-enable_microphone-event-%EC%83%9D%EC%84%B1%ED%95%98%EA%B8%B0)
+10. [Unity에서 OnMicrophoneAction() 설정하기](https://www.notion.so/Wwise-301-L4-28ae683f737e80ee96c5e247b5b52387#unity%EC%97%90%EC%84%9C-onmicrophoneaction-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+11. [Unity Audio 설정 활성화하기](https://www.notion.so/Wwise-301-L4-28ae683f737e80ee96c5e247b5b52387#unity-audio-%EC%84%A4%EC%A0%95-%ED%99%9C%EC%84%B1%ED%99%94%ED%95%98%EA%B8%B0)
+12. [테스트 및 동작 확인](https://www.notion.so/Wwise-301-L4-28ae683f737e80ee96c5e247b5b52387#%ED%85%8C%EC%8A%A4%ED%8A%B8-%EB%B0%8F-%EB%8F%99%EC%9E%91-%ED%99%95%EC%9D%B8)
+13. [문제 해결 및 팁](https://www.notion.so/Wwise-301-L4-28ae683f737e80ee96c5e247b5b52387#%EB%AC%B8%EC%A0%9C-%ED%95%B4%EA%B2%B0-%EB%B0%8F-%ED%8C%81)
+14. [핵심 요약](https://www.notion.so/Wwise-301-L4-28ae683f737e80ee96c5e247b5b52387#%ED%95%B5%EC%8B%AC-%EC%9A%94%EC%95%BD)
+
+---
+
+## 1. 개요 및 핵심 개념
+
+- 이 섹션은 **보너스 강의**로, **Wwise 301 자격증 시험 범위에는 포함되지 않음.**
+- 하지만 매우 흥미로운 고급 주제:
+  → **“오디오 입력(마이크)”을 이용해 게임 속 이벤트를 트리거(발생)** 시키는 방법을 다룸.
+
+### 🔑 핵심 개념 요약
+
+| 구분                 | 설명                                                                           |
+| -------------------- | ------------------------------------------------------------------------------ |
+| **기존 방식**        | Player의 행동(Ex. 발이 바닥에 닿을 때) → `Player_Footsteps` Event 게시         |
+| **이번 방식**        | 마이크 입력 신호 → 특정 dB 이상일 때 → Player가 무기를 휘두름 등 이벤트 트리거 |
+| **Audio Input 역할** | “음원(Source)” 대신 “마이크 입력”을 사용                                       |
+| **핵심 목표**        | 마이크 신호가 -48dB를 초과할 때 **Player가 공격**하도록 구현                   |
+
+---
+
+## 2. 마이크 입력을 사용하는 이유
+
+- **Wwise Audio Input**을 통해 마이크 신호를 Wwise 오브젝트에 전달할 수 있음.
+- **Wwise Meter Effect 플러그인**으로 마이크 입력 신호의 **레벨(dB)** 을 측정 가능.
+- 즉, 오디오의 “볼륨” 정보를 실시간으로 받아서 **게임의 메커니즘(공격, 점프 등)** 을 조종할 수 있음.
+
+---
+
+## 3. Unity에서 AkMicrophone 스크립트 추가하기
+
+1. Unity 메뉴: `Audiokinetic > Certification > 301 > Lesson 4 > Posting Audio Input` 으로 이동.
+2. **Hierarchy에서 Player 오브젝트 선택.**
+3. **Inspector → Add Component → "AkMicrophone" 검색 → 추가.**
+
+> 💡 AkMicrophone 스크립트는 Audiokinetic이 미리 제공한 것으로,
+>
+> 마이크 신호를 읽고 RTPC와 이벤트를 자동으로 연결할 수 있게 설계됨.
+
+---
+
+## 4. Wwise에서 Audio Input 음원 만들기
+
+1. `Project Explorer > Audio > Actor-Mixer Hierarchy` 로 이동.
+2. `Default Work Unit` 우클릭 → `New Child > Sound SFX` 선택.
+3. 이름: **Microphone**
+
+🎧 아직 음원이 연결되지 않았기 때문에 **빨간색**으로 표시됨.
+
+이제 Wwise Audio Input을 추가해야 함.
+
+1. **Contents 탭 → Add Source >> → Audio Input** 선택.
+   - 이렇게 하면 **시스템의 마이크 입력**이 Wwise의 음원이 됨.
+   - 마이크 볼륨이 작으면 여기서 **Input Gain**을 조절 가능.
+2. **Transport Control**에서 ▶ 버튼을 눌러 입력 테스트 가능.
+   - 소리가 들리면 정상 작동.
+   - 단, 이 프로젝트에서는 “재생”이 아닌 “입력 감지”만 필요하므로 **출력을 뮤트**할 예정.
+
+---
+
+## 5. Microphone Audio Bus 생성 및 볼륨 조정
+
+### 🎛 출력 경로 설정 과정
+
+1. `Project Explorer > Master-Mixer Hierarchy > Master Audio Bus > Non-World Audio Bus`
+
+   → 우클릭 → `New Child > Audio Bus`
+
+2. 이름: **Microphone**
+3. `Audio Bus`의 **General 탭 → Bus Volume = -96 dB** 로 설정
+
+   → 완전히 음소거 상태로 만들어 **소리는 들리지 않지만** 입력은 처리되도록 함.
+
+4. 이제 **Microphone Sound SFX의 Output Bus**를 방금 만든 **Microphone Audio Bus**로 지정:
+   - `Sound Property Editor → General Settings 탭`
+   - Output Bus 탐색 버튼 (…) 클릭 → `Microphone Audio Bus` 선택.
+
+> 🔇 이렇게 하면 마이크 입력은 계속 들어오지만,
+>
+> 실제 오디오 출력은 완전히 꺼진 상태로 측정만 가능하게 됨.
+
+---
+
+## 6. Wwise Meter로 마이크 신호 측정하기
+
+- **Wwise Meter Effect**는 마이크 입력의 볼륨(dB)을 측정하는 플러그인.
+- 마이크 신호가 **얼마나 큰지(피크 값)** 실시간으로 감지해
+  이를 **RTPC (Real-Time Parameter Control)** 로 전달함.
+
+### 📌 설정 방법
+
+1. `Effects 탭` → `+` 클릭
+2. `Meter > Meters` 경로에서 `MicrophoneMeter` Effect ShareSet 선택
+3. `Edit` 클릭 → `Wwise Meter Effect Editor` 열기
+
+---
+
+## 7. RTPC를 Wwise Meter에 연결하기
+
+- **RTPC (Game Parameter)** 는 게임과 오디오 사이의 “데이터 교환 통로”.
+
+🎯 목표:
+
+Wwise Meter에서 측정한 볼륨 값을
+
+`MicrophoneLevel` RTPC로 전달.
+
+- Wwise Meter의 `Output Game Parameter` 를
+  `MicrophoneLevel RTPC`로 연결.
+
+> 📘 기본 Output Min 값은 -48 dB,
+>
+> 즉, 마이크 입력이 -48dB보다 크면 이벤트가 발생하게 됨.
+
+---
+
+## 8. Unity의 AkMicrophone 스크립트와 RTPC 연결
+
+1. Unity로 돌아가 `AkMicrophone` 컴포넌트를 선택.
+2. `Microphone Level RTPC Property Drawer` 항목을 찾기.
+   - 이 프로퍼티는 마이크 입력 레벨과 연결됨.
+   - `MicrophoneLevel` RTPC를 선택해야 함.
+3. 선택 버튼 → `Generic > MicrophoneLevel` 선택.
+
+> ⚠️ 만약 Enable_Microphone Event가 보이지 않는다면
+>
+> Unity의 Wwise Settings에서 **Wwise Project Path**를 올바르게 변경해야 함.
+
+---
+
+## 9. Wwise에서 Enable_Microphone Event 생성하기
+
+1. `Project Explorer > Audio > Actor-Mixer Hierarchy`
+
+   → `Microphone Sound SFX` 우클릭 → `New Event > Play`
+
+2. 이름: **Enable_Microphone**
+3. `Event Editor`에서 이름을 확인하고,
+
+   **General SoundBank**에 자동으로 추가됨.
+
+4. `Project > Save`
+
+   → SoundBank Layout으로 전환 → `Generate All` 클릭
+
+5. Unity로 돌아가
+
+   `AkMicrophone` 컴포넌트의 `Microphone Event Property`에서
+
+   `Events > Default Work Unit > Enable_Microphone` 선택.
+
+---
+
+## 10. Unity에서 OnMicrophoneAction() 설정하기
+
+1. `AkMicrophone` 컴포넌트에서 ➕ 버튼 클릭.
+2. `PlayerAttack` 컴포넌트를 **Object 필드**에 드래그.
+3. 함수 선택 메뉴에서 `PlayerAttack > Swing()` 선택.
+
+> 🎮 이렇게 설정하면
+>
+> 마이크 신호가 -48dB를 초과할 때
+>
+> `PlayerAttack` 스크립트의 `Swing()` 함수가 호출되어
+>
+> 플레이어가 **공격 모션**을 실행함.
+
+---
+
+## 11. Unity Audio 설정 활성화하기
+
+> ⚠️ Unity에서 기본적으로 Wwise를 사용할 때는 Unity 오디오가 비활성화되어 있음.
+>
+> 하지만 마이크 입력을 사용하려면 Unity 오디오 시스템이 켜져 있어야 함.
+
+1. 메뉴: `Edit > Project Settings > Audio`
+2. **Disable Unity Audio** 체크 해제.
+
+이제 Unity의 마이크 입력 기능을 사용할 수 있음.
+
+---
+
+## 12. 테스트 및 동작 확인
+
+1. Play 모드 실행
+2. 상자 근처로 이동
+3. **박수를 치거나 소리를 내보세요!**
+
+   → 마이크 입력이 -48dB를 초과하면 Player가 무기를 휘두름
+
+---
+
+## 13. 문제 해결 및 팁
+
+- 오디오 입력이 끊기거나 반응이 느릴 경우:
+  - `AkMicrophone` 컴포넌트의
+    - `Sample Rate`
+    - `Initial Read Delay in Samples`
+      값을 조절해보세요.
+- 스피커 대신 **헤드폰 사용 권장**
+  → 스피커 출력이 다시 마이크에 입력되면 **루프(피드백)** 발생 가능.
+
+---
+
+## 14. 핵심 요약
+
+| 항목              | 설명                                                 |
+| ----------------- | ---------------------------------------------------- |
+| **주요 목적**     | 마이크 입력 신호를 Wwise로 전달해 게임 이벤트 트리거 |
+| **핵심 스크립트** | AkMicrophone.cs                                      |
+| **입력 음원**     | Wwise Audio Input                                    |
+| **측정 도구**     | Wwise Meter Effect                                   |
+| **임계값**        | -48 dB 초과 시 OnMicrophoneAction() 호출             |
+| **사용 예시**     | 마이크로 “소리 내면” → Player가 공격                 |
+| **주의점**        | Unity 오디오 시스템을 임시로 활성화해야 함           |
+
+---
+
+## ✅ 정리 마무리
+
+이번 강의에서는 단순히 “사운드 재생”을 넘어서,
+
+**“소리를 입력으로 받아 게임을 제어”** 하는
+
+양방향 오디오 통합 방식을 다뤘습니다.
+
+즉,
+
+- 마이크 입력 → RTPC → Unity 이벤트 → 게임 메커니즘 실행
+  이라는 **오디오 기반 상호작용 구조**를 직접 구현한 것입니다.
+
+이 방법을 응용하면:
+
+- 소리로 문 열기
+- 박수로 조명 켜기
+- 음성 세기로 캐릭터 파워 조정하기
+  등 다양한 “사운드 기반 인터랙션” 시스템을 만들 수 있습니다. 🎮🎙️

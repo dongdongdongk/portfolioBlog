@@ -1,0 +1,1326 @@
+---
+title: '섹션 6 : 샤프 슈터 2'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+# { 🔫 무기 반동 애니메이션 만들기 }
+
+이번 강의는 **권총에 반동 애니메이션을 직접 제작하고, 코드에서 제어하는 방법**을 배우는 시간입니다.
+
+즉, 단순히 애니메이션을 넣는 것이 아니라, **Animator와 Animation Clip을 활용**해 **커스텀 반동 효과**를 만드는 것이 목표입니다.
+
+---
+
+## 📋 목차
+
+1. [Animator와 Animation 창 불러오기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#animator%EC%99%80-animation-%EC%B0%BD-%EB%B6%88%EB%9F%AC%EC%98%A4%EA%B8%B0)
+2. [폴더 및 애니메이터 컨트롤러 준비하기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%ED%8F%B4%EB%8D%94-%EB%B0%8F-%EC%95%A0%EB%8B%88%EB%A9%94%EC%9D%B4%ED%84%B0-%EC%BB%A8%ED%8A%B8%EB%A1%A4%EB%9F%AC-%EC%A4%80%EB%B9%84%ED%95%98%EA%B8%B0)
+3. [활성 무기(Active Weapon) 구조 세팅하기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%ED%99%9C%EC%84%B1-%EB%AC%B4%EA%B8%B0active-weapon-%EA%B5%AC%EC%A1%B0-%EC%84%B8%ED%8C%85%ED%95%98%EA%B8%B0)
+4. [애니메이션 클립 제작하기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%EC%95%A0%EB%8B%88%EB%A9%94%EC%9D%B4%EC%85%98-%ED%81%B4%EB%A6%BD-%EC%A0%9C%EC%9E%91%ED%95%98%EA%B8%B0)
+5. [키프레임으로 반동 애니메이션 만들기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%ED%82%A4%ED%94%84%EB%A0%88%EC%9E%84%EC%9C%BC%EB%A1%9C-%EB%B0%98%EB%8F%99-%EC%95%A0%EB%8B%88%EB%A9%94%EC%9D%B4%EC%85%98-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+6. [Animator.Play()로 코드에서 제어하기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#animatorplay%EB%A1%9C-%EC%BD%94%EB%93%9C%EC%97%90%EC%84%9C-%EC%A0%9C%EC%96%B4%ED%95%98%EA%B8%B0)
+7. [최종 코드와 실행 결과](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%EC%B5%9C%EC%A2%85-%EC%BD%94%EB%93%9C%EC%99%80-%EC%8B%A4%ED%96%89-%EA%B2%B0%EA%B3%BC)
+
+---
+
+## 1. Animator와 Animation 창 불러오기
+
+- **Window → Animation → Animator / Animation**
+- **Animator** : 애니메이션 상태(State)들을 관리하고 전환(Transition)을 설정하는 창.
+- **Animation** : 실제 클립(Animation Clip)을 편집하고 키프레임을 배치하는 창.
+- 강사처럼 **Console 아래에 도킹**하거나, 원하는 위치에 자유롭게 배치 가능.
+- 두 창을 나란히 띄워야 작업이 편리함.
+
+---
+
+## 2. 폴더 및 애니메이터 컨트롤러 준비하기
+
+- **Assets/Animations/Weapon 폴더 생성**
+  - 정리: `Animations` → 그 안에 `Weapon` 폴더.
+- **Animator Controller 생성**
+  - 우클릭 → Create → Animator Controller
+  - 이름: `Weapon`
+- 이 컨트롤러는 무기 반동, 대기 같은 상태 전환을 제어하는 역할.
+
+---
+
+## 3. 활성 무기(Active Weapon) 구조 세팅하기
+
+- **권총(Pistol)을 감싸는 빈 오브젝트 생성**
+  - 단축키: `Ctrl+Shift+G` → 선택한 오브젝트의 부모를 새로 생성.
+  - 이름: `Active Weapon`
+- **Animator 컴포넌트 부착**
+  - `Active Weapon`에 Animator 추가.
+  - Controller 슬롯에 `Weapon` Animator Controller 드래그.
+- 이렇게 하면 `Active Weapon` 전체를 애니메이션 할 수 있으며, 자식 오브젝트(권총 본체)도 함께 움직임.
+
+---
+
+## 4. 애니메이션 클립 제작하기
+
+- `Weapon` 폴더에서 **Animation Clip 생성** (Animator Controller가 아님)
+  - 우클릭 → Create → Animation Clip
+  - 2개 생성:
+    1. **Idle (대기)**
+    2. **Shoot (사격)**
+- Animator 창에서 Idle을 먼저 넣으면 기본 상태(Default State)로 설정됨 (주황색 화살표 표시).
+- Shoot도 추가해 두지만, Transition은 사용하지 않고 코드로 직접 제어할 예정.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380450/notion-blog/_/3D_/3D_/_6_2/image.png)
+
+```jsx
+애니메이터와 애니메이션 클립 제작
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380445/notion-blog/_/3D_/3D_/_6_2/image_1.png)
+
+```jsx
+Idle 과 Shoot 을 애니메이터 창으로 드래그 이후 연
+```
+
+---
+
+## 5. 키프레임으로 반동 애니메이션 만들기
+
+### (1) 기본 세팅
+
+- `Active Weapon` 선택 후 Animation 창 열기.
+- `Shoot` 클립 선택.
+- **녹화 버튼 활성화(Record)**.
+
+### (2) 키프레임 배치
+
+1. **0초 지점** : 위치(Position), 회전(Rotation)을 초기 상태로 키프레임 추가.
+2. **1초 지점(60프레임)** : Ctrl+C → Ctrl+V → 같은 키프레임 붙여넣기.
+   - 시작과 끝이 같아야 애니메이션이 자연스럽게 루프 종료됨.
+3. **0.3초(약 20프레임)** : 권총을 약간 뒤로 이동 + 뒤로 회전시켜 반동 효과 추가.
+
+### (3) 속도 조절
+
+- 녹화 종료 후 모든 키프레임 선택 (Ctrl+A).
+- **타임라인 압축** → 전체 길이를 약 **20프레임(0.3초)** 정도로 줄임.
+- 결과: **빠르고 짧은 반동**이 완성됨.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380447/notion-blog/_/3D_/3D_/_6_2/image_2.png)
+
+```jsx
+weapon 애니메이터를 클릭하고 애니메이션에서 shoot 클릭
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380448/notion-blog/_/3D_/3D_/_6_2/image_3.png)
+
+```jsx
+이런식으로 1초의 처음과 끝에 같은 위치 ( 처음 시작위치 ) 를 두고 그 사이에 뒤로 밀리는
+
+위로 올라가는 효과를 넣어주고 후에 전체 1초 간격을 줄여주면서 조절
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380449/notion-blog/_/3D_/3D_/_6_2/image_4.png)
+
+---
+
+## 6. Animator.Play()로 코드에서 제어하기
+
+Animator 상태 전환을 **Transition(전이)**으로 연결하지 않고, **코드에서 직접 `Play()` 메서드 호출**을 통해 원하는 시점에 애니메이션을 실행합니다.
+
+이 방식은 "조건 기반의 애니메이션 전환"이 아니라, **명령 기반의 직접 실행**이라는 점에서 차별성이 있습니다.
+
+```csharp
+animator.Play(SHOOT_STRING, 0, 0f);
+```
+
+---
+
+### 📌 인자 설명
+
+1. **첫 번째 인자 (애니메이션 이름, string)**
+   - 실행할 애니메이션 클립의 이름을 문자열로 전달합니다.
+   - 여기서는 `"Shoot"` 클립을 사용.
+   - 강의에서는 문자열을 직접 쓰는 대신,
+     ```csharp
+     const string SHOOT_STRING = "Shoot";
+     ```
+     처럼 **상수(Constant)**를 만들어 사용 → 오타 방지 & 유지보수 용이.
+2. **두 번째 인자 (레이어, int)**
+   - Animator는 여러 **레이어(Layer)**를 가질 수 있습니다.
+   - 각 레이어는 독립적으로 애니메이션을 실행할 수 있어,
+     예: **상체는 사격 동작, 하체는 걷기 동작**을 동시에 실행 가능.
+   - 이번 예제에서는 레이어를 사용하지 않았으므로 `0` (기본 레이어)로 지정.
+3. **세 번째 인자 (normalizedTime, float)**
+   - 애니메이션 실행을 **정규화된 시간(0.0 ~ 1.0)** 으로 제어합니다.
+   - `0f` → 항상 **맨 처음 프레임**부터 시작.
+   - `0.5f` → 애니메이션을 **절반 지점**에서 시작.
+   - `1f` → 애니메이션의 끝부분에서 시작.
+   - 강의에서는 `0f`를 전달하여, **사격할 때마다 반동 애니메이션이 처음부터 재생**되도록 설정.
+
+---
+
+### 🚀 이 방식의 장점
+
+1. **단순화된 제어**
+   - Transition(조건식, Trigger, Bool, Blend Tree 등)을 설정할 필요가 없음.
+   - 코드 한 줄로 즉시 애니메이션 실행 가능.
+2. **반복 실행 가능**
+   - Transition 방식은 "전이 조건" 때문에 동일한 애니메이션을 반복 실행하기 어렵습니다.
+     (예: Shoot → Idle → Shoot 구조를 거쳐야 함)
+   - `Play()` 방식은 **연속 입력(빠른 연사)** 상황에서도 항상 0초부터 재시작됨 → 반동 애니메이션에 최적.
+3. **디버깅/테스트 용이**
+   - 코드에서 직접 실행하므로, Animator 창을 복잡하게 설정하지 않아도 동작 확인 가능.
+   - 애니메이션 이름만 바꾸면 바로 다른 애니메이션 실행 가능.
+
+---
+
+### ⚠️ 주의할 점
+
+- **문자열 의존성**:
+  잘못된 문자열 입력 시(오타) 애니메이션 실행 실패. → 따라서 `const string`으로 관리하는 것이 안전.
+- **Transition 이벤트 미사용**:
+  `OnStateEnter`, `OnStateExit` 같은 Animator의 이벤트 훅은 Transition 방식에서 유용한데,
+  `Play()` 방식은 이들을 건너뛰므로 필요하다면 별도의 코드 로직으로 처리해야 함.
+
+---
+
+👉 정리하면,
+
+`Animator.Play(SHOOT_STRING, 0, 0f);` 은
+
+**"Shoot 애니메이션을 0번 레이어에서 항상 처음부터 재생하라"**는 명령이고,
+
+**Transition 대신 코드 제어**를 통해 반동 같은 **짧고 반복적인 애니메이션**을 깔끔하게 실행할 수 있습니다.
+
+---
+
+## 7. 최종 코드와 실행 결과
+
+### 🔑 핵심 코드
+
+```csharp
+[SerializeField] Animator animator;
+[SerializeField] ParticleSystem muzzleFlash;
+const string SHOOT_STRING = "Shoot";
+
+void HandleShoot()
+{
+    if (!starterAssetsInputs.shoot) return;
+
+    muzzleFlash.Play();                         // 총구 화염 효과
+    animator.Play(SHOOT_STRING, 0, 0f);         // 반동 애니메이션 실행
+
+    if (Physics.Raycast(Camera.main.transform.position, Camera.main.transform.forward, out RaycastHit hit, Mathf.Infinity))
+    {
+        EnemyHealth enemyHealth = hit.collider.GetComponent<EnemyHealth>();
+        enemyHealth?.TakeDamage(damageAmount);  // 피격 대상 체력 감소
+    }
+
+    starterAssetsInputs.ShootInput(false);      // 입력 상태 초기화
+}
+```
+
+### 🎯 실행 결과
+
+1. **총 발사 시**
+   - `muzzleFlash` 파티클(총구 화염)이 재생됨.
+   - `Shoot` 애니메이션이 즉시 실행됨 (반동 동작).
+2. **Animator 창 확인**
+   - 매 발사 시 Shoot 클립이 **처음부터 다시 실행**되는 것을 확인할 수 있음.
+3. **속사 가능**
+   - 빠르게 연속 발사해도 애니메이션이 정상적으로 반복됨.
+
+---
+
+## ✅ 정리
+
+- **Animator** : 상태 전환 관리
+- **Animation Clip** : 실제 키프레임 정의
+- **Idle & Shoot 클립 생성** : 대기 / 반동 상태 분리
+- **반동 애니메이션** : 위치·회전 키프레임으로 구현, 짧고 빠르게 반복
+- **코드 제어** : `animator.Play("Shoot", 0, 0f)` 로 매 발사마다 초기화 후 실행
+
+---
+
+# { 🚀 로켓 추진기와 파티클 시스템 제어하기 }
+
+이번 강의는 **무기 발사 시 레이캐스트(Raycast) 충돌 지점에 파티클 효과를 인스턴스화하는 방법**을 다룹니다.
+
+즉, 총알이 날아가는 대신 보이지 않는 레이(광선)를 쏘고, 그 레이가 벽이나 적과 **충돌하는 위치(hit.point)** 에 **파티클 시스템을 생성**하여 시각적인 타격 효과를 표현합니다.
+
+---
+
+## 📋 목차
+
+1. [파티클 시스템 개념 이해하기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%ED%8C%8C%ED%8B%B0%ED%81%B4-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Hit VFX 파티클 프리팹 만들기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#hit-vfx-%ED%8C%8C%ED%8B%B0%ED%81%B4-%ED%94%84%EB%A6%AC%ED%8C%B9-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+3. [파티클 시스템 세부 옵션 조정하기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%ED%8C%8C%ED%8B%B0%ED%81%B4-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EC%84%B8%EB%B6%80-%EC%98%B5%EC%85%98-%EC%A1%B0%EC%A0%95%ED%95%98%EA%B8%B0)
+4. [머티리얼(Material) 수정 및 색상 효과 추가하기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%EB%A8%B8%ED%8B%B0%EB%A6%AC%EC%96%BCmaterial-%EC%88%98%EC%A0%95-%EB%B0%8F-%EC%83%89%EC%83%81-%ED%9A%A8%EA%B3%BC-%EC%B6%94%EA%B0%80%ED%95%98%EA%B8%B0)
+5. [무기 클래스에 VFX 인스턴스화하기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%EB%AC%B4%EA%B8%B0-%ED%81%B4%EB%9E%98%EC%8A%A4%EC%97%90-vfx-%EC%9D%B8%EC%8A%A4%ED%84%B4%EC%8A%A4%ED%99%94%ED%95%98%EA%B8%B0)
+6. [파티클 시스템 파괴(Stop Action) 설정하기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%ED%8C%8C%ED%8B%B0%ED%81%B4-%EC%8B%9C%EC%8A%A4%ED%85%9C-%ED%8C%8C%EA%B4%B4stop-action-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+
+---
+
+## 1. 파티클 시스템 개념 이해하기
+
+- **파티클 시스템(Particle System)** : 불꽃, 연기, 먼지, 빛, 폭발 등 작은 입자가 모여서 보이는 효과를 구현하는 시스템.
+- 구성 요소:
+  - **Emitter (방출기)** : 입자가 시작되는 지점.
+  - **Particles (입자)** : 실제로 화면에 보이는 작은 조각.
+  - **Renderer (렌더러)** : 입자의 재질과 시각적 표현을 담당.
+
+이번 강의에서는 **무기 레이캐스트와 충돌하는 위치**에 **Hit VFX 파티클**을 생성하여 총알이 맞은 효과를 구현합니다.
+
+---
+
+## 2. Hit VFX 파티클 프리팹 만들기
+
+1. **에셋 탐색기 이동**:
+
+   `[Imported Assets] - [3rd Party Assets] - [SimpleFX]`
+
+   → 제공된 이펙트 프리팹 중 **FX_Fireworks_Green_Small** 선택.
+
+2. **장면에 배치하여 확인**
+   - 프리팹을 Scene에 드래그 → 시각적으로 어떻게 보이는지 테스트.
+3. **계층 구조(Hierarchy)에서 풀기 (Unpack)**
+   - 원본 프리팹을 덮어쓰지 않기 위함.
+   - 이름을 `Hit VFX` 로 변경.
+4. **새로운 프리팹으로 저장**
+   - `Hit VFX`를 프로젝트의 `[Prefabs]` 폴더에 다시 저장하여 재사용 가능하도록 함.
+
+---
+
+## 3. 파티클 시스템 세부 옵션 조정하기
+
+Hit VFX를 작은 충돌 효과로 만들기 위해 여러 세부 옵션을 수정합니다.
+
+- **스케일 조정 (Scaling Mode → Hierarchy)**
+  - `Transform Scale` 값 변경:
+    - `x, y, z = 0.1` → 너무 작음.
+    - `x, y, z = 0.2` → 적절한 크기.
+- **Start Delay (시작 지연)**
+  - 기본값: `0.1`
+  - 수정: `0`
+  - 이유: 총구 섬광처럼 즉각적인 반응이 필요하기 때문에 지연 제거.
+- **Start Lifetime (수명)**
+  - 기본값: `0.1`
+  - 수정: `0.3`
+  - 이유: 너무 짧지 않게 하여 자연스럽게 보이도록 함.
+- **Start Speed (속도)**
+  - 값: `10` 정도가 적당.
+  - 이유: 충돌 효과가 약간 튀어오르는 느낌을 주기 위해.
+- **Emission (방출량)**
+  - 기본값: `150`
+  - 수정: `50`
+  - 이유: 화면에 과도하게 많은 파티클이 뿌려지지 않도록.
+
+---
+
+## 4. 머티리얼(Material) 수정 및 색상 효과 추가하기
+
+- 기본 머티리얼은 다른 FX에도 공유되므로 **복제하여 사용**.
+- 새로운 머티리얼 이름: **FX_Green**
+- **Hit VFX → Renderer → Material** 슬롯에 FX_Green 적용.
+- 수정 내용:
+  - **기본 색상(Color)**: 녹색으로 변경.
+  - **Emission (발광)**: 값 `4.1` 정도 → 빛나는 초록색 효과.
+  - **Color over Lifetime**: 파티클의 전 생애 동안 색상이 유지되도록 녹색으로 맞춤.
+
+결과: **녹색 레이저 같은 공상과학 무기 효과** 완성.
+
+---
+
+## 5. 무기 클래스에 VFX 인스턴스화하기
+
+무기 발사 시 Hit VFX를 **레이캐스트 충돌 위치(hit.point)** 에 생성.
+
+### 코드 요약
+
+```csharp
+if (Physics.Raycast(Camera.main.transform.position, Camera.main.transform.forward, out hit, Mathf.Infinity))
+{
+    Instantiate(hitVFXPrefab, hit.point, Quaternion.identity);
+
+    EnemyHealth enemyHealth = hit.collider.GetComponent<EnemyHealth>();
+    enemyHealth?.TakeDamage(damageAmount);
+}
+```
+
+- **hit.point**
+  - 레이캐스트 충돌 지점의 3D 좌표(Vector3).
+  - 파티클 시스템이 생성될 위치.
+- **Quaternion.identity**
+  - 특별한 회전이 필요 없을 때 사용.
+- **EnemyHealth 처리**
+  - 충돌한 오브젝트가 EnemyHealth를 가지고 있으면 `TakeDamage()` 호출.
+
+---
+
+## 6. 파티클 시스템 파괴(Stop Action) 설정하기
+
+- 문제: Hit VFX가 계속 계층구조에 남아있음.
+- 해결:
+  - **Particle System → Stop Action** 값을 `Destroy` 로 설정.
+  - 파티클이 수명을 다하면 자동으로 파괴됨.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380449/notion-blog/_/3D_/3D_/_6_2/image_5.png)
+
+---
+
+✅ **최종 결과**
+
+- 총구 섬광(Muzzle Flash) → 노란색 → FX_Green 적용 후 녹색.
+- Hit VFX → 녹색 발광 파티클 효과.
+- 두 효과가 합쳐져 **스플래툰 같은 레이저 물감 총 효과** 구현.
+
+---
+
+# { 🤖 로봇 커스텀 애니메이션 설정하기 }
+
+이번 강의는 로봇이 단순히 플레이어를 향해 이동하는 데서 나아가, **애니메이션과 애니메이터 컨트롤러를 활용해 로봇에게 위아래로 흔들리는(호버링) 효과를 주는 방법**을 다룹니다.
+
+---
+
+## 📋 목차
+
+1. [현재 로봇 문제 파악하기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%ED%98%84%EC%9E%AC-%EB%A1%9C%EB%B4%87-%EB%AC%B8%EC%A0%9C-%ED%8C%8C%EC%95%85%ED%95%98%EA%B8%B0)
+2. [내비 메쉬 에이전트 높이 및 오프셋 조정하기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%EB%82%B4%EB%B9%84-%EB%A9%94%EC%89%AC-%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8-%EB%86%92%EC%9D%B4-%EB%B0%8F-%EC%98%A4%ED%94%84%EC%85%8B-%EC%A1%B0%EC%A0%95%ED%95%98%EA%B8%B0)
+3. [애니메이터 컨트롤러와 애니메이션 클립 생성하기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%EC%95%A0%EB%8B%88%EB%A9%94%EC%9D%B4%ED%84%B0-%EC%BB%A8%ED%8A%B8%EB%A1%A4%EB%9F%AC%EC%99%80-%EC%95%A0%EB%8B%88%EB%A9%94%EC%9D%B4%EC%85%98-%ED%81%B4%EB%A6%BD-%EC%83%9D%EC%84%B1%ED%95%98%EA%B8%B0)
+4. [호버링 애니메이션 만들기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%ED%98%B8%EB%B2%84%EB%A7%81-%EC%95%A0%EB%8B%88%EB%A9%94%EC%9D%B4%EC%85%98-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+5. [콜라이더와 동기화하기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%EC%BD%9C%EB%9D%BC%EC%9D%B4%EB%8D%94%EC%99%80-%EB%8F%99%EA%B8%B0%ED%99%94%ED%95%98%EA%B8%B0)
+6. [프리팹 적용 및 루프 설정](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%ED%94%84%EB%A6%AC%ED%8C%B9-%EC%A0%81%EC%9A%A9-%EB%B0%8F-%EB%A3%A8%ED%94%84-%EC%84%A4%EC%A0%95)
+7. [최종 실행 및 확인](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%EC%B5%9C%EC%A2%85-%EC%8B%A4%ED%96%89-%EB%B0%8F-%ED%99%95%EC%9D%B8)
+
+---
+
+## 1. 현재 로봇 문제 파악하기
+
+- 지금까지 로봇은 **정적**임.
+- 플레이어를 향해 걷기는 하지만, **위아래로 흔들리는 느낌(호버링)이 없음**.
+- 목표:
+  - 로봇이 플레이어를 향해 이동하면서 **부유하는 듯 위아래로 움직이게** 만들기.
+  - 실제 게임 화면에서 “앞뒤로 흔들리며 걷는” 효과 연출.
+
+---
+
+## 2. 내비 메쉬 에이전트 높이 및 오프셋 조정하기
+
+- 문제: 로봇 모델이 **지면에 너무 낮게 위치**.
+- 해결 방법:
+  1. 로봇을 선택하고 **Nav Mesh Agent의 Height(높이)** 값을 `1.5`로 변경.
+  2. 로봇 전체를 **0.5 유닛 위로 이동** → 최종 높이가 정확히 1.5가 되도록 조정.
+  3. **Base Offset(기본 오프셋)** 값을 `1`로 변경.
+     - 이렇게 하면 내비 메쉬 에이전트는 지면에 맞춰 걷지만,
+       로봇 모델 자체는 공중에 살짝 떠 있는 상태가 됨.
+- 이 변경 사항을 **Prefab에 적용** → 모든 로봇에 동일하게 반영.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380449/notion-blog/_/3D_/3D_/_6_2/image_6.png)
+
+```jsx
+캐릭터를 공중에 뜨게하기 위해 높이와 bassOff를 조절
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380449/notion-blog/_/3D_/3D_/_6_2/image_7.png)
+
+```jsx
+애니메이터 컨트롤러 연결
+```
+
+---
+
+## 3. 애니메이터 컨트롤러와 애니메이션 클립 생성하기
+
+1. **Animation 폴더**에 `Robot`이라는 새 폴더 생성.
+2. 그 안에 **Animator Controller** 생성 → 이름도 `Robot`.
+3. **Animation Clip** 생성 → 이름은 `Idle`.
+4. 로봇 부모 오브젝트에 **Animator 컴포넌트** 추가.
+   - 방금 만든 Animator Controller(`Robot`)를 연결.
+5. Animator 창을 열고 `Idle` 애니메이션 클립을 **드래그 앤 드롭**하여 기본 상태로 설정.
+
+---
+
+## 4. 호버링 애니메이션 만들기
+
+- 중요한 점:
+  - \*Nav Mesh Agent(부모 전체)\*\*를 애니메이션하면 이동에 문제 발생.
+  - 따라서 **실제 로봇 모델(자식 오브젝트)**만 애니메이션해야 함.
+
+### 애니메이션 작업 과정
+
+1. **Animation 탭** 열기.
+2. `Idle` 애니메이션 클립 선택 후 **녹화 버튼(●)** 클릭.
+3. 호버링 로봇 모델(자식 오브젝트) 선택.
+4. Transform → Position(Y축)을 기준으로 애니메이션 키프레임 추가.
+   - **0초 지점**: 원래 위치에서 키프레임 추가.
+   - **30프레임(0.5초)**: 살짝 아래로 이동.
+   - **60프레임(1초)**: 원래 위치로 복귀.
+5. 이렇게 하면 로봇이 **위아래로 1초마다 흔들리는 루프** 애니메이션 완성.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380449/notion-blog/_/3D_/3D_/_6_2/image_8.png)
+
+```jsx
+모델의 위치를 위 아래로 이동하게 ( 아까전에 사용했던 1초 만들고 중간에 key 넣기 )
+```
+
+---
+
+## 5. 콜라이더와 동기화하기
+
+- 문제: 애니메이션 적용 후 **Capsule Collider와 로봇 모델이 어긋남**.
+- 해결 방법:
+  1. 녹화 버튼을 다시 켜고, Capsule Collider 선택.
+  2. **Center → Y값**에 키프레임 추가.
+     - 0초, 30프레임, 60프레임에 각각 키 추가.
+  3. 30프레임(로봇이 내려간 시점)에서는 Y 값을 -0.16 정도로 조정.
+  4. 이렇게 하면 콜라이더도 로봇의 움직임을 따라가며 정확히 정렬.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380450/notion-blog/_/3D_/3D_/_6_2/image_9.png)
+
+```jsx
+콜라이더도 같이 움직이도록 해준다
+```
+
+---
+
+## 6. 프리팹 적용 및 루프 설정
+
+1. 변경된 로봇을 다시 **Prefab에 적용** → 세 로봇 모두 동일한 설정 공유.
+2. `Idle` 애니메이션 클립에서 **Loop Time 체크** → 애니메이션이 끊임없이 반복되도록 설정.
+
+---
+
+## 7. 최종 실행 및 확인
+
+- 실행 버튼(▶) 클릭 → 모든 로봇이 **위아래로 흔들리며 플레이어를 추적**.
+- 테스트: 로봇을 공격해도 애니메이션 문제 없음.
+- 최종 결과: **3대의 로봇 모두 성공적으로 호버링 애니메이션을 수행**.
+
+---
+
+✅ **핵심 요약**
+
+- Nav Mesh Agent의 높이/오프셋 조정으로 로봇 모델을 공중에 띄움.
+- Animator Controller + Animation Clip(`Idle`) 생성.
+- 부모 오브젝트가 아닌 **자식 모델**만 애니메이션 → Nav Mesh Agent에 간섭 없음.
+- Collider 중심도 같이 애니메이션 → 물리 충돌 정상 작동.
+- Animation Clip을 Loop로 설정 → 자연스럽게 반복.
+
+---
+
+# { 🛠 유니티 ProBuilder 기본 이해와 사용하기 }
+
+이번 강의는 **유니티의 기본 도형(Primitive Object)** 대신 **ProBuilder를 사용하여 메쉬를 직접 수정**하고, 새로운 레벨 환경을 만들기 위한 기초를 다루는 강의입니다.
+
+---
+
+## 📋 목차
+
+1. [기본 도형(Primitive)의 한계](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%EA%B8%B0%EB%B3%B8-%EB%8F%84%ED%98%95primitive%EC%9D%98-%ED%95%9C%EA%B3%84)
+2. [ProBuilder 설치하기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#probuilder-%EC%84%A4%EC%B9%98%ED%95%98%EA%B8%B0)
+3. [ProBuilder 인터페이스 변화 (Unity 6 / ProBuilder 6)](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#probuilder-%EC%9D%B8%ED%84%B0%ED%8E%98%EC%9D%B4%EC%8A%A4-%EB%B3%80%ED%99%94-unity-6--probuilder-6)
+4. [ProBuilder 도형 생성 및 그리드 스냅](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#probuilder-%EB%8F%84%ED%98%95-%EC%83%9D%EC%84%B1-%EB%B0%8F-%EA%B7%B8%EB%A6%AC%EB%93%9C-%EC%8A%A4%EB%83%85)
+5. [ProBuilder 오브젝트 편집 모드](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#probuilder-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%ED%8E%B8%EC%A7%91-%EB%AA%A8%EB%93%9C)
+6. [면/모서리/꼭짓점 조작 및 단축키](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%EB%A9%B4%EB%AA%A8%EC%84%9C%EB%A6%AC%EA%BC%AD%EC%A7%93%EC%A0%90-%EC%A1%B0%EC%9E%91-%EB%B0%8F-%EB%8B%A8%EC%B6%95%ED%82%A4)
+7. [오른쪽 클릭 컨텍스트 메뉴](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%EC%98%A4%EB%A5%B8%EC%AA%BD-%ED%81%B4%EB%A6%AD-%EC%BB%A8%ED%85%8D%EC%8A%A4%ED%8A%B8-%EB%A9%94%EB%89%B4)
+8. [실습 준비 – 레벨 초기화](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%EC%8B%A4%EC%8A%B5-%EC%A4%80%EB%B9%84--%EB%A0%88%EB%B2%A8-%EC%B4%88%EA%B8%B0%ED%99%94)
+
+---
+
+## 1. 기본 도형(Primitive)의 한계
+
+- 지금까지는 **Cube, Sphere, Capsule, Plane, Cylinder** 같은 **유니티 기본 제공 도형**을 사용.
+- 단점:
+  - 기본 Transform(위치, 회전, 스케일)만 조절 가능.
+  - **메쉬(Mesh) 자체 수정 불가**.
+  - 특정 **꼭짓점(Vertex), 모서리(Edge), 면(Face)** 을 당기거나 돌출(Extrude)하는 편집 불가능.
+
+✅ 그래서 **ProBuilder**가 필요함 → **Unity Technologies에서 제공하는 공식 툴**.
+
+---
+
+## 2. ProBuilder 설치하기
+
+1. **패키지 매니저 열기**: `Window → Package Manager`.
+2. `Unity Registry`로 전환 후, **ProBuilder 검색**.
+3. `Install` 버튼 클릭 → 설치 완료.
+4. 설치 후:
+   - 상단 메뉴바에 **Tools 드롭다운 메뉴**가 새로 생성됨.
+   - 간혹 메뉴가 바로 안 보이면 → **다른 곳 클릭 / 프로젝트 재시작** 필요.
+
+---
+
+## 3. ProBuilder 인터페이스 변화 (Unity 6 / ProBuilder 6)
+
+- 과거(ProBuilder 5까지):
+  - `Tools → ProBuilder` → 별도 팝업 창 열어 사용.
+  - 옵션이 많았지만, 맥락(Context)에 맞지 않아 불편.
+- 현재(ProBuilder 6):
+  - 팝업 창 제거.
+  - 모든 기능이 **상황(Context)에 따라 메뉴/툴바에 표시**.
+  - 직관적이고 깔끔해짐.
+
+---
+
+## 4. ProBuilder 도형 생성 및 그리드 스냅
+
+- Scene 뷰의 왼쪽 도구 모음 → 기존 6개 버튼 + **ProBuilder 전용 버튼 2개 추가됨**.
+- 첫 번째 버튼 → **ProBuilder Shape 생성**.
+  - **Cube, Cylinder, Plane 등 다양한 모양** 제공.
+- 생성 방법:
+  1. 원하는 모양 클릭 & 드래그 → 장면 뷰에 직접 생성.
+  2. `Ctrl` 누른 상태 → **그리드 스냅(Grid Snap)** 가능.
+
+### ⚙️ 스냅 옵션 (자석 아이콘 드롭다운)
+
+- Grid Size: **0.5 단위** (X, Y, Z).
+- Rotation Snap: **15도**.
+- Scale Snap: **1 단위**.
+- → `Ctrl` 키 누른 상태에서 이동/회전/스케일하면 자동 스냅됨.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380445/notion-blog/_/3D_/3D_/_6_2/image_10.png)
+
+```csharp
+* 주의 그리드 사이즈를 0.5 로 해야지 정확하게 분할 가능하다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380445/notion-blog/_/3D_/3D_/_6_2/image_11.png)
+
+```jsx
+새로 생긴 프로빌더
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380446/notion-blog/_/3D_/3D_/_6_2/image_12.png)
+
+```jsx
+컨트롤을 누르면 정확한 크기로 제작 가능하다 (자석 모양 상단의 바를 수정하면 옵션 조절 가능)
+```
+
+---
+
+## 5. ProBuilder 오브젝트 편집 모드
+
+- 일반 Cube(기본 3D Object)와 비교:
+  - 일반 Cube → **면/모서리/꼭짓점 수정 불가**.
+  - ProBuilder Cube → **편집 모드 전환 가능**.
+- 편집 모드 전환:
+  - 하단 상태 표시줄의 **Active Context** 메뉴 클릭.
+  - `Game Object Mode` ↔ `ProBuilder Edit Mode` 전환 가능.
+- Edit Mode에서는:
+  - **Vertex Mode (꼭짓점 선택)**
+  - **Edge Mode (모서리 선택)**
+  - **Face Mode (면 선택)** 가능.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380446/notion-blog/_/3D_/3D_/_6_2/image_13.png)
+
+```jsx
+프로빌더는 다양한 옵션으로 조절 가능하다
+```
+
+---
+
+## 6. 면/모서리/꼭짓점 조작 및 단축키
+
+- **이동(Move), 회전(Rotate), 스케일(Scale)** 도구 그대로 사용 가능.
+
+### ✅ 주요 편집 기능
+
+- **Extrude (돌출)**:
+  - `Shift + 드래그` → z축 기준 돌출.
+  - `Ctrl + E` → 자동 Extrude.
+- **Inset (내부 돌출)**:
+  - `Shift + Scale` → 면이 안쪽으로 돌출.
+- **Undo (되돌리기)**:
+  - `Ctrl + Z`.
+
+---
+
+## 7. 오른쪽 클릭 컨텍스트 메뉴
+
+- ProBuilder 6의 핵심 변화:
+  - **상황별 우클릭 메뉴** 제공.
+  - 꼭짓점/모서리/면 모드 각각에서 → 해당 요소에 맞는 옵션만 표시됨.
+  - 다중 선택 여부와 관계없이 항상 다양한 옵션 사용 가능.
+
+---
+
+## 8. 실습 준비 – 레벨 초기화
+
+1. 기존 장면의 **Primitive Cube 기반 오브젝트 모두 삭제**.
+2. **NavMesh Surface**는 유지 (AI 경로 탐색용).
+3. 로봇(Enemy)들은 빈 GameObject `Enemies` 생성 후 자식으로 이동 → 부모 오브젝트 비활성화.
+4. → 새로운 레벨을 **ProBuilder Shapes** 기반으로 만들 준비 완료.
+
+---
+
+## 📌 이번 강의 핵심 요약
+
+- 기본 도형은 메쉬 수정 불가 → **ProBuilder 필요**.
+- ProBuilder 6에서는 **맥락 기반 UI**로 더 직관적.
+- ProBuilder Shape 생성 시 **그리드 스냅** 지원.
+- 오브젝트를 **Vertex/Edge/Face 단위**로 편집 가능.
+- Extrude, Inset 등 **모델링의 기본 기능**을 Unity 안에서 직접 활용 가능.
+- 레벨 디자인 시, 기본 큐브 대신 **ProBuilder Shapes로 환경 제작** 권장.
+
+---
+
+# { 🚀 ProBuilder로 레벨을 그레이박싱하기 }
+
+이번 강의는 **ProBuilder 도형을 사용하여 게임 레벨을 빠르게 프로토타입(그레이박싱)하는 과정**을 다룹니다.
+
+즉, **상세 그래픽 모델링**이 아닌 **게임 플레이 테스트용 레벨 구조 만들기**에 집중합니다.
+
+---
+
+## 📋 목차
+
+1. [ProBuilder 기본 개념](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#probuilder-%EA%B8%B0%EB%B3%B8-%EA%B0%9C%EB%85%90)
+2. [바닥(Base) 만들기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%EB%B0%94%EB%8B%A5base-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+3. [벽 만들기 - Edge Loop와 Extrude 활용](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%EB%B2%BD-%EB%A7%8C%EB%93%A4%EA%B8%B0---edge-loop%EC%99%80-extrude-%ED%99%9C%EC%9A%A9)
+4. [추가 구조물(Subdivide & Extrude Faces)](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%EC%B6%94%EA%B0%80-%EA%B5%AC%EC%A1%B0%EB%AC%BCsubdivide--extrude-faces)
+5. [경사로(Ramp) 만들기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%EA%B2%BD%EC%82%AC%EB%A1%9Cramp-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+6. [플랫폼(Platform)과 점프 동선](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%ED%94%8C%EB%9E%AB%ED%8F%BCplatform%EA%B3%BC-%EC%A0%90%ED%94%84-%EB%8F%99%EC%84%A0)
+7. [플레이어 컨트롤러 조정](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%ED%94%8C%EB%A0%88%EC%9D%B4%EC%96%B4-%EC%BB%A8%ED%8A%B8%EB%A1%A4%EB%9F%AC-%EC%A1%B0%EC%A0%95)
+8. [NavMesh와 적 배치](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#navmesh%EC%99%80-%EC%A0%81-%EB%B0%B0%EC%B9%98)
+9. [도전 과제](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%EB%8F%84%EC%A0%84-%EA%B3%BC%EC%A0%9C)
+
+---
+
+## 1. ProBuilder 기본 개념
+
+- **ProBuilder란?**
+  Unity에서 제공하는 **레벨 디자인/메시 제작 도구**.
+  → 3D 모델링 툴에서 넘어올 필요 없이 바로 Unity에서 기초 레벨을 설계 가능.
+- **그레이박싱(Gray Boxing)** :
+  - **색상 없는 단순한 기하학 도형**(큐브, 원통 등)을 이용해 레벨 구조를 빠르게 만드는 방식.
+  - 아트 디테일보다 **게임 플레이 테스트**가 목적.
+- **중요한 특징**:
+  - ProBuilder에서 만든 것은 **Mesh 자체 수정**이며,
+    GameObject의 **Transform Scale** 값은 여전히 (1,1,1) 유지됨.
+  - 즉, **도형 속성**과 **Transform 속성**은 별도로 관리됨.
+
+---
+
+## 2. 바닥(Base) 만들기
+
+1. **[ProBuilder → Create Shape] → Cube 선택**
+2. **Control 키 + 드래그** → 바닥 면적 생성 (50 × 50).
+3. **바닥 한 칸 위로 올리기 (Y=1)**.
+4. **표면 크기 수정**:
+   - X = 30, Z = 30 (양수 값으로 설정).
+   - Y = 1 유지.
+5. **위치 초기화**: (0,0,0).
+6. **이름 변경**: `Cube` → `Base`.
+   - 이유: 이후 벽을 포함하는 기본 구조물이 되기 때문.
+
+---
+
+## 3. 벽 만들기 - Edge Loop와 Extrude 활용
+
+- **문제**: 처음에는 Edge 선택이 불가능.
+- **해결**: **Insert Edge Loop** 기능을 사용해야 함.
+
+1. ProBuilder **Edge 모드**로 전환.
+   - (강사 개인 단축키: H → Vertex/Edge/Face 모드 전환)
+   - 기본 단축키 없음 → `Edit → Shortcuts` 에서 직접 설정 가능.
+2. 상단 Edge 선택 → **우클릭 → Insert Edge Loop** (또는 `Shift+U`).
+   - 메시 전체에 걸쳐 **Edge Loop**가 생성됨.
+3. Loop를 이동:
+   - `W` (이동 툴) + **Ctrl** → 일정 단위로 **슬라이드 이동**.
+   - 오른쪽, 왼쪽, 위, 아래 각각 1단위씩 떨어진 곳에 배치.
+4. Face 모드 전환 후, **벽이 될 면(Faces) 선택**.
+   - Ctrl + 클릭으로 다중 선택.
+   - F 키: 선택한 오브젝트에 **카메라 초점 맞추기**.
+5. Extrude (돌출)
+   - `Ctrl+E` 또는 우클릭 → **Extrude Faces**.
+   - Distance = 15 (높음) → 다소 높아보임.
+   - Distance = 10 으로 조정 → 벽 높이 완성.
+
+---
+
+## 4. 추가 구조물(Subdivide & Extrude Faces)
+
+- **기존 메시를 활용하여 새로운 구조 추가 가능**.
+
+1. Face 선택 → 우클릭 → **Subdivide Faces**.
+   - 하나의 Face가 4개의 작은 Face로 나뉨.
+2. 원하는 면 선택 → **Ctrl+E (Extrude Faces)**.
+   - Distance = 5 정도로 돌출.
+3. 확인(Confirm).
+
+👉 이렇게 하면 벽 옆에 새로운 구조물(벽돌, 기둥 등)을 쉽게 생성할 수 있음.
+
+---
+
+## 5. 경사로(Ramp) 만들기
+
+1. 새 Cube 생성 → 두 번째 레벨 위치까지 대략 배치.
+2. Edge 모드 → 윗부분 Edge 선택 → **Ctrl + 드래그** 아래로 내림.
+   - Cube가 경사 구조(슬로프)로 변형됨.
+3. 필요하면 Edge를 더 당겨 길이 조절.
+4. 테스트: 실행 → 플레이어가 실제로 **경사로를 걸어 올라갈 수 있음**.
+
+⚠️ **주의**: ProBuilder 6 + Unity 6 조합에서 간헐적 크래시 발생 가능.
+
+👉 **자주 저장할 것!**
+
+---
+
+## 6. 플랫폼(Platform)과 점프 동선
+
+1. **실린더(Cylinder) 생성** → 3 × 3, Y=1.
+   - 속성: Side Count (10), Smooth 옵션 켬.
+   - 위치 조정 → 작은 점프용 발판.
+2. 같은 실린더 복제 → 여러 개를 배치.
+   - Y=0.5 유지.
+   - 플랫폼 간격 조정 → 플레이어가 **점프 → 점프** 하며 두 번째 레벨로 올라갈 수 있도록.
+3. **정확히 수학적으로 정렬되지 않아도 괜찮음**.
+   - 테스트하면서 “점프 가능 거리”만 맞추면 됨.
+
+---
+
+## 7. 플레이어 컨트롤러 조정
+
+- 기본 Player Capsule의 움직임이 느림.
+- **First Person Controller 설정 변경**:
+  - Move Speed = 6
+  - Sprint Speed = 10
+  - Jump Height = 1.5
+
+👉 더 빠른 아레나 슈팅(FPS) 느낌 제공.
+
+---
+
+## 8. NavMesh와 적 배치
+
+1. 적 GameObject 활성화 → **NavMesh Surface Bake** 필요.
+2. 문제: Enemy Layer 미적용 → NavMesh에 포함 안 됨.
+   - 해결: Enemy 오브젝트를 부모로 묶고, Enemy Layer 전체 적용.
+3. NavMesh 다시 Bake → 적들이 올바르게 인식.
+4. 실행 시 → 로봇들이 플레이어를 따라다님.
+   - 진짜 **FPS 전투 느낌** 연출 가능.
+
+---
+
+✅ **정리 포인트**
+
+- ProBuilder는 Transform Scale을 건드리지 않고, **Mesh 자체 편집**을 한다.
+- Edge Loop, Subdivide, Extrude 기능은 벽/플랫폼 제작의 핵심.
+- 테스트 → 조정 → 반복, 빠른 프로토타이핑이 목표.
+- NavMesh와 적 배치까지 포함하면 실제 플레이 테스트 가능.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380446/notion-blog/_/3D_/3D_/_6_2/image_14.png)
+
+```jsx
+30 1 30 으로 바닥 만들기
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380446/notion-blog/_/3D_/3D_/_6_2/image_15.png)
+
+```jsx
+벽을 만들기 위해서 Edge Loop 를 추가
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380446/notion-blog/_/3D_/3D_/_6_2/image_16.png)
+
+```jsx
+4 방향으로 전부 만들고 면을 다 선택한뒤 Shift 올리기 컨트롤 + E 도 가능
+```
+
+---
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380447/notion-blog/_/3D_/3D_/_6_2/image_17.png)
+
+```jsx
+조절을 통해서 계단 숫자 나선형 계단도 가능하다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380447/notion-blog/_/3D_/3D_/_6_2/image_18.png)
+
+```jsx
+계단은 그냥 올라가기 불가능해서 큐브를 만들고 그걸로 덮어준다 그리고 큐브는 랜더를 빼준다
+
+그리고 계단은 콜라이더를 빼준다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380447/notion-blog/_/3D_/3D_/_6_2/image_19.png)
+
+```csharp
+아래 이 숫자를 잘 사용하면서 도형을 옮기고 스냅을 잘 조절하면서 1 ~ 0.5 어긋나지 않게
+
+도형들을 붙여주자
+```
+
+# 🧱 ProBuilder Face 메뉴 옵션 설명
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380447/notion-blog/_/3D_/3D_/_6_2/image_20.png)
+
+### 1. **Bevel Edges (모서리 베벨)**
+
+- 면의 가장자리(엣지)를 깎아서 **둥글게 또는 평평하게 처리**.
+- 예: 박스 모서리를 날카롭게 두지 않고 살짝 깎아내듯이 → 좀 더 자연스러운 모양.
+- 사용처: 건물 모서리, 계단 모서리, 둥근 기둥 같은 느낌 만들 때.
+
+---
+
+### 2. **Triangulate Faces (삼각형 분할)**
+
+- 선택한 면을 **삼각형 단위로 쪼갬**.
+- 3D 모델은 사실 삼각형 메시로 이루어져 있기 때문에, 복잡한 면은 삼각형으로 잘라주는 게 필요할 때가 있음.
+- 사용처: Blender 등 외부 툴로 내보낼 때, 메시가 깨지지 않게 안전하게 처리.
+
+---
+
+### 3. **Subdivide Faces (면 세분화)**
+
+- 하나의 큰 면을 **작은 면 여러 개로 쪼갬**.
+- 예: 정사각형 면 → 4개의 작은 정사각형으로 나눔.
+- 사용처: 특정 부분만 돌출(Extrude)하거나 디테일을 추가하고 싶을 때.
+
+---
+
+### 4. **Merge Faces (면 합치기)**
+
+- 인접한 여러 면을 **하나의 면으로 합침**.
+- 예: 큐브 위의 네 개 면을 선택 → 하나의 큰 면으로 합쳐서 단순화.
+- 사용처: 불필요하게 잘려 있는 면을 정리해서 **최적화**.
+
+---
+
+### 5. **Flip Face Normals (면 노멀 뒤집기)**
+
+- **면의 앞뒤 방향**(Normal)을 반대로 뒤집음.
+- 3D에서 면은 한쪽 방향만 보이는데, 반대로 돌리면 내부가 보이게 할 수 있음.
+- 단축키: **Alt+N**.
+- 사용처: 방 안쪽 벽 만들 때, 면이 바깥만 보이게 되어 안쪽이 안 보일 경우.
+
+---
+
+### 6. **Flip Face Edge (삼각형 분할선 뒤집기)**
+
+- 삼각형으로 쪼개진 면의 **대각선 방향**을 바꿔줌.
+- 사각형 면을 삼각형 두 개로 나눌 때, 어떤 대각선으로 나누느냐에 따라 형태가 달라짐.
+- 사용처: 메시 변형 시 뒤틀림 방지.
+
+---
+
+### 7. **Conform Face Normals (노멀 정렬)**
+
+- 선택된 여러 면의 **앞뒤 방향(노멀)**을 서로 맞춰줌.
+- 사용처: 면이 일부는 뒤집혀 있고 일부는 정상이어서 시각적으로 이상할 때 정리.
+
+---
+
+### 8. **Detach Faces (면 분리하기)**
+
+- 선택한 면을 원래 오브젝트에서 떼어내어 **새로운 메시**로 만듦.
+- 예: 큐브에서 윗면만 분리 → 독립된 Plane 오브젝트가 됨.
+- 사용처: 벽에서 문짝 따로 만들기, 지붕 분리하기 등.
+
+---
+
+### 9. **Duplicate Faces (면 복제)**
+
+- 선택한 면을 그대로 복제해서 붙여둠.
+- 예: 벽 일부 면을 복제 → 다른 쪽에 새 벽으로 붙임.
+- 사용처: 반복 구조 빠르게 만들 때.
+
+---
+
+### 10. **Delete Faces (면 삭제)**
+
+- 선택한 면을 제거. (단축키: **Backspace**)
+- 사용처: 큐브의 윗면을 없애서 **빈 상자** 만들기.
+- ⚠️ 주의: 삭제하면 구멍이 뚫려서 양쪽이 뚫린 메시가 됨.
+
+---
+
+### 11. **Offset Elements (요소 이동/축소)**
+
+- 선택한 면을 안쪽이나 바깥쪽으로 **작게 복사해서 안으로 이동**시킴.
+- 예: 벽에 창문 틀 모양 만들기.
+- 사용처: 면 안에 또 다른 면 영역을 만들고 싶을 때.
+
+---
+
+### 12. **Set Pivot To Selection (피벗 옮기기)**
+
+- \*피벗(회전/이동 기준점)\*\*을 선택한 면의 중앙으로 옮김.
+- 예: 건물 옆벽을 기준으로 회전시키고 싶을 때.
+- 사용처: 특정 부분 기준으로 회전/스케일 조정 필요할 때.
+
+---
+
+### 13. **Extrude Faces (면 돌출)**
+
+- 선택한 면을 **바깥쪽이나 안쪽으로 밀어내어 새로운 입체 구조**를 만듦.
+- 예: 벽면을 선택 → 앞으로 돌출하면 기둥, 안으로 넣으면 창문 홈.
+- 사용처: 건물 기둥, 문틀, 계단, 블록 구조 만들 때 **가장 많이 쓰이는 기능**.
+
+---
+
+# ✅ 정리
+
+- **모양 추가/변형**: Subdivide Faces, Extrude Faces, Bevel Edges, Offset Elements
+- **정리/수정**: Merge Faces, Delete Faces, Triangulate Faces, Conform Normals
+- **방향 조정**: Flip Normals, Flip Edge
+- **분리/복제**: Detach Faces, Duplicate Faces
+- **조작 편의**: Set Pivot To Selection
+
+👉 초보자라면 가장 많이 쓸 기능은 **Extrude Faces, Subdivide Faces, Bevel Edges** 세 가지예요.
+
+# 🧱 ProBuilder Edge 메뉴 옵션 설명
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380448/notion-blog/_/3D_/3D_/_6_2/image_21.png)
+
+### 1. **Extrude Edges (엣지 돌출)**
+
+- 선택한 **모서리(Edge)** 를 기준으로 새로운 면을 밀어내듯이 확장.
+- 예: 벽 모서리를 선택 → 바깥쪽으로 Extrude → 새로운 면과 기둥 같은 구조 생성.
+- **Faces Extrude**와 비슷하지만, 여기서는 **모서리 중심**으로 새로운 면이 생김.
+
+---
+
+### 2. **Connect Edges (엣지 연결)**
+
+- 선택한 두 Edge 사이에 **새로운 선(Edge) 또는 면(Face)을 생성**.
+- 예: 사각형 안의 두 Edge를 선택하고 Connect → 그 사이를 가로지르는 선 추가.
+- 사용처: 면을 세분화하거나 새로운 절단선(Cut) 만들 때.
+
+---
+
+### 3. **Bevel Edges (엣지 베벨/Chamfer)**
+
+- 선택한 모서리를 **깎아서 평평하게 만들거나 둥글게**.
+- 예: 박스 모서리를 날카롭지 않게 다듬기.
+- 사용처: 건물 모서리, 계단 모서리, 다듬어진 구조 만들 때.
+
+---
+
+### 4. **Bridge Edges (엣지 브리지)**
+
+- 떨어진 두 Edge를 **다리처럼 연결**.
+- 예: 두 개의 구멍 난 면이 있다면, 그 둘 사이에 Bridge Edges 하면 새로운 면이 생겨 연결됨.
+- 사용처: 구멍 메우기, 복잡한 구조 연결하기.
+
+---
+
+### 5. **Offset Elements (오프셋 엘리먼트)**
+
+- 선택한 Edge를 기준으로 **안쪽/바깥쪽으로 복사된 Edge 생성**.
+- 예: 창문 틀처럼 Edge 안에 또 다른 Edge 테두리를 만드는 것.
+- 사용처: 테두리 장식, 추가 구조 라인 생성.
+
+---
+
+### 6. **Set Pivot To Selection (피벗 맞추기)**
+
+- 선택한 Edge의 중심으로 **피벗(회전/이동 기준점)** 위치를 변경.
+- 예: Edge 기준으로 오브젝트 회전하거나 스케일링할 때.
+
+---
+
+### 7. **Fill Hole (구멍 채우기)**
+
+- Edge들로만 둘러싸인 **빈 구멍을 자동으로 면(Face)으로 메움**.
+- 예: 큐브에서 위쪽 면을 지우면 네 개 Edge가 남음 → Fill Hole → 윗면 다시 생성.
+
+---
+
+### 8. **Insert Edge Loop (엣지 루프 삽입)**
+
+- 메시 전체를 가로지르는 **Edge Loop** 추가.
+- 단축키: **Alt+U**.
+- 예: 박스의 옆면에 수직으로 선을 하나 추가 → 메시를 세분화 가능.
+- 사용처: 새로운 절단선 추가 후, 그 부분만 Extrude 등 변형하기.
+
+---
+
+### 9. **Subdivide Edges (엣지 세분화)**
+
+- 선택한 Edge를 여러 개의 작은 Edge로 나눔.
+- 예: Edge를 2등분, 3등분해서 세분화.
+- 사용처: 더 세밀하게 조절할 포인트가 필요할 때.
+
+---
+
+# ✅ 요약
+
+- **새로운 구조 만들기**: Extrude Edges, Bridge Edges
+- **세분화**: Connect Edges, Insert Edge Loop, Subdivide Edges
+- **모양 다듬기**: Bevel Edges, Offset Elements
+- **편의/정리**: Fill Hole, Set Pivot To Selection
+
+---
+
+# { 🏗️ ProBuilder 기본 사용법과 팁 정리 }
+
+이번 강의는 **ProBuilder를 사용해서 레벨을 블록아웃(blockout)하고, 계단·문·오브젝트를 만드는 방법**을 다루었습니다.
+
+특정 툴 옵션 설명과, 실제 게임플레이 환경에서의 팁까지 정리합니다.
+
+---
+
+## 📋 목차
+
+1. [ProBuilder 개요](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#1-probuilder-%EA%B0%9C%EC%9A%94)
+2. [계단 만들기 (Stairs Tool)](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#2-%EA%B3%84%EB%8B%A8-%EB%A7%8C%EB%93%A4%EA%B8%B0-stairs-tool)
+3. [Mesh Collider 한계와 가짜 계단 기법](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#3-mesh-collider-%ED%95%9C%EA%B3%84%EC%99%80-%EA%B0%80%EC%A7%9C-%EA%B3%84%EB%8B%A8-%EA%B8%B0%EB%B2%95)
+4. [오브젝트 분리하기 (Detach Faces)](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#4-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%EB%B6%84%EB%A6%AC%ED%95%98%EA%B8%B0-detach-faces)
+5. [Fill Hole과 Extrude로 형태 보완하기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#5-fill-hole%EA%B3%BC-extrude%EB%A1%9C-%ED%98%95%ED%83%9C-%EB%B3%B4%EC%99%84%ED%95%98%EA%B8%B0)
+6. [문(Door) 만들기와 한계](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#6-%EB%AC%B8door-%EB%A7%8C%EB%93%A4%EA%B8%B0%EC%99%80-%ED%95%9C%EA%B3%84)
+7. [Edge Loop 삽입과 스냅 설정](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#7-edge-loop-%EC%82%BD%EC%9E%85%EA%B3%BC-%EC%8A%A4%EB%83%85-%EC%84%A4%EC%A0%95)
+8. [Nav Mesh Surface와 충돌 계층](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#8-nav-mesh-surface%EC%99%80-%EC%B6%A9%EB%8F%8C-%EA%B3%84%EC%B8%B5)
+9. [ProBuilder 실험적 기능 (베지어 곡선)](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#9-probuilder-%EC%8B%A4%ED%97%98%EC%A0%81-%EA%B8%B0%EB%8A%A5-%EB%B2%A0%EC%A7%80%EC%96%B4-%EA%B3%A1%EC%84%A0)
+10. [강의 과제와 정리](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#10-%EA%B0%95%EC%9D%98-%EA%B3%BC%EC%A0%9C%EC%99%80-%EC%A0%95%EB%A6%AC)
+
+---
+
+## 1. ProBuilder 개요
+
+- **ProBuilder** : Unity 내에서 레벨 블록아웃(blockout)과 간단한 모델링을 할 수 있는 툴.
+- 포괄적이고 다양한 기능 제공.
+- 이번 강의에서는 **실제 제작에 필요한 일반적인 팁과 요령**을 다룸.
+- 모든 기능을 다루진 않고, **계단·오브젝트 분리·문·NavMesh와의 연동** 중심.
+
+---
+
+## 2. 계단 만들기 (Stairs Tool)
+
+- **새로운 ProBuilder Shape → Stairs 생성**
+- 크기를 드래그해서 배치 후, **Steps Count** 슬라이더로 계단 수 조정.
+- Circumference Slider → 계단을 원형/나선형으로 만들 수 있음.
+- 실습 예시: 약 14단 정도 배치 → 나중에 16단으로 조정.
+
+---
+
+## 3. Mesh Collider 한계와 가짜 계단 기법
+
+- 기본 **PlayerController**는 계단 모양 Mesh Collider를 인식 못 하고, 들쭉날쭉한 부분 때문에 올라갈 수 없음.
+- 해결책 = **가짜 계단 기법**:
+  1. 계단은 시각적 메시로만 사용.
+  2. 그 아래에 경사로(ramp) 오브젝트 배치.
+  3. Ramp에 Mesh Collider 적용 → Player는 Ramp를 따라 올라감.
+  4. Ramp의 Mesh Renderer는 꺼서 보이지 않게 만듦.
+- 결과: 플레이어는 Ramp를 밟고 올라가면서, 보이는 건 계단 메시.
+
+---
+
+## 4. 오브젝트 분리하기 (Detach Faces)
+
+- **큐브 생성 → 특정 면 선택 → Detach Faces**
+- Detach하면 한 GameObject에서 분리되어 새로운 오브젝트 생성됨.
+- 하지만 분리 후엔 “공유하던 면”이 사라져 내부가 뚫려 보일 수 있음.
+
+---
+
+## 5. Fill Hole과 Extrude로 형태 보완하기
+
+- **Fill Hole** : Edge 선택 → 우클릭 → Fill Hole → 빈 공간에 새로운 면 생성.
+- **Extrude (Ctrl+E)** : 면을 바깥/안쪽으로 돌출하거나 밀어 넣어 새로운 모양 제작.
+- 조합을 통해 원하는 복잡한 형태 제작 가능.
+
+---
+
+## 6. 문(Door) 만들기와 한계
+
+- ProBuilder의 **Create Door** 기능 사용 시 → 기대와 달리 이상한 “열쇠구멍 모양” 구조 생성됨.
+- 실제 제작 방식:
+  1. ProBuilder Door로 “문짝”만 생성.
+  2. 주위 벽/프레임은 Cube 등 다른 오브젝트로 따로 구성.
+- Fill Hole로 빈 공간 메꾸는 것은 문에서는 잘 안 맞음.
+
+---
+
+## 7. Edge Loop 삽입과 스냅 설정
+
+- **Edge Loop 삽입 (Insert Edge Loop)**
+  - 수직 Edge 선택 → 우클릭 → Insert Edge Loop.
+  - 새로운 Edge 추가 → 벽이나 천장 등 세부 구조 제작 가능.
+- **스냅 단위 설정**
+  - 기본 0.5 단위 → 더 정밀하게 하고 싶다면 0.25 단위로 변경.
+  - Ctrl 누르고 드래그하면 스냅 단위에 맞춰 정렬 가능.
+
+---
+
+## 8. Nav Mesh Surface와 충돌 계층
+
+- 계단/문 제작 후 **NavMesh Bake** 필요.
+- Bake 시 플레이어 오브젝트가 “Default Layer”로 설정되어 있으면 NavMesh에 영향을 안 줌 → **Player Layer**로 변경해야 함.
+- 예시: Pistol 오브젝트가 잘못된 레이어에 있어서 NavMesh 재생성 시 충돌. → 올바른 레이어(Player)로 변경 후 Bake.
+
+---
+
+## 9. ProBuilder 실험적 기능 (베지어 곡선)
+
+- 강의에서 나온 **구부러진 파이프** = ProBuilder 기본 기능 아님.
+- **Experimental Features** 활성화 필요:
+  - Edit → Preferences → ProBuilder → Experimental Features Enabled 체크.
+- 베지어 곡선을 활용하면 곡선형 오브젝트 제작 가능.
+
+---
+
+✅ **핵심 요약**
+
+- ProBuilder로 계단·문·오브젝트 제작 가능.
+- Mesh Collider 한계 때문에 “가짜 계단”(Ramp+계단 메시) 기법 자주 사용.
+- Detach Faces → Fill Hole + Extrude로 형태 분리/보완.
+- 문은 별도 프레임을 만들어주는 게 실용적.
+- Edge Loop + 스냅 단위 변경으로 정밀 제어.
+- NavMesh와 Layer 충돌 문제 주의.
+- Experimental Features → 베지어 곡선 같은 고급 기능도 가능.
+
+---
+
+# { 🔫 ScriptableObjects로 무기 데이터 관리하기 }
+
+이번 강의는 **ScriptableObject를 활용하여 무기 데이터를 모듈화하고 재사용하는 방법**을 다룹니다.
+
+즉, 기존에 MonoBehaviour 클래스에 직접 작성했던 무기 속성들을 ScriptableObject로 분리하여 더 효율적이고 확장성 있는 아키텍처를 만드는 것이 목표입니다.
+
+---
+
+## 📋 목차
+
+1. [Weapon 클래스와 기존 구조 복습](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#weapon-%ED%81%B4%EB%9E%98%EC%8A%A4%EC%99%80-%EA%B8%B0%EC%A1%B4-%EA%B5%AC%EC%A1%B0-%EB%B3%B5%EC%8A%B5)
+2. [ScriptableObject 개념 이해하기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#scriptableobject-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+3. [첫 번째 ScriptableObject 만들기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%EC%B2%AB-%EB%B2%88%EC%A7%B8-scriptableobject-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+4. [WeaponSO를 활용하여 무기 데이터 분리하기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#weaponso%EB%A5%BC-%ED%99%9C%EC%9A%A9%ED%95%98%EC%97%AC-%EB%AC%B4%EA%B8%B0-%EB%8D%B0%EC%9D%B4%ED%84%B0-%EB%B6%84%EB%A6%AC%ED%95%98%EA%B8%B0)
+5. [여러 무기 ScriptableObjects 생성하기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#%EC%97%AC%EB%9F%AC-%EB%AC%B4%EA%B8%B0-scriptableobjects-%EC%83%9D%EC%84%B1%ED%95%98%EA%B8%B0)
+6. [Weapon 클래스에 ScriptableObject 적용하기](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#weapon-%ED%81%B4%EB%9E%98%EC%8A%A4%EC%97%90-scriptableobject-%EC%A0%81%EC%9A%A9%ED%95%98%EA%B8%B0)
+7. [ScriptableObjects의 장점과 활용 사례](https://www.notion.so/27fe683f737e8033a929c47e9eb2b23b#scriptableobjects%EC%9D%98-%EC%9E%A5%EC%A0%90%EA%B3%BC-%ED%99%9C%EC%9A%A9-%EC%82%AC%EB%A1%80)
+
+---
+
+## 1. Weapon 클래스와 기존 구조 복습
+
+- 기존에는 `Weapon` 클래스 안에 **SerializeField int damageAmount** 필드가 있었음.
+- 무기가 적을 맞출 경우, `enemyHealth.TakeDamage(damageAmount)`로 직접 데미지를 전달.
+- 문제점: 무기의 종류(권총, 기관총, 저격총 등)가 늘어날수록 무기별 속성을 `Weapon` 클래스 안에 계속 추가해야 했음. → 유지보수 어려움, 확장성 부족.
+
+---
+
+## 2. ScriptableObject 개념 이해하기
+
+- **ScriptableObject란?**
+  - Unity에서 제공하는 특별한 유형의 C# 클래스.
+  - **MonoBehaviour와 다르게 게임 오브젝트에 붙지 않음.**
+  - 장면과 독립적으로 데이터를 저장하고 공유할 수 있음.
+  - 프로젝트 내의 **에셋 파일(Asset)** 형태로 저장됨.
+- **특징**:
+  - Unity 라이프사이클 메서드(`Start()`, `Update()` 등)를 사용하지 않음.
+  - 데이터를 중앙 집중화할 수 있어 여러 클래스에서 재사용 가능.
+  - 주로 게임 내의 **아이템, 무기, 캐릭터 능력치, 퀘스트 데이터 등**을 관리할 때 사용됨.
+
+---
+
+## 3. 첫 번째 ScriptableObject 만들기
+
+1. **Scripts 폴더**에서 새 스크립트 생성 → 이름: `WeaponSO`.
+2. 기본 생성 시 `MonoBehaviour`를 상속하지만, 여기서는 `ScriptableObject`로 변경.
+
+   ```csharp
+   public class WeaponSO : ScriptableObject
+   {
+       public int Damage = 1;
+       public float FireRate = 0.5f;
+   }
+   ```
+
+3. **[CreateAssetMenu] 속성** 추가:
+   - 에셋 생성 시 메뉴에 표시되도록 함.
+
+   ```csharp
+   [CreateAssetMenu(fileName = "WeaponSO", menuName = "Scriptable Objects/WeaponSO")]
+   public class WeaponSO : ScriptableObject
+   {
+       public int Damage = 1;
+       public float FireRate = 0.5f;
+   }
+   ```
+
+4. 이제 `Assets > Create > Scriptable Objects > WeaponSO` 경로로 새로운 무기 데이터를 생성할 수 있음.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380448/notion-blog/_/3D_/3D_/_6_2/image_22.png)
+
+```csharp
+추가된 Scriptable Objects 만들기
+```
+
+---
+
+## 4. WeaponSO를 활용하여 무기 데이터 분리하기
+
+- 예를 들어, **권총(Pistol)**을 하나 생성:
+  - Damage = 1
+  - FireRate = 0.5
+- 이 데이터는 이제 게임 오브젝트와 독립적으로 관리되며, 여러 무기에서 재사용 가능.
+
+---
+
+## 5. 여러 무기 ScriptableObjects 생성하기
+
+- 동일한 방식으로 **다양한 무기 에셋 생성 가능**:
+  1. **Pistol**
+     - Damage = 1
+     - FireRate = 0.5
+  2. **Machine Gun**
+     - Damage = 1
+     - FireRate = 0.2
+  3. **Sniper Rifle**
+     - Damage = 5
+     - FireRate = 1.0
+- Unity 내에서 Ctrl+D 로 복제 → 이름만 변경 → 값 수정으로 빠르게 다양한 무기 SO 생성 가능.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380448/notion-blog/_/3D_/3D_/_6_2/image_23.png)
+
+```csharp
+각 무기에 맞는 SO 파일
+```
+
+---
+
+## 6. Weapon 클래스에 ScriptableObject 적용하기
+
+1. 기존 코드에서 `damageAmount` 제거.
+2. 대신 `WeaponSO` 타입의 필드 추가.
+
+   ```csharp
+   [SerializeField] WeaponSO weaponSO;
+   ```
+
+3. 무기를 발사할 때 `weaponSO.Damage` 참조하도록 수정.
+
+   ```csharp
+   enemyHealth?.TakeDamage(weaponSO.Damage);
+   ```
+
+4. Inspector에서 원하는 ScriptableObject(Pistol, Machine Gun, Sniper Rifle 등)를 드래그&드롭으로 할당.
+5. 플레이 시 해당 SO에 따라 다른 데미지/발사 속도 동작.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380448/notion-blog/_/3D_/3D_/_6_2/image_24.png)
+
+```csharp
+만들어진 SO 파일 연결해주기
+```
+
+---
+
+## 7. ScriptableObjects의 장점과 활용 사례
+
+- **장점**:
+  - 데이터와 로직을 분리 → 코드가 더 간결하고 모듈화됨.
+  - 에셋 형태로 관리 → 프로젝트 전체에서 재사용 가능.
+  - 여러 무기/아이템을 쉽게 생성하고 값만 바꿔 다양한 데이터를 가질 수 있음.
+- **활용 사례**:
+  - RPG 게임: 무기, 방어구, 아이템, 스킬 데이터 관리.
+  - 농장 게임: 수십/수백 가지 작물과 아이템 데이터 관리.
+  - 퀘스트 시스템: 퀘스트 목표와 보상을 ScriptableObject로 저장.
+
+---
+
+✅ **정리**
+
+이번 강의에서는 **무기 속성을 MonoBehaviour에 직접 작성하는 방식에서 ScriptableObject로 분리하는 방법**을 배웠습니다.
+
+이를 통해 **데이터 중심의 아키텍처**를 구축하고, 무기 종류를 손쉽게 추가/변경할 수 있는 구조로 개선할 수 있었습니다.

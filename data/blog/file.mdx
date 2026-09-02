@@ -1,0 +1,186 @@
+---
+title: 'File 관리'
+date: '2026-09-02'
+category: '기타, 사용 적음/국비'
+tags: ['기타, 사용 적음', '국비']
+draft: false
+summary: ''
+---
+
+# 1. FileUpload
+
+```jsx
+Upload에 필요한 API는 기본 내장
+```
+
+## 1. Form 태그 수정
+
+```jsx
+# method 속성의 값은 post
+# enctype 속성의 값은 multipart/form-data
+
+<form action="url주소" method="post" enctype="multipart/form-data">
+    <input type="file" name="files">
+    ...
+</form>
+```
+
+## 2. [application.properties](http://application.properties) 설정
+
+```jsx
+########################################### FileUpload
+## Multipart 사용 여부
+spring.servlet.multipart.enabled=true
+## 파일 하나당 최대 크기 설정
+spring.servlet.multipart.max-file-size=10MB
+## 총 파일 최대 크기 설정
+spring.servlet.multipart.max-request-size=50MB
+```
+
+## 3. Controller에서 파라미터 처리
+
+```jsx
+1. 메서드의 매개변수로 선언
+MultiPartFile 파라미터명
+MultiPartFile [] 파라미터명
+
+2. VO(DTO)의 멤버변수로 선언
+private MultiPartFile 파라미터명
+private [] MultiPartFile 파라미터명
+```
+
+## 4. HDD에 File 저장
+
+```jsx
+1. 배포시 WAS에 배포
+	 - 기본 방식(Legacy) 사용 가능
+
+2. Java명령어로 실행 배포(단독 실행)
+	 - 프로젝트내부가 아닌 배포(운영) 서버에 특정 폴더에 저장
+
+a. application.properties
+	 - 저장할 폴더 경로 작성
+	 app.upload.qna=D:/result/upload/qna/
+
+b. File 객체 생성 폴더 생성
+
+c. 저장할 파일명 생성
+
+e. 파일을 저장
+	 1) FileCopyUtils.copy()
+	 2) mutipartFile.transferTo()
+
+```
+
+## 5. 요청 시 App 외부 폴더의 파일 접근
+
+```jsx
+요청이 발생 했을 때 URL과 Local 경로를 Mapping 해 주어야 함
+
+1. application.properties
+
+## Upload 경로
+app.upload.qna=D:/result/upload/qna/
+
+## 요청시 파일 경로
+app.upload.base=file:///result/upload/
+app.upload.base=file:///C:/result/upload/   :
+
+app.url.path=/file/**
+
+/file/** 시작하는 URL요청을 Controller로 보내지 않고 /result/upload에서 반환
+현재 Project를 D드라이브에서 실행하면 /(root)의 경로는  D:/ 가 되고
+현재 Project를 C드라이브에서 실행하면 /(root)의 경로는  C:/ 가 되고
+
+**** 추가
+app.upload.base=file:///C:/result/upload/    Windows OS인 경우 Root경로가 잘 잡히지 않는 문제가 발생 할 수 있으므로 Driver명을 명시
+
+*/
+2. Mapping 설정
+	Servlet-context.xml 의 <resources ...>코드를 java로 설정
+	a. 설정할 class 생성
+	b. WebMvcConfigure Interface 구현
+	c. addResourceHandlers 오버라이딩 : URL과 Local 연결
+
+@Configuration  // ***-context.xml
+@Slf4j
+public class WebConfig implements WebMvcConfigurer {
+
+	@Value("${app.upload.base}")//spEl
+	private String filePath;
+
+	@Value("${app.url.path}")
+	private String urlPath;
+
+	@Override
+	public void addResourceHandlers(ResourceHandlerRegistry registry) {
+		// TODO Auto-generated method stub
+		log.info("=====================================");
+		log.info("filePath {} ", filePath );
+		log.info("urlPath {} ", urlPath);
+		log.info("=====================================");
+
+		//<resources mapping="/resources/**" location="/resources/" />
+		registry.addResourceHandler(urlPath) //요청 URL 주소
+				.addResourceLocations(filePath);
+	}
+
+}
+
+```
+
+# FileDown
+
+```jsx
+파일을 다운로드 할 수 있도록 Custom View 사용
+BeanNameViewResolver 클래스 사용
+
+1. CustomView 역할의 class 생성
+	 - AbstractView 추상 클래스 상속
+	 - renderMergedOutputModel 오버라이딩
+
+2. Constroller에서 view의 이름을 CustomView의 이름으로 설정
+	 modelAndView.setViewName("CustomView의 bean name")
+
+3. renderMergedOutputModel 다운 로드 코드 작성
+
+	@Override
+	protected void renderMergedOutputModel(Map<String, Object> model, HttpServletRequest request,
+			HttpServletResponse response) throws Exception {
+
+		 QnaFileVO qnaFileVO = (QnaFileVO)model.get("fileVO");
+		 log.info("--------------------------------");
+		 log.info("FILEVO {} ", qnaFileVO);
+
+		 File file = new File("D:/result/upload/qna/", qnaFileVO.getFileName());
+
+		 //한글 처리
+		 response.setCharacterEncoding("UTF-8");
+
+		 //총 파일의 크기
+		 response.setContentLengthLong(file.length());
+
+		 //다운로드시 파일의 이름을 인코딩
+		 String oriName = URLEncoder.encode(qnaFileVO.getOriName(), "UTF-8");
+
+		 //header 설정
+		 response.setHeader("Content-Disposition", "attachment;filename=\""+oriName+"\"");
+		 response.setHeader("Content-Transfer-Encoding", "binary");
+
+		 //HDD에서 파일을 읽고
+		 FileInputStream fi = new FileInputStream(file);
+		 //Client 로 전송 준비
+		 OutputStream os = response.getOutputStream();
+
+		 //전송
+		 FileCopyUtils.copy(fi, os);
+
+		 //자원 해제
+		 os.close();
+		 fi.close();
+
+
+
+
+	}
+```

@@ -1,0 +1,1268 @@
+---
+title: '섹션 4: 백엔드: 인증 기능 - 2 -'
+date: '2026-09-02'
+category: '풀스택/React를 사용한 Node 풀스택 웹 애플리케이션 빌드 및 배포'
+tags: ['풀스택', 'React를 사용한 Node 풀스택 웹 애플리케이션 빌드 및 배포']
+draft: false
+summary: ''
+---
+
+# { User (사용자 관련) 인터페이스, 모델 설정 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381344/notion-blog/_/React_Node_/_4_-_2_-/image.png)
+
+## 유저 인터페이스
+
+```jsx
+인터페이스는 데이터의 구조를 정의하는 "청사진"이라고 생각할 수 있어요. 예를 들어, 어떤 객체가 어떻게 생겼고,
+
+어떤 속성(필드)을 가지고 있는지 미리 약속해 두는 거예요.
+
+자바스크립트에서 객체를 다룰 때, 이 객체가 어떤 모양인지 명확하게 하기 위해 사용합니다.
+```
+
+```jsx
+import mongoose, { Document } from 'mongoose'; // Mongoose와 Document 타입을 불러옴
+import { ObjectId } from 'mongodb'; // MongoDB의 ObjectId 타입을 불러옴
+
+// IUserDocument는 MongoDB에 저장될 User 문서를 정의하는 인터페이스입니다.
+// MongoDB에 저장될 각 사용자에 대한 정보들이 포함됩니다.
+export interface IUserDocument extends Document {
+  _id: string | ObjectId; // MongoDB에서 생성되는 유저의 고유 ID
+  authId: string | ObjectId; // 인증 시스템에서 사용되는 유저의 ID
+  username?: string; // 유저의 사용자명 (선택 사항)
+  email?: string; // 유저의 이메일 (선택 사항)
+  password?: string; // 유저의 암호 (선택 사항)
+  avatarColor?: string; // 유저 아바타의 색상 (선택 사항)
+  uId?: string; // 유저의 고유 식별자 (선택 사항)
+  postsCount: number; // 유저가 작성한 게시물 수
+  work: string; // 유저의 직장 정보
+  school: string; // 유저의 학교 정보
+  quote: string; // 유저의 자기소개나 인용구
+  location: string; // 유저의 위치 정보
+  blocked: mongoose.Types.ObjectId[]; // 유저가 차단한 다른 유저들의 ID 리스트
+  blockedBy: mongoose.Types.ObjectId[]; // 유저를 차단한 다른 유저들의 ID 리스트
+  followersCount: number; // 유저를 팔로우하는 사람 수
+  followingCount: number; // 유저가 팔로우하는 사람 수
+  notifications: INotificationSettings; // 유저의 알림 설정
+  social: ISocialLinks; // 유저의 소셜 미디어 링크
+  bgImageVersion: string; // 배경 이미지 버전 정보
+  bgImageId: string; // 배경 이미지 ID
+  profilePicture: string; // 프로필 사진 URL
+  createdAt?: Date; // 유저가 생성된 날짜 (선택 사항)
+}
+
+// 비밀번호 재설정을 위한 파라미터들을 정의하는 인터페이스입니다.
+export interface IResetPasswordParams {
+  username: string; // 비밀번호 재설정 요청한 유저의 사용자명
+  email: string; // 유저의 이메일
+  ipaddress: string; // 요청 시 유저의 IP 주소
+  date: string; // 요청한 날짜 정보
+}
+
+// 유저의 알림 설정을 정의하는 인터페이스입니다.
+// 각 속성은 true일 경우 해당 이벤트에 대한 알림을 받습니다.
+export interface INotificationSettings {
+  messages: boolean; // 메시지 알림 여부
+  reactions: boolean; // 반응(좋아요, 이모티콘 등) 알림 여부
+  comments: boolean; // 댓글 알림 여부
+  follows: boolean; // 팔로우 알림 여부
+}
+
+// 유저의 기본 프로필 정보를 정의하는 인터페이스입니다.
+export interface IBasicInfo {
+  quote: string; // 유저의 인용구나 자기소개
+  work: string; // 직장 정보
+  school: string; // 학교 정보
+  location: string; // 위치 정보
+}
+
+// 유저의 소셜 미디어 링크 정보를 정의하는 인터페이스입니다.
+export interface ISocialLinks {
+  facebook: string; // 페이스북 링크
+  instagram: string; // 인스타그램 링크
+  twitter: string; // 트위터 링크
+  youtube: string; // 유튜브 링크
+}
+
+// 검색 결과에서 보여줄 유저 정보를 정의하는 인터페이스입니다.
+export interface ISearchUser {
+  _id: string; // 유저의 고유 ID
+  profilePicture: string; // 유저의 프로필 사진
+  username: string; // 유저의 사용자명
+  email: string; // 유저의 이메일
+  avatarColor: string; // 유저 아바타 색상
+}
+
+// 소켓 통신에서 사용할 데이터를 정의하는 인터페이스입니다.
+export interface ISocketData {
+  blockedUser: string; // 차단한 유저의 ID
+  blockedBy: string; // 차단당한 유저의 ID
+}
+
+// 로그인 정보를 정의하는 인터페이스입니다.
+export interface ILogin {
+  userId: string; // 로그인한 유저의 ID
+}
+
+// 유저 작업에 대한 정보를 정의하는 인터페이스입니다.
+export interface IUserJobInfo {
+  key?: string; // 작업에 대한 키값 (선택 사항)
+  value?: string | ISocialLinks; // 작업과 관련된 값 (소셜 링크 포함)
+}
+
+// 유저 작업과 관련된 정보를 정의하는 인터페이스입니다.
+export interface IUserJob {
+  keyOne?: string; // 첫 번째 키 (선택 사항)
+  keyTwo?: string; // 두 번째 키 (선택 사항)
+  key?: string; // 작업에 대한 키값
+  value?: string | INotificationSettings | IUserDocument; // 작업과 관련된 값
+}
+
+// 이메일 작업에 필요한 정보를 정의하는 인터페이스입니다.
+export interface IEmailJob {
+  receiverEmail: string; // 이메일 수신자의 주소
+  template: string; // 이메일 템플릿
+  subject: string; // 이메일 제목
+}
+
+// 모든 유저의 목록과 총 유저 수를 정의하는 인터페이스입니다.
+export interface IAllUsers {
+  users: IUserDocument[]; // 유저들의 문서 배열
+  totalUsers: number; // 총 유저 수
+}
+
+```
+
+## 1. 사용자 인터페이스와 모델 생성
+
+```jsx
+사용자 문서(UserDocument): MongoDB에 저장될 사용자의 정보를 정의하는 인터페이스입니다.
+
+사용자의 ID, 인증 정보(authId), 이메일, 패스워드, 아바타 색상, 프로필 사진, 게시물 수, 팔로워 및 팔로잉 수,
+
+차단된 사용자 목록, 알림 설정, 소셜 링크, 배경 이미지 정보 등이 포함됩니다.
+
+이 데이터 중 일부(예: 인증 정보, 소셜 링크)는 Redis에만 저장되며, MongoDB에는 저장되지 않습니다.
+
+이러한 데이터를 Redis에서 관리하여 빠른 액세스가 가능합니다.
+```
+
+## 2. 인터페이스 설명
+
+```jsx
+IUserDocument:
+
+사용자 문서를 나타내며, MongoDB에 저장될 사용자의 필드와 구조를 정의합니다.
+
+사용자의 인증 ID(authId), 이메일, 패스워드, 차단 목록 등 다양한 속성들이 포함됩니다.
+
+IResetPasswordParams:
+
+비밀번호 재설정 시 필요한 데이터를 정의합니다.
+
+INotificationSettings:
+
+알림 설정을 관리하는 인터페이스로, 메시지, 리액션, 댓글, 팔로우 알림 등을 정의합니다.
+
+IBasicInfo:
+
+사용자 기본 정보를 나타내며, 직업, 학교, 위치 등의 정보를 포함합니다.
+
+ISocialLinks:
+
+사용자의 소셜 미디어 링크 정보를 저장하는 인터페이스입니다.
+
+기타 인터페이스:
+
+사용자 검색, 소켓 데이터, 로그인 정보, 작업(job) 관련 데이터 등도 정의됩니다.
+```
+
+## 유저 스키마 ( 모델 )
+
+```jsx
+userSchema:
+
+Mongoose를 사용하여 MongoDB에 저장될 사용자 스키마를 정의합니다.
+
+이 스키마는 사용자의 프로필 사진, 게시물 수, 팔로워 및 팔로잉 수, 차단 목록, 알림 설정, 소셜 링크 등을 포함하며,
+
+데이터베이스에 저장될 필드를 지정합니다.
+
+기본적으로 MongoDB 컬렉션에 저장되며, 스키마는 User라는 이름으로 정의됩니다.
+```
+
+```jsx
+모델은 데이터베이스와 소통하기 위한 도구입니다.
+
+실제로 MongoDB 같은 데이터베이스에 데이터를 저장하거나 가져올 때 이 모델을 사용해요.
+
+모델은 데이터베이스에 저장될 자료의 형식과 그 자료가 어떻게 동작할지를 정의합니다.
+
+쉽게 말해, 모델은 데이터베이스와 자바스크립트 사이의 다리 역할을 합니다.
+```
+
+```jsx
+import { IUserDocument } from '@user/interfaces/user.interface'; // IUserDocument 타입을 불러옴 (유저 문서 구조를 정의)
+import mongoose, { model, Model, Schema } from 'mongoose'; // mongoose에서 모델 생성과 관련된 기능들을 불러옴
+
+// User 컬렉션의 스키마를 정의합니다.
+// 각 필드의 타입과 기본값을 설정하여 데이터베이스에 저장될 유저 정보를 구조화합니다.
+const userSchema: Schema = new Schema({
+  authId: { type: mongoose.Schema.Types.ObjectId, ref: 'Auth', index: true },
+  // 인증 ID를 참조하며, ObjectId 타입입니다. 'Auth' 컬렉션을 참조하는 필드로 설정. 인덱스를 추가하여 검색 성능 향상.
+
+  profilePicture: { type: String, default: '' },
+  // 유저의 프로필 사진 URL을 저장하는 필드, 기본값은 빈 문자열.
+
+  postsCount: { type: Number, default: 0 },
+  // 유저가 작성한 게시물의 수, 기본값은 0.
+
+  followersCount: { type: Number, default: 0 },
+  // 유저를 팔로우하는 사람들의 수, 기본값은 0.
+
+  followingCount: { type: Number, default: 0 },
+  // 유저가 팔로우하는 사람들의 수, 기본값은 0.
+
+  passwordResetToken: { type: String, default: '' },
+  // 비밀번호 재설정을 위한 토큰, 기본값은 빈 문자열.
+
+  passwordResetExpires: { type: Number },
+  // 비밀번호 재설정 토큰의 만료 시간. 숫자형으로 Unix timestamp 형태로 저장될 가능성이 있음.
+
+  blocked: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  // 유저가 차단한 다른 유저들의 목록. 'User' 컬렉션을 참조하는 ObjectId 배열.
+
+  blockedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  // 유저를 차단한 다른 유저들의 목록. 'User' 컬렉션을 참조하는 ObjectId 배열.
+
+  notifications: {
+    // 유저의 알림 설정을 저장하는 객체.
+    messages: { type: Boolean, default: true }, // 메시지 알림 활성화 여부, 기본값은 true.
+    reactions: { type: Boolean, default: true }, // 반응 알림 활성화 여부, 기본값은 true.
+    comments: { type: Boolean, default: true }, // 댓글 알림 활성화 여부, 기본값은 true.
+    follows: { type: Boolean, default: true } // 팔로우 알림 활성화 여부, 기본값은 true.
+  },
+
+  social: {
+    // 유저의 소셜 미디어 링크를 저장하는 객체.
+    facebook: { type: String, default: '' }, // 페이스북 링크, 기본값은 빈 문자열.
+    instagram: { type: String, default: '' }, // 인스타그램 링크, 기본값은 빈 문자열.
+    twitter: { type: String, default: '' }, // 트위터 링크, 기본값은 빈 문자열.
+    youtube: { type: String, default: '' } // 유튜브 링크, 기본값은 빈 문자열.
+  },
+
+  work: { type: String, default: '' },
+  // 유저의 직장 정보, 기본값은 빈 문자열.
+
+  school: { type: String, default: '' },
+  // 유저의 학교 정보, 기본값은 빈 문자열.
+
+  location: { type: String, default: '' },
+  // 유저의 위치 정보, 기본값은 빈 문자열.
+
+  quote: { type: String, default: '' },
+  // 유저의 자기소개나 인용구, 기본값은 빈 문자열.
+
+  bgImageVersion: { type: String, default: '' },
+  // 유저 프로필의 배경 이미지 버전 정보. 기본값은 빈 문자열.
+
+  bgImageId: { type: String, default: '' }
+  // 유저 프로필의 배경 이미지 ID 정보. 기본값은 빈 문자열.
+});
+
+// 'User'라는 이름의 모델을 생성합니다. 이 모델은 IUserDocument 인터페이스를 구현하며, 'User' 컬렉션과 연결됩니다.
+const UserModel: Model<IUserDocument> = model<IUserDocument>('User', userSchema, 'User');
+
+// UserModel을 내보내 다른 모듈에서 사용할 수 있도록 합니다.
+export { UserModel };
+
+```
+
+## 4. MongoDB와 Redis 저장 전략
+
+```jsx
+MongoDB에는 사용자의 기본 정보(ID, 팔로워 수 등)만 저장되며,
+
+인증 정보(이메일, 패스워드, 소셜 링크 등)는 Redis에 저장됩니다.
+
+이는 성능 최적화를 위해 Redis에 빠른 접근이 필요한 데이터를 저장하고,
+
+중요한 사용자 정보는 MongoDB에 저장하는 구조를 유지합니다.
+```
+
+### \* tsconfig.json 에 경로를 추가해줘야 짧은 경로를 사용 가능하다 잊지말자
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381342/notion-blog/_/React_Node_/_4_-_2_-/image_1.png)
+
+# { Redis 설치 및 연결 설정 }
+
+## Redis 설치
+
+```jsx
+Redis를 설치해야 합니다.
+```
+
+```jsx
+npm i redis
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381342/notion-blog/_/React_Node_/_4_-_2_-/image_2.png)
+
+```jsx
+npm i redis
+```
+
+## 폴더 구조
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381342/notion-blog/_/React_Node_/_4_-_2_-/image_3.png)
+
+```jsx
+services 폴더 안에 redis라는 폴더를 만들고, 여기에 Redis 관련 코드를 작성할 것입니다.
+```
+
+## Base Cache 클래스 작성 (base.cache.ts)
+
+```jsx
+Redis 연결을 처리하는 기본 클래스(Base Class)를 만듭니다. 이 클래스는 Redis 클라이언트를 생성하고,
+
+다른 클래스들이 상속할 수 있도록 설정을 합니다.
+```
+
+```jsx
+import { createClient } from 'redis'; // Redis 클라이언트를 import
+import Logger from 'bunyan'; // 로깅을 위한 라이브러리
+import { config } from '@root/config'; // 설정 파일에서 환경 변수 불러옴
+
+// Redis 클라이언트 타입 설정
+export type RedisClient = ReturnType<typeof createClient>;
+
+// 추상 클래스 BaseCache를 작성
+export abstract class BaseCache {
+  client: RedisClient;
+  log: Logger;
+
+  constructor(cacheName: string) {
+    // Redis 클라이언트를 생성하고 URL 설정
+    this.client = createClient({ url: config.REDIS_HOST });
+    // 로그 설정
+    this.log = config.createLogger(cacheName);
+    // 에러를 처리하는 메서드 호출
+    this.cacheError();
+  }
+
+  // 에러가 발생하면 로그에 기록하는 메서드
+  private cacheError(): void {
+    this.client.on('error', (error: unknown) => {
+      this.log.error(error);
+    });
+  }
+}
+
+```
+
+### 추상 클래스란 무엇일까요?
+
+```jsx
+추상 클래스는 일종의 설계도입니다. 완전한 클래스는 아니고, 공통적인 기능과 구조를 정의해둔 틀이라고 생각하면 됩니다.
+
+추상 클래스는 직접적으로 인스턴스(객체)를 생성할 수 없고,
+
+반드시 다른 클래스가 상속해서 구체적인 기능을 추가한 뒤에 사용할 수 있습니다.
+
+예를 들어, BaseCache는 여러 캐시 시스템에서 공통적으로 사용할 수 있는 기본적인 설정과 기능만을 정의하고,
+
+구체적인 동작은 각 캐시 시스템에서 별도로 구현하도록 설계되어 있습니다.
+```
+
+### 왜 `BaseCache`를 추상 클래스로 만들었나요?
+
+```jsx
+공통 기능 재사용
+
+		BaseCache 클래스는 Redis 클라이언트를 만들고, 에러를 처리하는 공통적인 로직을 포함하고 있습니다.
+
+		여러 곳에서 Redis 캐시를 사용하게 될 경우, 모든 곳에서 이 공통 기능을 반복적으로 작성하는 것은 비효율적이겠죠?
+
+		따라서 이 공통 기능을 한 곳에서 정의하고,
+
+		이를 상속받아 재사용할 수 있도록 하는 것이 추상 클래스의 핵심 목적입니다.
+
+상속받은 클래스에서 재사용
+
+		BaseCache는 직접 사용되기 위한 클래스가 아니라, 다른 클래스들이 상속하여 사용할 기본 기능들을 제공하는 클래스입니다.
+
+		즉, 다른 구체적인 캐시 관련 클래스들이 BaseCache를 상속받아 Redis 클라이언트를 손쉽게 생성하고,
+
+		에러 처리 로직을 재사용할 수 있게 됩니다.
+
+		예를 들어, 나중에 유저 캐시를 다루는 UserCache 같은 클래스를 만들면,
+
+		BaseCache로부터 Redis 연결 설정과 에러 처리를 자동으로 상속받아서 손쉽게 사용할 수 있게 됩니다.
+```
+
+```jsx
+class UserCache extends BaseCache {
+  constructor() {
+    super('UserCache') // BaseCache의 생성자 호출
+  }
+
+  // UserCache만의 추가 기능을 여기에 작성
+}
+```
+
+```jsx
+이렇게 하면 UserCache는 이미 BaseCache가 제공하는 Redis 클라이언트 연결 및 에러 처리 기능을 자동으로 상속받게 됩니다.
+
+굳이 동일한 코드를 여러 번 작성할 필요 없이 재사용할 수 있다는 장점이 있죠.
+```
+
+## Redis 연결 클래스 작성 (redis.connection.ts)
+
+```jsx
+이제 BaseCache 클래스를 상속받는 RedisConnection 클래스를 작성합니다. 이 클래스는 Redis 서버에 연결하고 상태를 확인하는 역할을 합니다.
+```
+
+```jsx
+import Logger from 'bunyan';
+import { config } from '@root/config';
+import { BaseCache } from '@service/redis/base.cache'; // BaseCache 상속
+
+const log: Logger = config.createLogger('redisConnection');
+
+class RedisConnection extends BaseCache {
+  constructor() {
+    super('redisConnection');
+  }
+
+  // Redis에 연결하는 비동기 함수
+  async connect(): Promise<void> { // 비동기 함수는 기본적으로 항상 Promise를 반환
+    try {
+      // Redis 클라이언트 연결
+      await this.client.connect();
+      // Ping 명령어로 연결 상태 확인
+      const res = await this.client.ping();
+      console.log(res, 'redis'); // 연결 성공 시 'PONG' 메시지 출력
+    } catch (error) {
+      log.error(error); // 에러 발생 시 로그 출력
+    }
+  }
+}
+
+// redisConnection 객체를 export
+export const redisConnection: RedisConnection = new RedisConnection();
+```
+
+```jsx
+BaseCache를 상속받아 RedisConnection 클래스를 만들고, Redis 서버에 연결하는 connect 메서드를 정의했습니다.
+
+ping 명령어를 사용해 Redis 서버 연결을 테스트할 수 있습니다. 성공하면 PONG 메시지가 출력됩니다. ( 공식문서 확인 )
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381343/notion-blog/_/React_Node_/_4_-_2_-/image_4.png)
+
+## 데이터베이스 연결 설정 파일 수정 (setupDatabase.ts)
+
+```jsx
+이제 데이터베이스 연결 설정 파일에 Redis 연결을 추가합니다.
+
+데이터베이스가 연결될 때 Redis도 함께 연결되도록 설정합니다.
+
+MongoDB와 Redis가 모두 연결되도록 설정했습니다. 데이터베이스 연결 후 Redis 연결을 시도하고, 연결 상태를 확인합니다.
+
+setupDatabase.ts 파일을 수정합니다.
+
+* redisConnection.connect(); 추가
+```
+
+```jsx
+import mongoose from 'mongoose';
+import { redisConnection } from '@service/redis/redis.connection';
+import { config } from '@root/config';
+import Logger from 'bunyan';
+
+const log: Logger = config.createLogger('setupDatabase');
+
+export default () => {
+  const connect = () => {
+    // MongoDB 연결
+    mongoose
+      .connect(`${config.DATABASE_URL}`)
+      .then(() => {
+        log.info('Successfully connected to database.');
+        // 데이터베이스 연결 시 Redis도 연결
+        redisConnection.connect();
+      })
+      .catch((error) => {
+        log.error('Error connecting to database', error);
+        return process.exit(1); // 연결 실패 시 프로세스 종료
+      });
+  };
+
+  connect();
+
+  // 데이터베이스 연결이 끊겼을 때 재연결
+  mongoose.connection.on('disconnected', connect);
+};
+
+```
+
+## Redis 연결 테스트
+
+```jsx
+Redis 서버가 실행 중인지 확인한 후, 애플리케이션을 실행하여 Redis 연결을 테스트합니다.
+
+터미널에 PONG 메시지가 출력되면 Redis 연결이 성공적으로 이루어진 것입니다.
+```
+
+```jsx
+npm run dev
+```
+
+# { Redis를 활용한 사용자 데이터 캐싱 이해하기 }
+
+## 1. **캐시란 무엇일까요?**
+
+```jsx
+캐시는 자주 사용하는 데이터를 빠르게 불러올 수 있도록 메모리 같은 빠른 저장 공간에 저장해 두는 기술이에요.
+
+예를 들어, 웹사이트에서 어떤 사용자가 자주 자신의 프로필을 조회한다고 생각해볼게요.
+
+그때마다 데이터베이스(DB)에서 정보를 가져오면 시간이 많이 걸릴 수 있어요.
+
+하지만 그 정보를 미리 캐시에 저장해 두면 훨씬 빠르게 데이터를 불러올 수 있어요.
+
+그래서 이번 강의에서는 이런 자주 조회될 가능성이 높은 사용자 데이터를 Redis라는 캐시 서버에 저장하는 방법을 다루고 있어요.
+```
+
+## 2. **왜 모든 데이터를 저장하지 않을까요?**
+
+```jsx
+모든 데이터를 Redis에 저장하면 서버 자원이 너무 많이 사용될 수 있어요.
+
+그래서 자주 사용되거나 빨리 불러와야 하는 중요한 데이터만 저장하는 거예요.
+
+예를 들어, 사용자의 프로필 정보는 자주 사용되기 때문에 캐시에 저장하는 게 좋아요.
+
+하지만 알림(Notification) 같은 데이터는 잠깐 기다려도 괜찮기 때문에 캐시에 저장하지 않아도 됩니다.
+```
+
+## 3. **Redis에 데이터를 어떻게 저장하나요?**
+
+```jsx
+Redis에는 데이터를 저장할 수 있는 여러 가지 방법이 있어요.
+
+이번 강의에서는 사용자 정보를 Redis의 "셋(Set)"이라는 구조로 저장하려고 해요.
+
+간단히 말해서, 셋은 서로 다른 값들을 모아놓은 일종의 배열 같은 구조예요.
+
+Redis에는 데이터를 문자열(String) 형태로도 저장할 수 있고, 리스트(List), 셋(Set) 등 다양한 형태로 저장할 수 있어요.
+
+이 강의에서는 사용자 데이터를 빠르게 불러오고, 전체 데이터를 한번에 가져오기 위해서 "셋(Set)" 구조를 사용해요.
+```
+
+## 4. **강의 코드 내용 설명**
+
+```jsx
+import { BaseCache } from '@service/redis/base.caches'; // Redis와 상호작용하는 기본 캐시 클래스 임포트
+import { IUserDocument } from '@user/interfaces/user.interface'; // 사용자 인터페이스를 임포트하여 타입 안전성을 보장
+
+// UserCache 클래스는 BaseCache 클래스를 상속하며 사용자 데이터를 Redis에 캐싱하는 기능을 담당
+export class UserCache extends BaseCache {
+  constructor() {
+    // BaseCache 클래스의 생성자를 호출하고, 캐시의 이름을 'userCache'로 설정
+    super('userCache');
+  }
+
+  // 사용자를 Redis 캐시에 저장하는 메서드
+  // key는 Redis에서 사용자 데이터를 식별하는 키로 사용되고,
+  // userId는 사용자의 고유 식별자, createdUser는 저장할 사용자 데이터이다.
+  public async saveUserToCache(key: string, userId: string, createdUser: IUserDocument): Promise<void> {
+    // 사용자가 생성된 시간을 기록
+    const createdAt = new Date();
+
+    // createdUser 객체에서 필요한 속성들을 구조분해 할당으로 추출
+    const {
+      _id, uId, username, email, avatarColor, blocked, blockedBy, postsCount,
+      profilePicture, followersCount, followingCount, notifications, work,
+      location, school, quote, bgImageId, bgImageVersion, social
+    } = createdUser;
+
+    // 첫 번째 리스트는 Redis에 저장될 사용자의 기본 정보들을 포함
+    const firstList: string[] = [
+      '_id', `${_id}`,  // 사용자 ID
+      'uId', `${uId}`,  // 사용자 고유 uId
+      'username', `${username}`,  // 사용자 이름
+      'email', `${email}`,  // 사용자 이메일
+      'avatarColor', `${avatarColor}`,  // 아바타 색상
+      'createdAt', `${createdAt}`,  // 계정 생성일
+      'postsCount', `${postsCount}`  // 게시물 수
+    ];
+
+    // 두 번째 리스트는 추가적인 정보들로, JSON.stringify를 사용해 배열이나 객체를 문자열로 변환
+    const secondList: string[] = [
+      'blocked', JSON.stringify(blocked),  // 차단한 사용자 목록
+      'blockedBy', JSON.stringify(blockedBy),  // 차단된 사용자 목록
+      'profilePicture', `${profilePicture}`,  // 프로필 사진 URL
+      'followersCount', `${followersCount}`,  // 팔로워 수
+      'followingCount', `${followingCount}`,  // 팔로잉 수
+      'notifications', JSON.stringify(notifications),  // 알림 정보
+      'social', JSON.stringify(social)  // 소셜 미디어 정보
+    ];
+
+    // 세 번째 리스트는 사용자의 배경 정보와 관련된 필드를 포함
+    const thirdList: string[] = [
+      'work', `${work}`,  // 직업 정보
+      'location', `${location}`,  // 위치 정보
+      'school', `${school}`,  // 학교 정보
+      'quote', `${quote}`,  // 사용자 소개글 또는 명언
+      'avatarColor', `${avatarColor}`,  // 아바타 색상(중복 필드)
+      'bgImageVersion', `${bgImageVersion}`,  // 배경 이미지 버전
+      'bgImageId', `${bgImageId}`  // 배경 이미지 ID
+    ];
+
+    // 세 개의 리스트를 하나로 병합하여 저장할 데이터를 준비
+    const dataToSave: string[] = [...firstList, ...secondList, ...thirdList];
+
+    // 이 부분은 Redis에 데이터를 저장하는 로직이 추가될 예정
+  }
+}
+
+```
+
+```jsx
+UserCache 클래스:
+
+이 클래스는 BaseCache라는 기본 캐시 클래스에서 확장된 클래스예요. BaseCache는 캐시와 관련된 기본 기능을 제공하고,
+
+우리는 UserCache를 통해 사용자와 관련된 기능을 추가하려고 해요.
+
+saveUserToCache 메서드:
+
+이 메서드는 사용자 정보를 Redis에 저장하는 역할을 해요. Redis에 데이터를 저장할 때는 키-값 쌍으로 저장해요.
+
+여기서 key는 사용자의 고유 ID가 될 수 있어요. 이 키를 나중에 이용해서 Redis에서 사용자 데이터를 불러올 수 있어요.
+```
+
+```jsx
+public async saveUserToCache(key: string, userId: string, createdUser: IUserDocument): Promise<void>
+
+* 위 코드에서 key는 Redis에 저장할 때 사용할 식별자(예: 사용자 ID)고, createdUser는 새로 생성된 사용자 정보를 담고 있어요.
+```
+
+```jsx
+const firstList: string[] = [
+    '_id', `${_id}`,
+    'uId', `${uId}`,
+    'username', `${username}`,
+    'email', `${email}`,
+    'avatarColor', `${avatarColor}`,
+    'createdAt', `${createdAt}`,
+    'postsCount', `${postsCount}`
+];
+```
+
+```jsx
+데이터 구조:
+
+createdUser 안에 있는 사용자 정보(예: 아이디, 이름, 이메일, 프로필 사진 등)를 여러 개의 리스트로 나눠서 저장하고 있어요.
+
+firstList, secondList, thirdList로 나눠진 각각의 리스트에는 사용자 정보가 키-값 쌍으로 저장되고 있어요.
+
+예를 들어, _id는 사용자의 고유 ID를 가리키고, 그 다음에 실제 ID 값이 저장돼요.
+
+왜 이렇게 나누냐면,
+
+Redis에 데이터를 저장할 때 리스트로 나눠서 효율적으로 저장하고 나중에 불러올 때도 편리하게 가져오기 위해서예요.
+```
+
+## 5. **데이터를 어떻게 저장하나요?**
+
+```jsx
+데이터를 Redis에 저장할 때는 hset이나 zadd 같은 명령어를 사용할 수 있어요.
+
+이 메서드들에 대해 더 깊이 다루지는 않았지만,
+
+중요한 점은 zadd를 사용하면 데이터를 정렬해서 저장할 수 있다는 거예요. 이는 나중에 데이터를 빠르게 가져올 때 유리합니다.
+```
+
+## 6. **문자열로 변환하는 이유**
+
+```jsx
+어떤 데이터는 숫자나 문자열이 아니고, 객체(Object)나 배열(Array)일 수 있어요.
+
+Redis는 이런 복잡한 구조를 직접 저장할 수 없기 때문에, JSON.stringify()를 이용해서 객체나 배열을 문자열로 바꿔서 저장하고,
+
+나중에 데이터를 불러올 때는 JSON.parse()로 다시 객체나 배열 형태로 바꿔요.
+```
+
+# { Redis를 활용한 유저 데이터 캐싱하기 }
+
+```jsx
+이 강의에서는 Redis 캐시를 사용해 유저 데이터를 저장하는 방법을 아주 자세하게 설명하고 있습니다.
+
+코드의 흐름과 Redis 연결, 그리고 데이터를 저장하는 과정을 이해하기 쉽도록 단계별로 설명해 보겠습니다.
+```
+
+## 1. **Redis 연결 설정**
+
+```jsx
+Redis는 서버 메모리에 데이터를 저장해 빠르게 접근할 수 있도록 해주는 데이터베이스입니다.
+
+최신 버전의 Redis 모듈에서는 Redis 연결을 필요할 때마다 생성해야 합니다.
+
+* 요청이 올 때마다 Redis와 연결을 새로 만들어야 한다"**는 뜻입니다.
+
+  예전에는 애플리케이션이 Redis에 한 번 연결하면, 그 연결을 계속 유지하면서 사용할 수 있었는데,
+
+  이제는 요청이 들어올 때마다 Redis 서버와 연결을 확인하고 필요하면 새로 연결을 만들어야 한다는 의미입니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381343/notion-blog/_/React_Node_/_4_-_2_-/image_5.png)
+
+### user.cache.ts 에 추가
+
+```jsx
+// user.cache.ts 에 추가
+
+try {
+    if (!this.client.isOpen) {  // 클라이언트가 열려 있는지 확인
+        await this.client.connect();  // 클라이언트 연결
+    }
+```
+
+```jsx
+이 코드는 Redis 클라이언트가 열려 있는지 확인하고, 열려 있지 않으면 새로운 연결을 생성합니다.
+
+클라이언트가 이미 연결되어 있으면 새로 연결을 만들지 않고 기존 연결을 사용합니다.
+```
+
+## 2. **ZADD 명령어로 Sorted Set에 데이터 저장**
+
+```jsx
+Redis의 ZADD 명령어는 Sorted Set이라는 자료 구조에 데이터를 추가할 때 사용합니다.
+
+여기서 점수(score)를 기준으로 데이터가 정렬됩니다.
+
+예를 들어, user라는 키로 유저의 아이디(userId)를 점수로, 유저의 키(key)를 값으로 저장하는 방식입니다.
+
+* Sorted Set은 Redis에서 데이터를 자동으로 정렬해서 저장하는 특수한 자료 구조입니다.
+
+  이 구조는 데이터(값)마다 점수(score)를 부여하고, 이 점수를 기준으로 값들이 오름차순으로 정렬
+
+  쉽게 말해, Sorted Set은 "순서가 있는 리스트"라고 생각하면 됩니다.
+```
+
+```jsx
+await this.client.ZADD('user', { score: parseInt(userId, 10), value: `${key}` })
+```
+
+```jsx
+이 코드는 user라는 Redis Sorted Set에 userId를 점수로, key를 값으로 추가합니다.
+
+이렇게 하면, 이후에 userId를 기준으로 정렬된 데이터를 쉽게 조회할 수 있습니다.
+
+* userId 를 10진수로 변환해서 사용
+
+* 점수는 ZADD 명령어에서 데이터를 정렬하는 기준이 되는 숫자입니다.
+
+  이 점수를 기준으로 데이터를 오름차순 또는 내림차순으로 정렬할 수 있습니다.
+
+  여기서는 유저의 userId를 숫자로 변환하여 점수로 사용하고 있습니다.
+
+  즉, 유저 ID 값이 클수록 Sorted Set에서 더 뒤쪽에 위치하게 됩니다
+```
+
+## 3. **HSET 명령어로 Hash 데이터 저장**
+
+```jsx
+Redis의 HSET 명령어는 Hash 자료 구조에 데이터를 저장할 때 사용됩니다.
+
+Hash는 키와 값의 쌍으로 이루어진 자료 구조로, 특정 유저에 대한 여러 데이터를 한 번에 저장할 수 있습니다.
+```
+
+```jsx
+await this.client.HSET(`users:${key}`, dataToSave)
+```
+
+```jsx
+이 코드는 users:${key}라는 Hash에 dataToSave라는 데이터를 저장하는 것입니다.
+
+여기서 key는 유저의 고유 ID를 나타내고, dataToSave는 유저에 대한 여러 정보를 포함한 객체입니다.
+
+이후 해당 유저의 데이터를 쉽게 가져올 수 있습니다.
+```
+
+### \* ERR wrong number of arguments for 'hset' command 오류 발생
+
+```jsx
+원인:
+
+1. Redis에 데이터를 저장할 때 HSET 명령어는 "키-값" 쌍으로 데이터를 저장해야 합니다.
+
+2. 원래 코드에서는 모든 데이터를 한번에 배열로 전달했기 때문에 Redis가 어떤 것이 키이고 어떤 것이 값인지 구분하지 못했습니다.
+
+dataToSave = [
+    '_id', '123',           // 0번, 1번 인덱스
+    'username', 'john',     // 2번, 3번 인덱스
+    'email', 'john@mail.com'// 4번, 5번 인덱스
+    // ... 이런식으로 계속
+]
+
+해결방법:
+
+1. 배열에 있는 데이터를 2개씩 나눠서 처리합니다 (첫번째는 키, 두번째는 값)
+
+2. for 루프를 사용해서 2칸씩 건너뛰면서 HSET을 실행합니다.
+
+이렇게 하면 Redis가 키-값 쌍을 정확하게 인식할 수 있습니다.
+
+ // 배열의 데이터를 2개씩 묶어서 Redis에 저장
+      for (let i = 0; i < dataToSave.length; i += 2) {
+        // dataToSave[i]는 키(필드이름), dataToSave[i + 1]는 값
+        // 예: i가 0일 때 => HSET('users:key', '_id', '123')
+        //     i가 2일 때 => HSET('users:key', 'username', 'john')
+        await this.client.HSET(`users:${key}`, dataToSave[i], dataToSave[i + 1]);
+      }
+```
+
+```jsx
+import { BaseCache } from '@service/redis/base.caches';
+import { IUserDocument } from '@user/interfaces/user.interface';
+import { config } from '@root/config';
+import Logger from 'bunyan';
+import { ServerError } from '@global/helpers/error-handler';
+
+const log: Logger = config.createLogger('redisConnection');
+
+export class UserCache extends BaseCache {
+  constructor() {
+    super('userCache');
+  }
+
+  public async saveUserToCache(key: string, userUId: string, createdUser: IUserDocument): Promise<void> {
+    const createdAt = new Date();
+    // 사용자 정보를 구조 분해 할당으로 추출
+    const {
+      _id,
+      uId,
+      username,
+      email,
+      avatarColor,
+      blocked,
+      blockedBy,
+      postsCount,
+      profilePicture,
+      followersCount,
+      followingCount,
+      notifications,
+      work,
+      location,
+      school,
+      quote,
+      bgImageId,
+      bgImageVersion,
+      social
+    } = createdUser;
+
+    // 기본 정보를 배열로 구성
+    const firstList: string[] = [
+      '_id', `${_id}`,
+      'uId', `${uId}`,
+      'username', `${username}`,
+      'email', `${email}`,
+      'avatarColor', `${avatarColor}`,
+      'createdAt', `${createdAt}`,
+      'postsCount', `${postsCount}`
+    ];
+
+    // 사용자 상태 정보를 배열로 구성
+    const secondList: string[] = [
+      'blocked', JSON.stringify(blocked),
+      'blockedBy', JSON.stringify(blockedBy),
+      'profilePicture', `${profilePicture}`,
+      'followersCount', `${followersCount}`,
+      'followingCount', `${followingCount}`,
+      'notifications', JSON.stringify(notifications),
+      'social', JSON.stringify(social)
+    ];
+
+    // 추가 프로필 정보를 배열로 구성
+    const thirdList: string[] = [
+      'work', `${work}`,
+      'location', `${location}`,
+      'school', `${school}`,
+      'quote', `${quote}`,
+      'bgImageVersion', `${bgImageVersion}`,
+      'bgImageId', `${bgImageId}`
+    ];
+
+    // 모든 리스트를 하나의 배열로 합침
+    const dataToSave: string[] = [...firstList, ...secondList, ...thirdList];
+
+    try {
+      // Redis 연결이 닫혀있으면 연결
+      if (!this.client.isOpen) {
+        await this.client.connect();
+      }
+
+      // 사용자 정보를 Redis sorted set에 추가
+      await this.client.ZADD('user', { score: parseInt(userUId, 10), value: `${key}` });
+
+      // 배열의 데이터를 2개씩 묶어서 Redis에 저장
+      for (let i = 0; i < dataToSave.length; i += 2) {
+        // dataToSave[i]는 키(필드이름), dataToSave[i + 1]는 값
+        // 예: i가 0일 때 => HSET('users:key', '_id', '123')
+        //     i가 2일 때 => HSET('users:key', 'username', 'john')
+        await this.client.HSET(`users:${key}`, dataToSave[i], dataToSave[i + 1]);
+      }
+    } catch (error) {
+      log.error(error);
+      throw new ServerError('Server error. Try again.');
+    }
+  }
+}
+```
+
+## 4. **SignUp.ts에서 유저 데이터 준비 및 캐시에 저장**
+
+```jsx
+이 부분에서는 userCache라는 인스턴스를 사용하여 유저 데이터를 Redis에 저장하는 과정을 설명합니다.
+
+이때 유저 데이터는 IUserDocument 타입으로 정의된 여러 속성을 포함하고 있습니다.
+```
+
+### 5. **유저 데이터 구조 추가해주기( userData 메서드 추가 )**
+
+```jsx
+유저 데이터를 저장할 때는 특정 구조를 따르도록 정의해야 합니다.
+
+여기서는 IUserDocument 타입으로 유저 데이터를 정의하고 있으며,
+
+userData 메서드에서 이 데이터를 생성합니다.
+```
+
+```jsx
+private userData(data: IAuthDocument, userObjectId: ObjectId): IUserDocument {
+    const { _id, username, email, uId, password, avatarColor } = data;
+    return {
+        _id: userObjectId,
+        authId: _id,
+        uId,
+        username: Helpers.firstletterUppercase(username),
+        email,
+        password,
+        avatarColor,
+        profilePicture: '',
+        blocked: [],
+        blockedBy: [],
+        work: '',
+        location: '',
+        school: '',
+        quote: '',
+        bgImageVersion: '',
+        bgImageId: '',
+        followersCount: 0,
+        followingCount: 0,
+        notifications: {
+            messages: true,
+            reactions: true,
+            comments: true,
+            follows: true
+        },
+        social: {
+            facebook: '',
+            instagram: '',
+            twitter: '',
+            youtube: ''
+        }
+    } as unknown as IUserDocument;
+}
+
+```
+
+```jsx
+const userCache: UserCache = new UserCache();
+```
+
+```jsx
+UserCache는 Redis에 유저 데이터를 저장하거나 불러오는 기능을 담당하는 클래스입니다.
+```
+
+```jsx
+const userDataForCache: IUserDocument = SignUp.prototype.userData(authDate, userObjectId);
+```
+
+```jsx
+여기서는 SignUp 클래스의 userData 메서드를 호출해 유저 데이터를 생성합니다.
+
+이 데이터는 유저의 ID, 이메일, 비밀번호, 프로필 사진 URL 등 다양한 정보를 포함합니다.
+```
+
+```jsx
+userDataForCache.profilePicture = `https://res/cloudinary.com/dhk9309/image/upload/v${result.version}/${userObjectId}`
+```
+
+```jsx
+프로필 사진 URL은 Cloudinary라는 외부 서비스에 이미지를 업로드한 후
+
+해당 이미지의 URL을 저장하는 방식으로 설정됩니다.
+```
+
+```jsx
+await userCache.saveUserToCache(`${userObjectId}`, uId, userDataForCache)
+```
+
+```jsx
+마지막으로, userCache의 saveUserToCache 메서드를 사용해 유저 데이터를 Redis 캐시에 저장합니다.
+
+여기서는 userObjectId를 키로 사용하고, 유저의 uId와 userDataForCache를 캐시에 저장합니다.
+```
+
+### **SignUp.ts 전체 코드**
+
+```jsx
+// 필요한 모듈과 타입을 import (가져옴)
+import { Request, Response } from 'express'; // Express.js에서 Request와 Response 객체 타입을 가져옴
+import { joiValidation } from '@global/decorators/joi-validation.decorator'; // Joi로 데이터 검증하는 데코레이터 함수
+import { signupSchema } from '@auth/schemes/signup'; // Joi로 정의된 회원가입 데이터의 스키마(형식)
+import { IAuthDocument, ISignUpData } from '@auth/interfaces/auth.interface'; // 사용자 인증 관련 인터페이스 정의
+import { authService } from '@service/db/auth.service'; // 사용자 인증 관련 DB 서비스 모듈
+import { BadRequestError } from '@global/helpers/error-handler'; // 잘못된 요청 에러 처리 클래스
+import { Helpers } from '@global/helpers/heplers'; // 다양한 유틸리티 함수 모음
+import { UploadApiResponse } from 'cloudinary'; // Cloudinary API 응답 타입 정의
+import { upload } from '@global/helpers/cloudinary-upload'; // Cloudinary에 이미지 업로드 함수
+import { ObjectId } from 'mongodb'; // MongoDB에서 사용하는 ObjectId 타입
+import HTTP_STATUS from 'http-status-codes'; // HTTP 상태 코드 모음
+import { UserCache } from '@service/redis/user.cache'; // Redis(캐시 서버)에 사용자 데이터를 저장하는 서비스
+import { IUserDocument } from '@user/interfaces/user.interface'; // 사용자 관련 인터페이스 정의
+
+// Redis 캐시 서버에 사용자 데이터를 저장하는 객체 생성
+const userCache: UserCache = new UserCache();
+
+// 회원가입 처리 클래스 정의
+export class SignUp {
+
+  // 회원가입 요청 데이터를 Joi 스키마로 검증하기 위한 데코레이터
+  @joiValidation(signupSchema)
+
+  // 회원가입 처리를 담당하는 메서드
+  public async create(req: Request, res: Response): Promise<void> {
+    // 사용자로부터 입력받은 회원가입 데이터를 가져옴
+    const { username, email, password, avatarColor, avatarImage } = req.body;
+
+    // DB에서 사용자가 이미 존재하는지 확인 (이메일이나 사용자명이 중복인지 체크)
+    const checkIfUserExit: IAuthDocument = await authService.getUserByUsernameOrEamil(username, email);
+
+    // 이미 존재하는 사용자가 있으면 에러를 던져서 요청 중단
+    if (checkIfUserExit) {
+      throw new BadRequestError('Invalid credentials');
+    }
+
+    // 새로운 사용자에 대한 ObjectId 생성 (MongoDB에서 사용하는 고유 ID)
+    const authObjectId: ObjectId = new ObjectId(); // 인증용 ID
+    const userObjectId: ObjectId = new ObjectId(); // 사용자용 ID
+
+    // 12자리 랜덤 숫자로 고유한 사용자 ID 생성
+    const uId = `${Helpers.generateRandomIntegers(12)}`;
+
+    // 회원가입 데이터를 처리하는 메서드 호출 (필요한 데이터를 넘김)
+    const authDate: IAuthDocument = SignUp.prototype.signupData({
+      _id: authObjectId,
+      uId,
+      username,
+      email,
+      password,
+      avatarColor
+    });
+
+    // Cloudinary에 프로필 사진 업로드 (이미지 업로드 처리)
+    const result: UploadApiResponse = (await upload(avatarImage, `${userObjectId}`, true, true)) as UploadApiResponse;
+
+    // 업로드된 이미지의 결과 확인 (업로드가 실패하면 에러 발생)
+    if (!result?.public_id) {
+      throw new BadRequestError('File upload Error accurred. Try again');
+    }
+
+    // Redis 캐시에 사용자 데이터를 저장하기 위해 데이터를 준비
+    const userDataForCache: IUserDocument = SignUp.prototype.userData(authDate, userObjectId);
+
+    // Cloudinary에 업로드된 프로필 사진 URL을 설정
+    userDataForCache.profilePicture = `https://res/cloudinary.com/dhk9309/image/upload/v${result.version}/${userObjectId}`;
+
+    // Redis 캐시에 사용자 정보를 저장 (빠른 조회를 위해)
+    await userCache.saveUserToCache(`${userObjectId}`, uId, userDataForCache);
+
+    // 사용자에게 회원가입 성공 메시지를 반환
+    res.status(HTTP_STATUS.CREATED).json({ message: 'User created successfully', authDate });
+  }
+
+  // 회원가입 데이터를 포맷팅하는 메서드 (주로 데이터를 정리하고 가공함)
+  private signupData(data: ISignUpData): IAuthDocument {
+    const { _id, username, email, uId, password, avatarColor } = data;
+
+    // 입력된 데이터를 정리하고, 특정 형식에 맞게 반환
+    return {
+      _id,
+      uId,
+      username: Helpers.firstletterUppercase(username), // 사용자 이름의 첫 글자를 대문자로
+      email: Helpers.lowerCase(email), // 이메일을 소문자로 변환
+      password,
+      avatarColor,
+      createdAt: new Date() // 현재 시간을 생성일로 설정
+    } as IAuthDocument;
+  }
+
+  // 사용자 데이터를 생성하는 메서드 (Redis에 저장할 때 사용할 형식으로 변환)
+  private userData(data: IAuthDocument, userObjectId: ObjectId): IUserDocument {
+    const { _id, username, email, uId, password, avatarColor } = data;
+
+    // 사용자 데이터를 정리하고, 초기 상태로 반환
+    return {
+      _id: userObjectId,
+      authId: _id, // 인증용 ID와 연동
+      uId,
+      username: Helpers.firstletterUppercase(username),
+      email,
+      password,
+      avatarColor,
+      profilePicture: '', // 프로필 사진은 나중에 설정
+      blocked: [], // 차단된 사용자 목록
+      blockedBy: [], // 차단한 사용자 목록
+      work: '', // 직업 정보
+      location: '', // 위치 정보
+      school: '', // 학교 정보
+      quote: '', // 인용구(사용자가 설정할 수 있는 정보)
+      bgImageVersion: '', // 배경 이미지 버전
+      bgImageId: '', // 배경 이미지 ID
+      followersCount: 0, // 팔로워 수 초기값
+      followingCount: 0, // 팔로잉 수 초기값
+      notifications: { // 알림 설정
+        messages: true,
+        reactions: true,
+        comments: true,
+        follows: true
+      },
+      social: { // 소셜 미디어 정보
+        facebook: '',
+        instagram: '',
+        twitter: '',
+        youtube: ''
+      }
+    } as unknown as IUserDocument; // IUserDocument 타입으로 캐스팅하여 반환
+  }
+}
+
+```
+
+```jsx
+위 강의 내용은 Redis를 사용하여 사용자 데이터를 캐시(cache)에 저장하고 관리하는 방법을 설명하고 있습니다.
+```
+
+## 1. **Redis와 Sorted Set 사용**
+
+```jsx
+Redis는 빠르게 데이터를 읽고 쓰는 데 강력한 성능을 제공하는 인메모리 데이터베이스입니다.
+
+강의에서는 Sorted Set(ZSet)과 Hash라는 Redis의 두 가지 데이터 구조를 사용해 데이터를 저장하는 방법을 설명하고 있습니다.
+
+Sorted Set(ZSet):
+
+		점수(Score)와 값(Value)을 함께 저장하는 데이터 구조입니다. 점수는 정렬 목적으로 사용됩니다.
+
+		예를 들어, 사용자 ID와 같은 고유 값을 점수로 하여 정렬된 목록으로 저장할 수 있습니다.
+
+Hash:
+
+		하나의 키에 여러 필드-값 쌍을 저장하는 구조입니다. 예를 들어, 사용자의 이름, 이메일, 프로필 사진 등의 정보를 각각의 필드로 저장할 수 있습니다.
+```
+
+## 2. **ZSet에 사용자 데이터 저장**
+
+```jsx
+먼저 ZAdd 명령을 사용해 사용자 정보를 Sorted Set에 저장합니다. 여기서는 사용자 ID가 점수(Score)로 사용되고, 이 값으로 정렬됩니다.
+
+이 사용자 ID는 MongoDB와 같은 데이터베이스에도 저장되어 연동됩니다.
+
+users:67165afcb5cad23b8845b375
+```
+
+## 3. **Hash에 사용자 세부 정보 저장**
+
+```jsx
+사용자의 세부 정보(예: 이름, 이메일, 프로필 사진 등)는 Hash 데이터 구조에 저장됩니다.
+
+HMSET 명령을 사용해 users:67165afcb5cad23b8845b375 이라는 키에 필드와 값을 저장합니다. 이렇게 하면 여러 사용자의 데이터를 개별적으로 관리할 수 있습니다
+
+( user.cache.ts 에 저장하는 로직 있다 )
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381343/notion-blog/_/React_Node_/_4_-_2_-/image_6.png)
+
+## 4. **Redis Commander 설치**
+
+```jsx
+Redis Commander는 Redis의 데이터를 시각적으로 관리할 수 있는 도구입니다.
+
+이를 사용하면 Redis에 저장된 데이터를 손쉽게 확인하고 조작할 수 있습니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381343/notion-blog/_/React_Node_/_4_-_2_-/image_7.png)
+
+```jsx
+npm install -g redis-commander ( 전역으로 설치해야한다 )
+
+이후 터미널에서 redis-commander 를 입력한뒤 웹 레디스에 접속한다
+
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381343/notion-blog/_/React_Node_/_4_-_2_-/image_8.png)
+
+```jsx
+터미널에서 접속
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381344/notion-blog/_/React_Node_/_4_-_2_-/image_9.png)
+
+```jsx
+새로운 유저 생성
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381342/notion-blog/_/React_Node_/_4_-_2_-/image_10.png)
+
+```jsx
+유저를 등록한뒤 레디스에서 확인 가능하다
+```
+
+## 5. **데이터 확인과 조작**
+
+```jsx
+Redis Commander를 통해 Redis에 저장된 데이터를 확인할 수 있습니다. 예를 들어, 저장된 사용자의 정보를 확인하거나 수정할 수 있습니다.
+
+데이터 조회: 특정 사용자의 정보를 조회하려면 HGET 명령을 사용하여 Hash에서 원하는 필드 값을 가져옵니다.
+
+전체 데이터 조회: HGETALL 명령을 사용하면 해당 사용자에 대한 모든 필드와 값을 가져올 수 있습니다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381342/notion-blog/_/React_Node_/_4_-_2_-/image_11.png)
+
+```jsx
+hgetall 을 이용해서 유저 정보를 불러왔다
+
+hget users:67165afcb5cad23b8845b375 _id
+
+hget 을 이용해서 _id 만 가져올 수 있다
+
+```
+
+## 6. **프로필 사진 저장 및 조회**
+
+```jsx
+프로필 사진 URL은 Cloudinary라는 외부 서비스를 사용하여 저장합니다.
+
+사용자는 해당 URL을 통해 프로필 사진을 서버에 저장할 수 있으며, 이를 Redis에 연동하여 빠르게 로드할 수 있습니다.
+```
+
+```jsx
+https://res.cloudinary.com/your-cloud-name/image/upload/v{version}/{user-object-id}
+```

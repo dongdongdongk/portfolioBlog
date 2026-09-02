@@ -1,0 +1,958 @@
+---
+title: '섹션 4 - 3'
+date: '2026-09-02'
+category: '게임 개발/3D 유니티'
+tags: ['게임 개발', '3D 유니티']
+draft: false
+summary: ''
+---
+
+# { 🚀 Unity에서 충돌(Collider)과 트리거(Trigger) 처리하기 }
+
+이번 강의는 **Unity에서 Collider와 Trigger의 개념**, **RigidBody의 필요 조건**, 그리고 **OnTriggerEnter 이벤트를 활용해 충돌 정보를 처리하는 방법**을 실습 중심으로 다룹니다. 플레이어 함선과 적 함선 간의 충돌을 테스트하며, Collider의 위치/크기 조정 및 문자열 연결·보간법(Debug.Log) 사용법까지 정리합니다.
+
+---
+
+## 📋 목차
+
+1. [Collider와 Trigger 개념 이해](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#collider%EC%99%80-trigger-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4)
+2. [플레이어 함선에 Collider 추가 및 설정](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#%ED%94%8C%EB%A0%88%EC%9D%B4%EC%96%B4-%ED%95%A8%EC%84%A0%EC%97%90-collider-%EC%B6%94%EA%B0%80-%EB%B0%8F-%EC%84%A4%EC%A0%95)
+3. [RigidBody 설정 및 충돌 규칙](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#rigidbody-%EC%84%A4%EC%A0%95-%EB%B0%8F-%EC%B6%A9%EB%8F%8C-%EA%B7%9C%EC%B9%99)
+4. [적 함선과 지형의 Collider 준비](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#%EC%A0%81-%ED%95%A8%EC%84%A0%EA%B3%BC-%EC%A7%80%ED%98%95%EC%9D%98-collider-%EC%A4%80%EB%B9%84)
+5. [CollisionHandler 스크립트 작성(OnTriggerEnter)](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#collisionhandler-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%9E%91%EC%84%B1ontriggerenter)
+6. [Debug.Log 문자열 처리 (연결 vs 보간법)](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#debuglog-%EB%AC%B8%EC%9E%90%EC%97%B4-%EC%B2%98%EB%A6%AC-%EC%97%B0%EA%B2%B0-vs-%EB%B3%B4%EA%B0%84%EB%B2%95)
+7. [충돌 테스트와 출력 결과 확인](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#%EC%B6%A9%EB%8F%8C-%ED%85%8C%EC%8A%A4%ED%8A%B8%EC%99%80-%EC%B6%9C%EB%A0%A5-%EA%B2%B0%EA%B3%BC-%ED%99%95%EC%9D%B8)
+
+---
+
+## 1. Collider와 Trigger 개념 이해
+
+- **Collider**: 게임 오브젝트의 물리적 경계를 정의하여 충돌을 감지. 예) Box Collider, Sphere Collider 등.
+- **Is Trigger** 옵션:
+  - 체크하면 물리적 충돌(튕기거나 밀림) 없이 **이벤트만 발생**.
+  - 주로 “충돌 감지 후 로직만 실행”할 때 사용.
+
+---
+
+## 2. 플레이어 함선에 Collider 추가 및 설정
+
+1. **Inspector에서 Box Collider 추가**
+   - 크기: `(10, 10, 10)`으로 시작해 함선 크기와 대략 일치시킴.
+   - 피벗(Pivot)이 함선 아래쪽에 있으므로 **Collider를 위로 이동**해 함선 중심과 맞춤.
+   - 디자인적으로 **너무 빡빡하지 않게** — 꼬리나 윗부분까지 완벽히 덮지 않아도 충분.
+2. **Is Trigger 활성화**
+   - 충돌 시 물리 반응 없이 이벤트만 받도록 설정.
+
+---
+
+## 3. RigidBody 설정 및 충돌 규칙
+
+- **RigidBody 컴포넌트 추가 (중요!)**
+  - Use Gravity 해제: 중력 영향 제거.
+  - 함선이 장면 내 다른 오브젝트와 상호작용하도록 RigidBody 필요.
+- **충돌 규칙 요약 (Unity 충돌 매트릭스)**
+  - 두 오브젝트 모두 **정적 Collider만** 있으면 충돌 이벤트가 발생하지 않음.
+  - 일반적으로 **한쪽에는 반드시 RigidBody가 있어야** 충돌 이벤트가 처리됨.
+  - 플레이어 함선이 RigidBody를 가지므로, 적 함선이나 지형은 정적 Collider만 있어도 충돌 가능.
+
+---
+
+## 4. 적 함선과 지형의 Collider 준비
+
+- **지형(Terrain)**: Terrain Collider가 기본 포함 → 별도 작업 불필요.
+- **테스트용 적 함선**
+  - 에셋에서 테스트용 우주선을 가져와 장면에 배치.
+  - Box Collider 추가 → Y축 방향 크기 축소로 모델 모양에 맞춤.
+  - 크기와 회전을 적절히 조정해 플레이어가 쉽게 부딪히도록 배치.
+  - 적 함선은 **RigidBody 불필요** (플레이어에 RigidBody 있음).
+
+---
+
+## 5. CollisionHandler 스크립트 작성(OnTriggerEnter)
+
+1. **새 스크립트 생성**: `CollisionHandler.cs`
+   - `Assets > Scripts` 폴더 → 우클릭 → `Create > C# Script`.
+2. **플레이어 함선에 부착**: 다른 스크립트 옆에 추가.
+3. **VS Code에서 작성**:
+
+```csharp
+using UnityEngine;
+
+public class CollisionHandler : MonoBehaviour
+{
+    // Trigger 충돌 시 호출
+    private void OnTriggerEnter(Collider other)
+    {
+        // 방식 1: 문자열 연결
+        Debug.Log("Hit " + other.name);
+
+        // 방식 2: 문자열 보간법
+        Debug.Log($"Hit {other.gameObject.name}");
+    }
+}
+```
+
+---
+
+## 6. Debug.Log 문자열 처리 (연결 vs 보간법)
+
+- **문자열 연결 (Concatenation)**
+  - `"Hit " + other.name`
+  - 간단하지만 여러 변수 결합 시 가독성이 떨어질 수 있음.
+- **문자열 보간법 (Interpolation)**
+  - `$"Hit {other.gameObject.name}"`
+  - `$`와 `{}` 사용 → 코드가 깔끔하고 가독성이 좋음.
+  - C# 6.0 이상에서 사용 가능.
+
+---
+
+## 7. 충돌 테스트와 출력 결과 확인
+
+1. **Unity로 돌아가 플레이 모드 실행**
+2. 플레이어 함선을 이동시켜 적 함선이나 지형과 충돌.
+3. \*콘솔(Console)\*\*에서 결과 확인:
+   - 예: `Hit Test Enemy`
+   - 두 개의 로그가 보이는 이유: 연결 방식과 보간법 두 줄이 모두 실행되었기 때문.
+4. 필요 없는 로그(연결 방식)는 주석 처리하고, 보간법만 남겨 정리.
+
+---
+
+### ✅ **핵심 개념 정리**
+
+- Collider는 물리 경계를 정의하고, Trigger는 이벤트만 감지.
+- 최소 한 오브젝트에 **RigidBody**가 있어야 충돌 이벤트 발생.
+- Debug.Log는 **문자열 연결**과 **보간법** 두 가지 방식 사용 가능.
+- 충돌 감지는 **OnTriggerEnter(Collider other)** 메서드로 처리.
+- Terrain Collider와 Box Collider의 크기·위치 조정은 게임 디자인 편의성에 따라 유연하게 설정.
+
+이로써 Unity에서 Collider와 Trigger를 적절히 사용하는 방법을 완전히 이해할 수 있습니다.
+
+---
+
+# { 🚀 레이저 입자 시스템과 적 함선 충돌 처리 }
+
+이번 강의에서는 **레이저 파티클 시스템(Particle System)** 이 적 함선과 **충돌**할 수 있도록 설정하는 과정을 다뤘습니다. 파티클 시스템 충돌 기능과 Unity의 내장 이벤트를 활용해, 플레이어의 레이저가 적 함선을 파괴하도록 구현합니다.
+
+---
+
+## 📋 목차
+
+1. [파티클 충돌 개념 이해하기](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#%ED%8C%8C%ED%8B%B0%ED%81%B4-%EC%B6%A9%EB%8F%8C-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [Send Collision Messages 활성화](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#send-collision-messages-%ED%99%9C%EC%84%B1%ED%99%94)
+3. [프리팹과 오버라이드 확인](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#%ED%94%84%EB%A6%AC%ED%8C%B9%EA%B3%BC-%EC%98%A4%EB%B2%84%EB%9D%BC%EC%9D%B4%EB%93%9C-%ED%99%95%EC%9D%B8)
+4. [Enemy 스크립트 작성 및 부착](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#enemy-%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-%EC%9E%91%EC%84%B1-%EB%B0%8F-%EB%B6%80%EC%B0%A9)
+5. [Non-Trigger 콜라이더 확인](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#non-trigger-%EC%BD%9C%EB%9D%BC%EC%9D%B4%EB%8D%94-%ED%99%95%EC%9D%B8)
+6. [충돌 테스트와 복제로 효과 확인](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#%EC%B6%A9%EB%8F%8C-%ED%85%8C%EC%8A%A4%ED%8A%B8%EC%99%80-%EB%B3%B5%EC%A0%9C%EB%A1%9C-%ED%9A%A8%EA%B3%BC-%ED%99%95%EC%9D%B8)
+
+---
+
+## 1. 파티클 충돌 개념 이해하기
+
+- **파티클 시스템(Particle System)** 은 불꽃, 연기, 먼지, 추진 화염, 레이저 등 작은 입자들이 모여 시각적 효과를 표현하는 시스템.
+- **충돌(Particle Collision)** 은 파티클이 게임 오브젝트의 콜라이더와 부딪힐 때 이벤트를 발생시키도록 하는 기능.
+- 이 기능을 사용하면 별도의 Rigidbody 없이도 파티클이 **콜라이더와 상호작용**할 수 있음.
+
+---
+
+## 2. Send Collision Messages 활성화
+
+- 레이저 파티클 시스템에서 **Collision Module**을 찾음.
+- **Send Collision Messages** 체크박스를 활성화 → 파티클이 무언가와 충돌할 때 `OnParticleCollision(GameObject other)` 이벤트 호출.
+- 이 설정이 없으면 스크립트에서 충돌 이벤트를 감지할 수 없음.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380426/notion-blog/_/3D_/3D_/_4_-_3/image.png)
+
+---
+
+## 3. 프리팹과 오버라이드 확인
+
+- **Overrides** 탭에서 이 변경 사항이 **레이저 프리팹**에도 적용되었는지 확인.
+- 레이저가 두 개(왼쪽, 오른쪽) 있다면 **오른쪽 레이저 파티클 시스템에도 동일한 설정**이 적용되었는지 검증 필요.
+- 프리팹 변경 사항은 **Apply**를 눌러 저장해야 씬의 모든 인스턴스에 반영됨.
+
+---
+
+## 4. Enemy 스크립트 작성 및 부착
+
+1. **Scripts 폴더**에서 새로운 C# 스크립트를 생성 → 이름: `Enemy`.
+2. VS Code에서 열고 아래 코드 작성:
+
+   ```csharp
+   using UnityEngine;
+
+   public class Enemy : MonoBehaviour
+   {
+       void OnParticleCollision(GameObject other)
+       {
+           Destroy(this.gameObject);
+       }
+   }
+   ```
+
+3. 설명:
+   - `OnParticleCollision(GameObject other)` : 파티클이 이 오브젝트와 부딪힐 때 Unity가 자동 호출하는 메서드.
+   - `Destroy(this.gameObject)` : 이 스크립트가 붙은 **적 오브젝트**를 파괴.
+   - `this` 키워드는 현재 스크립트가 부착된 객체를 명확히 가리키는 선택적 사용(생략 가능하지만 가독성↑).
+4. 씬의 **테스트 적(Test Enemy)** 오브젝트에 `Enemy` 스크립트를 컴포넌트로 추가.
+5. 쉽게 찾을 수 있도록 **인스펙터 상단 근처**에 배치.
+
+---
+
+## 5. Non-Trigger 콜라이더 확인
+
+- 테스트 적의 콜라이더(Box Collider 등)가 **Non-Trigger** 상태인지 확인.
+  - Trigger로 설정되어 있으면 파티클 충돌 이벤트가 발생하지 않음.
+  - Non-Trigger 콜라이더만 파티클 시스템과 물리적 충돌 상호작용 가능.
+
+---
+
+## 6. 충돌 테스트와 복제로 효과 확인
+
+1. 테스트를 위해 **적 함선 복제(Clone)**: 2~3개 추가 복제 → 총 4대 배치.
+2. 적들을 약간 옆으로 이동시켜 플레이어 시야를 가리지 않도록 정렬.
+3. **Play 버튼** 클릭 → 레이저 발사 테스트.
+4. 파티클 충돌 시 적 함선이 사라지는지(파괴되는지) 확인.
+5. 일부 레이저가 너무 멀면 충돌이 발생하지 않을 수 있으므로 위치 조정 필요.
+
+---
+
+## ✅ 핵심 개념 정리
+
+- **Send Collision Messages** : 파티클 충돌 이벤트를 코드에서 사용할 수 있게 함.
+- **OnParticleCollision** : 파티클과 콜라이더 간 충돌 시 호출되는 Unity 내장 메서드.
+- **Destroy(this.gameObject)** : 스크립트가 부착된 오브젝트 파괴.
+- **Non-Trigger Collider** : 파티클 충돌 이벤트 발생의 필수 조건.
+- **프리팹 Overrides 관리** : 프리팹 수정 시 Apply로 모든 인스턴스에 반영.
+
+---
+
+# { 💥 오브젝트 인스턴스화와 폭발 파티클 시스템 }
+
+이번 강의에서는 **런타임 동안 오브젝트를 인스턴스화(Instantiate)하는 방법**과 **적 우주선 파괴 시 폭발 이펙트를 구현하는 과정**을 배웁니다.
+
+즉, 게임 도중 오브젝트가 파괴될 때 **VFX 파티클 효과를 생성하고, 자동으로 사라지도록 설정하는 과정**이 핵심이에요.
+
+---
+
+## 📋 목차
+
+1. [인스턴스화(Instantiate) 개념 이해하기](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#1-%EC%9D%B8%EC%8A%A4%ED%84%B4%EC%8A%A4%ED%99%94instantiate-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [폭발 파티클 시스템(VFX) 만들기](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#2-%ED%8F%AD%EB%B0%9C-%ED%8C%8C%ED%8B%B0%ED%81%B4-%EC%8B%9C%EC%8A%A4%ED%85%9Cvfx-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+3. [파티클 시스템 세부 설정](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#3-%ED%8C%8C%ED%8B%B0%ED%81%B4-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EC%84%B8%EB%B6%80-%EC%84%A4%EC%A0%95)
+4. [프리팹(Prefab)으로 저장하기](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#4-%ED%94%84%EB%A6%AC%ED%8C%B9prefab%EC%9C%BC%EB%A1%9C-%EC%A0%80%EC%9E%A5%ED%95%98%EA%B8%B0)
+5. [C# 코드에서 인스턴스화하기](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#5-c-%EC%BD%94%EB%93%9C%EC%97%90%EC%84%9C-%EC%9D%B8%EC%8A%A4%ED%84%B4%EC%8A%A4%ED%99%94%ED%95%98%EA%B8%B0)
+6. [유용한 팁 및 버그 해결](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#6-%EC%9C%A0%EC%9A%A9%ED%95%9C-%ED%8C%81-%EB%B0%8F-%EB%B2%84%EA%B7%B8-%ED%95%B4%EA%B2%B0)
+
+---
+
+## 1. 인스턴스화(Instantiate) 개념 이해하기
+
+- **인스턴스화(Instantiate)**: 게임이 실행 중일 때 특정 오브젝트를 장면(Scene)에 새로 생성하는 것.
+- 사용 예시:
+  - 플레이어 우주선이 충돌할 때 폭발 이펙트 생성.
+  - 적 우주선이 파괴될 때 VFX 출력.
+- **왜 필요한가?**
+  - 미리 배치해두는 게 아니라, 이벤트 발생 순간에만 효과를 출력할 수 있음 → **메모리 절약 + 동적 연출 가능**.
+- **Instantiate 메소드 오버로드 종류**:
+  1. `Instantiate(original)`
+     - 원본 오브젝트를 동일한 좌표, 동일한 회전값으로 생성.
+  2. `Instantiate(original, position, rotation)` ✅ (가장 많이 사용)
+     - 원본 오브젝트를 특정 위치와 회전값으로 생성.
+  3. `Instantiate(original, position, rotation, parent)`
+     - 생성 후 특정 부모(Parent)에 귀속시킴.
+
+---
+
+## 2. 폭발 파티클 시스템(VFX) 만들기
+
+- **목표**: 적 우주선이 파괴될 때 표시되는 폭발 효과 생성.
+- 계층 구조(Hierarchy)에 새로운 **Particle System** 생성.
+- 이름: `Destroyed Ship VFX`
+
+---
+
+## 3. 파티클 시스템 세부 설정
+
+파티클 효과를 자연스러운 폭발로 보이게 하기 위해 여러 모듈을 조정.
+
+### 3.1 Renderer (렌더러 모듈)
+
+- **Material** 변경:
+  - 기존 `레이저` 재질(Material)을 복제하여 새 재질 생성.
+  - 이름: `Destroyed Ship Particle`
+  - Texture(Map): 기본 원 → 별 모양(Star) PNG로 교체.
+  - **투명도**: 100%로 설정 (복사한 레이저 재질은 0%였기 때문에 안 보임).
+
+---
+
+### 3.2 Emission (방출 모듈)
+
+- **Rate over Time (시간당 방출률)** → `0`
+  (계속 방출되는 게 아니라 단발성 폭발만 필요하기 때문).
+- **Bursts (폭발)** → `300개`
+  - 게임 시작 순간 한 번에 다량의 파티클이 터지도록 설정.
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380425/notion-blog/_/3D_/3D_/_4_-_3/image_1.png)
+
+---
+
+### 3.3 Shape (방출 형태)
+
+- 기본값: **Cone (원뿔)** → 변경 필요.
+- 변경: **Sphere (구체)**
+  - 이유: 불꽃이 사방으로 퍼지는 자연스러운 폭발 연출.
+
+---
+
+### 3.4 Duration & Lifetime (지속 시간 & 수명)
+
+- **Duration (지속 시간)**: `1초`
+- **Start Lifetime (개별 파티클 수명)**: `Random between 0.2 ~ 0.5`
+  - → 입자들이 빠르게 사라지며 자연스러운 폭발 연출.
+
+---
+
+### 3.5 Start Speed (시작 속도)
+
+- 기본값보다 빠르게: `50`
+- 폭발이 한순간에 퍼지는 효과를 강조.
+
+---
+
+### 3.6 Noise (노이즈)
+
+- 약간의 무작위성 추가 → 파티클들이 직선이 아니라 불규칙하게 퍼짐.
+
+---
+
+### 3.7 Color over Lifetime (수명 동안 색상 변화)
+
+- **알파(Alpha) 값**: 시작 100% → 끝에서 0% (점점 사라짐).
+- 색상은 유지하되, 투명도만 점차 줄여서 부드럽게 사라지게 설정.
+
+---
+
+### 3.8 Stop Action (정지 동작)
+
+- 기본값: `None` → 파티클 시스템이 끝나도 Hierarchy에 남아있음.
+- 변경: **Destroy**
+  - → 파티클 시스템 종료 후 오브젝트 자동 파괴.
+  - 수동으로 `Destroy(gameObject)` 호출할 필요 없음.
+
+---
+
+### 3.9 Looping (루프)
+
+- 체크 해제(❌)
+- → 반복 재생을 방지. (루프 상태면 폭죽처럼 계속 폭발).
+
+---
+
+| 단계  | 옵션/모듈                               | 설정                                                      | 설명                                                                            |
+| ----- | --------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| **A** | **Renderer → Material**                 | 레이저 재질 복제 후 이름 변경 → `Destroyed Ship Particle` | 기존 레이저 헤드(Material)를 복제 → 별 모양 텍스처로 변경 → 투명도 100%로 올림. |
+| **B** | **Shape(모양)**                         | Cone(원뿔) → **Sphere(구체)**                             | 원뿔 대신 구형으로 바꿔 **자연스러운 폭발** 연출.                               |
+| **C** | **Emission(방출)**                      | Rate over Time(시간당 비율)=0 → Bursts=1회 / Count=300    | 폭발처럼 **한 번에 많은 입자 방출**.                                            |
+| **D** | **Duration(지속 시간)**                 | 1초                                                       | 효과가 너무 길지 않도록 조정.                                                   |
+| **E** | **Start Lifetime(입자 수명)**           | 무작위(Random Between Two Constants) → 0.2 ~ 0.5          | 입자들이 서로 다른 시간 동안 존재 → 자연스러운 변동.                            |
+| **F** | **Start Speed(시작 속도)**              | 50                                                        | 폭발이 빠르고 강렬하게 퍼지도록 속도 증가.                                      |
+| **G** | **Simulation Space(시뮬레이션 공간)**   | World                                                     | 파티클이 부모의 이동에 영향을 받지 않도록 월드 공간 사용.                       |
+| **H** | **Stop Action(정지 동작)**              | Destroy                                                   | 파티클 재생 종료 후 계층 구조에서 자동 삭제.                                    |
+| **I** | **Color over Lifetime(수명 동안 색상)** | 알파 값: 시작=255 → 끝=0                                  | 입자가 사라질 때 점점 투명해지도록 설정.                                        |
+| **J** | **Looping(루프)**                       | 끔                                                        | 한 번만 폭발하도록 루프 해제.                                                   |
+
+---
+
+## 4. 프리팹(Prefab)으로 저장하기
+
+- 만든 `Destroyed Ship VFX`를 **Prefabs 폴더로 드래그** → 프리팹 생성.
+- 장면(Scene)에서 원본은 삭제.
+- 이제 코드에서 이 프리팹을 **런타임에 인스턴스화**하여 사용.
+
+---
+
+## 5. C# 코드에서 인스턴스화하기
+
+```csharp
+using UnityEngine;
+
+public class Enemy : MonoBehaviour
+{
+    [SerializeField] GameObject destroyedVFX;
+
+    void OnParticleCollision(GameObject other)
+    {
+        // 1. 파괴 VFX를 적 우주선 위치에 생성
+        Instantiate(destroyedVFX, transform.position, Quaternion.identity);
+
+        // 2. 적 우주선 자체 제거
+        Destroy(this.gameObject);
+    }
+}
+```
+
+### 🔎 코드 설명
+
+1. `SerializeField`
+   - 인스펙터에서 `Destroyed Ship VFX` 프리팹을 직접 할당할 수 있게 함.
+2. `OnParticleCollision(GameObject other)`
+   - 플레이어 레이저 같은 파티클이 적과 충돌할 때 호출되는 이벤트.
+3. `Instantiate(...)`
+   - `destroyedVFX`를 **적 우주선의 현재 위치(transform.position)** 에서 **회전 없이(Quaternion.identity)** 생성.
+4. `Destroy(this.gameObject)`
+   - 폭발 이펙트 출력 후, 해당 적 오브젝트 삭제.
+
+---
+
+## 6. 유용한 팁 및 버그 해결
+
+- **루프 문제**: 루프가 켜져 있으면 폭죽처럼 계속 터짐 → Looping 해제 필요.
+- **프리팹 연결 이슈**: FBX 모델을 그대로 사용하면 프리팹 속성 할당 불가. → `Unpack` 하거나 새 프리팹 생성 필요.
+- **Stop Action 활용**: 자동으로 오브젝트 삭제되므로 메모리 관리에 유리.
+
+---
+
+✅ 최종 정리:
+
+- 인스턴스화는 **런타임 중 오브젝트 생성의 핵심 메커니즘**.
+- 폭발 VFX는 파티클 시스템으로 구현, **Emission / Shape / Lifetime / Speed / Stop Action** 등을 조절해야 자연스러움.
+- 프리팹화하여 코드에서 `Instantiate()`로 불러오는 것이 일반적인 패턴.
+- Destroyed VFX가 **한 번만 재생되고 자동 파괴**되도록 설정하는 것이 중요하다.
+
+---
+
+# { 💥 유니티 프리팹 변형(prefab variants)과 파티클 폭발 만들기 }
+
+이번 강의는 **유니티의 프리팹 시스템**과 **프리팹 변형(variants)**을 활용하여,
+
+플레이어 우주선과 적 우주선에 서로 다른 폭발 파티클 VFX를 적용하는 방법을 다룹니다.
+
+---
+
+## 📋 목차
+
+1. [프리팹 시스템 개념 이해하기](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#%ED%94%84%EB%A6%AC%ED%8C%B9-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B0%9C%EB%85%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+2. [프리팹 구조와 스케일 문제](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#%ED%94%84%EB%A6%AC%ED%8C%B9-%EA%B5%AC%EC%A1%B0%EC%99%80-%EC%8A%A4%EC%BC%80%EC%9D%BC-%EB%AC%B8%EC%A0%9C)
+3. [파괴 VFX 프리팹 준비하기](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#%ED%8C%8C%EA%B4%B4-vfx-%ED%94%84%EB%A6%AC%ED%8C%B9-%EC%A4%80%EB%B9%84%ED%95%98%EA%B8%B0)
+4. [프리팹 변형(prefab variant) 생성하기](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#%ED%94%84%EB%A6%AC%ED%8C%B9-%EB%B3%80%ED%98%95prefab-variant-%EC%83%9D%EC%84%B1%ED%95%98%EA%B8%B0)
+5. [플레이어/적 폭발 차별화하기](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#%ED%94%8C%EB%A0%88%EC%9D%B4%EC%96%B4%EC%A0%81-%ED%8F%AD%EB%B0%9C-%EC%B0%A8%EB%B3%84%ED%99%94%ED%95%98%EA%B8%B0)
+6. [공통 속성 적용과 오버라이드](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#%EA%B3%B5%ED%86%B5-%EC%86%8D%EC%84%B1-%EC%A0%81%EC%9A%A9%EA%B3%BC-%EC%98%A4%EB%B2%84%EB%9D%BC%EC%9D%B4%EB%93%9C)
+7. [CollisionHandler에 VFX 연결하기](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#collisionhandler%EC%97%90-vfx-%EC%97%B0%EA%B2%B0%ED%95%98%EA%B8%B0)
+8. [도전 과제](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#%EB%8F%84%EC%A0%84-%EA%B3%BC%EC%A0%9C)
+
+---
+
+## 1. 프리팹 시스템 개념 이해하기
+
+- **Prefab(프리팹)** :
+  게임 오브젝트를 저장해두고 재사용 가능한 템플릿으로 만드는 기능.
+  씬(Scene)과 독립적으로 관리 가능.
+- **Nested Prefab(중첩 프리팹)** :
+  프리팹 안에 또 다른 프리팹을 넣어 사용할 수 있음.
+- **Prefab Variants(프리팹 변형)** :
+  특정 프리팹을 기반으로 새로운 프리팹을 만들고, 일부 속성만 다르게 유지하는 구조.
+  → 기본 프리팹(Base)을 수정하면 변형된 모든 프리팹에도 자동 반영.
+
+✅ 활용 예시:
+
+- 플레이어 폭발 VFX (초록색)
+- 적 폭발 VFX (빨강/주황색)
+- 둘 다 같은 **기본 폭발 VFX(Base)**를 공유 → 공통 속성 관리 용이.
+
+---
+
+## 2. 프리팹 구조와 스케일 문제
+
+- **문제 상황** :
+  프리팹 안에 다른 프리팹을 자식으로 두면, 부모 오브젝트의 **스케일(scale)**이 자식에게 영향을 줌.
+- **예시 실험**:
+  1. 큐브(Cube)를 크게(scale=20) 만든 뒤 프리팹으로 저장.
+  2. 큐브 안에 구(Sphere)를 자식으로 두고 프리팹으로 저장.
+  3. 구 프리팹을 씬에 배치하면 **작게 보임** → 이유: 부모 큐브의 scale=20이 적용됨.
+- **해결 방법**:
+  모델을 항상 빈 게임 오브젝트(empty)의 자식으로 두고 **scale=1,1,1** 상태로 관리.
+
+---
+
+## 3. 파괴 VFX 프리팹 준비하기
+
+- 기본 파티클 폭발 프리팹을 씬에 배치.
+- 색상: 주황색 (기본적인 폭발 느낌).
+- 복제(Ctrl+D) → "Player Ship Explosion", "Enemy Ship Explosion" 식으로 분리할 수도 있음.
+- 하지만, 이렇게 하면 프리팹이 많아질수록(수십~수백 개) **관리하기 번거로움**.
+
+---
+
+## 4. 프리팹 변형(prefab variant) 생성하기
+
+- **방법**:
+  1. 기본 파괴 VFX 프리팹(Base Destroyed VFX)을 준비.
+  2. Project 창에서 **우클릭 → Create → Prefab Variant**.
+  3. 이름 지정:
+     - `Player Destroyed VFX`
+     - `Enemy Destroyed VFX`
+- **아이콘 구분**:
+  - 일반 프리팹: 파란색 네모
+  - 변형 프리팹: 줄무늬 아이콘 (variants 표시)
+
+---
+
+## 5. 플레이어/적 폭발 차별화하기
+
+- **속성 수정 예시**:
+  - Player VFX → 초록색 파티클, 속도 높게 (예: `Start Speed = 300`)
+  - Enemy VFX → 주황·빨강 계열, 속도 낮게 (예: `Start Speed = 10`)
+- **적용 팁**:
+  - Hierarchy(계층)에서 동시에 여러 개 선택 후 테스트 가능.
+  - Gizmos → `Selection Outline` 꺼두면 주황색 테두리 사라져서 보기 편함.
+
+---
+
+## 6. 공통 속성 적용과 오버라이드
+
+- **Base 프리팹 수정 시**:
+  - Trail Renderer 추가 → 모든 변형 프리팹에 자동 반영.
+  - Material 변경 → 모든 변형에 동일 적용.
+- **Override(오버라이드)**:
+  - Variant에서 개별 속성만 따로 유지 가능.
+  - 예: 색상은 Variant마다 다르게, Trail 효과는 Base에서 통일.
+- **적용 방법**:
+  - Inspector 속성 → 마우스 우클릭 → _Apply to Base Prefab_.
+
+---
+
+## 7. CollisionHandler에 VFX 연결하기
+
+- **기존 코드**:
+  충돌 시 `Debug.Log`만 출력.
+- **수정 코드**:
+
+  ```csharp
+  using UnityEngine;
+
+  public class CollisionHandler : MonoBehaviour
+  {
+      [SerializeField] GameObject playerExplosionVFX;
+
+      void OnTriggerEnter(Collider other)
+      {
+          // 폭발 VFX 인스턴스화
+          Instantiate(playerExplosionVFX, transform.position, Quaternion.identity);
+
+          // 플레이어 우주선 제거
+          Destroy(gameObject);
+      }
+  }
+  ```
+
+- **Inspector에서 연결**:
+  `playerExplosionVFX` 필드에 `Player Destroyed VFX` 프리팹 드래그 앤 드롭.
+
+---
+
+✅ 정리하면:
+
+- **Prefab Variant**를 활용하면 수십 개의 폭발 효과를 개별 관리하지 않고,
+  공통 속성은 Base에서 통합, 차별화할 부분은 Variant에서만 수정 가능.
+- **실습 핵심**:
+  1. Base 프리팹 → Variants 생성
+  2. 플레이어/적 폭발 차별화
+  3. CollisionHandler 연결 → 실제 게임에서 폭발 연출
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380425/notion-blog/_/3D_/3D_/_4_-_3/image_2.png)
+
+---
+
+# { 🚀 프리팹 변형(Prefab Variants)으로 적 함선 만들기 }
+
+이번 강의에서는 **Prefab Variants**(프리팹 변형)를 활용해 다양한 적 우주선을 효율적으로 만드는 방법을 다룹니다.
+
+즉, **하나의 기본(Base) 적 프리팹을 기준으로 다양한 적 우주선을 변형(Variants) 형태로 생성**하여 관리하는 방법을 배우게 됩니다.
+
+---
+
+## 📋 목차
+
+1. [Prefab 정리 및 폴더 구조 만들기](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#prefab-%EC%A0%95%EB%A6%AC-%EB%B0%8F-%ED%8F%B4%EB%8D%94-%EA%B5%AC%EC%A1%B0-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+2. [플레이어와 기본 적 프리팹(Base Enemy) 만들기](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#%ED%94%8C%EB%A0%88%EC%9D%B4%EC%96%B4%EC%99%80-%EA%B8%B0%EB%B3%B8-%EC%A0%81-%ED%94%84%EB%A6%AC%ED%8C%B9base-enemy-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+3. [전용 Ships 장면(Scene) 만들기](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#%EC%A0%84%EC%9A%A9-ships-%EC%9E%A5%EB%A9%B4scene-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+4. [Prefab Variant로 다양한 적 생성하기](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#prefab-variant%EB%A1%9C-%EB%8B%A4%EC%96%91%ED%95%9C-%EC%A0%81-%EC%83%9D%EC%84%B1%ED%95%98%EA%B8%B0)
+5. [Collider & Enemy 컴포넌트 설정](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#collider--enemy-%EC%BB%B4%ED%8F%AC%EB%84%8C%ED%8A%B8-%EC%84%A4%EC%A0%95)
+6. [과제: 다양한 적 우주선 만들기](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#%EA%B3%BC%EC%A0%9C-%EB%8B%A4%EC%96%91%ED%95%9C-%EC%A0%81-%EC%9A%B0%EC%A3%BC%EC%84%A0-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+
+---
+
+## 1. Prefab 정리 및 폴더 구조 만들기
+
+- **Hierarchy 정리**
+  - 테스트용으로 두었던 네 개의 임시 적 오브젝트는 삭제. (프리팹으로 만들 필요 없음)
+  - 플레이어 함선은 그대로 유지 (참조용 크기 비교, 로직 포함).
+- **폴더 구조 설정**
+  - `Prefabs` 폴더 안에 하위 폴더 생성:
+    1. `Player` → 플레이어 관련 프리팹(플레이어 함선, 레이저, 플레이어 리그 등).
+    2. `VFX` → 폭발, 파괴 효과 등 파티클 관련 프리팹.
+    3. `Ships` → 모든 우주선 프리팹(아군, 적군).
+
+---
+
+## 2. 플레이어와 기본 적 프리팹(Base Enemy) 만들기
+
+- **플레이어 함선 프리팹화**
+  - 플레이어 함선을 `Ships` 폴더에 드래그 → 프리팹 생성.
+  - Prefab Mode(프리팹 격리 모드)로 열어서 불필요한 오브젝트(카메라, 리그 등)는 장면에 남지 않도록 관리.
+- **기본 적(Base Enemy) 프리팹 생성**
+  - 기존 적 오브젝트를 `Base Enemy` 라는 이름으로 Ships 폴더에 드래그.
+  - Prefab Mode로 열어, **임시 플레이스홀더 큐브**를 넣어 크기 기준 설정.
+  - 나중에 진짜 모델로 교체할 예정.
+
+---
+
+## 3. 전용 Ships 장면(Scene) 만들기
+
+- **이유**: 다양한 우주선을 만들고 비교/참조하기 위해 전용 장면 사용.
+- 과정:
+  1. `Scenes` 폴더 안에 새로운 씬 생성 → 이름을 `Ships`.
+  2. 기존 메인 씬은 `MainLevel` 로 이름 변경.
+  3. `Ships` 씬을 열고 `Player` 와 `Base Enemy` 프리팹을 드래그.
+  4. 두 함선을 `(0,0,0)` 위치에 두고 크기와 스케일(`1,1,1`) 확인.
+  5. 플레이어 함선은 살짝 옆으로 이동 → **크기 비교 참조용**으로 활용.
+- **중요 팁**
+  - 우주선 모델 스케일은 가능하면 **1,1,1** 유지 → 전체 게임 자산의 기준 크기로 삼음.
+  - 추후 레이저, 카메라, 파티클 효과, 지형 배치 시 기준이 되어 일관성 확보.
+
+---
+
+## 4. Prefab Variant로 다양한 적 생성하기
+
+- **Prefab Variant 만들기**
+  - `Base Enemy` → 마우스 우클릭 → _Create → Prefab Variant_.
+  - 이름: `Enemy 1`.
+  - 씬에 드래그 후 **플레이스홀더 큐브**를 실제 우주선 모델(FBX)로 교체.
+  - 예: 빨간 전투기 모델.
+- **새로운 적 추가하기**
+  - `Enemy 1` 프리팹을 Project 창에서 `Ctrl+D` → `Enemy 2` 생성.
+  - 씬에 드래그, 모델 교체.
+  - 예: 흰색 전투기 모델.
+- **주의**
+  - Hierarchy에서 단순 복제(`Ctrl+D`) → **프리팹 변형이 아닌 동일 오브젝트 복제**일 뿐.
+  - 반드시 Project 뷰의 Prefab에서 복제해야 새로운 Variant 생성 가능.
+
+---
+
+## 5. Collider & Enemy 컴포넌트 설정
+
+- **문제 상황**
+  - 기본 플레이스홀더 큐브에 Box Collider가 있었지만,
+    이 Collider는 루트 오브젝트가 아니라 **자식 오브젝트에 붙어 있었음**.
+  - Enemy 스크립트는 루트 오브젝트의 Collider를 필요로 함 → 충돌 감지가 안 됨.
+- **해결**
+  1. 플레이스홀더 큐브의 Box Collider 제거.
+  2. `Base Enemy` 루트 오브젝트에 새 Box Collider 추가.
+  3. Collider 크기는 **조금 크게** 설정 → 게임플레이 측면에서 “관대한 충돌 판정” 제공.
+- **Enemy 스크립트 연결**
+  - `Base Enemy` 루트에 Enemy 스크립트 추가.
+  - `Destroyed VFX` 필드에 적 파괴 이펙트 프리팹 연결.
+  - 이렇게 하면 모든 Variant(Enemy 1, Enemy 2, …)가 자동으로 해당 설정을 상속.
+
+---
+
+## 6. 과제: 다양한 적 우주선 만들기
+
+- 최소 **3개 이상의 적 우주선 Variant** 제작.
+- 각각:
+  - 다른 모델(FBX) 사용.
+  - 크기에 맞는 Box Collider 조정.
+  - Base Enemy로부터 상속 → Enemy 스크립트 + VFX 자동 적용.
+- 강사 시연:
+  - 빨간 전투기, 흰색 전투기 → 적군.
+  - 노란색, 파란색 → 이후 아군(친화적 함선)으로 활용 가능.
+  - 총 5개 모델 사용 → 모두 프리팹 변형으로 제작.
+- **팁**
+  - Scene 뷰에서 `F` 키 → 선택 오브젝트에 카메라 초점 맞춤.
+  - 오른쪽 위 기즈모의 작은 사각형 버튼 → 원근/등각 뷰 전환.
+  - 등각 뷰에서 Collider 크기 조정이 더 정확함.
+
+---
+
+✅ 정리:
+
+이 강의는 **Prefab Variants 개념을 실제 적용**하면서,
+
+- 폴더 구조 정리 →
+- Base Enemy 프리팹 생성 →
+- Variant 만들기 →
+- Collider & Enemy 스크립트 적용 →
+- 다양한 모델을 활용해 적 우주선 확장
+
+이라는 전체 워크플로우를 보여주었습니다.
+
+---
+
+# { Enemy 히트포인트(HP) 구현 }
+
+이번 강의에서는 `Enemy` 클래스에 개별 적 프리팹마다 히트포인트(`hitPoints`)를 두어 파티클(레이저) 충돌 시 체력이 깎이고 0 이하가 되면 폭발 VFX를 띄우고 오브젝트를 제거하는 흐름을 구현했습니다. 또한 `OnParticleCollision` 내부 로직을 깔끔하게 추출(Extract method)해 코드 가독성을 높였고, 파티클 이벤트의 특성(한 발당 여러 파티클 충돌 → 중복 대미지)을 고려해 적의 `hitPoints` 값을 조절하는 실습을 했습니다.
+
+---
+
+## 📋 목차
+
+1. [핵심 개념: 파티클 충돌과 이벤트](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#1-%ED%8C%8C%ED%8B%B0%ED%81%B4-%EC%B6%A9%EB%8F%8C%EA%B3%BC-%EC%9D%B4%EB%B2%A4%ED%8A%B8)
+2. [설계: hitPoints 변수와 동작 원리](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#2-hitpoints-%EC%84%A4%EA%B3%84%EC%99%80-%EB%8F%99%EC%9E%91-%EC%9B%90%EB%A6%AC)
+3. [구현 코드와 라인별 설명](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#3-%EA%B5%AC%ED%98%84-%EC%BD%94%EB%93%9C%EC%99%80-%EB%9D%BC%EC%9D%B8%EB%B3%84-%EC%84%A4%EB%AA%85)
+4. [리팩터링(Extract Method) — 절차와 이유](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#4-%EB%A6%AC%ED%8C%A9%ED%84%B0%EB%A7%81-extract-method)
+5. [테스트 절차와 '두 번 맞는 현상' 디버깅 포인트](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#5-%ED%85%8C%EC%8A%A4%ED%8A%B8-%EC%A0%88%EC%B0%A8%EC%99%80-%EB%91%90-%EB%B2%88-%EB%A7%9E%EB%8A%94-%ED%98%84%EC%83%81)
+6. [클래스 책임과 아키텍처(강의에서의 논의 요약)](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#6-%ED%81%B4%EB%9E%98%EC%8A%A4-%EC%B1%85%EC%9E%84%EA%B3%BC-%EC%95%84%ED%82%A4%ED%85%8D%EC%B2%98)
+7. [실습: 강의에서 사용한 Enemy별 hitPoints 설정 예시](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#7-%EC%8B%A4%EC%8A%B5-Enemy%EB%B3%84-hitpoints-%EC%84%A4%EC%A0%95-%EC%98%88%EC%8B%9C)
+8. [요약 및 다음 강의 예고](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#8-%EC%9A%94%EC%95%BD-%EB%B0%8F-%EB%8B%A4%EC%9D%8C-%EA%B0%95%EC%9D%98-%EC%98%88%EA%B3%A0)
+
+---
+
+## 1. 파티클 충돌과 이벤트
+
+- `OnParticleCollision(GameObject other)`는 Unity의 **파티클 시스템이 다른 오브젝트와 충돌할 때 호출되는 이벤트 메서드**입니다.
+- 중요한 특성(강의에서 지적한 핵심 문제): 레이저를 발사할 때 **두 개의 레이저(혹은 두 개의 파티클 스트림)를 동시에 발사하는 구성**이라면, 대상 오브젝트는 파티클 충돌 이벤트를 **두 번** 받게 되고 그만큼 `ProcessHit()`가 두 번 호출됩니다.
+  → 즉, "한 번 맞았을 때 한 번만 데미지"를 기대하면 의도와 다르게 **중복 데미지**가 발생할 수 있음.
+
+(강의에서는 이 점을 염두에 두고 각 적의 `hitPoints`를 **의도한 히트 횟수 × 2**로 설정하는 방법을 사용했습니다.)
+
+---
+
+## 2. `hitPoints` 설계와 동작 원리
+
+- `hitPoints`는 각 적 프리팹마다 Inspector에서 설정 가능한 `int` 필드로 노출됩니다. (`[SerializeField] int hitPoints = 3;`)
+- **행동 원리**: 적이 파티클에 맞으면 `ProcessHit()`가 호출되고, 그 안에서 `hitPoints--`로 1씩 감소. `hitPoints <= 0`이면 폭발 VFX를 인스턴스화하고 `Destroy(this.gameObject)`로 오브젝트 제거.
+
+---
+
+## 3. 구현 코드와 라인별 설명
+
+```csharp
+using UnityEngine;
+
+public class Enemy : MonoBehaviour
+{
+    [SerializeField] GameObject destroyedVFX;
+    [SerializeField] int hitPoints = 3;
+
+    void OnParticleCollision(GameObject other)
+    {
+        ProcessHit();
+    }
+
+    private void ProcessHit()
+    {
+        hitPoints--;
+        if (hitPoints <= 0)
+        {
+            Instantiate(destroyedVFX, transform.position, Quaternion.identity);
+            Destroy(this.gameObject);
+        }
+    }
+}
+```
+
+- `using UnityEngine;`
+  Unity API를 사용하기 위한 네임스페이스 선언.
+- `public class Enemy : MonoBehaviour`
+  적 행동을 담당하는 컴포넌트 클래스. `MonoBehaviour`를 상속하여 Unity 이벤트(예: `OnParticleCollision`)를 사용할 수 있음.
+- `[SerializeField] GameObject destroyedVFX;`
+  Inspector에서 폭발(파괴) 시 보여줄 VFX 프리팹을 할당할 수 있게 공개(직렬화)한 필드. 프리팹을 드래그해 연결.
+- `[SerializeField] int hitPoints = 3;`
+  Inspector에서 편집 가능한 히트포인트. 기본값은 3(강의 초기값). 각 적(prefab)마다 다른 값으로 설정 가능.
+- `void OnParticleCollision(GameObject other)`
+  파티클이 이 오브젝트와 충돌할 때 Unity가 호출하는 이벤트 메서드. 파라미터 `other`는 충돌을 일으킨 파티클 시스템을 가진 게임오브젝트(레이저 등)를 가리킴.
+- `ProcessHit();`
+  충돌이 발생하면 실제 체력 감소/파괴 처리를 `ProcessHit()`로 위임 — Unity 이벤트 핸들러는 가급적 간단히 유지.
+- `private void ProcessHit()`
+  실제로 히트 처리(데미지 적용 및 파괴 처리)를 담당하는 메서드.
+  - `hitPoints--;`
+    현재 히트포인트를 1 감소. (강의에선 동등한 문법으로 `hitPoints = hitPoints - 1;`도 설명)
+  - `if (hitPoints <= 0)`
+    HP가 0이하가 되었을 때 파괴 로직 실행.
+    - `Instantiate(destroyedVFX, transform.position, Quaternion.identity);`
+      폭발 VFX 인스턴스 생성. 위치는 `transform.position`(적의 현재 위치), 회전은 `Quaternion.identity`로 기본 회전(즉 회전 없음).
+    - `Destroy(this.gameObject);`
+      적 게임오브젝트 제거(파괴).
+
+---
+
+## 4. 리팩터링
+
+- **왜 리팩터링했나?**
+  UnityEvent 메서드(`OnParticleCollision`)는 이벤트 처리 중심으로 가급적 **짧고 명확하게** 유지하는 것이 유지보수에 유리합니다. 이벤트 내부에 여러 로직이 섞이면 가독성이 떨어지고 테스트하기도 어렵습니다.
+- **강의에서 실제로 한 절차**
+  1. `OnParticleCollision` 내부의 파괴 처리(데미지 로직)를 선택(하이라이트).
+  2. 에디터(IDE)의 작은 전구(Quick Actions)를 클릭하여 `Extract method` 선택.
+  3. 새 메서드 이름을 `ProcessHit`로 지정.
+  4. 여러 메서드명을 동시에 바꾸고 싶을 때 `Ctrl+D`로 동시에 편집하거나, 메서드 간 이름 변경은 `F2`로 일괄 리네임 가능(IDE 단축키 사용법 소개).
+
+     → 결과: `OnParticleCollision`는 이벤트 트리거만 하고, 실제 처리 로직은 `ProcessHit()`가 담당.
+
+- **결과적 이점**
+  - 이벤트 핸들러 단순화
+  - 테스트·디버깅이 쉬워짐
+  - 재사용성 향상 (다른 곳에서 `ProcessHit()`를 호출 가능)
+
+---
+
+## 5. 클래스 책임과 아키텍처
+
+- **문제 제기**: 현재 `Enemy` 클래스가 여러 책임(파티클 충돌 처리, 체력관리, VFX 인스턴스화 등)을 동시에 가지고 있음.
+- **원칙적 권고**: 클래스는 보통 **하나의 책임(Single Responsibility Principle)** 만 가지는 것이 바람직. (강의에서는 SOLID 원칙을 간단히 언급)
+- **실제 수업 흐름**: 지금은 단일 클래스에 기능을 넣어도 괜찮지만, 나중에 코드가 커지면 각 책임을 분리하여(예: Health 컴포넌트, VFX 매니저, Collision 처리기 등) 클래스 간 상호작용으로 설계해야 함. 다음 강의에서 클래스 간 통신을 다룰 예정.
+
+---
+
+# { 🎯 Scoreboard와 Enemy 클래스 소통하기 }
+
+이번 강의에서는 **두 클래스(Scoreboard와 Enemy)가 서로 소통할 수 있도록 `public 메소드`를 사용하는 방법**을 배우고, 실제로 적을 파괴할 때 점수가 올라가도록 구현했습니다.
+
+---
+
+## 📋 목차
+
+1. [Scoreboard 클래스 만들기](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#scoreboard-%ED%81%B4%EB%9E%98%EC%8A%A4-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+2. [점수 증가 메소드 작성하기](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#%EC%A0%90%EC%88%98-%EC%A6%9D%EA%B0%80-%EB%A9%94%EC%86%8C%EB%93%9C-%EC%9E%91%EC%84%B1%ED%95%98%EA%B8%B0)
+3. [메소드 접근 제한자 이해하기](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#%EB%A9%94%EC%86%8C%EB%93%9C-%EC%A0%91%EA%B7%BC-%EC%A0%9C%ED%95%9C%EC%9E%90-%EC%9D%B4%ED%95%B4%ED%95%98%EA%B8%B0)
+4. [Enemy 클래스에서 Scoreboard 접근하기](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#enemy-%ED%81%B4%EB%9E%98%EC%8A%A4%EC%97%90%EC%84%9C-scoreboard-%EC%A0%91%EA%B7%BC%ED%95%98%EA%B8%B0)
+5. [참조를 얻는 방법 (FindFirstObjectByType)](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#%EC%B0%B8%EC%A1%B0%EB%A5%BC-%EC%96%BB%EB%8A%94-%EB%B0%A9%EB%B2%95-findfirstobjectbytype)
+6. [점수 반영 및 Prefab 설정하기](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#%EC%A0%90%EC%88%98-%EB%B0%98%EC%98%81-%EB%B0%8F-prefab-%EC%84%A4%EC%A0%95%ED%95%98%EA%B8%B0)
+7. [Collider 비활성화 시의 Unity 동작 특성](https://www.notion.so/4-3-278e683f737e80fd9386fba9d00630f1#collider-%EB%B9%84%ED%99%9C%EC%84%B1%ED%99%94-%EC%8B%9C%EC%9D%98-unity-%EB%8F%99%EC%9E%91-%ED%8A%B9%EC%84%B1)
+
+---
+
+## 1. Scoreboard 클래스 만들기
+
+- **새로운 MonoBehaviour Script** → 이름: `Scoreboard`.
+- 계층 구조에 **빈 게임 오브젝트 생성** → 이름: `Scoreboard`.
+- 이 오브젝트에 `Scoreboard` 스크립트 컴포넌트 첨부.
+
+---
+
+## 2. 점수 증가 메소드 작성하기
+
+Scoreboard는 **게임 점수를 관리하는 클래스**입니다.
+
+```csharp
+public class Scoreboard : MonoBehaviour
+{
+    int score = 0;
+
+    public void IncreaseScore(int amount)
+    {
+        score += amount;        // 점수를 증가
+        Debug.Log(score);       // 콘솔에 출력 (테스트용)
+    }
+}
+```
+
+- `int score = 0;` : 시작 시 점수 초기화.
+- `IncreaseScore(int amount)` : 매개변수 `amount`만큼 점수를 증가.
+- `score += amount;` : 축약 연산자 사용 (`score = score + amount`와 동일).
+- `Debug.Log(score)` : 점수가 잘 올라가는지 콘솔에서 확인 가능.
+
+---
+
+## 3. 메소드 접근 제한자 이해하기
+
+- 기본적으로 Unity/C#의 함수는 **private**.
+- 다른 클래스에서 접근하려면 **public**으로 열어야 함.
+- 접근 제한자 개념:
+  - `private` : 해당 클래스 내부에서만 사용 가능.
+  - `public` : 외부 클래스에서도 접근 가능.
+  - (추가: `protected`, `internal` 같은 것도 존재 → 상속/특정 어셈블리에서만 사용)
+- 여기서는 Enemy가 Scoreboard의 함수를 호출해야 하므로 **public**으로 지정.
+
+👉 캡슐화 원칙:
+
+- 가능한 한 `private`으로 두고, 꼭 필요할 때만 `public`으로 열기.
+- 이는 **SOLID 원칙** 중 O(Open-Closed Principle: 개방-폐쇄 원칙)\*\*과도 연결됨 → 확장은 가능하지만 기존 코드를 직접 수정하지 않게 설계.
+
+---
+
+## 4. Enemy 클래스에서 Scoreboard 접근하기
+
+Enemy는 **파괴될 때 Scoreboard의 IncreaseScore 메소드를 실행**해야 함.
+
+```csharp
+public class Enemy : MonoBehaviour
+{
+    [SerializeField] GameObject destroyedVFX;
+    [SerializeField] int hitPoints = 3;
+    [SerializeField] int scoreValue = 10;
+    Scoreboard scoreboard;
+
+    void Start()
+    {
+        scoreboard = FindFirstObjectByType<Scoreboard>();
+    }
+
+    void OnParticleCollision(GameObject other)
+    {
+        ProcessHit();
+    }
+
+    private void ProcessHit()
+    {
+        hitPoints--;
+
+        if (hitPoints <= 0)
+        {
+            scoreboard.IncreaseScore(scoreValue);    // 점수 증가
+            Instantiate(destroyedVFX, transform.position, Quaternion.identity);
+            Destroy(this.gameObject);
+        }
+    }
+}
+
+```
+
+- `scoreValue` : 적마다 다른 점수를 가질 수 있도록 `[SerializeField]`로 Inspector에서 노출.
+- `Start()` : 게임 시작 시 `Scoreboard` 참조 가져오기.
+- `OnParticleCollision()` : 레이저 파티클이 맞았을 때 호출.
+- `ProcessHit()` : HP 감소 → 0 이하이면 파괴 & 점수 증가.
+
+---
+
+## 5. 참조를 얻는 방법 (FindFirstObjectByType)
+
+- `scoreboard = FindFirstObjectByType<Scoreboard>();`
+  - 장면(Scene)에서 **첫 번째 Scoreboard 오브젝트**를 찾아서 연결.
+- **장점** : Prefab마다 직접 Inspector에 드래그하지 않아도 됨.
+- **단점** : CPU 비용이 조금 듬 → 하지만 Start에서 1번만 찾으므로 큰 문제는 없음.
+- Unity에서 예전 방식: `FindObjectOfType<>()` → 이제는 `FindFirstObjectByType<>()` 사용 권장.
+- 여러 개를 찾고 싶다면 `FindObjectsByType<>()` 사용 가능 (배열 반환).
+
+---
+
+## 6. 점수 반영 및 Prefab 설정하기
+
+- 적마다 점수를 다르게 설정 가능:
+  - Beetle → 100점
+  - Butterfly → 50점
+  - Grasshopper → 5점
+  - Moth → 15점
+  - Wasp → 15점
+- 각 적 Prefab의 `Score Value` 필드에 값 입력.
+- Prefab 변경 시, 모든 인스턴스에 자동 반영됨.
+
+---
+
+## 7. Collider 비활성화 시의 Unity 동작 특성
+
+- **흥미로운 Unity 동작**:
+  - 스크립트 컴포넌트(`MonoBehaviour`)를 꺼도,
+    Collider가 활성화되어 있으면 **OnTriggerEnter / OnCollisionEnter는 여전히 실행됨**.
+  - 하지만 `Start()` 같은 일반 함수는 실행되지 않음.
+- 이유: Unity는 Collider 이벤트를 **물리 시스템**에서 직접 처리하기 때문.
+- 해결: 충돌 이벤트를 막고 싶다면 **Collider 자체를 비활성화**해야 함.
+
+---
+
+## ✅ 정리
+
+- **Scoreboard**: 점수 관리 전용 클래스 (점수 증가 함수 `IncreaseScore` 제공).
+- **Enemy**: 파괴될 때 `Scoreboard`와 소통 → 점수 증가.
+- **FindFirstObjectByType**: 장면에서 Scoreboard를 찾는 방법.
+- **Inspector [SerializeField]**: 적마다 다른 점수를 부여.
+- **Collider 동작 원리**: 스크립트 비활성화 ≠ 충돌 이벤트 비활성화.

@@ -1,0 +1,779 @@
+---
+title: 'Next.js + Supabase 연결 가이드'
+date: '2026-09-02'
+category: '풀스택/Supabase'
+tags: ['풀스택', 'Supabase']
+draft: false
+summary: ''
+---
+
+```jsx
+이 가이드는 Next.js와 Supabase를 처음 사용하는 초보자를 위해, 최대한 쉽게 단계별로 설명합니다.
+
+Next.js는 웹 애플리케이션을 만들기 위한 프레임워크이고, Supabase는 데이터베이스를 쉽게 관리할 수 있는 도구입니다.
+
+이 문서에서는 Supabase의 PostgreSQL 데이터베이스를 Next.js와 연결하는 두 가지 방법(Prisma와 Supabase JavaScript 클라이언트)을 다룹니다.
+```
+
+# 🎯 이 가이드를 따라하면 할 수 있는 것
+
+```jsx
+Next.js 프로젝트에서 Supabase 데이터베이스에 데이터를 저장하고 가져올 수 있습니다.
+
+심리 테스트 플랫폼 같은 간단한 웹 앱을 만들 준비를 할 수 있습니다.
+
+두 가지 연결 방법(Prisma와 Supabase 클라이언트)의 차이와 사용법을 이해할 수 있습니다.
+```
+
+# 🔍 Supabase란?
+
+```jsx
+Supabase는 클라우드에서 제공되는 PostgreSQL 데이터베이스입니다.
+
+PostgreSQL은 강력한 데이터베이스 시스템으로, 데이터를 체계적으로 저장하고 관리합니다.
+
+장점:
+
+		무료 플랜이 있어 비용 걱정 없이 시작 가능.
+
+		설정이 간단하고, 실시간 데이터 업데이트 기능 제공.
+
+		Next.js 같은 프론트엔드 프레임워크와 쉽게 연결 가능.
+
+용도: 심리 테스트 데이터, 사용자 정보, 테스트 결과 등을 저장하고 관리.
+```
+
+# 📋 연결 방법 2가지
+
+```jsx
+Next.js와 Supabase를 연결하는 두 가지 방법이 있습니다.
+
+이 가이드에서는 Prisma를 사용하는 방법을 주로 설명하고, Supabase JavaScript 클라이언트를 보조적으로 다룹니다.
+```
+
+## 1. Prisma를 통한 연결 (주로 서버에서 사용, 추천)
+
+```jsx
+Next.js → Prisma (데이터베이스 관리 도구) → Supabase PostgreSQL
+```
+
+```jsx
+장점: 타입 안정성(TypeScript) 뛰어남, 데이터베이스 작업이 체계적.
+
+단점: 설정이 약간 복잡, 실시간 기능은 없음.
+```
+
+## 2. Supabase JavaScript 클라이언트 (클라이언트와 서버 모두 사용):
+
+```jsx
+Next.js → Supabase JavaScript 클라이언트 → Supabase API
+```
+
+```jsx
+장점: 설정이 더 쉬움, 실시간 데이터 업데이트 가능.
+
+단점: 타입 안정성이 약간 부족, 보안 설정 주의 필요.
+```
+
+```jsx
+이 가이드에서는 Prisma를 중심으로 설명하지만, Supabase 클라이언트 사용법도 간단히 다룹니다su.
+```
+
+# supabase 클라이언트(Client) 를 이용한 연결 & Prisma 를 이용한 연결
+
+```jsx
+클라이언트(Client)는 사용자의 브라우저에서 실행되는 코드로, 주로 화면을 보여주고 사용자 입력을 받아 Supabase 같은 외부 서비스에 데이터를 요청할 때 사용됩니다.
+
+반면, Prisma는 서버에서만 실행되는 데이터베이스 접근 도구로, 직접 DB(PostgreSQL 등)에 연결해 데이터를 안전하게 읽고 쓰는 데 사용됩니다.
+
+클라이언트는 로그인, 게시글 보기 등 비민감한 데이터 처리에 적합하고, Prisma는 회원정보 수정, 관리자 기능처럼 보안이 필요한 서버 로직에 적합합니다.
+
+만약 Next.js에서 서버사이드 렌더링(SSR)을 한다면 Supabase로도 충분히 가능하며, 반드시 Prisma를 써야 하는 것은 아닙니다.
+```
+
+## 1. 클라이언트(Client)란?
+
+```jsx
+✨ 사용자 쪽 화면, 즉 브라우저에서 실행되는 코드
+
+📱 예시:
+
+우리가 웹사이트에 접속했을 때 보는 화면
+
+버튼 클릭, 로그인, 게시글 보기 등 브라우저에서 일어나는 모든 것
+
+👩‍💻 사용하는 이유:
+
+사용자와 직접 소통 (화면을 보여주고, 입력을 받음)
+
+Supabase에 데이터 요청 (예: 게시글 가져오기)
+
+하지만 보안이 약해서 민감한 작업은 할 수 없음!
+
+🔑 사용할 수 있는 도구:
+
+NEXT_PUBLIC_SUPABASE_URL
+
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+➡️ 이건 브라우저에서도 써도 되는 공개 키예요.
+```
+
+## 2. Prisma란?
+
+```jsx
+🔐 서버에서 사용하는 도구
+
+데이터베이스(PostgreSQL)에 안전하게 접속해서 데이터를 관리하는 용도
+
+📦 비유:
+
+클라이언트가 “데이터 주세요!” 라고 말하면,
+
+Prisma는 서버에서 직접 데이터베이스에 가서 꺼내주는 관리자예요.
+
+📱 예시:
+
+서버에서 주문 목록 가져오기
+
+서버에서 유저 데이터 추가/삭제하기
+
+민감한 비즈니스 로직 처리 (ex. 결제 후 상태 변경 등)
+
+👨‍💻 사용하는 이유:
+
+보안이 필요한 작업은 반드시 서버에서만 해야 돼요
+
+Prisma는 그 서버 안에서 DB에 안전하게 연결하는 도구예요
+
+🔑 필요한 정보:
+
+DATABASE_URL (DB 비밀번호까지 포함)
+
+절대 클라이언트에서는 쓰면 안 되는 정보
+```
+
+| 구분        | 클라이언트 (Client)         | Prisma                                  |
+| ----------- | --------------------------- | --------------------------------------- |
+| 위치        | 사용자 브라우저             | 서버 내부                               |
+| 용도        | 화면 보여주기, 데이터 요청  | 데이터베이스 직접 관리                  |
+| 보안        | 낮음 (공개 환경)            | 높음 (비공개 환경)                      |
+| 예시        | 게시글 목록 보기, 로그인 폼 | 게시글 추가, 회원정보 수정              |
+| Supabase 키 | `anon key` 사용             | `service role` 또는 `DATABASE_URL` 사용 |
+
+## 최종 예시 `.env` 파일
+
+```jsx
+# 브라우저에서도 사용할 Supabase 정보
+NEXT_PUBLIC_SUPABASE_URL=https://abcd1234.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI...
+
+# 서버 사이드에서만 사용할 관리자 키 (절대 노출 금지!)
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI...
+
+# Prisma가 Supabase DB에 연결하기 위한 주소
+DATABASE_URL="postgresql://postgres:your_db_password@db.abcd1234.supabase.co:5432/postgres"
+```
+
+### ① `NEXT_PUBLIC_SUPABASE_URL`
+
+```jsx
+내 Supabase 프로젝트의 주소 (URL)
+
+Supabase에서 만든 나만의 서버 주소라고 보면 돼요.
+
+클라이언트(브라우저)에서 Supabase에 접근할 때 이 주소를 사용해요.
+
+🔍 어디서 찾나요?
+
+Supabase 콘솔 접속
+
+프로젝트 클릭 → Settings → API → Project URL 복사
+```
+
+### ② `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+```jsx
+🔐 익명 사용자용 공개 키
+
+클라이언트(브라우저)에서 Supabase에 접근할 수 있게 해줘요.
+
+이 키는 로그인하지 않은 사람도 쓸 수 있는 키예요.
+
+주로 읽기 작업 등에 사용돼요.
+
+🔍 어디서 찾나요?
+
+Supabase 콘솔 → Settings → API → Project API Keys → anon public
+
+✅ NEXT_PUBLIC_으로 시작하는 건 Next.js가 브라우저에서도 접근할 수 있게 해주는 변수라는 뜻이에요!
+```
+
+### ③ `SUPABASE_SERVICE_ROLE_KEY`
+
+```jsx
+🚫 절대 브라우저에 노출하면 안 되는 관리자용 키
+
+이건 Supabase 서버를 전체 통제할 수 있는 강력한 키예요.
+
+예를 들어, 로그인 안 해도 데이터 다 지우는 요청을 보낼 수 있어요.
+
+오직 서버 사이드 코드에서만 사용해야 해요.
+
+🔍 어디서 찾나요?
+
+Supabase 콘솔 → Settings → API → service_role 키 복사
+```
+
+## 프리즈마 설정은 아래와 같이 한다
+
+## 예시 (Prisma용 DATABASE_URL)
+
+### Direct Connection (가장 이상적)
+
+```jsx
+DATABASE_URL = 'postgresql://postgres:[PASSWORD]@db.ktudkjtqjhkmnxegjgqr.supabase.co:5432/postgres'
+```
+
+```jsx
+IPv6 기반 (IPv4-only 환경에서 실패할 수 있음)
+
+Vercel 등 일부 플랫폼에서 안 될 수 있음
+```
+
+### Session Pooler (IPv4도 지원)
+
+```jsx
+DATABASE_URL =
+  'postgresql://postgres.ktudkjtqjhkmnxegjgqr:[PASSWORD]@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres'
+```
+
+```jsx
+안정적이고 대부분 환경에서 잘 작동
+
+Prisma에서 안정적으로 사용 가능
+```
+
+### Transaction Pooler (비추천)
+
+```jsx
+DATABASE_URL =
+  'postgresql://postgres.ktudkjtqjhkmnxegjgqr:[PASSWORD]@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres'
+```
+
+```jsx
+Prisma에서 작동 안 됨
+
+Supabase JS 클라이언트는 가능
+```
+
+| 사용 환경                                                              | 추천 연결 방식                            | 이유                                           |
+| ---------------------------------------------------------------------- | ----------------------------------------- | ---------------------------------------------- |
+| **일반 서버(VM, Vercel edge functions X)**                             | ✅ Direct Connection                      | 가장 빠르고 안정적                             |
+| **IPv4-only 환경**(Vercel, Netlify 등 서버리스 플랫폼 일부)            | ✅ Session Pooler                         | Direct가 안 될 수 있으니 IPv4 가능해야 함      |
+| **서버리스 (짧은 실행, 연결 짧음)**예: Serverless 함수, Edge, Cron job | ⚠️ Transaction Pooler(단 Prisma는 미지원) | Prisma는 지원 안 함, Supabase client만 써야 함 |
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381352/notion-blog/_/Supabase/Next_js_Supabase_/image.png)
+
+```jsx
+# Prisma Database URL (Supabase PostgreSQL)
+DATABASE_URL=postgresql://postgres.ktudkjtqjhkmnxegjgqr:Kim14582367!@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres
+DIRECT_URL=postgresql://postgres.ktudkjtqjhkmnxegjgqr:Kim14582367!@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres
+```
+
+# 🛠️ 단계별 설정 과정
+
+## 1단계: Supabase 프로젝트 생성
+
+```jsx
+1. Supabase 웹사이트 접속:
+
+supabase.com에 들어가세요.
+
+계정이 없으면 이메일 또는 GitHub로 가입하세요.
+
+2. 새 프로젝트 만들기:
+
+		로그인 후, 대시보드에서 "New Project" 버튼을 클릭하세요.
+
+		프로젝트 정보를 입력:
+
+				Name: psychology-test-platform (원하는 이름으로 변경 가능).
+
+				Database Password: 강력한 비밀번호 설정 (예: KimDongHyun14582367).
+
+						비밀번호는 복잡하게 만들어야 해킹 위험이 줄어듭니다.
+
+				Region: "Northeast Asia" (한국에 가까운 지역 선택, 빠른 속도를 위해).
+
+		Create 버튼을 누르고, 프로젝트 생성이 완료될 때까지 2~3분 기다리세요.
+
+3. 완료 확인:
+
+		대시보드에서 프로젝트 이름(psychology-test-platform)이 보이면 성공!
+```
+
+## 2단계: 연결 정보 수집
+
+```jsx
+Supabase 프로젝트가 생성되면, Next.js에서 사용할 연결 정보를 얻어야 합니다.
+
+두 가지 방법(Prisma, Supabase 클라이언트)에 따라 필요한 정보가 다릅니다.
+```
+
+### A. Prisma용 연결 정보 (직접 데이터베이스 연결)
+
+```jsx
+위치: Supabase 대시보드 → Settings → Database → Connection String 탭.
+
+필요한 정보:
+
+		Host: aws-0-ap-northeast-2.pooler.supabase.com (지역에 따라 다름).
+
+		Port: 5432 (직접 연결) 또는 6543 (Connection Pooling, 여러 사용자를 위해 추천).
+
+		Database: postgres (기본 데이터베이스 이름).
+
+		Username: postgres.프로젝트ID (예: postgres.mubrtiwgrcwvpbyedvtp).
+
+		Password: 1단계에서 설정한 비밀번호 (예: KimDongHyun14582367).
+```
+
+```jsx
+최종 연결 문자열 (한 줄로):
+
+이 문자열은 나중에 .env 파일에 저장합니다.
+```
+
+```jsx
+postgresql://postgres.mubrtiwgrcwvpbyedvtp:mDogHyn158367@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres
+```
+
+### B. Supabase JavaScript 클라이언트용 정보
+
+```jsx
+위치: Supabase 대시보드 → Settings → API 탭.
+
+필요한 정보:
+
+		Project URL: https://mubrtiwgrcwvpbyedvtp.supabase.co (프로젝트별 고유 주소).
+
+		Anon Key: 긴 문자열 (예: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...).
+
+				Anon Key는 공개 가능한 키로, 클라이언트에서 사용됩니다.
+```
+
+## 3단계: Next.js 프로젝트 설정
+
+```jsx
+Next.js 프로젝트가 없으면 먼저 생성하세요. 터미널에서 다음 명령어를 실행:
+```
+
+### 환경변수 설정
+
+```jsx
+프로젝트 루트 폴더에 .env 파일을 만드세요
+
+touch .env
+```
+
+```jsx
+.env 파일에 다음 내용을 추가하세요. 2단계에서 얻은 정보를 사용합니다:
+
+# Supabase 클라이언트용
+NEXT_PUBLIC_SUPABASE_URL=https://mubrtiwgrcwvpbyedvtp.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
+
+# Prisma용
+DATABASE_URL="postgresql://postgres.mubrtiwgrcwvpbyedvtp:KimDongHyun14582367@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres"
+
+# NextAuth (인증용, 나중에 필요)
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="psychology-test-platform-secret-key-2025-very-secure-random-string"
+```
+
+```jsx
+중요: NEXT_PUBLIC_ 접두사는 클라이언트에 노출되므로, 민감한 정보(DATABASE_URL, NEXTAUTH_SECRET)에는 사용하지 마세요.
+
+your_anon_key_here는 Supabase 대시보드에서 얻은 Anon Key로 교체하세요.
+```
+
+## 4단계: 필요한 패키지 설치
+
+```jsx
+터미널에서 다음 명령어를 실행해 필요한 패키지를 설치합니다:
+```
+
+```jsx
+# Supabase JavaScript 클라이언트
+npm install @supabase/supabase-js
+
+# Prisma와 Prisma 클라이언트
+npm install prisma @prisma/client
+```
+
+## 5단계: Supabase 클라이언트 설정
+
+```jsx
+Supabase JavaScript 클라이언트를 사용하려면 클라이언트를 초기화해야 합니다.
+```
+
+### 1. src/lib 폴더를 만들고, 그 안에 supabase.ts 파일을 생성:
+
+```jsx
+mkdir -p src/lib
+touch src/lib/supabase.ts
+```
+
+### 2. src/lib/supabase.ts에 다음 코드를 추가
+
+```jsx
+import { createClient } from '@supabase/supabase-js'
+
+// 환경변수에서 URL과 Anon Key 가져오기
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+// Supabase 클라이언트 생성
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+```
+
+```jsx
+이 코드는 Supabase와 통신할 클라이언트를 설정합니다.
+!는 TypeScript에게 변수가 반드시 존재한다고 알려주는 문법입니다.
+```
+
+## 6단계: Prisma 설정
+
+```jsx
+Prisma는 데이터베이스와 쉽게 작업할 수 있도록 도와주는 도구입니다.
+```
+
+### 1. Prisma 초기화:
+
+```jsx
+npx prisma init
+```
+
+```jsx
+이 명령어는 prisma 폴더와 prisma/schema.prisma 파일을 생성합니다.
+
+.env 파일에 DATABASE_URL이 이미 추가되어 있어야 합니다.
+```
+
+### 2. Prisma 스키마 설정: prisma/schema.prisma 파일을 열고 다음 내용으로 수정
+
+```jsx
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Test {
+  id           String   @id @db.VarChar(50)
+  title        String   @db.VarChar(255)
+  description  String?  @db.Text
+  thumbnailUrl String?  @map("thumbnail_url") @db.VarChar(500)
+  testUrl      String   @map("test_url") @db.VarChar(500)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  responses    UserResponse[] @relation("TestToResponses")
+
+  @@map("tests")
+}
+
+model UserResponse {
+  id        String   @id @db.VarChar(50)
+  testId    String   @map("test_id") @db.VarChar(50)
+  userId    String   @map("user_id") @db.VarChar(50)
+  response  Json     @db.Json
+  createdAt DateTime @default(now()) @map("created_at")
+  test      Test     @relation("TestToResponses", fields: [testId], references: [id])
+
+  @@map("user_responses")
+}
+```
+
+```jsx
+이 스키마는 심리 테스트(Test)와 사용자 응답(UserResponse) 테이블을 정의합니다.
+
+Test: 테스트의 제목, 설명, 썸네일 URL 등을 저장.
+
+UserResponse: 사용자가 테스트에 답한 결과를 저장.
+```
+
+### 3. 데이터베이스에 스키마 적용
+
+```jsx
+# Prisma 클라이언트 생성
+npx prisma generate
+
+# 데이터베이스에 스키마 적용
+npx prisma db push
+```
+
+```jsx
+db push는 Supabase 데이터베이스에 테이블을 생성합니다.
+```
+
+### 4. 샘플 데이터 추가 (선택): prisma/seed.ts 파일을 만들어 샘플 데이터를 추가:
+
+```jsx
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
+
+async function main() {
+  await prisma.test.create({
+    data: {
+      id: 'stress-test-1',
+      title: 'Stress Test',
+      description: 'Measure your stress level',
+      thumbnailUrl: 'https://example.com/thumbnail.jpg',
+      testUrl: '/tests/stress-test',
+      isActive: true,
+    },
+  })
+  console.log('Sample data created')
+}
+
+main()
+  .catch((e) => console.error(e))
+  .finally(async () => await prisma.$disconnect())
+```
+
+```jsx
+npx ts-node prisma/seed.ts
+```
+
+## 7단계: Prisma 클라이언트 설정
+
+```jsx
+Prisma를 서버에서 효율적으로 사용하려면 클라이언트를 초기화해야 합니다.
+```
+
+### 1. src/lib/prisma.ts 파일을 생성:
+
+```jsx
+touch src/lib/prisma.ts
+```
+
+### 2. src/lib/prisma.ts에 다음 코드를 추가:
+
+```jsx
+import { PrismaClient } from '@prisma/client'
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined
+}
+
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    log: ['query'],
+  })
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+```
+
+```jsx
+이 코드는 Prisma 클라이언트를 한 번만 생성하도록 보장합니다.
+
+log: ['query']는 데이터베이스 쿼리를 콘솔에 출력해 디버깅에 유용합니다.
+```
+
+## 8단계: API 라우트로 데이터 가져오기
+
+```jsx
+Next.js의 API 라우트를 사용해 Supabase 데이터를 가져옵니다.
+```
+
+### 1. src/app/api/tests/route.ts 파일 생성
+
+```jsx
+mkdir -p src/app/api/tests
+touch src/app/api/tests/route.ts
+```
+
+### 2. route.ts에 다음 코드를 추가:
+
+```jsx
+import { NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+
+export async function GET() {
+  try {
+    const tests = await prisma.test.findMany({
+      where: { isActive: true },
+    })
+    return NextResponse.json(tests)
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to fetch tests' }, { status: 500 })
+  }
+}
+```
+
+```jsx
+이 API는 활성화된 테스트 목록을 반환합니다.
+URL: http://localhost:3000/api/tests
+```
+
+## 9단계: Supabase 클라이언트로 데이터 가져오기
+
+```jsx
+클라이언트 컴포넌트에서 Supabase 클라이언트를 사용해 데이터를 가져옵니다.
+```
+
+### 1. src/app/tests/page.tsx 파일을 수정:
+
+```jsx
+'use client'
+
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
+
+export default function TestsPage() {
+  const [tests, setTests] = useState<any[]>([])
+
+  useEffect(() => {
+    async function fetchTests() {
+      const { data, error } = await supabase
+        .from('tests')
+        .select('*')
+        .eq('is_active', true)
+
+      if (error) {
+        console.error('Error:', error)
+        return
+      }
+      setTests(data)
+    }
+    fetchTests()
+  }, [])
+
+  return (
+    <div>
+      <h1>심리 테스트 목록</h1>
+      <ul>
+        {tests.map((test) => (
+          <li key={test.id}>
+            <a href={test.test_url}>{test.title}</a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+```
+
+```jsx
+이 코드는 활성화된 테스트 목록을 가져와 화면에 표시합니다.
+URL: http://localhost:3000/tests
+```
+
+## 10단계: 개발 서버 실행
+
+```jsx
+모든 설정이 완료되었으니 Next.js 서버를 실행해 확인하세요:
+```
+
+```jsx
+npm run dev
+```
+
+## 🎯 Prisma와 Supabase 클라이언트의 차이
+
+| **항목**        | **Prisma**                  | **Supabase 클라이언트**              |
+| --------------- | --------------------------- | ------------------------------------ |
+| **사용 위치**   | 서버사이드 (API Routes)     | 클라이언트 + 서버사이드              |
+| **타입 안정성** | 강력 (TypeScript 자동 생성) | 보통 (수동 타입 정의 필요)           |
+| **실시간 기능** | 없음                        | 지원 (예: 실시간 채팅, 알림)         |
+| **설정 복잡도** | 약간 복잡                   | 매우 쉬움                            |
+| **보안**        | 서버에서만 실행, 안전       | 클라이언트에서 실행 시 RLS 설정 필요 |
+
+```jsx
+서버에서 데이터 작업 → Prisma (안전하고 체계적).
+
+실시간 기능이나 간단한 작업 → Supabase 클라이언트.
+```
+
+## 📁 최종 파일 구조
+
+```jsx
+psychology-test-platform/
+├── src/
+│   ├── app/
+│   │   ├── api/
+│   │   │   └── tests/
+│   │   │       └── route.ts      # API 라우트
+│   │   └── tests/
+│   │       └── page.tsx          # 테스트 목록 페이지
+│   ├── lib/
+│   │   ├── prisma.ts             # Prisma 클라이언트
+│   │   └── supabase.ts           # Supabase 클라이언트
+│   └── prisma/
+│       ├── schema.prisma         # 데이터베이스 스키마
+│       └── seed.ts               # 샘플 데이터
+├── .env                          # 환경변수
+├── package.json
+└── tsconfig.json
+```
+
+# { Supabase mcp 연결하기 }
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381351/notion-blog/_/Supabase/Next_js_Supabase_/image_1.png)
+
+```jsx
+supabase 에서 새로운 토큰을 만든다 이름은 MCP 같은걸로 해주자
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381351/notion-blog/_/Supabase/Next_js_Supabase_/image_2.png)
+
+```jsx
+wsl 설정을 supabase에 들어가서 확인한다.
+
+그리고 내 토큰을 넣어서 사용한다
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381351/notion-blog/_/Supabase/Next_js_Supabase_/image_3.png)
+
+```jsx
+프로젝트 ref 부분은 위의 내용을 넣어준다
+```
+
+```jsx
+{
+  "mcpServers": {
+    "supabase": {
+      "command": "wsl",
+      "args": [
+        "npx",
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--read-only",
+        "--project-ref=ktudkjtqjhkmnxegjgqr"
+      ],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "your_supabase_personal_access_token"
+      }
+    }
+  }
+}
+```
+
+## 더 쉬운방법 ( 대상 프로젝트만 mcp 설치 )
+
+```jsx
+로컬 범위에서 사용하는 방법이다 토큰만 있으면 설치 가능하고 프로젝트 안에서 설치하면 된다.
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788381352/notion-blog/_/Supabase/Next_js_Supabase_/image_4.png)
+
+```jsx
+claude mcp add supabase -s local -e SUPABASE_ACCESS_TOKEN=your_token_here -- npx -y @supabase/mcp-server-supabase@latest
+```

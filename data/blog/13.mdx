@@ -1,0 +1,683 @@
+---
+title: '섹션 13. 셀레니움으로 멜론 모바일 사이트 조작 자동화'
+date: '2026-09-02'
+category: '기타, 사용 적음/크롤링 & 파이썬'
+tags: ['기타, 사용 적음', '크롤링 & 파이썬']
+draft: false
+summary: ''
+---
+
+# 멜론 모바일 사이트 접속 방법
+
+```python
+어떤 사이트는 모바일 버전으로 접속하려고 해도 접속하지 못하게 되어있다 ( 주소창에 m 을 붙이거나 하는 방식으로 )
+
+이럴때는 아래와 같은 방법으로 모바일 버전으로 접속이 가능하다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380935/notion-blog/_/_/_/_13_/Untitled.png)
+
+```python
+개발자 도구를 키고 모바일 변경 버튼을 클릭한 뒤
+
+모바일 버전으로 변경해준다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380929/notion-blog/_/_/_/_13_/Untitled_1.png)
+
+```python
+그리고 기기를 선택해주고 새로고침을 해주면 모바일 버전으로 사용이 가능하다
+
+* 현재 모바일로 하면 주소가 변하는게 아니기 때문에 셀레니움으로만 작업을 진행할거다
+```
+
+# 모바일 유저 에이전트 찾는 방법 및 멜론 모바일 메인 페이지 접속
+
+```python
+모바일에서 useragent 를 찾는 방법은 2가지 정도 있다
+```
+
+## 첫번째 유저 에이전트 찾는 방법
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380931/notion-blog/_/_/_/_13_/Untitled_2.png)
+
+```python
+기존과 똑같이 개발자 도구의 네트워크 부분에 user-Agent 부분을 복사해서 사용해준다
+```
+
+## 두번째 유저 에이전트 찾는 방법
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380931/notion-blog/_/_/_/_13_/Untitled_3.png)
+
+```python
+인터넷에 기종 이름 + userAgent 를 쳐서 위와 같은 내용을 찾아서 골라서 아무거나 넣어준다
+```
+
+## 메인 페이지로 이동 후 다른 페이지로 바로 이동되는 문제
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380932/notion-blog/_/_/_/_13_/Untitled_4.png)
+
+```python
+위와 같이 나는 https://m2.melon.com/index.htm 로 이동하길 원했지만
+
+바로 다른 사이트로 이동되어 버리고 있다
+```
+
+### current_url 과 if 를 사용해서 해결
+
+```python
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.options import Options
+import time
+
+options = Options()
+
+user_agent = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1"
+
+options.add_argument(f"user-agent={user_agent}")
+
+options.add_argument("--start-maximized")
+
+options.add_experimental_option("detach", True)
+
+# options.add_experimental_option("excludeSwitches", ["enable-logging"])
+
+driver = webdriver.Chrome(options=options)
+
+url = "https://m2.melon.com/index.htm"
+
+driver.get(url)
+time.sleep(2)
+
+if driver.current_url != url: # 현재 페이지가 url 이 아니라면 다시 접속하도록
+    driver.get(url)
+```
+
+```python
+if driver.current_url != url: # 현재 페이지가 url 이 아니라면 다시 접속하도록
+    driver.get(url)
+
+이 부분을 추가해서 해결 가능하다  ( current_url 은 현재 주소를 가져온다 )
+
+만약 지금 url 이 내가 원하는 url 이 아니라면 다시 내가 원하는 url 로 이동하도록 해준다
+
+* 배너가 뜬다면 배너를 끄는 닫기 버튼의 요소를 찾아서 끄게 해주자
+```
+
+# 멜론차트 클릭해서 페이지 이동 후 차트 더 보기 버튼 클릭 자동화
+
+```python
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.options import Options
+import time
+
+options = Options()
+
+user_agent = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1"
+
+options.add_argument(f"user-agent={user_agent}")
+
+options.add_argument("--start-maximized")
+
+options.add_experimental_option("detach", True)
+
+# options.add_experimental_option("excludeSwitches", ["enable-logging"])
+
+driver = webdriver.Chrome(options=options)
+
+url = "https://m2.melon.com/index.htm"
+
+driver.get(url)
+time.sleep(2)
+
+if driver.current_url != url: # 현재 페이지가 url 이 아니라면 다시 접속하도록
+    driver.get(url)
+
+driver.find_element(By.LINK_TEXT, "멜론차트").click()
+time.sleep(2)
+
+driver.find_element(By.TAG_NAME, "body").send_keys(Keys.END)
+time.sleep(1)
+
+# 두 번째 더 보기 버튼 클릭
+more_btns = driver.find_elements(By.CSS_SELECTOR, "#moreBtn")[1].click()
+
+```
+
+```python
+차트를 불러오고 더보기 버튼을 클릭해서 차트를 100까지 불러온다
+```
+
+## 모바일에서 버튼이 보이지 않아 클릭할 수 없는 문제 발생
+
+```python
+유저 에이전트를 알맞게 변경 해줬음에도 이상하게 모바일 버전으로 접속해도 버튼이 보이지 않는 문제가 발생했다
+
+( 원인은 내가 id 를 제대로 잡아주지 않은것 그러나 방법을 찾다가 몇가지 알아낸 명시적 대기 등을 아까워서 적어둔다 )
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380932/notion-blog/_/_/_/_13_/Untitled_5.png)
+
+```python
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import time
+
+options = Options()
+
+user_agent = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1"
+
+options.add_argument(f"user-agent={user_agent}")
+
+options.add_argument("--start-maximized")
+
+options.add_experimental_option("detach", True)
+
+# options.add_experimental_option("excludeSwitches", ["enable-logging"])
+
+driver = webdriver.Chrome(options=options)
+
+url = "https://m2.melon.com/index.htm"
+
+driver.get(url)
+time.sleep(2)
+
+if driver.current_url != url: # 현재 페이지가 url 이 아니라면 다시 접속하도록
+    driver.get(url)
+
+driver.find_element(By.LINK_TEXT, "멜론차트").click()
+time.sleep(2)
+
+driver.find_element(By.TAG_NAME, "body").send_keys(Keys.END)
+time.sleep(1)
+
+# 더 보기 버튼 요소 찾기
+more_btn = WebDriverWait(driver, 10).until(
+    EC.presence_of_element_located((By.CSS_SELECTOR, "#moreBtn"))
+)
+
+# # 더 보기 버튼 표시하기
+# driver.execute_script("arguments[0].style.display = 'block';", more_btn)
+# time.sleep(3)
+
+# 두 번째 더 보기 버튼 클릭
+more_btns = driver.find_elements(By.CSS_SELECTOR, "#moreBtn")
+if len(more_btns) > 1:
+    more_btns[1].click()
+
+
+
+# 솔직히 위의 반복문도 필요없다
+more_btns = driver.find_elements(By.CSS_SELECTOR, "#moreBtn")[1].click()
+```
+
+```python
+더보기 버튼을 보이게 클릭하는 방법은 의미가 없었다 없어도 클릭이 된다
+
+해답은 id 로 잡아서 클릭을 하는거였다 내가 제대로 html 을 분석하지 못한 문제였다 제대로 분석하고
+
+클래스 id 등등 다 시도해보자
+```
+
+```python
+from selenium.webdriver.support.ui import WebDriverWait
+
+WebDriverWait: 특정 조건이 충족될 때까지 최대 대기 시간 동안 기다리는 클래스이다.
+
+웹 페이지의 로딩 지연이나 비동기 요소 렌더링 등의 문제를 해결하는 데 사용된다.
+```
+
+```python
+from selenium.webdriver.support import expected_conditions as EC
+
+expected_conditions: 명시적 대기를 위한 다양한 조건들을 제공하는 모듈이다.
+
+예를 들어, 특정 요소가 존재하는지, 클릭 가능한지 등의 조건들이 있다.
+```
+
+# list_item 1위부터 100위까지 전체 수집하는 두 가지 방법
+
+## 상위 클래스를 선택하고 그 하위 요소를 가져오는 방법
+
+```python
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import NoSuchElementException
+import time
+
+options = Options()
+
+user_agent = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1"
+
+options.add_argument(f"user-agent={user_agent}")
+
+options.add_argument("--start-maximized")
+
+options.add_experimental_option("detach", True)
+
+# options.add_experimental_option("excludeSwitches", ["enable-logging"])
+
+driver = webdriver.Chrome(options=options)
+
+url = "https://m2.melon.com/index.htm"
+
+driver.get(url)
+time.sleep(2)
+
+if driver.current_url != url: # 현재 페이지가 url 이 아니라면 다시 접속하도록
+    driver.get(url)
+
+driver.find_element(By.LINK_TEXT, "멜론차트").click()
+time.sleep(2)
+
+driver.find_element(By.TAG_NAME, "body").send_keys(Keys.END)
+time.sleep(1)
+
+# 두 번째 더 보기 버튼 클릭
+more_btns = driver.find_elements(By.CSS_SELECTOR, "#moreBtn")[1].click()
+
+chart_list = driver.find_element(By.CSS_SELECTOR, "#_chartList")
+
+items = chart_list.find_elements(By.CSS_SELECTOR, ".list_item")
+
+print(len(items))
+
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380932/notion-blog/_/_/_/_13_/Untitled_6.png)
+
+```python
+1위 부터 100위까지 리스트를 보면 100개가 나와야 하는데 452개가 나온다 ( 아마도 다른 차트 리스트 까지 가져오는거 같다 )
+
+이럴때는 100위 차트 리스트 상위 요소인 chart_list 를 먼저 잡고 그 하위 list_item 를 잡도록 한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380934/notion-blog/_/_/_/_13_/Untitled_7.png)
+
+```python
+총 100 개가 나온다
+```
+
+## 모든 클래스를 불러오고 그 중 특정 클래스를 추가적으로 포함한 클래스만 가져오기
+
+```python
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import NoSuchElementException
+import time
+
+options = Options()
+
+user_agent = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1"
+
+options.add_argument(f"user-agent={user_agent}")
+
+options.add_argument("--start-maximized")
+
+options.add_experimental_option("detach", True)
+
+# options.add_experimental_option("excludeSwitches", ["enable-logging"])
+
+driver = webdriver.Chrome(options=options)
+
+url = "https://m2.melon.com/index.htm"
+
+driver.get(url)
+time.sleep(2)
+
+if driver.current_url != url: # 현재 페이지가 url 이 아니라면 다시 접속하도록
+    driver.get(url)
+
+driver.find_element(By.LINK_TEXT, "멜론차트").click()
+time.sleep(2)
+
+driver.find_element(By.TAG_NAME, "body").send_keys(Keys.END)
+time.sleep(1)
+
+# 두 번째 더 보기 버튼 클릭
+more_btns = driver.find_elements(By.CSS_SELECTOR, "#moreBtn")[1].click()
+
+items = driver.find_elements(By.CSS_SELECTOR, ".list_item")
+
+for item in items[:]: # 반복문이 돌면서 삭제를 진행 할 경우에는 오류가 많다 그래서 복사를 해온 상태에서 반복문을 돌려 삭제하도록 한다
+    try:
+        ranking_num = item.find_element(By.CSS_SELECTOR, ".ranking_num")
+    except NoSuchElementException:
+        items.remove(item) # ranking_num 이 없는 아이템은 지운다
+
+print(len(items))
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380932/notion-blog/_/_/_/_13_/Untitled_8.png)
+
+```python
+100개의 요소를 가져와야 하지만 현재 list_item 을 하면 400 개가 넘는 요소가 나온다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380935/notion-blog/_/_/_/_13_/Untitled_9.png)
+
+```python
+그럼 list_item 에서 100위 차트에는 ranking_num 이라는 클래스가 존재하는데 이걸 포함한 클래스만 가져오도록 해준다
+
+그러나 이렇게 사용하면 오류가 발생한다 그 이유는 raking_num 을 가지고 있지 않은 list_item 이 다수 존재하기 때문이다
+```
+
+### 셀레니움 익셉션 처리
+
+```python
+셀레니움은 뷰티플숩 과 다르게 요소가 없으면 오류가 난다
+
+그래서 셀레니움은 에러 처리를 많이 해줘야 한다
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380931/notion-blog/_/_/_/_13_/Untitled_10.png)
+
+```python
+위의 오류에서 뒷부분만 가져와서 익셉션을 임포트 시켜준다 ( 이렇게 하는 이유는 짧게 쓰기 위해서 )
+
+from selenium.common.exceptions import NoSuchElementException
+```
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380931/notion-blog/_/_/_/_13_/Untitled_11.png)
+
+![Untitled](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380931/notion-blog/_/_/_/_13_/Untitled_12.png)
+
+```python
+items = driver.find_elements(By.CSS_SELECTOR, ".list_item")
+
+for item in items[:]: # 반복문이 돌면서 삭제를 진행 할 경우에는 오류가 많다 그래서 복사를 해온 상태에서 반복문을 돌려 삭제하도록 한다
+    try:
+        ranking_num = item.find_element(By.CSS_SELECTOR, ".ranking_num")
+    except NoSuchElementException:
+        items.remove(item) # ranking_num 이 없는 아이템은 지운다
+
+print(len(items))
+```
+
+```python
+익셉션 처리는 내용을 안 적어줘도 괜찮지만 정확하게 어떤 오류인지 적어주는게 좋다
+
+except NoSuchElementException:
+
+현재 내용은 요소를 찾지 못하면 item 을 지우게 하는 내용이다
+```
+
+# **[:] 문법 ( 파이썬 슬라이싱 )**
+
+```python
+[:]는 Python에서 리스트를 슬라이싱하는 기법 중 하나이다. ( 슬라이싱 해서 복사본을 만든다 )
+
+슬라이싱은 리스트의 일부분을 선택하는데 사용되며, 시작 인덱스:끝 인덱스:간격 형식으로 사용된다.
+
+[:]는 리스트의 전체를 선택하는 슬라이스이다. 즉, 리스트의 처음부터 끝까지 모든 요소를 선택한다.
+
+따라서 [:]는 리스트의 복사본을 생성하는데 사용될 때 주로 쓰인다.
+
+예를 들어, items[:]는 리스트 items의 전체를 선택하여 복사본을 만든다.
+
+이렇게 복사본을 만든 후에는 원본 리스트와는 별개로 복사본을 조작할 수 있다. 이때 원본 리스트에는 아무런 변화가 없다.
+
+즉, items[:]는 items 리스트 전체를 선택하는 슬라이스 표현이며, 이를 통해 리스트의 복사본을 만들 수 있다.
+```
+
+```python
+전체 리스트의 복사본 만들기:
+
+original_list = [1, 2, 3, 4, 5]
+copy_of_list = original_list[:]
+
+리스트의 일부분 가져오기:
+
+my_list = [10, 20, 30, 40, 50]
+partial_list = my_list[1:4]  # 인덱스 1부터 3까지의 요소를 가져옴
+
+간격을 이용한 리스트 요소 선택:
+
+numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+even_numbers = numbers[::2]  # 간격을 이용하여 인덱스가 짝수인 요소만 선택
+
+리스트의 뒤에서부터 요소 선택:
+
+my_list = ['a', 'b', 'c', 'd', 'e']
+last_three_items = my_list[-3:]  # 뒤에서부터 세 번째 요소부터 마지막까지 선택
+```
+
+# **곡 제목, 가수명 등 정보 수집하면서 액션 체인으로 수집하는 위치로 이동**
+
+```python
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver import ActionChains
+from selenium.common.exceptions import NoSuchElementException
+import time
+
+options = Options()
+
+user_agent = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1"
+
+options.add_argument(f"user-agent={user_agent}")
+
+options.add_argument("--start-maximized")
+
+options.add_experimental_option("detach", True)
+
+# options.add_experimental_option("excludeSwitches", ["enable-logging"])
+
+driver = webdriver.Chrome(options=options)
+
+url = "https://m2.melon.com/index.htm"
+
+driver.get(url)
+time.sleep(2)
+
+if driver.current_url != url: # 현재 페이지가 url 이 아니라면 다시 접속하도록
+    driver.get(url)
+
+driver.find_element(By.LINK_TEXT, "멜론차트").click()
+time.sleep(2)
+
+driver.find_element(By.TAG_NAME, "body").send_keys(Keys.END)
+time.sleep(1)
+
+# 두 번째 더 보기 버튼 클릭
+more_btns = driver.find_elements(By.CSS_SELECTOR, "#moreBtn")[1].click()
+
+chart_list = driver.find_element(By.CSS_SELECTOR, "#_chartList")
+
+items = chart_list.find_elements(By.CSS_SELECTOR, ".list_item")
+
+print(len(items))
+
+time.sleep(2)
+
+# items = driver.find_elements(By.CSS_SELECTOR, ".list_item")
+
+# for item in items[:]: # 반복문이 돌면서 삭제를 진행 할 경우에는 오류가 많다 그래서 복사를 해온 상태에서 반복문을 돌려 삭제하도록 한다
+#     try:
+#         ranking_num = item.find_element(By.CSS_SELECTOR, ".ranking_num")
+#     except NoSuchElementException:
+#         items.remove(items) # ranking_num 이 없는 아이템은 지운다
+
+# print(len(items))
+
+action = ActionChains(driver)
+
+action.move_to_element(items[90]).perform() # 원하는 엘리먼트로 이동하는 방벙 마지막에 perform() 을 붙여줘야 한다
+
+for rank, item in enumerate(items, 1):
+    action.move_to_element(item).perform()
+
+    name = item.find_element(By.CSS_SELECTOR, ".name.ellipsis")
+    title = item.find_element(By.CSS_SELECTOR, ".title.ellipsis")
+
+    print(f"<<<{rank}>>>")
+    print(name.text)
+    print(title.text)
+
+    time.sleep(1)
+
+```
+
+```python
+**액션 체인을 사용해서 원하는 요소의 위치로 이동하게 할 수 있다**
+
+from selenium.webdriver import ActionChains
+
+액션 체인을 임포트 해주고
+
+# ActionChains 객체를 생성합니다. 이 객체를 사용하여 다양한 상호작용을 시뮬레이션할 수 있습니다.
+action = ActionChains(driver)
+
+# move_to_element() 메서드를 사용하여 원하는 엘리먼트(items[90])로 마우스를 이동시킵니다.
+# 마지막에 perform() 메서드를 호출하여 실제 동작을 수행합니다.
+action.move_to_element(items[90]).perform()
+
+# 반복문을 사용하여 모든 아이템을 순회합니다.
+for rank, item in enumerate(items, 1):
+    # 현재 아이템으로 마우스를 이동시킵니다.
+    action.move_to_element(item).perform()
+
+    # 각 아이템에서 이름과 제목을 찾아서 출력합니다.
+    name = item.find_element(By.CSS_SELECTOR, ".name.ellipsis")
+    title = item.find_element(By.CSS_SELECTOR, ".title.ellipsis")
+
+    # 순위(rank), 이름(name), 제목(title)을 출력합니다.
+    print(f"<<<{rank}>>>")
+    print(name.text)
+    print(title.text)
+
+    # 1초 대기합니다.
+    time.sleep(1)
+```
+
+## 액션체인 개념 사용 이유
+
+```python
+액션 체인은 보통 웹 페이지에서 마우스 클릭, 드래그 앤 드롭, 키보드 이벤트 등과 같은 다양한 상호작용을 시뮬레이션하기 위해 사용된다.
+
+주로 다음과 같은 상황에서 사용될 수 있다
+
+1. 드래그 앤 드롭: 웹 페이지에서 요소를 드래그하여 다른 위치로 이동시키는 동작을 시뮬레이션할 때 사용된다.
+
+2. 마우스 호버(Hover): 마우스를 요소 위에 올렸을 때 발생하는 효과를 시뮬레이션합니다.
+
+	 예를 들어, 메뉴 항목 위에 마우스를 가져가면 하위 메뉴가 나타나는 경우 등에 사용될 수 있다.
+
+3. 복잡한 동작 조작: 여러 동작이 필요한 상황에서 사용됩니다.
+
+	 예를 들어, 마우스 클릭 후 대기하고 스크롤 다운 등의 다양한 동작을 조합하여 원하는 작업을 수행할 수 있다.
+
+4. 액션 체인은 여러 웹 애플리케이션 테스트 시나리오 및 웹 스크래핑 작업에서 유용하게 사용된다.
+```
+
+# 썸네일 클릭하여 곡 정보 페이지로 이동, url 수집 후 멜론 차트로 돌아가기
+
+```python
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver import ActionChains
+from selenium.common.exceptions import NoSuchElementException
+import time
+
+options = Options()
+
+user_agent = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1"
+
+options.add_argument(f"user-agent={user_agent}")
+
+options.add_argument("--start-maximized")
+
+options.add_experimental_option("detach", True)
+
+# options.add_experimental_option("excludeSwitches", ["enable-logging"])
+
+driver = webdriver.Chrome(options=options)
+
+url = "https://m2.melon.com/index.htm"
+
+driver.get(url)
+time.sleep(2)
+
+if driver.current_url != url: # 현재 페이지가 url 이 아니라면 다시 접속하도록
+    driver.get(url)
+
+driver.find_element(By.LINK_TEXT, "멜론차트").click()
+time.sleep(2)
+
+driver.find_element(By.TAG_NAME, "body").send_keys(Keys.END)
+time.sleep(1)
+
+# 두 번째 더 보기 버튼 클릭
+more_btns = driver.find_elements(By.CSS_SELECTOR, "#moreBtn")[1].click()
+
+chart_list = driver.find_element(By.CSS_SELECTOR, "#_chartList")
+
+items = chart_list.find_elements(By.CSS_SELECTOR, ".list_item")
+
+print(len(items))
+
+time.sleep(2)
+
+# items = driver.find_elements(By.CSS_SELECTOR, ".list_item")
+
+# for item in items[:]: # 반복문이 돌면서 삭제를 진행 할 경우에는 오류가 많다 그래서 복사를 해온 상태에서 반복문을 돌려 삭제하도록 한다
+#     try:
+#         ranking_num = item.find_element(By.CSS_SELECTOR, ".ranking_num")
+#     except NoSuchElementException:
+#         items.remove(items) # ranking_num 이 없는 아이템은 지운다
+
+# print(len(items))
+
+action = ActionChains(driver)
+
+action.move_to_element(items[90]).perform() # 원하는 엘리먼트로 이동하는 방벙 마지막에 perform() 을 붙여줘야 한다
+
+for rank, item in enumerate(items, 1):
+    action.move_to_element(item).perform()
+
+    name = item.find_element(By.CSS_SELECTOR, ".name.ellipsis")
+    title = item.find_element(By.CSS_SELECTOR, ".title.ellipsis")
+
+    thumb = item.find_element(By.CSS_SELECTOR, ".inner > span") # 정확한 접근
+    thumb.click()
+    time.sleep(1)
+    album_url = driver.current_url
+    driver.back()
+    time.sleep(1)
+
+    print(f"<<<{rank}>>>")
+    print(name.text)
+    print(title.text)
+    print(f"album_url : {album_url}")
+
+    time.sleep(1)
+
+```
+
+```python
+  thumb = item.find_element(By.CSS_SELECTOR, ".inner > span") # 정확한 접근
+  thumb.click()
+
+  이런식으로 썸네일을 클릭 후 url 을 넘어간 뒤
+
+  album_url = driver.current_url
+  driver.back()
+
+  url 을 수집한 뒤 back() 을 사용해서 뒤로가기로 다시 차트로 돌아온다
+```

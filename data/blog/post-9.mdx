@@ -1,0 +1,2114 @@
+---
+title: '터렛 시스템 만들기'
+date: '2026-09-02'
+category: '게임 개발/유니티 개인 정리'
+tags: ['게임 개발', '유니티 개인 정리']
+draft: false
+summary: ''
+---
+
+# 🎯 유니티 터렛 시스템 완벽 가이드 (오브젝트 풀링 포함)
+
+유니티에서 **플레이어를 자동으로 추적하고 공격하는 터렛 시스템**을 **오브젝트 풀링으로 최적화**하여 만들어봅시다.
+
+---
+
+## 📋 목차
+
+1. [시스템 전체 구조](https://claude.ai/chat/2bd22684-8867-44de-96c9-c06903ce5257#1-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EC%A0%84%EC%B2%B4-%EA%B5%AC%EC%A1%B0)
+2. [오브젝트 풀링 시스템 구현](https://claude.ai/chat/2bd22684-8867-44de-96c9-c06903ce5257#2-%EC%98%A4%EB%B8%8C%EC%A0%9D%ED%8A%B8-%ED%92%80%EB%A7%81-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B5%AC%ED%98%84)
+3. [발사체 만들기](https://claude.ai/chat/2bd22684-8867-44de-96c9-c06903ce5257#3-%EB%B0%9C%EC%82%AC%EC%B2%B4-%EB%A7%8C%EB%93%A4%EA%B8%B0)
+4. [터렛 시스템 구현](https://claude.ai/chat/2bd22684-8867-44de-96c9-c06903ce5257#4-%ED%84%B0%EB%A0%9B-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B5%AC%ED%98%84)
+5. [플레이어 감지 시스템](https://claude.ai/chat/2bd22684-8867-44de-96c9-c06903ce5257#5-%ED%94%8C%EB%A0%88%EC%9D%B4%EC%96%B4-%EA%B0%90%EC%A7%80-%EC%8B%9C%EC%8A%A4%ED%85%9C)
+6. [플레이어 체력 시스템](https://claude.ai/chat/2bd22684-8867-44de-96c9-c06903ce5257#6-%ED%94%8C%EB%A0%88%EC%9D%B4%EC%96%B4-%EC%B2%B4%EB%A0%A5-%EC%8B%9C%EC%8A%A4%ED%85%9C)
+7. [전체 설정 및 테스트](https://claude.ai/chat/2bd22684-8867-44de-96c9-c06903ce5257#7-%EC%A0%84%EC%B2%B4-%EC%84%A4%EC%A0%95-%EB%B0%8F-%ED%85%8C%EC%8A%A4%ED%8A%B8)
+
+---
+
+## 1. 시스템 전체 구조
+
+### 동작 흐름
+
+```
+오브젝트 풀 생성 → 터렛 감시 → 플레이어 감지 → 회전 → 풀에서 발사체 꺼내기 → 충돌 → 풀로 반환
+```
+
+### 필요한 스크립트
+
+| 스크립트                | 역할               |
+| ----------------------- | ------------------ |
+| **IPooledObject.cs**    | 풀링 인터페이스    |
+| **ObjectPool.cs**       | 오브젝트 풀 관리   |
+| **TurretProjectile.cs** | 발사체 (풀링 적용) |
+| **Turret.cs**           | 터렛 (풀링 사용)   |
+| **TurretDetection.cs**  | 플레이어 감지      |
+| **PlayerHealth.cs**     | 플레이어 체력      |
+
+### 오브젝트 풀링이란?
+
+**기존 방식 문제점:**
+
+```csharp
+Instantiate(projectile);  // 생성 → 메모리 할당
+Destroy(projectile);      // 삭제 → GC 발생 → 렉!
+```
+
+**풀링 방식 장점:**
+
+```csharp
+objectPool.SpawnFromPool();   // 활성화 → 빠름
+objectPool.ReturnToPool();    // 비활성화 → GC 없음
+```
+
+✅ 프레임 안정 / ✅ 렉 없음 / ✅ 대량 발사 가능
+
+---
+
+## 2. 오브젝트 풀링 시스템 구현
+
+### IPooledObject.cs
+
+```csharp
+// 풀에서 꺼낼 때 초기화할 내용을 정의하는 인터페이스
+public interface IPooledObject
+{
+    void OnObjectSpawn();  // 풀에서 꺼낼 때 호출
+}
+```
+
+**인터페이스란?**
+
+- "이 인터페이스를 사용하는 클래스는 OnObjectSpawn() 함수를 반드시 만들어야 한다"는 규칙
+- 풀에서 꺼낼 때 초기화 코드를 작성하는 곳
+
+---
+
+### ObjectPool.cs
+
+```csharp
+using System.Collections.Generic;
+using UnityEngine;
+
+/// <summary>
+/// 오브젝트 풀링 시스템 - 오브젝트를 미리 만들어두고 재사용하는 관리자
+/// Instantiate/Destroy 반복으로 인한 성능 저하를 방지
+/// </summary>
+public class ObjectPool : MonoBehaviour
+{
+    /// <summary>
+    /// 풀 정보를 담는 클래스 (Inspector에서 설정 가능)
+    /// [System.Serializable] - Unity Inspector에 표시되도록 만듦
+    /// </summary>
+    [System.Serializable]
+    public class Pool
+    {
+        public string tag;           // 풀을 구분하는 이름 (예: "TurretProjectile")
+        public GameObject prefab;    // 미리 만들어둘 프리팹
+        public int size;             // 풀에 미리 생성할 오브젝트 개수
+    }
+
+    // Inspector에서 여러 종류의 풀을 설정할 수 있음
+    // 예: 발사체 풀, 이펙트 풀 등
+    [SerializeField] List<Pool> pools;
+
+    /// <summary>
+    /// Dictionary: 키(string)로 값(Queue)을 빠르게 찾는 자료구조
+    /// 태그 이름으로 해당 풀을 빠르게 찾기 위해 사용
+    /// 예: poolDictionary["TurretProjectile"] → 발사체들이 담긴 Queue 반환
+    /// </summary>
+    private Dictionary<string, Queue<GameObject>> poolDictionary;
+
+    /// <summary>
+    /// Awake는 Start보다 먼저 실행됨
+    /// 다른 스크립트들이 Start에서 풀을 사용할 수 있도록 미리 준비
+    /// </summary>
+    void Awake()
+    {
+        // Dictionary 초기화 (빈 사전 만들기)
+        poolDictionary = new Dictionary<string, Queue<GameObject>>();
+
+        // Inspector에서 설정한 모든 풀을 하나씩 생성
+        foreach (Pool pool in pools)
+        {
+            // Queue: 선입선출(FIFO) 자료구조
+            // 먼저 넣은 것이 먼저 나옴 (줄 서기와 비슷)
+            Queue<GameObject> objectPool = new Queue<GameObject>();
+
+            // 풀 크기만큼 오브젝트를 미리 생성
+            // 예: size가 20이면 20개의 발사체를 미리 만들어둠
+            for (int i = 0; i < pool.size; i++)
+            {
+                // 프리팹으로부터 오브젝트 생성
+                GameObject obj = Instantiate(pool.prefab);
+
+                // SetActive(false): 오브젝트 비활성화
+                // - 화면에 보이지 않음
+                // - Update, FixedUpdate 등의 함수가 실행되지 않음
+                // - 메모리에는 존재 (삭제가 아님!)
+                obj.SetActive(false);
+
+                // SetParent: 이 오브젝트를 ObjectPool의 자식으로 만듦
+                // 하이어라키 창에서 정리되어 보기 좋음
+                obj.transform.SetParent(transform);
+
+                // Enqueue: 큐의 뒤쪽에 오브젝트 추가
+                // [●●●] ← obj (뒤에 추가)
+                objectPool.Enqueue(obj);
+            }
+
+            // Dictionary에 "태그-큐" 쌍을 등록
+            // 나중에 태그로 이 풀을 찾을 수 있음
+            poolDictionary.Add(pool.tag, objectPool);
+        }
+    }
+
+    /// <summary>
+    /// 풀에서 오브젝트를 꺼내서 사용하는 함수
+    /// Instantiate 대신 이 함수를 사용하면 성능 향상
+    /// </summary>
+    /// <param name="tag">꺼낼 풀의 태그 (예: "TurretProjectile")</param>
+    /// <param name="position">오브젝트를 배치할 위치</param>
+    /// <param name="rotation">오브젝트의 회전값</param>
+    /// <returns>꺼낸 GameObject (실패시 null)</returns>
+    public GameObject SpawnFromPool(string tag, Vector3 position, Quaternion rotation)
+    {
+        // ContainsKey: Dictionary에 이 태그가 등록되어 있는지 확인
+        // 태그가 없으면 에러 메시지 출력하고 null 반환
+        if (!poolDictionary.ContainsKey(tag))
+        {
+            Debug.LogWarning($"Pool with tag {tag} doesn't exist.");
+            return null;
+        }
+
+        // Dequeue: 큐의 맨 앞에서 오브젝트를 꺼냄
+        // obj ← [●●●] (앞에서 꺼냄)
+        GameObject objectToSpawn = poolDictionary[tag].Dequeue();
+
+        // SetActive(true): 오브젝트 활성화
+        // - 화면에 보임
+        // - Update, FixedUpdate 등이 다시 실행됨
+        objectToSpawn.SetActive(true);
+
+        // 위치와 회전을 요청받은 값으로 설정
+        objectToSpawn.transform.position = position;
+        objectToSpawn.transform.rotation = rotation;
+
+        // GetComponent: 이 오브젝트에 IPooledObject 인터페이스를 구현한 컴포넌트가 있는지 확인
+        IPooledObject pooledObj = objectToSpawn.GetComponent<IPooledObject>();
+
+        // 인터페이스를 구현했다면 (null이 아니면)
+        if (pooledObj != null)
+        {
+            // OnObjectSpawn 함수 호출
+            // 풀에서 꺼낼 때마다 필요한 초기화 작업 수행
+            // 예: 생성 시간 기록, 이펙트 재생 등
+            pooledObj.OnObjectSpawn();
+        }
+
+        // Enqueue: 꺼낸 오브젝트를 다시 큐의 뒤에 추가
+        // 이렇게 하면 풀의 오브젝트들이 순환하며 사용됨
+        // [●●●] ← obj (다시 뒤에 추가)
+        // 나중에 다시 Dequeue하면 맨 처음 꺼낸 오브젝트가 다시 나옴
+        poolDictionary[tag].Enqueue(objectToSpawn);
+
+        // 꺼낸 오브젝트 반환
+        return objectToSpawn;
+    }
+
+    /// <summary>
+    /// 오브젝트를 풀로 반환하는 함수
+    /// Destroy 대신 이 함수를 사용
+    /// </summary>
+    /// <param name="obj">반환할 GameObject</param>
+    public void ReturnToPool(GameObject obj)
+    {
+        // SetActive(false): 비활성화 (숨기기)
+        // Destroy가 아니므로:
+        // - 메모리에서 삭제되지 않음
+        // - 다시 SpawnFromPool로 꺼내서 사용 가능
+        // - 가비지 컬렉션(GC) 발생하지 않음
+        obj.SetActive(false);
+    }
+}
+
+/*
+=== 사용 예시 ===
+
+1. Inspector 설정:
+   ObjectPool GameObject 생성
+   → ObjectPool.cs 추가
+   → Pools 설정:
+      - Tag: "TurretProjectile"
+      - Prefab: 발사체 프리팹
+      - Size: 20
+
+2. 발사체 생성 (Turret.cs):
+   // 기존 방식
+   Instantiate(projectilePrefab, position, rotation);
+
+   // 풀링 방식
+   objectPool.SpawnFromPool("TurretProjectile", position, rotation);
+
+3. 발사체 삭제 (TurretProjectile.cs):
+   // 기존 방식
+   Destroy(gameObject);
+
+   // 풀링 방식
+   objectPool.ReturnToPool(gameObject);
+
+=== 동작 흐름 ===
+
+게임 시작:
+  Awake() 실행
+  → 20개의 발사체 미리 생성 (모두 비활성)
+  → 큐에 저장: [●●●●●●●●●●●●●●●●●●●●]
+
+첫 번째 발사:
+  SpawnFromPool 호출
+  → Dequeue: ● ← [●●●●●●●●●●●●●●●●●●●]
+  → 활성화 및 위치 설정
+  → Enqueue: [●●●●●●●●●●●●●●●●●●●] ← ●
+
+충돌 후 반환:
+  ReturnToPool 호출
+  → SetActive(false)로 비활성화
+  → 큐에 그대로 있으므로 다시 사용 가능
+
+=== 성능 비교 ===
+
+기존 방식 (Instantiate/Destroy):
+  발사 → 메모리 할당 (느림) → 충돌 → 메모리 해제 (GC 발생) → 렉!
+
+풀링 방식 (SpawnFromPool/ReturnToPool):
+  발사 → 활성화 (빠름) → 충돌 → 비활성화 (빠름) → 부드러움!
+
+*/
+```
+
+**핵심 개념:**
+
+**Dictionary:** 키-값 쌍으로 빠르게 찾기
+
+```csharp
+poolDictionary["TurretProjectile"]  // 태그로 풀 접근
+```
+
+**Queue:** 선입선출 (FIFO)
+
+```csharp
+Enqueue(obj)  // 뒤에 추가
+Dequeue()     // 앞에서 꺼냄
+```
+
+**SetActive:** 삭제 아닌 숨기기
+
+```csharp
+SetActive(false)  // 비활성 (보이지 않음, Update 안 돌아감)
+SetActive(true)   // 활성화 (보임, Update 돌아감)
+```
+
+---
+
+## 3. 발사체 만들기
+
+### 오브젝트 구조
+
+```
+TurretProjectile
+├─ Capsule Collider
+├─ Rigidbody
+├─ TurretProjectile.cs
+└─ FX_Particle (자식)
+```
+
+### TurretProjectile.cs (풀링 버전)
+
+```csharp
+using UnityEngine;
+
+/// <summary>
+/// 터렛 발사체 - 오브젝트 풀링을 사용하는 발사체
+/// IPooledObject 인터페이스를 구현하여 풀에서 꺼낼 때 초기화됨
+/// </summary>
+public class TurretProjectile : MonoBehaviour, IPooledObject
+{
+    // ===== Inspector 설정 값들 =====
+
+    [Header("Movement")]
+    [SerializeField] float speed = 15f;        // 발사체가 앞으로 날아가는 속도 (초당 15미터)
+    [SerializeField] float lifetime = 5f;      // 발사 후 자동으로 사라지는 시간 (5초)
+
+    [Header("Damage")]
+    [SerializeField] float damage = 10f;       // 플레이어에게 줄 데미지 양
+
+    [Header("Effects")]
+    [SerializeField] GameObject muzzlePrefab;  // 발사 시 나타나는 총구 섬광 이펙트 프리팹
+    [SerializeField] GameObject hitPrefab;     // 충돌 시 나타나는 폭발 이펙트 프리팹
+
+    // ===== Private 변수들 =====
+
+    private ObjectPool objectPool;  // ObjectPool 스크립트 참조 (풀로 반환할 때 사용)
+    private float spawnTime;        // 이 발사체가 풀에서 꺼내진 시간 (수명 계산용)
+
+    /// <summary>
+    /// Start는 오브젝트가 처음 활성화될 때 한 번만 실행
+    /// 여기서는 ObjectPool을 찾아서 저장
+    /// </summary>
+    void Start()
+    {
+        // FindObjectOfType: 씬에서 ObjectPool 타입의 컴포넌트를 찾음
+        // 주의: 씬에 ObjectPool이 1개만 있어야 정확히 찾을 수 있음
+        objectPool = FindObjectOfType<ObjectPool>();
+    }
+
+    /// <summary>
+    /// IPooledObject 인터페이스 구현
+    /// 풀에서 꺼낼 때마다 ObjectPool.SpawnFromPool()에서 자동으로 호출됨
+    /// Start()는 맨 처음 한 번만 실행되지만, 이 함수는 풀에서 꺼낼 때마다 실행됨
+    /// </summary>
+    public void OnObjectSpawn()
+    {
+        // Time.time: 게임 시작 후 경과된 총 시간 (초)
+        // 현재 시간을 기록해서 나중에 수명을 계산함
+        spawnTime = Time.time;
+
+        // 총구 섬광 이펙트 생성
+        SpawnMuzzleEffect();
+    }
+
+    /// <summary>
+    /// Update는 매 프레임마다 실행됨 (초당 약 60회)
+    /// 발사체를 앞으로 이동시키고, 수명이 다하면 풀로 반환
+    /// </summary>
+    void Update()
+    {
+        // ===== 발사체 이동 =====
+
+        // transform.forward: 오브젝트가 바라보는 앞 방향 벡터
+        // speed: 초당 이동 거리
+        // Time.deltaTime: 이전 프레임과의 시간 차이 (약 0.016초 at 60fps)
+        // 예: 15 * 0.016 = 0.24미터 이동 (매 프레임마다)
+        transform.position += transform.forward * speed * Time.deltaTime;
+
+        // ===== 수명 체크 =====
+
+        // Time.time: 현재 시간
+        // spawnTime: 생성된 시간
+        // lifetime: 수명 (5초)
+        // 예: 현재 10초, 생성 6초 → 10 >= 6 + 5 → 11 >= 11 (true) → 풀로 반환
+        if (Time.time >= spawnTime + lifetime)
+        {
+            ReturnToPool();  // 수명이 다하면 풀로 반환 (비활성화)
+        }
+    }
+
+    /// <summary>
+    /// 총구 섬광 이펙트 생성
+    /// 발사 시 총구에서 빛나는 효과를 만듦
+    /// </summary>
+    void SpawnMuzzleEffect()
+    {
+        // muzzlePrefab이 설정되어 있는지 확인
+        if (muzzlePrefab != null)
+        {
+            // ===== 이펙트 생성 =====
+
+            // Instantiate: 프리팹으로부터 새 오브젝트 생성
+            // transform.position: 현재 발사체 위치
+            // Quaternion.identity: 회전 없음 (0, 0, 0)
+            var muzzleVFX = Instantiate(muzzlePrefab, transform.position, Quaternion.identity);
+
+            // 이펙트가 발사체와 같은 방향을 바라보도록 설정
+            muzzleVFX.transform.forward = transform.forward;
+
+            // ===== 파티클 시스템 찾기 (이펙트의 메인 컴포넌트) =====
+
+            // GetComponent: 이 오브젝트에 ParticleSystem 컴포넌트가 있는지 확인
+            var psMuzzle = muzzleVFX.GetComponent<ParticleSystem>();
+
+            if (psMuzzle != null)
+            {
+                // 파티클이 메인 오브젝트에 있는 경우
+                // Destroy(오브젝트, 시간): 지정된 시간 후 삭제
+                // psMuzzle.main.duration: 파티클 재생 시간 (예: 0.5초)
+                // 파티클이 다 재생되면 자동으로 삭제됨
+                Destroy(muzzleVFX, psMuzzle.main.duration);
+            }
+            else
+            {
+                // 파티클이 자식 오브젝트에 있는 경우 (일부 에셋은 이렇게 구성됨)
+                // GetChild(0): 첫 번째 자식 오브젝트
+                var psChild = muzzleVFX.transform.GetChild(0).GetComponent<ParticleSystem>();
+
+                if (psChild != null)
+                {
+                    // 자식의 파티클 재생 시간만큼 후 삭제
+                    Destroy(muzzleVFX, psChild.main.duration);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// OnCollisionEnter: 물리 충돌이 발생할 때 자동으로 호출됨
+    /// Collider의 Is Trigger가 체크 해제되어 있어야 작동
+    /// </summary>
+    /// <param name="collision">충돌 정보 (어디에 맞았는지, 충돌 지점 등)</param>
+    void OnCollisionEnter(Collision collision)
+    {
+        SpawnHitEffect(collision);       // 충돌 이펙트 생성 (폭발 효과)
+        DealDamage(collision.gameObject); // 맞은 대상에게 데미지 처리
+        ReturnToPool();                   // 발사체를 풀로 반환 (Destroy 대신!)
+    }
+
+    /// <summary>
+    /// 충돌 이펙트 생성
+    /// 발사체가 무언가에 맞았을 때 폭발 효과를 표시
+    /// </summary>
+    /// <param name="collision">충돌 정보</param>
+    void SpawnHitEffect(Collision collision)
+    {
+        // hitPrefab이 설정되어 있는지 확인
+        if (hitPrefab != null)
+        {
+            // ===== 충돌 지점 정보 가져오기 =====
+
+            // collision.contacts[0]: 첫 번째 충돌 지점
+            // 여러 지점에서 동시에 충돌할 수 있지만 첫 번째만 사용
+            ContactPoint contact = collision.contacts[0];
+
+            // ===== 이펙트 회전 계산 =====
+
+            // contact.normal: 충돌 표면의 수직 방향 (법선 벡터)
+            // FromToRotation: Vector3.up(위)를 normal 방향으로 회전시키는 회전값 계산
+            // 이렇게 하면 이펙트가 벽에 수직으로 붙어서 자연스러움
+            // 예: 바닥에 맞으면 위로, 벽에 맞으면 벽 방향으로
+            Quaternion rot = Quaternion.FromToRotation(Vector3.up, contact.normal);
+
+            // contact.point: 정확한 충돌 위치 (3D 좌표)
+            Vector3 pos = contact.point;
+
+            // ===== 이펙트 생성 =====
+
+            // 충돌 위치와 계산된 회전값으로 이펙트 생성
+            var hitVFX = Instantiate(hitPrefab, pos, rot);
+
+            // ===== 파티클 시스템 찾기 및 자동 삭제 =====
+
+            var psHit = hitVFX.GetComponent<ParticleSystem>();
+
+            if (psHit != null)
+            {
+                // 메인 오브젝트에 파티클이 있으면
+                Destroy(hitVFX, psHit.main.duration);
+            }
+            else
+            {
+                // 자식 오브젝트에 파티클이 있으면
+                var psChild = hitVFX.transform.GetChild(0).GetComponent<ParticleSystem>();
+                if (psChild != null)
+                {
+                    Destroy(hitVFX, psChild.main.duration);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// 충돌한 대상에게 데미지 주기
+    /// Player 태그가 있는 오브젝트에만 데미지를 줌
+    /// </summary>
+    /// <param name="target">충돌한 GameObject</param>
+    void DealDamage(GameObject target)
+    {
+        // ===== 플레이어인지 확인 =====
+
+        // CompareTag: 이 오브젝트의 태그가 "Player"인지 확인
+        // 태그 비교는 == 연산자보다 CompareTag가 더 빠르고 안전함
+        if (target.CompareTag("Player"))
+        {
+            // ===== PlayerHealth 컴포넌트 찾기 =====
+
+            // GetComponent: target에 PlayerHealth 스크립트가 있는지 확인
+            PlayerHealth playerHealth = target.GetComponent<PlayerHealth>();
+
+            // PlayerHealth가 있으면 (null이 아니면)
+            if (playerHealth != null)
+            {
+                // TakeDamage 함수 호출해서 데미지 전달
+                // 예: damage = 10 → 플레이어 체력 10 감소
+                playerHealth.TakeDamage(damage);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 발사체를 오브젝트 풀로 반환
+    /// Destroy(gameObject) 대신 이 함수를 사용하여 재사용 가능하게 만듦
+    /// </summary>
+    void ReturnToPool()
+    {
+        // objectPool이 존재하는지 확인
+        if (objectPool != null)
+        {
+            // ObjectPool의 ReturnToPool 함수 호출
+            // 이 함수는 SetActive(false)를 실행하여 발사체를 비활성화
+            // 삭제가 아니므로 나중에 다시 SpawnFromPool로 꺼내서 사용 가능
+            objectPool.ReturnToPool(gameObject);
+        }
+        else
+        {
+            // ObjectPool을 찾지 못한 경우 (보통 발생하지 않음)
+            // 직접 비활성화
+            gameObject.SetActive(false);
+        }
+    }
+}
+
+/*
+=== 동작 흐름 설명 ===
+
+1. 게임 시작:
+   - Start() 실행 → ObjectPool 찾기
+
+2. 터렛이 발사:
+   - Turret.cs에서 objectPool.SpawnFromPool() 호출
+   - 발사체 활성화 (SetActive(true))
+   - OnObjectSpawn() 자동 호출
+     → spawnTime 기록
+     → SpawnMuzzleEffect() → 총구 섬광 생성
+
+3. 발사체 날아감:
+   - Update() 매 프레임 실행
+     → transform.position 앞으로 이동
+     → 시간 체크 (수명 5초)
+
+4. 충돌 발생:
+   - OnCollisionEnter() 자동 호출
+     → SpawnHitEffect() → 폭발 이펙트 생성
+     → DealDamage() → 플레이어에게 데미지
+     → ReturnToPool() → 비활성화 (풀로 반환)
+
+5. 재사용:
+   - 비활성화된 발사체는 풀에 대기
+   - 다음 발사 시 다시 SpawnFromPool()으로 꺼내져서 사용됨
+
+=== 주요 개념 ===
+
+Time.time vs Time.deltaTime:
+- Time.time: 게임 시작 후 총 경과 시간 (예: 10.5초)
+- Time.deltaTime: 이전 프레임과의 시간 차이 (예: 0.016초)
+
+transform.forward:
+- 오브젝트의 Z축(파란 화살표) 방향
+- 발사체는 항상 forward 방향으로 날아감
+
+SetActive vs Destroy:
+- SetActive(false): 숨기기만 (메모리에 존재, 재사용 가능)
+- Destroy: 완전 삭제 (메모리에서 제거, 재사용 불가능, GC 발생)
+
+ContactPoint:
+- point: 충돌 지점 좌표 (예: (5, 0.5, 3))
+- normal: 표면의 수직 방향 (예: 바닥이면 (0, 1, 0) = 위쪽)
+
+Quaternion:
+- 회전을 나타내는 특수한 수학 타입
+- FromToRotation: 한 방향을 다른 방향으로 회전시키는 값 계산
+*/
+```
+
+**기존 방식과 차이점:**
+
+| 기존                            | 풀링                             |
+| ------------------------------- | -------------------------------- |
+| `Start()` 에서 초기화           | `OnObjectSpawn()` 에서 초기화    |
+| `Destroy(gameObject, lifetime)` | `Update()`에서 시간 체크 후 반환 |
+| `Destroy(gameObject)`           | `ReturnToPool()`                 |
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380608/notion-blog/_/_/_/image.png)
+
+```csharp
+충돌을 더 정확하게 하기 위해서 Rigbody 에 Collision Detection 을 Continuous 로
+```
+
+---
+
+### 설정 방법
+
+**1. GameObject 생성**
+
+- 이름: `TurretProjectile`
+
+**2. Capsule Collider 추가**
+
+- Radius: `0.2`
+- Height: `0.5`
+- Is Trigger: **체크 해제** ← 물리 충돌
+
+**3. Rigidbody 추가**
+
+- Use Gravity: **체크 해제**
+- Collision Detection: `Continuous`
+
+**4. TurretProjectile.cs 추가**
+
+- Speed: `15`
+- Lifetime: `5`
+- Damage: `10`
+
+**5. FX 추가 및 프리팹 저장**
+
+- FX 파티클을 자식으로 드래그
+- Prefabs 폴더로 드래그
+
+---
+
+## 4. 터렛 시스템 구현
+
+### 오브젝트 구조
+
+```
+Turret
+├─ TurretBase (Cube)
+└─ TurretHead (Empty)
+   ├─ Visual (Cube)
+   └─ FirePoint (Empty)
+
+```
+
+### Turret.cs (풀링 버전)
+
+```csharp
+using UnityEngine;
+
+/// <summary>
+/// 터렛 시스템 - 플레이어 자동 추적 및 발사
+/// </summary>
+public class Turret : MonoBehaviour
+{
+    // ===== Inspector 설정 (선택사항 - 자동 찾기 가능) =====
+
+    [Header("References (Optional - Will auto-find)")]
+    [SerializeField] Transform turretHead;          // 회전할 머리 부분
+    [SerializeField] Transform playerTargetPoint;   // 플레이어
+    [SerializeField] Transform firePoint;           // 발사 위치
+
+    [Header("Pooling")]
+    [SerializeField] string projectilePoolTag = "TurretProjectile";
+
+    [Header("Settings")]
+    [SerializeField] float fireRate = 1f;           // 초당 발사 횟수
+    [SerializeField] float rotationSpeed = 5f;      // 회전 속도
+    [SerializeField] float aimThreshold = 5f;       // 조준 허용 오차(각도)
+
+    // ===== Private 변수 =====
+
+    private float nextFireTime = 0f;      // 다음 발사 가능 시간
+    private TurretDetection detection;    // 감지 시스템
+    private ObjectPool objectPool;        // 오브젝트 풀
+
+    void Start()
+    {
+        InitializeComponents();
+    }
+
+    /// <summary>
+    /// 필요한 컴포넌트 자동 찾기 및 초기화
+    /// </summary>
+    void InitializeComponents()
+    {
+        // TurretDetection 찾기/추가
+        detection = GetComponent<TurretDetection>();
+        if (detection == null)
+        {
+            detection = gameObject.AddComponent<TurretDetection>();
+        }
+
+        // ObjectPool 찾기 (씬에 1개 있어야 함)
+        objectPool = FindObjectOfType<ObjectPool>();
+        if (objectPool == null)
+        {
+            Debug.LogError("❌ ObjectPool not found in scene!");
+        }
+
+        // Player 자동 찾기 (태그로 검색)
+        if (playerTargetPoint == null)
+        {
+            GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+            if (playerObj != null)
+            {
+                playerTargetPoint = playerObj.transform;
+            }
+        }
+
+        // TurretHead 자동 찾기
+        if (turretHead == null)
+        {
+            // "TurretHead" 이름으로 찾기
+            turretHead = transform.Find("TurretHead");
+
+            // 못 찾으면 "Head" 포함된 자식 찾기
+            if (turretHead == null)
+            {
+                foreach (Transform child in transform)
+                {
+                    if (child.name.Contains("Head") || child.name.Contains("head"))
+                    {
+                        turretHead = child;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // FirePoint 자동 찾기 (3단계)
+        if (firePoint == null)
+        {
+            // 1단계: 경로로 찾기
+            firePoint = transform.Find("TurretHead/FirePoint");
+
+            // 2단계: TurretHead 안에서 찾기
+            if (firePoint == null && turretHead != null)
+            {
+                firePoint = turretHead.Find("FirePoint");
+            }
+
+            // 3단계: 모든 자식에서 "Fire" 포함된 것 찾기
+            if (firePoint == null)
+            {
+                Transform[] allChildren = GetComponentsInChildren<Transform>();
+                foreach (Transform child in allChildren)
+                {
+                    if (child.name == "FirePoint" || child.name.Contains("Fire"))
+                    {
+                        firePoint = child;
+                        break;
+                    }
+                }
+            }
+
+            if (firePoint == null)
+            {
+                Debug.LogWarning("⚠️ FirePoint not found!");
+            }
+        }
+    }
+
+    void Update()
+    {
+        // 플레이어가 감지 범위 안에 있으면
+        if (playerTargetPoint != null && detection.IsPlayerInRange())
+        {
+            RotateTurretHead();  // 플레이어 방향으로 회전
+
+            // 조준이 정확하고 쿨다운 끝났으면 발사
+            if (IsAimingAtTarget() && Time.time >= nextFireTime)
+            {
+                Shoot();
+                nextFireTime = Time.time + 1f / fireRate;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 플레이어 방향으로 부드럽게 회전
+    /// </summary>
+    void RotateTurretHead()
+    {
+        if (turretHead != null)
+        {
+            // 플레이어 방향 계산
+            Vector3 direction = playerTargetPoint.position - turretHead.position;
+            // 그 방향을 바라보는 회전값
+            Quaternion targetRotation = Quaternion.LookRotation(direction);
+
+            // Slerp: 부드러운 회전 (구면 보간)
+            turretHead.rotation = Quaternion.Slerp(
+                turretHead.rotation,           // 현재 회전
+                targetRotation,                // 목표 회전
+                Time.deltaTime * rotationSpeed // 회전 속도
+            );
+        }
+    }
+
+    /// <summary>
+    /// 정확히 조준했는지 확인
+    /// </summary>
+    bool IsAimingAtTarget()
+    {
+        if (turretHead == null || playerTargetPoint == null)
+            return false;
+
+        // 터렛이 바라보는 방향
+        Vector3 turretForward = turretHead.forward;
+        // 플레이어로 향하는 방향
+        Vector3 directionToPlayer = (playerTargetPoint.position - turretHead.position).normalized;
+
+        // 두 방향 사이의 각도 계산
+        float angle = Vector3.Angle(turretForward, directionToPlayer);
+
+        // 각도가 허용 오차 이내면 true
+        return angle <= aimThreshold;
+    }
+
+    /// <summary>
+    /// 오브젝트 풀에서 발사체 꺼내서 발사
+    /// </summary>
+    void Shoot()
+    {
+        if (firePoint != null && objectPool != null)
+        {
+            objectPool.SpawnFromPool(
+                projectilePoolTag,      // 풀 태그
+                firePoint.position,     // 발사 위치
+                firePoint.rotation      // 발사 방향
+            );
+        }
+    }
+
+    /// <summary>
+    /// Scene 뷰에서 감지 범위 시각화 (빨간 원)
+    /// </summary>
+    void OnDrawGizmosSelected()
+    {
+        if (detection != null)
+        {
+            Gizmos.color = Color.red;
+            Gizmos.DrawWireSphere(transform.position, detection.GetDetectionRange());
+        }
+    }
+}
+
+/*
+=== 자동 찾기 규칙 ===
+
+1. Player: "Player" 태그
+2. TurretHead: "TurretHead" 또는 "Head" 포함
+3. FirePoint: "FirePoint" 또는 "Fire" 포함
+
+=== GameObject 구조 ===
+
+Turret
+├─ TurretHead
+│  └─ FirePoint
+└─ Scripts
+
+=== 발사 조건 (모두 만족) ===
+
+1. 플레이어 존재
+2. 감지 범위 안
+3. 조준 정확 (aimThreshold 이내)
+4. 쿨다운 완료
+
+=== 값 설명 ===
+
+aimThreshold:
+  5 = 정확 (추천)
+  10 = 빠른 발사
+
+rotationSpeed:
+  5 = 적당 (추천)
+  10 = 빠른 회전
+
+fireRate:
+  1 = 1초에 1발 (추천)
+  2 = 0.5초에 1발
+*/
+```
+
+**핵심 포인트:**
+
+**1. 프리팹 대신 태그 사용**
+
+```csharp
+// 기존: GameObject projectilePrefab
+// 풀링: string projectilePoolTag = "TurretProjectile"
+
+```
+
+**2. Instantiate → SpawnFromPool**
+
+```csharp
+// 기존
+Instantiate(prefab, position, rotation);
+
+// 풀링
+objectPool.SpawnFromPool(tag, position, rotation);
+
+```
+
+---
+
+### 설정 방법
+
+**1. Turret 구조 생성**
+
+```
+Turret (Empty, Position 원하는 위치)
+├─ TurretBase (Cube, Scale: 1, 0.5, 1)
+└─ TurretHead (Empty, Position: 0, 0.5, 0)
+   ├─ Visual (Cube, Scale: 0.8, 0.3, 1.2)
+   └─ FirePoint (Empty, Position: 0, 0, 0.8)
+
+```
+
+**2. Turret.cs 추가 및 설정**
+
+Inspector:
+
+- **Turret Head**: TurretHead 드래그
+- **Player Target Point**: Player 드래그
+- **Fire Point**: FirePoint 드래그
+- **Projectile Pool Tag**: `TurretProjectile` (태그 정확히 입력!)
+- **Detection Range**: `20` \* TurretDetection 에서 실질적으로 범위 설정 여기서는 Gimoz 때문에 있
+- **Fire Rate**: `1`
+- **Rotation Speed**: `5`
+
+---
+
+## 5. 플레이어 감지 시스템
+
+### TurretDetection.cs
+
+```csharp
+using UnityEngine;
+
+/// <summary>
+/// 터렛 감지 시스템 - 간단 버전
+/// 1. 거리 체크
+/// 2. Raycast로 플레이어인지 확인 (장애물에 막히는지)
+/// </summary>
+public class TurretDetection : MonoBehaviour
+{
+    [Header("Detection Settings")]
+    [SerializeField] float detectionRange = 20f;     // 감지 거리
+    [SerializeField] Transform raycastOrigin;        // Raycast 시작점 (TurretHead)
+
+    private Transform player;          // 플레이어 Transform
+    private bool playerInRange = false; // 감지 여부
+    private int playerLayer;           // Player 레이어 번호
+
+    void Start()
+    {
+        // Player 태그로 찾기
+        GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+
+        if (playerObj != null)
+        {
+            player = playerObj.transform;
+            Debug.Log("✅ Player found!");
+        }
+        else
+        {
+            Debug.LogError("❌ Player not found! Set 'Player' tag on player.");
+        }
+
+        // Player 레이어 번호 저장
+        playerLayer = LayerMask.NameToLayer("Player");
+
+        if (raycastOrigin == null)
+        {
+            Debug.LogWarning("⚠️ Raycast Origin not set!");
+        }
+    }
+
+    void Update()
+    {
+        CheckPlayerInRange();
+    }
+
+    /// <summary>
+    /// 플레이어 감지 로직
+    /// 1단계: 거리 체크
+    /// 2단계: Raycast로 플레이어인지 확인
+    /// </summary>
+    void CheckPlayerInRange()
+    {
+        // 플레이어가 없으면 감지 실패
+        if (player == null)
+        {
+            playerInRange = false;
+            return;
+        }
+
+        // ===== 1단계: 거리 체크 =====
+
+        // Raycast 시작점
+        Vector3 origin = raycastOrigin != null ? raycastOrigin.position : transform.position;
+
+        // 플레이어 위치 (약간 위 - 가슴 높이)
+        Vector3 playerCenter = player.position + Vector3.up * 1.0f;
+
+        // 거리 계산
+        float distance = Vector3.Distance(origin, playerCenter);
+
+        // 거리가 감지 범위를 벗어나면 감지 실패
+        if (distance > detectionRange)
+        {
+            playerInRange = false;
+            return;
+        }
+
+        // ===== 2단계: Raycast로 플레이어 확인 =====
+
+        // 플레이어 방향
+        Vector3 direction = (playerCenter - origin).normalized;
+
+        // Raycast 발사
+        RaycastHit hit;
+        if (Physics.Raycast(origin, direction, out hit, distance))
+        {
+            // 맞은 오브젝트의 레이어가 Player 레이어인지 확인
+            if (hit.collider.gameObject.layer == playerLayer)
+            {
+                // 플레이어 감지 성공!
+                playerInRange = true;
+
+                // 디버그: 초록 선
+                Debug.DrawLine(origin, hit.point, Color.green);
+            }
+            else
+            {
+                // 플레이어 아님 (장애물에 막힘)
+                playerInRange = false;
+
+                // 디버그: 빨간 선 + 로그
+                Debug.DrawLine(origin, hit.point, Color.red);
+            }
+        }
+        else
+        {
+            // 아무것도 안 맞음
+            playerInRange = false;
+        }
+    }
+
+    /// <summary>
+    /// 플레이어가 감지되었는지 반환
+    /// </summary>
+    public bool IsPlayerInRange()
+    {
+        return playerInRange && player != null;
+    }
+
+    /// <summary>
+    /// 플레이어 Transform 반환
+    /// </summary>
+    public Transform GetPlayer()
+    {
+        return player;
+    }
+
+    /// <summary>
+    /// 감지 거리 설정
+    /// </summary>
+    public void Initialize(float range)
+    {
+        detectionRange = range;
+    }
+
+    /// <summary>
+    /// 현재 감지 거리 반환
+    /// </summary>
+    public float GetDetectionRange()
+    {
+        return detectionRange;
+    }
+
+    /// <summary>
+    /// Scene 뷰에서 시각화
+    /// </summary>
+    void OnDrawGizmos()
+    {
+        if (player == null) return;
+
+        // Raycast 시작점
+        Vector3 origin = raycastOrigin != null ? raycastOrigin.position : transform.position;
+
+        // 플레이어 중심점
+        Vector3 playerCenter = player.position + Vector3.up * 1.0f;
+
+        // Raycast 시작점 표시 (파란 구)
+        Gizmos.color = Color.blue;
+        Gizmos.DrawWireSphere(origin, 0.3f);
+
+        // 플레이어 조준점 표시 (노란 구)
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireSphere(playerCenter, 0.2f);
+
+        // Raycast 선
+        if (playerInRange)
+        {
+            Gizmos.color = Color.green;  // 감지 성공
+        }
+        else
+        {
+            Gizmos.color = Color.red;    // 감지 실패
+        }
+        Gizmos.DrawLine(origin, playerCenter);
+
+        // 감지 범위 원
+        Gizmos.color = new Color(1f, 0f, 0f, 0.2f);  // 반투명 빨강
+        Gizmos.DrawWireSphere(origin, detectionRange);
+    }
+
+    /// <summary>
+    /// 터렛 선택 시 추가 정보
+    /// </summary>
+    void OnDrawGizmosSelected()
+    {
+        if (player == null) return;
+
+        Vector3 origin = raycastOrigin != null ? raycastOrigin.position : transform.position;
+
+        // 감지 범위 더 진하게
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(origin, detectionRange);
+    }
+}
+
+/*
+=== 설정 방법 ===
+
+1. Layer 생성:
+   Edit → Project Settings → Tags and Layers
+   User Layer 8: Player
+
+2. Player GameObject 설정:
+   Player GameObject 선택
+   → Inspector 상단 Layer → Player 선택
+
+3. TurretDetection Inspector:
+   ┌─────────────────────────────┐
+   │ Detection Range: 20         │
+   │ Raycast Origin: TurretHead  │ ← 드래그
+   └─────────────────────────────┘
+
+4. 장애물 설정 (선택사항):
+   벽/장애물 → Layer → Obstacle
+   (Player가 아닌 다른 레이어면 자동으로 막힘)
+
+=== 동작 원리 ===
+
+1단계: 거리 체크
+   터렛 ----(15m)---- 플레이어
+   → detectionRange = 20
+   → 범위 안! 다음 단계
+
+2단계: Raycast
+   터렛 ----Raycast----> 플레이어
+   → hit.layer == playerLayer?
+   → YES → 감지 성공 ✅
+
+   터렛 ----[벽]---- 플레이어
+   → hit.layer == playerLayer?
+   → NO (벽 레이어) → 감지 실패 ❌
+
+=== 코드 흐름 ===
+
+Update()
+  ↓
+CheckPlayerInRange()
+  ↓
+player == null? → YES → 실패
+  ↓ NO
+거리 > detectionRange? → YES → 실패
+  ↓ NO
+Raycast 발사
+  ↓
+맞은 것 있음?
+  ↓ YES
+hit.layer == playerLayer?
+  ↓ YES → 성공 ✅
+  ↓ NO → 실패 ❌
+
+=== Scene 뷰 시각화 ===
+
+파란 구: Raycast 시작점 (TurretHead)
+노란 구: 플레이어 조준점 (가슴 높이)
+초록 선: 플레이어 감지 성공
+빨강 선: 장애물에 막힘
+빨강 원: 감지 범위
+
+=== 디버깅 ===
+
+문제: "Blocked by: Capsule"
+해결: Player Layer 설정 확인
+     Player GameObject → Layer → Player
+
+문제: 아예 감지 안 됨
+해결: Raycast Origin에 TurretHead 할당 확인
+
+문제: 벽 뒤에서도 감지됨
+해결: 벽에 Collider 있는지 확인
+*/
+```
+
+---
+
+## 7. 전체 설정 및 테스트
+
+### Step 1: ObjectPool 설정
+
+**1. 빈 GameObject 생성**
+
+- 이름: `ObjectPool`
+
+**2. ObjectPool.cs 추가**
+
+**3. Inspector 설정**
+
+```
+Pools
+  Size: 1
+
+  Element 0
+  ├─ Tag: TurretProjectile
+  ├─ Prefab: [TurretProjectile 프리팹 드래그]
+  └─ Size: 30
+
+```
+
+**Size 계산법:**
+
+```
+필요 개수 = 터렛 수 × 발사속도 × 수명
+예: 5터렛 × 1발/초 × 5초 = 25개
+→ 여유있게 30~50 추천
+
+```
+
+---
+
+### Step 2: Player 설정
+
+**1. Player GameObject 선택**
+
+**2. 태그 설정**
+
+- Inspector 상단 Tag → `Player`
+
+**3. PlayerHealth.cs 추가**
+
+- Max Health: `100`
+
+---
+
+### Step 3: Turret 설정
+
+**이미 위에서 설정했지만 다시 확인:**
+
+- Turret Head: ✅
+- Player Target Point: ✅
+- Fire Point: ✅
+- Projectile Pool Tag: `TurretProjectile` ✅
+- Detection Range: `20` ✅
+
+---
+
+### Step 4: 테스트
+
+**✅ 게임 시작 시 확인**
+
+하이어라키:
+
+```
+ObjectPool
+├─ TurretProjectile (Clone) - Active: false
+├─ TurretProjectile (Clone) - Active: false
+├─ ... (30개 생성됨)
+
+```
+
+**✅ 발사 시 확인**
+
+- 새 오브젝트 생성 안 됨
+- 기존 비활성 오브젝트가 활성화됨
+
+**✅ 충돌 후 확인**
+
+- 삭제 안 되고 비활성화됨
+- 다시 풀에서 재사용 가능
+
+**✅ 콘솔 확인**
+
+```
+Player took 10 damage! Health: 90/100
+Player took 10 damage! Health: 80/100
+
+```
+
+**✅ 성능 확인**
+
+- 프레임 드롭 없음
+- 여러 터렛 동시 발사해도 부드러움
+
+---
+
+## 📝 핵심 개념 정리
+
+### 1. 오브젝트 풀링
+
+```
+미리 생성 → 활성화/비활성화 → 재사용
+
+```
+
+**장점:** GC 없음, 프레임 안정
+
+### 2. Dictionary & Queue
+
+```csharp
+Dictionary<string, Queue<GameObject>>  // 태그로 풀 찾기
+Queue.Enqueue(obj)  // 뒤에 추가
+Queue.Dequeue()     // 앞에서 꺼냄
+
+```
+
+### 3. 인터페이스
+
+```csharp
+public interface IPooledObject
+{
+    void OnObjectSpawn();  // 구현 강제
+}
+
+```
+
+### 4. SetActive
+
+```csharp
+SetActive(false)  // 비활성 (삭제 아님!)
+SetActive(true)   // 활성화
+
+```
+
+### 5. 핵심 함수들
+
+```csharp
+FindObjectOfType<T>()           // 씬에서 찾기
+Vector3.Distance(a, b)          // 거리 계산
+Quaternion.LookRotation(dir)    // 방향 보기
+Quaternion.Slerp(a, b, t)       // 부드러운 회전
+Time.deltaTime                  // 프레임 독립 이동
+Time.time                       // 경과 시간
+
+```
+
+---
+
+## ✅ 최종 체크리스트
+
+- [ ] IPooledObject.cs 생성
+- [ ] ObjectPool.cs 생성 및 설정
+- [ ] TurretProjectile.cs (풀링 버전) 생성
+- [ ] Turret.cs (풀링 버전) 생성
+- [ ] TurretDetection.cs 생성
+- [ ] PlayerHealth.cs 생성
+- [ ] Player 태그 설정
+- [ ] ObjectPool에 발사체 프리팹 등록
+- [ ] 게임 실행 시 풀 생성 확인
+- [ ] 발사체 재사용 확인 (하이어라키 관찰)
+- [ ] 프레임 안정성 확인
+
+---
+
+## ⚠️ 문제 해결
+
+### 발사 안 됨
+
+**원인:** 태그 불일치
+**해결:** `TurretProjectile` 정확히 입력
+
+### 풀 부족
+
+**원인:** Size 작음
+**해결:** ObjectPool Size 늘리기 (50~100)
+
+### ObjectPool 에러
+
+**원인:** 씬에 없음
+**해결:** ObjectPool GameObject 생성
+
+# 🎯 Unity Layer 시스템 완벽 가이드
+
+Layer를 이용한 **충돌 제어**와 **렌더링 제어**를 초보자도 쉽게 이해할 수 있도록 정리합니다.
+
+---
+
+## 📋 목차
+
+1. [Layer란 무엇인가?](https://claude.ai/chat/2bd22684-8867-44de-96c9-c06903ce5257#1-layer%EB%9E%80-%EB%AC%B4%EC%97%87%EC%9D%B8%EA%B0%80)
+2. [Layer로 충돌 제어하기](https://claude.ai/chat/2bd22684-8867-44de-96c9-c06903ce5257#2-layer%EB%A1%9C-%EC%B6%A9%EB%8F%8C-%EC%A0%9C%EC%96%B4%ED%95%98%EA%B8%B0)
+3. [Culling Mask로 렌더링 제어하기](https://claude.ai/chat/2bd22684-8867-44de-96c9-c06903ce5257#3-culling-mask%EB%A1%9C-%EB%A0%8C%EB%8D%94%EB%A7%81-%EC%A0%9C%EC%96%B4%ED%95%98%EA%B8%B0)
+4. [실전 예제: 터렛 시스템](https://claude.ai/chat/2bd22684-8867-44de-96c9-c06903ce5257#4-%EC%8B%A4%EC%A0%84-%EC%98%88%EC%A0%9C-%ED%84%B0%EB%A0%9B-%EC%8B%9C%EC%8A%A4%ED%85%9C)
+
+---
+
+## 1. Layer란 무엇인가?
+
+### Layer의 개념
+
+- \*Layer(레이어)**는 GameObject를 **그룹으로 분류\*\*하는 시스템입니다.
+
+```
+현실 비유:
+- 학교에서 학년별로 학생을 나누는 것
+- 1학년, 2학년, 3학년...
+
+Unity:
+- Player 레이어, Enemy 레이어, Obstacle 레이어...
+
+```
+
+### Layer의 용도
+
+Unity에서 Layer는 **2가지 주요 용도**로 사용됩니다:
+
+| 용도                  | 설명                            | 예시                            |
+| --------------------- | ------------------------------- | ------------------------------- |
+| **1. 물리 충돌 제어** | 어떤 오브젝트끼리 충돌할지 결정 | 총알이 벽과 충돌, 아군과는 통과 |
+| **2. 렌더링 제어**    | 카메라가 무엇을 보여줄지 결정   | 미니맵 카메라는 지형만 표시     |
+
+---
+
+### Tag vs Layer
+
+많은 초보자가 헷갈리는 부분입니다!
+
+```
+┌─────────────────────────────────────┐
+│ Inspector 상단                      │
+├─────────────────────────────────────┤
+│ GameObject 이름                     │
+│ Tag: Player          ▼              │ ← Tag (식별용)
+│ Layer: Default       ▼              │ ← Layer (충돌/렌더링)
+└─────────────────────────────────────┘
+
+```
+
+| 구분     | Tag                   | Layer                |
+| -------- | --------------------- | -------------------- |
+| **목적** | 오브젝트 **식별**     | 오브젝트 **그룹화**  |
+| **개수** | 여러 개 가능          | GameObject당 1개만   |
+| **용도** | FindGameObjectWithTag | 충돌, 렌더링 제어    |
+| **예시** | "Player", "Enemy"     | "Player", "Obstacle" |
+
+**쉬운 비유:**
+
+- **Tag**: 이름표 (이름으로 찾기)
+- **Layer**: 반 번호 (그룹으로 관리)
+
+---
+
+## 2. Layer로 충돌 제어하기
+
+### 문제 상황 예시
+
+```
+터렛이 발사체를 쏨
+    ↓
+발사체가 터렛 자신의 머리에 충돌 💥
+    ↓
+즉시 폭발! ❌
+
+```
+
+**원하는 동작:**
+
+```
+터렛이 발사체를 쏨
+    ↓
+발사체가 터렛을 통과 ✅
+    ↓
+플레이어에게만 충돌 💥
+
+```
+
+---
+
+### 해결 방법: Layer Collision Matrix
+
+Unity는 **Layer Collision Matrix**로 "어떤 레이어끼리 충돌할지" 설정할 수 있습니다.
+
+---
+
+### 단계별 설정 가이드
+
+### Step 1: Layer 생성
+
+```
+1. Unity 상단 메뉴
+   Edit → Project Settings
+
+2. 왼쪽 메뉴에서
+   Tags and Layers 선택
+
+3. Layers 섹션 펼치기
+   ▶ Layers 클릭
+
+4. 빈 User Layer 찾기
+   User Layer 8: (비어있음)
+   User Layer 9: (비어있음)
+   User Layer 10: (비어있음)
+
+5. Layer 이름 입력
+   User Layer 10: Turret
+   User Layer 11: TurretProjectile
+   User Layer 8: Player (이미 있으면 건너뛰기)
+
+```
+
+**완성:**
+
+```
+Layers
+├─ User Layer 8: Player
+├─ User Layer 10: Turret
+└─ User Layer 11: TurretProjectile
+
+```
+
+---
+
+### Step 2: GameObject에 Layer 할당
+
+**Turret 설정:**
+
+```
+1. Hierarchy에서 Turret GameObject 선택
+
+2. Inspector 상단에서
+   Layer 드롭다운 클릭 (Tag 아님!)
+
+3. "Turret" 선택
+
+4. 팝업 창 나타남:
+   "Do you want to set layer to Turret for all child objects as well?"
+   → "Yes, change children" 클릭
+
+   이유: 자식(TurretHead, FirePoint 등)도 모두 Turret 레이어로 설정
+
+```
+
+**TurretProjectile 프리팹 설정:**
+
+```
+1. Project 창에서 TurretProjectile 프리팹 선택
+
+2. Inspector 상단
+   Layer → TurretProjectile 선택
+
+```
+
+**Player 설정:**
+
+```
+1. Hierarchy에서 Player GameObject 선택
+
+2. Inspector 상단
+   Layer → Player 선택
+
+3. "Yes, change children" 클릭
+
+```
+
+---
+
+### Step 3: Layer Collision Matrix 설정
+
+**이제 "어떤 레이어끼리 충돌할지" 설정합니다:**
+
+```
+1. Unity 상단 메뉴
+   Edit → Project Settings
+
+2. 왼쪽 메뉴
+   Physics 선택
+
+3. 아래로 스크롤
+   "Layer Collision Matrix" 섹션 찾기
+
+```
+
+**Layer Collision Matrix란?**
+
+표 형태로 되어있습니다:
+
+```
+                    Turret  TurretProjectile  Player  Default
+Turret                ✓            ✓            ✓        ✓
+TurretProjectile      ✓            ✓            ✓        ✓
+Player                ✓            ✓            ✓        ✓
+Default               ✓            ✓            ✓        ✓
+
+✓ = 체크박스 (충돌함)
+
+```
+
+**설정 방법:**
+
+```
+1. Turret(가로)과 TurretProjectile(세로) 교차점 찾기
+
+2. 체크박스 클릭하여 체크 해제 ✗
+
+3. 결과:
+                    Turret  TurretProjectile  Player
+Turret                ✓            ✗            ✓
+TurretProjectile      ✗            ✓            ✓
+Player                ✓            ✓            ✓
+
+Turret ↔ TurretProjectile: 충돌 안 함 ✗
+
+```
+
+---
+
+### 동작 원리
+
+**충돌 매트릭스 읽는 법:**
+
+```
+질문: "Turret과 TurretProjectile이 충돌하나요?"
+
+답변 찾기:
+1. 가로축에서 "Turret" 찾기
+2. 세로축에서 "TurretProjectile" 찾기
+3. 교차점 확인
+   - ✓ 체크되어 있으면 → 충돌함
+   - ✗ 체크 안 되어 있으면 → 충돌 안 함
+
+```
+
+**우리 설정:**
+
+```
+Turret과 TurretProjectile 교차점: ✗
+→ 서로 충돌하지 않음! ✅
+
+TurretProjectile과 Player 교차점: ✓
+→ 충돌함! ✅
+
+```
+
+---
+
+### 전후 비교
+
+### 설정 전:
+
+```
+발사체 생성
+    ↓
+터렛 머리 Collider 감지 💥
+    ↓
+즉시 OnCollisionEnter 호출
+    ↓
+폭발! ❌
+
+```
+
+### 설정 후:
+
+```
+발사체 생성
+    ↓
+터렛 머리를 통과 (충돌 무시) ✅
+    ↓
+플레이어에게 날아감
+    ↓
+플레이어 Collider 감지 💥
+    ↓
+OnCollisionEnter 호출
+    ↓
+데미지! ✅
+
+```
+
+---
+
+## 3. Culling Mask로 렌더링 제어하기
+
+### Culling Mask란?
+
+**Culling Mask**는 카메라가 **어떤 레이어를 화면에 보여줄지** 결정합니다.
+
+```
+현실 비유:
+- 필터 안경을 쓴다고 상상하세요
+- 빨간색 필터: 빨간 것만 보임
+- 파란색 필터: 파란 것만 보임
+
+Unity Culling Mask:
+- Player 레이어 체크: Player만 보임
+- Everything 체크: 모든 것 보임
+
+```
+
+---
+
+### 문제 상황
+
+```
+Layer를 "Turret"으로 설정함
+    ↓
+게임 실행
+    ↓
+터렛이 안 보임! ❌
+
+```
+
+**원인:**
+
+Camera의 Culling Mask에 "Turret" 레이어가 **체크 해제**되어 있음!
+
+---
+
+### 해결 방법
+
+### Main Camera 선택
+
+```
+Hierarchy에서 "Main Camera" 선택
+
+```
+
+### Camera 컴포넌트 찾기
+
+```
+Inspector에서 Camera 컴포넌트 찾기
+
+```
+
+### Culling Mask 설정
+
+```
+Camera 컴포넌트 안에
+├─ Clear Flags
+├─ Background
+├─ Culling Mask: Mixed...  ▼  ← 여기 클릭!
+└─ ...
+
+```
+
+**드롭다운 메뉴:**
+
+```
+┌────────────────────────┐
+│ Nothing                │ ← 아무것도 안 보임
+│ Everything             │ ← 모든 레이어 보임 (추천)
+├────────────────────────┤
+│ ✓ Default              │
+│ ✓ TransparentFX        │
+│ ✓ Ignore Raycast       │
+│ ✓ Water                │
+│ ✓ UI                   │
+│ ✓ Player               │
+│ ✗ Turret               │ ← 체크 해제됨 (문제!)
+│ ✗ TurretProjectile     │ ← 체크 해제됨 (문제!)
+└────────────────────────┘
+
+```
+
+---
+
+### 해결 방법 2가지
+
+### 방법 1: Everything 선택 (가장 간단)
+
+```
+Culling Mask 드롭다운
+→ "Everything" 클릭
+
+결과: 모든 레이어가 보임 ✅
+
+```
+
+**장점:**
+
+- 클릭 한 번
+- 모든 오브젝트 보임
+- 실수 없음
+
+**단점:**
+
+- 나중에 특정 레이어를 숨기고 싶을 때 불편
+
+---
+
+### 방법 2: 필요한 레이어만 선택 (더 정확)
+
+```
+Culling Mask 드롭다운
+→ 각 레이어를 체크/해제
+
+체크할 레이어:
+✓ Default
+✓ Player
+✓ Turret           ← 체크!
+✓ TurretProjectile ← 체크!
+✓ UI
+
+```
+
+**장점:**
+
+- 세밀한 제어
+- 성능 최적화 가능
+
+**단점:**
+
+- 설정 복잡
+
+---
+
+### Culling Mask 활용 예시
+
+### 예시 1: 미니맵 카메라
+
+```
+Main Camera:
+  Culling Mask: Everything
+  → 모든 것 표시
+
+Minimap Camera:
+  Culling Mask: Player, Enemy, Obstacle (UI 제외)
+  → 미니맵에 UI 안 보임
+
+```
+
+### 예시 2: UI 전용 카메라
+
+```
+Main Camera:
+  Culling Mask: Everything except UI
+  → UI 제외한 모든 것
+
+UI Camera:
+  Culling Mask: UI only
+  → UI만 표시
+
+```
+
+### 예시 3: 투명 벽
+
+```
+일반 플레이:
+  Culling Mask: Player, Enemy, Obstacle
+
+스펙테이터 모드:
+  Culling Mask: Everything
+  → 숨겨진 오브젝트도 보임
+
+```
+
+---
+
+### Culling Mask 읽는 법
+
+```
+Culling Mask: Mixed...
+
+```
+
+- **Mixed**: 일부 레이어만 선택됨
+- **Everything**: 모든 레이어 선택
+- **Nothing**: 아무것도 선택 안 됨
+
+**"Mixed..."일 때:**
+
+```
+체크된 레이어 = 보임 ✅
+체크 안 된 레이어 = 안 보임 ❌
+
+```
+
+---
+
+## 4. 실전 예제: 터렛 시스템
+
+### 전체 설정 요약
+
+### 1️⃣ Layer 생성
+
+```
+Edit → Project Settings → Tags and Layers
+
+Layers:
+├─ User Layer 8: Player
+├─ User Layer 10: Turret
+└─ User Layer 11: TurretProjectile
+
+```
+
+### 2️⃣ GameObject Layer 설정
+
+```
+Player:
+  Inspector → Layer → Player
+
+Turret:
+  Inspector → Layer → Turret
+  → "Yes, change children"
+
+TurretProjectile 프리팹:
+  Inspector → Layer → TurretProjectile
+
+```
+
+### 3️⃣ Layer Collision Matrix
+
+```
+Edit → Project Settings → Physics
+
+Layer Collision Matrix:
+  Turret ↔ TurretProjectile: ✗ (체크 해제)
+  → 서로 충돌 안 함
+
+```
+
+### 4️⃣ Camera Culling Mask
+
+```
+Main Camera 선택
+Inspector → Camera → Culling Mask
+
+선택:
+  ✓ Turret
+  ✓ TurretProjectile
+  ✓ Player
+
+또는 "Everything" 선택
+
+```
+
+---
+
+### 동작 확인
+
+### ✅ 정상 동작:
+
+```
+1. 터렛이 화면에 보임 (Culling Mask)
+2. 발사체가 터렛 통과 (Collision Matrix)
+3. 발사체가 플레이어에 충돌 (Collision Matrix)
+4. 플레이어 데미지 입음 ✅
+
+```
+
+### ❌ 문제 발생:
+
+**터렛이 안 보임:**
+
+```
+원인: Culling Mask에 Turret 체크 안 됨
+해결: Main Camera → Culling Mask → Turret 체크
+
+```
+
+**발사체가 터렛에 충돌:**
+
+```
+원인: Collision Matrix 설정 안 됨
+해결: Physics → Turret ↔ TurretProjectile 체크 해제
+
+```
+
+**발사체가 플레이어 통과:**
+
+```
+원인: Collision Matrix에서 TurretProjectile ↔ Player 체크 해제됨
+해결: TurretProjectile ↔ Player 체크
+
+```
+
+---
+
+## 📊 Layer 시스템 전체 구조
+
+```
+Unity Layer System
+├─ 목적 1: 물리 충돌 제어
+│  └─ Layer Collision Matrix
+│     ├─ Turret ↔ TurretProjectile: ✗
+│     ├─ TurretProjectile ↔ Player: ✓
+│     └─ Player ↔ Turret: ✓
+│
+└─ 목적 2: 렌더링 제어
+   └─ Camera Culling Mask
+      ├─ Main Camera
+      │  ├─ ✓ Turret
+      │  ├─ ✓ TurretProjectile
+      │  └─ ✓ Player
+      │
+      └─ Minimap Camera (예시)
+         ├─ ✓ Player
+         └─ ✗ UI
+
+```
+
+---
+
+## 🎯 핵심 정리
+
+### Layer란?
+
+```
+GameObject를 그룹으로 분류하는 시스템
+- 충돌 제어 (Layer Collision Matrix)
+- 렌더링 제어 (Camera Culling Mask)
+
+```
+
+### Layer Collision Matrix
+
+```
+어떤 레이어끼리 충돌할지 설정
+- 체크 ✓: 충돌함
+- 해제 ✗: 충돌 안 함
+
+```
+
+### Culling Mask
+
+```
+카메라가 어떤 레이어를 보여줄지 설정
+- 체크 ✓: 보임
+- 해제 ✗: 안 보임
+
+```
+
+### Tag vs Layer
+
+```
+Tag: 오브젝트 식별 (이름표)
+Layer: 오브젝트 그룹화 (반 번호)
+
+```
+
+---
+
+## ✅ 최종 체크리스트
+
+### Layer 설정
+
+- [ ] Layer 생성 (Turret, TurretProjectile, Player)
+- [ ] GameObject에 Layer 할당
+- [ ] Layer Collision Matrix 설정 (Turret ↔ TurretProjectile 해제)
+
+### Camera 설정
+
+- [ ] Main Camera의 Culling Mask에 모든 레이어 체크
+- [ ] 또는 "Everything" 선택
+
+### 테스트
+
+- [ ] 터렛이 화면에 보임
+- [ ] 발사체가 터렛 통과
+- [ ] 발사체가 플레이어에 충돌
+- [ ] 플레이어 데미지 입음
+
+---
+
+이제 Layer 시스템을 완벽하게 이해하셨을 겁니다! 🎯

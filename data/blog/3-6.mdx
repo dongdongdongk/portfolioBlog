@@ -1,0 +1,3369 @@
+---
+title: '3'
+date: '2026-09-02'
+category: '게임 개발/언리얼'
+tags: ['게임 개발', '언리얼']
+draft: false
+summary: ''
+---
+
+# { 🎮 UI 위젯 시스템 구현하기 (Widget Blueprint) }
+
+## 🎯 목표
+
+게임 화면에 UI 텍스트 표시 및 제어
+
+- Widget Blueprint 생성
+- 화면에 텍스트 표시
+- Blueprint에서 텍스트 동적 변경
+- 핸드브레이크 상태 표시 예제
+
+---
+
+## 💡 핵심 개념
+
+### UI (User Interface)란?
+
+```
+사용자와 게임이 소통하는 화면 요소
+  ↓
+예시:
+  ├─ 체력 바
+  ├─ 미니맵
+  ├─ 점수 표시
+  ├─ 버튼
+  └─ 이 강의: 스로틀/상태 텍스트
+
+중요성:
+  - 게임 정보 전달
+  - 플레이어 피드백
+  - 조작 가이드
+```
+
+### Widget Blueprint란?
+
+```
+언리얼 엔진의 UI 제작 도구
+  ↓
+특징:
+  ├─ 비주얼 편집 (드래그 앤 드롭)
+  ├─ Blueprint 시스템 통합
+  ├─ 실시간 미리보기
+  └─ 반응형 UI 지원
+
+일반 Blueprint와 차이:
+  - 일반: 게임 로직, 오브젝트 제어
+  - Widget: UI 전용, 화면 표시
+```
+
+---
+
+## 🔧 1단계: 폴더 구조 생성
+
+### 폴더 생성
+
+```
+Content Drawer → FighterJet 폴더
+  ↓
+우클릭 → New Folder
+  ↓
+이름: Widgets
+```
+
+**정리의 중요성**
+
+```
+UI 관련 파일들을 한 곳에 모음
+  ↓
+장점:
+  ├─ 쉬운 관리
+  ├─ 빠른 검색
+  └─ 협업 편의성
+```
+
+---
+
+## 🔧 2단계: Widget Blueprint 생성
+
+### 생성 방법
+
+```
+Widgets 폴더에서 우클릭
+  ↓
+User Interface → Widget Blueprint
+  ↓
+클래스 선택: User Widget
+  ↓
+이름: WB_F18_UI
+  (WB = Widget Blueprint의 약자)
+```
+
+**User Widget이란?**
+
+```
+가장 기본적인 Widget 타입
+  ↓
+용도:
+  - HUD (Head-Up Display)
+  - 메뉴 화면
+  - 게임 내 UI
+  - 이 강의: 전투기 상태 표시
+```
+
+---
+
+## 🔧 3단계: Widget Blueprint 에디터 이해
+
+### 에디터 열기
+
+```
+WB_F18_UI 더블클릭
+  ↓
+Widget Blueprint 에디터 표시
+```
+
+### 주요 패널 구성
+
+**1. Viewport (뷰포트)**
+
+```
+기능: UI 디자인 화면
+  ↓
+표시:
+  - UI 요소 배치
+  - 시각적 미리보기
+  - 실시간 편집
+```
+
+**2. Palette (팔레트)**
+
+```
+기능: UI 요소 목록
+  ↓
+포함:
+  ├─ Text (텍스트)
+  ├─ Button (버튼)
+  ├─ Image (이미지)
+  ├─ Progress Bar (진행 바)
+  └─ 드래그로 Viewport에 추가
+```
+
+**3. Hierarchy (계층 구조)**
+
+```
+기능: UI 요소 트리 구조
+  ↓
+표시:
+  - 부모-자식 관계
+  - 요소 계층
+  - 선택/편집 용이
+```
+
+**4. Details (상세 정보)**
+
+```
+기능: 선택한 요소의 속성
+  ↓
+조정:
+  ├─ 위치, 크기
+  ├─ 색상, 폰트
+  ├─ 정렬, 앵커
+  └─ 모든 시각적 속성
+```
+
+### Graph 탭
+
+```
+Designer 탭 옆에 위치
+  ↓
+포함:
+  ├─ Event Construct (생성 이벤트)
+  └─ Event Tick (틱 이벤트)
+
+Event Construct:
+  - Event BeginPlay와 유사
+  - UI 생성 시 1회 실행
+  - 초기화 작업
+
+Event Tick:
+  - 매 프레임 실행 (초당 60회)
+  - 실시간 업데이트
+```
+
+---
+
+## 🔧 4단계: Canvas Panel 추가
+
+### Canvas Panel이란?
+
+```
+UI 요소를 배치하는 기본 컨테이너
+  ↓
+특징:
+  ├─ 자유로운 위치 지정
+  ├─ Anchor 시스템 지원
+  ├─ 반응형 레이아웃
+  └─ 화면 = Canvas Panel
+
+비유:
+  - 그림을 그리는 캔버스
+  - 모니터 화면 전체
+  - 모든 UI의 배경
+```
+
+### 추가 방법
+
+```
+Palette → Panel 섹션
+  ↓
+Canvas Panel 드래그
+  ↓
+Viewport로 드롭
+  ↓
+Hierarchy에 Canvas Panel 생성
+```
+
+---
+
+## 🔧 5단계: Text 추가
+
+### Text 위젯 추가
+
+```
+Palette → Common 섹션
+  ↓
+Text 드래그
+  ↓
+Canvas Panel 위로 드롭
+  ↓
+Canvas Panel의 자식으로 추가
+```
+
+**부모-자식 관계**
+
+```
+Canvas Panel (부모)
+  └─ Text (자식)
+
+자식 요소는:
+  - 부모 안에 포함
+  - 부모를 벗어날 수 없음
+  - 부모 삭제 시 함께 삭제
+```
+
+### Text 내용 변경
+
+```
+Text 선택
+  ↓
+Details 패널 → Content 섹션
+  ↓
+Text 항목: "Hello World" 입력
+```
+
+### 폰트 크기 변경
+
+```
+Details 패널 → Appearance 섹션
+  ↓
+Font → Size: 24 → 48 (예시)
+  ↓
+크기 증가 확인
+```
+
+---
+
+## 🔧 6단계: Size To Content 설정
+
+### Size To Content란?
+
+```
+기능: 텍스트 길이에 맞춰 박스 크기 자동 조절
+  ↓
+효과:
+  - 텍스트 짧음 → 박스 작게
+  - 텍스트 길음 → 박스 크게
+  - 자동 조정으로 편리함
+
+비활성화 시:
+  - 고정된 크기
+  - 텍스트가 잘리거나 넘침
+```
+
+### 설정 방법
+
+```
+Text 선택
+  ↓
+Details 패널 → Slot (Canvas Panel Slot) 섹션
+  ↓
+Size To Content 체크박스 ✅
+```
+
+---
+
+## 🔧 7단계: Anchor 시스템 이해
+
+### Anchor (앵커)란?
+
+```
+UI 요소의 기준점 설정
+  ↓
+역할:
+  - 화면 크기가 변해도 상대적 위치 유지
+  - 다양한 해상도 지원
+  - 반응형 UI 핵심
+
+비유:
+  - 배를 묶는 닻
+  - UI를 화면에 고정하는 기준점
+```
+
+### Anchor 설정
+
+```
+Text 선택
+  ↓
+Details 패널 → Anchors 드롭다운
+  ↓
+가운데 아이콘 선택 (Center)
+  ↓
+Anchor가 화면 중앙에 위치
+```
+
+**Anchor 옵션들**
+
+```
+Top Left: 좌측 상단 고정
+Top Center: 상단 중앙 고정
+Top Right: 우측 상단 고정
+Center: 화면 정중앙 고정 ✅
+Bottom Left: 좌측 하단 고정
+등등...
+```
+
+---
+
+## 🔧 8단계: Position과 Alignment로 정중앙 배치
+
+### Position 설정
+
+```
+Text 선택
+  ↓
+Details 패널 → Position X: 0
+                Position Y: 0
+  ↓
+Anchor 위치로 이동 (좌측 상단 모서리가 중앙)
+```
+
+**현재 문제점**
+
+```
+텍스트의 좌측 상단이 중앙에 위치
+  ↓
+텍스트가 중앙에서 오른쪽으로 치우침
+  ↓
+텍스트 자체를 중앙에 배치 필요
+```
+
+### Alignment로 해결
+
+```
+Details 패널 → Alignment
+  ↓
+X: 0.5
+Y: 0.5
+  ↓
+텍스트의 중심점이 Anchor로 이동
+  ↓
+완벽한 화면 정중앙 배치 ✅
+```
+
+**Alignment 이해**
+
+```
+0.0 = 좌측/상단 끝
+0.5 = 가운데
+1.0 = 우측/하단 끝
+
+Alignment X: 0.5, Y: 0.5
+  ↓
+텍스트 박스의 정중앙을
+Anchor 위치(화면 중앙)에 배치
+```
+
+---
+
+## 🔧 9단계: Blueprint에서 Widget 생성 및 표시
+
+### 노드 구성
+
+```
+BP_F18 → Event Graph
+  ↓
+Event BeginPlay
+  ↓
+[Create Widget]
+  ├─ Class: WB_F18_UI
+  └─ Owning Player: Get Player Controller
+  ↓
+[Add to Viewport]
+```
+
+### Create Widget 노드
+
+```
+기능: Widget Blueprint 인스턴스 생성
+  ↓
+입력:
+  ├─ Class: 생성할 Widget 타입
+  └─ Owning Player: 소유 플레이어 컨트롤러
+
+출력:
+  └─ Return Value: 생성된 Widget 객체
+
+중요:
+  - 생성만 하고 표시는 안 함
+  - Add to Viewport 필요
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380599/notion-blog/_/_/BG/3/image.png)
+
+**Owning Player란?**
+
+```
+이 UI를 소유하는 플레이어
+  ↓
+멀티플레이어 게임:
+  - 플레이어 1 → UI 1
+  - 플레이어 2 → UI 2
+  - 각자의 UI 표시
+
+싱글플레이어:
+  - Get Player Controller 사용
+  - 현재 플레이어 자동 연결
+```
+
+### Add to Viewport 노드
+
+```
+기능: 생성된 Widget을 화면에 표시
+  ↓
+입력:
+  └─ Target: 표시할 Widget
+
+효과:
+  - 화면에 UI 표시
+  - 플레이어가 볼 수 있게 됨
+```
+
+### 테스트
+
+```
+컴파일 → 저장 → 게임 실행
+  ↓
+결과: "Hello World" 화면 중앙에 표시 ✅
+```
+
+---
+
+## 🔧 10단계: Widget을 변수로 저장
+
+### Promote to Variable
+
+```
+Create Widget의 Return Value
+  ↓
+우클릭 → Promote to Variable
+  ↓
+이름: F18_UI
+```
+
+**왜 변수로 저장하나?**
+
+```
+변수 없이:
+  - Widget 생성만 가능
+  - 나중에 접근 불가
+  - 내용 변경 불가 ❌
+
+변수 저장:
+  - 언제든 접근 가능
+  - 텍스트 업데이트 가능
+  - 다른 함수에서 사용 가능 ✅
+```
+
+### 노드 연결
+
+```
+[Event BeginPlay]
+  ↓
+[Create Widget] → Class: WB_F18_UI
+  ↓
+Return Value → [SET] F18_UI (변수 저장)
+  ↓
+F18_UI → [Add to Viewport]
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380593/notion-blog/_/_/BG/3/image_1.png)
+
+---
+
+## 🔧 11단계: Text를 변수로 노출
+
+### Is Variable 설정
+
+```
+WB_F18_UI Widget 열기
+  ↓
+Designer 탭에서 Text 선택
+  ↓
+Details 패널 → Is Variable: ✅
+  ↓
+이름 변경: Text (기본) → "Text" 유지 또는 변경
+```
+
+**Is Variable이란?**
+
+```
+UI 요소를 Blueprint에서 접근 가능하게 만드는 옵션
+  ↓
+체크 전:
+  - Designer에서만 편집 가능
+  - Graph에서 접근 불가
+
+체크 후:
+  - Graph에서 변수로 사용 가능
+  - 동적 변경 가능 ✅
+```
+
+---
+
+## 🔧 12단계: Widget 내부에서 텍스트 변경
+
+### Graph 탭에서 작업
+
+```
+WB_F18_UI → Graph 탭
+  ↓
+Variables 패널에 "Text" 변수 생성됨
+  ↓
+[GET] Text
+  ↓
+[Set Text (Text)] 노드
+  ↓
+In Text: "F-18"
+  ↓
+Event Construct에 연결
+```
+
+### 노드 구조
+
+```
+[Event Construct]
+  ↓
+[GET] Text 변수
+  ↓
+[Set Text (Text)]
+  └─ In Text: "F-18"
+```
+
+### 테스트
+
+```
+컴파일 → 저장 → 게임 실행
+  ↓
+결과: "F-18" 표시 ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380596/notion-blog/_/_/BG/3/image_2.png)
+
+---
+
+## 🔧 13단계: 외부에서 제어 가능한 함수 생성
+
+### 현재 한계
+
+```
+Widget 내부에서만 텍스트 변경 가능
+  ↓
+문제:
+  - BP_F18에서 변경 불가
+  - 게임 상태에 따른 동적 변경 어려움
+  ↓
+해결:
+  외부에서 호출 가능한 함수 생성
+```
+
+### Function 생성
+
+```
+WB_F18_UI → Graph 탭
+  ↓
+Functions 패널 → + 버튼
+  ↓
+이름: Set_My_Text
+```
+
+### 함수 내부 구성
+
+```
+[Entry] Set_My_Text
+  ↓
+[GET] Text 변수
+  ↓
+[Set Text (Text)]
+  └─ In Text: (함수 입력값 연결 예정)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380598/notion-blog/_/_/BG/3/image_3.png)
+
+---
+
+## 🔧 14단계: 함수 입력 파라미터 추가
+
+### 입력 파라미터란?
+
+```
+함수를 호출할 때 전달하는 값
+  ↓
+예시:
+  Set_My_Text("핸드브레이크")
+  ↓
+  "핸드브레이크"가 입력 파라미터
+
+효과:
+  - 다양한 텍스트 표시 가능
+  - 재사용성 증가
+  - 유연한 제어
+```
+
+### 입력 추가 방법
+
+```
+Set_My_Text 함수 선택
+  ↓
+Details 패널 → Inputs 섹션
+  ↓
++ 버튼 클릭
+  ↓
+입력 이름: My_Text
+  ↓
+타입: Text
+```
+
+### 함수 완성
+
+```
+[Entry] Set_My_Text
+  ├─ My_Text (입력 파라미터)
+  ↓
+[GET] Text 변수
+  ↓
+[Set Text (Text)]
+  └─ In Text: My_Text (파라미터 연결)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380598/notion-blog/_/_/BG/3/image_4.png)
+
+---
+
+## 🔧 15단계: BP_F18에서 함수 호출
+
+### 핸드브레이크 Started 이벤트
+
+```
+[IA_Handbrake] Started
+  ↓
+[GET] F18_UI 변수
+  ↓
+[Set_My_Text] 함수
+  └─ My_Text: "핸드브레이크"
+```
+
+### 핸드브레이크 Completed 이벤트
+
+```
+[IA_Handbrake] Completed
+  ↓
+[GET] F18_UI 변수
+  ↓
+[Set_My_Text] 함수
+  └─ My_Text: "핸드브레이크 해제"
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380598/notion-blog/_/_/BG/3/image_5.png)
+
+---
+
+## ✅ 최종 테스트
+
+### 테스트 시나리오
+
+```
+게임 실행
+  ↓
+초기 화면: "F-18" 표시
+  ↓
+Space 키 누름: "핸드브레이크" 표시
+  ↓
+Space 키 떼기: "핸드브레이크 해제" 표시
+  ↓
+모든 동작 정상 ✅
+```
+
+---
+
+## 🔧 16단계: 불필요한 코드 정리
+
+### Event Construct의 Set Text 삭제
+
+```
+이유:
+  - 테스트용 코드였음
+  - 실제로는 BP_F18에서 제어
+  - 불필요한 중복 제거
+
+남겨둘 것:
+  - Set_My_Text 함수
+  - Text 변수 (Is Variable)
+```
+
+### 초기 텍스트 설정
+
+```
+WB_F18_UI → Designer 탭
+  ↓
+Text 선택
+  ↓
+Details 패널 → Content → Text
+  ↓
+"F-18" 입력
+  ↓
+기본값으로 표시됨
+```
+
+---
+
+## 📝 핵심 정리
+
+### 전체 시스템 구조
+
+```
+WB_F18_UI (Widget Blueprint)
+  ├─ Canvas Panel (컨테이너)
+  │   └─ Text (Is Variable: ✅)
+  │       ├─ Content: "F-18" (기본값)
+  │       ├─ Anchor: Center
+  │       ├─ Alignment: 0.5, 0.5
+  │       └─ Size To Content: ✅
+  └─ Set_My_Text 함수
+      ├─ 입력: My_Text (Text 타입)
+      └─ 기능: Text 위젯의 내용 변경
+
+BP_F18 (게임 로직)
+  ├─ Event BeginPlay
+  │   ├─ Create Widget → WB_F18_UI
+  │   ├─ 변수 저장 → F18_UI
+  │   └─ Add to Viewport
+  └─ IA_Handbrake
+      ├─ Started → Set_My_Text("핸드브레이크")
+      └─ Completed → Set_My_Text("핸드브레이크 해제")
+```
+
+### 핵심 개념 정리
+
+**1. Widget Blueprint**
+
+```
+UI 전용 Blueprint
+  ├─ Designer: 시각적 편집
+  ├─ Graph: 동작 로직
+  └─ 두 탭을 오가며 작업
+```
+
+**2. Canvas Panel**
+
+```
+UI 컨테이너
+  ├─ 자유로운 배치
+  ├─ Anchor 시스템
+  └─ 반응형 레이아웃
+```
+
+**3. Anchor & Alignment**
+
+```
+Anchor: 화면 내 기준점
+Alignment: 요소 내 기준점
+  ↓
+조합으로 정확한 위치 지정
+```
+
+**4. Is Variable**
+
+```
+UI 요소를 Graph에서 접근 가능하게
+  ↓
+동적 제어의 핵심
+```
+
+**5. 함수 입력 파라미터**
+
+```
+Blueprint 간 데이터 전달
+  ↓
+유연하고 재사용 가능한 코드
+```
+
+---
+
+## 💡 추가 설명
+
+### Designer vs Graph
+
+```
+Designer:
+  - 어떻게 보일지 (시각)
+  - 드래그 앤 드롭
+  - 미리보기
+
+Graph:
+  - 어떻게 작동할지 (로직)
+  - 노드 기반 프로그래밍
+  - 동적 제어
+```
+
+### Size To Content의 중요성
+
+```
+활성화:
+  "짧은 텍스트" → 작은 박스
+  "매우 긴 텍스트입니다" → 큰 박스
+  ↓
+  자동 조정으로 깔끔한 UI
+
+비활성화:
+  고정 크기 박스
+  ↓
+  텍스트가 잘리거나 공간 낭비
+```
+
+### Anchor의 실용성
+
+```
+1920×1080 해상도:
+  Text가 화면 정중앙
+
+3840×2160 해상도:
+  여전히 화면 정중앙 ✅
+
+Anchor 없이:
+  고정 좌표 사용
+  ↓
+  해상도 변경 시 위치 어긋남 ❌
+```
+
+### 함수 사용의 이점
+
+```
+직접 Set Text:
+  - 매번 Text 변수 접근
+  - 코드 중복
+  - 수정 시 여러 곳 변경
+
+함수 사용:
+  - 한 줄로 호출
+  - 재사용 가능
+  - 수정 시 함수만 변경 ✅
+```
+
+---
+
+## 🔜 다음 단계 예고
+
+```
+현재:
+  - 단순 텍스트 표시
+  - 핸드브레이크 상태만
+
+다음:
+  - 텍스트 효과 추가
+  - 애니메이션
+  - 더 멋진 시각적 표현
+```
+
+---
+
+## 🎉 UI 시스템 기초 완성!
+
+### 구현 완료 기능
+
+```
+✅ Widget Blueprint 생성
+✅ 화면에 UI 표시
+✅ 텍스트 정중앙 배치
+✅ Blueprint에서 동적 제어
+✅ 함수를 통한 외부 제어
+✅ 핸드브레이크 상태 표시
+```
+
+### 실전 활용 가능성
+
+```
+이 방법으로:
+  ├─ 체력 바
+  ├─ 점수 표시
+  ├─ 타이머
+  ├─ 알림 메시지
+  └─ 모든 UI 요소 제작 가능!
+```
+
+# { 🎮 Widget 텍스트 페이드 애니메이션 구현하기 }
+
+## 🎯 목표
+
+텍스트에 페이드아웃 애니메이션 추가
+
+- 일정 시간 후 텍스트가 서서히 사라지도록
+- Widget Blueprint의 Animation 시스템 사용
+- 시간과 투명도 제어
+
+---
+
+## 💡 핵심 개념
+
+### Widget Animation이란?
+
+```
+Widget 내 UI 요소의 시간에 따른 변화
+  ↓
+가능한 애니메이션:
+  ├─ 페이드 인/아웃 (투명도 변화)
+  ├─ 위치 이동
+  ├─ 크기 변화
+  ├─ 회전
+  └─ 색상 변화
+
+장점:
+  - 시각적으로 부드러운 전환
+  - 사용자 경험 향상
+  - 전문적인 느낌
+```
+
+### Keyframe (키프레임)이란?
+
+```
+애니메이션의 특정 시간 지점에서의 상태
+  ↓
+작동 방식:
+  키프레임 1 (0초): 투명도 100%
+  키프레임 2 (1초): 투명도 0%
+  ↓
+  엔진이 자동으로 중간값 계산
+  ↓
+  0초 → 0.5초: 50% → 1초: 0% (부드러운 전환)
+
+비유:
+  - 만화 영화의 핵심 장면
+  - 중간은 컴퓨터가 자동 생성
+```
+
+---
+
+## 🔧 1단계: Animation 탭 열기
+
+### 탭 전환
+
+```
+WB_F18_UI Widget Blueprint 열기
+  ↓
+하단 탭에서 Animations 클릭
+  ↓
+Animation 편집 패널 표시
+```
+
+**기본 탭 구성**
+
+```
+Designer: UI 디자인
+Graph: 로직 작성
+Animations: 애니메이션 제작 ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380598/notion-blog/_/_/BG/3/image_6.png)
+
+---
+
+## 🔧 2단계: 새 Animation 생성
+
+### Animation 추가
+
+```
+Animations 패널 → + Animation 버튼
+  ↓
+새 애니메이션 생성
+  ↓
+이름: Text_Fade
+```
+
+**Animation 이름 규칙**
+
+```
+기능을 명확히 표현:
+  - Text_Fade: 텍스트 페이드
+  - Button_Press: 버튼 누름
+  - Panel_Slide: 패널 슬라이드
+
+명확한 이름:
+  - 나중에 찾기 쉬움
+  - 용도 파악 쉬움
+```
+
+### Animation 선택
+
+```
+Text_Fade 클릭
+  ↓
+타임라인 편집기 활성화
+  ↓
+하단에 타임라인 표시
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380598/notion-blog/_/_/BG/3/image_7.png)
+
+---
+
+## 🔧 3단계: Timeline에 Text 추가
+
+### Timeline이란?
+
+```
+시간축을 따라 애니메이션을 편집하는 도구
+  ↓
+구성:
+  - 가로축: 시간 (초 단위)
+  - 세로축: 애니메이션할 요소
+  - 점: 키프레임
+
+비유:
+  - 동영상 편집 프로그램
+  - 시간에 따른 변화 기록
+```
+
+### Text를 Timeline에 추가
+
+```
+Hierarchy에서 Text 선택
+  ↓
+Timeline의 + Track 버튼 클릭
+  ↓
+Text 트랙이 Timeline에 추가됨
+```
+
+---
+
+## 🔧 4단계: Color and Opacity 속성 추가
+
+### 속성 추가 방법
+
+```
+Timeline의 Text 트랙 옆 + 버튼 클릭
+  ↓
+드롭다운 메뉴 표시
+  ↓
+Color and Opacity 선택
+```
+
+**Color and Opacity란?**
+
+```
+색상과 투명도를 제어하는 속성
+  ↓
+포함:
+  ├─ R (Red): 빨강 값
+  ├─ G (Green): 초록 값
+  ├─ B (Blue): 파랑 값
+  └─ A (Alpha): 투명도 ✅
+
+Alpha (투명도):
+  - 1.0 = 완전 불투명 (보임)
+  - 0.0 = 완전 투명 (안 보임)
+  - 0.5 = 반투명
+```
+
+### 다른 애니메이션 가능 속성들
+
+```
+Transform:
+  - Position: 위치
+  - Rotation: 회전
+  - Scale: 크기
+
+Render:
+  - Visibility: 표시/숨김
+  - Render Opacity: 렌더 투명도
+
+이 강의: Color and Opacity만 사용
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380599/notion-blog/_/_/BG/3/image_8.png)
+
+---
+
+## 🔧 5단계: 첫 번째 키프레임 생성 (시작점)
+
+### 시간 0초 키프레임
+
+```
+Timeline 커서를 0초 위치로 이동
+  ↓
+Color and Opacity 트랙에서 키 추가 버튼 클릭
+  ↓
+키프레임 생성
+```
+
+**키프레임이 안 생길 때**
+
+```
+문제:
+  - 클릭해도 키프레임 미생성
+  - 버그 또는 초기 상태
+
+해결:
+  Details 패널에서 Alpha 값 살짝 변경
+  (예: 1.0 → 0.99 → 1.0)
+  ↓
+  키프레임 자동 생성
+  ↓
+  원하는 값으로 재설정
+
+  ( 뒷 부분 키를 만들면 알아서 1.0 을 생기기도 한다 )
+```
+
+### 초기값 확인
+
+```
+0초 키프레임:
+  ├─ R: 1.0 (흰색)
+  ├─ G: 1.0 (흰색)
+  ├─ B: 1.0 (흰색)
+  └─ A: 1.0 (완전 불투명)
+
+결과: 완전히 보이는 흰색 텍스트
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380599/notion-blog/_/_/BG/3/image_9.png)
+
+---
+
+## 🔧 6단계: 두 번째 키프레임 생성 (종료점)
+
+### 시간 1초 키프레임
+
+```
+Timeline 커서를 1초 위치로 이동
+  ↓
+Alpha 값을 0으로 변경
+  ↓
+Details 패널 → Color and Opacity → A: 0.0
+  ↓
+자동으로 키프레임 생성
+```
+
+### 1초 키프레임 값
+
+```
+1초 키프레임:
+  ├─ R: 1.0 (흰색 유지)
+  ├─ G: 1.0 (흰색 유지)
+  ├─ B: 1.0 (흰색 유지)
+  └─ A: 0.0 (완전 투명)
+
+결과: 완전히 사라진 텍스트
+```
+
+### 애니메이션 미리보기
+
+```
+Timeline의 재생 버튼 클릭
+  ↓
+확인:
+  0초: F-18 완전히 보임
+  0.5초: 반투명
+  1초: 완전히 사라짐 ✅
+```
+
+---
+
+## 🔧 7단계: Blueprint에서 Animation 재생
+
+### Graph 탭으로 이동
+
+```
+WB_F18_UI → Graph 탭
+  ↓
+Event Construct 찾기
+```
+
+### Play Animation 노드 추가
+
+```
+우클릭 → 검색: Play Animation
+  ↓
+Play Animation 노드 추가
+```
+
+### 노드 연결
+
+```
+[Event Construct]
+  ↓
+[Play Animation]
+  ├─ Target: Self (자기 자신)
+  └─ In Animation: Text_Fade
+```
+
+**Play Animation 노드 설명**
+
+```
+기능: Widget의 애니메이션 재생
+  ↓
+입력:
+  ├─ Target: 애니메이션을 재생할 Widget
+  ├─ In Animation: 재생할 애니메이션 선택
+  ├─ Start at Time: 시작 시간 (기본 0.0)
+  ├─ Num Loops to Play: 반복 횟수 (기본 1)
+  ├─ Play Mode: 재생 모드 (Forward)
+  ├─ Playback Speed: 재생 속도 (기본 1.0)
+  └─ Restore State: 종료 후 원래 상태로 복귀 여부
+
+출력:
+  └─ Return Value: 애니메이션 재생 객체
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380594/notion-blog/_/_/BG/3/image_10.png)
+
+### 주요 파라미터 설명
+
+**In Animation**
+
+```
+재생할 애니메이션 선택
+  ↓
+드롭다운에서 Text_Fade 선택
+  ↓
+해당 애니메이션이 재생됨
+```
+
+**Start at Time**
+
+```
+기본값: 0.0
+  - 애니메이션 처음부터 시작
+
+0.5로 설정 시:
+  - 0.5초 지점부터 시작
+  - 중간부터 재생
+```
+
+**Num Loops to Play**
+
+```
+기본값: 1
+  - 한 번만 재생
+
+0으로 설정 시:
+  - 무한 반복
+
+3으로 설정 시:
+  - 3번 반복
+```
+
+**Play Mode**
+
+```
+Forward (정방향):
+  - 처음 → 끝
+
+Reverse (역방향):
+  - 끝 → 처음
+
+PingPong (핑퐁):
+  - 정방향 → 역방향 → 정방향 반복
+```
+
+**Playback Speed**
+
+```
+기본값: 1.0
+  - 정상 속도
+
+2.0:
+  - 2배속 (더 빠름)
+
+0.5:
+  - 0.5배속 (더 느림)
+```
+
+---
+
+## ✅ 1차 테스트
+
+### 테스트 실행
+
+```
+컴파일 → 저장 → 게임 실행
+  ↓
+결과 확인
+```
+
+### 동작 확인
+
+```
+게임 시작:
+  "F-18" 표시
+  ↓
+1초 후:
+  서서히 사라짐 ✅
+```
+
+---
+
+## 🔧 8단계: 대기 시간 추가 (개선)
+
+### 현재 문제점
+
+```
+게임 시작하자마자 바로 페이드 시작
+  ↓
+텍스트를 제대로 볼 시간이 없음
+  ↓
+개선 필요: 일정 시간 유지 후 페이드
+```
+
+### 중간 키프레임 추가
+
+```
+Animations 탭 → Text_Fade 선택
+  ↓
+Timeline 커서를 0.75초 위치로 이동
+  ↓
+Alpha 값을 1.0으로 설정
+  ↓
+키프레임 추가
+```
+
+### 키프레임 구조 (개선 후)
+
+```
+0초: Alpha 1.0 (완전히 보임)
+  ↓
+0.75초: Alpha 1.0 (여전히 완전히 보임)
+  ↓
+1초: Alpha 0.0 (완전히 사라짐)
+```
+
+**효과**
+
+```
+0 ~ 0.75초:
+  - 투명도 변화 없음
+  - 텍스트 그대로 유지
+  - 읽을 시간 확보 ✅
+
+0.75 ~ 1초:
+  - 투명도 1.0 → 0.0
+  - 0.25초 동안 페이드
+  - 부드럽게 사라짐
+```
+
+### 테스트
+
+```
+게임 실행
+  ↓
+결과:
+  0.75초 동안 "F-18" 유지
+  이후 0.25초 동안 페이드아웃 ✅
+```
+
+---
+
+## 🔧 9단계: 전체 시간 연장 (최종 개선)
+
+### 더 긴 대기 시간
+
+```
+Animations 탭 → Text_Fade
+  ↓
+마지막 두 키프레임 선택
+  (0.75초, 1초 키프레임)
+  ↓
+드래그하여 오른쪽으로 이동
+```
+
+### 최종 키프레임 배치
+
+```
+0초: Alpha 1.0
+  ↓
+2.75초: Alpha 1.0 (← 0.75초에서 이동)
+  ↓
+3초: Alpha 0.0 (← 1초에서 이동)
+```
+
+**드래그 방법**
+
+```
+키프레임 클릭 후 좌우 드래그
+  ↓
+또는
+  ↓
+키프레임 우클릭 → 시간값 직접 입력
+```
+
+### 최종 타이밍
+
+```
+0 ~ 2.75초:
+  - 텍스트 완전히 유지
+  - 충분한 읽기 시간
+
+2.75 ~ 3초:
+  - 0.25초 동안 페이드아웃
+  - 부드러운 사라짐
+```
+
+---
+
+## ✅ 최종 테스트
+
+### 테스트 실행
+
+```
+컴파일 → 저장 → 게임 실행
+  ↓
+확인 사항
+```
+
+### 동작 확인
+
+```
+게임 시작:
+  "F-18" 표시
+  ↓
+2.75초 동안:
+  텍스트 유지 (읽기 시간 충분)
+  ↓
+2.75초 ~ 3초:
+  부드럽게 페이드아웃
+  ↓
+3초 후:
+  완전히 사라짐 ✅
+
+완벽한 타이밍! ✅
+```
+
+---
+
+## 📝 핵심 정리
+
+### Animation 시스템 구조
+
+```
+WB_F18_UI Widget
+  └─ Animations
+      └─ Text_Fade
+          └─ Text (Track)
+              └─ Color and Opacity
+                  ├─ 0초: A = 1.0
+                  ├─ 2.75초: A = 1.0
+                  └─ 3초: A = 0.0
+
+Event Construct
+  ↓
+Play Animation (Text_Fade)
+```
+
+### 타임라인 최종 구성
+
+```
+시간축:
+  0초────────2.75초──3초
+  ↓          ↓       ↓
+  완전 보임  유지    사라짐
+  (A=1.0)   (A=1.0) (A=0.0)
+
+효과:
+  - 2.75초 대기
+  - 0.25초 페이드
+  - 총 3초 애니메이션
+```
+
+### 키프레임 배치 전략
+
+```
+시작 키프레임 (0초):
+  - 초기 상태 정의
+  - Alpha 1.0 (보임)
+
+중간 키프레임 (2.75초):
+  - 대기 종료 지점
+  - Alpha 1.0 (여전히 보임)
+  - 페이드 시작 직전
+
+끝 키프레임 (3초):
+  - 최종 상태 정의
+  - Alpha 0.0 (사라짐)
+```
+
+---
+
+## 💡 추가 설명
+
+### Alpha vs Visibility
+
+```
+Alpha (투명도):
+  - 0.0 ~ 1.0 범위
+  - 부드러운 페이드 가능
+  - 공간은 차지 (레이아웃 유지)
+
+Visibility (표시/숨김):
+  - Visible / Hidden / Collapsed
+  - 즉시 켜짐/꺼짐 (페이드 X)
+  - Collapsed는 공간도 제거
+
+페이드 애니메이션:
+  - Alpha 사용 권장 ✅
+  - 부드러운 전환
+```
+
+### 키프레임 보간 (Interpolation)
+
+```
+엔진이 자동으로 중간값 계산
+  ↓
+예시:
+  0.75초: A = 1.0
+  3초: A = 0.0
+  ↓
+  2.875초: A = 0.5 (중간)
+  ↓
+  자동으로 부드러운 곡선 생성
+
+보간 타입:
+  - Linear: 직선 (일정한 속도)
+  - Ease In: 천천히 시작
+  - Ease Out: 천천히 끝
+  - 이 강의: Linear (기본값)
+```
+
+### Event Construct vs Event Tick
+
+```
+Event Construct:
+  - Widget 생성 시 1회 실행
+  - 초기화 작업
+  - 애니메이션 시작에 적합 ✅
+
+Event Tick:
+  - 매 프레임 실행
+  - 연속적인 업데이트
+  - 애니메이션 재생에는 비효율적
+```
+
+### Play Animation의 활용
+
+```
+기본 재생:
+  Event Construct에서 자동 시작
+
+조건부 재생:
+  특정 이벤트 발생 시
+  예: 버튼 클릭, 상태 변화
+
+반복 재생:
+  Num Loops to Play = 0
+  무한 반복 애니메이션
+```
+
+---
+
+## 🔜 다음 단계 예고
+
+```
+현재:
+  - 기본 텍스트만 페이드
+
+다음:
+  - 스로틀 UI 제작
+  - 실시간 값 표시
+  - 더 복잡한 UI 구성
+```
+
+---
+
+### 여러 애니메이션 조합
+
+```
+순차 재생:
+  Animation 1 끝 → Animation 2 시작
+  (Sequencer 또는 Delay 사용)
+
+동시 재생:
+  페이드 + 이동
+  (여러 속성 동시 키프레임)
+
+반복 패턴:
+  깜빡임, 흔들림
+  (Num Loops to Play 활용)
+```
+
+### 성능 고려사항
+
+```
+적당한 키프레임 수:
+  - 너무 많으면 성능 저하
+  - 필요한 만큼만 사용
+  - 이 강의: 3개면 충분 ✅
+
+복잡한 애니메이션:
+  - 필요할 때만 재생
+  - 화면 밖 요소는 정지
+  - 최적화 중요
+```
+
+# { 🎮 스로틀 UI 게이지 구현하기 }
+
+## 🎯 목표
+
+시각적인 스로틀 게이지 만들기
+
+- Border를 이미지로 사용 (배경)
+- Image를 동적으로 이동 (게이지 바)
+- 스로틀 값에 따라 Y 위치 변경
+- 실시간 업데이트
+
+---
+
+## 🔧 1단계: Border 추가 (배경)
+
+### Border란?
+
+```
+기본적으로 테두리 장식용 위젯
+  ↓
+하지만:
+  Brush를 이미지로 변경 가능
+  ↓
+  이미지처럼 사용 가능 ✅
+
+장점:
+  - 패딩, 정렬 기능
+  - 자식 위젯 포함 가능
+  - Image보다 유연함
+```
+
+### Border 추가 및 배치
+
+```
+Designer 탭
+  ↓
+Palette → Common → Border
+  ↓
+Canvas Panel로 드래그
+```
+
+---
+
+## 🔧 2단계: Border Anchor 설정 (우하단)
+
+### Anchor 설정
+
+```
+Border 선택
+  ↓
+Details 패널 → Anchors
+  ↓
+우하단 아이콘 선택 (Bottom Right)
+```
+
+**왜 우하단인가?**
+
+```
+대부분의 게임:
+  - 체력/마나: 좌상단
+  - 미니맵: 우상단
+  - 스로틀/속도계: 우하단 ✅
+
+업계 표준 레이아웃
+```
+
+---
+
+## 🔧 3단계: Border Position 설정
+
+### 초기 Position
+
+```
+Position X: 0
+Position Y: 0
+  ↓
+Anchor 위치 (우하단)에 정확히 배치
+```
+
+### Alignment 설정
+
+```
+Alignment X: 1.0
+Alignment Y: 1.0
+  ↓
+Border의 우하단 모서리를 Anchor에 정렬
+```
+
+**Alignment 1.0의 의미**
+
+```
+0.0 = 좌측/상단 끝
+1.0 = 우측/하단 끝 ✅
+  ↓
+Border의 오른쪽 아래 모서리가
+화면 오른쪽 아래에 딱 맞춤
+```
+
+---
+
+## 🔧 4단계: Border 위치 조정 (여백)
+
+### 화면 끝에서 떼어내기
+
+```
+Position X: -50
+Position Y: -59
+  ↓
+우측으로 50px, 하단에서 59px 떨어짐
+  ↓
+화면 모서리에 붙지 않고 여백 생김
+```
+
+**음수 값의 의미**
+
+```
+Anchor: Bottom Right (우하단)
+  ↓
+Position X: -50 → 왼쪽으로 50px 이동
+Position Y: -59 → 위쪽으로 59px 이동
+  ↓
+화면 경계에서 떨어진 위치
+```
+
+---
+
+## 🔧 5단계: Border 크기 설정
+
+### Size 설정
+
+```
+Size X: 50 (가로)
+Size Y: 215 (세로)
+  ↓
+세로로 긴 바 형태
+```
+
+---
+
+## 🔧 6단계: Border를 이미지로 변경
+
+### Brush 설정
+
+```
+Border 선택
+  ↓
+Details 패널 → Appearance → Brush
+  ↓
+Image 선택
+  ↓
+드롭다운 → Throttle_Back (배경 이미지)
+```
+
+**Brush란?**
+
+```
+위젯을 어떻게 그릴지 정의
+  ↓
+옵션:
+  - No Brush: 투명
+  - Solid Color: 단색
+  - Image: 이미지 ✅
+  - Material: 머티리얼
+```
+
+### 결과
+
+```
+Border가 이미지처럼 보임
+  ↓
+Throttle_Back 이미지 표시
+  ↓
+스로틀 게이지 배경 완성 ✅
+```
+
+---
+
+## 🔧 7단계: Canvas Panel 자식 추가
+
+### 왜 Canvas Panel이 필요한가?
+
+```
+Border 안에 자식 위젯 배치
+  ↓
+Canvas Panel:
+  - 자유로운 위치 지정
+  - Anchor 시스템 사용
+  - 동적 이동 가능 ✅
+
+다른 Panel은:
+  - Vertical Box: 세로 정렬만
+  - Horizontal Box: 가로 정렬만
+  - Grid Panel: 격자 고정
+  → 위치 조정 어려움
+```
+
+### Canvas Panel 추가
+
+```
+Palette → Panel → Canvas Panel
+  ↓
+Border 위로 드래그
+  ↓
+Border의 자식으로 추가
+```
+
+### Padding 제거
+
+```
+Canvas Panel 선택
+  ↓
+Details 패널 → Slot (Border Slot)
+  ↓
+Padding:
+  Left: 0
+  Top: 0
+  Right: 0
+  Bottom: 0
+```
+
+**Padding 제거 이유**
+
+```
+Padding 있으면:
+  Canvas Panel이 Border보다 작음
+  ↓
+  여백 생김
+  ↓
+  게이지가 배경을 꽉 채우지 못함
+
+Padding 0:
+  Canvas Panel = Border 크기
+  ↓
+  꽉 찬 레이아웃 ✅
+```
+
+---
+
+## 🔧 8단계: Image 추가 (게이지 바)
+
+### Image 추가
+
+```
+Palette → Common → Image
+  ↓
+Canvas Panel로 드래그
+```
+
+### Image 설정
+
+```
+Image 선택
+  ↓
+Details 패널 → Appearance → Brush → Image
+  ↓
+Throttle (게이지 이미지) 선택
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380593/notion-blog/_/_/BG/3/image_11.png)
+
+---
+
+## 🔧 9단계: Image Anchor 설정 (하단 중앙)
+
+### Anchor
+
+```
+Image 선택
+  ↓
+Anchors → Bottom Center 선택
+```
+
+**왜 하단 중앙인가?**
+
+```
+스로틀 증가 = 위로 올라감
+  ↓
+하단을 기준점으로:
+  - 위치 0 = 바닥 (최소)
+  - 위치 -200 = 최상단 (최대)
+  ↓
+계산이 간단함 ✅
+```
+
+### Position & Alignment
+
+```
+Position X: 0
+Position Y: 0
+  ↓
+Alignment X: 0.5
+Alignment Y: 0.5
+  ↓
+Image의 중심점이 하단 중앙에 위치
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380594/notion-blog/_/_/BG/3/image_12.png)
+
+---
+
+## 🔧 10단계: 동작 범위 확인
+
+### Designer에서 테스트
+
+```
+Image 선택
+  ↓
+Position Y 값 변경:
+
+Position Y: 0
+  ↓
+  게이지 바닥 (스로틀 0%)
+
+Position Y: -200
+  ↓
+  게이지 최상단 (스로틀 100%)
+```
+
+**범위 결정**
+
+```
+최소값 (0): Position Y = 0
+최대값 (1.0): Position Y = -200
+  ↓
+범위: 0 ~ -200
+  ↓
+변화량: 200픽셀
+```
+
+---
+
+## 🔧 11단계: Image를 변수로 만들기
+
+### Is Variable 설정
+
+```
+Image 선택
+  ↓
+Details 패널 → Is Variable: ✅
+  ↓
+이름: Throttle_Image
+```
+
+**변수 이름 규칙**
+
+```
+Throttle_Image
+  ├─ 기능 명확
+  ├─ 언더스코어로 구분
+  └─ 직관적
+
+좋은 이름:
+  - 나중에 찾기 쉬움
+  - 용도 파악 쉬움
+```
+
+---
+
+## 🔧 12단계: Set Throttle 함수 생성
+
+### Function 생성
+
+```
+Graph 탭 → Functions → + 버튼
+  ↓
+이름: Set_Throttle
+```
+
+### 입력 파라미터 추가
+
+```
+Set_Throttle 함수 선택
+  ↓
+Details 패널 → Inputs → + 버튼
+  ↓
+이름: Throttle_Value
+타입: Float
+```
+
+---
+
+## 🔧 13단계: Slot as Canvas Slot 이해
+
+### 문제 상황
+
+```
+Throttle_Image (GET)
+  ↓
+Set Position? ← 없음!
+  ↓
+왜?
+```
+
+**이유:**
+
+```
+Image는 여러 종류의 Panel에 들어갈 수 있음:
+  - Canvas Panel
+  - Vertical Box
+  - Horizontal Box
+  등등
+
+각 Panel마다 다른 Slot 타입:
+  - Canvas Panel Slot: Position 있음 ✅
+  - Vertical Box Slot: Order만 있음
+  - Horizontal Box Slot: Padding만 있음
+```
+
+### Slot as Canvas Slot 노드
+
+```
+기능: Widget을 Canvas Panel Slot으로 변환
+  ↓
+효과:
+  Canvas Panel 전용 기능 사용 가능
+  └─ Set Position ✅
+```
+
+### 노드 구성
+
+```
+[GET] Throttle_Image
+  ↓
+[Slot as Canvas Slot]
+  ↓
+Return Value (Canvas Panel Slot)
+  ↓
+[Set Position] 사용 가능!
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380593/notion-blog/_/_/BG/3/image_13.png)
+
+---
+
+## 🔧 14단계: Set Position 노드 연결
+
+### 전체 노드 구조
+
+```
+[Function] Set_Throttle
+  ├─ Input: Throttle_Value (0~1)
+  ↓
+[GET] Throttle_Image
+  ↓
+[Slot as Canvas Slot]
+  ↓
+[Set Position]
+  └─ In Position: Make Vector 2D
+      ├─ X: 0 (고정)
+      └─ Y: Throttle_Value × -200
+```
+
+### Make Vector 2D
+
+```
+X: 0 (고정)
+  - 좌우로 움직이지 않음
+  - 항상 중앙 유지
+
+Y: Throttle_Value × -200
+  - 스로틀에 따라 변함
+  - 위아래로 이동 ✅
+```
+
+---
+
+## 🔧 15단계: 수식 계산 (Multiply)
+
+### Multiply 노드 추가
+
+```
+[Throttle_Value] (입력 파라미터)
+  ↓
+[Float × Float]
+  ├─ A: Throttle_Value
+  └─ B: -200
+  ↓
+[Make Vector 2D] Y 입력
+```
+
+### 수식 검증
+
+```
+스로틀 0:
+  0 × -200 = 0
+  ↓
+  Position Y = 0 (바닥) ✅
+
+스로틀 0.5:
+  0.5 × -200 = -100
+  ↓
+  Position Y = -100 (중간) ✅
+
+스로틀 1.0:
+  1.0 × -200 = -200
+  ↓
+  Position Y = -200 (최상단) ✅
+```
+
+**왜 -200인가?**
+
+```
+양수 (200):
+  위치가 아래로 이동 (반대)
+
+음수 (-200):
+  위치가 위로 이동 (올바름) ✅
+  ↓
+  스로틀 증가 = 게이지 상승
+```
+
+---
+
+## 🔧 16단계: BP_F18에서 함수 호출
+
+### IA_Thrust에 추가
+
+```
+기존 노드 (스로틀 증가):
+  [FInterp To]
+    ↓
+  [SET] Throttle_Value
+    ↓
+  [Set Throttle Input]
+
+추가할 노드:
+  [SET] Throttle_Value 앞에 삽입
+    ↓
+  [GET] F18_UI
+    ↓
+  [Set_Throttle]
+    └─ Throttle_Value: (FInterp To 결과)
+    ↓
+  [SET] Throttle_Value
+    ↓
+  [Set Throttle Input]
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380595/notion-blog/_/_/BG/3/image_14.png)
+
+### 연결 순서
+
+```
+[FInterp To] Return Value
+  ├─────────────────┐
+  ↓                 ↓
+[Set_Throttle]   [SET] Throttle_Value
+  (UI 업데이트)    (변수 저장)
+  ↓
+[Set Throttle Input]
+  (엔진 제어)
+```
+
+---
+
+## 🔧 17단계: IA_Brake에도 동일 적용
+
+### 복사 & 붙여넣기
+
+```
+IA_Thrust의 노드 복사 (Ctrl+C)
+  ↓
+IA_Brake로 이동
+  ↓
+붙여넣기 (Ctrl+V)
+  ↓
+동일하게 연결
+```
+
+### IA_Brake 노드 구조
+
+```
+[FInterp To] Return Value
+  ├─────────────────┐
+  ↓                 ↓
+[GET] F18_UI      [SET] Throttle_Value
+  ↓
+[Set_Throttle]
+  └─ Throttle_Value: (FInterp To 결과)
+  ↓
+[Set Throttle Input]
+```
+
+---
+
+## ✅ 최종 테스트
+
+### 테스트 시나리오
+
+```
+게임 실행
+  ↓
+초기 상태:
+  스로틀 게이지 바닥 (0%) ✅
+  ↓
+Shift 누름:
+  게이지 서서히 상승
+  최대 100%까지 ✅
+  ↓
+Ctrl 누름:
+  게이지 서서히 하강
+  최소 0%까지 ✅
+```
+
+---
+
+## 📝 핵심 정리
+
+### 전체 구조
+
+```
+WBP_F18_UI (Widget)
+  └─ Canvas Panel
+      └─ Border (배경)
+          ├─ Image: Throttle_Back
+          └─ Canvas Panel (자식)
+              └─ Image: Throttle_Image (Is Variable)
+                  ├─ Anchor: Bottom Center
+                  └─ Position Y: 0 ~ -200
+
+Function: Set_Throttle(Throttle_Value)
+  ↓
+[Throttle_Image → Slot as Canvas Slot]
+  ↓
+[Set Position]
+  └─ Y: Throttle_Value × -200
+
+BP_F18:
+  IA_Thrust/Brake → F18_UI.Set_Throttle
+```
+
+### 수식 요약
+
+```
+Throttle Value (0~1)
+  ×
+Scale Factor (-200)
+  =
+Position Y (0 ~ -200)
+  ↓
+게이지 높이
+```
+
+---
+
+## 💡 추가 설명
+
+### Border vs Image 비교
+
+```
+Image:
+  - 이미지만 표시
+  - 자식 위젯 불가
+
+Border:
+  - 이미지도 표시 가능 ✅
+  - 자식 위젯 포함 가능 ✅
+  - 패딩, 정렬 기능
+  - 더 유연함
+```
+
+### Slot as Canvas Slot의 중요성
+
+```
+없으면:
+  Set Position 사용 불가
+  ↓
+  위치 변경 불가능 ❌
+
+있으면:
+  Canvas Panel 전용 기능 사용
+  ↓
+  자유로운 위치 조정 ✅
+```
+
+### Event Tick vs 함수 호출
+
+```
+Event Tick 사용 시:
+  - 매 프레임 확인
+  - 불필요한 업데이트
+  - 성능 낭비
+
+스로틀 변경 시만 호출:
+  - 필요할 때만 업데이트
+  - 효율적 ✅
+  - 정확한 타이밍
+```
+
+### 음수 값의 활용
+
+```
+UI 좌표계:
+  - 원점: 좌상단
+  - X+: 오른쪽
+  - Y+: 아래쪽
+  - Y-: 위쪽 ✅
+
+스로틀 증가 = 위로 이동
+  ↓
+Position Y는 음수로 증가
+  ↓
+  × -200 사용
+```
+
+---
+
+## 🎉 스로틀 UI 완성!
+
+### 구현 완료 기능
+
+```
+✅ 시각적 게이지 배경
+✅ 동적 게이지 바
+✅ 스로틀 값 실시간 반영
+✅ 부드러운 움직임 (FInterp)
+✅ 정확한 범위 (0~100%)
+✅ 효율적인 업데이트
+```
+
+이제 플레이어가 **스로틀 상태를 한눈에 파악**할 수 있습니다! 🚀
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380595/notion-blog/_/_/BG/3/image_15.png)
+
+# { 🎮 Pitch (상하 조종) 제어 구현하기 }
+
+## 🎯 목표
+
+전투기를 위아래로 조종 가능하게 만들기
+
+- W 키: 기수 위로 (상승)
+- S 키: 기수 아래로 (하강)
+- 키를 떼면 자동으로 중립 복귀
+
+---
+
+## 💡 핵심 개념: Pitch란?
+
+### Pitch (피치) 이해
+
+```
+Y축 중심 회전 = Pitch
+  ↓
+W 키: 기수 위로 (↑)
+S 키: 기수 아래로 (↓)
+
+비행기 3가지 회전:
+  ├─ Pitch: 상하 (Y축) ✅ 이번 강의
+  ├─ Yaw: 좌우 (Z축) 다음에
+  └─ Roll: 굴림 (X축) 다음에
+```
+
+**왜 Pitch부터인가?**
+
+```
+비행에서 가장 중요한 조작:
+  - 이륙/착륙
+  - 고도 조절
+  - 타겟 조준
+  ↓
+기본 중의 기본 ✅
+```
+
+---
+
+## 🔧 1단계: Input Action 생성
+
+### IA_Pitch 생성
+
+```
+Input 폴더 → 우클릭
+  ↓
+Input → Input Action
+  ↓
+이름: IA_Pitch
+```
+
+### Value Type 설정
+
+```
+IA_Pitch 열기
+  ↓
+Value Type: Axis1D (1D Axis)
+```
+
+**왜 Axis1D인가?**
+
+```
+Digital (Boolean):
+  - True/False만 가능
+  - 예: 점프 (누름/안 누름)
+
+Axis1D (1차원 축):
+  - -1.0 ~ +1.0 범위
+  - 방향과 강도 모두 표현 ✅
+  - 예: 위(+1) / 중립(0) / 아래(-1)
+
+Axis2D:
+  - 조이스틱처럼 X, Y 두 방향
+  - Pitch에는 과도함
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380595/notion-blog/_/_/BG/3/image_16.png)
+
+---
+
+## 🔧 2단계: IMC 매핑
+
+### W 키 매핑
+
+```
+IMC_FighterJet 열기
+  ↓
++ Mapping → IA_Pitch
+  ↓
+키: W
+  ↓
+기본값: 1.0 전달
+```
+
+### S 키 매핑 (음수)
+
+```
++ 버튼으로 추가 매핑
+  ↓
+키: S
+  ↓
+Modifiers → + Add
+  ↓
+Type: Negate (부정)
+```
+
+**Negate (부정)의 역할**
+
+```
+Negate 없이:
+  W: 1.0
+  S: 1.0 (똑같음!)
+  ↓
+  둘 다 같은 방향 ❌
+
+Negate 적용:
+  W: 1.0 (위로)
+  S: -1.0 (아래로) ✅
+  ↓
+  반대 방향 구현
+
+작동 원리:
+  입력값 × -1
+  1.0 × -1 = -1.0
+```
+
+**왜 Modifier를 사용하나?**
+
+```
+다른 방법 (2개의 Input Action):
+  - IA_Pitch_Up
+  - IA_Pitch_Down
+  ↓
+  관리 복잡, 코드 중복
+
+Modifier 사용:
+  - IA_Pitch 하나로 통합
+  - 깔끔한 구조 ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380595/notion-blog/_/_/BG/3/image_17.png)
+
+---
+
+## 🔧 3단계: Blueprint 구성
+
+### Triggered 이벤트
+
+```
+[IA_Pitch] Triggered
+  ↓
+[Set Pitch Input]
+  ├─ Target: Vehicle Movement Component
+  └─ Pitch: Action Value
+```
+
+**Set Pitch Input 노드란?**
+
+```
+기능: Vehicle Movement Component에 Pitch 값 전달
+  ↓
+입력:
+  - Target: 조종할 차량
+  - Pitch: -1.0 ~ +1.0
+
+효과:
+  - +1.0: 기수를 위로 회전
+  - -1.0: 기수를 아래로 회전
+  - 0.0: 회전 멈춤
+
+내부 처리:
+  Pitch 값 → 물리 엔진
+  ↓
+  실제 회전 계산
+  ↓
+  비행기 움직임
+```
+
+**작동 방식**
+
+```
+W 누름:
+  Action Value = 1.0
+  ↓
+  Set Pitch Input (1.0)
+  ↓
+  기수 위로 회전 시작
+
+S 누름:
+  Action Value = -1.0
+  ↓
+  Set Pitch Input (-1.0)
+  ↓
+  기수 아래로 회전 시작
+```
+
+---
+
+## 🔧 4단계: 중립 복귀 (매우 중요!)
+
+### ⚠️ 발생하는 문제
+
+```
+W 누르고 떼기
+  ↓
+Triggered 이벤트만 발생
+  ↓
+Pitch가 1.0으로 고정 ❌
+  ↓
+계속 회전함
+  ↓
+결국 땅에 박히거나 하늘로 날아감
+```
+
+**왜 이런 일이 발생하나?**
+
+```
+Set Pitch Input은:
+  - 값을 "설정"하는 것
+  - 자동으로 0으로 돌아가지 않음
+
+예시:
+  온도 조절기를 30도로 설정
+  ↓
+  손을 떼도 30도 유지
+  ↓
+  다시 조작하기 전까지 계속 30도
+
+Pitch도 동일:
+  1.0으로 설정
+  ↓
+  손을 떼도 1.0 유지
+  ↓
+  다시 0으로 설정하기 전까지 계속 회전 ❌
+```
+
+### ✅ 해결: Completed 이벤트
+
+```
+[IA_Pitch] Completed
+  ↓
+[Set Pitch Input]
+  ├─ Target: Vehicle Movement Component
+  └─ Pitch: 0.0
+```
+
+**Completed 이벤트란?**
+
+```
+키를 떼는 순간 발생하는 이벤트
+  ↓
+용도:
+  - 입력 종료 감지
+  - 초기화 작업
+  - 중립 상태 복귀 ✅
+
+Triggered와 차이:
+  - Triggered: 키 누르는 동안
+  - Completed: 키 떼는 순간
+```
+
+**효과**
+
+```
+W 누름:
+  Triggered → Pitch 1.0 → 회전 시작
+  ↓
+W 떼기:
+  Completed → Pitch 0.0 → 회전 정지 ✅
+  ↓
+직진 비행 유지
+
+S도 동일:
+  누름 → 회전
+  떼기 → 정지
+```
+
+**만약 Completed가 없다면?**
+
+```
+W 누르고 떼기
+  ↓
+Pitch = 1.0 고정
+  ↓
+계속 위로 회전
+  ↓
+결국 뒤집혀서 추락 ❌
+
+실제 비행기와 비교:
+  - 실제: 조종간 놓으면 중립 복귀 ✅
+  - 없으면: 조종간이 고정된 채로 ❌
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380595/notion-blog/_/_/BG/3/image_18.png)
+
+---
+
+## 📝 핵심 정리
+
+### 전체 구조
+
+```
+Input Action:
+  IA_Pitch (Axis1D)
+    ├─ W: +1.0 (위로)
+    └─ S: -1.0 (아래로, Negate)
+
+Blueprint:
+  [Triggered] → Set Pitch Input (Action Value)
+    └─ 누르는 동안: 회전
+
+  [Completed] → Set Pitch Input (0.0)
+    └─ 떼는 순간: 중립 복귀
+```
+
+### 작동 흐름 상세
+
+```
+1. W 누름:
+   IA_Pitch Triggered → Action Value 1.0
+   ↓
+   Set Pitch Input (1.0)
+   ↓
+   Vehicle Movement가 물리 계산
+   ↓
+   기수가 위로 회전 시작
+
+2. W 유지:
+   계속 Triggered 상태
+   ↓
+   Pitch 1.0 유지
+   ↓
+   계속 회전
+
+3. W 떼기:
+   IA_Pitch Completed
+   ↓
+   Set Pitch Input (0.0)
+   ↓
+   회전 멈춤
+   ↓
+   현재 각도에서 직진
+
+4. S 누름:
+   IA_Pitch Triggered → Action Value -1.0
+   ↓
+   Set Pitch Input (-1.0)
+   ↓
+   기수가 아래로 회전 시작
+
+5. S 떼기:
+   Completed → Pitch 0.0
+   ↓
+   회전 멈춤
+```
+
+---
+
+## 💡 추가 설명
+
+### Vehicle Movement Component의 역할
+
+```
+Pitch 입력을 받으면:
+  ↓
+1. 현재 비행기 상태 확인
+   - 속도
+   - 현재 각도
+   - 공기 저항
+
+2. 물리 계산
+   - 회전 토크 계산
+   - 양력 변화
+   - 중력 영향
+
+3. 실제 회전 적용
+   - 부드러운 회전
+   - 현실적인 움직임 ✅
+```
+
+**직접 회전 vs Vehicle Movement**
+
+```
+직접 회전 (Set Actor Rotation):
+  - 즉시 회전
+  - 물리 무시
+  - 비현실적 ❌
+
+Vehicle Movement:
+  - 점진적 회전
+  - 물리 기반
+  - 현실적 ✅
+```
+
+### Axis1D의 장점
+
+```
+Boolean 대신:
+  IA_Pitch_Up (True/False)
+  IA_Pitch_Down (True/False)
+  ↓
+  2개 필요, 동시 입력 처리 복잡
+
+Axis1D:
+  하나로 통합
+  ↓
+  -1.0 ~ +1.0 범위
+  ↓
+  방향과 강도 동시 표현
+  ↓
+  조이스틱 대응 쉬움
+```
+
+### 조이스틱 대응 가능성
+
+```
+현재 (키보드):
+  W: 1.0 (최대)
+  S: -1.0 (최대)
+
+미래 (조이스틱):
+  살짝 밀기: 0.3 (약한 회전)
+  많이 밀기: 0.8 (강한 회전)
+  최대: 1.0 (최대 회전)
+  ↓
+  Axis1D 덕분에 자동 대응 ✅
+```
+
+---
+
+## ⚠️ 주의사항
+
+### Completed 빠뜨리면 안 되는 이유
+
+```
+실수로 Completed 제거:
+  ↓
+W 한 번 누름
+  ↓
+Pitch 1.0 고정
+  ↓
+계속 위로 회전
+  ↓
+뒤집혀서 땅으로 추락
+  ↓
+게임 불가능 ❌
+
+반드시 Completed로 0 설정!
+
+```
+
+### 실제 비행기와의 비교
+
+```
+실제 비행기 조종간:
+  - 놓으면 스프링으로 중립 복귀
+  - 물리적 제한
+
+게임:
+  - Completed 이벤트로 구현
+  - 수동으로 0 설정 필요 ✅
+```
+
+---
+
+## 🎯 핵심 요약
+
+**3가지 필수 요소:**
+
+```
+1. Axis1D 타입
+   → 방향과 강도 표현
+
+2. Negate Modifier
+   → 반대 방향 구현
+
+3. Completed 이벤트
+   → 중립 복귀 (제일 중요!) ⭐
+```
+
+이제 전투기를 **위아래로 자유롭게 조종**할 수 있습니다! 🛩️
+
+# { 🎮 Pitch 시각적 피드백 - Elevator 애니메이션 구현하기 }
+
+## 🎯 목표
+
+Pitch 조작 시 실제 비행기처럼 Elevator가 움직이도록 구현
+
+- W/S 키로 상하 조종 시 Elevator 회전
+- Animation Blueprint에서 뼈대 회전 제어
+- 현실적인 비행 시각화
+
+---
+
+## 💡 핵심 개념
+
+### Elevator와 Aileron이란?
+
+```
+실제 비행기 조종면:
+
+Elevator (승강타):
+  - 위치: 꼬리 날개
+  - 역할: 상하 조종 (Pitch)
+  - 이 강의에서 구현 ✅
+
+Aileron (보조익):
+  - 위치: 주 날개
+  - 역할: 굴림 조종 (Roll)
+  - 나중에 구현
+
+현실감:
+  이것들이 움직여야 진짜처럼 보임!
+```
+
+---
+
+## 🔧 1단계: Skeletal Mesh에서 확인
+
+### Elevator 찾기
+
+```
+Content Drawer → Assets → Meshes → F18
+  ↓
+F18_Skeletal_Mesh 더블클릭
+  ↓
+Skeleton 탭에서 검색: "elevator"
+  ↓
+발견: lf_elevator_jnt (왼쪽 승강타)
+```
+
+### 수동 회전 테스트
+
+```
+lf_elevator_jnt 클릭
+  ↓
+Viewport에서 회전 도구 (E 키)
+  ↓
+Y축 회전 (Pitch) 테스트
+  ↓
+Elevator가 위아래로 움직임 확인 ✅
+```
+
+---
+
+## 🔧 2단계: Bone Space 이해
+
+### 3가지 Space 타입
+
+```
+Bone Space:
+  - 부모 뼈대 기준 상대 좌표
+  - 가장 사용하기 쉬움 ✅
+  - 이 강의에서 사용
+
+Component Space:
+  - 전체 Skeletal Mesh 기준
+  - 복잡함
+
+World Space:
+  - 게임 월드 기준
+  - 더 복잡함
+```
+
+**왜 Bone Space인가?**
+
+```
+Elevator는:
+  꼬리 뼈대에 부착됨
+  ↓
+부모 뼈대가 움직여도
+  ↓
+상대적 회전만 유지하면 됨
+  ↓
+Bone Space가 가장 적합 ✅
+```
+
+---
+
+## 🔧 3단계: Transform (Modify) Bone 노드 추가
+
+### Animation Blueprint에서 작업
+
+```
+ABP_F18 열기 → AnimGraph
+  ↓
+Component To Local 앞에 노드 추가
+```
+
+### 노드 추가 방법
+
+```
+우클릭 → 검색: Transform Modify Bone
+  ↓
+노드 배치
+  ↓
+연결:
+  Wheel Controller
+    ↓
+  Transform (Modify) Bone
+    ↓
+  Component To Local
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380596/notion-blog/_/_/BG/3/image_19.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380596/notion-blog/_/_/BG/3/image_20.png)
+
+---
+
+## 🔧 4단계: 노드 설정 (불필요한 핀 숨기기)
+
+### Translation 숨기기
+
+```
+Transform (Modify) Bone 노드 선택
+  ↓
+Details 패널 → Translation
+  ↓
+핀 아이콘 클릭 (Expose as Pin 해제)
+  ↓
+Translation 핀 사라짐 ✅
+```
+
+### Scale 숨기기
+
+```
+Details 패널 → Scale
+  ↓
+핀 아이콘 클릭 (Expose as Pin 해제)
+  ↓
+Scale 핀 사라짐 ✅
+```
+
+**왜 숨기나?**
+
+```
+필요한 것: Rotation만
+불필요: Translation (위치), Scale (크기)
+  ↓
+숨기면:
+  - 노드가 깔끔해짐
+  - 실수 방지
+  - 집중도 향상 ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380596/notion-blog/_/_/BG/3/image_21.png)
+
+---
+
+## 🔧 5단계: Rotation 분리 (Split Struct Pin)
+
+### Rotation 핀 분리
+
+```
+Rotation 핀 우클릭
+  ↓
+Split Struct Pin 선택
+  ↓
+3개로 분리:
+  ├─ Rotation X (Roll) - 굴림
+  ├─ Rotation Y (Pitch) - 상하 ✅
+  └─ Rotation Z (Yaw) - 좌우
+```
+
+**왜 분리하나?**
+
+```
+Rotation = Vector3 (X, Y, Z)
+  ↓
+필요한 건 Y(Pitch)만
+  ↓
+분리하면:
+  - Y만 제어 가능
+  - 다른 축 영향 없음 ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380596/notion-blog/_/_/BG/3/image_22.png)
+
+---
+
+## 🔧 6단계: Rotation Mode 설정
+
+### Add to Existing 선택
+
+```
+Details 패널 → Rotation Mode
+  ↓
+Ignore → Add to Existing 변경
+```
+
+**각 모드 차이:**
+
+```
+Ignore:
+  - 기존 회전 무시
+  - 절대값으로 설정
+  - 기본 자세 깨짐 ❌
+
+Replace:
+  - 기존 회전 완전 대체
+  - 위험함
+
+Add to Existing:
+  - 기존 회전에 추가 ✅
+  - 원래 자세 유지
+  - 안전하고 자연스러움
+```
+
+**예시:**
+
+```
+Elevator 기본 회전: 10도
+  ↓
+Ignore 모드로 5도 설정:
+  → 결과: 5도 (기본 무시)
+
+Add to Existing으로 5도 설정:
+  → 결과: 15도 (10 + 5) ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380597/notion-blog/_/_/BG/3/image_23.png)
+
+---
+
+## 🔧 7단계: Rotation Space 설정
+
+### Bone Space 선택
+
+```
+Details 패널 → Rotation Space
+  ↓
+Component Space → Bone Space 변경
+```
+
+**Bone Space의 장점:**
+
+```
+부모 뼈대 기준 회전
+  ↓
+비행기가 회전해도:
+  - Elevator는 상대적 회전 유지
+  - 계산 간단
+  - 예측 가능 ✅
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380597/notion-blog/_/_/BG/3/image_24.png)
+
+---
+
+## 🔧 8단계: Bone 선택
+
+### Bone to Modify 설정
+
+```
+Details 패널 → Bone to Modify
+  ↓
+검색: "elevator"
+  ↓
+선택: lf_elevator_jnt (왼쪽 승강타)
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380597/notion-blog/_/_/BG/3/image_25.png)
+
+---
+
+## 🔧 9단계: 테스트 (수동 값 입력)
+
+### 직접 값 테스트
+
+```
+Rotation Y (Pitch): 45 입력
+  ↓
+컴파일
+  ↓
+Viewport 확인: Elevator 45도 회전 ✅
+
+다른 값 시도:
+  90도: 수직
+  10도: 약간 회전
+  0도: 중립
+```
+
+---
+
+## 🔧 10단계: 변수 생성 (동적 제어)
+
+### Pitch_Value 변수 생성
+
+```
+Variables 패널 → + 버튼
+  ↓
+이름: Pitch_Value
+타입: Float
+기본값: 0.0
+```
+
+### 변수 연결
+
+```
+[GET] Pitch_Value
+  ↓
+[Transform (Modify) Bone] Rotation Y (Pitch)
+  ↓
+컴파일
+```
+
+---
+
+## 🔧 11단계: Anim Preview Editor로 테스트
+
+### Anim Preview Editor 열기
+
+```
+Window → Anim Preview Editor
+  ↓
+패널 표시
+  ↓
+Pitch_Value 슬라이더 표시
+```
+
+**Anim Preview Editor란?**
+
+```
+Animation Blueprint 변수를
+실시간으로 조절하는 도구
+  ↓
+용도:
+  - 테스트
+  - 미세 조정
+  - 시각적 확인 ✅
+```
+
+### 실시간 테스트
+
+```
+Pitch_Value 슬라이더 조절
+  ↓
+Viewport에서 즉시 확인
+  ↓
+-30 ~ +30 범위 테스트
+  ↓
+자연스러운 각도 확인
+```
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380597/notion-blog/_/_/BG/3/image_26.png)
+
+![image.png](https://res.cloudinary.com/du1acdhxq/image/upload/v1788380597/notion-blog/_/_/BG/3/image_27.png)
+
+---
+
+## 📝 핵심 정리
+
+### 전체 노드 구조
+
+```
+AnimGraph:
+
+Mesh Space Ref Pose
+  ↓
+Wheel Controller
+  ↓
+Transform (Modify) Bone
+  ├─ Bone: lf_elevator_jnt
+  ├─ Rotation Mode: Add to Existing
+  ├─ Rotation Space: Bone Space
+  └─ Rotation Y (Pitch): Pitch_Value 변수
+  ↓
+Component To Local
+  ↓
+Output Pose
+```
+
+### 주요 설정값
+
+```
+Transform (Modify) Bone:
+  ├─ Bone to Modify: lf_elevator_jnt
+  ├─ Rotation Mode: Add to Existing
+  ├─ Rotation Space: Bone Space
+  ├─ Translation: Hidden
+  ├─ Scale: Hidden
+  └─ Rotation: Split (X, Y, Z)
+```
+
+---
+
+## 💡 추가 설명
+
+### Add to Existing의 중요성
+
+```
+3D 모델 제작 시:
+  Elevator가 기본 각도로 모델링됨
+  (예: 5도 위로 살짝 올라간 상태)
+  ↓
+Add to Existing:
+  기본 5도 + 조종 입력
+  ↓
+  자연스러운 움직임 ✅
+
+Replace 사용 시:
+  기본 자세 무시
+  ↓
+  이상하게 보임 ❌
+```
+
+### Bone Space의 실용성
+
+```
+비행기가 굴림(Roll) 중:
+  ↓
+World Space:
+  복잡한 좌표 변환 필요
+  계산 어려움
+
+Bone Space:
+  부모 뼈대 기준이므로
+  ↓
+  비행기가 어떻게 회전해도
+  ↓
+  Elevator는 항상 일정한 방식으로 회전 ✅
+```
+
+### Split Struct Pin의 장점
+
+```
+분리 전:
+  Rotation = (X, Y, Z) 한 덩어리
+  ↓
+  Y만 바꾸려면?
+  전체를 새로 만들어야 함
+
+분리 후:
+  Rotation Y만 따로 제어
+  ↓
+  X, Z는 0으로 유지
+  ↓
+  간단하고 명확 ✅
+```
+
+---
+
+## ⚠️ 주의사항
+
+### Translation/Scale 숨기기
+
+```
+꼭 숨겨야 하나?
+  - 아니요, 선택사항
+
+하지만 권장:
+  - 실수로 값 변경 방지
+  - 노드가 깔끔해짐
+  - 집중도 향상 ✅
+```
+
+### Rotation Mode 실수
+
+```
+잘못된 설정:
+  Ignore 또는 Replace
+  ↓
+  Elevator가 이상한 각도로
+  ↓
+  비현실적 움직임
+
+올바른 설정:
+  Add to Existing ✅
+  ↓
+  기본 자세 + 조종 입력
+  ↓
+  자연스러운 움직임
+```
+
+---
+
+## 🎯 핵심 요약
+
+**3가지 핵심 설정:**
+
+```
+1. Rotation Mode: Add to Existing
+   → 기존 회전 유지하며 추가
+
+2. Rotation Space: Bone Space
+   → 부모 기준 상대 회전
+
+3. Split Struct Pin
+   → Y축(Pitch)만 제어
+```
+
+**현재까지 완성:**
+
+```
+✅ Elevator 뼈대 찾기
+✅ Transform (Modify) Bone 노드 설정
+✅ 변수로 제어 가능
+✅ Anim Preview Editor로 테스트
+
+다음:
+  Blueprint → Animation Blueprint 연동
+```
+
+Animation Blueprint로 **Elevator를 제어할 준비** 완료! 🛩️

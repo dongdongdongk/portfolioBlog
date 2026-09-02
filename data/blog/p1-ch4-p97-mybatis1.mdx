@@ -1,0 +1,341 @@
+---
+title: 'P1 ch4 p97 MyBatis연동(1)'
+date: '2026-09-02'
+category: '백엔드/스프링'
+tags: ['백엔드', '스프링']
+draft: false
+summary: ''
+---
+
+# MyBatis
+
+## • SQL Mapping 프레임워크
+
+```java
+* SQL과 Object간의 관계를 매핑해주는 역할
+
+* JDBC코드에 비해 처리하는 부분이 간결해지고, close처리등이 지원
+```
+
+## • Spring에서의 사용
+
+```java
+* 스프링은 MyBatis와의 연결을 위한 mybatis-spring 라이브러리을 이용해서 연동 처리
+```
+
+![Untitled](<P1%20ch4%20p97%20MyBatis%EC%97%B0%EB%8F%99(1)/Untitled.png>)
+
+## 라이브러리 추가
+
+```java
+마이바티스 라이브러리와 마이바티스 스프링 라이브러리 (스프링과 연동해주는) 두 라이브러리를 추가해준다
+```
+
+```java
+//마이바티스
+<!-- [https://mvnrepository.com/artifact/org.mybatis/mybatis](https://mvnrepository.com/artifact/org.mybatis/mybatis) -->
+<dependency>
+	<groupId>org.mybatis</groupId>
+	<artifactId>mybatis</artifactId>
+	<version>3.4.6</version>
+</dependency>
+
+//마이바티스 스프링
+<!-- https://mvnrepository.com/artifact/org.mybatis/mybatis-spring -->
+		<dependency>
+			<groupId>org.mybatis</groupId>
+			<artifactId>mybatis-spring</artifactId>
+			<version>1.3.2</version>
+		</dependency>
+```
+
+```java
+Spring jdbc, tx 추가
+
+스프링에서 데이터베이스 처리와 트랜잭션 처리 (해당 라이브러리 들은 Mybatis 와 무관하게 보이지만 없을 경우 에러가 발생하기 때문에 추가 해준다 tx-트랜젝션 관리 jdbc- jdbc )
+```
+
+```java
+
+  	<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-jdbc</artifactId>
+			<version>${org.springframework-version}</version>
+		</dependency>
+
+	 <dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-tx</artifactId>
+			<version>${org.springframework-version}</version>
+		</dependency>
+```
+
+## SqlSessionFactory의 설정
+
+```java
+* root-context.xml에 MyBatis설정
+
+* MyBatis의 핵심 객체는 SqlSessionFactory타입의 객체
+
+* SqlSessionFactoryBean은 내부적으로 MyBatis의 SqlSessionFactory를 생성
+```
+
+![Untitled](<P1%20ch4%20p97%20MyBatis%EC%97%B0%EB%8F%99(1)/Untitled%201.png>)
+
+```java
+root-context.xml에 sqlSessionFactoryBean 을 추가해준다
+```
+
+```java
+  <bean id="sqlSessionFactory"
+		class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="dataSource"></property>
+	</bean>
+```
+
+```java
+히카리를CP 를 사용하지 않았을 경우 예제
+```
+
+![Untitled](<P1%20ch4%20p97%20MyBatis%EC%97%B0%EB%8F%99(1)/Untitled%202.png>)
+
+### SqlSessionFactoryBean 연결 테스트
+
+![Untitled](<P1%20ch4%20p97%20MyBatis%EC%97%B0%EB%8F%99(1)/Untitled%203.png>)
+
+```java
+package org.zerock.persistence;
+import java.sql.Connection;
+
+import javax.sql.DataSource;
+
+import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+
+import lombok.extern.log4j.Log4j;
+
+@RunWith(SpringJUnit4ClassRunner.class)
+@ContextConfiguration("file:src/main/webapp/WEB-INF/spring/root-context.xml")
+@Log4j
+public class DataSourceTests {
+
+	@Autowired
+	private SqlSessionFactory sessionFactory;
+
+
+	@Test
+	public void testConnection2() {
+
+		try(SqlSession session = sessionFactory.openSession();
+			Connection con = session.getConnection()) {
+
+			log.info(session);
+
+			log.info(con);
+
+		} catch(Exception e) {
+
+			e.printStackTrace();
+		}
+
+	}
+
+}
+```
+
+```java
+이제 Mapper 에서 mybatis 태그를 사용 가능하도록 설정을 해준다
+```
+
+![Untitled](<P1%20ch4%20p97%20MyBatis%EC%97%B0%EB%8F%99(1)/Untitled%204.png>)
+
+```java
+위와 같이 mybatis spring 을 체크 해주면
+```
+
+![Untitled](<P1%20ch4%20p97%20MyBatis%EC%97%B0%EB%8F%99(1)/Untitled%205.png>)
+
+```java
+mybatis 태그와 자동 완성을 사용할 수 있도록 위의 코드가 추가된다
+```
+
+![Untitled](<P1%20ch4%20p97%20MyBatis%EC%97%B0%EB%8F%99(1)/Untitled%206.png>)
+
+```java
+마지막으로 Mapper 의 경로를 지정해준다
+
+(mybatis 와 관련된 내용은 저기를 스캔 해달라)
+```
+
+### Mapper Mybatis 연결 테스트
+
+```java
+Mapper 가 Mybatis 랑 연동되어 작동하는지 테스트 한다
+```
+
+![Untitled](<P1%20ch4%20p97%20MyBatis%EC%97%B0%EB%8F%99(1)/Untitled%207.png>)
+
+```java
+package org.zerock.mapper;
+
+import org.apache.ibatis.annotations.Select;
+
+public interface TimeMapper {
+	//; 없어야 한다
+	@Select("select sysdate from dual")
+	String getTime();
+
+}
+```
+
+```java
+현재 시간을 확인 가능한 인터페이스를 하나 만들어 준다 ( 보통 시간을 찍어주는 테스트를 많이 사용한다 )
+```
+
+```java
+@RunWith(SpringJUnit4ClassRunner.class)
+@ContextConfiguration("file:src/main/webapp/WEB-INF/spring/root-context.xml")
+@Log4j
+public class TimeMapperTests {
+
+	@Autowired
+	private TimeMapper timeMapper;
+
+	@Test
+	public void testTime1() {
+
+		log.info(timeMapper.getTime());
+	}
+
+}
+```
+
+```java
+시간을 찍어주는 테스트를 만들어 준다
+```
+
+![Untitled](<P1%20ch4%20p97%20MyBatis%EC%97%B0%EB%8F%99(1)/Untitled%208.png>)
+
+## XML Mapper + Mapper 인터페이스
+
+```java
+실제로 어노테이션을 이용해서 위의 예시처럼 (@Select)  sql문을 사용하면 코드가 복잡해지고 효율적이지 못하다 (동적인 sql 생성도 불가)
+
+이 상황을 해결하기 위해 XML Mapper + Mapper 인터페이스를 사용한다
+```
+
+```java
+인터페이스에 새로운 메서드를 추가한다
+```
+
+```java
+//TimeMapper 인터페이스
+
+package org.zerock.mapper;
+
+import org.apache.ibatis.annotations.Select;
+
+//org.zerock.mapper.TimeMapper.getTime2 -> 메서드 경로 풀 네임
+
+public interface TimeMapper {
+	//; 없어야 한다
+	@Select("select sysdate from dual")
+	String getTime();
+
+	String getTime2();
+}
+```
+
+![Untitled](<P1%20ch4%20p97%20MyBatis%EC%97%B0%EB%8F%99(1)/Untitled%209.png>)
+
+```java
+매퍼 XML 을 넣을 폴더를 생성 해준다 (생성할 떄 org.zerock.mapper 이렇게 생성하지 말고 폴더 하나 만들고 다시 또 만들고 이렇게 만들도록 꼬일수도 있다)
+```
+
+![Untitled](<P1%20ch4%20p97%20MyBatis%EC%97%B0%EB%8F%99(1)/Untitled%2010.png>)
+
+```java
+mapper 폴더에 XML File 을 추가한다
+```
+
+![Untitled](<P1%20ch4%20p97%20MyBatis%EC%97%B0%EB%8F%99(1)/Untitled%2011.png>)
+
+```java
+xml 파일에 dtd (자동완성) 을 추가해 준다
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+```
+
+![Untitled](<P1%20ch4%20p97%20MyBatis%EC%97%B0%EB%8F%99(1)/Untitled%2012.png>)
+
+```java
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.zerock.mapper.TimeMapper">
+
+	<select id="getTime2" resultType="string">
+		SELECT SYSDATE
+	  	  FROM DUAL
+	</select>
+
+</mapper>
+```
+
+```java
+Mapper 의 namespace (인터페이스 경로) 를 지정해주고
+
+sql 문을 작성해준다
+```
+
+```java
+마지막으로 테스트를 돌려 연결이 완료된걸 확인한다
+```
+
+```java
+package org.zerock.persistence;
+
+import java.sql.Connection;
+
+import javax.sql.DataSource;
+
+import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.zerock.mapper.TimeMapper;
+
+import lombok.extern.log4j.Log4j;
+
+@RunWith(SpringJUnit4ClassRunner.class)
+@ContextConfiguration("file:src/main/webapp/WEB-INF/spring/root-context.xml")
+@Log4j
+public class TimeMapperTests {
+
+	@Autowired
+	private TimeMapper timeMapper;
+
+	@Test
+	public void testTime1() {
+
+		log.info(timeMapper.getTime());
+	}
+
+	@Test
+	public void testTime2() {
+
+		log.info(timeMapper.getTime2());
+	}
+
+}
+```
+
+![Untitled](<P1%20ch4%20p97%20MyBatis%EC%97%B0%EB%8F%99(1)/Untitled%2013.png>)
