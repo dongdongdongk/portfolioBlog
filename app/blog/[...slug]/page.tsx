@@ -65,10 +65,7 @@ export async function generateMetadata(props: {
   }
 }
 
-export const generateStaticParams = async () => {
-  const posts = getAllPosts('blog')
-  return posts.map((p) => ({ slug: [p.slug] }))
-}
+export const dynamic = 'force-dynamic'
 
 export default async function Page(props: { params: Promise<{ slug: string[] }> }) {
   const params = await props.params
