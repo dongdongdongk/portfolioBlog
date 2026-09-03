@@ -11,7 +11,7 @@ export default async function Page(props: { params: Promise<{ page: string }> })
   const allPosts = getAllPosts('blog')
   const posts = allPosts
     .sort((a, b) => (a.date < b.date ? 1 : -1))
-    .map((post) => ({
+    .map(({ content: _, ...post }) => ({
       ...post,
       path: `/blog/${post.slug}`,
       url: `/blog/${post.slug}`,
